@@ -33,7 +33,7 @@ config :instructor,
 
 ## Example
 
-Here's how to use Jido AI with Jido.Workflow to get structured information about US politicians. See the [examples/politician.ex](examples/politician.ex) for more a full example.
+Here's how to use Jido AI with Jido.Workflow to get structured information about US politicians. See the [lib/examples/politician.ex](lib/examples/politician.ex) for more a full example.
 
 ```elixir
 # Define a simple workflow
