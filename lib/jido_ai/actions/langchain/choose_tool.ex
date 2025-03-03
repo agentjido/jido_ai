@@ -100,7 +100,9 @@ defmodule Jido.AI.Actions.Langchain.ChooseTool do
             end
 
           {:error, reason} ->
-            Logger.warning("Failed to parse tool selection response, response: #{chain.last_message.content}, error: #{inspect(reason)}")
+            Logger.warning(
+              "Failed to parse tool selection response, response: #{chain.last_message.content}, error: #{inspect(reason)}"
+            )
 
             {:error, :invalid_response}
         end
@@ -121,7 +123,9 @@ defmodule Jido.AI.Actions.Langchain.ChooseTool do
       end
     catch
       kind, reason ->
-        Logger.warning("Unexpected error in tool selection, kind: #{kind}, error: #{inspect(reason)}, stacktrace: #{inspect(__STACKTRACE__)}")
+        Logger.warning(
+          "Unexpected error in tool selection, kind: #{kind}, error: #{inspect(reason)}, stacktrace: #{inspect(__STACKTRACE__)}"
+        )
 
         {:error, reason}
     end

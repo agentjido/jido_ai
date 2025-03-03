@@ -31,6 +31,43 @@ config :instructor,
   ]
 ```
 
+## Prompt and Message Handling
+
+Jido AI provides a robust system for handling prompts and messages when interacting with LLMs.
+
+### MessageItem
+
+The `Jido.AI.Prompt.MessageItem` module is used to represent messages in conversations with LLMs. It supports:
+
+- Basic text messages with different roles (user, assistant, system, function)
+- Rich content including images and files
+- Template-based messages using EEx
+
+```elixir
+alias Jido.AI.Prompt.MessageItem
+
+# Create a simple user message
+user_msg = MessageItem.new(%{role: :user, content: "Hello"})
+
+# Create a system message
+system_msg = MessageItem.new(%{role: :system, content: "You are a helpful assistant"})
+
+# Create a message with rich content (image)
+rich_msg = MessageItem.new_multipart(:user, [
+  MessageItem.text_part("Check out this image:"),
+  MessageItem.image_part("https://example.com/image.jpg")
+])
+
+# Create a message with a template
+template_msg = MessageItem.new(%{
+  role: :system,
+  content: "You are a <%= @assistant_type %>",
+  engine: :eex
+})
+```
+
+For more details on migrating from the deprecated `Jido.AI.Message` module, see the [MIGRATION.md](MIGRATION.md) guide.
+
 ## Example
 
 Here's how to use Jido AI with Jido.Workflow to get structured information about US politicians. See the [examples/politician.ex](examples/politician.ex) for more a full example.

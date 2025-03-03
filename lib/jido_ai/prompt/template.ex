@@ -23,7 +23,7 @@ defmodule Jido.AI.Prompt.Template do
   require Logger
   alias __MODULE__
   alias Jido.AI.Error
-  alias Jido.AI.Message
+  alias Jido.AI.Prompt.MessageItem
 
   @enforce_keys [:text]
   defstruct [
@@ -414,31 +414,31 @@ defmodule Jido.AI.Prompt.Template do
   end
 
   @doc """
-  Convert a template to a Message struct.
+  Convert a template to a MessageItem struct.
 
   This is useful when you want to use a template as part of a conversation.
   """
-  @spec to_message(t(), inputs :: map()) :: {:ok, Message.t()} | {:error, String.t()}
+  @spec to_message(t(), inputs :: map()) :: {:ok, MessageItem.t()} | {:error, String.t()}
   def to_message(%Template{} = template, inputs \\ %{}) do
     try do
       content = format(template, inputs)
-      {:ok, Message.new(%{role: template.role, content: content})}
+      {:ok, MessageItem.new(%{role: template.role, content: content})}
     rescue
       e -> {:error, Exception.message(e)}
     end
   end
 
   @doc """
-  Convert a template to a Message struct. Raises if there's an error.
+  Convert a template to a MessageItem struct. Raises if there's an error.
   """
-  @spec to_message!(t(), inputs :: map()) :: Message.t() | no_return()
+  @spec to_message!(t(), inputs :: map()) :: MessageItem.t() | no_return()
   def to_message!(%Template{} = template, inputs \\ %{}) do
     content = format(template, inputs)
-    Message.new!(%{role: template.role, content: content})
+    MessageItem.new(%{role: template.role, content: content})
   end
 
   @doc """
-  Convert a list of templates, messages, and strings to a list of messages.
+  Convert a list of templates, message items, and strings to a list of message items.
 
   This is useful when you want to build a conversation from a mix of
   templates and messages.
@@ -453,12 +453,12 @@ defmodule Jido.AI.Prompt.Template do
         question: "What is 2+2?"
       })
   """
-  @spec to_messages!(list(), inputs :: map()) :: [Message.t()]
+  @spec to_messages!(list(), inputs :: map()) :: [MessageItem.t()]
   def to_messages!(templates_or_messages, inputs \\ %{}) do
     Enum.map(templates_or_messages, fn
       %Template{} = t -> to_message!(t, inputs)
-      %Message{} = m -> m
-      text when is_binary(text) -> Message.new_user!(text)
+      %MessageItem{} = m -> m
+      text when is_binary(text) -> MessageItem.new(%{role: :user, content: text})
     end)
   end
 

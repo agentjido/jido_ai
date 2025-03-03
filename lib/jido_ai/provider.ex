@@ -187,5 +187,20 @@ defmodule Jido.AI.Provider do
     end
   end
 
+  def call_provider_callback(provider, callback, args) do
+    impl = module_for(provider)
+
+    if function_exported?(impl, callback, length(args)) do
+      apply(impl, callback, args)
+    else
+      {:error, "#{inspect(impl)} does not implement callback #{callback}/#{length(args)}"}
+    end
+  end
+
+  defp module_for(:anthropic), do: Jido.AI.Provider.Anthropic
+  defp module_for(:cloudflare), do: Jido.AI.Provider.Cloudflare
+  defp module_for(:openai), do: Jido.AI.Provider.OpenAI
+  defp module_for(:openrouter), do: Jido.AI.Provider.OpenRouter
+
   def ensure_atom(id), do: id
 end

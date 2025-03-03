@@ -10,4 +10,5 @@ if Code.loaded?(Mimic) do
   Mimic.copy(Instructor.Adapters.Anthropic)
   Mimic.copy(Dotenvy)
   Mimic.copy(Jido.AI.Keyring)
+  Mimic.copy(Jido.Agent)
 end

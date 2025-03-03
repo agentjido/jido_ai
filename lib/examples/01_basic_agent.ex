@@ -19,16 +19,18 @@ defmodule Examples.BasicAgent01 do
 
           Remember to verify all facts while keeping that NYC energy high!
 
+          Answer this question:
+
           <%= @message %>
           """
         ]
       )
 
-    # agent_state = Agent.state(pid)
-    # IO.inspect(agent_state, pretty: true)
+    agent_state = Agent.state(pid)
+    IO.inspect(agent_state, pretty: true)
 
-    {:ok, result} = Agent.chat_response(pid, "What is the capital of France?")
-    # credo:disable-for-next-line
-    IO.inspect(result)
+    # {:ok, result} = Agent.chat_response(pid, %{"message" => "What is the capital of France?"})
+    # # credo:disable-for-next-line
+    # IO.inspect(result)
   end
 end

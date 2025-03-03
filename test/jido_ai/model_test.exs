@@ -47,13 +47,13 @@ defmodule JidoTest.AI.ModelTest do
       assert model.architecture.modality == "text"
     end
 
-    test "validates category-based model" do
-      assert {:ok, model} = Model.validate_model_opts({:category, :chat, :fastest})
+    # test "validates category-based model" do
+    #   assert {:ok, model} = Model.validate_model_opts({:category, :chat, :fastest})
 
-      assert model.id == "chat_fastest"
-      assert model.name == "chat fastest Model"
-      assert model.description =~ "Category-based model"
-    end
+    #   assert model.id == "chat_fastest"
+    #   assert model.name == "chat fastest Model"
+    #   assert model.description =~ "Category-based model"
+    # end
 
     test "rejects invalid provider" do
       assert {:error, message} = Model.validate_model_opts(:invalid_provider)

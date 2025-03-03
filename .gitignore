@@ -26,3 +26,5 @@ jido_ai-*.tar
 /tmp/
 .elixir_ls
 
+# AI Docs
+PLAN.md

@@ -49,7 +49,6 @@ defmodule Jido.Ai.MixProject do
   defp deps do
     require Logger
     use_local_deps = System.get_env("LOCAL_JIDO_DEPS") == "true" || false
-    Logger.info("Using local Jido dependencies: #{inspect(use_local_deps)}")
 
     deps = [
       {:typed_struct, "~> 0.3.0"},
@@ -124,7 +123,7 @@ defmodule Jido.Ai.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
-        "guides/getting-started.md",
+        "guides/getting-started.md"
       ]
     ]
   end

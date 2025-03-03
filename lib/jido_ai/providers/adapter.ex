@@ -77,4 +77,38 @@ defmodule Jido.AI.Model.Provider.Adapter do
     - A provider struct
   """
   @callback definition() :: Jido.AI.Provider.t()
+
+  @doc """
+  Validates the options for creating a Jido.AI.Model specific to this provider.
+
+  Providers can parse and verify that `opts` is valid. Returns:
+    - `{:ok, %Jido.AI.Model{}}` if validation succeeds
+    - `{:error, reason}` otherwise.
+  """
+  @callback validate_model_opts(opts :: keyword()) ::
+              {:ok, Jido.AI.Model.t()} | {:error, any()}
+
+  @doc """
+  Transforms a generic `Jido.AI.Model` struct into a provider-specific client model.
+
+  For example, `transform_model_to_clientmodel(:langchain, model)` might produce a
+  config map specialized for LangChain usage.
+  """
+  @callback transform_model_to_clientmodel(client_atom :: atom(), model :: Jido.AI.Model.t()) ::
+              {:ok, any()} | {:error, any()}
+
+  @doc """
+  Builds a %Jido.AI.Model{} struct from the provided options.
+
+  This is the main entry point for creating a model struct from provider-specific options.
+  Each provider implements this to handle its own validation, defaults, and API key retrieval.
+
+  ## Parameters
+    - opts: Keyword list of options for building the model
+
+  ## Returns
+    - {:ok, %Jido.AI.Model{}} on success
+    - {:error, reason} on failure
+  """
+  @callback build(opts :: keyword()) :: {:ok, Jido.AI.Model.t()} | {:error, String.t()}
 end

@@ -7,6 +7,7 @@ defmodule Jido.AI.Provider.Anthropic do
   @behaviour Jido.AI.Model.Provider.Adapter
   alias Jido.AI.Provider
   alias Jido.AI.Provider.Helpers
+  alias Jido.AI.Model
 
   @base_url "https://api.anthropic.com/v1"
   @api_version "2023-06-01"
@@ -133,6 +134,72 @@ defmodule Jido.AI.Provider.Anthropic do
   @impl true
   def base_url() do
     @base_url
+  end
+
+  @impl true
+  def validate_model_opts(opts) do
+    %Jido.AI.Model{
+      id: opts[:model_id],
+      name: opts[:model_name],
+      description: opts[:model_description],
+      # capabilities: opts[:model_capabilities],
+      # tier: opts[:model_tier]
+    }
+  end
+
+  @impl true
+  @doc """
+  Builds a %Jido.AI.Model{} struct from the provided options.
+
+  This function validates the options, sets defaults, and creates a fully populated
+  model struct for the Anthropic provider.
+
+  ## Parameters
+    - opts: Keyword list of options for building the model
+
+  ## Returns
+    - {:ok, %Jido.AI.Model{}} on success
+    - {:error, reason} on failure
+  """
+  def build(opts) do
+    # Extract or generate an API key
+    api_key = Helpers.get_api_key(opts, "ANTHROPIC_API_KEY", :anthropic_api_key)
+
+    # Get model_id from opts
+    model_id = Keyword.get(opts, :model_id)
+
+    # Validate model_id
+    if is_nil(model_id) do
+      {:error, "model_id is required for Anthropic models"}
+    else
+      # Create the model struct with all necessary fields
+      model = %Model{
+        id: Keyword.get(opts, :id, "anthropic_#{model_id}"),
+        name: Keyword.get(opts, :name, "Anthropic #{model_id}"),
+        provider: :anthropic,
+        model_id: model_id,
+        base_url: @base_url,
+        api_key: api_key,
+        temperature: Keyword.get(opts, :temperature, 0.7),
+        max_tokens: Keyword.get(opts, :max_tokens, 1024),
+        max_retries: Keyword.get(opts, :max_retries, 0),
+        architecture: %Model.Architecture{
+          modality: Keyword.get(opts, :modality, "text"),
+          tokenizer: Keyword.get(opts, :tokenizer, "unknown"),
+          instruct_type: Keyword.get(opts, :instruct_type)
+        },
+        description: Keyword.get(opts, :description, "Anthropic Claude model"),
+        created: System.system_time(:second),
+        endpoints: []
+      }
+
+      {:ok, model}
+    end
+  end
+
+  @impl true
+  def transform_model_to_clientmodel(_client_atom, _model) do
+    {:error, "Not implemented yet"}
   end
 
   # Private helper functions

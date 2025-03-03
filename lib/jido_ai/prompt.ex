@@ -1,162 +1,395 @@
 defmodule Jido.AI.Prompt do
   @moduledoc ~S"""
-  A behavior for modules that can generate contextual prompts.
+  A module that provides struct-based prompt generation.
 
-  This behavior is specifically for function-based prompt generation, where
-  prompts are generated based on context parameters. For struct-based prompt
-  generation, use the Jido.AI.Promptable protocol instead.
-
-  ## Examples
-
-      defmodule MyApp.GreetingPrompt do
-        use Jido.AI.Prompt
-
-        @impl true
-        def prompt(%{name: name, style: style}) do
-          case style do
-            :formal -> "Greetings, #{name}."
-            :casual -> "Hey #{name}!"
-            _ -> "Hi #{name}!"
-          end
-        end
-
-        def prompt(%{name: name}) do
-          "Hi #{name}!"
-        end
-
-        def prompt(_) do
-          "Hello there!"
-        end
-      end
-
-      # Use it with context
-      MyApp.GreetingPrompt.prompt(%{name: "Alice", style: :formal})
-      #=> "Greetings, Alice."
-  """
-
-  @doc """
-  Generates a prompt string based on the given context.
-
-  The context is a map of parameters that can be used to customize the prompt.
-  """
-  @callback prompt(context :: map()) :: String.t()
-
-  defmacro __using__(_opts) do
-    quote do
-      @behaviour Jido.AI.Prompt
-
-      # Simple behavior implementation
-      def prompt(context)
-      defoverridable prompt: 1
-    end
-  end
-
-  @doc """
-  Creates a new prompt module from a string. Raises if invalid.
+  The struct-based approach provides full visibility into the prompt's content
+  when inspecting the agent state, making it easier to debug and understand
+  the conversation flow.
 
   ## Examples
 
-      iex> prompt = Jido.AI.Prompt.new!("Hello, I am an AI assistant")
-      iex> prompt.prompt(%{})
-      "Hello, I am an AI assistant"
-  """
-  def new!(content) when is_binary(content) do
-    # Create a new anonymous module that implements the Prompt behavior
-    module = Module.concat(Jido.AI.Prompt, "Prompt#{:erlang.unique_integer([:positive])}")
-
-    Module.create(
-      module,
-      quote do
-        use Jido.AI.Prompt
-        @impl true
-        def prompt(_context), do: unquote(content)
-      end,
-      Macro.Env.location(__ENV__)
-    )
-
-    module
-  end
-
-  @doc """
-  Validates a prompt value for NimbleOptions.
-
-  Accepts either a string or a module that implements the Jido.AI.Prompt behavior.
-
-  ## Returns
-
-  * `{:ok, prompt}` - The prompt is valid.
-  * `{:error, reason}` - The prompt is invalid.
-  """
-  @spec validate_prompt(term()) :: {:ok, term()} | {:error, String.t()}
-  def validate_prompt(prompt) when is_binary(prompt) do
-    {:ok, new!(prompt)}
-  end
-
-  def validate_prompt(prompt) when is_atom(prompt) do
-    if Code.ensure_loaded?(prompt) and function_exported?(prompt, :prompt, 1) do
-      {:ok, prompt}
-    else
-      {:error,
-       "Expected a module that implements the Jido.AI.Prompt behavior, got: #{inspect(prompt)}"}
-    end
-  end
-
-  def validate_prompt(other) do
-    {:error,
-     "Expected a string or a module that implements the Jido.AI.Prompt behavior, got: #{inspect(other)}"}
-  end
-
-  @doc """
-  Composes prompts from multiple promptable modules or structs.
-
-  Each item in the list can be either:
-  - A module that implements the `Jido.AI.Prompt` behavior
-  - A struct that implements the `Jido.AI.Promptable` protocol
-
-  The context is passed to each module's `prompt/1` function or merged with
-  each struct before converting it via the protocol.
-
-  Returns a string with all the prompts joined by the given separator.
-
-  ## Examples
-
-      # Compose prompts from behavior modules
-      Jido.AI.Prompt.compose([MyApp.GreetingPrompt, MyApp.TaskPrompt], %{
-        name: "Charlie",
-        style: :formal
+      # Create a simple prompt with a single message
+      prompt = Jido.AI.Prompt.new(%{
+        messages: [
+          %{role: :user, content: "Hello"}
+        ]
       })
 
-      # Compose prompts from structs
-      Jido.AI.Prompt.compose([%User{name: "Alice"}, %Task{title: "Learn Elixir"}])
+      # Create a prompt with EEx templates
+      prompt = Jido.AI.Prompt.new(%{
+        messages: [
+          %{role: :system, content: "You are a <%= @assistant_type %>", engine: :eex},
+          %{role: :user, content: "Hello <%= @name %>", engine: :eex}
+        ],
+        params: %{
+          assistant_type: "helpful assistant",
+          name: "Alice"
+        }
+      })
+
+      # Render the prompt to get the final messages
+      messages = Jido.AI.Prompt.render(prompt)
+      # => [
+      #      %{role: :system, content: "You are a helpful assistant"},
+      #      %{role: :user, content: "Hello Alice"}
+      #    ]
   """
-  @spec compose(list(), map(), String.t()) :: String.t()
-  def compose(items, context \\ %{}, separator \\ "\n\n") do
-    items
-    |> Enum.map(fn
-      module when is_atom(module) ->
-        # If it's a module, call its prompt function
-        if function_exported?(module, :prompt, 1) do
-          module.prompt(context)
-        else
-          raise ArgumentError, "Module #{inspect(module)} does not implement prompt/1"
+
+  alias __MODULE__
+  alias Jido.AI.Prompt.MessageItem
+
+  use TypedStruct
+
+  typedstruct do
+    @typedoc "A complete prompt with messages and parameters"
+
+    # Unique identifier for the prompt
+    field :id, String.t(), default: Jido.Util.generate_id()
+
+    # Current version number of the prompt
+    field :version, non_neg_integer(), default: 1
+
+    # History of previous versions of this prompt
+    field :history, list(map()), default: []
+
+    # Holds a list of messages, each might be raw string or templated content
+    # with a role to indicate system|assistant|user or others
+    field :messages, list(MessageItem.t()), default: []
+
+    # A map of parameters that can be interpolated into the messages (if they use EEx)
+    field :params, map(), default: %{}
+
+    # Optional metadata or advanced features
+    field :metadata, map(), default: %{}
+  end
+
+  @doc """
+  Creates a new prompt struct from the given attributes.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(%{
+      ...>   messages: [
+      ...>     %{role: :user, content: "Hello"}
+      ...>   ]
+      ...> })
+      iex> prompt.messages |> length()
+      1
+      iex> hd(prompt.messages).role
+      :user
+      iex> hd(prompt.messages).content
+      "Hello"
+  """
+  def new(attrs) when is_map(attrs) do
+    # Convert message maps to MessageItem structs
+    messages =
+      attrs
+      |> Map.get(:messages, [])
+      |> Enum.map(fn
+        %MessageItem{} = item -> item
+        map when is_map(map) -> MessageItem.new(map)
+      end)
+
+    # Create the prompt struct
+    struct(
+      __MODULE__,
+      attrs
+      |> Map.put(:messages, messages)
+      |> Map.put_new(:params, %{})
+      |> Map.put_new(:metadata, %{})
+    )
+  end
+
+  @doc """
+  Creates a new prompt with a single message.
+
+  This is a convenience function for creating a prompt with a single message.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Hello")
+      iex> prompt.messages |> length()
+      1
+      iex> hd(prompt.messages).role
+      :user
+      iex> hd(prompt.messages).content
+      "Hello"
+  """
+  def new(role, content, opts \\ []) when is_atom(role) and is_binary(content) do
+    engine = Keyword.get(opts, :engine, :none)
+    params = Keyword.get(opts, :params, %{})
+    metadata = Keyword.get(opts, :metadata, %{})
+    id = Keyword.get(opts, :id)
+
+    new(%{
+      messages: [%{role: role, content: content, engine: engine}],
+      params: params,
+      metadata: metadata,
+      id: id
+    })
+  end
+
+  @doc """
+  Validates and converts the prompt option.
+
+  Accepts either:
+  - A string, which is converted to a system message in a Prompt struct
+  - An existing Prompt struct, which is returned as-is
+
+  ## Examples
+
+      iex> Jido.AI.Prompt.validate_prompt_opts("You are a helpful assistant")
+      {:ok, %Jido.AI.Prompt{messages: [%Jido.AI.Prompt.MessageItem{role: :system, content: "You are a helpful assistant", engine: :none}], id: nil, version: 1, history: [], params: %{}, metadata: %{}}}
+
+      iex> prompt = Jido.AI.Prompt.new(:system, "Custom prompt")
+      iex> Jido.AI.Prompt.validate_prompt_opts(prompt)
+      {:ok, prompt}
+  """
+  @spec validate_prompt_opts(String.t() | t()) :: {:ok, t()} | {:error, String.t()}
+  def validate_prompt_opts(prompt) when is_binary(prompt) do
+    # Convert the string to a Prompt struct with a system message
+    {:ok, new(:system, prompt)}
+  end
+
+  def validate_prompt_opts(%__MODULE__{} = prompt) do
+    # If it's already a Prompt struct, return it as-is
+    {:ok, prompt}
+  end
+
+  def validate_prompt_opts(other) do
+    {:error, "Expected a string or a Jido.AI.Prompt struct, got: #{inspect(other)}"}
+  end
+
+  @doc """
+  Renders the prompt into a list of messages with interpolated content.
+
+  This function applies any EEx templates in the messages using the parameters
+  provided in the prompt and any override parameters.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(%{
+      ...>   messages: [
+      ...>     %{role: :user, content: "Hello <%= @name %>", engine: :eex}
+      ...>   ],
+      ...>   params: %{name: "Alice"}
+      ...> })
+      iex> Prompt.render(prompt)
+      [%{role: :user, content: "Hello Alice"}]
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(%{
+      ...>   messages: [
+      ...>     %{role: :user, content: "Hello <%= @name %>", engine: :eex}
+      ...>   ],
+      ...>   params: %{name: "Alice"}
+      ...> })
+      iex> Prompt.render(prompt, %{name: "Bob"})
+      [%{role: :user, content: "Hello Bob"}]
+  """
+  @spec render(t(), map()) :: list(%{role: atom(), content: String.t()})
+  def render(%Prompt{} = prompt, override_params \\ %{}) do
+    # 1. Merge params
+    final_params = Map.merge(prompt.params, override_params)
+
+    # 2. Build final messages
+    Enum.map(prompt.messages, fn msg ->
+      content =
+        case msg.engine do
+          :eex -> EEx.eval_string(msg.content, assigns: final_params)
+          :none -> msg.content
         end
 
-      %{__struct__: _} = struct ->
-        # If it's a struct, try to convert it via the protocol
-        if Map.keys(context) == [] do
-          Jido.AI.Promptable.to_prompt(struct)
-        else
-          # Merge the context with the struct
-          struct
-          |> Map.from_struct()
-          |> Map.merge(context)
-          |> then(&struct(struct.__struct__, &1))
-          |> Jido.AI.Promptable.to_prompt()
-        end
-
-      other ->
-        raise ArgumentError, "Expected a module or struct, got: #{inspect(other)}"
+      %{role: msg.role, content: content}
     end)
-    |> Enum.join(separator)
+  end
+
+  @doc """
+  Converts the prompt to a single text string.
+
+  This is useful for debugging or when the LLM API expects a single text prompt.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(%{
+      ...>   messages: [
+      ...>     %{role: :system, content: "You are an assistant"},
+      ...>     %{role: :user, content: "Hello"}
+      ...>   ]
+      ...> })
+      iex> Prompt.to_text(prompt)
+      "[system] You are an assistant\\n[user] Hello"
+  """
+  @spec to_text(t(), map()) :: String.t()
+  def to_text(%Prompt{} = prompt, override_params \\ %{}) do
+    prompt
+    |> render(override_params)
+    |> Enum.map(fn %{role: r, content: c} -> "[#{r}] #{c}" end)
+    |> Enum.join("\n")
+  end
+
+  @doc """
+  Adds a new message to the prompt.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(%{
+      ...>   messages: [
+      ...>     %{role: :user, content: "Hello"}
+      ...>   ]
+      ...> })
+      iex> updated = Prompt.add_message(prompt, :assistant, "Hi there!")
+      iex> length(updated.messages)
+      2
+      iex> List.last(updated.messages).content
+      "Hi there!"
+  """
+  @spec add_message(t(), atom(), String.t(), keyword()) :: t()
+  def add_message(%Prompt{} = prompt, role, content, opts \\ []) do
+    engine = Keyword.get(opts, :engine, :none)
+
+    item = MessageItem.new(%{role: role, content: content, engine: engine})
+    %{prompt | messages: prompt.messages ++ [item]}
+  end
+
+  @doc """
+  Creates a new version of the prompt.
+
+  This function creates a new version of the prompt by:
+  1. Storing the current state in the history
+  2. Incrementing the version number
+  3. Applying the changes to the prompt
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Hello")
+      iex> updated = Prompt.new_version(prompt, fn p -> Prompt.add_message(p, :assistant, "Hi there!") end)
+      iex> updated.version
+      2
+      iex> length(updated.history)
+      1
+      iex> length(updated.messages)
+      2
+  """
+  @spec new_version(t(), (t() -> t())) :: t()
+  def new_version(%Prompt{} = prompt, change_fn) when is_function(change_fn, 1) do
+    # Store current state in history
+    current_state = %{
+      version: prompt.version,
+      messages: prompt.messages,
+      params: prompt.params,
+      metadata: prompt.metadata
+    }
+
+    # Apply changes to create a new version
+    prompt
+    |> change_fn.()
+    |> Map.put(:version, prompt.version + 1)
+    |> Map.put(:history, [current_state | prompt.history])
+  end
+
+  @doc """
+  Gets a specific version of the prompt.
+
+  Returns the current prompt if version matches the current version,
+  or reconstructs a historical version from the history.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Hello")
+      iex> updated = Prompt.new_version(prompt, fn p -> Prompt.add_message(p, :assistant, "Hi there!") end)
+      iex> {:ok, original} = Prompt.get_version(updated, 1)
+      iex> length(original.messages)
+      1
+      iex> hd(original.messages).content
+      "Hello"
+  """
+  @spec get_version(t(), non_neg_integer()) :: {:ok, t()} | {:error, String.t()}
+  def get_version(%Prompt{} = prompt, version) when is_integer(version) and version > 0 do
+    cond do
+      # Current version
+      version == prompt.version ->
+        {:ok, prompt}
+
+      # Historical version
+      version < prompt.version ->
+        case Enum.find(prompt.history, &(&1.version == version)) do
+          nil ->
+            {:error, "Version #{version} not found in history"}
+
+          historical ->
+            reconstructed =
+              %{prompt |
+                messages: historical.messages,
+                params: historical.params,
+                metadata: historical.metadata,
+                version: historical.version
+              }
+
+            {:ok, reconstructed}
+        end
+
+      # Future version
+      true ->
+        {:error, "Cannot get future version #{version} (current: #{prompt.version})"}
+    end
+  end
+
+  @doc """
+  Lists all available versions of the prompt.
+
+  Returns a list of version numbers, with the most recent first.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Hello")
+      iex> v2 = Prompt.new_version(prompt, fn p -> Prompt.add_message(p, :assistant, "Hi there!") end)
+      iex> v3 = Prompt.new_version(v2, fn p -> Prompt.add_message(p, :user, "How are you?") end)
+      iex> Prompt.list_versions(v3)
+      [3, 2, 1]
+  """
+  @spec list_versions(t()) :: list(non_neg_integer())
+  def list_versions(%Prompt{} = prompt) do
+    [prompt.version | Enum.map(prompt.history, & &1.version)]
+  end
+
+  @doc """
+  Compares two versions of a prompt and returns the differences.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Hello")
+      iex> v2 = Prompt.new_version(prompt, fn p -> Prompt.add_message(p, :assistant, "Hi there!") end)
+      iex> {:ok, diff} = Prompt.compare_versions(v2, 2, 1)
+      iex> diff.added_messages
+      [%{role: :assistant, content: "Hi there!"}]
+  """
+  @spec compare_versions(t(), non_neg_integer(), non_neg_integer()) ::
+          {:ok, %{added_messages: list(map()), removed_messages: list(map())}} |
+          {:error, String.t()}
+  def compare_versions(%Prompt{} = prompt, version1, version2)
+      when is_integer(version1) and is_integer(version2) and version1 > 0 and version2 > 0 do
+    with {:ok, v1} <- get_version(prompt, version1),
+         {:ok, v2} <- get_version(prompt, version2) do
+
+      # Convert messages to simple maps for comparison
+      v1_msgs = render(v1)
+      v2_msgs = render(v2)
+
+      # Find added and removed messages
+      added = v1_msgs -- v2_msgs
+      removed = v2_msgs -- v1_msgs
+
+      {:ok, %{added_messages: added, removed_messages: removed}}
+    end
   end
 end
