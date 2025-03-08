@@ -7,10 +7,64 @@ defmodule Jido.AI.Provider.Helpers do
   - File path management for model caching
   - Reading from and writing to cache
   - Making API requests with proper authentication
+  - Model name standardization across providers
   """
 
   require Logger
   alias Jido.AI.Keyring
+
+  @model_patterns [
+    {~r/claude-3\.7-sonnet/i, "claude-3.7-sonnet"},
+    {~r/claude-3\.5-sonnet/i, "claude-3.5-sonnet"},
+    {~r/claude-3-opus/i, "claude-3-opus"},
+    {~r/gpt-4o-mini/i, "gpt-4o-mini"},
+    {~r/gpt-4o/i, "gpt-4o"},
+    {~r/gpt-4/i, "gpt-4"},
+    {~r/gpt-3\.5/i, "gpt-3.5"},
+    {~r/mistral-7b/i, "mistral-7b"},
+    {~r/mistral-8x7b/i, "mistral-8x7b"},
+    {~r/llama-2-70b/i, "llama-2-70b"},
+    {~r/llama-2-13b/i, "llama-2-13b"},
+    {~r/llama-2-7b/i, "llama-2-7b"}
+  ]
+
+  @doc """
+  Standardizes a model name across providers by removing version numbers and dates.
+  This helps match equivalent models from different providers.
+
+  ## Examples
+      iex> standardize_name("claude-3.7-sonnet-20250219")
+      "claude-3.7-sonnet"
+      iex> standardize_name("gpt-4-0613")
+      "gpt-4"
+  """
+  def standardize_name(model_id) when is_binary(model_id) do
+    # First try exact matches from our patterns
+    case Enum.find_value(@model_patterns, fn {pattern, standard_name} ->
+           if String.match?(model_id, pattern), do: standard_name, else: nil
+         end) do
+      nil ->
+        # If no exact match, try to remove version/date suffixes
+        model_id
+        |> remove_version_suffix()
+        |> remove_date_suffix()
+
+      standard_name ->
+        standard_name
+    end
+  end
+
+  def standardize_name(model_id), do: model_id
+
+  # Remove version suffixes like -0613, -1106, etc.
+  defp remove_version_suffix(model_id) do
+    Regex.replace(~r/-[0-9]{4}$/, model_id, "")
+  end
+
+  # Remove date suffixes like -20250219, -20241022, etc.
+  defp remove_date_suffix(model_id) do
+    Regex.replace(~r/-[0-9]{8}$/, model_id, "")
+  end
 
   @doc """
   Gets the path to the models file for a provider.
@@ -204,5 +258,67 @@ defmodule Jido.AI.Provider.Helpers do
     Keyword.get(opts, :api_key) ||
       Keyring.get(keyring_key) ||
       System.get_env(env_var)
+  end
+
+  @doc """
+  Merges model information from multiple providers.
+
+  ## Parameters
+    - models: List of model maps from different providers
+
+  ## Returns
+    - A merged model map with combined information
+  """
+  def merge_model_information(models) do
+    # Start with the first model as the base
+    [base_model | other_models] = models
+
+    # Get base capabilities, defaulting to empty map if not present
+    base_capabilities =
+      Map.get(base_model, :capabilities) || Map.get(base_model, "capabilities") || %{}
+
+    # Merge capabilities from all models
+    merged_capabilities =
+      other_models
+      |> Enum.reduce(base_capabilities, fn model, acc ->
+        model_capabilities =
+          Map.get(model, :capabilities) || Map.get(model, "capabilities") || %{}
+
+        Map.merge(acc, model_capabilities, fn _k, v1, v2 -> v1 || v2 end)
+      end)
+
+    # Collect pricing information from all providers
+    pricing_by_provider =
+      models
+      |> Enum.reduce(%{}, fn model, acc ->
+        pricing = Map.get(model, :pricing) || Map.get(model, "pricing")
+
+        if pricing && !is_nil(pricing) do
+          Map.put(acc, model.provider, pricing)
+        else
+          acc
+        end
+      end)
+
+    # Merge the rest of the information, prioritizing non-nil values
+    other_models
+    |> Enum.reduce(base_model, fn model, acc ->
+      acc
+      |> Map.merge(model, fn
+        # Special handling for specific fields
+        :capabilities, _, _ -> merged_capabilities
+        "capabilities", _, _ -> merged_capabilities
+        # Keep original provider
+        :provider, v1, _v2 -> v1
+        # Clear individual pricing (use pricing_by_provider instead)
+        :pricing, _v1, _v2 -> nil
+        # Clear individual pricing (use pricing_by_provider instead)
+        "pricing", _v1, _v2 -> nil
+        # Prefer v2 if not nil
+        _k, v1, v2 -> v2 || v1
+      end)
+    end)
+    |> Map.put(:pricing_by_provider, pricing_by_provider)
+    |> Map.put(:available_from, Enum.map(models, & &1.provider))
   end
 end

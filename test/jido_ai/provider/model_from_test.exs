@@ -11,6 +11,7 @@ defmodule JidoTest.AI.Model.FromTest do
         model_id: "claude-3-5-haiku",
         base_url: "https://api.anthropic.com/v1"
       }
+
       assert {:ok, ^original} = Model.from(original)
     end
 
@@ -66,7 +67,7 @@ defmodule JidoTest.AI.Model.FromTest do
 
     test "with invalid input" do
       assert {:error, message} = Model.from("not_a_valid_input")
-      assert message =~ "Unknown model format"
+      assert message =~ "Invalid model specification"
     end
 
     test "with invalid provider" do

@@ -7,11 +7,12 @@ defmodule JidoTest.AI.PromptTest do
 
   describe "new/1" do
     test "creates a new prompt struct with default values" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :user, content: "Hello"}
-        ]
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello"}
+          ]
+        })
 
       assert %Prompt{} = prompt
       assert length(prompt.messages) == 1
@@ -25,13 +26,14 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "creates a prompt with multiple messages" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :system, content: "You are an assistant"},
-          %{role: :user, content: "Hello"},
-          %{role: :assistant, content: "Hi there!"}
-        ]
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :system, content: "You are an assistant"},
+            %{role: :user, content: "Hello"},
+            %{role: :assistant, content: "Hi there!"}
+          ]
+        })
 
       assert length(prompt.messages) == 3
       [system, user, assistant] = prompt.messages
@@ -41,15 +43,29 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "creates a prompt with parameters" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :user, content: "Hello <%= @name %>", engine: :eex}
-        ],
-        params: %{name: "Alice"}
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello <%= @name %>", engine: :eex}
+          ],
+          params: %{name: "Alice"}
+        })
 
       assert prompt.params == %{name: "Alice"}
       assert hd(prompt.messages).engine == :eex
+    end
+
+    test "creates a prompt with Liquid templates" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello {{ name }}", engine: :liquid}
+          ],
+          params: %{name: "Alice"}
+        })
+
+      assert prompt.params == %{name: "Alice"}
+      assert hd(prompt.messages).engine == :liquid
     end
   end
 
@@ -76,10 +92,11 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "creates a new prompt with metadata and id" do
-      prompt = Prompt.new(:system, "You are an assistant",
-        metadata: %{version: "1.0"},
-        id: "system_prompt"
-      )
+      prompt =
+        Prompt.new(:system, "You are an assistant",
+          metadata: %{version: "1.0"},
+          id: "system_prompt"
+        )
 
       assert %Prompt{} = prompt
       assert prompt.metadata == %{version: "1.0"}
@@ -89,49 +106,53 @@ defmodule JidoTest.AI.PromptTest do
 
   describe "render/2" do
     test "renders a simple prompt without templates" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :user, content: "Hello"}
-        ]
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello"}
+          ]
+        })
 
       result = Prompt.render(prompt)
       assert result == [%{role: :user, content: "Hello"}]
     end
 
     test "renders a prompt with EEx templates" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :user, content: "Hello <%= @name %>", engine: :eex}
-        ],
-        params: %{name: "Alice"}
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello <%= @name %>", engine: :eex}
+          ],
+          params: %{name: "Alice"}
+        })
 
       result = Prompt.render(prompt)
       assert result == [%{role: :user, content: "Hello Alice"}]
     end
 
-    test "renders a prompt with override parameters" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :user, content: "Hello <%= @name %>", engine: :eex}
-        ],
-        params: %{name: "Alice"}
-      })
+    test "renders a prompt with Liquid templates" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello {{ name }}", engine: :liquid}
+          ],
+          params: %{name: "Alice"}
+        })
 
-      result = Prompt.render(prompt, %{name: "Bob"})
-      assert result == [%{role: :user, content: "Hello Bob"}]
+      result = Prompt.render(prompt)
+      assert result == [%{role: :user, content: "Hello Alice"}]
     end
 
-    test "renders a prompt with multiple messages and templates" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :system, content: "You are an <%= @assistant_type %>", engine: :eex},
-          %{role: :user, content: "Hello <%= @name %>", engine: :eex},
-          %{role: :assistant, content: "Hi there!"}
-        ],
-        params: %{assistant_type: "helpful assistant", name: "Alice"}
-      })
+    test "renders a prompt with mixed template engines" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :system, content: "You are an <%= @assistant_type %>", engine: :eex},
+            %{role: :user, content: "Hello {{ name }}", engine: :liquid},
+            %{role: :assistant, content: "Hi there!"}
+          ],
+          params: %{assistant_type: "helpful assistant", name: "Alice"}
+        })
 
       result = Prompt.render(prompt)
       assert length(result) == 3
@@ -140,30 +161,88 @@ defmodule JidoTest.AI.PromptTest do
       assert user.content == "Hello Alice"
       assert assistant.content == "Hi there!"
     end
+
+    test "renders a prompt with Liquid template filters" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello {{ name | upcase }}", engine: :liquid}
+          ],
+          params: %{name: "Alice"}
+        })
+
+      result = Prompt.render(prompt)
+      assert result == [%{role: :user, content: "Hello ALICE"}]
+    end
+
+    test "renders a prompt with Liquid template conditionals" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{
+              role: :user,
+              content: "{% if is_admin %}Hello Admin{% else %}Hello User{% endif %}",
+              engine: :liquid
+            }
+          ],
+          params: %{is_admin: true}
+        })
+
+      result = Prompt.render(prompt)
+      assert result == [%{role: :user, content: "Hello Admin"}]
+    end
+
+    test "renders a prompt with override parameters" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello <%= @name %>", engine: :eex}
+          ],
+          params: %{name: "Alice"}
+        })
+
+      result = Prompt.render(prompt, %{name: "Bob"})
+      assert result == [%{role: :user, content: "Hello Bob"}]
+    end
+
+    test "renders a prompt with Liquid template override parameters" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello {{ name }}", engine: :liquid}
+          ],
+          params: %{name: "Alice"}
+        })
+
+      result = Prompt.render(prompt, %{name: "Bob"})
+      assert result == [%{role: :user, content: "Hello Bob"}]
+    end
   end
 
   describe "to_text/2" do
     test "converts a prompt to a single text string" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :system, content: "You are an assistant"},
-          %{role: :user, content: "Hello"},
-          %{role: :assistant, content: "Hi there!"}
-        ]
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :system, content: "You are an assistant"},
+            %{role: :user, content: "Hello"},
+            %{role: :assistant, content: "Hi there!"}
+          ]
+        })
 
       result = Prompt.to_text(prompt)
       assert result == "[system] You are an assistant\n[user] Hello\n[assistant] Hi there!"
     end
 
     test "converts a prompt with templates to a single text string" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :system, content: "You are an <%= @assistant_type %>", engine: :eex},
-          %{role: :user, content: "Hello <%= @name %>", engine: :eex}
-        ],
-        params: %{assistant_type: "helpful assistant", name: "Alice"}
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :system, content: "You are an <%= @assistant_type %>", engine: :eex},
+            %{role: :user, content: "Hello <%= @name %>", engine: :eex}
+          ],
+          params: %{assistant_type: "helpful assistant", name: "Alice"}
+        })
 
       result = Prompt.to_text(prompt)
       assert result == "[system] You are an helpful assistant\n[user] Hello Alice"
@@ -172,11 +251,12 @@ defmodule JidoTest.AI.PromptTest do
 
   describe "add_message/3" do
     test "adds a message to the prompt" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :user, content: "Hello"}
-        ]
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello"}
+          ]
+        })
 
       updated = Prompt.add_message(prompt, :assistant, "Hi there!")
       assert length(updated.messages) == 2
@@ -185,11 +265,12 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "adds a templated message to the prompt" do
-      prompt = Prompt.new(%{
-        messages: [
-          %{role: :user, content: "Hello"}
-        ]
-      })
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello"}
+          ]
+        })
 
       updated = Prompt.add_message(prompt, :assistant, "Hi <%= @name %>!", engine: :eex)
       assert length(updated.messages) == 2
@@ -206,9 +287,10 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "new_version creates a new version with changes", %{prompt: prompt} do
-      v2 = Prompt.new_version(prompt, fn p ->
-        Prompt.add_message(p, :assistant, "Hi there!")
-      end)
+      v2 =
+        Prompt.new_version(prompt, fn p ->
+          Prompt.add_message(p, :assistant, "Hi there!")
+        end)
 
       assert v2.version == 2
       assert length(v2.messages) == 2
@@ -227,9 +309,10 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "get_version retrieves a historical version", %{prompt: prompt} do
-      v2 = Prompt.new_version(prompt, fn p ->
-        Prompt.add_message(p, :assistant, "Hi there!")
-      end)
+      v2 =
+        Prompt.new_version(prompt, fn p ->
+          Prompt.add_message(p, :assistant, "Hi there!")
+        end)
 
       {:ok, v1} = Prompt.get_version(v2, 1)
       assert v1.version == 1
@@ -243,22 +326,25 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "list_versions returns all available versions", %{prompt: prompt} do
-      v2 = Prompt.new_version(prompt, fn p ->
-        Prompt.add_message(p, :assistant, "Hi there!")
-      end)
+      v2 =
+        Prompt.new_version(prompt, fn p ->
+          Prompt.add_message(p, :assistant, "Hi there!")
+        end)
 
-      v3 = Prompt.new_version(v2, fn p ->
-        Prompt.add_message(p, :user, "How are you?")
-      end)
+      v3 =
+        Prompt.new_version(v2, fn p ->
+          Prompt.add_message(p, :user, "How are you?")
+        end)
 
       versions = Prompt.list_versions(v3)
       assert versions == [3, 2, 1]
     end
 
     test "compare_versions identifies added and removed messages", %{prompt: prompt} do
-      v2 = Prompt.new_version(prompt, fn p ->
-        Prompt.add_message(p, :assistant, "Hi there!")
-      end)
+      v2 =
+        Prompt.new_version(prompt, fn p ->
+          Prompt.add_message(p, :assistant, "Hi there!")
+        end)
 
       {:ok, diff} = Prompt.compare_versions(v2, 2, 1)
 
@@ -269,17 +355,20 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "multiple versions maintain correct history", %{prompt: prompt} do
-      v2 = Prompt.new_version(prompt, fn p ->
-        Prompt.add_message(p, :assistant, "Hi there!")
-      end)
+      v2 =
+        Prompt.new_version(prompt, fn p ->
+          Prompt.add_message(p, :assistant, "Hi there!")
+        end)
 
-      v3 = Prompt.new_version(v2, fn p ->
-        Prompt.add_message(p, :user, "How are you?")
-      end)
+      v3 =
+        Prompt.new_version(v2, fn p ->
+          Prompt.add_message(p, :user, "How are you?")
+        end)
 
-      v4 = Prompt.new_version(v3, fn p ->
-        Prompt.add_message(p, :assistant, "I'm doing well!")
-      end)
+      v4 =
+        Prompt.new_version(v3, fn p ->
+          Prompt.add_message(p, :assistant, "I'm doing well!")
+        end)
 
       assert v4.version == 4
       assert length(v4.history) == 3

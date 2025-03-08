@@ -62,14 +62,13 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
     }
 
     {:ok,
-      model: model,
-      test_splitter: test_splitter,
-      large_splitter: large_splitter,
-      done_splitter: done_splitter,
-      test_tokens: test_tokens,
-      test_input: test_input,
-      large_input: large_input
-    }
+     model: model,
+     test_splitter: test_splitter,
+     large_splitter: large_splitter,
+     done_splitter: done_splitter,
+     test_tokens: test_tokens,
+     test_input: test_input,
+     large_input: large_input}
   end
 
   describe "new/2" do
@@ -83,7 +82,8 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
       expected_splitter = %Splitter{
         model: model,
         input: input,
-        input_tokens: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], # This would be the result of Tokenizer.encode
+        # This would be the result of Tokenizer.encode
+        input_tokens: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         offset: 0,
         done: false
       }
@@ -132,7 +132,8 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
 
       # Verify the first chunk results
       assert is_binary(slice1)
-      assert updated_splitter1.offset == 17  # We should have processed 17 tokens
+      # We should have processed 17 tokens
+      assert updated_splitter1.offset == 17
       assert updated_splitter1.done == false
 
       # Call the function under test for the second chunk
@@ -140,7 +141,8 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
 
       # Verify the second chunk results
       assert is_binary(slice2)
-      assert updated_splitter2.offset == 34  # We should have processed another 17 tokens
+      # We should have processed another 17 tokens
+      assert updated_splitter2.offset == 34
       assert updated_splitter2.done == false
     end
 
@@ -164,9 +166,10 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
       # Create a custom splitter that's done but with a different offset
       # This will test the private get_slice function's behavior when done is true
       custom_splitter = %Splitter{
-        splitter |
-        offset: 0,  # Set offset to 0 to ensure we're testing the done flag, not the offset
-        done: true
+        splitter
+        | # Set offset to 0 to ensure we're testing the done flag, not the offset
+          offset: 0,
+          done: true
       }
 
       # Call next_chunk, which will call get_slice internally
@@ -234,9 +237,10 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
     updated_splitter = %Splitter{splitter | offset: length(splitter.input_tokens)}
 
     # This is what next_chunk would do
-    final_splitter = %Splitter{updated_splitter |
-      offset: updated_splitter.offset,
-      done: updated_splitter.offset >= length(splitter.input_tokens)
+    final_splitter = %Splitter{
+      updated_splitter
+      | offset: updated_splitter.offset,
+        done: updated_splitter.offset >= length(splitter.input_tokens)
     }
 
     assert final_splitter.done == true

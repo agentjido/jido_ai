@@ -2,12 +2,9 @@ defmodule Jido.AI.Skill do
   @moduledoc """
   General purpose AI skill powered by Jido
   """
-  use Jido.Skill,
-    name: "jido_ai_skill",
-    description: "General purpose AI skill powered by Jido",
-    vsn: "0.1.0",
-    opts_key: :ai,
-    opts_schema: [
+  require Logger
+  @ai_opts_key :ai
+  @ai_opts_schema [
       model: [
         type: {:custom, Jido.AI.Model, :validate_model_opts, []},
         required: true,
@@ -25,7 +22,7 @@ defmodule Jido.AI.Skill do
       ],
       chat_action: [
         type: {:custom, Jido.Util, :validate_actions, []},
-        default: Jido.AI.Actions.OpenaiEx.ChatCompletion,
+        default: Jido.AI.Actions.Instructor.ChatResponse,
         doc: "The chat action to use"
       ],
       tool_action: [
@@ -38,56 +35,21 @@ defmodule Jido.AI.Skill do
         default: [],
         doc: "The tools to use"
       ]
-    ],
-    signals: %{
-      input: [
-        "arithmetic.add",
-        "arithmetic.subtract",
-        "arithmetic.multiply",
-        "arithmetic.divide",
-        "arithmetic.square",
-        "arithmetic.eval"
-      ],
-      output: [
-        "arithmetic.result",
-        "arithmetic.error"
-      ]
-    }
+    ]
 
-  @doc """
-  Validates and converts the prompt option.
-
-  Accepts either:
-  - A string, which is converted to a system message in a Prompt struct
-  - An existing Prompt struct, which is returned as-is
-
-  ## Examples
-
-      iex> Jido.AI.Skill.validate_prompt_opts("You are a helpful assistant")
-      {:ok, %Jido.AI.Prompt{messages: [%Jido.AI.Prompt.MessageItem{role: :system, content: "You are a helpful assistant", engine: :none}]}}
-
-      iex> prompt = Jido.AI.Prompt.new(:system, "Custom prompt")
-      iex> Jido.AI.Skill.validate_prompt_opts(prompt)
-      {:ok, prompt}
-  """
-  @spec validate_prompt_opts(String.t() | Jido.AI.Prompt.t()) :: {:ok, Jido.AI.Prompt.t()} | {:error, String.t()}
-  def validate_prompt_opts(prompt) when is_binary(prompt) do
-    # Convert the string to a Prompt struct with a system message
-    {:ok, Jido.AI.Prompt.new(:system, prompt)}
-  end
-
-  def validate_prompt_opts(%Jido.AI.Prompt{} = prompt) do
-    # If it's already a Prompt struct, return it as-is
-    {:ok, prompt}
-  end
-
-  def validate_prompt_opts(other) do
-    {:error, "Expected a string or a Jido.AI.Prompt struct, got: #{inspect(other)}"}
-  end
+  use Jido.Skill,
+    name: "jido_ai_skill",
+    description: "General purpose AI skill powered by Jido",
+    vsn: "0.1.0",
+    opts_key: @ai_opts_key,
+    opts_schema: @ai_opts_schema,
+    signal_patterns: [
+      "jido.ai.**"
+    ]
 
   def mount(agent, opts) do
     chat_action =
-      Keyword.get(opts, :chat_action, Jido.AI.Actions.OpenaiEx.ChatCompletion)
+      Keyword.get(opts, :chat_action, Jido.AI.Actions.Instructor.ChatResponse)
 
     tool_action =
       Keyword.get(opts, :tool_action, Jido.AI.Actions.Langchain.GenerateToolResponse)
@@ -115,68 +77,113 @@ defmodule Jido.AI.Skill do
     end
   end
 
-  def router do
+  def router(opts \\ []) do
+    model = Keyword.get(opts, :model)
+
     [
-      # High priority weather alerts
-      %{
-        path: "weather_monitor.alert.**",
-        instruction: %{
-          action: Actions.GenerateWeatherAlert
-        },
-        priority: 100
-      }
+      {"jido.ai.chat.response",
+       %Instruction{
+         action: Jido.AI.Actions.Instructor.ChatResponse,
+         params: %{model: model}
+       }},
+      {"jido.ai.tool.response",
+       %Instruction{
+         action: Jido.AI.Actions.Langchain.GenerateToolResponse,
+         params: %{model: model}
+       }}
     ]
   end
 
-  def chat_response(agent, message, opts \\ []) do
-    prompt = Keyword.get(opts, :prompt, Jido.AI.Prompt.new(:system, "You are a helpful assistant"))
+  def handle_signal(signal, skill_opts) do
+    Logger.info("SKILL HANDLE SIGNAL: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    Logger.info("Signal: #{inspect(signal, pretty: true)}")
+    Logger.info("Skill opts: #{inspect(skill_opts, pretty: true)}")
 
-    # Ensure prompt is a Prompt struct
-    prompt = case prompt do
-      %Jido.AI.Prompt{} -> prompt
-      string when is_binary(string) -> Jido.AI.Prompt.new(:system, string)
-      _ -> Jido.AI.Prompt.new(:system, "You are a helpful assistant")
+    with {:ok, base_prompt} <- Jido.AI.Prompt.validate_prompt_opts(Keyword.get(skill_opts, :prompt)) do
+      # Convert system message to user message and render with signal data
+      updated_messages = Enum.map(base_prompt.messages, fn msg ->
+        %{msg | role: :user, engine: :eex}
+      end)
+
+      base_prompt = %{base_prompt | messages: updated_messages}
+      rendered_prompt = Jido.AI.Prompt.render(base_prompt, signal.data)
+      IO.inspect(rendered_prompt, label: "Rendered prompt")
+
+      # Create a new prompt with the rendered content
+      updated_prompt = %{base_prompt | messages: rendered_prompt}
+      IO.inspect(updated_prompt, label: "Updated prompt")
+
+      # Update the signal data with the new prompt
+      updated_signal = %{signal | data: Map.put(signal.data, :prompt, updated_prompt)}
+
+      {:ok, updated_signal}
+    else
+      {:error, reason} ->
+        Logger.error("Failed to validate prompt: #{inspect(reason)}")
+        {:ok, signal}
     end
-
-    # Add the user message to the prompt
-    prompt = Jido.AI.Prompt.add_message(prompt, :user, message)
-
-    {:ok, signal} =
-      Jido.Signal.new(%{
-        type: "jido.ai.chat.response",
-        data: %{
-          prompt: prompt,
-          history: [],
-          message: message
-        }
-      })
-
-    Jido.Agent.call(agent, signal)
   end
 
-  def tool_response(agent, message, opts \\ []) do
-    prompt = Keyword.get(opts, :prompt, Jido.AI.Prompt.new(:system, "You are a helpful assistant"))
-
-    # Ensure prompt is a Prompt struct
-    prompt = case prompt do
-      %Jido.AI.Prompt{} -> prompt
-      string when is_binary(string) -> Jido.AI.Prompt.new(:system, string)
-      _ -> Jido.AI.Prompt.new(:system, "You are a helpful assistant")
-    end
-
-    # Add the user message to the prompt
-    prompt = Jido.AI.Prompt.add_message(prompt, :user, message)
-
-    {:ok, signal} =
-      Jido.Signal.new(%{
-        type: "jido.ai.tool.response",
-        data: %{
-          prompt: prompt,
-          history: [],
-          message: message
-        }
-      })
-
-    Jido.Agent.call(agent, signal)
+  def transform_result(signal, result, skill_opts) do
+    Logger.info("SKILL TRANSFORM RESULT: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+    Logger.info("Transforming result: #{inspect(result, pretty: true)}")
+    Logger.info("Skill opts: #{inspect(skill_opts, pretty: true)}")
+    {:ok, result}
   end
+
+  # def chat_response(agent, message, opts \\ []) do
+  #   prompt =
+  #     Keyword.get(opts, :prompt, Jido.AI.Prompt.new(:system, "You are a helpful assistant"))
+
+  #   # Ensure prompt is a Prompt struct
+  #   prompt =
+  #     case prompt do
+  #       %Jido.AI.Prompt{} -> prompt
+  #       string when is_binary(string) -> Jido.AI.Prompt.new(:system, string)
+  #       _ -> Jido.AI.Prompt.new(:system, "You are a helpful assistant")
+  #     end
+
+  #   # Add the user message to the prompt
+  #   prompt = Jido.AI.Prompt.add_message(prompt, :user, message)
+
+  #   {:ok, signal} =
+  #     Jido.Signal.new(%{
+  #       type: "jido.ai.chat.response",
+  #       data: %{
+  #         prompt: prompt,
+  #         history: [],
+  #         message: message
+  #       }
+  #     })
+
+  #   Jido.Agent.Server.call(agent, signal)
+  # end
+
+  # def tool_response(agent, message, opts \\ []) do
+  #   prompt =
+  #     Keyword.get(opts, :prompt, Jido.AI.Prompt.new(:system, "You are a helpful assistant"))
+
+  #   # Ensure prompt is a Prompt struct
+  #   prompt =
+  #     case prompt do
+  #       %Jido.AI.Prompt{} -> prompt
+  #       string when is_binary(string) -> Jido.AI.Prompt.new(:system, string)
+  #       _ -> Jido.AI.Prompt.new(:system, "You are a helpful assistant")
+  #     end
+
+  #   # Add the user message to the prompt
+  #   prompt = Jido.AI.Prompt.add_message(prompt, :user, message)
+
+  #   {:ok, signal} =
+  #     Jido.Signal.new(%{
+  #       type: "jido.ai.tool.response",
+  #       data: %{
+  #         prompt: prompt,
+  #         history: [],
+  #         message: message
+  #       }
+  #     })
+
+  #   Jido.Agent.Server.call(agent, signal)
+  # end
 end

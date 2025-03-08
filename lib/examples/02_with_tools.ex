@@ -7,7 +7,7 @@ defmodule Examples.ToolAgent02 do
       Agent.start_link(
         ai: [
           model: {:anthropic, chat: :small},
-          instructions: """
+          prompt: """
           You are a super math genius.
           You are given a math problem and you need to solve it using the tools provided.
           """,

@@ -27,6 +27,18 @@ defmodule Jido.AI.Prompt do
         }
       })
 
+      # Create a prompt with Liquid templates
+      prompt = Jido.AI.Prompt.new(%{
+        messages: [
+          %{role: :system, content: "You are a {{ assistant_type }}", engine: :liquid},
+          %{role: :user, content: "Hello {{ name }}", engine: :liquid}
+        ],
+        params: %{
+          assistant_type: "helpful assistant",
+          name: "Alice"
+        }
+      })
+
       # Render the prompt to get the final messages
       messages = Jido.AI.Prompt.render(prompt)
       # => [
@@ -44,23 +56,23 @@ defmodule Jido.AI.Prompt do
     @typedoc "A complete prompt with messages and parameters"
 
     # Unique identifier for the prompt
-    field :id, String.t(), default: Jido.Util.generate_id()
+    field(:id, String.t(), default: Jido.Util.generate_id())
 
     # Current version number of the prompt
-    field :version, non_neg_integer(), default: 1
+    field(:version, non_neg_integer(), default: 1)
 
     # History of previous versions of this prompt
-    field :history, list(map()), default: []
+    field(:history, list(map()), default: [])
 
     # Holds a list of messages, each might be raw string or templated content
     # with a role to indicate system|assistant|user or others
-    field :messages, list(MessageItem.t()), default: []
+    field(:messages, list(MessageItem.t()), default: [])
 
     # A map of parameters that can be interpolated into the messages (if they use EEx)
-    field :params, map(), default: %{}
+    field(:params, map(), default: %{})
 
     # Optional metadata or advanced features
-    field :metadata, map(), default: %{}
+    field(:metadata, map(), default: %{})
   end
 
   @doc """
@@ -165,7 +177,7 @@ defmodule Jido.AI.Prompt do
   @doc """
   Renders the prompt into a list of messages with interpolated content.
 
-  This function applies any EEx templates in the messages using the parameters
+  This function applies any EEx or Liquid templates in the messages using the parameters
   provided in the prompt and any override parameters.
 
   ## Examples
@@ -174,6 +186,16 @@ defmodule Jido.AI.Prompt do
       iex> prompt = Prompt.new(%{
       ...>   messages: [
       ...>     %{role: :user, content: "Hello <%= @name %>", engine: :eex}
+      ...>   ],
+      ...>   params: %{name: "Alice"}
+      ...> })
+      iex> Prompt.render(prompt)
+      [%{role: :user, content: "Hello Alice"}]
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(%{
+      ...>   messages: [
+      ...>     %{role: :user, content: "Hello {{ name }}", engine: :liquid}
       ...>   ],
       ...>   params: %{name: "Alice"}
       ...> })
@@ -199,8 +221,18 @@ defmodule Jido.AI.Prompt do
     Enum.map(prompt.messages, fn msg ->
       content =
         case msg.engine do
-          :eex -> EEx.eval_string(msg.content, assigns: final_params)
-          :none -> msg.content
+          :eex ->
+            EEx.eval_string(msg.content, assigns: final_params)
+
+          :liquid ->
+            {:ok, template} = Solid.parse(msg.content)
+            # Convert atom keys to strings for Liquid templates
+            liquid_params = Map.new(final_params, fn {k, v} -> {Atom.to_string(k), v} end)
+            {:ok, parts} = Solid.render(template, liquid_params, [])
+            Enum.join(parts, "")
+
+          :none ->
+            msg.content
         end
 
       %{role: msg.role, content: content}
@@ -326,11 +358,12 @@ defmodule Jido.AI.Prompt do
 
           historical ->
             reconstructed =
-              %{prompt |
-                messages: historical.messages,
-                params: historical.params,
-                metadata: historical.metadata,
-                version: historical.version
+              %{
+                prompt
+                | messages: historical.messages,
+                  params: historical.params,
+                  metadata: historical.metadata,
+                  version: historical.version
               }
 
             {:ok, reconstructed}
@@ -374,13 +407,12 @@ defmodule Jido.AI.Prompt do
       [%{role: :assistant, content: "Hi there!"}]
   """
   @spec compare_versions(t(), non_neg_integer(), non_neg_integer()) ::
-          {:ok, %{added_messages: list(map()), removed_messages: list(map())}} |
-          {:error, String.t()}
+          {:ok, %{added_messages: list(map()), removed_messages: list(map())}}
+          | {:error, String.t()}
   def compare_versions(%Prompt{} = prompt, version1, version2)
       when is_integer(version1) and is_integer(version2) and version1 > 0 and version2 > 0 do
     with {:ok, v1} <- get_version(prompt, version1),
          {:ok, v2} <- get_version(prompt, version2) do
-
       # Convert messages to simple maps for comparison
       v1_msgs = render(v1)
       v2_msgs = render(v2)

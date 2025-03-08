@@ -5,9 +5,9 @@ defmodule Jido.AI do
 
   alias Jido.AI.Keyring
 
-  defdelegate get_key(provider), to: Keyring
-  defdelegate set_session_key(provider, key), to: Keyring
-  defdelegate get_session_key(provider), to: Keyring
-  defdelegate clear_session_key(provider), to: Keyring
-  defdelegate clear_all_session_keys, to: Keyring
+  defdelegate get(key), to: Keyring
+  defdelegate set_session_value(key, value), to: Keyring
+  defdelegate get_session_value(key), to: Keyring
+  defdelegate clear_session_value(key), to: Keyring
+  defdelegate clear_all_session_values, to: Keyring
 end

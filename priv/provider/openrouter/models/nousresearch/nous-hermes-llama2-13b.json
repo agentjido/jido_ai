@@ -1,0 +1,25 @@
+{
+  "id": "nousresearch/nous-hermes-llama2-13b",
+  "name": "Nous: Hermes 13B",
+  "description": "A state-of-the-art language model fine-tuned on over 300k instructions by Nous Research, with Teknium and Emozilla leading the fine tuning process.",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Llama2",
+    "instruct_type": "alpaca"
+  },
+  "created": 1692489600,
+  "endpoints": []
+}

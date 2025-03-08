@@ -47,12 +47,13 @@ defmodule Jido.Ai.MixProject do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    require Logger
-    use_local_deps = System.get_env("LOCAL_JIDO_DEPS") == "true" || false
+    # require Logger
+    # use_local_deps = System.get_env("LOCAL_JIDO_DEPS") == "true" || false
 
     deps = [
-      {:typed_struct, "~> 0.3.0"},
       {:dotenvy, "~> 1.0.0"},
+      {:solid, "~> 0.18.0"},
+      {:typed_struct, "~> 0.3.0"},
 
       # Clients
       {:req, "~> 0.5.8"},
@@ -60,34 +61,39 @@ defmodule Jido.Ai.MixProject do
       {:instructor, "~> 0.1.0"},
       {:langchain, "~> 0.3.1"},
 
-      # Testing
+      # Testing & Release
       {:credo, "~> 1.7"},
-      {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.22.0", only: [:dev, :test]},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:ex_check, "~> 0.12", only: [:dev, :test]},
+      {:ex_doc, "~> 0.37-rc", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
       {:expublish, "~> 2.5", only: [:dev], runtime: false},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:git_ops, "~> 2.5", only: [:dev, :test]},
+      {:igniter, "~> 0.5", only: [:dev, :test]},
       {:mimic, "~> 1.7", only: [:dev, :test]},
+      {:mix_audit, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:sobelow, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.1", only: [:dev, :test]}
     ]
 
-    if use_local_deps do
-      require Logger
-      Logger.warning("Using local Jido dependencies")
+    # if use_local_deps do
+    #   require Logger
+    #   Logger.warning("Using local Jido dependencies")
 
       deps ++
         [
           {:jido, path: "../jido"}
           # {:jido_memory, path: "../jido_memory"}
         ]
-    else
-      deps ++
-        [
-          {:jido, github: "agentjido/jido"}
-          # {:jido_memory, github: "agentjido/jido_memory"}
-        ]
-    end
+    # else
+    #   deps ++
+    #     [
+    #       {:jido, github: "agentjido/jido"}
+    #       # {:jido_memory, github: "agentjido/jido_memory"}
+    #     ]
+    # end
   end
 
   defp aliases do

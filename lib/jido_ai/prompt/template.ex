@@ -350,8 +350,8 @@ defmodule Jido.AI.Prompt.Template do
       compiled = EEx.compile_string(text)
       {:ok, compiled}
     rescue
-      e in EEx.SyntaxError ->
-        {:error, Exception.message(e)}
+      e in [EEx.SyntaxError] ->
+        raise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
 
       e in CompileError ->
         {:error, Exception.message(e)}
@@ -365,17 +365,14 @@ defmodule Jido.AI.Prompt.Template do
     try do
       EEx.eval_string(text, assigns: inputs)
     rescue
-      e in EEx.SyntaxError ->
-        reraise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
-
-      e in RuntimeError ->
-        reraise Jido.AI.Error, "Template formatting error: #{Exception.message(e)}"
+      e in [RuntimeError] ->
+        raise Jido.AI.Error, "Template formatting error: #{Exception.message(e)}"
 
       e in CompileError ->
-        reraise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
+        raise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
 
       e ->
-        reraise Jido.AI.Error, "Unexpected error: #{Exception.message(e)}"
+        raise Jido.AI.Error, "Unexpected error: #{Exception.message(e)}"
     end
   end
 
@@ -642,9 +639,14 @@ defmodule Jido.AI.Prompt.Template do
   Validates the syntax of a template without evaluating it.
   """
   def validate_template_syntax(%__MODULE__{text: text, engine: :eex}) do
-    case compile_with_eex(text) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
+    try do
+      case compile_with_eex(text) do
+        {:ok, _} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    rescue
+      e ->
+        {:error, "Template compilation error: #{Exception.message(e)}"}
     end
   end
 end

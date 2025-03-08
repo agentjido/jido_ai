@@ -127,11 +127,12 @@ defmodule Jido.AI.Provider.OpenAI do
 
   @impl true
   def validate_model_opts(opts) do
-    {:ok, %Jido.AI.Model{
-      id: opts[:model_id] || "openai_default",
-      name: opts[:model_name] || "OpenAI Model",
-      provider: :openai
-    }}
+    {:ok,
+     %Jido.AI.Model{
+       id: opts[:model_id] || "openai_default",
+       name: opts[:model_name] || "OpenAI Model",
+       provider: :openai
+     }}
   end
 
   @impl true

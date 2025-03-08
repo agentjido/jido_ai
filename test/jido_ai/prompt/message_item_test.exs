@@ -15,11 +15,12 @@ defmodule JidoTest.AI.Prompt.MessageItemTest do
     end
 
     test "creates a message item with specified values" do
-      message = MessageItem.new(%{
-        role: :system,
-        content: "You are an assistant",
-        engine: :eex
-      })
+      message =
+        MessageItem.new(%{
+          role: :system,
+          content: "You are an assistant",
+          engine: :eex
+        })
 
       assert message.role == :system
       assert message.content == "You are an assistant"
@@ -37,10 +38,11 @@ defmodule JidoTest.AI.Prompt.MessageItemTest do
 
   describe "from_map/1" do
     test "creates a message item from a map with string keys" do
-      message = MessageItem.from_map(%{
-        "role" => "user",
-        "content" => "Hello"
-      })
+      message =
+        MessageItem.from_map(%{
+          "role" => "user",
+          "content" => "Hello"
+        })
 
       assert message.role == :user
       assert message.content == "Hello"
@@ -48,11 +50,12 @@ defmodule JidoTest.AI.Prompt.MessageItemTest do
     end
 
     test "creates a message item with engine specified" do
-      message = MessageItem.from_map(%{
-        "role" => "system",
-        "content" => "You are an <%= @assistant_type %>",
-        "engine" => :eex
-      })
+      message =
+        MessageItem.from_map(%{
+          "role" => "system",
+          "content" => "You are an <%= @assistant_type %>",
+          "engine" => :eex
+        })
 
       assert message.role == :system
       assert message.content == "You are an <%= @assistant_type %>"
@@ -60,21 +63,23 @@ defmodule JidoTest.AI.Prompt.MessageItemTest do
     end
 
     test "handles different role types" do
-      message = MessageItem.from_map(%{
-        "role" => "assistant",
-        "content" => "I can help with that"
-      })
+      message =
+        MessageItem.from_map(%{
+          "role" => "assistant",
+          "content" => "I can help with that"
+        })
 
       assert message.role == :assistant
       assert message.content == "I can help with that"
     end
 
     test "handles function role" do
-      message = MessageItem.from_map(%{
-        "role" => "function",
-        "content" => "Result of calculation",
-        "name" => "calculator"
-      })
+      message =
+        MessageItem.from_map(%{
+          "role" => "function",
+          "content" => "Result of calculation",
+          "name" => "calculator"
+        })
 
       assert message.role == :function
       assert message.content == "Result of calculation"

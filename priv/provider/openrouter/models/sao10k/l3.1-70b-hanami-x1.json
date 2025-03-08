@@ -1,0 +1,25 @@
+{
+  "id": "sao10k/l3.1-70b-hanami-x1",
+  "name": "Sao10K: Llama 3.1 70B Hanami x1",
+  "description": "This is [Sao10K](/sao10k)'s experiment over [Euryale v2.2](/sao10k/l3.1-euryale-70b).",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Llama3",
+    "instruct_type": null
+  },
+  "created": 1736302854,
+  "endpoints": []
+}

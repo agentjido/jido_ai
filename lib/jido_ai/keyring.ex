@@ -1,31 +1,49 @@
 defmodule Jido.AI.Keyring do
   @moduledoc """
-  GenServer that manages environment variables and application config.
-  Serves as the source of truth for configuration values.
+  A GenServer that manages environment variables and application configuration.
 
-  Values can be loaded from:
-  1. Environment variables (via Dotenvy, highest priority)
-  2. Application environment (under :jido_ai, :keyring)
-  3. Default values (lowest priority)
+  This module serves as the source of truth for configuration values, with a hierarchical loading priority:
 
-  Values can also be set on a per-session (per-process) basis.
+  1. Session values (per-process overrides)
+  2. Environment variables (via Dotenvy)
+  3. Application environment (under :jido_ai, :keyring)
+  4. Default values
+
+  The keyring supports both global environment values and process-specific session values,
+  allowing for flexible configuration management in different contexts.
+
+  ## Usage
+
+      # Get a value (checks session then environment)
+      value = Keyring.get(:my_key, "default")
+
+      # Set a session-specific override
+      Keyring.set_session_value(:my_key, "override")
+
+      # Clear session values
+      Keyring.clear_session_value(:my_key)
+      Keyring.clear_all_session_values()
+
   """
 
   use GenServer
   require Logger
 
-  # Process registry for session keys
   @session_registry :jido_ai_keyring_sessions
-
   @default_name __MODULE__
 
-  # Ensure ETS table exists
+  @doc false
+  @spec ensure_session_registry(atom()) :: atom()
   defp ensure_session_registry(registry_name) do
     if :ets.whereis(registry_name) == :undefined do
       :ets.new(registry_name, [:set, :public, :named_table])
     end
   end
 
+  @doc """
+  Returns the child specification for starting the keyring under a supervisor.
+  """
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
     name = Keyword.get(opts, :name, @default_name)
 
@@ -38,33 +56,38 @@ defmodule Jido.AI.Keyring do
     }
   end
 
+  @doc """
+  Starts the keyring process.
+
+  ## Options
+
+    * `:name` - The name to register the process under (default: #{@default_name})
+    * `:registry` - The name for the ETS registry table (default: #{@session_registry})
+
+  """
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     name = Keyword.get(opts, :name, @default_name)
     registry = Keyword.get(opts, :registry, @session_registry)
 
-    # Ensure ETS table exists before starting GenServer
     ensure_session_registry(registry)
-
     GenServer.start_link(__MODULE__, registry, name: name)
   end
 
   @impl true
+  @spec init(atom()) :: {:ok, map()}
   def init(registry) do
     Logger.debug("Initializing environment variables")
 
-    # Load environment variables
     env = load_from_env()
-
-    # Load application environment
     app_env = load_from_app_env()
-
-    # Merge with priority: env vars > app env
     keys = Map.merge(app_env, env)
 
     {:ok, %{keys: keys, registry: registry}}
   end
 
-  # Load all environment variables and convert to atoms
+  @doc false
+  @spec load_from_env() :: map()
   defp load_from_env do
     env_dir_prefix = Path.expand("./envs/")
 
@@ -81,7 +104,8 @@ defmodule Jido.AI.Keyring do
     end)
   end
 
-  # Convert environment variable name to atom
+  @doc false
+  @spec env_var_to_atom(String.t()) :: atom()
   defp env_var_to_atom(env_var) do
     env_var
     |> String.downcase()
@@ -89,31 +113,39 @@ defmodule Jido.AI.Keyring do
     |> String.to_atom()
   end
 
-  # Load keys from application environment
+  @doc false
+  @spec load_from_app_env() :: map()
   defp load_from_app_env do
     case Application.get_env(:jido_ai, :keyring) do
-      nil ->
-        %{}
-
-      config when is_map(config) ->
-        config
-
-      _ ->
-        %{}
+      nil -> %{}
+      config when is_map(config) -> config
+      _ -> %{}
     end
   end
 
   @doc """
   Lists all available keys in the keyring.
-  Returns a list of atoms representing the available keys.
+
+  Returns a list of atoms representing the available environment-level keys.
+  Does not include session-specific overrides.
   """
+  @spec list(GenServer.server()) :: [atom()]
   def list(server \\ @default_name) do
     GenServer.call(server, :list_keys)
   end
 
   @doc """
-  Gets a value, checking session values first, then falling back to environment values.
+  Gets a value from the keyring, checking session values first, then environment values.
+
+  ## Parameters
+
+    * `server` - The server to query (default: #{@default_name})
+    * `key` - The key to look up (as an atom)
+    * `default` - The default value if key is not found
+
+  Returns the value if found, otherwise returns the default value.
   """
+  @spec get(GenServer.server(), atom(), term()) :: term()
   def get(server \\ @default_name, key, default \\ nil) when is_atom(key) do
     case get_session_value(server, key) do
       nil -> get_env_value(server, key, default)
@@ -123,7 +155,16 @@ defmodule Jido.AI.Keyring do
 
   @doc """
   Gets a value from the environment-level storage.
+
+  ## Parameters
+
+    * `server` - The server to query (default: #{@default_name})
+    * `key` - The key to look up (as an atom)
+    * `default` - The default value if key is not found
+
+  Returns the environment value if found, otherwise returns the default value.
   """
+  @spec get_env_value(GenServer.server(), atom(), term()) :: term()
   def get_env_value(server \\ @default_name, key, default \\ nil) when is_atom(key) do
     GenServer.call(server, {:get_value, key, default})
   end
@@ -131,7 +172,16 @@ defmodule Jido.AI.Keyring do
   @doc """
   Sets a session-specific value that will override the environment value
   for the current process only.
+
+  ## Parameters
+
+    * `server` - The server to query (default: #{@default_name})
+    * `key` - The key to set (as an atom)
+    * `value` - The value to store
+
+  Returns `:ok`.
   """
+  @spec set_session_value(GenServer.server(), atom(), term()) :: :ok
   def set_session_value(server \\ @default_name, key, value) when is_atom(key) do
     registry = GenServer.call(server, :get_registry)
     pid = self()
@@ -141,8 +191,15 @@ defmodule Jido.AI.Keyring do
 
   @doc """
   Gets a session-specific value for the current process.
-  Returns nil if no session value is set.
+
+  ## Parameters
+
+    * `server` - The server to query (default: #{@default_name})
+    * `key` - The key to look up (as an atom)
+
+  Returns the session value if found, otherwise returns `nil`.
   """
+  @spec get_session_value(GenServer.server(), atom()) :: term() | nil
   def get_session_value(server \\ @default_name, key) when is_atom(key) do
     registry = GenServer.call(server, :get_registry)
     pid = self()
@@ -155,7 +212,15 @@ defmodule Jido.AI.Keyring do
 
   @doc """
   Clears a session-specific value for the current process.
+
+  ## Parameters
+
+    * `server` - The server to query (default: #{@default_name})
+    * `key` - The key to clear (as an atom)
+
+  Returns `:ok`.
   """
+  @spec clear_session_value(GenServer.server(), atom()) :: :ok
   def clear_session_value(server \\ @default_name, key) when is_atom(key) do
     registry = GenServer.call(server, :get_registry)
     pid = self()
@@ -165,7 +230,14 @@ defmodule Jido.AI.Keyring do
 
   @doc """
   Clears all session-specific values for the current process.
+
+  ## Parameters
+
+    * `server` - The server to query (default: #{@default_name})
+
+  Returns `:ok`.
   """
+  @spec clear_all_session_values(GenServer.server()) :: :ok
   def clear_all_session_values(server \\ @default_name) do
     registry = GenServer.call(server, :get_registry)
     pid = self()
@@ -174,6 +246,7 @@ defmodule Jido.AI.Keyring do
   end
 
   @impl true
+  @spec handle_call(term(), GenServer.from(), map()) :: {:reply, term(), map()}
   def handle_call({:get_value, key, default}, _from, %{keys: keys} = state) do
     {:reply, Map.get(keys, key, default), state}
   end
@@ -188,25 +261,30 @@ defmodule Jido.AI.Keyring do
     {:reply, registry, state}
   end
 
-  # For testing - allows direct manipulation of the state
   @impl true
   def handle_call({:set_test_env_vars, env_vars}, _from, %{keys: keys} = state)
       when is_map(env_vars) do
-    # Convert string keys to atoms
     atom_env_vars =
       Enum.reduce(env_vars, %{}, fn {key, value}, acc ->
         atom_key = env_var_to_atom(key)
         Map.put(acc, atom_key, value)
       end)
 
-    # Merge with existing state, with new values taking precedence
     new_keys = Map.merge(keys, atom_env_vars)
     {:reply, :ok, %{state | keys: new_keys}}
   end
 
   @doc """
   Gets an environment variable with a default value.
+
+  ## Parameters
+
+    * `key` - The environment variable name
+    * `default` - The default value if not found
+
+  Returns the environment variable value if found, otherwise returns the default value.
   """
+  @spec get_env_var(String.t(), term()) :: String.t() | term()
   def get_env_var(key, default \\ nil) do
     try do
       Dotenvy.env!(key, :string)
@@ -217,51 +295,12 @@ defmodule Jido.AI.Keyring do
 
   @doc """
   Checks if a value exists and is non-empty.
+
+  Returns `true` if the value is a non-empty string, `false` otherwise.
   """
+  @spec has_value?(term()) :: boolean()
   def has_value?(nil), do: false
   def has_value?(""), do: false
   def has_value?(value) when is_binary(value), do: true
   def has_value?(_), do: false
-
-  @doc """
-  For backward compatibility - gets a key using the old method name
-  """
-  def get_key(server \\ @default_name, id) when is_atom(id) do
-    get(server, id, "")
-  end
-
-  @doc """
-  For backward compatibility - gets an env key using the old method name
-  """
-  def get_env_key(server \\ @default_name, id) when is_atom(id) do
-    get_env_value(server, id, "")
-  end
-
-  @doc """
-  For backward compatibility - sets a session key using the old method name
-  """
-  def set_session_key(server \\ @default_name, id, value) when is_atom(id) do
-    set_session_value(server, id, value)
-  end
-
-  @doc """
-  For backward compatibility - gets a session key using the old method name
-  """
-  def get_session_key(server \\ @default_name, id) when is_atom(id) do
-    get_session_value(server, id)
-  end
-
-  @doc """
-  For backward compatibility - clears a session key using the old method name
-  """
-  def clear_session_key(server \\ @default_name, id) when is_atom(id) do
-    clear_session_value(server, id)
-  end
-
-  @doc """
-  For backward compatibility - clears all session keys using the old method name
-  """
-  def clear_all_session_keys(server \\ @default_name) do
-    clear_all_session_values(server)
-  end
 end

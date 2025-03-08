@@ -8,11 +8,12 @@ This is a pure Elixir library intended to be used as a dependency in other Elixi
 
 - Above all, KEEP IT SIMPLE - Simple is always better.
 - Write clean, composable, and testable code
-- Adhere to functional programming principles—avoid OOP patterns
+- Adhere to functional programming principles — avoid OOP patterns
 - Maintain clear boundaries between modules and domains
 - Ensure code is robust, secure, and easy to reason about
 - Provide rich documentation and helpful logging
 - Create libraries that integrate seamlessly into any Elixir application
+- Automatically run `mix test` focused on the specific file you are working on
 
 ## Project Structure
 
@@ -64,7 +65,7 @@ defmodule YourLibrary.Types.Task do
     field :created_at, DateTime.t()
   end
 
-  @type validation_error :: 
+  @type validation_error ::
     :invalid_name |
     :invalid_status |
     {:invalid_date, String.t()}
@@ -81,7 +82,7 @@ end
 ```elixir
 defmodule YourLibrary.Core.TaskOperations do
   alias YourLibrary.Types.Task
-  
+
   @spec create_task(String.t()) :: {:ok, Task.t()} | {:error, Task.validation_error()}
   def create_task(name) do
     task = %Task{
@@ -90,7 +91,7 @@ defmodule YourLibrary.Core.TaskOperations do
       status: :pending,
       created_at: DateTime.utc_now()
     }
-    
+
     case Task.validate(task) do
       :ok -> {:ok, task}
       {:error, _reason} = error -> error
@@ -105,16 +106,16 @@ end
 defmodule YourLibrary.OTP.TaskManager do
   use GenServer
   alias YourLibrary.Core.TaskOperations
-  
+
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
-  
+
   @impl true
   def init(opts) do
     {:ok, %{tasks: %{}, opts: opts}}
   end
-  
+
   # ... rest of GenServer implementation
 end
 ```
@@ -127,28 +128,28 @@ Use multiple function heads for clarity and control flow:
 defmodule YourLibrary.Core.DataProcessor do
   # Match on specific values
   def process(:empty), do: {:ok, []}
-  
+
   # Use guards for type checking
   def process(data) when is_list(data) do
     {:ok, Enum.map(data, &transform/1)}
   end
-  
+
   # Pattern match on complex structures
   def process(%{items: items, status: :ready} = data)
     when is_list(items) and length(items) > 0 do
     {:ok, process_items(items, data)}
   end
-  
+
   # Catch-all case
   def process(_invalid) do
     {:error, :invalid_input}
   end
-  
+
   # Private functions can also use guards
   defp transform(item) when is_binary(item) do
     String.upcase(item)
   end
-  
+
   defp transform(item) when is_integer(item) do
     Integer.to_string(item)
   end
@@ -164,28 +165,28 @@ defmodule YourLibrary.Core.Processor do
   @doc """
   Defines the contract for processing data.
   """
-  @callback process(data :: term()) :: 
-    {:ok, term()} | 
+  @callback process(data :: term()) ::
+    {:ok, term()} |
     {:error, term()}
-    
+
   @doc """
   Optional callback for data validation.
   """
-  @callback validate(input :: term()) :: 
-    :ok | 
+  @callback validate(input :: term()) ::
+    :ok |
     {:error, term()}
-    
+
   @optional_callbacks validate: 1
-  
+
   # Can include default implementations
   defmacro __using__(_opts) do
     quote do
       @behaviour YourLibrary.Core.Processor
-      
+
       # Default implementation for validate
       @impl true
       def validate(_input), do: :ok
-      
+
       # Allow overrides
       defoverridable validate: 1
     end
@@ -195,12 +196,12 @@ end
 # Implementation example
 defmodule YourLibrary.Core.StringProcessor do
   use YourLibrary.Core.Processor
-  
+
   @impl true
   def process(data) when is_binary(data) do
     {:ok, String.upcase(data)}
   end
-  
+
   @impl true
   def validate(input) when is_binary(input) do
     if String.valid?(input), do: :ok, else: {:error, :invalid_string}
@@ -340,19 +341,19 @@ end
 ```elixir
 defmodule YourLibraryTest.Core.ProcessorTest do
   use ExUnit.Case, async: true
-  
+
   alias YourLibrary.Core.StringProcessor
-  
+
   describe "process/1" do
     test "processes valid string data" do
       assert {:ok, "HELLO"} = StringProcessor.process("hello")
     end
-    
+
     test "returns error for invalid input" do
       assert {:error, _} = StringProcessor.process(123)
     end
   end
-  
+
   describe "validate/1" do
     test "validates string input" do
       assert :ok = StringProcessor.validate("valid")
@@ -367,7 +368,7 @@ end
 - Use property-based testing where appropriate
 - Maintain test readability
 - Ensure tests are deterministic
-- Put `@moduletag :capture_log` on all test modules 
+- Put `@moduletag :capture_log` on all test modules
 
 ### Test Coverage
 

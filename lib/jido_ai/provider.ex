@@ -1,6 +1,7 @@
 defmodule Jido.AI.Provider do
   use TypedStruct
   require Logger
+  alias Jido.AI.Provider.Helpers
 
   @providers [
     {:openrouter, Jido.AI.Provider.OpenRouter},
@@ -29,11 +30,25 @@ defmodule Jido.AI.Provider do
   Returns the base directory path for provider-specific files.
 
   This is where provider configuration, models, and other data files are stored.
-  The path is relative to the project root and expands to `./priv/providers/`.
+  The path is relative to the project root and expands to `./priv/provider/`.
   """
   def base_dir do
-    default = Application.app_dir(:jido_ai, "priv/provider")
+    default = Path.join([File.cwd!(), "priv", "provider"])
     Application.get_env(:jido_ai, :provider_base_dir, default)
+  end
+
+  @doc """
+  Standardizes a model name across providers by removing version numbers and dates.
+  This helps match equivalent models from different providers.
+
+  ## Examples
+      iex> standardize_model_name("claude-3.7-sonnet-20250219")
+      "claude-3.7-sonnet"
+      iex> standardize_model_name("gpt-4-0613")
+      "gpt-4"
+  """
+  def standardize_model_name(model_id) do
+    Helpers.standardize_name(model_id)
   end
 
   def providers do
@@ -159,33 +174,12 @@ defmodule Jido.AI.Provider do
   end
 
   @doc """
-  Ensures that a provider ID is an atom.
-
-  Converts strings to atoms if necessary.
+  Ensures the given value is an atom.
   """
+  @spec ensure_atom(atom() | String.t() | term()) :: atom() | term()
   def ensure_atom(id) when is_atom(id), do: id
-
-  def ensure_atom(id) when is_binary(id) do
-    case id do
-      "openai" ->
-        :openai
-
-      "anthropic" ->
-        :anthropic
-
-      "openrouter" ->
-        :openrouter
-
-      _ ->
-        try do
-          String.to_existing_atom(id)
-        rescue
-          ArgumentError ->
-            Logger.warning("Unknown provider ID: #{id}")
-            String.to_atom(id)
-        end
-    end
-  end
+  def ensure_atom(id) when is_binary(id), do: String.to_atom(id)
+  def ensure_atom(id), do: id
 
   def call_provider_callback(provider, callback, args) do
     impl = module_for(provider)
@@ -202,5 +196,77 @@ defmodule Jido.AI.Provider do
   defp module_for(:openai), do: Jido.AI.Provider.OpenAI
   defp module_for(:openrouter), do: Jido.AI.Provider.OpenRouter
 
-  def ensure_atom(id), do: id
+  @doc """
+  Lists all cached models across all providers.
+
+  ## Returns
+    - List of model maps, each containing provider information
+  """
+  def list_all_cached_models do
+    # Ensure the base directory exists
+    File.mkdir_p!(base_dir())
+
+    # Find all provider directories
+    provider_dirs =
+      case File.ls(base_dir()) do
+        {:ok, dirs} -> Enum.filter(dirs, &File.dir?(Path.join(base_dir(), &1)))
+        {:error, _} -> []
+      end
+
+    # Collect models from each provider
+    provider_dirs
+    |> Enum.flat_map(fn provider_dir ->
+      provider_id = String.to_atom(provider_dir)
+      models_file = Path.join([base_dir(), provider_dir, "models.json"])
+
+      if File.exists?(models_file) do
+        case File.read(models_file) do
+          {:ok, json} ->
+            case Jason.decode(json) do
+              {:ok, %{"data" => models}} when is_list(models) ->
+                Enum.map(models, &Map.put(&1, :provider, provider_id))
+
+              {:ok, models} when is_list(models) ->
+                Enum.map(models, &Map.put(&1, :provider, provider_id))
+
+              _ ->
+                []
+            end
+
+          _ ->
+            []
+        end
+      else
+        []
+      end
+    end)
+  end
+
+  @doc """
+  Retrieves combined information for a model across all providers.
+
+  ## Parameters
+    - model_name: The name of the model to search for
+
+  ## Returns
+    - {:ok, model_info} - Combined model information
+    - {:error, reason} - Error if model not found
+  """
+  def get_combined_model_info(model_name) do
+    models =
+      list_all_cached_models()
+      |> Enum.filter(fn model ->
+        model_id = Map.get(model, :id) || Map.get(model, "id")
+        standardized_name = standardize_model_name(model_id)
+        standardized_name == model_name
+      end)
+
+    if Enum.empty?(models) do
+      {:error, "No model found with name: #{model_name}"}
+    else
+      # Merge information from all matching models
+      merged_model = Helpers.merge_model_information(models)
+      {:ok, merged_model}
+    end
+  end
 end

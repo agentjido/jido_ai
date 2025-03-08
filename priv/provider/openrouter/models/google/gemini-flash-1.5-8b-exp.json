@@ -1,0 +1,25 @@
+{
+  "id": "google/gemini-flash-1.5-8b-exp",
+  "name": "Google: Gemini Flash 1.5 8B Experimental",
+  "description": "Gemini Flash 1.5 8B Experimental is an experimental, 8B parameter version of the [Gemini Flash 1.5](/models/google/gemini-flash-1.5) model.\n\nUsage of Gemini is subject to Google's [Gemini Terms of Use](https://ai.google.dev/terms).\n\n#multimodal\n\nNote: This model is currently experimental and not suitable for production use-cases, and may be heavily rate-limited.",
+  "capabilities": {
+    "code": false,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text+image->text",
+    "tokenizer": "Gemini",
+    "instruct_type": null
+  },
+  "created": 1724803200,
+  "endpoints": []
+}

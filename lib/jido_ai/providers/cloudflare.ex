@@ -112,11 +112,12 @@ defmodule Jido.AI.Provider.Cloudflare do
 
   @impl true
   def validate_model_opts(opts) do
-    {:ok, %Jido.AI.Model{
-      id: opts[:model_id] || "cloudflare_default",
-      name: opts[:model_name] || "Cloudflare Model",
-      provider: :cloudflare
-    }}
+    {:ok,
+     %Jido.AI.Model{
+       id: opts[:model_id] || "cloudflare_default",
+       name: opts[:model_name] || "Cloudflare Model",
+       provider: :cloudflare
+     }}
   end
 
   @impl true

@@ -20,18 +20,11 @@ defmodule Jido.AI.Agent do
     Jido.Agent.Server.start_link(opts)
   end
 
-
-  def chat_response(pid, message, opts \\ []) do
-    _personality = Keyword.get(opts, :personality, "You are a helpful assistant")
-    _prompt = Keyword.get(opts, :prompt, "")
-
+  def chat_response(pid, message) when is_binary(message) do
     {:ok, signal} =
       Jido.Signal.new(%{
         type: "jido.ai.chat.response",
         data: %{
-          prompt: "",
-          personality: "You are a helpful assistant",
-          history: [],
           message: message
         }
       })
@@ -39,17 +32,11 @@ defmodule Jido.AI.Agent do
     call(pid, signal)
   end
 
-  def tool_response(pid, message, opts \\ []) do
-    _personality = Keyword.get(opts, :personality, "You are a helpful assistant")
-    _prompt = Keyword.get(opts, :prompt, "")
-
+  def tool_response(pid, message) do
     {:ok, signal} =
       Jido.Signal.new(%{
         type: "jido.ai.tool.response",
         data: %{
-          prompt: "",
-          personality: "You are a helpful assistant",
-          history: [],
           message: message
         }
       })

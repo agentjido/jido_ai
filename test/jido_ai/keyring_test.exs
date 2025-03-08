@@ -38,9 +38,8 @@ defmodule JidoTest.AI.KeyringTest do
       registry = :"registry_#{System.unique_integer()}"
       {:ok, _} = Keyring.start_link(name: name, registry: registry)
 
-      # Test both old and new API
-      assert Keyring.get_key(name, :anthropic_api_key) == "test_anthropic_key"
-      assert Keyring.get_key(name, :openai_api_key) == "test_openai_key"
+      assert Keyring.get(name, :anthropic_api_key, nil) == "test_anthropic_key"
+      assert Keyring.get(name, :openai_api_key, nil) == "test_openai_key"
       assert Keyring.get(name, :test_environment_variable, nil) == "test_value"
     end
 
@@ -101,10 +100,6 @@ defmodule JidoTest.AI.KeyringTest do
       # Set session value
       Keyring.set_session_value(name, :test_key, "session_test_value")
       assert Keyring.get_session_value(name, :test_key) == "session_test_value"
-
-      # Test backward compatibility methods
-      Keyring.set_session_key(name, :test_key2, "session_test_value2")
-      assert Keyring.get_session_key(name, :test_key2) == "session_test_value2"
     end
 
     test "session values take precedence over environment variables" do
@@ -222,12 +217,6 @@ defmodule JidoTest.AI.KeyringTest do
       # Should fall back to env vars
       assert Keyring.get(name, :test_environment_variable, nil) == "env_test_value"
       assert Keyring.get(name, :test_environment_variable2, nil) == "env_test_value2"
-
-      # Test backward compatibility method
-      Keyring.set_session_key(name, :test_environment_variable, "session_test_value")
-      assert Keyring.get(name, :test_environment_variable, nil) == "session_test_value"
-      Keyring.clear_all_session_keys(name)
-      assert Keyring.get(name, :test_environment_variable, nil) == "env_test_value"
     end
   end
 

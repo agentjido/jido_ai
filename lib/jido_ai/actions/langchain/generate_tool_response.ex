@@ -27,8 +27,7 @@ defmodule Jido.AI.Actions.Langchain.GenerateToolResponse do
   end
 
   def run(params, _context) do
-    Logger.metadata(action: "generate_tool_response")
-    Logger.debug("Starting tool response generation", params: inspect(params))
+    Logger.debug("Starting tool response generation, params: #{inspect(params)}")
 
     add_function = Function.new!(Add.to_tool())
     subtract_function = Function.new!(Subtract.to_tool())
@@ -73,10 +72,8 @@ defmodule Jido.AI.Actions.Langchain.GenerateToolResponse do
       end
     catch
       kind, reason ->
-        Logger.warning("Unexpected error in tool response generation",
-          kind: kind,
-          error: inspect(reason),
-          stacktrace: __STACKTRACE__
+        Logger.warning(
+          "Unexpected error in tool response generation, kind: #{kind}, error: #{inspect(reason)}, stacktrace: #{inspect(__STACKTRACE__)}"
         )
 
         {:error, reason}

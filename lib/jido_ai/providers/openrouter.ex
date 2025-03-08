@@ -6,7 +6,6 @@ defmodule Jido.AI.Provider.OpenRouter do
   """
   @behaviour Jido.AI.Model.Provider.Adapter
   alias Jido.AI.Provider
-  alias Jido.AI.Provider.Helpers
 
   @base_url "https://openrouter.ai/api/v1"
 
@@ -141,11 +140,12 @@ defmodule Jido.AI.Provider.OpenRouter do
 
   @impl true
   def validate_model_opts(opts) do
-    {:ok, %Jido.AI.Model{
-      id: opts[:model_id] || "openrouter_default",
-      name: opts[:model_name] || "OpenRouter Model",
-      provider: :openrouter
-    }}
+    {:ok,
+     %Jido.AI.Model{
+       id: opts[:model_id] || "openrouter_default",
+       name: opts[:model_name] || "OpenRouter Model",
+       provider: :openrouter
+     }}
   end
 
   @impl true
@@ -164,7 +164,8 @@ defmodule Jido.AI.Provider.OpenRouter do
   """
   def build(opts) do
     # Extract or generate an API key
-    api_key = Jido.AI.Provider.Helpers.get_api_key(opts, "OPENROUTER_API_KEY", :openrouter_api_key)
+    api_key =
+      Jido.AI.Provider.Helpers.get_api_key(opts, "OPENROUTER_API_KEY", :openrouter_api_key)
 
     # Get model_id from opts
     model_id = Keyword.get(opts, :model_id)

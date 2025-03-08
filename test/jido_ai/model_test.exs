@@ -13,13 +13,14 @@ defmodule JidoTest.AI.ModelTest do
                     id: "anthropic_test",
                     name: "Test Model",
                     modality: "text",
-                    model: "claude-3-5-haiku"
+                    model_id: "claude-3-5-haiku"
                   ]}
                )
 
       assert model.id == "anthropic_test"
       assert model.name == "Test Model"
       assert model.architecture.modality == "text"
+      assert model.model_id == "claude-3-5-haiku"
     end
 
     test "validates provider with capabilities" do
@@ -30,6 +31,7 @@ defmodule JidoTest.AI.ModelTest do
                     id: "anthropic_test",
                     name: "Test Model",
                     modality: "text",
+                    model_id: "claude-3-5-haiku",
                     capabilities: [:chat]
                   ]}
                )
@@ -37,14 +39,17 @@ defmodule JidoTest.AI.ModelTest do
       assert model.id == "anthropic_test"
       assert model.name == "Test Model"
       assert model.architecture.modality == "text"
+      assert model.model_id == "claude-3-5-haiku"
     end
 
     test "validates provider atom" do
-      assert {:ok, model} = Model.validate_model_opts(:anthropic)
+      assert {:ok, model} =
+               Model.validate_model_opts({:anthropic, [model_id: "claude-3-5-haiku"]})
 
-      assert model.id == "anthropic_default"
-      assert model.name == "anthropic Model"
+      assert model.id == "anthropic_claude-3-5-haiku"
+      assert model.name == "Anthropic claude-3-5-haiku"
       assert model.architecture.modality == "text"
+      assert model.model_id == "claude-3-5-haiku"
     end
 
     # test "validates category-based model" do
@@ -57,27 +62,41 @@ defmodule JidoTest.AI.ModelTest do
 
     test "rejects invalid provider" do
       assert {:error, message} = Model.validate_model_opts(:invalid_provider)
-      assert message =~ "Invalid provider"
+      assert message =~ "Invalid model specification"
+    end
+
+    test "rejects missing model_id for Anthropic" do
+      assert {:error, message} =
+               Model.validate_model_opts(
+                 {:anthropic,
+                  [
+                    id: "anthropic_test",
+                    name: "Test Model",
+                    modality: "text"
+                  ]}
+               )
+
+      assert message == "model_id is required for Anthropic models"
     end
   end
 
   describe "new!/2" do
     test "creates model with provider and options" do
-      result = Model.new!(:anthropic, model: "claude-3-5-haiku-20240307")
+      result = Model.new!(:anthropic, model_id: "claude-3-5-haiku-20240307")
       assert is_tuple(result)
       assert elem(result, 0) == :anthropic
-      assert Keyword.get(elem(result, 1), :model) == "claude-3-5-haiku-20240307"
+      assert Keyword.get(elem(result, 1), :model_id) == "claude-3-5-haiku-20240307"
     end
 
     test "creates model with tuple format" do
-      result = Model.new!({:anthropic, [model: "claude-3-5-haiku-20240307"]})
+      result = Model.new!({:anthropic, [model_id: "claude-3-5-haiku-20240307"]})
       assert is_tuple(result)
       assert elem(result, 0) == :anthropic
-      assert Keyword.get(elem(result, 1), :model) == "claude-3-5-haiku-20240307"
+      assert Keyword.get(elem(result, 1), :model_id) == "claude-3-5-haiku-20240307"
     end
 
     test "handles unknown provider" do
-      result = Model.new!(:unknown_provider, model: "test-model")
+      result = Model.new!(:unknown_provider, model_id: "test-model")
       assert is_tuple(result)
       assert elem(result, 0) == :openai
       assert Keyword.get(elem(result, 1), :original_provider) == :unknown_provider

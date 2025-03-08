@@ -4,7 +4,7 @@ defmodule Jido.AI.Prompt.MessageItem do
 
   Each message has a role (system, user, assistant, function) and content.
   The content can be either a raw string, an EEx template to be rendered,
-  or a list of content parts for rich media support.
+  a Liquid template to be rendered, or a list of content parts for rich media support.
   """
 
   use TypedStruct
@@ -13,16 +13,16 @@ defmodule Jido.AI.Prompt.MessageItem do
     @typedoc "A message item within a prompt"
 
     # role can be :system, :assistant, :user, :function, etc.
-    field :role, atom(), default: :user
+    field(:role, atom(), default: :user)
 
-    # Either a raw string, an EEx template, or a list of content parts
-    field :content, String.t() | list(), default: ""
+    # Either a raw string, an EEx template, a Liquid template, or a list of content parts
+    field(:content, String.t() | list(), default: "")
 
     # Indicates whether the content is a template or plain text
-    field :engine, :eex | :none, default: :none
+    field(:engine, :eex | :liquid | :none, default: :none)
 
     # Optional name field for function calling or other uses
-    field :name, String.t(), default: nil
+    field(:name, String.t(), default: nil)
   end
 
   @doc """
@@ -35,6 +35,9 @@ defmodule Jido.AI.Prompt.MessageItem do
 
       iex> Jido.AI.Prompt.MessageItem.new(%{role: :system, content: "You are <%= @assistant_type %>", engine: :eex})
       %Jido.AI.Prompt.MessageItem{role: :system, content: "You are <%= @assistant_type %>", engine: :eex}
+
+      iex> Jido.AI.Prompt.MessageItem.new(%{role: :user, content: "Hello {{ name }}", engine: :liquid})
+      %Jido.AI.Prompt.MessageItem{role: :user, content: "Hello {{ name }}", engine: :liquid}
   """
   def new(attrs) when is_map(attrs) do
     struct(__MODULE__, attrs)

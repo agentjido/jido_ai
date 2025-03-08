@@ -141,7 +141,7 @@ defmodule Jido.AI.Provider.Anthropic do
     %Jido.AI.Model{
       id: opts[:model_id],
       name: opts[:model_name],
-      description: opts[:model_description],
+      description: opts[:model_description]
       # capabilities: opts[:model_capabilities],
       # tier: opts[:model_tier]
     }
@@ -248,7 +248,8 @@ defmodule Jido.AI.Provider.Anthropic do
         max_tokens: model["max_tokens_to_sample"],
         context_length: model["context_window"],
         capabilities: extract_capabilities(model),
-        tier: determine_tier(model)
+        tier: determine_tier(model),
+        provider: @provider_id
       }
     end)
   end
@@ -264,11 +265,13 @@ defmodule Jido.AI.Provider.Anthropic do
       max_tokens: model_data["max_tokens_to_sample"],
       context_length: model_data["context_window"],
       capabilities: extract_capabilities(model_data),
-      tier: determine_tier(model_data)
+      tier: determine_tier(model_data),
+      provider: @provider_id
     }
   end
 
-  defp process_single_model(_, model_id), do: %{id: model_id, name: model_id}
+  defp process_single_model(_, model_id),
+    do: %{id: model_id, name: model_id, provider: @provider_id}
 
   # Extract capabilities based on the model's name and other properties
   defp extract_capabilities(model) do
