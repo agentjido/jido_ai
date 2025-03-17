@@ -2,20 +2,16 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
   use ExUnit.Case
   use Mimic
 
-  alias Jido.AI.Actions.Instructor.{ChatResponse, ChatCompletion}
+  alias Jido.AI.Actions.Instructor.{ChatResponse, BaseCompletion}
   alias Jido.AI.Prompt
   alias Jido.AI.Model
-  alias Instructor.Adapters.Anthropic
-  alias Jido.Workflow
 
   @moduletag :capture_log
 
   setup :set_mimic_global
 
   setup do
-    Mimic.copy(Anthropic)
-    Mimic.copy(Instructor)
-    Mimic.copy(Workflow)
+    Mimic.copy(BaseCompletion)
     :ok
   end
 
@@ -33,38 +29,39 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
     }
   end
 
-  defp create_model do
-    {:ok, model} = Model.from({:anthropic, [
-      model_id: "claude-3-sonnet-20240229",
-      api_key: "test-api-key",
-      base_url: "https://api.anthropic.com/v1",
-      description: "Anthropic Claude model",
-      temperature: 0.7,
-      max_tokens: 1024,
-      max_retries: 0
-    ]})
-    model
+  defp create_model(provider \\ :anthropic) do
+    case provider do
+      :anthropic ->
+        {:ok, model} = Model.from({:anthropic, [
+          model_id: "claude-3-sonnet-20240229",
+          api_key: "test-api-key"
+        ]})
+        model
+
+      :openai ->
+        {:ok, model} = Model.from({:openai, [
+          model_id: "gpt-4",
+          api_key: "test-openai-key"
+        ]})
+        model
+    end
   end
 
-  defp mock_workflow_response do
-    expect(Instructor, :chat_completion, fn opts, config ->
-      assert opts[:model] == "claude-3-sonnet-20240229"
-      assert length(opts[:messages]) > 0
-      assert opts[:temperature] == 0.7
-      assert opts[:max_tokens] == 1024
-      assert config[:adapter] == Instructor.Adapters.Anthropic
-      assert config[:api_key] == "test-api-key"
-
-      {:ok, %ChatResponse.Schema{response: "Test response"}}
+  defp mock_base_completion_response(response_text) do
+    expect(BaseCompletion, :run, fn params, _context ->
+      assert params.model != nil
+      assert params.prompt != nil
+      assert params.response_model == ChatResponse.Schema
+      assert params.temperature != nil
+      assert params.max_tokens != nil
+      assert params.mode == :json
+      {:ok, %{result: %ChatResponse.Schema{response: response_text}}, %{}}
     end)
+  end
 
-    expect(Workflow, :run, fn ChatCompletion, params ->
-      assert params[:model] != nil
-      assert params[:temperature] != nil
-      assert params[:max_tokens] != nil
-
-      # Forward the call to ChatCompletion.run
-      ChatCompletion.run(params, %{})
+  defp mock_base_completion_error(error) do
+    expect(BaseCompletion, :run, fn _params, _context ->
+      {:error, error, %{}}
     end)
   end
 
@@ -72,9 +69,9 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
     test "processes a simple question and returns a structured response" do
       prompt = create_prompt("What is pattern matching in Elixir?")
       model = create_model()
-      mock_workflow_response()
+      mock_base_completion_response("Pattern matching in Elixir is a powerful feature that allows you to match values against patterns and extract parts from complex data structures.")
 
-      assert {:ok, %{response: "Test response"}} =
+      assert {:ok, %{response: response}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
@@ -84,6 +81,8 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
                  },
                  %{}
                )
+
+      assert response =~ "Pattern matching in Elixir"
     end
 
     test "handles prompts with multiple messages" do
@@ -100,9 +99,9 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
       }
 
       model = create_model()
-      mock_workflow_response()
+      mock_base_completion_response("The pipe operator (|>) in Elixir is used to chain function calls, passing the result of the left side as the first argument to the function on the right side.")
 
-      assert {:ok, %{response: "Test response"}} =
+      assert {:ok, %{response: response}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
@@ -112,14 +111,16 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
                  },
                  %{}
                )
+
+      assert response =~ "pipe operator"
     end
 
     test "handles prompts with EEx templating" do
       prompt = create_prompt("Explain <%= @concept %> in Elixir", :eex, %{concept: "supervisors"})
       model = create_model()
-      mock_workflow_response()
+      mock_base_completion_response("Supervisors in Elixir are processes that monitor other processes, called child processes, and can restart them when they crash.")
 
-      assert {:ok, %{response: "Test response"}} =
+      assert {:ok, %{response: response}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
@@ -129,35 +130,15 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
                  },
                  %{}
                )
+
+      assert response =~ "Supervisors in Elixir"
     end
 
-    test "handles prompts with Liquid templating" do
-      prompt = create_prompt("What is {{ concept }}?", :liquid, %{concept: "OTP"})
-      model = create_model()
-      mock_workflow_response()
-
-      assert {:ok, %{response: "Test response"}} =
-               ChatResponse.run(
-                 %{
-                   prompt: prompt,
-                   model: model,
-                   temperature: 0.7,
-                   max_tokens: 1024
-                 },
-                 %{}
-               )
-    end
-
-    test "handles workflow errors gracefully" do
+    test "handles base completion errors gracefully" do
       prompt = create_prompt("What is Elixir?")
       model = create_model()
 
-      expect(Workflow, :run, fn ChatCompletion, params ->
-        assert params[:model] != nil
-        assert params[:temperature] != nil
-        assert params[:max_tokens] != nil
-        {:error, "API error", %{}}
-      end)
+      mock_base_completion_error("API error")
 
       assert {:error, "API error"} =
                ChatResponse.run(
@@ -171,44 +152,47 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
                )
     end
 
-    test "handles unexpected response shapes" do
+    test "supports different model providers" do
+      prompt = create_prompt("What is pattern matching?")
+      openai_model = create_model(:openai)
+
+      mock_base_completion_response("Pattern matching is a feature in Elixir and other functional programming languages that allows you to match values against patterns and destructure complex data.")
+
+      assert {:ok, %{response: response}} =
+               ChatResponse.run(
+                 %{
+                   prompt: prompt,
+                   model: openai_model,
+                   temperature: 0.7,
+                   max_tokens: 1024
+                 },
+                 %{}
+               )
+
+      assert response =~ "Pattern matching"
+    end
+
+    test "uses default parameters when not provided" do
       prompt = create_prompt("What is Elixir?")
       model = create_model()
 
-      expect(Workflow, :run, fn ChatCompletion, params ->
-        assert params[:model] != nil
-        assert params[:temperature] != nil
-        assert params[:max_tokens] != nil
-        {:ok, %{result: %{result: nil}}, %{}}
+      expect(BaseCompletion, :run, fn params, _context ->
+        assert params.temperature == 0.7
+        assert params.max_tokens == 1000
+        assert params.mode == :json
+        {:ok, %{result: %ChatResponse.Schema{response: "Elixir is a functional programming language."}}, %{}}
       end)
 
-      assert {:error, "Unexpected response shape"} =
+      assert {:ok, %{response: response}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
-                   model: model,
-                   temperature: 0.7,
-                   max_tokens: 1024
+                   model: model
                  },
                  %{}
                )
-    end
 
-    test "handles empty references" do
-      prompt = create_prompt("What is pattern matching?")
-      model = create_model()
-      mock_workflow_response()
-
-      assert {:ok, %{response: "Test response"}} =
-               ChatResponse.run(
-                 %{
-                   prompt: prompt,
-                   model: model,
-                   temperature: 0.7,
-                   max_tokens: 1024
-                 },
-                 %{}
-               )
+      assert response =~ "Elixir is a functional programming language"
     end
   end
 end

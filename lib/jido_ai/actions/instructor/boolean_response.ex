@@ -21,33 +21,57 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponse do
     name: "get_boolean_response",
     description: "Get a true/false answer to a question with explanation",
     schema: [
+      model: [
+        type: {:custom, Jido.AI.Model, :validate_model_opts, []},
+        doc: "The AI model to use (defaults to Anthropic Claude)",
+        default: {:anthropic, [model_id: "claude-3-haiku-20240307"]}
+      ],
       prompt: [
         type: {:custom, Jido.AI.Prompt, :validate_prompt_opts, []},
         required: true,
         doc: "The prompt containing the yes/no question"
+      ],
+      temperature: [
+        type: :float,
+        default: 0.1,
+        doc: "Temperature for response randomness (lower is more deterministic)"
+      ],
+      max_tokens: [
+        type: :integer,
+        default: 500,
+        doc: "Maximum tokens in response"
       ]
     ]
 
-  alias Jido.AI.Actions.Instructor.ChatCompletion
+  alias Jido.AI.Actions.Instructor.BaseCompletion
   alias Jido.AI.Model
 
-  def run(params, _context) do
-    Logger.debug("Starting boolean response generation with params: #{inspect(params)}")
+  def run(params, context) do
+    # Create a map with all optional parameters set to defaults
+    params_with_defaults =
+      Map.merge(
+        %{
+          temperature: 0.1,
+          max_tokens: 500
+        },
+        params
+      )
 
     # Create a model using the provider tuple format
-    {:ok, model} = Model.from({:anthropic, [model_id: "claude-3-haiku-20240307"]})
+    {:ok, model} = Model.from(params_with_defaults.model)
 
     # Add system message to force structured boolean response
-    enhanced_prompt = add_boolean_system_message(params.prompt)
+    enhanced_prompt = add_boolean_system_message(params_with_defaults.prompt)
 
-    # Make the chat completion call
-    case Jido.Workflow.run(ChatCompletion, %{
+    # Make the chat completion call directly
+    case BaseCompletion.run(%{
            model: model,
            prompt: enhanced_prompt,
            response_model: Schema,
-           temperature: 0.1,
-           max_tokens: 500
-         }) do
+           temperature: params_with_defaults.temperature,
+           max_tokens: params_with_defaults.max_tokens,
+           mode: :json,
+         }, context) do
       {:ok, %{result: %Schema{} = response}, _} ->
         {:ok,
          %{

@@ -1,12 +1,13 @@
 defmodule Examples.ToolAgent02 do
   alias Jido.AI.Agent
   alias Jido.Actions.Arithmetic.{Add, Subtract, Multiply, Divide}
+  require Logger
 
   def demo do
     {:ok, pid} =
       Agent.start_link(
         ai: [
-          model: {:anthropic, chat: :small},
+          model: {:anthropic,  model_id: "claude-3-haiku-20240307"},
           prompt: """
           You are a super math genius.
           You are given a math problem and you need to solve it using the tools provided.
@@ -20,12 +21,17 @@ defmodule Examples.ToolAgent02 do
         ]
       )
 
-    agent_state = Agent.state(pid)
+    # {:ok, agent_state} = Agent.state(pid)
+    # Logger.info("Agent state: #{inspect(agent_state, pretty: true)}")
 
-    require Logger
-    Logger.info("Agent state: #{inspect(agent_state)}")
+    {:ok, result} = Agent.tool_response(pid, "What is 100 + 100?")
+    Logger.info("Result: #{inspect(result, pretty: true)}")
 
-    result = Agent.tool_response(pid, "What is 100 + 100?")
-    Logger.info("Result: #{inspect(result)}")
+    # agent_state = Agent.state(pid)
+
+    # Logger.info("Agent state: #{inspect(agent_state)}")
+
+    # result = Agent.tool_response(pid, "What is 100 + 100?")
+    # Logger.info("Result: #{inspect(result)}")
   end
 end

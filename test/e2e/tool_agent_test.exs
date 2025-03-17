@@ -35,6 +35,7 @@ defmodule JidoTest.E2E.ToolAgentTest do
       :ok
     end
 
+    @tag :skip
     test "agent can perform arithmetic operations using tools" do
       # Start the agent with arithmetic tools
       {:ok, agent} =

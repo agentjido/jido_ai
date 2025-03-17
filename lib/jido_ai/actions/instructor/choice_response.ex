@@ -20,6 +20,11 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponse do
     name: "generate_chat_response",
     description: "Choose an option and explain why",
     schema: [
+      model: [
+        type: {:custom, Jido.AI.Model, :validate_model_opts, []},
+        doc: "The AI model to use (defaults to Anthropic Claude)",
+        default: {:anthropic, [model_id: "claude-3-haiku-20240307"]}
+      ],
       prompt: [
         type: {:custom, Jido.AI.Prompt, :validate_prompt_opts, []},
         required: true,
@@ -29,32 +34,53 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponse do
         type: {:list, :map},
         required: true,
         doc: "List of available options to choose from, each with an id, name, and description"
+      ],
+      temperature: [
+        type: :float,
+        default: 0.7,
+        doc: "Temperature for response randomness"
+      ],
+      max_tokens: [
+        type: :integer,
+        default: 1000,
+        doc: "Maximum tokens in response"
       ]
     ]
 
-  alias Jido.AI.Actions.Instructor.ChatCompletion
+  alias Jido.AI.Actions.Instructor.BaseCompletion
   alias Jido.AI.Model
 
-  def run(params, _context) do
+  def run(params, context) do
     Logger.debug("Starting choice response generation with params: #{inspect(params)}")
 
+    # Create a map with all optional parameters set to defaults
+    params_with_defaults =
+      Map.merge(
+        %{
+          temperature: 0.7,
+          max_tokens: 1000
+        },
+        params
+      )
+
     # Create a model using the provider tuple format
-    {:ok, model} = Model.from({:anthropic, [model_id: "claude-3-haiku-20240307"]})
+    {:ok, model} = Model.from(params_with_defaults.model)
 
     # Get list of valid option IDs
-    valid_options = Enum.map(params.available_actions, & &1.id)
+    valid_options = Enum.map(params_with_defaults.available_actions, & &1.id)
 
     # Enhance the prompt with available options
-    enhanced_prompt = add_choice_system_message(params.prompt, params.available_actions)
+    enhanced_prompt = add_choice_system_message(params_with_defaults.prompt, params_with_defaults.available_actions)
 
-    # Make the chat completion call
-    case Jido.Workflow.run(ChatCompletion, %{
+    # Make the chat completion call directly
+    case BaseCompletion.run(%{
            model: model,
            prompt: enhanced_prompt,
            response_model: Schema,
-           temperature: 0.7,
-           max_tokens: 1000
-         }) do
+           temperature: params_with_defaults.temperature,
+           max_tokens: params_with_defaults.max_tokens,
+           mode: :json
+         }, context) do
       {:ok, %{result: %Schema{} = response}, _} ->
         if response.selected_option in valid_options do
           {:ok,

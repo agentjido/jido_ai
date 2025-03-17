@@ -28,8 +28,8 @@ defmodule Examples.BasicAgent01 do
         ]
       )
 
-    {:ok, agent_state} = Agent.state(pid)
-    Logger.info("Agent state: #{inspect(agent_state, pretty: true)}")
+    # {:ok, agent_state} = Agent.state(pid)
+    # Logger.info("Agent state: #{inspect(agent_state, pretty: true)}")
 
     {:ok, result} = Agent.chat_response(pid, "What is the capital of France?")
     Logger.info("Result: #{inspect(result, pretty: true)}")

@@ -1,9 +1,9 @@
-defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
+defmodule JidoTest.AI.Actions.Instructor.BaseCompletionTest do
   use ExUnit.Case
   use Mimic
   require Logger
 
-  alias Jido.AI.Actions.Instructor.ChatCompletion
+  alias Jido.AI.Actions.Instructor.BaseCompletion
   alias Jido.AI.Model
   alias Jido.AI.Prompt
 
@@ -24,7 +24,7 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
       Mimic.copy(Instructor)
 
       # Create a mock model for Anthropic
-      model = %Model{
+      anthropic_model = %Model{
         provider: :anthropic,
         model_id: "claude-3-sonnet-20240229",
         api_key: "test-api-key",
@@ -42,12 +42,18 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
         endpoints: []
       }
 
+      # Create a mock model for OpenAI
+      openai_model = %{anthropic_model | provider: :openai}
+
+      # Create a mock model for Ollama
+      ollama_model = %{anthropic_model | provider: :ollama, base_url: "http://test-ollama:11434"}
+
       # Create a prompt
       prompt = Prompt.new(:user, "Hello, how are you?")
 
       # Create valid params
       params = %{
-        model: model,
+        model: anthropic_model,
         prompt: prompt,
         response_model: TestResponse
       }
@@ -55,7 +61,14 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
       # Create context
       context = %{state: %{}}
 
-      {:ok, %{model: model, prompt: prompt, params: params, context: context}}
+      {:ok, %{
+        anthropic_model: anthropic_model,
+        openai_model: openai_model,
+        ollama_model: ollama_model,
+        prompt: prompt,
+        params: params,
+        context: context
+      }}
     end
 
     test "successfully processes a valid request", %{params: params, context: context} do
@@ -78,7 +91,7 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
         {:ok, expected_response}
       end)
 
-      assert {:ok, %{result: ^expected_response}, %{}} = ChatCompletion.run(params, context)
+      assert {:ok, %{result: ^expected_response}, %{}} = BaseCompletion.run(params, context)
     end
 
     test "handles error response from Instructor", %{params: params, context: context} do
@@ -86,7 +99,7 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
         {:error, "API Error"}
       end)
 
-      assert {:error, "API Error", %{}} = ChatCompletion.run(params, context)
+      assert {:error, "API Error", %{}} = BaseCompletion.run(params, context)
     end
 
     test "handles nil response from Instructor", %{params: params, context: context} do
@@ -95,7 +108,7 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
       end)
 
       assert {:error, "Instructor chat completion returned nil", %{}} =
-        ChatCompletion.run(params, context)
+        BaseCompletion.run(params, context)
     end
 
     test "handles streaming response", %{params: params, context: context} do
@@ -108,7 +121,7 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
         {:ok, expected_response}
       end)
 
-      assert {:ok, %{result: ^expected_response}, %{}} = ChatCompletion.run(params, context)
+      assert {:ok, %{result: ^expected_response}, %{}} = BaseCompletion.run(params, context)
     end
 
     test "handles partial streaming response", %{params: params, context: context} do
@@ -121,38 +134,75 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
         {:ok, expected_response}
       end)
 
-      assert {:ok, %{result: ^expected_response}, %{}} = ChatCompletion.run(params, context)
+      assert {:ok, %{result: ^expected_response}, %{}} = BaseCompletion.run(params, context)
     end
 
     test "handles optional parameters", %{params: params, context: context} do
       params = Map.merge(params, %{
         top_p: 0.9,
         stop: ["END"],
-        max_retries: 2
+        max_retries: 2,
+        mode: :json
       })
 
       expect(Instructor, :chat_completion, fn opts, _config ->
         assert opts[:top_p] == 0.9
         assert opts[:stop] == ["END"]
         assert opts[:max_retries] == 2
+        assert opts[:mode] == :json
         {:ok, %TestResponse{message: "Response"}}
       end)
 
       assert {:ok, %{result: %TestResponse{message: "Response"}}, %{}} =
-        ChatCompletion.run(params, context)
+        BaseCompletion.run(params, context)
+    end
+
+    test "uses OpenAI adapter for OpenAI provider", %{openai_model: model, prompt: prompt, context: context} do
+      params = %{
+        model: model,
+        prompt: prompt,
+        response_model: TestResponse
+      }
+
+      expect(Instructor, :chat_completion, fn _opts, config ->
+        assert config[:adapter] == Instructor.Adapters.OpenAI
+        assert config[:openai][:api_key] == "test-api-key"
+        {:ok, %TestResponse{message: "OpenAI response"}}
+      end)
+
+      assert {:ok, %{result: %TestResponse{message: "OpenAI response"}}, %{}} =
+        BaseCompletion.run(params, context)
+    end
+
+    test "uses Ollama provider configuration", %{ollama_model: model, prompt: prompt, context: context} do
+      params = %{
+        model: model,
+        prompt: prompt,
+        response_model: TestResponse
+      }
+
+      expect(Instructor, :chat_completion, fn _opts, config ->
+        assert config[:adapter] == Instructor.Adapters.OpenAI
+        assert config[:openai][:api_key] == "test-api-key"
+        assert config[:openai][:api_url] == "http://test-ollama:11434"
+        {:ok, %TestResponse{message: "Ollama response"}}
+      end)
+
+      assert {:ok, %{result: %TestResponse{message: "Ollama response"}}, %{}} =
+        BaseCompletion.run(params, context)
     end
 
     test "validates model specification", context do
       params = %{context.params | model: "invalid_model"}
 
       assert {:error, "Invalid model specification: \"invalid_model\""} =
-        ChatCompletion.on_before_validate_params(params)
+        BaseCompletion.on_before_validate_params(params)
     end
 
     test "converts string to system prompt", context do
       params = %{context.params | prompt: "Hello, system!"}
 
-      assert {:ok, validated_params} = ChatCompletion.on_before_validate_params(params)
+      assert {:ok, validated_params} = BaseCompletion.on_before_validate_params(params)
       assert %Prompt{} = validated_params.prompt
       assert [%{role: :system, content: "Hello, system!"}] = Prompt.render(validated_params.prompt)
     end
@@ -161,7 +211,7 @@ defmodule JidoTest.AI.Actions.Instructor.ChatCompletionTest do
       params = %{context.params | prompt: ["not a string or prompt"]}
 
       assert {:error, "Expected a string or a Jido.AI.Prompt struct, got: [\"not a string or prompt\"]"} =
-        ChatCompletion.on_before_validate_params(params)
+        BaseCompletion.on_before_validate_params(params)
     end
   end
 end

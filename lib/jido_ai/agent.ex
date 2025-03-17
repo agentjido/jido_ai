@@ -21,26 +21,27 @@ defmodule Jido.AI.Agent do
   end
 
   def chat_response(pid, message) when is_binary(message) do
-    {:ok, signal} =
-      Jido.Signal.new(%{
-        type: "jido.ai.chat.response",
-        data: %{
-          message: message
-        }
-      })
+    {:ok, signal} = build_signal("jido.ai.chat.response", message)
 
     call(pid, signal)
   end
 
   def tool_response(pid, message) do
-    {:ok, signal} =
-      Jido.Signal.new(%{
-        type: "jido.ai.tool.response",
-        data: %{
-          message: message
-        }
-      })
+    {:ok, signal} = build_signal("jido.ai.tool.response", message)
 
     call(pid, signal)
+  end
+
+  def boolean_response(pid, message) do
+    {:ok, signal} = build_signal("jido.ai.boolean.response", message)
+
+    call(pid, signal)
+  end
+
+  defp build_signal(type, message) do
+    Jido.Signal.new(%{
+      type: type,
+      data: %{message: message}
+    })
   end
 end

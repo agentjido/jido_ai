@@ -2,9 +2,9 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
   use ExUnit.Case
   use Mimic
 
-  alias Jido.AI.Actions.Instructor.{BooleanResponse, ChatCompletion}
+  alias Jido.AI.Actions.Instructor.{BooleanResponse, BaseCompletion}
   alias Jido.AI.Prompt
-  alias Jido.Workflow
+  alias Jido.AI.Model
 
   @moduletag :capture_log
 
@@ -12,43 +12,60 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
 
   setup do
     Mimic.copy(BooleanResponse)
-    Mimic.copy(Workflow)
+    Mimic.copy(BaseCompletion)
     :ok
   end
 
   describe "run/2" do
     setup do
+      model = %Model{
+        provider: :anthropic,
+        model_id: "claude-3-haiku-20240307",
+        api_key: "test-api-key",
+        temperature: 0.1,
+        max_tokens: 500,
+        name: "Test Model",
+        id: "test-model",
+        description: "Test Model",
+        created: System.system_time(:second),
+        architecture: %Model.Architecture{
+          modality: "text",
+          tokenizer: "unknown",
+          instruct_type: nil
+        },
+        endpoints: []
+      }
+
       prompt = %Prompt{
         id: "test-prompt-id",
         messages: [
-          %{role: :system, content: "You are a precise reasoning engine that answers questions with true or false.\n- If you can determine a clear answer, set answer to true or false\n- Always provide a brief explanation of your reasoning\n- Set confidence between 0.00 and 1.00 based on certainty\n- If the question is ambiguous, set is_ambiguous to true and explain why\n"},
           %{role: :user, content: "Is this a test?"}
         ],
         version: 1
       }
 
-      {:ok, %{prompt: prompt}}
+      {:ok, %{model: model, prompt: prompt}}
     end
 
-    defp mock_workflow_response(expected_response) do
-      expect(Workflow, :run, fn ChatCompletion, params ->
-        assert params[:model] != nil
-        assert params[:temperature] != nil
-        assert params[:max_tokens] != nil
+    defp mock_base_completion_response(expected_response) do
+      expect(BaseCompletion, :run, fn params, _context ->
+        assert params.model != nil
+        assert params.prompt != nil
+        assert params.response_model == BooleanResponse.Schema
+        assert params.temperature != nil
+        assert params.max_tokens != nil
+        assert params.mode == :json
         {:ok, %{result: expected_response}, %{}}
       end)
     end
 
-    defp mock_workflow_error(error) do
-      expect(Workflow, :run, fn ChatCompletion, params ->
-        assert params[:model] != nil
-        assert params[:temperature] != nil
-        assert params[:max_tokens] != nil
+    defp mock_base_completion_error(error) do
+      expect(BaseCompletion, :run, fn _params, _context ->
         {:error, error, %{}}
       end)
     end
 
-    test "returns true for clear affirmative response", %{prompt: prompt} do
+    test "returns true for clear affirmative response", %{model: model, prompt: prompt} do
       expected_response = %BooleanResponse.Schema{
         answer: true,
         explanation: "The sky is blue on a clear day due to Rayleigh scattering of sunlight.",
@@ -56,16 +73,16 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
         is_ambiguous: false
       }
 
-      mock_workflow_response(expected_response)
+      mock_base_completion_response(expected_response)
 
-      assert {:ok, response} = BooleanResponse.run(%{prompt: prompt}, %{})
+      assert {:ok, response} = BooleanResponse.run(%{model: model, prompt: prompt}, %{})
       assert response.result == true
       assert response.explanation == expected_response.explanation
       assert response.confidence == expected_response.confidence
       assert response.is_ambiguous == false
     end
 
-    test "returns false for clear negative response", %{prompt: prompt} do
+    test "returns false for clear negative response", %{model: model, prompt: prompt} do
       expected_response = %BooleanResponse.Schema{
         answer: false,
         explanation: "The sky is not green on a clear day. It appears blue due to Rayleigh scattering.",
@@ -73,16 +90,16 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
         is_ambiguous: false
       }
 
-      mock_workflow_response(expected_response)
+      mock_base_completion_response(expected_response)
 
-      assert {:ok, response} = BooleanResponse.run(%{prompt: prompt}, %{})
+      assert {:ok, response} = BooleanResponse.run(%{model: model, prompt: prompt}, %{})
       assert response.result == false
       assert response.explanation == expected_response.explanation
       assert response.confidence == expected_response.confidence
       assert response.is_ambiguous == false
     end
 
-    test "handles ambiguous questions", %{prompt: prompt} do
+    test "handles ambiguous questions", %{model: model, prompt: prompt} do
       expected_response = %BooleanResponse.Schema{
         answer: false,
         explanation: "The question is ambiguous as it lacks context about what 'this' refers to.",
@@ -90,17 +107,16 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
         is_ambiguous: true
       }
 
-      mock_workflow_response(expected_response)
+      mock_base_completion_response(expected_response)
 
-      assert {:ok, response} = BooleanResponse.run(%{prompt: prompt}, %{})
+      assert {:ok, response} = BooleanResponse.run(%{model: model, prompt: prompt}, %{})
       assert response.is_ambiguous == true
       assert response.confidence == 0.0
       assert response.explanation == expected_response.explanation
     end
 
-    test "handles prompts with multiple messages", %{prompt: prompt} do
+    test "handles prompts with multiple messages", %{model: model, prompt: prompt} do
       prompt = %{prompt | messages: [
-        %{role: :system, content: "You are a precise reasoning engine that answers questions with true or false.\n- If you can determine a clear answer, set answer to true or false\n- Always provide a brief explanation of your reasoning\n- Set confidence between 0.00 and 1.00 based on certainty\n- If the question is ambiguous, set is_ambiguous to true and explain why\n"},
         %{role: :system, content: "You are a helpful assistant."},
         %{role: :user, content: "Is this a test?"}
       ]}
@@ -112,36 +128,39 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
         is_ambiguous: false
       }
 
-      mock_workflow_response(expected_response)
+      mock_base_completion_response(expected_response)
 
-      assert {:ok, response} = BooleanResponse.run(%{prompt: prompt}, %{})
+      assert {:ok, response} = BooleanResponse.run(%{model: model, prompt: prompt}, %{})
       assert response.result == true
       assert response.explanation == expected_response.explanation
       assert response.confidence == expected_response.confidence
       assert response.is_ambiguous == false
     end
 
-    test "handles workflow errors gracefully", %{prompt: prompt} do
-      mock_workflow_error("API error")
+    test "handles BaseCompletion errors gracefully", %{model: model, prompt: prompt} do
+      mock_base_completion_error("API error")
 
-      assert {:error, "API error"} = BooleanResponse.run(%{prompt: prompt}, %{})
+      assert {:error, "API error"} = BooleanResponse.run(%{model: model, prompt: prompt}, %{})
     end
 
-    test "handles unexpected response shapes", %{prompt: prompt} do
+    test "supports different model providers", %{prompt: prompt} do
+      openai_model = %Model{
+        provider: :openai,
+        model_id: "gpt-4",
+        api_key: "test-openai-key"
+      }
+
       expected_response = %BooleanResponse.Schema{
         answer: true,
-        explanation: "This is a test question.",
-        confidence: 0.9,
+        explanation: "This is a test as indicated by the context.",
+        confidence: 0.98,
         is_ambiguous: false
       }
 
-      mock_workflow_response(expected_response)
+      mock_base_completion_response(expected_response)
 
-      assert {:ok, response} = BooleanResponse.run(%{prompt: prompt}, %{})
+      assert {:ok, response} = BooleanResponse.run(%{model: openai_model, prompt: prompt}, %{})
       assert response.result == true
-      assert response.explanation == expected_response.explanation
-      assert response.confidence == expected_response.confidence
-      assert response.is_ambiguous == false
     end
   end
 end
