@@ -57,7 +57,7 @@ defmodule Jido.Ai.MixProject do
 
       # Clients
       {:req, "~> 0.5.8"},
-      {:openai_ex, "~> 0.8.6"},
+      {:openai_ex, "~> 0.9.0"},
       {:instructor, "~> 0.1.0"},
       {:langchain, "~> 0.3.1"},
 

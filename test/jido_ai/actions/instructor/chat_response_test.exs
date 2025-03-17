@@ -2,16 +2,20 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
   use ExUnit.Case
   use Mimic
 
-  alias Jido.AI.Actions.Instructor.ChatResponse
+  alias Jido.AI.Actions.Instructor.{ChatResponse, ChatCompletion}
   alias Jido.AI.Prompt
   alias Jido.AI.Model
+  alias Instructor.Adapters.Anthropic
+  alias Jido.Workflow
 
   @moduletag :capture_log
 
   setup :set_mimic_global
 
   setup do
-    Mimic.copy(ChatResponse)
+    Mimic.copy(Anthropic)
+    Mimic.copy(Instructor)
+    Mimic.copy(Workflow)
     :ok
   end
 
@@ -30,45 +34,39 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
   end
 
   defp create_model do
-    Model.from(%{
-      max_retries: 0,
-      max_tokens: 1024,
-      temperature: 0.7,
+    {:ok, model} = Model.from({:anthropic, [
       model_id: "claude-3-sonnet-20240229",
       api_key: "test-api-key",
       base_url: "https://api.anthropic.com/v1",
-      endpoints: [],
       description: "Anthropic Claude model",
-      created: 1_741_285_515,
-      architecture: %{
-        tokenizer: "unknown",
-        modality: "text",
-        instruct_type: nil
-      },
-      provider: :anthropic,
-      name: "Anthropic claude-3-sonnet-20240229",
-      id: "anthropic_claude-3-sonnet-20240229"
-    })
+      temperature: 0.7,
+      max_tokens: 1024,
+      max_retries: 0
+    ]})
+    model
   end
 
   defp mock_workflow_response do
-    expect(ChatResponse, :run, fn params, _opts ->
+    expect(Instructor, :chat_completion, fn opts, config ->
+      assert opts[:model] == "claude-3-sonnet-20240229"
+      assert length(opts[:messages]) > 0
+      assert opts[:temperature] == 0.7
+      assert opts[:max_tokens] == 1024
+      assert config[:adapter] == Instructor.Adapters.Anthropic
+      assert config[:api_key] == "test-api-key"
+
+      {:ok, %ChatResponse.Schema{response: "Test response"}}
+    end)
+
+    expect(Workflow, :run, fn ChatCompletion, params ->
       assert params[:model] != nil
       assert params[:temperature] != nil
       assert params[:max_tokens] != nil
-      {:ok, %{content: "Test response"}}
+
+      # Forward the call to ChatCompletion.run
+      ChatCompletion.run(params, %{})
     end)
   end
-
-  defp mock_workflow_error do
-    expect(ChatResponse, :run, fn params, _opts ->
-      assert params[:model] != nil
-      assert params[:temperature] != nil
-      assert params[:max_tokens] != nil
-      {:error, "API error"}
-    end)
-  end
-
 
   describe "run/2" do
     test "processes a simple question and returns a structured response" do
@@ -76,7 +74,7 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
       model = create_model()
       mock_workflow_response()
 
-      assert {:ok, %{content: "Test response"}} =
+      assert {:ok, %{response: "Test response"}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
@@ -104,7 +102,7 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
       model = create_model()
       mock_workflow_response()
 
-      assert {:ok, %{content: "Test response"}} =
+      assert {:ok, %{response: "Test response"}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
@@ -121,7 +119,7 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
       model = create_model()
       mock_workflow_response()
 
-      assert {:ok, %{content: "Test response"}} =
+      assert {:ok, %{response: "Test response"}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
@@ -138,7 +136,7 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
       model = create_model()
       mock_workflow_response()
 
-      assert {:ok, %{content: "Test response"}} =
+      assert {:ok, %{response: "Test response"}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
@@ -153,7 +151,13 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
     test "handles workflow errors gracefully" do
       prompt = create_prompt("What is Elixir?")
       model = create_model()
-      mock_workflow_error()
+
+      expect(Workflow, :run, fn ChatCompletion, params ->
+        assert params[:model] != nil
+        assert params[:temperature] != nil
+        assert params[:max_tokens] != nil
+        {:error, "API error", %{}}
+      end)
 
       assert {:error, "API error"} =
                ChatResponse.run(
@@ -171,14 +175,14 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
       prompt = create_prompt("What is Elixir?")
       model = create_model()
 
-      expect(ChatResponse, :run, fn params, _opts ->
+      expect(Workflow, :run, fn ChatCompletion, params ->
         assert params[:model] != nil
         assert params[:temperature] != nil
         assert params[:max_tokens] != nil
         {:ok, %{result: %{result: nil}}, %{}}
       end)
 
-      assert {:ok, %{result: %{result: nil}}, %{}} =
+      assert {:error, "Unexpected response shape"} =
                ChatResponse.run(
                  %{
                    prompt: prompt,
@@ -195,7 +199,7 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
       model = create_model()
       mock_workflow_response()
 
-      assert {:ok, %{content: "Test response"}} =
+      assert {:ok, %{response: "Test response"}} =
                ChatResponse.run(
                  %{
                    prompt: prompt,

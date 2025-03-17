@@ -1,6 +1,6 @@
 defmodule Jido.AI.Actions.Instructor.ChatCompletion do
   @moduledoc """
-  A low-level thunk that provides direct access to Instructor's chat completion functionality.
+  A low-level action that provides direct access to Instructor's chat completion functionality.
   Supports most Instructor options and integrates with Jido's Model and Prompt structures.
   """
   use Jido.Action,
@@ -41,7 +41,7 @@ defmodule Jido.AI.Actions.Instructor.ChatCompletion do
 
   @impl true
   def on_before_validate_params(params) do
-    Logger.info("ChatCompletion validation params: #{inspect(params)}")
+    # Logger.info("ChatCompletion validation params: #{inspect(params, pretty: true)}")
 
     with {:ok, model} <- validate_model(params.model),
          {:ok, prompt} <- Prompt.validate_prompt_opts(params.prompt) do
@@ -70,11 +70,6 @@ defmodule Jido.AI.Actions.Instructor.ChatCompletion do
         params
       )
 
-    # Get the rendered messages from the prompt and convert role atoms to strings
-    messages =
-      Prompt.render(params.prompt)
-      |> Enum.map(fn msg -> %{msg | role: Atom.to_string(msg.role)} end)
-
     # Build the Instructor options
     model_id = get_model_id(params.model)
 
@@ -87,7 +82,7 @@ defmodule Jido.AI.Actions.Instructor.ChatCompletion do
     opts =
       [
         model: model_id,
-        messages: messages,
+        messages: convert_messages(params.prompt.messages),
         response_model: get_response_model(params_with_defaults),
         temperature: params_with_defaults.temperature,
         max_tokens: params_with_defaults.max_tokens,
@@ -97,6 +92,7 @@ defmodule Jido.AI.Actions.Instructor.ChatCompletion do
       |> add_if_present(:top_p, params_with_defaults.top_p)
       |> add_if_present(:stop, params_with_defaults.stop)
 
+    # Make the chat completion call
     case Instructor.chat_completion(opts, config) do
       {:ok, response} ->
         {:ok, %{result: response}, %{}}
@@ -138,4 +134,14 @@ defmodule Jido.AI.Actions.Instructor.ChatCompletion do
 
   defp add_if_present(opts, _key, nil), do: opts
   defp add_if_present(opts, key, value), do: Keyword.put(opts, key, value)
+
+  # Convert messages to Instructor format
+  defp convert_messages(messages) do
+    Enum.map(messages, fn message ->
+      %{
+        role: to_string(message.role),
+        content: message.content
+      }
+    end)
+  end
 end

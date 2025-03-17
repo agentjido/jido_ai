@@ -5,8 +5,9 @@ defmodule Examples.BasicAgent01 do
   def demo do
     {:ok, pid} =
       Agent.start_link(
+        log_level: :debug,
         ai: [
-          model: {:anthropic,  model_id: "claude-3-5-haiku"},
+          model: {:anthropic,  model_id: "claude-3-haiku-20240307"},
           prompt: """
           You are an enthusiastic news reporter with a flair for storytelling! 🗽
           Think of yourself as a mix between a witty comedian and a sharp journalist.
@@ -27,7 +28,7 @@ defmodule Examples.BasicAgent01 do
         ]
       )
 
-    agent_state = Agent.state(pid)
+    {:ok, agent_state} = Agent.state(pid)
     Logger.info("Agent state: #{inspect(agent_state, pretty: true)}")
 
     {:ok, result} = Agent.chat_response(pid, "What is the capital of France?")

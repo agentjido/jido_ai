@@ -77,11 +77,11 @@ defmodule Jido.AI.Keyring do
   @impl true
   @spec init(atom()) :: {:ok, map()}
   def init(registry) do
-    Logger.debug("Initializing environment variables")
-
     env = load_from_env()
     app_env = load_from_app_env()
     keys = Map.merge(app_env, env)
+
+    Logger.debug("[Jido.AI.Keyring] Initializing environment variables")
 
     {:ok, %{keys: keys, registry: registry}}
   end

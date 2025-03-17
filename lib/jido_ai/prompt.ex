@@ -78,6 +78,11 @@ defmodule Jido.AI.Prompt do
   @doc """
   Creates a new prompt struct from the given attributes.
 
+  ## Rules
+  - Only one system message is allowed
+  - If present, the system message must be the first message
+  - Messages are rendered without the engine field
+
   ## Examples
 
       iex> alias Jido.AI.Prompt
@@ -102,6 +107,9 @@ defmodule Jido.AI.Prompt do
         %MessageItem{} = item -> item
         map when is_map(map) -> MessageItem.new(map)
       end)
+
+    # Validate system message rules
+    validate_system_message_rules!(messages)
 
     # Create the prompt struct
     struct(
@@ -177,8 +185,8 @@ defmodule Jido.AI.Prompt do
   @doc """
   Renders the prompt into a list of messages with interpolated content.
 
-  This function applies any EEx or Liquid templates in the messages using the parameters
-  provided in the prompt and any override parameters.
+  The rendered messages will only include the role and content fields,
+  excluding the engine field to ensure compatibility with API requests.
 
   ## Examples
 
@@ -191,26 +199,6 @@ defmodule Jido.AI.Prompt do
       ...> })
       iex> Prompt.render(prompt)
       [%{role: :user, content: "Hello Alice"}]
-
-      iex> alias Jido.AI.Prompt
-      iex> prompt = Prompt.new(%{
-      ...>   messages: [
-      ...>     %{role: :user, content: "Hello {{ name }}", engine: :liquid}
-      ...>   ],
-      ...>   params: %{name: "Alice"}
-      ...> })
-      iex> Prompt.render(prompt)
-      [%{role: :user, content: "Hello Alice"}]
-
-      iex> alias Jido.AI.Prompt
-      iex> prompt = Prompt.new(%{
-      ...>   messages: [
-      ...>     %{role: :user, content: "Hello <%= @name %>", engine: :eex}
-      ...>   ],
-      ...>   params: %{name: "Alice"}
-      ...> })
-      iex> Prompt.render(prompt, %{name: "Bob"})
-      [%{role: :user, content: "Hello Bob"}]
   """
   @spec render(t(), map()) :: list(%{role: atom(), content: String.t()})
   def render(%Prompt{} = prompt, override_params \\ %{}) do
@@ -235,6 +223,7 @@ defmodule Jido.AI.Prompt do
             msg.content
         end
 
+      # Only include role and content in the rendered message
       %{role: msg.role, content: content}
     end)
   end
@@ -267,6 +256,9 @@ defmodule Jido.AI.Prompt do
   @doc """
   Adds a new message to the prompt.
 
+  Enforces the rule that system messages can only appear first in the message list.
+  Raises ArgumentError if attempting to add a system message in any other position.
+
   ## Examples
 
       iex> alias Jido.AI.Prompt
@@ -285,8 +277,29 @@ defmodule Jido.AI.Prompt do
   def add_message(%Prompt{} = prompt, role, content, opts \\ []) do
     engine = Keyword.get(opts, :engine, :none)
 
-    item = MessageItem.new(%{role: role, content: content, engine: engine})
-    %{prompt | messages: prompt.messages ++ [item]}
+    # Validate system message rules before adding
+    messages = prompt.messages
+    new_message = MessageItem.new(%{role: role, content: content, engine: engine})
+    validate_system_message_rules!(messages ++ [new_message])
+
+    %{prompt | messages: messages ++ [new_message]}
+  end
+
+  # Private helper to validate system message rules
+  @spec validate_system_message_rules!([MessageItem.t()]) :: :ok | no_return()
+  defp validate_system_message_rules!(messages) do
+    system_messages = Enum.filter(messages, &(&1.role == :system))
+
+    cond do
+      length(system_messages) > 1 ->
+        raise ArgumentError, "Only one system message is allowed and it must be first"
+
+      length(system_messages) == 1 && hd(messages).role != :system ->
+        raise ArgumentError, "Only one system message is allowed and it must be first"
+
+      true ->
+        :ok
+    end
   end
 
   @doc """

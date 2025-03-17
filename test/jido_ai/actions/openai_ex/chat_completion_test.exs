@@ -9,7 +9,19 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
   alias OpenaiEx.ChatMessage
   alias Jido.Actions.Arithmetic.Add
 
+  # Define test response model at module level
+  defmodule TestResponse do
+    use Ecto.Schema
+
+    embedded_schema do
+      field :message, :string
+    end
+  end
+
   @moduletag :capture_log
+
+  # Add global mock setup
+  setup :set_mimic_global
 
   describe "run/2" do
     setup do

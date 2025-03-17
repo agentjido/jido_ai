@@ -13,6 +13,9 @@ defmodule JidoTest.AI.Actions.Langchain.ChatCompletionTest do
 
   @moduletag :capture_log
 
+  # Add global mock setup
+  setup :set_mimic_global
+
   describe "run/2" do
     setup do
       # Copy LangChain modules for Mimic

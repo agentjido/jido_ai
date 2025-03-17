@@ -42,6 +42,26 @@ defmodule JidoTest.AI.PromptTest do
       assert assistant.role == :assistant
     end
 
+    test "enforces single system message at start" do
+      assert_raise ArgumentError, ~r/Only one system message is allowed and it must be first/, fn ->
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello"},
+            %{role: :system, content: "System prompt"}
+          ]
+        })
+      end
+
+      assert_raise ArgumentError, ~r/Only one system message is allowed and it must be first/, fn ->
+        Prompt.new(%{
+          messages: [
+            %{role: :system, content: "First system"},
+            %{role: :system, content: "Second system"}
+          ]
+        })
+      end
+    end
+
     test "creates a prompt with parameters" do
       prompt =
         Prompt.new(%{
@@ -157,9 +177,25 @@ defmodule JidoTest.AI.PromptTest do
       result = Prompt.render(prompt)
       assert length(result) == 3
       [system, user, assistant] = result
-      assert system.content == "You are an helpful assistant"
-      assert user.content == "Hello Alice"
-      assert assistant.content == "Hi there!"
+      assert system == %{role: :system, content: "You are an helpful assistant"}
+      assert user == %{role: :user, content: "Hello Alice"}
+      assert assistant == %{role: :assistant, content: "Hi there!"}
+    end
+
+    test "excludes engine field from rendered messages" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :system, content: "System prompt", engine: :eex},
+            %{role: :user, content: "User message", engine: :liquid}
+          ]
+        })
+
+      result = Prompt.render(prompt)
+      assert [system, user] = result
+      refute Map.has_key?(system, :engine)
+      refute Map.has_key?(user, :engine)
+      assert Enum.all?(result, &(Map.keys(&1) == [:role, :content]))
     end
 
     test "renders a prompt with Liquid template filters" do
@@ -277,6 +313,33 @@ defmodule JidoTest.AI.PromptTest do
       assert List.last(updated.messages).role == :assistant
       assert List.last(updated.messages).content == "Hi <%= @name %>!"
       assert List.last(updated.messages).engine == :eex
+    end
+
+    test "prevents adding system message if not first" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :user, content: "Hello"}
+          ]
+        })
+
+      assert_raise ArgumentError, ~r/Only one system message is allowed and it must be first/, fn ->
+        Prompt.add_message(prompt, :system, "System message")
+      end
+    end
+
+    test "prevents adding second system message" do
+      prompt =
+        Prompt.new(%{
+          messages: [
+            %{role: :system, content: "First system message"},
+            %{role: :user, content: "Hello"}
+          ]
+        })
+
+      assert_raise ArgumentError, ~r/Only one system message is allowed and it must be first/, fn ->
+        Prompt.add_message(prompt, :system, "Second system message")
+      end
     end
   end
 

@@ -44,13 +44,14 @@ defmodule Jido.AI.Actions.Instructor.ChatResponse do
   alias Jido.AI.Model
 
   def run(params, _context) do
-    Logger.debug("Starting chat response generation with params: #{inspect(params)}")
+    Logger.debug("Starting chat response generation with params: #{inspect(params, pretty: true)}")
 
     # Create a model using the provider tuple format
     {:ok, model} = Model.from(params.model)
 
     # Add system message to guide response structure
     enhanced_prompt = add_chat_system_message(params.prompt)
+    Logger.debug("Enhanced prompt: #{inspect(enhanced_prompt, pretty: true)}")
 
     # Make the chat completion call
     case Jido.Workflow.run(ChatCompletion, %{

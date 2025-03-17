@@ -1,11 +1,12 @@
-defmodule Jido.E2E.ToolAgentTest do
+defmodule JidoTest.E2E.ToolAgentTest do
   use ExUnit.Case, async: false
   use Mimic
+
+  @moduletag :capture_log
 
   require Logger
 
   alias Jido.AI.Agent
-  alias Jido.AI.Actions.Instructor.ChatCompletion
   alias Jido.Actions.Arithmetic.{Add, Subtract, Multiply, Divide}
   alias Instructor.Adapters.Anthropic
 
@@ -53,26 +54,9 @@ defmodule Jido.E2E.ToolAgentTest do
           ]
         )
 
-      state = Agent.state(agent)
-      # Log initial state
-      # Logger.info("Initial agent state: #{inspect(Agent.state(agent))}")
-      # IO.inspect(state, label: "Initial agent state")
-
-      # # Test addition
-      {:ok, result} = Agent.chat_response(agent, "What is the capital of France?")
-      IO.inspect(result)
-      # assert result == 200
-
-      # # Test multiplication
-      # {:ok, result} = Agent.tool_response(agent, "What is 4 * 6?")
-      # assert result == 200
-
-      # # Test complex operation
-      # {:ok, result} = Agent.tool_response(agent, "What is (5 + 3) * 2?")
-      # assert result == 200
-
-      # # Log final state
-      # Logger.info("Final agent state: #{inspect(Agent.state(agent))}")
+      # Test chat response
+      assert {:ok, %{response: response}} = Agent.chat_response(agent, "What is the capital of France?")
+      assert is_binary(response)
     end
   end
 end
