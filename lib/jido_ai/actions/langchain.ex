@@ -188,11 +188,26 @@ defmodule Jido.AI.Actions.Langchain do
     with {:ok, model} <- validate_model(params_with_defaults.model),
          {:ok, chat_model} <- create_chat_model(model, params_with_defaults),
          {:ok, messages} <- convert_messages(params_with_defaults.prompt),
-         {:ok, result} <- create_and_run_chain(chat_model, messages, params_with_defaults) do
-      if params_with_defaults.stream do
-        {:ok, stream_response(result)}
-      else
-        format_response(result)
+         result <- create_and_run_chain(chat_model, messages, params_with_defaults) do
+      case result do
+        {:ok, chain_result} ->
+          if params_with_defaults.stream do
+            {:ok, stream_response(chain_result)}
+          else
+            format_response(chain_result)
+          end
+
+        {:error, %LangChain.LangChainError{message: message}} ->
+          Logger.error("Chain run failed: #{message}")
+          {:error, "Chain run failed"}
+
+        {:error, %LLMChain{}, %LangChain.LangChainError{message: message}} ->
+          Logger.error("Chain run failed: #{message}")
+          {:error, "Chain run failed"}
+
+        {:error, error} ->
+          Logger.error("Chain run failed: #{inspect(error)}")
+          format_response({:error, error})
       end
     else
       {:error, reason} ->

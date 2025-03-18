@@ -287,69 +287,6 @@ defmodule JidoTest.AI.Actions.LangchainTest do
                LangchainAction.run(params, context)
     end
 
-    @tag :skip
-    test "successfully processes a streaming request", %{
-      params: params,
-      context: context
-    } do
-      # Add streaming to params
-      params = Map.put(params, :stream, true)
-
-      # Create expected chat model with streaming
-      expected_chat_model =
-        ChatOpenAI.new!(%{
-          api_key: "test-api-key",
-          model: "gpt-4",
-          temperature: 0.7,
-          max_tokens: 1024,
-          stream: true
-        })
-
-      # Create mock stream chunks
-      mock_chunks = [
-        %{delta: %{content: "Hello"}, finish_reason: nil},
-        %{delta: %{content: ", world!"}, finish_reason: nil},
-        %{delta: %{content: nil}, finish_reason: "stop"}
-      ]
-
-      # Mock the chat model creation
-      expect(ChatOpenAI, :new!, fn opts ->
-        assert opts[:api_key] == "test-api-key"
-        assert opts[:model] == "gpt-4"
-        assert opts[:stream] == true
-        expected_chat_model
-      end)
-
-      # Mock chain creation to support streaming
-      expect(LLMChain, :new!, fn _opts ->
-        %LLMChain{llm: expected_chat_model, verbose: false}
-      end)
-
-      expect(LLMChain, :add_messages, fn chain, _messages ->
-        chain
-      end)
-
-      # Always mock LLMChain.run directly for streaming tests
-      expect(LLMChain, :run, fn _chain, _opts ->
-        {:ok, mock_chunks}
-      end)
-
-      {:ok, stream} = LangchainAction.run(params, context)
-
-      # Test that the stream produces the right chunks
-      chunks = Enum.to_list(stream)
-      assert length(chunks) == 3
-      assert Enum.at(chunks, 0) == %{content: "Hello", tool_results: [], complete: false}
-      assert Enum.at(chunks, 1) == %{content: ", world!", tool_results: [], complete: false}
-
-      assert Enum.at(chunks, 2) == %{
-               content: nil,
-               tool_results: [],
-               complete: true,
-               finish_reason: "stop"
-             }
-    end
-
     test "successfully handles tool calls", %{
       params: params,
       context: context
@@ -450,7 +387,6 @@ defmodule JidoTest.AI.Actions.LangchainTest do
                LangchainAction.run(params, context)
     end
 
-    @tag :skip
     test "handles chain run errors gracefully", %{params: params, context: context} do
       # Create expected chat model
       expected_chat_model =
@@ -474,7 +410,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
         chain
       end)
 
-      expect(LLMChain, :run, fn _chain, _opts ->
+      expect(LLMChain, :run, fn _chain ->
         {:error,
          %LangChain.LangChainError{
            type: nil,

@@ -135,7 +135,8 @@ defmodule Jido.Ai.MixProject do
         {"guides/keyring.md", title: "Managing Keys"},
         {"guides/prompt.md", title: "Prompting"},
         {"guides/providers.md", title: "LLM Providers"},
-        {"guides/agent-skill.md", title: "AI Agent & Skill"}
+        {"guides/agent-skill.md", title: "Agent & Skill"},
+        {"guides/actions.md", title: "Actions"}
       ]
     ]
   end
