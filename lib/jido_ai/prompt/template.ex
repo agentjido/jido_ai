@@ -12,9 +12,7 @@ defmodule Jido.AI.Prompt.Template do
   Here's an example of setting up a template using a parameter then later
   providing the input value.
 
-      import Jido.AI.Prompt.Sigil
-
-      template = ~p"What's a name for a company that makes <%= @product %>?"
+      template = Jido.AI.Prompt.Template.from_string!("What's a name for a company that makes <%= @product %>?")
 
       # later, format the final text after after applying the values.
       Jido.AI.Prompt.Template.format(template, %{product: "colorful socks"})

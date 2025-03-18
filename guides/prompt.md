@@ -1,287 +1,353 @@
-# Jido.AI.Prompt Module Documentation
+# Jido.AI.Prompt
 
-## Overview
+## Introduction
 
-The `Jido.AI.Prompt` module provides a powerful, struct-based approach to managing AI conversations. It enables developers to create, version, and render prompts with dynamic content substitution, making it ideal for building sophisticated AI interactions in Elixir applications.
+The `Jido.AI.Prompt` module provides a structured approach to managing conversations with Large Language Models (LLMs). Instead of working with simple strings, this module enables developers to create, version, manipulate, and render sophisticated prompts with dynamic content substitution.
 
 ## Core Concepts
 
-### What Problem Does Jido.AI.Prompt Solve?
+### Understanding the Prompt Architecture
 
-When building AI-powered applications, managing prompts as simple strings becomes unwieldy as applications grow in complexity. The `Jido.AI.Prompt` module solves this by offering:
+The `Jido.AI.Prompt` module is built around a central struct with these key components:
 
-1. **Structured Prompt Management**: Organizes prompts as versioned, inspectable structs
-2. **Template Support**: Integrates seamlessly with EEx and Liquid templates
-3. **Conversation History**: Maintains version history for debugging and rollback
-4. **Parameter Substitution**: Simplifies dynamic content generation
+```elixir
+typedstruct do
+  field(:id, String.t(), default: Jido.Util.generate_id())
+  field(:version, non_neg_integer(), default: 1)
+  field(:history, list(map()), default: [])
+  field(:messages, list(MessageItem.t()), default: [])
+  field(:params, map(), default: %{})
+  field(:metadata, map(), default: %{})
+end
+```
 
-## Basic Usage
+- **Messages**: The core content of the prompt, each with a role (system, user, assistant)
+- **Parameters**: Values that can be interpolated into templated messages
+- **Versioning**: Built-in tracking of prompt changes with history and rollback capability
 
-### Creating a Simple Prompt
+## Getting Started
+
+### Creating Basic Prompts
 
 ```elixir
 alias Jido.AI.Prompt
 
-# Create a basic prompt with a single message
-prompt = Prompt.new(%{
+# Simple prompt with a single message
+prompt = Prompt.new(:user, "How do I use Elixir's pattern matching?")
+
+# Multiple messages
+complex_prompt = Prompt.new(%{
   messages: [
-    %{role: :user, content: "Hello AI assistant"}
+    %{role: :system, content: "You are a programming assistant"},
+    %{role: :user, content: "Explain pattern matching in Elixir"}
   ]
 })
-
-# Create a prompt with specific role and content
-system_prompt = Prompt.new(:system, "You are a helpful coding assistant specializing in Elixir")
 ```
 
-### Working with Templates
+### Rendering Prompts for LLM Submission
+
+To convert your prompt into a format suitable for LLM API calls:
 
 ```elixir
-# Create a prompt with EEx template
+# Get a list of message maps
+messages = Prompt.render(prompt)
+# => [%{role: :user, content: "How do I use Elixir's pattern matching?"}]
+
+# For debugging or text-based APIs
+text_format = Prompt.to_text(prompt)
+# => "[user] How do I use Elixir's pattern matching?"
+```
+
+## Working with Templates
+
+The module's true power emerges when using templates for dynamic content generation.
+
+### Template-Based Messages
+
+```elixir
+# Create a prompt with EEx templates
 template_prompt = Prompt.new(%{
   messages: [
     %{role: :system, content: "You are a <%= @assistant_type %>", engine: :eex},
     %{role: :user, content: "Help me with <%= @topic %>", engine: :eex}
   ],
   params: %{
-    assistant_type: "helpful AI assistant",
-    topic: "prompt engineering"
+    assistant_type: "programming assistant",
+    topic: "recursion"
   }
 })
 
-# Render messages with default parameters
+# Render with default parameters
 messages = Prompt.render(template_prompt)
-# => [
-#      %{role: :system, content: "You are a helpful AI assistant"},
-#      %{role: :user, content: "Help me with prompt engineering"}
-#    ]
 
 # Override parameters during rendering
-messages = Prompt.render(template_prompt, %{topic: "Elixir programming"})
-# => [
-#      %{role: :system, content: "You are a helpful AI assistant"},
-#      %{role: :user, content: "Help me with Elixir programming"}
-#    ]
+messages = Prompt.render(template_prompt, %{topic: "list comprehensions"})
 ```
 
-## Going Deeper
+### Template Engines
 
-### Prompt Versioning
-
-The `Prompt` module maintains version history, enabling you to track changes and roll back when needed:
+The module supports different template engines:
 
 ```elixir
-# Create initial prompt
+# EEx (Embedded Elixir) - default
+eex_message = %{
+  role: :user, 
+  content: "My name is <%= @name %>, I need help with <%= @topic %>", 
+  engine: :eex
+}
+
+# Liquid templates
+liquid_message = %{
+  role: :user, 
+  content: "My name is {{ name }}, I need help with {{ topic }}", 
+  engine: :liquid
+}
+```
+
+## Building Conversations
+
+### Adding Messages
+
+```elixir
+# Start with a system message
+prompt = Prompt.new(:system, "You are a helpful assistant")
+
+# Add a user question
+prompt = Prompt.add_message(prompt, :user, "How does pattern matching work?")
+
+# Add an assistant response
+prompt = Prompt.add_message(prompt, :assistant, "Pattern matching in Elixir allows...")
+
+# Add a follow-up question
+prompt = Prompt.add_message(prompt, :user, "Can you show an example?")
+```
+
+### Message Roles and Validation
+
+The module enforces rules about message roles:
+
+1. Only one system message is allowed
+2. If present, the system message must be the first message
+
+```elixir
+# This works - system message first
+valid_prompt = Prompt.new(%{
+  messages: [
+    %{role: :system, content: "You are an assistant"},
+    %{role: :user, content: "Hello"}
+  ]
+})
+
+# This raises an error - system message not first
+# invalid_prompt = Prompt.new(%{
+#   messages: [
+#     %{role: :user, content: "Hello"},
+#     %{role: :system, content: "You are an assistant"}
+#   ]
+# })
+```
+
+## Versioning and History
+
+### Creating New Versions
+
+```elixir
+# Start with a basic prompt
 prompt = Prompt.new(:user, "Initial question")
 
-# Create a new version with additional message
+# Create version 2 with an additional message
 v2 = Prompt.new_version(prompt, fn p -> 
-  Prompt.add_message(p, :assistant, "How can I help you?") 
+  Prompt.add_message(p, :assistant, "Initial response") 
 end)
 
-# Add another message in version 3
-v3 = Prompt.new_version(v2, fn p -> 
-  Prompt.add_message(p, :user, "Tell me about Elixir") 
+# Create version 3
+v3 = Prompt.new_version(v2, fn p ->
+  Prompt.add_message(p, :user, "Follow-up question")
 end)
+```
 
+### Managing Versions
+
+```elixir
 # List all versions
 versions = Prompt.list_versions(v3)  # [3, 2, 1]
 
 # Retrieve a specific version
 {:ok, original} = Prompt.get_version(v3, 1)
+
+# Compare versions
+{:ok, diff} = Prompt.compare_versions(v3, 3, 1)
+# => %{added_messages: [...], removed_messages: [...]}
 ```
 
-### Template Engines
+## Advanced Usage Patterns
 
-Jido.AI.Prompt supports multiple template engines:
-
-```elixir
-# Using EEx templates
-eex_prompt = Prompt.new(%{
-  messages: [
-    %{role: :user, content: "My name is <%= @name %>, I am <%= @age %> years old", engine: :eex}
-  ],
-  params: %{name: "Alice", age: 30}
-})
-
-# Using Liquid templates
-liquid_prompt = Prompt.new(%{
-  messages: [
-    %{role: :user, content: "My name is {{ name }}, I am {{ age }} years old", engine: :liquid}
-  ],
-  params: %{name: "Bob", age: 25}
-})
-```
-
-### Converting to Text
-
-For debugging or when an API requires a single text string:
-
-```elixir
-text_prompt = Prompt.to_text(prompt)
-# => "[system] You are an assistant\n[user] Hello"
-```
-
-## Advanced Patterns
-
-### Composing Multi-part Conversations
-
-Build complex conversation flows while maintaining context:
-
-```elixir
-# Start with a system message
-prompt = Prompt.new(:system, "You are an Elixir programming assistant")
-
-# Add user question
-prompt = Prompt.add_message(prompt, :user, "How do I use GenServer?")
-
-# Add assistant response
-prompt = Prompt.add_message(prompt, :assistant, "GenServer is a behavior module for implementing...")
-
-# Add follow-up user question
-prompt = Prompt.add_message(prompt, :user, "Can you show me an example?")
-
-# Render the entire conversation
-conversation = Prompt.render(prompt)
-```
-
-### Using Template Parameters
-
-Templates become powerful when combined with dynamic parameters:
-
-```elixir
-# Create a reusable prompt template with placeholders
-code_review_prompt = Prompt.new(%{
-  messages: [
-    %{role: :system, content: "You are a code reviewer focusing on <%= @language %>", engine: :eex},
-    %{role: :user, content: "Please review this code:\n\n```<%= @language %>\n<%= @code %>\n```", engine: :eex}
-  ],
-  params: %{
-    language: "elixir",
-    code: ""  # Will be provided later
-  }
-})
-
-# Use it with specific code
-elixir_review = Prompt.render(code_review_prompt, %{
-  code: """
-  defmodule Calculator do
-    def add(a, b), do: a + b
-  end
-  """
-})
-
-# Reuse with different language and code
-js_review = Prompt.render(code_review_prompt, %{
-  language: "javascript",
-  code: """
-  function add(a, b) {
-    return a + b;
-  }
-  """
-})
-```
-
-### Error Handling
-
-Robust error handling ensures your application gracefully manages template rendering failures:
-
-```elixir
-case Prompt.validate_prompt_opts(user_input) do
-  {:ok, prompt} ->
-    try do
-      rendered = Prompt.render(prompt)
-      # Use rendered messages
-    rescue
-      e in Jido.AI.Error ->
-        # Handle template rendering errors
-        Logger.error("Failed to render prompt: #{Exception.message(e)}")
-        # Fallback behavior
-    end
-  
-  {:error, reason} ->
-    # Handle invalid prompt configuration
-    Logger.error("Invalid prompt: #{reason}")
-end
-```
-
-## Common Questions
-
-### How do I create a prompt with multiple messages?
-
-```elixir
-Prompt.new(%{
-  messages: [
-    %{role: :system, content: "You are a helpful assistant"},
-    %{role: :user, content: "Hello!"},
-    %{role: :assistant, content: "Hi there! How can I help you today?"}
-  ]
-})
-```
-
-### How can I add messages to an existing prompt?
-
-```elixir
-prompt = Prompt.new(:user, "Initial message")
-updated = Prompt.add_message(prompt, :assistant, "Response message")
-```
-
-### Can I use more complex logic in templates?
-
-Yes, you can use full EEx syntax for complex logic:
+### Parameter Substitution with Logic
 
 ```elixir
 template = """
 <%= if @advanced_mode do %>
-  Detailed technical response with advanced terminology:
-  <%= @technical_content %>
+You are an expert-level <%= @domain %> consultant. Use technical terminology and provide in-depth explanations.
 <% else %>
-  Simplified explanation for beginners:
-  <%= @simple_content %>
+You are a helpful <%= @domain %> assistant. Explain concepts simply and avoid technical jargon.
 <% end %>
 """
 
 prompt = Prompt.new(%{
   messages: [
-    %{role: :assistant, content: template, engine: :eex}
+    %{role: :system, content: template, engine: :eex}
   ],
   params: %{
     advanced_mode: false,
-    technical_content: "...",
-    simple_content: "..."
+    domain: "machine learning"
   }
 })
 ```
 
-## Best Practices
+### Creating Reusable Templates
 
-1. **Separate Structure from Content**: Use templates to keep prompt structure separate from variable content
-2. **Version Critical Prompts**: Leverage versioning for important prompt chains
-3. **Use Descriptive Parameter Names**: Make templates readable with clear variable names
-4. **Validate Inputs**: Sanitize user inputs before including them in templates
-5. **Keep a Library of Reusable Prompts**: Build and share common prompt patterns
-
-## Integration with Jido.AI Ecosystem
-
-The `Prompt` module integrates seamlessly with other Jido.AI components:
+For common prompt patterns, leverage the `Template` module:
 
 ```elixir
-alias Jido.AI.Prompt
 alias Jido.AI.Prompt.Template
-import Jido.AI.Prompt.Sigil
 
-# Create a system prompt template using sigil
-system_template = ~AI"You are an <%= @assistant_type %> specialized in <%= @domain %>"
-
-# Create a user prompt
-user_prompt = Prompt.new(:user, "Help me with <%= @problem %>", engine: :eex)
-
-# Combine into a complete prompt
-full_prompt = Prompt.new(%{
+# Use template to create prompts
+prompt = Prompt.new(%{
   messages: [
-    Template.to_message!(system_template, %{assistant_type: "AI assistant", domain: "Elixir"}),
-    # Add more messages
+    %{role: :system, content: "You are a code reviewer"},
+    %{role: :user, content: Template.format(code_review_template, %{
+      language: "elixir",
+      code: "defmodule Math do\n  def add(a, b), do: a + b\nend",
+      focus_areas: ["Performance", "Readability", "Error handling"]
+    }), engine: :none}
   ]
 })
 ```
 
-By mastering the `Jido.AI.Prompt` module, you can build sophisticated AI interactions with clean, maintainable code that scales with your application's complexity.
+## Integration with AI Actions
+
+Jido.AI includes action modules that use these prompts for LLM interactions:
+
+```elixir
+# Create a prompt
+prompt = Prompt.new(:user, "What is the Elixir programming language?")
+
+# Use with ChatResponse action
+{:ok, result} = Jido.AI.Actions.Instructor.ChatResponse.run(%{
+  model: %Jido.AI.Model{provider: :anthropic, model: "claude-3-haiku-20240307"},
+  prompt: prompt,
+  temperature: 0.7
+}, %{})
+
+# Response is in result.response
+IO.puts(result.response)
+```
+
+## Error Handling and Validation
+
+### Validating Prompt Options
+
+```elixir
+case Prompt.validate_prompt_opts(user_input) do
+  {:ok, validated_prompt} ->
+    # Use the validated prompt
+    messages = Prompt.render(validated_prompt)
+    # Call LLM with messages
+    
+  {:error, reason} ->
+    # Handle validation error
+    Logger.error("Invalid prompt: #{reason}")
+end
+```
+
+### Template Rendering Errors
+
+Handle potential rendering errors when working with templates:
+
+```elixir
+try do
+  messages = Prompt.render(template_prompt)
+  # Use rendered messages
+rescue
+  e in Jido.AI.Error ->
+    # Handle template rendering errors
+    Logger.error("Failed to render prompt: #{Exception.message(e)}")
+end
+```
+
+## Best Practices
+
+1. **Separate Structure from Content**
+   - Use templates to isolate prompt structure from variable content
+   - Create reusable prompt patterns for common use cases
+
+2. **Leverage Role-Based Messaging**
+   - Use system messages for overall instruction
+   - Use user messages for specific queries
+   - Use assistant messages to provide context from previous responses
+
+3. **Manage Complexity with Versioning**
+   - Use the built-in versioning for complex, evolving prompts
+   - Compare versions when debugging unexpected LLM behaviors
+
+4. **Validate and Sanitize Inputs**
+   - Use `sanitize_inputs` to prevent template injection when working with user inputs
+   - Validate inputs before rendering templates
+
+5. **Progressive Enhancement**
+   - Start with simple prompts and gradually add complexity
+   - Test prompt variations to optimize LLM responses
+
+## Example Workflow: Implementing a Chain-of-Thought
+
+```elixir
+defmodule ChainOfThoughtPrompt do
+  alias Jido.AI.Prompt
+  alias Jido.AI.Model
+  alias Jido.AI.Actions.Instructor.ChatResponse
+  
+  def solve_problem(problem_statement) do
+    # Create a base prompt with system instruction
+    prompt = Prompt.new(:system, """
+    You are a problem-solving assistant that uses step-by-step reasoning.
+    Always break down problems into clear steps before providing the final answer.
+    """)
+    
+    # Add the user's problem
+    prompt = Prompt.add_message(prompt, :user, problem_statement)
+    
+    # Get initial response with reasoning
+    {:ok, init_result} = ChatResponse.run(%{
+      model: %Model{provider: :anthropic, model: "claude-3-haiku-20240307"},
+      prompt: prompt
+    }, %{})
+    
+    # Add the response to the conversation
+    prompt = Prompt.add_message(prompt, :assistant, init_result.response)
+    
+    # Add a follow-up to verify the solution
+    prompt = Prompt.add_message(prompt, :user, """
+    Thank you for the step-by-step solution. 
+    Can you check your work and ensure the final answer is correct?
+    """)
+    
+    # Get verification response
+    {:ok, final_result} = ChatResponse.run(%{
+      model: %Model{provider: :anthropic, model: "claude-3-haiku-20240307"},
+      prompt: prompt
+    }, %{})
+    
+    # Return the complete conversation and final response
+    %{
+      conversation: Prompt.to_text(prompt),
+      final_answer: final_result.response
+    }
+  end
+end
+```
+
+## Conclusion
+
+The `Jido.AI.Prompt` module provides a powerful foundation for building sophisticated LLM interactions in Elixir. By leveraging its structured approach to prompt management, templates, and version control, developers can create robust, maintainable, and dynamic LLM-powered applications.
+
+By mastering these techniques, you'll be able to create prompt systems that adapt to changing requirements, maintain context across complex conversations, and deliver consistent, high-quality interactions with large language models.
