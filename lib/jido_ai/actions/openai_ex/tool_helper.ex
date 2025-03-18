@@ -14,8 +14,8 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelper do
     - actions: List of Jido.Action modules that implement Jido.Action.Tool
 
   ## Returns
-    - {:ok, tools} where tools is a list of OpenAI tool specifications
-    - {:error, reason} if any action doesn't implement the protocol
+    * `{:ok, tools}` - where tools is a list of OpenAI tool specifications
+    * `{:error, reason}` - if any action doesn't implement the protocol
   """
   @spec to_openai_tools([module()]) :: {:ok, list(map())} | {:error, term()}
   def to_openai_tools(actions) when is_list(actions) do
@@ -66,8 +66,8 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelper do
     - available_actions: List of available Jido.Action modules
 
   ## Returns
-    - {:ok, result} where result is the output of the action
-    - {:error, reason} if the tool call cannot be handled
+    * `{:ok, result}` - where result is the output of the action
+    * `{:error, reason}` - if the tool call cannot be handled
   """
   @spec handle_tool_call(map(), [module()]) :: {:ok, term()} | {:error, term()}
   def handle_tool_call(%{name: name, arguments: arguments} = _tool_call, available_actions) do
@@ -95,9 +95,8 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelper do
     - available_actions: List of available Jido.Action modules
 
   ## Returns
-    - {:ok, %{content: content, tool_results: results}} where content is the assistant's message
-      and results are the outputs of any tool calls
-    - {:error, reason} if tool calls cannot be processed
+    * `{:ok, %{content: content, tool_results: results}}` - where content is the assistant's message
+    * `{:error, reason}` - if tool calls cannot be processed
   """
   @spec process_response(map(), [module()]) :: {:ok, map()} | {:error, term()}
   def process_response(%{choices: [%{message: message} | _]} = _response, available_actions) do

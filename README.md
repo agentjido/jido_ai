@@ -66,7 +66,7 @@ template_msg = MessageItem.new(%{
 })
 ```
 
-For more details on migrating from the deprecated `Jido.AI.Message` module, see the [MIGRATION.md](MIGRATION.md) guide.
+For more details on MessageItem usage, refer to the documentation.
 
 ## Example
 

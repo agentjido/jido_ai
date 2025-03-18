@@ -55,8 +55,8 @@ defmodule Jido.AI.Model do
     - input: The input to create a model from
 
   ## Returns
-    - {:ok, %Jido.AI.Model{}} on success
-    - {:error, reason} on failure
+    * `{:ok, %Jido.AI.Model{}}` - on success
+    * `{:error, reason}` - on failure
 
   ## Examples
 
@@ -181,8 +181,8 @@ defmodule Jido.AI.Model do
     - opts: The options to validate
 
   ## Returns
-    - {:ok, %Jido.AI.Model{}} on success
-    - {:error, reason} on failure
+    * `{:ok, %Jido.AI.Model{}}` - on success
+    * `{:error, reason}` - on failure
   """
   @spec validate_model_opts(term()) :: {:ok, __MODULE__.t()} | {:error, String.t()}
   def validate_model_opts(opts) do

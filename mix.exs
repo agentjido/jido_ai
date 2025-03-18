@@ -100,7 +100,8 @@ defmodule Jido.Ai.MixProject do
   defp aliases do
     [
       # test: "test --trace",
-      docs: "docs -f html --open",
+      docs: "docs",
+      # docs: "docs -f html --open",
       q: ["quality"],
       quality: [
         "format",
@@ -130,7 +131,11 @@ defmodule Jido.Ai.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
-        "guides/getting-started.md"
+        {"guides/getting-started.md", title: "Getting Started"},
+        {"guides/keyring.md", title: "Managing Keys"},
+        {"guides/prompt.md", title: "Prompting"},
+        {"guides/providers.md", title: "LLM Providers"},
+        {"guides/agent-skill.md", title: "AI Agent & Skill"}
       ]
     ]
   end

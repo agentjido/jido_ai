@@ -24,8 +24,8 @@ defmodule Jido.AI.Model.Provider.Adapter do
     - opts: Options for the fetch operation (like API key, etc.)
 
   ## Returns
-    - {:ok, models} on success
-    - {:error, reason} on failure
+    * `{:ok, models}` - on success
+    * `{:error, reason}` - on failure
   """
   @callback list_models(opts :: keyword()) ::
               {:ok, list(map())} | {:error, any()}
@@ -38,8 +38,8 @@ defmodule Jido.AI.Model.Provider.Adapter do
     - opts: Options for the fetch operation (like API key, etc.)
 
   ## Returns
-    - {:ok, model} on success
-    - {:error, reason} on failure
+    * `{:ok, model}` - on success
+    * `{:error, reason}` - on failure
   """
   @callback model(model :: String.t(), opts :: keyword()) ::
               {:ok, map()} | {:error, any()}
@@ -48,12 +48,12 @@ defmodule Jido.AI.Model.Provider.Adapter do
   Normalizes a model ID to ensure it's in the correct format for the provider.
 
   ## Parameters
-    - model: The ID of the model to normalize
-    - opts: Options for the normalization
+    - id: The ID to normalize
+    - opts: Options for normalization
 
   ## Returns
-    - {:ok, normalized_id} on success
-    - {:error, reason} on failure
+    * `{:ok, normalized_id}` - on success
+    * `{:error, reason}` - on failure
   """
   @callback normalize(model :: String.t(), opts :: keyword()) ::
               {:ok, String.t()} | {:error, any()}
@@ -107,8 +107,8 @@ defmodule Jido.AI.Model.Provider.Adapter do
     - opts: Keyword list of options for building the model
 
   ## Returns
-    - {:ok, %Jido.AI.Model{}} on success
-    - {:error, reason} on failure
+    * `{:ok, %Jido.AI.Model{}}` - on success
+    * `{:error, reason}` - on failure
   """
   @callback build(opts :: keyword()) :: {:ok, Jido.AI.Model.t()} | {:error, String.t()}
 end
