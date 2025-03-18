@@ -146,7 +146,8 @@ defmodule JidoTest.AI.Provider.HelpersTest do
         %{id: id, name: model_data["name"], description: model_data["description"]}
       end
 
-      {:ok, model_result} = Helpers.fetch_model_from_cache("test_provider", model_id, [], process_fn)
+      {:ok, model_result} =
+        Helpers.fetch_model_from_cache("test_provider", model_id, [], process_fn)
 
       assert model_result.id == model_id
       assert model_result.name == "Test Model"

@@ -177,9 +177,7 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
       context: context
     } do
       {:ok, model} =
-        Model.from(
-          {:openrouter, [model: "anthropic/claude-3-sonnet", api_key: "test-api-key"]}
-        )
+        Model.from({:openrouter, [model: "anthropic/claude-3-sonnet", api_key: "test-api-key"]})
 
       # Update params to use OpenRouter model
       params = %{
