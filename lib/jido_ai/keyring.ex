@@ -142,12 +142,13 @@ defmodule Jido.AI.Keyring do
     * `server` - The server to query (default: #{@default_name})
     * `key` - The key to look up (as an atom)
     * `default` - The default value if key is not found
+    * `pid` - The process ID to check session values for (default: current process)
 
   Returns the value if found, otherwise returns the default value.
   """
-  @spec get(GenServer.server(), atom(), term()) :: term()
-  def get(server \\ @default_name, key, default \\ nil) when is_atom(key) do
-    case get_session_value(server, key) do
+  @spec get(GenServer.server(), atom(), term(), pid()) :: term()
+  def get(server \\ @default_name, key, default \\ nil, pid \\ self()) when is_atom(key) do
+    case get_session_value(server, key, pid) do
       nil -> get_env_value(server, key, default)
       value -> value
     end
@@ -171,38 +172,38 @@ defmodule Jido.AI.Keyring do
 
   @doc """
   Sets a session-specific value that will override the environment value
-  for the current process only.
+  for the specified process.
 
   ## Parameters
 
     * `server` - The server to query (default: #{@default_name})
     * `key` - The key to set (as an atom)
     * `value` - The value to store
+    * `pid` - The process ID to associate with this value (default: current process)
 
   Returns `:ok`.
   """
-  @spec set_session_value(GenServer.server(), atom(), term()) :: :ok
-  def set_session_value(server \\ @default_name, key, value) when is_atom(key) do
+  @spec set_session_value(GenServer.server(), atom(), term(), pid()) :: :ok
+  def set_session_value(server \\ @default_name, key, value, pid \\ self()) when is_atom(key) do
     registry = GenServer.call(server, :get_registry)
-    pid = self()
     :ets.insert(registry, {{pid, key}, value})
     :ok
   end
 
   @doc """
-  Gets a session-specific value for the current process.
+  Gets a session-specific value for the specified process.
 
   ## Parameters
 
     * `server` - The server to query (default: #{@default_name})
     * `key` - The key to look up (as an atom)
+    * `pid` - The process ID to get the value for (default: current process)
 
   Returns the session value if found, otherwise returns `nil`.
   """
-  @spec get_session_value(GenServer.server(), atom()) :: term() | nil
-  def get_session_value(server \\ @default_name, key) when is_atom(key) do
+  @spec get_session_value(GenServer.server(), atom(), pid()) :: term() | nil
+  def get_session_value(server \\ @default_name, key, pid \\ self()) when is_atom(key) do
     registry = GenServer.call(server, :get_registry)
-    pid = self()
 
     case :ets.lookup(registry, {pid, key}) do
       [{{^pid, ^key}, value}] -> value
@@ -211,36 +212,36 @@ defmodule Jido.AI.Keyring do
   end
 
   @doc """
-  Clears a session-specific value for the current process.
+  Clears a session-specific value for the specified process.
 
   ## Parameters
 
     * `server` - The server to query (default: #{@default_name})
     * `key` - The key to clear (as an atom)
+    * `pid` - The process ID to clear the value for (default: current process)
 
   Returns `:ok`.
   """
-  @spec clear_session_value(GenServer.server(), atom()) :: :ok
-  def clear_session_value(server \\ @default_name, key) when is_atom(key) do
+  @spec clear_session_value(GenServer.server(), atom(), pid()) :: :ok
+  def clear_session_value(server \\ @default_name, key, pid \\ self()) when is_atom(key) do
     registry = GenServer.call(server, :get_registry)
-    pid = self()
     :ets.delete(registry, {pid, key})
     :ok
   end
 
   @doc """
-  Clears all session-specific values for the current process.
+  Clears all session-specific values for the specified process.
 
   ## Parameters
 
     * `server` - The server to query (default: #{@default_name})
+    * `pid` - The process ID to clear all values for (default: current process)
 
   Returns `:ok`.
   """
-  @spec clear_all_session_values(GenServer.server()) :: :ok
-  def clear_all_session_values(server \\ @default_name) do
+  @spec clear_all_session_values(GenServer.server(), pid()) :: :ok
+  def clear_all_session_values(server \\ @default_name, pid \\ self()) do
     registry = GenServer.call(server, :get_registry)
-    pid = self()
     :ets.match_delete(registry, {{pid, :_}, :_})
     :ok
   end
