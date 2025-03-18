@@ -188,7 +188,6 @@ defmodule JidoTest.AI.Prompt.TemplateTest do
     #       role: :assistant,
     #       estimated_tokens: 10
     #     })
-
     #   assert_raise Jido.AI.Error, fn ->
     #     Template.to_message!(template, %{})
     #   end

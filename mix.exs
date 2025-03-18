@@ -47,8 +47,8 @@ defmodule Jido.Ai.MixProject do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
-    # require Logger
-    # use_local_deps = System.get_env("LOCAL_JIDO_DEPS") == "true" || false
+    require Logger
+    use_local_deps = System.get_env("LOCAL_JIDO_DEPS") == "true" || false
 
     deps = [
       {:dotenvy, "~> 1.0.0"},
@@ -61,9 +61,9 @@ defmodule Jido.Ai.MixProject do
       {:instructor, "~> 0.1.0"},
       {:langchain, "~> 0.3.1"},
 
-      # Testing & Release
-      {:credo, "~> 1.7"},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      # Testing
+      {:credo, "~> 1.7", only: [:dev, :test]},
+      {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:doctor, "~> 0.22.0", only: [:dev, :test]},
       {:ex_check, "~> 0.12", only: [:dev, :test]},
       {:ex_doc, "~> 0.37-rc", only: [:dev, :test], runtime: false},
@@ -78,30 +78,28 @@ defmodule Jido.Ai.MixProject do
       {:stream_data, "~> 1.1", only: [:dev, :test]}
     ]
 
-    # if use_local_deps do
-    #   require Logger
-    #   Logger.warning("Using local Jido dependencies")
+    if use_local_deps do
+      require Logger
+      Logger.warning("Using local Jido dependencies")
 
-    deps ++
-      [
-        {:jido, path: "../jido"}
-        # {:jido_memory, path: "../jido_memory"}
-      ]
-
-    # else
-    #   deps ++
-    #     [
-    #       {:jido, github: "agentjido/jido"}
-    #       # {:jido_memory, github: "agentjido/jido_memory"}
-    #     ]
-    # end
+      deps ++
+        [
+          {:jido, path: "../jido"}
+          # {:jido_memory, path: "../jido_memory"}
+        ]
+    else
+      deps ++
+        [
+          {:jido, github: "agentjido/jido", branch: "main"}
+          # {:jido_memory, github: "agentjido/jido_memory"}
+        ]
+    end
   end
 
   defp aliases do
     [
-      # test: "test --trace",
-      docs: "docs",
-      # docs: "docs -f html --open",
+      test: "test --trace",
+      docs: "docs -f html --open",
       q: ["quality"],
       quality: [
         "format",
