@@ -34,28 +34,28 @@ defmodule Jido.AI.Model.Provider.Adapter do
   Fetches a specific model by ID from the provider's API.
 
   ## Parameters
-    - model_id: The ID of the model to fetch
+    - model: The ID of the model to fetch
     - opts: Options for the fetch operation (like API key, etc.)
 
   ## Returns
     - {:ok, model} on success
     - {:error, reason} on failure
   """
-  @callback model(model_id :: String.t(), opts :: keyword()) ::
+  @callback model(model :: String.t(), opts :: keyword()) ::
               {:ok, map()} | {:error, any()}
 
   @doc """
   Normalizes a model ID to ensure it's in the correct format for the provider.
 
   ## Parameters
-    - model_id: The ID of the model to normalize
+    - model: The ID of the model to normalize
     - opts: Options for the normalization
 
   ## Returns
     - {:ok, normalized_id} on success
     - {:error, reason} on failure
   """
-  @callback normalize(model_id :: String.t(), opts :: keyword()) ::
+  @callback normalize(model :: String.t(), opts :: keyword()) ::
               {:ok, String.t()} | {:error, any()}
 
   @doc """

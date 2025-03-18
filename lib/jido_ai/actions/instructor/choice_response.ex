@@ -23,7 +23,7 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponse do
       model: [
         type: {:custom, Jido.AI.Model, :validate_model_opts, []},
         doc: "The AI model to use (defaults to Anthropic Claude)",
-        default: {:anthropic, [model_id: "claude-3-haiku-20240307"]}
+        default: {:anthropic, [model: "claude-3-haiku-20240307"]}
       ],
       prompt: [
         type: {:custom, Jido.AI.Prompt, :validate_prompt_opts, []},
@@ -47,7 +47,7 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponse do
       ]
     ]
 
-  alias Jido.AI.Actions.Instructor.BaseCompletion
+  alias Jido.AI.Actions.Instructor
   alias Jido.AI.Model
 
   def run(params, context) do
@@ -70,17 +70,24 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponse do
     valid_options = Enum.map(params_with_defaults.available_actions, & &1.id)
 
     # Enhance the prompt with available options
-    enhanced_prompt = add_choice_system_message(params_with_defaults.prompt, params_with_defaults.available_actions)
+    enhanced_prompt =
+      add_choice_system_message(
+        params_with_defaults.prompt,
+        params_with_defaults.available_actions
+      )
 
     # Make the chat completion call directly
-    case BaseCompletion.run(%{
-           model: model,
-           prompt: enhanced_prompt,
-           response_model: Schema,
-           temperature: params_with_defaults.temperature,
-           max_tokens: params_with_defaults.max_tokens,
-           mode: :json
-         }, context) do
+    case Instructor.run(
+           %{
+             model: model,
+             prompt: enhanced_prompt,
+             response_model: Schema,
+             temperature: params_with_defaults.temperature,
+             max_tokens: params_with_defaults.max_tokens,
+             mode: :json
+           },
+           context
+         ) do
       {:ok, %{result: %Schema{} = response}, _} ->
         if response.selected_option in valid_options do
           {:ok,

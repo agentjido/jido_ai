@@ -22,8 +22,8 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelperTest do
                    type: "object",
                    required: ["value", "amount"],
                    properties: %{
-                     "amount" => %{type: "string", description: "The second number to add"},
-                     "value" => %{type: "string", description: "The first number to add"}
+                     "amount" => %{type: "integer", description: "The second number to add"},
+                     "value" => %{type: "integer", description: "The first number to add"}
                    }
                  }
                }
@@ -33,7 +33,8 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelperTest do
     test "returns error for module that doesn't implement protocol" do
       actions = [String]
 
-      assert {:error, "Action String does not implement Jido.Action.Tool protocol"} =
+      assert {:error,
+              "Action String is not a valid compiled module or does not implement Jido.Action.Tool protocol"} =
                ToolHelper.to_openai_tools(actions)
     end
   end

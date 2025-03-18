@@ -41,7 +41,7 @@ defmodule LangchainDemo do
         You are a helpful math assistant that can perform arithmetic operations.
         When asked about addition or subtraction, use the appropriate function to calculate the result.
       """),
-      Message.new_user!("What is 5 + 3?")
+      Message.new_user!("What is (527 + 313) - 248?")
     ]
 
     # Create chat model
@@ -54,7 +54,7 @@ defmodule LangchainDemo do
 
     # Create and run chain with variables
     {:ok, chain} =
-      %{llm: chat_model}
+      %{llm: chat_model, verbose: true}
       |> LLMChain.new!()
       |> LLMChain.add_messages(messages)
       |> LLMChain.add_tools([add_function, subtract_function])

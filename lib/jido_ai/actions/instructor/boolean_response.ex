@@ -24,7 +24,7 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponse do
       model: [
         type: {:custom, Jido.AI.Model, :validate_model_opts, []},
         doc: "The AI model to use (defaults to Anthropic Claude)",
-        default: {:anthropic, [model_id: "claude-3-haiku-20240307"]}
+        default: {:anthropic, [model: "claude-3-haiku-20240307"]}
       ],
       prompt: [
         type: {:custom, Jido.AI.Prompt, :validate_prompt_opts, []},
@@ -43,7 +43,7 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponse do
       ]
     ]
 
-  alias Jido.AI.Actions.Instructor.BaseCompletion
+  alias Jido.AI.Actions.Instructor
   alias Jido.AI.Model
 
   def run(params, context) do
@@ -64,14 +64,17 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponse do
     enhanced_prompt = add_boolean_system_message(params_with_defaults.prompt)
 
     # Make the chat completion call directly
-    case BaseCompletion.run(%{
-           model: model,
-           prompt: enhanced_prompt,
-           response_model: Schema,
-           temperature: params_with_defaults.temperature,
-           max_tokens: params_with_defaults.max_tokens,
-           mode: :json,
-         }, context) do
+    case Instructor.run(
+           %{
+             model: model,
+             prompt: enhanced_prompt,
+             response_model: Schema,
+             temperature: params_with_defaults.temperature,
+             max_tokens: params_with_defaults.max_tokens,
+             mode: :json
+           },
+           context
+         ) do
       {:ok, %{result: %Schema{} = response}, _} ->
         {:ok,
          %{

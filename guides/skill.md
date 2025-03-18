@@ -91,7 +91,7 @@ The Jido AI skill provides several configuration options:
 | `prompt` | String or Prompt struct | The default instructions (default: "You are a helpful assistant") |
 | `response_schema` | Keyword list | A NimbleOptions schema to validate the AI response |
 | `chat_action` | Module | The chat action to use (default: `Jido.AI.Actions.Instructor.ChatResponse`) |
-| `tool_action` | Module | The default tool action to use (default: `Jido.AI.Actions.Langchain.GenerateToolResponse`) |
+| `tool_action` | Module | The default tool action to use (default: `Jido.AI.Actions.Langchain.ToolResponse`) |
 | `tools` | List of modules | The tools to make available to the AI |
 
 ### Model Configuration

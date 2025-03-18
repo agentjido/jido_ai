@@ -143,13 +143,13 @@ defmodule Jido.AI.Provider.OpenRouterTest do
   describe "model/2" do
     test "fetches specific model details", %{test_dir: tmp_dir} do
       # Create the nested directory structure for the model
-      model_id = "anthropic/claude-3-opus"
-      model_dir_path = Path.join([tmp_dir, "openrouter", "models", Path.dirname(model_id)])
+      model = "anthropic/claude-3-opus"
+      model_dir_path = Path.join([tmp_dir, "openrouter", "models", Path.dirname(model)])
       File.mkdir_p!(model_dir_path)
 
       mock_model = %{
         "data" => %{
-          "id" => model_id,
+          "id" => model,
           "name" => "Claude 3 Opus",
           "description" => "Most powerful Claude model",
           "created" => 1_234_567_890,
@@ -172,10 +172,10 @@ defmodule Jido.AI.Provider.OpenRouterTest do
         {:ok, %{status: 200, body: mock_model}}
       end)
 
-      assert {:ok, model} = OpenRouter.model(model_id, refresh: true)
-      assert model.name == "Claude 3 Opus"
-      assert model.capabilities.chat == true
-      assert model.id == model_id
+      assert {:ok, model_result} = OpenRouter.model(model, refresh: true)
+      assert model_result.name == "Claude 3 Opus"
+      assert model_result.capabilities.chat == true
+      assert model_result.id == model
     end
 
     test "handles model fetch errors" do

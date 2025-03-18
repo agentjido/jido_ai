@@ -1,11 +1,11 @@
-defmodule Jido.AI.Actions.Instructor.BaseCompletion do
+defmodule Jido.AI.Actions.Instructor do
   @moduledoc """
   A low-level action that provides direct access to Instructor's chat completion functionality.
   Supports most Instructor options and integrates with Jido's Model and Prompt structures.
 
   ## Features
 
-  - Multi-provider support (Anthropic, OpenAI, Ollama, llamacpp, Together, etc.)
+  - Multi-provider support (Anthropic, OpenAI, Ollama, llamacpp, Together, OpenRouter, etc.)
   - Streaming capabilities with array or partial response models
   - Response mode configuration (:json, :function_call)
   - Structured output validation with automatic retries
@@ -25,8 +25,8 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
   end
 
   # Create a structured response
-  {:ok, result, _} = Jido.AI.Actions.Instructor.BaseCompletion.execute(%{
-    model: %Jido.AI.Model{provider: :anthropic, model_id: "claude-3-sonnet-20240229", api_key: "key"},
+  {:ok, result, _} = Jido.AI.Actions.Instructor.run(%{
+    model: %Jido.AI.Model{provider: :anthropic, model: "claude-3-sonnet-20240229", api_key: "key"},
     prompt: Jido.AI.Prompt.new(:user, "What's the weather in Tokyo?"),
     response_model: WeatherResponse,
     max_retries: 2
@@ -35,14 +35,15 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
 
   ## Support Matrix
 
-  | Provider  | Adapter               | Configuration               |
-  |-----------|----------------------|----------------------------|
-  | anthropic | Anthropic            | api_key                    |
-  | openai    | OpenAI               | openai: [api_key: "key"]  |
-  | ollama    | OpenAI               | openai: [api_key, api_url] |
-  | llamacpp  | Llamacpp             | llamacpp: [api_url]        |
-  | together  | OpenAI               | openai: [api_key, api_url] |
-  | other     | Defaults to Anthropic| api_key                    |
+  | Provider   | Adapter               | Configuration                     |
+  |------------|----------------------|----------------------------------|
+  | anthropic  | Anthropic            | api_key                          |
+  | openai     | OpenAI               | openai: [api_key: "key"]         |
+  | openrouter | OpenAI               | openai: [api_key, api_url]       |
+  | ollama     | OpenAI               | openai: [api_key, api_url]       |
+  | llamacpp   | Llamacpp             | llamacpp: [api_url]              |
+  | together   | OpenAI               | openai: [api_key, api_url]       |
+  | other      | Defaults to Anthropic| api_key                          |
   """
   use Jido.Action,
     name: "instructor_chat_completion",
@@ -52,7 +53,7 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
         type: {:custom, Jido.AI.Model, :validate_model_opts, []},
         required: true,
         doc:
-          "The AI model to use (e.g., {:anthropic, [model_id: \"claude-3-sonnet-20240229\"]} or %Jido.AI.Model{})"
+          "The AI model to use (e.g., {:anthropic, [model: \"claude-3-sonnet-20240229\"]} or %Jido.AI.Model{})"
       ],
       prompt: [
         type: {:custom, Jido.AI.Prompt, :validate_prompt_opts, []},
@@ -75,8 +76,9 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
       stop: [type: {:list, :string}, doc: "Stop sequences"],
       timeout: [type: :integer, default: 60_000, doc: "Request timeout in milliseconds"],
       mode: [
-        type: {:in, [:json, :function_call, nil]},
-        doc: "Response mode (:json, :function_call, or nil for default)"
+        type: {:in, [:tools, :json, :md_json]},
+        default: :tools,
+        doc: "Response mode (:tools, :json, :md_json, or nil for default)"
       ],
       stream: [type: :boolean, default: false, doc: "Enable streaming responses"],
       partial: [type: :boolean, default: false, doc: "Return partial responses while streaming"]
@@ -117,14 +119,14 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
       )
 
     # Build the Instructor options
-    model_id = get_model_id(params.model)
+    model = get_model(params.model)
 
     # Configure Instructor with the appropriate adapter and API key
     config = get_instructor_config(params.model)
 
     opts =
       [
-        model: model_id,
+        model: model,
         messages: convert_messages(params.prompt.messages),
         response_model: get_response_model(params_with_defaults),
         temperature: params_with_defaults.temperature,
@@ -136,6 +138,8 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
       |> add_if_present(:stop, params_with_defaults.stop)
       |> add_if_present(:mode, params_with_defaults.mode)
 
+    # IO.inspect(opts, label: "Instructor opts")
+    # IO.inspect(config, label: "Instructor config")
     # Make the chat completion call
     case Instructor.chat_completion(opts, config) do
       {:ok, response} ->
@@ -166,8 +170,8 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
   end
 
   # Helper to get the model ID from our Model struct
-  defp get_model_id(%Model{model_id: model_id}), do: model_id
-  defp get_model_id(_), do: nil
+  defp get_model(%Model{model: model}), do: model
+  defp get_model(_), do: nil
 
   # Helper to handle array and partial response models
   defp get_response_model(%{response_model: model, stream: true, partial: true}),
@@ -206,6 +210,16 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
     ]
   end
 
+  defp get_instructor_config(%Model{provider: :openrouter, api_key: api_key, base_url: base_url}) do
+    [
+      adapter: Instructor.Adapters.OpenAI,
+      openai: [
+        api_key: api_key,
+        api_url: base_url || "https://openrouter.ai/api/v1"
+      ]
+    ]
+  end
+
   defp get_instructor_config(%Model{provider: :ollama, api_key: api_key, base_url: base_url}) do
     [
       adapter: Instructor.Adapters.OpenAI,
@@ -236,7 +250,9 @@ defmodule Jido.AI.Actions.Instructor.BaseCompletion do
   end
 
   defp get_instructor_config(%Model{provider: provider, api_key: api_key}) do
-    Logger.warning("No specific adapter for provider: #{provider}, defaulting to Anthropic adapter")
+    Logger.warning(
+      "No specific adapter for provider: #{provider}, defaulting to Anthropic adapter"
+    )
 
     [
       adapter: Instructor.Adapters.Anthropic,

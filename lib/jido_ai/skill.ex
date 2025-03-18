@@ -5,37 +5,37 @@ defmodule Jido.AI.Skill do
   require Logger
   @ai_opts_key :ai
   @ai_opts_schema [
-      model: [
-        type: {:custom, Jido.AI.Model, :validate_model_opts, []},
-        required: true,
-        doc: "The AI model to use"
-      ],
-      prompt: [
-        type: {:custom, Jido.AI.Prompt, :validate_prompt_opts, []},
-        default: "You are a helpful assistant",
-        doc: "The default instructions to follow (string or Prompt struct)"
-      ],
-      response_schema: [
-        type: :keyword_list,
-        default: [],
-        doc: "A NimbleOptions schema to validate the AI response"
-      ],
-      chat_action: [
-        type: {:custom, Jido.Util, :validate_actions, []},
-        default: Jido.AI.Actions.Instructor.ChatResponse,
-        doc: "The chat action to use"
-      ],
-      tool_action: [
-        type: {:custom, Jido.Util, :validate_actions, []},
-        default: Jido.AI.Actions.Langchain.GenerateToolResponse,
-        doc: "The default tool action to use"
-      ],
-      tools: [
-        type: {:custom, Jido.Util, :validate_actions, []},
-        default: [],
-        doc: "The tools to use"
-      ]
+    model: [
+      type: {:custom, Jido.AI.Model, :validate_model_opts, []},
+      required: true,
+      doc: "The AI model to use"
+    ],
+    prompt: [
+      type: {:custom, Jido.AI.Prompt, :validate_prompt_opts, []},
+      default: "You are a helpful assistant",
+      doc: "The default instructions to follow (string or Prompt struct)"
+    ],
+    response_schema: [
+      type: :keyword_list,
+      default: [],
+      doc: "A NimbleOptions schema to validate the AI response"
+    ],
+    chat_action: [
+      type: {:custom, Jido.Util, :validate_actions, []},
+      default: Jido.AI.Actions.Instructor.ChatResponse,
+      doc: "The chat action to use"
+    ],
+    tool_action: [
+      type: {:custom, Jido.Util, :validate_actions, []},
+      default: Jido.AI.Actions.Langchain.ToolResponse,
+      doc: "The default tool action to use"
+    ],
+    tools: [
+      type: {:custom, Jido.Util, :validate_actions, []},
+      default: [],
+      doc: "The tools to use"
     ]
+  ]
 
   use Jido.Skill,
     name: "jido_ai_skill",
@@ -52,7 +52,7 @@ defmodule Jido.AI.Skill do
       Keyword.get(opts, :chat_action, Jido.AI.Actions.Instructor.ChatResponse)
 
     tool_action =
-      Keyword.get(opts, :tool_action, Jido.AI.Actions.Langchain.GenerateToolResponse)
+      Keyword.get(opts, :tool_action, Jido.AI.Actions.Langchain.ToolResponse)
 
     # Register the actions with the agent
     Jido.AI.Agent.register_action(agent, [chat_action, tool_action])
@@ -88,18 +88,20 @@ defmodule Jido.AI.Skill do
        }},
       {"jido.ai.tool.response",
        %Instruction{
-         action: Jido.AI.Actions.Langchain.GenerateToolResponse,
+         action: Jido.AI.Actions.Langchain.ToolResponse,
          params: %{model: model}
        }}
     ]
   end
 
   def handle_signal(signal, skill_opts) do
-    with {:ok, base_prompt} <- Jido.AI.Prompt.validate_prompt_opts(Keyword.get(skill_opts, :prompt)) do
+    with {:ok, base_prompt} <-
+           Jido.AI.Prompt.validate_prompt_opts(Keyword.get(skill_opts, :prompt)) do
       # Convert system message to user message and render with signal data
-      updated_messages = Enum.map(base_prompt.messages, fn msg ->
-        %{msg | role: :user, engine: :eex}
-      end)
+      updated_messages =
+        Enum.map(base_prompt.messages, fn msg ->
+          %{msg | role: :user, engine: :eex}
+        end)
 
       base_prompt = %{base_prompt | messages: updated_messages}
       rendered_prompt = Jido.AI.Prompt.render(base_prompt, signal.data)

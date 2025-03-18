@@ -37,27 +37,20 @@ defmodule Jido.AI.Actions.Instructor.ChatResponse do
         type: :integer,
         default: 1000,
         doc: "Maximum tokens in response"
-      ],
-      mode: [
-        type: {:in, [:json, nil]},
-        default: :json,
-        doc: "Response mode (:json or nil for default)"
       ]
     ]
 
-  alias Jido.AI.Actions.Instructor.BaseCompletion
+  alias Jido.AI.Actions.Instructor, as: InstructorAction
   alias Jido.AI.Model
 
   def run(params, context) do
-    Logger.debug("Starting chat response generation with params: #{inspect(params, pretty: true)}")
-
     # Create a map with all optional parameters set to defaults
     params_with_defaults =
       Map.merge(
         %{
           temperature: 0.7,
           max_tokens: 1000,
-          mode: :json
+          mode: :tools
         },
         params
       )
@@ -69,7 +62,7 @@ defmodule Jido.AI.Actions.Instructor.ChatResponse do
     enhanced_prompt = add_chat_system_message(params_with_defaults.prompt)
 
     # Make the chat completion call directly
-    case BaseCompletion.run(
+    case InstructorAction.run(
            %{
              model: model,
              prompt: enhanced_prompt,

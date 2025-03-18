@@ -21,7 +21,9 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelper do
   def to_openai_tools(actions) when is_list(actions) do
     tools =
       Enum.map(actions, fn action ->
-        if function_exported?(action, :to_tool, 0) do
+        # Ensure action is a compiled module
+        if is_atom(action) and Code.ensure_loaded?(action) and
+             function_exported?(action, :to_tool, 0) do
           case action.to_tool() do
             %{name: name, description: description, parameters_schema: schema} ->
               %{
@@ -37,7 +39,8 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelper do
               {:error, "Action #{inspect(action)} does not implement Jido.Action.Tool protocol"}
           end
         else
-          {:error, "Action #{inspect(action)} does not implement Jido.Action.Tool protocol"}
+          {:error,
+           "Action #{inspect(action)} is not a valid compiled module or does not implement Jido.Action.Tool protocol"}
         end
       end)
 

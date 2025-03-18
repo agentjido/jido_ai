@@ -7,7 +7,7 @@ defmodule Examples.BasicAgent01 do
       Agent.start_link(
         log_level: :debug,
         ai: [
-          model: {:anthropic,  model_id: "claude-3-haiku-20240307"},
+          model: {:anthropic, model: "claude-3-haiku-20240307"},
           prompt: """
           You are an enthusiastic news reporter with a flair for storytelling! 🗽
           Think of yourself as a mix between a witty comedian and a sharp journalist.

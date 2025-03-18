@@ -37,7 +37,7 @@ defmodule Jido.AI.Model do
     # New fields for LLM calls
     field(:base_url, String.t())
     field(:api_key, String.t())
-    field(:model_id, String.t())
+    field(:model, String.t())
     field(:temperature, float(), default: 0.7)
     field(:max_tokens, non_neg_integer(), default: 1024)
     field(:max_retries, non_neg_integer(), default: 0)
@@ -60,11 +60,11 @@ defmodule Jido.AI.Model do
 
   ## Examples
 
-      iex> Jido.AI.Model.from({:anthropic, [model_id: "claude-3-5-haiku"]})
-      {:ok, %Jido.AI.Model{provider: :anthropic, model_id: "claude-3-5-haiku", ...}}
+      iex> Jido.AI.Model.from({:anthropic, [model: "claude-3-5-haiku"]})
+      {:ok, %Jido.AI.Model{provider: :anthropic, model: "claude-3-5-haiku", ...}}
 
-      iex> Jido.AI.Model.from(%Jido.AI.Model{provider: :openai, model_id: "gpt-4"})
-      {:ok, %Jido.AI.Model{provider: :openai, model_id: "gpt-4", ...}}
+      iex> Jido.AI.Model.from(%Jido.AI.Model{provider: :openai, model: "gpt-4"})
+      {:ok, %Jido.AI.Model{provider: :openai, model: "gpt-4", ...}}
   """
   @spec from(term()) :: {:ok, __MODULE__.t()} | {:error, String.t()}
   def from(input) do
@@ -101,7 +101,7 @@ defmodule Jido.AI.Model do
            endpoints: [],
            base_url: "",
            api_key: "",
-           model_id: "#{category}_#{class}"
+           model: "#{category}_#{class}"
          }}
 
       other ->

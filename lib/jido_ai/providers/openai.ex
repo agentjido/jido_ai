@@ -67,21 +67,21 @@ defmodule Jido.AI.Provider.OpenAI do
 
   Returns a tuple with {:ok, model} on success or {:error, reason} on failure.
   """
-  def model(model_id, opts \\ []) do
+  def model(model, opts \\ []) do
     refresh = Keyword.get(opts, :refresh, false)
 
     # Check if we should refresh or try to get from cache first
     if refresh do
-      fetch_model_from_api(model_id, opts)
+      fetch_model_from_api(model, opts)
     else
       # Try to get from cache first, fallback to API if not found
-      case Helpers.fetch_model_from_cache(@provider_path, model_id, opts, &process_single_model/2) do
+      case Helpers.fetch_model_from_cache(@provider_path, model, opts, &process_single_model/2) do
         {:ok, model} ->
           {:ok, model}
 
         {:error, _reason} ->
           # If not found in cache, try API
-          fetch_model_from_api(model_id, opts)
+          fetch_model_from_api(model, opts)
       end
     end
   end
@@ -95,11 +95,11 @@ defmodule Jido.AI.Provider.OpenAI do
 
   Returns a tuple with {:ok, normalized_id} on success or {:error, reason} on failure.
   """
-  def normalize(model_id, _opts \\ []) do
+  def normalize(model, _opts \\ []) do
     # OpenAI model IDs are simple strings like "gpt-4" or "text-embedding-ada-002"
     # This method ensures the ID is properly formatted
-    if String.match?(model_id, ~r/^[a-zA-Z0-9\-]+$/) do
-      {:ok, model_id}
+    if String.match?(model, ~r/^[a-zA-Z0-9\-]+$/) do
+      {:ok, model}
     else
       {:error, "Invalid model ID format for OpenAI."}
     end
@@ -129,7 +129,7 @@ defmodule Jido.AI.Provider.OpenAI do
   def validate_model_opts(opts) do
     {:ok,
      %Jido.AI.Model{
-       id: opts[:model_id] || "openai_default",
+       id: opts[:model] || "openai_default",
        name: opts[:model_name] || "OpenAI Model",
        provider: :openai
      }}
@@ -153,19 +153,19 @@ defmodule Jido.AI.Provider.OpenAI do
     # Extract or generate an API key
     api_key = Helpers.get_api_key(opts, "OPENAI_API_KEY", :openai_api_key)
 
-    # Get model_id from opts
-    model_id = Keyword.get(opts, :model_id)
+    # Get model from opts
+    model = Keyword.get(opts, :model)
 
-    # Validate model_id
-    if is_nil(model_id) do
-      {:error, "model_id is required for OpenAI models"}
+    # Validate model
+    if is_nil(model) do
+      {:error, "model is required for OpenAI models"}
     else
       # Create the model struct with all necessary fields
       model = %Jido.AI.Model{
-        id: Keyword.get(opts, :id, "openai_#{model_id}"),
-        name: Keyword.get(opts, :name, "OpenAI #{model_id}"),
+        id: Keyword.get(opts, :id, "openai_#{model}"),
+        name: Keyword.get(opts, :name, "OpenAI #{model}"),
         provider: :openai,
-        model_id: model_id,
+        model: model,
         base_url: @base_url,
         api_key: api_key,
         temperature: Keyword.get(opts, :temperature, 0.7),
@@ -200,9 +200,9 @@ defmodule Jido.AI.Provider.OpenAI do
     Helpers.fetch_and_cache_models(provider, url, headers, @provider_path, &process_models/1)
   end
 
-  defp fetch_model_from_api(model_id, opts) do
+  defp fetch_model_from_api(model, opts) do
     provider = definition()
-    url = base_url() <> "/models/#{model_id}"
+    url = base_url() <> "/models/#{model}"
     headers = request_headers(opts)
 
     # Ensure the models directory exists
@@ -219,7 +219,7 @@ defmodule Jido.AI.Provider.OpenAI do
       provider,
       url,
       headers,
-      model_id,
+      model,
       @provider_path,
       &process_single_model/2,
       opts
@@ -242,10 +242,10 @@ defmodule Jido.AI.Provider.OpenAI do
 
   defp process_models(_), do: []
 
-  defp process_single_model(model_data, model_id) when is_map(model_data) do
+  defp process_single_model(model_data, model) when is_map(model_data) do
     %{
-      id: model_data["id"] || model_id,
-      name: model_data["id"] || model_id,
+      id: model_data["id"] || model,
+      name: model_data["id"] || model,
       description: model_data["description"] || "",
       created: model_data["created"],
       owned_by: model_data["owned_by"],
@@ -254,34 +254,34 @@ defmodule Jido.AI.Provider.OpenAI do
     }
   end
 
-  defp process_single_model(_, model_id), do: %{id: model_id, name: model_id}
+  defp process_single_model(_, model), do: %{id: model, name: model}
 
   # Extract capabilities based on the model's name and other properties
   defp extract_capabilities(model) do
-    model_id = model["id"] || ""
+    model = model["id"] || ""
 
     %{
-      chat: String.contains?(model_id, "gpt") || String.contains?(model_id, "turbo"),
-      embedding: String.contains?(model_id, "embedding"),
-      image: String.contains?(model_id, "dall-e"),
-      vision: String.contains?(model_id, "vision"),
-      multimodal: String.contains?(model_id, "vision") || String.contains?(model_id, "gpt-4"),
-      audio: String.contains?(model_id, "whisper"),
-      code: String.contains?(model_id, "gpt-4") || String.contains?(model_id, "codex")
+      chat: String.contains?(model, "gpt") || String.contains?(model, "turbo"),
+      embedding: String.contains?(model, "embedding"),
+      image: String.contains?(model, "dall-e"),
+      vision: String.contains?(model, "vision"),
+      multimodal: String.contains?(model, "vision") || String.contains?(model, "gpt-4"),
+      audio: String.contains?(model, "whisper"),
+      code: String.contains?(model, "gpt-4") || String.contains?(model, "codex")
     }
   end
 
   # Determine the tier based on model characteristics
   defp determine_tier(model) do
-    model_id = model["id"] || ""
+    model = model["id"] || ""
 
     cond do
       # Advanced tier for top models
-      String.contains?(model_id, "gpt-4") ->
+      String.contains?(model, "gpt-4") ->
         %{value: :advanced, description: "High-performance model"}
 
       # Standard tier for mid-range models
-      String.contains?(model_id, "gpt-3.5") ->
+      String.contains?(model, "gpt-3.5") ->
         %{value: :standard, description: "Balanced performance and cost"}
 
       # Basic tier for everything else

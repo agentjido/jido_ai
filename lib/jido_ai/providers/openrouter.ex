@@ -13,7 +13,7 @@ defmodule Jido.AI.Provider.OpenRouter do
   # curl https://openrouter.ai/api/v1/models
 
   # Get Model
-  # curl https://openrouter.ai/api/v1/models/{model_id}/endpoints
+  # curl https://openrouter.ai/api/v1/models/{model}/endpoints
 
   @provider_id :openrouter
   @provider_path "openrouter"
@@ -77,21 +77,21 @@ defmodule Jido.AI.Provider.OpenRouter do
 
   Returns a tuple with {:ok, model} on success or {:error, reason} on failure.
   """
-  def model(model_id, opts \\ []) do
+  def model(model, opts \\ []) do
     refresh = Keyword.get(opts, :refresh, false)
 
     # Check if we should refresh or try to get from cache first
     if refresh do
-      fetch_model_from_api(model_id, opts)
+      fetch_model_from_api(model, opts)
     else
       # Try to get from cache first, fallback to API if not found
-      case fetch_model_from_cache(model_id, opts) do
+      case fetch_model_from_cache(model, opts) do
         {:ok, model} ->
           {:ok, model}
 
         {:error, _reason} ->
           # If not found in cache, try API
-          fetch_model_from_api(model_id, opts)
+          fetch_model_from_api(model, opts)
       end
     end
   end
@@ -105,11 +105,11 @@ defmodule Jido.AI.Provider.OpenRouter do
 
   Returns a tuple with {:ok, normalized_id} on success or {:error, reason} on failure.
   """
-  def normalize(model_id, _opts \\ []) do
+  def normalize(model, _opts \\ []) do
     # OpenRouter model IDs are already in the format "author/slug"
     # This method ensures the ID is properly formatted
-    if String.contains?(model_id, "/") do
-      {:ok, model_id}
+    if String.contains?(model, "/") do
+      {:ok, model}
     else
       {:error, "Invalid model ID format. Expected 'author/slug' format."}
     end
@@ -142,7 +142,7 @@ defmodule Jido.AI.Provider.OpenRouter do
   def validate_model_opts(opts) do
     {:ok,
      %Jido.AI.Model{
-       id: opts[:model_id] || "openrouter_default",
+       id: opts[:model] || "openrouter_default",
        name: opts[:model_name] || "OpenRouter Model",
        provider: :openrouter
      }}
@@ -167,19 +167,19 @@ defmodule Jido.AI.Provider.OpenRouter do
     api_key =
       Jido.AI.Provider.Helpers.get_api_key(opts, "OPENROUTER_API_KEY", :openrouter_api_key)
 
-    # Get model_id from opts
-    model_id = Keyword.get(opts, :model_id)
+    # Get model from opts
+    model = Keyword.get(opts, :model)
 
-    # Validate model_id
-    if is_nil(model_id) do
-      {:error, "model_id is required for OpenRouter models"}
+    # Validate model
+    if is_nil(model) do
+      {:error, "model is required for OpenRouter models"}
     else
       # Create the model struct with all necessary fields
       model = %Jido.AI.Model{
-        id: Keyword.get(opts, :id, "openrouter_#{model_id}"),
-        name: Keyword.get(opts, :name, "OpenRouter #{model_id}"),
+        id: Keyword.get(opts, :id, "openrouter_#{model}"),
+        name: Keyword.get(opts, :name, "OpenRouter #{model}"),
         provider: :openrouter,
-        model_id: model_id,
+        model: model,
         base_url: @base_url,
         api_key: api_key,
         temperature: Keyword.get(opts, :temperature, 0.7),
@@ -212,11 +212,11 @@ defmodule Jido.AI.Provider.OpenRouter do
     Path.join(provider_path, "models.json")
   end
 
-  defp get_model_file_path(model_id) do
+  defp get_model_file_path(model) do
     base_dir = Jido.AI.Provider.base_dir()
     provider_path = Path.join(base_dir, @provider_path)
     model_dir = Path.join(provider_path, "models")
-    Path.join(model_dir, "#{model_id}.json")
+    Path.join(model_dir, "#{model}.json")
   end
 
   defp read_models_from_cache do
@@ -235,16 +235,16 @@ defmodule Jido.AI.Provider.OpenRouter do
     end
   end
 
-  defp fetch_model_from_cache(model_id, opts) do
+  defp fetch_model_from_cache(model, opts) do
     # First try to read from the dedicated model file
-    model_file = get_model_file_path(model_id)
+    model_file = get_model_file_path(model)
 
     if File.exists?(model_file) do
       case File.read(model_file) do
         {:ok, json} ->
           case Jason.decode(json) do
             {:ok, model_data} ->
-              {:ok, process_single_model(model_data, model_id)}
+              {:ok, process_single_model(model_data, model)}
 
             {:error, reason} ->
               {:error, "Failed to parse cached model: #{inspect(reason)}"}
@@ -257,8 +257,8 @@ defmodule Jido.AI.Provider.OpenRouter do
       # If no dedicated file exists, try to find in the models list
       case list_models(Keyword.put(opts, :refresh, false)) do
         {:ok, models} ->
-          case Enum.find(models, fn model -> model.id == model_id end) do
-            nil -> {:error, "Model not found in cache: #{model_id}"}
+          case Enum.find(models, fn model -> model.id == model end) do
+            nil -> {:error, "Model not found in cache: #{model}"}
             model -> {:ok, model}
           end
 
@@ -293,18 +293,18 @@ defmodule Jido.AI.Provider.OpenRouter do
     end
   end
 
-  defp fetch_model_from_api(model_id, opts) do
-    url = base_url() <> "/models/#{model_id}/endpoints"
+  defp fetch_model_from_api(model, opts) do
+    url = base_url() <> "/models/#{model}/endpoints"
     headers = request_headers(opts)
 
     case Req.get(url, headers: headers) do
       {:ok, %{status: 200, body: %{"data" => model_data}}} ->
         # Process the model data
-        processed_model = process_single_model(model_data, model_id)
+        processed_model = process_single_model(model_data, model)
 
         # Cache the model data if requested
         if Keyword.get(opts, :save_to_cache, true) do
-          cache_single_model(model_id, model_data)
+          cache_single_model(model, model_data)
         end
 
         {:ok, processed_model}
@@ -317,11 +317,11 @@ defmodule Jido.AI.Provider.OpenRouter do
     end
   end
 
-  defp cache_single_model(model_id, model_data) do
+  defp cache_single_model(model, model_data) do
     base_dir = Jido.AI.Provider.base_dir()
     provider_path = Path.join(base_dir, @provider_path)
     model_dir = Path.join(provider_path, "models")
-    model_file = Path.join(model_dir, "#{model_id}.json")
+    model_file = Path.join(model_dir, "#{model}.json")
 
     # Ensure directory exists
     File.mkdir_p!(model_dir)
@@ -348,11 +348,11 @@ defmodule Jido.AI.Provider.OpenRouter do
 
   defp process_models(_), do: []
 
-  defp process_single_model(model_data, model_id) when is_map(model_data) do
+  defp process_single_model(model_data, model) when is_map(model_data) do
     # Extract model details from the endpoints response
     %{
-      id: model_id,
-      name: model_data["name"] || model_id,
+      id: model,
+      name: model_data["name"] || model,
       description: model_data["description"] || "",
       created: model_data["created"],
       architecture: process_architecture(model_data["architecture"]),

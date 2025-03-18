@@ -82,11 +82,12 @@ defmodule Jido.Ai.MixProject do
     #   require Logger
     #   Logger.warning("Using local Jido dependencies")
 
-      deps ++
-        [
-          {:jido, path: "../jido"}
-          # {:jido_memory, path: "../jido_memory"}
-        ]
+    deps ++
+      [
+        {:jido, path: "../jido"}
+        # {:jido_memory, path: "../jido_memory"}
+      ]
+
     # else
     #   deps ++
     #     [

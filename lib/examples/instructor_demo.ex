@@ -25,12 +25,12 @@ defmodule Jido.Examples.InstructorDemo do
   end
 
   def model do
-    {:ok, model} = Model.from({:anthropic, [model_id: "claude-3-haiku-20240307"]})
+    {:ok, model} = Model.from({:anthropic, [model: "claude-3-haiku-20240307"]})
     model
   end
 
   def chat do
-    # 1. Define a model using provider tuple format with model_id
+    # 1. Define a model using provider tuple format with model
 
     # 2. Create a sophisticated prompt with history and template substitution
     prompt =

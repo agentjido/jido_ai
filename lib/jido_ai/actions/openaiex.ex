@@ -1,4 +1,4 @@
-defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
+defmodule Jido.AI.Actions.OpenaiEx do
   use Jido.Action,
     name: "openai_ex_chat_completion",
     description: "Chat completion using OpenAI Ex with support for tool calling",
@@ -6,7 +6,7 @@ defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
       model: [
         type: {:custom, Jido.AI.Model, :validate_model_opts, []},
         required: true,
-        doc: "The AI model to use (e.g., {:openai, [model_id: \"gpt-4\"]} or %Jido.AI.Model{})"
+        doc: "The AI model to use (e.g., {:openai, [model: \"gpt-4\"]} or %Jido.AI.Model{})"
       ],
       messages: [
         type: {:list, {:map, [role: :atom, content: :string]}},
@@ -31,6 +31,7 @@ defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
       temperature: [
         type: :float,
         required: false,
+        default: 0.7,
         doc: "Temperature for response randomness (0-2)"
       ],
       max_tokens: [
@@ -57,6 +58,23 @@ defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
         type: {:list, :string},
         required: false,
         doc: "Stop sequences"
+      ],
+      response_format: [
+        type: {:in, [:text, :json]},
+        required: false,
+        default: :text,
+        doc: "Response format (text or json)"
+      ],
+      seed: [
+        type: :integer,
+        required: false,
+        doc: "Random number seed for deterministic responses"
+      ],
+      stream: [
+        type: :boolean,
+        required: false,
+        default: false,
+        doc: "Whether to stream the response"
       ]
     ]
 
@@ -85,22 +103,36 @@ defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
       - frequency_penalty: Optional float between -2.0 and 2.0
       - presence_penalty: Optional float between -2.0 and 2.0
       - stop: Optional list of strings
+      - response_format: Optional atom (:text or :json)
+      - seed: Optional integer for deterministic responses
+      - stream: Optional boolean for streaming responses
     - context: The action context containing state and other information
 
   ## Returns
     - {:ok, %{content: content, tool_results: results}} on success
     - {:error, reason} on failure
+    - Stream of chunks if streaming is enabled
   """
   def run(params, context) do
     Logger.info("Running OpenAI Ex chat completion with params: #{inspect(params)}")
     Logger.info("Context: #{inspect(context)}")
 
+    params = Map.put_new(params, :stream, false)
+
     with {:ok, model} <- validate_and_get_model(params),
          {:ok, messages} <- validate_and_get_messages(params),
-         {:ok, chat_req} <- build_chat_request(model, messages, params),
-         {:ok, response} <- make_request(model, chat_req),
-         {:ok, processed} <- ToolHelper.process_response(response, params[:tools] || []) do
-      {:ok, processed}
+         {:ok, chat_req} <- build_chat_request(model, messages, params) do
+      if params.stream do
+        make_streaming_request(model, chat_req)
+      else
+        case make_request(model, chat_req) do
+          {:ok, response} ->
+            ToolHelper.process_response(response, params[:tools] || [])
+
+          error ->
+            error
+        end
+      end
     end
   end
 
@@ -164,6 +196,7 @@ defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
         case msg.role do
           :user -> ChatMessage.user(msg.content)
           :assistant -> ChatMessage.assistant(msg.content)
+          :system -> ChatMessage.system(msg.content)
           _ -> %{role: msg.role, content: msg.content}
         end
       end)
@@ -171,9 +204,9 @@ defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
     # Build base request with model and messages
     chat_req =
       Chat.Completions.new(
-        model: Map.get(model, :model_id),
+        model: Map.get(model, :model),
         messages: chat_messages,
-        temperature: params[:temperature] || Map.get(model, :temperature),
+        temperature: params[:temperature] || Map.get(model, :temperature) || 0.7,
         max_tokens: params[:max_tokens] || Map.get(model, :max_tokens)
       )
 
@@ -184,6 +217,9 @@ defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
       |> maybe_add_param(:frequency_penalty, params[:frequency_penalty])
       |> maybe_add_param(:presence_penalty, params[:presence_penalty])
       |> maybe_add_param(:stop, params[:stop])
+      |> maybe_add_param(:response_format, params[:response_format])
+      |> maybe_add_param(:seed, params[:seed])
+      |> maybe_add_param(:stream, params[:stream])
 
     # Add tool calling configuration if provided
     chat_req =
@@ -211,6 +247,15 @@ defmodule Jido.AI.Actions.OpenaiEx.ChatCompletion do
   defp maybe_add_param(req, key, value), do: Map.put(req, key, value)
 
   defp make_request(model, chat_req) do
+    client =
+      OpenaiEx.new(model.api_key)
+      |> maybe_add_base_url(model)
+      |> maybe_add_headers(model)
+
+    Chat.Completions.create(client, chat_req)
+  end
+
+  defp make_streaming_request(model, chat_req) do
     client =
       OpenaiEx.new(model.api_key)
       |> maybe_add_base_url(model)

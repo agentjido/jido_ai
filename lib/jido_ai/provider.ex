@@ -47,8 +47,8 @@ defmodule Jido.AI.Provider do
       iex> standardize_model_name("gpt-4-0613")
       "gpt-4"
   """
-  def standardize_model_name(model_id) do
-    Helpers.standardize_name(model_id)
+  def standardize_model_name(model) do
+    Helpers.standardize_name(model)
   end
 
   def providers do
@@ -77,7 +77,7 @@ defmodule Jido.AI.Provider do
   ## Parameters
 
   * `provider` - The provider struct or ID
-  * `model_id` - The ID or name of the model to fetch
+  * `model` - The ID or name of the model to fetch
   * `opts` - Additional options for the request
 
   ## Returns
@@ -86,16 +86,16 @@ defmodule Jido.AI.Provider do
   * `{:error, reason}` - The model was not found or an error occurred
   """
   @spec get_model(t() | atom(), String.t(), keyword()) :: {:ok, map()} | {:error, String.t()}
-  def get_model(provider, model_id, opts \\ [])
+  def get_model(provider, model, opts \\ [])
 
-  def get_model(%__MODULE__{} = provider, model_id, opts) do
+  def get_model(%__MODULE__{} = provider, model, opts) do
     case get_adapter_module(provider) do
       {:ok, adapter} ->
         if function_exported?(adapter, :get_model, 3) do
-          adapter.get_model(provider, model_id, opts)
+          adapter.get_model(provider, model, opts)
         else
           # Fallback implementation if the adapter doesn't implement get_model
-          fallback_get_model(provider, model_id, opts)
+          fallback_get_model(provider, model, opts)
         end
 
       {:error, reason} ->
@@ -103,7 +103,7 @@ defmodule Jido.AI.Provider do
     end
   end
 
-  def get_model(provider_id, model_id, opts)
+  def get_model(provider_id, model, opts)
       when is_atom(provider_id) or is_binary(provider_id) do
     provider_id_atom = ensure_atom(provider_id)
 
@@ -116,7 +116,7 @@ defmodule Jido.AI.Provider do
             name: Atom.to_string(provider_id_atom)
           }
 
-          adapter.get_model(provider, model_id, opts)
+          adapter.get_model(provider, model, opts)
         else
           # Fallback implementation
           {:error, "Provider adapter does not implement get_model/3"}
@@ -128,11 +128,11 @@ defmodule Jido.AI.Provider do
   end
 
   # Fallback implementation for get_model when the adapter doesn't implement it
-  defp fallback_get_model(provider, model_id, opts) do
+  defp fallback_get_model(provider, model, opts) do
     case models(provider, opts) do
       {:ok, models} ->
-        case Enum.find(models, fn model -> model.id == model_id end) do
-          nil -> {:error, "Model not found: #{model_id}"}
+        case Enum.find(models, fn model -> model.id == model end) do
+          nil -> {:error, "Model not found: #{model}"}
           model -> {:ok, model}
         end
 
@@ -256,8 +256,8 @@ defmodule Jido.AI.Provider do
     models =
       list_all_cached_models()
       |> Enum.filter(fn model ->
-        model_id = Map.get(model, :id) || Map.get(model, "id")
-        standardized_name = standardize_model_name(model_id)
+        model = Map.get(model, :id) || Map.get(model, "id")
+        standardized_name = standardize_model_name(model)
         standardized_name == model_name
       end)
 

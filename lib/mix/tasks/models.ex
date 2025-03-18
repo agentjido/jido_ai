@@ -160,8 +160,8 @@ defmodule Mix.Tasks.Jido.Ai.Models do
         list_provider_models(provider_id, opts)
 
       Keyword.get(opts, :fetch, false) && Keyword.get(opts, :model) ->
-        model_id = Keyword.get(opts, :model)
-        fetch_specific_model(provider_id, model_id, opts)
+        model = Keyword.get(opts, :model)
+        fetch_specific_model(provider_id, model, opts)
 
       Keyword.get(opts, :fetch, false) ->
         fetch_provider_models(provider_id, opts)
@@ -187,8 +187,8 @@ defmodule Mix.Tasks.Jido.Ai.Models do
       # Group models by standardized name
       models
       |> Enum.group_by(fn model ->
-        model_id = Map.get(model, :id) || Map.get(model, "id")
-        Jido.AI.Provider.standardize_model_name(model_id)
+        model = Map.get(model, :id) || Map.get(model, "id")
+        Jido.AI.Provider.standardize_model_name(model)
       end)
       |> Enum.each(fn {standard_name, models} ->
         providers = Enum.map(models, & &1.provider)
@@ -395,7 +395,7 @@ defmodule Mix.Tasks.Jido.Ai.Models do
     end
   end
 
-  defp fetch_specific_model(provider_id, model_id, opts) do
+  defp fetch_specific_model(provider_id, model, opts) do
     verbose = Keyword.get(opts, :verbose, false)
     refresh = Keyword.get(opts, :refresh, false)
 
@@ -403,12 +403,12 @@ defmodule Mix.Tasks.Jido.Ai.Models do
       {:ok, adapter} ->
         provider = adapter.definition()
         IO.puts("\n--- Fetching model from: #{provider.name} (#{provider.id}) ---")
-        IO.puts("Model ID: #{model_id}")
+        IO.puts("Model ID: #{model}")
 
         # Always set save_to_cache to true and use refresh if specified
         model_opts = [save_to_cache: true, refresh: refresh]
 
-        case adapter.model(model_id, model_opts) do
+        case adapter.model(model, model_opts) do
           {:ok, model} ->
             IO.puts("Successfully fetched and cached model: #{model.id}")
 
@@ -422,7 +422,7 @@ defmodule Mix.Tasks.Jido.Ai.Models do
                 Provider.base_dir(),
                 to_string(provider.id),
                 "models",
-                "#{model_id}.json"
+                "#{model}.json"
               ])
 
             # Create directory if it doesn't exist
@@ -448,14 +448,14 @@ defmodule Mix.Tasks.Jido.Ai.Models do
   end
 
   defp print_model_details(model) do
-    model_id = Map.get(model, :id) || Map.get(model, "id")
+    model = Map.get(model, :id) || Map.get(model, "id")
     provider = model.provider
-    display_name = Map.get(model, :display_name) || Map.get(model, "display_name") || model_id
+    display_name = Map.get(model, :display_name) || Map.get(model, "display_name") || model
     description = Map.get(model, :description) || Map.get(model, "description") || "N/A"
     created_at = Map.get(model, :created_at) || Map.get(model, "created") || "N/A"
 
     IO.puts("\nModel: #{display_name}")
-    IO.puts("ID: #{model_id}")
+    IO.puts("ID: #{model}")
     IO.puts("Provider: #{provider}")
     IO.puts("Description: #{description}")
     IO.puts("Created: #{created_at}")

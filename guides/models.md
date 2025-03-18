@@ -34,20 +34,20 @@ You can create a model instance using the `Jido.AI.Model.from/1` function:
 ```elixir
 # Using the Anthropic provider with Claude
 {:ok, model} = Jido.AI.Model.from({:anthropic, [
-  model_id: "claude-3-5-haiku",
+  model: "claude-3-5-haiku",
   temperature: 0.7,
   max_tokens: 1024
 ]})
 
 # Using OpenAI provider with GPT-4
 {:ok, gpt4_model} = Jido.AI.Model.from({:openai, [
-  model_id: "gpt-4",
+  model: "gpt-4",
   temperature: 0.5
 ]})
 
 # Using OpenRouter for model access
 {:ok, router_model} = Jido.AI.Model.from({:openrouter, [
-  model_id: "anthropic/claude-3-opus-20240229",
+  model: "anthropic/claude-3-opus-20240229",
   max_tokens: 2000
 ]})
 ```
@@ -61,7 +61,7 @@ Each model is represented as a `Jido.AI.Model` struct with the following fields:
   id: String.t(),             # Unique identifier for the model
   name: String.t(),           # Human-readable name
   provider: atom(),           # Provider identifier (e.g., :anthropic, :openai)
-  model_id: String.t(),       # Provider-specific model identifier
+  model: String.t(),       # Provider-specific model identifier
   base_url: String.t(),       # API base URL
   api_key: String.t(),        # API key for authentication
   temperature: float(),       # Temperature setting for generation
@@ -83,7 +83,7 @@ Jido AI provides flexible API key management through the `Jido.AI.Keyring` modul
 Jido.AI.Keyring.set_session_value(:anthropic_api_key, "your-api-key")
 
 # Create a model using the stored API key
-{:ok, model} = Jido.AI.Model.from({:anthropic, [model_id: "claude-3-5-haiku"]})
+{:ok, model} = Jido.AI.Model.from({:anthropic, [model: "claude-3-5-haiku"]})
 ```
 
 API keys can be provided through multiple methods (in order of precedence):
@@ -99,14 +99,14 @@ The Anthropic provider gives you access to Claude models:
 
 ```elixir
 {:ok, claude_model} = Jido.AI.Model.from({:anthropic, [
-  model_id: "claude-3-7-sonnet",
+  model: "claude-3-7-sonnet",
   temperature: 0.3,
   max_tokens: 2048
 ]})
 ```
 
 Key configuration options:
-- `model_id`: Claude model identifier (e.g., "claude-3-7-sonnet", "claude-3-5-haiku")
+- `model`: Claude model identifier (e.g., "claude-3-7-sonnet", "claude-3-5-haiku")
 - `temperature`: Controls randomness (0.0 to 1.0)
 - `max_tokens`: Maximum number of tokens to generate
 
@@ -116,14 +116,14 @@ The OpenAI provider enables access to GPT models and other OpenAI services:
 
 ```elixir
 {:ok, openai_model} = Jido.AI.Model.from({:openai, [
-  model_id: "gpt-4o",
+  model: "gpt-4o",
   temperature: 0.7,
   max_tokens: 1024
 ]})
 ```
 
 Key configuration options:
-- `model_id`: OpenAI model identifier (e.g., "gpt-4o", "gpt-3.5-turbo")
+- `model`: OpenAI model identifier (e.g., "gpt-4o", "gpt-3.5-turbo")
 - `temperature`: Controls randomness (0.0 to 1.0)
 - `max_tokens`: Maximum number of tokens to generate
 
@@ -133,13 +133,13 @@ OpenRouter provides unified access to multiple AI providers:
 
 ```elixir
 {:ok, router_model} = Jido.AI.Model.from({:openrouter, [
-  model_id: "anthropic/claude-3-opus-20240229",
+  model: "anthropic/claude-3-opus-20240229",
   max_tokens: 2000
 ]})
 ```
 
 Key configuration options:
-- `model_id`: Provider and model in format "provider/model"
+- `model`: Provider and model in format "provider/model"
 - `temperature`: Controls randomness (0.0 to 1.0)
 - `max_tokens`: Maximum number of tokens to generate
 
@@ -149,13 +149,13 @@ The Cloudflare provider gives access to Cloudflare's AI Gateway:
 
 ```elixir
 {:ok, cloudflare_model} = Jido.AI.Model.from({:cloudflare, [
-  model_id: "@cf/meta/llama-3-8b-instruct",
+  model: "@cf/meta/llama-3-8b-instruct",
   account_id: "your-account-id"
 ]})
 ```
 
 Key configuration options:
-- `model_id`: Cloudflare model identifier
+- `model`: Cloudflare model identifier
 - `account_id`: Your Cloudflare account ID
 - `email`: Your Cloudflare account email (optional)
 
@@ -234,7 +234,7 @@ end
 Jido AI employs consistent error patterns throughout the provider system:
 
 ```elixir
-case Jido.AI.Model.from({:anthropic, [model_id: "invalid-model"]}) do
+case Jido.AI.Model.from({:anthropic, [model: "invalid-model"]}) do
   {:ok, model} ->
     # Handle successful model creation
     process_with_model(model)
@@ -287,10 +287,10 @@ defmodule MyApp.AI do
   
   defp get_summarization_model(opts) do
     provider = Keyword.get(opts, :provider, :anthropic)
-    model_id = Keyword.get(opts, :model_id, "claude-3-5-haiku")
+    model = Keyword.get(opts, :model, "claude-3-5-haiku")
     
     Model.from({provider, [
-      model_id: model_id,
+      model: model,
       temperature: 0.3,
       max_tokens: 1000
     ]})
@@ -338,15 +338,15 @@ defmodule MyApp.ResilientAI do
   end
   
   defp create_model_for_provider(:anthropic) do
-    Jido.AI.Model.from({:anthropic, [model_id: "claude-3-5-haiku"]})
+    Jido.AI.Model.from({:anthropic, [model: "claude-3-5-haiku"]})
   end
   
   defp create_model_for_provider(:openai) do
-    Jido.AI.Model.from({:openai, [model_id: "gpt-3.5-turbo"]})
+    Jido.AI.Model.from({:openai, [model: "gpt-3.5-turbo"]})
   end
   
   defp create_model_for_provider(:openrouter) do
-    Jido.AI.Model.from({:openrouter, [model_id: "google/gemini-pro"]})
+    Jido.AI.Model.from({:openrouter, [model: "google/gemini-pro"]})
   end
   
   defp perform_completion(model, prompt) do

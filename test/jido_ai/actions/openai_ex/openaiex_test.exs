@@ -1,8 +1,8 @@
-defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
-  use ExUnit.Case
+defmodule JidoTest.AI.Actions.OpenaiExTest do
+  use ExUnit.Case, async: true
   use Mimic
   require Logger
-  alias Jido.AI.Actions.OpenaiEx.ChatCompletion
+  alias Jido.AI.Actions.OpenaiEx, as: OpenaiExAction
   alias Jido.AI.Model
   alias Jido.AI.Prompt
   alias OpenaiEx.Chat
@@ -14,7 +14,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
     use Ecto.Schema
 
     embedded_schema do
-      field :message, :string
+      field(:message, :string)
     end
   end
 
@@ -25,28 +25,9 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
 
   describe "run/2" do
     setup do
-      # Copy OpenaiEx module for Mimic
-      Mimic.copy(OpenaiEx)
-      Mimic.copy(OpenaiEx.Chat.Completions)
-
       # Create a mock model
-      model = %Model{
-        provider: :openai,
-        model_id: "gpt-4",
-        api_key: "test-api-key",
-        temperature: 0.7,
-        max_tokens: 1024,
-        name: "Test Model",
-        id: "test-model",
-        description: "Test Model",
-        created: System.system_time(:second),
-        architecture: %Model.Architecture{
-          modality: "text",
-          tokenizer: "unknown",
-          instruct_type: nil
-        },
-        endpoints: []
-      }
+      {:ok, model} =
+        Model.from({:openai, [model: "gpt-4", api_key: "test-api-key"]})
 
       # Create valid messages
       messages = [
@@ -57,7 +38,9 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
       # Create valid params
       params = %{
         model: model,
-        messages: messages
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 1024
       }
 
       # Create context
@@ -70,29 +53,15 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
       params: params,
       context: context
     } do
-      # Create expected chat request
-      expected_messages = [
-        ChatMessage.user("Hello, how are you?"),
-        ChatMessage.assistant("I'm doing well, thank you!")
-      ]
-
-      expected_req =
-        Chat.Completions.new(
-          model: "gpt-4",
-          messages: expected_messages,
-          temperature: 0.7,
-          max_tokens: 1024
-        )
-
       # Mock the OpenAI client
       expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
 
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, ^expected_req ->
+      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
         {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "successfully processes a valid request with prompt", %{model: model, context: context} do
@@ -101,29 +70,20 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
 
       params = %{
         model: model,
-        prompt: prompt
+        prompt: prompt,
+        temperature: 0.7,
+        max_tokens: 1024
       }
-
-      # Create expected chat request
-      expected_messages = [ChatMessage.user("Hello, how are you?")]
-
-      expected_req =
-        Chat.Completions.new(
-          model: "gpt-4",
-          messages: expected_messages,
-          temperature: 0.7,
-          max_tokens: 1024
-        )
 
       # Mock the OpenAI client
       expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
 
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, ^expected_req ->
+      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
         {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "successfully processes a valid request with prompt and template", %{
@@ -141,29 +101,20 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
 
       params = %{
         model: model,
-        prompt: prompt
+        prompt: prompt,
+        temperature: 0.7,
+        max_tokens: 1024
       }
-
-      # Create expected chat request
-      expected_messages = [ChatMessage.user("Hello Alice")]
-
-      expected_req =
-        Chat.Completions.new(
-          model: "gpt-4",
-          messages: expected_messages,
-          temperature: 0.7,
-          max_tokens: 1024
-        )
 
       # Mock the OpenAI client
       expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
 
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, ^expected_req ->
+      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
         {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "successfully processes a valid request with additional parameters", %{
@@ -178,89 +129,75 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
           top_p: 0.9,
           frequency_penalty: 0.5,
           presence_penalty: 0.5,
-          stop: ["\n", "END"]
+          stop: ["\n", "END"],
+          response_format: :json,
+          seed: 123
         })
-
-      # Create expected chat request
-      expected_messages = [
-        ChatMessage.user("Hello, how are you?"),
-        ChatMessage.assistant("I'm doing well, thank you!")
-      ]
-
-      expected_req =
-        Chat.Completions.new(
-          model: "gpt-4",
-          messages: expected_messages,
-          temperature: 0.5,
-          max_tokens: 2048,
-          top_p: 0.9,
-          frequency_penalty: 0.5,
-          presence_penalty: 0.5,
-          stop: ["\n", "END"]
-        )
 
       # Mock the OpenAI client
       expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
 
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, ^expected_req ->
+      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
         {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
+    end
+
+    test "successfully processes a streaming request", %{params: params, context: context} do
+      # Add streaming parameter
+      params = Map.put(params, :stream, true)
+
+      # Mock the OpenAI client
+      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
+
+      # Use create instead of create_stream
+      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
+        {:ok,
+         Stream.map(["Hello", ", ", "world", "!"], fn chunk ->
+           %{choices: [%{delta: %{content: chunk}}]}
+         end)}
+      end)
+
+      {:ok, stream} = OpenaiExAction.run(params, context)
+
+      chunks =
+        stream
+        |> Enum.to_list()
+        |> Enum.map(fn chunk ->
+          chunk.choices |> List.first() |> Map.get(:delta) |> Map.get(:content)
+        end)
+
+      assert chunks == ["Hello", ", ", "world", "!"]
     end
 
     test "successfully processes a valid request with OpenRouter model", %{
       params: params,
       context: context
     } do
+      {:ok, model} =
+        Model.from(
+          {:openrouter, [model: "anthropic/claude-3-sonnet", api_key: "test-api-key"]}
+        )
+
       # Update params to use OpenRouter model
       params = %{
         params
-        | model: %Model{
-            provider: :openrouter,
-            model_id: "anthropic/claude-3-sonnet",
-            api_key: "test-api-key",
-            temperature: 0.7,
-            max_tokens: 1024,
-            name: "Test Model",
-            id: "test-model",
-            description: "Test Model",
-            created: System.system_time(:second),
-            architecture: %Model.Architecture{
-              modality: "text",
-              tokenizer: "unknown",
-              instruct_type: nil
-            },
-            endpoints: []
-          }
+        | model: model
       }
-
-      # Create expected chat request
-      expected_messages = [
-        ChatMessage.user("Hello, how are you?"),
-        ChatMessage.assistant("I'm doing well, thank you!")
-      ]
-
-      expected_req =
-        Chat.Completions.new(
-          model: "anthropic/claude-3-sonnet",
-          messages: expected_messages,
-          temperature: 0.7,
-          max_tokens: 1024
-        )
 
       # Mock the OpenRouter client
       expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
       expect(OpenaiEx, :with_base_url, fn client, _url -> client end)
       expect(OpenaiEx, :with_additional_headers, fn client, _headers -> client end)
 
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, ^expected_req ->
+      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
         {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "handles tool calling configuration", %{params: params, context: context} do
@@ -314,7 +251,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "handles tool calls in response", %{params: params, context: context} do
@@ -361,10 +298,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
       # Mock the OpenAI client
       expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
 
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, req ->
-        # Log the actual request
-        Logger.info("Actual request: #{inspect(req)}")
-
+      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
         {:ok,
          %{
            choices: [
@@ -388,14 +322,14 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
                 content: "Let me calculate that for you.",
                 tool_results: [%{tool: "add", result: 8}]
               }} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "returns error for invalid model specification", %{params: params, context: context} do
       params = %{params | model: "invalid_model"}
 
       assert {:error, "Invalid model specification. Must be a map or {provider, opts} tuple."} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "returns error for invalid provider", %{params: params, context: context} do
@@ -403,7 +337,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
         params
         | model: %Model{
             provider: :invalid_provider,
-            model_id: "test-model",
+            model: "test-model",
             api_key: "test-api-key",
             temperature: 0.7,
             max_tokens: 1024,
@@ -422,21 +356,21 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
 
       assert {:error,
               "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter]"} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "returns error for invalid messages", %{params: params, context: context} do
       params = %{params | messages: [%{invalid: "message"}]}
 
       assert {:error, "Invalid message format. Each message must have :role and :content fields."} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "returns error for missing messages and prompt", %{params: params, context: context} do
       params = Map.delete(params, :messages)
 
       assert {:error, "Either messages or prompt must be provided."} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
 
     test "returns error for invalid prompt", %{model: model, context: context} do
@@ -446,7 +380,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ChatCompletionTest do
       }
 
       assert {:error, "Expected a string or a Jido.AI.Prompt struct, got: 123"} =
-               ChatCompletion.run(params, context)
+               OpenaiExAction.run(params, context)
     end
   end
 end

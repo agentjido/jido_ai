@@ -2,7 +2,8 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
   use ExUnit.Case
   use Mimic
 
-  alias Jido.AI.Actions.Instructor.{BooleanResponse, BaseCompletion}
+  alias Jido.AI.Actions.Instructor.BooleanResponse
+  alias Jido.AI.Actions.Instructor
   alias Jido.AI.Prompt
   alias Jido.AI.Model
 
@@ -10,31 +11,10 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
 
   setup :set_mimic_global
 
-  setup do
-    Mimic.copy(BooleanResponse)
-    Mimic.copy(BaseCompletion)
-    :ok
-  end
-
   describe "run/2" do
     setup do
-      model = %Model{
-        provider: :anthropic,
-        model_id: "claude-3-haiku-20240307",
-        api_key: "test-api-key",
-        temperature: 0.1,
-        max_tokens: 500,
-        name: "Test Model",
-        id: "test-model",
-        description: "Test Model",
-        created: System.system_time(:second),
-        architecture: %Model.Architecture{
-          modality: "text",
-          tokenizer: "unknown",
-          instruct_type: nil
-        },
-        endpoints: []
-      }
+      {:ok, model} =
+        Model.from({:anthropic, [model: "claude-3-haiku-20240307", api_key: "test-api-key"]})
 
       prompt = %Prompt{
         id: "test-prompt-id",
@@ -48,7 +28,7 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
     end
 
     defp mock_base_completion_response(expected_response) do
-      expect(BaseCompletion, :run, fn params, _context ->
+      expect(Instructor, :run, fn params, _context ->
         assert params.model != nil
         assert params.prompt != nil
         assert params.response_model == BooleanResponse.Schema
@@ -60,7 +40,7 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
     end
 
     defp mock_base_completion_error(error) do
-      expect(BaseCompletion, :run, fn _params, _context ->
+      expect(Instructor, :run, fn _params, _context ->
         {:error, error, %{}}
       end)
     end
@@ -85,7 +65,8 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
     test "returns false for clear negative response", %{model: model, prompt: prompt} do
       expected_response = %BooleanResponse.Schema{
         answer: false,
-        explanation: "The sky is not green on a clear day. It appears blue due to Rayleigh scattering.",
+        explanation:
+          "The sky is not green on a clear day. It appears blue due to Rayleigh scattering.",
         confidence: 0.98,
         is_ambiguous: false
       }
@@ -116,10 +97,13 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
     end
 
     test "handles prompts with multiple messages", %{model: model, prompt: prompt} do
-      prompt = %{prompt | messages: [
-        %{role: :system, content: "You are a helpful assistant."},
-        %{role: :user, content: "Is this a test?"}
-      ]}
+      prompt = %{
+        prompt
+        | messages: [
+            %{role: :system, content: "You are a helpful assistant."},
+            %{role: :user, content: "Is this a test?"}
+          ]
+      }
 
       expected_response = %BooleanResponse.Schema{
         answer: true,
@@ -137,7 +121,7 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
       assert response.is_ambiguous == false
     end
 
-    test "handles BaseCompletion errors gracefully", %{model: model, prompt: prompt} do
+    test "handles Instructor errors gracefully", %{model: model, prompt: prompt} do
       mock_base_completion_error("API error")
 
       assert {:error, "API error"} = BooleanResponse.run(%{model: model, prompt: prompt}, %{})
@@ -146,7 +130,7 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
     test "supports different model providers", %{prompt: prompt} do
       openai_model = %Model{
         provider: :openai,
-        model_id: "gpt-4",
+        model: "gpt-4",
         api_key: "test-openai-key"
       }
 

@@ -207,6 +207,10 @@ defmodule Jido.AI.Prompt do
 
     # 2. Build final messages
     Enum.map(prompt.messages, fn msg ->
+      # Ensure message has an engine field
+      msg =
+        if is_map(msg) && !Map.has_key?(msg, :engine), do: Map.put(msg, :engine, :none), else: msg
+
       content =
         case msg.engine do
           :eex ->
@@ -220,6 +224,10 @@ defmodule Jido.AI.Prompt do
             Enum.join(parts, "")
 
           :none ->
+            msg.content
+
+          _ ->
+            # Handle any other engine type as :none
             msg.content
         end
 

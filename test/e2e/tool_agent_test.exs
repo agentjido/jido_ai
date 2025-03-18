@@ -41,7 +41,7 @@ defmodule JidoTest.E2E.ToolAgentTest do
       {:ok, agent} =
         Agent.start_link(
           ai: [
-            model: {:anthropic, [model_id: "claude-3-haiku-20240307"]},
+            model: {:anthropic, [model: "claude-3-haiku-20240307"]},
             prompt: """
             You are a super math genius.
             You are given a math problem and you need to solve it using the tools provided.
@@ -56,7 +56,9 @@ defmodule JidoTest.E2E.ToolAgentTest do
         )
 
       # Test chat response
-      assert {:ok, %{response: response}} = Agent.chat_response(agent, "What is the capital of France?")
+      assert {:ok, %{response: response}} =
+               Agent.chat_response(agent, "What is the capital of France?")
+
       assert is_binary(response)
     end
   end

@@ -43,23 +43,27 @@ defmodule JidoTest.AI.PromptTest do
     end
 
     test "enforces single system message at start" do
-      assert_raise ArgumentError, ~r/Only one system message is allowed and it must be first/, fn ->
-        Prompt.new(%{
-          messages: [
-            %{role: :user, content: "Hello"},
-            %{role: :system, content: "System prompt"}
-          ]
-        })
-      end
+      assert_raise ArgumentError,
+                   ~r/Only one system message is allowed and it must be first/,
+                   fn ->
+                     Prompt.new(%{
+                       messages: [
+                         %{role: :user, content: "Hello"},
+                         %{role: :system, content: "System prompt"}
+                       ]
+                     })
+                   end
 
-      assert_raise ArgumentError, ~r/Only one system message is allowed and it must be first/, fn ->
-        Prompt.new(%{
-          messages: [
-            %{role: :system, content: "First system"},
-            %{role: :system, content: "Second system"}
-          ]
-        })
-      end
+      assert_raise ArgumentError,
+                   ~r/Only one system message is allowed and it must be first/,
+                   fn ->
+                     Prompt.new(%{
+                       messages: [
+                         %{role: :system, content: "First system"},
+                         %{role: :system, content: "Second system"}
+                       ]
+                     })
+                   end
     end
 
     test "creates a prompt with parameters" do
@@ -323,9 +327,11 @@ defmodule JidoTest.AI.PromptTest do
           ]
         })
 
-      assert_raise ArgumentError, ~r/Only one system message is allowed and it must be first/, fn ->
-        Prompt.add_message(prompt, :system, "System message")
-      end
+      assert_raise ArgumentError,
+                   ~r/Only one system message is allowed and it must be first/,
+                   fn ->
+                     Prompt.add_message(prompt, :system, "System message")
+                   end
     end
 
     test "prevents adding second system message" do
@@ -337,9 +343,11 @@ defmodule JidoTest.AI.PromptTest do
           ]
         })
 
-      assert_raise ArgumentError, ~r/Only one system message is allowed and it must be first/, fn ->
-        Prompt.add_message(prompt, :system, "Second system message")
-      end
+      assert_raise ArgumentError,
+                   ~r/Only one system message is allowed and it must be first/,
+                   fn ->
+                     Prompt.add_message(prompt, :system, "Second system message")
+                   end
     end
   end
 

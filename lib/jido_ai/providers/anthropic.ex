@@ -18,7 +18,7 @@ defmodule Jido.AI.Provider.Anthropic do
   #    --header "anthropic-version: 2023-06-01"
 
   # Retrieve Model
-  # curl https://api.anthropic.com/v1/models/{model_id} \
+  # curl https://api.anthropic.com/v1/models/{model} \
   # --header "x-api-key: $ANTHROPIC_API_KEY" \
   # --header "anthropic-version: 2023-06-01"
 
@@ -93,21 +93,21 @@ defmodule Jido.AI.Provider.Anthropic do
 
   Returns a tuple with {:ok, model} on success or {:error, reason} on failure.
   """
-  def model(model_id, opts \\ []) do
+  def model(model, opts \\ []) do
     refresh = Keyword.get(opts, :refresh, false)
 
     # Check if we should refresh or try to get from cache first
     if refresh do
-      fetch_model_from_api(model_id, opts)
+      fetch_model_from_api(model, opts)
     else
       # Try to get from cache first, fallback to API if not found
-      case Helpers.fetch_model_from_cache(@provider_path, model_id, opts, &process_single_model/2) do
+      case Helpers.fetch_model_from_cache(@provider_path, model, opts, &process_single_model/2) do
         {:ok, model} ->
           {:ok, model}
 
         {:error, _reason} ->
           # If not found in cache, try API
-          fetch_model_from_api(model_id, opts)
+          fetch_model_from_api(model, opts)
       end
     end
   end
@@ -121,11 +121,11 @@ defmodule Jido.AI.Provider.Anthropic do
 
   Returns a tuple with {:ok, normalized_id} on success or {:error, reason} on failure.
   """
-  def normalize(model_id, _opts \\ []) do
+  def normalize(model, _opts \\ []) do
     # Anthropic model IDs are simple strings like "claude-3-opus-20240229"
     # This method ensures the ID is properly formatted
-    if String.match?(model_id, ~r/^claude-[a-zA-Z0-9\-]+$/) do
-      {:ok, model_id}
+    if String.match?(model, ~r/^claude-[a-zA-Z0-9\-]+$/) do
+      {:ok, model}
     else
       {:error, "Invalid model ID format for Anthropic. Expected 'claude-*' format."}
     end
@@ -139,7 +139,7 @@ defmodule Jido.AI.Provider.Anthropic do
   @impl true
   def validate_model_opts(opts) do
     %Jido.AI.Model{
-      id: opts[:model_id],
+      id: opts[:model],
       name: opts[:model_name],
       description: opts[:model_description]
       # capabilities: opts[:model_capabilities],
@@ -165,19 +165,19 @@ defmodule Jido.AI.Provider.Anthropic do
     # Extract or generate an API key
     api_key = Helpers.get_api_key(opts, "ANTHROPIC_API_KEY", :anthropic_api_key)
 
-    # Get model_id from opts
-    model_id = Keyword.get(opts, :model_id)
+    # Get model from opts
+    model = Keyword.get(opts, :model)
 
-    # Validate model_id
-    if is_nil(model_id) do
-      {:error, "model_id is required for Anthropic models"}
+    # Validate model
+    if is_nil(model) do
+      {:error, "model is required for Anthropic models"}
     else
       # Create the model struct with all necessary fields
       model = %Model{
-        id: Keyword.get(opts, :id, "anthropic_#{model_id}"),
-        name: Keyword.get(opts, :name, "Anthropic #{model_id}"),
+        id: Keyword.get(opts, :id, "anthropic_#{model}"),
+        name: Keyword.get(opts, :name, "Anthropic #{model}"),
         provider: :anthropic,
-        model_id: model_id,
+        model: model,
         base_url: @base_url,
         api_key: api_key,
         temperature: Keyword.get(opts, :temperature, 0.7),
@@ -212,9 +212,9 @@ defmodule Jido.AI.Provider.Anthropic do
     Helpers.fetch_and_cache_models(provider, url, headers, @provider_path, &process_models/1)
   end
 
-  defp fetch_model_from_api(model_id, opts) do
+  defp fetch_model_from_api(model, opts) do
     provider = definition()
-    url = base_url() <> "/models/#{model_id}"
+    url = base_url() <> "/models/#{model}"
     headers = request_headers(opts)
 
     # Ensure the models directory exists
@@ -231,7 +231,7 @@ defmodule Jido.AI.Provider.Anthropic do
       provider,
       url,
       headers,
-      model_id,
+      model,
       @provider_path,
       &process_single_model/2,
       opts
@@ -256,10 +256,10 @@ defmodule Jido.AI.Provider.Anthropic do
 
   defp process_models(_), do: []
 
-  defp process_single_model(model_data, model_id) when is_map(model_data) do
+  defp process_single_model(model_data, model) when is_map(model_data) do
     %{
-      id: model_data["id"] || model_id,
-      name: model_data["display_name"] || model_data["name"] || model_data["id"] || model_id,
+      id: model_data["id"] || model,
+      name: model_data["display_name"] || model_data["name"] || model_data["id"] || model,
       description: model_data["description"] || "",
       created: model_data["created_at"] || model_data["created"],
       max_tokens: model_data["max_tokens_to_sample"],
@@ -270,12 +270,12 @@ defmodule Jido.AI.Provider.Anthropic do
     }
   end
 
-  defp process_single_model(_, model_id),
-    do: %{id: model_id, name: model_id, provider: @provider_id}
+  defp process_single_model(_, model),
+    do: %{id: model, name: model, provider: @provider_id}
 
   # Extract capabilities based on the model's name and other properties
   defp extract_capabilities(model) do
-    model_id = model["id"] || ""
+    model = model["id"] || ""
 
     %{
       # All Claude models support chat
@@ -283,11 +283,11 @@ defmodule Jido.AI.Provider.Anthropic do
       # Anthropic doesn't offer embedding models
       embedding: false,
       # Claude 3 models support image input
-      image: String.contains?(model_id, "opus") || String.contains?(model_id, "sonnet"),
+      image: String.contains?(model, "opus") || String.contains?(model, "sonnet"),
       # Claude 3 models support vision
-      vision: String.contains?(model_id, "opus") || String.contains?(model_id, "sonnet"),
+      vision: String.contains?(model, "opus") || String.contains?(model, "sonnet"),
       # Claude 3 models are multimodal
-      multimodal: String.contains?(model_id, "opus") || String.contains?(model_id, "sonnet"),
+      multimodal: String.contains?(model, "opus") || String.contains?(model, "sonnet"),
       # Anthropic doesn't offer audio models
       audio: false,
       # All Claude models have good code capabilities
@@ -297,15 +297,15 @@ defmodule Jido.AI.Provider.Anthropic do
 
   # Determine the tier based on model characteristics
   defp determine_tier(model) do
-    model_id = model["id"] || ""
+    model = model["id"] || ""
 
     cond do
       # Advanced tier for top models
-      String.contains?(model_id, "opus") ->
+      String.contains?(model, "opus") ->
         %{value: :advanced, description: "High-performance model"}
 
       # Standard tier for mid-range models
-      String.contains?(model_id, "sonnet") ->
+      String.contains?(model, "sonnet") ->
         %{value: :standard, description: "Balanced performance and cost"}
 
       # Basic tier for everything else

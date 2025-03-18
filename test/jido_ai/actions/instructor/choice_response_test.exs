@@ -1,8 +1,9 @@
 defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.Actions.Instructor.{ChoiceResponse, BaseCompletion}
+  alias Jido.AI.Actions.Instructor.ChoiceResponse
+  alias Jido.AI.Actions.Instructor
   alias Jido.AI.Prompt
   alias Jido.AI.Model
 
@@ -10,35 +11,8 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
 
   setup :set_mimic_global
 
-  setup do
-    Mimic.copy(BaseCompletion)
-    :ok
-  end
-
-  defp create_prompt(content, engine \\ :none, params \\ %{}) do
-    %Prompt{
-      metadata: %{},
-      params: params,
-      messages: [
-        %{role: :user, engine: engine, content: content}
-      ],
-      history: [],
-      version: 1,
-      id: "test-prompt-id"
-    }
-  end
-
-  defp create_model do
-    {:ok, model} = Model.from({:anthropic, [
-      model_id: "claude-3-sonnet-20240229",
-      api_key: "test-api-key"
-    ]})
-
-    model
-  end
-
   defp mock_base_completion_response(expected_response) do
-    expect(BaseCompletion, :run, fn params, _context ->
+    expect(Instructor, :run, fn params, _context ->
       assert params.model != nil
       assert params.prompt != nil
       assert params.response_model == ChoiceResponse.Schema
@@ -50,15 +24,23 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
   end
 
   defp mock_base_completion_error(error) do
-    expect(BaseCompletion, :run, fn _params, _context ->
+    expect(Instructor, :run, fn _params, _context ->
       {:error, error, %{}}
     end)
   end
 
   describe "run/2" do
     test "selects a valid option and provides explanation" do
-      prompt = create_prompt("How should I handle errors?")
-      model = create_model()
+      prompt = Prompt.new(:user, "How should I handle errors?")
+
+      {:ok, model} =
+        Model.from(
+          {:anthropic,
+           [
+             model: "claude-3-sonnet-20240229",
+             api_key: "test-api-key"
+           ]}
+        )
 
       available_actions = [
         %{id: "try_rescue", name: "Try/Rescue", description: "Use try/rescue for error handling"},
@@ -78,16 +60,17 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
 
       mock_base_completion_response(expected_response)
 
-      assert {:ok, %{result: result}} = ChoiceResponse.run(
-        %{
-          prompt: prompt,
-          model: model,
-          temperature: 0.7,
-          max_tokens: 1024,
-          available_actions: available_actions
-        },
-        %{}
-      )
+      assert {:ok, %{result: result}} =
+               ChoiceResponse.run(
+                 %{
+                   prompt: prompt,
+                   model: model,
+                   temperature: 0.7,
+                   max_tokens: 1024,
+                   available_actions: available_actions
+                 },
+                 %{}
+               )
 
       assert result.selected_option == "with_statement"
       assert result.confidence == 0.8
@@ -95,8 +78,16 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
     end
 
     test "rejects invalid option selection" do
-      prompt = create_prompt("How should I handle errors?")
-      model = create_model()
+      prompt = Prompt.new(:user, "How should I handle errors?")
+
+      {:ok, model} =
+        Model.from(
+          {:anthropic,
+           [
+             model: "claude-3-sonnet-20240229",
+             api_key: "test-api-key"
+           ]}
+        )
 
       available_actions = [
         %{id: "try_rescue", name: "Try/Rescue", description: "Use try/rescue for error handling"},
@@ -115,23 +106,33 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
 
       mock_base_completion_response(expected_response)
 
-      assert {:error, error_message} = ChoiceResponse.run(
-        %{
-          prompt: prompt,
-          model: model,
-          temperature: 0.7,
-          max_tokens: 1024,
-          available_actions: available_actions
-        },
-        %{}
-      )
+      assert {:error, error_message} =
+               ChoiceResponse.run(
+                 %{
+                   prompt: prompt,
+                   model: model,
+                   temperature: 0.7,
+                   max_tokens: 1024,
+                   available_actions: available_actions
+                 },
+                 %{}
+               )
 
-      assert error_message =~ "Selected option 'invalid_option' is not one of the available options"
+      assert error_message =~
+               "Selected option 'invalid_option' is not one of the available options"
     end
 
     test "handles base completion errors gracefully" do
-      prompt = create_prompt("How should I handle errors?")
-      model = create_model()
+      prompt = Prompt.new(:user, "How should I handle errors?")
+
+      {:ok, model} =
+        Model.from(
+          {:anthropic,
+           [
+             model: "claude-3-sonnet-20240229",
+             api_key: "test-api-key"
+           ]}
+        )
 
       available_actions = [
         %{id: "try_rescue", name: "Try/Rescue", description: "Use try/rescue for error handling"},
@@ -144,26 +145,31 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
 
       mock_base_completion_error("API rate limit exceeded")
 
-      assert {:error, "API rate limit exceeded"} = ChoiceResponse.run(
-        %{
-          prompt: prompt,
-          model: model,
-          temperature: 0.7,
-          max_tokens: 1024,
-          available_actions: available_actions
-        },
-        %{}
-      )
+      assert {:error, "API rate limit exceeded"} =
+               ChoiceResponse.run(
+                 %{
+                   prompt: prompt,
+                   model: model,
+                   temperature: 0.7,
+                   max_tokens: 1024,
+                   available_actions: available_actions
+                 },
+                 %{}
+               )
     end
 
     test "supports different model providers" do
-      prompt = create_prompt("How should I handle errors?")
+      prompt = Prompt.new(:user, "How should I handle errors?")
 
       # Use OpenAI model
-      {:ok, openai_model} = Model.from({:openai, [
-        model_id: "gpt-4",
-        api_key: "test-openai-key"
-      ]})
+      {:ok, openai_model} =
+        Model.from(
+          {:openai,
+           [
+             model: "gpt-4",
+             api_key: "test-openai-key"
+           ]}
+        )
 
       available_actions = [
         %{id: "try_rescue", name: "Try/Rescue", description: "Use try/rescue for error handling"},
@@ -182,14 +188,15 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
 
       mock_base_completion_response(expected_response)
 
-      assert {:ok, %{result: result}} = ChoiceResponse.run(
-        %{
-          prompt: prompt,
-          model: openai_model,
-          available_actions: available_actions
-        },
-        %{}
-      )
+      assert {:ok, %{result: result}} =
+               ChoiceResponse.run(
+                 %{
+                   prompt: prompt,
+                   model: openai_model,
+                   available_actions: available_actions
+                 },
+                 %{}
+               )
 
       assert result.selected_option == "try_rescue"
       assert result.confidence == 0.85

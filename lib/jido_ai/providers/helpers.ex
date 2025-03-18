@@ -38,14 +38,14 @@ defmodule Jido.AI.Provider.Helpers do
       iex> standardize_name("gpt-4-0613")
       "gpt-4"
   """
-  def standardize_name(model_id) when is_binary(model_id) do
+  def standardize_name(model) when is_binary(model) do
     # First try exact matches from our patterns
     case Enum.find_value(@model_patterns, fn {pattern, standard_name} ->
-           if String.match?(model_id, pattern), do: standard_name, else: nil
+           if String.match?(model, pattern), do: standard_name, else: nil
          end) do
       nil ->
         # If no exact match, try to remove version/date suffixes
-        model_id
+        model
         |> remove_version_suffix()
         |> remove_date_suffix()
 
@@ -54,16 +54,16 @@ defmodule Jido.AI.Provider.Helpers do
     end
   end
 
-  def standardize_name(model_id), do: model_id
+  def standardize_name(model), do: model
 
   # Remove version suffixes like -0613, -1106, etc.
-  defp remove_version_suffix(model_id) do
-    Regex.replace(~r/-[0-9]{4}$/, model_id, "")
+  defp remove_version_suffix(model) do
+    Regex.replace(~r/-[0-9]{4}$/, model, "")
   end
 
   # Remove date suffixes like -20250219, -20241022, etc.
-  defp remove_date_suffix(model_id) do
-    Regex.replace(~r/-[0-9]{8}$/, model_id, "")
+  defp remove_date_suffix(model) do
+    Regex.replace(~r/-[0-9]{8}$/, model, "")
   end
 
   @doc """
@@ -78,11 +78,11 @@ defmodule Jido.AI.Provider.Helpers do
   @doc """
   Gets the path to a specific model file for a provider.
   """
-  def get_model_file_path(provider_path, model_id) do
+  def get_model_file_path(provider_path, model) do
     base_dir = Jido.AI.Provider.base_dir()
     provider_dir = Path.join(base_dir, provider_path)
     model_dir = Path.join(provider_dir, "models")
-    Path.join(model_dir, "#{model_id}.json")
+    Path.join(model_dir, "#{model}.json")
   end
 
   @doc """
@@ -122,16 +122,16 @@ defmodule Jido.AI.Provider.Helpers do
   @doc """
   Fetches a model from the cache.
   """
-  def fetch_model_from_cache(provider_path, model_id, _opts, process_fn) do
+  def fetch_model_from_cache(provider_path, model, _opts, process_fn) do
     # First try to read from the dedicated model file
-    model_file = get_model_file_path(provider_path, model_id)
+    model_file = get_model_file_path(provider_path, model)
 
     if File.exists?(model_file) do
       case File.read(model_file) do
         {:ok, json} ->
           case Jason.decode(json) do
             {:ok, model_data} ->
-              {:ok, process_fn.(model_data, model_id)}
+              {:ok, process_fn.(model_data, model)}
 
             {:error, reason} ->
               {:error, "Failed to parse cached model: #{inspect(reason)}"}
@@ -150,8 +150,8 @@ defmodule Jido.AI.Provider.Helpers do
            end) do
         {:ok, processed_models} ->
           # Find the specific model by ID
-          case Enum.find(processed_models, fn model -> model.id == model_id end) do
-            nil -> {:error, "Model not found in cache: #{model_id}"}
+          case Enum.find(processed_models, fn model -> model.id == model end) do
+            nil -> {:error, "Model not found in cache: #{model}"}
             model -> {:ok, model}
           end
 
@@ -196,7 +196,7 @@ defmodule Jido.AI.Provider.Helpers do
         _provider,
         url,
         headers,
-        model_id,
+        model,
         provider_path,
         process_fn,
         opts \\ []
@@ -205,11 +205,11 @@ defmodule Jido.AI.Provider.Helpers do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
         # Process the model data
         model_data = extract_model_from_response(body)
-        processed_model = process_fn.(model_data, model_id)
+        processed_model = process_fn.(model_data, model)
 
         # Cache the model data if requested
         if Keyword.get(opts, :save_to_cache, true) do
-          cache_single_model(provider_path, model_id, model_data)
+          cache_single_model(provider_path, model, model_data)
         end
 
         {:ok, processed_model}
@@ -225,8 +225,8 @@ defmodule Jido.AI.Provider.Helpers do
   @doc """
   Caches a single model to a file.
   """
-  def cache_single_model(provider_path, model_id, model_data) do
-    model_file = get_model_file_path(provider_path, model_id)
+  def cache_single_model(provider_path, model, model_data) do
+    model_file = get_model_file_path(provider_path, model)
 
     # Ensure model directory exists
     File.mkdir_p!(Path.dirname(model_file))
