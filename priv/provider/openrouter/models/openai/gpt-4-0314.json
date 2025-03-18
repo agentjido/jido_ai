@@ -1,0 +1,25 @@
+{
+  "id": "openai/gpt-4-0314",
+  "name": "OpenAI: GPT-4 (older v0314)",
+  "description": "GPT-4-0314 is the first version of GPT-4 released, with a context length of 8,192 tokens, and was supported until June 14. Training data: up to Sep 2021.",
+  "capabilities": {
+    "code": true,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "advanced",
+    "description": "High-performance model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "GPT",
+    "instruct_type": null
+  },
+  "created": 1685232000,
+  "endpoints": []
+}

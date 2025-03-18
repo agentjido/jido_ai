@@ -1,0 +1,25 @@
+{
+  "id": "mistralai/pixtral-12b",
+  "name": "Mistral: Pixtral 12B",
+  "description": "The first multi-modal, text+image-to-text model from Mistral AI. Its weights were launched via torrent: https://x.com/mistralai/status/1833758285167722836.",
+  "capabilities": {
+    "code": false,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text+image->text",
+    "tokenizer": "Mistral",
+    "instruct_type": null
+  },
+  "created": 1725926400,
+  "endpoints": []
+}

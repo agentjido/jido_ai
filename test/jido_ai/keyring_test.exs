@@ -38,9 +38,8 @@ defmodule JidoTest.AI.KeyringTest do
       registry = :"registry_#{System.unique_integer()}"
       {:ok, _} = Keyring.start_link(name: name, registry: registry)
 
-      # Test both old and new API
-      assert Keyring.get_key(name, :anthropic_api_key) == "test_anthropic_key"
-      assert Keyring.get_key(name, :openai_api_key) == "test_openai_key"
+      assert Keyring.get(name, :anthropic_api_key, nil) == "test_anthropic_key"
+      assert Keyring.get(name, :openai_api_key, nil) == "test_openai_key"
       assert Keyring.get(name, :test_environment_variable, nil) == "test_value"
     end
 
@@ -101,10 +100,6 @@ defmodule JidoTest.AI.KeyringTest do
       # Set session value
       Keyring.set_session_value(name, :test_key, "session_test_value")
       assert Keyring.get_session_value(name, :test_key) == "session_test_value"
-
-      # Test backward compatibility methods
-      Keyring.set_session_key(name, :test_key2, "session_test_value2")
-      assert Keyring.get_session_key(name, :test_key2) == "session_test_value2"
     end
 
     test "session values take precedence over environment variables" do
@@ -222,12 +217,121 @@ defmodule JidoTest.AI.KeyringTest do
       # Should fall back to env vars
       assert Keyring.get(name, :test_environment_variable, nil) == "env_test_value"
       assert Keyring.get(name, :test_environment_variable2, nil) == "env_test_value2"
+    end
+  end
 
-      # Test backward compatibility method
-      Keyring.set_session_key(name, :test_environment_variable, "session_test_value")
-      assert Keyring.get(name, :test_environment_variable, nil) == "session_test_value"
-      Keyring.clear_all_session_keys(name)
-      assert Keyring.get(name, :test_environment_variable, nil) == "env_test_value"
+  describe "session values with explicit PID" do
+    test "can set and get session values for another process" do
+      # Start a fresh keyring instance with unique name and registry
+      name = :"keyring_#{System.unique_integer()}"
+      registry = :"registry_#{System.unique_integer()}"
+      {:ok, _} = Keyring.start_link(name: name, registry: registry)
+
+      # Create another process
+      {pid, ref} = spawn_monitor(fn -> Process.sleep(5000) end)
+
+      # Set session value for the other process
+      Keyring.set_session_value(name, :test_key, "other_process_value", pid)
+
+      # Set different value for current process
+      Keyring.set_session_value(name, :test_key, "current_process_value")
+
+      # Check that the values are separate
+      assert Keyring.get_session_value(name, :test_key, pid) == "other_process_value"
+      assert Keyring.get_session_value(name, :test_key) == "current_process_value"
+
+      # Check that get/4 works with explicit PID
+      assert Keyring.get(name, :test_key, nil, pid) == "other_process_value"
+      assert Keyring.get(name, :test_key) == "current_process_value"
+
+      # Clean up the spawned process
+      Process.demonitor(ref, [:flush])
+      Process.exit(pid, :kill)
+    end
+
+    test "can clear session values for specific process" do
+      # Mock Dotenvy.source! to return our test environment variables
+      expect(Dotenvy, :source!, fn _sources ->
+        %{"TEST_ENVIRONMENT_VARIABLE" => "env_test_value"}
+      end)
+
+      # Start a fresh keyring instance with unique name and registry
+      name = :"keyring_#{System.unique_integer()}"
+      registry = :"registry_#{System.unique_integer()}"
+      {:ok, _} = Keyring.start_link(name: name, registry: registry)
+
+      # Create another process
+      {pid, ref} = spawn_monitor(fn -> Process.sleep(5000) end)
+
+      # Set session values for both processes
+      Keyring.set_session_value(name, :test_key, "other_process_value", pid)
+      Keyring.set_session_value(name, :test_key, "current_process_value")
+
+      # Clear just the other process's value
+      Keyring.clear_session_value(name, :test_key, pid)
+
+      # Check current process value is preserved
+      assert Keyring.get_session_value(name, :test_key, pid) == nil
+      assert Keyring.get_session_value(name, :test_key) == "current_process_value"
+
+      # Clean up the spawned process
+      Process.demonitor(ref, [:flush])
+      Process.exit(pid, :kill)
+    end
+
+    test "can clear all session values for specific process" do
+      # Start a fresh keyring instance with unique name and registry
+      name = :"keyring_#{System.unique_integer()}"
+      registry = :"registry_#{System.unique_integer()}"
+      {:ok, _} = Keyring.start_link(name: name, registry: registry)
+
+      # Create another process
+      {pid, ref} = spawn_monitor(fn -> Process.sleep(5000) end)
+
+      # Set multiple session values for both processes
+      Keyring.set_session_value(name, :test_key1, "other_process_value1", pid)
+      Keyring.set_session_value(name, :test_key2, "other_process_value2", pid)
+      Keyring.set_session_value(name, :test_key1, "current_process_value1")
+      Keyring.set_session_value(name, :test_key2, "current_process_value2")
+
+      # Clear all values for the other process
+      Keyring.clear_all_session_values(name, pid)
+
+      # Check current process values are preserved
+      assert Keyring.get_session_value(name, :test_key1, pid) == nil
+      assert Keyring.get_session_value(name, :test_key2, pid) == nil
+      assert Keyring.get_session_value(name, :test_key1) == "current_process_value1"
+      assert Keyring.get_session_value(name, :test_key2) == "current_process_value2"
+
+      # Clean up the spawned process
+      Process.demonitor(ref, [:flush])
+      Process.exit(pid, :kill)
+    end
+
+    test "get/4 falls back to environment variables when no session value for a process" do
+      # Mock Dotenvy.source! to return our test environment variables
+      expect(Dotenvy, :source!, fn _sources ->
+        %{"TEST_KEY" => "env_test_value"}
+      end)
+
+      # Start a fresh keyring instance with unique name and registry
+      name = :"keyring_#{System.unique_integer()}"
+      registry = :"registry_#{System.unique_integer()}"
+      {:ok, _} = Keyring.start_link(name: name, registry: registry)
+
+      # Create another process
+      {pid, ref} = spawn_monitor(fn -> Process.sleep(5000) end)
+
+      # Only set value for current process
+      Keyring.set_session_value(name, :test_key, "current_process_value")
+
+      # For other process it should fall back to environment
+      assert Keyring.get(name, :test_key, nil, pid) == "env_test_value"
+      assert Keyring.get(name, :test_key) == "current_process_value"
+
+      # Clean up the spawned process
+      Process.demonitor(ref, [:flush])
+      Process.exit(pid, :kill)
     end
   end
 

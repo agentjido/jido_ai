@@ -1,0 +1,20 @@
+{
+  "id": "chatgpt-4o-latest",
+  "name": "chatgpt-4o-latest",
+  "description": "",
+  "capabilities": {
+    "code": true,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "advanced",
+    "description": "High-performance model"
+  },
+  "created": 1723515131,
+  "owned_by": "system"
+}

@@ -1,6 +1,7 @@
 defmodule Jido.AI.Provider do
   use TypedStruct
   require Logger
+  alias Jido.AI.Provider.Helpers
 
   @providers [
     {:openrouter, Jido.AI.Provider.OpenRouter},
@@ -29,11 +30,25 @@ defmodule Jido.AI.Provider do
   Returns the base directory path for provider-specific files.
 
   This is where provider configuration, models, and other data files are stored.
-  The path is relative to the project root and expands to `./priv/providers/`.
+  The path is relative to the project root and expands to `./priv/provider/`.
   """
   def base_dir do
-    default = Application.app_dir(:jido_ai, "priv/provider")
+    default = Path.join([File.cwd!(), "priv", "provider"])
     Application.get_env(:jido_ai, :provider_base_dir, default)
+  end
+
+  @doc """
+  Standardizes a model name across providers by removing version numbers and dates.
+  This helps match equivalent models from different providers.
+
+  ## Examples
+      iex> standardize_model_name("claude-3.7-sonnet-20250219")
+      "claude-3.7-sonnet"
+      iex> standardize_model_name("gpt-4-0613")
+      "gpt-4"
+  """
+  def standardize_model_name(model) do
+    Helpers.standardize_name(model)
   end
 
   def providers do
@@ -62,7 +77,7 @@ defmodule Jido.AI.Provider do
   ## Parameters
 
   * `provider` - The provider struct or ID
-  * `model_id` - The ID or name of the model to fetch
+  * `model` - The ID or name of the model to fetch
   * `opts` - Additional options for the request
 
   ## Returns
@@ -71,16 +86,16 @@ defmodule Jido.AI.Provider do
   * `{:error, reason}` - The model was not found or an error occurred
   """
   @spec get_model(t() | atom(), String.t(), keyword()) :: {:ok, map()} | {:error, String.t()}
-  def get_model(provider, model_id, opts \\ [])
+  def get_model(provider, model, opts \\ [])
 
-  def get_model(%__MODULE__{} = provider, model_id, opts) do
+  def get_model(%__MODULE__{} = provider, model, opts) do
     case get_adapter_module(provider) do
       {:ok, adapter} ->
         if function_exported?(adapter, :get_model, 3) do
-          adapter.get_model(provider, model_id, opts)
+          adapter.get_model(provider, model, opts)
         else
           # Fallback implementation if the adapter doesn't implement get_model
-          fallback_get_model(provider, model_id, opts)
+          fallback_get_model(provider, model, opts)
         end
 
       {:error, reason} ->
@@ -88,7 +103,7 @@ defmodule Jido.AI.Provider do
     end
   end
 
-  def get_model(provider_id, model_id, opts)
+  def get_model(provider_id, model, opts)
       when is_atom(provider_id) or is_binary(provider_id) do
     provider_id_atom = ensure_atom(provider_id)
 
@@ -101,7 +116,7 @@ defmodule Jido.AI.Provider do
             name: Atom.to_string(provider_id_atom)
           }
 
-          adapter.get_model(provider, model_id, opts)
+          adapter.get_model(provider, model, opts)
         else
           # Fallback implementation
           {:error, "Provider adapter does not implement get_model/3"}
@@ -113,11 +128,11 @@ defmodule Jido.AI.Provider do
   end
 
   # Fallback implementation for get_model when the adapter doesn't implement it
-  defp fallback_get_model(provider, model_id, opts) do
+  defp fallback_get_model(provider, model, opts) do
     case models(provider, opts) do
       {:ok, models} ->
-        case Enum.find(models, fn model -> model.id == model_id end) do
-          nil -> {:error, "Model not found: #{model_id}"}
+        case Enum.find(models, fn model -> model.id == model end) do
+          nil -> {:error, "Model not found: #{model}"}
           model -> {:ok, model}
         end
 
@@ -159,33 +174,99 @@ defmodule Jido.AI.Provider do
   end
 
   @doc """
-  Ensures that a provider ID is an atom.
-
-  Converts strings to atoms if necessary.
+  Ensures the given value is an atom.
   """
+  @spec ensure_atom(atom() | String.t() | term()) :: atom() | term()
   def ensure_atom(id) when is_atom(id), do: id
+  def ensure_atom(id) when is_binary(id), do: String.to_atom(id)
+  def ensure_atom(id), do: id
 
-  def ensure_atom(id) when is_binary(id) do
-    case id do
-      "openai" ->
-        :openai
+  def call_provider_callback(provider, callback, args) do
+    impl = module_for(provider)
 
-      "anthropic" ->
-        :anthropic
-
-      "openrouter" ->
-        :openrouter
-
-      _ ->
-        try do
-          String.to_existing_atom(id)
-        rescue
-          ArgumentError ->
-            Logger.warning("Unknown provider ID: #{id}")
-            String.to_atom(id)
-        end
+    if function_exported?(impl, callback, length(args)) do
+      apply(impl, callback, args)
+    else
+      {:error, "#{inspect(impl)} does not implement callback #{callback}/#{length(args)}"}
     end
   end
 
-  def ensure_atom(id), do: id
+  defp module_for(:anthropic), do: Jido.AI.Provider.Anthropic
+  defp module_for(:cloudflare), do: Jido.AI.Provider.Cloudflare
+  defp module_for(:openai), do: Jido.AI.Provider.OpenAI
+  defp module_for(:openrouter), do: Jido.AI.Provider.OpenRouter
+
+  @doc """
+  Lists all cached models across all providers.
+
+  ## Returns
+    - List of model maps, each containing provider information
+  """
+  def list_all_cached_models do
+    # Ensure the base directory exists
+    File.mkdir_p!(base_dir())
+
+    # Find all provider directories
+    provider_dirs =
+      case File.ls(base_dir()) do
+        {:ok, dirs} -> Enum.filter(dirs, &File.dir?(Path.join(base_dir(), &1)))
+        {:error, _} -> []
+      end
+
+    # Collect models from each provider
+    provider_dirs
+    |> Enum.flat_map(fn provider_dir ->
+      provider_id = String.to_atom(provider_dir)
+      models_file = Path.join([base_dir(), provider_dir, "models.json"])
+
+      if File.exists?(models_file) do
+        case File.read(models_file) do
+          {:ok, json} ->
+            case Jason.decode(json) do
+              {:ok, %{"data" => models}} when is_list(models) ->
+                Enum.map(models, &Map.put(&1, :provider, provider_id))
+
+              {:ok, models} when is_list(models) ->
+                Enum.map(models, &Map.put(&1, :provider, provider_id))
+
+              _ ->
+                []
+            end
+
+          _ ->
+            []
+        end
+      else
+        []
+      end
+    end)
+  end
+
+  @doc """
+  Retrieves combined information for a model across all providers.
+
+  ## Parameters
+    - model_name: The name of the model to search for
+
+  ## Returns
+    - {:ok, model_info} - Combined model information
+    - {:error, reason} - Error if model not found
+  """
+  def get_combined_model_info(model_name) do
+    models =
+      list_all_cached_models()
+      |> Enum.filter(fn model ->
+        model = Map.get(model, :id) || Map.get(model, "id")
+        standardized_name = standardize_model_name(model)
+        standardized_name == model_name
+      end)
+
+    if Enum.empty?(models) do
+      {:error, "No model found with name: #{model_name}"}
+    else
+      # Merge information from all matching models
+      merged_model = Helpers.merge_model_information(models)
+      {:ok, merged_model}
+    end
+  end
 end

@@ -1,0 +1,20 @@
+{
+  "id": "gpt-4o-mini-2024-07-18",
+  "name": "gpt-4o-mini-2024-07-18",
+  "description": "",
+  "capabilities": {
+    "code": true,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "advanced",
+    "description": "High-performance model"
+  },
+  "created": 1721172717,
+  "owned_by": "system"
+}

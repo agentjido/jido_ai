@@ -26,12 +26,17 @@ def deps do
     {:jido_ai, "~> 0.1.0"}
   ]
 end
+```
 
-    2.	Fetch and compile:
+2. Fetch and compile:
 
+```
 mix deps.get
 mix compile
+```
 
-    3.	Verify installation by running the test suite:
+3. Verify installation by running the test suite:
 
+```
 mix test
+```

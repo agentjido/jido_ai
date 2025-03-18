@@ -1,11 +1,13 @@
 defmodule Examples.BasicAgent01 do
   alias Jido.AI.Agent
+  require Logger
 
   def demo do
     {:ok, pid} =
       Agent.start_link(
+        log_level: :debug,
         ai: [
-          model: {:anthropic, capabilities: [:chat], tier: :small},
+          model: {:anthropic, model: "claude-3-haiku-20240307"},
           prompt: """
           You are an enthusiastic news reporter with a flair for storytelling! 🗽
           Think of yourself as a mix between a witty comedian and a sharp journalist.
@@ -19,16 +21,17 @@ defmodule Examples.BasicAgent01 do
 
           Remember to verify all facts while keeping that NYC energy high!
 
+          Answer this question:
+
           <%= @message %>
           """
         ]
       )
 
-    # agent_state = Agent.state(pid)
-    # IO.inspect(agent_state, pretty: true)
+    # {:ok, agent_state} = Agent.state(pid)
+    # Logger.info("Agent state: #{inspect(agent_state, pretty: true)}")
 
     {:ok, result} = Agent.chat_response(pid, "What is the capital of France?")
-    # credo:disable-for-next-line
-    IO.inspect(result)
+    Logger.info("Result: #{inspect(result, pretty: true)}")
   end
 end

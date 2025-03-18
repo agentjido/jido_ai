@@ -146,11 +146,11 @@ defmodule JidoTest.AI.Provider.HelpersTest do
         %{id: id, name: model_data["name"], description: model_data["description"]}
       end
 
-      {:ok, model} = Helpers.fetch_model_from_cache("test_provider", model_id, [], process_fn)
+      {:ok, model_result} = Helpers.fetch_model_from_cache("test_provider", model_id, [], process_fn)
 
-      assert model.id == model_id
-      assert model.name == "Test Model"
-      assert model.description == "A test model"
+      assert model_result.id == model_id
+      assert model_result.name == "Test Model"
+      assert model_result.description == "A test model"
     end
 
     test "returns error when model file doesn't exist and models list is unavailable" do
@@ -248,7 +248,7 @@ defmodule JidoTest.AI.Provider.HelpersTest do
         %{id: id, name: model_data["name"], description: model_data["description"]}
       end
 
-      {:ok, model} =
+      {:ok, model_result} =
         Helpers.fetch_model_from_api(
           provider,
           url,
@@ -258,9 +258,9 @@ defmodule JidoTest.AI.Provider.HelpersTest do
           process_fn
         )
 
-      assert model.id == model_id
-      assert model.name == "Test Model"
-      assert model.description == "A test model"
+      assert model_result.id == model_id
+      assert model_result.name == "Test Model"
+      assert model_result.description == "A test model"
 
       # Verify the model was cached
       cache_file = Path.join([test_dir, "test_provider", "models", "#{model_id}.json"])

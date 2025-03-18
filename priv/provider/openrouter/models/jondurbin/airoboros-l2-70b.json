@@ -1,0 +1,25 @@
+{
+  "id": "jondurbin/airoboros-l2-70b",
+  "name": "Airoboros 70B",
+  "description": "A Llama 2 70B fine-tune using synthetic data (the Airoboros dataset).\n\nCurrently based on [jondurbin/airoboros-l2-70b](https://huggingface.co/jondurbin/airoboros-l2-70b-2.2.1), but might get updated in the future.",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Llama2",
+    "instruct_type": "airoboros"
+  },
+  "created": 1698537600,
+  "endpoints": []
+}

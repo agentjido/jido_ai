@@ -24,8 +24,8 @@ defmodule Jido.AI.Model.Provider.Adapter do
     - opts: Options for the fetch operation (like API key, etc.)
 
   ## Returns
-    - {:ok, models} on success
-    - {:error, reason} on failure
+    * `{:ok, models}` - on success
+    * `{:error, reason}` - on failure
   """
   @callback list_models(opts :: keyword()) ::
               {:ok, list(map())} | {:error, any()}
@@ -34,28 +34,28 @@ defmodule Jido.AI.Model.Provider.Adapter do
   Fetches a specific model by ID from the provider's API.
 
   ## Parameters
-    - model_id: The ID of the model to fetch
+    - model: The ID of the model to fetch
     - opts: Options for the fetch operation (like API key, etc.)
 
   ## Returns
-    - {:ok, model} on success
-    - {:error, reason} on failure
+    * `{:ok, model}` - on success
+    * `{:error, reason}` - on failure
   """
-  @callback model(model_id :: String.t(), opts :: keyword()) ::
+  @callback model(model :: String.t(), opts :: keyword()) ::
               {:ok, map()} | {:error, any()}
 
   @doc """
   Normalizes a model ID to ensure it's in the correct format for the provider.
 
   ## Parameters
-    - model_id: The ID of the model to normalize
-    - opts: Options for the normalization
+    - id: The ID to normalize
+    - opts: Options for normalization
 
   ## Returns
-    - {:ok, normalized_id} on success
-    - {:error, reason} on failure
+    * `{:ok, normalized_id}` - on success
+    * `{:error, reason}` - on failure
   """
-  @callback normalize(model_id :: String.t(), opts :: keyword()) ::
+  @callback normalize(model :: String.t(), opts :: keyword()) ::
               {:ok, String.t()} | {:error, any()}
 
   @doc """
@@ -77,4 +77,38 @@ defmodule Jido.AI.Model.Provider.Adapter do
     - A provider struct
   """
   @callback definition() :: Jido.AI.Provider.t()
+
+  @doc """
+  Validates the options for creating a Jido.AI.Model specific to this provider.
+
+  Providers can parse and verify that `opts` is valid. Returns:
+    - `{:ok, %Jido.AI.Model{}}` if validation succeeds
+    - `{:error, reason}` otherwise.
+  """
+  @callback validate_model_opts(opts :: keyword()) ::
+              {:ok, Jido.AI.Model.t()} | {:error, any()}
+
+  @doc """
+  Transforms a generic `Jido.AI.Model` struct into a provider-specific client model.
+
+  For example, `transform_model_to_clientmodel(:langchain, model)` might produce a
+  config map specialized for LangChain usage.
+  """
+  @callback transform_model_to_clientmodel(client_atom :: atom(), model :: Jido.AI.Model.t()) ::
+              {:ok, any()} | {:error, any()}
+
+  @doc """
+  Builds a %Jido.AI.Model{} struct from the provided options.
+
+  This is the main entry point for creating a model struct from provider-specific options.
+  Each provider implements this to handle its own validation, defaults, and API key retrieval.
+
+  ## Parameters
+    - opts: Keyword list of options for building the model
+
+  ## Returns
+    * `{:ok, %Jido.AI.Model{}}` - on success
+    * `{:error, reason}` - on failure
+  """
+  @callback build(opts :: keyword()) :: {:ok, Jido.AI.Model.t()} | {:error, String.t()}
 end

@@ -49,15 +49,15 @@ defmodule Jido.Ai.MixProject do
   defp deps do
     require Logger
     use_local_deps = System.get_env("LOCAL_JIDO_DEPS") == "true" || false
-    Logger.info("Using local Jido dependencies: #{inspect(use_local_deps)}")
 
     deps = [
-      {:typed_struct, "~> 0.3.0"},
       {:dotenvy, "~> 1.0.0"},
+      {:solid, "~> 0.18.0"},
+      {:typed_struct, "~> 0.3.0"},
 
       # Clients
       {:req, "~> 0.5.8"},
-      {:openai_ex, "~> 0.8.6"},
+      {:openai_ex, "~> 0.9.0"},
       {:instructor, "~> 0.1.0"},
       {:langchain, "~> 0.3.1"},
 
@@ -65,11 +65,16 @@ defmodule Jido.Ai.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test]},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:doctor, "~> 0.22.0", only: [:dev, :test]},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:ex_check, "~> 0.12", only: [:dev, :test]},
+      {:ex_doc, "~> 0.37-rc", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
       {:expublish, "~> 2.5", only: [:dev], runtime: false},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:git_ops, "~> 2.5", only: [:dev, :test]},
+      {:igniter, "~> 0.5", only: [:dev, :test]},
       {:mimic, "~> 1.7", only: [:dev, :test]},
+      {:mix_audit, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:sobelow, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.1", only: [:dev, :test]}
     ]
 
@@ -93,7 +98,7 @@ defmodule Jido.Ai.MixProject do
 
   defp aliases do
     [
-      # test: "test --trace",
+      test: "test --trace",
       docs: "docs -f html --open",
       q: ["quality"],
       quality: [
@@ -124,7 +129,12 @@ defmodule Jido.Ai.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
-        "guides/getting-started.md"
+        {"guides/getting-started.md", title: "Getting Started"},
+        {"guides/keyring.md", title: "Managing Keys"},
+        {"guides/prompt.md", title: "Prompting"},
+        {"guides/providers.md", title: "LLM Providers"},
+        {"guides/agent-skill.md", title: "Agent & Skill"},
+        {"guides/actions.md", title: "Actions"}
       ]
     ]
   end

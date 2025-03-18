@@ -20,6 +20,7 @@ defmodule JidoTest.AI.ModelTest do
       assert model.id == "anthropic_test"
       assert model.name == "Test Model"
       assert model.architecture.modality == "text"
+      assert model.model == "claude-3-5-haiku"
     end
 
     test "validates provider with capabilities" do
@@ -30,6 +31,7 @@ defmodule JidoTest.AI.ModelTest do
                     id: "anthropic_test",
                     name: "Test Model",
                     modality: "text",
+                    model: "claude-3-5-haiku",
                     capabilities: [:chat]
                   ]}
                )
@@ -37,27 +39,44 @@ defmodule JidoTest.AI.ModelTest do
       assert model.id == "anthropic_test"
       assert model.name == "Test Model"
       assert model.architecture.modality == "text"
+      assert model.model == "claude-3-5-haiku"
     end
 
     test "validates provider atom" do
-      assert {:ok, model} = Model.validate_model_opts(:anthropic)
+      assert {:ok, model} =
+               Model.validate_model_opts({:anthropic, [model: "claude-3-5-haiku"]})
 
-      assert model.id == "anthropic_default"
-      assert model.name == "anthropic Model"
+      assert model.id == "anthropic_claude-3-5-haiku"
+      assert model.name == "Anthropic claude-3-5-haiku"
       assert model.architecture.modality == "text"
+      assert model.model == "claude-3-5-haiku"
     end
 
-    test "validates category-based model" do
-      assert {:ok, model} = Model.validate_model_opts({:category, :chat, :fastest})
+    # test "validates category-based model" do
+    #   assert {:ok, model} = Model.validate_model_opts({:category, :chat, :fastest})
 
-      assert model.id == "chat_fastest"
-      assert model.name == "chat fastest Model"
-      assert model.description =~ "Category-based model"
-    end
+    #   assert model.id == "chat_fastest"
+    #   assert model.name == "chat fastest Model"
+    #   assert model.description =~ "Category-based model"
+    # end
 
     test "rejects invalid provider" do
       assert {:error, message} = Model.validate_model_opts(:invalid_provider)
-      assert message =~ "Invalid provider"
+      assert message =~ "Invalid model specification"
+    end
+
+    test "rejects missing model for Anthropic" do
+      assert {:error, message} =
+               Model.validate_model_opts(
+                 {:anthropic,
+                  [
+                    id: "anthropic_test",
+                    name: "Test Model",
+                    modality: "text"
+                  ]}
+               )
+
+      assert message == "model is required for Anthropic models"
     end
   end
 

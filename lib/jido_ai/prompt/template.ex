@@ -12,9 +12,7 @@ defmodule Jido.AI.Prompt.Template do
   Here's an example of setting up a template using a parameter then later
   providing the input value.
 
-      import Jido.AI.Prompt.Sigil
-
-      template = ~p"What's a name for a company that makes <%= @product %>?"
+      template = Jido.AI.Prompt.Template.from_string!("What's a name for a company that makes <%= @product %>?")
 
       # later, format the final text after after applying the values.
       Jido.AI.Prompt.Template.format(template, %{product: "colorful socks"})
@@ -23,7 +21,7 @@ defmodule Jido.AI.Prompt.Template do
   require Logger
   alias __MODULE__
   alias Jido.AI.Error
-  alias Jido.AI.Message
+  alias Jido.AI.Prompt.MessageItem
 
   @enforce_keys [:text]
   defstruct [
@@ -350,8 +348,8 @@ defmodule Jido.AI.Prompt.Template do
       compiled = EEx.compile_string(text)
       {:ok, compiled}
     rescue
-      e in EEx.SyntaxError ->
-        {:error, Exception.message(e)}
+      e in [EEx.SyntaxError] ->
+        raise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
 
       e in CompileError ->
         {:error, Exception.message(e)}
@@ -365,17 +363,14 @@ defmodule Jido.AI.Prompt.Template do
     try do
       EEx.eval_string(text, assigns: inputs)
     rescue
-      e in EEx.SyntaxError ->
-        reraise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
-
-      e in RuntimeError ->
-        reraise Jido.AI.Error, "Template formatting error: #{Exception.message(e)}"
+      e in [RuntimeError] ->
+        raise Jido.AI.Error, "Template formatting error: #{Exception.message(e)}"
 
       e in CompileError ->
-        reraise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
+        raise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
 
       e ->
-        reraise Jido.AI.Error, "Unexpected error: #{Exception.message(e)}"
+        raise Jido.AI.Error, "Unexpected error: #{Exception.message(e)}"
     end
   end
 
@@ -414,31 +409,31 @@ defmodule Jido.AI.Prompt.Template do
   end
 
   @doc """
-  Convert a template to a Message struct.
+  Convert a template to a MessageItem struct.
 
   This is useful when you want to use a template as part of a conversation.
   """
-  @spec to_message(t(), inputs :: map()) :: {:ok, Message.t()} | {:error, String.t()}
+  @spec to_message(t(), inputs :: map()) :: {:ok, MessageItem.t()} | {:error, String.t()}
   def to_message(%Template{} = template, inputs \\ %{}) do
     try do
       content = format(template, inputs)
-      {:ok, Message.new(%{role: template.role, content: content})}
+      {:ok, MessageItem.new(%{role: template.role, content: content})}
     rescue
       e -> {:error, Exception.message(e)}
     end
   end
 
   @doc """
-  Convert a template to a Message struct. Raises if there's an error.
+  Convert a template to a MessageItem struct. Raises if there's an error.
   """
-  @spec to_message!(t(), inputs :: map()) :: Message.t() | no_return()
+  @spec to_message!(t(), inputs :: map()) :: MessageItem.t() | no_return()
   def to_message!(%Template{} = template, inputs \\ %{}) do
     content = format(template, inputs)
-    Message.new!(%{role: template.role, content: content})
+    MessageItem.new(%{role: template.role, content: content})
   end
 
   @doc """
-  Convert a list of templates, messages, and strings to a list of messages.
+  Convert a list of templates, message items, and strings to a list of message items.
 
   This is useful when you want to build a conversation from a mix of
   templates and messages.
@@ -453,12 +448,12 @@ defmodule Jido.AI.Prompt.Template do
         question: "What is 2+2?"
       })
   """
-  @spec to_messages!(list(), inputs :: map()) :: [Message.t()]
+  @spec to_messages!(list(), inputs :: map()) :: [MessageItem.t()]
   def to_messages!(templates_or_messages, inputs \\ %{}) do
     Enum.map(templates_or_messages, fn
       %Template{} = t -> to_message!(t, inputs)
-      %Message{} = m -> m
-      text when is_binary(text) -> Message.new_user!(text)
+      %MessageItem{} = m -> m
+      text when is_binary(text) -> MessageItem.new(%{role: :user, content: text})
     end)
   end
 
@@ -642,9 +637,14 @@ defmodule Jido.AI.Prompt.Template do
   Validates the syntax of a template without evaluating it.
   """
   def validate_template_syntax(%__MODULE__{text: text, engine: :eex}) do
-    case compile_with_eex(text) do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, reason}
+    try do
+      case compile_with_eex(text) do
+        {:ok, _} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    rescue
+      e ->
+        {:error, "Template compilation error: #{Exception.message(e)}"}
     end
   end
 end

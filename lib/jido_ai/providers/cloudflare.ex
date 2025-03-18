@@ -8,7 +8,7 @@ defmodule Jido.AI.Provider.Cloudflare do
   alias Jido.AI.Provider
   alias Jido.AI.Provider.Helpers
 
-  @base_url "https://api.cloudflare.com/client/v4"
+  @base_url "https://api.cloudflare.com/client/v4/accounts"
   @provider_id :cloudflare
   @provider_path "cloudflare"
 
@@ -64,22 +64,22 @@ defmodule Jido.AI.Provider.Cloudflare do
 
   Returns a tuple with {:ok, model} on success or {:error, reason} on failure.
   """
-  def model(model_id, opts \\ []) do
+  def model(model, opts \\ []) do
     refresh = Keyword.get(opts, :refresh, false)
 
     if refresh do
-      fetch_model_from_api(model_id, opts)
+      fetch_model_from_api(model, opts)
     else
-      case fetch_model_from_cache(model_id, opts) do
+      case fetch_model_from_cache(model, opts) do
         {:ok, model} -> {:ok, model}
-        {:error, _} -> fetch_model_from_api(model_id, opts)
+        {:error, _} -> fetch_model_from_api(model, opts)
       end
     end
   end
 
   @impl true
-  def normalize(model_id, _opts \\ []) do
-    {:ok, model_id}
+  def normalize(model, _opts \\ []) do
+    {:ok, model}
   end
 
   @impl true
@@ -110,6 +110,71 @@ defmodule Jido.AI.Provider.Cloudflare do
     end
   end
 
+  @impl true
+  def validate_model_opts(opts) do
+    {:ok,
+     %Jido.AI.Model{
+       id: opts[:model] || "cloudflare_default",
+       name: opts[:model_name] || "Cloudflare Model",
+       provider: :cloudflare
+     }}
+  end
+
+  @impl true
+  @doc """
+  Builds a %Jido.AI.Model{} struct from the provided options.
+
+  This function validates the options, sets defaults, and creates a fully populated
+  model struct for the Cloudflare provider.
+
+  ## Parameters
+    - opts: Keyword list of options for building the model
+
+  ## Returns
+    - {:ok, %Jido.AI.Model{}} on success
+    - {:error, reason} on failure
+  """
+  def build(opts) do
+    # Extract or generate an API key
+    api_key = Helpers.get_api_key(opts, "CLOUDFLARE_API_KEY", :cloudflare_api_key)
+
+    # Get model from opts
+    model = Keyword.get(opts, :model)
+
+    # Validate model
+    if is_nil(model) do
+      {:error, "model is required for Cloudflare models"}
+    else
+      # Create the model struct with all necessary fields
+      model = %Jido.AI.Model{
+        id: Keyword.get(opts, :id, "cloudflare_#{model}"),
+        name: Keyword.get(opts, :name, "Cloudflare #{model}"),
+        provider: :cloudflare,
+        model: model,
+        base_url: @base_url,
+        api_key: api_key,
+        temperature: Keyword.get(opts, :temperature, 0.7),
+        max_tokens: Keyword.get(opts, :max_tokens, 1024),
+        max_retries: Keyword.get(opts, :max_retries, 0),
+        architecture: %Jido.AI.Model.Architecture{
+          modality: Keyword.get(opts, :modality, "text"),
+          tokenizer: Keyword.get(opts, :tokenizer, "unknown"),
+          instruct_type: Keyword.get(opts, :instruct_type)
+        },
+        description: Keyword.get(opts, :description, "Cloudflare model"),
+        created: System.system_time(:second),
+        endpoints: []
+      }
+
+      {:ok, model}
+    end
+  end
+
+  @impl true
+  def transform_model_to_clientmodel(_client_atom, _model) do
+    {:error, "Not implemented yet"}
+  end
+
   # Private helper functions
 
   defp read_models_from_cache do
@@ -128,15 +193,15 @@ defmodule Jido.AI.Provider.Cloudflare do
     end
   end
 
-  defp fetch_model_from_cache(model_id, opts) do
-    model_file = Helpers.get_model_file_path(@provider_path, model_id)
+  defp fetch_model_from_cache(model, opts) do
+    model_file = Helpers.get_model_file_path(@provider_path, model)
 
     if File.exists?(model_file) do
       case File.read(model_file) do
         {:ok, json} ->
           case Jason.decode(json) do
             {:ok, model_data} ->
-              {:ok, process_single_model(model_data, model_id)}
+              {:ok, process_single_model(model_data, model)}
 
             {:error, reason} ->
               {:error, "Failed to parse cached model: #{inspect(reason)}"}
@@ -148,8 +213,8 @@ defmodule Jido.AI.Provider.Cloudflare do
     else
       case list_models(Keyword.put(opts, :refresh, false)) do
         {:ok, models} ->
-          case Enum.find(models, fn model -> model.id == model_id end) do
-            nil -> {:error, "Model not found in cache: #{model_id}"}
+          case Enum.find(models, fn model -> model.id == model end) do
+            nil -> {:error, "Model not found in cache: #{model}"}
             model -> {:ok, model}
           end
 
@@ -182,18 +247,18 @@ defmodule Jido.AI.Provider.Cloudflare do
     end
   end
 
-  defp fetch_model_from_api(model_id, opts) do
+  defp fetch_model_from_api(model, opts) do
     account_id = Keyword.get(opts, :account_id) || System.get_env("CLOUDFLARE_ACCOUNT_ID")
     url = "#{base_url()}/accounts/#{account_id}/ai/models/schema"
     headers = request_headers(opts)
-    body = Jason.encode!(%{model_id: model_id})
+    body = Jason.encode!(%{model: model})
 
     case Req.post(url, headers: headers, body: body) do
       {:ok, %{status: 200, body: %{"result" => model_data}}} ->
-        processed_model = process_single_model(model_data, model_id)
+        processed_model = process_single_model(model_data, model)
 
         if Keyword.get(opts, :save_to_cache, true) do
-          cache_single_model(model_id, model_data)
+          cache_single_model(model, model_data)
         end
 
         {:ok, processed_model}
@@ -206,7 +271,7 @@ defmodule Jido.AI.Provider.Cloudflare do
     end
   end
 
-  defp cache_single_model(model_id, model_data) do
+  defp cache_single_model(model, model_data) do
     # Ensure the models directory exists
     base_dir = Jido.AI.Provider.base_dir()
     provider_dir = Path.join(base_dir, @provider_path)
@@ -217,7 +282,7 @@ defmodule Jido.AI.Provider.Cloudflare do
       File.mkdir_p!(model_dir)
     end
 
-    model_file = Helpers.get_model_file_path(@provider_path, model_id)
+    model_file = Helpers.get_model_file_path(@provider_path, model)
     json = Jason.encode!(model_data, pretty: true)
     File.write!(model_file, json)
   end
@@ -237,10 +302,10 @@ defmodule Jido.AI.Provider.Cloudflare do
 
   defp process_models(_), do: []
 
-  defp process_single_model(model_data, model_id) when is_map(model_data) do
+  defp process_single_model(model_data, model) when is_map(model_data) do
     %{
-      id: model_id,
-      name: model_data["name"] || model_id,
+      id: model,
+      name: model_data["name"] || model,
       description: model_data["description"] || "",
       created: model_data["created"],
       capabilities: extract_capabilities(model_data),

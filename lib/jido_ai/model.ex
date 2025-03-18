@@ -34,6 +34,79 @@ defmodule Jido.AI.Model do
     field(:created, integer())
     field(:description, String.t())
     field(:endpoints, list(Endpoint.t()))
+    # New fields for LLM calls
+    field(:base_url, String.t())
+    field(:api_key, String.t())
+    field(:model, String.t())
+    field(:temperature, float(), default: 0.7)
+    field(:max_tokens, non_neg_integer(), default: 1024)
+    field(:max_retries, non_neg_integer(), default: 0)
+  end
+
+  @doc """
+  Creates a model struct from various input formats.
+
+  This is the main entry point for creating a model struct. It handles:
+  - An existing %Jido.AI.Model{} struct (pass-through)
+  - A tuple of {provider, opts} where provider is an atom and opts is a keyword list
+  - A category tuple of {:category, category, class}
+
+  ## Parameters
+    - input: The input to create a model from
+
+  ## Returns
+    * `{:ok, %Jido.AI.Model{}}` - on success
+    * `{:error, reason}` - on failure
+
+  ## Examples
+
+      iex> Jido.AI.Model.from({:anthropic, [model: "claude-3-5-haiku"]})
+      {:ok, %Jido.AI.Model{provider: :anthropic, model: "claude-3-5-haiku", ...}}
+
+      iex> Jido.AI.Model.from(%Jido.AI.Model{provider: :openai, model: "gpt-4"})
+      {:ok, %Jido.AI.Model{provider: :openai, model: "gpt-4", ...}}
+  """
+  @spec from(term()) :: {:ok, __MODULE__.t()} | {:error, String.t()}
+  def from(input) do
+    case input do
+      # Already a Model struct
+      %__MODULE__{} = model ->
+        {:ok, model}
+
+      # A provider tuple
+      {provider, opts} when is_atom(provider) and is_list(opts) ->
+        case Jido.AI.Provider.get_adapter_by_id(provider) do
+          {:ok, adapter_module} ->
+            adapter_module.build(opts)
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      # A category tuple
+      {:category, category, class} when is_atom(category) and is_atom(class) ->
+        # For now, create a basic model with category info
+        # This could be enhanced to map to specific providers based on category/class
+        {:ok,
+         %__MODULE__{
+           id: "#{category}_#{class}",
+           name: "#{category} #{class} Model",
+           provider: nil,
+           architecture: %Architecture{
+             modality: "text",
+             tokenizer: "unknown"
+           },
+           description: "Category-based model for #{category} #{class}",
+           created: System.system_time(:second),
+           endpoints: [],
+           base_url: "",
+           api_key: "",
+           model: "#{category}_#{class}"
+         }}
+
+      other ->
+        {:error, "Invalid model specification: #{inspect(other)}"}
+    end
   end
 
   # Define the schema for model options
@@ -102,100 +175,24 @@ defmodule Jido.AI.Model do
                         )
 
   @doc """
-  Validates model options specification for NimbleOptions.
+  Validates model options for use in an action.
 
-  This function is used by NimbleOptions to validate the model option in the Agent module.
-  It's a replacement for the deprecated Jido.AI.Models.validate_model_opts function.
+  ## Parameters
+    - opts: The options to validate
 
-  Accepts either:
-  - A tuple of {provider, keyword_list} like {:anthropic, chat: :small}
-  - A provider atom like :openrouter
-  - A category tuple like {:category, :chat, :fastest}
-
-  Returns {:ok, value} if valid, {:error, message} if invalid.
+  ## Returns
+    * `{:ok, %Jido.AI.Model{}}` - on success
+    * `{:error, reason}` - on failure
   """
   @spec validate_model_opts(term()) :: {:ok, __MODULE__.t()} | {:error, String.t()}
-  def validate_model_opts({provider, opts}) when is_atom(provider) and is_list(opts) do
-    # Get the list of valid providers from Jido.AI.Provider
-    valid_providers = get_valid_providers()
+  def validate_model_opts(opts) do
+    case from(opts) do
+      {:ok, model} ->
+        {:ok, model}
 
-    # Check if the provider is valid
-    if provider in valid_providers do
-      # Validate options using NimbleOptions
-      case validate_options_with_schema(opts) do
-        {:ok, validated_opts} ->
-          model = %__MODULE__{
-            id: Keyword.get(validated_opts, :id, "#{provider}_default"),
-            name: Keyword.get(validated_opts, :name, "#{provider} Model"),
-            provider: provider,
-            architecture: %Architecture{
-              modality: Keyword.get(validated_opts, :modality, "text"),
-              tokenizer: Keyword.get(validated_opts, :tokenizer, "unknown"),
-              instruct_type: Keyword.get(validated_opts, :instruct_type)
-            },
-            description: Keyword.get(validated_opts, :description, ""),
-            created: System.system_time(:second),
-            endpoints: []
-          }
-
-          {:ok, model}
-
-        {:error, reason} ->
-          {:error, reason}
-      end
-    else
-      {:error,
-       "Invalid provider: #{inspect(provider)}. Valid providers are: #{inspect(valid_providers)}"}
+      {:error, reason} ->
+        {:error, reason}
     end
-  end
-
-  def validate_model_opts(provider) when is_atom(provider) do
-    # Get the list of valid providers from Jido.AI.Provider
-    valid_providers = get_valid_providers()
-
-    # Check if the provider is valid
-    if provider in valid_providers do
-      model = %__MODULE__{
-        id: "#{provider}_default",
-        name: "#{provider} Model",
-        provider: provider,
-        architecture: %Architecture{
-          modality: "text",
-          tokenizer: "unknown"
-        },
-        description: "",
-        created: System.system_time(:second),
-        endpoints: []
-      }
-
-      {:ok, model}
-    else
-      {:error,
-       "Invalid provider: #{inspect(provider)}. Valid providers are: #{inspect(valid_providers)}"}
-    end
-  end
-
-  def validate_model_opts({:category, category, class})
-      when is_atom(category) and is_atom(class) do
-    model = %__MODULE__{
-      id: "#{category}_#{class}",
-      name: "#{category} #{class} Model",
-      provider: nil,
-      architecture: %Architecture{
-        modality: "text",
-        tokenizer: "unknown"
-      },
-      description: "Category-based model for #{category} #{class}",
-      created: System.system_time(:second),
-      endpoints: []
-    }
-
-    {:ok, model}
-  end
-
-  def validate_model_opts(other) do
-    {:error,
-     "Invalid model specification: #{inspect(other)}. Expected a provider atom, a {provider, opts} tuple, or a {:category, category, class} tuple."}
   end
 
   @doc """
@@ -218,6 +215,8 @@ defmodule Jido.AI.Model do
   ## Returns
 
   A model configuration that can be used with Jido.AI.Agent.
+
+  @deprecated Use Jido.AI.Model.from/1 instead
   """
   @spec new!(atom() | {atom(), keyword()}, keyword()) :: atom() | {atom(), keyword()}
   def new!(provider_or_tuple, opts \\ [])
@@ -275,6 +274,8 @@ defmodule Jido.AI.Model do
 
   * `{:ok, model_config}` - The model configuration is valid.
   * `{:error, reason}` - The model configuration is invalid.
+
+  @deprecated Use Jido.AI.Model.from/1 instead
   """
   @spec validate(term()) :: {:ok, term()} | {:error, String.t()}
   def validate({provider, opts}) when is_atom(provider) and is_list(opts) do

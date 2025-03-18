@@ -1,0 +1,25 @@
+{
+  "id": "eva-unit-01/eva-qwen-2.5-32b",
+  "name": "EVA Qwen2.5 32B",
+  "description": "EVA Qwen2.5 32B is a roleplaying/storywriting specialist model. It's a full-parameter finetune of Qwen2.5-32B on mixture of synthetic and natural data.\n\nIt uses Celeste 70B 0.1 data mixture, greatly expanding it to improve versatility, creativity and \"flavor\" of the resulting model.",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Qwen",
+    "instruct_type": "chatml"
+  },
+  "created": 1731104847,
+  "endpoints": []
+}
