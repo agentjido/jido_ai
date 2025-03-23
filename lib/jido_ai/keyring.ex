@@ -90,18 +90,31 @@ defmodule Jido.AI.Keyring do
   @spec load_from_env() :: map()
   defp load_from_env do
     env_dir_prefix = Path.expand("./envs/")
+    current_env = get_environment()
 
     Dotenvy.source!([
       Path.join(File.cwd!(), ".env"),
       Path.absname(".env", env_dir_prefix),
-      Path.absname(".#{Mix.env()}.env", env_dir_prefix),
-      Path.absname(".#{Mix.env()}.overrides.env", env_dir_prefix),
+      Path.absname(".#{current_env}.env", env_dir_prefix),
+      Path.absname(".#{current_env}.overrides.env", env_dir_prefix),
       System.get_env()
     ])
     |> Enum.reduce(%{}, fn {key, value}, acc ->
       atom_key = env_var_to_atom(key)
       Map.put(acc, atom_key, value)
     end)
+  end
+
+  @doc false
+  @spec get_environment() :: atom()
+  defp get_environment do
+    cond do
+      # First try to use Mix.env() which works in dev, test
+      function_exported?(Mix, :env, 0) -> Mix.env()
+      # In production releases, check for config
+      true ->
+        Application.get_env(:jido_ai, :env, :prod)
+    end
   end
 
   @doc false
