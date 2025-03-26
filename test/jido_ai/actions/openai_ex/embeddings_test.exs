@@ -193,7 +193,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.EmbeddingsTest do
       }
 
       assert {:error,
-              "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter]"} =
+              "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter, :google]"} =
                Embeddings.run(params, context)
     end
 

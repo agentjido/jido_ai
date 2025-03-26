@@ -190,6 +190,7 @@ The Keyring looks for provider-specific keys in the following formats:
 - Anthropic: `:anthropic_api_key` or `ANTHROPIC_API_KEY`
 - OpenRouter: `:openrouter_api_key` or `OPENROUTER_API_KEY`
 - Cloudflare: `:cloudflare_api_key` or `CLOUDFLARE_API_KEY`
+- Google: `:google_api_key` or `GOOGLE_API_KEY`
 
 ## Advanced Usage
 

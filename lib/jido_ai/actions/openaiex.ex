@@ -85,7 +85,7 @@ defmodule Jido.AI.Actions.OpenaiEx do
   alias OpenaiEx.ChatMessage
   alias Jido.AI.Actions.OpenaiEx.ToolHelper
 
-  @valid_providers [:openai, :openrouter]
+  @valid_providers [:openai, :openrouter, :google]
 
   @doc """
   Runs a chat completion request using OpenAI Ex.
@@ -251,8 +251,63 @@ defmodule Jido.AI.Actions.OpenaiEx do
       OpenaiEx.new(model.api_key)
       |> maybe_add_base_url(model)
       |> maybe_add_headers(model)
+      |> maybe_remove_auth_header(model)
 
-    Chat.Completions.create(client, chat_req)
+    Logger.debug("Making request with client: #{inspect(client)}")
+    Logger.debug("Chat request: #{inspect(chat_req)}")
+
+    case model.provider do
+      :google ->
+        # Convert OpenAI format to Google format
+        google_req = %{
+          contents: [
+            %{
+              parts: [
+                %{
+                  text: hd(chat_req.messages).content
+                }
+              ]
+            }
+          ],
+          generationConfig: %{
+            temperature: chat_req.temperature,
+            maxOutputTokens: chat_req.max_tokens
+          }
+        }
+
+        url = "#{model.base_url}#{model.model}:generateContent"
+        Logger.debug("Google URL: #{url}")
+        Logger.debug("Google request: #{inspect(google_req)}")
+
+        case Req.post(url, json: google_req, headers: client._http_headers) do
+          {:ok, %{status: 200, body: body}} ->
+            {:ok, %{choices: [%{message: %{content: extract_google_response(body)}}]}}
+
+          error ->
+            error
+        end
+
+      _ ->
+        Chat.Completions.create(client, chat_req)
+    end
+  end
+
+  defp maybe_remove_auth_header(client, %Model{provider: :google}) do
+    Map.update!(client, :_http_headers, fn headers ->
+      Enum.reject(headers, fn {key, _} -> key == "Authorization" end)
+    end)
+  end
+
+  defp maybe_remove_auth_header(client, _), do: client
+
+  defp extract_google_response(%{
+         "candidates" => [%{"content" => %{"parts" => [%{"text" => text}]}} | _]
+       }) do
+    text
+  end
+
+  defp extract_google_response(body) do
+    "Error: Unexpected response format from Google API: #{inspect(body)}"
   end
 
   defp make_streaming_request(model, chat_req) do
@@ -261,6 +316,9 @@ defmodule Jido.AI.Actions.OpenaiEx do
       |> maybe_add_base_url(model)
       |> maybe_add_headers(model)
 
+    Logger.debug("Making streaming request with client: #{inspect(client)}")
+    Logger.debug("Chat request: #{inspect(chat_req)}")
+
     Chat.Completions.create(client, chat_req)
   end
 
@@ -268,10 +326,18 @@ defmodule Jido.AI.Actions.OpenaiEx do
     OpenaiEx.with_base_url(client, Jido.AI.Provider.OpenRouter.base_url())
   end
 
+  defp maybe_add_base_url(client, %Model{provider: :google}) do
+    OpenaiEx.with_base_url(client, Jido.AI.Provider.Google.base_url())
+  end
+
   defp maybe_add_base_url(client, _), do: client
 
   defp maybe_add_headers(client, %Model{provider: :openrouter}) do
     OpenaiEx.with_additional_headers(client, Jido.AI.Provider.OpenRouter.request_headers([]))
+  end
+
+  defp maybe_add_headers(client, %Model{provider: :google}) do
+    OpenaiEx.with_additional_headers(client, Jido.AI.Provider.Google.request_headers([]))
   end
 
   defp maybe_add_headers(client, _), do: client

@@ -110,7 +110,9 @@ defmodule Jido.AI.Keyring do
   defp get_environment do
     cond do
       # First try to use Mix.env() which works in dev, test
-      function_exported?(Mix, :env, 0) -> Mix.env()
+      function_exported?(Mix, :env, 0) ->
+        Mix.env()
+
       # In production releases, check for config
       true ->
         Application.get_env(:jido_ai, :env, :prod)
@@ -168,7 +170,7 @@ defmodule Jido.AI.Keyring do
   end
 
   @doc """
-  Gets a value from the environment-level storage.
+  Gets a value from the environment-level storage, also checking for LiveBook prefixed keys as fallback.
 
   ## Parameters
 
@@ -180,7 +182,16 @@ defmodule Jido.AI.Keyring do
   """
   @spec get_env_value(GenServer.server(), atom(), term()) :: term()
   def get_env_value(server \\ @default_name, key, default \\ nil) when is_atom(key) do
-    GenServer.call(server, {:get_value, key, default})
+    # First try the regular key
+    case GenServer.call(server, {:get_value, key, nil}) do
+      nil ->
+        # If not found, try the LiveBook prefixed version
+        livebook_key = to_livebook_key(key)
+        GenServer.call(server, {:get_value, livebook_key, default})
+
+      value ->
+        value
+    end
   end
 
   @doc """
@@ -317,4 +328,12 @@ defmodule Jido.AI.Keyring do
   def has_value?(""), do: false
   def has_value?(value) when is_binary(value), do: true
   def has_value?(_), do: false
+
+  @doc false
+  @spec to_livebook_key(atom()) :: atom()
+  defp to_livebook_key(key) do
+    # Convert the key to a string, prefix with "lb_", and convert back to atom
+    "lb_#{key}"
+    |> String.to_atom()
+  end
 end

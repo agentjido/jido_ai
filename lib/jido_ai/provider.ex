@@ -7,7 +7,8 @@ defmodule Jido.AI.Provider do
     {:openrouter, Jido.AI.Provider.OpenRouter},
     {:anthropic, Jido.AI.Provider.Anthropic},
     {:openai, Jido.AI.Provider.OpenAI},
-    {:cloudflare, Jido.AI.Provider.Cloudflare}
+    {:cloudflare, Jido.AI.Provider.Cloudflare},
+    {:google, Jido.AI.Provider.Google}
   ]
 
   @type provider_id :: atom()
@@ -195,6 +196,7 @@ defmodule Jido.AI.Provider do
   defp module_for(:cloudflare), do: Jido.AI.Provider.Cloudflare
   defp module_for(:openai), do: Jido.AI.Provider.OpenAI
   defp module_for(:openrouter), do: Jido.AI.Provider.OpenRouter
+  defp module_for(:google), do: Jido.AI.Provider.Google
 
   @doc """
   Lists all cached models across all providers.

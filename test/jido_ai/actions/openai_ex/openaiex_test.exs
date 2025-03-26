@@ -330,30 +330,39 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
                OpenaiExAction.run(params, context)
     end
 
-    test "returns error for invalid provider", %{params: params, context: context} do
+    test "run/2 returns error for invalid provider" do
       params = %{
-        params
-        | model: %Model{
-            provider: :invalid_provider,
-            model: "test-model",
-            api_key: "test-api-key",
-            temperature: 0.7,
-            max_tokens: 1024,
-            name: "Test Model",
-            id: "test-model",
-            description: "Test Model",
-            created: System.system_time(:second),
-            architecture: %Model.Architecture{
-              modality: "text",
-              tokenizer: "unknown",
-              instruct_type: nil
-            },
-            endpoints: []
-          }
+        model: %Model{
+          id: "test-model",
+          name: "Test Model",
+          description: "Test Model",
+          created: 1_743_009_480,
+          provider: :invalid_provider,
+          architecture: %Model.Architecture{
+            tokenizer: "unknown",
+            modality: "text",
+            instruct_type: nil
+          },
+          model: "test-model",
+          api_key: "test-api-key",
+          base_url: nil,
+          endpoints: nil,
+          max_retries: 0,
+          max_tokens: 1024,
+          temperature: 0.7
+        },
+        messages: [
+          %{role: :user, content: "Hello, how are you?"},
+          %{role: :assistant, content: "I'm doing well, thank you!"}
+        ],
+        temperature: 0.7,
+        max_tokens: 1024
       }
 
+      context = %{state: %{}}
+
       assert {:error,
-              "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter]"} =
+              "Invalid provider: :invalid_provider. Must be one of: #{inspect(@valid_providers)}"} =
                OpenaiExAction.run(params, context)
     end
 

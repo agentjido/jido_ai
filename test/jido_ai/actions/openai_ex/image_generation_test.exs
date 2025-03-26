@@ -200,7 +200,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ImageGenerationTest do
       }
 
       assert {:error,
-              "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter]"} =
+              "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter, :google]"} =
                ImageGeneration.run(params, context)
     end
 

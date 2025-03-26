@@ -90,7 +90,7 @@ defmodule Jido.AI.Actions.OpenaiEx.ImageGeneration do
   alias Jido.AI.Model
   alias OpenaiEx.Images
 
-  @valid_providers [:openai, :openrouter]
+  @valid_providers [:openai, :openrouter, :google]
 
   @doc """
   Generates images from a text prompt using OpenAI Ex.
@@ -210,11 +210,19 @@ defmodule Jido.AI.Actions.OpenaiEx.ImageGeneration do
     OpenaiEx.with_base_url(client, Jido.AI.Provider.OpenRouter.base_url())
   end
 
+  defp maybe_add_base_url(client, %Model{provider: :google}) do
+    OpenaiEx.with_base_url(client, Jido.AI.Provider.Google.base_url())
+  end
+
   defp maybe_add_base_url(client, _), do: client
 
   @spec maybe_add_headers(OpenaiEx.t(), Model.t()) :: OpenaiEx.t()
   defp maybe_add_headers(client, %Model{provider: :openrouter}) do
     OpenaiEx.with_additional_headers(client, Jido.AI.Provider.OpenRouter.request_headers([]))
+  end
+
+  defp maybe_add_headers(client, %Model{provider: :google}) do
+    OpenaiEx.with_additional_headers(client, Jido.AI.Provider.Google.request_headers([]))
   end
 
   defp maybe_add_headers(client, _), do: client

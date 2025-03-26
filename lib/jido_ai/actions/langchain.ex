@@ -264,6 +264,28 @@ defmodule Jido.AI.Actions.Langchain do
     {:ok, ChatOpenAI.new!(model_opts)}
   end
 
+  defp create_chat_model(%Model{provider: :google} = model, params) do
+    # Google uses the OpenAI-compatible API but requires a different base URL
+    model_opts =
+      %{
+        api_key: model.api_key,
+        model: model.model,
+        temperature: params.temperature || 0.7,
+        max_tokens: model.max_tokens || params.max_tokens,
+        stream: params.stream || false,
+        endpoint:
+          model.base_url ||
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+      }
+      |> add_if_present(:frequency_penalty, params.frequency_penalty)
+      |> add_if_present(:presence_penalty, params.presence_penalty)
+      |> add_if_present(:top_p, params.top_p)
+      |> add_if_present(:stop, params.stop)
+      |> add_if_present(:json_response, params.json_mode)
+
+    {:ok, ChatOpenAI.new!(model_opts)}
+  end
+
   defp create_chat_model(%Model{provider: :anthropic} = model, params) do
     model_opts =
       %{
