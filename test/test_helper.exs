@@ -18,7 +18,7 @@ if Code.loaded?(Mimic) do
   Mimic.copy(OpenaiEx.Images)
   Mimic.copy(Dotenvy)
   Mimic.copy(Jido.AI.Keyring)
-  Mimic.copy(Jido.Workflow)
+  Mimic.copy(Jido.Exec)
   Mimic.copy(Jido.AI.Actions.Instructor)
   Mimic.copy(Jido.AI.Actions.Langchain)
   Mimic.copy(Jido.AI.Actions.OpenaiEx)

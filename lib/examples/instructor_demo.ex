@@ -51,7 +51,7 @@ defmodule Jido.Examples.InstructorDemo do
       })
 
     # 3. Make the chat completion call
-    case Jido.Workflow.run(ChatCompletion, %{
+    case Jido.Exec.run(ChatCompletion, %{
            model: model(),
            prompt: prompt,
            response_model: ResponseSchema,
@@ -119,7 +119,7 @@ defmodule Jido.Examples.InstructorDemo do
       })
 
     # Make the choice response call
-    case Jido.Workflow.run(ChoiceResponse, %{
+    case Jido.Exec.run(ChoiceResponse, %{
            prompt: prompt,
            available_actions: available_options,
            model: model()
@@ -150,7 +150,7 @@ defmodule Jido.Examples.InstructorDemo do
         ]
       })
 
-    case Jido.Workflow.run(BooleanResponse, %{prompt: prompt, model: model()}) do
+    case Jido.Exec.run(BooleanResponse, %{prompt: prompt, model: model()}) do
       {:ok,
        %{
          result: response,

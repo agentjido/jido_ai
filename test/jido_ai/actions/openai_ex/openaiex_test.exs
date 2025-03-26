@@ -362,7 +362,7 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
       context = %{state: %{}}
 
       assert {:error,
-              "Invalid provider: :invalid_provider. Must be one of: #{inspect(@valid_providers)}"} =
+              "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter, :google]"} =
                OpenaiExAction.run(params, context)
     end
 

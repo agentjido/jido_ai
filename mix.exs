@@ -51,7 +51,7 @@ defmodule Jido.Ai.MixProject do
     use_local_deps = System.get_env("LOCAL_JIDO_DEPS") == "true" || false
 
     deps = [
-      {:dotenvy, "~> 1.0.0"},
+      {:dotenvy, "~> 1.1.0"},
       {:solid, "~> 0.18.0"},
       {:typed_struct, "~> 0.3.0"},
 

@@ -96,7 +96,7 @@ defmodule Jido.AI.Provider.GoogleTest do
 
   test "normalize/2 validates proper Gemini model IDs" do
     assert {:ok, "gemini-2.0-flash"} = Google.normalize("models/gemini-2.0-flash", [])
-    assert {:ok, "gemini-2.0-pro"} = Google.normalize("models/gemini-2.0-pro", [])
+    assert {:ok, "gemini-2.0-flash-lite"} = Google.normalize("models/gemini-2.0-flash-lite", [])
     assert {:error, _} = Google.normalize("invalid-model", [])
   end
 end

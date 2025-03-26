@@ -110,7 +110,7 @@ For more details on MessageItem usage, refer to the documentation.
 
 ## Example
 
-Here's how to use Jido AI with Jido.Workflow to get structured information about US politicians. See the [examples/politician.ex](examples/politician.ex) for more a full example.
+Here's how to use Jido AI with Jido.Exec to get structured information about US politicians. See the [examples/politician.ex](examples/politician.ex) for more a full example.
 
 ```elixir
 # Define a simple workflow
@@ -166,7 +166,7 @@ defmodule JidoAi.Examples.Politician do
 end
 
 # Run the workflow
-iex> {:ok, result} = Jido.Workflow.run(JidoAi.Examples.Politician, %{query: "Tell me about Barack Obama's political career"})
+iex> {:ok, result} = Jido.Exec.run(JidoAi.Examples.Politician, %{query: "Tell me about Barack Obama's political career"})
 iex> result.result
 %JidoAi.Examples.Politician.Schema{
   first_name: "Barack",
@@ -189,7 +189,7 @@ iex> result.result
 The example demonstrates how JidoAi can:
 
 - Write Actions that can wrap other Actions
-- Use Jido.Workflow to orchestrate AI operations
+- Use Jido.Exec to orchestrate AI operations
 - Parse natural language queries about politicians
 - Return structured data using Ecto schemas
 - Handle complex nested data structures
