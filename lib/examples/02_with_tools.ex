@@ -12,13 +12,16 @@ defmodule Examples.ToolAgent02 do
           You are a super math genius.
           You are given a math problem and you need to solve it using the tools provided.
           Always use the tools to solve arithmetic problems rather than calculating yourself.
+
+          <%= @message %>
           """,
           tools: [
             Add,
             Subtract,
             Multiply,
             Divide
-          ]
+          ],
+          verbose: true
         ]
       )
 

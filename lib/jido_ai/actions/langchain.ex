@@ -164,7 +164,11 @@ defmodule Jido.AI.Actions.Langchain do
 
   @impl true
   def run(params, _context) do
-    Logger.info("Running Langchain chat completion with params: #{inspect(params, pretty: true)}")
+    if params.verbose do
+      Logger.info(
+        "Running Langchain chat completion with params: #{inspect(params, pretty: true)}"
+      )
+    end
 
     # Create a map with all optional parameters set to defaults
     params_with_defaults =
@@ -325,25 +329,23 @@ defmodule Jido.AI.Actions.Langchain do
   end
 
   defp create_and_run_chain(chat_model, messages, params) do
+    verbose? = params.verbose || false
+
     chain =
-      %{llm: chat_model, verbose: false}
+      %{llm: chat_model, verbose: verbose?}
       |> LLMChain.new!()
       |> LLMChain.add_messages(messages)
 
-    # Add tools if provided
-    chain =
-      case params do
-        %{tools: tools} when is_list(tools) and length(tools) > 0 ->
-          functions = Enum.map(tools, &Function.new!(&1.to_tool()))
-          LLMChain.add_tools(chain, functions)
+    # Add tools if provided and run with appropriate mode
+    case params do
+      %{tools: tools} when is_list(tools) and length(tools) > 0 ->
+        functions = Enum.map(tools, &Function.new!(&1.to_tool()))
+        chain = LLMChain.add_tools(chain, functions)
+        LLMChain.run(chain, mode: :while_needs_response)
 
-        _ ->
-          chain
-      end
-
-    # Run the chain directly without specifying a mode
-    # This ensures compatibility across different LangChain versions
-    LLMChain.run(chain)
+      _ ->
+        LLMChain.run(chain)
+    end
   end
 
   # Format response handles both {:ok, chain} and direct chain input

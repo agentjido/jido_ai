@@ -21,7 +21,8 @@ defmodule Jido.AI.Actions.Langchain.ToolResponse do
         doc: "List of Jido.Action modules to use as tools"
       ],
       temperature: [type: :float, default: 0.7, doc: "Temperature for response randomness"],
-      timeout: [type: :integer, default: 30_000, doc: "Timeout in milliseconds"]
+      timeout: [type: :integer, default: 30_000, doc: "Timeout in milliseconds"],
+      verbose: [type: :boolean, default: false, doc: "Verbose output"]
     ]
 
   alias Jido.AI.Actions.Langchain, as: LangchainAction
@@ -76,7 +77,8 @@ defmodule Jido.AI.Actions.Langchain.ToolResponse do
       model: model,
       prompt: prompt,
       tools: tools,
-      temperature: params[:temperature] || 0.7
+      temperature: params[:temperature] || 0.7,
+      verbose: params[:verbose] || false
     }
 
     case LangchainAction.run(completion_params, %{}) do

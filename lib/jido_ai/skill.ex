@@ -34,8 +34,16 @@ defmodule Jido.AI.Skill do
       type: {:custom, Jido.Util, :validate_actions, []},
       default: [],
       doc: "The tools to use"
+    ],
+    verbose: [
+      type: :boolean,
+      default: false,
+      doc: "Whether to enable verbose logging"
     ]
   ]
+
+  alias Jido.AI.Prompt
+  alias Jido.AI.Prompt.MessageItem
 
   use Jido.Skill,
     name: "jido_ai_skill",
@@ -54,13 +62,17 @@ defmodule Jido.AI.Skill do
     tool_action =
       Keyword.get(opts, :tool_action, Jido.AI.Actions.Langchain.ToolResponse)
 
+    tools = Keyword.get(opts, :tools, [])
+
+    # Register all actions with the agent
+    actions = [chat_action, tool_action] ++ tools
+
     # Register the actions with the agent
-    Jido.AI.Agent.register_action(agent, [chat_action, tool_action])
+    Jido.AI.Agent.register_action(agent, actions)
   end
 
   @spec validate_opts(keyword()) :: {:ok, keyword()} | {:error, String.t()}
   def validate_opts(opts) do
-    # Get AI opts if they exist under the ai key, otherwise use full opts
     ai_opts =
       if Keyword.has_key?(opts, @ai_opts_key) do
         Keyword.get(opts, @ai_opts_key)
@@ -77,55 +89,72 @@ defmodule Jido.AI.Skill do
     end
   end
 
-  def router(opts \\ []) do
-    model = Keyword.get(opts, :model)
-
+  def router(_opts \\ []) do
     [
-      {"jido.ai.chat.response",
-       %Instruction{
-         action: Jido.AI.Actions.Instructor.ChatResponse,
-         params: %{model: model}
-       }},
-      {"jido.ai.tool.response",
-       %Instruction{
-         action: Jido.AI.Actions.Langchain.ToolResponse,
-         params: %{model: model}
-       }}
+      {"jido.ai.chat.response", %Instruction{action: Jido.AI.Actions.Instructor.ChatResponse}},
+      {"jido.ai.tool.response", %Instruction{action: Jido.AI.Actions.Langchain.ToolResponse}}
     ]
   end
 
-  def handle_signal(signal, skill_opts) do
-    with {:ok, base_prompt} <-
-           Jido.AI.Prompt.validate_prompt_opts(Keyword.get(skill_opts, :prompt)) do
-      # Convert system message to user message and render with signal data
-      updated_messages =
-        Enum.map(base_prompt.messages, fn msg ->
-          %{msg | role: :user, engine: :eex}
-        end)
+  def handle_signal(%Signal{type: "jido.ai.tool.response"} = signal, skill_opts) do
+    base_prompt = Keyword.get(skill_opts, :prompt)
+    rendered_prompt = render_prompt(base_prompt, signal.data)
+    tools = Keyword.get(skill_opts, :tools, [])
+    model = Keyword.get(skill_opts, :model)
+    verbose = Keyword.get(skill_opts, :verbose, false)
 
-      base_prompt = %{base_prompt | messages: updated_messages}
-      rendered_prompt = Jido.AI.Prompt.render(base_prompt, signal.data)
-      # IO.inspect(rendered_prompt, label: "Rendered prompt")
+    tool_response_params = %{
+      model: model,
+      prompt: rendered_prompt,
+      tools: tools,
+      verbose: verbose
+    }
 
-      # Create a new prompt with the rendered content
-      updated_prompt = %{base_prompt | messages: rendered_prompt}
-      # IO.inspect(updated_prompt, label: "Updated prompt")
+    IO.inspect(tool_response_params, label: "TOOL RESPONSE PARAMS")
 
-      # Update the signal data with the new prompt
-      updated_signal = %{signal | data: Map.put(signal.data, :prompt, updated_prompt)}
+    updated_signal = %{signal | data: tool_response_params}
 
-      {:ok, updated_signal}
-    else
-      {:error, reason} ->
-        Logger.error("Failed to validate prompt: #{inspect(reason)}")
-        {:ok, signal}
-    end
+    {:ok, updated_signal}
   end
 
-  def transform_result(_signal, result, _skill_opts) do
-    # Logger.debug("SKILL TRANSFORM RESULT: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-    # Logger.debug("Transforming result: #{inspect(result, pretty: true)}")
-    # Logger.debug("Skill opts: #{inspect(skill_opts, pretty: true)}")
-    {:ok, result}
+  def handle_signal(%Signal{type: "jido.ai.chat.response"} = signal, skill_opts) do
+    base_prompt = Keyword.get(skill_opts, :prompt)
+    rendered_prompt = render_prompt(base_prompt, signal.data)
+    model = Keyword.get(skill_opts, :model)
+
+    chat_response_params = %{
+      model: model,
+      prompt: rendered_prompt
+    }
+
+    {:ok, %{signal | data: chat_response_params}}
+  end
+
+  defp render_prompt(base_prompt, signal_data) when is_binary(base_prompt) do
+    prompt_struct = %Prompt{
+      messages: [
+        %MessageItem{
+          role: :user,
+          content: base_prompt,
+          engine: :eex
+        }
+      ]
+    }
+
+    render_prompt(prompt_struct, signal_data)
+  end
+
+  defp render_prompt(%Prompt{} = base_prompt, signal_data) do
+    # Convert system message to user message and render with signal data
+    updated_messages =
+      Enum.map(base_prompt.messages, fn msg ->
+        %{msg | role: :user, engine: :eex}
+      end)
+
+    base_prompt = %{base_prompt | messages: updated_messages}
+    rendered_prompt = Prompt.render(base_prompt, signal_data)
+
+    # Create a new prompt with the rendered content
+    %{base_prompt | messages: rendered_prompt}
   end
 end
