@@ -191,6 +191,19 @@ defmodule Jido.AI.Actions.OpenaiEx do
   defp valid_message?(_), do: false
 
   defp build_chat_request(model, messages, params) do
+    # Extract options from prompt if available
+    prompt_opts =
+      case params[:prompt] do
+        %Prompt{options: options} when is_list(options) and length(options) > 0 ->
+          Map.new(options)
+
+        _ ->
+          %{}
+      end
+
+    # Merge options with priority: explicit params > prompt options
+    params_with_prompt_opts = Map.merge(prompt_opts, params)
+
     chat_messages =
       Enum.map(messages, fn msg ->
         case msg.role do
@@ -206,24 +219,24 @@ defmodule Jido.AI.Actions.OpenaiEx do
       Chat.Completions.new(
         model: Map.get(model, :model),
         messages: chat_messages,
-        temperature: params[:temperature] || Map.get(model, :temperature) || 0.7,
-        max_tokens: params[:max_tokens] || Map.get(model, :max_tokens)
+        temperature: params_with_prompt_opts[:temperature] || Map.get(model, :temperature) || 0.7,
+        max_tokens: params_with_prompt_opts[:max_tokens] || Map.get(model, :max_tokens)
       )
 
     # Add optional parameters if provided
     chat_req =
       chat_req
-      |> maybe_add_param(:top_p, params[:top_p])
-      |> maybe_add_param(:frequency_penalty, params[:frequency_penalty])
-      |> maybe_add_param(:presence_penalty, params[:presence_penalty])
-      |> maybe_add_param(:stop, params[:stop])
-      |> maybe_add_param(:response_format, params[:response_format])
-      |> maybe_add_param(:seed, params[:seed])
-      |> maybe_add_param(:stream, params[:stream])
+      |> maybe_add_param(:top_p, params_with_prompt_opts[:top_p])
+      |> maybe_add_param(:frequency_penalty, params_with_prompt_opts[:frequency_penalty])
+      |> maybe_add_param(:presence_penalty, params_with_prompt_opts[:presence_penalty])
+      |> maybe_add_param(:stop, params_with_prompt_opts[:stop])
+      |> maybe_add_param(:response_format, params_with_prompt_opts[:response_format])
+      |> maybe_add_param(:seed, params_with_prompt_opts[:seed])
+      |> maybe_add_param(:stream, params_with_prompt_opts[:stream])
 
     # Add tool calling configuration if provided
     chat_req =
-      case params do
+      case params_with_prompt_opts do
         %{tools: tools} when is_list(tools) ->
           case ToolHelper.to_openai_tools(tools) do
             {:ok, openai_tools} -> Map.put(chat_req, :tools, openai_tools)
@@ -235,7 +248,7 @@ defmodule Jido.AI.Actions.OpenaiEx do
       end
 
     chat_req =
-      case params do
+      case params_with_prompt_opts do
         %{tool_choice: choice} when is_map(choice) -> Map.put(chat_req, :tool_choice, choice)
         _ -> chat_req
       end

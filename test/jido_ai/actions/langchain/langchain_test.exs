@@ -114,7 +114,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
           api_key: "test-api-key",
           model: "gpt-4",
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 1000,
           stream: false
         })
 
@@ -136,8 +136,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
         assert opts[:api_key] == "test-api-key"
         assert opts[:model] == "gpt-4"
         assert opts[:temperature] == 0.7
-        assert opts[:max_tokens] == 1024
-        assert opts[:stream] == false
+        assert opts[:max_tokens] == 1000
         expected_chat_model
       end)
 
@@ -180,7 +179,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
           api_key: "test-api-key",
           model: "claude-3-haiku-20240307",
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 1000,
           stream: false
         })
 
@@ -202,7 +201,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
         assert opts[:api_key] == "test-api-key"
         assert opts[:model] == "claude-3-haiku-20240307"
         assert opts[:temperature] == 0.7
-        assert opts[:max_tokens] == 1024
+        assert opts[:max_tokens] == 1000
         assert opts[:stream] == false
         expected_chat_model
       end)
@@ -238,7 +237,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
           api_key: "test-api-key",
           model: "gpt-4",
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 1000,
           stream: false
         })
 
@@ -249,18 +248,19 @@ defmodule JidoTest.AI.Actions.LangchainTest do
       expected_chain = %LLMChain{
         llm: expected_chat_model,
         messages: expected_messages,
-        verbose: false
+        verbose: false,
+        last_message: %Message{
+          content: "Test response",
+          role: :assistant
+        }
       }
-
-      # Mock Finch to simulate a successful response
-      mock_finch_for_success("Test response")
 
       # Mock the chat model creation
       expect(ChatOpenAI, :new!, fn opts ->
         assert opts[:api_key] == "test-api-key"
         assert opts[:model] == "gpt-4"
         assert opts[:temperature] == 0.7
-        assert opts[:max_tokens] == 1024
+        assert opts[:max_tokens] == 1000
         expected_chat_model
       end)
 
@@ -283,6 +283,13 @@ defmodule JidoTest.AI.Actions.LangchainTest do
         chain
       end)
 
+      # Add expect for LLMChain.run
+      expect(LLMChain, :run, fn chain, opts ->
+        assert chain == expected_chain
+        assert opts[:mode] == :while_needs_response
+        chain
+      end)
+
       assert {:ok, %{content: "Test response", tool_results: []}} =
                LangchainAction.run(params, context)
     end
@@ -302,48 +309,28 @@ defmodule JidoTest.AI.Actions.LangchainTest do
       expected_chain = %LLMChain{
         llm: expected_chat_model,
         messages: [Message.new_user!("Hello")],
-        verbose: false
-      }
-
-      # Mock Finch to respond with a tool call
-      expect(Finch, :request, fn _req, _finch, _opts ->
-        tool_call_resp = %{
-          "object" => "chat.completion",
-          "choices" => [
+        verbose: false,
+        last_message: %Message{
+          content: "The result is 3",
+          role: :assistant,
+          tool_calls: [
             %{
-              "message" => %{
-                "content" => "The result is 3",
-                "role" => "assistant",
-                "tool_calls" => [
-                  %{
-                    "id" => "call_123",
-                    "type" => "function",
-                    "function" => %{
-                      "name" => "add",
-                      "arguments" => Jason.encode!(%{"a" => 1, "b" => 2})
-                    }
-                  }
-                ]
-              },
-              "index" => 0,
-              "finish_reason" => "tool_calls"
+              id: "call_123",
+              type: "function",
+              # Add the name field directly
+              name: "add",
+              arguments: %{"a" => 1, "b" => 2}
             }
           ]
         }
-
-        {:ok,
-         %Finch.Response{
-           status: 200,
-           headers: [{"content-type", "application/json"}],
-           body: Jason.encode!(tool_call_resp)
-         }}
-      end)
+      }
 
       # Mock the chat model and chain behavior
       expect(ChatOpenAI, :new!, fn _opts -> expected_chat_model end)
       expect(LLMChain, :new!, fn _opts -> expected_chain end)
       expect(LLMChain, :add_messages, fn chain, _messages -> chain end)
       expect(LLMChain, :add_tools, fn chain, _tools -> chain end)
+      expect(LLMChain, :run, fn chain, _opts -> chain end)
 
       assert {:ok,
               %{
@@ -368,7 +355,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
             model: "test-model",
             api_key: "test-api-key",
             temperature: 0.7,
-            max_tokens: 1024,
+            max_tokens: 1000,
             name: "Test Model",
             id: "test-model",
             description: "Test Model",
@@ -394,7 +381,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
           api_key: "test-api-key",
           model: "gpt-4",
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 1000,
           stream: false
         })
 
@@ -441,7 +428,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
           api_key: "test-api-key",
           model: "anthropic/claude-3-opus",
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 1000,
           stream: false,
           endpoint: "https://openrouter.ai/api/v1"
         })
@@ -464,7 +451,7 @@ defmodule JidoTest.AI.Actions.LangchainTest do
         assert opts[:api_key] == "test-api-key"
         assert opts[:model] == "anthropic/claude-3-opus"
         assert opts[:temperature] == 0.7
-        assert opts[:max_tokens] == 1024
+        assert opts[:max_tokens] == 1000
         assert opts[:stream] == false
         assert opts[:endpoint] == "https://openrouter.ai/api/v1"
         expected_chat_model

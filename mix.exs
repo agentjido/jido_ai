@@ -1,7 +1,7 @@
 defmodule Jido.Ai.MixProject do
   use Mix.Project
 
-  @version "0.5.0"
+  @version "0.5.2"
   @source_url "https://github.com/agentjido/jido_ai"
 
   def project do

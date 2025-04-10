@@ -73,6 +73,12 @@ defmodule Jido.AI.Prompt do
 
     # Optional metadata or advanced features
     field(:metadata, map(), default: %{})
+
+    # LLM specific options (temperature, max_tokens, top_p, stop, timeout)
+    field(:options, keyword(), default: [])
+
+    # Schema to validate the expected output structure
+    field(:output_schema, NimbleOptions.t(), default: nil)
   end
 
   @doc """
@@ -237,6 +243,39 @@ defmodule Jido.AI.Prompt do
   end
 
   @doc """
+  Renders the prompt with options for an LLM API call.
+
+  Returns a map containing both the rendered messages and any LLM-specific options.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Generate a story")
+      ...> |> Prompt.with_temperature(0.7)
+      ...> |> Prompt.with_max_tokens(500)
+      iex> result = Prompt.render_with_options(prompt)
+      iex> result[:messages]
+      [%{role: :user, content: "Generate a story"}]
+      iex> result[:temperature]
+      0.7
+      iex> result[:max_tokens]
+      500
+  """
+  @spec render_with_options(t(), map()) :: map()
+  def render_with_options(%Prompt{} = prompt, override_params \\ %{}) do
+    # Render the messages
+    messages = render(prompt, override_params)
+
+    # Create the base map with messages
+    base = %{messages: messages}
+
+    # Add each option to the map if present
+    Enum.reduce(prompt.options, base, fn {key, value}, acc ->
+      Map.put(acc, key, value)
+    end)
+  end
+
+  @doc """
   Converts the prompt to a single text string.
 
   This is useful for debugging or when the LLM API expects a single text prompt.
@@ -337,7 +376,9 @@ defmodule Jido.AI.Prompt do
       version: prompt.version,
       messages: prompt.messages,
       params: prompt.params,
-      metadata: prompt.metadata
+      metadata: prompt.metadata,
+      options: prompt.options,
+      output_schema: prompt.output_schema
     }
 
     # Apply changes to create a new version
@@ -384,6 +425,8 @@ defmodule Jido.AI.Prompt do
                 | messages: historical.messages,
                   params: historical.params,
                   metadata: historical.metadata,
+                  options: historical.options || [],
+                  output_schema: historical.output_schema,
                   version: historical.version
               }
 
@@ -413,6 +456,155 @@ defmodule Jido.AI.Prompt do
   @spec list_versions(t()) :: list(non_neg_integer())
   def list_versions(%Prompt{} = prompt) do
     [prompt.version | Enum.map(prompt.history, & &1.version)]
+  end
+
+  @doc """
+  Adds LLM options to the prompt.
+
+  ## Options
+  - `:temperature` - Controls randomness. Higher values mean more random completions.
+  - `:max_tokens` - Maximum number of tokens to generate in the completion.
+  - `:top_p` - Controls diversity via nucleus sampling.
+  - `:stop` - Sequences where the API will stop generating tokens.
+  - `:timeout` - Request timeout in milliseconds.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Generate a creative story")
+      iex> prompt = Prompt.with_options(prompt, temperature: 0.8, max_tokens: 1000)
+      iex> prompt.options[:temperature]
+      0.8
+  """
+  @spec with_options(t(), keyword()) :: t()
+  def with_options(%Prompt{} = prompt, options) when is_list(options) do
+    %{prompt | options: Keyword.merge(prompt.options, options)}
+  end
+
+  @doc """
+  Sets the temperature option.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Generate a creative story")
+      iex> prompt = Prompt.with_temperature(prompt, 0.8)
+      iex> prompt.options[:temperature]
+      0.8
+  """
+  @spec with_temperature(t(), number()) :: t()
+  def with_temperature(%Prompt{} = prompt, temperature) when is_number(temperature) do
+    with_options(prompt, temperature: temperature)
+  end
+
+  @doc """
+  Sets the max_tokens option.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Summarize this text")
+      iex> prompt = Prompt.with_max_tokens(prompt, 500)
+      iex> prompt.options[:max_tokens]
+      500
+  """
+  @spec with_max_tokens(t(), non_neg_integer()) :: t()
+  def with_max_tokens(%Prompt{} = prompt, max_tokens)
+      when is_integer(max_tokens) and max_tokens > 0 do
+    with_options(prompt, max_tokens: max_tokens)
+  end
+
+  @doc """
+  Sets the top_p option.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Generate diverse responses")
+      iex> prompt = Prompt.with_top_p(prompt, 0.9)
+      iex> prompt.options[:top_p]
+      0.9
+  """
+  @spec with_top_p(t(), number()) :: t()
+  def with_top_p(%Prompt{} = prompt, top_p) when is_number(top_p) and top_p > 0 and top_p <= 1 do
+    with_options(prompt, top_p: top_p)
+  end
+
+  @doc """
+  Sets the stop sequences option.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Write until you reach the end")
+      iex> prompt = Prompt.with_stop(prompt, ["END", "STOP"])
+      iex> prompt.options[:stop]
+      ["END", "STOP"]
+  """
+  @spec with_stop(t(), String.t() | [String.t()]) :: t()
+  def with_stop(%Prompt{} = prompt, stop) when is_binary(stop) do
+    with_options(prompt, stop: [stop])
+  end
+
+  def with_stop(%Prompt{} = prompt, stop) when is_list(stop) do
+    with_options(prompt, stop: stop)
+  end
+
+  @doc """
+  Sets the timeout option in milliseconds.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> prompt = Prompt.new(:user, "Process this request")
+      iex> prompt = Prompt.with_timeout(prompt, 30000)
+      iex> prompt.options[:timeout]
+      30000
+  """
+  @spec with_timeout(t(), non_neg_integer()) :: t()
+  def with_timeout(%Prompt{} = prompt, timeout) when is_integer(timeout) and timeout > 0 do
+    with_options(prompt, timeout: timeout)
+  end
+
+  @doc """
+  Sets the output schema for validating LLM responses.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> schema = NimbleOptions.new!([
+      ...>   name: [type: :string, required: true],
+      ...>   age: [type: :integer, required: true]
+      ...> ])
+      iex> prompt = Prompt.new(:user, "Generate a person")
+      iex> prompt = Prompt.with_output_schema(prompt, schema)
+      iex> prompt.output_schema == schema
+      true
+  """
+  @spec with_output_schema(t(), NimbleOptions.t()) :: t()
+  def with_output_schema(%Prompt{} = prompt, schema) do
+    %{prompt | output_schema: schema}
+  end
+
+  @doc """
+  Creates a new output schema from the given schema specification.
+
+  ## Examples
+
+      iex> alias Jido.AI.Prompt
+      iex> schema_spec = [
+      ...>   name: [type: :string, required: true],
+      ...>   age: [type: :integer, required: true]
+      ...> ]
+      iex> prompt = Prompt.new(:user, "Generate a person")
+      iex> prompt = Prompt.with_new_output_schema(prompt, schema_spec)
+      iex> prompt.output_schema != nil
+      true
+  """
+  @spec with_new_output_schema(t(), keyword()) :: t()
+  def with_new_output_schema(%Prompt{} = prompt, schema_spec) when is_list(schema_spec) do
+    schema = NimbleOptions.new!(schema_spec)
+    with_output_schema(prompt, schema)
   end
 
   @doc """

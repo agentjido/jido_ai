@@ -102,27 +102,55 @@ defmodule Jido.AI.Actions.Instructor do
 
   @impl true
   def run(params, _context) do
-    # Create a map with all optional parameters set to nil by default
+    # Extract options from prompt if available
+    prompt_opts =
+      case params[:prompt] do
+        %Prompt{options: options} when is_list(options) and length(options) > 0 ->
+          Map.new(options)
+
+        _ ->
+          %{}
+      end
+
+    # Keep required parameters
+    required_params = Map.take(params, [:model, :prompt, :response_model])
+
+    # Create a map with all optional parameters set to defaults
+    # Priority: explicit params > prompt options > defaults
     params_with_defaults =
-      Map.merge(
-        %{
-          top_p: nil,
-          stop: nil,
-          stream: false,
-          partial: false,
-          max_retries: 0,
-          temperature: 0.7,
-          max_tokens: 1000,
-          mode: nil
-        },
-        params
+      %{
+        top_p: nil,
+        stop: nil,
+        stream: false,
+        partial: false,
+        max_retries: 0,
+        temperature: 0.7,
+        max_tokens: 1000,
+        mode: nil
+      }
+      # Apply prompt options over defaults
+      |> Map.merge(prompt_opts)
+      # Apply explicit params over prompt options
+      |> Map.merge(
+        Map.take(params, [
+          :top_p,
+          :stop,
+          :stream,
+          :partial,
+          :max_retries,
+          :temperature,
+          :max_tokens,
+          :mode
+        ])
       )
+      # Always keep required params
+      |> Map.merge(required_params)
 
     # Build the Instructor options
-    model = get_model(params.model)
+    model = get_model(params_with_defaults.model)
 
     # Configure Instructor with the appropriate adapter and API key
-    config = get_instructor_config(params.model)
+    config = get_instructor_config(params_with_defaults.model)
 
     opts =
       [

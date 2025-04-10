@@ -84,7 +84,84 @@ messages = Prompt.render(template_prompt)
 messages = Prompt.render(template_prompt, %{topic: "list comprehensions"})
 ```
 
-### Template Engines
+## Configuring LLM Options
+
+The Prompt struct can store LLM-specific options that are used when making requests to AI providers.
+
+### Setting Options
+
+```elixir
+# Create a prompt with options
+prompt = Prompt.new(:user, "Generate creative text")
+         |> Prompt.with_temperature(0.9)
+         |> Prompt.with_max_tokens(2000)
+         |> Prompt.with_top_p(0.95)
+         |> Prompt.with_stop(["END", "STOP"])
+
+# Setting multiple options at once
+prompt = Prompt.new(:user, "Generate a story")
+         |> Prompt.with_options([
+           temperature: 0.8,
+           max_tokens: 2500,
+           timeout: 60000
+         ])
+
+# When rendering with options
+complete_params = Prompt.render_with_options(prompt)
+# => %{
+#      messages: [%{role: :user, content: "Generate a story"}],
+#      temperature: 0.8,
+#      max_tokens: 2500,
+#      timeout: 60000
+#    }
+```
+
+### Options Precedence in Actions
+
+When using prompts with Jido.AI actions, the options in the prompt serve as defaults but can be overridden:
+
+```elixir
+# Create a prompt with options
+prompt = Prompt.new(:user, "Generate text")
+         |> Prompt.with_temperature(0.7)
+         |> Prompt.with_max_tokens(1000)
+
+# Use with an action - prompt options are used as defaults
+{:ok, result} = Jido.AI.Actions.Langchain.run(%{
+  model: model,
+  prompt: prompt
+  # temperature will be 0.7 from the prompt
+  # max_tokens will be 1000 from the prompt
+}, context)
+
+# Override prompt options with explicit parameters
+{:ok, result} = Jido.AI.Actions.Langchain.run(%{
+  model: model,
+  prompt: prompt,
+  temperature: 0.9 # Overrides the 0.7 from the prompt
+  # max_tokens will still be 1000 from the prompt
+}, context)
+```
+
+This behavior works consistently across all Jido.AI actions (Langchain, Instructor, OpenaiEx).
+
+### Structured Output Schema
+
+The prompt can also include a schema for validating structured outputs:
+
+```elixir
+schema = NimbleOptions.new!([
+  name: [type: :string, required: true],
+  age: [type: :integer, required: true],
+  interests: [type: {:list, :string}, required: false]
+])
+
+prompt = Prompt.new(:user, "Generate a person profile")
+         |> Prompt.with_output_schema(schema)
+         |> Prompt.with_temperature(0.3) # More deterministic for structured data
+```
+
+## Template Engines
 
 The module supports different template engines:
 
