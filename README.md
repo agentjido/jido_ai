@@ -52,17 +52,25 @@ Jido.AI.Keyring.set_session_value(:google_api_key, "your_gemini_api_key")
 # Create a model using the Google provider
 {:ok, model} = Jido.AI.Model.from({:google, [model: "gemini-2.0-flash"]})
 
-# Use the model with any OpenAI-compatible action
-{:ok, result} = Jido.AI.Actions.OpenaiEx.run(
+# Use the model with the OpenaiEx action
+result = Jido.AI.Actions.OpenaiEx.run(
   %{
     model: model,
     messages: [
-      %{role: "user", content: "Tell me about Elixir programming language"}
+      %{role: :user, content: "Tell me about Elixir programming language"}
     ],
     temperature: 0.7
   },
   %{}
 )
+
+# Handle the result
+case result do
+  {:ok, %{content: content, tool_results: _}} ->
+    IO.puts("Response: #{content}")
+  {:error, %{reason: reason, details: details}} ->
+    IO.puts("Error: #{reason} - #{inspect(details)}")
+end
 ```
 
 You can also set the Google API key using environment variables:

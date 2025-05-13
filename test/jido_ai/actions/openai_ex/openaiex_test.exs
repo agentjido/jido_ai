@@ -326,7 +326,11 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
     test "returns error for invalid model specification", %{params: params, context: context} do
       params = %{params | model: "invalid_model"}
 
-      assert {:error, "Invalid model specification. Must be a map or {provider, opts} tuple."} =
+      assert {:error,
+              %{
+                reason: "Invalid model specification",
+                details: "Must be a map or {provider, opts} tuple"
+              }} =
                OpenaiExAction.run(params, context)
     end
 
@@ -362,21 +366,32 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
       context = %{state: %{}}
 
       assert {:error,
-              "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter, :google]"} =
+              %{
+                reason: "Invalid provider",
+                details: "Got :invalid_provider, expected one of [:openai, :openrouter, :google]"
+              }} =
                OpenaiExAction.run(params, context)
     end
 
     test "returns error for invalid messages", %{params: params, context: context} do
       params = %{params | messages: [%{invalid: "message"}]}
 
-      assert {:error, "Invalid message format. Each message must have :role and :content fields."} =
+      assert {:error,
+              %{
+                reason: "Invalid message format",
+                details: "Messages must have :role and :content, got [%{invalid: \"message\"}]"
+              }} =
                OpenaiExAction.run(params, context)
     end
 
     test "returns error for missing messages and prompt", %{params: params, context: context} do
       params = Map.delete(params, :messages)
 
-      assert {:error, "Either messages or prompt must be provided."} =
+      assert {:error,
+              %{
+                reason: "Missing input",
+                details: "Either messages or prompt must be provided"
+              }} =
                OpenaiExAction.run(params, context)
     end
 
@@ -386,7 +401,11 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
         prompt: 123
       }
 
-      assert {:error, "Expected a string or a Jido.AI.Prompt struct, got: 123"} =
+      assert {:error,
+              %{
+                reason: "Invalid prompt",
+                details: "Expected a string or a Jido.AI.Prompt struct, got: 123"
+              }} =
                OpenaiExAction.run(params, context)
     end
   end
