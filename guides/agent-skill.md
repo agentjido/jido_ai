@@ -409,7 +409,7 @@ end
 
 ### Customizable Timeouts
 
-Define how long agent is able to process response before timing out, the default is 30 seconds.
+Define how long agent is able to process response before timing out, the default is 30 000 milliseconds.
 
 ```elixir
 def long_running_response(pid, task_msg) do
