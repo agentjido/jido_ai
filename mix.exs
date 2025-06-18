@@ -52,7 +52,7 @@ defmodule Jido.Ai.MixProject do
 
     deps = [
       {:dotenvy, "~> 1.1.0"},
-      {:solid, "~> 0.18.0"},
+      {:solid, "~> 1.0"},
       {:typed_struct, "~> 0.3.0"},
 
       # Clients

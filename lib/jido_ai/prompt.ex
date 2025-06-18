@@ -226,7 +226,7 @@ defmodule Jido.AI.Prompt do
             {:ok, template} = Solid.parse(msg.content)
             # Convert atom keys to strings for Liquid templates
             liquid_params = Map.new(final_params, fn {k, v} -> {Atom.to_string(k), v} end)
-            {:ok, parts} = Solid.render(template, liquid_params, [])
+            {:ok, parts, _} = Solid.render(template, liquid_params, [])
             Enum.join(parts, "")
 
           :none ->
