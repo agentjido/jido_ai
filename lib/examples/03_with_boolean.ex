@@ -18,20 +18,14 @@ defmodule Examples.BooleanAgent03 do
 
     Logger.info("Agent started successfully")
 
-    question = "Is 273 + 112 - 937 positive?"
-    Logger.info("Question: #{question}")
+    pos_question = "Is 273 + 112 - 937 positive?"
+    neg_question = "Is 273 + 112 - 937 negative?"
 
-    case Agent.boolean_response(pid, question) do
-      {:ok, %{result: bool_result, confidence: confidence}} ->
-        if bool_result,
-          do: Logger.info("Result: true (#{confidence}%)"),
-          else: Logger.info("Result: false (#{confidence}%)")
+    boolean_response(pid, pos_question)
+    boolean_response(pid, neg_question)
+  end
 
-      {:error, error} ->
-        Logger.error("Error: #{inspect(error, pretty: true)}")
-    end
-
-    question = "Is 273 + 112 - 937 negative?"
+  defp boolean_response(pid, question) do
     Logger.info("Question: #{question}")
 
     case Agent.boolean_response(pid, question) do

@@ -125,7 +125,8 @@ defmodule Jido.AI.Skill do
     {:ok, updated_signal}
   end
 
-  def handle_signal(%Signal{type: "jido.ai.chat.response"} = signal, skill_opts) do
+  def handle_signal(%Signal{type: type} = signal, skill_opts)
+      when type in ["jido.ai.chat.response", "jido.ai.boolean.response"] do
     base_prompt = Keyword.get(skill_opts, :prompt)
     rendered_prompt = render_prompt(base_prompt, signal.data)
     model = Keyword.get(skill_opts, :model)
@@ -136,19 +137,6 @@ defmodule Jido.AI.Skill do
     }
 
     {:ok, %{signal | data: chat_response_params}}
-  end
-
-  def handle_signal(%Signal{type: "jido.ai.boolean.response"} = signal, skill_opts) do
-    base_prompt = Keyword.get(skill_opts, :prompt)
-    rendered_prompt = render_prompt(base_prompt, signal.data)
-    model = Keyword.get(skill_opts, :model)
-
-    boolean_response_params = %{
-      model: model,
-      prompt: rendered_prompt
-    }
-
-    {:ok, %{signal | data: boolean_response_params}}
   end
 
   defp render_prompt(base_prompt, signal_data) when is_binary(base_prompt) do
