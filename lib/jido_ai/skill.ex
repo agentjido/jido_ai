@@ -30,6 +30,11 @@ defmodule Jido.AI.Skill do
       default: Jido.AI.Actions.Langchain.ToolResponse,
       doc: "The default tool action to use"
     ],
+    boolean_action: [
+      type: {:custom, Jido.Util, :validate_actions, []},
+      default: Jido.AI.Actions.Instructor.BooleanResponse,
+      doc: "The default boolean action to use"
+    ],
     tools: [
       type: {:custom, Jido.Util, :validate_actions, []},
       default: [],
@@ -62,10 +67,13 @@ defmodule Jido.AI.Skill do
     tool_action =
       Keyword.get(opts, :tool_action, Jido.AI.Actions.Langchain.ToolResponse)
 
+    boolean_action =
+      Keyword.get(opts, :boolean_action, Jido.AI.Actions.Instructor.BooleanResponse)
+
     tools = Keyword.get(opts, :tools, [])
 
     # Register all actions with the agent
-    actions = [chat_action, tool_action] ++ tools
+    actions = [chat_action, tool_action, boolean_action] ++ tools
 
     # Register the actions with the agent
     Jido.AI.Agent.register_action(agent, actions)
@@ -92,7 +100,9 @@ defmodule Jido.AI.Skill do
   def router(_opts \\ []) do
     [
       {"jido.ai.chat.response", %Instruction{action: Jido.AI.Actions.Instructor.ChatResponse}},
-      {"jido.ai.tool.response", %Instruction{action: Jido.AI.Actions.Langchain.ToolResponse}}
+      {"jido.ai.tool.response", %Instruction{action: Jido.AI.Actions.Langchain.ToolResponse}},
+      {"jido.ai.boolean.response",
+       %Instruction{action: Jido.AI.Actions.Instructor.BooleanResponse}}
     ]
   end
 
@@ -110,8 +120,6 @@ defmodule Jido.AI.Skill do
       verbose: verbose
     }
 
-    IO.inspect(tool_response_params, label: "TOOL RESPONSE PARAMS")
-
     updated_signal = %{signal | data: tool_response_params}
 
     {:ok, updated_signal}
@@ -128,6 +136,19 @@ defmodule Jido.AI.Skill do
     }
 
     {:ok, %{signal | data: chat_response_params}}
+  end
+
+  def handle_signal(%Signal{type: "jido.ai.boolean.response"} = signal, skill_opts) do
+    base_prompt = Keyword.get(skill_opts, :prompt)
+    rendered_prompt = render_prompt(base_prompt, signal.data)
+    model = Keyword.get(skill_opts, :model)
+
+    boolean_response_params = %{
+      model: model,
+      prompt: rendered_prompt
+    }
+
+    {:ok, %{signal | data: boolean_response_params}}
   end
 
   defp render_prompt(base_prompt, signal_data) when is_binary(base_prompt) do
