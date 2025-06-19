@@ -89,6 +89,7 @@ end
 | `tools` | List of Jido Actions the agent can use | `[Jido.Actions.Weather, Jido.Actions.Search]` |
 | `chat_action` | The Jido Action to handle chat responses | `Jido.AI.Actions.Instructor.ChatResponse` |
 | `tool_action` | The Jido Action to handle tool-based responses | `Jido.AI.Actions.Langchain.ToolResponse` |
+| `boolean_action` | The Jido action to handle boolean responses | `Jido.AI.Actions.Instructor.BooleanResponse` |
 
 ## Understanding Jido.AI.Skill
 
@@ -401,6 +402,22 @@ def ask_question(pid, question) do
     {:ok, response} -> 
       {:ok, response.response}
     {:error, reason} -> 
+      Logger.error("AI request failed: #{inspect(reason)}")
+      {:error, "Unable to process your request at this time"}
+  end
+end
+```
+
+### Customizable Timeouts
+
+Define how long agent is able to process response before timing out, the default is 30 000 milliseconds.
+
+```elixir
+def long_running_response(pid, task_msg) do
+  case Agent.chat_response(pid, task_msg, timeout: 15_000) do
+    {:ok, response} ->
+      {:ok, response.response}
+    {:error, reason} ->
       Logger.error("AI request failed: #{inspect(reason)}")
       {:error, "Unable to process your request at this time"}
   end
