@@ -162,7 +162,8 @@ defmodule Jido.AI.Actions.OpenaiEx do
   end
 
   defp validate_and_get_model(_) do
-    {:error, %{reason: "Invalid model specification", details: "Must be a map or {provider, opts} tuple"}}
+    {:error,
+     %{reason: "Invalid model specification", details: "Must be a map or {provider, opts} tuple"}}
   end
 
   defp validate_provider(%Model{provider: provider} = model) when provider in @valid_providers do
@@ -170,15 +171,25 @@ defmodule Jido.AI.Actions.OpenaiEx do
   end
 
   defp validate_provider(%Model{provider: provider}) do
-    {:error, %{reason: "Invalid provider", details: "Got #{inspect(provider)}, expected one of #{inspect(@valid_providers)}"}}
+    {:error,
+     %{
+       reason: "Invalid provider",
+       details: "Got #{inspect(provider)}, expected one of #{inspect(@valid_providers)}"
+     }}
   end
 
-  defp validate_and_get_messages(%{messages: messages}) when is_list(messages) and messages != [] do
+  defp validate_and_get_messages(%{messages: messages})
+       when is_list(messages) and messages != [] do
     if Enum.all?(messages, &valid_message?/1) do
       {:ok, messages}
     else
       invalid = Enum.filter(messages, &(not valid_message?(&1)))
-      {:error, %{reason: "Invalid message format", details: "Messages must have :role and :content, got #{inspect(invalid)}"}}
+
+      {:error,
+       %{
+         reason: "Invalid message format",
+         details: "Messages must have :role and :content, got #{inspect(invalid)}"
+       }}
     end
   end
 
@@ -186,8 +197,10 @@ defmodule Jido.AI.Actions.OpenaiEx do
     case Prompt.validate_prompt_opts(prompt) do
       {:ok, prompt} ->
         {:ok, Prompt.render(prompt)}
+
       {:error, reason} ->
         {:error, %{reason: "Invalid prompt", details: reason}}
+
       error ->
         # Normalize unexpected error formats from Prompt.validate_prompt_opts/1
         {:error, %{reason: "Unexpected prompt validation error", details: inspect(error)}}
@@ -198,7 +211,9 @@ defmodule Jido.AI.Actions.OpenaiEx do
     {:error, %{reason: "Missing input", details: "Either messages or prompt must be provided"}}
   end
 
-  defp valid_message?(%{role: role, content: content}) when is_atom(role) and is_binary(content), do: true
+  defp valid_message?(%{role: role, content: content}) when is_atom(role) and is_binary(content),
+    do: true
+
   defp valid_message?(_), do: false
 
   defp build_chat_request(model, messages, params) do
@@ -220,6 +235,7 @@ defmodule Jido.AI.Actions.OpenaiEx do
           _ -> %{role: msg.role, content: msg.content}
         end
       end)
+
     {:ok, chat_messages}
   end
 
@@ -259,7 +275,9 @@ defmodule Jido.AI.Actions.OpenaiEx do
 
   defp add_tools(req, _), do: {:ok, req}
 
-  defp add_tool_choice(req, %{tool_choice: choice}) when is_map(choice), do: {:ok, Map.put(req, :tool_choice, choice)}
+  defp add_tool_choice(req, %{tool_choice: choice}) when is_map(choice),
+    do: {:ok, Map.put(req, :tool_choice, choice)}
+
   defp add_tool_choice(req, _), do: {:ok, req}
 
   defp maybe_add_param(req, _key, nil), do: req
