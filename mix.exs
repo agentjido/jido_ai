@@ -90,7 +90,7 @@ defmodule Jido.Ai.MixProject do
     else
       deps ++
         [
-          {:jido, "~> 1.1.0-rc.2"}
+          {:jido, "~> 1.2.0"}
           # {:jido_memory, github: "agentjido/jido_memory"}
         ]
     end
