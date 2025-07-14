@@ -108,14 +108,12 @@ defmodule Jido.AI.Keyring do
   @doc false
   @spec get_environment() :: atom()
   defp get_environment do
-    cond do
-      # First try to use Mix.env() which works in dev, test
-      function_exported?(Mix, :env, 0) ->
-        Mix.env()
-
+    # First try to use Mix.env() which works in dev, test
+    if function_exported?(Mix, :env, 0) do
+      Mix.env()
+    else
       # In production releases, check for config
-      true ->
-        Application.get_env(:jido_ai, :env, :prod)
+      Application.get_env(:jido_ai, :env, :prod)
     end
   end
 

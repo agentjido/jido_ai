@@ -58,9 +58,9 @@ defmodule JidoTest.AI.PromptOptionsTest do
     test "with_timeout sets timeout option" do
       prompt =
         Prompt.new(:user, "Generate text")
-        |> Prompt.with_timeout(30000)
+        |> Prompt.with_timeout(30_000)
 
-      assert prompt.options[:timeout] == 30000
+      assert prompt.options[:timeout] == 30_000
     end
 
     test "options are preserved across new versions" do
@@ -89,7 +89,7 @@ defmodule JidoTest.AI.PromptOptionsTest do
         |> Prompt.with_max_tokens(500)
         |> Prompt.with_top_p(0.9)
         |> Prompt.with_stop("END")
-        |> Prompt.with_timeout(30000)
+        |> Prompt.with_timeout(30_000)
 
       result = Prompt.render_with_options(prompt)
 
@@ -98,7 +98,7 @@ defmodule JidoTest.AI.PromptOptionsTest do
       assert result[:max_tokens] == 500
       assert result[:top_p] == 0.9
       assert result[:stop] == ["END"]
-      assert result[:timeout] == 30000
+      assert result[:timeout] == 30_000
     end
 
     test "applies parameter overrides when rendering with options" do

@@ -34,8 +34,7 @@ defmodule Jido.AI.Actions.Langchain.ToolResponse do
     prompt = Prompt.new(:user, "What is (527 + 313) - 248?")
     tools = [Jido.Actions.Arithmetic.Add, Jido.Actions.Arithmetic.Subtract]
 
-    {:ok, result} = LangchainAction.run(%{model: model, prompt: prompt, tools: tools}, %{})
-    IO.inspect(result, label: "Result")
+    {:ok, _result} = LangchainAction.run(%{model: model, prompt: prompt, tools: tools}, %{})
   end
 
   def run(params, _context) do

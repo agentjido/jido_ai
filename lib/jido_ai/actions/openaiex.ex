@@ -219,9 +219,8 @@ defmodule Jido.AI.Actions.OpenaiEx do
   defp build_chat_request(model, messages, params) do
     with {:ok, chat_messages} <- build_chat_messages(messages),
          {:ok, base_req} <- build_base_request(model, chat_messages, params),
-         {:ok, req_with_tools} <- add_tools(base_req, params),
-         {:ok, final_req} <- add_tool_choice(req_with_tools, params) do
-      {:ok, final_req}
+         {:ok, req_with_tools} <- add_tools(base_req, params) do
+      add_tool_choice(req_with_tools, params)
     end
   end
 

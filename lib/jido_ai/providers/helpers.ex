@@ -13,20 +13,22 @@ defmodule Jido.AI.Provider.Helpers do
   require Logger
   alias Jido.AI.Keyring
 
-  @model_patterns [
-    {~r/claude-3\.7-sonnet/i, "claude-3.7-sonnet"},
-    {~r/claude-3\.5-sonnet/i, "claude-3.5-sonnet"},
-    {~r/claude-3-opus/i, "claude-3-opus"},
-    {~r/gpt-4o-mini/i, "gpt-4o-mini"},
-    {~r/gpt-4o/i, "gpt-4o"},
-    {~r/gpt-4/i, "gpt-4"},
-    {~r/gpt-3\.5/i, "gpt-3.5"},
-    {~r/mistral-7b/i, "mistral-7b"},
-    {~r/mistral-8x7b/i, "mistral-8x7b"},
-    {~r/llama-2-70b/i, "llama-2-70b"},
-    {~r/llama-2-13b/i, "llama-2-13b"},
-    {~r/llama-2-7b/i, "llama-2-7b"}
-  ]
+  defp model_patterns do
+    [
+      {~r/claude-3\.7-sonnet/i, "claude-3.7-sonnet"},
+      {~r/claude-3\.5-sonnet/i, "claude-3.5-sonnet"},
+      {~r/claude-3-opus/i, "claude-3-opus"},
+      {~r/gpt-4o-mini/i, "gpt-4o-mini"},
+      {~r/gpt-4o/i, "gpt-4o"},
+      {~r/gpt-4/i, "gpt-4"},
+      {~r/gpt-3\.5/i, "gpt-3.5"},
+      {~r/mistral-7b/i, "mistral-7b"},
+      {~r/mistral-8x7b/i, "mistral-8x7b"},
+      {~r/llama-2-70b/i, "llama-2-70b"},
+      {~r/llama-2-13b/i, "llama-2-13b"},
+      {~r/llama-2-7b/i, "llama-2-7b"}
+    ]
+  end
 
   @doc """
   Standardizes a model name across providers by removing version numbers and dates.
@@ -40,7 +42,7 @@ defmodule Jido.AI.Provider.Helpers do
   """
   def standardize_name(model) when is_binary(model) do
     # First try exact matches from our patterns
-    case Enum.find_value(@model_patterns, fn {pattern, standard_name} ->
+    case Enum.find_value(model_patterns(), fn {pattern, standard_name} ->
            if String.match?(model, pattern), do: standard_name, else: nil
          end) do
       nil ->

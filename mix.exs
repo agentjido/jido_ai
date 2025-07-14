@@ -13,6 +13,13 @@ defmodule Jido.Ai.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      dialyzer: [
+        plt_add_apps: [:mix, :ex_unit],
+        flags: [
+          :error_handling,
+          :underspecs
+        ]
+      ],
       name: "Jido AI",
       description: "Jido Actions and Workflows for interacting with LLMs",
       package: package(),
@@ -63,7 +70,7 @@ defmodule Jido.Ai.MixProject do
 
       # Testing
       {:credo, "~> 1.7", only: [:dev, :test]},
-      {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.22.0", only: [:dev, :test]},
       {:ex_check, "~> 0.12", only: [:dev, :test]},
       {:ex_doc, "~> 0.37-rc", only: [:dev, :test], runtime: false},
@@ -90,7 +97,7 @@ defmodule Jido.Ai.MixProject do
     else
       deps ++
         [
-          {:jido, "~> 1.1.0-rc.2"}
+          {:jido, "~> 1.1"}
           # {:jido_memory, github: "agentjido/jido_memory"}
         ]
     end

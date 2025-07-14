@@ -296,8 +296,7 @@ defmodule Jido.AI.Prompt do
   def to_text(%Prompt{} = prompt, override_params \\ %{}) do
     prompt
     |> render(override_params)
-    |> Enum.map(fn %{role: r, content: c} -> "[#{r}] #{c}" end)
-    |> Enum.join("\n")
+    |> Enum.map_join("\n", fn %{role: r, content: c} -> "[#{r}] #{c}" end)
   end
 
   @doc """
