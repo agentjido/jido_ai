@@ -77,13 +77,25 @@ defmodule Jido.AI.Keyring do
   @impl true
   @spec init(atom()) :: {:ok, map()}
   def init(registry) do
+    # Load environment data
     env = load_from_env()
     app_env = load_from_app_env()
     keys = Map.merge(app_env, env)
 
-    Logger.debug("[Jido.AI.Keyring] Initializing environment variables")
+    # Create ETS table for fast environment lookups
+    env_table = :ets.new(:jido_ai_env_cache, [:set, :protected, read_concurrency: true])
 
-    {:ok, %{keys: keys, registry: registry}}
+    # Populate ETS table with environment values and LiveBook variants
+    Enum.each(keys, fn {key, value} ->
+      :ets.insert(env_table, {key, value})
+      # Also insert LiveBook prefixed version
+      livebook_key = to_livebook_key(key)
+      :ets.insert(env_table, {livebook_key, value})
+    end)
+
+    Logger.debug("[Jido.AI.Keyring] Initializing environment variables with ETS optimization")
+
+    {:ok, %{keys: keys, registry: registry, env_table: env_table}}
   end
 
   @doc false
@@ -180,15 +192,22 @@ defmodule Jido.AI.Keyring do
   """
   @spec get_env_value(GenServer.server(), atom(), term()) :: term()
   def get_env_value(server \\ @default_name, key, default \\ nil) when is_atom(key) do
-    # First try the regular key
-    case GenServer.call(server, {:get_value, key, nil}) do
-      nil ->
+    # Get the ETS table reference from the GenServer state
+    env_table = GenServer.call(server, :get_env_table)
+
+    # First try the regular key in ETS (fast lookup)
+    case :ets.lookup(env_table, key) do
+      [{^key, value}] ->
+        value
+
+      [] ->
         # If not found, try the LiveBook prefixed version
         livebook_key = to_livebook_key(key)
-        GenServer.call(server, {:get_value, livebook_key, default})
 
-      value ->
-        value
+        case :ets.lookup(env_table, livebook_key) do
+          [{^livebook_key, value}] -> value
+          [] -> default
+        end
     end
   end
 
@@ -285,13 +304,30 @@ defmodule Jido.AI.Keyring do
   end
 
   @impl true
-  def handle_call({:set_test_env_vars, env_vars}, _from, %{keys: keys} = state)
+  def handle_call(:get_env_table, _from, %{env_table: env_table} = state) do
+    {:reply, env_table, state}
+  end
+
+  @impl true
+  def handle_call(
+        {:set_test_env_vars, env_vars},
+        _from,
+        %{keys: keys, env_table: env_table} = state
+      )
       when is_map(env_vars) do
     atom_env_vars =
       Enum.reduce(env_vars, %{}, fn {key, value}, acc ->
         atom_key = env_var_to_atom(key)
         Map.put(acc, atom_key, value)
       end)
+
+    # Update both the state and the ETS table
+    Enum.each(atom_env_vars, fn {key, value} ->
+      :ets.insert(env_table, {key, value})
+      # Also insert LiveBook prefixed version
+      livebook_key = to_livebook_key(key)
+      :ets.insert(env_table, {livebook_key, value})
+    end)
 
     new_keys = Map.merge(keys, atom_env_vars)
     {:reply, :ok, %{state | keys: new_keys}}
