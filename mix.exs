@@ -78,7 +78,7 @@ defmodule Jido.Ai.MixProject do
       {:expublish, "~> 2.5", only: [:dev], runtime: false},
       {:git_ops, "~> 2.5", only: [:dev, :test]},
       {:igniter, "~> 0.5", only: [:dev, :test]},
-      {:mimic, "~> 1.7", only: [:dev, :test]},
+      {:mimic, "~> 2.0", only: [:dev, :test]},
       {:mix_audit, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:sobelow, ">= 0.0.0", only: [:dev, :test], runtime: false},
