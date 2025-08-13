@@ -103,7 +103,7 @@ defmodule Jido.AI.Keyring.Filter do
   @spec sanitize_data(term()) :: term()
   def sanitize_data(data) when is_map(data) do
     Enum.reduce(data, %{}, fn {key, value}, acc ->
-      if is_sensitive_key?(key) do
+      if sensitive_key?(key) do
         Map.put(acc, key, @redacted_text)
       else
         Map.put(acc, key, sanitize_data(value))
@@ -115,7 +115,7 @@ defmodule Jido.AI.Keyring.Filter do
     if Keyword.keyword?(data) do
       # Handle keyword lists specially
       Enum.map(data, fn {key, value} ->
-        if is_sensitive_key?(key) do
+        if sensitive_key?(key) do
           {key, @redacted_text}
         else
           {key, sanitize_data(value)}
@@ -154,18 +154,18 @@ defmodule Jido.AI.Keyring.Filter do
 
   Returns `true` if the key indicates sensitive data, `false` otherwise.
   """
-  @spec is_sensitive_key?(term()) :: boolean()
-  def is_sensitive_key?(key) when is_atom(key) do
+  @spec sensitive_key?(term()) :: boolean()
+  def sensitive_key?(key) when is_atom(key) do
     key
     |> Atom.to_string()
-    |> is_sensitive_key?()
+    |> sensitive_key?()
   end
 
-  def is_sensitive_key?(key) when is_binary(key) do
+  def sensitive_key?(key) when is_binary(key) do
     Enum.any?(@sensitive_patterns, &Regex.match?(&1, key))
   end
 
-  def is_sensitive_key?(_), do: false
+  def sensitive_key?(_), do: false
 
   @doc """
   Checks if a string value looks like sensitive data.

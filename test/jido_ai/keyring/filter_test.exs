@@ -148,47 +148,47 @@ defmodule Jido.AI.Keyring.FilterTest do
     end
   end
 
-  describe "is_sensitive_key?/1" do
+  describe "sensitive_key?/1" do
     test "identifies sensitive atom keys" do
-      assert Filter.is_sensitive_key?(:api_key)
-      assert Filter.is_sensitive_key?(:apikey)
-      assert Filter.is_sensitive_key?(:API_KEY)
-      assert Filter.is_sensitive_key?(:token)
-      assert Filter.is_sensitive_key?(:auth_token)
-      assert Filter.is_sensitive_key?(:bearer_token)
-      assert Filter.is_sensitive_key?(:password)
-      assert Filter.is_sensitive_key?(:secret)
-      assert Filter.is_sensitive_key?(:private_key)
-      assert Filter.is_sensitive_key?(:cert)
-      assert Filter.is_sensitive_key?(:pem)
-      assert Filter.is_sensitive_key?(:encryption_key)
+      assert Filter.sensitive_key?(:api_key)
+      assert Filter.sensitive_key?(:apikey)
+      assert Filter.sensitive_key?(:API_KEY)
+      assert Filter.sensitive_key?(:token)
+      assert Filter.sensitive_key?(:auth_token)
+      assert Filter.sensitive_key?(:bearer_token)
+      assert Filter.sensitive_key?(:password)
+      assert Filter.sensitive_key?(:secret)
+      assert Filter.sensitive_key?(:private_key)
+      assert Filter.sensitive_key?(:cert)
+      assert Filter.sensitive_key?(:pem)
+      assert Filter.sensitive_key?(:encryption_key)
     end
 
     test "identifies sensitive string keys" do
-      assert Filter.is_sensitive_key?("api_key")
-      assert Filter.is_sensitive_key?("apiKey")
-      assert Filter.is_sensitive_key?("API_KEY")
-      assert Filter.is_sensitive_key?("token")
-      assert Filter.is_sensitive_key?("auth_token")
-      assert Filter.is_sensitive_key?("password")
-      assert Filter.is_sensitive_key?("secret")
-      assert Filter.is_sensitive_key?("private_key")
+      assert Filter.sensitive_key?("api_key")
+      assert Filter.sensitive_key?("apiKey")
+      assert Filter.sensitive_key?("API_KEY")
+      assert Filter.sensitive_key?("token")
+      assert Filter.sensitive_key?("auth_token")
+      assert Filter.sensitive_key?("password")
+      assert Filter.sensitive_key?("secret")
+      assert Filter.sensitive_key?("private_key")
     end
 
     test "does not identify non-sensitive keys" do
-      refute Filter.is_sensitive_key?(:user_id)
-      refute Filter.is_sensitive_key?(:name)
-      refute Filter.is_sensitive_key?(:email)
-      refute Filter.is_sensitive_key?(:timeout)
-      refute Filter.is_sensitive_key?(:config)
-      refute Filter.is_sensitive_key?("user_name")
-      refute Filter.is_sensitive_key?("config_value")
+      refute Filter.sensitive_key?(:user_id)
+      refute Filter.sensitive_key?(:name)
+      refute Filter.sensitive_key?(:email)
+      refute Filter.sensitive_key?(:timeout)
+      refute Filter.sensitive_key?(:config)
+      refute Filter.sensitive_key?("user_name")
+      refute Filter.sensitive_key?("config_value")
     end
 
     test "handles non-string/atom keys safely" do
-      refute Filter.is_sensitive_key?(123)
-      refute Filter.is_sensitive_key?(self())
-      refute Filter.is_sensitive_key?(%{})
+      refute Filter.sensitive_key?(123)
+      refute Filter.sensitive_key?(self())
+      refute Filter.sensitive_key?(%{})
     end
   end
 
