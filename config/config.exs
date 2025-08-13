@@ -1,5 +1,5 @@
 import Config
 
 config :logger, :console,
-  format: "[$level] $message $metadata\n",
+  format: {Jido.AI.Keyring.Filter, :format},
   metadata: [:module]

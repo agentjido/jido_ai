@@ -105,7 +105,7 @@ defmodule Jido.Ai.MixProject do
 
   defp aliases do
     [
-      test: "test --trace",
+      # test: "test --trace",
       docs: "docs -f html --open",
       q: ["quality"],
       quality: [
