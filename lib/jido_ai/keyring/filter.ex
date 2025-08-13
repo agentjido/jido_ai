@@ -27,7 +27,6 @@ defmodule Jido.AI.Keyring.Filter do
 
   # Patterns that indicate sensitive data
   @sensitive_patterns [
-    ~r/^api_?key$/i,
     ~r/.*api_?key.*/i,
     ~r/.*token.*/i,
     ~r/.*password.*/i,
@@ -38,8 +37,7 @@ defmodule Jido.AI.Keyring.Filter do
     ~r/.*private_key.*/i,
     ~r/.*cert.*/i,
     ~r/.*pem.*/i,
-    ~r/^(private|encryption|signing|access|session)_key$/i,
-    ~r/^key$/i
+    ~r/^(private|encryption|signing|access|session)_key$/i
   ]
 
   @doc """
@@ -50,7 +48,6 @@ defmodule Jido.AI.Keyring.Filter do
   """
   @spec format(Logger.level(), Logger.message(), Logger.metadata(), keyword()) :: IO.chardata()
   def format(level, message, metadata, _opts) do
-    # Debug: Add a marker to confirm this formatter is being used
     # Sanitize both message and metadata
     sanitized_message = sanitize_data(message)
 

@@ -31,12 +31,22 @@ defmodule Jido.AI.Keyring do
 
   @session_registry :jido_ai_keyring_sessions
   @default_name __MODULE__
+  @default_env_table_prefix :jido_ai_env_cache
 
   @doc false
   @spec ensure_session_registry(atom()) :: atom()
   defp ensure_session_registry(registry_name) do
     if :ets.whereis(registry_name) == :undefined do
       :ets.new(registry_name, [:set, :public, :named_table])
+    end
+  end
+
+  @doc false
+  @spec generate_env_table_name(atom()) :: atom()
+  defp generate_env_table_name(name) do
+    case name do
+      @default_name -> @default_env_table_prefix
+      _ -> :"#{@default_env_table_prefix}_#{name}"
     end
   end
 
@@ -63,27 +73,33 @@ defmodule Jido.AI.Keyring do
 
     * `:name` - The name to register the process under (default: #{@default_name})
     * `:registry` - The name for the ETS registry table (default: #{@session_registry})
+    * `:env_table_name` - The name for the environment cache table (default: dynamic based on process name)
 
   """
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     name = Keyword.get(opts, :name, @default_name)
     registry = Keyword.get(opts, :registry, @session_registry)
+    env_table_name = Keyword.get(opts, :env_table_name, generate_env_table_name(name))
 
     ensure_session_registry(registry)
-    GenServer.start_link(__MODULE__, registry, name: name)
+    GenServer.start_link(__MODULE__, {registry, env_table_name}, name: name)
   end
 
   @impl true
-  @spec init(atom()) :: {:ok, map()}
-  def init(registry) do
+  def init({registry, env_table_name}) do
     # Load environment data
     env = load_from_env()
     app_env = load_from_app_env()
     keys = Map.merge(app_env, env)
 
-    # Create ETS table for fast environment lookups
-    env_table = :ets.new(:jido_ai_env_cache, [:set, :protected, read_concurrency: true])
+    # Create ETS table for fast environment lookups with unique name
+    # Clean up any existing table first
+    if :ets.whereis(env_table_name) != :undefined do
+      :ets.delete(env_table_name)
+    end
+
+    env_table = :ets.new(env_table_name, [:set, :protected, :named_table, read_concurrency: true])
 
     # Populate ETS table with environment values and LiveBook variants
     Enum.each(keys, fn {key, value} ->
@@ -93,28 +109,35 @@ defmodule Jido.AI.Keyring do
       :ets.insert(env_table, {livebook_key, value})
     end)
 
-    Logger.debug("[Jido.AI.Keyring] Initializing environment variables with ETS optimization")
+    Logger.debug(
+      "[Jido.AI.Keyring] Initializing environment variables with ETS optimization (table: #{env_table_name})"
+    )
 
-    {:ok, %{keys: keys, registry: registry, env_table: env_table}}
+    {:ok, %{keys: keys, registry: registry, env_table: env_table, env_table_name: env_table_name}}
   end
 
   @doc false
-  @spec load_from_env() :: map()
   defp load_from_env do
-    env_dir_prefix = Path.expand("./envs/")
-    current_env = get_environment()
+    try do
+      env_dir_prefix = Path.expand("./envs/")
+      current_env = get_environment()
 
-    Dotenvy.source!([
-      Path.join(File.cwd!(), ".env"),
-      Path.absname(".env", env_dir_prefix),
-      Path.absname(".#{current_env}.env", env_dir_prefix),
-      Path.absname(".#{current_env}.overrides.env", env_dir_prefix),
-      System.get_env()
-    ])
-    |> Enum.reduce(%{}, fn {key, value}, acc ->
-      atom_key = env_var_to_atom(key)
-      Map.put(acc, atom_key, value)
-    end)
+      env_sources =
+        Dotenvy.source!([
+          Path.join(File.cwd!(), ".env"),
+          Path.absname(".env", env_dir_prefix),
+          Path.absname(".#{current_env}.env", env_dir_prefix),
+          Path.absname(".#{current_env}.overrides.env", env_dir_prefix),
+          System.get_env()
+        ])
+
+      Enum.reduce(env_sources, %{}, fn {key, value}, acc ->
+        atom_key = env_var_to_atom(key)
+        Map.put(acc, atom_key, value)
+      end)
+    rescue
+      _ -> %{}
+    end
   end
 
   @doc false
@@ -139,7 +162,6 @@ defmodule Jido.AI.Keyring do
   end
 
   @doc false
-  @spec load_from_app_env() :: map()
   defp load_from_app_env do
     case Application.get_env(:jido_ai, :keyring) do
       nil -> %{}
@@ -193,21 +215,28 @@ defmodule Jido.AI.Keyring do
   @spec get_env_value(GenServer.server(), atom(), term()) :: term()
   def get_env_value(server \\ @default_name, key, default \\ nil) when is_atom(key) do
     # Get the ETS table reference from the GenServer state
-    env_table = GenServer.call(server, :get_env_table)
+    case GenServer.call(server, :get_env_table) do
+      {:error, :env_table_not_found} ->
+        default
 
-    # First try the regular key in ETS (fast lookup)
-    case :ets.lookup(env_table, key) do
-      [{^key, value}] ->
-        value
+      env_table when is_atom(env_table) or is_reference(env_table) ->
+        # First try the regular key in ETS (fast lookup)
+        case :ets.lookup(env_table, key) do
+          [{^key, value}] ->
+            value
 
-      [] ->
-        # If not found, try the LiveBook prefixed version
-        livebook_key = to_livebook_key(key)
+          [] ->
+            # If not found, try the LiveBook prefixed version
+            livebook_key = to_livebook_key(key)
 
-        case :ets.lookup(env_table, livebook_key) do
-          [{^livebook_key, value}] -> value
-          [] -> default
+            case :ets.lookup(env_table, livebook_key) do
+              [{^livebook_key, value}] -> value
+              [] -> default
+            end
         end
+
+      _ ->
+        default
     end
   end
 
@@ -304,8 +333,13 @@ defmodule Jido.AI.Keyring do
   end
 
   @impl true
-  def handle_call(:get_env_table, _from, %{env_table: env_table} = state) do
+  def handle_call(:get_env_table, _from, %{env_table: env_table} = state) when env_table != nil do
     {:reply, env_table, state}
+  end
+
+  @impl true
+  def handle_call(:get_env_table, _from, state) do
+    {:reply, {:error, :env_table_not_found}, state}
   end
 
   @impl true
@@ -362,6 +396,19 @@ defmodule Jido.AI.Keyring do
   def has_value?(""), do: false
   def has_value?(value) when is_binary(value), do: true
   def has_value?(_), do: false
+
+  @impl true
+  @spec terminate(term(), map()) :: :ok
+  def terminate(_reason, %{env_table_name: env_table_name}) do
+    # Clean up the ETS table to prevent conflicts on restart
+    if :ets.whereis(env_table_name) != :undefined do
+      :ets.delete(env_table_name)
+    end
+
+    :ok
+  end
+
+  def terminate(_reason, _state), do: :ok
 
   @doc false
   @spec to_livebook_key(atom()) :: atom()

@@ -55,7 +55,8 @@ defmodule Jido.AI do
   """
   @spec api_key(atom()) :: String.t() | nil
   def api_key(provider \\ :openai) do
-    Keyring.get(Keyring, {provider, :api_key})
+    key = :"#{provider}_api_key"
+    Keyring.get(Keyring, key)
   end
 
   @doc """
@@ -82,7 +83,8 @@ defmodule Jido.AI do
         _ -> "gpt-4o"
       end
 
-    Keyring.get(Keyring, {provider, :model}, default_model)
+    key = :"#{provider}_model"
+    Keyring.get(Keyring, key, default_model)
   end
 
   @doc """
