@@ -25,20 +25,22 @@ defmodule Jido.AI.Keyring.Filter do
 
   @redacted_text "[REDACTED]"
 
-  # Patterns that indicate sensitive data
-  @sensitive_patterns [
-    ~r/.*api_?key.*/i,
-    ~r/.*token.*/i,
-    ~r/.*password.*/i,
-    ~r/.*secret.*/i,
-    ~r/.*pass$/i,
-    ~r/.*auth.*/i,
-    ~r/.*bearer.*/i,
-    ~r/.*private_key.*/i,
-    ~r/.*cert.*/i,
-    ~r/.*pem.*/i,
-    ~r/^(private|encryption|signing|access|session)_key$/i
-  ]
+  # Get sensitive patterns - defined as function to avoid compile-time reference issues
+  defp sensitive_patterns do
+    [
+      ~r/.*api_?key.*/i,
+      ~r/.*token.*/i,
+      ~r/.*password.*/i,
+      ~r/.*secret.*/i,
+      ~r/.*pass$/i,
+      ~r/.*auth.*/i,
+      ~r/.*bearer.*/i,
+      ~r/.*private_key.*/i,
+      ~r/.*cert.*/i,
+      ~r/.*pem.*/i,
+      ~r/^(private|encryption|signing|access|session)_key$/i
+    ]
+  end
 
   @doc """
   Custom format function for logger that automatically filters sensitive data.
@@ -162,7 +164,7 @@ defmodule Jido.AI.Keyring.Filter do
   end
 
   def sensitive_key?(key) when is_binary(key) do
-    Enum.any?(@sensitive_patterns, &Regex.match?(&1, key))
+    Enum.any?(sensitive_patterns(), &Regex.match?(&1, key))
   end
 
   def sensitive_key?(_), do: false
