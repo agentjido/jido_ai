@@ -1,7 +1,7 @@
 defmodule Jido.Ai.MixProject do
   use Mix.Project
 
-  @version "0.5.2"
+  @version "0.5.3"
   @source_url "https://github.com/agentjido/jido_ai"
 
   def project do
@@ -97,7 +97,7 @@ defmodule Jido.Ai.MixProject do
     else
       deps ++
         [
-          {:jido, "~> 1.1"}
+          {:jido, "~> 1.2.0"}
           # {:jido_memory, github: "agentjido/jido_memory"}
         ]
     end
