@@ -1,0 +1,299 @@
+# Getting Started with Jido
+
+## Introduction
+
+Welcome to Jido! In this interactive guide, we'll explore how to build composable actions and workflows. We'll create a complete user registration system that you can run and experiment with right here in Livebook.
+
+First, let's install the required dependencies:
+
+```elixir
+Mix.install([
+  {:jido, "~> 1.0.0-rc.5"},
+  {:jason, "~> 1.4"}
+])
+```
+
+## Understanding Actions
+
+Before we dive into code, let's understand why Jido exists and when you should use it.
+
+You might be wondering: "Why should I wrap my code in Actions when I could just write regular Elixir functions?" This is an excellent question. If you're building a standard Elixir application without AI agents, you probably shouldn't use Actions – regular Elixir modules and functions would be simpler and more direct.
+
+Actions exist specifically to support AI agent systems. When you're building agents that need to make autonomous decisions about what steps to take, you need a way to package functionality into discrete, composable units that the agent can reason about and combine in novel ways. Think of Actions as LEGO bricks for agents – standardized, well-described building blocks that can be assembled in different combinations to solve problems.
+
+Let's create our first Action to see how this works in practice:
+
+```elixir
+defmodule FormatUser do
+  use Jido.Action,
+    name: "format_user",
+    description: "Formats and validates user data",
+    schema: [
+      name: [
+        type: :string,
+        required: true,
+        doc: "User's full name"
+      ],
+      email: [
+        type: :string,
+        required: true,
+        doc: "User's email address"
+      ],
+      age: [
+        type: :integer,
+        required: true,
+        doc: "User's age"
+      ]
+    ]
+
+  @impl true
+  def run(params, _context) do
+    # Extract params (they're already validated by the schema)
+    %{name: name, email: email, age: age} = params
+
+    # Return formatted data
+    {:ok, %{
+      formatted_name: String.trim(name),
+      email: String.downcase(email),
+      age: age,
+      is_adult: age >= 18
+    }}
+  end
+end
+```
+
+Let's try running our FormatUser action with some test data:
+
+```elixir
+# Notice the trailing space and uppercase email - our Action will clean these
+test_data = %{
+  name: "John Doe ",
+  email: "JOHN@EXAMPLE.COM",
+  age: 30
+}
+
+# Run the action directly
+{:ok, result} = FormatUser.run(test_data, %{})
+
+# Let's see what we got
+IO.inspect(result, label: "Formatted User Data")
+```
+
+Now let's create an action to enrich our user data with additional information:
+
+```elixir
+defmodule EnrichUserData do
+  use Jido.Action,
+    name: "enrich_user_data",
+    description: "Adds username and avatar URL to user data",
+    schema: [
+      formatted_name: [type: :string, required: true],
+      email: [type: :string, required: true]
+    ]
+
+  def run(%{formatted_name: name, email: email}, _context) do
+    {:ok, %{
+      username: generate_username(name),
+      avatar_url: get_gravatar_url(email)
+    }}
+  end
+
+  defp generate_username(name) do
+    name
+    |> String.downcase()
+    |> String.replace(" ", ".")
+  end
+
+  defp get_gravatar_url(email) do
+    hash = :crypto.hash(:md5, email) |> Base.encode16(case: :lower)
+    "https://www.gravatar.com/avatar/#{hash}"
+  end
+end
+```
+
+Let's try our enrichment action:
+
+```elixir
+# Use the result from our previous FormatUser action
+{:ok, enriched_result} = EnrichUserData.run(result, %{})
+
+IO.inspect(enriched_result, label: "Enriched User Data")
+```
+
+Finally, let's create an action to simulate sending a welcome notification:
+
+```elixir
+defmodule NotifyUser do
+  use Jido.Action,
+    name: "notify_user",
+    description: "Sends welcome notification to user",
+    schema: [
+      email: [type: :string, required: true],
+      username: [type: :string, required: true]
+    ]
+
+  require Logger
+
+  def run(%{email: email, username: username}, _context) do
+    # In a real app, you'd send an actual email
+    Logger.info("Sending welcome email to #{email}")
+
+    {:ok, %{
+      notification_sent: true,
+      notification_type: "welcome_email",
+      recipient: %{
+        email: email,
+        username: username
+      }
+    }}
+  end
+end
+```
+
+Now that we have our individual actions, let's see how we can chain them together using Jido's workflow system:
+
+```elixir
+alias Jido.Exec.Chain
+
+# Our initial test data
+user_data = %{
+  name: "Jane Smith ",          # Notice the trailing space
+  email: "JANE@EXAMPLE.COM",    # Will be downcased
+  age: 25
+}
+
+# Chain all three actions together
+{:ok, final_result} = Chain.chain(
+  [
+    FormatUser,
+    EnrichUserData,
+    NotifyUser
+  ],
+  user_data
+)
+
+# Let's see the complete result
+IO.inspect(final_result, label: "Complete Workflow Result")
+```
+
+Let's break down what happened in this chain:
+
+1. `FormatUser` processed the raw input:
+
+   - Trimmed the name
+   - Converted email to lowercase
+   - Added the is_adult flag
+
+2. `EnrichUserData` added profile information:
+
+   - Generated a username
+   - Created an avatar URL
+   - Results were merged with existing data
+
+3. `NotifyUser` simulated sending a welcome message:
+   - Used the email and username from previous steps
+   - Added notification status to the results
+
+## Experimenting with Chains
+
+Try modifying the chain! Here are some experiments you can run:
+
+1. Change the order of actions:
+
+```elixir
+# What happens if we try to notify before enriching?
+{:ok, result} = Chain.chain(
+  [
+    FormatUser,
+    NotifyUser,     # This will fail! Why?
+    EnrichUserData
+  ],
+  user_data
+)
+```
+
+2. Add context data:
+
+```elixir
+# Pass additional context to all actions
+{:ok, result} = Chain.chain(
+  [FormatUser, EnrichUserData, NotifyUser],
+  user_data,
+  context: %{
+    tenant_id: "123",
+    environment: "test"
+  }
+)
+```
+
+3. Override parameters for specific actions:
+
+```elixir
+# Override the name just for FormatUser
+{:ok, result} = Chain.chain(
+  [
+    {FormatUser, [name: "Override Name"]},
+    EnrichUserData,
+    NotifyUser
+  ],
+  user_data
+)
+```
+
+## Error Handling
+
+Let's see how Jido handles errors in chains:
+
+```elixir
+# Try with invalid data
+invalid_data = %{
+  name: "John Doe",
+  email: nil,     # This will fail validation
+  age: 30
+}
+
+case Chain.chain([FormatUser, EnrichUserData, NotifyUser], invalid_data) do
+  {:ok, result} ->
+    IO.puts("Success!")
+    IO.inspect(result)
+
+  {:error, error} ->
+    IO.puts("Failed with error:")
+    IO.inspect(error)
+end
+```
+
+## Configuration
+
+### Global Timeout Settings
+
+By default, Jido actions have a 30-second timeout. You can configure this globally in your application:
+
+```elixir
+# config/config.exs
+config :jido, default_timeout: 60_000  # 60 seconds
+```
+
+### Per-Action Timeouts
+
+You can also set timeouts for individual actions:
+
+```elixir
+# Run with a custom timeout
+{:ok, result} = Jido.Exec.run(FormatUser, %{name: "Alice", email: "alice@example.com", age: 30}, %{}, timeout: 10_000)
+
+# Disable timeout completely for long-running operations
+{:ok, result} = Jido.Exec.run(LongRunningAction, params, %{}, timeout: 0)
+```
+
+## Next Steps
+
+Now that you understand the basics of Jido actions and workflows, you can:
+
+1. Create your own actions for different domains
+2. Build more complex workflows with branching and conditions
+3. Add error compensation and rollback handling
+4. Create agents that use these actions
+5. Configure timeouts and other execution options for your use case
+
+The complete Jido documentation has more examples and advanced features to explore!

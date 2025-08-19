@@ -1,0 +1,5 @@
+# Think-Plan-Act Cycle
+
+_Part of the "Examples" section in the documentation._
+
+This LiveBook guide demonstrates implementing the Think-Plan-Act cycle in agents. It shows how to create agents that can analyze situations, plan responses, and execute actions in a coordinated way.

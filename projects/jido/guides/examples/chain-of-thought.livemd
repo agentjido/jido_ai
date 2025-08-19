@@ -1,0 +1,5 @@
+# Chain of Thought Reasoning
+
+_Part of the "Examples" section in the documentation._
+
+This LiveBook guide explores implementing chain-of-thought reasoning in agents. It demonstrates how to build agents that can break down complex problems and reason through solutions step by step.

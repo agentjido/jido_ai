@@ -1,0 +1,5 @@
+# Your First Agent
+
+_Part of the "Examples" section in the documentation._
+
+This LiveBook guide walks you through creating your first agent with Jido. It provides a hands-on introduction to agent creation, configuration, and basic operations.
