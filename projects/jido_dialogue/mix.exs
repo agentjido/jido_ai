@@ -33,8 +33,9 @@ defmodule Jido.Dialogue.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      ws_dep(:jido, "../jido", [github: "agentjido/jido"]),
+
       {:elixir_uuid, "~> 1.2"},
-      {:jido, path: "../jido"},
       {:yaml_elixir, "~> 2.11"},
 
       # Testing
@@ -53,5 +54,18 @@ defmodule Jido.Dialogue.MixProject do
     [
       test: "test --no-start"
     ]
+  end
+
+  # Workspace dependency management helpers
+  defp workspace? do
+    System.get_env("JIDO_WORKSPACE") in ["1", "true"]
+  end
+
+  defp ws_dep(app, rel_path, remote_opts, extra_opts \\ []) do
+    if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
+      {app, [path: rel_path, override: true] ++ extra_opts}
+    else
+      {app, remote_opts ++ extra_opts}
+    end
   end
 end

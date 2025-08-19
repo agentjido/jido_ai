@@ -232,8 +232,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      ws_dep(:jido_action, "../jido_action", github: "agentjido/jido_action"),
-      ws_dep(:jido_signal, "../jido_signal", github: "agentjido/jido_signal"),
+      ws_dep(:jido_action, "../jido_action", [github: "agentjido/jido_action"]),
+      ws_dep(:jido_signal, "../jido_signal", [github: "agentjido/jido_signal"]),
 
       # Jido Deps
       {:backoff, "~> 1.1"},
@@ -299,11 +299,11 @@ defmodule Jido.MixProject do
     System.get_env("JIDO_WORKSPACE") in ["1", "true"]
   end
 
-  defp ws_dep(app, rel_path, fallback_dep, opts \\ []) do
+  defp ws_dep(app, rel_path, remote_opts, extra_opts \\ []) do
     if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
-      {app, [path: rel_path, override: true] ++ opts}
+      {app, [path: rel_path, override: true] ++ extra_opts}
     else
-      {app, fallback_dep ++ opts}
+      {app, remote_opts ++ extra_opts}
     end
   end
 end

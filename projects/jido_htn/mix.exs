@@ -26,7 +26,8 @@ defmodule JidoHtn.MixProject do
       {:ex_dbug, "~> 2.0"},
       {:proper_case, "~> 1.3"},
       {:private, "~> 0.1.2"},
-      {:jido, path: "../ship/jido"},
+      ws_dep(:jido, "../jido", [github: "agentjido/jido"]),
+      ws_dep(:jido_action, "../jido_action", [github: "agentjido/jido_action"]),
 
       # Development & Test Dependencies
       {:credo, "~> 1.7", only: [:dev, :test]},
@@ -61,5 +62,18 @@ defmodule JidoHtn.MixProject do
         "credo --all"
       ]
     ]
+  end
+
+  # Workspace dependency management helpers
+  defp workspace? do
+    System.get_env("JIDO_WORKSPACE") in ["1", "true"]
+  end
+
+  defp ws_dep(app, rel_path, remote_opts, extra_opts \\ []) do
+    if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
+      {app, [path: rel_path, override: true] ++ extra_opts}
+    else
+      {app, remote_opts ++ extra_opts}
+    end
   end
 end

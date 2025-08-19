@@ -24,7 +24,7 @@ defmodule JidoEval.MixProject do
   defp deps do
     [
       # Jido
-      {:jido_ai, path: "../jido_ai"},
+      ws_dep(:jido_ai, "../jido_ai", [github: "agentjido/jido_ai"]),
 
       # Core
       {:typed_struct, "~> 0.3.0"},
@@ -65,5 +65,18 @@ defmodule JidoEval.MixProject do
         "docs"
       ]
     ]
+  end
+
+  # Workspace dependency management helpers
+  defp workspace? do
+    System.get_env("JIDO_WORKSPACE") in ["1", "true"]
+  end
+
+  defp ws_dep(app, rel_path, remote_opts, extra_opts \\ []) do
+    if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
+      {app, [path: rel_path, override: true] ++ extra_opts}
+    else
+      {app, remote_opts ++ extra_opts}
+    end
   end
 end
