@@ -57,7 +57,15 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/jido_workbench"
+    },
+    %{
+      name: "depot",
+      upstream_url: "git@github.com:mikehostetler/depot.git",
+      branch: "main",
+      type: :library,
+      path: "projects/depot"
     }
+
 
 
 
