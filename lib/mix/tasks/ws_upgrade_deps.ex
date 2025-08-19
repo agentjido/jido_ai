@@ -1,6 +1,6 @@
-defmodule Mix.Tasks.Workspace.Deps do
+defmodule Mix.Tasks.Ws.Upgrade.Deps do
   @moduledoc """
-  Manage dependencies across all projects in the workspace.
+  Upgrade dependencies across all projects in the workspace.
   """
   @shortdoc "Check/upgrade dependencies for all workspace projects"
 
@@ -16,7 +16,7 @@ defmodule Mix.Tasks.Workspace.Deps do
     case remaining_args do
       [] ->
         if opts[:check] do
-          JidoWorkspace.Runner.run_task_all("hex.outdated", [], continue_on_error: true)
+          JidoWorkspace.Runner.run_task_all("hex.outdated", [])
         else
           upgrade_all_deps(opts)
         end
@@ -31,7 +31,7 @@ defmodule Mix.Tasks.Workspace.Deps do
 
           project ->
             if opts[:check] do
-              JidoWorkspace.Runner.run_task_single(project.path, "hex.outdated")
+              JidoWorkspace.Runner.run_task_in_project(project, "hex.outdated", [])
             else
               upgrade_single_project(project, opts)
             end
@@ -123,16 +123,16 @@ defmodule Mix.Tasks.Workspace.Deps do
 
   defp print_usage do
     IO.puts("""
-    Usage: mix workspace.deps [project_name] [options]
+    Usage: mix ws.upgrade.deps [project_name] [options]
 
     Options:
       --check    Only check for outdated dependencies, don't upgrade
       --upgrade  Upgrade dependencies (default behavior)
 
     Examples:
-      mix workspace.deps                    # Upgrade all projects
-      mix workspace.deps --check           # Check all for outdated deps
-      mix workspace.deps jido              # Upgrade specific project
+      mix ws.upgrade.deps                    # Upgrade all projects
+      mix ws.upgrade.deps --check           # Check all for outdated deps
+      mix ws.upgrade.deps jido              # Upgrade specific project
     """)
   end
 end

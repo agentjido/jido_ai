@@ -1,7 +1,16 @@
-defmodule Mix.Tasks.Workspace.Pull do
+defmodule Mix.Tasks.Ws.Git.Pull do
   use Mix.Task
 
   @shortdoc "Pull project updates from upstream"
+
+  @moduledoc """
+  Pull updates from upstream repositories for workspace projects.
+
+  ## Examples
+
+      mix ws.git.pull           # Pull all projects
+      mix ws.git.pull jido      # Pull specific project
+  """
 
   def run([]) do
     Application.ensure_all_started(:jido_workspace)
@@ -16,6 +25,6 @@ defmodule Mix.Tasks.Workspace.Pull do
   end
 
   def run(_) do
-    Mix.shell().error("Usage: mix workspace.pull [project_name]")
+    Mix.shell().error("Usage: mix ws.git.pull [project_name]")
   end
 end

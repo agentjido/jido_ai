@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Workspace.Quality do
+defmodule Mix.Tasks.Ws.Quality do
   @moduledoc """
   Run quality checks (format, compile, dialyzer, credo) across all projects in the workspace.
   """
@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Workspace.Quality do
 
     case args do
       [] ->
-        JidoWorkspace.Runner.run_task_all("quality", [], continue_on_error: false)
+        JidoWorkspace.Runner.run_task_all("quality", [])
 
       [project_name] ->
         projects = JidoWorkspace.config()
@@ -24,14 +24,11 @@ defmodule Mix.Tasks.Workspace.Quality do
             System.halt(1)
 
           project ->
-            case JidoWorkspace.Runner.run_task_single(project.path, "quality") do
-              :ok -> :ok
-              {:error, {code, _}} -> System.halt(code)
-            end
+            JidoWorkspace.Runner.run_task_in_project(project, "quality", [])
         end
 
       _ ->
-        IO.puts("Usage: mix workspace.quality [project_name]")
+        IO.puts("Usage: mix ws.quality [project_name]")
         System.halt(1)
     end
   end

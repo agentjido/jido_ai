@@ -26,15 +26,19 @@ defmodule JidoWorkspace.MixProject do
 
   defp aliases do
     [
-      morning: ["workspace.pull", "compile"],
-      sync: ["workspace.pull", "workspace.test.all"],
-      "ws.pull": ["workspace.pull"],
-      "ws.push": ["workspace.push"],
-      "ws.status": ["workspace.status"],
-      "ws.test": ["workspace.test.all"],
-      "ws.quality": ["workspace.quality"],
-      "ws.deps": ["workspace.deps"],
-      "ws.diff": ["workspace.diff"],
+      # High-level shortcuts
+      morning: ["ws.git.pull", "compile"],
+      sync: ["ws.git.pull", "ws test"],
+      
+      # Convenient shortcuts for new commands
+      "ws.pull": ["ws.git.pull"],
+      "ws.push": ["ws.git.push"],
+      "ws.status": ["ws.git.status"],
+      "ws.test": ["ws test"],
+      "ws.deps.get": ["ws deps.get"],
+      "ws.deps.upgrade": ["ws.upgrade.deps"],
+      
+      # Slidev commands
       "slidev.dev": ["slidev.dev"],
       "slidev.build": ["slidev.build"],
       "slidev.install": ["slidev.install"],

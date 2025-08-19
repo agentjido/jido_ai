@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.Workspace.Diff do
+defmodule Mix.Tasks.Ws.Git.Diff do
   @moduledoc """
   Show differences between local workspace and upstream repositories.
   """
@@ -29,7 +29,7 @@ defmodule Mix.Tasks.Workspace.Diff do
         end
 
       _ ->
-        IO.puts("Usage: mix workspace.diff [project_name]")
+        IO.puts("Usage: mix ws.git.diff [project_name]")
         System.halt(1)
     end
   end
