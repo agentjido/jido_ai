@@ -9,6 +9,7 @@ defmodule Mix.Tasks.Workspace.Test.All do
   @impl Mix.Task
   def run(args) do
     Application.ensure_all_started(:jido_workspace)
+    JidoWorkspace.ensure_workspace_env()
     
     case args do
       [] ->

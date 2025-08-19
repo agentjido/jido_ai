@@ -23,6 +23,8 @@ defmodule Mix.Tasks.Workspace.Add do
           path: path
         }
         
+        Application.ensure_all_started(:jido_workspace)
+        JidoWorkspace.ensure_workspace_env()
         add_project_to_config(project)
         JidoWorkspace.pull_project(name)
         

@@ -6,10 +6,10 @@ defmodule JidoWorkspaceTest do
     projects = JidoWorkspace.config()
     assert is_list(projects)
     assert length(projects) > 0
-    
+
     jido_project = Enum.find(projects, &(&1.name == "jido"))
     assert jido_project != nil
-    assert jido_project.upstream_url == "https://github.com/agentjido/jido"
+    assert jido_project.upstream_url == "git@github.com:agentjido/jido.git"
   end
 
   test "workspace status returns ok" do

@@ -6,6 +6,15 @@ defmodule JidoWorkspace do
   require Logger
 
   @doc """
+  Ensure JIDO_WORKSPACE environment variable is set for workspace operations.
+  """
+  def ensure_workspace_env do
+    unless System.get_env("JIDO_WORKSPACE") do
+      System.put_env("JIDO_WORKSPACE", "1")
+    end
+  end
+
+  @doc """
   Get the workspace configuration.
   """
   def config do

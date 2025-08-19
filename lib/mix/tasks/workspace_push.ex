@@ -5,11 +5,13 @@ defmodule Mix.Tasks.Workspace.Push do
 
   def run([project_name]) do
     Application.ensure_all_started(:jido_workspace)
+    JidoWorkspace.ensure_workspace_env()
     JidoWorkspace.push_project(project_name)
   end
 
   def run([project_name, "--branch", branch_name]) do
     Application.ensure_all_started(:jido_workspace)
+    JidoWorkspace.ensure_workspace_env()
     JidoWorkspace.push_project(project_name, branch: branch_name)
   end
   

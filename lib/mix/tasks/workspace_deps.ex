@@ -9,6 +9,7 @@ defmodule Mix.Tasks.Workspace.Deps do
   @impl Mix.Task
   def run(args) do
     Application.ensure_all_started(:jido_workspace)
+    JidoWorkspace.ensure_workspace_env()
     
     {opts, remaining_args} = parse_args(args)
     

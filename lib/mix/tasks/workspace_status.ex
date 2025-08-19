@@ -5,6 +5,7 @@ defmodule Mix.Tasks.Workspace.Status do
 
   def run(_) do
     Application.ensure_all_started(:jido_workspace)
+    JidoWorkspace.ensure_workspace_env()
     JidoWorkspace.status()
   end
 end
