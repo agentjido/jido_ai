@@ -9,7 +9,15 @@ defmodule JidoWorkspace do
   Get the workspace configuration.
   """
   def config do
-    Application.get_env(:jido_workspace, :projects, [])
+    # Read config using Config.Reader for proper evaluation
+    config_path = Path.join(File.cwd!(), "config/workspace.exs")
+    
+    case Config.Reader.read!(config_path) do
+      [{:jido_workspace, workspace_config}] ->
+        Keyword.get(workspace_config, :projects, [])
+      _ ->
+        []
+    end
   end
 
   @doc """
