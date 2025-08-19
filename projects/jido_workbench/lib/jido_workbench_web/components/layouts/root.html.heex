@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+
+    <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
+
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js">
+    </script>
+    <!-- Used in css-theme-switch.js - remove if you don't support light/dark mode -->
+    <script defer src="https://unpkg.com/js-cookie@3.x.x/dist/js.cookie.min.js">
+    </script>
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}>
+    </script>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=VT323&display=swap"
+      rel="stylesheet"
+    />
+
+    <%= if Application.get_env(:jido_workbench, :enable_analytics) do %>
+      <script
+        defer
+        data-domain={Application.get_env(:jido_workbench, :canonical_host) || "agentjido.xyz"}
+        src="https://plausible.io/js/script.outbound-links.js"
+      >
+      </script>
+      <script>
+        window.plausible = window.plausible || function() {
+          (window.plausible.q = window.plausible.q || []).push(arguments)
+        }
+      </script>
+    <% end %>
+
+    <.color_scheme_switch_js />
+
+    <SEO.juice conn={@conn} config={JidoWorkbenchWeb.SEO.config()} page_title={assigns[:page_title]} />
+  </head>
+  <body class="antialiased bg-white dark:bg-zinc-900 font-sans">
+    {@inner_content}
+  </body>
+</html>

@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Configuration for Elixir dependencies
+  - package-ecosystem: "mix"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "elixir"
+    commit-message:
+      prefix: "mix"
+      prefix-development: "mix dev"
+      include: "scope"
