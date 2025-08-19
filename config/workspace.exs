@@ -43,7 +43,15 @@ config :jido_workspace,
       branch: "refactor/models",
       type: :library,
       path: "projects/jido_ai"
+    },
+    %{
+      name: "jido_eval",
+      upstream_url: "git@github.com:agentjido/jido_eval.git",
+      branch: "main",
+      type: :library,
+      path: "projects/jido_eval"
     }
+
 
 
   ]
