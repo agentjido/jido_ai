@@ -1,0 +1,135 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide detailed information about what you'd like to see added to jido_action.
+        
+        Before submitting, please check our [Contributing Guidelines](./CONTRIBUTING.md) and [Best Practices](./EX_BEST_PRACTICES.md).
+
+  - type: textarea
+    id: feature_summary
+    attributes:
+      label: Feature Summary
+      description: Provide a brief summary of the feature you're requesting.
+      placeholder: "Add support for..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_description
+    attributes:
+      label: Problem Description
+      description: What problem does this feature solve? What's the current limitation?
+      placeholder: "Currently, when working with actions, I find it difficult to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your ideal solution. How should this feature work?
+      placeholder: "I would like to be able to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: api_design
+    attributes:
+      label: Proposed API Design
+      description: If applicable, show what the API might look like.
+      render: elixir
+      placeholder: |
+        # Example of how the new feature might be used
+        {:ok, action} = Jido.Action.new_feature(%{...})
+        result = Jido.Action.SomeNewModule.new_function(action, options)
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other solutions have you considered? Why wouldn't they work?
+      placeholder: "I considered using... but it doesn't work because..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: use_cases
+    attributes:
+      label: Use Cases
+      description: Provide specific use cases where this feature would be valuable.
+      placeholder: |
+        1. When building action workflows that need to...
+        2. For AI-integrated tools that require...
+        3. In distributed action execution where...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - "Nice to have"
+        - "Important for my use case"
+        - "Critical for my project"
+        - "Blocking my adoption of jido_action"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Implementation Complexity (if known)
+      description: If you have an idea of the implementation complexity
+      options:
+        - "I don't know"
+        - "Simple - small addition"
+        - "Medium - requires some design work"
+        - "Complex - significant changes needed"
+        - "Very complex - major architectural changes"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other context, links, or references about the feature request.
+      placeholder: "Links to similar features in other libraries, related discussions, etc."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Are you willing to contribute to implementing this feature?
+      options:
+        - label: I'm willing to implement this feature and submit a PR
+        - label: I can help with testing the implementation
+        - label: I can help with documentation for this feature
+        - label: I can provide feedback during development
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched for existing feature requests for this functionality
+          required: true
+        - label: I have checked the roadmap and documentation for planned features
+          required: true
+        - label: This feature aligns with the goals of jido_action
+          required: true
+        - label: I have reviewed the [Contributing Guidelines](./CONTRIBUTING.md)
+          required: true
