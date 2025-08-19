@@ -14,7 +14,7 @@ defmodule Mix.Tasks.Workspace.Push do
     JidoWorkspace.ensure_workspace_env()
     JidoWorkspace.push_project(project_name, branch: branch_name)
   end
-  
+
   def run(_) do
     Mix.shell().error("Usage: mix workspace.push <project_name> [--branch <branch_name>]")
   end

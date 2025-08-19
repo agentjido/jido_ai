@@ -14,9 +14,9 @@ defmodule Mix.Tasks.Slidev.Dev do
 
   def run(_args) do
     JidoWorkspace.ensure_workspace_env()
-    
+
     path = "presentations"
-    
+
     unless File.dir?(path) do
       Mix.shell().error("Presentations directory not found: #{path}")
       exit(1)
@@ -43,19 +43,21 @@ defmodule Mix.Tasks.Slidev.Build do
 
   def run(_args) do
     JidoWorkspace.ensure_workspace_env()
-    
+
     path = "presentations"
-    
+
     unless File.dir?(path) do
       Mix.shell().error("Presentations directory not found: #{path}")
       exit(1)
     end
 
     Mix.shell().info("Building presentations...")
+
     case System.cmd("bun", ["run", "build"], cd: path) do
       {output, 0} ->
         Mix.shell().info("Build completed successfully")
         Mix.shell().info(output)
+
       {output, _} ->
         Mix.shell().error("Build failed:")
         Mix.shell().error(output)
@@ -80,19 +82,21 @@ defmodule Mix.Tasks.Slidev.Install do
 
   def run(_args) do
     JidoWorkspace.ensure_workspace_env()
-    
+
     path = "presentations"
-    
+
     unless File.dir?(path) do
       Mix.shell().error("Presentations directory not found: #{path}")
       exit(1)
     end
 
     Mix.shell().info("Installing presentation dependencies...")
+
     case System.cmd("bun", ["install"], cd: path) do
       {output, 0} ->
         Mix.shell().info("Dependencies installed successfully")
         Mix.shell().info(output)
+
       {output, _} ->
         Mix.shell().error("Installation failed:")
         Mix.shell().error(output)
@@ -117,9 +121,9 @@ defmodule Mix.Tasks.Slidev.New do
 
   def run(args) do
     JidoWorkspace.ensure_workspace_env()
-    
+
     path = "presentations"
-    
+
     case args do
       [name] ->
         unless File.dir?(path) do
@@ -128,15 +132,18 @@ defmodule Mix.Tasks.Slidev.New do
         end
 
         Mix.shell().info("Creating new presentation: #{name}")
+
         case System.cmd("bun", ["run", "new", name], cd: path) do
           {output, 0} ->
             Mix.shell().info("Presentation '#{name}' created successfully")
             Mix.shell().info(output)
+
           {output, _} ->
             Mix.shell().error("Failed to create presentation:")
             Mix.shell().error(output)
             exit(1)
         end
+
       _ ->
         Mix.shell().error("Usage: mix slidev.new <presentation-name>")
         exit(1)

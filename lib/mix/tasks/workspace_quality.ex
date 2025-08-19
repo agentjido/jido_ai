@@ -10,17 +10,19 @@ defmodule Mix.Tasks.Workspace.Quality do
   def run(args) do
     Application.ensure_all_started(:jido_workspace)
     JidoWorkspace.ensure_workspace_env()
-    
+
     case args do
       [] ->
         JidoWorkspace.Runner.run_task_all("quality", [], continue_on_error: false)
 
       [project_name] ->
         projects = JidoWorkspace.config()
+
         case Enum.find(projects, &(&1.name == project_name)) do
           nil ->
             IO.puts("Project '#{project_name}' not found")
             System.halt(1)
+
           project ->
             case JidoWorkspace.Runner.run_task_single(project.path, "quality") do
               :ok -> :ok

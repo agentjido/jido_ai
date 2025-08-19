@@ -86,12 +86,4 @@ config :jido_workspace,
       type: :library,
       path: "projects/sparq"
     }
-
-
-
-
-
-
-
-
   ]
