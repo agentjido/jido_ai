@@ -1,0 +1,5 @@
+# Multi-Agent Systems
+
+_Part of the "Examples" section in the documentation._
+
+This LiveBook guide explores building systems with multiple cooperating agents. It demonstrates patterns for agent communication, coordination, and collaboration in solving complex problems.

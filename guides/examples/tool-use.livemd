@@ -1,0 +1,5 @@
+# Tool Use in Agents
+
+_Part of the "Examples" section in the documentation._
+
+This LiveBook guide demonstrates how to implement and use tools with agents. It provides practical examples of tool definition, integration with AI systems, and common tool usage patterns.
