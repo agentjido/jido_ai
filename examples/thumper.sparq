@@ -1,0 +1,62 @@
+character ThumperTroll do
+  name = "Thumper"
+  voice = "gruff"
+  mood = "neutral"
+  emoji = "👹"
+
+  health = 100
+  stamina = 0xFF   # Hex number
+  rage = -10       # Negative decimal
+  _trunk_health = 0b1010  # Binary
+  _target = nil
+end
+
+environment BridgeLands do
+  bridges = ["stone_bridge", "wooden_bridge", "rope_bridge", "magical_bridge"]
+  weather = "cloudy"
+  time_of_day = "dusk"
+  danger_level = 0o12  # Octal
+  is_locked = false
+end
+
+scene @TrunkTest(troll) do
+  # Single-line comment
+  * This line is just a stage note
+
+  set trunk_count = 42
+
+  narrate """Attempting multi-line mstring test:
+This line is in the next row
+#{troll.emoji} We'll see how it parses."""
+
+  troll say "Halt! No crossing allowed."
+
+  # Ask usage
+  answer = troll ask "WHO GOES THERE?"
+
+  path when answer.includes?("friend") || answer.includes?("ally") do
+    troll say "Very well, friend..."
+    effect do
+      troll.mood = "helpful"
+      trunk_count = -99
+    end
+    @PeacefulResolution
+  end
+
+  # Default path
+  troll say "NO FRIEND? THEN BEWARE!"
+  effect troll.rage += 5
+end
+
+flow @PeacefulResolution(troll) do
+  set do
+    troll.mood = "calm"
+    troll.stamina += 10
+  end
+  path when troll.stamina >= 100 do
+    do
+      troll.say "Fully recovered!"
+    end
+    @Done
+  end
+end
