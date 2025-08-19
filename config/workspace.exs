@@ -92,6 +92,14 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/jido_character"
+    },
+    %{
+      name: "jido_dialogue",
+      upstream_url: "git@github.com:epic-creative/jido_dialogue.git",
+      branch: "main",
+      type: :library,
+      path: "projects/jido_dialogue"
     }
+
 
   ]
