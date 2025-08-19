@@ -50,7 +50,15 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/jido_eval"
+    },
+    %{
+      name: "jido_workbench",
+      upstream_url: "git@github.com:agentjido/jido_workbench.git",
+      branch: "main",
+      type: :library,
+      path: "projects/jido_workbench"
     }
+
 
 
 
