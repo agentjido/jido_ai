@@ -25,9 +25,17 @@ config :jido_workspace,
     },
     %{
       name: "jido_presentations",
-      upstream_url: "https://github.com/agentjido/jido_presentations.git",
+      upstream_url: "git@github.com:agentjido/jido_presentations.git",
       branch: "main",
       type: :docs,
       path: "presentations"
+    },
+    %{
+      name: "ash_jido",
+      upstream_url: "git@github.com:agentjido/ash_jido.git",
+      branch: "main",
+      type: :library,
+      path: "projects/ash_jido"
     }
+
   ]
