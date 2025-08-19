@@ -99,7 +99,15 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/jido_dialogue"
+    },
+    %{
+      name: "jido_htn",
+      upstream_url: "git@github.com:epic-creative/jido_htn.git",
+      branch: "main",
+      type: :library,
+      path: "projects/jido_htn"
     }
+
 
 
   ]
