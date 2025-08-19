@@ -22,5 +22,12 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/jido_signal"
+    },
+    %{
+      name: "jido_presentations",
+      upstream_url: "https://github.com/agentjido/jido_presentations.git",
+      branch: "main",
+      type: :docs,
+      path: "presentations"
     }
   ]

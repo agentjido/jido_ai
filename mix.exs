@@ -34,7 +34,10 @@ defmodule JidoWorkspace.MixProject do
       "ws.test": ["workspace.test.all"],
       "ws.quality": ["workspace.quality"],
       "ws.deps": ["workspace.deps"],
-      "ws.diff": ["workspace.diff"]
+      "ws.diff": ["workspace.diff"],
+      "slidev.dev": ["slidev.dev"],
+      "slidev.build": ["slidev.build"],
+      "slidev.install": ["slidev.install"]
     ]
   end
 end
