@@ -37,7 +37,8 @@ defmodule JidoWorkspace.MixProject do
       "ws.diff": ["workspace.diff"],
       "slidev.dev": ["slidev.dev"],
       "slidev.build": ["slidev.build"],
-      "slidev.install": ["slidev.install"]
+      "slidev.install": ["slidev.install"],
+      "slidev.new": ["slidev.new"]
     ]
   end
 end
