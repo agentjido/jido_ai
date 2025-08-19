@@ -1,0 +1,69 @@
+name: Elixir CI
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        otp: ["27"]
+        elixir: ["1.17", "1.18"]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
+
+      - name: Restore dependencies and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-
+            ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Compile with warnings as errors
+        run: mix compile --warnings-as-errors
+
+      - name: Run static analysis with Dialyzer
+        run: mix dialyzer --format dialyxir
+
+      - name: Run code analysis with Credo
+        run: mix credo --min-priority higher
+
+      - name: Run documentation coverage with Doctor
+        run: mix doctor --summary
+
+      - name: Check for unused dependencies
+        run: mix deps.unlock --check-unused
+
+      - name: Audit dependencies for vulnerabilities
+        run: mix hex.audit
+
+      - name: Run tests with coverage
+        run: mix coveralls.github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
