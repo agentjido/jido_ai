@@ -71,7 +71,15 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/jido_behaviortree"
+    },
+    %{
+      name: "jido_chat",
+      upstream_url: "git@github.com:agentjido/jido_chat.git",
+      branch: "main",
+      type: :library,
+      path: "projects/jido_chat"
     }
+
 
 
 
