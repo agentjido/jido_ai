@@ -78,7 +78,15 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/jido_chat"
+    },
+    %{
+      name: "sparq",
+      upstream_url: "git@github.com:epic-creative/sparq.git",
+      branch: "main",
+      type: :library,
+      path: "projects/sparq"
     }
+
 
 
 
