@@ -62,15 +62,16 @@ defmodule JidoWorkspace do
   @doc """
   Push changes for a specific project to its upstream repository.
   """
-  def push_project(name) when is_binary(name) do
+  def push_project(name, opts \\ []) when is_binary(name) do
     case find_project(name) do
       nil ->
         Logger.error("Project '#{name}' not found in workspace config")
         :error
       
       project ->
-        Logger.info("Pushing project: #{project.name}")
-        git_subtree_push(project)
+        branch = Keyword.get(opts, :branch, project.branch)
+        Logger.info("Pushing project: #{project.name} to branch: #{branch}")
+        git_subtree_push(project, branch)
     end
   end
 
@@ -147,8 +148,8 @@ defmodule JidoWorkspace do
     end
   end
 
-  defp git_subtree_push(%{name: name, upstream_url: url, branch: branch, path: path}) do
-    cmd = ["git", "subtree", "push", "--prefix=#{path}", url, branch]
+  defp git_subtree_push(%{name: name, upstream_url: url, path: path}, target_branch) do
+    cmd = ["git", "subtree", "push", "--prefix=#{path}", url, target_branch]
     
     case System.cmd("git", Enum.drop(cmd, 1), stderr_to_stdout: true) do
       {output, 0} ->

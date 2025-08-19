@@ -4,21 +4,21 @@ config :jido_workspace,
   projects: [
     %{
       name: "jido",
-      upstream_url: "https://github.com/agentjido/jido",
+      upstream_url: "git@github.com:agentjido/jido.git",
       branch: "main",
       type: :library,
       path: "projects/jido"
     },
     %{
       name: "jido_action",
-      upstream_url: "https://github.com/agentjido/jido_action",
+      upstream_url: "git@github.com:agentjido/jido_action.git",
       branch: "main",
       type: :library,
       path: "projects/jido_action"
     },
     %{
       name: "jido_signal",
-      upstream_url: "https://github.com/agentjido/jido_signal",
+      upstream_url: "git@github.com:agentjido/jido_signal.git",
       branch: "main",
       type: :library,
       path: "projects/jido_signal"
