@@ -232,8 +232,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, github: "agentjido/jido_action"},
-      {:jido_signal, github: "agentjido/jido_signal"},
+      ws_dep(:jido_action, "../jido_action", "~> 0.3"),
+      ws_dep(:jido_signal, "../jido_signal", "~> 0.1"),
 
       # Jido Deps
       {:backoff, "~> 1.1"},
@@ -292,5 +292,19 @@ defmodule Jido.MixProject do
         "credo --all"
       ]
     ]
+  end
+
+  # Workspace dependency management helpers
+  defp workspace? do
+    System.get_env("JIDO_WORKSPACE") in ["1", "true"]
+  end
+
+  defp ws_dep(app, rel_path, hex_req, opts \\ []) do
+    if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
+      Keyword.merge([{app, [path: rel_path, override: true]}], opts)
+    else
+      Keyword.merge([{app, hex_req}], opts)
+    end
+    |> List.first()
   end
 end
