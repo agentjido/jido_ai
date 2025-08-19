@@ -1,0 +1,276 @@
+# Getting Started with Jido Chat
+
+## Introduction
+
+In this guide, we'll explore Jido Chat, an Elixir framework for building real-time chat systems that seamlessly integrate human users and AI agents. We'll start with a simple Echo bot and progressively explore more advanced features.
+
+## Setup
+
+First, let's install the required dependencies:
+
+```elixir
+Mix.install([
+  {:jido_chat, "~> 0.5.0"},
+  {:logger, "~> 1.0"}
+])
+```
+
+## Echo Bot Example
+
+Let's create a simple Echo bot that responds to messages by repeating them:
+
+```elixir
+defmodule EchoBot do
+  use Jido.Chat.Room
+
+  @impl true
+  def mount(room) do
+    # Create our Echo bot agent
+    {:ok, echo_agent} = Jido.Chat.Participant.new("echo_bot", :agent,
+      display_name: "Echo Bot"
+    )
+
+    # Add the bot to the room
+    :ok = Jido.Chat.join_room(room, echo_agent)
+
+    {:ok, room}
+  end
+
+  @impl true
+  def handle_message(room, message) do
+    # Only respond to messages not from our bot
+    if message.signal.subject != "echo_bot" do
+      Task.start(fn ->
+        response = "Echo: #{message.signal.data.content}"
+        Jido.Chat.post_message(room, "echo_bot", response)
+      end)
+    end
+
+    {:ok, message}
+  end
+end
+```
+
+Let's try out our Echo bot:
+
+```elixir
+# Create a new room with our EchoBot implementation
+{:ok, room} = Jido.Chat.create_room("demo_bus", "echo_room",
+  module: EchoBot
+)
+
+# Create a test user
+{:ok, user} = Jido.Chat.Participant.new("test_user", :human,
+  display_name: "Test User"
+)
+
+# Add user to room
+:ok = Jido.Chat.join_room("demo_bus", "echo_room", user)
+
+# Send a test message
+{:ok, message} = Jido.Chat.post_message("demo_bus", "echo_room",
+  "test_user",
+  "Hello, Echo Bot!"
+)
+
+# Get room messages to see the response
+{:ok, messages} = Jido.Chat.get_messages("demo_bus", "echo_room")
+messages |> Enum.map(&(&1.signal.data.content)) |> IO.inspect(label: "Messages")
+```
+
+## Core Concepts
+
+Now that we've seen a basic example, let's understand Jido Chat's key components:
+
+- **Rooms**: Independent chat spaces with their own participants and message history
+- **Participants**: Human users or AI agents that can send/receive messages
+- **Messages**: Text or rich content exchanged between participants
+- **Threads**: Grouped messages for organized conversations
+
+## Basic Room Operations
+
+Let's explore basic room management:
+
+```elixir
+# Create a new room
+{:ok, room} = Jido.Chat.create_room("example_bus", "room_123")
+
+# List all rooms in the bus
+rooms = Jido.Chat.list_rooms("example_bus")
+IO.inspect(rooms, label: "Active Rooms")
+
+# Check room existence
+case Jido.Chat.get_room("example_bus", "room_123") do
+  {:ok, pid} -> IO.puts("Room is active with PID: #{inspect(pid)}")
+  {:error, :not_found} -> IO.puts("Room not found")
+end
+```
+
+## Participant Management
+
+Let's manage some participants:
+
+```elixir
+# Create participants
+{:ok, alice} = Jido.Chat.Participant.new("alice_id", :human,
+  display_name: "Alice"
+)
+
+{:ok, bob} = Jido.Chat.Participant.new("bob_id", :human,
+  display_name: "Bob"
+)
+
+{:ok, helper} = Jido.Chat.Participant.new("helper_id", :agent,
+  display_name: "Helper Bot"
+)
+
+# Add participants to room
+:ok = Jido.Chat.join_room("example_bus", "room_123", alice)
+:ok = Jido.Chat.join_room("example_bus", "room_123", bob)
+:ok = Jido.Chat.join_room("example_bus", "room_123", helper)
+
+# List participants
+participants = Jido.Chat.list_participants("example_bus", "room_123")
+IO.inspect(participants, label: "Room Participants")
+```
+
+## Messaging
+
+Let's exchange some messages:
+
+```elixir
+# Send messages from different participants
+{:ok, msg1} = Jido.Chat.post_message("example_bus", "room_123",
+  "alice_id",
+  "Hello everyone!"
+)
+
+{:ok, msg2} = Jido.Chat.post_message("example_bus", "room_123",
+  "helper_id",
+  "Welcome! How can I help?",
+  type: :rich,
+  payload: %{
+    type: "greeting",
+    suggestions: ["Ask a question", "Get help", "Start tutorial"]
+  }
+)
+
+# Create a threaded reply
+{:ok, reply} = Jido.Chat.post_message("example_bus", "room_123",
+  "bob_id",
+  "I'd like to start the tutorial",
+  thread_id: msg2.signal.id
+)
+
+# Get all messages
+{:ok, messages} = Jido.Chat.get_messages("example_bus", "room_123")
+messages
+|> Enum.map(&(&1.signal.data.content))
+|> IO.inspect(label: "Message History")
+
+# Get thread messages
+{:ok, thread} = Jido.Chat.get_thread("example_bus", "room_123", msg2.signal.id)
+thread
+|> Enum.map(&(&1.signal.data.content))
+|> IO.inspect(label: "Thread Messages")
+```
+
+## Custom Room Implementation
+
+Let's create a room with custom behavior:
+
+```elixir
+defmodule ModeratedRoom do
+  use Jido.Chat.Room
+  require Logger
+
+  @impl true
+  def mount(room) do
+    Logger.info("Starting moderated room")
+    {:ok, room}
+  end
+
+  @impl true
+  def handle_message(room, message) do
+    if contains_prohibited_words?(message.signal.data.content) do
+      Logger.warn("Message rejected: prohibited content")
+      {:error, :prohibited_content}
+    else
+      {:ok, message}
+    end
+  end
+
+  @impl true
+  def handle_join(room, participant) do
+    Logger.info("#{participant.display_name} joined the room")
+    {:ok, participant}
+  end
+
+  defp contains_prohibited_words?(content) do
+    prohibited = ["spam", "offensive", "inappropriate"]
+    Enum.any?(prohibited, &String.contains?(String.downcase(content), &1))
+  end
+end
+
+# Create moderated room
+{:ok, room} = Jido.Chat.create_room("moderated_bus", "safe_room",
+  module: ModeratedRoom
+)
+
+# Test message moderation
+{:ok, user} = Jido.Chat.Participant.new("user1", :human)
+:ok = Jido.Chat.join_room("moderated_bus", "safe_room", user)
+
+# Try posting allowed and prohibited messages
+results = [
+  Jido.Chat.post_message("moderated_bus", "safe_room", "user1", "Hello, everyone!"),
+  Jido.Chat.post_message("moderated_bus", "safe_room", "user1", "This is spam content")
+]
+
+IO.inspect(results, label: "Moderation Results")
+```
+
+## Cleaning Up
+
+Before finishing, let's clean up our test rooms:
+
+```elixir
+# Stop all our test rooms
+:ok = Jido.Chat.stop_room("demo_bus", "echo_room")
+:ok = Jido.Chat.stop_room("example_bus", "room_123")
+:ok = Jido.Chat.stop_room("moderated_bus", "safe_room")
+```
+
+## Next Steps
+
+Now that you've explored the basics of Jido Chat, you can:
+
+1. Create more sophisticated bot implementations
+2. Implement custom room behaviors for your use case
+3. Build real-time chat applications with AI integration
+
+For more information:
+
+- Check the [full API documentation](https://hexdocs.pm/jido_chat)
+- Explore the [GitHub repository](https://github.com/agentjido/jido_chat)
+- Join the [community discussions](https://github.com/agentjido/jido_chat/discussions)
+
+## Troubleshooting Common Issues
+
+If you encounter issues:
+
+1. Room Creation Failures
+
+   - Verify bus name and room ID uniqueness
+   - Check supervision tree health
+
+2. Message Delivery Problems
+
+   - Confirm participant existence in room
+   - Verify message format and content
+   - Ensure room is active
+
+3. Participant Management Issues
+   - Check participant struct format
+   - Look for duplicate participant IDs
+   - Verify room existence
