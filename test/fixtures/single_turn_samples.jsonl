@@ -1,0 +1,3 @@
+{"id": "sample_1", "user_input": "What is AI?", "response": "AI is artificial intelligence", "tags": {"category": "tech"}}
+{"id": "sample_2", "user_input": "Hello", "response": "Hi there!", "tags": {"category": "greeting"}}
+{"id": "sample_3", "user_input": "How are you?", "response": "I'm doing well, thanks!", "reference": "I'm fine", "rubrics": {"politeness": "high"}}
