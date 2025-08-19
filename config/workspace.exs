@@ -106,7 +106,15 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/jido_htn"
+    },
+    %{
+      name: "kodo",
+      upstream_url: "git@github.com:epic-creative/kodo.git",
+      branch: "main",
+      type: :library,
+      path: "projects/kodo"
     }
+
 
 
 
