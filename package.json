@@ -1,0 +1,20 @@
+{
+  "name": "jido_presentations",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "slidev build",
+    "dev": "slidev --open",
+    "export": "slidev export",
+    "build:default": "slidev build presentations/default",
+    "dev:default": "slidev presentations/default --open",
+    "export:default": "slidev export presentations/default",
+    "new": "bash scripts/new-presentation.sh"
+  },
+  "dependencies": {
+    "@slidev/cli": "^52.1.0",
+    "@slidev/theme-default": "latest",
+    "@slidev/theme-seriph": "latest",
+    "vue": "^3.5.18"
+  }
+}
