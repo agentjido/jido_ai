@@ -1,0 +1,127 @@
+name: 🐛 Bug Report
+description: Report a bug or issue
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us fix the issue.
+        
+        Before submitting, please check our [Contributing Guidelines](./CONTRIBUTING.md) and [Best Practices](./EX_BEST_PRACTICES.md).
+
+  - type: input
+    id: jido_action_version
+    attributes:
+      label: Jido Action Version
+      description: What version of jido_action are you using?
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: elixir_version
+    attributes:
+      label: Elixir Version
+      description: What version of Elixir are you using?
+      placeholder: "1.17.0"
+    validations:
+      required: true
+
+  - type: input
+    id: otp_version
+    attributes:
+      label: OTP Version
+      description: What version of Erlang/OTP are you using?
+      placeholder: "27.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the bug...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Describe what you expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Steps to Reproduce
+      description: Please provide detailed steps to reproduce the issue.
+      placeholder: |
+        1. Create an action with...
+        2. Execute with...
+        3. Use instruction...
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: code_sample
+    attributes:
+      label: Code Sample
+      description: Please provide a minimal code sample that reproduces the issue.
+      render: elixir
+      placeholder: |
+        # Minimal code to reproduce the bug
+        {:ok, action} = Jido.Action.new("test_action", TestAction, %{param: "value"})
+        result = Jido.Action.run(action, %{input: "test"})
+        # ... rest of the code
+    validations:
+      required: false
+
+  - type: textarea
+    id: error_output
+    attributes:
+      label: Error Output
+      description: If applicable, paste the full error message or stack trace.
+      render: shell
+      placeholder: Paste error output here...
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (logs, environment details, etc.).
+      placeholder: Any additional information...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched for existing issues that describe this bug
+          required: true
+        - label: I have tested this with the latest version of jido_action
+          required: true
+        - label: I have included all relevant information above
+          required: true
+        - label: I have reviewed the [Contributing Guidelines](./CONTRIBUTING.md)
+          required: true
