@@ -36,7 +36,10 @@ defmodule JidoWorkspace.MixProject do
       "ws.pull": ["workspace.pull"],
       "ws.push": ["workspace.push"],
       "ws.status": ["workspace.status"],
-      "ws.test": ["workspace.test.all"]
+      "ws.test": ["workspace.test.all"],
+      "ws.quality": ["workspace.quality"],
+      "ws.deps": ["workspace.deps"],
+      "ws.diff": ["workspace.diff"]
     ]
   end
 end

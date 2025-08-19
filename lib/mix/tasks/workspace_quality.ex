@@ -1,8 +1,8 @@
-defmodule Mix.Tasks.Workspace.Test.All do
+defmodule Mix.Tasks.Workspace.Quality do
   @moduledoc """
-  Run tests across all projects in the workspace.
+  Run quality checks (format, compile, dialyzer, credo) across all projects in the workspace.
   """
-  @shortdoc "Test all workspace projects"
+  @shortdoc "Run quality checks for all workspace projects"
 
   use Mix.Task
 
@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Workspace.Test.All do
     
     case args do
       [] ->
-        JidoWorkspace.Runner.run_task_all("test", [], continue_on_error: false)
+        JidoWorkspace.Runner.run_task_all("quality", [], continue_on_error: false)
 
       [project_name] ->
         projects = JidoWorkspace.config()
@@ -21,14 +21,14 @@ defmodule Mix.Tasks.Workspace.Test.All do
             IO.puts("Project '#{project_name}' not found")
             System.halt(1)
           project ->
-            case JidoWorkspace.Runner.run_task_single(project.path, "test") do
+            case JidoWorkspace.Runner.run_task_single(project.path, "quality") do
               :ok -> :ok
               {:error, {code, _}} -> System.halt(code)
             end
         end
 
       _ ->
-        IO.puts("Usage: mix workspace.test.all [project_name]")
+        IO.puts("Usage: mix workspace.quality [project_name]")
         System.halt(1)
     end
   end

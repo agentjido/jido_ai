@@ -1,21 +1,49 @@
 # JidoWorkspace
 
-**TODO: Add description**
+Git subtree-powered monorepo workspace manager for the Jido ecosystem.
 
-## Installation
+## Quick Start
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `jido_workspace` to your list of dependencies in `mix.exs`:
+```bash
+# Daily sync - pull all projects and compile
+mix morning
 
-```elixir
-def deps do
-  [
-    {:jido_workspace, "~> 0.1.0"}
-  ]
-end
+# Run tests across all projects  
+mix ws.test
+
+# Run quality checks across all projects
+mix ws.quality
+
+# Check dependencies across all projects
+mix ws.deps --check
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/jido_workspace>.
+## Workspace Management
+
+```bash
+mix workspace.pull              # Pull all projects
+mix workspace.pull <project>    # Pull specific project
+mix workspace.push <project>    # Push to upstream
+mix workspace.status            # Show workspace status
+mix workspace.add <name> <url>  # Add new project
+```
+
+## Development Setup
+
+**External developers** (default): Uses Hex packages automatically.
+
+**Workspace developers**: Set `JIDO_WORKSPACE=1` to use local dependencies:
+
+```bash
+export JIDO_WORKSPACE=1
+# or use direnv with .envrc
+```
+
+## Projects
+
+- **jido** - Core Jido library
+- **jido_action** - Composable action framework with AI integration  
+- **jido_signal** - Event-driven messaging and workflow system
+
+See [AGENTS.md](AGENTS.md) for detailed commands and architecture.
 
