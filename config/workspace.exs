@@ -36,6 +36,14 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/ash_jido"
+    },
+    %{
+      name: "jido_ai",
+      upstream_url: "git@github.com:agentjido/jido_ai.git",
+      branch: "refactor/models",
+      type: :library,
+      path: "projects/jido_ai"
     }
+
 
   ]
