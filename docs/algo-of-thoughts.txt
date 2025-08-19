@@ -1,0 +1,3903 @@
+Algorithm of Thoughts:
+Enhancing Exploration of Ideas in Large Language Models
+
+Bilgehan Sel 1 Ahmad Al-Tawaha 1 Vanshaj Khattar 1 Ruoxi Jia 1 Ming Jin 1
+
+Abstract
+
+code generation (Chen et al., 2021; Austin et al., 2021),
+and instruction following (Ouyang et al., 2022; Bai et al.,
+2022). While early models relied on direct answer strategies (Brown et al., 2020), contemporary research has shifted
+towards linear reasoning paths (Wei et al., 2022b; Kojima
+et al., 2022; Zhang et al., 2022) by breaking problems into
+sub-tasks for solution discovery, or harnesses external mechanisms to alter token generation by changing the context
+(Zhou et al., 2022a; Drozdov et al., 2022; Yao et al., 2023).
+
+arXiv:2308.10379v3 [cs.CL] 2 Jun 2024
+
+Current literature, aiming to surpass the “Chainof-Thought” approach, often resorts to external
+modi operandi involving halting, modifying, and
+then resuming the generation process to boost
+Large Language Models’ (LLMs) reasoning capacities. Due to their myopic perspective, they
+escalate the number of query requests, leading
+to increased costs, memory, and computational
+overheads. Addressing this, we propose the Algorithm of Thoughts—a novel strategy that propels LLMs through algorithmic reasoning pathways. By employing algorithmic examples fully
+in-context, this overarching view of the whole
+process exploits the innate recurrence dynamics
+of LLMs, expanding their idea exploration with
+merely one or a few queries. Our technique outperforms earlier single-query methods and even
+more recent multi-query strategies that employ
+an extensive tree search algorithms while using
+significantly fewer tokens. Intriguingly, our results suggest that instructing an LLM using an
+algorithm can lead to performance surpassing that
+of the algorithm itself, hinting at LLM’s inherent ability to weave its intuition into optimized
+searches. We probe into the underpinnings of our
+method’s efficacy and its nuances in application.
+The code and related content can be found in:
+algorithm-of-thoughts.github.io.
+
+Analogous to human cognition (Sloman, 1996; Kahneman,
+2011), early LLM strategies seemed to emulate the instantaneous System 1, characterized by its impulsive decisionmaking. In contrast, more recent methodologies like chainof-thought (CoT) (Wei et al., 2022b) and least-to-most
+prompting (L2M) (Zhou et al., 2022a; Drozdov et al., 2022)
+reflect the analytical nature of System 2. Notably, integrating intermediary reasoning steps has yielded improvements
+in arithmetic reasoning tasks (Srivastava et al., 2022; Liang
+et al., 2022).
+However, as tasks shift towards deeper planning and extensive thought exploration, these methods appear restrictive.
+Although CoT integrated with Self-Consistency (CoT-SC)
+(Wang et al., 2022) enlists multiple LLM outputs for a consensus, the lack of meticulous evaluation can result in model
+misdirection. The “Tree of Thoughts” (Yao et al., 2023;
+Long, 2023) emerges as a notable solution. While one LLM
+is dedicated to idea generation, another steps in to assess
+the merit of these ideas, following a halting-assessmentresuming cycle. This iterative process, based on a tree
+search, has shown marked effectiveness, especially in tasks
+with a breadth of continuations. We see this progression
+as akin to humans employing tools to circumvent working
+memory limitations, serving as an external augmentation
+for LLMs (Mialon et al., 2023; Sel et al., 2023; Gu et al.,
+2024a).
+
+1. Introduction
+Recent developments in large language models (Chowdhery et al., 2022; Thoppilan et al., 2022; Liu et al., 2023,
+inter alia) have spotlighted their efficacy in general problem solving (Huang & Chang, 2022; Suzgun et al., 2022),
+
+On the flip side, this enhanced LLM approach is not without
+pitfalls. A prominent downside is the substantial surge in
+the number of queries and computational demands. Each
+query to online LLM APIs such as GPT-4—a focal point of
+our study—incurs a monetary expense (Chen et al., 2023)
+but also contributes to latency, a significant limitation especially critical in real-time applications. Cumulative de-
+
+1
+
+Department of Electrical and Computer Engineering, Virginia Tech, Blacksburg, USA. Correspondence to: Bilgehan Sel
+<bsel@vt.edu>.
+Proceedings of the 41 st International Conference on Machine
+Learning, Vienna, Austria. PMLR 235, 2024. Copyright 2024 by
+the author(s).
+
+1
+
+Algorithm of Thoughts
+
+Standard Prompting
+
+Algorithm of Thoughts
+
+Model Input
+
+Model Input
+
+U ser: 8 6 4 4
+Assistant:
+Answer: (4 + (8 - 6)) * 4 = 24.
+
+U ser: 8 6 4 4
+Assistant:
+1. 4 - 4: (left: 8, 6, 0)
+.
+.
+.
+3. 8 - 6: (left: 4, 4, 2)
+- 4 + 4: (left: 8, 2) 10, 6, 16, 4
+- 4 - 4: (left: 2, 0) 2, 2, 0, undefined
+- 4 * 4: (left: 16, 2) 18, 14, 32, 8
+- 4 / 4: (left: 2, 1) 3, 1, 2, 2
+- 4 + 2: (left: 6, 4) 10, 2, 24 = 6 * 4 -> found it!
+Answer: (4 + (8 - 6)) * 4 = 24.
+
+U ser:
+
+11 10 5 1
+
+Model Output
+Assistant:
+Answer: (11 - 1) * (10 - 5) = 24
+
+Chain-of-Thought
+Model Input
+U ser: 8 6 4 4
+Assistant:
+8 - 6 = 2 (left: 4, 4, 2)
+4 + 2 = 6 (left: 6, 4)
+6 * 4 = 24
+Answer: (4 + (8 - 6)) * 4 = 24.
+U ser:
+
+U ser:
+
+11 10 5 1
+
+Model Output
+Assistant:
+1. 11 - 1: (left: 10, 10, 5)
+.
+.
+.
+5. 11 + 1: (left: 12, 10, 5)
+- 12 + 10: (left: 22, 5) 27, 17, 110, 4.4
+- 12 - 10: (left: 5, 2) 7, 3, 10, 2.5
+- 12 * 10: (left: 120, 5) 24 = 120 / 5 -> found it!
+Answer: ((11 + 1) * 10) / 5 = 24.
+
+11 10 5 1
+
+Model Output
+Assistant:
+11 - 10 = 1 (left: 1, 1, 5)
+1 * 1 = 1 (left: 1, 5)
+5 * 1 = 5 (left: 5)
+Answer: ((11 - 10) * 1) * 5 - 1 = 24.
+
+Figure 1. Comparison between standard prompting, CoT, and AoT in the game of 24. While standard prompting aims for a direct answer,
+CoT sketches out the successive steps to the final solution. AoT’s in-context example, distinct from CoT, integrates the search process,
+highlighted by markers ‘1’,..., ‘3’ as “first operations” guiding subtree exploration for the problem set ‘8 6 4 4’. For clarity, only a single
+in-context example is displayed, with a focus on the third subtree exploration. AoT produces prospective search steps (e.g., the subtree
+exploration ‘5. 11 + 1’) and evaluates potential subsequent steps to either progress towards a solution or retrace to another viable subtree.
+
+lays from these queries can compromise solution efficiency.
+Infrastructure-wise, continuous interactions can stress systems, leading to potential bandwidth constraints and reduced
+model availability (Aminabadi et al., 2022). Moreover, the
+environmental implications cannot be ignored; incessant
+querying escalates the energy consumption of already powerhungry data centers, exacerbating the carbon footprint (Wu
+et al., 2022; Dhar, 2020; Khattar & Jin, 2023).
+
+Gu et al., 2024b). Characterized by its methodical nature,
+the algorithmic perspective offers a path to keenly explore
+problem spaces, enact strategies, and formulate solutions
+(Al-Tawaha et al., 2021; Helie & Pizlo, 2022; Banerjee et al.,
+2022; Sel et al., 2022; Khattar et al., 2022). While much
+of the prevailing literature treats algorithms as external to
+LLMs (Lin et al.), given LLMs’ inherent generative recurrence, can we channel this iterative logic to internalize an
+algorithm?
+
+With this in mind, our goal was to dramatically reduce the
+query counts employed by contemporary multi-query reasoning methods while maintaining performance for tasks
+necessitating adept use of world knowledge, thereby steering a more responsible and proficient use of AI resources.
+Intriguingly, our aim has actually resulted in surpassing
+the performance of such techniques while requiring significantly fewer tokens for prompting and generation.
+
+Drawing upon both the intricate nuances of human reasoning and the disciplined precision of algorithmic methodologies, our work aims to fuse these two elements to enhance
+reasoning capabilities within LLMs. Existing research underscores that humans, when navigating complex problems,
+instinctively draw upon past efforts, ensuring a comprehensive contemplation rather than a narrow focus (Monsell,
+2003; Holyoak & Morrison, 2005; Baddeley, 2003). LLMs,
+with their generative span bounded only by token limits, appear poised to break through the barriers of human working
+memory. Spurred by this observation, we investigated if
+
+Reflecting on the evolution of LLMs from System 1 to System 2, an essential ingredient comes to light: algorithms
+(Sel et al., 2021; Al-Tawaha et al., 2023; Jin et al., 2023a;
+2
+
+Algorithm of Thoughts
+
+Input
+
+Input
+
+Input
+
+Input
+
+Output
+
+Output
+
+Output
+
+Output
+
+Standard Prompting
+
+Chain of Thoughts
+
+Tree of Thoughts
+
+Algorithm of Thoughts
+
+Figure 2. Illustration outlining various strategies for tackling reasoning problems with LLMs. Each box signifies a distinct thought,
+functioning as a unified string of words that forms an incremental pathway to reasoning. Green boxes indicate ideas deemed promising by
+the LLM, while red boxes represent less promising concepts.
+
+2. Related Work
+
+LLMs could mirror a similar layered exploration of ideas,
+referencing prior intermediate steps to sieve out infeasible
+options, all within their iterative generation cycle. And
+while humans excel with their intuitive insight, algorithms
+stand out with organized, systematic exploration. Current
+techniques, like CoT, often sidestep this synergistic potential, imposing undue pressure on LLMs for on-the-spot
+precision. By capitalizing on LLMs’ recursive capabilities,
+we emulate a hybrid human-algorithmic approach. This
+is achieved through our use of algorithmic examples that
+capture the essence of exploration, from initial candidates
+to validated solutions. Thus emerges our concept of the
+Algorithm of Thoughts (AoT), as illustrated in Figs. 1 and 2.
+
+Standard Prompting. Also known as input-output
+prompting, it provides a few input-output examples of the
+task before getting an answer for the test sample from the
+language model (Brown et al., 2020). Although this method
+is very general and does not need any special prompting
+strategy, the performance is also worse compared to more
+advanced methods (Shao et al., 2023; Wei et al., 2022a; Lyu
+et al., 2023).
+Chain-of-Thought. In CoT, LLMs are presented with examples where a given question x unfolds through a chain
+of intermediate reasoning pieces c1 , . . . , cn to reach an answer y, represented as x → c1 → . . . → cn → y (Wei
+et al., 2022b; Lyu et al., 2023). By mimicking the examples
+in the context, the LLM automatically divides the solution
+into simpler linear steps to arrive at the answer, improving
+performance across numerous reasoning benchmarks. Selfconsistency (Wang et al., 2022) is a widely used decoding
+strategy aimed at generating a variety of reasoning paths by
+choosing the final answer through a majority vote, though
+this necessitates additional generations. CoT can be further
+improved with integrating detailed algorithmic reasoning
+(Zhou et al., 2022b). We also utilize algorithmic examples
+in AoT, however, they are for emerging the inherent heuristic of LLMs to lead the search and not designed to follow a
+specified pseudocode, or are on language tasks, e.g., creative
+writing. Contrary to CoT’s linear progression, our approach
+pivots towards the explorative aspect of LLMs. We reconceptualize the c1 , . . . , cn sequence, not merely as successive
+steps towards a solution, but as a dynamic, potentially mutable path that resembles an algorithmic search, allowing for
+exploration, recalibration, and non-linear progression.
+
+More broadly, our approach signifies a new paradigm of
+in-context learning. Instead of the traditional “supervisedlearning” mold of [ PROBLEM , SOLUTION ] or [ PROBLEM ,
+SUCCESSIVE STEPS TO SOLUTION ], we present a new
+structure that covers [ PROBLEM , SEARCH PROCESS , SO LUTION ]. Naturally, when instructing an LLM using an
+algorithm, the anticipation leans towards the LLM simply
+imitating the algorithm’s iterative thinking. However, what
+emerges as intriguing is the LLM’s ability to infuse its own
+“intuition” to achieve a search efficiency that even surpasses
+the algorithm itself (see Fig. 5).
+In the subsequent sections, we first situate our work within
+the existing literature, followed by a discussion of our principal idea. We then present our experimental results and probe
+a series of hypotheses related to this emerging capability of
+LLM before rounding off with a conclusion.
+
+3
+
+Algorithm of Thoughts
+
+Least-to-Most prompting (L2M). Taking cues from educational psychology (Libby et al., 2008), L2M prompting
+directs the LLM to decompose the central problem into
+smaller subproblems. Each subproblem is tackled in sequence, with the outcome appended before progressing to
+the next (Zhou et al., 2022a; Drozdov et al., 2022). While
+this structured delineation is beneficial for broader generalization, it operates on the premise of finding a nearly
+perfect decomposition in a single attempt—ideal for problems with a clear-cut structure. Yet, when tasks intertwine
+with their decomposition complexities (like games of 24),
+this method’s inflexibility becomes apparent. Contrastingly,
+AoT not only underscores the active subproblem (as shown
+in Fig. 1), but also permits a more contemplative approach
+by entertaining various options for each subproblem, while
+maintaining efficacy even with minimal prompts.
+
+those outputs over generating the appropriate questions. To
+shed light on this phenomenon, we designed an experiment.
+
+Probability of Correct Token
+
+Querying text-davinci-003 for arithmetic tasks (e.g., ‘11 −
+2 =’), we prefixed them with multiple in-context equations
+converging to an identical output (e.g. ‘15−5 = 10, 8+2 =
+10’). Our results, presented in Fig. 3, reveal a steep decline
+in accuracy, suggesting that the mere presence of correct
+reasoning in the context might inadvertently compromise
+even basic arithmetic skills.
+
+Tree of Thoughts (ToT). In the cases where each subproblem has multiple viable options to explore, linear reasoning
+paths from CoT or L2M substantially limit the coverage of
+the thought space. Considering possible options for each
+subproblem, the decision tree can be explored by external
+tree-search mechanisms (e.g., BFS, DFS) (Yao et al., 2023;
+Jin et al., 2023b; Sel et al., 2024). Evaluation capabilities
+of LLMs can also be used to direct the search by pruning
+nodes that are hopeless to increase efficiency. However, ToT,
+due to its requirement for multiple queries to the LLM for
+a solution, demands significantly more computation than
+AoT. Additionally, it necessitates evaluating the potential
+of each search node in the in-context examples and writing
+specialized functions to extract information from model responses to maintain the tree structure externally. In stark
+contrast, AoT requires just a single prompt and no coding
+skills, greatly democratizing LLM use for complex problems.
+
+1.0
+0.8
+0.6
+0.4
+0.2
+0.00.0
+
+2.5
+
+5.0
+
+7.5
+
+10.0 12.5
+
+# of Equations
+
+Figure 3. The probability of generating the correct token as we add
+more in-context examples that are correct but possess identical
+outputs.
+
+3. Algorithm of Thoughts
+
+To offset this bias, diversifying the outputs of examples
+might seem like a viable solution, but this could subtly skew
+the distribution of outputs. Merely adding unsuccessful
+trials, much like a random search, might inadvertently encourage the model to retry rather than truly solve. Capturing
+the true essence of algorithmic behavior, where both failed
+searches and subsequent recovering and learning from such
+attempts play a role, we incorporate in-context examples
+patterned after search algorithms, notably depth-first search
+(DFS) and breadth-first search (BFS). See Fig. 1 for an
+example.
+
+Our strategy pivots on recognizing a core shortcoming of
+current in-context learning paradigms. CoT, while enhancing the coherency of thought linkages leading to solutions,
+occasionally falters, presenting incorrect intermediate steps
+(Zelikman et al., 2022; Turpin et al., 2023; Lanham et al.,
+2023). Faithful CoT (Lyu et al., 2023) ought to amend this
+by eliciting symbolic chains of reasoning where the LLM’s
+output resembles task-specific pseudo-code, primed for deterministic execution like Python. The intention is only to
+use the thought processes but not the outputs and inputs
+of each link since they have a tendency to be unreliable.
+But, the occasional missteps of CoT may not necessarily be
+due to the LLM’s inability to compute correctly. The LLM,
+when confronted with questions that closely match conditions of previous in-context examples, may favor echoing
+
+This paper focuses on a broad class of tasks reminiscent
+of tree-search problems. These tasks necessitate breaking
+down the main problem, crafting feasible solutions for each
+segment, and making decisions on the paths to either pursue
+or forsake, with the option of reevaluating more promising
+segmentations. Rather than posing separate queries for
+every subset, we leverage the iterative capabilities of the
+LLM to address them in one unified generation sweep. By
+confining ourselves to one or two LLM interactions, this
+approach naturally incorporates insights from antecedent
+context candidates and tackles intricate issues requiring an
+in-depth exploration of the solution domain. We also give
+insights into how small or big those thoughts should be
+and what type of in-context examples should be given to
+the LLM to promote token efficiency. Subsequently, we
+4
+
+Algorithm of Thoughts
+
+3. Evaluating the Promise of a Subproblem. Existing
+techniques lean on additional prompting to discern the potential of tree nodes, aiding decisions regarding exploration
+direction. Our observations suggest that if the most promising routes are encapsulated within the in-context examples,
+LLMs inherently gravitate towards prioritizing those promising candidates. This diminishes the need for intricate prompt
+engineering and allows the incorporation of intricate heuristics, whether intuitive or knowledge-driven. Again, the
+absence of disjoint prompts in our approach allows for an
+immediate assessment of candidate viability in the same
+generation.
+
+outline key components of tree-search algorithms and their
+manifestation in our framework.
+1. Dividing the search into steps. Similar to creating stepby-step solutions in CoT or L2M, we also need to identify
+intermediate search layers. This is akin to creating examples for CoT, especially for tree-search problems, where
+the correct reasoning path resembles a CoT solution. The
+challenge lies in selecting the right chain from numerous
+candidates at each layer to reach the final answer. Thus, our
+focus will be more on generating the search process for incontext examples rather than how to solve each subproblem
+after selecting the next chain.
+
+4. Backtracking to a More Promising Node. The decision of which node to explore next (including retracing to a
+prior node) inherently depends on the selected tree-search
+algorithm. While previous studies (Yao et al., 2023) have
+employed external means, such as coded mechanisms for the
+search process, this restricts its broader appeal and entails
+additional customization. Our designs predominantly adopt
+a DFS approach supplemented by pruning. The aim is to
+maintain proximity between nodes sharing the same parent,
+thereby encouraging the LLM to prioritize local over distant
+features. Additionally, we present performance metrics for
+the AoT approach grounded in BFS. Our reliance on the
+model’s inherent capacity to glean insights from in-context
+examples obviates the necessity for additional mechanisms.
+
+Text Completion
+
+The first five prime numbers:
+2, 3, 5, 7, 11
+probabilities for the first
+token
+
+2 = 87.6%
+1 = 12.3%
+...
+...
+
+Figure 4. An example highlighting the drawback of isolated sampling of sequenced ideas. Input is denoted in blue, with the textdavinci-003 providing the green completions.
+
+2. Proposing Solutions to Subproblems. A dominant
+approach in existing works involves direct sampling from
+LLM token output probabilities (Wang et al., 2022; Yao
+et al., 2023). Though effective for one-off answers (Kadavath et al., 2022) , this method falls short in scenarios
+demanding a sequence of samples to be integrated or evaluated within subsequent prompts (Robinson & Wingate,
+2022). To minimize model queries, we adopt an uninterrupted solution-creation process. Here, we directly and continuously generate solutions for the prevailing subproblem
+without any generation pauses.
+
+Expressiveness of LLMs with AoT. Recent works have
+investigated the expressivity of transformers with standard
+and CoT prompting (Chiang et al., 2023; Schuurmans, 2023;
+Merrill & Sabharwal, 2023; Feng et al., 2023). We provide
+the following theoretical result for AoT, which implies that
+it can tackle NP problems, extending from P problems that
+of COT’s.
+Corollary 3.1 (Informal). Consider TIME(an ) as the class
+of problems for which a Turing machine exists that operates
+within a time complexity of O(an ) for some a ≥ 1. If a
+transformer can generate an intermediate tokens to solve
+the problem when prompted by AoT, we have
+
+The benefits are three-fold. First, with all generated solutions existing within a shared context, there is no need for
+individual model queries for each solution evaluation. Second, while it may seem counterintuitive, isolated token or
+token group probabilities might not always yield meaningful
+choices. A simple illustration is found in Fig. 4. When evaluated independently, the second-most probable token for
+our inaugural number is ‘1’—not qualifying as prime. But,
+when generation remains unbroken, the derived sequence is
+correct. This incongruence points towards the restrictive nature of the Markov property in sequence modeling. Core to
+our perspective is the premise that for sequential tasks like
+algorithmic search, LLMs are more adept at generating entire sequences than intermittently pausing and re-initiating
+the token sampling process.
+
+TIME(an ) ⊆ AOT(n),
+
+(1)
+
+where AOT(n) refers to the decoding steps by AoT when
+the input has n tokens.
+The proof of the above corollary is given in the appendix.
+
+4. Experiments
+We show that AoT surpasses the performance of other singleprompt methods (e.g., standard, CoT/-SC prompting) and
+even that of strategies utilizing external mechanisms, such
+as ToT, across the benchmarks we tested. We present the
+5
+
+Algorithm of Thoughts
+
+results for the creative writing task in the appendix. In addition, we show that AoT continues to have an advantage
+over standard prompting or CoT even after fine-tuning. This
+implies that the issue with LLMs is not simply a minor
+misalignment or a deficiency in domain expertise. Rather,
+it underscores the necessity of AoT prompting. This approach is vital because the nature of the tasks we evaluated
+inherently demands a thorough exploration of solution paths,
+a requirement that goes beyond simple fine-tuning adjustments. For the generation of in-context examples, we have
+asked the authors to write down their search process and
+randomly chosen from that list. We have written them again
+in a simple structured way to have uniformity between the
+examples to create our AoT prompts. More details regarding this process for each task is given in the AoT setup
+subsections.
+
+ing of these three numbers culminates in 19 leaf nodes, all
+visible under the ‘3’ subtree in Fig. 1. In order to generate
+our in-context examples, we have randomly selected games
+that do not appear at test time. We asked the authors to write
+the search steps they used until they arrived at the answers.
+These are exactly the node selection, node expansion steps
+with inherent heuristics of the individuals. Then, we have
+selected randomly from these solutions and written them
+in a trivial structured way to assure uniformity between
+the examples. The exact prompts we use are given in the
+Prompts section under the ‘AoT (DFS)’ subsection in the
+appendix. We aim to assess two aspects: the ability of the
+LLM to pinpoint promising first operations, which directly
+impacts the number of resolved leaf nodes, and its performance against a conventional DFS. Details on the prompts
+are provided in the appendix. As our method emphasizes
+sequential generation over trajectory sampling, we operate
+with a temperature setting of 0.
+
+4.1. Game of 24
+The game of 24 is a mathematical card game in which
+players are given four numbers and must use addition, subtraction, multiplication, and division (each operation can be
+used more than once) to manipulate those numbers to reach
+a total of 24. For instance, for the numbers ‘8 8 5 4’, one
+solution could be ‘8 ∗ (5 − (8/4)) = 24’. At first glance,
+the game might appear straightforward. However, a cursory calculation suggests there are nearly 13,000 distinct
+expressions possible for any set of four numbers, making it
+a formidable challenge for present-day LLMs.
+
+Results. From Table 1, it is evident that standard prompting combined with CoT/-SC significantly lags behind tree
+search methods when used with LLMs. The “Standard +
+Refine” result, showing a 27% success rate, is referenced
+from (Yao et al., 2023). This method involves iteratively
+asking the LLM (up to 10 iterations) to refine its answer if
+the initial one is incorrect. Meanwhile, ToT is limited to a
+maximum of 100 node visits, translating to several hundred
+LLM queries for each example. Remarkably, AoT achieves
+its results with just a single query! Despite reducing the
+number of requests by more than a factor of 100, AoT still
+outperforms ToT in this task. Furthermore, AoT is also
+more efficient than ToT in terms of the total number of
+prompt tokens given to the LLM and the completion tokens
+it generates.
+
+Task Setup. Adhering to the setup detailed in (Yao et al.,
+2023), we use games from indices 901-1000, sourced from
+the 1362 games ranked by relative difficulty at 4nums.com.
+An attempt is considered successful if it is able to reach a
+total of 24 using the exact numbers provided and only the
+allowed operations.
+
+Method
+I/O
+CoT
+CoT-SC
+I/O + Refine
+ToT (b = 5)
+AoT (ours)
+
+Baselines. Standard prompting and CoT are used in the 5shot setting, with CoT integrating 3 steps for the operations.
+These methods are sampled 100 times, and the averaged
+success rates from these samples are reported. CoT-SC is
+also tested with 100 votes in our setup. For ToT, we use a
+breadth of 5.
+
+Success
+7.3%
+4.0%
+9.0%
+27%
+69%
+71%
+
+Queries
+1
+1
+100
+10
+109.1
+1
+
+PTs
+164
+421
+42,100
+458
+13,900
+5,450
+
+CTs
+18
+46.2
+4,620
+360
+5,500
+998.4
+
+Table 1. Game of 24: success rates and the average number of
+LLM queries for each example. We give the average query count,
+prompt tokens (PT), and completion tokens generated by the LLM
+(CT).
+
+AoT Setup. We employ the same 5-shot setting as in standard prompting and CoT baseline setup. Our in-context
+samples leverage a DFS-style search algorithm, which is the
+same version used when contrasting with traditional DFS
+in Fig. 5. During each subtree exploration, dubbed either
+the ‘first step’ or ‘first operation’, we choose two numbers—
+illustrated by the selection of 8 and 6 in the third ’first step’
+(i.e., subtree labeled ‘3’) of Fig. 1—and a corresponding operation (e.g., 8 − 6). This operation results in a new number,
+2, leaving us with three numbers in total. A thorough comb-
+
+Error Analysis. Using a strictly LLM-centric approach—
+eschewing any external tooling or edits—we sought to categorize mistakes observed during the game of 24. This aids
+in highlighting areas for refinement when solely deploying LLMs. We’ve classified these errors into four distinct
+6
+
+Algorithm of Thoughts
+
+categories: 1) Out-of-token error: The LLM reaches its
+maximum token threshold without identifying a solution.
+2) Expression misstep: The LLM has the correct logic or
+steps but fails when trying to express or formulate them
+into a coherent answer. 3) Non-finalization error: The LLM
+discovers the solution but continues its search without consolidating the finding. 4) Other errors: This umbrella term
+encompasses other mistakes like computational errors that
+result in overlooking the solution or furnishing incorrect
+answers. To exclusively showcase the AoT’s search capabilities, we also present the AoT + Manual Resolution version.
+Here, once the LLM pinpoints a solution, its final articulation is manually processed—a strategy also employed by
+the ToT method. As evidenced in Table 2, a notable 7%
+of mistakes stem from non-algorithmic factors like nonfinalization and expression missteps. In fact, with manual
+resolution, AoT attains a 78% success rate, surpassing ToT.
+This underlines the potential for refining our prompt, especially in areas concerning recognizing and expressing
+successful problem resolutions. Additionally, the token limitation underscores the appeal of expanding the generative
+context window, which may further bolster LLMs’ recursive
+reasoning when engaged with algorithmic examples.
+Error Type
+Out-of-token error
+Expression misstep
+Non-finalization error
+Others
+Method
+ToT
+AoT
+AoT + Manual Resolution
+
+Baselines. As done in the game of 24, we benchmark our
+method against established techniques: standard prompting,
+CoT, and ToT. For standard prompting, we provide both
+the crosswords and their respective solutions as in-context
+examples. CoT augments this by prompting the retrieval
+of words for each of the ten clues—equally split between
+horizontal and vertical orientations. We directly extract the
+success rates of ToT from their paper for comparison.
+AoT Setup. We divide the process into two steps, each
+involving a query. Initially, we task the LLM with suggesting five potential words for each row and column. We then
+pinpoint the starting word candidates that have the highest
+compatibility with other words within the crossword framework. This preliminary phase mirrors a ’warm-up’ sequence
+in algorithm initialization. In the subsequent step, we exclusively leverage the LLM’s algorithmic reasoning prowess,
+starting with the pre-selected word. The method involves
+cyclically choosing a likely option for insertion, generating
+candidate words, and assessing their compatibility with the
+words already on the board. If no match is found, the process shifts focus to another promising candidate. Otherwise,
+the word is added to the crossword, and the search continues.
+The cycle concludes either when the board is fully populated
+or no more suitable words can be found, which may be due
+to either incorrect existing words or the absence of matching words. Notably, this entire process unfolds within a
+single-generation window. The algorithmic examples in our
+prompt (detailed in the Appendix) include three that achieve
+game completion and two that predominantly populate the
+crossword, filling 8 or 9 slots.
+
+Error
+9%
+4%
+3%
+13%
+Success
+69%
+71%
+78%
+
+Results. Table 3 underscores AoT’s proficiency in the
+mini crosswords task, showcasing a word success rate—a
+measure used in existing studies to represent the percentage
+of words correctly completed out of the total—that surpasses
+earlier methods reliant on various prompting techniques. It
+also outperforms ToT. An important observation is the sheer
+volume of queries ToT employs, exceeding AoT’s by over a
+factor of 100. AoT also enjoys 25x reduction in total tokens
+required compared to ToT, a benefit of having everything
+in-context.
+
+Table 2. Game of 24: AoT error analysis.
+
+4.2. Mini Crosswords
+The 5×5 mini crossword is a compact word puzzle featuring
+a grid of 25 squares arranged in a 5-by-5 configuration.
+Players are tasked with filling the grid based on provided
+clues for each word. Clues are given for words that run both
+across (horizontally) and down (vertically). Words intersect
+at certain letters, offering additional hints to complete the
+puzzle.
+
+Method
+I/O
+CoT-SC
+ToT
+AoT (ours)
+
+Task Setup. Adhering to the setup outlined in (Yao et al.,
+2023), we draw our prompts from games 136, 141, 146, 151,
+and 156 out of the 156 games available on goobix.com. Our
+testing focuses on a set of 20 games, specifically games 1,
+6, . . ., 91, and 96.
+
+W. Success
+14%
+15.6%
+46.5%
+52%
+
+Queries
+1
+1
+> 200
+2
+
+PTs
+790.3
+1,400
+96,700
+3,800
+
+CTs
+30.5
+1,600
+21.8k
+975.6
+
+Table 3. 5 × 5 mini crosswords word: word success rates and the
+average number of LLM queries for each example. We give the
+average query count, prompt tokens (PT), and completion tokens
+generated by the LLM (CT).
+
+7
+
+Algorithm of Thoughts
+
+Error Analysis. To understand the prevalent mistakes
+made by AoT, we’ve categorized the errors into four distinct
+categories. In our analysis for each game, we focus on the
+initial error the LLM produces while charting its reasoning
+path, given that an early error typically cascades into subsequent failures. 1) No preselections: LLM fails to generate
+compatible words essential for the warm-start phase. Given
+a correctly preselected word, the second phase for recursive reasoning can exhibit errors including: 2) Expression
+misstep: The LLM mistakenly believes it has exhausted all
+choices and jumps to an answer prematurely. 3) Incorrect
+pattern extraction: The LLM wrongly extracts a pattern
+based on the current board layout. 4) Erroneous word placement: Despite recognizing the correct pattern, the LLM
+selects a mismatched word or misses better-fitting alternatives. Navigating the crossword complexity arises from
+outdated terms and esoteric references. Predominantly, the
+errors observed are due to misguided word placements followed by pattern misinterpretations. Also, the LLM seems
+challenged in aligning letters at precise indices to create
+word structures— an obstacle circumvented by an external
+mechanism in the ToT framework.
+
+w/o finetuning
+3%
+3%
+
+w/ finetuning
+12%
+63%
+
+Table 5. AoT’s advantage continues even after finetuning. Finetuning results on the Game of 24 on 900 examples with CoT and AoT
+prompting.
+
+5. Discussion
+In this section, we delve into crucial aspects to consider
+when crafting prompts for AoT, using the game of 24 as our
+primary case study.
+Can AoT surpass the DFS it is patterned after? A core
+query of ours is to ascertain if the LLM has the capability to not only mirror but also outdo the efficiency of the
+algorithm introduced in-context. As evidenced in Fig. 5,
+AoT systematically navigates fewer nodes than its DFS
+counterpart. While DFS employs a uniform strategy when
+choosing the subsequent subtree to investigate, AoT’s LLM
+integrates its inherent heuristic. This amplification over
+the base algorithm exemplifies the advantages of LLM’s
+recursive reasoning capability.
+
+Error
+15.8%
+5.3%
+26.3%
+52.6%
+
+20
+16
+
+# of Games
+
+Error Type
+No preselections
+Expression misstep
+Incorrect pattern extraction
+Erroneous word placement
+
+Method
+CoT
+AoT
+
+12
+
+Table 4. Breakdown of errors in 5 × 5 mini crosswords with AoT.
+Numbers indicate the relative percentage of each error type among
+all errors.
+
+8
+
+DFS
+AoT
+
+4
+00
+
+200
+
+400
+
+600
+
+800
+
+# of Visited Nodes
+
+1000
+
+Figure 5. Histogram showing the number of visited nodes for AoT
+and DFS in the Game of 24.
+
+4.3. Finetuning
+In order to eliminate the possibility that prior experiments
+lacked domain knowledge or were misaligned with the task,
+even after few-shot prompting via standard prompting or
+CoT, we also finetuned GPT-3.5-Turbo using OpenAI’s API
+with 900 examples with CoT and AoT. In Table 5, we can
+see that although GPT-3.5-Turbo had similar solution rates
+for the Game of 24 with CoT and AoT, AoT fine-tuning
+improved the model by 60% compared to 8% for CoT. This
+shows that fine-tuning alone cannot emerge implicit nonlinear thinking, and LLMs still require explicit exploration
+of possible options to arrive at a solution. This is similar
+to chess grandmasters being able to find better moves than
+others even when they play without thinking deeply. However, to find the truly great moves, they are also required to
+deliberately explore the possibility of space.
+
+How does the search step count within the algorithmic
+example modulate AoT’s behavior? We begin with the
+standard AoT prompt and modify the subtree explorations.
+In AoT (Short), each in-context example uses one or two
+steps to reach a solution, while AoT (Long) incorporates
+three to five extra subtree explorations. The impact on
+total search steps is illustrated in Fig. 6. Our observations
+highlight longer generations for AoT (Long) and shorter
+ones for AoT (Short) relative to the original AoT. This
+suggests that the search step count introduces an implicit
+bias on the LLM’s search velocity. Notably, even when
+navigating incorrect steps, it’s essential to emphasize the
+exploration of promising directions.
+8
+
+Algorithm of Thoughts
+
+# of Games
+
+100
+
+Problem
+I/O
+CoT
+AoT
+
+80
+60
+
+AoT (Short)
+AoT
+AoT (Long)
+
+40
+20
+00
+
+100
+
+200
+
+300
+
+# of Visited Nodes
+
+400
+
+Pro benefit significantly. We were unable to run Gemini 1.5
+Pro on CoT-SC due to API access not being available yet.
+Please refer to Table 8 for detailed results.
+Method
+IO
+CoT-SC
+AoT
+
+Can AoT be used for question-answering tasks? To
+answer this question, we have followed the same structure
+to the Creative Writing task (given in the appendix of our
+paper) to evaluate AoT and the baselines on the first 100
+questions of well-known GSM8K and StrategyQA benchmarks. Briefly, we implemented a zero-shot AoT prompt
+for StrategyQA and GSM8K that proposes 3 strategies and
+expands them with detail to select the best one. As seen in
+Table 6, we see a slight boost on this task due to GPT-4 with
+CoT already being competent.
+GSM8K
+51%
+86%
+90%
+89%
+
+Edit Distance
+61%
+64%
+90%
+
+Table 7. Performance comparison of AoT with traditional dynamic
+programming methods on solving Coin Change and Edit Distance
+problems.
+
+Figure 6. Comparison of AoT with shorter and longer in-context
+examples prompted AoT versions: cumulative number of games
+for the number of visited nodes.
+
+Method
+IO
+CoT
+ToT
+AoT
+
+Coin Change
+72%
+76%
+96%
+
+GPT-4
+7%
+9%
+71%
+
+Claude 3
+6%
+9%
+68%
+
+Gemini 1.5 Pro
+6%
+55%
+
+Table 8. Additional language model results for the AoT, CoT-SC,
+and IO methods across different models.
+
+6. Conclusion
+This paper presents the Algorithm of Thoughts, a pioneering prompting strategy to navigate reasoning pathways in
+LLMs using minimal queries. Our findings reveal that this
+method not only substantially surpasses prior single-query
+techniques but also outperforms external tree-search implementations. Such an approach augments the potential to
+streamline idea discovery in LLMs, balancing both cost and
+computational demands. Future work includes designing
+token-efficient algorithmic examples, developing adaptive
+mechanisms for “tunnel-vision” activation to expedite the
+search, and deepening the understanding of this fresh mode
+of in-context learning from theoretical angles.
+
+StrategyQA
+73%
+82%
+83%
+84%
+
+Table 6. Performance comparison of different methods on questionanswer tasks using GSM8K and StrategyQA benchmarks. The
+AoT model shows competitive performance, especially when compared with the CoT and ToT methods.
+
+Can AoT work as other dynamic programming methods? We have also tested AoT and the baselines on the
+traditional dynamic programming problems Coin Change
+and Edit Distance, where DFS and BFS have explosive complexities. However, another DP method named tabulation
+can more easily solve these problems. Since ToT cannot
+take the form of tabulation, and has to either DFS or BFS,
+we decided not to include those poor results to be fair. However, one can use a single leaf node with a CoT prompt to
+solve these problems. There, ToT’s performance can be
+considered the same as that of CoT’s. Please refer to Table
+7 for the detailed results.
+
+7. Limitations
+While AoT substantially cuts down on the number of queries
+relative to ToT, its resource demands exceed those of standard prompting and CoT, a consequence of its extensive
+exploration of ideas via token generation. Crafting tokenefficient algorithmic examples is one direction of future
+research. It is also pertinent to highlight that we conducted
+our tests exclusively with GPT-4. Though more costly than
+other LLMs, GPT-4’s advanced capabilities appear pivotal
+for AoT’s optimal functioning; models of lesser caliber
+might not yield comparable performance boosts from AoT.
+
+Can AoT help other SOTA LLMs? We investigate AoT
+for other SOTA LLMs, Claude 3 and Gemini 1.5 Pro, to
+see if it provides a significant boost for them as well on
+the game of 24. We see that both Claude 3 and Gemini 1.5
+9
+
+Algorithm of Thoughts
+
+Acknowledgments
+
+Advances in neural information processing systems, 33:
+1877–1901, 2020.
+
+This work was supported in part by the Amazon Research
+and Virginia Tech Initiative for Efficient and Robust Machine Learning and the National Science Foundation (Grants
+#2331775 and #2312794).
+
+Chen, L., Zaharia, M., and Zou, J. Frugalgpt: How to use
+large language models while reducing cost and improving
+performance. arXiv preprint arXiv:2305.05176, 2023.
+Chen, M., Tworek, J., Jun, H., Yuan, Q., Pinto, H. P. d. O.,
+Kaplan, J., Edwards, H., Burda, Y., Joseph, N., Brockman,
+G., et al. Evaluating large language models trained on
+code. arXiv preprint arXiv:2107.03374, 2021.
+
+Impact Statement
+This paper presents work whose goal is to advance the field
+of Machine Learning. There are many potential societal
+consequences of our work, none which we feel must be
+specifically highlighted here.
+
+Chiang, D., Cholak, P., and Pillay, A. Tighter bounds on
+the expressivity of transformer encoders. arXiv preprint
+arXiv:2301.10743, 2023.
+
+References
+
+Chowdhery, A., Narang, S., Devlin, J., Bosma, M., Mishra,
+G., Roberts, A., Barham, P., Chung, H. W., Sutton, C.,
+Gehrmann, S., et al. Palm: Scaling language modeling
+with pathways. arXiv preprint arXiv:2204.02311, 2022.
+
+Al-Tawaha, A., Kaushik, H., Sel, B., Jia, R., and Jin, M.
+Decision-focused learning for inverse noncooperative
+games: Generalization bounds and convergence analysis.
+IFAC-PapersOnLine, 56(2):9336–9341, 2023.
+
+Dhar, P. The carbon impact of artificial intelligence. Nat.
+Mach. Intell., 2(8):423–425, 2020.
+
+Al-Tawaha, A. S., Aljanaideh, K., and Alshorman, A. A
+singular value thresholding algorithm for order estimation.
+In 2021 American Control Conference (ACC), pp. 4478–
+4483. IEEE, 2021.
+
+Drozdov, A., Schärli, N., Akyürek, E., Scales, N., Song, X.,
+Chen, X., Bousquet, O., and Zhou, D. Compositional Semantic Parsing with Large Language Models. September
+2022. URL https://openreview.net/forum?
+id=gJW8hSGBys8.
+
+Aminabadi, R. Y., Rajbhandari, S., Awan, A. A., Li, C.,
+Li, D., Zheng, E., Ruwase, O., Smith, S., Zhang, M.,
+Rasley, J., et al. Deepspeed-inference: enabling efficient
+inference of transformer models at unprecedented scale.
+In SC22: International Conference for High Performance
+Computing, Networking, Storage and Analysis, pp. 1–15.
+IEEE, 2022.
+
+Feng, G., Gu, Y., Zhang, B., Ye, H., He, D., and Wang, L.
+Towards revealing the mystery behind chain of thought: a
+theoretical perspective. arXiv preprint arXiv:2305.15408,
+2023.
+Gu, S., Sel, B., Ding, Y., Wang, L., Lin, Q., Jin, M., and
+Knoll, A. Balance reward and safety optimization for
+safe reinforcement learning: A perspective of gradient
+manipulation. In Proceedings of the AAAI Conference
+on Artificial Intelligence, volume 38, pp. 21099–21106,
+2024a.
+
+Austin, J., Odena, A., Nye, M., Bosma, M., Michalewski,
+H., Dohan, D., Jiang, E., Cai, C., Terry, M., Le, Q., et al.
+Program synthesis with large language models. arXiv
+preprint arXiv:2108.07732, 2021.
+Baddeley, A. Working memory: looking back and looking
+forward. Nature reviews neuroscience, 4(10):829–839,
+2003.
+
+Gu, S., Sel, B., Ding, Y., Wang, L., Lin, Q., Knoll, A., and
+Jin, M. Safe and balanced: A framework for constrained
+multi-objective reinforcement learning. arXiv preprint
+arXiv:2405.16390, 2024b.
+
+Bai, Y., Kadavath, S., Kundu, S., Askell, A., Kernion, J.,
+Jones, A., Chen, A., Goldie, A., Mirhoseini, A., McKinnon, C., et al. Constitutional ai: Harmlessness from ai
+feedback. arXiv preprint arXiv:2212.08073, 2022.
+
+Helie, S. and Pizlo, Z. When is psychology research useful
+in artificial intelligence? a case for reducing computational complexity in problem solving. Topics in Cognitive
+Science, 14(4):687–701, 2022.
+
+Banerjee, S., Bringsjord, S., Giancola, M., and Govindarajulu, N. S. Qualitative mechanical problem-solving by
+artificial agents:: Further progress, under psychometric
+ai. In The International FLAIRS Conference Proceedings,
+volume 35, 2022.
+
+Holyoak, K. J. and Morrison, R. G. The Cambridge handbook of thinking and reasoning. Cambridge University
+Press, 2005.
+
+Brown, T., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D.,
+Dhariwal, P., Neelakantan, A., Shyam, P., Sastry, G.,
+Askell, A., et al. Language models are few-shot learners.
+
+Huang, J. and Chang, K. C.-C. Towards reasoning in
+large language models: A survey. arXiv preprint
+arXiv:2212.10403, 2022.
+10
+
+Algorithm of Thoughts
+
+Jin, M., Khattar, V., Kaushik, H., Sel, B., and Jia, R. On
+solution functions of optimization: Universal approximation and covering number bounds. In Proceedings of the
+AAAI Conference on Artificial Intelligence, volume 37,
+pp. 8123–8131, 2023a.
+
+Long, J. Large language model guided tree-of-thought.
+arXiv preprint arXiv:2305.08291, 2023.
+Lyu, Q., Havaldar, S., Stein, A., Zhang, L., Rao, D., Wong,
+E., Apidianaki, M., and Callison-Burch, C. Faithful chainof-thought reasoning. arXiv preprint arXiv:2301.13379,
+2023.
+
+Jin, M., Sel, B., Hardeep, F., and Yin, W. A human-on-theloop optimization autoformalism approach for sustainability. arXiv preprint arXiv:2308.10380, 2023b.
+
+Merrill, W. and Sabharwal, A. The expresssive power
+of transformers with chain of thought. arXiv preprint
+arXiv:2310.07923, 2023.
+
+Kadavath, S., Conerly, T., Askell, A., Henighan, T., Drain,
+D., Perez, E., Schiefer, N., Hatfield-Dodds, Z., DasSarma,
+N., Tran-Johnson, E., et al. Language models (mostly)
+know what they know. arXiv preprint arXiv:2207.05221,
+2022.
+
+Mialon, G., Dessı̀, R., Lomeli, M., Nalmpantis, C., Pasunuru, R., Raileanu, R., Rozière, B., Schick, T., DwivediYu, J., Celikyilmaz, A., et al. Augmented language models: a survey. arXiv preprint arXiv:2302.07842, 2023.
+
+Kahneman, D. Thinking, fast and slow. macmillan, 2011.
+
+Monsell, S. Task switching. Trends in cognitive sciences, 7
+(3):134–140, 2003.
+
+Khattar, V. and Jin, M. Winning the citylearn challenge:
+adaptive optimization with evolutionary search under
+trajectory-based guidance. In Proceedings of the AAAI
+Conference on Artificial Intelligence, volume 37, pp.
+14286–14294, 2023.
+
+Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C.,
+Mishkin, P., Zhang, C., Agarwal, S., Slama, K., Ray, A.,
+et al. Training language models to follow instructions
+with human feedback. Advances in Neural Information
+Processing Systems, 35:27730–27744, 2022.
+
+Khattar, V., Ding, Y., Sel, B., Lavaei, J., and Jin, M. A
+cmdp-within-online framework for meta-safe reinforcement learning. In The Eleventh International Conference
+on Learning Representations, 2022.
+
+Robinson, J. and Wingate, D. Leveraging Large Language Models for Multiple Choice Question Answering. September 2022. URL https://openreview.
+net/forum?id=yKbprarjc5B.
+
+Kojima, T., Gu, S. S., Reid, M., Matsuo, Y., and Iwasawa,
+Y. Large language models are zero-shot reasoners. Advances in neural information processing systems, 35:
+22199–22213, 2022.
+
+Schuurmans, D. Memory augmented large language
+models are computationally universal. arXiv preprint
+arXiv:2301.04589, 2023.
+
+Lanham, T., Chen, A., Radhakrishnan, A., Steiner, B., Denison, C., Hernandez, D., Li, D., Durmus, E., Hubinger,
+E., Kernion, J., et al. Measuring faithfulness in chainof-thought reasoning. arXiv preprint arXiv:2307.13702,
+2023.
+
+Sel, A., Sel, B., and Kasnakoglu, C. Glsdc based parameter
+estimation algorithm for a pmsm model. Energies, 14(3):
+611, 2021.
+Sel, A., Sel, B., Coskun, U., and Kasnakoglu, C. Sosbased nonlinear observer design for simultaneous state
+and disturbance estimation designed for a pmsm model.
+Sustainability, 14(17):10650, 2022.
+
+Liang, P., Bommasani, R., Lee, T., Tsipras, D., Soylu, D.,
+Yasunaga, M., Zhang, Y., Narayanan, D., Wu, Y., Kumar,
+A., et al. Holistic evaluation of language models. arXiv
+preprint arXiv:2211.09110, 2022.
+
+Sel, B., Tawaha, A., Ding, Y., Jia, R., Ji, B., Lavaei, J.,
+and Jin, M. Learning-to-learn to guide random search:
+Derivative-free meta blackbox optimization on manifold.
+In Learning for Dynamics and Control Conference, pp.
+38–50. PMLR, 2023.
+
+Libby, M. E., Weiss, J. S., Bancroft, S., and Ahearn, W. H.
+A comparison of most-to-least and least-to-most prompting on the acquisition of solitary play skills. Behavior
+analysis in practice, 1:37–43, 2008.
+
+Sel, B., Shanmugasundaram, P., Kachuee, M., Zhou, K.,
+Jia, R., and Jin, M. Skin-in-the-game: Decision making
+via multi-stakeholder alignment in llms. arXiv preprint
+arXiv:2405.12933, 2024.
+
+Lin, T.-W., Khattar, V., Huang, Y., Hong, J., Jia, R., Liu,
+C.-C., Sangiovanni-Vincentelli, A., and Jin, M. Causalprompt: Enhancing llms with weakly supervised causal
+reasoning for robust per-formance in non-language tasks.
+
+Shao, Z., Gong, Y., Shen, Y., Huang, M., Duan, N., and
+Chen, W. Synthetic Prompting: Generating Chainof-Thought Demonstrations for Large Language Models. June 2023. URL https://openreview.net/
+forum?id=RYD1UMgTdk.
+
+Liu, Y., Han, T., Ma, S., Zhang, J., Yang, Y., Tian, J., He, H.,
+Li, A., He, M., Liu, Z., et al. Summary of chatgpt/gpt-4
+research and perspective towards the future of large language models. arXiv preprint arXiv:2304.01852, 2023.
+11
+
+Algorithm of Thoughts
+
+Sloman, S. A. The empirical case for two systems of reasoning. Psychological bulletin, 119(1):3, 1996.
+
+Zelikman, E., Wu, Y., Mu, J., and Goodman, N. Star: Bootstrapping reasoning with reasoning. Advances in Neural
+Information Processing Systems, 35:15476–15488, 2022.
+
+Srivastava, A., Rastogi, A., Rao, A., Shoeb, A. A. M., Abid,
+A., Fisch, A., Brown, A. R., Santoro, A., Gupta, A.,
+Garriga-Alonso, A., et al. Beyond the imitation game:
+Quantifying and extrapolating the capabilities of language
+models. arXiv preprint arXiv:2206.04615, 2022.
+
+Zhang, Z., Zhang, A., Li, M., and Smola, A. Automatic
+Chain of Thought Prompting in Large Language Models. September 2022. URL https://openreview.
+net/forum?id=5NTt8GFjUHkr.
+
+Suzgun, M., Scales, N., Schärli, N., Gehrmann, S., Tay,
+Y., Chung, H. W., Chowdhery, A., Le, Q. V., Chi, E. H.,
+Zhou, D., and Wei, J. Challenging BIG-Bench Tasks
+and Whether Chain-of-Thought Can Solve Them, October 2022. URL http://arxiv.org/abs/2210.
+09261. arXiv:2210.09261 [cs].
+
+Zhou, D., Schärli, N., Hou, L., Wei, J., Scales, N., Wang,
+X., Schuurmans, D., Cui, C., Bousquet, O., Le, Q. V.,
+and Chi, E. H. Least-to-Most Prompting Enables Complex Reasoning in Large Language Models. September
+2022a. URL https://openreview.net/forum?
+id=WZH7099tgfM.
+Zhou, H., Nova, A., Larochelle, H., Courville, A.,
+Neyshabur, B., and Sedghi, H. Teaching algorithmic reasoning via in-context learning. arXiv preprint
+arXiv:2211.09066, 2022b.
+
+Thoppilan, R., De Freitas, D., Hall, J., Shazeer, N., Kulshreshtha, A., Cheng, H.-T., Jin, A., Bos, T., Baker, L.,
+Du, Y., et al. Lamda: Language models for dialog applications. arXiv preprint arXiv:2201.08239, 2022.
+Turpin, M., Michael, J., Perez, E., and Bowman, S. R. Language models don’t always say what they think: Unfaithful explanations in chain-of-thought prompting. arXiv
+preprint arXiv:2305.04388, 2023.
+Wang, X., Wei, J., Schuurmans, D., Le, Q. V., Chi,
+E. H., Narang, S., Chowdhery, A., and Zhou, D. SelfConsistency Improves Chain of Thought Reasoning in
+Language Models. September 2022. URL https:
+//openreview.net/forum?id=1PL1NIMMrw.
+Wei, J., Tay, Y., Bommasani, R., Raffel, C., Zoph, B.,
+Borgeaud, S., Yogatama, D., Bosma, M., Zhou, D., Metzler, D., Chi, E. H., Hashimoto, T., Vinyals, O., Liang, P.,
+Dean, J., and Fedus, W. Emergent Abilities of Large Language Models, October 2022a. URL http://arxiv.
+org/abs/2206.07682. arXiv:2206.07682 [cs].
+Wei, J., Wang, X., Schuurmans, D., Bosma, M., Xia, F., Chi,
+E., Le, Q. V., Zhou, D., et al. Chain-of-thought prompting
+elicits reasoning in large language models. Advances in
+neural information processing systems, 35:24824–24837,
+2022b.
+Wu, C.-J., Raghavendra, R., Gupta, U., Acun, B., Ardalani,
+N., Maeng, K., Chang, G., Aga, F., Huang, J., Bai, C.,
+et al. Sustainable ai: Environmental implications, challenges and opportunities. Proceedings of Machine Learning and Systems, 4:795–813, 2022.
+Yao, S., Yu, D., Zhao, J., Shafran, I., Griffiths, T. L.,
+Cao, Y., and Narasimhan, K. Tree of Thoughts: Deliberate Problem Solving with Large Language Models,
+May 2023. URL http://arxiv.org/abs/2305.
+10601. arXiv:2305.10601 [cs].
+12
+
+Algorithm of Thoughts
+
+A. Game of 24 - Additional Details
+In order to avoid confusion in our analysis of AoT in the game of 24, we give additional details in terms of terminologies we
+use as well as their direct implications in the performance figures. An Illustration of these are given in Fig. 7.
+Input: 8 6 4 4
+
+4-4=8
+(left: 8, 6, 0)
+
+Subtree
+Exploration
+
+8-6=2
+
+4+2=6
+
+Visited Nodes
+
+(left: 6, 4)
+
+6 * 4 = 24
+(left: 24)
+
+First Operations
+
+(left: 4, 4, 2)
+
+...
+
+...
+
+6 + 4 = 10
+(left: 10)
+
+4/4=1
+(left: 2, 1)
+
+Second Operations
+
+Third Operations
+
+Figure 7. An illustration of terminologies we use for the game of 24. The yellow nodes represent the first operations and the states they
+lead to; the green node represents the node where we find the solution; all other nodes are represented by pink.
+
+First operations / First iterations. This represents the scenario that after we choose the first two number in the game of
+24, the case of either adding, subtracting, multiplying or dividing them.
+Subtree Exploration. This denotes searching all or most of the nodes coming from the same state, typically states with
+less than four numbers left.
+Number of nodes visited. This is the number of states that the method has been on the game of 24. Each state is the set of
+number we are left with, after our operations in the numbers. For example, after the first operation we might be left with the
+numbers ‘8 3 1’. This set of numbers represent a state, as well as the state of ‘8 3’ that we will be left with after another
+operation of ‘8 ∗ 1 = 8’.
+
+B. Creative Writing
+We use the creative writing task, also used by (Yao et al., 2023), where the LLM is provided with four arbitrary sentences.
+The objective is to craft a cohesive narrative divided into four paragraphs, with each paragraph culminating in one of the
+given sentences. This exercise not only fosters creativity but also emphasizes strategic deliberation.
+B.1. Task Setup
+Sentences are randomly sourced from randomwordgenerator.com, resulting in 100 distinct sets of inputs. Given the absence
+of predetermined correct answers, the primary focus lies in evaluating the coherence of the responses. We have noted
+that GPT-4 consistently aligns with these input guidelines. Evaluation is centered around assessing passage coherence
+using a GPT-4 zero-shot prompt, where each output is rated on a scale of 1 to 10. Each task response undergoes five such
+evaluations, with their scores being averaged subsequently.
+B.2. Baselines
+For this task, both standard and CoT prompts are employed without preliminary training. While the standard prompt directly
+guides the LLM to fashion a cohesive narrative based on stipulated parameters, the CoT prompt obliges the model to initially
+13
+
+Algorithm of Thoughts
+
+outline a succinct plan prior to drafting the narrative, serving as an intermediate cognitive bridge. For each task iteration,
+ten samples are generated using both the standard and CoT methods. Results of the ToT approach are presented without
+modification.
+B.3. AoT Setup
+Mirroring ToT’s methodology, the task is tackled in a zero-shot setting. Our prompt instructs the model to first formulate five
+distinct plans. Subsequent to this, the model selects the most promising among them to shape a narrative and then refines it
+for optimal coherence. The exact prompts used for this zero-shot approach will be provided in the subsequent section.
+B.4. Results
+As depicted in Fig. 8, AoT outpaces other singular query prompting techniques such as standard prompting and CoT in
+terms of performance. It also exhibits a marked improvement over ToT, although the difference is not statistically significant.
+Comprehensive scores, along with the average query count needed for each method, are consolidated in Table 9. Notably,
+AoT necessitates fewer queries compared to ToT.
+
+10
+8
+6
+4
+2
+0
+
+Standard CoT
+
+ToT
+
+AoT
+
+Figure 8. Comparison of the standard prompting, CoT, ToT and AoT on the creative writing task.
+
+Method
+Standard Prompting
+CoT
+ToT
+AoT
+
+Score
+6.19
+6.93
+7.56
+7.58
+
+Avg. Queries
+1
+1
+20
+1
+
+Table 9. Performance of the methods determined by GPT-4.
+
+C. CoT vs. Single Iteration AoT in the Game of 24
+To demonstrate that the tree search mechanism is fundamentally distinct from the CoT prompting, even in scenarios where
+AoT’s in-context examples include only a single initial operation in the game of 24, we draw a comparison between AoT
+(Short) and CoT. In this setup, AoT (Short) determines the first operation and subsequently conducts a tree search on the
+remaining three numbers. Interestingly, AoT (Short) achieves a success rate of 48%, while CoT lags significantly, securing
+only 4%. These results underscore the notion that even a rudimentary search mechanism can lead to significant performance
+enhancements.
+14
+
+Algorithm of Thoughts
+
+D. Detailed Analysis on the Effect of the Length of the Prompts
+In this section, we delve deeper into Fig. 6 by presenting histograms for the successful, unsuccessful, and total games of
+‘24’, considering the number of initial steps in methods AoT (Short), AoT, and AoT (Long). These are displayed in Figs.
+9-11.
+From these figures, it becomes evident that the length of the prompts, measured by the number of initial steps included in
+in-context examples, correlates with the length of their solutions to test examples. This trend is consistent across all three
+cases, suggesting that AoT’s strategy in determining the number of initial steps is influenced by its in-context examples.
+Interestingly, when AoT is provided a well-balanced set of initial steps that emphasize the most promising operations, it
+excels in solving the majority of games in earlier iterations. This indicates AoT’s capacity to prioritize swift problem-solving
+without sacrificing performance. This tendency is also observed in AoT (Long), albeit with a somewhat reduced success
+rate, as illustrated in Fig. 9.
+40
+
+# of Successful Games
+
+20
+0
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+12
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+12
+
+40
+20
+0
+40
+
+AoT (Short)
+AoT
+AoT (Long)
+
+20
+0
+
+0
+
+2
+
+4
+
+6
+
+# of First Steps
+
+8
+
+10
+
+12
+
+Figure 9. Histogram of the number of successful games with respect to the number of first steps for AoT (Short), AoT and AoT (Long).
+
+E. Proof of Corollary 3.1
+Corollary E.1. Consider TIME(an ) as the class of languages L for which a Turing machine exists that operates within a
+time complexity of O(an ) for some a ≥ 1. For a transformer generating O(an ) intermediate tokens with AoT, we have
+TIME(an ) ⊆ AOT(n),
+
+(2)
+
+where AOT(n) refers to the decoding steps by AoT when the input has n tokens.
+Proof. Since with AoT prompting, we can backtrack and continue from other nodes, the number of intermediate tokens
+scale exponentially with the depth of the problem over the number of possible actions in each leaf node. Then, directly by
+Theorem 2. in Merrill & Sabharwal (2023), we have the stated result implying the capability of solving NP problems with
+AoT prompting.
+
+F. Prompts
+F.1. Game of 24
+Below, we represent the specific prompts employed for the various methods detailed in the experiments section. It’s
+important to note that the terms “System”,“User”, and “Assistant” are utilized to denote the roles within the OpenAI API
+15
+
+Algorithm of Thoughts
+
+# of Unsuccessful Games
+
+40
+20
+0
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+12
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+12
+
+40
+20
+0
+40
+
+AoT (Short)
+AoT
+AoT (Long)
+
+20
+0
+
+0
+
+2
+
+4
+
+6
+
+# of First Steps
+
+8
+
+10
+
+12
+
+Figure 10. Histogram of the number of unsuccessful games with respect to the number of first steps for AoT (Short), AoT and AoT
+(Long).
+
+100
+
+# of All Games
+
+50
+0
+100
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+12
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+12
+
+50
+0
+100
+
+AoT (Short)
+AoT
+AoT (Long)
+
+50
+0
+
+0
+
+2
+
+4
+
+6
+
+# of First Steps
+
+8
+
+10
+
+12
+
+Figure 11. Histogram of the number of all games with respect to the number of first steps for AoT (Short), AoT and AoT (Long).
+
+when operating in chat completion mode. The line breaks serve to show the transitions between the user and assistant
+interactions within the API.
+AoT (DFS)
+System :
+Use numbers and b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) t o o b t a i n
+2 4 . When c o n s i d e r i n g t h e n e x t s t e p s , do n o t c h o o s e o p e r a t i o n s
+t h a t w i l l r e s u l t i n a n e g a t i v e o r f r a c t i o n a l number . I n o r d e r
+t o h e l p w i t h t h e c a l c u l a t i o n s , t h e numbers i n t h e p a r e n t h e s i s
+r e p r e s e n t t h e numbers t h a t a r e l e f t a f t e r t h e o p e r a t i o n s and
+16
+
+Algorithm of Thoughts
+
+they are in descending order .
+A n o t h e r t h i n g we do i s when t h e r e a r e o n l y two numbers l e f t i n t h e
+p a r e n t h e s i s , we c h e c k w h e t h e r we c a n a r r i v e a t 24 o n l y by
+u s i n g b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) . Some e x a m p l e s
+regarding this idea :
+( 2 1 2 ) no
+s i n c e 21 + 2 = 2 3 , 21 − 2 = 1 9 , 21 * 2 = 4 2 , 21 / 2 = 1 0 . 5 , none
+o f which i s e q u a l t o 2 4 .
+( 3 0 6 ) 30 − 6 = 24 y e s
+( 8 3 ) 8 * 3 = 24 y e s
+( 1 2 8 ) no
+( 4 8 2 ) 48 / 2 = 24 y e s
+Most i m p o r t a n t l y , do n o t g i v e up , a l l t h e numbers t h a t w i l l be
+given has indeed a s o l u t i o n .
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+14 8 8 2
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 8 + 2: (14 , 10 , 8)
+− 14 + 1 0 : ( 2 4 , 8 ) 3 2 , 1 6 , 1 9 2 , 3
+− 14 − 1 0 : ( 8 , 4 ) 1 2 , 8 , 3 2 , 2
+− 14 * 1 0 : ( 1 4 0 , 8 ) 1 4 8 , 1 3 2 , 1 1 2 0 , f r a c t i o n a l
+− 14 / 1 0 : ( 8 , 1 . 4 ) f r a c t i o n a l
+− 14 + 8 : ( 2 2 , 1 0 ) 3 2 , 1 2 , 2 2 0 , f r a c t i o n a l
+− 14 − 8 : ( 1 0 , 6 ) 1 6 , 4 , 6 0 , f r a c t i o n a l
+− 14 * 8 : ( 1 1 2 , 1 0 ) 1 2 2 , 1 0 2 , 1 1 2 0 , f r a c t i o n a l
+− 14 / 8 : f r a c t i o n a l
+− 10 + 8 : ( 1 8 , 1 4 ) 3 2 , 4 , 2 5 2 , f r a c t i o n a l
+− 10 − 8 : ( 1 4 , 2 ) 1 6 , 1 2 , 2 8 , 7
+− 10 * 8 : ( 8 0 , 1 4 ) 9 4 , 6 6 , b i g , f r a c t i o n a l
+− 10 / 8 : f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+2. 8 / 2: (14 , 8 , 4)
+− 14 + 8 : ( 2 2 , 4 ) 2 6 , 1 8 , 8 8 , f r a c t i o n a l
+− 14 − 8 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 / 2 = 4
+Step 2:
+14 − 8 = 6
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 1 4 − 8 ) * 4 = ( 1 4 − 8 ) * ( 8
+/ 2) = 24.
+answer : (14 − 8) * (8 / 2) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+9 5 5 5
+Assistant :
+Trying a promising f i r s t op era tio n :
+17
+
+Algorithm of Thoughts
+
+1. 9 − 5: (5 , 5 , 4)
+− 5 + 5: (10 , 4) 14 , 6 , 40 , f r a c t i o n a l
+− 5 − 5: (4 , 0) 4 , 4 , 0 , undefined
+− 5 * 5 : (25 , 4) 29 , 21 , 100 , f r a c t i o n a l
+− 5 / 5: (4 , 1) 5 , 3 , 4 , 4
+− 5 + 4: ( 9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+− 5 − 4: (5 , 1) 6 , 4 , 5 , 0.2
+− 5 * 4 : (20 , 5) 25 , 15 , 100 , f r a c t i o n a l
+− 5 / 4: f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+2. 5 + 5: (10 , 9 , 5)
+− 10 + 9 : ( 1 9 , 5 ) 24 = 19 + 5 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+5 + 5 = 10
+Step 2:
+10 + 9 = 19
+Step 3:
+19 + 5 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 19 + 5 = ( 1 0 + 9 ) + 5 = ( ( 5 + 5 ) +
+9) + 5 = 24.
+answer : ( ( 5 + 5) + 9) + 5 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+8 6 4 4
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 8 − 6: (4 , 4 , 2)
+− 4 + 4: ( 8 , 2) 10 , 6 , 16 , 4
+− 4 − 4: (2 , 0) 2 , 2 , 0 , undefined
+− 4 * 4: (16 , 2) 18 , 14 , 32 , 8
+− 4 / 4: (2 , 1) 3 , 1 , 2 , 2
+− 4 + 2 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 − 6 = 2
+Step 2:
+4 + 2 = 6
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 4 + 2 ) * 4 = ( 4 + ( 8 − 6 ) )
+* 4 = 24.
+answer : (4 + (8 − 6) ) * 4 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+13 10 9 4
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 13 − 4 : ( 1 0 , 9 , 9 )
+− 10 + 9 : ( 1 9 , 9 ) 2 8 , 1 0 , 1 7 1 , f r a c t i o n a l
+− 10 − 9 : ( 9 , 1 ) 1 0 , 8 , 9 , 9
+− 10 * 9 : ( 9 0 , 9 ) 9 9 , 8 1 , 8 1 0 , f r a c t i o n a l
+− 10 / 9 : f r a c t i o n a l
+18
+
+Algorithm of Thoughts
+
+− 9 +
+− 9 −
+− 9 *
+− 9 /
+
+9:
+9:
+9:
+9:
+
+(18 ,
+(10 ,
+(81 ,
+(10 ,
+
+10) 28 , 8 , 180 , f r a c t i o n a l
+0) 10 , 10 , 0 , undefined
+10) 91 , 71 , 810 , f r a c t i o n a l
+1 ) 1 1 , 9 , 1 0 , 10
+
+Trying another promising f i r s t op era tio n :
+2 . 10 − 4 : ( 1 3 , 9 , 6 )
+− 13 + 9 : ( 2 2 , 6 ) 2 8 , 1 6 , 1 3 2 , f r a c t i o n a l
+− 13 − 9 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+10 − 4 = 6
+Step 2:
+13 − 9 = 4
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = 6 * ( 1 3 − 9 ) = ( 1 0 − 4 ) *
+(13 − 9) = 24.
+answer : (10 − 4) * (13 − 9) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+8 8 5 4
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 8 − 4: (8 , 5 , 4)
+− 8 + 5: (13 , 4) 17 , 9 , 52 , f r a c t i o n a l
+− 8 − 5: ( 4 , 3) 7 , 1 , 12 , f r a c t i o n a l
+− 8 * 5 : (40 , 4) 44 , 36 , 160 , f r a c t i o n a l
+− 8 / 5: f r a c t i o n a l
+− 8 + 4: (12 , 5) 17 , 7 , 60 , f r a c t i o n a l
+− 8 − 4: ( 5 , 4) 9 , 1 , 20 , f r a c t i o n a l
+− 8 * 4 : (32 , 5) 37 , 27 , 160 , f r a c t i o n a l
+− 8 / 4: ( 5 , 2) 7 , 3 , 10 , 2.5
+− 5 + 4: ( 9 , 8) 17 , 1 , 72 , f r a c t i o n a l
+− 5 − 4: (8 , 1) 9 , 7 , 8 , 8
+− 5 * 4 : (20 , 8) 28 , 12 , 160 , f r a c t i o n a l
+− 5 / 4: f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+2. 8 / 4: (8 , 5 , 2)
+− 8 + 5: (13 , 2) 15 , 11 , 26 , f r a c t i o n a l
+− 8 − 5: (3 , 2) 5 , 1 , 6 , 1.5
+− 8 * 5 : ( 4 0 , 2 ) 4 2 , 3 8 , 8 0 , 20
+− 8 / 5: f r a c t i o n a l
+− 8 + 2: (10 , 5) 15 , 5 , 50 , 2
+− 8 − 2: ( 6 , 5) 11 , 1 , 30 , f r a c t i o n a l
+− 8 * 2: (16 , 5) 21 , 11 , 80 , f r a c t i o n a l
+− 8 / 2: ( 5 , 4) 9 , 1 , 20 , f r a c t i o n a l
+− 5 + 2: ( 7 , 8) 15 , 1 , 56 , f r a c t i o n a l
+− 5 − 2 : ( 8 , 3 ) 1 1 , 5 , 24 = 8 * 3 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 / 4 = 2
+Step 2:
+19
+
+Algorithm of Thoughts
+
+5 − 2 = 3
+Step 3:
+8 * 3 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 8 * 3 = 8 * ( 5 − 2 ) = 8 * ( 5 − ( 8 /
+4) ) = 24.
+answer : 8 * (5 − (8 / 4) ) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 11 1 1
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 11 − 1 : ( 1 1 , 1 0 , 1 )
+− 11 + 1 0 : ( 2 1 , 1 ) 2 2 , 2 0 , 2 1 , 21
+− 11 − 1 0 : ( 1 , 1 ) 2 , 0 , 1 , 1
+− 11 * 1 0 : ( 1 1 0 , 1 ) 1 1 1 , 1 0 9 , 1 1 0 , 110
+− 11 / 1 0 : f r a c t i o n a l
+− 11 + 1 : ( 1 2 , 1 0 ) 2 2 , 2 , 1 2 0 , 1 . 2
+− 11 − 1 : ( 1 0 , 1 0 ) 2 0 , 0 , 1 0 0 , 1
+− 11 * 1 : ( 1 1 , 1 0 ) 2 1 , 1 , 1 1 0 , 1 . 1
+− 11 / 1 : ( 1 1 , 1 0 ) 2 1 , 1 , 1 1 0 , f r a c t i o n a l
+− 10 + 1 : ( 1 1 , 1 1 ) 2 2 , 0 , 1 2 1 , 1
+− 10 − 1 : ( 1 1 , 9 ) 2 0 , 2 , 9 9 , 1 . 1
+− 10 * 1 : ( 1 1 , 1 0 ) 2 1 , 1 , 1 1 0 , 1 . 1
+− 10 / 1 : ( 1 1 , 1 0 ) 2 1 , 1 , 1 1 0 , 1 . 1
+Trying another promising f i r s t op era tio n :
+2 . 11 + 1 : ( 1 2 , 1 1 , 1 )
+− 12 + 1 1 : ( 2 3 , 1 ) 24 = 23 + 1 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+11 + 1 = 12
+Step 2:
+12 + 11 = 23
+Step 3:
+23 + 1
+C o n s i d e r i n g t h e s e s t e p s : 24 = 23 + 1 = ( 1 2 + 1 1 ) + 1 = ( ( 1 1 + 1 ) +
+11) + 1 = 24.
+answer : ( ( 1 1 + 1) + 11) + 1 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 7 4 1
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 7 * 4: (28 , 11 , 1)
+− 28 + 1 1 : ( 3 9 , 1 ) 4 0 , 3 8 , 3 9 , 39
+− 28 − 1 1 : ( 1 7 , 1 ) 1 8 , 1 6 , 1 7 , 17
+− 28 * 1 1 : ( 3 0 8 , 1 ) 3 0 9 , 3 0 7 , 3 0 8 , 308
+− 28 / 1 1 : f r a c t i o n a l
+− 28 + 1 : ( 2 9 , 1 1 ) 4 0 , 1 8 , 3 1 9 , f r a c t i o n a l
+− 28 − 1 : ( 2 7 , 1 1 ) 3 8 , 1 6 , 2 9 7 , f r a c t i o n a l
+− 28 * 1 : ( 2 8 , 1 1 ) 3 9 , 1 7 , 3 0 8 , f r a c t i o n a l
+− 28 / 1 : ( 2 8 , 1 1 ) 3 9 , 1 7 , 3 0 8 , f r a c t i o n a l
+− 11 + 1 : ( 2 9 , 2 8 ) 5 7 , 1 , 8 1 2 , f r a c t i o n a l
+− 11 − 1 : ( 2 8 , 1 0 ) 3 8 , 1 8 , 2 8 0 , f r a c t i o n a l
+20
+
+Algorithm of Thoughts
+
+− 11 * 1 : ( 2 8 , 1 1 ) 3 9 , 1 7 , 3 0 8 , f r a c t i o n a l
+− 11 / 1 : ( 2 8 , 1 1 ) 3 9 , 1 7 , 3 0 8 , f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+2. 7 + 1: (11 8 4)
+− 11 + 8 : ( 1 9 , 4 ) 2 3 , 1 5 , 7 6 , f r a c t i o n a l
+− 11 − 8 : ( 4 , 3 ) 7 , 1 , 1 2 , f r a c t i o n a l
+− 11 * 8 : ( 8 8 , 4 ) 9 2 , 8 4 , 3 5 2 , f r a c t i o n a l
+− 11 / 8 : f r a c t i o n a l
+− 11 + 4 : ( 1 5 , 8 ) 2 3 , 7 , 1 2 0 , f r a c t i o n a l
+− 11 − 4 : ( 7 , 8 ) 1 5 , −1 , 5 6 , f r a c t i o n a l
+− 11 * 4 : ( 4 4 , 8 ) 5 2 , 3 6 , 3 5 2 , f r a c t i o n a l
+− 11 / 4 : f r a c t i o n a l
+− 8 + 4 : ( 1 2 , 1 1 ) 2 3 , −1 , 1 3 2 , f r a c t i o n a l
+− 8 − 4: (11 , 4) 15 , 7 , 44 , f r a c t i o n a l
+− 8 * 4 : (32 , 11) 43 , 21 , 352 , f r a c t i o n a l
+− 8 / 4: (11 , 2) 13 , 9 , 22 , f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+3. 4 + 1: (11 7 5)
+− 11 + 7 : ( 1 8 , 5 ) 2 3 , 1 3 , 9 0 , f r a c t i o n a l
+− 11 − 7 : ( 5 , 4 ) 9 , 1 , 2 0 , f r a c t i o n a l
+− 11 * 7 : ( 7 7 , 5 ) 8 2 , 7 2 , 3 8 5 , f r a c t i o n a l
+− 11 / 7 : f r a c t i o n a l
+− 11 + 5 : ( 1 6 , 7 ) 2 3 , 9 , 1 1 2 , f r a c t i o n a l
+− 11 − 5 : ( 7 , 6 ) 1 3 , 1 , 4 2 , f r a c t i o n a l
+− 11 * 5 : ( 5 5 , 7 ) 6 2 , 4 8 , 3 8 5 , f r a c t i o n a l
+− 11 / 5 : f r a c t i o n a l
+− 7 + 5: (12 , 11) 23 , 1 , 132 , f r a c t i o n a l
+− 7 − 5: (11 , 2) 13 , 9 , 22 , f r a c t i o n a l
+− 7 * 5 : ( 3 5 , 1 1 ) 4 6 , 24 = 35 − 11 −> f o u n d i t !
+Step 1:
+4 + 1 = 5
+Step 2:
+7 * 5 = 35
+Step 3:
+35 − 11 = 24
+Considering these steps : Backtracking the solution :
+24 = 35 − 11 = ( 7 * 5 ) − 11 = ( 7 * ( 4 + 1 ) ) − 11 = 2 4 .
+a n s w e r : ( 7 * ( 4 + 1 ) ) − 11 = 2 4 .
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 5 4 3
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 5 * 4: (20 , 11 , 3)
+− 20 + 1 1 : ( 3 1 , 3 ) 3 4 , 2 8 , 9 3 , f r a c t i o n a l
+− 20 − 1 1 : ( 9 , 3 ) 1 2 , 6 , 2 7 , 3
+− 20 * 1 1 : ( 2 2 0 , 3 ) 2 2 3 , 2 1 7 , 6 6 0 , f r a c t i o n a l
+− 20 / 1 1 : f r a c t i o n a l
+− 20 + 3 : ( 2 3 , 1 1 ) 3 4 , 1 2 , 2 5 3 , f r a c t i o n a l
+− 20 − 3 : ( 1 7 , 1 1 ) 2 8 , 6 , 1 8 7 , f r a c t i o n a l
+− 20 * 3 : ( 6 0 , 1 1 ) 7 1 , 4 9 , 6 6 0 , f r a c t i o n a l
+− 20 / 3 : f r a c t i o n a l
+21
+
+Algorithm of Thoughts
+
+− 11 +
+− 11 −
+− 11 *
+− 11 /
+
+3:
+3:
+3:
+3:
+
+( 1 4 , 2 0 ) 3 4 , −6 , 2 8 0 , f r a c t i o n a l
+( 8 , 2 0 ) 2 8 , −12 , 1 6 0 , f r a c t i o n a l
+(33 , 20) 53 , 13 , 660 , f r a c t i o n a l
+fractional
+
+Trying another promising f i r s t op era tio n :
+2 . 11 − 3 : ( 8 , 5 , 4 )
+− 8 + 5: (13 , 4) 17 , 9 , 52 , f r a c t i o n a l
+− 8 − 5: ( 4 , 3) 7 , 1 , 12 , f r a c t i o n a l
+− 8 * 5 : (40 , 4) 44 , 36 , 160 , f r a c t i o n a l
+− 8 / 5: f r a c t i o n a l
+− 8 + 4: (12 , 5) 17 , 7 , 60 , f r a c t i o n a l
+− 8 − 4: ( 5 , 4) 9 , 1 , 20 , f r a c t i o n a l
+− 8 * 4 : (32 , 5) 37 , 27 , 160 , f r a c t i o n a l
+− 8 / 4: ( 5 , 2) 7 , 3 , 10 , 2.5
+− 5 + 4: ( 9 , 8) 17 , 1 , 72 , f r a c t i o n a l
+− 5 − 4: (8 , 1) 9 , 7 , 8 , 8
+− 5 * 4 : (20 , 8) 28 , 12 , 160 , f r a c t i o n a l
+− 5 / 4: f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+3 . 11 * 3 : ( 3 3 , 5 , 4 )
+− 33 + 5 : ( 3 8 , 4 ) 4 2 , 3 4 , 1 5 2 , f r a c t i o n a l
+− 33 − 5 : ( 2 8 , 4 ) 3 2 , 24 = 28 − 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+11 * 3 = 33
+Step 2:
+33 − 5 = 28
+Step 3:
+28 − 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 28 − 4 = ( 3 3 − 5 ) − 4 = ( ( 1 1 * 3 ) −
+5) − 4 = 24.
+answer : ( ( 1 1 * 3) − 5) − 4 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+13 12 5 2
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 12 + 2 : ( 1 4 , 1 3 , 5 )
+− 14 + 1 3 : ( 2 7 , 5 ) 3 2 , 2 2 , 1 3 5 , f r a c t i o n a l
+− 14 − 1 3 : ( 5 , 1 ) 6 , 4 , 5 , 5
+− 14 * 1 3 : ( 1 8 2 , 5 ) 1 8 7 , 1 7 7 , 9 1 0 , f r a c t i o n a l
+− 14 / 1 3 : f r a c t i o n a l
+− 14 + 5 : ( 1 9 , 1 3 ) 3 2 , 6 , 2 4 7 , f r a c t i o n a l
+− 14 − 5 : ( 1 3 , 9 ) 2 2 , 4 , 1 1 7 , f r a c t i o n a l
+− 14 * 5 : ( 7 0 , 1 3 ) 8 3 , 5 7 , 9 1 0 , f r a c t i o n a l
+− 14 / 5 : f r a c t i o n a l
+− 13 + 5 : ( 1 8 , 1 4 ) 3 2 , 4 , 2 5 2 , f r a c t i o n a l
+− 13 − 5 : ( 1 4 , 8 ) 2 2 , 6 , 1 1 2 , f r a c t i o n a l
+− 13 * 5 : ( 6 5 , 1 4 ) 7 9 , 5 1 , 9 1 0 , f r a c t i o n a l
+− 13 / 5 : f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+22
+
+Algorithm of Thoughts
+
+2 . 13 + 5 : ( 1 8 , 1 2 , 2 )
+− 18 + 1 2 : ( 3 0 , 2 ) 3 2 , 2 8 , 6 0 , f r a c t i o n a l
+− 18 − 1 2 : ( 6 , 2 ) 8 , 4 , 1 2 , 3
+− 18 * 1 2 : ( 2 1 6 , 2 ) 2 1 8 , 2 1 4 , 4 3 2 , f r a c t i o n a l
+− 18 / 1 2 : f r a c t i o n a l
+− 18 + 2 : ( 2 0 , 1 2 ) 3 2 , 8 , 2 4 0 , f r a c t i o n a l
+− 18 − 2 : ( 1 6 , 1 2 ) 2 8 , 4 , 1 9 2 , f r a c t i o n a l
+− 18 * 2 : ( 3 6 , 1 2 ) 4 8 , 24 = 36 − 12 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+13 + 5 = 18
+Step 2:
+18 * 2 = 36
+Step 3:
+36 − 12 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 36 − 12 = ( 1 8 * 2 ) − 12 = ( ( 1 3 + 5 )
+* 2 ) − 12 = 2 4 .
+a n s w e r : ( ( 1 3 + 5 ) * 2 ) − 12 = 2 4 .
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+9 8 2 1
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 9 − 1: (8 , 8 , 2)
+− 8 + 8: (16 , 2) 18 , 14 , 32 , 8
+− 8 − 8: (2 , 0) 2 , 2 , 0 , undefined
+− 8 * 8 : ( 6 4 , 2 ) 6 6 , 6 2 , 1 2 8 , 32
+− 8 / 8: (2 , 1) 3 , 1 , 2 , 2
+− 8 + 2: (10 , 8) 18 , 2 , 80 , 4
+− 8 − 2 : ( 6 , 8 ) 1 4 , −2 , 4 8 , f r a c t i o n a l
+− 8 * 2 : ( 1 6 , 8 ) 24 = 16 + 8 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+9 − 1 = 8
+Step 2:
+8 * 2 = 16
+Step 3:
+16 + 8 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 16 + 8 = ( 8 * 2 ) + 8 = ( ( 9 − 1 ) * 2 )
++ 8 = 24.
+answer : ( ( 9 − 1) * 2) + 8 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+
+F.1.1. AOT (L ONG )
+
+System :
+Use numbers and b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) t o o b t a i n
+2 4 . When c o n s i d e r i n g t h e n e x t s t e p s , do n o t c h o o s e o p e r a t i o n s
+t h a t w i l l r e s u l t i n a n e g a t i v e o r f r a c t i o n a l number . I n o r d e r
+t o h e l p w i t h t h e c a l c u l a t i o n s , t h e numbers i n t h e p a r e n t h e s i s
+r e p r e s e n t t h e numbers t h a t a r e l e f t a f t e r t h e o p e r a t i o n s and
+they are in descending order .
+23
+
+Algorithm of Thoughts
+
+A n o t h e r t h i n g we do i s when t h e r e a r e o n l y two numbers l e f t i n t h e
+p a r e n t h e s i s , we c h e c k w h e t h e r we c a n a r r i v e a t 24 o n l y by
+u s i n g b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) . Some e x a m p l e s
+regarding this idea :
+( 2 1 2 ) no
+s i n c e 21 + 2 = 2 3 , 21 − 2 = 1 9 , 21 * 2 = 4 2 , 21 / 2 = 1 0 . 5 , none
+o f which i s e q u a l t o 2 4 .
+( 3 0 6 ) 30 − 6 = 24 y e s
+( 8 3 ) 8 * 3 = 24 y e s
+( 1 2 8 ) no
+( 4 8 2 ) 48 / 2 = 24 y e s
+Most i m p o r t a n t l y , do n o t g i v e up , a l l t h e numbers t h a t w i l l be
+given has indeed a s o l u t i o n .
+User :
+14 8 8 2
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 8 + 2: (14 , 10 , 8)
+− 14 + 1 0 : ( 2 4 , 8 ) 3 2 , 1 6 , 1 9 2 , 3
+− 14 − 1 0 : ( 8 , 4 ) 1 2 , 8 , 3 2 , 2
+− 14 * 1 0 : ( 1 4 0 , 8 ) 1 4 8 , 1 3 2 , 1 1 2 0 , f r a c t i o n a l
+− 14 / 1 0 : ( 8 , 1 . 4 ) f r a c t i o n a l
+− 14 + 8 : ( 2 2 , 1 0 ) 3 2 , 1 2 , 2 2 0 , f r a c t i o n a l
+− 14 − 8 : ( 1 0 , 6 ) 1 6 , 4 , 6 0 , f r a c t i o n a l
+− 14 * 8 : ( 1 1 2 , 1 0 ) 1 2 2 , 1 0 2 , 1 1 2 0 , f r a c t i o n a l
+− 14 / 8 : f r a c t i o n a l
+− 10 + 8 : ( 1 8 , 1 4 ) 3 2 , 4 , 2 5 2 , f r a c t i o n a l
+− 10 − 8 : ( 1 4 , 2 ) 1 6 , 1 2 , 2 8 , 7
+− 10 * 8 : ( 8 0 , 1 4 ) 9 4 , 6 6 , b i g , f r a c t i o n a l
+− 10 / 8 : f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+2 . 14 + 8 : ( 2 2 , 8 , 2 )
+− 22 + 8 : ( 3 0 , 2 ) 3 2 , 2 8 , 6 0 , 15
+− 22 − 8 : ( 1 4 , 2 ) 1 6 , 1 2 , 2 8 , 7
+− 22 * 8 : ( 1 7 6 , 2 ) 1 7 8 , 1 7 4 , 88
+− 22 / 8 : ( 2 . 7 5 , 2 ) f r a c t i o n a l
+− 22 + 2 : ( 2 4 , 8 ) 3 2 , 1 6 , 1 9 2 , 3
+− 22 − 2 : ( 2 0 , 8 ) 2 8 , 1 2 , 1 6 0 , f r a c t i o n a l
+− 22 * 2 : ( 4 4 , 8 ) 5 2 , 3 6 , 3 5 2 , f r a c t i o n a l
+− 22 / 2 : ( 1 1 , 8 ) 1 9 , 3 , 8 8 , f r a c t i o n a l
+− 8 + 2: (22 , 10) 32 , 12 , 220 , f r a c t i o n a l
+− 8 − 2: (22 , 6) 28 , 16 , 132 , f r a c t i o n a l
+− 8 * 2 : (22 , 16) 38 , 6 , 352 , f r a c t i o n a l
+− 8 / 2: (22 , 4) 26 , 18 , 88 , f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+3 . 14 + 2 : ( 1 6 , 8 , 8 )
+− 16 + 8 : ( 2 4 , 8 ) 3 2 , 1 6 , 1 9 2 , 3
+− 16 − 8 : ( 8 , 8 ) 1 6 , 0 , 6 4 , 1
+− 16 * 8 : ( 1 2 8 , 8 ) 1 3 6 , 1 2 0 , 1 0 2 4 , 16
+− 16 / 8 : ( 8 , 2 ) 1 0 , 6 , 1 6 , 4
+24
+
+Algorithm of Thoughts
+
+− 8 +
+− 8 −
+− 8 *
+− 8 /
+
+8:
+8:
+8:
+8:
+
+(16 ,
+(16 ,
+(64 ,
+(16 ,
+
+16 3 2 , 0 , 2 5 6 , 1
+0) 16 , 16 , 0 , undefined
+16) 80 , 48 , 1024 , 4
+1 ) 1 7 , 1 5 , 1 6 , 16
+
+Trying another promising f i r s t op era tio n :
+4. 8 − 2: (14 , 8 , 6)
+− 14 + 8 : ( 2 2 , 1 4 ) 3 6 , 8 , 3 0 8 , f r a c t i o n a l
+− 14 − 8 : ( 6 , 6 ) 1 2 , 0 , 3 6 , 1
+− 14 * 8 : ( 1 1 2 , 6 ) 1 1 8 , 1 0 6 , 6 7 2 , f r a c t i o n a l
+− 14 / 8 : ( 6 , 1 . 7 5 ) f r a c t i o n a l
+− 14 + 6 : ( 2 0 , 8 ) 2 2 , 1 2 , 1 6 0 , f r a c t i o n a l
+− 14 − 6 : ( 8 , 8 ) 1 6 , 0 , 6 4 , 1
+− 14 * 6 : ( 8 4 , 8 ) 9 2 , 7 6 , 6 7 2 , f r a c t i o n a l
+− 14 / 6 : ( 8 , 2 . 3 ) f r a c t i o n a l
+− 8 + 6: (14 , 14) 28 , 0 , 196 , 1
+− 8 − 6: (14 , 2) 16 , 12 , 28 , 7
+− 8 * 6 : (48 , 14) 62 , 34 , 672 , f r a c t i o n a l
+− 8 / 6: (14 , 1.3) f r a c t i o n a l
+Trying
+5. 8 *
+− 16 +
+− 16 −
+− 16 *
+− 16 /
+− 16 +
+− 16 −
+− 16 *
+− 16 /
+− 14 +
+− 14 −
+− 14 *
+− 14 /
+
+another promising f i r s t operation :
+2: (16 , 14 , 8)
+14: (30 , 8) 38 , 22 , 240 , f r a c t i o n a l
+14: ( 8 , 2) 10 , 6 , 16 , 4
+1 4 : ( 2 2 4 , 8 ) 2 3 2 , 2 1 6 , 1 7 9 2 , 28
+14: (8 , 1.1) f r a c t i o n a l
+8: (24 , 14) 38 , 10 , 336 , f r a c t i o n a l
+8: (14 , 8) 22 , 6 , 112 , f r a c t i o n a l
+8 : (128 , 14) 142 , 112 , 1792 , f r a c t i o n a l
+8: (14 , 2) 16 , 12 , 28 , 7
+8: (22 , 16) 38 , 6 , 352 , f r a c t i o n a l
+8: (16 , 6) 22 , 10 , 96 , f r a c t i o n a l
+8 : (112 , 16) 128 , 96 , 1792 , 7
+8: (16 , 1.7) f r a c t i o n a l
+
+Trying another promising f i r s t op era tio n :
+6 . 14 * 2 : ( 2 8 , 8 , 8 )
+− 28 + 8 : ( 3 6 , 8 ) 4 4 , 2 8 , 2 8 8 , f r a c t i o n a l
+− 28 − 8 : ( 2 0 , 8 ) 2 8 , 1 2 , 1 6 0 , f r a c t i o n a l
+− 28 * 8 : ( 2 2 4 , 8 ) 2 3 2 , 2 1 6 , 1 7 9 2 , 28
+− 28 / 8 : ( 8 , 3 . 5 ) f r a c t i o n a l , f r a c t i o n a l , 2 8 , f r a c t i o n a l
+− 8 + 8 : ( 1 6 , 16 3 2 , 0 , 2 5 6 , 1
+− 8 − 8: (16 , 0) 16 , 16 , 0 , undefined
+− 8 * 8 : (64 , 16) 80 , 48 , 1024 , 4
+− 8 / 8 : ( 1 6 , 1 ) 1 7 , 1 5 , 1 6 , 16
+Trying another promising f i r s t op era tio n :
+7. 8 / 2: (14 , 8 , 4)
+− 14 + 8 : ( 2 2 , 4 ) 2 6 , 1 8 , 8 8 , f r a c t i o n a l
+− 14 − 8 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 / 2 = 4
+Step 2:
+25
+
+Algorithm of Thoughts
+
+14 − 8 = 6
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 1 4 − 8 ) * 4 = ( 1 4 − 8 ) * ( 8
+/ 2) = 24.
+answer : (14 − 8) * (8 / 2) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+9 5 5 5
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 9 − 5: (5 , 5 , 4)
+− 5 + 5: (10 , 4) 14 , 6 , 40 , f r a c t i o n a l
+− 5 − 5: (4 , 0) 4 , 4 , 0 , undefined
+− 5 * 5 : (25 , 4) 29 , 21 , 100 , f r a c t i o n a l
+− 5 / 5: (4 , 1) 5 , 3 , 4 , 4
+− 5 + 4: ( 9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+− 5 − 4: (5 , 1) 6 , 4 , 5 , 0.2
+− 5 * 4 : (20 , 5) 25 , 15 , 100 , f r a c t i o n a l
+− 5 / 4: f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+2. 5 * 5: (25 , 9 , 5)
+− 25 + 9 : ( 3 4 , 5 ) 3 9 , 2 9 , 1 7 0 , f r a c t i o n a l
+− 25 − 9 : ( 1 6 , 5 ) 2 1 , 1 1 , 8 0 , f r a c t i o n a l
+− 25 * 9 : ( 2 2 5 , 5 ) 2 3 0 , 2 2 0 , 1 1 2 5 , 45
+− 25 / 9 : ( 5 , 2 . 7 ) f r a c t i o n a l
+− 25 + 5 : ( 3 0 , 9 ) 3 9 , 2 1 , 2 7 0 , f r a c t i o n a l
+− 25 − 5 : ( 2 0 , 9 ) 2 9 , 1 1 , 1 8 0 , f r a c t i o n a l
+− 25 * 5 : ( 7 5 , 9 ) 8 4 , 6 6 , 6 7 5 , f r a c t i o n a l
+− 25 / 5 : ( 9 , 5 ) 1 4 , 4 , 4 5 , f r a c t i o n a l
+− 9 + 5: (25 , 14) 39 , 11 , 350 , f r a c t i o n a l
+− 9 − 5: (25 , 4) 29 , 21 , 100 , f r a c t i o n a l
+− 9 * 5 : (45 , 25) 70 , 20 , 1125 , f r a c t i o n a l
+− 9 / 5: (25 , 1 . 8 ) f r a c t i o n a l , f r a c t i o n a l , 45 , f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+3. 5 − 5: (9 , 5 , 0)
+− 9 + 5: (25 , 14) 39 , 11 , 350 , f r a c t i o n a l
+− 9 − 5: (25 , 4) 29 , 21 , 100 , f r a c t i o n a l
+− 9 * 5 : (45 , 25) 70 , 20 , 1125 , f r a c t i o n a l
+− 9 / 5: (25 , 1 . 8 ) f r a c t i o n a l , f r a c t i o n a l , 45 , f r a c t i o n a l
+− 9 + 0: ( 9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+− 9 − 0: ( 9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+− 9 * 0: (5 , 0) 5 , 5 , 0 , undefined
+− 9 / 0: undefined
+− 5 + 0: ( 9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+− 5 − 0: ( 9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+− 5 * 0: (9 , 0) 9 , 9 , 0 , undefined
+− 5 / 0: undefined
+Trying another promising f i r s t op era tio n :
+4. 5 / 5: (9 , 5 , 1)
+− 9 + 5: (25 , 14) 39 , 11 , 350 , f r a c t i o n a l
+26
+
+Algorithm of Thoughts
+
+− 9 −
+− 9 *
+− 9 /
+− 9 +
+− 9 −
+− 9 *
+− 9 /
+− 5 +
+− 5 −
+− 5 *
+− 5 /
+
+5:
+5:
+5:
+1:
+1:
+1:
+1:
+1:
+1:
+1:
+1:
+
+(25 , 4) 29 , 21 , 100 , f r a c t i o n a l
+(45 , 25) 70 , 20 , 1125 , f r a c t i o n a l
+(25 , 1 . 8 ) f r a c t i o n a l , f r a c t i o n a l , 45 , f r a c t i o n a l
+(10 , 5) 15 , 5 , 50 , 2
+( 8 , 5) 13 , 3 , 40 , f r a c t i o n a l
+(9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+( 9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+( 9 , 6) 15 , 3 , 54 , f r a c t i o n a l
+( 9 , 4) 13 , 5 , 36 , f r a c t i o n a l
+(9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+( 9 , 5) 14 , 4 , 45 , f r a c t i o n a l
+
+Trying another promising f i r s t op era tio n :
+5. 9 * 5: (45 , 5 , 5)
+− 45 + 5 : ( 5 0 , 5 ) 5 5 , 4 5 , 2 5 0 , 10
+− 45 − 5 : ( 4 0 , 5 ) 4 5 , 3 5 , 2 0 0 , 8
+− 45 * 5 : ( 2 2 5 , 5 ) 2 3 0 , 2 2 0 , 1 1 2 5 , 45
+− 45 / 5 : ( 9 , 5 ) 1 4 , 4 , 4 5 , f r a c t i o n a l
+− 5 + 5: (10 , 4) 14 , 6 , 40 , f r a c t i o n a l
+− 5 − 5: (4 , 0) 4 , 4 , 0 , undefined
+− 5 * 5 : (25 , 4) 29 , 21 , 100 , f r a c t i o n a l
+− 5 / 5: (4 , 1) 5 , 3 , 4 , 4
+Trying another promising f i r s t op era tio n :
+6. 5 + 5: (10 , 9 , 5)
+− 10 + 9 : ( 1 9 , 5 ) 24 = 19 + 5 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+5 + 5 = 10
+Step 2:
+10 + 9 = 19
+Step 3:
+19 + 5 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 19 + 5 = ( 1 0 + 9 ) + 5 = ( ( 5 + 5 ) +
+9) + 5 = 24.
+answer : ( ( 5 + 5) + 9) + 5 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+8 6 4 4
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 8 * 6: (48 , 4 , 4)
+− 48 + 4 : ( 5 2 , 4 ) 5 6 , 4 8 , 2 0 8 , 13
+− 48 − 4 : ( 4 4 , 4 ) 4 8 , 4 0 , 1 7 6 , 11
+− 48 * 4 : ( 1 9 2 , 4 ) 1 9 6 , 1 8 8 , 7 6 8 , 48
+− 48 / 4 : ( 1 2 , 4 ) 1 6 , 8 , 4 8 , 3
+− 4 + 4: (48 , 8) 56 , 40 , 384 , 6
+− 4 − 4: (48 , 0) 48 , 48 , 0 , undefined
+− 4 * 4 : (48 , 16) 64 , 32 , 768 , 3
+− 4 / 4 : ( 4 8 , 1 ) 4 9 , 4 7 , 4 8 , 48
+Trying another promising f i r s t op era tio n :
+2. 4 − 4: (8 , 6 , 0)
+− 8 + 6: (14 , 0) 14 , 14 , 0 , undefined
+27
+
+Algorithm of Thoughts
+
+− 8 −
+− 8 *
+− 8 /
+− 8 +
+− 8 −
+− 8 *
+− 8 /
+− 6 +
+− 6 −
+− 6 *
+− 6 /
+
+6:
+6:
+6:
+0:
+0:
+0:
+0:
+0:
+0:
+0:
+0:
+
+(2 , 0) 2 , 2 , 0 , undefined
+(48 , 0) 48 , 48 , 0 , undefined
+( 1 . 3 , 0) f r a c t i o n a l
+( 8 , 6) 14 , 2 , 48 , f r a c t i o n a l
+( 8 , 6) 14 , 2 , 48 , f r a c t i o n a l
+(6 , 0) 6 , 6 , 0 , undefined
+undefined
+( 8 , 6) 14 , 2 , 48 , f r a c t i o n a l
+( 8 , 6) 14 , 2 , 48 , f r a c t i o n a l
+(8 , 0) 8 , 8 , 0 , undefined
+undefined
+
+Trying another promising f i r s t op era tio n :
+3. 4 / 4: (8 , 6 , 1)
+− 8 + 6 : ( 1 4 , 1 ) 1 5 , 1 3 , 1 4 , 14
+− 8 − 6: (2 , 1) 3 , 1 , 2 , 2
+− 8 * 6 : ( 4 8 , 1 ) 4 9 , 4 7 , 4 8 , 48
+− 8 / 6: ( 1 . 3 , 1) f r a c t i o n a l
+− 8 + 1: ( 9 , 6) 15 , 3 , 54 , f r a c t i o n a l
+− 8 − 1: ( 7 , 6) 13 , 1 , 42 , f r a c t i o n a l
+− 8 * 1: (8 , 6) 14 , 2 , 48 , f r a c t i o n a l
+− 8 / 1: ( 8 , 6) 14 , 2 , 48 , f r a c t i o n a l
+− 6 + 1: ( 8 , 7) 15 , 1 , 56 , f r a c t i o n a l
+− 6 − 1: ( 8 , 5) 13 , 3 , 40 , f r a c t i o n a l
+− 6 * 1: (8 , 6) 14 , 2 , 48 , f r a c t i o n a l
+− 6 / 1: (8 , 1) 9 , 7 , 8 , 8
+Trying another promising f i r s t op era tio n :
+4. 8 − 6: (4 , 4 , 2)
+− 4 + 4: ( 8 , 2) 10 , 6 , 16 , 4
+− 4 − 4: (2 , 0) 2 , 2 , 0 , undefined
+− 4 * 4: (16 , 2) 18 , 14 , 32 , 8
+− 4 / 4: (2 , 1) 3 , 1 , 2 , 2
+− 4 + 2 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 − 6 = 2
+Step 2:
+4 + 2 = 6
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 4 + 2 ) * 4 = ( 4 + ( 8 − 6 ) )
+* 4 = 24.
+answer : (4 + (8 − 6) ) * 4 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+13 10 9 4
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 13 − 4 : ( 1 0 , 9 , 9 )
+− 10 + 9 : ( 1 9 , 9 ) 2 8 , 1 0 , 1 7 1 , f r a c t i o n a l
+− 10 − 9 : ( 9 , 1 ) 1 0 , 8 , 9 , 9
+− 10 * 9 : ( 9 0 , 9 ) 9 9 , 8 1 , 8 1 0 , f r a c t i o n a l
+− 10 / 9 : f r a c t i o n a l
+28
+
+Algorithm of Thoughts
+
+− 9 + 9: (18 , 10) 28 , 8 , 180 , f r a c t i o n a l
+− 9 − 9: (10 , 0) 10 , 10 , 0 , undefined
+− 9 * 9 : (81 , 10) 91 , 71 , 810 , f r a c t i o n a l
+− 9 / 9 : ( 1 0 , 1 ) 1 1 , 9 , 1 0 , 10
+Trying another promising f i r s t op era tio n :
+2 . 13 / 1 0 : ( 9 , 4 , 1 . 3 )
+− 9 + 4 : ( 1 3 , 1 . 3 ) f r a c t i o n a l , f r a c t i o n a l , f r a c t i o n a l , 10
+− 9 − 4: (5 , 1.3) f r a c t i o n a l
+− 9 * 4: (36 , 1.3) f r a c t i o n a l
+− 9 / 4: (2.3 , 1.3) fractional , 1 , fractional , f r a c t i o n a l
+− 9 + 1 . 3 : (10.3 , 4) f r a c t i o n a l
+− 9 − 1 . 3 : ( 7 . 7 , 4) f r a c t i o n a l
+− 9 * 1 . 3 : (1 1. 7 , 4) f r a c t i o n a l
+− 9 / 1 . 3 : ( 6 . 9 , 4) f r a c t i o n a l
+− 4 + 1.3: (9 , 5.3) f r a c t i o n a l
+− 4 − 1.3: (9 , 2.7) f r a c t i o n a l
+− 4 * 1.3: (9 , 5.2) f r a c t i o n a l
+− 4 / 1.3: (9 , 3.1) f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+3 . 9 / 4: (13 , 10 , 2 . 3 )
+− 13 + 1 0 : ( 2 3 , 2 . 3 ) f r a c t i o n a l , f r a c t i o n a l , f r a c t i o n a l , 10
+− 13 − 1 0 : ( 3 , 2 . 3 ) f r a c t i o n a l
+− 13 * 1 0 : ( 1 3 0 , 2 . 3 ) f r a c t i o n a l
+− 13 / 1 0 : ( 2 . 3 , 1 . 3 ) f r a c t i o n a l , 1 , f r a c t i o n a l , f r a c t i o n a l
+− 13 + 2 . 3 : ( 1 5 . 3 , 1 0 ) f r a c t i o n a l , f r a c t i o n a l , 1 5 3 , f r a c t i o n a l
+− 13 − 2 . 3 : ( 1 1 . 7 , 1 0 ) f r a c t i o n a l , f r a c t i o n a l , 1 1 7 , f r a c t i o n a l
+− 13 * 2 . 3 : ( 2 9 . 9 , 1 0 ) f r a c t i o n a l , f r a c t i o n a l , 2 9 9 , f r a c t i o n a l
+− 13 / 2 . 3 : ( 1 0 , 5 . 6 ) f r a c t i o n a l , f r a c t i o n a l , 5 6 0 , f r a c t i o n a l
+− 10 + 2 . 3 : ( 1 3 , 1 2 . 3 ) f r a c t i o n a l
+− 10 − 2 . 3 : ( 1 3 , 7 . 7 ) f r a c t i o n a l
+− 10 * 2 . 3 : ( 2 3 , 1 3 ) 3 6 , 1 0 , 2 9 9 , f r a c t i o n a l
+− 10 / 2 . 3 : ( 1 3 , 4 . 3 ) f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+4 . 13 / 4 : ( 1 0 , 9 , 3 . 3 )
+− 10 + 9 : ( 1 9 , 3 . 3 ) f r a c t i o n a l
+− 10 − 9 : ( 3 . 3 , 1 ) f r a c t i o n a l
+− 10 * 9 : ( 9 0 , 3 . 3 ) f r a c t i o n a l
+− 10 / 9 : ( 3 . 3 , 1 . 1 ) f r a c t i o n a l , f r a c t i o n a l , f r a c t i o n a l , 3
+− 10 + 3 . 3 : ( 1 3 . 3 , 9 ) f r a c t i o n a l
+− 10 − 3 . 3 : ( 9 , 6 . 7 ) f r a c t i o n a l
+− 10 * 3 . 3 : ( 3 3 , 9 ) 4 2 , 2 4 , 2 9 7 , f r a c t i o n a l
+− 10 / 3 . 3 : ( 3 . 1 , 9 ) f r a c t i o n a l
+− 9 + 3 . 3 : ( 1 2 . 3 , 10) f r a c t i o n a l , f r a c t i o n a l , 123 , f r a c t i o n a l
+− 9 − 3 . 3 : (10 , 5 . 7 ) f r a c t i o n a l , f r a c t i o n a l , 57 , f r a c t i o n a l
+− 9 * 3 . 3 : ( 2 9 . 7 , 10) f r a c t i o n a l , f r a c t i o n a l , 297 , f r a c t i o n a l
+− 9 / 3 . 3 : (10 , 2 . 7 ) f r a c t i o n a l , f r a c t i o n a l , 27 , f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+5 . 13 / 9 : ( 1 0 , 9 , 1 . 4 )
+− 10 + 9 : ( 1 9 , 1 . 4 ) f r a c t i o n a l
+− 10 − 9 : ( 1 . 4 , 1 ) f r a c t i o n a l
+− 10 * 9 : ( 9 0 , 1 . 4 ) f r a c t i o n a l , f r a c t i o n a l , 1 3 0 , f r a c t i o n a l
+− 10 / 9 : ( 1 . 1 , 1 . 4 ) f r a c t i o n a l
+− 10 + 1 . 4 : ( 1 1 . 4 , 9 ) f r a c t i o n a l
+− 10 − 1 . 4 : ( 9 , 8 . 6 ) f r a c t i o n a l
+29
+
+Algorithm of Thoughts
+
+− 10 * 1 . 4 : ( 1 4 0 , 9 ) 1 4 9 , 1 3 1 , 1 2 6 0 , f r a c t i o n a l
+− 10 / 1 . 4 : ( 9 , 7 . 1 ) f r a c t i o n a l
+− 9 + 1 . 4 : ( 1 0 . 4 , 10) f r a c t i o n a l , f r a c t i o n a l , 104 , f r a c t i o n a l
+− 9 − 1 . 4 : (10 , 7 . 6 ) f r a c t i o n a l , f r a c t i o n a l , 76 , f r a c t i o n a l
+− 9 * 1 . 4 : ( 1 2 . 6 , 10) f r a c t i o n a l , f r a c t i o n a l , 126 , f r a c t i o n a l
+− 9 / 1 . 4 : (10 , 6 . 4 ) f r a c t i o n a l , f r a c t i o n a l , 64 , f r a c t i o n a l
+Trying another promising f i r s t op era tio n :
+6 . 10 − 4 : ( 1 3 , 9 , 6 )
+− 13 + 9 : ( 2 2 , 6 ) 2 8 , 1 6 , 1 3 2 , f r a c t i o n a l
+− 13 − 9 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+10 − 4 = 6
+Step 2:
+13 − 9 = 4
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = 6 * ( 1 3 − 9 ) = ( 1 0 − 4 ) *
+(13 − 9) = 24.
+answer : (10 − 4) * (13 − 9) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+
+F.1.2. AOT (R ANDOM )
+
+System :
+Use numbers and b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) t o o b t a i n
+2 4 . Each s t e p , you a r e o n l y a l l o w e d t o c h o o s e two o f t h e
+r e m a i n i n g numbers t o o b t a i n a new number .
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+4 4 6 8.
+Assistant :
+Trying a promising f i r s t op era tio n :
+(4 + 4) * 6 − 8 = 40.
+Trying another promising f i r s t op era tio n :
+(8 − 6) * 4 + 4 = 12.
+Trying another promising f i r s t op era tio n :
+(6 − 4) * (4 + 8) = 24.
+answer : (6 − 4) * (4 + 8) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+2 9 10 1 2 .
+Assistant :
+Trying a promising f i r s t op era tio n :
+((12 − 10) / 2) + 9 = 10.
+Trying another promising f i r s t op era tio n :
+(10 + 9) + (12 / 2) = 25.
+Trying another promising f i r s t op era tio n :
+30
+
+Algorithm of Thoughts
+
+(12 * 2) * (10 − 9) = 24.
+answer : (12 * 2) * (10 − 9) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+4 9 10 1 3 .
+Assistant :
+Trying a promising f i r s t op era tio n :
+((13 − 10) / 4) + 9 = 10.
+Trying another promising f i r s t op era tio n :
+4 * (9 − (13 − 10) ) = 24.
+answer : 4 * (9 − (13 − 10) ) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+1 4 8 8.
+Assistant :
+Trying a promising f i r s t op era tio n :
+(8 + 1) + 4 * 8 + 32.
+Trying another promising f i r s t op era tio n :
+(1 + 8 / 4) * 8 = 24.
+answer : (1 + 8 / 4) * 8 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+5 5 5 9.
+Assistant :
+Trying a promising f i r s t op era tio n :
+(( 5 + 5) + 5) + 9 = 24.
+answer : ( ( 5 + 5) + 5) + 9 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+
+F.1.3. AOT (BFS)
+
+System :
+Use numbers and b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) t o o b t a i n
+2 4 . When c o n s i d e r i n g t h e n e x t s t e p s , do n o t c h o o s e o p e r a t i o n s
+t h a t w i l l r e s u l t i n a n e g a t i v e o r f r a c t i o n a l number . I n o r d e r
+t o h e l p w i t h t h e c a l c u l a t i o n s , t h e numbers i n t h e p a r e n t h e s i s
+r e p r e s e n t t h e numbers t h a t a r e l e f t a f t e r t h e o p e r a t i o n s and
+they are in descending order .
+A n o t h e r t h i n g we do i s when t h e r e a r e o n l y two numbers l e f t i n t h e
+p a r e n t h e s i s , we c h e c k w h e t h e r we c a n a r r i v e a t 24 o n l y by
+u s i n g b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) . Some e x a m p l e s
+regarding this idea :
+(21 , 2) : 23 , 19 , 42 , f r a c t i o n a l
+( 3 0 , 6 ) : 3 6 , 24 = 30 − 6 −> f o u n d i t !
+( 8 , 3 ) : 1 1 , 5 , 24 = 8 * 3 y e s
+(12 , 8) : 20 , 4 , 72 , f r a c t i o n a l
+I n t h e s e c o n d s t e p s , when t h e r e a r e t h r e e numbers l e f t , we c h o o s e
+t h e most p r o m i s i n g o p e r a t i o n s s o t h a t when we a r e l e f t w i t h two
+31
+
+Algorithm of Thoughts
+
+numbers , we w i l l be a b l e t o g e t t o 2 4 .
+So , when we r e a c h 24 i n t h e t h i r d s t e p s , t h a t means we f o u n d t h e
+s o l u t i o n , we d i r e c t l y b a c k t r a c k t o w r i t e t h e a n s w e r .
+I n e a c h s t e p , we want t o c h o o s e t h e b e s t o p e r a t i o n s s o t h a t t h e
+numbers l e f t , w i l l h a v e a good c h a n c e t o r e a c h 2 4 .
+User :
+14 8 8 2
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g p o s s i b l e
+1 . 8 + 8: (16 , 14 , 2)
+2 . 14 − 8 : ( 8 , 6 , 2 )
+3 . 14 + 2 : ( 1 6 , 8 , 8 )
+4. 8 / 2: (14 , 8 , 4)
+
+f i r s t steps :
+
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s :
+1 . (16 , 14 , 2)
+− 16 − 1 4 : ( 2 , 2 )
+− 16 / 2 : ( 8 , 1 4 )
+− 14 * 2 : ( 2 8 , 1 6 )
+− 14 / 2 : ( 7 , 1 6 )
+2. (8 , 6 , 2)
+− 8 − 6: (2 , 2)
+− 8 / 2: (4 , 6)
+− 6 * 2: (12 , 8)
+− 6 / 2: (3 , 8)
+3. (16 , 8 , 8)
+− 16 − 8 : ( 8 , 8 )
+− 16 / 8 : ( 2 , 8 )
+− 8 * 8: (64 , 16)
+− 8 / 8: (1 , 16)
+4. (14 , 8 , 4)
+− 14 − 8 : ( 6 , 4 )
+− 14 / 4 : ( 3 . 5 , 8 )
+− 8 * 4: (32 , 14)
+− 8 / 4: (2 , 14)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g t h i r d s t e p s :
+1 . 8 + 8 = 16
+− 16 − 1 4 : ( 2 , 2 ) : 4 , 0 , 4 , 1
+− 16 / 2 : ( 8 , 1 4 ) : 2 2 , 6 , 1 1 2 , f r a c t i o n a l
+− 14 * 2 : ( 2 8 , 1 6 ) : 4 4 , 1 2 , 4 4 8 , f r a c t i o n a l
+− 14 / 2 : ( 7 , 1 6 ) : 2 3 , 9 , 1 1 2 , f r a c t i o n a l
+2 . 14 − 8 = 6
+− 8 − 6: (2 , 2) : 4 , 0 , 4 , 1
+− 8 / 2 : ( 6 , 4 ) : 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+14 − 8 = 6
+32
+
+Algorithm of Thoughts
+
+Step 2:
+8 / 2 = 4
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 1 4 − 8 ) * ( 8 / 2 ) = 2 4 .
+answer : (14 − 8) * (8 / 2) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+9 5 5 5
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s :
+1. 9 − 5: (5 , 5 , 4)
+2 . 5 + 5: ( 9 , 10 , 5)
+3. 9 + 5: (14 , 5 , 5)
+4. 5 − 5: (9 , 5 , 0)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s :
+1. (5 , 5 , 4)
+− 5 + 5: (10 , 4)
+− 5 * 4: (20 , 5)
+− 5 − 4: (5 , 1)
+− 5 / 4: (5 , 1.25)
+2. (9 ,
+− 10 +
+− 10 −
+− 10 *
+− 10 /
+
+10 , 5)
+9: (19 , 5)
+5: (9 , 5)
+5: (50 , 9)
+5: (9 , 2)
+
+3. (14 , 5 , 5)
+− 14 − 5 : ( 9 , 5 )
+− 14 + 5 : ( 1 9 , 5 )
+− 5 * 5: (25 , 14)
+− 5 / 5: (14 , 1)
+4. (9 , 5 , 0)
+− 9 + 5: (14 , 0)
+− 9 − 5: (4 , 0)
+− 5 * 0: (9 , 0)
+− 5 / 0: (9 , i n f i n i t y )
+Let ’ s c o n s i d e r t h e most p r o m i s i n g t h i r d s t e p s :
+1. 9 − 5 = 4
+− 5 + 5: (10 , 4) : 14 , 6 , 40 , f r a c t i o n a l
+− 5 * 4 : (20 , 5) : 25 , 15 , 100 , 4
+− 5 − 4: (5 , 1) : 6 , 4 , 5 , 5
+− 5 / 4: (5 , 1.25) : 6.25 , 3.75 , 6.25 , 4
+2 . 5 + 5 = 10
+− 10 + 9 : ( 1 9 , 5 ) : 24 = 19 + 5 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+5 + 5 = 10
+Step 2:
+33
+
+Algorithm of Thoughts
+
+10 + 9 = 19
+Step 3:
+19 + 5 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 19 + 5 = ( 1 0 + 9 ) + 5 = ( ( 5 + 5 ) +
+9) + 5 = 24.
+answer : ( ( 5 + 5) + 9) + 5 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+8 6 4 4
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s :
+1. 8 * 6: (48 , 4 , 4)
+2. 8 + 4: (12 , 6 , 4)
+3. 8 − 6: (4 , 4 , 2)
+4. 6 − 4: (8 , 4 , 2)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s :
+1. (48 , 4 , 4)
+− 4 * 4: (48 , 16)
+− 48 / 4 : ( 1 2 , 4 )
+− 4 + 4: (48 , 8)
+− 48 − 4 : ( 4 4 , 4 )
+2. (12 , 6 , 4)
+− 12 + 6 : ( 1 8 , 4 )
+− 6 * 4: (24 , 12)
+− 6 + 4: (12 , 10)
+− 12 / 4 : ( 6 , 3 )
+3. (4 , 4 , 2)
+− 4 * 4: (16 , 2)
+− 4 + 2: (6 , 4)
+− 4 + 4: (8 , 2)
+− 4 * 2: (8 , 4)
+4. (8 , 4 , 2)
+− 8 * 4: (32 , 2)
+− 4 * 2: (8 , 8)
+− 8 + 4: (12 , 2)
+− 8 / 4: (4 , 2)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g t h i r d s t e p s :
+1 . 8 * 6 = 48
+− 4 * 4 : ( 4 8 , 16) : 64 , 32 , big , 3
+− 48 / 4 : ( 1 2 , 4 ) : 1 6 , 8 , 4 8 , 3
+− 4 + 4 : ( 4 8 , 8) : 56 , 40 , big , 6
+− 48 − 4 : ( 4 4 , 4 ) : 4 8 , 4 0 , b i g , 11
+2 . 8 + 4 = 12
+− 12 + 6 : ( 1 8 , 4 ) : 2 2 , 1 4 , 7 2 , f r a c t i o n a l
+− 6 * 4 : (24 , 12) : 36 , 12 , 288 , 2
+− 6 + 4: (12 , 10) : 22 , 2 , 120 , f r a c t i o n a l
+− 12 / 4 : ( 6 , 3 ) : 9 , 3 , 1 8 , 2
+
+34
+
+Algorithm of Thoughts
+
+3. 8 − 6 = 2
+− 4 * 4: (16 , 2) : 19 , 14 , 32 , 8
+− 4 + 2 : ( 6 , 4 ) : 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 − 6 = 2
+Step 2:
+4 + 2 = 6
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 4 + 2 ) * 4 = ( 4 + ( 8 − 6 ) )
+* 4 = 24.
+answer : (4 + (8 − 6) ) * 4 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+13 10 9 4
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s :
+1 . 13 − 4 : ( 1 0 , 9 , 9 )
+2 . 10 − 4 : ( 1 3 , 9 , 6 )
+3 . 13 + 9 : ( 2 2 , 1 0 , 4 )
+4 . 10 − 9 : ( 1 3 , 4 , 1 )
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s :
+1. (10 , 9 , 9)
+− 10 + 9 : ( 1 9 , 9 )
+− 10 − 9 : ( 9 , 1 )
+− 9 + 9: (18 , 10)
+− 9 / 9: (9 , 1)
+2. (13 , 9 , 6)
+− 9 + 6: (15 ,
+− 9 * 6: (54 ,
+− 13 − 9 : ( 6 ,
+− 13 − 6 : ( 9 ,
+
+13)
+13)
+4)
+7)
+
+3 . (22 , 10 , 4)
+− 22 − 1 0 : ( 1 2 , 4 )
+− 22 − 4 : ( 1 8 , 1 0 )
+− 10 * 4 : ( 4 0 , 2 2 )
+− 10 / 4 : ( 2 2 , 5 . 5 )
+4. (13 , 4 , 1)
+− 13 − 4 : ( 9 , 1 )
+− 13 * 4 : ( 5 2 , 1 )
+− 4 − 1: (13 , 3)
+− 13 − 1 : ( 1 2 , 4 )
+Let ’ s c o n s i d e r t h e most p r o m i s i n g t h i r d s t e p s :
+1 . 13 − 4 = 9
+− 10 + 9 : ( 1 9 , 9 ) : 2 8 , 1 0 , 1 7 1 , f r a c t i o n a l
+− 10 − 9 : ( 9 , 1 ) : 1 0 , 8 , 9 , 9
+− 9 + 9: (18 , 10) : 28 , 8 , 180 , f r a c t i o n a l
+− 9 / 9: ( 9 , 1) : 10 , 8 , 9 , 9
+35
+
+Algorithm of Thoughts
+
+2 . 10 − 4 = 6
+− 9 + 6: (15 , 13) : 28 , 2 , 195 , f r a c t i o n a l
+− 9 * 6 : (54 , 13) : 67 , 41 , 702 , f r a c t i o n a l
+− 13 − 9 : ( 6 , 4 ) : 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+13 − 9 = 4
+Step 2:
+10 − 4 = 6
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 1 0 − 4 ) * ( 1 3 − 9 ) = 2 4 .
+answer : (10 − 4) * (13 − 9) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+8 8 5 4
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s :
+1. 5 + 4: (9 , 8 , 8)
+2. 8 / 4: (8 , 5 , 2)
+3. 8 − 5: (8 , 4 , 3)
+4. 8 / 8: (5 , 4 , 1)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s :
+1. (9 , 8 , 8)
+− 9 + 8: (17 , 8)
+− 8 + 8: (16 , 9)
+− 9 * 8: (72 , 8)
+− 8 / 8: (9 , 1)
+2. (8 , 5 , 2)
+− 5 − 2: (8 , 3)
+− 8 − 2: (6 , 5)
+− 8 + 5: (13 , 2)
+− 5 * 2: (10 , 8)
+3. (8 , 4 , 3)
+− 8 − 4: (4 , 3)
+− 8 − 3: (5 , 4)
+− 4 * 3: (12 , 8)
+− 4 + 3: (8 , 7)
+4. (5 , 4 , 1)
+− 5 + 4: (9 ,
+− 5 − 4: (1 ,
+− 4 − 1: (5 ,
+− 5 + 1: (6 ,
+
+1)
+1)
+3)
+4)
+
+Let ’ s c o n s i d e r t h e most p r o m i s i n g t h i r d s t e p s :
+1. 5 + 4 = 9
+− 9 + 8: (17 , 8) : 25 , 9 , 136 , f r a c t i o n a l
+− 8 + 8: (16 , 9) : 25 , 7 , 144 , f r a c t i o n a l
+− 9 * 8 : (72 , 8) : 80 , 64 , 576 , 9
+36
+
+Algorithm of Thoughts
+
+− 8 / 8: ( 9 , 1) : 10 , 8 , 9 , 9
+2. 8 / 4 = 2
+− 5 − 2 : ( 8 , 3 ) : 1 1 , 5 , 24 = 8 * 3 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 / 4 = 2
+Step 2:
+5 − 2 = 3
+Step 3:
+8 * 3 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 8 * 3 = 8 * ( 5 − 2 ) = 8 * ( 5 − ( 8 /
+4) ) = 24.
+answer : 8 * (5 − (8 / 4) ) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 11 1 1
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s :
+1 . 11 − 1 : ( 1 1 , 1 0 , 1 )
+2 . 11 + 1 : ( 1 2 , 1 1 , 1 )
+3 . 11 + 1 1 : ( 2 2 , 1 , 1 )
+4 . 1 + 1: (11 , 11 , 2)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s :
+1 . (11 , 10 , 1)
+− 11 + 1 0 : ( 2 1 , 1 )
+− 10 + 1 : ( 1 1 , 1 1 )
+− 10 / 1 : ( 1 1 , 1 0 )
+− 11 / 1 : ( 1 1 , 1 0 )
+2 . (12 , 11 , 1)
+− 12 + 1 1 : ( 2 3 , 1 )
+− 11 + 1 : ( 1 2 , 1 1 )
+− 11 − 1 : ( 1 2 , 1 0 )
+− 12 + 1 : ( 1 3 , 1 1 )
+3. (22 , 1 , 1)
+− 22 + 1 : ( 2 3 , 1 )
+− 1 + 1: (22 , 2)
+− 22 / 1 : ( 2 2 , 1 )
+− 1 / 1: (22 , 1)
+4 . (11 , 11 , 2)
+− 11 + 1 1 : ( 2 2 , 2 )
+− 11 * 2 : ( 2 2 , 1 1 )
+− 11 + 2 : ( 1 3 , 1 1 )
+− 2 * 11: (22 , 11)
+Let ’ s c o n s i d e r t h e most
+1 . 11 − 1 = 10
+− 11 + 1 0 : ( 2 1 , 1 ) : 2 2 ,
+− 10 + 1 : ( 1 1 , 1 1 ) : 2 2 ,
+− 10 / 1 : ( 1 1 , 1 0 ) : 2 1 ,
+
+promising t h i r d steps :
+2 0 , 2 1 , 20
+10 , 121 , 0
+1 , 110 , 0
+37
+
+Algorithm of Thoughts
+
+− 11 / 1 : ( 1 1 , 1 0 ) : 2 1 , 1 , 1 1 0 , 0
+2 . 11 + 1 = 12
+− 12 + 1 1 : ( 2 3 , 1 ) : 24 = 23 + 1 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+11 + 1 = 12
+Step 2:
+12 + 11 = 23
+Step 3:
+23 + 1 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 23 + 1 = ( 1 2 + 1 1 ) + 1 = ( ( 1 1 + 1 ) +
+11) + 1 = 24.
+answer : ( ( 1 1 + 1) + 11) + 1 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 7 4 1
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s :
+1 . 7 * 4: (28 , 11 , 1)
+2. 7 + 1: (11 , 8 , 4)
+3. 4 + 1: (11 , 7 , 5)
+4 . 11 − 4 : ( 7 , 3 , 1 )
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s :
+1 . (28 , 11 , 1)
+− 28 − 1 1 : ( 1 7 , 1 )
+− 28 − 1 : ( 2 7 , 1 1 )
+− 11 + 1 : ( 2 9 , 2 8 )
+− 11 − 1 : ( 2 8 , 1 0 )
+2. (11 , 8 , 4)
+− 11 + 8 : ( 1 9 , 4 )
+− 8 + 4: (12 , 11)
+− 11 − 8 : ( 4 , 3 )
+− 8 − 4: (7 , 11)
+3. (11 , 7 , 5)
+− 11 − 5 : ( 7 , 6 )
+− 7 − 5: (11 , 2)
+− 7 * 5: (35 , 11)
+− 11 + 5 : ( 1 6 , 7 )
+4. (7 , 3 , 1)
+− 7 − 3: (4 , 1)
+− 7 * 3: (21 , 1)
+− 3 + 1: (7 , 4)
+− 7 − 1: (6 , 3)
+Let ’ s c o n s i d e r t h e most
+1 . 7 * 4 = 28
+− 28 − 1 1 : ( 1 7 , 1 ) : 1 8 ,
+− 28 − 1 : ( 2 7 , 1 1 ) : 3 8 ,
+− 11 + 1 : ( 2 9 , 2 8 ) : 5 7 ,
+
+promising t h i r d steps :
+1 6 , 1 7 , 17
+16 , 297 , 2.45
+1 , 812 , 1.03
+38
+
+Algorithm of Thoughts
+
+− 11 − 1 : ( 2 8 , 1 0 ) : 3 8 , 1 8 , 2 8 0 , 2 . 8
+2. 7 + 1 = 8
+− 11 + 8 : ( 1 9 , 4 ) : 2 3 , 1 5 , 7 6 , 4 . 7 5
+− 8 + 4: (12 , 11) : 23 , 7 , 132 , 3
+− 11 − 8 : ( 4 , 3 ) : 7 , 1 , 1 2 , 1 . 3 3
+− 8 − 4: ( 7 , 11) : 18 , 4 , 77 , 1.75
+3. 4 + 1 = 5
+− 11 − 5 : ( 7 , 6 ) : 1 3 , 1 , 4 2 , 1 . 1 7
+− 7 − 5: (11 , 2) : 13 , 9 , 22 , 5.5
+− 7 * 5 : ( 3 5 , 1 1 ) : 4 6 , 24 = 35 − 11 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+4 + 1 = 5
+Step 2:
+7 * 5 = 35
+Step 3:
+35 − 11 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 35 − 11 = ( 7 * 5 ) − 11 = ( 7 * ( 4 +
+1 ) ) − 11 = 2 4 .
+a n s w e r : ( 7 * ( 4 + 1 ) ) − 11 = 2 4 .
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 5 4 3
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s t o r e a c h 2 4 :
+1 . 11 * 3 : ( 3 3 , 5 , 4 )
+2. 5 + 4: (11 , 9 , 3)
+3 . 11 − 4 : ( 7 , 5 , 3 )
+4. 4 + 3: (11 , 7 , 5)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s t o r e a c h 2 4 :
+1. (33 , 5 , 4)
+− 33 − 5 : ( 2 8 , 4 )
+− 33 − 4 : ( 2 9 , 5 )
+− 5 + 4: (33 , 9)
+− 5 * 4: (20 , 33)
+2. (11 , 9 , 3)
+− 11 * 3 : ( 3 3 , 9 )
+− 11 + 3 : ( 1 4 , 9 )
+− 9 + 3: (12 , 11)
+− 9 / 3: (11 , 3)
+3. (7 , 5 , 3)
+− 7 − 3: (4 , 5)
+− 7 + 5: (12 , 3)
+− 5 + 3: (8 , 7)
+− 5 * 3: (7 , 6)
+4. (11 , 7 , 5)
+− 11 + 7 : ( 1 8 , 5 )
+− 11 − 5 : ( 6 , 7 )
+39
+
+Algorithm of Thoughts
+
+− 7 + 5: (12 , 11)
+− 7 − 5: (2 , 11)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g t h i r d s t e p s t o r e a c h 2 4 :
+1 . 11 * 3 = 33
+− 33 − 5 : ( 2 8 , 4 ) : 3 2 , 24 = 28 − 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+11 * 3 = 33
+Step 2:
+33 − 5 = 28
+Step 3:
+28 − 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 28 − 4 = ( 3 3 − 5 ) − 4 = ( ( 1 1 * 3 ) −
+5) − 4 = 24.
+answer : ( ( 1 1 * 3) − 5) − 4 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+13 12 5 2
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s t o r e a c h 2 4 :
+1 . 12 / 2 : ( 1 3 , 6 , 5 )
+2 . 13 + 5 : ( 1 8 , 1 2 , 2 )
+3 . 12 − 5 : ( 1 3 , 7 , 2 )
+4 . 5 − 2: (13 , 12 , 3)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s t o r e a c h 2 4 :
+1. (13 , 6 , 5)
+− 13 + 6 : ( 1 9 , 5 )
+− 13 − 5 : ( 8 , 6 )
+− 6 * 5: (30 , 13)
+− 6 − 5: (13 , 1)
+2 . (18 , 12 , 2)
+− 18 * 2 : ( 3 6 ,
+− 12 / 2 : ( 1 8 ,
+− 18 − 2 : ( 1 6 ,
+− 12 * 2 : ( 2 4 ,
+
+12)
+6)
+12)
+18)
+
+3. (13 , 7 , 2)
+− 13 + 7 : ( 2 0 , 2 )
+− 13 − 2 : ( 1 1 , 7 )
+− 7 * 2: (14 , 13)
+− 7 − 2: (13 , 5)
+4 . (13 , 12 , 3)
+− 13 * 3 : ( 3 9 ,
+− 13 − 3 : ( 1 0 ,
+− 12 * 3 : ( 3 6 ,
+− 12 / 3 : ( 1 3 ,
+
+12)
+12)
+13)
+4)
+
+Let ’ s c o n s i d e r t h e most p r o m i s i n g t h i r d s t e p s t o r e a c h 2 4 :
+1 . 12 / 2 = 6
+− 13 + 6 : ( 1 9 , 5 ) : 24 = 19 + 5 −> f o u n d i t !
+40
+
+Algorithm of Thoughts
+
+Backtracking the solution :
+Step 1:
+12 / 2 = 6
+Step 2:
+13 + 6 = 19
+Step 3:
+19 + 5 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 19 + 5 = ( 1 3 + 6 ) + 5 = ( 1 3 + ( 1 2 /
+2) ) + 5 = 24.
+answer : (13 + (12 / 2) ) + 5 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+9 8 2 1
+Assistant :
+Let ’ s c o n s i d e r t h e most p r o m i s i n g f i r s t s t e p s t o r e a c h 2 4 :
+1. 9 − 1: (8 , 8 , 2)
+2. 8 + 2: (10 , 9 , 1)
+3. 9 + 1: (10 , 8 , 2)
+4. 2 + 1: (9 , 8 , 3)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g s e c o n d s t e p s t o r e a c h 2 4 :
+1. (8 , 8 , 2)
+− 8 + 8: (16 , 2)
+− 8 * 2: (16 , 8)
+− 8 − 2: (6 , 8)
+− 8 + 8: (16 , 2)
+2. (10 , 9 , 1)
+− 10 + 9 : ( 1 9 , 1 )
+− 10 − 1 : ( 9 , 9 )
+− 9 + 1: (10 , 10)
+− 9 / 1: (8 , 10)
+3. (10 , 8 , 2)
+− 10 + 8 : ( 1 8 , 2 )
+− 10 * 2 : ( 8 , 8 )
+− 8 + 2: (10 , 10)
+− 8 / 2: (6 , 10)
+4. (9 , 8 , 3)
+− 9 + 8: (17 , 3)
+− 9 / 3: (6 , 8)
+− 8 + 3: (11 , 9)
+− 8 * 3: (24 , 9)
+Let ’ s c o n s i d e r t h e most p r o m i s i n g t h i r d s t e p s t o r e a c h 2 4 :
+1. 9 − 1 = 8
+− 8 + 8: (16 , 2) : 18 , 14 , 32 , 8
+− 8 * 2 : ( 1 6 , 8 ) : 24 = 16 + 8 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+9 − 1 = 8
+Step 2:
+8 * 2 = 16
+41
+
+Algorithm of Thoughts
+
+Step 3:
+16 + 8 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 16 + 8 = ( 8 * 2 ) + 8 = ( ( 9 − 1 ) * 2 )
++ 8 = 24.
+answer : ( ( 9 − 1) * 2) + 8 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+
+F.2. AoT (Short)
+
+System :
+Use numbers and b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) t o o b t a i n
+2 4 . When c o n s i d e r i n g t h e n e x t s t e p s , do n o t c h o o s e o p e r a t i o n s
+t h a t w i l l r e s u l t i n a n e g a t i v e o r f r a c t i o n a l number . I n o r d e r
+t o h e l p w i t h t h e c a l c u l a t i o n s , t h e numbers i n t h e p a r e n t h e s i s
+r e p r e s e n t t h e numbers t h a t a r e l e f t a f t e r t h e o p e r a t i o n s and
+they are in descending order .
+A n o t h e r t h i n g we do i s when t h e r e a r e o n l y two numbers l e f t i n t h e
+p a r e n t h e s i s , we c h e c k w h e t h e r we c a n a r r i v e a t 24 o n l y by
+u s i n g b a s i c a r i t h m e t i c o p e r a t i o n s ( + − * / ) . Some e x a m p l e s
+regarding this idea :
+( 2 1 2 ) no
+s i n c e 21 + 2 = 2 3 , 21 − 2 = 1 9 , 21 * 2 = 4 2 , 21 / 2 = 1 0 . 5 , none
+o f which i s e q u a l t o 2 4 .
+( 3 0 6 ) 30 − 6 = 24 y e s
+( 8 3 ) 8 * 3 = 24 y e s
+( 1 2 8 ) no
+( 4 8 2 ) 48 / 2 = 24 y e s
+Most i m p o r t a n t l y , do n o t g i v e up , a l l t h e numbers t h a t w i l l be
+given has indeed a s o l u t i o n .
+User :
+14 8 8 2
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 8 / 2: (14 , 8 , 4)
+− 14 + 8 : ( 2 2 , 4 ) 2 6 , 1 8 , 8 8 , f r a c t i o n a l
+− 14 − 8 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 / 2 = 4
+Step 2:
+14 − 8 = 6
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 1 4 − 8 ) * 4 = ( 1 4 − 8 ) * ( 8
+/ 2) = 24.
+answer : (14 − 8) * (8 / 2) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+9 5 5 5
+Assistant :
+42
+
+Algorithm of Thoughts
+
+Trying a promising f i r s t op era tio n :
+1. 5 + 5: (10 , 9 , 5)
+− 10 + 9 : ( 1 9 , 5 ) 24 = 19 + 5 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+5 + 5 = 10
+Step 2:
+10 + 9 = 19
+Step 3:
+19 + 5 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 19 + 5 = ( 1 0 + 9 ) + 5 = ( ( 5 + 5 ) +
+9) + 5 = 24.
+answer : ( ( 5 + 5) + 9) + 5 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+8 6 4 4
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 8 − 6: (4 , 4 , 2)
+− 4 + 4: ( 8 , 2) 10 , 6 , 16 , 4
+− 4 − 4: (2 , 0) 2 , 2 , 0 , undefined
+− 4 * 4: (16 , 2) 18 , 14 , 32 , 8
+− 4 / 4: (2 , 1) 3 , 1 , 2 , 2
+− 4 + 2 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 − 6 = 2
+Step 2:
+4 + 2 = 6
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = ( 4 + 2 ) * 4 = ( 4 + ( 8 − 6 ) )
+* 4 = 24.
+answer : (4 + (8 − 6) ) * 4 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+13 10 9 4
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 10 − 4 : ( 1 3 , 9 , 6 )
+− 13 + 9 : ( 2 2 , 6 ) 2 8 , 1 6 , 1 3 2 , f r a c t i o n a l
+− 13 − 9 : ( 6 , 4 ) 1 0 , 2 , 24 = 6 * 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+10 − 4 = 6
+Step 2:
+13 − 9 = 4
+Step 3:
+6 * 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 6 * 4 = 6 * ( 1 3 − 9 ) = ( 1 0 − 4 ) *
+(13 − 9) = 24.
+answer : (10 − 4) * (13 − 9) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+43
+
+Algorithm of Thoughts
+
+8 8 5 4
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 8 / 4: (8 , 5 , 2)
+− 8 + 5: (13 , 2) 15 , 11 , 26 , f r a c t i o n a l
+− 8 − 5: (3 , 2) 5 , 1 , 6 , 1.5
+− 8 * 5 : ( 4 0 , 2 ) 4 2 , 3 8 , 8 0 , 20
+− 8 / 5: f r a c t i o n a l
+− 8 + 2: (10 , 5) 15 , 5 , 50 , 2
+− 8 − 2: ( 6 , 5) 11 , 1 , 30 , f r a c t i o n a l
+− 8 * 2: (16 , 5) 21 , 11 , 80 , f r a c t i o n a l
+− 8 / 2: ( 5 , 4) 9 , 1 , 20 , f r a c t i o n a l
+− 5 + 2: ( 7 , 8) 15 , 1 , 56 , f r a c t i o n a l
+− 5 − 2 : ( 8 , 3 ) 1 1 , 5 , 24 = 8 * 3 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+8 / 4 = 2
+Step 2:
+5 − 2 = 3
+Step 3:
+8 * 3 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 8 * 3 = 8 * ( 5 − 2 ) = 8 * ( 5 − ( 8 /
+4) ) = 24.
+answer : 8 * (5 − (8 / 4) ) = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 11 1 1
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 11 + 1 : ( 1 2 , 1 1 , 1 )
+− 12 + 1 1 : ( 2 3 , 1 ) 24 = 23 + 1 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+11 + 1 = 12
+Step 2:
+12 + 11 = 23
+Step 3:
+23 + 1
+C o n s i d e r i n g t h e s e s t e p s : 24 = 23 + 1 = ( 1 2 + 1 1 ) + 1 = ( ( 1 1 + 1 ) +
+11) + 1 = 24.
+answer : ( ( 1 1 + 1) + 11) + 1 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 7 4 1
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 4 + 1: (11 7 5)
+− 11 + 7 : ( 1 8 , 5 ) 2 3 , 1 3 , 9 0 , f r a c t i o n a l
+− 11 − 7 : ( 5 , 4 ) 9 , 1 , 2 0 , f r a c t i o n a l
+− 11 * 7 : ( 7 7 , 5 ) 8 2 , 7 2 , 3 8 5 , f r a c t i o n a l
+− 11 / 7 : f r a c t i o n a l
+− 11 + 5 : ( 1 6 , 7 ) 2 3 , 9 , 1 1 2 , f r a c t i o n a l
+− 11 − 5 : ( 7 , 6 ) 1 3 , 1 , 4 2 , f r a c t i o n a l
+− 11 * 5 : ( 5 5 , 7 ) 6 2 , 4 8 , 3 8 5 , f r a c t i o n a l
+44
+
+Algorithm of Thoughts
+
+− 11 / 5 : f r a c t i o n a l
+− 7 + 5: (12 , 11) 23 , 1 , 132 , f r a c t i o n a l
+− 7 − 5: (11 , 2) 13 , 9 , 22 , f r a c t i o n a l
+− 7 * 5 : ( 3 5 , 1 1 ) 4 6 , 24 = 35 − 11 −> f o u n d i t !
+Step 1:
+4 + 1 = 5
+Step 2:
+7 * 5 = 35
+Step 3:
+35 − 11 = 24
+Considering these steps : Backtracking the solution :
+24 = 35 − 11 = ( 7 * 5 ) − 11 = ( 7 * ( 4 + 1 ) ) − 11 = 2 4 .
+a n s w e r : ( 7 * ( 4 + 1 ) ) − 11 = 2 4 .
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+11 5 4 3
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 11 * 3 : ( 3 3 , 5 , 4 )
+− 33 + 5 : ( 3 8 , 4 ) 4 2 , 3 4 , 1 5 2 , f r a c t i o n a l
+− 33 − 5 : ( 2 8 , 4 ) 3 2 , 24 = 28 − 4 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+11 * 3 = 33
+Step 2:
+33 − 5 = 28
+Step 3:
+28 − 4 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 28 − 4 = ( 3 3 − 5 ) − 4 = ( ( 1 1 * 3 ) −
+5) − 4 = 24.
+answer : ( ( 1 1 * 3) − 5) − 4 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+13 12 5 2
+Assistant :
+Trying a promising f i r s t op era tio n :
+1 . 13 + 5 : ( 1 8 , 1 2 , 2 )
+− 18 + 1 2 : ( 3 0 , 2 ) 3 2 , 2 8 , 6 0 , f r a c t i o n a l
+− 18 − 1 2 : ( 6 , 2 ) 8 , 4 , 1 2 , 3
+− 18 * 1 2 : ( 2 1 6 , 2 ) 2 1 8 , 2 1 4 , 4 3 2 , f r a c t i o n a l
+− 18 / 1 2 : f r a c t i o n a l
+− 18 + 2 : ( 2 0 , 1 2 ) 3 2 , 8 , 2 4 0 , f r a c t i o n a l
+− 18 − 2 : ( 1 6 , 1 2 ) 2 8 , 4 , 1 9 2 , f r a c t i o n a l
+− 18 * 2 : ( 3 6 , 1 2 ) 4 8 , 24 = 36 − 12 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+13 + 5 = 18
+Step 2:
+18 * 2 = 36
+Step 3:
+36 − 12 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 36 − 12 = ( 1 8 * 2 ) − 12 = ( ( 1 3 + 5 )
+* 2 ) − 12 = 2 4 .
+a n s w e r : ( ( 1 3 + 5 ) * 2 ) − 12 = 2 4 .
+45
+
+Algorithm of Thoughts
+
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+9 8 2 1
+Assistant :
+Trying a promising f i r s t op era tio n :
+1. 9 − 1: (8 , 8 , 2)
+− 8 + 8: (16 , 2) 18 , 14 , 32 , 8
+− 8 − 8: (2 , 0) 2 , 2 , 0 , undefined
+− 8 * 8 : ( 6 4 , 2 ) 6 6 , 6 2 , 1 2 8 , 32
+− 8 / 8: (2 , 1) 3 , 1 , 2 , 2
+− 8 + 2: (10 , 8) 18 , 2 , 80 , 4
+− 8 − 2 : ( 6 , 8 ) 1 4 , −2 , 4 8 , f r a c t i o n a l
+− 8 * 2 : ( 1 6 , 8 ) 24 = 16 + 8 −> f o u n d i t !
+Backtracking the solution :
+Step 1:
+9 − 1 = 8
+Step 2:
+8 * 2 = 16
+Step 3:
+16 + 8 = 24
+C o n s i d e r i n g t h e s e s t e p s : 24 = 16 + 8 = ( 8 * 2 ) + 8 = ( ( 9 − 1 ) * 2 )
++ 8 = 24.
+answer : ( ( 9 − 1) * 2) + 8 = 24.
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+F.3. 5 × 5 Mini Crosswords Prompts
+In the following we give all the exact prompts we used for the methods given in the experiments section and some selection
+of the generations from the LLM. In the prompts the keywords “System”, “User” and “Assistant” used are the roles in the
+OpenAI API in chat completion mode. The line breaks are to show the turns between the user and assistant in the API.
+F.3.1. AOT
+
+User :
+h1 .
+h2 .
+h3 .
+h4 .
+h5 .
+v1 .
+v2 .
+v3 .
+v4 .
+v5 .
+
+A lunar valley
+A fatty oil
+To e n t i c e
+To l o w e r ; t o r e d u c e
+A s o l i t a r y person
+According to the r o s t e r
+A n o t h e r name f o r P o r t − F r a n c q u i
+An i l l i c i t l o v e r ; a E u r o p e a n l a k e
+To l i s p
+To come i n
+
+The words I a l r e a d y f o u n d a r e :
+h1 . r i l l e
+h3 . t e m p t
+v2 . i l e b o
+v5 . e n t e r
+Assistant :
+T h e r e a r e two h o r i z o n t a l and two v e r t i c a l words . S i n c e t h e y a r e
+t h e amount , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d h o r i z o n t a l word ,
+46
+
+Algorithm of Thoughts
+
+which i s h2 . S i n c e we a r e c o n s i d e r i n g t h e s e c o n d h o r i z o n t a l
+word , we n e e d t o l o o k a t t h e s e c o n d l e t t e r s o f t h e v e r t i c a l
+words we f o u n d :
+− What i s t h e s e c o n d l e t t e r o f i l e b o : e
+− What i s t h e s e c o n d l e t t e r o f e n t e r : n
+The word we a r e l o o k i n g f i t s t h e c l u e ”A f a t t y o i l ” and n e e d s t o
+h a v e t h e l e t t e r s e and n i n i t s ( v2 , two ) s e c o n d and ( v5 , f i v e )
+fifth letters :
+e
+n . The c a n d i d a t e s a r e : o l e i c , o l e i n ,
+olive .
+− oleic (o l e i c ,
+e
+n ) doesn ’ t f i t
+− olein (o l e i n ,
+e
+n) fits
+− olive (o l i v e ,
+e
+n ) doesn ’ t f i t
+We add t h e word o l e i n f o r h2 . The c u r r e n t words a r e :
+h1 . r i l l e
+h2 . o l e i n
+h3 . t e m p t
+v2 . i l e b o
+v5 . e n t e r
+Now , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d v e r t i c a l word , which i s v1 .
+S i n c e we a r e c o n s i d e r i n g t h e f i r s t v e r t i c a l word , we n e e d t o
+l o o k a t t h e f i r s t l e t t e r s o f t h e h o r i z o n t a l words we f o u n d :
+− What i s t h e f i r s t l e t t e r o f r i l l e : r
+− What i s t h e f i r s t l e t t e r o f o l e i n : o
+− What i s t h e f i r s t l e t t e r o f t e m p t : t
+The word we a r e l o o k i n g f i t s t h e c l u e ” A c c o r d i n g t o t h e r o s t e r ”
+and n e e d s t o h a v e t h e l e t t e r s r , o , and t i n i t s ( h1 , one )
+f i r s t , ( h2 , two ) s e c o n d , and ( h3 , t h r e e ) t h i r d l e t t e r s : r o t
+. The c a n d i d a t e s a r e : none
+Now , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d v e r t i c a l word , which i s v3 .
+S i n c e we a r e c o n s i d e r i n g t h e t h i r d v e r t i c a l word , we n e e d t o
+l o o k a t t h e t h i r d l e t t e r s o f t h e h o r i z o n t a l words we f o u n d :
+− What i s t h e t h i r d l e t t e r o f r i l l e : l
+− What i s t h e t h i r d l e t t e r o f o l e i n : e
+− What i s t h e t h i r d l e t t e r o f t e m p t : m
+The word we a r e l o o k i n g f i t s t h e c l u e ”An i l l i c i t l o v e r ; a
+E u r o p e a n l a k e ” and n e e d s t o h a v e t h e l e t t e r s l , e , and m i n i t s
+( h1 , one ) f i r s t , ( h2 , two ) s e c o n d , and ( h3 , t h r e e ) t h i r d
+letters : l e m
+. The c a n d i d a t e s a r e : leman .
+− leman ( l e m a n , l e m
+) fits
+We add t h e word leman f o r v3 . The c u r r e n t words a r e :
+h1 . r i l l e
+h2 . o l e i n
+h3 . t e m p t
+v2 . i l e b o
+v3 . leman
+v5 . e n t e r
+Now , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d h o r i z o n t a l word , which i s h4 .
+S i n c e we a r e c o n s i d e r i n g t h e f o u r t h h o r i z o n t a l word , we n e e d
+t o l o o k a t t h e f o u r t h l e t t e r s o f t h e v e r t i c a l words we f o u n d :
+− What i s t h e f o u r t h l e t t e r o f i l e b o : b
+− What i s t h e f o u r t h l e t t e r o f leman : a
+− What i s t h e f o u r t h l e t t e r o f e n t e r : e
+The word we a r e l o o k i n g f i t s t h e c l u e ” To l o w e r ; t o r e d u c e ” and
+n e e d s t o h a v e t h e l e t t e r s b , a , and e i n i t s ( v2 , two ) s e c o n d ,
+47
+
+Algorithm of Thoughts
+
+( v3 , t h r e e ) t h i r d , and ( v5 , f i v e ) f i f t h l e t t e r s :
+b a
+e . The
+c a n d i d a t e s a r e : abase , a b a t e .
+− abase ( a b a s e ,
+b a
+e) fits
+− abate ( a b a t e ,
+b a
+e) fits
+S i n c e b o t h f i t s , l e t ’ s c o n s i d e r a n o t h e r word .
+Now , l e t ’ s c o n s i d e r t h e l a s t u n f o u n d v e r t i c a l word , which i s v4 .
+S i n c e we a r e c o n s i d e r i n g t h e f o u r t h v e r t i c a l word , we n e e d t o
+l o o k a t t h e f o u r t h l e t t e r s o f t h e h o r i z o n t a l words we f o u n d :
+− What i s t h e f o u r t h l e t t e r o f r i l l e : l
+− What i s t h e f o u r t h l e t t e r o f o l e i n : i
+− What i s t h e f o u r t h l e t t e r o f t e m p t : p
+The word we a r e l o o k i n g f i t s t h e c l u e ” To l i s p ” and n e e d s t o h a v e
+t h e l e t t e r s l , i , p , and s i n i t s ( h1 , one ) f i r s t , ( h2 , two )
+s e c o n d , ( h3 , t h r e e ) t h i r d l e t t e r s : l i p
+. The c a n d i d a t e s
+a r e : The c a n d i d a t e i s ” l i s p s ” .
+− lisps ( l i s p s , l i p
+) doesn ’ t f i t
+We h a v e c o n s i d e r e d a l l o f t h e words f o r t h e h o r i z o n t a l words , we
+h a v e two o p t i o n s : a b a s e and a b a t e , l e t ’ s c h o o s e one o f them .
+answer :
+h1 . r i l l e
+h2 . o l e i n
+h3 . t e m p t
+h4 . a b a s e
+v2 . i l e b o
+v3 . leman
+v5 . e n t e r
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+h1 . One who saws
+h2 . A f u n g u s g e n u s
+h3 . An a s s e s s o r
+h4 . P a s t u r e l a n d
+h5 . R e c e i v i n g by t h e e a r
+v1 . To s w e l l ; t o i n c r e a s e
+v2 . The B r a z i l i a n macaw ; an A u s t r a l i a n b i r d
+v3 . A T i m o r e s e i s l a n d
+v4 . E x c e s s i v e f l u i d a c c u m u l a t i o n
+v5 . Dewy ; r o s c i d
+The words I a l r e a d y f o u n d a r e :
+h1 . s a w e r
+h3 . r a t e r
+v1 . s u r g e
+v4 . edema
+Assistant :
+T h e r e a r e two h o r i z o n t a l and two v e r t i c a l words . S i n c e t h e y a r e
+t h e amount , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d h o r i z o n t a l word ,
+which i s h2 . S i n c e we a r e c o n s i d e r i n g t h e s e c o n d h o r i z o n t a l
+word , we n e e d t o l o o k a t t h e s e c o n d l e t t e r s o f t h e v e r t i c a l
+words we f o u n d :
+− What i s t h e s e c o n d l e t t e r o f s u r g e : u
+− What i s t h e s e c o n d l e t t e r o f edema : d
+The word we a r e l o o k i n g f i t s t h e c l u e ”A f u n g u s g e n u s ” and n e e d s
+48
+
+Algorithm of Thoughts
+
+t o h a v e t h e l e t t e r s u and d i n i t s ( v1 , one ) f i r s t and ( v4 ,
+four ) fourth l e t t e r s : u
+d . The c a n d i d a t e s a r e : u r e d o .
+− uredo ( u r e d o , u
+d ) fits
+We add t h e word u r e d o f o r h2 . The c u r r e n t words a r e :
+h1 . s a w e r
+h2 . u r e d o
+h3 . r a t e r
+v1 . s u r g e
+v4 . edema
+Now , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d v e r t i c a l word , which i s v2 .
+S i n c e we a r e c o n s i d e r i n g t h e s e c o n d v e r t i c a l word , we n e e d t o
+l o o k a t t h e s e c o n d l e t t e r s o f t h e h o r i z o n t a l words we f o u n d :
+− What i s t h e s e c o n d l e t t e r o f s a w e r : a
+− What i s t h e s e c o n d l e t t e r o f u r e d o : r
+− What i s t h e s e c o n d l e t t e r o f r a t e r : a
+The word we a r e l o o k i n g f i t s t h e c l u e ” The B r a z i l i a n macaw ; an
+A u s t r a l i a n b i r d ” and n e e d s t o h a v e t h e l e t t e r s a , r , and a i n
+i t s ( h1 , one ) f i r s t , ( h2 , two ) s e c o n d , and ( h3 , t h i r d ) t h i r d
+letters : a r a
+. The c a n d i d a t e s a r e : a r a r a .
+− arara (a r a r a , a r a
+) fits
+We add t h e word a r a r a f o r v2 . The c u r r e n t words a r e :
+h1 . s a w e r
+h2 . u r e d o
+h3 . r a t e r
+v1 . s u r g e
+v2 . a r a r a
+v4 . edema
+Now , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d h o r i z o n t a l word , which i s h4 .
+S i n c e we a r e c o n s i d e r i n g t h e f o u r t h h o r i z o n t a l word , we n e e d
+t o l o o k a t t h e f o u r t h l e t t e r s o f t h e v e r t i c a l words we f o u n d :
+− What i s t h e f o u r t h l e t t e r o f s u r g e : g
+− What i s t h e f o u r t h l e t t e r o f a r a r a : r
+− What i s t h e f o u r t h l e t t e r o f edema : m
+t h e word we a r e l o o k i n g f i t s t h e c l u e ” P a s t u r e l a n d ” and n e e d s t o
+h a v e t h e l e t t e r s g , r , and m i n i t s ( v1 , one ) f i r s t , ( v2 , two )
+s e c o n d , and ( v4 , f o u r ) f o u r t h l e t t e r s : g r
+m . The
+c a n d i d a t e s a r e : grama .
+− grama ( g r a m a , g r a
+) fits
+We add t h e word grama f o r h4 . The c u r r e n t words a r e :
+h1 . Sawer
+h2 . U r e d o s
+h3 . R a t e r
+h4 . Grama
+v1 . s u r g e
+v2 . a r a r a
+v4 . edema
+Now , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d v e r t i c a l word , which i s v3 .
+S i n c e we a r e c o n s i d e r i n g t h e t h i r d v e r t i c a l word , we n e e d t o
+l o o k a t t h e t h i r d l e t t e r s o f t h e h o r i z o n t a l words we f o u n d :
+− What i s t h e t h i r d l e t t e r o f s a w e r : w
+− What i s t h e t h i r d l e t t e r o f u r e d o : e
+− What i s t h e t h i r d l e t t e r o f r a t e r : t
+− What i s t h e t h i r d l e t t e r o f grama : a
+The word we a r e l o o k i n g f i t s t h e c l u e ”A T i m o r e s e i s l a n d ” and
+49
+
+Algorithm of Thoughts
+
+n e e d s t o h a v e t h e l e t t e r s w, e , t , and a i n i t s ( h1 , one ) f i r s t
+, ( h2 , two ) s e c o n d , ( h3 , t h r e e ) t h i r d , and ( h4 , f o u r ) f o u r t h
+l e t t e r s : w e t a . The c a n d i d a t e s a r e : The c a n d i d a t e i s ” w e t a r
+”.
+− w e t a r (w e t a r , w e t a ) f i t s
+We add t h e word w e t a r f o r v3 . The c u r r e n t words a r e :
+h1 . s a w e r
+h2 . u r e d o
+h3 . r a t e r
+h4 . grama
+v1 . s u r g e
+v2 . a r a r a
+v3 . w e t a r
+v4 . edema
+Now , l e t ’ s c o n s i d e r t h e l a s t u n f o u n d h o r i z o n t a l word , which i s h5 .
+S i n c e we a r e c o n s i d e r i n g t h e f i f t h h o r i z o n t a l word , we n e e d t o
+l o o k a t t h e f i f t h l e t t e r s o f t h e v e r t i c a l words we f o u n d :
+− What i s t h e f i f t h l e t t e r o f s u r g e : e
+− What i s t h e f i f t h l e t t e r o f a r a r a : a
+− What i s t h e f i f t h l e t t e r o f w e t a r : r
+− What i s t h e f i f t h l e t t e r o f edema : a
+The word we a r e l o o k i n g f i t s t h e c l u e ” R e c e i v i n g by t h e e a r ” and
+n e e d s t o h a v e t h e l e t t e r s e , a , r , and a i n i t s ( v1 , one ) f i r s t
+, ( v2 , two ) s e c o n d , ( v3 , t h r e e ) t h i r d , and ( v4 , f o u r ) f o u r t h
+l e t t e r s : e a r a . The c a n d i d a t e s a r e : The c a n d i d a t e i s ” e a r a l
+”.
+− earal (e a r a l , e a r a ) fits
+We add t h e word e a r a l f o r h5 . The c u r r e n t words a r e :
+h1 . s a w e r
+h2 . u r e d o
+h3 . r a t e r
+h4 . grama
+h5 . e a r a l
+v1 . s u r g e
+v2 . a r a r a
+v3 . w e t a r
+v4 . edema
+S i n c e we f o u n d a l l h o r i z o n t a l words :
+answer :
+h1 . s a w e r
+h2 . u r e d o
+h3 . r a t e r
+h4 . grama
+h5 . e a r a l
+v1 . s u r g e
+v2 . a r a r a
+v3 . w e t a r
+v4 . edema
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+User :
+h1 . D a n d r u f f ; scum ; t h e b u l l − t r o u t
+h2 . One who g r e e t s ; t o v a c i l l a t e ; a B r i t i s h r i v e r
+h3 . A T u r k i s h w r i t t e n d e c r e e
+h4 . Mignon ; p e t t y ; l i t t l e
+50
+
+Algorithm of Thoughts
+
+h5 .
+v1 .
+v2 .
+v3 .
+v4 .
+v5 .
+
+A bishop ’ s permission f o r a p r i e s t to leave a dioce se
+To s t e a l ; t o b r u s h a c r o s s
+A sedge ( a p r i m i t i v e three − sided g r a s s )
+Grape jam
+A flatworm l a r v a
+Ore r e f u s e ; t o p r e p a r e m a t e r i a l f o r g l a s s by h e a t
+
+h2 . waver
+h5 . e x e a t
+v1 . s w i p e
+v2 . c a r e x
+Assistant :
+Let ’ s c o n s i d e r t h e n e x t u n f o u n d h o r i z o n t a l word , which i s h1 .
+S i n c e we a r e c o n s i d e r i n g t h e f i r s t h o r i z o n t a l word , we n e e d t o
+l o o k a t t h e f i r s t l e t t e r s o f t h e v e r t i c a l words we f o u n d :
+− What i s t h e f i r s t l e t t e r o f s w i p e : s
+− What i s t h e f i r s t l e t t e r o f c a r e x : c
+The word we a r e l o o k i n g f i t s t h e c l u e ” D a n d r u f f ; scum ; t h e b u l l −
+t r o u t ” and n e e d s t o h a v e t h e l e t t e r s s and c i n i t s ( v1 , one )
+f i r s t and ( v2 , two ) s e c o n d l e t t e r s : s c
+. The c a n d i d a t e s
+are : scurf .
+− scurf ( s c u r f , s c
+) fits
+We add t h e word s c u r f f o r h1 . The c u r r e n t words a r e :
+h1 . s c u r f
+h2 . waver
+h5 . e x e a t
+v1 . s w i p e
+v2 . c a r e x
+Now , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d v e r t i c a l word , which i s v3 .
+S i n c e we a r e c o n s i d e r i n g t h e t h i r d v e r t i c a l word , we n e e d t o
+l o o k a t t h e t h i r d l e t t e r s o f t h e h o r i z o n t a l words we f o u n d :
+− What i s t h e t h i r d l e t t e r o f s c u r f : u
+− What i s t h e t h i r d l e t t e r o f waver : v
+− What i s t h e t h i r d l e t t e r o f e x e a t : e
+The word we a r e l o o k i n g f i t s t h e c l u e ” Grape jam ” and n e e d s t o
+h a v e t h e l e t t e r s u , v , and e i n i t s ( h1 , one ) f i r s t , ( h2 , two )
+s e c o n d , and ( h5 , f i v e ) f i f t h l e t t e r s : u v
+e . The c a n d i d a t e s
+a r e : The c a n d i d a t e i s ” u v e t t a ” .
+− uvetta (u v e t t a , u v
+e ) doesn ’ t f i t
+Let ’ s c o n s i d e r t h e n e x t u n f o u n d v e r t i c a l word , which i s v4 . S i n c e
+we a r e c o n s i d e r i n g t h e f o u r t h v e r t i c a l word , we n e e d t o l o o k a t
+t h e f o u r t h l e t t e r s o f t h e h o r i z o n t a l words we f o u n d :
+− What i s t h e f o u r t h l e t t e r o f s c u r f : r
+− What i s t h e f o u r t h l e t t e r o f waver : e
+− What i s t h e f o u r t h l e t t e r o f e x e a t : a
+The word we a r e l o o k i n g f i t s t h e c l u e ”A f l a t w o r m l a r v a ” and n e e d s
+t o h a v e t h e l e t t e r s r , e , and a i n i t s ( h1 , one ) f i r s t , ( h2 ,
+two ) s e c o n d , and ( h5 , f i v e ) f i f t h l e t t e r s : r e
+a . The
+candidates are : redia .
+− redia ( r e d i a , r e
+a) fits
+We add t h e word r e d i a f o r v4 . The c u r r e n t words a r e :
+h1 . s c u r f
+h2 . waver
+h5 . e x e a t
+51
+
+Algorithm of Thoughts
+
+v1 . s w i p e
+v2 . c a r e x
+v4 . r e d i a
+Now , l e t ’ s c o n s i d e r t h e n e x t u n f o u n d h o r i z o n t a l word , which i s h3 .
+S i n c e we a r e c o n s i d e r i n g t h e t h i r d h o r i z o n t a l word , we n e e d t o
+l o o k a t t h e t h i r d l e t t e r s o f t h e v e r t i c a l words we f o u n d :
+− What i s t h e t h i r d l e t t e r o f s w i p e : i
+− What i s t h e t h i r d l e t t e r o f c a r e x : r
+− What i s t h e t h i r d l e t t e r o f r e d i a : d
+The word we a r e l o o k i n g f i t s t h e c l u e ”A T u r k i s h w r i t t e n d e c r e e ”
+and n e e d s t o h a v e t h e l e t t e r s i , r , and d i n i t s ( v1 , one )
+f i r s t , ( v2 , two ) s e c o n d , and ( v4 , f o u r ) f o u r t h l e t t e r s : i r
+d
+. The c a n d i d a t e s a r e : i r a d e .
+− irade ( i r a d e , i r
+d ) fits
+We add t h e word i r a d e f o r h3 . The c u r r e n t words a r e :
+h1 . s c u r f
+h2 . waver
+h3 . i r a d e
+h5 . e x e a t
+v1 . s w i p e
+v2 . c a r e x
+v4 . r e d i a
+Now , l e t ’ s c o n s i d e r t h e l a s t u n f o u n d v e r t i c a l word , which i s v5 .
+S i n c e we a r e c o n s i d e r i n g t h e f i f t h v e r t i c a l word , we n e e d t o
+l o o k a t t h e f i f t h l e t t e r s o f t h e h o r i z o n t a l words we f o u n d :
+− What i s t h e f i f t h l e t t e r o f s c u r f : f
+− What i s t h e f i f t h l e t t e r o f waver : r
+− What i s t h e f i f t h l e t t e r o f i r a d e : e
+− What i s t h e f i f t h l e t t e r o f e x e a t : t
+The word we a r e l o o k i n g f i t s t h e c l u e ” Ore r e f u s e ; t o p r e p a r e
+m a t e r i a l f o r g l a s s by h e a t ” and n e e d s t o h a v e t h e l e t t e r s f , r ,
+e , and t i n i t s ( h1 , one ) f i r s t , ( h2 , two ) s e c o n d , ( h3 , t h r e e )
+t h i r d , and ( h5 , f i v e ) f i f t h l e t t e r s : f r e
+t . The c a n d i d a t e s
+a r e : The c a n d i d a t e i s ” f r e t t ” .
+− frett (f r e t t , f r e
+t ) fits
+We add t h e word f r e t t f o r v5 . The c u r r e n t words a r e :
+h1 . s c u r f
+h2 . waver
+h3 . i r a d e
+h5 . e x e a t
+v1 . s w i p e
+v2 . c a r e x
+v4 . r e d i a
+v5 . f r e t t
+S i n c e we f o u n d a l l h o r i z o n t a l words :
+answer :
+h1 . s c u r f
+h2 . waver
+h3 . i r a d e
+h5 . e x e a t
+v1 . s w i p e
+v2 . c a r e x
+v4 . r e d i a
+v5 . f r e t t
+52
+
+Algorithm of Thoughts
+
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+F.3.2. P ROPOSE W ORDS
+
+User :
+h1 . A l u n a r v a l l e y
+h2 . A f a t t y o i l
+h3 . To e n t i c e
+h4 . To l o w e r ; t o r e d u c e
+h5 . A s o l i t a r y p e r s o n
+v1 . A c c o r d i n g t o t h e r o s t e r
+v2 . A n o t h e r name f o r P o r t − F r a n c q u i
+v3 . An i l l i c i t l o v e r ; a E u r o p e a n l a k e
+v4 . To l i s p
+v5 . To come i n
+Assistant :
+A l l p o s s i b l e 5− l e t t e r s words f o r e a c h c l u e , f o r e a c h c l u e we g i v e
+10 o p t i o n s :
+h1 . RILLE , VALLIS , CRATER, BASINS , PLAINS
+h2 . OLEIC , OLEIN , GREASE , BUTTER , ANIMAL
+h3 . LURE , TEMPT, SEDUCE , ENTICE , DRAWIN
+h4 . ABASE, LOWER, REDUCE, LESSEN , DEBASE
+h5 . HERMIT , ALONE, LONER, SINGLE , SOLITARY
+v1 . ONTAP, LISTED , ROSTER , SCHEDULE, PLANNED
+v2 . ILEBO , PORTF , CONGO, AFRICA , COLONY
+v3 . LOVER, AMOUR, GENEVA, LEMAN, ZURICH
+v4 . SLUR , LISPS , STUTTER , MUMBLE, STAMMER
+v5 . ENTER , ARRIVE , COMEIN, APPEAR , SHOWUP
+˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+
+F.4. Creative Writing
+F.4.1. AOT
+
+” W r i t e a c o h e r e n t p a s s a g e o f 4 s h o r t p a r a g r a p h s . The end s e n t e n c e o f
+e a c h p a r a g r a p h must be :
+{0}
+F i r s t l y , make f i v e d i f f e r e n t p l a n s f o r a c o h e r e n t p a s s a g e , t h e n w r i t e .
+Your o u t p u t s h o u l d be o f t h e f o l l o w i n g f o r m a t :
+Plan 1:
+Your p l a n h e r e .
+Plan 2:
+Your p l a n h e r e .
+Plan 3:
+Your p l a n h e r e .
+
+53
+
+Algorithm of Thoughts
+
+Plan 4:
+Your p l a n h e r e .
+Plan 5:
+Your p l a n h e r e .
+S e c o n d l y , g i v e n an i n s t r u c t i o n and s e v e r a l p l a n s , d e c i d e which c h o i c e
+i s most p r o m i s i n g . A n a l y z e e a c h c h o i c e i n d e t a i l , t h e n c o n c l u d e i n
+t h e l a s t l i n e ” The b e s t c h o i c e i s {{ s } } ” , where s t h e i n t e g e r i d o f
+the choice .
+T h i r d l y , w r i t e t h e p a s s a g e a c c o r d i n g t o t h a t c h o s e n p l a n i n t h e most
+c o h e r e n t way . Add ” P a s s a g e : ” b e f o r e w r i t i n g t h e p a s s a g e u n d e r i t .
+Passage :
+Your p a s s a g e h e r e .
+F i n a l l y , r e f i n e t h e p a s s a g e i n t h e most c o h e r e n t way , b u t you s t i l l
+h a v e t o end e a c h p a r a g r a p h w i t h t h e g i v e n s e n t e n c e s a s b e f o r e .
+Final Passage :
+Final passage here .
+F.4.2. S CORE P ROMPT
+
+A n a l y z e t h e f o l l o w i n g p a s s a g e , t h e n a t t h e l a s t l i n e c o n c l u d e ” Thus
+t h e c o h e r e n c y s c o r e i s {{ s } } ” , where s i s an i n t e g e r from 1 t o 1 0 .
+{0}
+
+54
+
+

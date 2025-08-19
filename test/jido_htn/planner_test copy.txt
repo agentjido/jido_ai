@@ -1,0 +1,260 @@
+defmodule JidoTest.HTN.PlannerTest do
+  use ExUnit.Case, async: true
+  alias Jido.HTN
+  alias Jido.HTN.Domain
+
+  @moduletag :capture_log
+
+  defmodule TestAction do
+    @moduledoc false
+    def run(_, _, _), do: {:ok, %{}}
+  end
+
+  defmodule AnotherTestAction do
+    @moduledoc false
+    def run(_, _, _), do: {:ok, %{}}
+  end
+
+  describe "plan/3" do
+    test "requires root task by default" do
+      # First verify current behavior with single root
+      {:ok, domain} =
+        "Test Domain"
+        |> Domain.new()
+        |> Domain.compound("root", methods: [%{subtasks: ["task1"]}])
+        |> Domain.primitive("task1", {TestAction, []})
+        |> Domain.allow("TestAction", TestAction)
+        |> Domain.build()
+
+      assert {:ok, [{TestAction, []}], _mtr} = HTN.plan(domain, %{})
+
+      # Now test with multiple root tasks but no "root" task
+      {:ok, domain_multi} =
+        "Test Domain"
+        |> Domain.new()
+        |> Domain.compound("root1", methods: [%{subtasks: ["task1"]}])
+        |> Domain.compound("root2", methods: [%{subtasks: ["task2"]}])
+        |> Domain.primitive("task1", {TestAction, []})
+        |> Domain.primitive("task2", {AnotherTestAction, []})
+        |> Domain.allow("TestAction", TestAction)
+        |> Domain.allow("AnotherTestAction", AnotherTestAction)
+        |> Domain.build()
+
+      # This should fail since there's no "root" task
+      assert {:error, "Unknown task: \"root\""} = HTN.plan(domain_multi, %{})
+    end
+
+    test "supports multiple root tasks with explicit root list" do
+      {:ok, domain} =
+        "Test Domain"
+        |> Domain.new()
+        |> Domain.compound("root1", methods: [%{subtasks: ["task1"]}])
+        |> Domain.compound("root2", methods: [%{subtasks: ["task2"]}])
+        |> Domain.primitive("task1", {TestAction, []})
+        |> Domain.primitive("task2", {AnotherTestAction, []})
+        |> Domain.allow("TestAction", TestAction)
+        |> Domain.allow("AnotherTestAction", AnotherTestAction)
+        |> Domain.build()
+
+      # Should succeed with both tasks executed in order
+      assert {:ok, [{AnotherTestAction, []}, {TestAction, []}], _mtr} =
+               HTN.plan(domain, %{}, root_tasks: ["root1", "root2"])
+    end
+
+    test "validates root_tasks option" do
+      {:ok, domain} =
+        "Test Domain"
+        |> Domain.new()
+        |> Domain.compound("root1", methods: [%{subtasks: ["task1"]}])
+        |> Domain.primitive("task1", {TestAction, []})
+        |> Domain.allow("TestAction", TestAction)
+        |> Domain.build()
+
+      # Test invalid root task name
+      assert_raise ArgumentError, "Root task 'nonexistent' not found in domain", fn ->
+        HTN.plan(domain, %{}, root_tasks: ["nonexistent"])
+      end
+
+      # Test non-compound root task
+      assert_raise ArgumentError, "Root task 'task1' must be a compound task", fn ->
+        HTN.plan(domain, %{}, root_tasks: ["task1"])
+      end
+
+      # Test invalid root_tasks type
+      assert_raise ArgumentError, ~r/root_tasks must be a list/, fn ->
+        HTN.plan(domain, %{}, root_tasks: "root1")
+      end
+    end
+
+    test "planner returns a partial plan when max_depth is reached" do
+      defmodule P1 do
+        def run(_, _, _), do: {:ok, %{p1: true}}
+      end
+
+      defmodule P2 do
+        def run(_, _, _), do: {:ok, %{p2: true}}
+      end
+
+      defmodule P3 do
+        def run(_, _, _), do: {:ok, %{p3: true}}
+      end
+
+      defmodule P4 do
+        def run(_, _, _), do: {:ok, %{p4: true}}
+      end
+
+      defmodule P5 do
+        def run(_, _, _), do: {:ok, %{p5: true}}
+      end
+
+      {:ok, domain} =
+        "Partial Plan Domain"
+        |> Domain.new()
+        |> Domain.compound("root", methods: [%{subtasks: ["P1", "P2", "P3", "P4", "P5"]}])
+        |> Domain.primitive("P1", {P1, []}, cost: 1)
+        |> Domain.primitive("P2", {P2, []}, cost: 1)
+        |> Domain.primitive("P3", {P3, []}, cost: 1)
+        |> Domain.primitive("P4", {P4, []}, cost: 1)
+        |> Domain.primitive("P5", {P5, []}, cost: 1)
+        |> Domain.allow("P1", P1)
+        |> Domain.allow("P2", P2)
+        |> Domain.allow("P3", P3)
+        |> Domain.allow("P4", P4)
+        |> Domain.allow("P5", P5)
+        |> Domain.build()
+
+      initial_ws = %{}
+      result = HTN.plan(domain, initial_ws, max_depth: 3)
+      assert {:partial, plan, final_ws, _mtr, remaining_tasks, _tree} = result
+      assert Enum.map(plan, fn {mod, _} -> mod end) == [P1, P2, P3]
+      assert Enum.map(remaining_tasks, fn {name, _, _} -> name end) == ["P4", "P5"]
+      assert final_ws[:p1] and final_ws[:p2] and final_ws[:p3]
+    end
+
+    test "planner returns full plan if max_depth is greater than plan length" do
+      defmodule Q1 do
+        def run(_, _, _), do: {:ok, %{q1: true}}
+      end
+
+      defmodule Q2 do
+        def run(_, _, _), do: {:ok, %{q2: true}}
+      end
+
+      {:ok, domain} =
+        "Full Plan Domain"
+        |> Domain.new()
+        |> Domain.compound("root", methods: [%{subtasks: ["Q1", "Q2"]}])
+        |> Domain.primitive("Q1", {Q1, []}, cost: 1)
+        |> Domain.primitive("Q2", {Q2, []}, cost: 1)
+        |> Domain.allow("Q1", Q1)
+        |> Domain.allow("Q2", Q2)
+        |> Domain.build()
+
+      result = HTN.plan(domain, %{}, max_depth: 10)
+      assert {:ok, plan, _mtr, _ws, _tree} = result
+      assert Enum.map(plan, fn {mod, _} -> mod end) == [Q1, Q2]
+    end
+
+    test "planner returns partial plan based on max_cost" do
+      defmodule R1 do
+        def run(_, _, _), do: {:ok, %{r1: true}}
+      end
+
+      defmodule R2 do
+        def run(_, _, _), do: {:ok, %{r2: true}}
+      end
+
+      defmodule R3 do
+        def run(_, _, _), do: {:ok, %{r3: true}}
+      end
+
+      {:ok, domain} =
+        "Cost Plan Domain"
+        |> Domain.new()
+        |> Domain.compound("root", methods: [%{subtasks: ["R1", "R2", "R3"]}])
+        |> Domain.primitive("R1", {R1, []}, cost: 2)
+        |> Domain.primitive("R2", {R2, []}, cost: 2)
+        |> Domain.primitive("R3", {R3, []}, cost: 2)
+        |> Domain.allow("R1", R1)
+        |> Domain.allow("R2", R2)
+        |> Domain.allow("R3", R3)
+        |> Domain.build()
+
+      result = HTN.plan(domain, %{}, max_cost: 4)
+      assert {:partial, plan, _ws, _mtr, remaining_tasks, _tree} = result
+      assert Enum.map(plan, fn {mod, _} -> mod end) == [R1, R2]
+      assert Enum.map(remaining_tasks, fn {name, _, _} -> name end) == ["R3"]
+    end
+
+    test "planner can resume from a partial plan's remaining tasks" do
+      defmodule S1 do
+        def run(_, _, _), do: {:ok, %{s1: true}}
+      end
+
+      defmodule S2 do
+        def run(_, _, _), do: {:ok, %{s2: true}}
+      end
+
+      defmodule S3 do
+        def run(_, _, _), do: {:ok, %{s3: true}}
+      end
+
+      {:ok, domain} =
+        "Resume Plan Domain"
+        |> Domain.new()
+        |> Domain.compound("root", methods: [%{subtasks: ["S1", "S2", "S3"]}])
+        |> Domain.primitive("S1", {S1, []}, cost: 1)
+        |> Domain.primitive("S2", {S2, []}, cost: 1)
+        |> Domain.primitive("S3", {S3, []}, cost: 1)
+        |> Domain.allow("S1", S1)
+        |> Domain.allow("S2", S2)
+        |> Domain.allow("S3", S3)
+        |> Domain.build()
+
+      # Get a partial plan
+      {:partial, plan, ws, _mtr, remaining_tasks, _tree} = HTN.plan(domain, %{}, max_depth: 2)
+      # Resume from remaining tasks
+      result = HTN.plan(domain, ws, initial_tasks_to_process: remaining_tasks)
+      assert {:ok, resumed_plan, _mtr, _ws, _tree} = result
+      assert Enum.map(resumed_plan, fn {mod, _} -> mod end) == [S3]
+      # Combined plan is [S1, S2, S3]
+      assert Enum.map(plan ++ resumed_plan, fn {mod, _} -> mod end) == [S1, S2, S3]
+    end
+
+    test "resuming with empty initial_tasks and no root_tasks results in no plan or specific error" do
+      {:ok, domain} =
+        "Empty Resume Domain"
+        |> Domain.new()
+        |> Domain.build()
+
+      result = HTN.plan(domain, %{}, initial_tasks_to_process: [])
+      assert match?({:ok, [], _mtr, _ws, _tree}, result) or match?({:error, _}, result)
+    end
+
+    test "resuming respects new max_depth for the resumed segment" do
+      defmodule T1 do
+        def run(_, _, _), do: {:ok, %{t1: true}}
+      end
+
+      defmodule T2 do
+        def run(_, _, _), do: {:ok, %{t2: true}}
+      end
+
+      {:ok, domain} =
+        "Resume Depth Domain"
+        |> Domain.new()
+        |> Domain.compound("root", methods: [%{subtasks: ["T1", "T2"]}])
+        |> Domain.primitive("T1", {T1, []}, cost: 1)
+        |> Domain.primitive("T2", {T2, []}, cost: 1)
+        |> Domain.allow("T1", T1)
+        |> Domain.allow("T2", T2)
+        |> Domain.build()
+
+      {:partial, plan, ws, _mtr, remaining_tasks, _tree} = HTN.plan(domain, %{}, max_depth: 1)
+      result = HTN.plan(domain, ws, initial_tasks_to_process: remaining_tasks, max_depth: 1)
+      assert {:partial, resumed_plan, _ws, _mtr, remaining_tasks2, _tree} = result
+      assert Enum.map(resumed_plan, fn {mod, _} -> mod end) == [T2]
+      assert remaining_tasks2 == []
+    end
+  end
+end
