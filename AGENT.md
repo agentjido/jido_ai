@@ -12,26 +12,34 @@ JidoWorkspace is a git subtree-powered monorepo workspace manager for the Jido e
 - `mix format` - Format Elixir code
 
 ### Workspace Management
+
+**Daily Workflow:**
 - `mix morning` - Pull all projects and compile (start of day routine)
 - `mix sync` - Pull all projects and run tests
-- `mix workspace.pull` - Pull updates from all upstream repos
-- `mix workspace.pull <project>` - Pull updates for specific project
-- `mix workspace.push <project>` - Push changes to specific project upstream
-- `mix workspace.status` - Show status of all projects
-- `mix workspace.test.all` - Run tests across all projects
-- `mix workspace.quality` - Run quality checks across all projects
-- `mix workspace.deps` - Check/upgrade dependencies across all projects
-- `mix workspace.diff` - Show local changes vs upstream
+
+**Generic Task Runner:**
+- `mix ws <task>` - Run any Mix task across all projects (e.g., `mix ws compile`, `mix ws test`, `mix ws format`)
+
+**Git Operations:**
+- `mix ws.git.pull` - Pull updates from all upstream repos
+- `mix ws.git.push <project>` - Push changes to specific project upstream
+- `mix ws.git.status` - Show git status of all projects
+- `mix ws.git.diff` - Show local changes vs upstream
+
+**Dependencies:**
+- `mix ws.deps.get` - Safely fetch dependencies (preserves mix.lock integrity)
+- `mix ws.deps.upgrade` - Upgrade dependencies across all projects
+
+**Quality & Testing:**
+- `mix ws.quality` - Run quality checks across all projects
 - `mix workspace.add <name> <url>` - Add new project to workspace
 
-### Short Aliases
-- `mix ws.pull` - Same as `workspace.pull`
-- `mix ws.push` - Same as `workspace.push`
-- `mix ws.status` - Same as `workspace.status`
-- `mix ws.test` - Same as `workspace.test.all`
-- `mix ws.quality` - Same as `workspace.quality`
-- `mix ws.deps` - Same as `workspace.deps`
-- `mix ws.diff` - Same as `workspace.diff`
+### Convenient Aliases
+- `mix ws.pull` - Same as `ws.git.pull`
+- `mix ws.push` - Same as `ws.git.push`
+- `mix ws.status` - Same as `ws.git.status`
+- `mix ws.test` - Same as `ws test`
+- `mix ws.deps` - Same as `ws.deps.get`
 
 ## Project Structure
 
@@ -40,11 +48,14 @@ jido_workspace/
 ├── mix.exs                    # Main project file with aliases
 ├── lib/
 │   ├── jido_workspace.ex      # Core management module
-│   └── mix/tasks/workspace.ex # Custom Mix tasks
-├── projects/                  # Git subtrees go here
-│   └── jido/                  # First subtree project
+│   ├── jido_workspace/        # Core modules
+│   │   └── runner.ex          # Task execution engine
+│   └── mix/tasks/             # Mix task definitions
+│       ├── ws.ex              # Generic task runner
+│       ├── ws_*.ex            # Workspace commands
+│       └── workspace_add.ex   # Add new projects
+├── projects/                  # Git subtrees (15+ projects)
 ├── config/workspace.exs       # Project configurations
-├── scripts/                   # Helper scripts
 └── test/                      # Workspace tests
 ```
 
@@ -57,13 +68,17 @@ config :jido_workspace,
   projects: [
     %{
       name: "jido",
-      upstream_url: "https://github.com/agentjido/jido",
+      upstream_url: "git@github.com:agentjido/jido.git",
       branch: "main",
       type: :library,
       path: "projects/jido"
     }
   ]
 ```
+
+**Git URL Guidelines:**
+- Always use SSH URLs (`git@github.com:`) for project repositories
+- SSH provides secure authentication and avoids credential prompts
 
 ## Core API
 
@@ -78,8 +93,8 @@ The `JidoWorkspace` module provides:
 
 1. **Adding new project**: `mix workspace.add <name> <url>`
 2. **Daily sync**: `mix morning` or `mix sync`
-3. **Pulling updates**: `mix workspace.pull [project]`
-4. **Pushing changes**: `mix workspace.push <project>`
+3. **Pulling updates**: `mix ws.git.pull [project]`
+4. **Pushing changes**: `mix ws.git.push <project>`
 
 ## Dependency Management
 

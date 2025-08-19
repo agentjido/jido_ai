@@ -21,7 +21,9 @@ defmodule JidoWorkspace.MixProject do
   end
 
   defp deps do
-    []
+    [
+      {:table_rex, "~> 4.0"}
+    ]
   end
 
   defp aliases do
@@ -34,6 +36,7 @@ defmodule JidoWorkspace.MixProject do
       "ws.pull": ["ws.git.pull"],
       "ws.push": ["ws.git.push"],
       "ws.status": ["ws.git.status"],
+      "ws.report": ["ws.status.detailed"],
       "ws.test": ["ws test"],
       "ws.deps.get": ["ws deps.get"],
       "ws.deps.upgrade": ["ws.upgrade.deps"],

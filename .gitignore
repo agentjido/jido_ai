@@ -22,6 +22,9 @@ jido_workspace-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+# Workspace status cache
+/.cache/
+
 # Env Vars
 .env
 .env*
