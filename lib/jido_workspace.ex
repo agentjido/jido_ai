@@ -15,6 +15,26 @@ defmodule JidoWorkspace do
   end
 
   @doc """
+  Check if the working tree is clean (no local modifications).
+  """
+  def check_clean_working_tree do
+    case System.cmd("git", ["status", "--porcelain"], stderr_to_stdout: true) do
+      {"", 0} ->
+        :ok
+      
+      {output, 0} ->
+        Logger.error("Working tree has local modifications. Please commit or stash changes first:")
+        Logger.error(output)
+        {:error, :dirty_working_tree}
+      
+      {output, code} ->
+        Logger.error("Failed to check git status (exit code: #{code})")
+        Logger.error(output)
+        {:error, :git_error}
+    end
+  end
+
+  @doc """
   Get the workspace configuration.
   """
   def config do
@@ -33,18 +53,22 @@ defmodule JidoWorkspace do
   Pull all projects from their upstream repositories.
   """
   def sync_all do
-    Logger.info("Syncing all projects...")
-    
-    config()
-    |> Enum.map(&pull_project(&1.name))
-    |> Enum.all?(&(&1 == :ok))
-    |> case do
-      true -> 
-        Logger.info("All projects synced successfully")
-        :ok
-      false -> 
-        Logger.error("Some projects failed to sync")
-        :error
+    with :ok <- check_clean_working_tree() do
+      Logger.info("Syncing all projects...")
+      
+      config()
+      |> Enum.map(&pull_project(&1.name))
+      |> Enum.all?(&(&1 == :ok))
+      |> case do
+        true -> 
+          Logger.info("All projects synced successfully")
+          :ok
+        false -> 
+          Logger.error("Some projects failed to sync")
+          :error
+      end
+    else
+      error -> error
     end
   end
 
@@ -52,19 +76,23 @@ defmodule JidoWorkspace do
   Pull a specific project from its upstream repository.
   """
   def pull_project(name) when is_binary(name) do
-    case find_project(name) do
-      nil ->
-        Logger.error("Project '#{name}' not found in workspace config")
-        :error
-      
-      project ->
-        Logger.info("Pulling project: #{project.name}")
+    with :ok <- check_clean_working_tree() do
+      case find_project(name) do
+        nil ->
+          Logger.error("Project '#{name}' not found in workspace config")
+          :error
         
-        if File.exists?(project.path) do
-          git_subtree_pull(project)
-        else
-          git_subtree_add(project)
-        end
+        project ->
+          Logger.info("Pulling project: #{project.name}")
+          
+          if File.exists?(project.path) do
+            git_subtree_pull(project)
+          else
+            git_subtree_add(project)
+          end
+      end
+    else
+      error -> error
     end
   end
 
