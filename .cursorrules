@@ -1,0 +1,221 @@
+# Project Instructions (Phoenix Project)
+
+This document serves as a comprehensive, award-winning set of guidelines for a Phoenix-based Elixir web application. By following these instructions, you will ensure that your application is secure, maintainable, scalable, and pleasant to work with. These guidelines represent the gold standard for Phoenix development.
+
+---
+
+## Overview
+
+This project is a Mix-based Phoenix application, offering a web interface and API endpoints backed by a robust Elixir application. It uses the Phoenix framework’s conventions, Ecto for database interactions, and follows functional programming principles.
+
+**Goals:**
+
+- Produce clean, maintainable, and modular code.
+- Embrace Phoenix conventions while encouraging functional design.
+- Write secure, resilient, and testable code.
+- Provide clear documentation and consistent logging.
+- Deliver an exemplary developer experience and user experience.
+
+---
+
+## Directory Structure
+
+A typical Phoenix project structure:
+
+. ├── config/ # Configuration files for all environments ├── lib/ │ ├── my_app/ # Core business logic, contexts, domain modules │ │ ├── ... │ ├── my_app_web/ # Phoenix web interface: controllers, views, templates, channels │ │ ├── controllers/ │ │ ├── templates/ │ │ ├── views/ │ │ ├── endpoint.ex │ │ ├── router.ex │ │ └── ... │ └── my_app.ex # Application entry point & supervision tree setup ├── priv/ │ ├── gettext/ # I18n & l10n (Gettext) files │ ├── repo/migrations/ # Database migrations │ ├── static/ # Static assets │ └── ... ├── test/ │ ├── support/ # Shared test setup, helpers, and mocks │ ├── my_app/ # Tests for core domain logic │ ├── my_app_web/ # Tests for controllers, views, channels, and integration tests │ └── test_helper.exs ├── mix.exs ├── mix.lock └── README.md
+
+markdown
+Copy code
+
+**Guiding Principles:**
+
+- **Separation of Concerns:**  
+  - Business logic in `lib/my_app` (contexts and domain modules).
+  - Web-related code (controllers, views, templates, channels) in `lib/my_app_web`.
+  - Configurations in `config/`.
+  - Tests mirroring the structure of `lib/` for easy navigation.
+  
+- **Functional Approach:**  
+  Keep modules small, focused, and pure where possible. Use contexts to group related domain functions and data operations.
+
+---
+
+## Code Quality & Style
+
+- **Formatting & Linting:**  
+  - Run `mix format` before committing.
+  - Use [Credo](https://hex.pm/packages/credo) to enforce Elixir best practices.
+  
+- **Documentation:**  
+  - Document all public functions and modules with `@doc` and `@moduledoc`.  
+  - Use [ExDoc](https://hex.pm/packages/ex_doc) to generate documentation.
+  - Consider inline documentation for complex logic.
+
+- **Type Specs:**  
+  - Add `@spec` annotations to all public functions.
+  - Use Dialyzer to catch type inconsistencies.
+
+- **Naming Conventions:**  
+  - Use `snake_case` for functions and variables.
+  - Use `PascalCase` for module names.
+  - Keep module names descriptive and reflective of their domain.
+
+---
+
+## Phoenix & Web Conventions
+
+- **Controllers, Views, and Templates:**
+  - Controllers: Keep thin, delegating complex logic to contexts.
+  - Views: Handle only data formatting for templates.
+  - Templates: Keep markup and presentation logic minimal.
+  
+- **Router:**
+  - Organize routes by scope and pipeline.
+  - Use `pipeline`s to apply common plugs.
+  - Keep routes RESTful and consistent, grouping related endpoints logically.
+
+- **Channels & LiveView (If Used):**
+  - Keep channel topics consistent and meaningful.
+  - For LiveViews, keep stateful logic simple and leverage contexts for data retrieval and updates.
+
+- **Error Handling:**
+  - Use `MyAppWeb.FallbackController` to handle errors gracefully in controllers.
+  - Return meaningful HTTP status codes and JSON error responses for APIs.
+  - Provide friendly and secure error pages for browser requests.
+
+---
+
+## Contexts & Domain Logic
+
+- **Contexts:**
+  - Group related functionality into contexts. For example: `MyApp.Accounts`, `MyApp.Billing`.
+  - Contexts expose a clean API to the rest of the app. Internally, they use Ecto schemas and queries.
+  - Keep business logic in contexts, not in controllers or views.
+
+- **Ecto & Database Interactions:**
+  - Define schemas and changesets in `lib/my_app/` contexts.
+  - Use migrations in `priv/repo/migrations/`.
+  - Keep queries in contexts, exposing functions that return domain structs or raw data as needed.
+  - Provide changesets for data validation and transformations at the domain boundaries.
+
+- **Resiliency & OTP:**
+  - Use GenServers, Supervisors, and other OTP constructs where appropriate.
+  - Keep OTP processes isolated and supervised in the application’s supervision tree.
+  
+---
+
+## Security Best Practices
+
+- **Authentication & Authorization:**
+  - Use Phoenix’s plug system or a well-established library for authentication (e.g., `phx.gen.auth`).
+  - Sanitize input and validate data thoroughly before processing.
+  - Implement authorization checks in contexts or a dedicated policy layer.
+
+- **CSRF, XSS & Injection Attacks:**
+  - Ensure CSRF protection in forms (`<%= csrf_meta_tag() %>`).
+  - Use `Phoenix.HTML.safe_to_string()` and similar safe helpers to avoid XSS.
+  - Use parameterized Ecto queries to avoid SQL injection.
+
+- **Secrets Management:**
+  - Store secrets like API keys in environment variables or encrypted configuration files.
+  - Never log sensitive data or secrets.
+  - Use the `config/runtime.exs` or environment-based config for runtime secrets.
+
+---
+
+## Configuration & Environments
+
+- **Config Files:**
+  - `config/config.exs`: Common base config.
+  - `config/dev.exs`, `config/test.exs`, `config/prod.exs`: Environment-specific overrides.
+  - Avoid environment checks within the code; rely on config files to handle environment differences.
+
+- **Runtime Configuration:**
+  - Use `config/releases.exs` for runtime configuration in releases.
+  - Access environment variables with `System.get_env/1` at runtime if needed.
+
+---
+
+## Dependencies & Assets
+
+- **Dependencies:**
+  - Keep dependencies minimal.
+  - Pin versions to known good versions and run `mix deps.get && mix deps.compile` regularly.
+  - Regularly check for dependency updates and security patches.
+
+- **Static Assets & Build Tools:**
+  - Use `assets/` directory for frontend code (if using default Phoenix assets pipeline).
+  - Follow the recommended Phoenix setup for asset bundling (esbuild, tailwind, etc.).
+  - Keep asset logic clean and minimal, focusing on performance and caching in production.
+
+---
+
+## Testing & Quality Assurance
+
+- **Test Setup:**
+  - Use `ExUnit` for testing.
+  - Configure `test_helper.exs` to start necessary application components.
+  - Use `Ecto.Adapters.SQL.Sandbox` in tests to isolate DB state.
+
+- **Test Organization:**
+  - Mirror `lib/my_app` and `lib/my_app_web` structure under `test/` for clarity.
+  - Write unit tests for contexts and integration tests for controllers and endpoints.
+  - Add `test/support/` for shared test utilities and mocks.
+
+- **Mocking & Property Testing:**
+  - Use Mox for mocking external services in tests.
+  - Explore property-based testing with [PropCheck](https://hex.pm/packages/propcheck) or StreamData where it adds value.
+
+- **Continuous Integration:**
+  - Set up a CI pipeline (e.g., GitHub Actions) to run `mix test`, `mix credo`, and `mix dialyzer`.
+  - Require PRs to pass CI before merging.
+
+---
+
+## Documentation & Release Process
+
+- **Documentation:**
+  - Generate documentation with `mix docs`.
+  - Maintain a `README.md` with setup instructions, usage examples, and a high-level overview.
+  - Consider `CHANGELOG.md` to track changes and version bumps.
+
+- **Releases:**
+  - Use `mix release` for creating releases.
+  - Follow semantic versioning.
+  - Tag releases in version control and document major changes in the changelog.
+
+---
+
+## Logging & Monitoring
+
+- **Logging:**
+  - Use `Logger` to log meaningful messages at appropriate levels.
+  - Redact sensitive information from logs.
+  
+- **Metrics & Monitoring:**
+  - Integrate telemetry and metrics for critical operations.
+  - Consider using external monitoring tools (e.g., Prometheus, Grafana, Honeybadger, AppSignal).
+
+---
+
+## Security, Performance, and Scalability
+
+- **Security:**
+  - Stay up to date with Phoenix and dependency security patches.
+  - Perform periodic security audits and code reviews.
+
+- **Performance:**
+  - Profile and benchmark critical endpoints under load.
+  - Use caching where appropriate (ETS, Redis) if needed.
+  
+- **Scalability:**
+  - Design modules and processes to scale horizontally.
+  - Leverage OTP distribution or Kubernetes for clustering if needed.
+
+---
+
+## Conclusion
+
+By adhering to these guidelines, you ensure that your Phoenix project is robust, maintainable, secure, and delightful to work with. Embrace these best practices to create a Phoenix application that stands as a shining example of Elixir’s power and elegance.
+
+This guidelines file sets a new standard for Phoenix projects—truly award-winning in clarity, completeness, and correctness.

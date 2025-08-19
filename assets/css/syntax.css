@@ -1,0 +1,119 @@
+/* Base styles for the code container */
+.makeup {
+  border-radius: theme('borderRadius.lg');
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.5;
+}
+
+.makeup .unselectable {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Light mode */
+.makeup {
+  color: #333;
+}
+
+/* Light mode tokens */
+.makeup .bp, .makeup .nb, .makeup .nn, .makeup .kt { color: #0550ae; } /* built-ins, namespaces, types */
+.makeup .k, .makeup .kc, .makeup .kd, .makeup .kn, .makeup .kp, .makeup .kr, .makeup .ow { color: #0033cc; } /* keywords */
+.makeup .s, .makeup .sa, .makeup .sb, .makeup .sc, .makeup .sd, .makeup .s1, .makeup .s2, .makeup .dl, .makeup .si { color: #aa5500; } /* strings */
+.makeup .ss, .makeup .sx { color: #aa5500; } /* symbols and other strings */
+.makeup .na, .makeup .nt { color: #1e70af; } /* attributes and tags */
+.makeup .nc, .makeup .nf { color: #008800; } /* classes and functions */
+.makeup .nv, .makeup .vi, .makeup .vc, .makeup .vg, .makeup .vm { color: #aa0000; } /* variables */
+.makeup .m, .makeup .mi, .makeup .mf, .makeup .mh, .makeup .mo, .makeup .mb, .makeup .il { color: #009999; } /* numbers */
+.makeup .c, .makeup .c1, .makeup .ch, .makeup .cm, .makeup .cs { color: #777777; font-style: italic; } /* comments */
+.makeup .cp, .makeup .cpf { color: #4c8317; } /* preprocessor */
+.makeup .o { color: #555555; } /* operators */
+.makeup .err { color: #d32f2f; } /* errors - removed background */
+
+/* Dark mode overrides */
+:root[class~="dark"] .makeup {
+  color: #d4d4d4;
+}
+
+:root[class~="dark"] .makeup .bp, 
+:root[class~="dark"] .makeup .nb, 
+:root[class~="dark"] .makeup .nn, 
+:root[class~="dark"] .makeup .kt { color: #4ec9b0; }
+
+:root[class~="dark"] .makeup .k, 
+:root[class~="dark"] .makeup .kc, 
+:root[class~="dark"] .makeup .kd, 
+:root[class~="dark"] .makeup .kn, 
+:root[class~="dark"] .makeup .kp, 
+:root[class~="dark"] .makeup .kr, 
+:root[class~="dark"] .makeup .ow { color: #569cd6; }
+
+:root[class~="dark"] .makeup .s, 
+:root[class~="dark"] .makeup .sa, 
+:root[class~="dark"] .makeup .sb, 
+:root[class~="dark"] .makeup .sc, 
+:root[class~="dark"] .makeup .sd, 
+:root[class~="dark"] .makeup .s1, 
+:root[class~="dark"] .makeup .s2, 
+:root[class~="dark"] .makeup .dl, 
+:root[class~="dark"] .makeup .si, 
+:root[class~="dark"] .makeup .ss, 
+:root[class~="dark"] .makeup .sx { color: #ce9178; }
+
+:root[class~="dark"] .makeup .na, 
+:root[class~="dark"] .makeup .nt { color: #9cdcfe; }
+
+:root[class~="dark"] .makeup .nc, 
+:root[class~="dark"] .makeup .nf { color: #4ec9b0; }
+
+:root[class~="dark"] .makeup .nv, 
+:root[class~="dark"] .makeup .vi, 
+:root[class~="dark"] .makeup .vc, 
+:root[class~="dark"] .makeup .vg, 
+:root[class~="dark"] .makeup .vm { color: #9cdcfe; }
+
+:root[class~="dark"] .makeup .m, 
+:root[class~="dark"] .makeup .mi, 
+:root[class~="dark"] .makeup .mf, 
+:root[class~="dark"] .makeup .mh, 
+:root[class~="dark"] .makeup .mo, 
+:root[class~="dark"] .makeup .mb, 
+:root[class~="dark"] .makeup .il { color: #b5cea8; }
+
+:root[class~="dark"] .makeup .c, 
+:root[class~="dark"] .makeup .c1, 
+:root[class~="dark"] .makeup .ch, 
+:root[class~="dark"] .makeup .cm, 
+:root[class~="dark"] .makeup .cs { color: #6a9955; font-style: italic; }
+
+:root[class~="dark"] .makeup .cp, 
+:root[class~="dark"] .makeup .cpf { color: #6a9955; }
+
+:root[class~="dark"] .makeup .o { color: #d4d4d4; }
+
+:root[class~="dark"] .makeup .err { color: #f44336; }
+
+/* Improve spacing and display */
+.prose pre {
+  margin: 0;
+  background-color: transparent;
+}
+
+.makeup pre {
+  padding: 1em;
+  margin: 0;
+}
+
+/* Remove text decoration to improve readability */
+.makeup .nc, .makeup .nn {
+  text-decoration: none;
+}
+
+:root[class~="dark"] .makeup .nc, 
+:root[class~="dark"] .makeup .nn {
+  text-decoration: none;
+}

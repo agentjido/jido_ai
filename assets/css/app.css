@@ -1,0 +1,43 @@
+@import "tailwindcss/base";
+@import "../../deps/petal_components/assets/default.css";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+@import "./syntax.css";
+@import "./menu.css";
+
+@layer base {
+  /* Add base styles here (eg. styles that are the defaults for common elements)
+
+    Example base style:
+    h1 {
+      @apply text-2xl;
+    }
+
+  */
+}
+
+@layer components {
+  /* Add component styles here (eg. buttons or tabs or anything that uses a number of styles)
+
+    Example change button styles:
+
+    .pc-button {
+      @apply inline-flex items-center justify-center font-semibold tracking-wider uppercase transition duration-150 ease-in-out border-2 rounded-none focus:outline-none;
+    }
+    .pc-button--primary {
+      @apply text-black border-black bg-primary-400 hover:bg-primary-700 focus:bg-primary-700 active:bg-primary-800 focus:shadow-primary-500/50;
+    }
+  */
+}
+
+@layer utilities {
+  /* LiveView specific classes for your customization */
+  .phx-click-loading {
+    opacity: 0.5;
+    transition: opacity 1s ease-out;
+  }
+
+  .phx-loading {
+    cursor: wait;
+  }
+}
