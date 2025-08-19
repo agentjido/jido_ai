@@ -6,23 +6,61 @@ defmodule JidoWorkspace.Runner do
   require Logger
 
   @doc """
-  Run a Mix task across all workspace projects.
+  Run a Mix task across all workspace projects asynchronously.
   """
   def run_task_all(task, args \\ []) do
     Logger.info("Running 'mix #{task} #{Enum.join(args, " ")}' across all projects...")
 
-    JidoWorkspace.config()
-    |> Enum.map(&run_task_in_project(&1, task, args))
-    |> Enum.all?(&(&1 == :ok))
-    |> case do
+    projects = JidoWorkspace.config()
+    
+    # Start async tasks for all projects
+    async_tasks = 
+      projects
+      |> Enum.map(fn project ->
+        Task.async(fn -> run_task_in_project(project, task, args) end)
+      end)
+
+    # Wait for all tasks to complete
+    results = Task.await_many(async_tasks, :infinity)
+
+    # Zip projects with results to track which succeeded/failed
+    project_results = Enum.zip(projects, results)
+    succeeded = Enum.filter(project_results, fn {_project, result} -> result == :ok end)
+    failed = Enum.filter(project_results, fn {_project, result} -> result == :error end)
+
+    case Enum.all?(results, &(&1 == :ok)) do
       true ->
-        Logger.info("Task '#{task}' completed successfully in all projects")
+        Logger.info("✓ Task '#{task}' completed successfully in all #{length(succeeded)} projects")
+        print_final_summary(task, succeeded, failed)
         :ok
 
       false ->
-        Logger.error("Task '#{task}' failed in some projects")
+        Logger.error("✗ Task '#{task}' failed: #{length(succeeded)} succeeded, #{length(failed)} failed")
+        print_final_summary(task, succeeded, failed)
         :error
     end
+  end
+
+  defp print_final_summary(task, succeeded, failed) do
+    IO.puts("\n" <> String.duplicate("=", 80))
+    IO.puts("WORKSPACE SUMMARY: mix #{task}")
+    IO.puts(String.duplicate("=", 80))
+    
+    if Enum.empty?(failed) do
+      IO.puts("SUCCESS: All #{length(succeeded)} projects completed successfully")
+    else
+      IO.puts("FAILED: #{length(succeeded)} succeeded, #{length(failed)} failed")
+    end
+    
+    unless Enum.empty?(succeeded) do
+      IO.puts("SUCCEEDED: #{Enum.map_join(succeeded, ", ", fn {project, _} -> project.name end)}")
+    end
+    
+    unless Enum.empty?(failed) do
+      IO.puts("FAILED: #{Enum.map_join(failed, ", ", fn {project, _} -> project.name end)}")
+    end
+    
+    IO.puts(String.duplicate("=", 80) <> "\n")
   end
 
   @doc """
