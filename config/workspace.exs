@@ -64,7 +64,15 @@ config :jido_workspace,
       branch: "master",
       type: :library,
       path: "projects/depot"
+    },
+    %{
+      name: "jido_behaviortree",
+      upstream_url: "git@github.com:agentjido/jido_behaviortree.git",
+      branch: "main",
+      type: :library,
+      path: "projects/jido_behaviortree"
     }
+
 
 
 
