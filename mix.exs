@@ -22,7 +22,8 @@ defmodule JidoWorkspace.MixProject do
 
   defp deps do
     [
-      {:table_rex, "~> 4.0"}
+      {:table_rex, "~> 4.0"},
+      {:git_cli, "~> 0.3"}
     ]
   end
 

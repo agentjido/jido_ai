@@ -18,11 +18,13 @@ defmodule JidoWorkspace do
   Check if the working tree is clean (no local modifications).
   """
   def check_clean_working_tree do
-    case System.cmd("git", ["status", "--porcelain"], stderr_to_stdout: true) do
-      {"", 0} ->
+    repo = Git.new(".")
+    
+    case Git.status(repo, "--porcelain") do
+      {:ok, ""} ->
         :ok
 
-      {output, 0} ->
+      {:ok, output} ->
         Logger.error(
           "Working tree has local modifications. Please commit or stash changes first:"
         )
@@ -30,9 +32,8 @@ defmodule JidoWorkspace do
         Logger.error(output)
         {:error, :dirty_working_tree}
 
-      {output, code} ->
-        Logger.error("Failed to check git status (exit code: #{code})")
-        Logger.error(output)
+      {:error, reason} ->
+        Logger.error("Failed to check git status: #{reason}")
         {:error, :git_error}
     end
   end
@@ -160,49 +161,46 @@ defmodule JidoWorkspace do
   end
 
   defp git_subtree_add(%{name: name, upstream_url: url, branch: branch, path: path}) do
-    cmd = ["git", "subtree", "add", "--prefix=#{path}", url, branch, "--squash"]
-
-    case System.cmd("git", Enum.drop(cmd, 1), stderr_to_stdout: true) do
-      {output, 0} ->
+    repo = Git.new(".")
+    
+    case Git.subtree(repo, ["add", "--prefix=#{path}", url, branch, "--squash"]) do
+      {:ok, output} ->
         Logger.info("Successfully added subtree: #{name}")
         Logger.debug(output)
         :ok
 
-      {output, code} ->
-        Logger.error("Failed to add subtree #{name} (exit code: #{code})")
-        Logger.error(output)
+      {:error, reason} ->
+        Logger.error("Failed to add subtree #{name}: #{reason}")
         :error
     end
   end
 
   defp git_subtree_pull(%{name: name, upstream_url: url, branch: branch, path: path}) do
-    cmd = ["git", "subtree", "pull", "--prefix=#{path}", url, branch, "--squash"]
-
-    case System.cmd("git", Enum.drop(cmd, 1), stderr_to_stdout: true) do
-      {output, 0} ->
+    repo = Git.new(".")
+    
+    case Git.subtree(repo, ["pull", "--prefix=#{path}", url, branch, "--squash"]) do
+      {:ok, output} ->
         Logger.info("Successfully pulled subtree: #{name}")
         Logger.debug(output)
         :ok
 
-      {output, code} ->
-        Logger.error("Failed to pull subtree #{name} (exit code: #{code})")
-        Logger.error(output)
+      {:error, reason} ->
+        Logger.error("Failed to pull subtree #{name}: #{reason}")
         :error
     end
   end
 
   defp git_subtree_push(%{name: name, upstream_url: url, path: path}, target_branch) do
-    cmd = ["git", "subtree", "push", "--prefix=#{path}", url, target_branch]
-
-    case System.cmd("git", Enum.drop(cmd, 1), stderr_to_stdout: true) do
-      {output, 0} ->
+    repo = Git.new(".")
+    
+    case Git.subtree(repo, ["push", "--prefix=#{path}", url, target_branch]) do
+      {:ok, output} ->
         Logger.info("Successfully pushed subtree: #{name}")
         Logger.debug(output)
         :ok
 
-      {output, code} ->
-        Logger.error("Failed to push subtree #{name} (exit code: #{code})")
-        Logger.error(output)
+      {:error, reason} ->
+        Logger.error("Failed to push subtree #{name}: #{reason}")
         :error
     end
   end
