@@ -34,6 +34,11 @@ JidoWorkspace is a git subtree-powered monorepo workspace manager for the Jido e
 - `mix ws.quality` - Run quality checks across all projects
 - `mix workspace.add <name> <url>` - Add new project to workspace
 
+**Publishing:**
+- `mix hex.publish.all <version> [--dry-run]` - Publish all packages to Hex
+- `mix version.check` - Check version consistency across projects
+- `mix hex_validate` - Validate packages for publishing
+
 ### Convenient Aliases
 - `mix ws.pull` - Same as `ws.git.pull`
 - `mix ws.push` - Same as `ws.git.push`
