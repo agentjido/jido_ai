@@ -1,5 +1,6 @@
 defmodule Jido.AI.Provider.BaseRetryTest do
   use Jido.AI.TestSupport.HTTPCase
+  use Jido.AI.TestSupport.KeyringCase
 
   alias Jido.AI.Error
   alias Jido.AI.Provider.{Base, OpenAI}
@@ -20,9 +21,11 @@ defmodule Jido.AI.Provider.BaseRetryTest do
         ]
       }
 
-      with_success(valid_response) do
-        result = Base.default_generate_object(OpenAI, model, "Generate a person", schema)
-        assert {:ok, %{"name" => "John Doe"}} = result
+      session(openai_api_key: "sk-test-key") do
+        with_success(valid_response) do
+          result = Base.default_generate_object(OpenAI, model, "Generate a person", schema)
+          assert {:ok, %{"name" => "John Doe"}} = result
+        end
       end
     end
 

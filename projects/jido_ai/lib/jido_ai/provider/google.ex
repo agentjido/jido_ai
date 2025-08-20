@@ -18,4 +18,12 @@ defmodule Jido.AI.Provider.Google do
   use Jido.AI.Provider.Macro,
     json: "google.json",
     base_url: "https://generativelanguage.googleapis.com/v1"
+
+  @impl true
+  @spec supports_json_mode?() :: false
+  def supports_json_mode?, do: false
+
+  @impl true
+  @spec stream_event_type() :: :openai
+  def stream_event_type, do: :openai
 end

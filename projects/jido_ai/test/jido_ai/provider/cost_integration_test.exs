@@ -1,6 +1,7 @@
 defmodule Jido.AI.Provider.CostIntegrationTest do
   use ExUnit.Case, async: true
   use Jido.AI.TestSupport.HTTPCase
+  use Jido.AI.TestSupport.KeyringCase
 
   alias Jido.AI.Provider
   alias Jido.AI.Test.Fixtures.{ModelFixtures, ProviderFixtures}
@@ -19,17 +20,19 @@ defmodule Jido.AI.Provider.CostIntegrationTest do
           total_tokens: 40
         )
 
-      with_success(response_body) do
-        case Provider.OpenAI.generate_text(model, "Hello") do
-          {:ok, text} ->
-            assert text == "Hello world!"
+      session(openai_api_key: "sk-test-key") do
+        with_success(response_body) do
+          case Provider.OpenAI.generate_text(model, "Hello") do
+            {:ok, text} ->
+              assert text == "Hello world!"
 
-          # Verify cost calculation happened in logs
-          # The actual cost should be logged at debug level
-          # (25 * 1.5 + 15 * 6.0) / 1_000_000 = 0.0000975
+            # Verify cost calculation happened in logs
+            # The actual cost should be logged at debug level
+            # (25 * 1.5 + 15 * 6.0) / 1_000_000 = 0.0000975
 
-          {:error, error} ->
-            flunk("Expected success, got error: #{inspect(error)}")
+            {:error, error} ->
+              flunk("Expected success, got error: #{inspect(error)}")
+          end
         end
       end
     end
@@ -54,15 +57,17 @@ defmodule Jido.AI.Provider.CostIntegrationTest do
         # No "usage" field
       }
 
-      with_success(response_body) do
-        case Provider.OpenAI.generate_text(model, "Hello") do
-          {:ok, text} ->
-            assert text == "Hello world!"
+      session(openai_api_key: "sk-test-key") do
+        with_success(response_body) do
+          case Provider.OpenAI.generate_text(model, "Hello") do
+            {:ok, text} ->
+              assert text == "Hello world!"
 
-          # Should still work, falling back to token estimation
+            # Should still work, falling back to token estimation
 
-          {:error, error} ->
-            flunk("Expected success, got error: #{inspect(error)}")
+            {:error, error} ->
+              flunk("Expected success, got error: #{inspect(error)}")
+          end
         end
       end
     end

@@ -31,6 +31,7 @@ defmodule Jido.AI.Error do
     @moduledoc "Error for invalid or missing parameters."
     use Splode.Error, fields: [:parameter], class: :invalid
 
+    @spec message(map()) :: String.t()
     def message(%{parameter: parameter}) do
       "Invalid parameter: #{parameter}"
     end
@@ -42,6 +43,7 @@ defmodule Jido.AI.Error do
       fields: [:reason, :status, :response_body, :request_body, :cause],
       class: :api
 
+    @spec message(map()) :: String.t()
     def message(%{reason: reason, status: status}) when not is_nil(status) do
       "API request failed (#{status}): #{reason}"
     end
@@ -55,6 +57,7 @@ defmodule Jido.AI.Error do
     @moduledoc "Error for unexpected or unhandled errors."
     use Splode.Error, fields: [:error], class: :unknown
 
+    @spec message(map()) :: String.t()
     def message(%{error: error}) do
       "Unknown error: #{inspect(error)}"
     end

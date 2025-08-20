@@ -22,9 +22,15 @@ defmodule Jido.AI.Provider.OpenRouter do
   alias Jido.AI.Provider.Util.Options
 
   @impl true
+  @spec supports_json_mode?() :: true
   def supports_json_mode?, do: true
 
   @impl true
+  @spec stream_event_type() :: :openai
+  def stream_event_type, do: :openai
+
+  @impl true
+  @spec chat_completion_opts() :: [atom(), ...]
   def chat_completion_opts do
     Options.default() ++ [:include_reasoning, :thinking]
   end
