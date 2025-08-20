@@ -45,7 +45,11 @@ defmodule JidoWorkspace.MixProject do
       "slidev.dev": ["slidev.dev"],
       "slidev.build": ["slidev.build"],
       "slidev.install": ["slidev.install"],
-      "slidev.new": ["slidev.new"]
+      "slidev.new": ["slidev.new"],
+      
+      # Hex publishing commands
+      "hex.publish.all": ["hex_publish"],
+      "version.check": ["version.check"]
     ]
   end
 end

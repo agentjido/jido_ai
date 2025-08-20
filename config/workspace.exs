@@ -108,8 +108,30 @@ config :jido_workspace,
       type: :library,
       path: "projects/kodo"
     }
-
-
-
-
+  ],
+  hex_packages: [
+    %{
+      name: "jido_signal",
+      path: "projects/jido_signal",
+      publish_order: 1,
+      dependencies: []
+    },
+    %{
+      name: "jido_action", 
+      path: "projects/jido_action",
+      publish_order: 2,
+      dependencies: []
+    },
+    %{
+      name: "jido",
+      path: "projects/jido", 
+      publish_order: 3,
+      dependencies: ["jido_signal", "jido_action"]
+    },
+    %{
+      name: "jido_ai",
+      path: "projects/jido_ai",
+      publish_order: 4, 
+      dependencies: ["jido", "jido_action"]
+    }
   ]

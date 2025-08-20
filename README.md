@@ -39,6 +39,31 @@ export JIDO_WORKSPACE=1
 # or use direnv with .envrc
 ```
 
+## Hex Publishing
+
+The workspace includes automated Hex publishing for all ecosystem packages.
+
+### Commands
+
+```bash
+mix hex.publish.all    # Publish all modified projects to Hex
+mix version.check      # Check version consistency across projects  
+mix hex_validate      # Validate Hex metadata before publishing
+```
+
+### Publishing Workflow
+
+1. **Version Check**: `mix version.check` to ensure consistency
+2. **Validation**: `mix hex_validate` to check metadata
+3. **Publish**: `mix hex.publish.all` to publish all modified packages
+4. **Always unset workspace mode**: `env -u JIDO_WORKSPACE mix hex.publish`
+
+### Key Notes
+
+- The `ws_dep` helper automatically switches between local paths (workspace mode) and Hex packages
+- Set `JIDO_WORKSPACE=1` for local development, unset for publishing
+- Publishing validates dependencies are pointing to Hex, not local paths
+
 ## Projects
 
 - **jido** - Core Jido library
