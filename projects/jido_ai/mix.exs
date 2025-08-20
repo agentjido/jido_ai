@@ -56,8 +56,8 @@ defmodule Jido.Ai.MixProject do
   defp deps do
     [
       # Jido
-      ws_dep(:jido, "../jido", [github: "agentjido/jido"]),
-      ws_dep(:jido_action, "../jido_action", [github: "agentjido/jido_action"]),
+      ws_dep(:jido, "../jido", "~> 1.3.0"),
+      ws_dep(:jido_action, "../jido_action", "~> 1.3.0"),
 
       # Deps
       {:dotenvy, "~> 1.1.0"},
