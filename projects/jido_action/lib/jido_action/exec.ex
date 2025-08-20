@@ -1,65 +1,60 @@
 defmodule Jido.Exec do
   @moduledoc """
-  Exec provides a robust set of methods for executing Actions (`Jido.Action`).
+  Action execution engine with modular architecture for robust action processing.
 
-  This module offers functionality to:
-  - Run actions synchronously or asynchronously
-  - Manage timeouts and retries
-  - Cancel running actions
-  - Normalize and validate input parameters and context
-  - Emit telemetry events for monitoring and debugging
+  This module provides the core execution interface for Jido Actions with specialized
+  helper modules handling specific concerns:
 
-  Execs are defined as modules (Actions) that implement specific callbacks, allowing for
-  a standardized way of defining and executing complex actions across a distributed system.
+  - **Jido.Exec.Validator** - Parameter and output validation
+  - **Jido.Exec.Telemetry** - Logging and telemetry events
+  - **Jido.Exec.Retry** - Exponential backoff and retry logic
+  - **Jido.Exec.Compensation** - Error handling and compensation
+  - **Jido.Exec.Async** - Asynchronous execution management
+  - **Jido.Exec.Chain** - Sequential action execution
+  - **Jido.Exec.Closure** - Action closures with pre-applied context
 
-  ## Features
+  ## Core Features
 
   - Synchronous and asynchronous action execution
   - Automatic retries with exponential backoff
   - Timeout handling for long-running actions
   - Parameter and context normalization
-  - Comprehensive error handling and reporting
+  - Comprehensive error handling and compensation
   - Telemetry integration for monitoring and tracing
-  - Cancellation of running actions
+  - Action cancellation and cleanup
 
   ## Usage
 
-  Execs are executed using the `run/4` or `run_async/4` functions:
+  Basic action execution:
 
       Jido.Exec.run(MyAction, %{param1: "value"}, %{context_key: "context_value"})
 
-  See `Jido.Action` for how to define an Action.
-
-  For asynchronous execution:
+  Asynchronous execution:
 
       async_ref = Jido.Exec.run_async(MyAction, params, context)
       # ... do other work ...
       result = Jido.Exec.await(async_ref)
 
+  See `Jido.Action` for how to define an Action.
   """
   use Private
   use ExDbug, enabled: false
 
-  import Jido.Action.Util, only: [cond_log: 3]
-
   alias Jido.Action.Error
+  alias Jido.Exec.Async
+  alias Jido.Exec.Compensation
+  alias Jido.Exec.Retry
+  alias Jido.Exec.Telemetry
+  alias Jido.Exec.Validator
   alias Jido.Instruction
 
   require Logger
 
-  @default_timeout 5000
-  @default_max_retries 1
-  @default_initial_backoff 250
+  @default_timeout 30000
 
   # Helper functions to get configuration values with fallbacks
   defp get_default_timeout,
     do: Application.get_env(:jido_action, :default_timeout, @default_timeout)
-
-  defp get_default_max_retries,
-    do: Application.get_env(:jido_action, :default_max_retries, @default_max_retries)
-
-  defp get_default_backoff,
-    do: Application.get_env(:jido_action, :default_backoff, @default_initial_backoff)
 
   @type action :: module()
   @type params :: map()
@@ -88,9 +83,9 @@ defmodule Jido.Exec do
   - `params`: A map of input parameters for the Action.
   - `context`: A map providing additional context for the Action execution.
   - `opts`: Options controlling the execution:
-    - `:timeout` - Maximum time (in ms) allowed for the Action to complete (default: #{@default_timeout}, configurable via `:jido_action, :default_timeout`).
-    - `:max_retries` - Maximum number of retry attempts (default: #{@default_max_retries}, configurable via `:jido_action, :default_max_retries`).
-    - `:backoff` - Initial backoff time in milliseconds, doubles with each retry (default: #{@default_initial_backoff}, configurable via `:jido_action, :default_backoff`).
+    - `:timeout` - Maximum time (in ms) allowed for the Action to complete (configurable via `:jido_action, :default_timeout`).
+    - `:max_retries` - Maximum number of retry attempts (configurable via `:jido_action, :default_max_retries`).
+    - `:backoff` - Initial backoff time in milliseconds, doubles with each retry (configurable via `:jido_action, :default_backoff`).
     - `:log_level` - Override the global Logger level for this specific action. Accepts #{inspect(Logger.levels())}.
 
   ## Action Metadata in Context
@@ -149,8 +144,8 @@ defmodule Jido.Exec do
 
     with {:ok, normalized_params} <- normalize_params(params),
          {:ok, normalized_context} <- normalize_context(context),
-         :ok <- validate_action(action),
-         {:ok, validated_params} <- validate_params(action, normalized_params) do
+         :ok <- Validator.validate_action(action),
+         {:ok, validated_params} <- Validator.validate_params(action, normalized_params) do
       enhanced_context =
         Map.put(normalized_context, :action_metadata, action.__action_metadata__())
 
@@ -160,17 +155,13 @@ defmodule Jido.Exec do
         validated_params: validated_params
       )
 
-      cond_log(
-        log_level,
-        :notice,
-        "Executing #{inspect(action)} with params: #{inspect(validated_params)} and context: #{inspect(enhanced_context)}"
-      )
+      Telemetry.cond_log_start(log_level, action, validated_params, enhanced_context)
 
       do_run_with_retry(action, validated_params, enhanced_context, opts)
     else
       {:error, reason} ->
         dbug("Error in action setup", error: reason)
-        cond_log(log_level, :debug, "Action Execution failed: #{inspect(reason)}")
+        Telemetry.cond_log_failure(log_level, inspect(reason))
         {:error, reason}
     end
   rescue
@@ -178,31 +169,26 @@ defmodule Jido.Exec do
       log_level = Keyword.get(opts, :log_level, :info)
       dbug("Function error in action", error: e)
 
-      cond_log(
-        log_level,
-        :warning,
-        "Function invocation error in action: #{extract_safe_error_message(e)}"
-      )
+      Telemetry.cond_log_function_error(log_level, e)
 
-      {:error, Error.validation_error("Invalid action module: #{extract_safe_error_message(e)}")}
+      {:error,
+       Error.validation_error("Invalid action module: #{Telemetry.extract_safe_error_message(e)}")}
 
     e ->
       log_level = Keyword.get(opts, :log_level, :info)
       dbug("Unexpected error in action", error: e)
-      cond_log(log_level, :error, "Unexpected error in action: #{extract_safe_error_message(e)}")
+      Telemetry.cond_log_unexpected_error(log_level, e)
 
       {:error,
-       Error.internal_error("An unexpected error occurred: #{extract_safe_error_message(e)}")}
+       Error.internal_error(
+         "An unexpected error occurred: #{Telemetry.extract_safe_error_message(e)}"
+       )}
   catch
     kind, reason ->
       log_level = Keyword.get(opts, :log_level, :info)
       dbug("Caught error in action", kind: kind, reason: reason)
 
-      cond_log(
-        log_level,
-        :warning,
-        "Caught unexpected throw/exit in action: #{extract_safe_error_message(reason)}"
-      )
+      Telemetry.cond_log_caught_error(log_level, reason)
 
       {:error, Error.internal_error("Caught #{kind}: #{inspect(reason)}")}
   end
@@ -244,24 +230,7 @@ defmodule Jido.Exec do
   """
   @spec run_async(action(), params(), context(), run_opts()) :: async_ref()
   def run_async(action, params \\ %{}, context \\ %{}, opts \\ []) do
-    dbug("Starting async action", action: action, params: params, context: context, opts: opts)
-    ref = make_ref()
-    parent = self()
-
-    # Start the task under the TaskSupervisor.
-    # If the supervisor is not running, this will raise an error.
-    {:ok, pid} =
-      Task.Supervisor.start_child(Jido.Action.TaskSupervisor, fn ->
-        result = run(action, params, context, opts)
-        send(parent, {:action_async_result, ref, result})
-        result
-      end)
-
-    # We monitor the newly created Task so we can handle :DOWN messages in `await`.
-    Process.monitor(pid)
-
-    dbug("Async action started", ref: ref, pid: pid)
-    %{ref: ref, pid: pid}
+    Async.start(action, params, context, opts)
   end
 
   @doc """
@@ -288,7 +257,7 @@ defmodule Jido.Exec do
       {:error, %Jido.Action.Error{type: :timeout, message: "Async action timed out after 100ms"}}
   """
   @spec await(async_ref()) :: exec_result
-  def await(async_ref), do: await(async_ref, get_default_timeout())
+  def await(async_ref), do: Async.await(async_ref)
 
   @doc """
   Awaits the completion of an asynchronous Action with a custom timeout.
@@ -304,44 +273,7 @@ defmodule Jido.Exec do
   - `{:error, reason}` if an error occurs or timeout is reached.
   """
   @spec await(async_ref(), timeout()) :: exec_result
-  def await(%{ref: ref, pid: pid}, timeout) do
-    dbug("Awaiting async action result", ref: ref, pid: pid, timeout: timeout)
-
-    receive do
-      {:action_async_result, ^ref, result} ->
-        dbug("Received async result", result: result)
-        result
-
-      {:DOWN, _monitor_ref, :process, ^pid, :normal} ->
-        dbug("Process completed normally")
-        # Process completed normally, but we might still receive the result
-        receive do
-          {:action_async_result, ^ref, result} ->
-            dbug("Received delayed result", result: result)
-            result
-        after
-          100 ->
-            dbug("No result received after normal completion")
-            {:error, Error.execution_error("Process completed but result was not received")}
-        end
-
-      {:DOWN, _monitor_ref, :process, ^pid, reason} ->
-        dbug("Process crashed", reason: reason)
-        {:error, Error.execution_error("Server error in async action: #{inspect(reason)}")}
-    after
-      timeout ->
-        dbug("Async action timed out", timeout: timeout)
-        Process.exit(pid, :kill)
-
-        receive do
-          {:DOWN, _, :process, ^pid, _} -> :ok
-        after
-          0 -> :ok
-        end
-
-        {:error, Error.timeout_error("Async action timed out after #{timeout}ms")}
-    end
-  end
+  def await(async_ref, timeout), do: Async.await(async_ref, timeout)
 
   @doc """
   Cancels a running asynchronous Action execution.
@@ -365,16 +297,7 @@ defmodule Jido.Exec do
       {:error, %Jido.Action.Error{type: :invalid_async_ref, message: "Invalid async ref for cancellation"}}
   """
   @spec cancel(async_ref() | pid()) :: :ok | exec_error
-  def cancel(%{ref: _ref, pid: pid}), do: cancel(pid)
-  def cancel(%{pid: pid}), do: cancel(pid)
-
-  def cancel(pid) when is_pid(pid) do
-    dbug("Cancelling action", pid: pid)
-    Process.exit(pid, :shutdown)
-    :ok
-  end
-
-  def cancel(_), do: {:error, Error.validation_error("Invalid async ref for cancellation")}
+  def cancel(async_ref_or_pid), do: Async.cancel(async_ref_or_pid)
 
   # Private functions are exposed to the test suite
   private do
@@ -396,92 +319,11 @@ defmodule Jido.Exec do
     defp normalize_context(context),
       do: {:error, Error.validation_error("Invalid context type: #{inspect(context)}")}
 
-    @spec validate_action(action()) :: :ok | {:error, Exception.t()}
-    defp validate_action(action) do
-      dbug("Validating action", action: action)
-
-      case Code.ensure_compiled(action) do
-        {:module, _} ->
-          if function_exported?(action, :run, 2) do
-            :ok
-          else
-            {:error,
-             Error.validation_error(
-               "Module #{inspect(action)} is not a valid action: missing run/2 function"
-             )}
-          end
-
-        {:error, reason} ->
-          {:error,
-           Error.validation_error(
-             "Failed to compile module #{inspect(action)}: #{inspect(reason)}"
-           )}
-      end
-    end
-
-    @spec validate_params(action(), map()) :: {:ok, map()} | {:error, Exception.t()}
-    defp validate_params(action, params) do
-      dbug("Validating params", action: action, params: params)
-
-      if function_exported?(action, :validate_params, 1) do
-        case action.validate_params(params) do
-          {:ok, params} ->
-            {:ok, params}
-
-          {:error, reason} ->
-            {:error, reason}
-
-          _ ->
-            {:error, Error.validation_error("Invalid return from action.validate_params/1")}
-        end
-      else
-        {:error,
-         Error.validation_error(
-           "Module #{inspect(action)} is not a valid action: missing validate_params/1 function"
-         )}
-      end
-    end
-
-    @spec validate_output(action(), map(), run_opts()) :: {:ok, map()} | {:error, Exception.t()}
-    defp validate_output(action, output, opts) do
-      log_level = Keyword.get(opts, :log_level, :info)
-      dbug("Validating output", action: action, output: output)
-
-      if function_exported?(action, :validate_output, 1) do
-        case action.validate_output(output) do
-          {:ok, validated_output} ->
-            cond_log(log_level, :debug, "Output validation succeeded for #{inspect(action)}")
-            {:ok, validated_output}
-
-          {:error, reason} ->
-            cond_log(
-              log_level,
-              :debug,
-              "Output validation failed for #{inspect(action)}: #{inspect(reason)}"
-            )
-
-            {:error, reason}
-
-          _ ->
-            cond_log(log_level, :debug, "Invalid return from action.validate_output/1")
-            {:error, Error.validation_error("Invalid return from action.validate_output/1")}
-        end
-      else
-        # If action doesn't have validate_output/1, skip output validation
-        cond_log(
-          log_level,
-          :debug,
-          "No output validation function found for #{inspect(action)}, skipping"
-        )
-
-        {:ok, output}
-      end
-    end
-
     @spec do_run_with_retry(action(), params(), context(), run_opts()) :: exec_result
     defp do_run_with_retry(action, params, context, opts) do
-      max_retries = Keyword.get(opts, :max_retries, get_default_max_retries())
-      backoff = Keyword.get(opts, :backoff, get_default_backoff())
+      retry_opts = Retry.extract_retry_opts(opts)
+      max_retries = retry_opts[:max_retries]
+      backoff = retry_opts[:backoff]
       dbug("Starting run with retry", action: action, max_retries: max_retries, backoff: backoff)
       do_run_with_retry(action, params, context, opts, 0, max_retries, backoff)
     end
@@ -537,45 +379,32 @@ defmodule Jido.Exec do
       end
     end
 
-    defp maybe_retry(action, params, context, opts, retry_count, max_retries, backoff, error) do
-      if retry_count < max_retries do
-        backoff = calculate_backoff(retry_count, backoff)
-
-        cond_log(
-          Keyword.get(opts, :log_level, :info),
-          :info,
-          "Retrying #{inspect(action)} (attempt #{retry_count + 1}/#{max_retries}) after #{backoff}ms backoff"
-        )
-
-        dbug("Retrying after backoff",
-          action: action,
-          retry_count: retry_count,
-          max_retries: max_retries,
-          backoff: backoff
-        )
-
-        :timer.sleep(backoff)
-
-        do_run_with_retry(
-          action,
-          params,
-          context,
-          opts,
-          retry_count + 1,
-          max_retries,
-          backoff
-        )
+    defp maybe_retry(
+           action,
+           params,
+           context,
+           opts,
+           retry_count,
+           max_retries,
+           initial_backoff,
+           error
+         ) do
+      if Retry.should_retry?(error, retry_count, max_retries, opts) do
+        Retry.execute_retry(action, retry_count, max_retries, initial_backoff, opts, fn ->
+          do_run_with_retry(
+            action,
+            params,
+            context,
+            opts,
+            retry_count + 1,
+            max_retries,
+            initial_backoff
+          )
+        end)
       else
         dbug("Max retries reached", action: action, max_retries: max_retries)
         error
       end
-    end
-
-    @spec calculate_backoff(non_neg_integer(), non_neg_integer()) :: non_neg_integer()
-    defp calculate_backoff(retry_count, backoff) do
-      (backoff * :math.pow(2, retry_count))
-      |> round()
-      |> min(30_000)
     end
 
     @spec do_run(action(), params(), context(), run_opts()) :: exec_result
@@ -637,128 +466,8 @@ defmodule Jido.Exec do
             run_opts()
           ) :: exec_result
     defp handle_action_error(action, params, context, error_or_tuple, opts) do
-      Logger.debug("Handle Action Error in handle_action_error: #{inspect(opts)}")
-      dbug("Handling action error", action: action, error: error_or_tuple)
-
-      # Extract error and directive if present
-      {error, directive} =
-        case error_or_tuple do
-          {error, directive} -> {error, directive}
-          error -> {error, nil}
-        end
-
-      if compensation_enabled?(action) do
-        metadata = action.__action_metadata__()
-        compensation_opts = metadata[:compensation] || []
-
-        timeout =
-          Keyword.get(opts, :timeout) ||
-            case compensation_opts do
-              opts when is_list(opts) -> Keyword.get(opts, :timeout, 5_000)
-              %{timeout: timeout} -> timeout
-              _ -> 5_000
-            end
-
-        dbug("Starting compensation", action: action, timeout: timeout)
-
-        task =
-          Task.async(fn ->
-            action.on_error(params, error, context, [])
-          end)
-
-        case Task.yield(task, timeout) || Task.shutdown(task) do
-          {:ok, result} ->
-            dbug("Compensation completed", result: result)
-            handle_compensation_result(result, error, directive)
-
-          nil ->
-            dbug("Compensation timed out", timeout: timeout)
-
-            error_result =
-              Error.execution_error(
-                "Compensation timed out after #{timeout}ms for: #{inspect(error)}",
-                %{
-                  compensated: false,
-                  compensation_error: "Compensation timed out after #{timeout}ms",
-                  original_error: error
-                }
-              )
-
-            if directive, do: {:error, error_result, directive}, else: {:error, error_result}
-        end
-      else
-        dbug("Compensation not enabled", action: action)
-        if directive, do: {:error, error, directive}, else: {:error, error}
-      end
-    end
-
-    @spec handle_compensation_result(any(), Exception.t(), any()) :: exec_result
-    defp handle_compensation_result(result, original_error, directive) do
-      error_result =
-        case result do
-          {:ok, comp_result} ->
-            # Extract fields that should be at the top level of the details
-            {top_level_fields, remaining_fields} =
-              Map.split(comp_result, [:test_value, :compensation_context])
-
-            # Create the details map with the compensation result
-            details =
-              Map.merge(
-                %{
-                  compensated: true,
-                  compensation_result: remaining_fields
-                },
-                top_level_fields
-              )
-
-            # Extract message from error struct properly using safe helper
-            error_message = extract_safe_error_message(original_error)
-
-            Error.execution_error(
-              "Compensation completed for: #{error_message}",
-              Map.put(details, :original_error, original_error)
-            )
-
-          {:error, comp_error} ->
-            # Extract message from error struct properly using safe helper
-            error_message = extract_safe_error_message(original_error)
-
-            Error.execution_error(
-              "Compensation failed for: #{error_message}",
-              %{
-                compensated: false,
-                compensation_error: comp_error,
-                original_error: original_error
-              }
-            )
-
-          _ ->
-            Error.execution_error(
-              "Invalid compensation result for: #{inspect(original_error)}",
-              %{
-                compensated: false,
-                compensation_error: "Invalid compensation result",
-                original_error: original_error
-              }
-            )
-        end
-
-      if directive, do: {:error, error_result, directive}, else: {:error, error_result}
-    end
-
-    @spec compensation_enabled?(action()) :: boolean()
-    defp compensation_enabled?(action) do
-      metadata = action.__action_metadata__()
-      compensation_opts = metadata[:compensation] || []
-
-      enabled =
-        case compensation_opts do
-          opts when is_list(opts) -> Keyword.get(opts, :enabled, false)
-          %{enabled: enabled} -> enabled
-          _ -> false
-        end
-
-      enabled && function_exported?(action, :on_error, 4)
+      dbug("Delegating to compensation handler", action: action, error: error_or_tuple)
+      Compensation.handle_error(action, params, context, error_or_tuple, opts)
     end
 
     @spec execute_action_with_timeout(
@@ -904,34 +613,22 @@ Debug info:
       log_level = Keyword.get(opts, :log_level, :info)
       dbug("Executing action", action: action, params: params, context: context)
 
-      cond_log(
-        log_level,
-        :debug,
-        "Starting execution of #{inspect(action)}, params: #{inspect(params)}, context: #{inspect(context)}"
-      )
+      Telemetry.cond_log_execution_debug(log_level, action, params, context)
 
       case action.run(params, context) do
         {:ok, result, other} ->
           dbug("Action succeeded with additional info", result: result, other: other)
 
-          case validate_output(action, result, opts) do
+          case Validator.validate_output(action, result, opts) do
             {:ok, validated_result} ->
-              cond_log(
-                log_level,
-                :debug,
-                "Finished execution of #{inspect(action)}, result: #{inspect(validated_result)}, directive: #{inspect(other)}"
-              )
+              Telemetry.cond_log_end(log_level, action, {:ok, validated_result, other})
 
               {:ok, validated_result, other}
 
             {:error, validation_error} ->
               dbug("Action output validation failed", error: validation_error)
 
-              cond_log(
-                log_level,
-                :error,
-                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
-              )
+              Telemetry.cond_log_validation_failure(log_level, action, validation_error)
 
               {:error, validation_error, other}
           end
@@ -939,64 +636,48 @@ Debug info:
         {:ok, result} ->
           dbug("Action succeeded", result: result)
 
-          case validate_output(action, result, opts) do
+          case Validator.validate_output(action, result, opts) do
             {:ok, validated_result} ->
-              cond_log(
-                log_level,
-                :debug,
-                "Finished execution of #{inspect(action)}, result: #{inspect(validated_result)}"
-              )
+              Telemetry.cond_log_end(log_level, action, {:ok, validated_result})
 
               {:ok, validated_result}
 
             {:error, validation_error} ->
               dbug("Action output validation failed", error: validation_error)
 
-              cond_log(
-                log_level,
-                :error,
-                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
-              )
+              Telemetry.cond_log_validation_failure(log_level, action, validation_error)
 
               {:error, validation_error}
           end
 
         {:error, reason, other} ->
           dbug("Action failed with additional info", error: reason, other: other)
-          cond_log(log_level, :error, "Action #{inspect(action)} failed: #{inspect(reason)}")
+          Telemetry.cond_log_error(log_level, action, reason)
           {:error, reason, other}
 
         {:error, %_{} = error} when is_exception(error) ->
           dbug("Action failed with error struct", error: error)
-          cond_log(log_level, :error, "Action #{inspect(action)} failed: #{inspect(error)}")
+          Telemetry.cond_log_error(log_level, action, error)
           {:error, error}
 
         {:error, reason} ->
           dbug("Action failed with reason", reason: reason)
-          cond_log(log_level, :error, "Action #{inspect(action)} failed: #{inspect(reason)}")
+          Telemetry.cond_log_error(log_level, action, reason)
           {:error, Error.execution_error(reason)}
 
         result ->
           dbug("Action returned unexpected result", result: result)
 
-          case validate_output(action, result, opts) do
+          case Validator.validate_output(action, result, opts) do
             {:ok, validated_result} ->
-              cond_log(
-                log_level,
-                :debug,
-                "Finished execution of #{inspect(action)}, result: #{inspect(validated_result)}"
-              )
+              Telemetry.cond_log_end(log_level, action, {:ok, validated_result})
 
               {:ok, validated_result}
 
             {:error, validation_error} ->
               dbug("Action output validation failed", error: validation_error)
 
-              cond_log(
-                log_level,
-                :error,
-                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
-              )
+              Telemetry.cond_log_validation_failure(log_level, action, validation_error)
 
               {:error, validation_error}
           end
@@ -1006,11 +687,11 @@ Debug info:
         dbug("Runtime error in action", error: e)
         stacktrace = __STACKTRACE__
         log_level = Keyword.get(opts, :log_level, :info)
-        cond_log(log_level, :error, "Action #{inspect(action)} failed: #{inspect(e)}")
+        Telemetry.cond_log_error(log_level, action, e)
 
         {:error,
          Error.execution_error(
-           "Server error in #{inspect(action)}: #{extract_safe_error_message(e)}",
+           "Server error in #{inspect(action)}: #{Telemetry.extract_safe_error_message(e)}",
            %{original_exception: e, action: action, stacktrace: stacktrace}
          )}
 
@@ -1018,48 +699,24 @@ Debug info:
         dbug("Argument error in action", error: e)
         stacktrace = __STACKTRACE__
         log_level = Keyword.get(opts, :log_level, :info)
-        cond_log(log_level, :error, "Action #{inspect(action)} failed: #{inspect(e)}")
+        Telemetry.cond_log_error(log_level, action, e)
 
         {:error,
          Error.execution_error(
-           "Argument error in #{inspect(action)}: #{extract_safe_error_message(e)}",
+           "Argument error in #{inspect(action)}: #{Telemetry.extract_safe_error_message(e)}",
            %{original_exception: e, action: action, stacktrace: stacktrace}
          )}
 
       e ->
         stacktrace = __STACKTRACE__
         log_level = Keyword.get(opts, :log_level, :info)
-        cond_log(log_level, :error, "Action #{inspect(action)} failed: #{inspect(e)}")
+        Telemetry.cond_log_error(log_level, action, e)
 
         {:error,
          Error.execution_error(
            "An unexpected error occurred during execution of #{inspect(action)}: #{inspect(e)}",
            %{original_exception: e, action: action, stacktrace: stacktrace}
          )}
-    end
-  end
-
-  # Private helper to safely extract error messages, handling nil and nested cases
-  defp extract_safe_error_message(error) do
-    case error do
-      %{message: %{message: inner_message}} when is_binary(inner_message) ->
-        inner_message
-
-      %{message: nil} ->
-        ""
-
-      %{message: message} when is_binary(message) ->
-        message
-
-      %{message: message} when is_struct(message) ->
-        if Map.has_key?(message, :message) and is_binary(message.message) do
-          message.message
-        else
-          inspect(message)
-        end
-
-      _ ->
-        inspect(error)
     end
   end
 end
