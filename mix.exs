@@ -56,8 +56,8 @@ defmodule Jido.Ai.MixProject do
   defp deps do
     [
       # Jido
-      {:jido, path: "../jido"},
-      {:jido_action, github: "agentjido/jido_action"},
+      ws_dep(:jido, "../jido", "~> 1.3.0"),
+      ws_dep(:jido_action, "../jido_action", "~> 1.3.0"),
 
       # Deps
       {:dotenvy, "~> 1.1.0"},
@@ -139,5 +139,18 @@ defmodule Jido.Ai.MixProject do
         {"guides/actions.md", title: "Actions"}
       ]
     ]
+  end
+
+  # Workspace dependency management helpers
+  defp workspace? do
+    System.get_env("JIDO_WORKSPACE") in ["1", "true"]
+  end
+
+  defp ws_dep(app, rel_path, remote_opts, extra_opts \\ []) do
+    if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
+      {app, [path: rel_path, override: true] ++ extra_opts}
+    else
+      {app, remote_opts ++ extra_opts}
+    end
   end
 end
