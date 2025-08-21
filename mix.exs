@@ -188,7 +188,6 @@ defmodule JidoAction.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ex_dbug, "~> 2.1"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:private, "~> 0.1.2"},

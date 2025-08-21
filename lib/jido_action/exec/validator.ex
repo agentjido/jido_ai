@@ -6,8 +6,6 @@ defmodule Jido.Exec.Validator do
   that has been extracted from the main Exec module for better separation of concerns.
   """
 
-  use ExDbug, enabled: false
-
   import Jido.Action.Util, only: [cond_log: 3]
 
   alias Jido.Action.Error
@@ -21,8 +19,6 @@ defmodule Jido.Exec.Validator do
   """
   @spec validate_action(module()) :: :ok | {:error, Exception.t()}
   def validate_action(action) do
-    dbug("Validating action", action: action)
-
     case Code.ensure_compiled(action) do
       {:module, _} ->
         if function_exported?(action, :run, 2) do
@@ -47,8 +43,6 @@ defmodule Jido.Exec.Validator do
   """
   @spec validate_params(module(), map()) :: {:ok, map()} | {:error, Exception.t()}
   def validate_params(action, params) do
-    dbug("Validating params", action: action, params: params)
-
     if function_exported?(action, :validate_params, 1) do
       case action.validate_params(params) do
         {:ok, params} ->
@@ -76,7 +70,6 @@ defmodule Jido.Exec.Validator do
   @spec validate_output(module(), map(), keyword()) :: {:ok, map()} | {:error, Exception.t()}
   def validate_output(action, output, opts) do
     log_level = Keyword.get(opts, :log_level, :info)
-    dbug("Validating output", action: action, output: output)
 
     if function_exported?(action, :validate_output, 1) do
       case action.validate_output(output) do

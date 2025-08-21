@@ -8,8 +8,6 @@ defmodule Jido.Exec.Retry do
   - Retry option processing and validation
   """
 
-  use ExDbug, enabled: false
-
   alias Jido.Exec.Telemetry
 
   require Logger
@@ -111,13 +109,6 @@ defmodule Jido.Exec.Retry do
       retry_count,
       max_retries,
       backoff
-    )
-
-    dbug("Retrying after backoff",
-      action: action,
-      retry_count: retry_count,
-      max_retries: max_retries,
-      backoff: backoff
     )
 
     :timer.sleep(backoff)
