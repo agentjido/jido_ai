@@ -179,7 +179,6 @@ defmodule Jido.Signal.MixProject do
   defp deps do
     [
       # Deps
-      {:ex_dbug, "~> 2.1"},
       {:jason, "~> 1.4"},
       {:msgpax, "~> 2.3"},
       {:nimble_options, "~> 1.1"},

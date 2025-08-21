@@ -3,8 +3,6 @@ defmodule Jido.Signal.Router.Engine do
   The routing engine that matches signals to handlers.
   """
 
-  use ExDbug, enabled: false
-
   alias Jido.Signal
 
   alias Jido.Signal.Router.{

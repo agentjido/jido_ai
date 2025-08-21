@@ -10,7 +10,6 @@ defmodule Jido.Signal.Bus do
   """
 
   use GenServer
-  use ExDbug, enabled: false
   use TypedStruct
 
   alias Jido.Signal.Bus.MiddlewarePipeline
@@ -61,7 +60,6 @@ defmodule Jido.Signal.Bus do
   """
   @impl GenServer
   def init({name, opts}) do
-    dbug("init", name: name, opts: opts)
     # Trap exits so we can handle subscriber termination
     Process.flag(:trap_exit, true)
 
@@ -117,7 +115,6 @@ defmodule Jido.Signal.Bus do
   """
   @spec start_link(keyword()) :: {:ok, pid()} | {:error, term()}
   def start_link(opts) do
-    dbug("start_link", opts: opts)
     name = Keyword.fetch!(opts, :name)
     GenServer.start_link(__MODULE__, {name, opts}, name: via_tuple(name, opts))
   end
@@ -509,7 +506,6 @@ defmodule Jido.Signal.Bus do
 
   @impl GenServer
   def handle_info({:DOWN, _ref, :process, pid, reason}, state) do
-    dbug("handle_info :DOWN", pid: pid, reason: reason, state: state)
     # Remove the subscriber if it dies
     case Enum.find(state.subscribers, fn {_id, sub_pid} -> sub_pid == pid end) do
       nil ->
@@ -523,7 +519,6 @@ defmodule Jido.Signal.Bus do
   end
 
   def handle_info(msg, state) do
-    dbug("handle_info", msg: msg, state: state)
     Logger.debug("Unexpected message in Bus: #{inspect(msg)}")
     {:noreply, state}
   end

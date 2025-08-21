@@ -8,8 +8,6 @@ defmodule Jido.Signal.Bus.Stream do
   signals to subscribers.
   """
 
-  use ExDbug, enabled: false
-
   alias Jido.Signal
   alias Jido.Signal.Bus.State, as: BusState
   alias Jido.Signal.Router
@@ -29,12 +27,6 @@ defmodule Jido.Signal.Bus.Stream do
     # Get list of signals from log map
     signals = BusState.log_to_list(state)
 
-    dbug("Filtering signals",
-      signal_count: length(signals),
-      type_pattern: type_pattern,
-      start_timestamp: start_timestamp
-    )
-
     # First filter by timestamp if provided
     timestamp_filtered =
       if start_timestamp do
@@ -47,27 +39,15 @@ defmodule Jido.Signal.Bus.Stream do
               try do
                 ts = Jido.Signal.ID.extract_timestamp(signal.id)
 
-                dbug("Signal timestamp",
-                  signal_id: signal.id,
-                  timestamp: ts,
-                  start_timestamp: start_timestamp
-                )
-
                 ts
               rescue
                 _error ->
-                  dbug("Failed to extract timestamp", error: _error)
                   # Default to 0 to include the signal
                   0
               end
 
             signal_ts > start_timestamp
           end)
-
-        dbug("After timestamp filtering",
-          filtered_count: length(filtered),
-          original_count: length(signals)
-        )
 
         filtered
       else
@@ -92,12 +72,6 @@ defmodule Jido.Signal.Bus.Stream do
         matches_pattern? = fn signal ->
           matches = Router.matches?(signal.type, type_pattern)
 
-          dbug("Pattern matching",
-            signal_type: signal.type,
-            pattern: type_pattern,
-            matches: matches
-          )
-
           matches
         end
 
@@ -116,7 +90,6 @@ defmodule Jido.Signal.Bus.Stream do
             }
           end)
 
-        dbug("Final filtered signals", count: length(filtered_signals))
         {:ok, filtered_signals}
 
       {:error, reason} ->
@@ -137,8 +110,6 @@ defmodule Jido.Signal.Bus.Stream do
   """
   @spec publish(BusState.t(), list(Signal.t())) :: {:ok, BusState.t()} | {:error, atom()}
   def publish(%BusState{} = state, signals) when is_list(signals) do
-    dbug("publish", signals: signals)
-
     if signals == [] do
       {:error, :empty_signal_list}
     else
@@ -165,8 +136,6 @@ defmodule Jido.Signal.Bus.Stream do
   """
   @spec ack(BusState.t(), String.t(), Signal.t()) :: {:ok, BusState.t()} | {:error, atom()}
   def ack(%BusState{} = state, subscription_id, %Signal{} = signal) do
-    dbug("ack", subscription_id: subscription_id, signal: signal)
-
     case BusState.get_subscription(state, subscription_id) do
       nil ->
         {:error, :subscription_not_found}

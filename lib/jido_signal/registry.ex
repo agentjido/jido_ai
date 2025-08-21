@@ -6,7 +6,6 @@ defmodule Jido.Signal.Registry do
   to signal paths with associated dispatch configurations.
   """
   use TypedStruct
-  use ExDbug, enabled: false
 
   typedstruct module: Subscription do
     @moduledoc """
