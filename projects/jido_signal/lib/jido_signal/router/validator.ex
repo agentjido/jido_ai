@@ -3,8 +3,6 @@ defmodule Jido.Signal.Router.Validator do
   Validates router configuration and normalizes route specifications.
   """
 
-  use ExDbug, enabled: false
-
   alias Jido.Signal
   alias Jido.Signal.Error
   alias Jido.Signal.Router.Route

@@ -39,7 +39,6 @@ defmodule Jido.Signal.Bus.Snapshot do
   ```
   """
   use TypedStruct
-  use ExDbug, enabled: false
 
   alias Jido.Signal.Bus.State, as: BusState
   alias Jido.Signal.Bus.Stream
@@ -107,8 +106,6 @@ defmodule Jido.Signal.Bus.Snapshot do
   @spec create(BusState.t(), String.t(), Keyword.t()) ::
           {:ok, SnapshotRef.t(), BusState.t()} | {:error, term()}
   def create(state, path, opts \\ []) do
-    dbug("create", path: path, state: state)
-
     # Extract options
     custom_id = Keyword.get(opts, :id)
     start_timestamp = Keyword.get(opts, :start_timestamp)
@@ -178,8 +175,6 @@ defmodule Jido.Signal.Bus.Snapshot do
   """
   @spec list(BusState.t()) :: [SnapshotRef.t()]
   def list(state) do
-    dbug("list", state: state)
-
     # Get all snapshots and sort them by creation time (newest first)
     state.snapshots
     |> Map.values()
@@ -201,8 +196,6 @@ defmodule Jido.Signal.Bus.Snapshot do
   @spec read(BusState.t(), String.t()) ::
           {:ok, SnapshotData.t()} | {:error, :not_found | :snapshot_read_failed}
   def read(state, snapshot_id) do
-    dbug("read", snapshot_id: snapshot_id, state: state)
-
     with {:ok, _ref} <- Map.fetch(state.snapshots, snapshot_id),
          {:ok, data} <- get_snapshot_data(snapshot_id) do
       {:ok, data}
@@ -233,8 +226,6 @@ defmodule Jido.Signal.Bus.Snapshot do
   @spec delete(BusState.t(), String.t()) ::
           {:ok, BusState.t()} | {:error, :not_found | :snapshot_deletion_failed}
   def delete(state, snapshot_id) do
-    dbug("delete", snapshot_id: snapshot_id, state: state)
-
     case Map.has_key?(state.snapshots, snapshot_id) do
       true ->
         # Remove from persistent_term
@@ -264,8 +255,6 @@ defmodule Jido.Signal.Bus.Snapshot do
   """
   @spec cleanup(BusState.t()) :: {:ok, BusState.t()} | {:error, :snapshot_cleanup_failed}
   def cleanup(state) do
-    dbug("cleanup", state: state)
-
     # Delete all snapshots from persistent_term
     Enum.each(state.snapshots, fn {id, _ref} ->
       :persistent_term.erase({__MODULE__, id})
@@ -295,8 +284,6 @@ defmodule Jido.Signal.Bus.Snapshot do
   @spec cleanup(BusState.t(), (SnapshotRef.t() -> boolean())) ::
           {:ok, BusState.t()} | {:error, :snapshot_cleanup_failed}
   def cleanup(state, filter_fn) when is_function(filter_fn, 1) do
-    dbug("cleanup with filter", state: state)
-
     # Find snapshots to remove based on the filter
     {to_remove, to_keep} =
       state.snapshots
