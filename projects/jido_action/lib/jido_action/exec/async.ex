@@ -6,7 +6,6 @@ defmodule Jido.Exec.Async do
   managing task supervision, cleanup, and async lifecycle.
   """
   use Private
-  use ExDbug, enabled: false
 
   alias Jido.Action.Error
 
@@ -57,7 +56,6 @@ defmodule Jido.Exec.Async do
   """
   @spec start(action(), params(), context(), run_opts()) :: async_ref()
   def start(action, params \\ %{}, context \\ %{}, opts \\ []) do
-    dbug("Starting async action", action: action, params: params, context: context, opts: opts)
     ref = make_ref()
     parent = self()
 
@@ -73,7 +71,6 @@ defmodule Jido.Exec.Async do
     # We monitor the newly created Task so we can handle :DOWN messages in `await`.
     Process.monitor(pid)
 
-    dbug("Async action started", ref: ref, pid: pid)
     %{ref: ref, pid: pid}
   end
 
@@ -108,32 +105,24 @@ defmodule Jido.Exec.Async do
   """
   @spec await(async_ref(), timeout()) :: exec_result
   def await(%{ref: ref, pid: pid}, timeout) do
-    dbug("Awaiting async action result", ref: ref, pid: pid, timeout: timeout)
-
     receive do
       {:action_async_result, ^ref, result} ->
-        dbug("Received async result", result: result)
         result
 
       {:DOWN, _monitor_ref, :process, ^pid, :normal} ->
-        dbug("Process completed normally")
         # Process completed normally, but we might still receive the result
         receive do
           {:action_async_result, ^ref, result} ->
-            dbug("Received delayed result", result: result)
             result
         after
           100 ->
-            dbug("No result received after normal completion")
             {:error, Error.execution_error("Process completed but result was not received")}
         end
 
       {:DOWN, _monitor_ref, :process, ^pid, reason} ->
-        dbug("Process crashed", reason: reason)
         {:error, Error.execution_error("Server error in async action: #{inspect(reason)}")}
     after
       timeout ->
-        dbug("Async action timed out", timeout: timeout)
         Process.exit(pid, :kill)
 
         receive do
@@ -163,7 +152,6 @@ defmodule Jido.Exec.Async do
   def cancel(%{pid: pid}), do: cancel(pid)
 
   def cancel(pid) when is_pid(pid) do
-    dbug("Cancelling action", pid: pid)
     Process.exit(pid, :shutdown)
     :ok
   end

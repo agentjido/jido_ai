@@ -7,7 +7,6 @@ defmodule Jido.Exec.Compensation do
   has compensation enabled in its metadata.
   """
   use Private
-  use ExDbug, enabled: false
 
   alias Jido.Action.Error
   alias Jido.Exec.Telemetry
@@ -84,8 +83,6 @@ defmodule Jido.Exec.Compensation do
         ) :: exec_result
   def handle_error(action, params, context, error_or_tuple, opts) do
     Logger.debug("Handle Action Error in handle_error: #{inspect(opts)}")
-    dbug("Handling action error", action: action, error: error_or_tuple)
-
     # Extract error and directive if present
     {error, directive} =
       case error_or_tuple do
@@ -96,7 +93,6 @@ defmodule Jido.Exec.Compensation do
     if enabled?(action) do
       execute_compensation(action, params, context, error, directive, opts)
     else
-      dbug("Compensation not enabled", action: action)
       if directive, do: {:error, error, directive}, else: {:error, error}
     end
   end
@@ -117,8 +113,6 @@ defmodule Jido.Exec.Compensation do
             _ -> 5_000
           end
 
-      dbug("Starting compensation", action: action, timeout: timeout)
-
       task =
         Task.async(fn ->
           action.on_error(params, error, context, [])
@@ -126,12 +120,9 @@ defmodule Jido.Exec.Compensation do
 
       case Task.yield(task, timeout) || Task.shutdown(task) do
         {:ok, result} ->
-          dbug("Compensation completed", result: result)
           handle_compensation_result(result, error, directive)
 
         nil ->
-          dbug("Compensation timed out", timeout: timeout)
-
           error_result =
             Error.execution_error(
               "Compensation timed out after #{timeout}ms for: #{inspect(error)}",

@@ -38,7 +38,6 @@ defmodule Jido.Exec do
   See `Jido.Action` for how to define an Action.
   """
   use Private
-  use ExDbug, enabled: false
 
   alias Jido.Action.Error
   alias Jido.Exec.Async
@@ -126,8 +125,6 @@ defmodule Jido.Exec do
   @spec run(Instruction.t()) :: exec_result()
   @spec run(action(), params(), context(), run_opts()) :: exec_result()
   def run(%Instruction{} = instruction) do
-    dbug("Running instruction", instruction: instruction)
-
     run(
       instruction.action,
       instruction.params,
@@ -139,7 +136,6 @@ defmodule Jido.Exec do
   def run(action, params \\ %{}, context \\ %{}, opts \\ [])
 
   def run(action, params, context, opts) when is_atom(action) and is_list(opts) do
-    dbug("Starting action run", action: action, params: params, context: context, opts: opts)
     log_level = Keyword.get(opts, :log_level, :info)
 
     with {:ok, normalized_params} <- normalize_params(params),
@@ -149,26 +145,17 @@ defmodule Jido.Exec do
       enhanced_context =
         Map.put(normalized_context, :action_metadata, action.__action_metadata__())
 
-      dbug("Params and context normalized and validated",
-        normalized_params: normalized_params,
-        normalized_context: enhanced_context,
-        validated_params: validated_params
-      )
-
       Telemetry.cond_log_start(log_level, action, validated_params, enhanced_context)
 
       do_run_with_retry(action, validated_params, enhanced_context, opts)
     else
       {:error, reason} ->
-        dbug("Error in action setup", error: reason)
         Telemetry.cond_log_failure(log_level, inspect(reason))
         {:error, reason}
     end
   rescue
     e in [FunctionClauseError, BadArityError, BadFunctionError] ->
       log_level = Keyword.get(opts, :log_level, :info)
-      dbug("Function error in action", error: e)
-
       Telemetry.cond_log_function_error(log_level, e)
 
       {:error,
@@ -176,7 +163,6 @@ defmodule Jido.Exec do
 
     e ->
       log_level = Keyword.get(opts, :log_level, :info)
-      dbug("Unexpected error in action", error: e)
       Telemetry.cond_log_unexpected_error(log_level, e)
 
       {:error,
@@ -186,15 +172,12 @@ defmodule Jido.Exec do
   catch
     kind, reason ->
       log_level = Keyword.get(opts, :log_level, :info)
-      dbug("Caught error in action", kind: kind, reason: reason)
-
       Telemetry.cond_log_caught_error(log_level, reason)
 
       {:error, Error.internal_error("Caught #{kind}: #{inspect(reason)}")}
   end
 
   def run(action, _params, _context, _opts) do
-    dbug("Invalid action type", action: action)
     {:error, Error.validation_error("Expected action to be a module, got: #{inspect(action)}")}
   end
 
@@ -324,7 +307,6 @@ defmodule Jido.Exec do
       retry_opts = Retry.extract_retry_opts(opts)
       max_retries = retry_opts[:max_retries]
       backoff = retry_opts[:backoff]
-      dbug("Starting run with retry", action: action, max_retries: max_retries, backoff: backoff)
       do_run_with_retry(action, params, context, opts, 0, max_retries, backoff)
     end
 
@@ -338,20 +320,14 @@ defmodule Jido.Exec do
             non_neg_integer()
           ) :: exec_result
     defp do_run_with_retry(action, params, context, opts, retry_count, max_retries, backoff) do
-      dbug("Attempting run", action: action, retry_count: retry_count)
-
       case do_run(action, params, context, opts) do
         {:ok, result} ->
-          dbug("Run succeeded", result: result)
           {:ok, result}
 
         {:ok, result, other} ->
-          dbug("Run succeeded with additional info", result: result, other: other)
           {:ok, result, other}
 
         {:error, reason, other} ->
-          dbug("Run failed with additional info", error: reason, other: other)
-
           maybe_retry(
             action,
             params,
@@ -364,8 +340,6 @@ defmodule Jido.Exec do
           )
 
         {:error, reason} ->
-          dbug("Run failed", error: reason)
-
           maybe_retry(
             action,
             params,
@@ -402,7 +376,6 @@ defmodule Jido.Exec do
           )
         end)
       else
-        dbug("Max retries reached", action: action, max_retries: max_retries)
         error
       end
     end
@@ -411,7 +384,6 @@ defmodule Jido.Exec do
     defp do_run(action, params, context, opts) do
       timeout = Keyword.get(opts, :timeout, get_default_timeout())
       telemetry = Keyword.get(opts, :telemetry, :full)
-      dbug("Starting action execution", action: action, timeout: timeout, telemetry: telemetry)
 
       result =
         case telemetry do
@@ -437,23 +409,18 @@ defmodule Jido.Exec do
 
       case result do
         {:ok, _result} = success ->
-          dbug("Action succeeded", result: success)
           success
 
         {:ok, _result, _other} = success ->
-          dbug("Action succeeded with additional info", result: success)
           success
 
         {:error, %Jido.Action.Error.TimeoutError{}} = timeout_err ->
-          dbug("Action timed out", error: timeout_err)
           timeout_err
 
         {:error, error, other} ->
-          dbug("Action failed with additional info", error: error, other: other)
           handle_action_error(action, params, context, {error, other}, opts)
 
         {:error, error} ->
-          dbug("Action failed", error: error)
           handle_action_error(action, params, context, error, opts)
       end
     end
@@ -466,7 +433,6 @@ defmodule Jido.Exec do
             run_opts()
           ) :: exec_result
     defp handle_action_error(action, params, context, error_or_tuple, opts) do
-      dbug("Delegating to compensation handler", action: action, error: error_or_tuple)
       Compensation.handle_error(action, params, context, error_or_tuple, opts)
     end
 
@@ -487,8 +453,6 @@ defmodule Jido.Exec do
          when is_integer(timeout) and timeout > 0 do
       parent = self()
       ref = make_ref()
-
-      dbug("Starting action with timeout", action: action, timeout: timeout)
 
       # Create a temporary task group for this execution
       {:ok, task_group} =
@@ -516,14 +480,11 @@ defmodule Jido.Exec do
 
           result =
             try do
-              dbug("Executing action in task", action: action, pid: self())
               result = execute_action(action, params, enhanced_context, opts)
-              dbug("Action execution completed", action: action, result: result)
               result
             catch
               kind, reason ->
                 stacktrace = __STACKTRACE__
-                dbug("Action execution caught error", action: action, kind: kind, reason: reason)
 
                 {:error,
                  Error.execution_error(
@@ -538,23 +499,19 @@ defmodule Jido.Exec do
       result =
         receive do
           {:done, ^ref, result} ->
-            dbug("Received action result", action: action, result: result)
             cleanup_task_group(task_group)
             Process.demonitor(monitor_ref, [:flush])
             result
 
           {:DOWN, ^monitor_ref, :process, ^pid, :killed} ->
-            dbug("Task was killed", action: action)
             cleanup_task_group(task_group)
             {:error, Error.execution_error("Task was killed")}
 
           {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
-            dbug("Task exited unexpectedly", action: action, reason: reason)
             cleanup_task_group(task_group)
             {:error, Error.execution_error("Task exited: #{inspect(reason)}")}
         after
           timeout ->
-            dbug("Action timed out", action: action, timeout: timeout)
             cleanup_task_group(task_group)
             Process.exit(pid, :kill)
 
@@ -611,14 +568,10 @@ Debug info:
     @spec execute_action(action(), params(), context(), run_opts()) :: exec_result
     defp execute_action(action, params, context, opts) do
       log_level = Keyword.get(opts, :log_level, :info)
-      dbug("Executing action", action: action, params: params, context: context)
-
       Telemetry.cond_log_execution_debug(log_level, action, params, context)
 
       case action.run(params, context) do
         {:ok, result, other} ->
-          dbug("Action succeeded with additional info", result: result, other: other)
-
           case Validator.validate_output(action, result, opts) do
             {:ok, validated_result} ->
               Telemetry.cond_log_end(log_level, action, {:ok, validated_result, other})
@@ -626,16 +579,12 @@ Debug info:
               {:ok, validated_result, other}
 
             {:error, validation_error} ->
-              dbug("Action output validation failed", error: validation_error)
-
               Telemetry.cond_log_validation_failure(log_level, action, validation_error)
 
               {:error, validation_error, other}
           end
 
         {:ok, result} ->
-          dbug("Action succeeded", result: result)
-
           case Validator.validate_output(action, result, opts) do
             {:ok, validated_result} ->
               Telemetry.cond_log_end(log_level, action, {:ok, validated_result})
@@ -643,31 +592,24 @@ Debug info:
               {:ok, validated_result}
 
             {:error, validation_error} ->
-              dbug("Action output validation failed", error: validation_error)
-
               Telemetry.cond_log_validation_failure(log_level, action, validation_error)
 
               {:error, validation_error}
           end
 
         {:error, reason, other} ->
-          dbug("Action failed with additional info", error: reason, other: other)
           Telemetry.cond_log_error(log_level, action, reason)
           {:error, reason, other}
 
         {:error, %_{} = error} when is_exception(error) ->
-          dbug("Action failed with error struct", error: error)
           Telemetry.cond_log_error(log_level, action, error)
           {:error, error}
 
         {:error, reason} ->
-          dbug("Action failed with reason", reason: reason)
           Telemetry.cond_log_error(log_level, action, reason)
           {:error, Error.execution_error(reason)}
 
         result ->
-          dbug("Action returned unexpected result", result: result)
-
           case Validator.validate_output(action, result, opts) do
             {:ok, validated_result} ->
               Telemetry.cond_log_end(log_level, action, {:ok, validated_result})
@@ -675,8 +617,6 @@ Debug info:
               {:ok, validated_result}
 
             {:error, validation_error} ->
-              dbug("Action output validation failed", error: validation_error)
-
               Telemetry.cond_log_validation_failure(log_level, action, validation_error)
 
               {:error, validation_error}
@@ -684,7 +624,6 @@ Debug info:
       end
     rescue
       e in RuntimeError ->
-        dbug("Runtime error in action", error: e)
         stacktrace = __STACKTRACE__
         log_level = Keyword.get(opts, :log_level, :info)
         Telemetry.cond_log_error(log_level, action, e)
@@ -696,7 +635,6 @@ Debug info:
          )}
 
       e in ArgumentError ->
-        dbug("Argument error in action", error: e)
         stacktrace = __STACKTRACE__
         log_level = Keyword.get(opts, :log_level, :info)
         Telemetry.cond_log_error(log_level, action, e)
