@@ -282,7 +282,7 @@ Jido.Action comes with a comprehensive library of pre-built tools organized by c
 ### External API Integration
 | Tool | Description | Use Case |
 |------|-------------|----------|
-| `Weather` | OpenWeatherMap API integration | Weather data, demos |
+| `Weather` | National Weather Service API integration | Weather data, forecasts |
 | `Github.Issues` | GitHub Issues API (create, list, filter) | Issue management |
 
 ### Workflow & Simulation
