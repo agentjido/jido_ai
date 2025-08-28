@@ -24,6 +24,22 @@ defmodule Jido.AI.Provider.Util.Options do
   @doc """
   Returns the default set of chat completion options.
   """
+  @spec default() :: [
+          :frequency_penalty
+          | :max_completion_tokens
+          | :max_tokens
+          | :messages
+          | :model
+          | :n
+          | :presence_penalty
+          | :response_format
+          | :seed
+          | :stop
+          | :temperature
+          | :top_p
+          | :user,
+          ...
+        ]
   def default, do: @default_chat_completion_opts
 
   @doc """
@@ -114,6 +130,7 @@ defmodule Jido.AI.Provider.Util.Options do
   end
 
   # Deep merge provider options with proper precedence
+  @spec deep_merge_provider_options(map(), map()) :: map()
   defp deep_merge_provider_options(base, override) when is_map(base) and is_map(override) do
     Map.merge(base, override, fn _key, base_val, override_val ->
       case {base_val, override_val} do
@@ -126,6 +143,7 @@ defmodule Jido.AI.Provider.Util.Options do
     end)
   end
 
+  @spec deep_merge_provider_options(term(), term()) :: term()
   defp deep_merge_provider_options(_base, override), do: override
 
   @doc """
@@ -140,6 +158,7 @@ defmodule Jido.AI.Provider.Util.Options do
     end
   end
 
+  @spec maybe_put(Keyword.t(), :api_key | :max_retries | :max_tokens | :temperature | :url, term()) :: Keyword.t()
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
 end

@@ -53,6 +53,12 @@ defmodule Jido.AI.Provider.Base do
   defdelegate do_http_request(provider_module, model, request_body, opts), to: HTTP
   defdelegate do_stream_request(provider_module, model, request_body, opts), to: HTTP
   # Compatibility wrappers that maintain the old return format
+  @doc """
+  Extracts text from response while maintaining backward compatibility.
+
+  **Deprecated**: Use `Jido.AI.Provider.Response.Parser.extract_text_response/1` instead.
+  """
+  @spec extract_text_response(map()) :: {:ok, String.t()} | {:error, Error.t()}
   def extract_text_response(response) do
     case Parser.extract_text_response(response) do
       {:ok, text, _meta} -> {:ok, text}
@@ -60,6 +66,12 @@ defmodule Jido.AI.Provider.Base do
     end
   end
 
+  @doc """
+  Extracts object from response while maintaining backward compatibility.
+
+  **Deprecated**: Use `Jido.AI.Provider.Response.Parser.extract_object_response/1` instead.
+  """
+  @spec extract_object_response(map()) :: {:ok, map()} | {:error, Error.t()}
   def extract_object_response(response) do
     case Parser.extract_object_response(response) do
       {:ok, object, _meta} -> {:ok, object}

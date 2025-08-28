@@ -1,5 +1,6 @@
 defmodule Jido.AI.Provider.BaseStreamObjectTest do
   use Jido.AI.TestSupport.HTTPCase
+  use Jido.AI.TestSupport.KeyringCase
 
   alias Jido.AI.Provider.{Base, OpenAI}
   alias Jido.AI.Test.Fixtures.ModelFixtures
@@ -15,12 +16,14 @@ defmodule Jido.AI.Provider.BaseStreamObjectTest do
         %{"choices" => [%{"delta" => %{"content" => "\"John\"}"}}]}
       ]
 
-      with_sse(events) do
-        result = Base.default_stream_object(OpenAI, model, "Generate a person", schema)
+      session(openai_api_key: "sk-test-key") do
+        with_sse(events) do
+          result = Base.default_stream_object(OpenAI, model, "Generate a person", schema)
 
-        # Should return a stream successfully
-        assert {:ok, stream} = result
-        assert is_function(stream)
+          # Should return a stream successfully
+          assert {:ok, stream} = result
+          assert is_function(stream)
+        end
       end
     end
   end

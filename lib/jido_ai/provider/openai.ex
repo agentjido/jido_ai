@@ -20,5 +20,10 @@ defmodule Jido.AI.Provider.OpenAI do
     base_url: "https://api.openai.com/v1"
 
   @impl true
+  @spec supports_json_mode?() :: true
   def supports_json_mode?, do: true
+
+  @impl true
+  @spec stream_event_type() :: :openai
+  def stream_event_type, do: :openai
 end

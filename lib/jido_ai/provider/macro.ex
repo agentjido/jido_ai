@@ -71,41 +71,76 @@ defmodule Jido.AI.Provider.Macro do
       @base_url base_url
 
       # Implement callbacks using compile-time data
+      @doc "Returns provider information loaded from compile-time metadata."
       @impl true
+      @spec provider_info() :: Provider.t()
       def provider_info, do: @provider_info
 
+      @doc "Returns the base API URL for this provider."
       @impl true
+      @spec api_url() :: String.t()
       def api_url, do: @base_url
 
       # Default to not supporting JSON mode - providers can override
+      @doc "Returns whether this provider supports JSON mode."
       @impl true
+      @spec supports_json_mode?() :: false
       def supports_json_mode?, do: false
 
       # Default to OpenAI-style options - providers can override
+      @doc "Returns the default chat completion options for this provider."
       @impl true
+      @spec chat_completion_opts() :: [
+              :frequency_penalty
+              | :max_completion_tokens
+              | :max_tokens
+              | :messages
+              | :model
+              | :n
+              | :presence_penalty
+              | :response_format
+              | :seed
+              | :stop
+              | :temperature
+              | :top_p
+              | :user,
+              ...
+            ]
       def chat_completion_opts, do: Util.Options.default()
 
       # Default to OpenAI stream format - providers can override
+      @doc "Returns the stream event type for this provider."
       @impl true
+      @spec stream_event_type() :: :openai
       def stream_event_type, do: :openai
 
       # Provide default implementation
+      @doc "Generates text using the default implementation."
       @impl true
+      @spec generate_text(Model.t(), String.t() | [Message.t()], keyword()) :: {:ok, String.t()} | {:error, Error.t()}
       def generate_text(%Model{} = model, prompt, opts \\ []) do
         Jido.AI.Provider.Macro.default_generate_text(__MODULE__, model, prompt, opts)
       end
 
+      @doc "Streams text using the default implementation."
       @impl true
+      @spec stream_text(Model.t(), String.t() | [Message.t()], keyword()) :: {:ok, Enumerable.t()} | {:error, Error.t()}
       def stream_text(%Model{} = model, prompt, opts \\ []) do
         Jido.AI.Provider.Macro.default_stream_text(__MODULE__, model, prompt, opts)
       end
 
+      @doc "Generates structured objects using the default implementation."
       @impl true
+      @spec generate_object(Model.t(), String.t() | [Message.t()], map() | keyword(), keyword()) ::
+              {:ok, map()} | {:error, Error.t()}
       def generate_object(%Model{} = model, prompt, schema, opts \\ []) do
         Jido.AI.Provider.Macro.default_generate_object(__MODULE__, model, prompt, schema, opts)
       end
 
+      @doc "Streams structured objects using the default implementation."
       @impl true
+      @spec stream_object(Model.t(), String.t() | [Message.t()], map() | keyword(), keyword()) ::
+              {:ok, Enumerable.t()} | {:error, Error.t()}
       def stream_object(%Model{} = model, prompt, schema, opts \\ []) do
         Jido.AI.Provider.Macro.default_stream_object(__MODULE__, model, prompt, schema, opts)
       end
@@ -216,6 +251,16 @@ defmodule Jido.AI.Provider.Macro do
   end
 
   # Private retry logic for generate_object
+  @spec do_generate_object_with_retry(
+          module(),
+          Model.t(),
+          String.t() | [Message.t()],
+          map() | keyword(),
+          keyword(),
+          non_neg_integer(),
+          non_neg_integer()
+        ) ::
+          {:ok, map()} | {:error, Error.t()}
   defp do_generate_object_with_retry(provider_module, model, prompt, schema, opts, max_retries, attempt) do
     system_prompt = Request.Builder.build_schema_system_prompt(schema, Keyword.get(opts, :system_prompt))
 
@@ -269,6 +314,7 @@ defmodule Jido.AI.Provider.Macro do
     """
   end
 
+  @spec format_validation_errors_for_retry(list() | term()) :: String.t()
   defp format_validation_errors_for_retry(errors) when is_list(errors) do
     errors
     |> Enum.map_join("\n", &format_single_validation_error/1)
@@ -276,6 +322,7 @@ defmodule Jido.AI.Provider.Macro do
 
   defp format_validation_errors_for_retry(_), do: "Invalid data format"
 
+  @spec format_single_validation_error(map() | String.t() | term()) :: String.t()
   defp format_single_validation_error(%{field: field, message: message}) do
     "- #{field}: #{message}"
   end

@@ -17,6 +17,7 @@ defmodule Jido.AI.Error.ObjectGeneration do
           cause: term() | nil
         }
 
+  @spec message(map()) :: String.t()
   def message(%{text: text, cause: cause}) when not is_nil(cause) do
     "Object generation failed: #{inspect(cause)}#{format_text_preview(text)}"
   end

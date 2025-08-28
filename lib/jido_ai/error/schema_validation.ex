@@ -20,6 +20,7 @@ defmodule Jido.AI.Error.SchemaValidation do
           validation_errors: list() | nil
         }
 
+  @spec message(map()) :: String.t()
   def message(%{validation_errors: errors, schema: schema}) when is_list(errors) and not is_nil(schema) do
     error_summary = format_validation_errors(errors)
     "Schema validation failed: #{error_summary}"
