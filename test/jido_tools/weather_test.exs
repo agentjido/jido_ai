@@ -1,354 +1,458 @@
 defmodule JidoTest.Tools.WeatherTest do
   use JidoTest.ActionCase, async: false
-  use Mimic
 
   import ExUnit.CaptureIO
+  import Mimic
 
   alias Jido.Tools.Weather
 
   @moduletag :capture_log
 
-  describe "run/2 with test mode" do
-    test "returns text format weather data in test mode" do
-      params = %{location: "test", test: true, format: "text"}
+  setup :set_mimic_global
 
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-      assert result =~ "Current Weather:"
-      assert result =~ "Temperature:"
-      assert result =~ "Feels like:"
-      assert result =~ "Humidity:"
-      assert result =~ "Wind:"
-      assert result =~ "Conditions:"
-      assert result =~ "Today's Forecast:"
-      assert result =~ "High:"
-      assert result =~ "Low:"
-    end
+  # Valid US coordinates for Chicago (default location)
+  @chicago_coords "41.8781,-87.6298"
+  # Valid US coordinates for NYC
+  @nyc_coords "40.7128,-74.0060"
 
-    test "returns map format weather data in test mode" do
-      params = %{location: "test", test: true, format: "map"}
+  # Mock NWS API responses
+  defp mock_location_to_grid_response(location) do
+    case location do
+      @chicago_coords ->
+        %{
+          status: 200,
+          body: %{
+            "properties" => %{
+              "relativeLocation" => %{
+                "properties" => %{
+                  "city" => "Chicago",
+                  "state" => "IL"
+                }
+              },
+              "timeZone" => "America/Chicago",
+              "forecast" => "https://api.weather.gov/gridpoints/LOT/76,73/forecast",
+              "forecastHourly" => "https://api.weather.gov/gridpoints/LOT/76,73/forecast/hourly",
+              "gridId" => "LOT",
+              "gridX" => 76,
+              "gridY" => 73
+            }
+          },
+          headers: %{"content-type" => "application/geo+json"}
+        }
 
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_map(result)
+      @nyc_coords ->
+        %{
+          status: 200,
+          body: %{
+            "properties" => %{
+              "relativeLocation" => %{
+                "properties" => %{
+                  "city" => "Hoboken",
+                  "state" => "NJ"
+                }
+              },
+              "timeZone" => "America/New_York",
+              "forecast" => "https://api.weather.gov/gridpoints/OKX/33,35/forecast",
+              "forecastHourly" => "https://api.weather.gov/gridpoints/OKX/33,35/forecast/hourly",
+              "gridId" => "OKX",
+              "gridX" => 33,
+              "gridY" => 35
+            }
+          },
+          headers: %{"content-type" => "application/geo+json"}
+        }
 
-      assert %{current: current, forecast: forecast} = result
-      assert Map.has_key?(current, :temperature)
-      assert Map.has_key?(current, :feels_like)
-      assert Map.has_key?(current, :humidity)
-      assert Map.has_key?(current, :wind_speed)
-      assert Map.has_key?(current, :conditions)
-      assert Map.has_key?(current, :unit)
-
-      assert Map.has_key?(forecast, :high)
-      assert Map.has_key?(forecast, :low)
-      assert Map.has_key?(forecast, :summary)
-      assert Map.has_key?(forecast, :unit)
-    end
-
-    test "uses default parameters when not specified" do
-      params = %{location: "test", test: true}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      # Should default to text format
-      assert is_binary(result)
-    end
-
-    test "uses explicit test mode" do
-      params = %{location: "test", units: "metric", hours: 24, format: "text", test: true}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles different units parameter" do
-      params = %{location: "test", test: true, units: "imperial"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles different hours parameter" do
-      params = %{location: "test", test: true, hours: 48}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
+      _ ->
+        %{
+          status: 404,
+          body: %{
+            "correlationId" => "6a6bbd9",
+            "detail" => "'/points/#{location}' is not a valid resource path",
+            "instance" => "https://api.weather.gov/requests/6a6bbd9",
+            "status" => 404,
+            "title" => "Not Found",
+            "type" => "https://api.weather.gov/problems/NotFound"
+          },
+          headers: %{"content-type" => "application/problem+json"}
+        }
     end
   end
 
-  describe "run/2 with real API" do
-    setup :set_mimic_global
+  defp mock_forecast_response(forecast_url, periods) do
+    case forecast_url do
+      "https://api.weather.gov/gridpoints/LOT/76,73/forecast" ->
+        # Chicago forecast data
+        periods_data =
+          [
+            %{
+              "number" => 1,
+              "name" => "Tonight",
+              "startTime" => "2025-08-24T19:00:00-05:00",
+              "endTime" => "2025-08-25T06:00:00-05:00",
+              "isDaytime" => false,
+              "temperature" => 56,
+              "temperatureUnit" => "F",
+              "temperatureTrend" => "",
+              "windSpeed" => "10 to 15 mph",
+              "windDirection" => "NW",
+              "icon" => "https://api.weather.gov/icons/land/night/sct?size=medium",
+              "shortForecast" => "Partly Cloudy",
+              "detailedForecast" =>
+                "Partly cloudy, with a low around 56. Northwest wind 10 to 15 mph, with gusts as high as 25 mph."
+            },
+            %{
+              "number" => 2,
+              "name" => "Monday",
+              "startTime" => "2025-08-25T06:00:00-05:00",
+              "endTime" => "2025-08-25T18:00:00-05:00",
+              "isDaytime" => true,
+              "temperature" => 70,
+              "temperatureUnit" => "F",
+              "temperatureTrend" => "",
+              "windSpeed" => "10 to 15 mph",
+              "windDirection" => "NW",
+              "icon" => "https://api.weather.gov/icons/land/day/sct?size=medium",
+              "shortForecast" => "Mostly Sunny",
+              "detailedForecast" =>
+                "Mostly sunny, with a high near 70. Northwest wind 10 to 15 mph."
+            },
+            %{
+              "number" => 3,
+              "name" => "Monday Night",
+              "startTime" => "2025-08-25T18:00:00-05:00",
+              "endTime" => "2025-08-26T06:00:00-05:00",
+              "isDaytime" => false,
+              "temperature" => 57,
+              "temperatureUnit" => "F",
+              "temperatureTrend" => "",
+              "windSpeed" => "10 mph",
+              "windDirection" => "NW",
+              "icon" => "https://api.weather.gov/icons/land/night/sct?size=medium",
+              "shortForecast" => "Partly Cloudy",
+              "detailedForecast" =>
+                "Partly cloudy, with a low around 57. Northwest wind around 10 mph, with gusts as high as 20 mph."
+            }
+          ]
+          |> Enum.take(periods)
 
-    test "returns error when API key is missing and test is false" do
-      stub(System, :fetch_env, fn "OPENWEATHER_API_KEY" ->
-        :error
-      end)
+        %{
+          status: 200,
+          body: %{
+            "properties" => %{
+              "updated" => nil,
+              "periods" => periods_data
+            }
+          },
+          headers: %{"content-type" => "application/geo+json"}
+        }
 
-      params = %{location: "60618,US", test: false, units: "metric", hours: 24, format: "text"}
+      "https://api.weather.gov/gridpoints/OKX/33,35/forecast" ->
+        # NYC forecast data
+        periods_data =
+          [
+            %{
+              "number" => 1,
+              "name" => "This Afternoon",
+              "startTime" => "2025-08-24T14:00:00-04:00",
+              "endTime" => "2025-08-24T18:00:00-04:00",
+              "isDaytime" => true,
+              "temperature" => 78,
+              "temperatureUnit" => "F",
+              "temperatureTrend" => "",
+              "windSpeed" => "16 mph",
+              "windDirection" => "S",
+              "icon" => "https://api.weather.gov/icons/land/day/bkn?size=medium",
+              "shortForecast" => "Partly Sunny",
+              "detailedForecast" =>
+                "Partly sunny. High near 78, with temperatures falling to around 75 in the afternoon. South wind around 16 mph."
+            },
+            %{
+              "number" => 2,
+              "name" => "Tonight",
+              "startTime" => "2025-08-24T18:00:00-04:00",
+              "endTime" => "2025-08-25T06:00:00-04:00",
+              "isDaytime" => false,
+              "temperature" => 71,
+              "temperatureUnit" => "F",
+              "temperatureTrend" => "",
+              "windSpeed" => "5 to 14 mph",
+              "windDirection" => "S",
+              "icon" =>
+                "https://api.weather.gov/icons/land/night/bkn/rain_showers,20?size=medium",
+              "shortForecast" => "Mostly Cloudy then Slight Chance Rain Showers",
+              "detailedForecast" =>
+                "A slight chance of rain showers after 2am. Mostly cloudy, with a low around 71. South wind 5 to 14 mph. Chance of precipitation is 20%."
+            }
+          ]
+          |> Enum.take(periods)
 
-      assert {:error, error} = Weather.run(params, %{})
-      assert error =~ "Failed to fetch weather:"
-      assert error =~ "Missing OPENWEATHER_API_KEY environment variable"
+        %{
+          status: 200,
+          body: %{
+            "properties" => %{
+              "updated" => nil,
+              "periods" => periods_data
+            }
+          },
+          headers: %{"content-type" => "application/geo+json"}
+        }
+
+      _ ->
+        %{
+          status: 404,
+          body: %{
+            "correlationId" => "abc123",
+            "detail" => "Forecast not found",
+            "status" => 404,
+            "title" => "Not Found"
+          },
+          headers: %{"content-type" => "application/problem+json"}
+        }
+    end
+  end
+
+  defp setup_weather_mocks(location \\ @chicago_coords, periods \\ 5) do
+    location_response = mock_location_to_grid_response(location)
+
+    # Use stub to handle multiple calls with the same response
+    stub(Req, :request!, fn opts ->
+      cond do
+        String.contains?(opts[:url], "/points/") ->
+          # LocationToGrid call
+          expected_url = "https://api.weather.gov/points/#{location}"
+          assert opts[:url] == expected_url
+          assert opts[:method] == :get
+          location_response
+
+        String.contains?(opts[:url], "/forecast") ->
+          # Forecast call
+          if location_response.status == 200 do
+            forecast_url = location_response.body["properties"]["forecast"]
+            forecast_response = mock_forecast_response(forecast_url, periods)
+            assert opts[:method] == :get
+            forecast_response
+          else
+            # Should not be called if location lookup failed
+            raise "Forecast called when location lookup failed"
+          end
+
+        true ->
+          raise "Unexpected URL: #{opts[:url]}"
+      end
+    end)
+  end
+
+  describe "run/2 basic functionality" do
+    test "uses Chicago coordinates as default location with default text format" do
+      setup_weather_mocks()
+
+      params = %{}
+
+      assert {:ok, result} = Weather.run(params, %{})
+      # Default format is text, so Weather action returns just the forecast string
+      assert is_binary(result)
+      assert result =~ "Temperature:"
+      assert result =~ "°F"
+      assert result =~ "Tonight"
+      assert result =~ "56°F"
     end
 
-    test "attempts to use real API when API key is available and test is false" do
-      stub(System, :fetch_env, fn "OPENWEATHER_API_KEY" ->
-        {:ok, "test_api_key"}
-      end)
+    test "accepts explicit location coordinates" do
+      setup_weather_mocks(@nyc_coords)
 
-      params = %{location: "60618,US", test: false, units: "metric", hours: 24, format: "text"}
+      params = %{location: @nyc_coords}
 
-      # The weather library validates the API key during opts creation and raises an exception
-      # for invalid keys instead of returning an error tuple
-      assert_raise ArgumentError, ~r/Unable to fetch location data/, fn ->
-        Weather.run(params, %{})
+      assert {:ok, result} = Weather.run(params, %{})
+      # Default format is text, so Weather action returns just the forecast string
+      assert is_binary(result)
+      assert result =~ "Temperature:"
+      assert result =~ "°F"
+      assert result =~ "This Afternoon"
+      assert result =~ "78°F"
+    end
+
+    test "supports different periods parameter" do
+      setup_weather_mocks(@chicago_coords, 3)
+
+      params = %{periods: 3}
+
+      assert {:ok, result} = Weather.run(params, %{})
+      # Default format is text, so Weather action returns just the forecast string
+      assert is_binary(result)
+      assert result =~ "Temperature:"
+      assert result =~ "°F"
+      # Should have 3 periods
+      assert result =~ "Tonight"
+      assert result =~ "Monday"
+      assert result =~ "Monday Night"
+    end
+
+    test "supports different format parameters" do
+      # Test text format (raw forecast string)
+      setup_weather_mocks(@chicago_coords, 2)
+
+      params = %{format: :text, periods: 2}
+      assert {:ok, result} = Weather.run(params, %{})
+      # Text format returns just the forecast string
+      assert is_binary(result)
+      assert result =~ "Temperature:"
+
+      # Test summary format (full map structure)
+      setup_weather_mocks(@chicago_coords, 2)
+
+      params = %{format: :summary, periods: 2}
+      assert {:ok, result} = Weather.run(params, %{})
+      # Summary format returns the full map structure
+      assert is_map(result)
+      assert Map.has_key?(result, :location)
+      assert Map.has_key?(result, :forecast)
+      assert is_list(result.forecast)
+      assert length(result.forecast) == 2
+
+      # Test detailed format (full map structure)
+      setup_weather_mocks(@chicago_coords, 2)
+
+      params = %{format: :detailed, periods: 2}
+      assert {:ok, result} = Weather.run(params, %{})
+      # Detailed format returns the full map structure
+      assert is_map(result)
+      assert Map.has_key?(result, :location)
+      assert Map.has_key?(result, :forecast)
+      assert is_list(result.forecast)
+      assert length(result.forecast) == 2
+    end
+  end
+
+  describe "run/2 error handling" do
+    test "handles invalid location format gracefully" do
+      setup_weather_mocks("invalid_location")
+
+      params = %{location: "invalid_location"}
+
+      assert {:error, error} = Weather.run(params, %{})
+      assert is_binary(error)
+      assert error =~ "Failed to fetch weather"
+      assert error =~ "NWS API error"
+    end
+
+    test "handles empty location gracefully" do
+      setup_weather_mocks("")
+
+      params = %{location: ""}
+
+      assert {:error, error} = Weather.run(params, %{})
+      assert is_binary(error)
+      assert error =~ "Failed to fetch weather"
+    end
+
+    test "handles invalid format gracefully" do
+      # Don't set up mocks since validation should fail before API calls
+      params = %{format: :invalid_format}
+
+      assert {:error, error} = Weather.run(params, %{})
+      assert is_binary(error)
+      assert error =~ "Invalid parameters"
+      assert error =~ "expected one of [:detailed, :summary, :text]"
+    end
+  end
+
+  describe "run/2 format validation" do
+    test "validates format parameter options" do
+      # Valid formats should not raise validation errors immediately
+      for format <- [:text, :summary, :detailed] do
+        setup_weather_mocks()
+
+        params = %{format: format}
+        assert {:ok, _result} = Weather.run(params, %{})
+      end
+    end
+
+    test "rejects invalid format options" do
+      # This was valid in old API, invalid in new
+      params = %{format: :map}
+
+      assert {:error, error} = Weather.run(params, %{})
+      assert error =~ "Invalid parameters"
+      assert error =~ "expected one of [:detailed, :summary, :text]"
+    end
+  end
+
+  describe "run/2 result structure" do
+    test "returns proper structure for successful calls with summary format" do
+      setup_weather_mocks(@chicago_coords, 2)
+
+      params = %{location: @chicago_coords, format: :summary, periods: 2}
+
+      assert {:ok, result} = Weather.run(params, %{})
+      # Summary format returns the full map structure
+      assert is_map(result)
+      assert Map.has_key?(result, :location)
+      assert Map.has_key?(result, :forecast)
+      assert Map.has_key?(result, :updated)
+
+      # Location should have expected structure
+      location = result.location
+      assert Map.has_key?(location, :query)
+      assert Map.has_key?(location, :city)
+      assert Map.has_key?(location, :state)
+      assert Map.has_key?(location, :timezone)
+      assert location.query == @chicago_coords
+      assert location.city == "Chicago"
+      assert location.state == "IL"
+
+      # Summary format should return list
+      assert is_list(result.forecast)
+      assert length(result.forecast) == 2
+    end
+
+    test "text format returns raw forecast string" do
+      setup_weather_mocks(@chicago_coords, 1)
+
+      params = %{format: :text, periods: 1}
+
+      assert {:ok, result} = Weather.run(params, %{})
+      # Text format returns just the forecast string, not a map
+      assert is_binary(result)
+      assert result =~ "Temperature:"
+      assert result =~ "°F"
+      assert result =~ "Tonight"
+    end
+
+    test "summary and detailed formats return structured data" do
+      for format <- [:summary, :detailed] do
+        setup_weather_mocks(@chicago_coords, 2)
+
+        params = %{format: format, periods: 2}
+
+        assert {:ok, result} = Weather.run(params, %{})
+        # Summary/detailed formats return the full map structure
+        assert is_map(result)
+        assert Map.has_key?(result, :location)
+        forecast = result.forecast
+        assert is_list(forecast)
+        assert length(forecast) == 2
       end
     end
   end
 
   describe "demo/0" do
-    test "demo function exists and can be called" do
-      # Demo function has hardcoded parameters that don't include all required fields
-      # This test just ensures the function exists and can be invoked
-      # The actual demo may fail due to missing parameters, but that's expected
-      assert function_exported?(Weather, :demo, 0)
+    test "demo function runs without crashing" do
+      # Set up mocks for the demo function calls
+      # Chicago text format
+      setup_weather_mocks(@chicago_coords, 5)
 
-      # The demo function might fail due to parameter validation issues
-      # so we just test that it doesn't crash the VM
-      capture_io(fn ->
-        try do
+      # LA map format (will fail validation)
+      # No mock needed since it fails at parameter validation
+
+      # NYC detailed format
+      setup_weather_mocks(@nyc_coords, 3)
+
+      output =
+        capture_io(fn ->
           Weather.demo()
-        rescue
-          # Expected due to parameter validation
-          _ -> :ok
-        catch
-          # Expected due to parameter validation
-          _ -> :ok
-        end
-      end)
-    end
-  end
+        end)
 
-  describe "format validation" do
-    test "supports text format" do
-      params = %{location: "test", test: true, format: "text"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "supports map format" do
-      params = %{location: "test", test: true, format: "map"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_map(result)
-    end
-
-    test "handles unknown format gracefully" do
-      params = %{location: "test", test: true, format: "unknown"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      # Should default to text format for unknown formats
-      assert is_binary(result)
-    end
-  end
-
-  describe "location parameter" do
-    test "handles zip code format" do
-      params = %{location: "60618,US", test: true}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles city name format" do
-      params = %{location: "London,UK", test: true}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles simple location string" do
-      params = %{location: "Tokyo", test: true}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-  end
-
-  describe "units parameter" do
-    test "handles metric units" do
-      params = %{location: "test", test: true, units: "metric"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles imperial units" do
-      params = %{location: "test", test: true, units: "imperial"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "uses default units when not specified" do
-      params = %{location: "test", test: true}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-  end
-
-  describe "hours parameter" do
-    test "handles 24 hour forecast" do
-      params = %{location: "test", test: true, hours: 24}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles 48 hour forecast" do
-      params = %{location: "test", test: true, hours: 48}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles custom hour values" do
-      params = %{location: "test", test: true, hours: 12}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "uses default hours when not specified" do
-      params = %{location: "test", test: true}
-
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-  end
-
-  describe "error handling" do
-    test "handles empty location gracefully" do
-      params = %{location: "", test: true}
-
-      # Should still work in test mode
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles nil location gracefully" do
-      params = %{location: nil, test: true}
-
-      # Should still work in test mode
-      assert {:ok, result} = Weather.run(params, %{})
-      assert is_binary(result)
-    end
-
-    test "handles missing location parameter" do
-      params = %{test: true}
-
-      # This should cause an error since location is required
-      case Weather.run(params, %{}) do
-        {:error, error} ->
-          assert is_binary(error)
-
-        {:ok, _result} ->
-          # If it succeeds, that's also acceptable given the schema
-          assert true
-      end
-    end
-  end
-
-  describe "output content validation" do
-    test "text format contains expected weather information" do
-      params = %{location: "test", test: true, format: "text"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-
-      # Check for key weather sections
-      assert result =~ "Current Weather:"
-      assert result =~ "Today's Forecast:"
-
-      # Check for specific weather metrics
-      assert result =~ "Temperature:"
-      assert result =~ "Feels like:"
-      assert result =~ "Humidity:"
-      assert result =~ "Wind:"
-      assert result =~ "Conditions:"
-      assert result =~ "High:"
-      assert result =~ "Low:"
-    end
-
-    test "map format contains expected data structure" do
-      params = %{location: "test", test: true, format: "map"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-
-      # Verify top-level structure
-      assert %{current: current, forecast: forecast} = result
-
-      # Verify current weather fields
-      required_current_fields = [
-        :temperature,
-        :feels_like,
-        :humidity,
-        :wind_speed,
-        :conditions,
-        :unit
-      ]
-
-      for field <- required_current_fields do
-        assert Map.has_key?(current, field), "Missing current field: #{field}"
-      end
-
-      # Verify forecast fields
-      required_forecast_fields = [:high, :low, :summary, :unit]
-
-      for field <- required_forecast_fields do
-        assert Map.has_key?(forecast, field), "Missing forecast field: #{field}"
-      end
-    end
-
-    test "text format properly formats temperature units" do
-      params = %{location: "test", test: true, format: "text"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-
-      # Should contain temperature with degree symbol
-      assert result =~ ~r/Temperature: \d+(\.\d+)?°[CF]/
-      assert result =~ ~r/Feels like: \d+(\.\d+)?°[CF]/
-      assert result =~ ~r/High: \d+(\.\d+)?°[CF]/
-      assert result =~ ~r/Low: \d+(\.\d+)?°[CF]/
-    end
-
-    test "map format includes valid temperature unit indicators" do
-      params = %{location: "test", test: true, format: "map"}
-
-      assert {:ok, result} = Weather.run(params, %{})
-
-      assert result.current.unit in ["C", "F"]
-      assert result.forecast.unit in ["C", "F"]
-      # Both should use the same unit
-      assert result.current.unit == result.forecast.unit
-    end
-  end
-
-  describe "context parameter" do
-    test "accepts empty context" do
-      params = %{location: "test", test: true}
-      context = %{}
-
-      assert {:ok, result} = Weather.run(params, context)
-      assert is_binary(result)
-    end
-
-    test "accepts context with additional data" do
-      params = %{location: "test", test: true}
-      context = %{user_id: "123", session: "abc"}
-
-      assert {:ok, result} = Weather.run(params, context)
-      assert is_binary(result)
+      assert output =~ "Testing NWS API"
     end
   end
 end
