@@ -1,6 +1,8 @@
 defmodule JidoTest.Case do
   @moduledoc """
   Test case helper module providing common test functionality for Jido tests.
+
+  Includes agent DSL functionality for testing agent workflows.
   """
 
   use ExUnit.CaseTemplate
@@ -8,7 +10,6 @@ defmodule JidoTest.Case do
   using do
     quote do
       # Import test helpers
-
       import JidoTest.Case
       import JidoTest.Helpers.Assertions
 
