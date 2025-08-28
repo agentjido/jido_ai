@@ -1,0 +1,13 @@
+{
+  "name": "slidev-theme-agent-jido",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Slidev theme inspired by agentjido.xyz (dark-first)",
+  "keywords": ["slidev-theme", "slidev", "theme", "jido"],
+  "type": "module",
+  "main": "index.ts",
+  "peerDependencies": {
+    "@slidev/cli": ">=0.47.0",
+    "vue": ">=3.3.0"
+  }
+}

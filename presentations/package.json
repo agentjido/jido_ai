@@ -3,18 +3,20 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "slidev build",
-    "dev": "slidev --open",
-    "export": "slidev export",
-    "build:default": "slidev build presentations/default",
-    "dev:default": "slidev presentations/default --open",
-    "export:default": "slidev export presentations/default",
-    "new": "bash scripts/new-presentation.sh"
+    "dev": "slidev slidev/01-intro/slides.md --open",
+    "build": "slidev build slidev/01-intro/slides.md",
+    "export": "slidev export slidev/01-intro/slides.md",
+    "build:all": "bash scripts/build-all.sh",
+    "deck:new": "bash scripts/new-deck.sh",
+    "dev:intro": "slidev slidev/01-intro/slides.md --open",
+    "build:intro": "slidev build slidev/01-intro/slides.md",
+    "export:intro": "slidev export slidev/01-intro/slides.md"
   },
   "dependencies": {
     "@slidev/cli": "^52.1.0",
-    "@slidev/theme-default": "latest",
-    "@slidev/theme-seriph": "latest",
-    "vue": "^3.5.18"
+
+    "vue": "^3.5.18",
+    "lz-string": "^1.5.0",
+    "slidev-theme-agent-jido": "file:themes/slidev-theme-agent-jido"
   }
 }
