@@ -34,3 +34,6 @@ presentations/*/node_modules/
 presentations/*/dist/
 presentations/*/.nuxt/
 presentations/*/.output/
+
+# Humanlayer Thoughts
+thoughts/

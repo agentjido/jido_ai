@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bin/spec_metadata.sh:*)",
+      "Bash(humanlayer thoughts:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

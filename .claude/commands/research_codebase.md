@@ -111,8 +111,8 @@ Then wait for the user's research query.
      ...
 
      ## Code References
-     - `path/to/file.py:123` - Description of what's there
-     - `another/file.ts:45-67` - Description of the code block
+     - `path/to/file.ex:123` - Description of what's there
+     - `another/file.exs:45-67` - Description of the code block
 
      ## Architecture Insights
      [Patterns, conventions, and design decisions discovered]
