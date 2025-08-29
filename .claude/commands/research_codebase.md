@@ -66,7 +66,7 @@ Then wait for the user's research query.
    - Answer the user's specific questions with concrete evidence
 
 5. **Gather metadata for the research document:**
-   - Run the `hack/spec_metadata.sh` script to generate all relevant metadata
+   - Run the `bin/spec_metadata.sh` script to generate all relevant metadata
    - Filename: `thoughts/shared/research/YYYY-MM-DD_HH-MM-SS_topic.md`
 
 6. **Generate research document:**

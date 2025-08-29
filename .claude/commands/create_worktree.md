@@ -1,6 +1,6 @@
 
 2. set up worktree for implementation:
-2a. read `hack/create_worktree.sh` and create a new worktree with the Linear branch name: `./hack/create_worktree.sh ENG-XXXX BRANCH_NAME`
+2a. read `bin/create_worktree.sh` and create a new worktree with the Linear branch name: `./bin/create_worktree.sh ENG-XXXX BRANCH_NAME`
 
 3. determine required data:
 
