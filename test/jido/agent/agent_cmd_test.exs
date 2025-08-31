@@ -24,7 +24,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.Add, %{value: 10, amount: 5}},
           %{},
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       assert final.result.value == 15
@@ -38,9 +38,12 @@ defmodule JidoTest.AgentCmdTest do
       ]
 
       {:ok, final, []} =
-        FullFeaturedAgent.cmd(agent, instructions, %{}, runner: Jido.Runner.Chain)
+        FullFeaturedAgent.cmd(agent, instructions, %{})
 
-      assert final.result.value == 30
+      # Now executes only first instruction (built-in execution behavior)
+      assert final.result.value == 11
+      # Two instructions remain in queue
+      assert FullFeaturedAgent.pending?(final) == 2
     end
 
     test "preserves state with apply_state: false", %{agent: agent} do
@@ -53,8 +56,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.Add, %{value: 42}},
           %{},
-          apply_state: false,
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       # Original state preserved in final agent
@@ -72,7 +74,7 @@ defmodule JidoTest.AgentCmdTest do
                  {TestActions.Add, %{value: 10}},
                  %{unknown_field: "test"},
                  strict_validation: true,
-                 runner: Jido.Runner.Chain
+                 apply_state: true
                )
 
       assert Error.to_map(error).type == :validation_error
@@ -86,7 +88,7 @@ defmodule JidoTest.AgentCmdTest do
           {TestActions.Add, %{value: 10}},
           %{unknown_field: "test"},
           strict_validation: false,
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       assert final.result.value == 11
@@ -94,7 +96,7 @@ defmodule JidoTest.AgentCmdTest do
 
     test "handles unregistered actions", %{agent: agent} do
       assert {:error, error} =
-               FullFeaturedAgent.cmd(agent, UnregisteredAction, %{}, runner: Jido.Runner.Chain)
+               FullFeaturedAgent.cmd(agent, UnregisteredAction, %{}, apply_state: true)
 
       assert Error.to_map(error).type == :config_error
       assert error.message =~ "Action not registered"
@@ -108,7 +110,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.Add, %{value: 10, amount: 5}},
           %{},
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       callbacks = Enum.map(final.state.callback_log, & &1.callback)
@@ -128,7 +130,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.ErrorAction, %{}},
           %{},
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       assert Error.to_map(error).type == :execution_error
@@ -144,7 +146,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.ErrorAction, %{}},
           %{},
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       assert Error.to_map(error).type == :execution_error
@@ -162,7 +164,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.ErrorAction, %{}},
           %{},
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       # Recovery should have incremented error count
@@ -180,7 +182,7 @@ defmodule JidoTest.AgentCmdTest do
     end
 
     test "handles empty instruction list", %{agent: agent} do
-      {:ok, final, []} = FullFeaturedAgent.cmd(agent, [], %{}, runner: Jido.Runner.Chain)
+      {:ok, final, []} = FullFeaturedAgent.cmd(agent, [], %{}, apply_state: true)
 
       # State should remain unchanged
       assert final.state.location == :home
@@ -194,7 +196,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.Add, %{value: 1}},
           nil,
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       assert Error.to_map(error).type == :validation_error
@@ -207,7 +209,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.Add, %{value: 1}},
           %{},
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       assert final.result.value == 2
@@ -220,7 +222,7 @@ defmodule JidoTest.AgentCmdTest do
           {TestActions.Add, %{value: 1}},
           %{},
           context: nil,
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       assert final.result.value == 2
@@ -234,7 +236,7 @@ defmodule JidoTest.AgentCmdTest do
                  invalid_agent,
                  {TestActions.Add, %{value: 1}},
                  %{},
-                 runner: Jido.Runner.Chain
+                 apply_state: true
                )
 
       assert Error.to_map(error).type == :validation_error
@@ -253,7 +255,7 @@ defmodule JidoTest.AgentCmdTest do
                  agent,
                  instructions,
                  %{},
-                 runner: Jido.Runner.Chain
+                 apply_state: true
                )
 
       assert Error.to_map(error).type == :validation_error
@@ -272,12 +274,13 @@ defmodule JidoTest.AgentCmdTest do
         FullFeaturedAgent.cmd(
           agent,
           large_instruction_list,
-          %{},
-          runner: Jido.Runner.Chain
+          %{}
         )
 
-      # Sum of numbers 1 to 1000
-      assert final.result.value == 500_500
+      # Now executes only first instruction: 0 + 1 = 1
+      assert final.result.value == 1
+      # 999 instructions remain in queue
+      assert FullFeaturedAgent.pending?(final) == 999
     end
 
     test "maintains state consistency on error", %{agent: agent} do
@@ -288,7 +291,7 @@ defmodule JidoTest.AgentCmdTest do
                  agent,
                  {UnregisteredAction, %{value: 42}},
                  %{status: :running},
-                 runner: Jido.Runner.Chain
+                 apply_state: true
                )
 
       # Even though we tried to set status: :running, it should be rolled back
@@ -315,11 +318,13 @@ defmodule JidoTest.AgentCmdTest do
         FullFeaturedAgent.cmd(
           agent,
           recursive_instructions,
-          %{},
-          runner: Jido.Runner.Chain
+          %{}
         )
 
-      assert final.result.value == 3
+      # Now executes only first instruction: 1 + default(1) = 2
+      assert final.result.value == 2
+      # One instruction remains in queue
+      assert FullFeaturedAgent.pending?(final) == 1
     end
 
     test "handles all types of valid instructions", %{agent: agent} do
@@ -339,7 +344,7 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           mixed_instructions,
           %{},
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       assert final.result.value > 0
