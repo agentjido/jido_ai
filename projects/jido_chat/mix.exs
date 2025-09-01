@@ -116,8 +116,8 @@ defmodule Jido.Chat.MixProject do
 
   defp deps do
     [
-      ws_dep(:jido, "../jido", [github: "agentjido/jido"]),
-      ws_dep(:jido_ai, "../jido_ai", [github: "agentjido/jido_ai"]),
+      jido_dep(:jido, "../jido", "~> 1.3.0"),
+      jido_dep(:jido_ai, "../jido_ai", "~> 0.5.0"),
       {:nimble_parsec, "~> 1.4"},
       {:typed_struct, "~> 0.3.0"},
 
@@ -151,16 +151,17 @@ defmodule Jido.Chat.MixProject do
     ]
   end
 
-  # Workspace dependency management helpers
-  defp workspace? do
-    System.get_env("JIDO_WORKSPACE") in ["1", "true"]
-  end
+  defp jido_dep(app, rel_path, hex_req, extra_opts \\ []) do
+    path = Path.expand(rel_path, __DIR__)
 
-  defp ws_dep(app, rel_path, remote_opts, extra_opts \\ []) do
-    if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
-      {app, [path: rel_path, override: true] ++ extra_opts}
+    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
+      {app, Keyword.merge([path: rel_path, override: true], extra_opts)}
     else
-      {app, remote_opts ++ extra_opts}
+      {app, hex_req, extra_opts}
+    end
+    |> case do
+      {app, opts} when is_list(opts) -> {app, opts}
+      {app, req, opts} -> {app, req, opts}
     end
   end
 end

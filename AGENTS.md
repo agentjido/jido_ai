@@ -119,35 +119,43 @@ The workspace uses a simple environment variable strategy to switch between loca
 
 ### Implementation
 
-Each project's `mix.exs` includes workspace helpers:
+Each project's `mix.exs` includes workspace helpers using `jido_dep/4`:
 
 ```elixir
-# Workspace dependency management helpers
-defp workspace? do
-  System.get_env("JIDO_WORKSPACE") in ["1", "true"]
-end
+defp jido_dep(app, rel_path, hex_req, extra_opts \\ []) do
+  path = Path.expand(rel_path, __DIR__)
 
-defp ws_dep(app, rel_path, hex_req, opts \\ []) do
-  if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
-    Keyword.merge([{app, [path: rel_path, override: true]}], opts)
+  if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
+    {app, Keyword.merge([path: rel_path, override: true], extra_opts)}
   else
-    Keyword.merge([{app, hex_req}], opts)
+    {app, hex_req, extra_opts}
   end
-  |> List.first()
+  |> case do
+    {app, opts} when is_list(opts) -> {app, opts}
+    {app, req, opts} -> {app, req, opts}
+  end
 end
 ```
 
-Dependencies are declared using `ws_dep/3`:
+Dependencies are declared using `jido_dep/4`:
 
 ```elixir
 defp deps do
   [
-    ws_dep(:jido_action, "../jido_action", "~> 0.3"),
-    ws_dep(:jido_signal, "../jido_signal", "~> 0.1"),
+    jido_dep(:jido_action, "../jido_action", "~> 1.3.0"),
+    jido_dep(:jido_signal, "../jido_signal", "~> 1.3.0"),
     # ... other deps
   ]
 end
 ```
+
+**Projects with `jido_dep` implementation:**
+- `jido_ai` - Uses `jido_dep` for jido ecosystem dependencies
+- `jido` - Uses `jido_dep` for jido_action, jido_signal dependencies  
+- `jido_chat` - Uses `jido_dep` for jido, jido_ai dependencies
+- `jido_dialogue` - Uses `jido_dep` for jido dependency
+- `jido_eval` - Uses `jido_dep` for jido_ai dependency
+- `jido_htn` - Uses `jido_dep` for jido, jido_action dependencies
 
 ### Publishing Safety
 

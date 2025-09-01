@@ -24,7 +24,7 @@ defmodule JidoEval.MixProject do
   defp deps do
     [
       # Jido
-      ws_dep(:jido_ai, "../jido_ai", [github: "agentjido/jido_ai"]),
+      jido_dep(:jido_ai, "../jido_ai", "~> 0.5.0"),
 
       # Core
       {:typed_struct, "~> 0.3.0"},
@@ -67,16 +67,17 @@ defmodule JidoEval.MixProject do
     ]
   end
 
-  # Workspace dependency management helpers
-  defp workspace? do
-    System.get_env("JIDO_WORKSPACE") in ["1", "true"]
-  end
+  defp jido_dep(app, rel_path, hex_req, extra_opts \\ []) do
+    path = Path.expand(rel_path, __DIR__)
 
-  defp ws_dep(app, rel_path, remote_opts, extra_opts \\ []) do
-    if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
-      {app, [path: rel_path, override: true] ++ extra_opts}
+    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
+      {app, Keyword.merge([path: rel_path, override: true], extra_opts)}
     else
-      {app, remote_opts ++ extra_opts}
+      {app, hex_req, extra_opts}
+    end
+    |> case do
+      {app, opts} when is_list(opts) -> {app, opts}
+      {app, req, opts} -> {app, req, opts}
     end
   end
 end
