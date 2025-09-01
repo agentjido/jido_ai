@@ -144,8 +144,8 @@ defmodule Mix.Tasks.HexPublish do
     else
       Mix.shell().info("Publishing #{package.name} v#{version}...")
 
-      # Use env -u to unset JIDO_WORKSPACE for hex publishing
-      case System.cmd("env", ["-u", "JIDO_WORKSPACE", "mix", "hex.publish", "--yes"],
+      # jido_dep automatically uses Hex dependencies when publishing
+      case System.cmd("mix", ["hex.publish", "--yes"],
              cd: package.path,
              stderr_to_stdout: true
            ) do

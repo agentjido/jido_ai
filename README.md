@@ -32,12 +32,7 @@ mix workspace.add <name> <url>  # Add new project
 
 **External developers** (default): Uses Hex packages automatically.
 
-**Workspace developers**: Set `JIDO_WORKSPACE=1` to use local dependencies:
-
-```bash
-export JIDO_WORKSPACE=1
-# or use direnv with .envrc
-```
+**Workspace developers**: Dependencies automatically switch to local path dependencies when project directories exist - no configuration needed.
 
 ## Hex Publishing
 
@@ -56,12 +51,12 @@ mix hex_validate      # Validate Hex metadata before publishing
 1. **Version Check**: `mix version.check` to ensure consistency
 2. **Validation**: `mix hex_validate` to check metadata
 3. **Publish**: `mix hex.publish.all` to publish all modified packages
-4. **Always unset workspace mode**: `env -u JIDO_WORKSPACE mix hex.publish`
+4. **Publishing handled automatically**: Hex dependencies are used automatically when publishing
 
 ### Key Notes
 
-- The `ws_dep` helper automatically switches between local paths (workspace mode) and Hex packages
-- Set `JIDO_WORKSPACE=1` for local development, unset for publishing
+- The `jido_dep` helper automatically switches between local paths and Hex packages
+- No environment variable configuration needed
 - Publishing validates dependencies are pointing to Hex, not local paths
 
 ## Projects

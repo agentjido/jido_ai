@@ -113,8 +113,8 @@ The workspace uses a simple environment variable strategy to switch between loca
 - Standard Mix workflow
 
 **Workspace developers:**
-- Set `JIDO_WORKSPACE=1` to use local path dependencies
-- Set `export JIDO_WORKSPACE=1` or use direnv with `.envrc`
+- Dependencies automatically switch to local path dependencies when the project directory exists
+- No environment variables required - detection is automatic
 - Dependencies switch to local paths (e.g., `{:jido_action, path: "../jido_action"}`)
 
 ### Implementation
@@ -159,13 +159,7 @@ end
 
 ### Publishing Safety
 
-Always unset the environment variable when publishing:
-
-```bash
-env -u JIDO_WORKSPACE mix hex.publish
-```
-
-This ensures only Hex versions are referenced in published packages.
+The workspace automatically uses Hex dependencies when publishing - no environment variable management needed.
 
 ## Code Style
 
