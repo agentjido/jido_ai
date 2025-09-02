@@ -1,51 +1,70 @@
 defmodule Jido.AI.Skill do
   @moduledoc """
-  An AI skill that provides text generation, streaming, and object creation capabilities
-  to Jido agents.
+  AI Skill providing text generation, streaming, and object creation capabilities.
 
-  This skill integrates the core AI actions (generateText, streamText, generateObject, 
-  streamObject) and handles AI-related signal patterns for agent communication.
+  This skill integrates the core AI actions for Jido agents, following the standard
+  Jido.Skill patterns and best practices. It provides a clean signal-based interface
+  for AI operations with proper configuration validation, signal routing, and result
+  transformation.
 
   ## Signal Patterns
 
-  This skill handles the following signal patterns:
-  - `jido.ai.generate.*` - Text and object generation requests
-  - `jido.ai.stream.*` - Streaming generation requests
-  - `jido.ai.model.*` - Model configuration and status signals
+  ### Incoming Requests
+  - `jido.ai.generate_text` - Generate text responses
+  - `jido.ai.generate_object` - Generate structured objects
+  - `jido.ai.stream_text` - Stream text generation
+  - `jido.ai.stream_object` - Stream object generation
+
+  ### Outgoing Responses
+  - `jido.ai.result` - Successful generation results
+  - `jido.ai.stream_chunk` - Individual streaming chunks
+  - `jido.ai.error` - Generation failures
+
+  All outgoing signals include:
+  - `request_id` - Links response to originating request
+  - `operation` - The operation type (generate_text, stream_text, etc.)
 
   ## Configuration
 
-  The skill accepts the following configuration options:
-  - `default_model`: Default AI model specification (default: "openai:gpt-4o")
-  - `max_tokens`: Default maximum tokens (default: 1000)
-  - `temperature`: Default temperature (default: 0.7)
-  - `provider_config`: Provider-specific configuration
+  The skill accepts the following options:
+  - `default_model`: AI model specification (default: "openai:gpt-4o")
+  - `max_tokens`: Maximum tokens for generation (default: 1000)
+  - `temperature`: Generation temperature 0.0-2.0 (default: 0.7)
+  - `provider_config`: Provider-specific configuration map
 
   ## Usage Example
 
-      agent = Agent.new("my_agent")
+      agent = Agent.new("ai_agent")
       |> Agent.add_skill(Jido.AI.Skill, 
           default_model: "openai:gpt-4o",
           max_tokens: 2000,
           temperature: 0.8
         )
+
+      # Send a generation signal
+      signal = Signal.new(
+        type: "jido.ai.generate_text",
+        data: %{
+          messages: "Hello, how are you?",
+          max_tokens: 100
+        }
+      )
+
+      Agent.handle_signal(agent, signal)
   """
 
   use Jido.Skill,
-    name: "ai_skill",
+    name: "ai",
     description: "Provides AI text generation, streaming, and object creation capabilities",
     category: "ai",
-    tags: ["ai", "generation", "text", "objects", "streaming"],
+    tags: ["ai", "generation", "llm", "text", "objects", "streaming"],
     vsn: "1.0.0",
     opts_key: :ai,
-    signal_patterns: [
-      "jido.ai.*"
-    ],
-    config: [
+    opts_schema: [
       default_model: [
-        type: :any,
+        type: :string,
         default: "openai:gpt-4o",
-        doc: "Default AI model specification (string, tuple, or Model struct)"
+        doc: "Default AI model specification (provider:model format)"
       ],
       max_tokens: [
         type: :pos_integer,
@@ -53,169 +72,151 @@ defmodule Jido.AI.Skill do
         doc: "Default maximum tokens for generation"
       ],
       temperature: [
-        type: :float,
+        type: {:custom, Jido.AI.Util, :validate_temperature, []},
         default: 0.7,
         doc: "Default temperature for generation (0.0-2.0)"
+      ],
+      system_prompt: [
+        type: {:or, [:string, nil]},
+        doc: "Default system prompt for generation"
+      ],
+      actions: [
+        type: {:custom, Jido.Util, :validate_actions, []},
+        default: [],
+        doc: "List of Jido Action modules for tools"
       ],
       provider_config: [
         type: :map,
         default: %{},
-        doc: "Provider-specific configuration"
+        doc: "Provider-specific configuration options"
       ]
+    ],
+    signal_patterns: [
+      "jido.ai.*"
+    ],
+    actions: [
+      Jido.Tools.AI.GenerateText,
+      Jido.Tools.AI.GenerateObject,
+      Jido.Tools.AI.StreamText,
+      Jido.Tools.AI.StreamObject
     ]
 
-  alias Jido.Tools.AI
+  alias Jido.Instruction
   alias Jido.Signal
+  alias Jido.Signal.Router.Route
+  alias Jido.Tools.AI.GenerateObject
+  alias Jido.Tools.AI.GenerateText
+  alias Jido.Tools.AI.StreamObject
+  alias Jido.Tools.AI.StreamText
+
   require Logger
 
-  @doc """
-  Child process specifications for the AI skill.
-  
-  Currently returns an empty list as the AI actions don't require
-  persistent child processes. This may change if we add connection
-  pooling or other stateful components.
-  """
-  def child_spec(_config), do: []
+  # Helper to build route structs following Arithmetic skill pattern
+  defp route(path, action) do
+    %Route{
+      path: path,
+      target: %Instruction{action: action},
+      priority: 0
+    }
+  end
 
   @doc """
-  Signal routing configuration for AI-related patterns.
+  Signal routing configuration mapping AI signal patterns to actions.
+
+  Following the Jido.Skills.Arithmetic pattern with proper Route structs.
   """
+  @impl true
+  @spec router(keyword()) :: [Route.t()]
   def router(_opts) do
     [
-      %{pattern: "jido.ai.generate.text", handler: &handle_generate_text/2},
-      %{pattern: "jido.ai.generate.object", handler: &handle_generate_object/2},
-      %{pattern: "jido.ai.stream.text", handler: &handle_stream_text/2},
-      %{pattern: "jido.ai.stream.object", handler: &handle_stream_object/2},
-      %{pattern: "jido.ai.model.status", handler: &handle_model_status/2}
+      route("jido.ai.generate_text", GenerateText),
+      route("jido.ai.generate_object", GenerateObject),
+      route("jido.ai.stream_text", StreamText),
+      route("jido.ai.stream_object", StreamObject)
     ]
   end
 
   @doc """
-  Handles incoming AI-related signals and routes them to appropriate actions.
+  Enriches incoming signals with default configuration and operation metadata.
+
+  This follows the Arithmetic skill pattern - minimal signal enrichment only,
+  leaving the actual business logic to the actions.
   """
-  def handle_signal(%Signal{type: "jido.ai.generate.text"} = signal, skill) do
-    params = merge_config_with_params(signal.data, skill)
+  @impl true
+  @spec handle_signal(Signal.t(), Jido.Skill.t()) :: {:ok, Signal.t()}
+  def handle_signal(%Signal{} = signal, skill) do
+    # Extract operation from signal type (jido.ai.generate_text -> generate_text)
+    operation =
+      signal.type
+      |> String.split(".")
+      # Remove "jido.ai" prefix
+      |> Enum.drop(2)
+      |> Enum.join("_")
+      |> String.to_atom()
+
+    # Enrich signal data with defaults and metadata
+    provider_config = skill.ai[:provider_config] || %{}
     
-    case AI.GenerateText.run(params, %{}) do
-      {:ok, result} -> {:ok, %{signal | data: result}}
-      {:error, reason} -> {:error, reason}
-    end
+    enriched_data =
+      signal.data
+      |> Map.put_new(:model, skill.ai[:default_model])
+      |> Map.put_new(:max_tokens, skill.ai[:max_tokens])
+      |> Map.put_new(:temperature, skill.ai[:temperature])
+      |> Map.merge(provider_config)
+      |> Map.put(:operation, operation)
+
+    enriched_signal = %{signal | data: enriched_data}
+    {:ok, enriched_signal}
   end
 
-  def handle_signal(%Signal{type: "jido.ai.generate.object"} = signal, skill) do
-    params = merge_config_with_params(signal.data, skill)
-    
-    case AI.GenerateObject.run(params, %{}) do
-      {:ok, result} -> {:ok, %{signal | data: result}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
+  @doc """
+  Transforms action results into proper outgoing signals.
 
-  def handle_signal(%Signal{type: "jido.ai.stream.text"} = signal, skill) do
-    params = merge_config_with_params(signal.data, skill)
-    
-    case AI.StreamText.run(params, %{}) do
-      {:ok, result} -> {:ok, %{signal | data: result}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
+  Following Arithmetic skill pattern, creates new signals for results and errors
+  with proper correlation metadata.
+  """
+  @impl true
+  @spec transform_result(Signal.t(), {:ok, map()} | {:error, term()}, Jido.Skill.t()) ::
+          {:ok, Signal.t()}
+  def transform_result(%Signal{} = request, {:ok, result}, _skill) do
+    # Determine output signal type based on operation
+    output_type = determine_result_type(request.type, result)
 
-  def handle_signal(%Signal{type: "jido.ai.stream.object"} = signal, skill) do
-    params = merge_config_with_params(signal.data, skill)
-    
-    case AI.StreamObject.run(params, %{}) do
-      {:ok, result} -> {:ok, %{signal | data: result}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  def handle_signal(%Signal{type: "jido.ai.model.status"} = signal, _skill) do
-    # Return model status information
-    status = %{
-      available_models: ["gpt-4o", "gpt-4", "gpt-3.5-turbo"],
-      status: :available,
-      timestamp: DateTime.utc_now()
+    # Create result signal with correlation metadata
+    result_signal = %Signal{
+      id: Jido.Util.generate_id(),
+      source: request.source,
+      type: output_type,
+      data:
+        Map.merge(result, %{
+          request_id: request.id,
+          operation: Map.get(result, :operation, request.data[:operation])
+        })
     }
-    
-    {:ok, %{signal | data: status}}
+
+    {:ok, result_signal}
   end
 
-  def handle_signal(signal, _skill) do
-    Logger.warning("AI Skill received unhandled signal: #{signal.type}")
-    {:ok, signal}
+  def transform_result(%Signal{} = request, {:error, reason}, _skill) do
+    # Create error signal with correlation metadata
+    error_signal = %Signal{
+      id: Jido.Util.generate_id(),
+      source: request.source,
+      type: "jido.ai.error",
+      data: %{
+        error: reason,
+        request_id: request.id,
+        operation: request.data[:operation]
+      }
+    }
+
+    {:ok, error_signal}
   end
 
-  @doc """
-  Transforms results from AI actions, adding metadata and formatting.
-  """
-  def transform_result(%Signal{type: "jido.ai.generate." <> _} = signal, result, _skill) do
-    enhanced_result = Map.put(result, :skill_metadata, %{
-      skill: "ai_skill",
-      processed_at: DateTime.utc_now(),
-      version: "1.0.0"
-    })
-    
-    {:ok, enhanced_result}
-  end
+  # Private helpers
 
-  def transform_result(%Signal{type: "jido.ai.stream." <> _} = signal, result, _skill) do
-    enhanced_result = Map.put(result, :skill_metadata, %{
-      skill: "ai_skill",
-      processed_at: DateTime.utc_now(),
-      version: "1.0.0",
-      streaming: true
-    })
-    
-    {:ok, enhanced_result}
-  end
-
-  def transform_result(_signal, result, _skill), do: {:ok, result}
-
-  @doc """
-  Mounts the AI skill to an agent, validating configuration.
-  """
-  def mount(agent, opts) do
-    with {:ok, validated_opts} <- validate_opts(__MODULE__, opts) do
-      # Store validated configuration in agent state
-      updated_agent = put_in(agent.state[:skills][:ai], validated_opts)
-      {:ok, updated_agent}
-    end
-  end
-
-  # Private helper functions
-
-  defp handle_generate_text(signal, skill) do
-    handle_signal(%{signal | type: "jido.ai.generate.text"}, skill)
-  end
-
-  defp handle_generate_object(signal, skill) do
-    handle_signal(%{signal | type: "jido.ai.generate.object"}, skill)
-  end
-
-  defp handle_stream_text(signal, skill) do
-    handle_signal(%{signal | type: "jido.ai.stream.text"}, skill)
-  end
-
-  defp handle_stream_object(signal, skill) do
-    handle_signal(%{signal | type: "jido.ai.stream.object"}, skill)
-  end
-
-  defp handle_model_status(signal, skill) do
-    handle_signal(%{signal | type: "jido.ai.model.status"}, skill)
-  end
-
-  defp merge_config_with_params(params, %{opts_key: opts_key} = skill) do
-    config = skill[opts_key] || %{}
-    
-    # Resolve default model if needed
-    default_model = case config[:default_model] do
-      nil -> "openai:gpt-4o"
-      model_spec -> model_spec
-    end
-    
-    params
-    |> Map.put_new(:model, default_model)
-    |> Map.put_new(:max_tokens, config[:max_tokens])
-    |> Map.put_new(:temperature, config[:temperature])
-  end
+  # Determine the appropriate result signal type
+  defp determine_result_type("jido.ai.stream_" <> _, %{stream: _}), do: "jido.ai.stream_chunk"
+  defp determine_result_type("jido.ai.stream_" <> _, _), do: "jido.ai.stream_done"
+  defp determine_result_type(_, _), do: "jido.ai.result"
 end

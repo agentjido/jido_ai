@@ -338,6 +338,8 @@ defmodule Jido.AI.GenerateObjectIntegrationTest do
 
   describe "message format support" do
     test "accepts different prompt formats" do
+      import Jido.AI.Messages
+
       schema = [response: [type: :string, required: true]]
 
       # String prompt
@@ -354,7 +356,7 @@ defmodule Jido.AI.GenerateObjectIntegrationTest do
       # Message list (simplified - we won't test complex message structures 
       # since that depends on the provider implementation)
       messages = [
-        %{role: "user", content: "Generate response"}
+        user("Generate response")
       ]
 
       result =

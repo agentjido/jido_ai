@@ -47,6 +47,7 @@ defmodule Jido.AI.Messages do
   AI provider through the main `Jido.AI.generate_text/3` API.
   """
 
+  alias Jido.AI.Error
   alias Jido.AI.{ContentPart, Message}
 
   @doc """
@@ -213,6 +214,51 @@ defmodule Jido.AI.Messages do
   end
 
   @doc """
+  Validates messages for use with AI text generation.
+
+  Accepts either:
+  - A non-empty string (simple text prompt) 
+  - A list of valid Message structs (conversation)
+
+  Returns `{:ok, messages}` if valid, or `{:error, validation_error}` if invalid.
+
+  ## Examples
+
+      # Valid string prompt
+      iex> validate("Tell me a joke")
+      {:ok, "Tell me a joke"}
+
+      # Valid message array  
+      iex> messages = [user("Hello"), assistant("Hi there")]
+      iex> validate(messages)
+      {:ok, [%Jido.AI.Message{role: :user, content: "Hello"}, %Jido.AI.Message{role: :assistant, content: "Hi there"}]}
+
+      # Invalid empty string
+      iex> validate("")
+      {:error, %Jido.AI.Error.Validation.Error{tag: :empty_prompt}}
+
+  """
+  @spec validate(String.t() | [Message.t()]) :: {:ok, String.t() | [Message.t()]} | {:error, Error.t()}
+  def validate(prompt) when is_binary(prompt) and prompt != "" do
+    {:ok, prompt}
+  end
+
+  def validate(messages) when is_list(messages) do
+    case validate_messages(messages) do
+      :ok -> {:ok, messages}
+      {:error, reason} -> {:error, Error.validation_error(:invalid_messages, reason)}
+    end
+  end
+
+  def validate("") do
+    {:error, Error.validation_error(:empty_prompt, "Messages cannot be empty")}
+  end
+
+  def validate(_) do
+    {:error, Error.validation_error(:invalid_messages, "Expected string or message list")}
+  end
+
+  @doc """
   Validates that a list contains only valid Message structs.
 
   Returns `:ok` if all messages are valid, or `{:error, reason}` with details about validation failures.
@@ -231,14 +277,18 @@ defmodule Jido.AI.Messages do
   """
   @spec validate_messages([Message.t()]) :: :ok | {:error, String.t()}
   def validate_messages(messages) when is_list(messages) do
-    messages
-    |> Enum.with_index()
-    |> Enum.reduce_while(:ok, fn {message, index}, _acc ->
-      case validate_message(message) do
-        :ok -> {:cont, :ok}
-        {:error, reason} -> {:halt, {:error, "Message at index #{index}: #{reason}"}}
-      end
-    end)
+    if Enum.empty?(messages) do
+      {:error, "Message list cannot be empty"}
+    else
+      messages
+      |> Enum.with_index()
+      |> Enum.reduce_while(:ok, fn {message, index}, _acc ->
+        case validate_message(message) do
+          :ok -> {:cont, :ok}
+          {:error, reason} -> {:halt, {:error, "Message at index #{index}: #{reason}"}}
+        end
+      end)
+    end
   end
 
   def validate_messages(messages) do
