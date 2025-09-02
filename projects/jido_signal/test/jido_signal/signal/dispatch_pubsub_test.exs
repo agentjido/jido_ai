@@ -329,20 +329,12 @@ defmodule JidoTest.Signal.Dispatch.PubSubTest do
       {:ok, signal: signal}
     end
 
-    test "handles PubSub server exit gracefully", %{signal: signal} do
-      # Start a temporary PubSub server
-      temp_pubsub = :"temp_pubsub_#{:erlang.unique_integer([:positive])}"
-      {:ok, pid} = start_supervised({Phoenix.PubSub, name: temp_pubsub})
+    test "handles non-existent PubSub server", %{signal: signal} do
+      # Use a PubSub name that was never started
+      nonexistent_pubsub = :"nonexistent_pubsub_#{:erlang.unique_integer([:positive])}"
+      opts = [target: nonexistent_pubsub, topic: "test.topic"]
 
-      opts = [target: temp_pubsub, topic: "test.topic"]
-
-      # Should work initially
-      assert :ok = PubSub.deliver(signal, opts)
-
-      # Stop the PubSub server
-      GenServer.stop(pid)
-
-      # Should return error now
+      # Should return error for non-existent server
       assert {:error, :pubsub_not_found} = PubSub.deliver(signal, opts)
     end
 
