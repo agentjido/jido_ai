@@ -178,7 +178,7 @@ defmodule Jido.Signal.Ext.IntegrationTest do
     end
 
     test "extensions don't interfere with each other" do
-      # Create signal 
+      # Create signal
       {:ok, signal} =
         Signal.new(
           "test.multi.extension",
@@ -453,7 +453,7 @@ defmodule Jido.Signal.Ext.IntegrationTest do
       assert basic_signal.data.message == "basic test"
       assert basic_signal.extensions == %{}
 
-      # Signal with jido_dispatch still works  
+      # Signal with jido_dispatch still works
       {:ok, dispatch_signal} =
         Signal.new(
           "test.dispatch",

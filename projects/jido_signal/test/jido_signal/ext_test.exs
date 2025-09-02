@@ -33,21 +33,25 @@ defmodule Jido.Signal.ExtTest do
     use Jido.Signal.Ext,
       namespace: "custom",
       schema: [
-        data: [type: :string, required: true]
+        content: [type: :string, required: true]
       ]
 
     @impl Jido.Signal.Ext
     def to_attrs(data) do
       # Custom serialization: prefix with "custom_"
-      %{data: "custom_#{data.data}"}
+      %{custom_content: "custom_#{data.content}"}
     end
 
     @impl Jido.Signal.Ext
     def from_attrs(attrs) do
-      # Custom deserialization: remove "custom_" prefix
-      case attrs.data do
-        "custom_" <> actual_data -> %{data: actual_data}
-        data -> %{data: data}
+      # Custom deserialization: only process if this extension's data is present
+      # Handle both atom and string keys for tests
+      custom_content = attrs[:custom_content] || attrs["custom_content"]
+
+      case custom_content do
+        "custom_" <> actual_data -> %{content: actual_data}
+        # This extension doesn't apply to this signal
+        _ -> nil
       end
     end
   end
@@ -89,13 +93,13 @@ defmodule Jido.Signal.ExtTest do
     end
 
     test "allows custom to_attrs and from_attrs implementations" do
-      data = %{data: "test"}
+      data = %{content: "test"}
 
       serialized = TestCustomSerializationExt.to_attrs(data)
-      assert serialized == %{data: "custom_test"}
+      assert serialized == %{custom_content: "custom_test"}
 
       deserialized = TestCustomSerializationExt.from_attrs(serialized)
-      assert deserialized == %{data: "test"}
+      assert deserialized == %{content: "test"}
     end
 
     test "extension without schema works" do

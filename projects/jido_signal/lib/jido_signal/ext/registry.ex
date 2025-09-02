@@ -109,8 +109,6 @@ defmodule Jido.Signal.Ext.Registry do
   def register(module) when is_atom(module) do
     namespace = apply(module, :namespace, [])
 
-    Logger.debug("Registering Signal extension: #{module} with namespace '#{namespace}'")
-
     # Handle the case where the registry process is not started (e.g., during compilation)
     try do
       GenServer.call(@registry_name, {:register, namespace, module})
@@ -137,9 +135,9 @@ defmodule Jido.Signal.Ext.Registry do
   ## Examples
 
       case Jido.Signal.Ext.Registry.get("auth") do
-        {:ok, AuthExt} -> 
+        {:ok, AuthExt} ->
           {:ok, data} = AuthExt.validate_data(%{user_id: "123"})
-        {:error, :not_found} -> 
+        {:error, :not_found} ->
           {:error, "Unknown extension: auth"}
       end
   """
@@ -185,7 +183,7 @@ defmodule Jido.Signal.Ext.Registry do
   ## Examples
 
       extensions = Jido.Signal.Ext.Registry.all()
-      
+
       Enum.each(extensions, fn {namespace, module} ->
         IO.puts("Extension \#{namespace}: \#{module}")
       end)

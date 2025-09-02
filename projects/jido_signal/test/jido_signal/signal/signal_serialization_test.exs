@@ -214,8 +214,8 @@ defmodule Jido.SignalSerializationTest do
       use Jido.Signal.Ext,
         namespace: "complextest",
         schema: [
-          user_id: [type: :string, required: true],
-          roles: [type: {:list, :string}, default: []],
+          complex_user_id: [type: :string, required: true],
+          complex_roles: [type: {:list, :string}, default: []],
           count: [type: :non_neg_integer, default: 0]
         ]
     end
@@ -286,16 +286,16 @@ defmodule Jido.SignalSerializationTest do
       # Add complex extension with defaults
       {:ok, extended_signal} =
         Signal.put_extension(signal, "complextest", %{
-          user_id: "user123",
-          roles: ["admin", "user"]
+          complex_user_id: "user123",
+          complex_roles: ["admin", "user"]
         })
 
       {:ok, json} = Signal.serialize(extended_signal)
       decoded = Jason.decode!(json)
 
       # Should contain extension data as top-level attributes
-      assert decoded["user_id"] == "user123"
-      assert decoded["roles"] == ["admin", "user"]
+      assert decoded["complex_user_id"] == "user123"
+      assert decoded["complex_roles"] == ["admin", "user"]
       # default value
       assert decoded["count"] == 0
 
@@ -329,16 +329,16 @@ defmodule Jido.SignalSerializationTest do
     test "serializes signal with multiple extensions", %{signal: signal} do
       # Add multiple extensions
       {:ok, signal1} = Signal.put_extension(signal, "simpletest", %{message: "simple"})
-      {:ok, signal2} = Signal.put_extension(signal1, "complextest", %{user_id: "user456"})
+      {:ok, signal2} = Signal.put_extension(signal1, "complextest", %{complex_user_id: "user456"})
 
       {:ok, json} = Signal.serialize(signal2)
       decoded = Jason.decode!(json)
 
       # Should contain data from both extensions
       assert decoded["message"] == "simple"
-      assert decoded["user_id"] == "user456"
+      assert decoded["complex_user_id"] == "user456"
       # default
-      assert decoded["roles"] == []
+      assert decoded["complex_roles"] == []
       # default
       assert decoded["count"] == 0
 
@@ -379,8 +379,8 @@ defmodule Jido.SignalSerializationTest do
           "source" => "/complex/source",
           "id" => "complex-123",
           "specversion" => "1.0.2",
-          "user_id" => "complex_user",
-          "roles" => ["viewer", "editor"],
+          "complex_user_id" => "complex_user",
+          "complex_roles" => ["viewer", "editor"],
           "count" => 42
         })
 
@@ -389,8 +389,8 @@ defmodule Jido.SignalSerializationTest do
       # Extension should be properly reconstructed
       extension_data = Signal.get_extension(deserialized, "complextest")
       assert extension_data != nil
-      assert extension_data.user_id == "complex_user"
-      assert extension_data.roles == ["viewer", "editor"]
+      assert extension_data.complex_user_id == "complex_user"
+      assert extension_data.complex_roles == ["viewer", "editor"]
       assert extension_data.count == 42
     end
 
@@ -419,8 +419,8 @@ defmodule Jido.SignalSerializationTest do
 
       {:ok, signal2} =
         Signal.put_extension(signal1, "complextest", %{
-          user_id: "roundtrip123",
-          roles: ["test", "round", "trip"],
+          complex_user_id: "roundtrip123",
+          complex_roles: ["test", "round", "trip"],
           count: 99
         })
 
@@ -440,8 +440,8 @@ defmodule Jido.SignalSerializationTest do
       assert simple_ext.message == "round-trip"
 
       complex_ext = Signal.get_extension(deserialized, "complextest")
-      assert complex_ext.user_id == "roundtrip123"
-      assert complex_ext.roles == ["test", "round", "trip"]
+      assert complex_ext.complex_user_id == "roundtrip123"
+      assert complex_ext.complex_roles == ["test", "round", "trip"]
       assert complex_ext.count == 99
     end
 

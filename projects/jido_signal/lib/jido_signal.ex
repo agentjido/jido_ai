@@ -577,17 +577,26 @@ defmodule Jido.Signal do
   """
   @spec from_map(map()) :: {:ok, t()} | {:error, String.t()}
   def from_map(map) when is_map(map) do
-    with :ok <- parse_specversion(map),
-         {:ok, type} <- parse_type(map),
-         {:ok, source} <- parse_source(map),
-         {:ok, id} <- parse_id(map),
-         {:ok, subject} <- parse_subject(map),
-         {:ok, time} <- parse_time(map),
-         {:ok, datacontenttype} <- parse_datacontenttype(map),
-         {:ok, dataschema} <- parse_dataschema(map),
-         {:ok, data} <- parse_data(map["data"]),
-         {:ok, jido_dispatch} <- parse_jido_dispatch(map["jido_dispatch"]),
-         {:ok, extensions} <- parse_extensions(map["extensions"]) do
+    # First, inflate extensions from top-level attributes
+    {extensions_data, remaining_attrs} = inflate_extensions(map)
+
+    # Parse extensions that were explicitly stored in "extensions" field
+    final_extensions =
+      case parse_extensions(remaining_attrs["extensions"]) do
+        {:ok, explicit} -> Map.merge(extensions_data, explicit)
+        {:error, _} -> extensions_data
+      end
+
+    with :ok <- parse_specversion(remaining_attrs),
+         {:ok, type} <- parse_type(remaining_attrs),
+         {:ok, source} <- parse_source(remaining_attrs),
+         {:ok, id} <- parse_id(remaining_attrs),
+         {:ok, subject} <- parse_subject(remaining_attrs),
+         {:ok, time} <- parse_time(remaining_attrs),
+         {:ok, datacontenttype} <- parse_datacontenttype(remaining_attrs),
+         {:ok, dataschema} <- parse_dataschema(remaining_attrs),
+         {:ok, data} <- parse_data(remaining_attrs["data"]),
+         {:ok, jido_dispatch} <- parse_jido_dispatch(remaining_attrs["jido_dispatch"]) do
       event = %__MODULE__{
         specversion: "1.0.2",
         type: type,
@@ -599,7 +608,7 @@ defmodule Jido.Signal do
         dataschema: dataschema,
         data: data,
         jido_dispatch: jido_dispatch,
-        extensions: extensions
+        extensions: final_extensions
       }
 
       {:ok, event}
