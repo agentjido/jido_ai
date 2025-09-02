@@ -3,8 +3,8 @@ defmodule Jido.Tools.Files do
   A collection of file system actions for common file operations.
 
   This module provides a set of actions for working with files and directories:
-  - WriteFile: Writes content to a file with optional directory creation
   - ReadFile: Reads content from a file
+  - WriteFile: Writes content to a file with optional directory creation
   - CopyFile: Copies a file from source to destination
   - MoveFile: Moves/renames a file from source to destination
   - DeleteFile: Deletes a file or directory with optional recursive deletion
@@ -17,6 +17,25 @@ defmodule Jido.Tools.Files do
   """
 
   alias Jido.Action
+
+  defmodule ReadFile do
+    @moduledoc false
+    use Action,
+      name: "read_file",
+      description: "Reads content from a file",
+      schema: [
+        path: [type: :string, required: true, doc: "Path to the file to be read"]
+      ]
+
+    @impl true
+    @spec run(map(), map()) :: {:ok, map()} | {:error, String.t()}
+    def run(%{path: path}, _context) do
+      case File.read(path) do
+        {:ok, content} -> {:ok, %{path: path, content: content}}
+        {:error, reason} -> {:error, "Failed to read file: #{inspect(reason)}"}
+      end
+    end
+  end
 
   defmodule WriteFile do
     @moduledoc false
@@ -178,25 +197,6 @@ defmodule Jido.Tools.Files do
       case result do
         :ok -> {:ok, %{path: path}}
         {:error, reason} -> {:error, "Failed to delete: #{inspect(reason)}"}
-      end
-    end
-  end
-
-  defmodule ReadFile do
-    @moduledoc false
-    use Action,
-      name: "read_file",
-      description: "Reads content from a file",
-      schema: [
-        path: [type: :string, required: true, doc: "Path to the file to be read"]
-      ]
-
-    @impl true
-    @spec run(map(), map()) :: {:ok, map()} | {:error, String.t()}
-    def run(%{path: path}, _context) do
-      case File.read(path) do
-        {:ok, content} -> {:ok, %{path: path, content: content}}
-        {:error, reason} -> {:error, "Failed to read file: #{inspect(reason)}"}
       end
     end
   end
