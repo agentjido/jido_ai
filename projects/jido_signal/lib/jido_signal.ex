@@ -41,23 +41,28 @@ defmodule Jido.Signal do
 
   ## Creating Signals
 
-  Signals can be created in several ways:
+  Signals can be created in several ways (prefer the positional new/3):
 
   ```elixir
-  # Basic event
+  alias Jido.Signal
+
+  # Preferred: positional constructor (type, data, attrs)
+  {:ok, signal} = Signal.new("metrics.collected", %{cpu: 80, memory: 70},
+    source: "/monitoring",
+    jido_dispatch: {:pubsub, topic: "metrics"}
+  )
+
+  # Also available: map/keyword constructor (backwards compatible)
   {:ok, signal} = Signal.new(%{
     type: "user.created",
     source: "/auth/registration",
     data: %{user_id: "123", email: "user@example.com"}
   })
 
-  # With dispatch config
-  {:ok, signal} = Signal.new(%{
-    type: "metrics.collected",
-    source: "/monitoring",
-    data: %{cpu: 80, memory: 70},
-    jido_dispatch: {:pubsub, topic: "metrics"}
-  })
+  # Data payloads follow CloudEvents rules:
+  # - When datacontenttype is JSON (or omitted in JSON format), `data` can be any JSON value
+  #   (object/map, array, string, number, boolean, null)
+  # - For non-JSON payloads, encode according to datacontenttype; binary payloads use data_base64 during JSON serialization
   ```
 
   ## Custom Signal Types
@@ -393,6 +398,40 @@ defmodule Jido.Signal do
   end
 
   @doc """
+  Creates a new Signal struct with explicit type and data, raising an error if invalid.
+
+  ## Parameters
+
+  - `type`: A string representing the event type (e.g., `"user.created"`).
+  - `data`: The payload (any term; see CloudEvents rules below).
+  - `attrs`: (Optional) A map or keyword list of additional Signal attributes (e.g., `:source`, `:subject`, `:jido_dispatch`).
+
+  ## Returns
+
+  `Signal.t()` if the attributes are valid.
+
+  ## Raises
+
+  `ArgumentError` if the attributes are invalid.
+
+  ## Examples
+
+      iex> Jido.Signal.new!("user.created", %{user_id: "123"}, source: "/auth")
+      %Jido.Signal{type: "user.created", source: "/auth", data: %{user_id: "123"}, ...}
+
+      iex> Jido.Signal.new!("user.created", %{user_id: "123"})
+      %Jido.Signal{type: "user.created", source: "...", data: %{user_id: "123"}, ...}
+
+  """
+  @spec new!(String.t(), term(), map() | keyword()) :: t() | no_return()
+  def new!(type, data, attrs \\ %{}) do
+    case new(type, data, attrs) do
+      {:ok, signal} -> signal
+      {:error, reason} -> raise ArgumentError, "invalid signal: #{reason}"
+    end
+  end
+
+  @doc """
   Creates a new Signal struct, raising an error if invalid.
 
   ## Parameters
@@ -444,6 +483,8 @@ defmodule Jido.Signal do
       {:ok, %Jido.Signal{type: "example.event", source: "/example", ...}}
 
   """
+  @reserved_keys [:type, "type", :data, "data"]
+
   @spec new(map() | keyword()) :: {:ok, t()} | {:error, String.t()}
   def new(attrs) when is_list(attrs) do
     attrs |> Map.new() |> new()
@@ -471,6 +512,47 @@ defmodule Jido.Signal do
     |> Map.new(fn {k, v} -> {to_string(k), v} end)
     |> Map.merge(defaults, fn _k, user_val, _default_val -> user_val end)
     |> from_map()
+  end
+
+  @doc """
+  Creates a Signal with explicit type and payload, plus optional attrs.
+
+  - `type` must be a string
+  - `data` can be any term (map, string, etc.)
+  - `attrs` is a map or keyword list for other fields (e.g., `:source`, `:subject`, `:jido_dispatch`)
+  - `attrs` must NOT include `:type`/`"type"` or `:data`/`"data"`
+
+  Examples:
+      iex> {:ok, s} = Jido.Signal.new("user.created", %{user_id: "123"}, source: "/auth")
+      iex> s.type
+      "user.created"
+      iex> {:ok, s} = Jido.Signal.new("log.message", "Hello world")
+      iex> s.data
+      "Hello world"
+  """
+  @spec new(String.t(), term(), map() | keyword()) :: {:ok, t()} | {:error, String.t()}
+  def new(type, data, attrs \\ %{})
+
+  def new(type, data, attrs) when is_binary(type) and (is_map(attrs) or is_list(attrs)) do
+    with {:ok, normalized_attrs} <- normalize_and_validate_attrs(attrs) do
+      normalized_attrs
+      |> Map.merge(%{type: type, data: data})
+      |> new()
+    end
+  end
+
+  def new(_, _, _),
+    do: {:error, "expected new/3 (type :: String.t(), data :: any(), attrs :: map/keyword)"}
+
+  defp normalize_and_validate_attrs(attrs) when is_list(attrs) do
+    normalize_and_validate_attrs(Map.new(attrs))
+  end
+
+  defp normalize_and_validate_attrs(attrs) when is_map(attrs) do
+    case Enum.find(@reserved_keys, &Map.has_key?(attrs, &1)) do
+      nil -> {:ok, attrs}
+      key -> {:error, "attribute #{inspect(key)} must not be passed in attrs when calling new/3"}
+    end
   end
 
   @doc """

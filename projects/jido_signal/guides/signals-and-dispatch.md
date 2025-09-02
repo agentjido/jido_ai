@@ -6,6 +6,12 @@ Signals implement the CloudEvents v1.0.2 specification with Jido extensions:
 
 ```elixir
 # Basic signal
+# Preferred: positional constructor (type, data, attrs)
+{:ok, signal} = Jido.Signal.new("user.created", %{user_id: "123", email: "user@example.com"},
+  source: "/auth/service"
+)
+
+# Also available: Map/keyword constructor (backwards compatible)
 {:ok, signal} = Jido.Signal.new(%{
   type: "user.created",
   source: "/auth/service",
@@ -21,6 +27,11 @@ signal.data            # %{user_id: "123", email: "user@example.com"}
 signal.time            # ISO 8601 timestamp (auto-generated)
 signal.datacontenttype # "application/json" (default)
 signal.jido_dispatch   # Dispatch configuration
+
+# Data semantics (CloudEvents):
+# - When datacontenttype is JSON (or omitted in JSON format), data may be any JSON value
+#   (object/map, array, string, number, boolean, null)
+# - For non-JSON payloads, encode according to datacontenttype; binary payloads use data_base64 when serialized to JSON
 ```
 
 ## Dispatch Adapters

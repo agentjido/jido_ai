@@ -119,4 +119,124 @@ defmodule JidoTest.SignalTest do
       assert signal.datacontenttype == "application/json"
     end
   end
+
+  describe "new/3 and new!/3" do
+    test "creates signal with positional type and data" do
+      {:ok, signal} = Signal.new("user.created", %{user_id: "123"})
+
+      assert signal.type == "user.created"
+      assert signal.data == %{user_id: "123"}
+      assert signal.specversion == "1.0.2"
+      assert is_binary(signal.id)
+      assert is_binary(signal.source)
+      assert is_binary(signal.time)
+    end
+
+    test "accepts keyword list for attrs" do
+      {:ok, signal} =
+        Signal.new("user.created", %{user_id: "123"},
+          source: "/auth/registration",
+          subject: "welcome-email"
+        )
+
+      assert signal.type == "user.created"
+      assert signal.data == %{user_id: "123"}
+      assert signal.source == "/auth/registration"
+      assert signal.subject == "welcome-email"
+    end
+
+    test "accepts map for attrs" do
+      {:ok, signal} =
+        Signal.new("order.placed", %{order_id: 456}, %{source: "/orders", subject: "new-order"})
+
+      assert signal.type == "order.placed"
+      assert signal.data == %{order_id: 456}
+      assert signal.source == "/orders"
+      assert signal.subject == "new-order"
+    end
+
+    test "works with empty attrs" do
+      {:ok, signal} = Signal.new("test.event", %{ok?: true})
+
+      assert signal.type == "test.event"
+      assert signal.data == %{ok?: true}
+    end
+
+    test "works with empty attrs map" do
+      {:ok, signal} = Signal.new("test.event", %{ok?: true}, %{})
+
+      assert signal.type == "test.event"
+      assert signal.data == %{ok?: true}
+    end
+
+    test "rejects reserved keys in attrs" do
+      assert {:error, error} = Signal.new("test.event", %{}, type: "override")
+      assert error =~ "attribute :type must not be passed in attrs"
+
+      assert {:error, error} = Signal.new("test.event", %{}, %{"type" => "override"})
+      assert error =~ "attribute \"type\" must not be passed in attrs"
+
+      assert {:error, error} = Signal.new("test.event", %{}, data: %{bad: true})
+      assert error =~ "attribute :data must not be passed in attrs"
+
+      assert {:error, error} = Signal.new("test.event", %{}, %{"data" => %{bad: true}})
+      assert error =~ "attribute \"data\" must not be passed in attrs"
+    end
+
+    test "validates type parameter" do
+      assert {:error, error} = Signal.new(123, %{})
+      assert error =~ "expected new/3"
+
+      assert {:error, error} = Signal.new(nil, %{})
+      assert error =~ "expected new/3"
+    end
+
+    test "validates attrs parameter" do
+      assert {:error, error} = Signal.new("test.event", %{}, "not a map or list")
+      assert error =~ "expected new/3"
+
+      assert {:error, error} = Signal.new("test.event", %{}, 123)
+      assert error =~ "expected new/3"
+    end
+
+    test "new!/3 returns signal on success" do
+      signal = Signal.new!("user.created", %{user_id: "123"}, source: "/auth")
+
+      assert signal.type == "user.created"
+      assert signal.data == %{user_id: "123"}
+      assert signal.source == "/auth"
+    end
+
+    test "new!/3 raises on error" do
+      assert_raise ArgumentError, ~r/invalid signal/, fn ->
+        Signal.new!("test.event", %{}, type: "forbidden")
+      end
+    end
+
+    test "accepts various data types" do
+      # String data
+      {:ok, signal} = Signal.new("log.message", "Hello world")
+      assert signal.data == "Hello world"
+
+      # List data
+      {:ok, signal} = Signal.new("batch.items", [1, 2, 3])
+      assert signal.data == [1, 2, 3]
+
+      # Nil data
+      {:ok, signal} = Signal.new("heartbeat", nil)
+      assert signal.data == nil
+
+      # Complex nested data
+      complex_data = %{user: %{id: 1, profile: %{name: "John"}}, items: [1, 2]}
+      {:ok, signal} = Signal.new("complex.event", complex_data)
+      assert signal.data == complex_data
+    end
+
+    test "new!/1 raises on error" do
+      assert_raise RuntimeError, fn ->
+        # missing required type
+        Signal.new!(%{source: "/test"})
+      end
+    end
+  end
 end

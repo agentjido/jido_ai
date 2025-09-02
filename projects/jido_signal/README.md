@@ -140,6 +140,12 @@ alias Jido.Signal
 {:ok, _sub_id} = Bus.subscribe(:my_app_bus, "user.*", dispatch: {:pid, target: sub_pid})
 
 # Create and publish a signal
+# Preferred: positional constructor (type, data, attrs)
+{:ok, signal} = Signal.new("user.created", %{user_id: "123", email: "user@example.com"},
+  source: "/auth/registration"
+)
+
+# Also available: Map/keyword constructor (backwards compatible)
 {:ok, signal} = Signal.new(%{
   type: "user.created",
   source: "/auth/registration",

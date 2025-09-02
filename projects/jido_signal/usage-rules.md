@@ -6,6 +6,10 @@ CloudEvents v1.0.2 compliant signal library for Elixir agent systems.
 
 ```elixir
 # Basic signal
+# Preferred: positional constructor (type, data, attrs)
+{:ok, signal} = Jido.Signal.new("user.created", %{user_id: 123}, source: "/auth/service")
+
+# Also available: Map/keyword constructor (backwards compatible)
 {:ok, signal} = Jido.Signal.new(%{
   type: "user.created",
   source: "/auth/service", 
