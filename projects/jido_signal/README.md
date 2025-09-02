@@ -427,10 +427,15 @@ workflow_signals = [
 
 ## Documentation
 
-- **[Getting Started Guide](https://hexdocs.pm/jido_signal/getting-started.html)** - Step-by-step tutorial
-- **[Core Concepts](https://hexdocs.pm/jido_signal/core-concepts.html)** - Deep dive into architecture  
+- **[Getting Started Guide](guides/getting-started.md)** - Step-by-step tutorial
+- **[Signal Extensions](guides/signal-extensions.md)** - Creating custom Signal extensions
+- **[Signals & Dispatch](guides/signals-and-dispatch.md)** - Routing and delivery patterns  
+- **[Event Bus](guides/event-bus.md)** - Pub/sub messaging system
+- **[Signal Router](guides/signal-router.md)** - Advanced pattern matching
+- **[Signal Journal](guides/signal-journal.md)** - Causality tracking
+- **[Serialization](guides/serialization.md)** - Data formats and protocols
+- **[Advanced Topics](guides/advanced.md)** - Performance and monitoring
 - **[API Reference](https://hexdocs.pm/jido_signal)** - Complete function documentation
-- **[Guides](https://hexdocs.pm/jido_signal/guides.html)** - Advanced usage patterns
 
 ## Development
 
