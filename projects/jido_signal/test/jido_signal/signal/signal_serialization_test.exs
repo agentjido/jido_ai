@@ -199,4 +199,379 @@ defmodule Jido.SignalSerializationTest do
       end
     end
   end
+
+  describe "extension serialization" do
+    # Define test extensions for serialization testing
+    defmodule SimpleTestExt do
+      use Jido.Signal.Ext,
+        namespace: "simpletest",
+        schema: [
+          message: [type: :string, required: true]
+        ]
+    end
+
+    defmodule ComplexTestExt do
+      use Jido.Signal.Ext,
+        namespace: "complextest",
+        schema: [
+          user_id: [type: :string, required: true],
+          roles: [type: {:list, :string}, default: []],
+          count: [type: :non_neg_integer, default: 0]
+        ]
+    end
+
+    defmodule CustomSerializationTestExt do
+      use Jido.Signal.Ext,
+        namespace: "customtest",
+        schema: [
+          data: [type: :string, required: true],
+          prefix: [type: :string, default: "test"]
+        ]
+
+      @impl Jido.Signal.Ext
+      def to_attrs(%{data: data, prefix: prefix}) do
+        %{"custom_data" => "#{prefix}_#{data}"}
+      end
+
+      @impl Jido.Signal.Ext
+      def from_attrs(attrs) do
+        case Map.get(attrs, "custom_data") do
+          nil ->
+            nil
+
+          custom_data ->
+            case String.split(custom_data, "_", parts: 2) do
+              [prefix, data] -> %{data: data, prefix: prefix}
+              [data] -> %{data: data, prefix: "test"}
+            end
+        end
+      end
+    end
+
+    setup do
+      # Create a base signal for testing
+      signal = %Signal{
+        type: "test.event",
+        source: "/test/source",
+        id: "test-id-123",
+        data: %{message: "hello world"}
+      }
+
+      %{signal: signal}
+    end
+
+    test "serializes signal with simple extension", %{signal: signal} do
+      # Add simple extension
+      {:ok, extended_signal} = Signal.put_extension(signal, "simpletest", %{message: "test"})
+
+      {:ok, json} = Signal.serialize(extended_signal)
+      assert is_binary(json)
+
+      decoded = Jason.decode!(json)
+
+      # Should contain extension data as top-level attributes
+      assert decoded["message"] == "test"
+
+      # Should contain core CloudEvents fields
+      assert decoded["type"] == "test.event"
+      assert decoded["source"] == "/test/source"
+      assert decoded["id"] == "test-id-123"
+      assert decoded["data"]["message"] == "hello world"
+
+      # Should NOT contain extensions field in serialized JSON
+      refute Map.has_key?(decoded, "extensions")
+    end
+
+    test "serializes signal with complex extension", %{signal: signal} do
+      # Add complex extension with defaults
+      {:ok, extended_signal} =
+        Signal.put_extension(signal, "complextest", %{
+          user_id: "user123",
+          roles: ["admin", "user"]
+        })
+
+      {:ok, json} = Signal.serialize(extended_signal)
+      decoded = Jason.decode!(json)
+
+      # Should contain extension data as top-level attributes
+      assert decoded["user_id"] == "user123"
+      assert decoded["roles"] == ["admin", "user"]
+      # default value
+      assert decoded["count"] == 0
+
+      # Should contain core fields
+      assert decoded["type"] == "test.event"
+      refute Map.has_key?(decoded, "extensions")
+    end
+
+    test "serializes signal with custom serialization extension", %{signal: signal} do
+      # Add extension with custom serialization
+      {:ok, extended_signal} =
+        Signal.put_extension(signal, "customtest", %{
+          data: "mydata",
+          prefix: "custom"
+        })
+
+      {:ok, json} = Signal.serialize(extended_signal)
+      decoded = Jason.decode!(json)
+
+      # Should use custom serialization
+      assert decoded["custom_data"] == "custom_mydata"
+
+      # Should still have Signal.data field (core CloudEvents field)
+      assert decoded["data"]["message"] == "hello world"
+
+      # Should NOT have the original extension fields as separate keys
+      refute Map.has_key?(decoded, "prefix")
+      refute Map.has_key?(decoded, "extensions")
+    end
+
+    test "serializes signal with multiple extensions", %{signal: signal} do
+      # Add multiple extensions
+      {:ok, signal1} = Signal.put_extension(signal, "simpletest", %{message: "simple"})
+      {:ok, signal2} = Signal.put_extension(signal1, "complextest", %{user_id: "user456"})
+
+      {:ok, json} = Signal.serialize(signal2)
+      decoded = Jason.decode!(json)
+
+      # Should contain data from both extensions
+      assert decoded["message"] == "simple"
+      assert decoded["user_id"] == "user456"
+      # default
+      assert decoded["roles"] == []
+      # default
+      assert decoded["count"] == 0
+
+      # Core fields should still be present
+      assert decoded["type"] == "test.event"
+      refute Map.has_key?(decoded, "extensions")
+    end
+
+    test "deserializes signal with simple extension", %{signal: _signal} do
+      # Create JSON with extension data as top-level attributes
+      json =
+        Jason.encode!(%{
+          "type" => "test.event",
+          "source" => "/test/source",
+          "id" => "test-id-123",
+          "specversion" => "1.0.2",
+          "data" => %{"message" => "hello world"},
+          # extension data
+          "message" => "deserialized test"
+        })
+
+      {:ok, deserialized} = Signal.deserialize(json)
+
+      assert %Signal{} = deserialized
+      assert deserialized.type == "test.event"
+      assert deserialized.data["message"] == "hello world"
+
+      # Extension should be inflated back
+      extension_data = Signal.get_extension(deserialized, "simpletest")
+      assert extension_data != nil
+      assert extension_data.message == "deserialized test"
+    end
+
+    test "deserializes signal with complex extension" do
+      json =
+        Jason.encode!(%{
+          "type" => "complex.event",
+          "source" => "/complex/source",
+          "id" => "complex-123",
+          "specversion" => "1.0.2",
+          "user_id" => "complex_user",
+          "roles" => ["viewer", "editor"],
+          "count" => 42
+        })
+
+      {:ok, deserialized} = Signal.deserialize(json)
+
+      # Extension should be properly reconstructed
+      extension_data = Signal.get_extension(deserialized, "complextest")
+      assert extension_data != nil
+      assert extension_data.user_id == "complex_user"
+      assert extension_data.roles == ["viewer", "editor"]
+      assert extension_data.count == 42
+    end
+
+    test "deserializes signal with custom serialization extension" do
+      json =
+        Jason.encode!(%{
+          "type" => "custom.event",
+          "source" => "/custom/source",
+          "id" => "custom-123",
+          "specversion" => "1.0.2",
+          "custom_data" => "myprefix_myvalue"
+        })
+
+      {:ok, deserialized} = Signal.deserialize(json)
+
+      # Custom deserialization should work
+      extension_data = Signal.get_extension(deserialized, "customtest")
+      assert extension_data != nil
+      assert extension_data.data == "myvalue"
+      assert extension_data.prefix == "myprefix"
+    end
+
+    test "round-trip serialization preserves extension data", %{signal: signal} do
+      # Create signal with multiple extensions
+      {:ok, signal1} = Signal.put_extension(signal, "simpletest", %{message: "round-trip"})
+
+      {:ok, signal2} =
+        Signal.put_extension(signal1, "complextest", %{
+          user_id: "roundtrip123",
+          roles: ["test", "round", "trip"],
+          count: 99
+        })
+
+      # Serialize and deserialize
+      {:ok, json} = Signal.serialize(signal2)
+      {:ok, deserialized} = Signal.deserialize(json)
+
+      # Verify core Signal fields
+      assert deserialized.type == signal2.type
+      assert deserialized.source == signal2.source
+      assert deserialized.id == signal2.id
+      # Data might have string keys after deserialization instead of atom keys
+      assert deserialized.data["message"] == signal2.data.message
+
+      # Verify extension data
+      simple_ext = Signal.get_extension(deserialized, "simpletest")
+      assert simple_ext.message == "round-trip"
+
+      complex_ext = Signal.get_extension(deserialized, "complextest")
+      assert complex_ext.user_id == "roundtrip123"
+      assert complex_ext.roles == ["test", "round", "trip"]
+      assert complex_ext.count == 99
+    end
+
+    test "round-trip with different serializers preserves extensions", %{signal: signal} do
+      {:ok, extended_signal} =
+        Signal.put_extension(signal, "simpletest", %{message: "serializer_test"})
+
+      serializers = [
+        Jido.Signal.Serialization.JsonSerializer,
+        Jido.Signal.Serialization.ErlangTermSerializer,
+        Jido.Signal.Serialization.MsgpackSerializer
+      ]
+
+      for serializer <- serializers do
+        {:ok, binary} = Signal.serialize(extended_signal, serializer: serializer)
+        {:ok, deserialized} = Signal.deserialize(binary, serializer: serializer)
+
+        assert deserialized.type == extended_signal.type
+        extension_data = Signal.get_extension(deserialized, "simpletest")
+        assert extension_data != nil
+        assert extension_data.message == "serializer_test"
+      end
+    end
+
+    test "deserialization without extensions works (backward compatibility)" do
+      # JSON without any extension data
+      json =
+        Jason.encode!(%{
+          "type" => "simple.event",
+          "source" => "/simple/source",
+          "id" => "simple-123",
+          "specversion" => "1.0.2",
+          "data" => %{"key" => "value"}
+        })
+
+      {:ok, deserialized} = Signal.deserialize(json)
+
+      assert %Signal{} = deserialized
+      assert deserialized.type == "simple.event"
+      assert deserialized.data["key"] == "value"
+      # empty extensions
+      assert deserialized.extensions == %{}
+    end
+
+    test "serialized format is CloudEvents compliant" do
+      {:ok, extended_signal} =
+        Signal.put_extension(
+          %Signal{
+            type: "cloudevents.test",
+            source: "/cloudevents",
+            id: "ce-123",
+            subject: "test-subject",
+            time: "2023-01-01T12:00:00Z",
+            datacontenttype: "application/json",
+            data: %{test: "data"}
+          },
+          "simpletest",
+          %{message: "cloudevents"}
+        )
+
+      {:ok, json} = Signal.serialize(extended_signal)
+      decoded = Jason.decode!(json)
+
+      # Required CloudEvents fields
+      assert decoded["specversion"] == "1.0.2"
+      assert decoded["type"] == "cloudevents.test"
+      assert decoded["source"] == "/cloudevents"
+      assert decoded["id"] == "ce-123"
+
+      # Optional CloudEvents fields
+      assert decoded["subject"] == "test-subject"
+      assert decoded["time"] == "2023-01-01T12:00:00Z"
+      assert decoded["datacontenttype"] == "application/json"
+      assert decoded["data"]["test"] == "data"
+
+      # Extension appears as top-level attribute
+      assert decoded["message"] == "cloudevents"
+
+      # No Jido-specific fields in serialized form (extensions should be flattened)
+      refute Map.has_key?(decoded, "extensions")
+      # jido_dispatch should not appear since it's nil (filtered out by flatten_extensions)
+      refute Map.has_key?(decoded, "jido_dispatch")
+    end
+
+    test "handles unknown extension attributes during deserialization" do
+      # JSON with attributes that don't match any registered extension
+      json =
+        Jason.encode!(%{
+          "type" => "unknown.test",
+          "source" => "/unknown",
+          "id" => "unknown-123",
+          "specversion" => "1.0.2",
+          "unknown_field" => "unknown_value",
+          "another_unknown" => 42
+        })
+
+      {:ok, deserialized} = Signal.deserialize(json)
+
+      # Should deserialize successfully
+      assert %Signal{} = deserialized
+      assert deserialized.type == "unknown.test"
+
+      # Unknown fields should be ignored (not cause errors)
+      assert deserialized.extensions == %{}
+    end
+
+    test "extension attributes don't interfere with core CloudEvents fields" do
+      # Test potential conflicts
+      {:ok, signal_with_time_ext} =
+        Signal.put_extension(
+          %Signal{
+            type: "conflict.test",
+            source: "/conflict",
+            id: "conflict-123",
+            # Core CloudEvents time
+            time: "2023-01-01T12:00:00Z"
+          },
+          "simpletest",
+          %{message: "no conflict"}
+        )
+
+      {:ok, json} = Signal.serialize(signal_with_time_ext)
+      {:ok, deserialized} = Signal.deserialize(json)
+
+      # Core time field should be preserved
+      assert deserialized.time == "2023-01-01T12:00:00Z"
+
+      # Extension should also be preserved
+      extension_data = Signal.get_extension(deserialized, "simpletest")
+      assert extension_data.message == "no conflict"
+    end
+  end
 end

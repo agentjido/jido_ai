@@ -27,6 +27,9 @@ defmodule Jido.Signal.Application do
     children = [
       {Registry, keys: :unique, name: Jido.Signal.Registry},
 
+      # Extension Registry for Signal extensions
+      Jido.Signal.Ext.Registry,
+
       # Exec Async Actions Task Supervisor
       {Task.Supervisor, name: Jido.Signal.TaskSupervisor}
     ]

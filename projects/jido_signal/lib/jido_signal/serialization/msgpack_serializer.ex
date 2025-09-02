@@ -40,7 +40,8 @@ if Code.ensure_loaded?(Msgpax) do
     @impl true
     def serialize(term, _opts \\ []) do
       # Pre-process the term to handle Elixir-specific types
-      preprocessed = preprocess_for_msgpack(term)
+      prepared = prepare_for_serialization(term)
+      preprocessed = preprocess_for_msgpack(prepared)
 
       case Msgpax.pack(preprocessed) do
         {:ok, iodata} -> {:ok, IO.iodata_to_binary(iodata)}
@@ -56,6 +57,7 @@ if Code.ensure_loaded?(Msgpax) do
     @impl true
     def deserialize(binary, config \\ []) do
       {:ok, unpacked} = Msgpax.unpack(binary)
+      unpacked = inflate_extensions_for_deserialization(unpacked)
 
       result =
         case Keyword.get(config, :type) do
@@ -149,5 +151,45 @@ if Code.ensure_loaded?(Msgpax) do
     end
 
     def valid_msgpack?(_), do: false
+
+    # Prepare term for serialization by flattening extensions in Signal structs
+    defp prepare_for_serialization(%Jido.Signal{} = signal) do
+      Jido.Signal.flatten_extensions(signal)
+    end
+
+    defp prepare_for_serialization(signals) when is_list(signals) do
+      Enum.map(signals, &prepare_for_serialization/1)
+    end
+
+    defp prepare_for_serialization(term), do: term
+
+    # Inflate extensions during deserialization for Signal maps
+    defp inflate_extensions_for_deserialization(data) when is_list(data) do
+      Enum.map(data, &inflate_extensions_for_deserialization/1)
+    end
+
+    defp inflate_extensions_for_deserialization(data) when is_map(data) do
+      # Check if this looks like a Signal by having required CloudEvents fields
+      if is_signal_map?(data) do
+        {extensions, remaining_attrs} = Jido.Signal.inflate_extensions(data)
+
+        # Add extensions map to the remaining attributes
+        if Enum.empty?(extensions) do
+          remaining_attrs
+        else
+          Map.put(remaining_attrs, "extensions", extensions)
+        end
+      else
+        data
+      end
+    end
+
+    defp inflate_extensions_for_deserialization(data), do: data
+
+    # Check if a map represents a CloudEvents/Signal structure
+    defp is_signal_map?(data) when is_map(data) do
+      Map.has_key?(data, "type") and Map.has_key?(data, "source") and
+        (Map.has_key?(data, "specversion") or Map.has_key?(data, "id"))
+    end
   end
 end
