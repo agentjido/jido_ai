@@ -38,11 +38,15 @@ defmodule Jido.Agent.Server.Signal do
   def type({:event, :transition_failed}), do: @event_base ++ ["transition", "failed"]
   def type({:event, :queue_overflow}), do: @event_base ++ ["queue", "overflow"]
   def type({:event, :queue_cleared}), do: @event_base ++ ["queue", "cleared"]
+  def type({:event, :mode_changed}), do: @event_base ++ ["mode", "changed"]
 
   def type({:event, :process_started}), do: @event_base ++ ["process", "started"]
   def type({:event, :process_restarted}), do: @event_base ++ ["process", "restarted"]
   def type({:event, :process_terminated}), do: @event_base ++ ["process", "terminated"]
   def type({:event, :process_failed}), do: @event_base ++ ["process", "failed"]
+
+  def type({:event, :debugger_pre_signal}), do: @event_base ++ ["debugger", "pre", "signal"]
+  def type({:event, :debugger_post_signal}), do: @event_base ++ ["debugger", "post", "signal"]
 
   def type({:err, :execution_error}), do: @error_base ++ ["execution", "error"]
   def type({:out, :instruction_result}), do: @output_base ++ ["instruction", "result"]
@@ -105,6 +109,9 @@ defmodule Jido.Agent.Server.Signal do
     do:
       build(state, Map.merge(%{type: type({:event, :queue_cleared}), data: params}, extra_attrs))
 
+  def event_signal(:mode_changed, %ServerState{} = state, params, extra_attrs),
+    do: build(state, Map.merge(%{type: type({:event, :mode_changed}), data: params}, extra_attrs))
+
   def event_signal(:stopped, %ServerState{} = state, params, extra_attrs),
     do: build(state, Map.merge(%{type: type({:event, :stopped}), data: params}, extra_attrs))
 
@@ -131,6 +138,20 @@ defmodule Jido.Agent.Server.Signal do
       build(
         state,
         Map.merge(%{type: type({:event, :process_started}), data: params}, extra_attrs)
+      )
+
+  def event_signal(:debugger_pre_signal, %ServerState{} = state, params, extra_attrs),
+    do:
+      build(
+        state,
+        Map.merge(%{type: type({:event, :debugger_pre_signal}), data: params}, extra_attrs)
+      )
+
+  def event_signal(:debugger_post_signal, %ServerState{} = state, params, extra_attrs),
+    do:
+      build(
+        state,
+        Map.merge(%{type: type({:event, :debugger_post_signal}), data: params}, extra_attrs)
       )
 
   def event_signal(_, _, _, _), do: nil

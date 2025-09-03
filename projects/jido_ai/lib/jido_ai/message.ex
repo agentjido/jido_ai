@@ -255,3 +255,24 @@ defmodule Jido.AI.Message do
     get_in(metadata, [:provider_options]) || %{}
   end
 end
+
+# Implement Enumerable protocol so Message can be treated as a single-item collection
+defimpl Enumerable, for: Jido.AI.Message do
+  def count(_message), do: {:ok, 1}
+  
+  def member?(_message, _element), do: {:error, __MODULE__}
+  
+  def slice(_message), do: {:error, __MODULE__}
+  
+  def reduce(message, {:cont, acc}, fun) do
+    fun.(message, acc)
+  end
+  
+  def reduce(_message, {:halt, acc}, _fun) do
+    {:halted, acc}
+  end
+  
+  def reduce(message, {:suspend, acc}, fun) do
+    {:suspended, acc, &reduce(message, &1, fun)}
+  end
+end

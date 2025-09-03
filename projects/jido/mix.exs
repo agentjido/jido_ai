@@ -109,6 +109,9 @@ defmodule Jido.MixProject do
           "guides/agents/callbacks.md",
           "guides/agents/child-processes.md"
         ],
+        Development: [
+          "guides/debugging.livemd"
+        ],
         Skills: [
           "guides/skills/overview.md",
           "guides/skills/testing.md"
@@ -161,6 +164,9 @@ defmodule Jido.MixProject do
         {"guides/agents/sensors.md", title: "Sensors"},
         {"guides/agents/callbacks.md", title: "Callbacks"},
         {"guides/agents/child-processes.md", title: "Child Processes"},
+
+        # Development
+        {"guides/debugging.livemd", title: "Debugging Agents"},
 
         # Skills
         {"guides/skills/overview.md", title: "Overview"},
