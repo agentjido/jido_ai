@@ -222,29 +222,30 @@ defmodule Jido.Signal.Ext do
           iex> MyExt.validate_data(%{})
           {:error, "required :user_id option not found"}
       """
-      @spec validate_data(term()) :: {:ok, term()} | {:error, String.t()}
-      def validate_data(data) do
-        case @ext_schema do
-          [] ->
-            {:ok, data}
+      # Compile-time specialization removes unreachable code paths and
+      # silences Dialyzer's "pattern can never match" warning.
+      if @ext_schema == [] do
+        @spec validate_data(term()) :: {:ok, term()}
+        def validate_data(data), do: {:ok, data}
+      else
+        @spec validate_data(term()) :: {:ok, term()} | {:error, String.t()}
+        def validate_data(data) do
+          data_list = if is_map(data), do: Enum.to_list(data), else: data
 
-          schema when is_list(schema) ->
-            data_list = if is_map(data), do: Enum.to_list(data), else: data
+          case NimbleOptions.validate(data_list, @ext_schema) do
+            {:ok, validated_data} ->
+              {:ok, if(is_map(data), do: Map.new(validated_data), else: validated_data)}
 
-            case NimbleOptions.validate(data_list, schema) do
-              {:ok, validated_data} ->
-                {:ok, if(is_map(data), do: Map.new(validated_data), else: validated_data)}
+            {:error, %NimbleOptions.ValidationError{} = error} ->
+              reason =
+                Jido.Signal.Error.format_nimble_validation_error(
+                  error,
+                  "Extension",
+                  __MODULE__
+                )
 
-              {:error, %NimbleOptions.ValidationError{} = error} ->
-                reason =
-                  Jido.Signal.Error.format_nimble_validation_error(
-                    error,
-                    "Extension",
-                    __MODULE__
-                  )
-
-                {:error, reason}
-            end
+              {:error, reason}
+          end
         end
       end
 
