@@ -1,6 +1,8 @@
 defmodule Jido.SignalSerializationTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias Jido.Signal
 
   describe "Signal.serialize/1" do
@@ -117,8 +119,10 @@ defmodule Jido.SignalSerializationTest do
     test "returns error for invalid signal structure" do
       json = ~s({"not_a_type":"test.event"})
 
-      result = Signal.deserialize(json)
-      assert {:error, _reason} = result
+      capture_log(fn ->
+        result = Signal.deserialize(json)
+        assert {:error, _reason} = result
+      end)
     end
   end
 
@@ -538,14 +542,19 @@ defmodule Jido.SignalSerializationTest do
           "another_unknown" => 42
         })
 
-      {:ok, deserialized} = Signal.deserialize(json)
+      capture_log(fn ->
+        {:ok, deserialized} = Signal.deserialize(json)
 
-      # Should deserialize successfully
-      assert %Signal{} = deserialized
-      assert deserialized.type == "unknown.test"
+        # Should deserialize successfully
+        assert %Signal{} = deserialized
+        assert deserialized.type == "unknown.test"
 
-      # Unknown fields should be ignored (not cause errors)
-      assert deserialized.extensions == %{}
+        # Unknown fields should be preserved as opaque data (not cause errors)
+        assert deserialized.extensions == %{
+                 "unknown_field" => "unknown_value",
+                 "another_unknown" => 42
+               }
+      end)
     end
 
     test "extension attributes don't interfere with core CloudEvents fields" do

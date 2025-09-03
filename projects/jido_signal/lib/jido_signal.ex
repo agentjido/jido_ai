@@ -148,8 +148,17 @@ defmodule Jido.Signal do
   import Jido.Signal.Ext.Registry, only: [get: 1]
 
   alias Jido.Signal.Dispatch
+  alias Jido.Signal.Ext
   alias Jido.Signal.ID
+  alias Jido.Signal.Serialization.Serializer
   alias Jido.Signal.Serialization.TypeProvider
+
+  require Logger
+
+  @core_attrs ~w[
+    specversion id source type subject time
+    datacontenttype dataschema data jido_dispatch extensions
+  ]a
 
   @signal_config_schema NimbleOptions.new!(
                           type: [
@@ -190,7 +199,8 @@ defmodule Jido.Signal do
              :datacontenttype,
              :dataschema,
              :data,
-             :specversion
+             :specversion,
+             :extensions
            ]}
 
   typedstruct do
@@ -203,9 +213,9 @@ defmodule Jido.Signal do
     field(:datacontenttype, String.t())
     field(:dataschema, String.t())
     field(:data, term())
+    field(:extensions, map(), default: %{})
     # Jido-specific fields
     field(:jido_dispatch, Dispatch.dispatch_configs())
-    field(:extensions, map(), default: %{})
   end
 
   @doc """
@@ -236,6 +246,7 @@ defmodule Jido.Signal do
 
     quote location: :keep do
       alias Jido.Signal
+      alias Jido.Signal.Error
       alias Jido.Signal.ID
 
       case NimbleOptions.validate(unquote(opts), unquote(escaped_schema)) do
@@ -250,11 +261,11 @@ defmodule Jido.Signal do
 
           def to_json do
             %{
-              type: @validated_opts[:type],
-              default_source: @validated_opts[:default_source],
               datacontenttype: @validated_opts[:datacontenttype],
               dataschema: @validated_opts[:dataschema],
-              schema: @validated_opts[:schema]
+              default_source: @validated_opts[:default_source],
+              schema: @validated_opts[:schema],
+              type: @validated_opts[:type]
             }
           end
 
@@ -343,7 +354,7 @@ defmodule Jido.Signal do
 
                   {:error, %NimbleOptions.ValidationError{} = error} ->
                     reason =
-                      Jido.Signal.Error.format_nimble_validation_error(
+                      Error.format_nimble_validation_error(
                         error,
                         "Signal",
                         __MODULE__
@@ -356,7 +367,8 @@ defmodule Jido.Signal do
 
           defp build_signal_attrs(validated_data, opts) do
             caller =
-              Process.info(self(), :current_stacktrace)
+              self()
+              |> Process.info(:current_stacktrace)
               |> elem(1)
               |> Enum.find(fn {mod, _fun, _arity, _info} ->
                 mod_str = to_string(mod)
@@ -366,12 +378,12 @@ defmodule Jido.Signal do
               |> to_string()
 
             attrs = %{
-              "type" => @validated_opts[:type],
-              "source" => @validated_opts[:default_source] || caller,
               "data" => validated_data,
               "id" => ID.generate!(),
+              "source" => @validated_opts[:default_source] || caller,
+              "specversion" => "1.0.2",
               "time" => DateTime.utc_now() |> DateTime.to_iso8601(),
-              "specversion" => "1.0.2"
+              "type" => @validated_opts[:type]
             }
 
             attrs =
@@ -394,7 +406,7 @@ defmodule Jido.Signal do
           end
 
         {:error, error} ->
-          message = Jido.Signal.Error.format_nimble_config_error(error, "Signal", __MODULE__)
+          message = Error.format_nimble_config_error(error, "Signal", __MODULE__)
           raise CompileError, description: message, file: __ENV__.file, line: __ENV__.line
       end
     end
@@ -495,7 +507,8 @@ defmodule Jido.Signal do
 
   def new(attrs) when is_map(attrs) do
     caller =
-      Process.info(self(), :current_stacktrace)
+      self()
+      |> Process.info(:current_stacktrace)
       |> elem(1)
       |> Enum.find(fn {mod, _fun, _arity, _info} ->
         mod_str = to_string(mod)
@@ -505,10 +518,10 @@ defmodule Jido.Signal do
       |> to_string()
 
     defaults = %{
-      "specversion" => "1.0.2",
       "id" => ID.generate!(),
-      "time" => DateTime.utc_now() |> DateTime.to_iso8601(),
-      "source" => caller
+      "source" => caller,
+      "specversion" => "1.0.2",
+      "time" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
 
     attrs
@@ -539,7 +552,7 @@ defmodule Jido.Signal do
   def new(type, data, attrs) when is_binary(type) and (is_map(attrs) or is_list(attrs)) do
     with {:ok, normalized_attrs} <- normalize_and_validate_attrs(attrs) do
       normalized_attrs
-      |> Map.merge(%{type: type, data: data})
+      |> Map.merge(%{data: data, type: type})
       |> new()
     end
   end
@@ -577,7 +590,6 @@ defmodule Jido.Signal do
   """
   @spec from_map(map()) :: {:ok, t()} | {:error, String.t()}
   def from_map(map) when is_map(map) do
-    # First, inflate extensions from top-level attributes
     {extensions_data, remaining_attrs} = inflate_extensions(map)
 
     # Parse extensions that were explicitly stored in "extensions" field
@@ -586,6 +598,25 @@ defmodule Jido.Signal do
         {:ok, explicit} -> Map.merge(extensions_data, explicit)
         {:error, _} -> extensions_data
       end
+
+    {core, maybe_ext} = Map.split(remaining_attrs, @core_attrs |> Enum.map(&to_string/1))
+
+    unknown_extensions =
+      Enum.reduce(maybe_ext, %{}, fn {k, v}, acc ->
+        ns = to_string(k)
+
+        case Jido.Signal.Ext.Registry.get(ns) do
+          {:ok, _mod} ->
+            acc
+
+          {:error, :not_found} ->
+            Logger.warning("Unknown extension '#{ns}' encountered - preserving as opaque data")
+            Map.put(acc, ns, v)
+        end
+      end)
+
+    all_extensions = Map.merge(final_extensions, unknown_extensions)
+    remaining_attrs = core
 
     with :ok <- parse_specversion(remaining_attrs),
          {:ok, type} <- parse_type(remaining_attrs),
@@ -598,17 +629,17 @@ defmodule Jido.Signal do
          {:ok, data} <- parse_data(remaining_attrs["data"]),
          {:ok, jido_dispatch} <- parse_jido_dispatch(remaining_attrs["jido_dispatch"]) do
       event = %__MODULE__{
-        specversion: "1.0.2",
-        type: type,
-        source: source,
-        id: id,
-        subject: subject,
-        time: time,
+        data: data,
         datacontenttype: datacontenttype || if(data, do: "application/json"),
         dataschema: dataschema,
-        data: data,
+        extensions: all_extensions,
+        id: id,
         jido_dispatch: jido_dispatch,
-        extensions: final_extensions
+        source: source,
+        specversion: "1.0.2",
+        subject: subject,
+        time: time,
+        type: type
       }
 
       {:ok, event}
@@ -654,12 +685,14 @@ defmodule Jido.Signal do
   end
 
   @spec map_to_signal_data(struct, Keyword.t()) :: t()
-  def map_to_signal_data(signal, _fields) do
+  def map_to_signal_data(signal, fields) do
+    source = Keyword.get(fields, :source, "/#{inspect(signal.__struct__)}")
+
     %__MODULE__{
+      data: signal,
       id: ID.generate(),
-      source: "http://example.com/bank",
-      type: TypeProvider.to_string(signal),
-      data: signal
+      source: source,
+      type: TypeProvider.to_string(signal)
     }
   end
 
@@ -766,11 +799,11 @@ defmodule Jido.Signal do
   def serialize(signal_or_list, opts \\ [])
 
   def serialize(%__MODULE__{} = signal, opts) do
-    Jido.Signal.Serialization.Serializer.serialize(signal, opts)
+    Serializer.serialize(signal, opts)
   end
 
   def serialize(signals, opts) when is_list(signals) do
-    Jido.Signal.Serialization.Serializer.serialize(signals, opts)
+    Serializer.serialize(signals, opts)
   end
 
   @doc """
@@ -820,7 +853,7 @@ defmodule Jido.Signal do
   """
   @spec deserialize(binary(), keyword()) :: {:ok, t() | list(t())} | {:error, term()}
   def deserialize(binary, opts \\ []) when is_binary(binary) do
-    case Jido.Signal.Serialization.Serializer.deserialize(binary, opts) do
+    case Serializer.deserialize(binary, opts) do
       {:ok, data} ->
         result =
           if is_list(data) do
@@ -887,13 +920,16 @@ defmodule Jido.Signal do
   def put_extension(%__MODULE__{} = signal, namespace, data) when is_binary(namespace) do
     case get(namespace) do
       {:ok, extension_module} ->
-        case extension_module.validate_data(data) do
-          {:ok, validated_data} ->
+        case Ext.safe_validate_data(extension_module, data) do
+          {:ok, {:ok, validated_data}} ->
             updated_extensions = Map.put(signal.extensions, namespace, validated_data)
             {:ok, %{signal | extensions: updated_extensions}}
 
-          {:error, reason} ->
+          {:ok, {:error, reason}} ->
             {:error, reason}
+
+          {:error, reason} ->
+            {:error, "extension #{namespace} validation failed: #{inspect(reason)}"}
         end
 
       {:error, :not_found} ->
@@ -1047,10 +1083,18 @@ defmodule Jido.Signal do
     Enum.reduce(signal.extensions, base_map, fn {namespace, data}, acc ->
       case get(namespace) do
         {:ok, extension_module} ->
-          extension_attrs = extension_module.to_attrs(data)
-          # Merge extension attributes into the map (only non-nil values)
-          filtered_attrs = Enum.reject(extension_attrs, fn {_k, v} -> v == nil end)
-          Map.merge(acc, Map.new(filtered_attrs))
+          case Ext.safe_to_attrs(extension_module, data) do
+            {:ok, extension_attrs} ->
+              filtered_attrs = Enum.reject(extension_attrs, fn {_k, v} -> v == nil end)
+              Map.merge(acc, Map.new(filtered_attrs))
+
+            {:error, reason} ->
+              Logger.warning(
+                "Extension #{namespace} to_attrs failed: #{inspect(reason)} - skipping"
+              )
+
+              acc
+          end
 
         {:error, :not_found} ->
           # If extension is not registered, skip it (for backward compatibility)
@@ -1106,74 +1150,103 @@ defmodule Jido.Signal do
       Enum.reduce(all_extensions, {%{}, attrs}, fn {namespace, extension_module},
                                                    {ext_acc, attrs_acc} ->
         # First try to get extension data
-        extension_data = extension_module.from_attrs(attrs_acc)
-
-        case extension_data do
-          nil ->
-            # Extension returned nil, no data for this extension
-            {ext_acc, attrs_acc}
-
-          ^attrs_acc when map_size(extension_data) == map_size(attrs_acc) ->
-            # Extension returned the full attrs map (default behavior)
-            # This means it doesn't have specific logic, so we need to check
-            # if any of its schema fields are present in the attrs
-            case has_extension_attributes?(extension_module, attrs_acc, core_fields) do
-              {false, _} ->
-                # No relevant attributes found, skip this extension
+        case Ext.safe_from_attrs(extension_module, attrs_acc) do
+          {:ok, extension_data} ->
+            case extension_data do
+              nil ->
                 {ext_acc, attrs_acc}
 
-              {true, matching_attrs} ->
-                # Found relevant attributes, validate them
-                # Convert to atom keys for validation
-                atom_keyed_attrs =
-                  Map.new(matching_attrs, fn {k, v} -> {String.to_atom(k), v} end)
+              ^attrs_acc when map_size(extension_data) == map_size(attrs_acc) ->
+                # Extension returned the full attrs map (default behavior)
+                # This means it doesn't have specific logic, so we need to check
+                # if any of its schema fields are present in the attrs
+                case has_extension_attributes?(extension_module, attrs_acc, core_fields) do
+                  {false, _} ->
+                    # No relevant attributes found, skip this extension
+                    {ext_acc, attrs_acc}
 
-                case extension_module.validate_data(atom_keyed_attrs) do
-                  {:ok, validated_data} ->
+                  {true, matching_attrs} ->
+                    # Found relevant attributes, validate them
+                    # Convert to atom keys for validation
+                    atom_keyed_attrs =
+                      Map.new(matching_attrs, fn {k, v} -> {String.to_atom(k), v} end)
+
+                    case Ext.safe_validate_data(extension_module, atom_keyed_attrs) do
+                      {:ok, {:ok, validated_data}} ->
+                        # Remove the extension's attributes from remaining attrs
+                        updated_attrs =
+                          Enum.reduce(matching_attrs, attrs_acc, fn {key, _value}, acc ->
+                            if key in core_fields do
+                              # Don't remove core fields
+                              acc
+                            else
+                              Map.delete(acc, key)
+                            end
+                          end)
+
+                        {Map.put(ext_acc, namespace, validated_data), updated_attrs}
+
+                      {:ok, {:error, _reason}} ->
+                        # Validation failed, skip this extension
+                        {ext_acc, attrs_acc}
+
+                      {:error, reason} ->
+                        Logger.warning(
+                          "Extension #{namespace} validate_data failed: #{inspect(reason)} - skipping"
+                        )
+
+                        {ext_acc, attrs_acc}
+                    end
+                end
+
+              extension_data ->
+                # Extension returned specific data (custom from_attrs)
+                # Validate the extension data instead of trying to remove attributes
+                case Ext.safe_validate_data(extension_module, extension_data) do
+                  {:ok, {:ok, validated_data}} ->
                     # Remove the extension's attributes from remaining attrs
-                    updated_attrs =
-                      Enum.reduce(matching_attrs, attrs_acc, fn {key, _value}, acc ->
-                        if key in core_fields do
-                          # Don't remove core fields
-                          acc
-                        else
-                          Map.delete(acc, key)
-                        end
-                      end)
+                    case Ext.safe_to_attrs(extension_module, validated_data) do
+                      {:ok, extension_attrs} ->
+                        # Only remove attributes that are not core CloudEvents fields
+                        updated_attrs =
+                          Enum.reduce(extension_attrs, attrs_acc, fn {key, _value}, acc ->
+                            if key in core_fields do
+                              # Don't remove core fields
+                              acc
+                            else
+                              Map.delete(acc, key)
+                            end
+                          end)
 
-                    {Map.put(ext_acc, namespace, validated_data), updated_attrs}
+                        {Map.put(ext_acc, namespace, validated_data), updated_attrs}
 
-                  {:error, _} ->
+                      {:error, reason} ->
+                        Logger.warning(
+                          "Extension #{namespace} to_attrs failed: #{inspect(reason)} - skipping"
+                        )
+
+                        {ext_acc, attrs_acc}
+                    end
+
+                  {:ok, {:error, _reason}} ->
                     # Validation failed, skip this extension
+                    {ext_acc, attrs_acc}
+
+                  {:error, reason} ->
+                    Logger.warning(
+                      "Extension #{namespace} validate_data failed: #{inspect(reason)} - skipping"
+                    )
+
                     {ext_acc, attrs_acc}
                 end
             end
 
-          extension_data ->
-            # Extension returned specific data (custom from_attrs)
-            # Validate the extension data instead of trying to remove attributes
-            case extension_module.validate_data(extension_data) do
-              {:ok, validated_data} ->
-                # Remove the extension's attributes from remaining attrs
-                extension_attrs = extension_module.to_attrs(validated_data)
+          {:error, reason} ->
+            Logger.warning(
+              "Extension #{namespace} from_attrs failed: #{inspect(reason)} - skipping"
+            )
 
-                # Only remove attributes that are not core CloudEvents fields
-                updated_attrs =
-                  Enum.reduce(extension_attrs, attrs_acc, fn {key, _value}, acc ->
-                    if key in core_fields do
-                      # Don't remove core fields
-                      acc
-                    else
-                      Map.delete(acc, key)
-                    end
-                  end)
-
-                {Map.put(ext_acc, namespace, validated_data), updated_attrs}
-
-              {:error, _} ->
-                # Validation failed, skip this extension
-                {ext_acc, attrs_acc}
-            end
+            {ext_acc, attrs_acc}
         end
       end)
 
@@ -1191,7 +1264,7 @@ defmodule Jido.Signal do
 
       schema_fields ->
         # Check if any schema fields are present in attrs (excluding core fields)
-        schema_field_names = Keyword.keys(schema_fields) |> Enum.map(&to_string/1)
+        schema_field_names = schema_fields |> Keyword.keys() |> Enum.map(&to_string/1)
 
         # Only look at top-level attributes, not nested data
         top_level_attrs = Map.drop(attrs, core_fields)

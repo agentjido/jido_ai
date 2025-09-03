@@ -271,13 +271,71 @@ defmodule MyApp.Signal.Ext.ThreadTest do
 end
 ```
 
+## Error Handling and Safety
+
+Jido Signal provides automatic error isolation for extensions to prevent corrupted extension data from affecting Signal processing. When extension callbacks fail, the system gracefully handles errors:
+
+```elixir
+# If an extension has corrupted data or fails validation
+signal = %Jido.Signal{
+  extensions: %{"thread" => %{invalid: "data"}}
+}
+
+# Safe operations return {:error, reason} instead of raising
+case Jido.Signal.get_extension(signal, Thread) do
+  {:ok, thread_data} -> 
+    # Extension data successfully retrieved
+    thread_data
+  {:error, _reason} -> 
+    # Extension failed validation - handle gracefully
+    nil
+end
+```
+
+The system uses "safe" wrapper functions internally that:
+- Catch and wrap exceptions from extension callbacks
+- Log warnings for unknown extensions during deserialization
+- Preserve Signal integrity even when extensions fail
+- Allow graceful degradation of functionality
+
+## Unknown Extension Handling
+
+When deserializing Signals with unknown extensions (extensions not registered in the current system), Jido Signal:
+
+```elixir
+# Signal from external system with unknown "customext" extension
+json = """
+{
+  "specversion": "1.0.2",
+  "type": "user.action",
+  "source": "/app",
+  "customextdata": "some-value"
+}
+"""
+
+# Deserialization succeeds and logs a warning
+{:ok, signal} = Jido.Signal.deserialize(json)
+# => [warning] Unknown extension attributes detected: customextdata
+
+# Unknown extension data is preserved as raw attributes
+signal.extensions
+# => %{"_unknown" => %{"customextdata" => "some-value"}}
+```
+
+This ensures:
+- Forward compatibility with future extensions
+- Graceful handling of mixed-system environments
+- Preservation of all CloudEvents data during round-trips
+
 ## Best Practices
 
 1. **Keep Extensions Simple**: Focus on single responsibility
 2. **Validate Early**: Use comprehensive schemas to catch errors
 3. **Test Serialization**: Always test round-trip serialization
-4. **Document Usage**: Provide clear examples in moduledocs
-5. **Consider CloudEvents**: Ensure attribute names follow CloudEvents rules
-6. **Backward Compatibility**: Design for evolution - avoid breaking changes
+4. **Handle Errors Gracefully**: Extensions may fail - design for resilience
+5. **Document Usage**: Provide clear examples in moduledocs
+6. **Consider CloudEvents**: Ensure attribute names follow CloudEvents rules
+7. **Backward Compatibility**: Design for evolution - avoid breaking changes
+8. **Test Error Cases**: Verify your application handles extension failures
 
-Extensions provide a powerful way to add domain-specific functionality to Signals while maintaining standardization and interoperability. They're the key to building sophisticated event-driven systems that scale from simple applications to complex distributed architectures.
+Extensions provide a powerful way to add domain-specific functionality to Signals while maintaining standardization and interoperability. The built-in error isolation ensures your system remains robust even when dealing with corrupted or unknown extension data, making them ideal for building sophisticated event-driven systems that scale from simple applications to complex distributed architectures.

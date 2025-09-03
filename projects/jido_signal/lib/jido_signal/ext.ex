@@ -66,6 +66,8 @@ defmodule Jido.Signal.Ext do
   - `Jido.Signal` - Core Signal functionality
   """
 
+  require Logger
+
   @doc """
   Returns the namespace for this extension.
 
@@ -253,5 +255,55 @@ defmodule Jido.Signal.Ext do
         Jido.Signal.Ext.Registry.register(__MODULE__)
       end
     end
+  end
+
+  @doc false
+  @spec safe_call(module(), atom(), [term()]) :: {:ok, term()} | {:error, any()}
+  def safe_call(mod, fun, args) do
+    {:ok, apply(mod, fun, args)}
+  rescue
+    e ->
+      Logger.warning(
+        "Extension #{inspect(mod)}.#{fun}/#{length(args)} crashed: #{Exception.message(e)}"
+      )
+
+      {:error, e}
+  catch
+    :exit, reason ->
+      Logger.warning(
+        "Extension #{inspect(mod)}.#{fun}/#{length(args)} exited: #{inspect(reason)}"
+      )
+
+      {:error, reason}
+
+    :throw, reason ->
+      Logger.warning("Extension #{inspect(mod)}.#{fun}/#{length(args)} threw: #{inspect(reason)}")
+
+      {:error, reason}
+
+    kind, reason ->
+      Logger.warning(
+        "Extension #{inspect(mod)}.#{fun}/#{length(args)} failed with #{kind}: #{inspect(reason)}"
+      )
+
+      {:error, {kind, reason}}
+  end
+
+  @doc false
+  @spec safe_validate_data(module(), term()) :: {:ok, term()} | {:error, any()}
+  def safe_validate_data(ext_mod, data) do
+    safe_call(ext_mod, :validate_data, [data])
+  end
+
+  @doc false
+  @spec safe_to_attrs(module(), term()) :: {:ok, term()} | {:error, any()}
+  def safe_to_attrs(ext_mod, data) do
+    safe_call(ext_mod, :to_attrs, [data])
+  end
+
+  @doc false
+  @spec safe_from_attrs(module(), term()) :: {:ok, term()} | {:error, any()}
+  def safe_from_attrs(ext_mod, attrs) do
+    safe_call(ext_mod, :from_attrs, [attrs])
   end
 end
