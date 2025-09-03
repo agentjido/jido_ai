@@ -18,7 +18,8 @@ if Code.ensure_loaded?(Jason) do
     """
     @impl true
     def serialize(term, _opts \\ []) do
-      {:ok, Jason.encode!(term)}
+      serializable_term = prepare_for_serialization(term)
+      {:ok, Jason.encode!(serializable_term)}
     rescue
       e -> {:error, Exception.message(e)}
     end
@@ -48,6 +49,7 @@ if Code.ensure_loaded?(Jason) do
       result =
         binary
         |> Jason.decode!(opts)
+        |> inflate_extensions_for_deserialization()
         |> to_struct(type)
         |> JsonDecoder.decode()
 
@@ -87,6 +89,46 @@ if Code.ensure_loaded?(Jason) do
     # Handle the case where struct is already a struct type (not a module name)
     defp to_struct(data, %type{} = _struct) do
       struct(type, data)
+    end
+
+    # Prepare term for serialization by flattening extensions in Signal structs
+    defp prepare_for_serialization(%Jido.Signal{} = signal) do
+      Jido.Signal.flatten_extensions(signal)
+    end
+
+    defp prepare_for_serialization(signals) when is_list(signals) do
+      Enum.map(signals, &prepare_for_serialization/1)
+    end
+
+    defp prepare_for_serialization(term), do: term
+
+    # Inflate extensions during deserialization for Signal maps
+    defp inflate_extensions_for_deserialization(data) when is_list(data) do
+      Enum.map(data, &inflate_extensions_for_deserialization/1)
+    end
+
+    defp inflate_extensions_for_deserialization(data) when is_map(data) do
+      # Check if this looks like a Signal by having required CloudEvents fields
+      if is_signal_map?(data) do
+        {extensions, remaining_attrs} = Jido.Signal.inflate_extensions(data)
+
+        # Add extensions map to the remaining attributes
+        if Enum.empty?(extensions) do
+          remaining_attrs
+        else
+          Map.put(remaining_attrs, "extensions", extensions)
+        end
+      else
+        data
+      end
+    end
+
+    defp inflate_extensions_for_deserialization(data), do: data
+
+    # Check if a map represents a CloudEvents/Signal structure
+    defp is_signal_map?(data) when is_map(data) do
+      Map.has_key?(data, "type") and Map.has_key?(data, "source") and
+        (Map.has_key?(data, "specversion") or Map.has_key?(data, "id"))
     end
   end
 end

@@ -16,9 +16,19 @@ end
 
 ## Create a Signal
 
-Basic signal creation:
+Basic signal creation (preferred):
 
 ```elixir
+# Preferred: positional constructor (type, data, attrs)
+{:ok, signal} = Jido.Signal.new("user.created", %{user_id: "123", email: "user@example.com"},
+  source: "/auth/registration"
+)
+```
+
+Also available:
+
+```elixir
+# Map/keyword constructor (backwards compatible)
 {:ok, signal} = Jido.Signal.new(%{
   type: "user.created",
   source: "/auth/registration",
@@ -29,12 +39,11 @@ Basic signal creation:
 With dispatch configuration:
 
 ```elixir
-{:ok, signal} = Jido.Signal.new(%{
-  type: "metrics.collected", 
+# Using the positional form
+{:ok, signal} = Jido.Signal.new("metrics.collected", %{cpu: 80, memory: 70},
   source: "/monitoring",
-  data: %{cpu: 80, memory: 70},
   jido_dispatch: {:pid, [target: pid, delivery_mode: :async]}
-})
+)
 ```
 
 ## Dispatch to a Process
