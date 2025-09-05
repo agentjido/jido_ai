@@ -69,8 +69,8 @@ end
 flow AnalyzeLogs do
   @character TechnicalGuide
   @goal "Analyze system logs for errors and patterns"
-  
-  step :collect_logs do
+ **** 
+  step :collect_logs **do**
     when has_recent_logs?() do
       fetch_relevant_logs()
     end
