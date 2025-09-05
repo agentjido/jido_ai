@@ -3,7 +3,7 @@ defmodule Jido.AI.ProviderTest do
   Tests for the Provider struct and related functionality.
   """
 
-  use ExUnit.Case, async: true
+  use Jido.AI.TestSupport.KeyringCase, async: true
 
   alias Jido.AI.Error.Invalid.Parameter
   alias Jido.AI.Provider

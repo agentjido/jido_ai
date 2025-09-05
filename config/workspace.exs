@@ -107,6 +107,13 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/kodo"
+    },
+    %{
+      name: "kagi",
+      upstream_url: "git@github.com:agentjido/kagi.git",
+      branch: "main",
+      type: :library,
+      path: "projects/kagi"
     }
   ],
   hex_packages: [

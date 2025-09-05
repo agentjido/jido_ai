@@ -11,7 +11,7 @@ defmodule Jido.AI.TestUtils do
 
   ## Keyring Test Utilities - DEPRECATED
   ## Use Jido.AI.TestSupport.KeyringCase instead
-  alias Jido.AI.Keyring
+  alias Kagi
   alias Jido.AI.Test.Fixtures.ProviderFixtures
 
   @doc """
@@ -22,10 +22,10 @@ defmodule Jido.AI.TestUtils do
   """
   def setup_isolated_keyring do
     # Clear any existing keys
-    Keyring.clear_all_session_values()
+    Kagi.clear_all_session_values()
 
     # Return cleanup function
-    fn -> Keyring.clear_all_session_values() end
+    fn -> Kagi.clear_all_session_values() end
   end
 
   ## Provider Registry Management

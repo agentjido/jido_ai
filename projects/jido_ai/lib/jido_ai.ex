@@ -214,7 +214,8 @@ defmodule Jido.AI do
 
   alias Jido.Action.Tool
   alias Jido.AI.Messages
-  alias Jido.AI.{Keyring, Message, Model, ObjectSchema, Util}
+  alias Jido.AI.{Message, Model, ObjectSchema, Util}
+  alias Kagi
 
   # ===========================================================================
   # Configuration API - Simple facades for common operations
@@ -238,12 +239,12 @@ defmodule Jido.AI do
   """
   @spec api_key(atom() | String.t()) :: String.t() | nil
   def api_key(key) when is_atom(key) do
-    Keyring.get(Keyring, key, nil)
+    Kagi.get(Kagi, key, nil)
   end
 
   def api_key(key) when is_binary(key) do
     normalized = String.downcase(key)
-    Keyring.get(normalized, nil)
+    Kagi.get(normalized, nil)
   end
 
   @doc """
@@ -253,7 +254,7 @@ defmodule Jido.AI do
   """
   @spec list_keys() :: [String.t()]
   def list_keys do
-    Keyring.list(Keyring)
+    Kagi.list(Kagi)
   end
 
   @doc """
@@ -286,13 +287,13 @@ defmodule Jido.AI do
     case Application.get_env(:jido_ai, main_key) do
       nil when rest == [] ->
         # For simple keys like [:http_client], try keyring fallback
-        Keyring.get(Keyring, main_key, default)
+        Kagi.get(Kagi, main_key, default)
 
       nil ->
         # For nested keys like [:openai, :api_key], check keyring with provider format
         if length(rest) == 1 and hd(rest) == :api_key do
           key = :"#{main_key}_api_key"
-          Keyring.get(Keyring, key, default)
+          Kagi.get(Kagi, key, default)
         else
           default
         end
@@ -310,7 +311,7 @@ defmodule Jido.AI do
               # For :api_key, try keyring fallback with provider format
               if next_key == :api_key do
                 key = :"#{main_key}_api_key"
-                Keyring.get(Keyring, key, default)
+                Kagi.get(Kagi, key, default)
               else
                 default
               end

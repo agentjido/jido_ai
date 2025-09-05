@@ -5,15 +5,11 @@ defmodule Jido.AI.Application do
 
   use Application
 
-  alias Jido.AI.Keyring
-
   @impl true
   def start(_type, _args) do
     Jido.AI.Provider.Registry.initialize()
 
-    children = [
-      Keyring
-    ]
+    children = []
 
     opts = [strategy: :one_for_one, name: Jido.AI.Supervisor]
     Supervisor.start_link(children, opts)

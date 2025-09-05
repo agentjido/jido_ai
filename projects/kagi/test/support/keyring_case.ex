@@ -1,4 +1,4 @@
-defmodule Jido.AI.TestSupport.KeyringCase do
+defmodule Kagi.TestSupport.KeyringCase do
   @moduledoc """
   ExUnit case template for Keyring-based tests.
 
@@ -11,7 +11,7 @@ defmodule Jido.AI.TestSupport.KeyringCase do
 
   using do
     quote do
-      import Jido.AI.TestSupport.KeyringCase
+      import Kagi.TestSupport.KeyringCase
 
       alias Kagi
     end
@@ -19,13 +19,13 @@ defmodule Jido.AI.TestSupport.KeyringCase do
 
   setup _tags do
     # Clear any existing state - Keyring is started by Application
-    Kagi.clear_all_session_values()
-    Kagi.set_test_env_vars(%{})
+    Keyring.clear_all_session_values()
+    Keyring.set_test_env_vars(%{})
 
     # Auto-cleanup on test exit
     on_exit(fn ->
-      Kagi.clear_all_session_values()
-      Kagi.set_test_env_vars(%{})
+      Keyring.clear_all_session_values()
+      Keyring.set_test_env_vars(%{})
     end)
 
     :ok
@@ -50,13 +50,13 @@ defmodule Jido.AI.TestSupport.KeyringCase do
           {env_key, value}
         end)
 
-      Kagi.set_test_env_vars(env_map)
+      Keyring.set_test_env_vars(env_map)
 
       try do
         unquote(block)
       after
         # Clear test env vars - they'll be reset by the test setup
-        Kagi.set_test_env_vars(%{})
+        Keyring.set_test_env_vars(%{})
       end
     end
   end
@@ -77,12 +77,12 @@ defmodule Jido.AI.TestSupport.KeyringCase do
 
       previous_values =
         for key <- keys_to_change, into: %{} do
-          {key, Kagi.get(key, :__no_value__)}
+          {key, Keyring.get(key, :__no_value__)}
         end
 
       # Set new session values
       Enum.each(unquote(session_vars), fn {key, value} ->
-        Kagi.set_session_value(key, value)
+        Keyring.set_session_value(key, value)
       end)
 
       try do
@@ -92,10 +92,10 @@ defmodule Jido.AI.TestSupport.KeyringCase do
         Enum.each(previous_values, fn {key, previous_value} ->
           if previous_value == :__no_value__ do
             # Key didn't exist before, remove it
-            Kagi.clear_session_value(key)
+            Keyring.clear_session_value(key)
           else
             # Restore previous value
-            Kagi.set_session_value(key, previous_value)
+            Keyring.set_session_value(key, previous_value)
           end
         end)
       end
@@ -111,7 +111,7 @@ defmodule Jido.AI.TestSupport.KeyringCase do
   """
   defmacro assert_value(key, expected_value) do
     quote do
-      actual_value = Kagi.get(unquote(key), nil)
+      actual_value = Keyring.get(unquote(key), nil)
 
       assert actual_value == unquote(expected_value),
              "Expected #{inspect(unquote(key))} to be #{inspect(unquote(expected_value))}, got #{inspect(actual_value)}"
@@ -127,7 +127,7 @@ defmodule Jido.AI.TestSupport.KeyringCase do
   """
   defmacro refute_value(key, default \\ nil) do
     quote do
-      actual_value = Kagi.get(unquote(key), unquote(default))
+      actual_value = Keyring.get(unquote(key), unquote(default))
 
       assert actual_value == unquote(default),
              "Expected #{inspect(unquote(key))} to be #{inspect(unquote(default))}, got #{inspect(actual_value)}"

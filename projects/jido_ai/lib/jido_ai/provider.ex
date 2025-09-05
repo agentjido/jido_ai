@@ -8,7 +8,8 @@ defmodule Jido.AI.Provider do
   use TypedStruct
 
   alias Jido.AI.Error.Invalid
-  alias Jido.AI.{Keyring, Model}
+  alias Jido.AI.Model
+  alias Kagi
 
   @derive {Jason.Encoder, only: [:id, :name, :base_url, :env, :doc]}
 
@@ -57,7 +58,7 @@ defmodule Jido.AI.Provider do
   Returns `{:ok, value}` if found, `{:error, Error.t()}` if not found.
   """
   @spec get_key(t(), GenServer.server()) :: {:ok, String.t()} | {:error, Exception.t()}
-  def get_key(%__MODULE__{env: env_vars, id: provider_id}, keyring_server \\ Keyring) do
+  def get_key(%__MODULE__{env: env_vars, id: provider_id}, keyring_server \\ Kagi) do
     case find_env_value(env_vars, keyring_server) do
       nil ->
         {:error,
@@ -82,7 +83,7 @@ defmodule Jido.AI.Provider do
   Returns `{:ok, provider}` if valid, `{:error, Error.t()}` if invalid.
   """
   @spec validate_key(t(), GenServer.server()) :: {:ok, t()} | {:error, Exception.t()}
-  def validate_key(%__MODULE__{} = provider, keyring_server \\ Keyring) do
+  def validate_key(%__MODULE__{} = provider, keyring_server \\ Kagi) do
     case get_key(provider, keyring_server) do
       {:ok, _value} -> {:ok, provider}
       {:error, _} = error -> error
@@ -101,7 +102,7 @@ defmodule Jido.AI.Provider do
   Returns the provider if valid, raises exception if invalid.
   """
   @spec validate_key!(t(), GenServer.server()) :: t()
-  def validate_key!(provider, keyring_server \\ Keyring) do
+  def validate_key!(provider, keyring_server \\ Kagi) do
     case validate_key(provider, keyring_server) do
       {:ok, provider} -> provider
       {:error, error} -> raise error
@@ -112,7 +113,7 @@ defmodule Jido.AI.Provider do
   @spec find_env_value([atom()], GenServer.server()) :: String.t() | nil
   defp find_env_value(env_vars, keyring_server) do
     Enum.find_value(env_vars, fn env_var ->
-      case Keyring.get_env_value(keyring_server, env_var) do
+      case Kagi.get_env_value(keyring_server, env_var) do
         nil -> nil
         value when is_binary(value) and value != "" -> value
         _ -> nil

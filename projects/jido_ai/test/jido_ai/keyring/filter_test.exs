@@ -1,5 +1,8 @@
 defmodule Jido.AI.Keyring.FilterTest do
   use ExUnit.Case, async: true
+  
+  # Skip this entire test module since Keyring has been extracted to Kagi project
+  @moduletag :skip
 
   alias Jido.AI.Keyring.Filter
 

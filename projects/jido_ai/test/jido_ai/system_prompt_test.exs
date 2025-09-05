@@ -36,7 +36,7 @@ defmodule Jido.AI.SystemPromptTest do
 
   describe "generate_text/3 - system prompt support" do
     test "3-arity with system prompt option works" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       result =
         assert_ok(AI.generate_text("fake:fake-model", "Hello", system_prompt: "You are helpful"))
@@ -47,7 +47,7 @@ defmodule Jido.AI.SystemPromptTest do
     end
 
     test "3-arity with nil system prompt option works" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       result = assert_ok(AI.generate_text("fake:fake-model", "Hello", system_prompt: nil))
 
@@ -57,7 +57,7 @@ defmodule Jido.AI.SystemPromptTest do
     end
 
     test "3-arity with system prompt and other options" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       result =
         assert_ok(
@@ -74,7 +74,7 @@ defmodule Jido.AI.SystemPromptTest do
     end
 
     test "3-arity with message array and system prompt" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       messages = [%Message{role: :user, content: "Hello there"}]
 
@@ -88,7 +88,7 @@ defmodule Jido.AI.SystemPromptTest do
 
   describe "generate_text backward compatibility" do
     test "3-arity with opts still works (backward compatible)" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       result = assert_ok(AI.generate_text("fake:fake-model", "Hello", max_tokens: 50))
 
@@ -99,7 +99,7 @@ defmodule Jido.AI.SystemPromptTest do
     end
 
     test "2-arity still works (backward compatible)" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       result = assert_ok(AI.generate_text("fake:fake-model", "Hello"))
 
@@ -111,7 +111,7 @@ defmodule Jido.AI.SystemPromptTest do
 
   describe "stream_text/3 - system prompt support" do
     test "3-arity with system prompt option works" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       stream =
         assert_ok(AI.stream_text("fake:fake-model", "Hello", system_prompt: "You are helpful"))
@@ -122,7 +122,7 @@ defmodule Jido.AI.SystemPromptTest do
     end
 
     test "3-arity with nil system prompt option works" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       stream = assert_ok(AI.stream_text("fake:fake-model", "Hello", system_prompt: nil))
       chunks = Enum.to_list(stream)
@@ -131,7 +131,7 @@ defmodule Jido.AI.SystemPromptTest do
     end
 
     test "3-arity with system prompt and other options" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       stream =
         assert_ok(
@@ -149,7 +149,7 @@ defmodule Jido.AI.SystemPromptTest do
 
   describe "stream_text backward compatibility" do
     test "3-arity with opts still works (backward compatible)" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       stream = assert_ok(AI.stream_text("fake:fake-model", "Hello", max_tokens: 50))
       chunks = Enum.to_list(stream)
@@ -158,7 +158,7 @@ defmodule Jido.AI.SystemPromptTest do
     end
 
     test "2-arity still works (backward compatible)" do
-      stub(Keyring, :get, fn _, _, _ -> nil end)
+      stub(Kagi, :get, fn _, _, _ -> nil end)
 
       stream = assert_ok(AI.stream_text("fake:fake-model", "Hello"))
       chunks = Enum.to_list(stream)
