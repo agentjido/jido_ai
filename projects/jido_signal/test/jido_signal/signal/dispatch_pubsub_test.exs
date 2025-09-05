@@ -17,6 +17,9 @@ defmodule JidoTest.Signal.Dispatch.PubSubTest do
 
   describe "behaviour implementation" do
     test "implements Adapter behaviour" do
+      # Ensure module is loaded before checking exports to prevent flaky test
+      Code.ensure_loaded!(PubSub)
+
       assert function_exported?(PubSub, :validate_opts, 1)
       assert function_exported?(PubSub, :deliver, 2)
 

@@ -51,12 +51,12 @@ defmodule Jido.Signal.Ext.TraceTest do
       attrs = Trace.to_attrs(data)
 
       assert %{
-               "traceid" => "trace-123",
-               "spanid" => "span-456"
+               "trace_id" => "trace-123",
+               "span_id" => "span-456"
              } = attrs
 
-      refute Map.has_key?(attrs, "parentspan")
-      refute Map.has_key?(attrs, "causationid")
+      refute Map.has_key?(attrs, "parent_span_id")
+      refute Map.has_key?(attrs, "causation_id")
     end
 
     test "serializes full data to CloudEvents attributes" do
@@ -70,10 +70,10 @@ defmodule Jido.Signal.Ext.TraceTest do
       attrs = Trace.to_attrs(data)
 
       assert %{
-               "traceid" => "trace-123",
-               "spanid" => "span-456",
-               "parentspan" => "parent-789",
-               "causationid" => "signal-abc"
+               "trace_id" => "trace-123",
+               "span_id" => "span-456",
+               "parent_span_id" => "parent-789",
+               "causation_id" => "signal-abc"
              } = attrs
     end
 
@@ -88,20 +88,20 @@ defmodule Jido.Signal.Ext.TraceTest do
       attrs = Trace.to_attrs(data)
 
       assert %{
-               "traceid" => "trace-123",
-               "spanid" => "span-456",
-               "causationid" => "signal-abc"
+               "trace_id" => "trace-123",
+               "span_id" => "span-456",
+               "causation_id" => "signal-abc"
              } = attrs
 
-      refute Map.has_key?(attrs, "parentspan")
+      refute Map.has_key?(attrs, "parent_span_id")
     end
   end
 
   describe "CloudEvents deserialization" do
     test "deserializes minimal CloudEvents attributes" do
       attrs = %{
-        "traceid" => "trace-123",
-        "spanid" => "span-456"
+        "trace_id" => "trace-123",
+        "span_id" => "span-456"
       }
 
       data = Trace.from_attrs(attrs)
@@ -116,10 +116,10 @@ defmodule Jido.Signal.Ext.TraceTest do
 
     test "deserializes full CloudEvents attributes" do
       attrs = %{
-        "traceid" => "trace-123",
-        "spanid" => "span-456",
-        "parentspan" => "parent-789",
-        "causationid" => "signal-abc"
+        "trace_id" => "trace-123",
+        "span_id" => "span-456",
+        "parent_span_id" => "parent-789",
+        "causation_id" => "signal-abc"
       }
 
       data = Trace.from_attrs(attrs)
@@ -132,9 +132,9 @@ defmodule Jido.Signal.Ext.TraceTest do
              } = data
     end
 
-    test "returns nil when no traceid present" do
+    test "returns nil when no trace_id present" do
       attrs = %{
-        "spanid" => "span-456",
+        "span_id" => "span-456",
         "other" => "data"
       }
 
@@ -143,9 +143,9 @@ defmodule Jido.Signal.Ext.TraceTest do
 
     test "handles missing optional attributes" do
       attrs = %{
-        "traceid" => "trace-123",
-        "spanid" => "span-456"
-        # missing parentspan and causationid
+        "trace_id" => "trace-123",
+        "span_id" => "span-456"
+        # missing parent_span_id and causation_id
       }
 
       data = Trace.from_attrs(attrs)

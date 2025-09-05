@@ -8,7 +8,7 @@ defmodule Jido.Signal.Ext.Trace do
   * `parent_span_id` - span that triggered this signal
   * `causation_id` - signal ID that caused this signal
 
-  Serializes to compact CloudEvents attributes: traceid, spanid, parentspan, causationid
+  Serializes to CloudEvents attributes: trace_id, span_id, parent_span_id, causation_id
   """
 
   use Jido.Signal.Ext,
@@ -23,28 +23,31 @@ defmodule Jido.Signal.Ext.Trace do
   @impl true
   def to_attrs(%{trace_id: trace_id, span_id: span_id} = data) do
     %{
-      "traceid" => trace_id,
-      "spanid" => span_id
+      "trace_id" => trace_id,
+      "span_id" => span_id
     }
-    |> maybe_put("parentspan", data[:parent_span_id])
-    |> maybe_put("causationid", data[:causation_id])
+    |> maybe_put("parent_span_id", data[:parent_span_id])
+    |> maybe_put("causation_id", data[:causation_id])
   end
 
   @impl true
   def from_attrs(attrs) do
-    case Map.get(attrs, "traceid") do
+    case Map.get(attrs, "trace_id") do
       nil ->
         nil
 
       trace_id ->
         %{
           trace_id: trace_id,
-          span_id: Map.get(attrs, "spanid"),
-          parent_span_id: Map.get(attrs, "parentspan"),
-          causation_id: Map.get(attrs, "causationid")
+          span_id: Map.get(attrs, "span_id")
         }
+        |> maybe_put_field(:parent_span_id, Map.get(attrs, "parent_span_id"))
+        |> maybe_put_field(:causation_id, Map.get(attrs, "causation_id"))
     end
   end
+
+  defp maybe_put_field(map, _key, nil), do: map
+  defp maybe_put_field(map, key, value), do: Map.put(map, key, value)
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)

@@ -23,7 +23,6 @@ defmodule Jido.Agent.DebuggerTest do
       {:ok, agent_pid: agent_pid, signals: [signal1, signal2], registry: registry_name}
     end
 
-  
     test "attach/1 returns debugger pid and suspends agent", %{agent_pid: agent_pid} do
       # Agent should be running initially
       assert Process.alive?(agent_pid)
@@ -38,7 +37,6 @@ defmodule Jido.Agent.DebuggerTest do
       assert :sys.get_state(agent_pid, 100)
     end
 
-  
     test "attach/1 fails if agent is not in debug mode", %{registry: registry} do
       # Start agent without debug mode
       {:ok, normal_agent_pid} = Server.start_link(agent: BasicAgent, registry: registry)
@@ -46,7 +44,6 @@ defmodule Jido.Agent.DebuggerTest do
       assert {:error, :not_in_debug_mode} = Debugger.attach(normal_agent_pid)
     end
 
-  
     test "step/1 processes one signal and re-suspends", %{agent_pid: agent_pid} do
       # Attach debugger to suspend processing
       {:ok, debugger_pid} = Debugger.attach(agent_pid)
@@ -75,7 +72,6 @@ defmodule Jido.Agent.DebuggerTest do
       assert Process.alive?(debugger_pid)
     end
 
-  
     test "step/1 handles empty queue gracefully", %{agent_pid: agent_pid} do
       {:ok, debugger_pid} = Debugger.attach(agent_pid)
 
@@ -87,7 +83,6 @@ defmodule Jido.Agent.DebuggerTest do
       assert {:error, :no_signals_queued} = Debugger.step(debugger_pid)
     end
 
-  
     test "detach/1 restores mode and resumes agent", %{agent_pid: agent_pid} do
       {:ok, debugger_pid} = Debugger.attach(agent_pid)
 
@@ -104,7 +99,6 @@ defmodule Jido.Agent.DebuggerTest do
       refute Process.alive?(debugger_pid)
     end
 
-  
     test "agent remains responsive after detach", %{agent_pid: agent_pid, signals: signals} do
       [signal1 | _] = signals
       {:ok, debugger_pid} = Debugger.attach(agent_pid)
@@ -130,7 +124,6 @@ defmodule Jido.Agent.DebuggerTest do
       assert GenServer.call(agent_pid, :ping, 1000) == :pong
     end
 
-  
     test "debugger handles agent termination gracefully", %{agent_pid: agent_pid} do
       {:ok, debugger_pid} = Debugger.attach(agent_pid)
 

@@ -41,7 +41,6 @@ defmodule Jido.Agent.Server.OptionsTest do
       assert Keyword.get(validated, :registry) == MyRegistry
     end
 
-  
     test "validates debug mode" do
       opts = [
         agent: MinimalAgent,

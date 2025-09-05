@@ -1,6 +1,7 @@
 defmodule Jido.Agent.Server.Signal do
   @moduledoc false
   alias Jido.Signal
+  alias Jido.Signal.Trace.Propagate
 
   alias Jido.Agent.Server.State, as: ServerState
 
@@ -205,13 +206,17 @@ defmodule Jido.Agent.Server.Signal do
 
     base
     |> Map.merge(attrs)
+    |> Propagate.inject_trace_context(state)
     |> Signal.new!()
   end
 
   defp build(nil, attrs) do
     type = join_type(attrs.type)
     attrs = Map.put(attrs, :type, type)
-    Signal.new!(attrs)
+
+    attrs
+    |> Propagate.inject_trace_context(%{})
+    |> Signal.new!()
   end
 
   defp build_source(%ServerState{current_signal: %Signal{id: id}}) when not is_nil(id),

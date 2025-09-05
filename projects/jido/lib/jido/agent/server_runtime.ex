@@ -6,6 +6,7 @@ defmodule Jido.Agent.Server.Runtime do
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Instruction
+  alias Jido.Signal.TraceContext
   alias Jido.Agent.Server.Callback, as: ServerCallback
   alias Jido.Agent.Server.Router, as: ServerRouter
   alias Jido.Agent.Server.State, as: ServerState
@@ -316,7 +317,9 @@ defmodule Jido.Agent.Server.Runtime do
     end
 
     defp set_current_signal(%ServerState{} = state, %Signal{} = signal) do
-      %{state | current_signal: signal}
+      state = %{state | current_signal: signal}
+      TraceContext.ensure_set_from_state(state)
+      state
     end
   end
 end

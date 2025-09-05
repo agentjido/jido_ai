@@ -453,8 +453,23 @@ defmodule Jido.Signal.Bus do
       # Route signals to subscribers with middleware
       Enum.each(signals, fn signal ->
         # For each subscription, check if the signal type matches the subscription path
-        Enum.each(new_state.subscriptions, fn {_id, subscription} ->
+        Enum.each(new_state.subscriptions, fn {subscription_id, subscription} ->
           if Router.matches?(signal.type, subscription.path) do
+            # Emit telemetry event before dispatch for bus spy observation
+            :telemetry.execute(
+              [:jido, :signal, :bus, :before_dispatch],
+              %{timestamp: System.monotonic_time(:microsecond)},
+              %{
+                bus_name: state.name,
+                signal_id: signal.id,
+                signal_type: signal.type,
+                subscription_id: subscription_id,
+                subscription_path: subscription.path,
+                signal: signal,
+                subscription: subscription
+              }
+            )
+
             # Run before_dispatch middleware
             case MiddlewarePipeline.before_dispatch(
                    state.middleware,
@@ -466,6 +481,22 @@ defmodule Jido.Signal.Bus do
                 # Dispatch the potentially modified signal
                 result = Jido.Signal.Dispatch.dispatch(processed_signal, subscription.dispatch)
 
+                # Emit telemetry event after dispatch with result
+                :telemetry.execute(
+                  [:jido, :signal, :bus, :after_dispatch],
+                  %{timestamp: System.monotonic_time(:microsecond)},
+                  %{
+                    bus_name: state.name,
+                    signal_id: processed_signal.id,
+                    signal_type: processed_signal.type,
+                    subscription_id: subscription_id,
+                    subscription_path: subscription.path,
+                    dispatch_result: result,
+                    signal: processed_signal,
+                    subscription: subscription
+                  }
+                )
+
                 # Run after_dispatch middleware
                 MiddlewarePipeline.after_dispatch(
                   state.middleware,
@@ -476,10 +507,41 @@ defmodule Jido.Signal.Bus do
                 )
 
               :skip ->
-                # Skip this subscriber
+                # Emit telemetry event for skipped dispatch
+                :telemetry.execute(
+                  [:jido, :signal, :bus, :dispatch_skipped],
+                  %{timestamp: System.monotonic_time(:microsecond)},
+                  %{
+                    bus_name: state.name,
+                    signal_id: signal.id,
+                    signal_type: signal.type,
+                    subscription_id: subscription_id,
+                    subscription_path: subscription.path,
+                    reason: :middleware_skip,
+                    signal: signal,
+                    subscription: subscription
+                  }
+                )
+
                 :ok
 
               {:error, reason} ->
+                # Emit telemetry event for middleware error
+                :telemetry.execute(
+                  [:jido, :signal, :bus, :dispatch_error],
+                  %{timestamp: System.monotonic_time(:microsecond)},
+                  %{
+                    bus_name: state.name,
+                    signal_id: signal.id,
+                    signal_type: signal.type,
+                    subscription_id: subscription_id,
+                    subscription_path: subscription.path,
+                    error: reason,
+                    signal: signal,
+                    subscription: subscription
+                  }
+                )
+
                 Logger.warning(
                   "Middleware halted dispatch for signal #{signal.id}: #{inspect(reason)}"
                 )

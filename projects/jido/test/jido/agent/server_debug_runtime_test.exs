@@ -57,7 +57,6 @@ defmodule Jido.Agent.ServerDebugRuntimeTest do
       }
     end
 
-
     test "in debug mode, only one signal is processed before pausing", %{
       state: state,
       signals: [s1, s2, s3]
@@ -84,7 +83,6 @@ defmodule Jido.Agent.ServerDebugRuntimeTest do
       {:ok, next_signal, _} = ServerState.dequeue(new_state)
       assert next_signal.id == s2.id
     end
-
 
     test "debug events are emitted during processing", %{state: state, signals: signals} do
       s1 = Enum.at(signals, 0)
@@ -124,7 +122,6 @@ defmodule Jido.Agent.ServerDebugRuntimeTest do
       assert post_signal.data.signal_id == s1.id
     end
 
-
     test "debug break tuple contains signal details", %{state: state, signals: signals} do
       s1 = Enum.at(signals, 0)
       {:ok, state} = ServerState.enqueue(state, s1)
@@ -136,7 +133,6 @@ defmodule Jido.Agent.ServerDebugRuntimeTest do
       assert signal.id == s1.id
       assert %ServerState{} = new_state
     end
-
 
     test "auto mode continues processing all signals", %{state: state, signals: [s1, s2, s3]} do
       # Set to auto mode
@@ -154,7 +150,6 @@ defmodule Jido.Agent.ServerDebugRuntimeTest do
       assert :queue.len(final_state.pending_signals) == 0
     end
 
-
     test "step mode processes one signal and stops normally", %{state: state, signals: signals} do
       [s1, s2] = Enum.take(signals, 2)
       # Set to step mode  
@@ -170,7 +165,6 @@ defmodule Jido.Agent.ServerDebugRuntimeTest do
       # Should process one signal and return normally (not debug_break)
       assert :queue.len(final_state.pending_signals) == 1
     end
-
 
     test "empty queue returns ok in debug mode", %{state: state} do
       # No signals in queue
