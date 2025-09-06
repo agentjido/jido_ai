@@ -114,6 +114,78 @@ defmodule ReqAI.Error do
     end
   end
 
+  defmodule Invalid.NotImplemented do
+    @moduledoc "Error for unimplemented functionality."
+    use Splode.Error, fields: [:feature], class: :invalid
+
+    @spec message(map()) :: String.t()
+    def message(%{feature: feature}) do
+      "#{feature} not implemented"
+    end
+  end
+
+  defmodule Invalid.Schema do
+    @moduledoc "Error for invalid schema definitions."
+    use Splode.Error, fields: [:reason], class: :invalid
+
+    @spec message(map()) :: String.t()
+    def message(%{reason: reason}) do
+      "Invalid schema: #{reason}"
+    end
+  end
+
+  defmodule Invalid.Message do
+    @moduledoc "Error for invalid message structures or validation failures."
+    use Splode.Error, fields: [:reason, :index], class: :invalid
+
+    @spec message(map()) :: String.t()
+    def message(%{reason: reason, index: index}) when is_integer(index) do
+      "Message at index #{index}: #{reason}"
+    end
+
+    def message(%{reason: reason}) do
+      reason
+    end
+  end
+
+  defmodule Invalid.MessageList do
+    @moduledoc "Error for invalid message list structures."
+    use Splode.Error, fields: [:reason, :received], class: :invalid
+
+    @spec message(map()) :: String.t()
+    def message(%{reason: _reason, received: received}) do
+      "Expected a list of messages, got: #{inspect(received)}"
+    end
+
+    def message(%{reason: reason}) do
+      reason
+    end
+  end
+
+  defmodule Invalid.Content do
+    @moduledoc "Error for invalid message content."
+    use Splode.Error, fields: [:reason, :received], class: :invalid
+
+    @spec message(map()) :: String.t()
+    def message(%{reason: _reason, received: received}) do
+      "Content must be a string or list of ContentPart structs, got: #{inspect(received)}"
+    end
+
+    def message(%{reason: reason}) do
+      reason
+    end
+  end
+
+  defmodule Invalid.Role do
+    @moduledoc "Error for invalid message roles."
+    use Splode.Error, fields: [:role], class: :invalid
+
+    @spec message(map()) :: String.t()
+    def message(%{role: role}) do
+      "Invalid role: #{inspect(role)}. Must be :user, :assistant, :system, or :tool"
+    end
+  end
+
   @doc """
   Creates a validation error with the given tag, reason, and context.
 

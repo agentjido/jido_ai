@@ -27,20 +27,17 @@ defmodule ReqAI.Providers.Anthropic do
     default_temperature: 1,
     default_max_tokens: 4096
 
+  alias ReqAI.Provider.Utils
+
   @impl true
   def build_request(input, provider_opts, request_opts) do
     spec = spec()
     prompt = input
     opts = Keyword.merge(provider_opts, request_opts)
 
-    # Default to first available model from JSON, fallback to haiku
-    default_model =
-      case spec.models |> Map.keys() |> List.first() do
-        nil -> "claude-3-haiku-20240307"
-        first_model -> first_model
-      end
-
-    model = Keyword.get(opts, :model, spec.default_model || default_model)
+    # Use shared utility for getting default model
+    default_model = Utils.default_model(spec) || "claude-3-haiku-20240307"
+    model = Keyword.get(opts, :model, default_model)
     max_tokens = Keyword.get(opts, :max_tokens, spec.default_max_tokens)
     temperature = Keyword.get(opts, :temperature, spec.default_temperature)
     stream = Keyword.get(opts, :stream?, false)
@@ -55,11 +52,11 @@ defmodule ReqAI.Providers.Anthropic do
     body = %{
       model: model,
       max_tokens: max_tokens,
-      messages: normalize_messages(prompt),
+      messages: Utils.normalize_messages(prompt),
       stream: stream
     }
 
-    body = if temperature != nil, do: Map.put(body, :temperature, temperature), else: body
+    body = Map.put(body, :temperature, temperature)
 
     request =
       Req.new(
@@ -84,18 +81,6 @@ defmodule ReqAI.Providers.Anthropic do
   end
 
   # Private helper functions
-
-  defp normalize_messages(prompt) when is_binary(prompt) do
-    [%{role: "user", content: prompt}]
-  end
-
-  defp normalize_messages(messages) when is_list(messages) do
-    messages
-  end
-
-  defp normalize_messages(prompt) do
-    [%{role: "user", content: to_string(prompt)}]
-  end
 
   defp parse_non_streaming_response(%{status: 200, body: body}) do
     case body do
@@ -137,32 +122,32 @@ defmodule ReqAI.Providers.Anthropic do
   end
 
   defp parse_sse_chunks(body) do
-    case ServerSentEvent.parse_all(body) do
-      {[], _rest} ->
-        {:error,
-         ReqAI.Error.API.Response.exception(reason: "No events found in streaming response")}
+    {events, _rest} = ServerSentEvent.parse_all(body)
 
-      {events, _rest} ->
-        content_parts =
-          events
-          |> Enum.filter(&(&1.event == nil or &1.event == "message"))
-          |> Enum.map(& &1.data)
-          |> Enum.reject(&(&1 in [nil, "", "[DONE]"]))
-          |> Enum.map(&Jason.decode/1)
-          |> Enum.filter(&match?({:ok, _}, &1))
-          |> Enum.map(fn {:ok, data} -> data end)
-          |> Enum.filter(&(&1["type"] == "content_block_delta"))
-          |> Enum.map(& &1["delta"]["text"])
-          |> Enum.filter(&is_binary/1)
+    if Enum.empty?(events) do
+      {:error,
+       ReqAI.Error.API.Response.exception(reason: "No events found in streaming response")}
+    else
+      content_parts =
+        events
+        |> Enum.filter(&(&1.event == nil or &1.event == "message"))
+        |> Enum.map(& &1.data)
+        |> Enum.reject(&(&1 in [nil, "", "[DONE]"]))
+        |> Enum.map(&Jason.decode/1)
+        |> Enum.filter(&match?({:ok, _}, &1))
+        |> Enum.map(fn {:ok, data} -> data end)
+        |> Enum.filter(&(&1["type"] == "content_block_delta"))
+        |> Enum.map(& &1["delta"]["text"])
+        |> Enum.filter(&is_binary/1)
 
-        case content_parts do
-          [] ->
-            {:error,
-             ReqAI.Error.API.Response.exception(reason: "No content found in streaming response")}
+      case content_parts do
+        [] ->
+          {:error,
+           ReqAI.Error.API.Response.exception(reason: "No content found in streaming response")}
 
-          parts ->
-            {:ok, Enum.join(parts, "")}
-        end
+        parts ->
+          {:ok, Enum.join(parts, "")}
+      end
     end
   end
 end

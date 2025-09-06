@@ -105,7 +105,12 @@ defmodule ReqAI.ObjectSchema do
     end
   end
 
-  def new(_), do: {:error, "Schema options must be a keyword list or ObjectSchema struct"}
+  def new(_),
+    do:
+      {:error,
+       ReqAI.Error.Invalid.Schema.exception(
+         reason: "Schema options must be a keyword list or ObjectSchema struct"
+       )}
 
   @doc """
   Creates a new ObjectSchema from various input formats, raising on error.
@@ -277,7 +282,10 @@ defmodule ReqAI.ObjectSchema do
 
   defp validate_enum_values(:enum, enum_values) do
     if enum_values == [] or not is_list(enum_values) do
-      {:error, "enum_values must be a non-empty list when output_type is :enum"}
+      {:error,
+       ReqAI.Error.Invalid.Schema.exception(
+         reason: "enum_values must be a non-empty list when output_type is :enum"
+       )}
     else
       :ok
     end
@@ -291,7 +299,11 @@ defmodule ReqAI.ObjectSchema do
   defp build_nimble_schema(_output_type, properties) do
     {:ok, NimbleOptions.new!(properties)}
   rescue
-    e -> {:error, "Invalid properties schema: #{Exception.message(e)}"}
+    e ->
+      {:error,
+       ReqAI.Error.Invalid.Schema.exception(
+         reason: "Invalid properties schema: #{Exception.message(e)}"
+       )}
   end
 
   defp validate_array_items(items, schema) do
@@ -319,7 +331,7 @@ defmodule ReqAI.ObjectSchema do
   end
 
   defp validate_item(item, _schema) do
-    {:error, "Expected map, got: #{inspect(item)}"}
+    {:error, ReqAI.Error.Invalid.Schema.exception(reason: "Expected map, got: #{inspect(item)}")}
   end
 
   defp normalize_keys(map) when is_map(map) do

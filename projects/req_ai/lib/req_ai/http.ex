@@ -7,7 +7,7 @@ defmodule ReqAI.HTTP do
   """
 
   @doc """
-  Sends an HTTP request with authentication and common error handling.
+  Sends an HTTP request with authentication, token usage tracking, and error handling.
 
   ## Parameters
 
@@ -19,19 +19,26 @@ defmodule ReqAI.HTTP do
   `{:ok, response}` on success, `{:error, reason}` on failure.
   """
   @spec send(Req.Request.t(), keyword()) :: {:ok, Req.Response.t()} | {:error, term()}
-  def send(request, _opts \\ []) do
-    # Inject provider spec into request private data for Kagi plugin
-    case Req.Request.get_private(request, :req_ai_provider_spec) do
-      nil ->
-        # No provider spec found, send without authentication
-        execute_request(request)
+  def send(request, opts \\ []) do
+    # Get model for token usage tracking
+    model = Keyword.get(opts, :model) || Req.Request.get_private(request, :req_ai_model)
 
-      _provider_spec ->
-        # Provider spec found, attach authentication
-        request
-        |> ReqAI.Plugins.Kagi.attach()
-        |> execute_request()
-    end
+    # Build request with plugins
+    request_with_plugins =
+      case Req.Request.get_private(request, :req_ai_provider_spec) do
+        nil ->
+          # No provider spec found, send without authentication but with token tracking
+          request
+          |> ReqAI.Plugins.TokenUsage.attach(model)
+
+        _provider_spec ->
+          # Provider spec found, attach authentication and token tracking
+          request
+          |> ReqAI.Plugins.Kagi.attach()
+          |> ReqAI.Plugins.TokenUsage.attach(model)
+      end
+
+    execute_request(request_with_plugins)
   end
 
   @doc """

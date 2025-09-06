@@ -81,7 +81,7 @@ defmodule ReqAI.Message do
 
   use TypedStruct
 
-  alias ReqAI.ContentPart
+  alias ReqAI.{ContentPart, MessageBuilder}
 
   @type role :: :user | :assistant | :system | :tool
 
@@ -95,6 +95,113 @@ defmodule ReqAI.Message do
     field(:tool_calls, [map()] | nil)
     field(:metadata, map() | nil)
   end
+
+  # Builder Pattern API
+
+  @doc """
+  Starts building a new message using the builder pattern.
+
+  ## Examples
+
+      iex> ReqAI.Message.build() |> ReqAI.Message.role(:user) |> ReqAI.Message.text("Hello") |> ReqAI.Message.create!()
+      %ReqAI.Message{role: :user, content: "Hello"}
+
+      iex> message = ReqAI.Message.build()
+      ...>   |> ReqAI.Message.role(:user)
+      ...>   |> ReqAI.Message.text("Describe this:")
+      ...>   |> ReqAI.Message.image_url("https://example.com/image.png")
+      ...>   |> ReqAI.Message.create!()
+      iex> message.role
+      :user
+
+  """
+  @spec build() :: MessageBuilder.t()
+  def build, do: MessageBuilder.new()
+
+  @doc """
+  Sets the role for the message being built.
+  """
+  @spec role(MessageBuilder.t(), role()) :: MessageBuilder.t()
+  def role(%MessageBuilder{} = builder, role), do: MessageBuilder.role(builder, role)
+
+  @doc """
+  Adds text content to the message being built.
+  """
+  @spec text(MessageBuilder.t(), String.t(), keyword()) :: MessageBuilder.t()
+  def text(%MessageBuilder{} = builder, text, opts \\ []),
+    do: MessageBuilder.text(builder, text, opts)
+
+  @doc """
+  Adds an image URL content part to the message being built.
+  """
+  @spec image_url(MessageBuilder.t(), String.t(), keyword()) :: MessageBuilder.t()
+  def image_url(%MessageBuilder{} = builder, url, opts \\ []),
+    do: MessageBuilder.image_url(builder, url, opts)
+
+  @doc """
+  Adds an image data content part to the message being built.
+  """
+  @spec image_data(MessageBuilder.t(), binary(), String.t(), keyword()) :: MessageBuilder.t()
+  def image_data(%MessageBuilder{} = builder, data, media_type, opts \\ []),
+    do: MessageBuilder.image_data(builder, data, media_type, opts)
+
+  @doc """
+  Adds a file content part to the message being built.
+  """
+  @spec file(MessageBuilder.t(), binary(), String.t(), String.t(), keyword()) ::
+          MessageBuilder.t()
+  def file(%MessageBuilder{} = builder, data, media_type, filename, opts \\ []),
+    do: MessageBuilder.file(builder, data, media_type, filename, opts)
+
+  @doc """
+  Adds a tool call content part to the message being built.
+  """
+  @spec tool_call(MessageBuilder.t(), String.t(), String.t(), map(), keyword()) ::
+          MessageBuilder.t()
+  def tool_call(%MessageBuilder{} = builder, tool_call_id, tool_name, input, opts \\ []),
+    do: MessageBuilder.tool_call(builder, tool_call_id, tool_name, input, opts)
+
+  @doc """
+  Adds a tool result content part to the message being built.
+  """
+  @spec tool_result(MessageBuilder.t(), String.t(), String.t(), any(), keyword()) ::
+          MessageBuilder.t()
+  def tool_result(%MessageBuilder{} = builder, tool_call_id, tool_name, output, opts),
+    do: MessageBuilder.tool_result(builder, tool_call_id, tool_name, output, opts)
+
+  @doc """
+  Sets the name field for the message being built.
+  """
+  @spec name(MessageBuilder.t(), String.t()) :: MessageBuilder.t()
+  def name(%MessageBuilder{} = builder, name), do: MessageBuilder.name(builder, name)
+
+  @doc """
+  Sets the tool_call_id field for the message being built.
+  """
+  @spec tool_call_id(MessageBuilder.t(), String.t()) :: MessageBuilder.t()
+  def tool_call_id(%MessageBuilder{} = builder, tool_call_id),
+    do: MessageBuilder.tool_call_id(builder, tool_call_id)
+
+  @doc """
+  Sets metadata for the message being built.
+  """
+  @spec metadata(MessageBuilder.t(), map()) :: MessageBuilder.t()
+  def metadata(%MessageBuilder{} = builder, metadata),
+    do: MessageBuilder.metadata(builder, metadata)
+
+  @doc """
+  Creates the final Message struct from the builder.
+  """
+  @spec create(MessageBuilder.t()) :: {:ok, t()} | {:error, String.t()}
+  def create(%MessageBuilder{} = builder), do: MessageBuilder.create(builder)
+
+  @doc """
+  Creates the final Message struct from the builder, raising on error.
+  """
+  @spec create!(MessageBuilder.t()) :: t()
+  def create!(%MessageBuilder{} = builder), do: MessageBuilder.create!(builder)
+
+  # Direct Constructor (preserved for backward compatibility)
 
   @doc """
   Creates a new message with the given role and content.
@@ -258,23 +365,47 @@ defmodule ReqAI.Message do
   end
 end
 
-# Implement Enumerable protocol so Message can be treated as a single-item collection
+# Implement Enumerable protocol to iterate over content parts
 defimpl Enumerable, for: ReqAI.Message do
-  def count(_message), do: {:ok, 1}
+  alias ReqAI.ContentPart
 
-  def member?(_message, _element), do: {:error, __MODULE__}
+  def count(%ReqAI.Message{content: content}) when is_list(content), do: {:ok, length(content)}
+  def count(%ReqAI.Message{content: content}) when is_binary(content), do: {:ok, 1}
 
-  def slice(_message), do: {:error, __MODULE__}
-
-  def reduce(message, {:cont, acc}, fun) do
-    fun.(message, acc)
+  def member?(%ReqAI.Message{content: content}, element) when is_list(content) do
+    {:ok, Enum.member?(content, element)}
   end
 
-  def reduce(_message, {:halt, acc}, _fun) do
+  def member?(%ReqAI.Message{content: content}, element) when is_binary(content) do
+    {:ok, content == element}
+  end
+
+  def slice(%ReqAI.Message{content: content}) when is_list(content) do
+    size = length(content)
+    {:ok, size, fn start, length, _step -> Enum.slice(content, start, length) end}
+  end
+
+  def slice(%ReqAI.Message{content: content}) when is_binary(content) do
+    {:ok, 1,
+     fn start, length, _step ->
+       if start == 0 and length > 0, do: [content], else: []
+     end}
+  end
+
+  def reduce(%ReqAI.Message{content: content}, acc, fun) when is_list(content) do
+    Enumerable.List.reduce(content, acc, fun)
+  end
+
+  def reduce(%ReqAI.Message{content: content}, {:cont, acc}, fun) when is_binary(content) do
+    fun.(content, acc)
+  end
+
+  def reduce(%ReqAI.Message{content: _content}, {:halt, acc}, _fun) do
     {:halted, acc}
   end
 
-  def reduce(message, {:suspend, acc}, fun) do
+  def reduce(%ReqAI.Message{content: content} = message, {:suspend, acc}, fun)
+      when is_binary(content) do
     {:suspended, acc, &reduce(message, &1, fun)}
   end
 end

@@ -7,18 +7,6 @@ defmodule ReqAI.Provider do
   """
   use TypedStruct
 
-  @doc """
-  Defines the behavior for AI provider modules.
-
-  All provider modules must implement these callbacks to provide a consistent
-  interface for AI text generation.
-  """
-  @callback provider_info() :: t()
-  @callback generate_text(ReqAI.Model.t(), String.t() | [ReqAI.Message.t()], keyword()) ::
-              {:ok, String.t()} | {:error, ReqAI.Error.t()}
-  @callback stream_text(ReqAI.Model.t(), String.t() | [ReqAI.Message.t()], keyword()) ::
-              {:ok, Enumerable.t()} | {:error, ReqAI.Error.t()}
-
   typedstruct do
     field(:id, atom(), enforce: true)
     field(:name, String.t(), enforce: true)

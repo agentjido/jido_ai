@@ -15,6 +15,11 @@ defmodule ReqAi.MixProject do
         "coveralls.detail": :test,
         "coveralls.post": :test,
         "coveralls.html": :test
+      ],
+      dialyzer: [
+        plt_add_apps: [:mix],
+        flags: [:unknown, :unmatched_returns, :error_handling],
+        ignore_warnings: ".dialyzer_ignore.exs"
       ]
     ]
   end
@@ -37,6 +42,7 @@ defmodule ReqAi.MixProject do
       {:splode, "~> 0.2.3"},
       {:server_sent_event, "~> 1.0"},
       {:kagi, path: "../kagi"},
+      {:rename_project, "~> 0.1.0"},
 
       # Dev/test dependencies
       {:excoveralls, "~> 0.18", only: [:test], runtime: false},

@@ -30,7 +30,7 @@ defmodule ReqAI.Provider.Registry do
         |> Enum.filter(&is_provider_module?/1)
         |> Enum.each(fn module ->
           try do
-            Code.ensure_loaded(module)
+            {:module, _} = Code.ensure_loaded(module)
 
             if function_exported?(module, :spec, 0) do
               spec = module.spec()

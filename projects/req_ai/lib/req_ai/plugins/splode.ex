@@ -31,6 +31,8 @@ defmodule ReqAI.Plugins.Splode do
 
   """
 
+  @type api_error :: %ReqAI.Error.API.Request{}
+
   @doc """
   Attaches the Splode error handling plugin to a Req request struct.
 
@@ -48,7 +50,7 @@ defmodule ReqAI.Plugins.Splode do
 
   @doc false
   @spec handle_error_response({Req.Request.t(), Req.Response.t() | Exception.t()}) ::
-          {Req.Request.t(), ReqAI.Error.t()}
+          {Req.Request.t(), api_error()}
   def handle_error_response({request, %Req.Response{} = response}) do
     error = convert_response_to_error(request, response)
     {request, error}
@@ -59,7 +61,7 @@ defmodule ReqAI.Plugins.Splode do
     {request, error}
   end
 
-  @spec convert_response_to_error(Req.Request.t(), Req.Response.t()) :: ReqAI.Error.t()
+  @spec convert_response_to_error(Req.Request.t(), Req.Response.t()) :: api_error()
   defp convert_response_to_error(request, response) do
     reason = determine_error_reason(response)
 
@@ -72,7 +74,7 @@ defmodule ReqAI.Plugins.Splode do
     )
   end
 
-  @spec convert_exception_to_error(Req.Request.t(), Exception.t()) :: ReqAI.Error.t()
+  @spec convert_exception_to_error(Req.Request.t(), Exception.t()) :: api_error()
   defp convert_exception_to_error(request, exception) do
     reason = Exception.message(exception)
 

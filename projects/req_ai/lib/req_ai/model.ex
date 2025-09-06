@@ -136,8 +136,18 @@ defmodule ReqAI.Model do
   def from(provider_model_string) when is_binary(provider_model_string) do
     case String.split(provider_model_string, ":", parts: 2) do
       [provider_str, model_name] when provider_str != "" and model_name != "" ->
-        provider = parse_provider(provider_str)
-        {:ok, new(provider, model_name)}
+        case parse_provider(provider_str) do
+          {:ok, provider} ->
+            {:ok, new(provider, model_name)}
+
+          {:error, reason} ->
+            {:error,
+             ReqAI.Error.validation_error(
+               :invalid_provider,
+               reason,
+               provider: provider_str
+             )}
+        end
 
       _ ->
         {:error,
@@ -221,14 +231,153 @@ defmodule ReqAI.Model do
     }
   end
 
+  @doc """
+  Loads a model with full metadata from the models_dev directory.
+
+  This is useful for capability verification and other scenarios requiring
+  detailed model information beyond what's needed for API calls.
+
+  ## Examples
+
+      {:ok, model_with_metadata} = ReqAI.Model.with_metadata("anthropic:claude-3-sonnet")
+      model_with_metadata.cost
+      #=> %{"input" => 3.0, "output" => 15.0, ...}
+
+  """
+  @spec with_metadata(String.t()) :: {:ok, t()} | {:error, String.t()}
+  def with_metadata(model_spec) when is_binary(model_spec) do
+    with {:ok, base_model} <- from(model_spec),
+         {:ok, full_metadata} <- load_full_metadata(model_spec) do
+      enhanced_model = %{
+        base_model
+        | limit: get_in(full_metadata, ["limit"]) |> map_string_keys_to_atoms(),
+          modalities: get_in(full_metadata, ["modalities"]) |> map_string_keys_to_atoms(),
+          capabilities: build_capabilities_from_metadata(full_metadata),
+          cost: get_in(full_metadata, ["cost"]) |> map_string_keys_to_atoms()
+      }
+
+      {:ok, enhanced_model}
+    end
+  end
+
   defp merge_with_defaults(nil, defaults), do: defaults
   defp merge_with_defaults(existing, defaults), do: Map.merge(defaults, existing)
 
+  # Define a whitelist of valid provider atoms based on currently supported providers
+  # These atoms are safe because they're defined at compile time, not from user input
+  @valid_providers [
+    :openai,
+    :anthropic,
+    :openrouter,
+    :google,
+    :mistral,
+    :togetherai,
+    :cerebras,
+    :deepseek,
+    :inference,
+    :submodel,
+    :venice,
+    :v0,
+    :zhipuai,
+    :alibaba,
+    :fastrouter
+  ]
+
   defp parse_provider(str) when is_binary(str) do
+    # Only use String.to_existing_atom to prevent atom table leaks
     try do
-      String.to_existing_atom(str)
+      atom = String.to_existing_atom(str)
+
+      if atom in @valid_providers do
+        {:ok, atom}
+      else
+        {:error, "Unsupported provider: #{str}"}
+      end
     rescue
-      ArgumentError -> String.to_atom(str)
+      ArgumentError -> {:error, "Unknown provider: #{str}"}
     end
+  end
+
+  # Load full metadata from JSON files for enhanced model creation
+  defp load_full_metadata(model_spec) do
+    priv_dir = Application.app_dir(:req_ai, "priv")
+
+    case String.split(model_spec, ":", parts: 2) do
+      [provider_id, specific_model_id] ->
+        provider_path = Path.join([priv_dir, "models_dev", "#{provider_id}.json"])
+        load_model_from_provider_file(provider_path, specific_model_id)
+
+      [single_model_id] ->
+        metadata_path = Path.join([priv_dir, "models_dev", "#{single_model_id}.json"])
+        load_individual_model_file(metadata_path)
+    end
+  end
+
+  defp load_model_from_provider_file(provider_path, specific_model_id) do
+    with {:ok, content} <- File.read(provider_path),
+         {:ok, %{"models" => models}} <- Jason.decode(content),
+         %{} = model_data <- Enum.find(models, &(&1["id"] == specific_model_id)) do
+      {:ok, model_data}
+    else
+      {:error, :enoent} ->
+        {:error, "Provider metadata not found: #{provider_path}"}
+
+      {:error, %Jason.DecodeError{} = error} ->
+        {:error, "Invalid JSON in #{provider_path}: #{Exception.message(error)}"}
+
+      nil ->
+        {:error, "Model #{specific_model_id} not found in provider file"}
+
+      _ ->
+        {:error, "Failed to load model metadata"}
+    end
+  end
+
+  defp load_individual_model_file(metadata_path) do
+    with {:ok, content} <- File.read(metadata_path),
+         {:ok, data} <- Jason.decode(content) do
+      {:ok, data}
+    else
+      {:error, :enoent} ->
+        {:error, "Model metadata not found: #{metadata_path}"}
+
+      {:error, %Jason.DecodeError{} = error} ->
+        {:error, "Invalid JSON in #{metadata_path}: #{Exception.message(error)}"}
+    end
+  end
+
+  # Whitelist of safe metadata keys to convert to atoms
+  @safe_metadata_keys ~w[
+    input output context text image reasoning tool_call temperature
+    cache_read cache_write limit modalities capabilities cost
+  ]
+
+  defp map_string_keys_to_atoms(nil), do: nil
+
+  defp map_string_keys_to_atoms(map) when is_map(map) do
+    Map.new(map, fn
+      {key, value} when is_binary(key) and key in @safe_metadata_keys ->
+        atom_key = String.to_existing_atom(key)
+        {atom_key, value}
+
+      {key, value} when is_binary(key) ->
+        # Keep unsafe keys as strings to prevent atom leakage
+        {key, value}
+
+      {key, value} ->
+        {key, value}
+    end)
+  rescue
+    ArgumentError ->
+      # If any safe key doesn't exist as an atom, just return the map as-is
+      map
+  end
+
+  defp build_capabilities_from_metadata(metadata) do
+    %{
+      reasoning?: Map.get(metadata, "reasoning", false),
+      tool_call?: Map.get(metadata, "tool_call", false),
+      supports_temperature?: Map.get(metadata, "temperature", false)
+    }
   end
 end

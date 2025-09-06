@@ -8,6 +8,7 @@
 - **Compile**: `mix compile` (basic), `mix compile --warnings-as-errors` (strict)
 - **Type Check**: `mix dialyzer`
 - **Coverage**: `mix test --cover` (basic coverage report)
+- **Scripts**: Always use `mix run script_name.exs` to run test scripts - avoids Mix.install conflicts
 
 ## Architecture
 

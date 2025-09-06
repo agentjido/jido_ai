@@ -49,7 +49,7 @@ defmodule Mix.Tasks.ReqAi.ModelSync do
 
   @impl Mix.Task
   def run(args) do
-    Application.ensure_all_started(:req_ai)
+    {:ok, _} = Application.ensure_all_started(:req_ai)
 
     {opts, _, _} =
       OptionParser.parse(args,
@@ -101,10 +101,17 @@ defmodule Mix.Tasks.ReqAi.ModelSync do
         {:ok, data}
 
       {:ok, %{status: status}} ->
-        {:error, "models.dev API returned status #{status}"}
+        {:error,
+         ReqAI.Error.API.Response.exception(
+           reason: "models.dev API returned status #{status}",
+           status: status
+         )}
 
       {:error, reason} ->
-        {:error, "Failed to fetch models.dev data: #{inspect(reason)}"}
+        {:error,
+         ReqAI.Error.API.Request.exception(
+           reason: "Failed to fetch models.dev data: #{inspect(reason)}"
+         )}
     end
   end
 

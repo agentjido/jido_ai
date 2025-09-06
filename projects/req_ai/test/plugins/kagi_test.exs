@@ -1,13 +1,13 @@
 defmodule ReqAI.Plugins.KagiTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
-  alias ReqAI.Plugins.Kagi
-
-  @moduletag :skip
+  alias ReqAI.Plugins.Kagi, as: KagiPlugin
 
   describe "attach/1" do
+    @describetag :serial
+
     test "attaches kagi_auth step to request" do
-      req = Req.new() |> Kagi.attach()
+      req = Req.new() |> KagiPlugin.attach()
 
       assert Enum.any?(req.request_steps, fn
                {:kagi_auth, _fun} -> true
@@ -17,8 +17,9 @@ defmodule ReqAI.Plugins.KagiTest do
   end
 
   describe "add_auth_header/1" do
-    test "adds x-api-key header with :plain wrap strategy" do
-      # Set up actual config for test
+    @describetag :serial
+
+    test "applies correct auth header - plain wrap strategy" do
       Kagi.put(:anthropic_api_key, "sk-ant-123")
 
       provider_spec = %{id: :anthropic, auth: {:header, "x-api-key", :plain}}
@@ -27,12 +28,12 @@ defmodule ReqAI.Plugins.KagiTest do
         Req.new(url: "https://api.anthropic.com/v1/messages")
         |> Req.Request.put_private(:req_ai_provider_spec, provider_spec)
 
-      result = Kagi.add_auth_header(req)
+      result = KagiPlugin.add_auth_header(req)
 
       assert Req.Request.get_header(result, "x-api-key") == ["sk-ant-123"]
     end
 
-    test "adds Authorization header with :bearer wrap strategy" do
+    test "applies correct auth header - bearer wrap strategy" do
       Kagi.put(:openai_api_key, "sk-123")
 
       provider_spec = %{id: :openai, auth: {:header, "authorization", :bearer}}
@@ -41,12 +42,12 @@ defmodule ReqAI.Plugins.KagiTest do
         Req.new(url: "https://api.openai.com/v1/chat/completions")
         |> Req.Request.put_private(:req_ai_provider_spec, provider_spec)
 
-      result = Kagi.add_auth_header(req)
+      result = KagiPlugin.add_auth_header(req)
 
       assert Req.Request.get_header(result, "authorization") == ["Bearer sk-123"]
     end
 
-    test "applies custom wrap function" do
+    test "applies correct auth header - custom wrap function" do
       Kagi.put(:custom_provider_api_key, "api-key-123")
 
       custom_wrapper = fn key -> "Custom #{key}" end
@@ -56,7 +57,7 @@ defmodule ReqAI.Plugins.KagiTest do
         Req.new(url: "https://api.custom.com/v1")
         |> Req.Request.put_private(:req_ai_provider_spec, provider_spec)
 
-      result = Kagi.add_auth_header(req)
+      result = KagiPlugin.add_auth_header(req)
 
       assert Req.Request.get_header(result, "custom-auth") == ["Custom api-key-123"]
     end
@@ -64,7 +65,7 @@ defmodule ReqAI.Plugins.KagiTest do
     test "does nothing when provider spec is missing" do
       req = Req.new(url: "https://unknown.com/api")
 
-      result = Kagi.add_auth_header(req)
+      result = KagiPlugin.add_auth_header(req)
 
       assert result == req
     end
@@ -76,7 +77,7 @@ defmodule ReqAI.Plugins.KagiTest do
         Req.new(url: "https://api.anthropic.com/v1/messages")
         |> Req.Request.put_private(:req_ai_provider_spec, provider_spec)
 
-      result = Kagi.add_auth_header(req)
+      result = KagiPlugin.add_auth_header(req)
 
       assert result == req
     end

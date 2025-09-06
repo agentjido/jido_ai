@@ -74,22 +74,44 @@ defmodule ReqAI.Plugins.SplodeTest do
       assert error.reason == "Internal server error"
     end
 
-    test "extracts error from various JSON response formats" do
-      test_cases = [
-        {~s({"error": {"message": "Test error"}}), "Test error"},
-        {~s({"error": "Simple error"}), "Simple error"},
-        {~s({"message": "Direct message"}), "Direct message"},
-        {~s({"detail": "Detail message"}), "Detail message"},
-        {~s({"error_description": "Description"}), "Description"}
-      ]
+    @error_format_cases [
+      %{
+        name: "nested error message",
+        body: ~s({"error": {"message": "Test error"}}),
+        expected_reason: "Test error"
+      },
+      %{
+        name: "simple error string",
+        body: ~s({"error": "Simple error"}),
+        expected_reason: "Simple error"
+      },
+      %{
+        name: "direct message field",
+        body: ~s({"message": "Direct message"}),
+        expected_reason: "Direct message"
+      },
+      %{
+        name: "detail field",
+        body: ~s({"detail": "Detail message"}),
+        expected_reason: "Detail message"
+      },
+      %{
+        name: "error description",
+        body: ~s({"error_description": "Description"}),
+        expected_reason: "Description"
+      }
+    ]
 
-      for {body, expected_reason} <- test_cases do
+    for test_case <- @error_format_cases do
+      test "extracts error from JSON response formats - #{test_case.name}" do
+        data = unquote(Macro.escape(test_case))
+
         request = %Req.Request{body: nil}
-        response = %Req.Response{status: 400, body: body}
+        response = %Req.Response{status: 400, body: data.body}
 
         {_req, error} = Splode.handle_error_response({request, response})
 
-        assert error.reason == expected_reason
+        assert error.reason == data.expected_reason
       end
     end
 

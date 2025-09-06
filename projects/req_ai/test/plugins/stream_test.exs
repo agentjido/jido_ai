@@ -42,16 +42,30 @@ defmodule ReqAI.Plugins.StreamTest do
       assert %{event: "done", data: "[DONE]"} = Enum.at(chunks, 1)
     end
 
-    test "passes through non-SSE responses unchanged" do
-      response = %Req.Response{
-        status: 200,
-        headers: %{"content-type" => ["application/json"]},
+    @non_sse_cases [
+      %{
+        name: "application/json",
+        content_type: "application/json",
         body: ~s({"message": "Hello"})
-      }
+      },
+      %{name: "text/html", content_type: "text/html", body: "<html><body>Hello</body></html>"},
+      %{name: "text/plain", content_type: "text/plain", body: "Plain text response"}
+    ]
 
-      result = Stream.process_sse_response(response)
+    for test_case <- @non_sse_cases do
+      test "passes through non-SSE responses unchanged - #{test_case.name}" do
+        data = unquote(Macro.escape(test_case))
 
-      assert result == response
+        response = %Req.Response{
+          status: 200,
+          headers: %{"content-type" => [data.content_type]},
+          body: data.body
+        }
+
+        result = Stream.process_sse_response(response)
+
+        assert result == response
+      end
     end
 
     test "handles SSE with JSON data parsing" do

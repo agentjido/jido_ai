@@ -82,7 +82,6 @@ defmodule ReqAI.Provider.DSL do
             json_path: json_path
           ] do
       @behaviour ReqAI.Provider.Adapter
-      @behaviour ReqAI.Provider
       @after_compile {ReqAI.Provider.Registry, :auto_register}
 
       # Mark as external resource for recompilation
@@ -147,46 +146,80 @@ defmodule ReqAI.Provider.DSL do
         ]
 
         spec_opts =
-          if @default_model,
-            do: Keyword.put(spec_opts, :default_model, @default_model),
-            else: spec_opts
+          unquote(
+            if default_model != nil do
+              quote do
+                Keyword.put(spec_opts, :default_model, @default_model)
+              end
+            else
+              quote do
+                spec_opts
+              end
+            end
+          )
 
         spec_opts =
-          if @default_temperature,
-            do: Keyword.put(spec_opts, :default_temperature, @default_temperature),
-            else: spec_opts
+          unquote(
+            if default_temperature != nil do
+              quote do
+                Keyword.put(spec_opts, :default_temperature, @default_temperature)
+              end
+            else
+              quote do
+                spec_opts
+              end
+            end
+          )
 
         spec_opts =
-          if @default_max_tokens,
-            do: Keyword.put(spec_opts, :default_max_tokens, @default_max_tokens),
-            else: spec_opts
+          unquote(
+            if default_max_tokens != nil do
+              quote do
+                Keyword.put(spec_opts, :default_max_tokens, @default_max_tokens)
+              end
+            else
+              quote do
+                spec_opts
+              end
+            end
+          )
 
         ReqAI.Provider.Spec.new(spec_opts)
       end
 
-      @impl ReqAI.Provider
+      @impl ReqAI.Provider.Adapter
       def provider_info do
         spec = spec()
         ReqAI.Provider.new(spec.id, spec.id |> to_string() |> String.capitalize(), spec.base_url)
       end
 
-      @impl ReqAI.Provider
+      @impl ReqAI.Provider.Adapter
       def generate_text(model, messages, opts \\ []) do
+        # Pass model through to HTTP layer for token usage tracking
+        http_opts = Keyword.put(opts, :model, model)
+
         with {:ok, request} <- build_request(messages, [], opts),
              request_with_spec <- ReqAI.HTTP.with_provider_spec(request, spec()),
-             {:ok, response} <- ReqAI.HTTP.send(request_with_spec, opts),
+             {:ok, response} <- ReqAI.HTTP.send(request_with_spec, http_opts),
              {:ok, parsed} <- parse_response(response, [], opts) do
-          {:ok, parsed}
+          # Return full response if :return_response option is set, otherwise just parsed text
+          if Keyword.get(opts, :return_response, false) do
+            {:ok, %{response | body: parsed}}
+          else
+            {:ok, parsed}
+          end
         end
       end
 
-      @impl ReqAI.Provider
+      @impl ReqAI.Provider.Adapter
       def stream_text(model, messages, opts \\ []) do
         stream_opts = Keyword.put(opts, :stream?, true)
+        # Pass model through to HTTP layer for token usage tracking
+        http_opts = Keyword.put(stream_opts, :model, model)
 
         with {:ok, request} <- build_request(messages, [], stream_opts),
              request_with_spec <- ReqAI.HTTP.with_provider_spec(request, spec()),
-             {:ok, response} <- ReqAI.HTTP.send(request_with_spec, stream_opts) do
+             {:ok, response} <- ReqAI.HTTP.send(request_with_spec, http_opts) do
           {:ok, response}
         end
       end

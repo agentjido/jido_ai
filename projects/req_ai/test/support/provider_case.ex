@@ -51,7 +51,7 @@ defmodule ReqAI.ProviderCase do
       describe "build_request/3" do
         test "returns {:ok, %Req.Request{}}" do
           spec = @mod.spec()
-          default_model = spec.default_model || Map.keys(spec.models) |> List.first()
+          default_model = ReqAI.Provider.Utils.default_model(spec)
           messages = [%ReqAI.Message{role: :user, content: "Hello"}]
 
           assert {:ok, %Req.Request{method: :post} = req} =
@@ -64,7 +64,7 @@ defmodule ReqAI.ProviderCase do
 
         test "handles provider options" do
           spec = @mod.spec()
-          default_model = spec.default_model || Map.keys(spec.models) |> List.first()
+          default_model = ReqAI.Provider.Utils.default_model(spec)
           messages = [%ReqAI.Message{role: :user, content: "Hello"}]
 
           assert {:ok, %Req.Request{}} =

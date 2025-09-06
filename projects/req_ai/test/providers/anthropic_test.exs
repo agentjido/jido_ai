@@ -5,7 +5,7 @@ defmodule ReqAI.Providers.AnthropicTest do
   describe "anthropic-specific behavior" do
     test "includes required Anthropic headers" do
       spec = @mod.spec()
-      default_model = spec.default_model || Map.keys(spec.models) |> List.first()
+      default_model = ReqAI.Provider.Utils.default_model(spec)
       messages = [%ReqAI.Message{role: :user, content: "Hello"}]
 
       assert {:ok, req} = @mod.build_request(messages, [], model: default_model)
@@ -18,7 +18,7 @@ defmodule ReqAI.Providers.AnthropicTest do
 
     test "sets correct request structure" do
       spec = @mod.spec()
-      default_model = spec.default_model || Map.keys(spec.models) |> List.first()
+      default_model = ReqAI.Provider.Utils.default_model(spec)
       messages = [%ReqAI.Message{role: :user, content: "Hello"}]
 
       assert {:ok, req} = @mod.build_request(messages, [], model: default_model)

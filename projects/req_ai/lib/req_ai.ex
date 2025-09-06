@@ -61,46 +61,85 @@ defmodule ReqAI do
   """
 
   alias Kagi
+  alias ReqAI.Messages
 
   # ===========================================================================
-  # NimbleOptions Schemas for validation
+  # NimbleOptions Compiled Schemas for validation
   # ===========================================================================
 
-  @generate_text_opts_schema [
-    temperature: [type: :float, doc: "Controls randomness in the output (0.0 to 2.0)"],
-    max_tokens: [type: :pos_integer, doc: "Maximum number of tokens to generate"],
-    top_p: [type: :float, doc: "Nucleus sampling parameter"],
-    presence_penalty: [type: :float, doc: "Penalize new tokens based on presence"],
-    frequency_penalty: [type: :float, doc: "Penalize new tokens based on frequency"],
-    tools: [type: {:list, :map}, doc: "List of tool definitions"],
-    tool_choice: [type: {:or, [:string, :atom, :map]}, doc: "Tool choice strategy"],
-    system_prompt: [type: :string, doc: "System prompt to prepend"],
-    provider_options: [type: :map, doc: "Provider-specific options"]
-  ]
+  # Base text generation schema - shared by generate_text and stream_text
+  @text_opts_schema NimbleOptions.new!(
+                      temperature: [
+                        type: :float,
+                        doc: "Controls randomness in the output (0.0 to 2.0)"
+                      ],
+                      max_tokens: [
+                        type: :pos_integer,
+                        doc: "Maximum number of tokens to generate"
+                      ],
+                      top_p: [type: :float, doc: "Nucleus sampling parameter"],
+                      presence_penalty: [
+                        type: :float,
+                        doc: "Penalize new tokens based on presence"
+                      ],
+                      frequency_penalty: [
+                        type: :float,
+                        doc: "Penalize new tokens based on frequency"
+                      ],
+                      tools: [type: {:list, :map}, doc: "List of tool definitions"],
+                      tool_choice: [
+                        type: {:or, [:string, :atom, :map]},
+                        doc: "Tool choice strategy"
+                      ],
+                      system_prompt: [type: :string, doc: "System prompt to prepend"],
+                      provider_options: [type: :map, doc: "Provider-specific options"]
+                    )
 
-  @stream_text_opts_schema @generate_text_opts_schema
+  # Object generation schema - extends text options with additional fields
+  @object_opts_schema NimbleOptions.new!(
+                        temperature: [
+                          type: :float,
+                          doc: "Controls randomness in the output (0.0 to 2.0)"
+                        ],
+                        max_tokens: [
+                          type: :pos_integer,
+                          doc: "Maximum number of tokens to generate"
+                        ],
+                        top_p: [type: :float, doc: "Nucleus sampling parameter"],
+                        presence_penalty: [
+                          type: :float,
+                          doc: "Penalize new tokens based on presence"
+                        ],
+                        frequency_penalty: [
+                          type: :float,
+                          doc: "Penalize new tokens based on frequency"
+                        ],
+                        tools: [type: {:list, :map}, doc: "List of tool definitions"],
+                        tool_choice: [
+                          type: {:or, [:string, :atom, :map]},
+                          doc: "Tool choice strategy"
+                        ],
+                        system_prompt: [type: :string, doc: "System prompt to prepend"],
+                        provider_options: [type: :map, doc: "Provider-specific options"],
+                        output_type: [
+                          type: {:in, [:object, :array, :enum, :no_schema]},
+                          default: :object,
+                          doc: "Type of output structure"
+                        ],
+                        enum_values: [
+                          type: {:list, :string},
+                          doc: "Allowed values when output_type is :enum"
+                        ]
+                      )
 
-  @generate_object_opts_schema @generate_text_opts_schema ++
-                                 [
-                                   output_type: [
-                                     type: {:in, [:object, :array, :enum, :no_schema]},
-                                     default: :object,
-                                     doc: "Type of output structure"
-                                   ],
-                                   enum_values: [
-                                     type: {:list, :string},
-                                     doc: "Allowed values when output_type is :enum"
-                                   ]
-                                 ]
-
-  @stream_object_opts_schema @generate_object_opts_schema
-
-  @embed_opts_schema [
-    dimensions: [type: :pos_integer, doc: "Number of dimensions for embeddings"],
-    provider_options: [type: :map, doc: "Provider-specific options"]
-  ]
-
-  @embed_many_opts_schema @embed_opts_schema
+  # Embedding schema - shared by embed and embed_many
+  @embed_opts_schema NimbleOptions.new!(
+                       dimensions: [
+                         type: :pos_integer,
+                         doc: "Number of dimensions for embeddings"
+                       ],
+                       provider_options: [type: :map, doc: "Provider-specific options"]
+                     )
 
   # ===========================================================================
   # Configuration API - Simple facades for common operations
@@ -124,7 +163,7 @@ defmodule ReqAI do
   """
   @spec api_key(atom() | String.t()) :: String.t() | nil
   def api_key(key) when is_atom(key) do
-    Kagi.get(Kagi, key, nil)
+    Kagi.get(key, nil)
   end
 
   def api_key(key) when is_binary(key) do
@@ -151,6 +190,29 @@ defmodule ReqAI do
     # Implementation will delegate to Kagi
     # This is a stub
     default
+  end
+
+  @doc """
+  Creates a messages collection from a list of messages.
+
+  ## Parameters
+
+    * `messages` - List of Message structs
+
+  ## Examples
+
+      messages = [
+        ReqAI.Messages.system("You are helpful"),
+        ReqAI.Messages.user("Hello!")
+      ]
+      collection = ReqAI.messages(messages)
+      # Now you can use Enum functions on the collection
+      user_msgs = collection |> Enum.filter(&(&1.role == :user))
+
+  """
+  @spec messages([struct()]) :: Messages.t()
+  def messages(message_list) when is_list(message_list) do
+    Messages.new(message_list)
   end
 
   @doc """
@@ -203,9 +265,10 @@ defmodule ReqAI do
   # ===========================================================================
 
   @doc """
-  Generates text using an AI model.
+  Generates text using an AI model with full response metadata.
 
-  Accepts flexible model specifications and generates text using the appropriate provider.
+  Returns the complete Req.Response which includes usage data, headers, and metadata.
+  For simple text-only results, use `generate_text!/3`.
 
   ## Parameters
 
@@ -227,27 +290,26 @@ defmodule ReqAI do
 
   ## Examples
 
-      ReqAI.generate_text("anthropic:claude-3-sonnet", "Hello world")
-      #=> {:ok, "Hello! How can I assist you today?"}
+      {:ok, response} = ReqAI.generate_text("anthropic:claude-3-sonnet", "Hello world")
+      response.body
+      #=> "Hello! How can I assist you today?"
 
-      ReqAI.generate_text(
-        "anthropic:claude-3-sonnet",
-        "Explain AI",
-        temperature: 0.7,
-        max_tokens: 100
-      )
+      # Access usage metadata
+      {:ok, text, usage} = ReqAI.generate_text("anthropic:claude-3-sonnet", "Hello") |> ReqAI.with_usage()
 
   """
   @spec generate_text(
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword()
-        ) :: {:ok, String.t()} | {:error, term()}
+        ) :: {:ok, Req.Response.t()} | {:error, term()}
   def generate_text(model_spec, messages, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @generate_text_opts_schema),
+    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
          {:ok, model} <- ReqAI.Model.from(model_spec),
          {:ok, provider_module} <- provider(model.provider) do
-      provider_module.generate_text(model, messages, validated_opts)
+      # Always return full response for metadata access
+      enhanced_opts = Keyword.put(validated_opts, :return_response, true)
+      provider_module.generate_text(model, messages, enhanced_opts)
     else
       {:error, :not_found} ->
         {:error, ReqAI.Error.Invalid.Provider.exception(provider: "unknown")}
@@ -258,10 +320,10 @@ defmodule ReqAI do
   end
 
   @doc """
-  Streams text generation using an AI model.
+  Generates text using an AI model, returning only the text content.
 
-  Accepts flexible model specifications and streams text using the appropriate provider.
-  Returns a Stream that emits text chunks as they arrive.
+  This is a convenience function that extracts just the text from the response.
+  For access to usage metadata and other response data, use `generate_text/3`.
 
   ## Parameters
 
@@ -269,26 +331,92 @@ defmodule ReqAI do
 
   ## Examples
 
-      {:ok, stream} = ReqAI.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
-      stream |> Enum.each(&IO.write/1)
+      {:ok, text} = ReqAI.generate_text!("anthropic:claude-3-sonnet", "Hello world")
+      text
+      #=> "Hello! How can I assist you today?"
+
+  """
+  @spec generate_text!(
+          String.t() | {atom(), keyword()} | struct(),
+          String.t() | list(),
+          keyword()
+        ) :: {:ok, String.t()} | {:error, term()}
+  def generate_text!(model_spec, messages, opts \\ []) do
+    case generate_text(model_spec, messages, opts) do
+      {:ok, %Req.Response{body: body}} -> {:ok, body}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  @doc """
+  Streams text generation using an AI model with full response metadata.
+
+  Returns the complete response containing usage data and metadata.
+  For simple streaming without metadata, use `stream_text!/3`.
+
+  ## Parameters
+
+  Same as `generate_text/3`.
+
+  ## Examples
+
+      {:ok, response} = ReqAI.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
+      response.body |> Enum.each(&IO.write/1)
+
+      # Access usage metadata after streaming
+      {:ok, stream, usage} = ReqAI.stream_text("anthropic:claude-3-sonnet", "Hello") |> ReqAI.with_usage()
 
   """
   @spec stream_text(
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword()
-        ) :: {:ok, Enumerable.t()} | {:error, term()}
+        ) :: {:ok, Req.Response.t()} | {:error, term()}
   def stream_text(model_spec, messages, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @stream_text_opts_schema),
+    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
          {:ok, model} <- ReqAI.Model.from(model_spec),
          {:ok, provider_module} <- provider(model.provider) do
-      provider_module.stream_text(model, messages, Keyword.put(validated_opts, :stream?, true))
+      # Always return full response for metadata access
+      enhanced_opts =
+        validated_opts
+        |> Keyword.put(:stream?, true)
+        |> Keyword.put(:return_response, true)
+
+      provider_module.stream_text(model, messages, enhanced_opts)
     else
       {:error, :not_found} ->
         {:error, ReqAI.Error.Invalid.Provider.exception(provider: "unknown")}
 
       error ->
         error
+    end
+  end
+
+  @doc """
+  Streams text generation using an AI model, returning only the stream.
+
+  This is a convenience function that extracts just the stream from the response.
+  For access to usage metadata and other response data, use `stream_text/3`.
+
+  ## Parameters
+
+  Same as `stream_text/3`.
+
+  ## Examples
+
+      {:ok, stream} = ReqAI.stream_text!("anthropic:claude-3-sonnet", "Tell me a story")
+      stream |> Enum.each(&IO.write/1)
+
+  """
+  @spec stream_text!(
+          String.t() | {atom(), keyword()} | struct(),
+          String.t() | list(),
+          keyword()
+        ) :: {:ok, Enumerable.t()} | {:error, term()}
+  def stream_text!(model_spec, messages, opts \\ []) do
+    case stream_text(model_spec, messages, opts) do
+      {:ok, %Req.Response{body: body}} -> {:ok, body}
+      {:error, error} -> {:error, error}
     end
   end
 
@@ -333,10 +461,10 @@ defmodule ReqAI do
           keyword()
         ) :: {:ok, map()} | {:error, term()}
   def generate_object(_model_spec, _messages, _schema, opts \\ []) do
-    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @generate_object_opts_schema) do
+    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @object_opts_schema) do
       # Implementation will delegate to provider
       # This is a stub
-      {:error, "generate_object not implemented"}
+      {:error, ReqAI.Error.Invalid.NotImplemented.exception(feature: "generate_object")}
     end
   end
 
@@ -373,10 +501,10 @@ defmodule ReqAI do
           keyword()
         ) :: {:ok, Enumerable.t()} | {:error, term()}
   def stream_object(_model_spec, _messages, _schema, opts \\ []) do
-    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @stream_object_opts_schema) do
+    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @object_opts_schema) do
       # Implementation will delegate to provider
       # This is a stub
-      {:error, "stream_object not implemented"}
+      {:error, ReqAI.Error.Invalid.NotImplemented.exception(feature: "stream_object")}
     end
   end
 
@@ -409,7 +537,7 @@ defmodule ReqAI do
     with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @embed_opts_schema) do
       # Implementation will delegate to provider
       # This is a stub
-      {:error, "embed not implemented"}
+      {:error, ReqAI.Error.Invalid.NotImplemented.exception(feature: "embed")}
     end
   end
 
@@ -441,10 +569,103 @@ defmodule ReqAI do
           keyword()
         ) :: {:ok, list(list(float()))} | {:error, term()}
   def embed_many(_model_spec, texts, opts \\ []) when is_list(texts) do
-    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @embed_many_opts_schema) do
+    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @embed_opts_schema) do
       # Implementation will delegate to provider
       # This is a stub
-      {:error, "embed_many not implemented"}
+      {:error, ReqAI.Error.Invalid.NotImplemented.exception(feature: "embed_many")}
+    end
+  end
+
+  @doc """
+  Extracts token usage information from a ReqAI result.
+
+  Designed to be used in a pipeline after `generate_text` or `stream_text` calls.
+  Works with both Response objects (from `generate_text/3`) and plain results (from `generate_text!/3`).
+
+  ## Parameters
+
+    * `result` - The result tuple from any ReqAI function
+
+  ## Examples
+
+      # Generate text with usage info - pipeline style
+      {:ok, text, usage} = 
+        ReqAI.generate_text("openai:gpt-4o", "Hello")
+        |> ReqAI.with_usage()
+      
+      usage
+      #=> %{tokens: %{input: 10, output: 15}, cost: 0.00075}
+
+      # Works with bang functions too (returns nil usage)
+      {:ok, text, usage} = 
+        ReqAI.generate_text!("openai:gpt-4o", "Hello")
+        |> ReqAI.with_usage()
+      
+      usage  #=> nil
+
+      # Stream text with usage info
+      {:ok, stream, usage} = 
+        ReqAI.stream_text("openai:gpt-4o", "Hello")
+        |> ReqAI.with_usage()
+
+  """
+  @spec with_usage({:ok, any()} | {:error, term()}) ::
+          {:ok, String.t() | Enumerable.t(), map() | nil} | {:error, term()}
+  def with_usage({:ok, %Req.Response{body: body} = response}) do
+    # Extract usage from response private data
+    usage = get_in(response.private, [:req_ai, :usage])
+    {:ok, body, usage}
+  end
+
+  def with_usage({:ok, result}) do
+    # Graceful passthrough for results without response metadata (like from bang functions)
+    {:ok, result, nil}
+  end
+
+  def with_usage({:error, error}) do
+    {:error, error}
+  end
+
+  @doc """
+  Extracts cost information from a ReqAI result.
+
+  Designed to be used in a pipeline after `generate_text` or `stream_text` calls.
+  Works with both Response objects (from `generate_text/3`) and plain results (from `generate_text!/3`).
+
+  ## Parameters
+
+    * `result` - The result tuple from any ReqAI function
+
+  ## Examples
+
+      # Generate text with cost info - pipeline style
+      {:ok, text, cost} = 
+        ReqAI.generate_text("openai:gpt-4o", "Hello")
+        |> ReqAI.with_cost()
+      
+      cost
+      #=> 0.00075
+
+      # Works with bang functions too (returns nil cost)
+      {:ok, text, cost} = 
+        ReqAI.generate_text!("openai:gpt-4o", "Hello")
+        |> ReqAI.with_cost()
+      
+      cost  #=> nil
+
+      # Stream text with cost info - pipeline style
+      {:ok, stream, cost} = 
+        ReqAI.stream_text("openai:gpt-4o", "Hello")
+        |> ReqAI.with_cost()
+
+  """
+  @spec with_cost({:ok, any()} | {:error, term()}) ::
+          {:ok, String.t() | Enumerable.t(), float() | nil} | {:error, term()}
+  def with_cost(result) do
+    case with_usage(result) do
+      {:ok, content, %{cost: cost}} -> {:ok, content, cost}
+      {:ok, content, _} -> {:ok, content, nil}
+      {:error, error} -> {:error, error}
     end
   end
 end

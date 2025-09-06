@@ -60,7 +60,7 @@ defmodule ReqAI.Plugins.Stream do
     end
   end
 
-  @spec parse_sse_stream(binary() | Stream.t()) :: Stream.t()
+  @spec parse_sse_stream(binary() | Enumerable.t()) :: Enumerable.t()
   defp parse_sse_stream(body) when is_binary(body) do
     body
     |> String.split("\n\n")
