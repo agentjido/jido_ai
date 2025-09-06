@@ -238,7 +238,8 @@ defmodule ReqAI.Messages do
       {:error, %ReqAI.Error.Validation.Error{tag: :empty_prompt}}
 
   """
-  @spec validate(String.t() | [Message.t()]) :: {:ok, String.t() | [Message.t()]} | {:error, Error.t()}
+  @spec validate(String.t() | [Message.t()]) ::
+          {:ok, String.t() | [Message.t()]} | {:error, Error.t()}
   def validate(prompt) when is_binary(prompt) and prompt != "" do
     {:ok, prompt}
   end
@@ -322,7 +323,9 @@ defmodule ReqAI.Messages do
   # Private validation helpers
 
   defp validate_role(role) when role in [:user, :assistant, :system, :tool], do: :ok
-  defp validate_role(role), do: {:error, "Invalid role: #{inspect(role)}. Must be :user, :assistant, :system, or :tool"}
+
+  defp validate_role(role),
+    do: {:error, "Invalid role: #{inspect(role)}. Must be :user, :assistant, :system, or :tool"}
 
   defp validate_content(content) when is_binary(content), do: :ok
 
@@ -335,7 +338,9 @@ defmodule ReqAI.Messages do
   end
 
   defp validate_content(content),
-    do: {:error, "Content must be a string or list of ContentPart structs, got: #{inspect(content)}"}
+    do:
+      {:error,
+       "Content must be a string or list of ContentPart structs, got: #{inspect(content)}"}
 
   defp valid_content_part?(%ContentPart{type: type})
        when type in [:text, :image_url, :image, :file, :tool_call, :tool_result],

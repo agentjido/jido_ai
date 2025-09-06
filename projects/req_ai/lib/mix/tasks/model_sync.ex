@@ -93,7 +93,9 @@ defmodule Mix.Tasks.ReqAi.ModelSync do
           provider_count = map_size(data)
           model_count = count_total_models(data)
 
-          IO.puts("Downloaded models.dev data: #{provider_count} providers, #{model_count} models")
+          IO.puts(
+            "Downloaded models.dev data: #{provider_count} providers, #{model_count} models"
+          )
         end
 
         {:ok, data}

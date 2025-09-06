@@ -21,7 +21,8 @@ defmodule ReqAI.Error.SchemaValidation do
         }
 
   @spec message(map()) :: String.t()
-  def message(%{validation_errors: errors, schema: schema}) when is_list(errors) and not is_nil(schema) do
+  def message(%{validation_errors: errors, schema: schema})
+      when is_list(errors) and not is_nil(schema) do
     error_summary = format_validation_errors(errors)
     "Schema validation failed: #{error_summary}"
   end
@@ -51,11 +52,13 @@ defmodule ReqAI.Error.SchemaValidation do
 
   defp format_validation_errors(_), do: "invalid validation error format"
 
-  defp format_single_error(%{field: field, message: message}) when is_binary(field) and is_binary(message) do
+  defp format_single_error(%{field: field, message: message})
+       when is_binary(field) and is_binary(message) do
     "#{field}: #{message}"
   end
 
-  defp format_single_error(%{path: path, message: message}) when is_list(path) and is_binary(message) do
+  defp format_single_error(%{path: path, message: message})
+       when is_list(path) and is_binary(message) do
     path_str = Enum.join(path, ".")
     "#{path_str}: #{message}"
   end

@@ -10,7 +10,7 @@ defmodule ReqAI.MessageTest do
     test "new/3 creates basic user and system messages" do
       user_msg = Message.new(:user, "Hello")
       assert %Message{role: :user, content: "Hello", metadata: nil} = user_msg
-      
+
       system_msg = Message.new(:system, "You are helpful")
       assert %Message{role: :system, content: "You are helpful"} = system_msg
     end
@@ -18,7 +18,7 @@ defmodule ReqAI.MessageTest do
     test "assistant_with_tools/3 creates assistant message with tools" do
       tool_calls = [ContentPart.tool_call("call_123", "get_weather", %{location: "NYC"})]
       message = Message.assistant_with_tools("I'll check the weather.", tool_calls)
-      
+
       assert %Message{role: :assistant} = message
       assert [text_part | tool_parts] = message.content
       assert %ContentPart{type: :text, text: "I'll check the weather."} = text_part
@@ -30,14 +30,14 @@ defmodule ReqAI.MessageTest do
         ContentPart.text("Describe this:"),
         ContentPart.image_url("https://example.com/image.png")
       ]
-      
+
       message = Message.user_multimodal(content_parts)
       assert %Message{role: :user, content: ^content_parts} = message
     end
 
     test "tool_result/4 creates tool result message" do
       message = Message.tool_result("call_123", "get_weather", %{temperature: 72})
-      
+
       assert %Message{role: :tool, tool_call_id: "call_123"} = message
       assert [result_part] = message.content
       assert %ContentPart{type: :tool_result, output: %{temperature: 72}} = result_part
@@ -50,18 +50,24 @@ defmodule ReqAI.MessageTest do
       assert Message.valid?(Message.new(:user, "Hello"))
       assert Message.valid?(Message.new(:assistant, "Hi there"))
       assert Message.valid?(Message.new(:tool, "Result", tool_call_id: "call_123"))
-      
-      content_parts = [ContentPart.text("Hello"), ContentPart.image_url("https://example.com/image.png")]
+
+      content_parts = [
+        ContentPart.text("Hello"),
+        ContentPart.image_url("https://example.com/image.png")
+      ]
+
       assert Message.valid?(Message.new(:user, content_parts))
     end
 
     test "valid?/1 rejects invalid messages" do
       refute Message.valid?(Message.new(:user, ""))
       refute Message.valid?(Message.new(:user, []))
-      refute Message.valid?(Message.new(:tool, "Result"))  # tool role needs tool_call_id
-      refute Message.valid?(%{role: :user, content: "Hello"})  # not a Message struct
+      # tool role needs tool_call_id
+      refute Message.valid?(Message.new(:tool, "Result"))
+      # not a Message struct
+      refute Message.valid?(%{role: :user, content: "Hello"})
       refute Message.valid?(nil)
-      
+
       invalid_parts = [ContentPart.text("Hello"), %ContentPart{type: :text, text: ""}]
       refute Message.valid?(Message.new(:user, invalid_parts))
     end
@@ -71,7 +77,7 @@ defmodule ReqAI.MessageTest do
   describe "Enumerable protocol" do
     test "implements basic enumerable functions" do
       message = Message.new(:user, "Hello")
-      
+
       assert Enumerable.count(message) == {:ok, 1}
       assert Enumerable.member?(message, message) == {:error, Enumerable.ReqAI.Message}
       assert Enumerable.slice(message) == {:error, Enumerable.ReqAI.Message}
@@ -79,11 +85,11 @@ defmodule ReqAI.MessageTest do
 
     test "implements reduce/3 correctly" do
       message = Message.new(:user, "Hello")
-      
+
       # Test continuation
       result = Enumerable.reduce(message, {:cont, []}, fn msg, acc -> {:cont, [msg | acc]} end)
       assert {:cont, [message]} = result
-      
+
       # Test halt
       result = Enumerable.reduce(message, {:halt, []}, fn _msg, acc -> {:cont, acc} end)
       assert {:halted, []} = result
@@ -94,7 +100,7 @@ defmodule ReqAI.MessageTest do
   describe "provider_options and edge cases" do
     test "provider_options/1 extracts metadata correctly" do
       assert Message.provider_options(Message.new(:user, "Hello")) == %{}
-      
+
       options = %{openai: %{reasoning_effort: "low"}}
       message = Message.new(:user, "Hello", metadata: %{provider_options: options})
       assert Message.provider_options(message) == options
@@ -107,13 +113,14 @@ defmodule ReqAI.MessageTest do
         ContentPart.file(<<1, 2, 3>>, "application/json", "data.json"),
         ContentPart.image_url("https://example.com/chart.png")
       ]
+
       assert Message.valid?(Message.new(:user, content_parts))
-      
+
       # Tool interaction flow
       tool_calls = [ContentPart.tool_call("call_123", "get_weather", %{location: "NYC"})]
       assistant_msg = Message.assistant_with_tools("Checking weather.", tool_calls)
       tool_msg = Message.tool_result("call_123", "get_weather", %{temperature: 72})
-      
+
       assert Message.valid?(assistant_msg)
       assert Message.valid?(tool_msg)
     end

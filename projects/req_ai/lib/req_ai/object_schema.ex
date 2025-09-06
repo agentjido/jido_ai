@@ -134,7 +134,11 @@ defmodule ReqAI.ObjectSchema do
     if data in enum_values do
       {:ok, data}
     else
-      {:error, build_error(["Value #{inspect(data)} is not one of: #{inspect(enum_values)}"], %{output_type: :enum, enum_values: enum_values})}
+      {:error,
+       build_error(["Value #{inspect(data)} is not one of: #{inspect(enum_values)}"], %{
+         output_type: :enum,
+         enum_values: enum_values
+       })}
     end
   end
 
@@ -144,14 +148,19 @@ defmodule ReqAI.ObjectSchema do
 
   def validate(%__MODULE__{output_type: :object, schema: schema}, data) when is_map(data) do
     normalized_data = normalize_keys(data)
+
     case NimbleOptions.validate(normalized_data, schema) do
-      {:ok, validated_data} -> {:ok, validated_data}
-      {:error, error} -> {:error, build_error([Exception.message(error)], %{output_type: :object})}
+      {:ok, validated_data} ->
+        {:ok, validated_data}
+
+      {:error, error} ->
+        {:error, build_error([Exception.message(error)], %{output_type: :object})}
     end
   end
 
   def validate(%__MODULE__{output_type: :object}, data) do
-    {:error, build_error(["Expected object (map), got: #{inspect(data)}"], %{output_type: :object})}
+    {:error,
+     build_error(["Expected object (map), got: #{inspect(data)}"], %{output_type: :object})}
   end
 
   def validate(%__MODULE__{output_type: :array, schema: nil}, data) when is_list(data) do
@@ -245,8 +254,9 @@ defmodule ReqAI.ObjectSchema do
   end
 
   def to_json_schema(%__MODULE__{output_type: :array, properties: properties}) do
-    item_schema = %{"type" => "object"}
-    |> add_object_properties(properties)
+    item_schema =
+      %{"type" => "object"}
+      |> add_object_properties(properties)
 
     %{
       "type" => "array",
@@ -260,7 +270,8 @@ defmodule ReqAI.ObjectSchema do
     if output_type in [:object, :array, :enum, :no_schema] do
       :ok
     else
-      {:error, "Invalid output_type: #{inspect(output_type)}. Must be one of: :object, :array, :enum, :no_schema"}
+      {:error,
+       "Invalid output_type: #{inspect(output_type)}. Must be one of: :object, :array, :enum, :no_schema"}
     end
   end
 
@@ -271,10 +282,12 @@ defmodule ReqAI.ObjectSchema do
       :ok
     end
   end
+
   defp validate_enum_values(_output_type, _enum_values), do: :ok
 
   defp build_nimble_schema(type, _properties) when type in [:no_schema, :enum], do: {:ok, nil}
   defp build_nimble_schema(_output_type, []), do: {:ok, nil}
+
   defp build_nimble_schema(_output_type, properties) do
     {:ok, NimbleOptions.new!(properties)}
   rescue
@@ -298,11 +311,13 @@ defmodule ReqAI.ObjectSchema do
 
   defp validate_item(item, schema) when is_map(item) do
     normalized_item = normalize_keys(item)
+
     case NimbleOptions.validate(normalized_item, schema) do
       {:ok, validated} -> {:ok, validated}
       {:error, error} -> {:error, Exception.message(error)}
     end
   end
+
   defp validate_item(item, _schema) do
     {:error, "Expected map, got: #{inspect(item)}"}
   end
@@ -330,15 +345,16 @@ defmodule ReqAI.ObjectSchema do
 
   defp add_object_properties(schema, nil), do: schema
   defp add_object_properties(schema, []), do: schema
+
   defp add_object_properties(schema, properties) do
-    {json_properties, required_fields} = 
+    {json_properties, required_fields} =
       Enum.reduce(properties, {%{}, []}, fn {key, opts}, {props_acc, req_acc} ->
         property_name = to_string(key)
         json_prop = nimble_type_to_json_schema(opts[:type] || :string, opts)
-        
+
         new_props = Map.put(props_acc, property_name, json_prop)
         new_req = if opts[:required], do: [property_name | req_acc], else: req_acc
-        
+
         {new_props, new_req}
       end)
 
@@ -348,19 +364,41 @@ defmodule ReqAI.ObjectSchema do
   end
 
   defp nimble_type_to_json_schema(type, opts) do
-    base_schema = case type do
-      :string -> %{"type" => "string"}
-      :integer -> %{"type" => "integer"}
-      :pos_integer -> %{"type" => "integer", "minimum" => 1}
-      :float -> %{"type" => "number"}
-      :number -> %{"type" => "number"}
-      :boolean -> %{"type" => "boolean"}
-      {:list, :string} -> %{"type" => "array", "items" => %{"type" => "string"}}
-      {:list, :integer} -> %{"type" => "array", "items" => %{"type" => "integer"}}
-      {:list, item_type} -> %{"type" => "array", "items" => nimble_type_to_json_schema(item_type, %{})}
-      :map -> %{"type" => "object"}
-      _ -> %{"type" => "string"}
-    end
+    base_schema =
+      case type do
+        :string ->
+          %{"type" => "string"}
+
+        :integer ->
+          %{"type" => "integer"}
+
+        :pos_integer ->
+          %{"type" => "integer", "minimum" => 1}
+
+        :float ->
+          %{"type" => "number"}
+
+        :number ->
+          %{"type" => "number"}
+
+        :boolean ->
+          %{"type" => "boolean"}
+
+        {:list, :string} ->
+          %{"type" => "array", "items" => %{"type" => "string"}}
+
+        {:list, :integer} ->
+          %{"type" => "array", "items" => %{"type" => "integer"}}
+
+        {:list, item_type} ->
+          %{"type" => "array", "items" => nimble_type_to_json_schema(item_type, %{})}
+
+        :map ->
+          %{"type" => "object"}
+
+        _ ->
+          %{"type" => "string"}
+      end
 
     case opts[:doc] do
       nil -> base_schema
@@ -369,6 +407,7 @@ defmodule ReqAI.ObjectSchema do
   end
 
   defp maybe_add_required(schema, []), do: schema
+
   defp maybe_add_required(schema, required_fields) do
     Map.put(schema, "required", Enum.reverse(required_fields))
   end

@@ -205,7 +205,8 @@ defmodule ReqAI.ContentPart do
 
   """
   @spec tool_result(String.t(), String.t(), any(), keyword()) :: t()
-  def tool_result(tool_call_id, tool_name, output, opts \\ []) when is_binary(tool_call_id) and is_binary(tool_name) do
+  def tool_result(tool_call_id, tool_name, output, opts \\ [])
+      when is_binary(tool_call_id) and is_binary(tool_name) do
     %__MODULE__{
       type: :tool_result,
       tool_call_id: tool_call_id,
@@ -247,18 +248,31 @@ defmodule ReqAI.ContentPart do
   end
 
   def valid?(%__MODULE__{type: :file, data: data, media_type: media_type, filename: filename})
-      when is_binary(data) and data != <<>> and is_binary(media_type) and media_type != "" and is_binary(filename) and
+      when is_binary(data) and data != <<>> and is_binary(media_type) and media_type != "" and
+             is_binary(filename) and
              filename != "" do
     valid_media_type?(media_type)
   end
 
-  def valid?(%__MODULE__{type: :tool_call, tool_call_id: tool_call_id, tool_name: tool_name, input: input})
-      when is_binary(tool_call_id) and tool_call_id != "" and is_binary(tool_name) and tool_name != "" and is_map(input) do
+  def valid?(%__MODULE__{
+        type: :tool_call,
+        tool_call_id: tool_call_id,
+        tool_name: tool_name,
+        input: input
+      })
+      when is_binary(tool_call_id) and tool_call_id != "" and is_binary(tool_name) and
+             tool_name != "" and is_map(input) do
     true
   end
 
-  def valid?(%__MODULE__{type: :tool_result, tool_call_id: tool_call_id, tool_name: tool_name, output: output})
-      when is_binary(tool_call_id) and tool_call_id != "" and is_binary(tool_name) and tool_name != "" and
+  def valid?(%__MODULE__{
+        type: :tool_result,
+        tool_call_id: tool_call_id,
+        tool_name: tool_name,
+        output: output
+      })
+      when is_binary(tool_call_id) and tool_call_id != "" and is_binary(tool_name) and
+             tool_name != "" and
              not is_nil(output) do
     true
   end
@@ -330,7 +344,12 @@ defmodule ReqAI.ContentPart do
     }
   end
 
-  def to_map(%__MODULE__{type: :tool_call, tool_call_id: tool_call_id, tool_name: tool_name, input: input}) do
+  def to_map(%__MODULE__{
+        type: :tool_call,
+        tool_call_id: tool_call_id,
+        tool_name: tool_name,
+        input: input
+      }) do
     %{
       type: "tool_call",
       id: tool_call_id,
@@ -341,7 +360,12 @@ defmodule ReqAI.ContentPart do
     }
   end
 
-  def to_map(%__MODULE__{type: :tool_result, tool_call_id: tool_call_id, tool_name: tool_name, output: output}) do
+  def to_map(%__MODULE__{
+        type: :tool_result,
+        tool_call_id: tool_call_id,
+        tool_name: tool_name,
+        output: output
+      }) do
     %{
       type: "tool_result",
       tool_call_id: tool_call_id,

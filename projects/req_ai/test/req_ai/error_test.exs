@@ -7,13 +7,18 @@ defmodule ReqAI.ErrorTest do
   # Core error test cases with {module, exception_args, expected_message_fragment, expected_class}
   @error_test_cases [
     {Error.Invalid.Parameter, [parameter: "model"], "Invalid parameter: model", :invalid},
-    {Error.API.Request, [reason: "timeout", status: 500], "API request failed (500): timeout", :api},
+    {Error.API.Request, [reason: "timeout", status: 500], "API request failed (500): timeout",
+     :api},
     {Error.API.Request, [reason: "network error"], "API request failed: network error", :api},
     {Error.Validation.Error, [reason: "Invalid temperature"], "Invalid temperature", :validation},
     {Error.Unknown.Unknown, [error: :test_error], "Unknown error: :test_error", :unknown},
-    {Error.ObjectGeneration, [text: "bad json", cause: :json_decode_error], "Object generation failed: :json_decode_error", :invalid},
-    {Error.ObjectGeneration, [text: "some text"], "Object generation failed: unable to parse generated content", :invalid},
-    {Error.SchemaValidation, [validation_errors: [%{field: "name", message: "is required"}], schema: %{}], "Schema validation failed: name: is required", :invalid}
+    {Error.ObjectGeneration, [text: "bad json", cause: :json_decode_error],
+     "Object generation failed: :json_decode_error", :invalid},
+    {Error.ObjectGeneration, [text: "some text"],
+     "Object generation failed: unable to parse generated content", :invalid},
+    {Error.SchemaValidation,
+     [validation_errors: [%{field: "name", message: "is required"}], schema: %{}],
+     "Schema validation failed: name: is required", :invalid}
   ]
 
   describe "all error modules" do
@@ -36,15 +41,22 @@ defmodule ReqAI.ErrorTest do
   describe "SchemaValidation advanced message handling" do
     test "handles complex validation error scenarios" do
       # Path-based errors
-      error = Error.SchemaValidation.exception(
-        validation_errors: [%{path: ["user", "address", "street"], message: "is required"}],
-        schema: %{}
-      )
+      error =
+        Error.SchemaValidation.exception(
+          validation_errors: [%{path: ["user", "address", "street"], message: "is required"}],
+          schema: %{}
+        )
+
       message = Error.SchemaValidation.message(error)
       assert message == "Schema validation failed: user.address.street: is required"
 
       # String errors
-      error = Error.SchemaValidation.exception(validation_errors: ["Missing required field"], schema: %{})
+      error =
+        Error.SchemaValidation.exception(
+          validation_errors: ["Missing required field"],
+          schema: %{}
+        )
+
       message = Error.SchemaValidation.message(error)
       assert message == "Schema validation failed: Missing required field"
 
@@ -62,7 +74,9 @@ defmodule ReqAI.ErrorTest do
       # Invalid validation errors format
       error = Error.SchemaValidation.exception(validation_errors: "not a list")
       message = Error.SchemaValidation.message(error)
-      assert message == "Schema validation failed: generated data does not conform to expected schema"
+
+      assert message ==
+               "Schema validation failed: generated data does not conform to expected schema"
     end
   end
 
@@ -87,26 +101,28 @@ defmodule ReqAI.ErrorTest do
   describe "validation_error helper" do
     test "creates validation error with tag, reason, and context" do
       error = Error.validation_error(:invalid_model_spec, "Bad model", model: "test")
+
       assert %Error.Validation.Error{
-        tag: :invalid_model_spec,
-        reason: "Bad model",
-        context: [model: "test"]
-      } = error
+               tag: :invalid_model_spec,
+               reason: "Bad model",
+               context: [model: "test"]
+             } = error
 
       # Default empty context
       error = Error.validation_error(:missing_param, "Parameter required")
+
       assert %Error.Validation.Error{
-        tag: :missing_param,
-        reason: "Parameter required",
-        context: []
-      } = error
+               tag: :missing_param,
+               reason: "Parameter required",
+               context: []
+             } = error
     end
   end
 
   describe "error class helpers" do
     test "all error classes are properly configured" do
       error_classes = [Error.Invalid, Error.API, Error.Validation, Error.Unknown]
-      
+
       for error_class <- error_classes do
         assert apply(error_class, :error_class?, [])
         assert apply(error_class, :exception, [[]])

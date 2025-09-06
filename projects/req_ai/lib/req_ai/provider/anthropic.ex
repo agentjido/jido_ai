@@ -1,8 +1,9 @@
 defmodule ReqAI.Provider.Anthropic do
   @moduledoc """
-  Anthropic provider implementation for text generation using Claude models.
+  Anthropic provider implementation using the three-callback architecture.
 
   Provides access to Anthropic's Claude models including Claude 3.5 Sonnet and Haiku.
+  Uses custom builder and parser modules for Anthropic-specific request/response formats.
 
   ## Usage
 
@@ -13,8 +14,8 @@ defmodule ReqAI.Provider.Anthropic do
   @behaviour ReqAI.Provider
 
   alias ReqAI.{Model, Error}
-
-  @base_url "https://api.anthropic.com/v1/messages"
+  alias ReqAI.Request.Builder.Anthropic, as: AnthropicBuilder
+  alias ReqAI.Response.Parser.Anthropic, as: AnthropicParser
 
   @doc """
   Returns provider information including supported models.
@@ -25,14 +26,14 @@ defmodule ReqAI.Provider.Anthropic do
     %ReqAI.Provider{
       id: :anthropic,
       name: "Anthropic",
-      base_url: @base_url,
+      base_url: "https://api.anthropic.com",
       models: %{
         "claude-3-5-sonnet-20241022" => %{
           name: "Claude 3.5 Sonnet",
           limit: %{context: 200_000, output: 8192}
         },
         "claude-3-5-haiku-20241022" => %{
-          name: "Claude 3.5 Haiku", 
+          name: "Claude 3.5 Haiku",
           limit: %{context: 200_000, output: 8192}
         },
         "claude-3-opus-20240229" => %{
@@ -44,79 +45,50 @@ defmodule ReqAI.Provider.Anthropic do
   end
 
   @doc """
-  Generates text using the Anthropic Claude API.
+  Generates text using the three-callback architecture.
+
+  Uses AnthropicBuilder to create the request and AnthropicParser to extract the response.
   """
   @impl true
   @spec generate_text(Model.t(), String.t(), keyword()) :: {:ok, String.t()} | {:error, Error.t()}
   def generate_text(%Model{} = model, prompt, opts \\ []) when is_binary(prompt) do
-    api_key = get_api_key()
-    
-    if is_nil(api_key) do
-      {:error, Error.Invalid.Parameter.exception(parameter: "ANTHROPIC_API_KEY environment variable")}
-    else
-      body = build_request_body(model, prompt, opts)
-      headers = build_headers(api_key)
-      
-      case Req.post(@base_url, json: body, headers: headers) do
-        {:ok, %{status: 200, body: response}} ->
-          extract_text_response(response)
-          
-        {:ok, %{status: status, body: error_body}} ->
-          {:error, Error.API.Request.exception(status: status, reason: format_error(error_body))}
-          
-        {:error, reason} ->
-          {:error, Error.API.Request.exception(reason: "Request failed: #{inspect(reason)}")}
-      end
+    with {:ok, request} <- build_request(model, prompt, opts),
+         {:ok, response} <- send_request(request, opts),
+         {:ok, text} <- parse_response(response, %{model: model}, opts) do
+      {:ok, text}
     end
   end
 
-  defp get_api_key do
-    System.get_env("ANTHROPIC_API_KEY") || Application.get_env(:req_ai, :anthropic_api_key)
+  @doc """
+  Builds a request using the Anthropic request builder.
+  """
+  @spec build_request(Model.t(), String.t(), keyword()) ::
+          {:ok, Req.Request.t()} | {:error, Error.t()}
+  def build_request(%Model{} = model, prompt, opts) do
+    AnthropicBuilder.build(model, prompt, opts)
   end
 
-  defp build_request_body(%Model{} = model, prompt, opts) do
-    %{
-      model: model.model,
-      messages: [%{role: "user", content: prompt}],
-      max_tokens: model.max_tokens || 4096
-    }
-    |> maybe_add_temperature(model.temperature)
-    |> maybe_add_system_prompt(Keyword.get(opts, :system_prompt))
+  @doc """
+  Sends the request using Req.
+  """
+  @spec send_request(Req.Request.t(), keyword()) ::
+          {:ok, Req.Response.t()} | {:error, Error.t()}
+  def send_request(%Req.Request{} = request, _opts) do
+    case Req.post(request) do
+      {:ok, response} ->
+        {:ok, response}
+
+      {:error, reason} ->
+        {:error, Error.API.Request.exception(reason: "Request failed: #{inspect(reason)}")}
+    end
   end
 
-  defp maybe_add_temperature(body, nil), do: body
-  defp maybe_add_temperature(body, temp), do: Map.put(body, :temperature, temp)
-
-  defp maybe_add_system_prompt(body, nil), do: body
-  defp maybe_add_system_prompt(body, system), do: Map.put(body, :system, system)
-
-  defp build_headers(api_key) do
-    [
-      {"content-type", "application/json"},
-      {"x-api-key", api_key},
-      {"anthropic-version", "2023-06-01"}
-    ]
+  @doc """
+  Parses the response using the Anthropic response parser.
+  """
+  @spec parse_response(Req.Response.t(), map(), keyword()) ::
+          {:ok, String.t()} | {:error, Error.t()}
+  def parse_response(%Req.Response{} = response, context, opts) do
+    AnthropicParser.parse_response(response, context, opts)
   end
-
-  defp extract_text_response(%{"content" => [%{"text" => text} | _]}) do
-    {:ok, text}
-  end
-
-  defp extract_text_response(%{"content" => content}) when is_list(content) do
-    text = 
-      content
-      |> Enum.filter(&(Map.get(&1, "type") == "text"))
-      |> Enum.map(&Map.get(&1, "text", ""))
-      |> Enum.join("")
-    
-    {:ok, text}
-  end
-
-  defp extract_text_response(response) do
-    {:error, Error.API.Request.exception(reason: "Unexpected response format: #{inspect(response)}")}
-  end
-
-  defp format_error(%{"error" => %{"message" => message}}), do: message
-  defp format_error(%{"error" => error}) when is_map(error), do: inspect(error)
-  defp format_error(error), do: inspect(error)
 end

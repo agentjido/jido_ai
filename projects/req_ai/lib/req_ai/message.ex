@@ -170,7 +170,8 @@ defmodule ReqAI.Message do
 
   """
   @spec assistant_with_tools(String.t(), [ContentPart.t()], keyword()) :: t()
-  def assistant_with_tools(text, tool_calls, opts \\ []) when is_binary(text) and is_list(tool_calls) do
+  def assistant_with_tools(text, tool_calls, opts \\ [])
+      when is_binary(text) and is_list(tool_calls) do
     content = [ContentPart.text(text) | tool_calls]
     new(:assistant, content, opts)
   end
@@ -185,7 +186,8 @@ defmodule ReqAI.Message do
 
   """
   @spec tool_result(String.t(), String.t(), any(), keyword()) :: t()
-  def tool_result(tool_call_id, tool_name, output, opts \\ []) when is_binary(tool_call_id) and is_binary(tool_name) do
+  def tool_result(tool_call_id, tool_name, output, opts \\ [])
+      when is_binary(tool_call_id) and is_binary(tool_name) do
     content = [ContentPart.tool_result(tool_call_id, tool_name, output)]
 
     new(:tool, content, Keyword.put(opts, :tool_call_id, tool_call_id))
@@ -259,19 +261,19 @@ end
 # Implement Enumerable protocol so Message can be treated as a single-item collection
 defimpl Enumerable, for: ReqAI.Message do
   def count(_message), do: {:ok, 1}
-  
+
   def member?(_message, _element), do: {:error, __MODULE__}
-  
+
   def slice(_message), do: {:error, __MODULE__}
-  
+
   def reduce(message, {:cont, acc}, fun) do
     fun.(message, acc)
   end
-  
+
   def reduce(_message, {:halt, acc}, _fun) do
     {:halted, acc}
   end
-  
+
   def reduce(message, {:suspend, acc}, fun) do
     {:suspended, acc, &reduce(message, &1, fun)}
   end

@@ -45,8 +45,11 @@ defmodule ReqAI.Provider.Registry do
   @spec fetch!(atom()) :: module()
   def fetch!(provider_id) do
     case fetch(provider_id) do
-      {:ok, module} -> module
-      {:error, :not_found} -> raise Error.Invalid.Parameter.exception(parameter: "provider #{provider_id}")
+      {:ok, module} ->
+        module
+
+      {:error, :not_found} ->
+        raise Error.Invalid.Parameter.exception(parameter: "provider #{provider_id}")
     end
   end
 

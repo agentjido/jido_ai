@@ -29,13 +29,15 @@ defmodule ReqAI.ObjectSchemaTest do
 
   describe "object validation" do
     setup do
-      {:ok, schema} = ObjectSchema.new([
-        output_type: :object,
-        properties: [
-          name: [type: :string, required: true, doc: "Full name"],
-          age: [type: :pos_integer]
-        ]
-      ])
+      {:ok, schema} =
+        ObjectSchema.new(
+          output_type: :object,
+          properties: [
+            name: [type: :string, required: true, doc: "Full name"],
+            age: [type: :pos_integer]
+          ]
+        )
+
       %{schema: schema}
     end
 
@@ -59,10 +61,12 @@ defmodule ReqAI.ObjectSchemaTest do
 
   describe "array validation" do
     setup do
-      {:ok, schema} = ObjectSchema.new([
-        output_type: :array,
-        properties: [name: [type: :string, required: true]]
-      ])
+      {:ok, schema} =
+        ObjectSchema.new(
+          output_type: :array,
+          properties: [name: [type: :string, required: true]]
+        )
+
       %{schema: schema}
     end
 
@@ -73,7 +77,8 @@ defmodule ReqAI.ObjectSchemaTest do
     end
 
     test "returns error for invalid item", %{schema: schema} do
-      data = [%{"name" => "Alice"}, %{}]  # missing required name
+      # missing required name
+      data = [%{"name" => "Alice"}, %{}]
       assert {:error, %SchemaValidation{}} = ObjectSchema.validate(schema, data)
     end
 
@@ -84,10 +89,12 @@ defmodule ReqAI.ObjectSchemaTest do
 
   describe "enum validation" do
     setup do
-      {:ok, schema} = ObjectSchema.new([
-        output_type: :enum,
-        enum_values: ["small", "medium", "large"]
-      ])
+      {:ok, schema} =
+        ObjectSchema.new(
+          output_type: :enum,
+          enum_values: ["small", "medium", "large"]
+        )
+
       %{schema: schema}
     end
 
@@ -114,12 +121,12 @@ defmodule ReqAI.ObjectSchemaTest do
       ]
 
       {:ok, schema} = ObjectSchema.new(output_type: :object, properties: properties)
-      
+
       valid_data = %{
         name: "John Doe",
         address: %{street: "123 Main St", city: "Anytown"}
       }
-      
+
       assert {:ok, ^valid_data} = ObjectSchema.validate(schema, valid_data)
       assert schema.properties[:address][:keys][:street][:doc] == "Street address"
     end
@@ -127,16 +134,17 @@ defmodule ReqAI.ObjectSchemaTest do
 
   describe "to_json_schema/1" do
     test "converts object schema to JSON schema format" do
-      {:ok, schema} = ObjectSchema.new([
-        output_type: :object,
-        properties: [
-          name: [type: :string, required: true, doc: "Full name"],
-          age: [type: :integer]
-        ]
-      ])
+      {:ok, schema} =
+        ObjectSchema.new(
+          output_type: :object,
+          properties: [
+            name: [type: :string, required: true, doc: "Full name"],
+            age: [type: :integer]
+          ]
+        )
 
       json_schema = ObjectSchema.to_json_schema(schema)
-      
+
       assert json_schema["type"] == "object"
       assert json_schema["properties"]["name"]["type"] == "string"
       assert json_schema["properties"]["name"]["description"] == "Full name"

@@ -97,13 +97,19 @@ defmodule ReqAI.Model do
   def from({provider, opts}) when is_atom(provider) and is_list(opts) do
     case Keyword.get(opts, :model) do
       nil ->
-        {:error, ReqAI.Error.validation_error(:missing_model, "model is required in options", provider: provider)}
+        {:error,
+         ReqAI.Error.validation_error(:missing_model, "model is required in options",
+           provider: provider
+         )}
 
       model_name when is_binary(model_name) ->
         {:ok, new(provider, model_name, opts)}
 
       _ ->
-        {:error, ReqAI.Error.validation_error(:invalid_model, "model must be a string", provider: provider)}
+        {:error,
+         ReqAI.Error.validation_error(:invalid_model, "model must be a string",
+           provider: provider
+         )}
     end
   end
 
@@ -114,12 +120,18 @@ defmodule ReqAI.Model do
         {:ok, new(provider, model_name)}
 
       _ ->
-        {:error, ReqAI.Error.validation_error(:invalid_format, "Invalid model specification. Expected format: 'provider:model'", input: provider_model_string)}
+        {:error,
+         ReqAI.Error.validation_error(
+           :invalid_format,
+           "Invalid model specification. Expected format: 'provider:model'",
+           input: provider_model_string
+         )}
     end
   end
 
   def from(input) do
-    {:error, ReqAI.Error.validation_error(:invalid_input, "Invalid model specification", input: input)}
+    {:error,
+     ReqAI.Error.validation_error(:invalid_input, "Invalid model specification", input: input)}
   end
 
   @doc """
@@ -154,7 +166,8 @@ defmodule ReqAI.Model do
   """
   @spec valid?(t()) :: boolean()
   def valid?(%__MODULE__{provider: provider, model: model, max_retries: max_retries})
-      when is_atom(provider) and is_binary(model) and model != "" and is_integer(max_retries) and max_retries >= 0 do
+      when is_atom(provider) and is_binary(model) and model != "" and is_integer(max_retries) and
+             max_retries >= 0 do
     true
   end
 
