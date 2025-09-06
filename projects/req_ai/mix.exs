@@ -7,7 +7,15 @@ defmodule ReqAi.MixProject do
       version: "0.1.0",
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: aliases(),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
+      ]
     ]
   end
 
@@ -24,7 +32,27 @@ defmodule ReqAi.MixProject do
       {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
-      {:kagi, path: "../kagi"}
+      {:typed_struct, "~> 0.3.0"},
+      {:splode, "~> 0.2.3"},
+      {:kagi, path: "../kagi"},
+
+      # Dev/test dependencies
+      {:excoveralls, "~> 0.18", only: [:test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      test: ["test --cover"],
+      quality: [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "dialyzer",
+        "credo --strict"
+      ],
+      q: ["quality"]
     ]
   end
 end

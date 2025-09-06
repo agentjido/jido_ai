@@ -1,8 +1,6 @@
-defmodule ReqAiTest do
+defmodule ReqAITest do
   use ExUnit.Case
-  doctest ReqAi
+  doctest ReqAI
 
-  test "greets the world" do
-    assert ReqAi.hello() == :world
-  end
+  # Main API module tests will be added when functions are implemented
 end
