@@ -1,20 +1,27 @@
 defmodule Kagi.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
   @moduledoc false
 
   use Application
 
   @impl true
   def start(_type, _args) do
+    configure_log_filter()
+
     children = [
-      # Starts a worker by calling: Kagi.Worker.start_link(arg)
-      # {Kagi.Worker, arg}
+      Kagi.Server
     ]
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Kagi.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  @doc false
+  @spec configure_log_filter() :: :ok
+  defp configure_log_filter do
+    if Application.get_env(:kagi, Kagi.LogFilter, []) |> Keyword.get(:enabled, true) do
+      :logger.add_primary_filter(:kagi_log_filter, {&Kagi.LogFilter.filter/2, []})
+    end
+
+    :ok
   end
 end
