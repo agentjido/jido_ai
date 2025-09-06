@@ -81,7 +81,7 @@ defmodule ReqAI.Message do
 
   use TypedStruct
 
-  alias ReqAI.{ContentPart, MessageBuilder}
+  alias ReqAI.ContentPart
 
   @type role :: :user | :assistant | :system | :tool
 
@@ -94,6 +94,12 @@ defmodule ReqAI.Message do
     field(:tool_call_id, String.t() | nil)
     field(:tool_calls, [map()] | nil)
     field(:metadata, map() | nil)
+  end
+
+  # Internal builder state for fluent API
+  defmodule Builder do
+    @moduledoc false
+    defstruct role: nil, content_parts: [], metadata: nil
   end
 
   # Builder Pattern API
@@ -115,91 +121,85 @@ defmodule ReqAI.Message do
       :user
 
   """
-  @spec build() :: MessageBuilder.t()
-  def build, do: MessageBuilder.new()
+  @spec build() :: Builder.t()
+  def build, do: %Builder{}
 
   @doc """
   Sets the role for the message being built.
   """
-  @spec role(MessageBuilder.t(), role()) :: MessageBuilder.t()
-  def role(%MessageBuilder{} = builder, role), do: MessageBuilder.role(builder, role)
+  @spec role(Builder.t(), role()) :: Builder.t()
+  def role(%Builder{} = builder, role) when role in [:user, :assistant, :system, :tool] do
+    %{builder | role: role}
+  end
 
   @doc """
   Adds text content to the message being built.
   """
-  @spec text(MessageBuilder.t(), String.t(), keyword()) :: MessageBuilder.t()
-  def text(%MessageBuilder{} = builder, text, opts \\ []),
-    do: MessageBuilder.text(builder, text, opts)
+  @spec text(Builder.t(), String.t(), keyword()) :: Builder.t()
+  def text(%Builder{} = builder, text, opts \\ []) when is_binary(text) do
+    part = ContentPart.text(text, opts)
+    %{builder | content_parts: builder.content_parts ++ [part]}
+  end
 
   @doc """
   Adds an image URL content part to the message being built.
   """
-  @spec image_url(MessageBuilder.t(), String.t(), keyword()) :: MessageBuilder.t()
-  def image_url(%MessageBuilder{} = builder, url, opts \\ []),
-    do: MessageBuilder.image_url(builder, url, opts)
-
-  @doc """
-  Adds an image data content part to the message being built.
-  """
-  @spec image_data(MessageBuilder.t(), binary(), String.t(), keyword()) :: MessageBuilder.t()
-  def image_data(%MessageBuilder{} = builder, data, media_type, opts \\ []),
-    do: MessageBuilder.image_data(builder, data, media_type, opts)
-
-  @doc """
-  Adds a file content part to the message being built.
-  """
-  @spec file(MessageBuilder.t(), binary(), String.t(), String.t(), keyword()) ::
-          MessageBuilder.t()
-  def file(%MessageBuilder{} = builder, data, media_type, filename, opts \\ []),
-    do: MessageBuilder.file(builder, data, media_type, filename, opts)
-
-  @doc """
-  Adds a tool call content part to the message being built.
-  """
-  @spec tool_call(MessageBuilder.t(), String.t(), String.t(), map(), keyword()) ::
-          MessageBuilder.t()
-  def tool_call(%MessageBuilder{} = builder, tool_call_id, tool_name, input, opts \\ []),
-    do: MessageBuilder.tool_call(builder, tool_call_id, tool_name, input, opts)
-
-  @doc """
-  Adds a tool result content part to the message being built.
-  """
-  @spec tool_result(MessageBuilder.t(), String.t(), String.t(), any(), keyword()) ::
-          MessageBuilder.t()
-  def tool_result(%MessageBuilder{} = builder, tool_call_id, tool_name, output, opts),
-    do: MessageBuilder.tool_result(builder, tool_call_id, tool_name, output, opts)
-
-  @doc """
-  Sets the name field for the message being built.
-  """
-  @spec name(MessageBuilder.t(), String.t()) :: MessageBuilder.t()
-  def name(%MessageBuilder{} = builder, name), do: MessageBuilder.name(builder, name)
-
-  @doc """
-  Sets the tool_call_id field for the message being built.
-  """
-  @spec tool_call_id(MessageBuilder.t(), String.t()) :: MessageBuilder.t()
-  def tool_call_id(%MessageBuilder{} = builder, tool_call_id),
-    do: MessageBuilder.tool_call_id(builder, tool_call_id)
+  @spec image_url(Builder.t(), String.t(), keyword()) :: Builder.t()
+  def image_url(%Builder{} = builder, url, opts \\ []) when is_binary(url) do
+    part = ContentPart.image_url(url, opts)
+    %{builder | content_parts: builder.content_parts ++ [part]}
+  end
 
   @doc """
   Sets metadata for the message being built.
   """
-  @spec metadata(MessageBuilder.t(), map()) :: MessageBuilder.t()
-  def metadata(%MessageBuilder{} = builder, metadata),
-    do: MessageBuilder.metadata(builder, metadata)
+  @spec metadata(Builder.t(), map()) :: Builder.t()
+  def metadata(%Builder{} = builder, metadata) when is_map(metadata) do
+    %{builder | metadata: metadata}
+  end
 
   @doc """
   Creates the final Message struct from the builder.
   """
-  @spec create(MessageBuilder.t()) :: {:ok, t()} | {:error, String.t()}
-  def create(%MessageBuilder{} = builder), do: MessageBuilder.create(builder)
+  @spec create(Builder.t()) :: {:ok, t()} | {:error, String.t()}
+  def create(%Builder{role: nil}) do
+    {:error, "Role is required"}
+  end
+
+  def create(%Builder{content_parts: []}) do
+    {:error, "Content is required"}
+  end
+
+  def create(%Builder{} = builder) do
+    content =
+      case builder.content_parts do
+        [%ContentPart{type: :text, text: text}] -> text
+        parts -> parts
+      end
+
+    message = %__MODULE__{
+      role: builder.role,
+      content: content,
+      metadata: builder.metadata
+    }
+
+    if valid?(message) do
+      {:ok, message}
+    else
+      {:error, "Invalid message structure"}
+    end
+  end
 
   @doc """
   Creates the final Message struct from the builder, raising on error.
   """
-  @spec create!(MessageBuilder.t()) :: t()
-  def create!(%MessageBuilder{} = builder), do: MessageBuilder.create!(builder)
+  @spec create!(Builder.t()) :: t()
+  def create!(%Builder{} = builder) do
+    case create(builder) do
+      {:ok, message} -> message
+      {:error, reason} -> raise ArgumentError, "Failed to create message: #{reason}"
+    end
+  end
 
   # Direct Constructor (preserved for backward compatibility)
 

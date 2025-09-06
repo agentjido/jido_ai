@@ -1,5 +1,4 @@
 defmodule Mix.Tasks.ReqAi.ModelSync do
-  @shortdoc "Synchronize model data from models.dev API"
   @moduledoc """
   Simplified model synchronization task.
 
@@ -24,6 +23,8 @@ defmodule Mix.Tasks.ReqAi.ModelSync do
   """
 
   use Mix.Task
+
+  @shortdoc "Synchronize model data from models.dev API"
 
   require Logger
 
