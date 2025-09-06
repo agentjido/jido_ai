@@ -1,21 +1,21 @@
 defmodule ReqAI.HTTP do
   @moduledoc """
   HTTP transport layer for ReqAI requests.
-  
+
   Handles common HTTP operations including authentication injection
   and request execution.
   """
 
   @doc """
   Sends an HTTP request with authentication and common error handling.
-  
+
   ## Parameters
-  
+
   - `request` - The Req.Request.t() struct to send
   - `opts` - Additional options (currently unused)
-  
+
   ## Returns
-  
+
   `{:ok, response}` on success, `{:error, reason}` on failure.
   """
   @spec send(Req.Request.t(), keyword()) :: {:ok, Req.Response.t()} | {:error, term()}
@@ -25,7 +25,7 @@ defmodule ReqAI.HTTP do
       nil ->
         # No provider spec found, send without authentication
         execute_request(request)
-        
+
       _provider_spec ->
         # Provider spec found, attach authentication
         request
@@ -36,7 +36,7 @@ defmodule ReqAI.HTTP do
 
   @doc """
   Attaches provider spec to request for authentication.
-  
+
   This is used by providers to ensure their authentication spec
   is available to the Kagi plugin.
   """
@@ -51,7 +51,7 @@ defmodule ReqAI.HTTP do
     case Req.request(request) do
       {:ok, response} ->
         {:ok, response}
-        
+
       {:error, reason} ->
         {:error, {:http_error, reason}}
     end

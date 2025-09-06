@@ -24,7 +24,11 @@ defmodule ReqAI.Model do
   @type modality :: :text | :audio | :image | :video | :pdf
   @type cost :: %{input: float(), output: float()}
   @type limit :: %{context: non_neg_integer(), output: non_neg_integer()}
-  @type capabilities :: %{reasoning?: boolean(), tool_call?: boolean(), supports_temperature?: boolean()}
+  @type capabilities :: %{
+          reasoning?: boolean(),
+          tool_call?: boolean(),
+          supports_temperature?: boolean()
+        }
 
   typedstruct do
     @typedoc "An AI model configuration"
@@ -113,15 +117,19 @@ defmodule ReqAI.Model do
   def from({provider, opts}) when is_atom(provider) and is_list(opts) do
     case Keyword.get(opts, :model) do
       nil ->
-        {:error, ReqAI.Error.validation_error(:missing_model, "model is required in options",
-                                              provider: provider)}
+        {:error,
+         ReqAI.Error.validation_error(:missing_model, "model is required in options",
+           provider: provider
+         )}
 
       model_name when is_binary(model_name) ->
         {:ok, new(provider, model_name, opts)}
 
       _ ->
-        {:error, ReqAI.Error.validation_error(:invalid_model_type, "model must be a string",
-                                               model: Keyword.get(opts, :model))}
+        {:error,
+         ReqAI.Error.validation_error(:invalid_model_type, "model must be a string",
+           model: Keyword.get(opts, :model)
+         )}
     end
   end
 
@@ -133,15 +141,19 @@ defmodule ReqAI.Model do
 
       _ ->
         {:error,
-         ReqAI.Error.validation_error(:invalid_model_spec,
+         ReqAI.Error.validation_error(
+           :invalid_model_spec,
            "Invalid model specification. Expected format: 'provider:model'",
-           spec: provider_model_string)}
+           spec: provider_model_string
+         )}
     end
   end
 
   def from(input) do
-    {:error, ReqAI.Error.validation_error(:invalid_model_spec, "Invalid model specification",
-                                           input: input)}
+    {:error,
+     ReqAI.Error.validation_error(:invalid_model_spec, "Invalid model specification",
+       input: input
+     )}
   end
 
   @doc """
@@ -157,7 +169,7 @@ defmodule ReqAI.Model do
   def from!(input) do
     case from(input) do
       {:ok, model} -> model
-      {:error, error} -> raise ArgumentError, error
+      {:error, error} -> raise error
     end
   end
 

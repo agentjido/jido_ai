@@ -298,6 +298,29 @@ defmodule Kagi do
   end
 
   @doc """
+  Sets a key-value pair in the current process session.
+
+  This is a convenience function that sets a session-specific value for the current process.
+
+  ## Parameters
+
+    * `key` - The key to set (as an atom or string)  
+    * `value` - The value to store
+
+  Returns `:ok`.
+
+  ## Examples
+
+      iex> Kagi.put(:api_key, "sk-123")
+      :ok
+
+  """
+  @spec put(atom() | String.t(), term()) :: :ok
+  def put(key, value) when is_atom(key) or is_binary(key) do
+    set_session_value(@default_name, key, value, self())
+  end
+
+  @doc """
   Sets a session-specific value that will override the environment value
   for the specified process.
 

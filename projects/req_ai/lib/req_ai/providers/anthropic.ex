@@ -34,10 +34,11 @@ defmodule ReqAI.Providers.Anthropic do
     opts = Keyword.merge(provider_opts, request_opts)
 
     # Default to first available model from JSON, fallback to haiku
-    default_model = case spec.models |> Map.keys() |> List.first() do
-      nil -> "claude-3-haiku-20240307"
-      first_model -> first_model
-    end
+    default_model =
+      case spec.models |> Map.keys() |> List.first() do
+        nil -> "claude-3-haiku-20240307"
+        first_model -> first_model
+      end
 
     model = Keyword.get(opts, :model, spec.default_model || default_model)
     max_tokens = Keyword.get(opts, :max_tokens, spec.default_max_tokens)
@@ -60,12 +61,13 @@ defmodule ReqAI.Providers.Anthropic do
 
     body = if temperature != nil, do: Map.put(body, :temperature, temperature), else: body
 
-    request = Req.new(
-      method: :post,
-      url: url,
-      headers: headers,
-      json: body
-    )
+    request =
+      Req.new(
+        method: :post,
+        url: url,
+        headers: headers,
+        json: body
+      )
 
     {:ok, request}
   end
@@ -137,12 +139,13 @@ defmodule ReqAI.Providers.Anthropic do
   defp parse_sse_chunks(body) do
     case ServerSentEvent.parse_all(body) do
       {[], _rest} ->
-        {:error, ReqAI.Error.API.Response.exception(reason: "No events found in streaming response")}
+        {:error,
+         ReqAI.Error.API.Response.exception(reason: "No events found in streaming response")}
 
       {events, _rest} ->
         content_parts =
           events
-          |> Enum.filter(& &1.event == nil or &1.event == "message")
+          |> Enum.filter(&(&1.event == nil or &1.event == "message"))
           |> Enum.map(& &1.data)
           |> Enum.reject(&(&1 in [nil, "", "[DONE]"]))
           |> Enum.map(&Jason.decode/1)
@@ -154,7 +157,8 @@ defmodule ReqAI.Providers.Anthropic do
 
         case content_parts do
           [] ->
-            {:error, ReqAI.Error.API.Response.exception(reason: "No content found in streaming response")}
+            {:error,
+             ReqAI.Error.API.Response.exception(reason: "No content found in streaming response")}
 
           parts ->
             {:ok, Enum.join(parts, "")}

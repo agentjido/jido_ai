@@ -251,7 +251,9 @@ defmodule ReqAI do
     else
       {:error, :not_found} ->
         {:error, ReqAI.Error.Invalid.Provider.exception(provider: "unknown")}
-      error -> error
+
+      error ->
+        error
     end
   end
 
@@ -284,7 +286,9 @@ defmodule ReqAI do
     else
       {:error, :not_found} ->
         {:error, ReqAI.Error.Invalid.Provider.exception(provider: "unknown")}
-      error -> error
+
+      error ->
+        error
     end
   end
 
@@ -328,8 +332,8 @@ defmodule ReqAI do
           keyword(),
           keyword()
         ) :: {:ok, map()} | {:error, term()}
-  def generate_object(model_spec, messages, schema, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @generate_object_opts_schema) do
+  def generate_object(_model_spec, _messages, _schema, opts \\ []) do
+    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @generate_object_opts_schema) do
       # Implementation will delegate to provider
       # This is a stub
       {:error, "generate_object not implemented"}
@@ -368,8 +372,8 @@ defmodule ReqAI do
           keyword(),
           keyword()
         ) :: {:ok, Enumerable.t()} | {:error, term()}
-  def stream_object(model_spec, messages, schema, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @stream_object_opts_schema) do
+  def stream_object(_model_spec, _messages, _schema, opts \\ []) do
+    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @stream_object_opts_schema) do
       # Implementation will delegate to provider
       # This is a stub
       {:error, "stream_object not implemented"}
@@ -401,8 +405,8 @@ defmodule ReqAI do
           String.t(),
           keyword()
         ) :: {:ok, list(float())} | {:error, term()}
-  def embed(model_spec, text, opts \\ []) when is_binary(text) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @embed_opts_schema) do
+  def embed(_model_spec, text, opts \\ []) when is_binary(text) do
+    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @embed_opts_schema) do
       # Implementation will delegate to provider
       # This is a stub
       {:error, "embed not implemented"}
@@ -436,8 +440,8 @@ defmodule ReqAI do
           list(String.t()),
           keyword()
         ) :: {:ok, list(list(float()))} | {:error, term()}
-  def embed_many(model_spec, texts, opts \\ []) when is_list(texts) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @embed_many_opts_schema) do
+  def embed_many(_model_spec, texts, opts \\ []) when is_list(texts) do
+    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @embed_many_opts_schema) do
       # Implementation will delegate to provider
       # This is a stub
       {:error, "embed_many not implemented"}

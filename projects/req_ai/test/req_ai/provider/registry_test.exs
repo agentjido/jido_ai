@@ -16,7 +16,7 @@ defmodule ReqAI.Provider.RegistryTest do
 
   describe "fetch!/1" do
     test "raises for unknown provider" do
-      assert_raise ReqAI.Error.Invalid.Parameter, ~r/provider unknown/, fn ->
+      assert_raise ReqAI.Error.Invalid.Provider, ~r/Unknown provider: unknown/, fn ->
         Registry.fetch!(:unknown)
       end
     end
@@ -31,7 +31,7 @@ defmodule ReqAI.Provider.RegistryTest do
 
   describe "fetch/1 with registered providers" do
     test "returns anthropic provider" do
-      assert {:ok, ReqAI.Provider.Anthropic} = Registry.fetch(:anthropic)
+      assert {:ok, ReqAI.Providers.Anthropic} = Registry.fetch(:anthropic)
     end
   end
 end

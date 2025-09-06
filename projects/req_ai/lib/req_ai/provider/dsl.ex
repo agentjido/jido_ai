@@ -66,28 +66,29 @@ defmodule ReqAI.Provider.DSL do
     end
 
     # Calculate JSON path - prefer /priv/models_dev by default
-    json_path = if metadata_file do
-      Path.join(:code.priv_dir(:req_ai), "models_dev/#{metadata_file}")
-    end
+    json_path =
+      if metadata_file do
+        Path.join(:code.priv_dir(:req_ai), "models_dev/#{metadata_file}")
+      end
 
     quote bind_quoted: [
-      id: id,
-      base_url: base_url, 
-      auth: auth,
-      default_model: default_model,
-      default_temperature: default_temperature,
-      default_max_tokens: default_max_tokens,
-      metadata_file: metadata_file,
-      json_path: json_path
-    ] do
+            id: id,
+            base_url: base_url,
+            auth: auth,
+            default_model: default_model,
+            default_temperature: default_temperature,
+            default_max_tokens: default_max_tokens,
+            metadata_file: metadata_file,
+            json_path: json_path
+          ] do
       @behaviour ReqAI.Provider.Adapter
       @behaviour ReqAI.Provider
       @after_compile {ReqAI.Provider.Registry, :auto_register}
 
       # Mark as external resource for recompilation
-      if json_path, do: @external_resource json_path
+      if json_path, do: @external_resource(json_path)
 
-      {provider_meta, models_map} = 
+      {provider_meta, models_map} =
         cond do
           json_path && File.exists?(json_path) ->
             json_path
@@ -96,26 +97,34 @@ defmodule ReqAI.Provider.DSL do
             |> then(fn data ->
               prov = Map.get(data, "provider", %{})
               models_data = Map.get(data, "models", [])
-              
-              models = Map.new(models_data, fn model_data ->
-                model = ReqAI.Model.new(
-                  id,
-                  model_data["id"],
-                  modalities: ReqAI.Provider.DSL.parse_modalities(model_data["modalities"]),
-                  capabilities: ReqAI.Provider.DSL.parse_capabilities(model_data),
-                  cost: ReqAI.Provider.DSL.parse_cost(model_data["cost"]),
-                  limit: ReqAI.Provider.DSL.parse_limit(model_data["limit"])
-                )
-                {model_data["id"], model}
-              end)
+
+              models =
+                Map.new(models_data, fn model_data ->
+                  model =
+                    ReqAI.Model.new(
+                      id,
+                      model_data["id"],
+                      modalities: ReqAI.Provider.DSL.parse_modalities(model_data["modalities"]),
+                      capabilities: ReqAI.Provider.DSL.parse_capabilities(model_data),
+                      cost: ReqAI.Provider.DSL.parse_cost(model_data["cost"]),
+                      limit: ReqAI.Provider.DSL.parse_limit(model_data["limit"])
+                    )
+
+                  {model_data["id"], model}
+                end)
+
               {prov, models}
             end)
-          
+
           metadata_file ->
             require Logger
-            Logger.warning("ReqAI provider #{inspect(__MODULE__)}: JSON #{metadata_file} not found")
+
+            Logger.warning(
+              "ReqAI provider #{inspect(__MODULE__)}: JSON #{metadata_file} not found"
+            )
+
             {%{}, %{}}
-            
+
           true ->
             {%{}, %{}}
         end
@@ -136,15 +145,24 @@ defmodule ReqAI.Provider.DSL do
           auth: @auth,
           models: @models_map
         ]
-        
-        spec_opts = if @default_model, do: Keyword.put(spec_opts, :default_model, @default_model), else: spec_opts
-        spec_opts = if @default_temperature, do: Keyword.put(spec_opts, :default_temperature, @default_temperature), else: spec_opts
-        spec_opts = if @default_max_tokens, do: Keyword.put(spec_opts, :default_max_tokens, @default_max_tokens), else: spec_opts
-        
+
+        spec_opts =
+          if @default_model,
+            do: Keyword.put(spec_opts, :default_model, @default_model),
+            else: spec_opts
+
+        spec_opts =
+          if @default_temperature,
+            do: Keyword.put(spec_opts, :default_temperature, @default_temperature),
+            else: spec_opts
+
+        spec_opts =
+          if @default_max_tokens,
+            do: Keyword.put(spec_opts, :default_max_tokens, @default_max_tokens),
+            else: spec_opts
+
         ReqAI.Provider.Spec.new(spec_opts)
       end
-
-
 
       @impl ReqAI.Provider
       def provider_info do
@@ -165,6 +183,7 @@ defmodule ReqAI.Provider.DSL do
       @impl ReqAI.Provider
       def stream_text(model, messages, opts \\ []) do
         stream_opts = Keyword.put(opts, :stream?, true)
+
         with {:ok, request} <- build_request(messages, [], stream_opts),
              request_with_spec <- ReqAI.HTTP.with_provider_spec(request, spec()),
              {:ok, response} <- ReqAI.HTTP.send(request_with_spec, stream_opts) do
@@ -187,12 +206,14 @@ defmodule ReqAI.Provider.DSL do
   # Helper functions for parsing JSON data - public so they can be called from the macro
   @doc false
   def parse_modalities(nil), do: nil
+
   def parse_modalities(%{"input" => input, "output" => output}) do
     %{
       input: Enum.map(input, &convert_to_atom/1),
       output: Enum.map(output, &convert_to_atom/1)
     }
   end
+
   def parse_modalities(_), do: nil
 
   @doc false
@@ -206,16 +227,20 @@ defmodule ReqAI.Provider.DSL do
 
   @doc false
   def parse_cost(nil), do: nil
+
   def parse_cost(%{"input" => input, "output" => output}) do
     %{input: input, output: output}
   end
+
   def parse_cost(_), do: nil
 
   @doc false
   def parse_limit(nil), do: nil
+
   def parse_limit(%{"context" => context, "output" => output}) do
     %{context: context, output: output}
   end
+
   def parse_limit(_), do: nil
 
   @doc false
@@ -223,11 +248,12 @@ defmodule ReqAI.Provider.DSL do
     try do
       String.to_existing_atom(str)
     rescue
-      ArgumentError -> 
+      ArgumentError ->
         # Return string as-is rather than creating new atoms
         # This prevents DoS attacks via atom table exhaustion
         str
     end
   end
+
   def convert_to_atom(atom) when is_atom(atom), do: atom
 end

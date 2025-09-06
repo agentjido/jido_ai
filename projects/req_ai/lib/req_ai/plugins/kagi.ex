@@ -63,9 +63,11 @@ defmodule ReqAI.Plugins.Kagi do
     case Req.Request.get_private(req, :req_ai_provider_spec) do
       %{id: provider_id, auth: auth_spec} ->
         api_key_name = :"#{provider_id}_api_key"
+
         case Kagi.get(api_key_name) do
           nil ->
             req
+
           api_key when is_binary(api_key) ->
             apply_auth(req, auth_spec, api_key)
         end
@@ -84,6 +86,7 @@ defmodule ReqAI.Plugins.Kagi do
   @spec wrap_api_key(String.t(), atom() | function()) :: String.t()
   defp wrap_api_key(api_key, :plain), do: api_key
   defp wrap_api_key(api_key, :bearer), do: "Bearer #{api_key}"
+
   defp wrap_api_key(api_key, wrapper_fn) when is_function(wrapper_fn, 1) do
     wrapper_fn.(api_key)
   end

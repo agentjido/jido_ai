@@ -11,8 +11,51 @@ defmodule ReqAI.Provider.Registry do
   @registry_key :req_ai_providers
 
   @doc """
+  Initializes the provider registry.
+
+  This is called automatically at application startup to ensure providers are properly registered.
+  """
+  @spec initialize() :: :ok
+  def initialize do
+    # Ensure all provider modules are loaded and registered
+    case Application.get_application(__MODULE__) do
+      nil ->
+        :ok
+
+      app ->
+        # Force load all provider modules in the application
+        {:ok, modules} = :application.get_key(app, :modules)
+
+        modules
+        |> Enum.filter(&is_provider_module?/1)
+        |> Enum.each(fn module ->
+          try do
+            Code.ensure_loaded(module)
+
+            if function_exported?(module, :spec, 0) do
+              spec = module.spec()
+              register(module, spec.id)
+            end
+          rescue
+            _ -> :ok
+          end
+        end)
+    end
+
+    :ok
+  end
+
+  @spec is_provider_module?(module()) :: boolean()
+  defp is_provider_module?(module) do
+    module_name = Atom.to_string(module)
+
+    String.contains?(module_name, "Providers.") or
+      String.ends_with?(module_name, "Provider")
+  end
+
+  @doc """
   Registers a provider module with its ID.
-  
+
   This is called automatically by the DSL macro, not intended for manual use.
   """
   @spec register(module(), atom()) :: :ok

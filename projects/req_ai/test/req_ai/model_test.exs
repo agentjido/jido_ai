@@ -74,7 +74,7 @@ defmodule ReqAI.ModelTest do
     test "returns error for tuple with invalid model" do
       assert {:error, error} = Model.from({:openai, model: 123})
 
-      assert error.tag == :invalid_model
+      assert error.tag == :invalid_model_type
       assert error.reason == "model must be a string"
     end
 
@@ -96,29 +96,29 @@ defmodule ReqAI.ModelTest do
     test "returns error for invalid string format" do
       assert {:error, error} = Model.from("invalid-format")
 
-      assert error.tag == :invalid_format
+      assert error.tag == :invalid_model_spec
       assert error.reason == "Invalid model specification. Expected format: 'provider:model'"
     end
 
     test "returns error for empty string parts" do
       assert {:error, error} = Model.from(":gpt-4")
 
-      assert error.tag == :invalid_format
+      assert error.tag == :invalid_model_spec
 
       assert {:error, error} = Model.from("openai:")
 
-      assert error.tag == :invalid_format
+      assert error.tag == :invalid_model_spec
     end
 
     test "returns error for invalid input types" do
       assert {:error, error} = Model.from(123)
 
-      assert error.tag == :invalid_input
+      assert error.tag == :invalid_model_spec
       assert error.reason == "Invalid model specification"
 
       assert {:error, error} = Model.from(%{provider: :openai})
 
-      assert error.tag == :invalid_input
+      assert error.tag == :invalid_model_spec
     end
   end
 
