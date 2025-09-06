@@ -1,16 +1,46 @@
 defmodule ReqAI.Provider.Registry do
   @moduledoc """
-  Simple, compile-time registry for AI provider modules.
+  Auto-registration registry for AI provider modules using persistent_term.
 
-  Provides O(1) lookup for provider modules using a simple compile-time map approach.
-  Much simpler than jido_ai's persistent_term and auto-discovery system.
+  Providers automatically register themselves at compile-time via the DSL macro.
+  Provides O(1) lookup without manual maintenance of provider lists.
   """
 
   alias ReqAI.Error
 
-  @providers %{
-    anthropic: ReqAI.Provider.Anthropic
-  }
+  @registry_key :req_ai_providers
+
+  @doc """
+  Registers a provider module with its ID.
+  
+  This is called automatically by the DSL macro, not intended for manual use.
+  """
+  @spec register(module(), atom()) :: :ok
+  def register(module, provider_id) when is_atom(provider_id) do
+    current_providers = get_all_providers()
+    updated_providers = Map.put(current_providers, provider_id, module)
+    :persistent_term.put(@registry_key, updated_providers)
+    :ok
+  end
+
+  @doc """
+  Called by the DSL macro after compilation to auto-register the provider.
+  """
+  def auto_register(env, _bytecode) do
+    try do
+      spec = env.module.spec()
+      register(env.module, spec.id)
+    rescue
+      # If spec/0 fails, silently ignore - provider may not be fully compiled yet
+      _ -> :ok
+    end
+  end
+
+  defp get_all_providers do
+    :persistent_term.get(@registry_key, %{})
+  rescue
+    ArgumentError -> %{}
+  end
 
   @doc """
   Gets the provider module for the given provider ID.
@@ -25,7 +55,7 @@ defmodule ReqAI.Provider.Registry do
   """
   @spec fetch(atom()) :: {:ok, module()} | {:error, :not_found}
   def fetch(provider_id) when is_atom(provider_id) do
-    case Map.get(@providers, provider_id) do
+    case Map.get(get_all_providers(), provider_id) do
       nil -> {:error, :not_found}
       module -> {:ok, module}
     end
@@ -39,7 +69,7 @@ defmodule ReqAI.Provider.Registry do
   ## Examples
 
       iex> ReqAI.Provider.Registry.fetch!(:nonexistent)
-      ** (ReqAI.Error.Invalid.Parameter) Invalid parameter: provider nonexistent
+      ** (ReqAI.Error.Invalid.Provider) Unknown provider: nonexistent
 
   """
   @spec fetch!(atom()) :: module()
@@ -49,7 +79,7 @@ defmodule ReqAI.Provider.Registry do
         module
 
       {:error, :not_found} ->
-        raise Error.Invalid.Parameter.exception(parameter: "provider #{provider_id}")
+        raise Error.Invalid.Provider.exception(provider: provider_id)
     end
   end
 
@@ -65,6 +95,6 @@ defmodule ReqAI.Provider.Registry do
   """
   @spec list_providers() :: [atom()]
   def list_providers do
-    Map.keys(@providers)
+    Map.keys(get_all_providers())
   end
 end

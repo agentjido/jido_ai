@@ -16,6 +16,8 @@ defmodule ReqAI.Provider do
   @callback provider_info() :: t()
   @callback generate_text(ReqAI.Model.t(), String.t() | [ReqAI.Message.t()], keyword()) ::
               {:ok, String.t()} | {:error, ReqAI.Error.t()}
+  @callback stream_text(ReqAI.Model.t(), String.t() | [ReqAI.Message.t()], keyword()) ::
+              {:ok, Enumerable.t()} | {:error, ReqAI.Error.t()}
 
   typedstruct do
     field(:id, atom(), enforce: true)

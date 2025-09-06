@@ -21,17 +21,26 @@ defmodule ReqAI.Model do
 
   use TypedStruct
 
+  @type modality :: :text | :audio | :image | :video | :pdf
+  @type cost :: %{input: float(), output: float()}
   @type limit :: %{context: non_neg_integer(), output: non_neg_integer()}
+  @type capabilities :: %{reasoning?: boolean(), tool_call?: boolean(), supports_temperature?: boolean()}
 
   typedstruct do
     @typedoc "An AI model configuration"
 
+    # Required runtime fields
     field(:provider, atom(), enforce: true)
     field(:model, String.t(), enforce: true)
     field(:temperature, float() | nil)
     field(:max_tokens, non_neg_integer() | nil)
     field(:max_retries, non_neg_integer() | nil, default: 3)
+
+    # Optional metadata fields
     field(:limit, limit() | nil)
+    field(:modalities, %{input: [modality()], output: [modality()]} | nil)
+    field(:capabilities, capabilities() | nil)
+    field(:cost, cost() | nil)
   end
 
   @doc """
@@ -49,6 +58,9 @@ defmodule ReqAI.Model do
   - `:max_tokens` - Maximum tokens to generate
   - `:max_retries` - Maximum retry attempts (default: 3)
   - `:limit` - Token limits map with `:context` and `:output` keys
+  - `:modalities` - Input/output modalities map with lists of supported types
+  - `:capabilities` - Model capabilities like `:reasoning?`, `:tool_call?`, `:supports_temperature?`
+  - `:cost` - Pricing information with `:input` and `:output` cost per 1K tokens
 
   ## Examples
 
@@ -67,7 +79,10 @@ defmodule ReqAI.Model do
       temperature: Keyword.get(opts, :temperature),
       max_tokens: Keyword.get(opts, :max_tokens),
       max_retries: Keyword.get(opts, :max_retries, 3),
-      limit: Keyword.get(opts, :limit)
+      limit: Keyword.get(opts, :limit),
+      modalities: Keyword.get(opts, :modalities),
+      capabilities: Keyword.get(opts, :capabilities),
+      cost: Keyword.get(opts, :cost)
     }
   end
 
@@ -84,8 +99,9 @@ defmodule ReqAI.Model do
       # From existing struct
       {:ok, model} = ReqAI.Model.from(%ReqAI.Model{provider: :openai, model: "gpt-4"})
 
-      # From tuple with options
-      {:ok, model} = ReqAI.Model.from({:openai, model: "gpt-4", temperature: 0.7, max_tokens: 1000})
+      # From tuple with options (including metadata)
+      {:ok, model} = ReqAI.Model.from({:openai, model: "gpt-4", temperature: 0.7, max_tokens: 1000,
+                                       capabilities: %{reasoning?: true, tool_call?: true}})
 
       # From string specification
       {:ok, model} = ReqAI.Model.from("anthropic:claude-3-sonnet")
@@ -97,19 +113,15 @@ defmodule ReqAI.Model do
   def from({provider, opts}) when is_atom(provider) and is_list(opts) do
     case Keyword.get(opts, :model) do
       nil ->
-        {:error,
-         ReqAI.Error.validation_error(:missing_model, "model is required in options",
-           provider: provider
-         )}
+        {:error, ReqAI.Error.validation_error(:missing_model, "model is required in options",
+                                              provider: provider)}
 
       model_name when is_binary(model_name) ->
         {:ok, new(provider, model_name, opts)}
 
       _ ->
-        {:error,
-         ReqAI.Error.validation_error(:invalid_model, "model must be a string",
-           provider: provider
-         )}
+        {:error, ReqAI.Error.validation_error(:invalid_model_type, "model must be a string",
+                                               model: Keyword.get(opts, :model))}
     end
   end
 
@@ -121,17 +133,15 @@ defmodule ReqAI.Model do
 
       _ ->
         {:error,
-         ReqAI.Error.validation_error(
-           :invalid_format,
+         ReqAI.Error.validation_error(:invalid_model_spec,
            "Invalid model specification. Expected format: 'provider:model'",
-           input: provider_model_string
-         )}
+           spec: provider_model_string)}
     end
   end
 
   def from(input) do
-    {:error,
-     ReqAI.Error.validation_error(:invalid_input, "Invalid model specification", input: input)}
+    {:error, ReqAI.Error.validation_error(:invalid_model_spec, "Invalid model specification",
+                                           input: input)}
   end
 
   @doc """
@@ -147,7 +157,7 @@ defmodule ReqAI.Model do
   def from!(input) do
     case from(input) do
       {:ok, model} -> model
-      {:error, error} -> raise error
+      {:error, error} -> raise ArgumentError, error
     end
   end
 
@@ -172,6 +182,35 @@ defmodule ReqAI.Model do
   end
 
   def valid?(_), do: false
+
+  @doc """
+  Returns a model with sensible defaults for missing metadata fields.
+
+  This helper fills in common defaults for models that don't have complete metadata.
+
+  ## Examples
+
+      iex> model = ReqAI.Model.new(:openai, "gpt-4")
+      iex> ReqAI.Model.with_defaults(model).capabilities
+      %{reasoning?: false, tool_call?: false, supports_temperature?: true}
+
+  """
+  @spec with_defaults(t()) :: t()
+  def with_defaults(%__MODULE__{} = model) do
+    default_limit = %{context: 128_000, output: 4_096}
+    default_modalities = %{input: [:text], output: [:text]}
+    default_capabilities = %{reasoning?: false, tool_call?: false, supports_temperature?: true}
+
+    %{
+      model
+      | limit: merge_with_defaults(model.limit, default_limit),
+        modalities: merge_with_defaults(model.modalities, default_modalities),
+        capabilities: merge_with_defaults(model.capabilities, default_capabilities)
+    }
+  end
+
+  defp merge_with_defaults(nil, defaults), do: defaults
+  defp merge_with_defaults(existing, defaults), do: Map.merge(defaults, existing)
 
   defp parse_provider(str) when is_binary(str) do
     try do

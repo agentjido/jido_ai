@@ -162,18 +162,16 @@ defmodule ReqAI do
 
   ## Examples
 
-      ReqAI.provider(:openai)
-      #=> {:ok, ReqAI.Provider.OpenAI}
+      ReqAI.provider(:anthropic)
+      #=> {:ok, ReqAI.Providers.Anthropic}
 
       ReqAI.provider(:unknown)
-      #=> {:error, "Unknown provider: unknown"}
+      #=> {:error, :not_found}
 
   """
-  @spec provider(atom()) :: {:ok, module()} | {:error, String.t()}
+  @spec provider(atom()) :: {:ok, module()} | {:error, :not_found}
   def provider(provider) when is_atom(provider) do
-    # Implementation will look up provider modules
-    # This is a stub
-    {:error, "Provider registry not implemented"}
+    ReqAI.Provider.Registry.fetch(provider)
   end
 
   @doc """
@@ -182,24 +180,22 @@ defmodule ReqAI do
   ## Parameters
 
     * `model_spec` - Model specification in various formats:
-      - String format: `"openai:gpt-4o"`
-      - Tuple format: `{:openai, model: "gpt-4o", temperature: 0.7}`
+      - String format: `"anthropic:claude-3-sonnet"`
+      - Tuple format: `{:anthropic, model: "claude-3-sonnet", temperature: 0.7}`
       - Model struct: `%ReqAI.Model{}`
 
   ## Examples
 
-      ReqAI.model("openai:gpt-4o")
-      #=> {:ok, %ReqAI.Model{provider: :openai, model: "gpt-4o"}}
+      ReqAI.model("anthropic:claude-3-sonnet")
+      #=> {:ok, %ReqAI.Model{provider: :anthropic, model: "claude-3-sonnet"}}
 
-      ReqAI.model({:anthropic, model: "claude-3-5-sonnet", temperature: 0.5})
-      #=> {:ok, %ReqAI.Model{provider: :anthropic, model: "claude-3-5-sonnet", temperature: 0.5}}
+      ReqAI.model({:anthropic, model: "claude-3-sonnet", temperature: 0.5})
+      #=> {:ok, %ReqAI.Model{provider: :anthropic, model: "claude-3-sonnet", temperature: 0.5}}
 
   """
   @spec model(String.t() | {atom(), keyword()} | struct()) :: {:ok, struct()} | {:error, term()}
   def model(model_spec) do
-    # Implementation will parse and validate model specifications
-    # This is a stub
-    {:error, "Model parsing not implemented"}
+    ReqAI.Model.from(model_spec)
   end
 
   # ===========================================================================
@@ -231,11 +227,11 @@ defmodule ReqAI do
 
   ## Examples
 
-      ReqAI.generate_text("openai:gpt-4o", "Hello world")
+      ReqAI.generate_text("anthropic:claude-3-sonnet", "Hello world")
       #=> {:ok, "Hello! How can I assist you today?"}
 
       ReqAI.generate_text(
-        "openai:gpt-4o",
+        "anthropic:claude-3-sonnet",
         "Explain AI",
         temperature: 0.7,
         max_tokens: 100
@@ -248,10 +244,14 @@ defmodule ReqAI do
           keyword()
         ) :: {:ok, String.t()} | {:error, term()}
   def generate_text(model_spec, messages, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @generate_text_opts_schema) do
-      # Implementation will delegate to provider
-      # This is a stub
-      {:error, "generate_text not implemented"}
+    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @generate_text_opts_schema),
+         {:ok, model} <- ReqAI.Model.from(model_spec),
+         {:ok, provider_module} <- provider(model.provider) do
+      provider_module.generate_text(model, messages, validated_opts)
+    else
+      {:error, :not_found} ->
+        {:error, ReqAI.Error.Invalid.Provider.exception(provider: "unknown")}
+      error -> error
     end
   end
 
@@ -267,7 +267,7 @@ defmodule ReqAI do
 
   ## Examples
 
-      {:ok, stream} = ReqAI.stream_text("openai:gpt-4o", "Tell me a story")
+      {:ok, stream} = ReqAI.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
       stream |> Enum.each(&IO.write/1)
 
   """
@@ -277,10 +277,14 @@ defmodule ReqAI do
           keyword()
         ) :: {:ok, Enumerable.t()} | {:error, term()}
   def stream_text(model_spec, messages, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @stream_text_opts_schema) do
-      # Implementation will delegate to provider
-      # This is a stub
-      {:error, "stream_text not implemented"}
+    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @stream_text_opts_schema),
+         {:ok, model} <- ReqAI.Model.from(model_spec),
+         {:ok, provider_module} <- provider(model.provider) do
+      provider_module.stream_text(model, messages, Keyword.put(validated_opts, :stream?, true))
+    else
+      {:error, :not_found} ->
+        {:error, ReqAI.Error.Invalid.Provider.exception(provider: "unknown")}
+      error -> error
     end
   end
 

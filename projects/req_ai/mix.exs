@@ -34,6 +34,7 @@ defmodule ReqAi.MixProject do
       {:nimble_options, "~> 1.1"},
       {:typed_struct, "~> 0.3.0"},
       {:splode, "~> 0.2.3"},
+      {:server_sent_event, "~> 1.0"},
       {:kagi, path: "../kagi"},
 
       # Dev/test dependencies

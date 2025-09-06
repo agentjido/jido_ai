@@ -59,6 +59,22 @@ defmodule ReqAI.Error do
     end
   end
 
+  defmodule API.Response do
+    @moduledoc "Error for provider response parsing failures and unexpected response formats."
+    use Splode.Error,
+      fields: [:reason, :response_body, :status],
+      class: :api
+
+    @spec message(map()) :: String.t()
+    def message(%{reason: reason, status: status}) when not is_nil(status) do
+      "Provider response error (#{status}): #{reason}"
+    end
+
+    def message(%{reason: reason}) do
+      "Provider response error: #{reason}"
+    end
+  end
+
   defmodule Validation.Error do
     @moduledoc "Error for parameter validation failures."
     use Splode.Error,
@@ -85,6 +101,16 @@ defmodule ReqAI.Error do
     @spec message(map()) :: String.t()
     def message(%{error: error}) do
       "Unknown error: #{inspect(error)}"
+    end
+  end
+
+  defmodule Invalid.Provider do
+    @moduledoc "Error for unknown or unsupported providers."
+    use Splode.Error, fields: [:provider], class: :invalid
+
+    @spec message(map()) :: String.t()
+    def message(%{provider: provider}) do
+      "Unknown provider: #{provider}"
     end
   end
 
