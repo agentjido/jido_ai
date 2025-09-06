@@ -151,7 +151,7 @@ defmodule Jido.AI.Provider.Cloudflare do
         name: Keyword.get(opts, :name, "Cloudflare #{model}"),
         provider: :cloudflare,
         model: model,
-        base_url: @base_url,
+        base_url: Keyword.get(opts, :base_url, @base_url),
         api_key: api_key,
         temperature: Keyword.get(opts, :temperature, 0.7),
         max_tokens: Keyword.get(opts, :max_tokens, 1024),

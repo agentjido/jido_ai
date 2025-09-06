@@ -272,7 +272,8 @@ defmodule Jido.AI.Actions.Langchain do
         model: model.model,
         temperature: params.temperature || 0.7,
         max_tokens: params.max_tokens || model.max_tokens,
-        stream: params.stream || false
+        stream: params.stream || false,
+        endpoint: build_endpoint_url(model.base_url, "https://api.openai.com/v1/chat/completions")
       }
       |> add_if_present(:frequency_penalty, params.frequency_penalty)
       |> add_if_present(:presence_penalty, params.presence_penalty)
@@ -347,6 +348,18 @@ defmodule Jido.AI.Actions.Langchain do
 
   defp add_if_present(opts, _key, nil), do: opts
   defp add_if_present(opts, key, value), do: Map.put(opts, key, value)
+
+  # Helper to build proper endpoint URL from base_url
+  defp build_endpoint_url(nil, default_endpoint), do: default_endpoint
+  defp build_endpoint_url("", default_endpoint), do: default_endpoint
+  defp build_endpoint_url(base_url, _default_endpoint) do
+    base_url = String.trim_trailing(base_url, "/")
+    if String.ends_with?(base_url, "/chat/completions") do
+      base_url
+    else
+      base_url <> "/chat/completions"
+    end
+  end
 
   defp convert_messages(prompt) do
     messages =

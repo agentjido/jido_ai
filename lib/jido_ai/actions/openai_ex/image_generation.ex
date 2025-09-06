@@ -206,6 +206,11 @@ defmodule Jido.AI.Actions.OpenaiEx.ImageGeneration do
   defp extract_image(_), do: nil
 
   @spec maybe_add_base_url(OpenaiEx.t(), Model.t()) :: OpenaiEx.t()
+  defp maybe_add_base_url(client, %Model{base_url: base_url})
+       when is_binary(base_url) and base_url != "" do
+    OpenaiEx.with_base_url(client, base_url)
+  end
+
   defp maybe_add_base_url(client, %Model{provider: :openrouter}) do
     OpenaiEx.with_base_url(client, Jido.AI.Provider.OpenRouter.base_url())
   end
