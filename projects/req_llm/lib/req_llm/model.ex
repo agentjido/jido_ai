@@ -30,6 +30,7 @@ defmodule ReqLLM.Model do
           supports_temperature?: boolean()
         }
 
+  @derive {Jason.Encoder, only: [:provider, :model, :temperature, :max_tokens, :max_retries]}
   typedstruct do
     @typedoc "An AI model configuration"
 

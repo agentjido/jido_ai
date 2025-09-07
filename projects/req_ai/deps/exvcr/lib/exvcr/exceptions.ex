@@ -1,5 +1,0 @@
-defmodule ExVCR.InvalidRequestError, do: defexception([:message])
-defmodule ExVCR.FileNotFoundError, do: defexception([:message])
-defmodule ExVCR.PathNotFoundError, do: defexception([:message])
-defmodule ExVCR.ImplementationMissingError, do: defexception([:message])
-defmodule ExVCR.RequestNotMatchError, do: defexception([:message])
