@@ -1,9 +1,9 @@
-defmodule ReqAI.Collections.EnumerableTest do
+defmodule ReqLLM.Collections.EnumerableTest do
   use ExUnit.Case, async: true
 
-  import ReqAI.Test.Factory
+  import ReqLLM.Test.Factory
 
-  alias ReqAI.{Message, Messages, ContentPart}
+  alias ReqLLM.{Message, Messages, ContentPart}
 
   # Parameterized helper for testing Enum behavior across different collections
   defp assert_enum_behaviour(collection, expected_items, context \\ %{}) do

@@ -1,7 +1,7 @@
-defmodule ReqAI.Plugins.KagiTest do
+defmodule ReqLLM.Plugins.KagiTest do
   use ExUnit.Case, async: false
 
-  alias ReqAI.Plugins.Kagi, as: KagiPlugin
+  alias ReqLLM.Plugins.Kagi, as: KagiPlugin
 
   describe "attach/1" do
     @describetag :serial
@@ -26,7 +26,7 @@ defmodule ReqAI.Plugins.KagiTest do
 
       req =
         Req.new(url: "https://api.anthropic.com/v1/messages")
-        |> Req.Request.put_private(:req_ai_provider_spec, provider_spec)
+        |> Req.Request.put_private(:req_llm_provider_spec, provider_spec)
 
       result = KagiPlugin.add_auth_header(req)
 
@@ -40,7 +40,7 @@ defmodule ReqAI.Plugins.KagiTest do
 
       req =
         Req.new(url: "https://api.openai.com/v1/chat/completions")
-        |> Req.Request.put_private(:req_ai_provider_spec, provider_spec)
+        |> Req.Request.put_private(:req_llm_provider_spec, provider_spec)
 
       result = KagiPlugin.add_auth_header(req)
 
@@ -55,7 +55,7 @@ defmodule ReqAI.Plugins.KagiTest do
 
       req =
         Req.new(url: "https://api.custom.com/v1")
-        |> Req.Request.put_private(:req_ai_provider_spec, provider_spec)
+        |> Req.Request.put_private(:req_llm_provider_spec, provider_spec)
 
       result = KagiPlugin.add_auth_header(req)
 
@@ -75,7 +75,7 @@ defmodule ReqAI.Plugins.KagiTest do
 
       req =
         Req.new(url: "https://api.anthropic.com/v1/messages")
-        |> Req.Request.put_private(:req_ai_provider_spec, provider_spec)
+        |> Req.Request.put_private(:req_llm_provider_spec, provider_spec)
 
       result = KagiPlugin.add_auth_header(req)
 

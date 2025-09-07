@@ -1,8 +1,8 @@
-defmodule ReqAI.MessagesTest do
+defmodule ReqLLM.MessagesTest do
   use ExUnit.Case, async: true
 
-  import ReqAI.Messages
-  alias ReqAI.{Message, ContentPart}
+  import ReqLLM.Messages
+  alias ReqLLM.{Message, ContentPart}
 
   describe "builder functions" do
     test "creates user, assistant, and system messages" do
@@ -55,29 +55,29 @@ defmodule ReqAI.MessagesTest do
     messages = [user("Hello"), assistant("Hi"), tool_result("call_1", "tool", "result")]
     assert :ok = validate_messages(messages)
 
-    assert {:error, %ReqAI.Error.Invalid.MessageList{reason: "Message list cannot be empty"}} =
+    assert {:error, %ReqLLM.Error.Invalid.MessageList{reason: "Message list cannot be empty"}} =
              validate_messages([])
 
     assert {:error,
-            %ReqAI.Error.Invalid.MessageList{reason: "Expected a list of messages", received: 42}} =
+            %ReqLLM.Error.Invalid.MessageList{reason: "Expected a list of messages", received: 42}} =
              validate_messages(42)
   end
 
   test "validation error cases" do
     invalid_messages = [user("Valid"), %{role: :user, content: "Invalid"}]
 
-    assert {:error, %ReqAI.Error.Invalid.Message{reason: "Not a valid Message struct", index: 1}} =
+    assert {:error, %ReqLLM.Error.Invalid.Message{reason: "Not a valid Message struct", index: 1}} =
              validate_messages(invalid_messages)
 
     invalid_message = %Message{role: :invalid_role, content: "Hello"}
 
-    assert {:error, %ReqAI.Error.Invalid.Role{role: :invalid_role}} =
+    assert {:error, %ReqLLM.Error.Invalid.Role{role: :invalid_role}} =
              validate_message(invalid_message)
 
     invalid_content = %Message{role: :user, content: 42}
 
     assert {:error,
-            %ReqAI.Error.Invalid.Content{
+            %ReqLLM.Error.Invalid.Content{
               reason: "Content must be a string or list of ContentPart structs",
               received: 42
             }} =

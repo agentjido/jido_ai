@@ -1,8 +1,8 @@
-defmodule ReqAI.Plugins.SplodeTest do
+defmodule ReqLLM.Plugins.SplodeTest do
   use ExUnit.Case, async: true
 
-  alias ReqAI.Plugins.Splode
-  alias ReqAI.Error
+  alias ReqLLM.Plugins.Splode
+  alias ReqLLM.Error
 
   describe "attach/1" do
     test "attaches splode_errors step to error handling" do

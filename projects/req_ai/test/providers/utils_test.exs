@@ -1,8 +1,8 @@
-defmodule ReqAI.Provider.UtilsTest do
+defmodule ReqLLM.Provider.UtilsTest do
   use ExUnit.Case, async: true
-  doctest ReqAI.Provider.Utils
+  doctest ReqLLM.Provider.Utils
 
-  alias ReqAI.Provider.Utils
+  alias ReqLLM.Provider.Utils
 
   describe "normalize_messages/1" do
     test "converts string prompt to user message" do

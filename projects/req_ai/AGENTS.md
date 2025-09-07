@@ -1,4 +1,4 @@
-# AGENTS.md - ReqAI Development Guide
+# AGENTS.md - ReqLLM Development Guide
 
 ## Commands
 
@@ -12,13 +12,13 @@
 
 ## Architecture
 
-ReqAI is a simplified Elixir library for AI interactions built on Req HTTP client:
+ReqLLM is a simplified Elixir library for AI interactions built on Req HTTP client:
 
-- **Core**: [`lib/req_ai.ex`](lib/req_ai.ex) - Main API facade
-- **Messages**: [`lib/req_ai/message.ex`](lib/req_ai/message.ex) - Multi-modal message structures
-- **ObjectSchema**: [`lib/req_ai/object_schema.ex`](lib/req_ai/object_schema.ex) - Schema definitions with JSON Schema export
-- **Error**: [`lib/req_ai/error.ex`](lib/req_ai/error.ex) - Splode-based error handling
-- **Provider**: [`lib/req_ai/provider/`](lib/req_ai/provider/) - Simple provider system with Registry and Behavior
+- **Core**: [`lib/req_llm.ex`](lib/req_llm.ex) - Main API facade
+- **Messages**: [`lib/req_llm/message.ex`](lib/req_llm/message.ex) - Multi-modal message structures
+- **ObjectSchema**: [`lib/req_llm/object_schema.ex`](lib/req_llm/object_schema.ex) - Schema definitions with JSON Schema export
+- **Error**: [`lib/req_llm/error.ex`](lib/req_llm/error.ex) - Splode-based error handling
+- **Provider**: [`lib/req_llm/provider/`](lib/req_llm/provider/) - Simple provider system with Registry and Behavior
 
 ## SDLC
 
@@ -43,7 +43,7 @@ ReqAI is a simplified Elixir library for AI interactions built on Req HTTP clien
 
 ## Project Goals
 
-ReqAI is designed to be a simpler, more focused alternative to jido_ai with:
+ReqLLM is designed to be a simpler, more focused alternative to jido_ai with:
 
 1. **Simplified Provider System**: Minimal registry, direct implementations
 2. **Clean Message Structures**: Multi-modal support without complexity

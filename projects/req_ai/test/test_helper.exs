@@ -5,6 +5,6 @@ Code.compile_file("test/support/factory.ex")
 Code.compile_file("test/support/macros.ex")
 
 # Ensure providers are loaded for testing
-Application.ensure_all_started(:req_ai)
+Application.ensure_all_started(:req_llm)
 
 ExUnit.start()

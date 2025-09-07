@@ -1,12 +1,12 @@
-defmodule ReqAI.Test.Factory do
+defmodule ReqLLM.Test.Factory do
   @moduledoc """
-  Factory functions for creating test objects in ReqAI.
+  Factory functions for creating test objects in ReqLLM.
 
   Provides builders for common test objects including content parts, messages,
   models, and schemas to simplify test setup and improve consistency.
   """
 
-  alias ReqAI.{ContentPart, Message, ObjectSchema}
+  alias ReqLLM.{ContentPart, Message, ObjectSchema}
 
   # Content Part Builders
 
@@ -16,10 +16,10 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> text_part("Hello world")
-      %ReqAI.ContentPart{type: :text, text: "Hello world"}
+      %ReqLLM.ContentPart{type: :text, text: "Hello world"}
 
       iex> text_part("Hello", metadata: %{cache_control: %{type: "ephemeral"}})
-      %ReqAI.ContentPart{type: :text, text: "Hello", metadata: %{cache_control: %{type: "ephemeral"}}}
+      %ReqLLM.ContentPart{type: :text, text: "Hello", metadata: %{cache_control: %{type: "ephemeral"}}}
 
   """
   @spec text_part(String.t(), keyword()) :: ContentPart.t()
@@ -37,10 +37,10 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> image_part("https://example.com/image.png")
-      %ReqAI.ContentPart{type: :image_url, url: "https://example.com/image.png"}
+      %ReqLLM.ContentPart{type: :image_url, url: "https://example.com/image.png"}
 
       iex> image_part("https://example.com/image.png", metadata: %{detail: "high"})
-      %ReqAI.ContentPart{type: :image_url, url: "https://example.com/image.png", metadata: %{detail: "high"}}
+      %ReqLLM.ContentPart{type: :image_url, url: "https://example.com/image.png", metadata: %{detail: "high"}}
 
   """
   @spec image_part(String.t(), keyword()) :: ContentPart.t()
@@ -58,7 +58,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> tool_use_part("call_123", "get_weather", %{location: "NYC"})
-      %ReqAI.ContentPart{type: :tool_call, tool_call_id: "call_123", tool_name: "get_weather", input: %{location: "NYC"}}
+      %ReqLLM.ContentPart{type: :tool_call, tool_call_id: "call_123", tool_name: "get_weather", input: %{location: "NYC"}}
 
   """
   @spec tool_use_part(String.t(), String.t(), map(), keyword()) :: ContentPart.t()
@@ -78,7 +78,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> tool_result_part("call_123", "get_weather", %{temperature: 72})
-      %ReqAI.ContentPart{type: :tool_result, tool_call_id: "call_123", tool_name: "get_weather", output: %{temperature: 72}}
+      %ReqLLM.ContentPart{type: :tool_result, tool_call_id: "call_123", tool_name: "get_weather", output: %{temperature: 72}}
 
   """
   @spec tool_result_part(String.t(), String.t(), any(), keyword()) :: ContentPart.t()
@@ -100,10 +100,10 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> user_msg("Hello")
-      %ReqAI.Message{role: :user, content: "Hello"}
+      %ReqLLM.Message{role: :user, content: "Hello"}
 
       iex> user_msg([text_part("Hello"), image_part("https://example.com/image.png")])
-      %ReqAI.Message{role: :user, content: [%ReqAI.ContentPart{...}, ...]}
+      %ReqLLM.Message{role: :user, content: [%ReqLLM.ContentPart{...}, ...]}
 
   """
   @spec user_msg(String.t() | [ContentPart.t()], keyword()) :: Message.t()
@@ -122,10 +122,10 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> assistant_msg("Hello back")
-      %ReqAI.Message{role: :assistant, content: "Hello back"}
+      %ReqLLM.Message{role: :assistant, content: "Hello back"}
 
       iex> assistant_msg("I'll help you", name: "assistant")
-      %ReqAI.Message{role: :assistant, content: "I'll help you", name: "assistant"}
+      %ReqLLM.Message{role: :assistant, content: "I'll help you", name: "assistant"}
 
   """
   @spec assistant_msg(String.t() | [ContentPart.t()], keyword()) :: Message.t()
@@ -145,7 +145,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> system_msg("You are a helpful assistant")
-      %ReqAI.Message{role: :system, content: "You are a helpful assistant"}
+      %ReqLLM.Message{role: :system, content: "You are a helpful assistant"}
 
   """
   @spec system_msg(String.t() | [ContentPart.t()], keyword()) :: Message.t()
@@ -164,7 +164,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> tool_msg("call_123", [tool_result_part("call_123", "get_weather", %{temperature: 72})])
-      %ReqAI.Message{role: :tool, tool_call_id: "call_123", content: [%ReqAI.ContentPart{...}]}
+      %ReqLLM.Message{role: :tool, tool_call_id: "call_123", content: [%ReqLLM.ContentPart{...}]}
 
   """
   @spec tool_msg(String.t(), [ContentPart.t()], keyword()) :: Message.t()
@@ -241,7 +241,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> simple_schema()
-      %ReqAI.ObjectSchema{output_type: :object, properties: [name: [type: :string, required: true]]}
+      %ReqLLM.ObjectSchema{output_type: :object, properties: [name: [type: :string, required: true]]}
 
   """
   @spec simple_schema(keyword()) :: ObjectSchema.t()
@@ -264,7 +264,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> complex_schema()
-      %ReqAI.ObjectSchema{output_type: :object, properties: [...]}
+      %ReqLLM.ObjectSchema{output_type: :object, properties: [...]}
 
   """
   @spec complex_schema(keyword()) :: ObjectSchema.t()
@@ -301,7 +301,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> enum_schema(["red", "green", "blue"])
-      %ReqAI.ObjectSchema{output_type: :enum, enum_values: ["red", "green", "blue"]}
+      %ReqLLM.ObjectSchema{output_type: :enum, enum_values: ["red", "green", "blue"]}
 
   """
   @spec enum_schema([String.t()], keyword()) :: ObjectSchema.t()
@@ -321,7 +321,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> array_schema()
-      %ReqAI.ObjectSchema{output_type: :array, properties: [...]}
+      %ReqLLM.ObjectSchema{output_type: :array, properties: [...]}
 
   """
   @spec array_schema(keyword()) :: ObjectSchema.t()
@@ -392,7 +392,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> basic_conversation()
-      [%ReqAI.Message{role: :system, ...}, %ReqAI.Message{role: :user, ...}]
+      [%ReqLLM.Message{role: :system, ...}, %ReqLLM.Message{role: :user, ...}]
 
   """
   @spec basic_conversation(keyword()) :: [Message.t()]
@@ -412,7 +412,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> multimodal_conversation()
-      [%ReqAI.Message{role: :user, content: [...]}, ...]
+      [%ReqLLM.Message{role: :user, content: [...]}, ...]
 
   """
   @spec multimodal_conversation(keyword()) :: [Message.t()]
@@ -434,7 +434,7 @@ defmodule ReqAI.Test.Factory do
   ## Examples
 
       iex> tool_conversation()
-      [%ReqAI.Message{role: :user, ...}, %ReqAI.Message{role: :assistant, ...}, ...]
+      [%ReqLLM.Message{role: :user, ...}, %ReqLLM.Message{role: :assistant, ...}, ...]
 
   """
   @spec tool_conversation(keyword()) :: [Message.t()]

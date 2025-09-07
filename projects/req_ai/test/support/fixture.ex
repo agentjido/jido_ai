@@ -1,4 +1,4 @@
-defmodule ReqAI.Test.Fixture do
+defmodule ReqLLM.Test.Fixture do
   @moduledoc """
   Test fixture helper for loading JSON response fixtures.
   """
@@ -10,7 +10,7 @@ defmodule ReqAI.Test.Fixture do
 
   ## Examples
 
-      iex> ReqAI.Test.Fixture.json!(:anthropic, "success.json")
+      iex> ReqLLM.Test.Fixture.json!(:anthropic, "success.json")
       %{"content" => [%{"text" => "Hello!"}]}
 
   """

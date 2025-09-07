@@ -1,4 +1,4 @@
-defmodule ReqAI.Providers.ToolCallingTest do
+defmodule ReqLLM.Providers.ToolCallingTest do
   use ExUnit.Case, async: true
 
   describe "OpenAI provider tool calling integration" do
@@ -23,7 +23,7 @@ defmodule ReqAI.Providers.ToolCallingTest do
         tool_choice: "auto"
       ]
 
-      {:ok, request} = ReqAI.Providers.OpenAI.build_request("Hello", [], opts)
+      {:ok, request} = ReqLLM.Providers.OpenAI.build_request("Hello", [], opts)
 
       # Verify the request contains the tools in the correct format
       assert request.options[:json]["tools"] == [
@@ -61,7 +61,7 @@ defmodule ReqAI.Providers.ToolCallingTest do
         tool_choice: "get_weather"
       ]
 
-      {:ok, request} = ReqAI.Providers.OpenAI.build_request("Hello", [], opts)
+      {:ok, request} = ReqLLM.Providers.OpenAI.build_request("Hello", [], opts)
 
       assert request.options[:json]["tool_choice"] == %{
                "type" => "function",
@@ -72,7 +72,7 @@ defmodule ReqAI.Providers.ToolCallingTest do
     test "build_request/3 without tools excludes tools from body" do
       opts = [model: "gpt-4"]
 
-      {:ok, request} = ReqAI.Providers.OpenAI.build_request("Hello", [], opts)
+      {:ok, request} = ReqLLM.Providers.OpenAI.build_request("Hello", [], opts)
 
       refute Map.has_key?(request.options[:json], "tools")
       refute Map.has_key?(request.options[:json], "tool_choice")
@@ -101,7 +101,7 @@ defmodule ReqAI.Providers.ToolCallingTest do
         tool_choice: "auto"
       ]
 
-      {:ok, request} = ReqAI.Providers.Anthropic.build_request("Hello", [], opts)
+      {:ok, request} = ReqLLM.Providers.Anthropic.build_request("Hello", [], opts)
 
       # Verify the request contains the tools in the correct format
       assert request.options[:json]["tools"] == [
@@ -136,7 +136,7 @@ defmodule ReqAI.Providers.ToolCallingTest do
         tool_choice: "get_weather"
       ]
 
-      {:ok, request} = ReqAI.Providers.Anthropic.build_request("Hello", [], opts)
+      {:ok, request} = ReqLLM.Providers.Anthropic.build_request("Hello", [], opts)
 
       assert request.options[:json]["tool_choice"] == %{"type" => "tool", "name" => "get_weather"}
     end
@@ -144,7 +144,7 @@ defmodule ReqAI.Providers.ToolCallingTest do
     test "build_request/3 without tools excludes tools from body" do
       opts = [model: "claude-3-haiku-20240307"]
 
-      {:ok, request} = ReqAI.Providers.Anthropic.build_request("Hello", [], opts)
+      {:ok, request} = ReqLLM.Providers.Anthropic.build_request("Hello", [], opts)
 
       refute Map.has_key?(request.options[:json], "tools")
       refute Map.has_key?(request.options[:json], "tool_choice")
@@ -174,7 +174,7 @@ defmodule ReqAI.Providers.ToolCallingTest do
         }
       }
 
-      {:ok, result} = ReqAI.Providers.OpenAI.parse_response(response, [], [])
+      {:ok, result} = ReqLLM.Providers.OpenAI.parse_response(response, [], [])
 
       assert result == %{
                tool_calls: [
@@ -203,7 +203,7 @@ defmodule ReqAI.Providers.ToolCallingTest do
         }
       }
 
-      {:ok, result} = ReqAI.Providers.Anthropic.parse_response(response, [], [])
+      {:ok, result} = ReqLLM.Providers.Anthropic.parse_response(response, [], [])
 
       assert result == %{
                tool_calls: [

@@ -1,4 +1,4 @@
-# ReqAI – Focused Implementation Feedback  
+# ReqLLM – Focused Implementation Feedback  
 **Reviewer:** Amp Oracle  
 **Date:** September 6 2025  
 
@@ -73,10 +73,10 @@ end
 
 ## 2. Build Option Schemas Programmatically
 
-The two NimbleOptions schemas in `req_ai.ex` share ~90 % of fields.
+The two NimbleOptions schemas in `req_llm.ex` share ~90 % of fields.
 
 ```elixir
-# req_ai.ex
+# req_llm.ex
 @base_gen_opts [
   temperature:        [type: :float, doc: "..."],
   max_tokens:         [type: :pos_integer, doc: "..."],
@@ -103,9 +103,9 @@ Problem: 16+ bespoke error structs slow compilation and obscure the public surfa
 Action plan (without abandoning Splode):
 
 1. Keep three public error structs  
-   • `ReqAI.Error.Invalid` (input / config)  
-   • `ReqAI.Error.API`      (HTTP and provider faults)  
-   • `ReqAI.Error.Validation` (schema & result validation)  
+   • `ReqLLM.Error.Invalid` (input / config)  
+   • `ReqLLM.Error.API`      (HTTP and provider faults)  
+   • `ReqLLM.Error.Validation` (schema & result validation)  
 
 2. All other Splode modules become private helpers or folded into the three above via `:class` tags.
 
@@ -113,7 +113,7 @@ Example:
 
 ```elixir
 # Replace many tiny modules with tagged variants
-defmodule ReqAI.Error.API do
+defmodule ReqLLM.Error.API do
   use Splode.Error, class: :api, fields: [:tag, :reason, :status, :data]
 
   def message(%{tag: :request, status: s, reason: r}),   do: "HTTP #{s}: #{r}"
@@ -125,7 +125,7 @@ end
 3. Update callers gradually:
 
 ```elixir
-{:error, ReqAI.Error.API.exception(tag: :request, status: 500, reason: "Timeout")}
+{:error, ReqLLM.Error.API.exception(tag: :request, status: 500, reason: "Timeout")}
 ```
 
 Outcome: same Splode semantics, faster compile times, simpler error matching.
@@ -146,7 +146,7 @@ def generate_text(model, prompt, opts) when is_list(prompt),
 ```
 
 ### 4.2 Model Spec Coercion
-Centralise parsing in `ReqAI.Model.new/1`:
+Centralise parsing in `ReqLLM.Model.new/1`:
 
 ```elixir
 def new("openai:" <> rest), do: parse_string(:openai, rest, [])
@@ -156,7 +156,7 @@ def new({provider, kw}) when is_atom(provider) and is_list(kw), do: struct(__MOD
 Implement `String.Chars`:
 
 ```elixir
-defimpl String.Chars, for: ReqAI.Model do
+defimpl String.Chars, for: ReqLLM.Model do
   def to_string(%{provider: p, model: m}), do: "#{p}:#{m}"
 end
 ```
@@ -182,7 +182,7 @@ Internally merge per-message metadata:
 ```elixir
 merged_opts =
   messages
-  |> Enum.flat_map(&ReqAI.Message.provider_options/1)
+  |> Enum.flat_map(&ReqLLM.Message.provider_options/1)
   |> Enum.into(opts[:provider_options] || %{})
 ```
 
@@ -220,8 +220,8 @@ Advantages:
 - [ ] Introduce `@base_gen_opts`, regenerate schemas.
 - [ ] Consolidate Splode error modules into three public structs.
 - [ ] Implement IO list support in generation APIs.
-- [ ] Add `ReqAI.Model.new/1` and protocol implementations.
+- [ ] Add `ReqLLM.Model.new/1` and protocol implementations.
 - [ ] Return finite `Stream` from `stream_text/3` and `stream_object/4`.
 - [ ] Merge message-level provider options into top-level opts.
 
-Implementing these targeted changes will make ReqAI more idiomatic, performant, and ergonomic while preserving the current architecture.
+Implementing these targeted changes will make ReqLLM more idiomatic, performant, and ergonomic while preserving the current architecture.

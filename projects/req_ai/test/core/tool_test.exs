@@ -1,8 +1,8 @@
-defmodule ReqAI.ToolTest do
+defmodule ReqLLM.ToolTest do
   use ExUnit.Case, async: true
 
-  alias ReqAI.Error
-  alias ReqAI.Tool
+  alias ReqLLM.Error
+  alias ReqLLM.Tool
 
   describe "new/1" do
     test "creates tool with minimal options" do

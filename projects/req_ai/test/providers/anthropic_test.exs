@@ -1,12 +1,12 @@
-defmodule ReqAI.Providers.AnthropicTest do
-  use ReqAI.ProviderCase, module: ReqAI.Providers.Anthropic
+defmodule ReqLLM.Providers.AnthropicTest do
+  use ReqLLM.ProviderCase, module: ReqLLM.Providers.Anthropic
 
   # Provider-specific tests beyond the standard ProviderCase tests
   describe "anthropic-specific behavior" do
     test "includes required Anthropic headers" do
       spec = @mod.spec()
-      default_model = ReqAI.Provider.Utils.default_model(spec)
-      messages = [%ReqAI.Message{role: :user, content: "Hello"}]
+      default_model = ReqLLM.Provider.Utils.default_model(spec)
+      messages = [%ReqLLM.Message{role: :user, content: "Hello"}]
 
       assert {:ok, req} = @mod.build_request(messages, [], model: default_model)
 
@@ -18,8 +18,8 @@ defmodule ReqAI.Providers.AnthropicTest do
 
     test "sets correct request structure" do
       spec = @mod.spec()
-      default_model = ReqAI.Provider.Utils.default_model(spec)
-      messages = [%ReqAI.Message{role: :user, content: "Hello"}]
+      default_model = ReqLLM.Provider.Utils.default_model(spec)
+      messages = [%ReqLLM.Message{role: :user, content: "Hello"}]
 
       assert {:ok, req} = @mod.build_request(messages, [], model: default_model)
 

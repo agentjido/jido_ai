@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.ReqAi.ModelSync do
+defmodule Mix.Tasks.ReqLLM.ModelSync do
   @moduledoc """
   Simplified model synchronization task.
 
@@ -8,10 +8,10 @@ defmodule Mix.Tasks.ReqAi.ModelSync do
   ## Usage
 
       # Sync models from models.dev
-      mix req_ai.model_sync
+      mix req_llm.model_sync
 
       # Verbose output
-      mix req_ai.model_sync --verbose
+      mix req_llm.model_sync --verbose
 
   ## Output Structure
 
@@ -50,7 +50,7 @@ defmodule Mix.Tasks.ReqAi.ModelSync do
 
   @impl Mix.Task
   def run(args) do
-    {:ok, _} = Application.ensure_all_started(:req_ai)
+    {:ok, _} = Application.ensure_all_started(:req_llm)
 
     {opts, _, _} =
       OptionParser.parse(args,
@@ -103,14 +103,14 @@ defmodule Mix.Tasks.ReqAi.ModelSync do
 
       {:ok, %{status: status}} ->
         {:error,
-         ReqAI.Error.API.Response.exception(
+         ReqLLM.Error.API.Response.exception(
            reason: "models.dev API returned status #{status}",
            status: status
          )}
 
       {:error, reason} ->
         {:error,
-         ReqAI.Error.API.Request.exception(
+         ReqLLM.Error.API.Request.exception(
            reason: "Failed to fetch models.dev data: #{inspect(reason)}"
          )}
     end

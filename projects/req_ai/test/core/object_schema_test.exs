@@ -1,10 +1,10 @@
-defmodule ReqAI.ObjectSchemaTest do
+defmodule ReqLLM.ObjectSchemaTest do
   use ExUnit.Case, async: true
-  doctest ReqAI.ObjectSchema
+  doctest ReqLLM.ObjectSchema
 
-  import ReqAI.Test.{Factory, Macros}
+  import ReqLLM.Test.{Factory, Macros}
 
-  alias ReqAI.ObjectSchema
+  alias ReqLLM.ObjectSchema
 
   describe "constructors" do
     test "creates object schema" do

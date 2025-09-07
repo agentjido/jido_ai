@@ -1,9 +1,9 @@
-defmodule ReqAI.MessageTest do
+defmodule ReqLLM.MessageTest do
   use ExUnit.Case, async: true
 
-  import ReqAI.Test.{Factory, Macros}
+  import ReqLLM.Test.{Factory, Macros}
 
-  alias ReqAI.{Message, ContentPart}
+  alias ReqLLM.{Message, ContentPart}
 
   doctest Message
 

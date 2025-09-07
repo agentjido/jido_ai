@@ -1,6 +1,6 @@
-defmodule ReqAI.Test.Macros do
+defmodule ReqLLM.Test.Macros do
   @moduledoc """
-  Test utility macros and helper functions for ReqAI testing.
+  Test utility macros and helper functions for ReqLLM testing.
 
   Provides macros for parameterized testing, scenario-based testing,
   and common assertion patterns to improve test readability and reduce duplication.
@@ -13,7 +13,7 @@ defmodule ReqAI.Test.Macros do
 
       defmodule MyTest do
         use ExUnit.Case
-        import ReqAI.Test.Macros
+        import ReqLLM.Test.Macros
 
         parameterized_test "validates input", [
           {"valid string", "hello", true},
@@ -45,7 +45,7 @@ defmodule ReqAI.Test.Macros do
 
       defmodule MyTest do
         use ExUnit.Case
-        import ReqAI.Test.Macros
+        import ReqLLM.Test.Macros
 
         with_cases "message validation", %{
           "user message" => %{role: :user, content: "hello"},
@@ -256,7 +256,7 @@ defmodule ReqAI.Test.Macros do
   """
   @spec with_temp_file(String.t(), (String.t() -> any())) :: any()
   def with_temp_file(content, fun) do
-    temp_file = System.tmp_dir!() |> Path.join("req_ai_test_#{:rand.uniform(1_000_000)}")
+    temp_file = System.tmp_dir!() |> Path.join("req_llm_test_#{:rand.uniform(1_000_000)}")
 
     try do
       File.write!(temp_file, content)

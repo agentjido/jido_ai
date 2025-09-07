@@ -1,8 +1,8 @@
-defmodule ReqAI.Plugins.TokenUsageTest do
+defmodule ReqLLM.Plugins.TokenUsageTest do
   use ExUnit.Case, async: true
 
-  alias ReqAI.Plugins.TokenUsage
-  alias ReqAI.Model
+  alias ReqLLM.Plugins.TokenUsage
+  alias ReqLLM.Model
 
   describe "attach/2" do
     test "attaches plugin to request" do
@@ -13,7 +13,7 @@ defmodule ReqAI.Plugins.TokenUsageTest do
 
       # Check that the plugin is attached
       assert Keyword.has_key?(attached_req.response_steps, :token_usage)
-      assert attached_req.private[:req_ai_model] == model
+      assert attached_req.private[:req_llm_model] == model
     end
 
     test "works without model" do
@@ -22,7 +22,7 @@ defmodule ReqAI.Plugins.TokenUsageTest do
       attached_req = TokenUsage.attach(req)
 
       assert Keyword.has_key?(attached_req.response_steps, :token_usage)
-      refute Map.has_key?(attached_req.private, :req_ai_model)
+      refute Map.has_key?(attached_req.private, :req_llm_model)
     end
   end
 
@@ -31,7 +31,7 @@ defmodule ReqAI.Plugins.TokenUsageTest do
       model = Model.new(:openai, "gpt-4", cost: %{input: 0.03, output: 0.06})
 
       request = %Req.Request{
-        private: %{req_ai_model: model}
+        private: %{req_llm_model: model}
       }
 
       response = %Req.Response{
@@ -53,14 +53,14 @@ defmodule ReqAI.Plugins.TokenUsageTest do
         cost: 0.006
       }
 
-      assert get_in(result.private, [:req_ai, :usage]) == expected_usage
+      assert get_in(result.private, [:req_llm, :usage]) == expected_usage
     end
 
     test "extracts usage from Anthropic format response" do
       model = Model.new(:anthropic, "claude-3", cost: %{input: 0.003, output: 0.015})
 
       request = %Req.Request{
-        private: %{req_ai_model: model}
+        private: %{req_llm_model: model}
       }
 
       response = %Req.Response{
@@ -82,14 +82,14 @@ defmodule ReqAI.Plugins.TokenUsageTest do
         cost: 0.0021
       }
 
-      assert get_in(result.private, [:req_ai, :usage]) == expected_usage
+      assert get_in(result.private, [:req_llm, :usage]) == expected_usage
     end
 
     test "handles missing usage data gracefully" do
       model = Model.new(:openai, "gpt-4")
 
       request = %Req.Request{
-        private: %{req_ai_model: model}
+        private: %{req_llm_model: model}
       }
 
       response = %Req.Response{
@@ -109,7 +109,7 @@ defmodule ReqAI.Plugins.TokenUsageTest do
       model = Model.new(:openai, "gpt-4", cost: nil)
 
       request = %Req.Request{
-        private: %{req_ai_model: model}
+        private: %{req_llm_model: model}
       }
 
       response = %Req.Response{
@@ -130,7 +130,7 @@ defmodule ReqAI.Plugins.TokenUsageTest do
         cost: nil
       }
 
-      assert get_in(result.private, [:req_ai, :usage]) == expected_usage
+      assert get_in(result.private, [:req_llm, :usage]) == expected_usage
     end
 
     test "handles missing model gracefully" do
@@ -162,7 +162,7 @@ defmodule ReqAI.Plugins.TokenUsageTest do
 
       :telemetry.attach(
         "test-token-usage",
-        [:req_ai, :token_usage],
+        [:req_llm, :token_usage],
         fn event, measurements, metadata, _config ->
           send(test_pid, {:telemetry, event, measurements, metadata})
         end,
@@ -170,7 +170,7 @@ defmodule ReqAI.Plugins.TokenUsageTest do
       )
 
       request = %Req.Request{
-        private: %{req_ai_model: model}
+        private: %{req_llm_model: model}
       }
 
       response = %Req.Response{
@@ -187,7 +187,7 @@ defmodule ReqAI.Plugins.TokenUsageTest do
       TokenUsage.handle({request, response})
 
       # Should receive telemetry event
-      assert_received {:telemetry, [:req_ai, :token_usage], measurements, metadata}
+      assert_received {:telemetry, [:req_llm, :token_usage], measurements, metadata}
       assert measurements.tokens == %{input: 100, output: 50}
       assert measurements.cost == 0.006
       assert metadata.model == model

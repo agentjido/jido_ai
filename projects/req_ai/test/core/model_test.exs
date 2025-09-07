@@ -1,9 +1,9 @@
-defmodule ReqAI.ModelTest do
+defmodule ReqLLM.ModelTest do
   use ExUnit.Case, async: true
 
-  import ReqAI.Test.Macros
+  import ReqLLM.Test.Macros
 
-  alias ReqAI.Model
+  alias ReqLLM.Model
 
   describe "new/3" do
     test "creates model with required fields" do
@@ -123,7 +123,7 @@ defmodule ReqAI.ModelTest do
     end
 
     test "raises exception on error" do
-      assert_raise ReqAI.Error.Validation.Error, fn ->
+      assert_raise ReqLLM.Error.Validation.Error, fn ->
         Model.from!("invalid-format")
       end
     end

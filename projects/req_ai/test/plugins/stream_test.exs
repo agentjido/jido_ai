@@ -1,7 +1,7 @@
-defmodule ReqAI.Plugins.StreamTest do
+defmodule ReqLLM.Plugins.StreamTest do
   use ExUnit.Case, async: true
 
-  alias ReqAI.Plugins.Stream
+  alias ReqLLM.Plugins.Stream
 
   describe "attach/1" do
     test "attaches stream_sse step to response" do

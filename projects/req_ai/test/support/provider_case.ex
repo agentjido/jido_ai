@@ -1,4 +1,4 @@
-defmodule ReqAI.ProviderCase do
+defmodule ReqLLM.ProviderCase do
   @moduledoc """
   Test case template for provider adapters.
 
@@ -7,8 +7,8 @@ defmodule ReqAI.ProviderCase do
 
   ## Usage
 
-      defmodule ReqAI.Providers.AnthropicTest do
-        use ReqAI.ProviderCase, module: ReqAI.Providers.Anthropic
+      defmodule ReqLLM.Providers.AnthropicTest do
+        use ReqLLM.ProviderCase, module: ReqLLM.Providers.Anthropic
         
         # Optional: skip standard tests
         # @skip [:generate_text_error_path]
@@ -23,14 +23,14 @@ defmodule ReqAI.ProviderCase do
 
   use ExUnit.CaseTemplate
   import Req.Test
-  import ReqAI.Test.Fixture
+  import ReqLLM.Test.Fixture
 
   using opts do
     quote do
       import Req.Test
-      import ReqAI.Test.Fixture
+      import ReqLLM.Test.Fixture
 
-      alias ReqAI.{Model, Error}
+      alias ReqLLM.{Model, Error}
 
       @mod unquote(opts[:module] || raise("module: provider module required"))
 
@@ -51,8 +51,8 @@ defmodule ReqAI.ProviderCase do
       describe "build_request/3" do
         test "returns {:ok, %Req.Request{}}" do
           spec = @mod.spec()
-          default_model = ReqAI.Provider.Utils.default_model(spec)
-          messages = [%ReqAI.Message{role: :user, content: "Hello"}]
+          default_model = ReqLLM.Provider.Utils.default_model(spec)
+          messages = [%ReqLLM.Message{role: :user, content: "Hello"}]
 
           assert {:ok, %Req.Request{method: :post} = req} =
                    @mod.build_request(messages, [], model: default_model)
@@ -64,8 +64,8 @@ defmodule ReqAI.ProviderCase do
 
         test "handles provider options" do
           spec = @mod.spec()
-          default_model = ReqAI.Provider.Utils.default_model(spec)
-          messages = [%ReqAI.Message{role: :user, content: "Hello"}]
+          default_model = ReqLLM.Provider.Utils.default_model(spec)
+          messages = [%ReqLLM.Message{role: :user, content: "Hello"}]
 
           assert {:ok, %Req.Request{}} =
                    @mod.build_request(messages, [temperature: 0.5], model: default_model)
@@ -102,7 +102,7 @@ defmodule ReqAI.ProviderCase do
       # For now, focus on unit testing build_request and parse_response directly
 
       # Allow the caller to inject extra behavior or skip tests
-      @before_compile ReqAI.ProviderCase
+      @before_compile ReqLLM.ProviderCase
     end
   end
 

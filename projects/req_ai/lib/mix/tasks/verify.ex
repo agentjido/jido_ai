@@ -1,12 +1,12 @@
-defmodule Mix.Tasks.ReqAi.Verify do
+defmodule Mix.Tasks.ReqLLM.Verify do
   @moduledoc """
   Verify advertised capabilities of a model or all models from a provider.
 
   ## Usage
 
-      mix req_ai.verify anthropic:claude-3-sonnet
-      mix req_ai.verify anthropic --only generate_text --format debug
-      mix req_ai.verify openai:gpt-4o --timeout 30000
+      mix req_llm.verify anthropic:claude-3-sonnet
+      mix req_llm.verify anthropic --only generate_text --format debug
+      mix req_llm.verify openai:gpt-4o --timeout 30000
 
   ## Options
 
@@ -83,7 +83,7 @@ defmodule Mix.Tasks.ReqAi.Verify do
     case String.contains?(input, ":") do
       true ->
         # Full model spec like "anthropic:claude-3-sonnet"
-        ReqAI.CapabilityVerifier.verify(input, opts)
+        ReqLLM.CapabilityVerifier.verify(input, opts)
 
       false ->
         # Provider-only string like "anthropic"
@@ -103,7 +103,7 @@ defmodule Mix.Tasks.ReqAi.Verify do
           |> Enum.map(fn model_id ->
             Mix.shell().info("\n--- Verifying #{model_id} ---")
 
-            case ReqAI.CapabilityVerifier.verify(model_id, opts) do
+            case ReqLLM.CapabilityVerifier.verify(model_id, opts) do
               :ok ->
                 Mix.shell().info("✅ #{model_id} passed")
                 :ok
@@ -127,7 +127,7 @@ defmodule Mix.Tasks.ReqAi.Verify do
 
   # Loads all model IDs for a given provider
   defp load_provider_models(provider_string) do
-    priv_dir = Application.app_dir(:req_ai, "priv")
+    priv_dir = Application.app_dir(:req_llm, "priv")
     provider_path = Path.join([priv_dir, "models_dev", "#{provider_string}.json"])
 
     case File.read(provider_path) do
@@ -161,7 +161,7 @@ defmodule Mix.Tasks.ReqAi.Verify do
 
   defp show_help do
     Mix.shell().info("""
-    Usage: mix req_ai.verify MODEL_ID|PROVIDER [OPTIONS]
+    Usage: mix req_llm.verify MODEL_ID|PROVIDER [OPTIONS]
 
     Verify that a model or all models from a provider can perform their advertised capabilities.
 
@@ -177,9 +177,9 @@ defmodule Mix.Tasks.ReqAi.Verify do
       --help, -h       Show this help
 
     Examples:
-      mix req_ai.verify anthropic:claude-3-sonnet
-      mix req_ai.verify anthropic --only generate_text --format debug
-      mix req_ai.verify openai:gpt-4o --timeout 30000
+      mix req_llm.verify anthropic:claude-3-sonnet
+      mix req_llm.verify anthropic --only generate_text --format debug
+      mix req_llm.verify openai:gpt-4o --timeout 30000
     """)
   end
 end

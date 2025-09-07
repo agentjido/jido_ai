@@ -1,9 +1,9 @@
-defmodule ReqAI.ContentPartTest do
+defmodule ReqLLM.ContentPartTest do
   use ExUnit.Case, async: true
 
-  import ReqAI.Test.{Factory, Macros}
+  import ReqLLM.Test.{Factory, Macros}
 
-  alias ReqAI.ContentPart
+  alias ReqLLM.ContentPart
 
   doctest ContentPart
 

@@ -1,8 +1,8 @@
-defmodule ReqAI.ProviderTest do
+defmodule ReqLLM.ProviderTest do
   use ExUnit.Case, async: true
-  doctest ReqAI.Provider
+  doctest ReqLLM.Provider
 
-  alias ReqAI.Provider
+  alias ReqLLM.Provider
 
   describe "new/4" do
     test "creates provider with required fields" do
@@ -15,7 +15,7 @@ defmodule ReqAI.ProviderTest do
     end
 
     test "creates provider with models" do
-      model = ReqAI.Model.new(:test_provider, "test-model")
+      model = ReqLLM.Model.new(:test_provider, "test-model")
       models = %{"model1" => model}
       provider = Provider.new(:test, "Test Provider", "https://api.test.com", models)
 

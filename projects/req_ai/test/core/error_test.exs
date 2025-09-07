@@ -1,8 +1,8 @@
-defmodule ReqAI.ErrorTest do
+defmodule ReqLLM.ErrorTest do
   use ExUnit.Case, async: true
-  doctest ReqAI.Error
+  doctest ReqLLM.Error
 
-  alias ReqAI.Error
+  alias ReqLLM.Error
 
   # Core error test cases with {module, exception_args, expected_message_fragment, expected_class}
   @error_test_cases [
