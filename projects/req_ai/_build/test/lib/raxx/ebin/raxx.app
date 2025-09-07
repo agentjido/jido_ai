@@ -1,0 +1,13 @@
+{application,raxx,
+             [{modules,['Elixir.Raxx','Elixir.Raxx.Context',
+                        'Elixir.Raxx.Data','Elixir.Raxx.HTTP1',
+                        'Elixir.Raxx.Middleware','Elixir.Raxx.Request',
+                        'Elixir.Raxx.Response','Elixir.Raxx.Router',
+                        'Elixir.Raxx.Server','Elixir.Raxx.SimpleServer',
+                        'Elixir.Raxx.Stack','Elixir.Raxx.Stack.State',
+                        'Elixir.Raxx.Tail','Elixir.ReturnError',raxx]},
+              {optional_applications,[]},
+              {applications,[kernel,stdlib,elixir,logger,ssl,eex]},
+              {description,"Interface for HTTP webservers, frameworks and clients.\n"},
+              {registered,[]},
+              {vsn,"1.1.0"}]}.
