@@ -197,8 +197,10 @@ defmodule ReqAI.Provider.DSL do
       def generate_text(model, messages, opts \\ []) do
         # Pass model through to HTTP layer for token usage tracking
         http_opts = Keyword.put(opts, :model, model)
+        # Pass model to build_request through opts
+        build_opts = Keyword.put(opts, :model, model)
 
-        with {:ok, request} <- build_request(messages, [], opts),
+        with {:ok, request} <- build_request(messages, [], build_opts),
              request_with_spec <- ReqAI.HTTP.with_provider_spec(request, spec()),
              {:ok, response} <- ReqAI.HTTP.send(request_with_spec, http_opts),
              {:ok, parsed} <- parse_response(response, [], opts) do
@@ -216,8 +218,10 @@ defmodule ReqAI.Provider.DSL do
         stream_opts = Keyword.put(opts, :stream?, true)
         # Pass model through to HTTP layer for token usage tracking
         http_opts = Keyword.put(stream_opts, :model, model)
+        # Pass model to build_request through opts
+        build_opts = Keyword.put(stream_opts, :model, model)
 
-        with {:ok, request} <- build_request(messages, [], stream_opts),
+        with {:ok, request} <- build_request(messages, [], build_opts),
              request_with_spec <- ReqAI.HTTP.with_provider_spec(request, spec()),
              {:ok, response} <- ReqAI.HTTP.send(request_with_spec, http_opts) do
           {:ok, response}

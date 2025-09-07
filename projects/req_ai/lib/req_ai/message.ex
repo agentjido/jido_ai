@@ -128,9 +128,10 @@ defmodule ReqAI.Message do
   Sets the role for the message being built.
   """
   @spec role(Builder.t(), role()) :: Builder.t()
-  def role(%Builder{} = builder, role) when role in [:user, :assistant, :system, :tool] do
-    %{builder | role: role}
-  end
+  def role(%Builder{} = builder, :user), do: %{builder | role: :user}
+  def role(%Builder{} = builder, :assistant), do: %{builder | role: :assistant}
+  def role(%Builder{} = builder, :system), do: %{builder | role: :system}
+  def role(%Builder{} = builder, :tool), do: %{builder | role: :tool}
 
   @doc """
   Adds text content to the message being built.
@@ -316,32 +317,27 @@ defmodule ReqAI.Message do
 
   """
   @spec valid?(t()) :: boolean()
-  def valid?(%__MODULE__{role: role, content: content, tool_call_id: tool_call_id})
-      when role in [:user, :assistant, :system, :tool] do
-    content_valid? =
-      case content do
-        content when is_binary(content) and content != "" ->
-          true
+  def valid?(%__MODULE__{role: :tool, content: content, tool_call_id: tool_call_id})
+      when is_binary(tool_call_id) and tool_call_id != "" do
+    content_valid?(content)
+  end
 
-        content when is_list(content) and content != [] ->
-          Enum.all?(content, &ContentPart.valid?/1)
+  def valid?(%__MODULE__{role: :tool}), do: false
 
-        _ ->
-          false
-      end
-
-    # Tool role messages must have a tool_call_id
-    tool_valid? =
-      case role do
-        :tool when is_binary(tool_call_id) and tool_call_id != "" -> true
-        :tool -> false
-        _ -> true
-      end
-
-    content_valid? and tool_valid?
+  def valid?(%__MODULE__{role: role, content: content})
+      when role in [:user, :assistant, :system] do
+    content_valid?(content)
   end
 
   def valid?(_), do: false
+
+  defp content_valid?(content) when is_binary(content) and content != "", do: true
+
+  defp content_valid?(content) when is_list(content) and content != [] do
+    Enum.all?(content, &ContentPart.valid?/1)
+  end
+
+  defp content_valid?(_), do: false
 
   @doc """
   Gets provider-specific options from message metadata.

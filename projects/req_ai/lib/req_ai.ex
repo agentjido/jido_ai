@@ -86,14 +86,18 @@ defmodule ReqAI do
                         type: :float,
                         doc: "Penalize new tokens based on frequency"
                       ],
-                      tools: [type: {:list, :map}, doc: "List of tool definitions"],
+                      tools: [type: :any, doc: "List of tool definitions"],
                       tool_choice: [
                         type: {:or, [:string, :atom, :map]},
                         default: "auto",
                         doc: "Tool choice strategy"
                       ],
                       system_prompt: [type: :string, doc: "System prompt to prepend"],
-                      provider_options: [type: :map, doc: "Provider-specific options"]
+                      provider_options: [type: :map, doc: "Provider-specific options"],
+                      reasoning: [
+                        type: {:in, [nil, false, true, "low", "auto", "high"]},
+                        doc: "Request reasoning tokens from the model"
+                      ]
                     )
 
   # Object generation schema - extends text options with additional fields
@@ -115,7 +119,7 @@ defmodule ReqAI do
                           type: :float,
                           doc: "Penalize new tokens based on frequency"
                         ],
-                        tools: [type: {:list, :map}, doc: "List of tool definitions"],
+                        tools: [type: :any, doc: "List of tool definitions"],
                         tool_choice: [
                           type: {:or, [:string, :atom, :map]},
                           default: "auto",
@@ -131,6 +135,10 @@ defmodule ReqAI do
                         enum_values: [
                           type: {:list, :string},
                           doc: "Allowed values when output_type is :enum"
+                        ],
+                        reasoning: [
+                          type: {:in, [nil, false, true, "low", "auto", "high"]},
+                          doc: "Request reasoning tokens from the model"
                         ]
                       )
 
@@ -461,12 +469,32 @@ defmodule ReqAI do
           String.t() | list(),
           keyword(),
           keyword()
-        ) :: {:ok, map()} | {:error, term()}
-  def generate_object(_model_spec, _messages, _schema, opts \\ []) do
-    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @object_opts_schema) do
-      # Implementation will delegate to provider
-      # This is a stub
-      {:error, ReqAI.Error.Invalid.NotImplemented.exception(feature: "generate_object")}
+        ) :: {:ok, map() | list() | String.t()} | {:error, ReqAI.Error.t()}
+  def generate_object(model_spec, messages, schema, opts \\ []) do
+    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @object_opts_schema),
+         {:ok, compiled_schema} <- compile_schema(schema),
+         {:ok, tool} <- create_response_tool(schema),
+         enhanced_opts <- prepare_tool_opts(validated_opts, tool),
+         {:ok, response} <- generate_text(model_spec, messages, enhanced_opts),
+         {:ok, model} <- ReqAI.Model.from(model_spec),
+         {:ok, provider_module} <- provider(model.provider),
+         {:ok, tool_args} <- parse_tool_response(response, provider_module),
+         {:ok, validated_result} <- validate_result(tool_args, compiled_schema) do
+      {:ok, validated_result}
+    else
+      {:error, %NimbleOptions.ValidationError{} = error} ->
+        {:error,
+         ReqAI.Error.Validation.Error.exception(
+           tag: :invalid_options,
+           reason: Exception.message(error),
+           context: []
+         )}
+
+      {:error, :not_found} ->
+        {:error, ReqAI.Error.Invalid.Provider.exception(provider: "unknown")}
+
+      error ->
+        error
     end
   end
 
@@ -502,11 +530,41 @@ defmodule ReqAI do
           keyword(),
           keyword()
         ) :: {:ok, Enumerable.t()} | {:error, term()}
-  def stream_object(_model_spec, _messages, _schema, opts \\ []) do
-    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @object_opts_schema) do
-      # Implementation will delegate to provider
-      # This is a stub
-      {:error, ReqAI.Error.Invalid.NotImplemented.exception(feature: "stream_object")}
+  def stream_object(model_spec, messages, schema, opts \\ []) do
+    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @object_opts_schema),
+         {:ok, compiled_schema} <- compile_schema(schema),
+         {:ok, tool} <- create_response_tool(schema),
+         enhanced_opts <- prepare_tool_opts(validated_opts, tool),
+         streaming_opts <- Keyword.merge(enhanced_opts, stream?: true, return_response: true),
+         {:ok, response} <- stream_text(model_spec, messages, streaming_opts),
+         {:ok, model} <- ReqAI.Model.from(model_spec),
+         {:ok, provider_module} <- provider(model.provider) do
+      # Build the validating stream
+      validating_stream =
+        build_validating_stream(
+          response.body,
+          provider_module,
+          compiled_schema,
+          "response_object"
+        )
+
+      # Return the stream in the same response structure for consistency
+      updated_response = %{response | body: validating_stream}
+      {:ok, updated_response}
+    else
+      {:error, %NimbleOptions.ValidationError{} = error} ->
+        {:error,
+         ReqAI.Error.Validation.Error.exception(
+           tag: :invalid_options,
+           reason: Exception.message(error),
+           context: []
+         )}
+
+      {:error, :not_found} ->
+        {:error, ReqAI.Error.Invalid.Provider.exception(provider: "unknown")}
+
+      error ->
+        error
     end
   end
 
@@ -669,5 +727,258 @@ defmodule ReqAI do
       {:ok, content, _} -> {:ok, content, nil}
       {:error, error} -> {:error, error}
     end
+  end
+
+  # Private helper functions for generate_object/4
+
+  defp compile_schema(schema) when is_list(schema) do
+    try do
+      {:ok, NimbleOptions.new!(schema)}
+    rescue
+      e ->
+        {:error,
+         ReqAI.Error.Validation.Error.exception(
+           tag: :invalid_schema,
+           reason: "Invalid schema: #{Exception.message(e)}",
+           context: [schema: schema]
+         )}
+    end
+  end
+
+  defp compile_schema(schema) do
+    {:error,
+     ReqAI.Error.Invalid.Parameter.exception(
+       parameter: "Schema must be a keyword list, got: #{inspect(schema)}"
+     )}
+  end
+
+  defp create_response_tool(schema) do
+    ReqAI.Tool.new(
+      name: "response_object",
+      description: "Return the response for the user request as arguments",
+      parameters: schema,
+      callback: fn args -> {:ok, args} end
+    )
+  end
+
+  defp prepare_tool_opts(validated_opts, tool) do
+    # Remove generate_object-specific options that don't apply to generate_text
+    text_opts =
+      validated_opts
+      |> Keyword.delete(:output_type)
+      |> Keyword.delete(:enum_values)
+
+    # Convert Tool struct to format expected by providers
+    provider_tool = convert_tool_for_provider(tool)
+
+    text_opts
+    |> Keyword.put(:tools, [provider_tool])
+    |> Keyword.put(:tool_choice, "response_object")
+  end
+
+  defp convert_tool_for_provider(%ReqAI.Tool{} = tool) do
+    %{
+      name: tool.name,
+      description: tool.description,
+      parameters_schema: parameters_to_json_schema(tool.parameters)
+    }
+  end
+
+  # Import the private function from ReqAI.Tool 
+  defp parameters_to_json_schema([]), do: %{"type" => "object", "properties" => %{}}
+
+  defp parameters_to_json_schema(parameters) do
+    {properties, required} =
+      Enum.reduce(parameters, {%{}, []}, fn {key, opts}, {props_acc, req_acc} ->
+        property_name = to_string(key)
+        json_prop = nimble_type_to_json_schema(opts[:type] || :string, opts)
+
+        new_props = Map.put(props_acc, property_name, json_prop)
+        new_req = if opts[:required], do: [property_name | req_acc], else: req_acc
+
+        {new_props, new_req}
+      end)
+
+    schema = %{
+      "type" => "object",
+      "properties" => properties
+    }
+
+    if required == [] do
+      schema
+    else
+      Map.put(schema, "required", Enum.reverse(required))
+    end
+  end
+
+  defp nimble_type_to_json_schema(type, opts) do
+    base_schema =
+      case type do
+        :string ->
+          %{"type" => "string"}
+
+        :integer ->
+          %{"type" => "integer"}
+
+        :pos_integer ->
+          %{"type" => "integer", "minimum" => 1}
+
+        :float ->
+          %{"type" => "number"}
+
+        :number ->
+          %{"type" => "number"}
+
+        :boolean ->
+          %{"type" => "boolean"}
+
+        {:list, :string} ->
+          %{"type" => "array", "items" => %{"type" => "string"}}
+
+        {:list, :integer} ->
+          %{"type" => "array", "items" => %{"type" => "integer"}}
+
+        {:list, item_type} ->
+          %{"type" => "array", "items" => nimble_type_to_json_schema(item_type, %{})}
+
+        :map ->
+          %{"type" => "object"}
+
+        _ ->
+          %{"type" => "string"}
+      end
+
+    case opts[:doc] do
+      nil -> base_schema
+      doc -> Map.put(base_schema, "description", doc)
+    end
+  end
+
+  defp parse_tool_response(%Req.Response{body: %{tool_calls: tool_calls}}, _provider_module)
+       when is_list(tool_calls) and tool_calls != [] do
+    case Enum.find(tool_calls, &(&1[:name] == "response_object")) do
+      %{arguments: args} ->
+        {:ok, args}
+
+      nil ->
+        {:error,
+         ReqAI.Error.API.Response.exception(
+           reason: "No response_object tool call found in response"
+         )}
+    end
+  end
+
+  defp parse_tool_response(%Req.Response{body: body}, provider_module) do
+    case provider_module.parse_tool_call(body, "response_object") do
+      {:ok, args} ->
+        {:ok, args}
+
+      {:error, :tool_not_found} ->
+        {:error,
+         ReqAI.Error.API.Response.exception(
+           reason: "No response_object tool call found in response"
+         )}
+
+      {:error, :no_tool_calls} ->
+        {:error, ReqAI.Error.API.Response.exception(reason: "No tool calls found in response")}
+
+      {:error, reason} ->
+        {:error,
+         ReqAI.Error.API.Response.exception(
+           reason: "Failed to parse tool call: #{inspect(reason)}"
+         )}
+    end
+  end
+
+  defp validate_result(tool_args, compiled_schema) do
+    case NimbleOptions.validate(tool_args, compiled_schema) do
+      {:ok, validated_result} ->
+        {:ok, validated_result}
+
+      {:error, error} ->
+        {:error,
+         ReqAI.Error.Validation.Error.exception(
+           tag: :result_validation,
+           reason: Exception.message(error),
+           context: [result: tool_args]
+         )}
+    end
+  end
+
+  # Helper functions for stream_object/4
+
+  defp build_validating_stream(stream, provider_module, compiled_schema, _tool_name) do
+    Stream.resource(
+      fn -> stream_tool_init(provider_module) end,
+      fn state ->
+        case Enum.take(stream, 1) do
+          [] ->
+            {:halt, state}
+
+          [chunk] ->
+            case stream_tool_accumulate(provider_module, chunk, state) do
+              {:ok, new_state} ->
+                {[], new_state}
+
+              {:ok, new_state, completed_args} ->
+                case validate_all(completed_args, compiled_schema) do
+                  {:ok, validated_results} ->
+                    {validated_results, new_state}
+
+                  {:error, error} ->
+                    raise error
+                end
+
+              {:error, error} ->
+                raise ReqAI.Error.API.Response.exception(
+                        reason: "Stream processing error: #{inspect(error)}"
+                      )
+            end
+        end
+      end,
+      fn _state -> :ok end
+    )
+  end
+
+  defp stream_tool_init(provider_module) do
+    if function_exported?(provider_module, :stream_tool_init, 1) do
+      provider_module.stream_tool_init("response_object")
+    else
+      %{}
+    end
+  end
+
+  defp stream_tool_accumulate(provider_module, chunk, state) do
+    if function_exported?(provider_module, :stream_tool_accumulate, 3) do
+      provider_module.stream_tool_accumulate(chunk, "response_object", state)
+    else
+      {:error, :not_implemented}
+    end
+  end
+
+  defp validate_all(args_list, compiled_schema) when is_list(args_list) do
+    try do
+      validated =
+        Enum.map(args_list, fn args ->
+          case NimbleOptions.validate(args, compiled_schema) do
+            {:ok, validated_args} -> validated_args
+            {:error, error} -> throw({:validation_error, error})
+          end
+        end)
+
+      {:ok, validated}
+    catch
+      {:validation_error, error} ->
+        {:error,
+         ReqAI.Error.Validation.Error.exception(
+           tag: :result_validation,
+           reason: Exception.message(error),
+           context: [result: args_list]
+         )}
+    end
+  end
+
+  defp validate_all(args, compiled_schema) do
+    validate_all([args], compiled_schema)
   end
 end

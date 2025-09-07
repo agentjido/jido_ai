@@ -93,7 +93,8 @@ defmodule ReqAI.CapabilityVerifier do
     [
       ReqAI.Capabilities.GenerateText,
       ReqAI.Capabilities.StreamText,
-      ReqAI.Capabilities.ToolCalling
+      ReqAI.Capabilities.ToolCalling,
+      ReqAI.Capabilities.Reasoning
     ]
   end
 

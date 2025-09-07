@@ -64,7 +64,7 @@ defmodule ReqAI.ObjectSchemaTest do
     test "enum validation" do
       schema = enum_schema(["small", "medium", "large"])
 
-      assert_ok(ObjectSchema.validate(schema, "medium"), "medium")
+      assert_ok(ObjectSchema.validate(schema, "medium"), :medium)
       assert_error(ObjectSchema.validate(schema, "extra-large"))
     end
 

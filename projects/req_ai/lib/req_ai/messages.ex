@@ -370,7 +370,10 @@ defmodule ReqAI.Messages do
 
   # Private validation helpers
 
-  defp validate_role(role) when role in [:user, :assistant, :system, :tool], do: :ok
+  defp validate_role(:user), do: :ok
+  defp validate_role(:assistant), do: :ok
+  defp validate_role(:system), do: :ok
+  defp validate_role(:tool), do: :ok
 
   defp validate_role(role),
     do: {:error, ReqAI.Error.Invalid.Role.exception(role: role)}
@@ -397,10 +400,12 @@ defmodule ReqAI.Messages do
          received: content
        )}
 
-  defp valid_content_part?(%ContentPart{type: type})
-       when type in [:text, :image_url, :image, :file, :tool_call, :tool_result],
-       do: true
-
+  defp valid_content_part?(%ContentPart{type: :text}), do: true
+  defp valid_content_part?(%ContentPart{type: :image_url}), do: true
+  defp valid_content_part?(%ContentPart{type: :image}), do: true
+  defp valid_content_part?(%ContentPart{type: :file}), do: true
+  defp valid_content_part?(%ContentPart{type: :tool_call}), do: true
+  defp valid_content_part?(%ContentPart{type: :tool_result}), do: true
   defp valid_content_part?(_), do: false
 end
 

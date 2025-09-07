@@ -57,14 +57,14 @@ defmodule ReqAI.ObjectSchema do
 
     field(:output_type, :object | :array | :enum | :no_schema)
     field(:properties, keyword() | nil)
-    field(:enum_values, [String.t()] | nil)
+    field(:enum_values, [atom()] | nil)
     field(:schema, NimbleOptions.t() | nil)
   end
 
   @type schema_opts :: [
           output_type: :object | :array | :enum | :no_schema,
           properties: keyword(),
-          enum_values: [String.t()]
+          enum_values: [String.t() | atom()]
         ]
 
   @type validation_result :: {:ok, term()} | {:error, SchemaValidation.t()}
@@ -89,7 +89,18 @@ defmodule ReqAI.ObjectSchema do
   def new(opts) when is_list(opts) do
     output_type = Keyword.get(opts, :output_type, :object)
     properties = Keyword.get(opts, :properties, [])
-    enum_values = Keyword.get(opts, :enum_values, [])
+    enum_values_raw = Keyword.get(opts, :enum_values, [])
+    
+    # Convert enum_values from strings to atoms at schema creation time
+    enum_values = 
+      case enum_values_raw do
+        [] -> []
+        values when is_list(values) ->
+          Enum.map(values, fn
+            value when is_binary(value) -> String.to_atom(value)
+            value when is_atom(value) -> value
+          end)
+      end
 
     with :ok <- validate_output_type(output_type),
          :ok <- validate_enum_values(output_type, enum_values),
@@ -136,8 +147,16 @@ defmodule ReqAI.ObjectSchema do
   end
 
   def validate(%__MODULE__{output_type: :enum, enum_values: enum_values}, data) do
-    if data in enum_values do
-      {:ok, data}
+    # Convert string data to atom for comparison, but keep original data for return
+    atom_data = 
+      case data do
+        value when is_binary(value) -> String.to_atom(value)
+        value when is_atom(value) -> value
+        value -> value
+      end
+    
+    if atom_data in enum_values do
+      {:ok, atom_data}
     else
       {:error,
        build_error(["Value #{inspect(data)} is not one of: #{inspect(enum_values)}"], %{
@@ -250,7 +269,9 @@ defmodule ReqAI.ObjectSchema do
   end
 
   def to_json_schema(%__MODULE__{output_type: :enum, enum_values: values}) do
-    %{"enum" => values}
+    # Convert atoms back to strings for JSON Schema compatibility
+    string_values = Enum.map(values, &to_string/1)
+    %{"enum" => string_values}
   end
 
   def to_json_schema(%__MODULE__{output_type: :object, properties: properties}) do
@@ -293,7 +314,8 @@ defmodule ReqAI.ObjectSchema do
 
   defp validate_enum_values(_output_type, _enum_values), do: :ok
 
-  defp build_nimble_schema(type, _properties) when type in [:no_schema, :enum], do: {:ok, nil}
+  defp build_nimble_schema(:no_schema, _properties), do: {:ok, nil}
+  defp build_nimble_schema(:enum, _properties), do: {:ok, nil}
   defp build_nimble_schema(_output_type, []), do: {:ok, nil}
 
   defp build_nimble_schema(_output_type, properties) do

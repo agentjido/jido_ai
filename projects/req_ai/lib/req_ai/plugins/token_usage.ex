@@ -19,7 +19,7 @@ defmodule ReqAI.Plugins.TokenUsage do
   ## Telemetry Events
 
   Emits `[:req_ai, :token_usage]` events with:
-  * Measurements: `%{tokens: %{input: 123, output: 456}, cost: 0.0123}`
+  * Measurements: `%{tokens: %{input: 123, output: 456, reasoning: 64}, cost: 0.0123}`
   * Metadata: `%{model: %ReqAI.Model{}}`
   """
 
@@ -68,13 +68,21 @@ defmodule ReqAI.Plugins.TokenUsage do
   end
 
   # Extracts token usage from various provider response formats
-  @spec extract_usage(any) :: {:ok, %{input: non_neg_integer, output: non_neg_integer}} | :error
+  @spec extract_usage(any) :: {:ok, map()} | :error
   defp extract_usage(%{"usage" => usage}) when is_map(usage) do
-    {:ok,
-     %{
-       input: usage["prompt_tokens"] || usage["input_tokens"] || 0,
-       output: usage["completion_tokens"] || usage["output_tokens"] || 0
-     }}
+    base_usage = %{
+      input: usage["prompt_tokens"] || usage["input_tokens"] || 0,
+      output: usage["completion_tokens"] || usage["output_tokens"] || 0
+    }
+
+    # Check for detailed token breakdown (e.g., OpenAI o1 models with reasoning)
+    case usage["completion_tokens_details"] do
+      %{"reasoning_tokens" => reasoning_tokens} when is_integer(reasoning_tokens) and reasoning_tokens > 0 ->
+        {:ok, Map.put(base_usage, :reasoning, reasoning_tokens)}
+
+      _ ->
+        {:ok, base_usage}
+    end
   end
 
   defp extract_usage(_), do: :error

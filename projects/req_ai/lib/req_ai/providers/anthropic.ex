@@ -28,6 +28,8 @@ defmodule ReqAI.Providers.Anthropic do
     default_max_tokens: 4096
 
   alias ReqAI.Provider.Utils
+  alias ReqAI.Response.Parser
+  alias ReqAI.Response.Stream
 
   def chat_completion_opts do
     [:tools, :tool_choice]
@@ -48,10 +50,7 @@ defmodule ReqAI.Providers.Anthropic do
 
     url = URI.merge(spec.base_url, "/v1/messages") |> URI.to_string()
 
-    headers = [
-      {"content-type", "application/json"},
-      {"anthropic-version", "2023-06-01"}
-    ]
+    headers = Utils.json_headers([{"anthropic-version", "2023-06-01"}])
 
     body = %{
       model: model,
@@ -95,36 +94,18 @@ defmodule ReqAI.Providers.Anthropic do
         if Enum.any?(tool_calls) do
           {:ok, %{tool_calls: tool_calls}}
         else
-          # No tool calls, extract text content
-          text_content =
-            content
-            |> Enum.filter(&(&1["type"] == "text"))
-            |> Enum.map(& &1["text"])
-            |> Enum.join("")
-
-          if text_content != "" do
-            {:ok, text_content}
-          else
-            {:error, ReqAI.Error.API.Response.exception(reason: "No text or tool content found")}
-          end
+          # Use the new parser for text responses (including thinking)
+          Parser.extract_text(%Req.Response{status: 200, body: body})
         end
 
-      %{"error" => %{"message" => message}} ->
-        {:error, ReqAI.Error.API.Response.exception(reason: message)}
-
       _ ->
-        {:error, ReqAI.Error.API.Response.exception(reason: "Unexpected response format")}
+        # Use the new parser for text responses (including thinking)
+        Parser.extract_text(%Req.Response{status: 200, body: body})
     end
   end
 
   defp parse_non_streaming_response(%{status: status, body: body}) do
-    error_message =
-      case body do
-        %{"error" => %{"message" => message}} -> message
-        _ -> "HTTP #{status}"
-      end
-
-    {:error, ReqAI.Error.API.Response.exception(reason: error_message, status: status)}
+    {:error, Utils.parse_error_response(status, body)}
   end
 
   defp parse_streaming_response(response) do
@@ -133,43 +114,47 @@ defmodule ReqAI.Providers.Anthropic do
         parse_sse_chunks(body)
 
       %{status: status, body: body} ->
-        error_message =
-          case body do
-            %{"error" => %{"message" => message}} -> message
-            _ -> "HTTP #{status}"
-          end
-
-        {:error, ReqAI.Error.API.Response.exception(reason: error_message, status: status)}
+        {:error, Utils.parse_error_response(status, body)}
     end
   end
 
   defp parse_sse_chunks(body) do
-    {events, _rest} = ServerSentEvent.parse_all(body)
+    # Parse SSE body into events, then use Stream parser for thinking support
+    events = parse_sse_body_to_events(body)
+    chunks = Stream.parse_events(events)
+    {:ok, chunks}
+  end
 
-    if Enum.empty?(events) do
-      {:error,
-       ReqAI.Error.API.Response.exception(reason: "No events found in streaming response")}
-    else
-      content_parts =
-        events
-        |> Enum.filter(&(&1.event == nil or &1.event == "message"))
-        |> Enum.map(& &1.data)
-        |> Enum.reject(&(&1 in [nil, "", "[DONE]"]))
-        |> Enum.map(&Jason.decode/1)
-        |> Enum.filter(&match?({:ok, _}, &1))
-        |> Enum.map(fn {:ok, data} -> data end)
-        |> Enum.filter(&(&1["type"] == "content_block_delta"))
-        |> Enum.map(& &1["delta"]["text"])
-        |> Enum.filter(&is_binary/1)
+  # Convert Anthropic SSE body to event maps that Stream.parse_events expects
+  defp parse_sse_body_to_events(body) when is_binary(body) do
+    body
+    |> String.split("\n\n")
+    |> Enum.map(&parse_sse_chunk_to_event/1)
+    |> Enum.reject(&is_nil/1)
+  end
 
-      case content_parts do
-        [] ->
-          {:error,
-           ReqAI.Error.API.Response.exception(reason: "No content found in streaming response")}
+  defp parse_sse_chunk_to_event(""), do: nil
 
-        parts ->
-          {:ok, Enum.join(parts, "")}
+  defp parse_sse_chunk_to_event(chunk) when is_binary(chunk) do
+    chunk
+    |> String.trim()
+    |> String.split("\n")
+    |> Enum.reduce(%{}, fn line, acc ->
+      case String.split(line, ":", parts: 2) do
+        ["data", value] -> 
+          # Try to parse JSON for Anthropic format
+          case Jason.decode(String.trim(value)) do
+            {:ok, json_data} -> Map.put(acc, :data, json_data)
+            {:error, _} -> Map.put(acc, :data, String.trim(value))
+          end
+        ["event", value] -> Map.put(acc, :event, String.trim(value))
+        ["id", value] -> Map.put(acc, :id, String.trim(value))
+        _ -> acc
       end
+    end)
+    |> case do
+      %{data: _} = event -> event
+      _ -> nil
     end
   end
 
@@ -223,4 +208,70 @@ defmodule ReqAI.Providers.Anthropic do
       arguments: input
     }
   end
+
+  @impl true
+  def parse_tool_call(response_body, tool_name) do
+    case response_body do
+      %{"content" => content} when is_list(content) ->
+        content
+        |> Enum.find(fn
+          %{"type" => "tool_use", "name" => ^tool_name} -> true
+          _ -> false
+        end)
+        |> case do
+          %{"input" => input} ->
+            {:ok, input}
+
+          nil ->
+            {:error, ReqAI.Error.API.Response.exception(reason: "Tool call not found")}
+        end
+
+      _ ->
+        {:error,
+         ReqAI.Error.API.Response.exception(reason: "No tool use blocks found in response")}
+    end
+  end
+
+  @impl true
+  def stream_tool_init(_tool_name) do
+    %{}
+  end
+
+  @impl true
+  def stream_tool_accumulate(raw_chunk, tool_name, state) do
+    case Jason.decode(raw_chunk) do
+      {:ok, %{"delta" => %{"content" => content}}} when is_list(content) ->
+        process_content_blocks(content, tool_name, state)
+
+      {:ok, %{"content" => content}} when is_list(content) ->
+        process_content_blocks(content, tool_name, state)
+
+      {:ok, _} ->
+        {state, []}
+
+      {:error, _} ->
+        {state, []}
+    end
+  end
+
+  # Private helper to process content blocks for tool calls
+  defp process_content_blocks(content_blocks, tool_name, state) when is_list(content_blocks) do
+    content_blocks
+    |> Enum.filter(&(&1["type"] == "tool_use"))
+    |> Enum.filter(&(&1["name"] == tool_name))
+    |> case do
+      [] ->
+        {state, []}
+
+      matching_tools ->
+        completed_tools =
+          matching_tools
+          |> Enum.map(& &1["input"])
+          |> Enum.filter(&is_map/1)
+
+        {state, completed_tools}
+    end
+  end
+
+  defp process_content_blocks(_, _, state), do: {state, []}
 end
