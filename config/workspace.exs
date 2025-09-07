@@ -114,6 +114,13 @@ config :jido_workspace,
       branch: "main",
       type: :library,
       path: "projects/kagi"
+    },
+    %{
+      name: "req_llm",
+      upstream_url: "git@github.com:agentjido/req_llm.git",
+      branch: "main",
+      type: :library,
+      path: "projects/req_llm"
     }
   ],
   hex_packages: [
