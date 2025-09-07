@@ -89,6 +89,7 @@ defmodule ReqAI do
                       tools: [type: {:list, :map}, doc: "List of tool definitions"],
                       tool_choice: [
                         type: {:or, [:string, :atom, :map]},
+                        default: "auto",
                         doc: "Tool choice strategy"
                       ],
                       system_prompt: [type: :string, doc: "System prompt to prepend"],
@@ -117,6 +118,7 @@ defmodule ReqAI do
                         tools: [type: {:list, :map}, doc: "List of tool definitions"],
                         tool_choice: [
                           type: {:or, [:string, :atom, :map]},
+                          default: "auto",
                           doc: "Tool choice strategy"
                         ],
                         system_prompt: [type: :string, doc: "System prompt to prepend"],

@@ -1,29 +1,29 @@
-defmodule ReqAI.Providers.Anthropic do
+defmodule ReqAI.Providers.OpenAI do
   @moduledoc """
-  Anthropic provider adapter implementation using the Messages API.
+  OpenAI provider adapter implementation using the Chat Completions API.
 
   ## Usage
 
-      ReqAI.Providers.Anthropic.generate_text("claude-3-haiku-20240307", "What is the capital of France?")
-      ReqAI.Providers.Anthropic.stream_text("claude-3-opus-20240229", "Tell me a story", stream: true)
+      ReqAI.Providers.OpenAI.generate_text("gpt-4", "What is the capital of France?")
+      ReqAI.Providers.OpenAI.stream_text("gpt-3.5-turbo", "Tell me a story", stream: true)
 
   ## Configuration
 
-  Set your Anthropic API key:
+  Set your OpenAI API key:
 
-      config :req_ai, ReqAI.Providers.Anthropic,
+      config :req_ai, ReqAI.Providers.OpenAI,
         api_key: "your-api-key"
 
   Or use environment variable:
 
-      export ANTHROPIC_API_KEY="your-api-key"
+      export OPENAI_API_KEY="your-api-key"
   """
 
   use ReqAI.Provider.DSL,
-    id: :anthropic,
-    base_url: "https://api.anthropic.com",
-    auth: {:header, "x-api-key", :plain},
-    metadata: "anthropic.json",
+    id: :openai,
+    base_url: "https://api.openai.com",
+    auth: {:header, "authorization", :bearer},
+    metadata: "openai.json",
     default_temperature: 1,
     default_max_tokens: 4096
 
@@ -40,17 +40,16 @@ defmodule ReqAI.Providers.Anthropic do
     opts = Keyword.merge(provider_opts, request_opts)
 
     # Use shared utility for getting default model
-    default_model = Utils.default_model(spec) || "claude-3-haiku-20240307"
+    default_model = Utils.default_model(spec) || "gpt-3.5-turbo"
     model = Keyword.get(opts, :model, default_model)
     max_tokens = Keyword.get(opts, :max_tokens, spec.default_max_tokens)
     temperature = Keyword.get(opts, :temperature, spec.default_temperature)
     stream = Keyword.get(opts, :stream?, false)
 
-    url = URI.merge(spec.base_url, "/v1/messages") |> URI.to_string()
+    url = URI.merge(spec.base_url, "/v1/chat/completions") |> URI.to_string()
 
     headers = [
-      {"content-type", "application/json"},
-      {"anthropic-version", "2023-06-01"}
+      {"content-type", "application/json"}
     ]
 
     body = %{
@@ -87,27 +86,52 @@ defmodule ReqAI.Providers.Anthropic do
 
   # Private helper functions
 
+  defp maybe_add_tools(body, opts) do
+    case Keyword.get(opts, :tools, []) do
+      [] ->
+        body
+
+      tools ->
+        body
+        |> Map.put("tools", encode_tools(tools))
+        |> maybe_put_tool_choice(opts)
+    end
+  end
+
+  defp maybe_put_tool_choice(body, opts) do
+    case Keyword.get(opts, :tool_choice) do
+      nil -> body
+      tool_choice -> Map.put(body, "tool_choice", encode_tool_choice(tool_choice))
+    end
+  end
+
+  defp encode_tools(tools) do
+    Enum.map(tools, fn tool ->
+      %{
+        "type" => "function",
+        "function" => %{
+          "name" => tool.name,
+          "description" => tool.description,
+          "parameters" => tool.parameters_schema
+        }
+      }
+    end)
+  end
+
+  defp encode_tool_choice("auto"), do: "auto"
+  defp encode_tool_choice("none"), do: "none"
+
+  defp encode_tool_choice(name) when is_binary(name),
+    do: %{"type" => "function", "function" => %{"name" => name}}
+
   defp parse_non_streaming_response(%{status: 200, body: body}) do
     case body do
-      %{"content" => content} when is_list(content) ->
-        tool_calls = extract_tool_calls_from_content(content)
+      %{"choices" => [%{"message" => %{"content" => content}} | _]} when is_binary(content) ->
+        {:ok, content}
 
-        if Enum.any?(tool_calls) do
-          {:ok, %{tool_calls: tool_calls}}
-        else
-          # No tool calls, extract text content
-          text_content =
-            content
-            |> Enum.filter(&(&1["type"] == "text"))
-            |> Enum.map(& &1["text"])
-            |> Enum.join("")
-
-          if text_content != "" do
-            {:ok, text_content}
-          else
-            {:error, ReqAI.Error.API.Response.exception(reason: "No text or tool content found")}
-          end
-        end
+      %{"choices" => [%{"message" => %{"tool_calls" => tool_calls}} | _]}
+      when is_list(tool_calls) ->
+        {:ok, %{tool_calls: extract_tool_calls(tool_calls)}}
 
       %{"error" => %{"message" => message}} ->
         {:error, ReqAI.Error.API.Response.exception(reason: message)}
@@ -152,14 +176,19 @@ defmodule ReqAI.Providers.Anthropic do
     else
       content_parts =
         events
-        |> Enum.filter(&(&1.event == nil or &1.event == "message"))
+        |> Enum.filter(&(&1.event == nil or &1.event == "data"))
         |> Enum.map(& &1.data)
         |> Enum.reject(&(&1 in [nil, "", "[DONE]"]))
         |> Enum.map(&Jason.decode/1)
         |> Enum.filter(&match?({:ok, _}, &1))
         |> Enum.map(fn {:ok, data} -> data end)
-        |> Enum.filter(&(&1["type"] == "content_block_delta"))
-        |> Enum.map(& &1["delta"]["text"])
+        |> Enum.flat_map(fn data ->
+          case data["choices"] do
+            nil -> []
+            choices -> choices
+          end
+        end)
+        |> Enum.map(& &1["delta"]["content"])
         |> Enum.filter(&is_binary/1)
 
       case content_parts do
@@ -173,54 +202,18 @@ defmodule ReqAI.Providers.Anthropic do
     end
   end
 
-  # Tool support functions
-
-  defp maybe_add_tools(body, opts) do
-    case Keyword.get(opts, :tools, []) do
-      [] ->
-        body
-
-      tools ->
-        body
-        |> Map.put("tools", encode_tools(tools))
-        |> maybe_put_tool_choice(opts)
-    end
+  defp extract_tool_calls(tool_calls) when is_list(tool_calls) do
+    Enum.map(tool_calls, &normalize_tool_call/1)
   end
 
-  defp maybe_put_tool_choice(body, opts) do
-    case Keyword.get(opts, :tool_choice) do
-      nil -> body
-      tool_choice -> Map.put(body, "tool_choice", encode_tool_choice(tool_choice))
-    end
-  end
+  defp extract_tool_calls(_), do: []
 
-  defp encode_tools(tools) do
-    Enum.map(tools, fn tool ->
-      %{
-        "name" => tool.name,
-        "description" => tool.description,
-        "input_schema" => tool.parameters_schema
-      }
-    end)
-  end
-
-  defp encode_tool_choice("auto"), do: %{"type" => "auto"}
-  defp encode_tool_choice("any"), do: %{"type" => "any"}
-  defp encode_tool_choice("none"), do: %{"type" => "none"}
-  defp encode_tool_choice(name) when is_binary(name), do: %{"type" => "tool", "name" => name}
-
-  defp extract_tool_calls_from_content(content) when is_list(content) do
-    content
-    |> Enum.filter(&(&1["type"] == "tool_use"))
-    |> Enum.map(&normalize_anthropic_tool_call/1)
-  end
-
-  defp normalize_anthropic_tool_call(%{"id" => id, "name" => name, "input" => input}) do
+  defp normalize_tool_call(%{"id" => id, "function" => func}) do
     %{
       id: id,
       type: "function",
-      name: name,
-      arguments: input
+      name: func["name"],
+      arguments: Jason.decode!(func["arguments"])
     }
   end
 end

@@ -92,7 +92,8 @@ defmodule ReqAI.CapabilityVerifier do
     # using :code.all_loaded() and checking for @behaviour ReqAI.Capability
     [
       ReqAI.Capabilities.GenerateText,
-      ReqAI.Capabilities.StreamText
+      ReqAI.Capabilities.StreamText,
+      ReqAI.Capabilities.ToolCalling
     ]
   end
 
