@@ -43,7 +43,11 @@ defmodule ReqLLM.Providers.Anthropic do
 
     # Use shared utility for getting default model
     default_model = Utils.default_model(spec) || "claude-3-haiku-20240307"
-    model = Keyword.get(opts, :model, default_model)
+    model = case Keyword.get(opts, :model, default_model) do
+      %ReqLLM.Model{model: model_name} -> model_name
+      model_string when is_binary(model_string) -> model_string
+      _ -> default_model
+    end
     max_tokens = Keyword.get(opts, :max_tokens, spec.default_max_tokens)
     temperature = Keyword.get(opts, :temperature, spec.default_temperature)
     stream = Keyword.get(opts, :stream?, false)
