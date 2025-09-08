@@ -43,6 +43,16 @@ defmodule ReqLLM.Generation do
                       reasoning: [
                         type: {:in, [nil, false, true, "low", "auto", "high"]},
                         doc: "Request reasoning tokens from the model"
+                      ],
+                      stream_format: [
+                        type: {:in, [:sse, :chunked, :json]},
+                        default: :sse,
+                        doc: "Provider specific streaming transport format"
+                      ],
+                      chunk_timeout: [
+                        type: :pos_integer,
+                        default: 30_000,
+                        doc: "How long to wait between chunks before aborting (ms)"
                       ]
                     )
 
@@ -88,16 +98,40 @@ defmodule ReqLLM.Generation do
   def generate_text(model_spec, messages, opts \\ []) do
     with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
          {:ok, model} <- Model.from(model_spec),
-         {:ok, provider_module} <- ReqLLM.provider(model.provider) do
-      # Always return full response for metadata access
-      enhanced_opts = Keyword.put(validated_opts, :return_response, true)
-      provider_module.generate_text(model, messages, enhanced_opts)
-    else
-      {:error, :not_found} ->
-        {:error, ReqLLM.Error.Invalid.Provider.exception(provider: "unknown")}
+         {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         request = Req.new(method: :post, body: prepare_request_body(messages, validated_opts)),
+         {:ok, configured_request} <- ReqLLM.attach(request, model),
+         {:ok, %Req.Response{} = response} <- Req.request(configured_request),
+         {:ok, chunks} <- provider_module.parse_response(response, model) do
+      # Extract text and tool calls from chunks and put them in response body
+      text_chunks = Enum.filter(chunks, &(&1.type == :content))
+      tool_call_chunks = Enum.filter(chunks, &(&1.type == :tool_call))
 
-      error ->
-        error
+      # Build response body based on what chunks we have
+      body =
+        case {text_chunks, tool_call_chunks} do
+          {[], []} ->
+            ""
+
+          {text_chunks, []} ->
+            # Only text content
+            Enum.map_join(text_chunks, "", & &1.text)
+
+          {[], tool_call_chunks} ->
+            # Only tool calls
+            %{tool_calls: convert_chunks_to_tool_calls(tool_call_chunks)}
+
+          {text_chunks, tool_call_chunks} ->
+            # Both text and tool calls
+            text = Enum.map_join(text_chunks, "", & &1.text)
+
+            %{
+              text: text,
+              tool_calls: convert_chunks_to_tool_calls(tool_call_chunks)
+            }
+        end
+
+      {:ok, %Req.Response{response | body: body}}
     end
   end
 
@@ -157,20 +191,13 @@ defmodule ReqLLM.Generation do
   def stream_text(model_spec, messages, opts \\ []) do
     with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
          {:ok, model} <- Model.from(model_spec),
-         {:ok, provider_module} <- ReqLLM.provider(model.provider) do
-      # Always return full response for metadata access
-      enhanced_opts =
-        validated_opts
-        |> Keyword.put(:stream?, true)
-        |> Keyword.put(:return_response, true)
-
-      provider_module.stream_text(model, messages, enhanced_opts)
-    else
-      {:error, :not_found} ->
-        {:error, ReqLLM.Error.Invalid.Provider.exception(provider: "unknown")}
-
-      error ->
-        error
+         {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         stream_opts = Keyword.put(validated_opts, :stream?, true),
+         request = Req.new(method: :post, body: prepare_request_body(messages, stream_opts)),
+         {:ok, configured_request} <- ReqLLM.attach(request, model),
+         {:ok, %Req.Response{} = response} <- Req.request(configured_request),
+         {:ok, stream} <- provider_module.parse_stream(response, model) do
+      {:ok, %Req.Response{response | body: stream}}
     end
   end
 
@@ -293,5 +320,53 @@ defmodule ReqLLM.Generation do
       {:ok, content, _} -> {:ok, content, nil}
       {:error, error} -> {:error, error}
     end
+  end
+
+  # Private helper functions
+
+  defp prepare_request_body(messages, opts) when is_binary(messages) do
+    prepare_request_body([%{role: "user", content: messages}], opts)
+  end
+
+  defp prepare_request_body(messages, opts) when is_list(messages) do
+    # Build basic request body
+    body = %{
+      messages: normalize_messages(messages)
+    }
+
+    # Add model-level options to body
+    body
+    |> add_if_present(:max_tokens, opts[:max_tokens])
+    |> add_if_present(:temperature, opts[:temperature])
+    |> add_if_present(:top_p, opts[:top_p])
+    |> add_if_present(:presence_penalty, opts[:presence_penalty])
+    |> add_if_present(:frequency_penalty, opts[:frequency_penalty])
+    |> add_if_present(:tools, opts[:tools])
+    |> add_if_present(:tool_choice, opts[:tool_choice])
+    |> add_streaming_option(opts[:stream?])
+  end
+
+  defp normalize_messages(messages) do
+    Enum.map(messages, fn
+      %{role: _, content: _} = message -> message
+      %ReqLLM.Message{} = message -> Map.from_struct(message)
+      other -> other
+    end)
+  end
+
+  defp add_if_present(body, _key, nil), do: body
+  defp add_if_present(body, key, value), do: Map.put(body, key, value)
+
+  defp add_streaming_option(body, true), do: Map.put(body, :stream, true)
+  defp add_streaming_option(body, _), do: body
+
+  defp convert_chunks_to_tool_calls(tool_call_chunks) do
+    Enum.map(tool_call_chunks, fn chunk ->
+      %{
+        name: chunk.name,
+        arguments: chunk.arguments,
+        id: get_in(chunk.metadata, [:id])
+      }
+    end)
   end
 end

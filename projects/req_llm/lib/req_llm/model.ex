@@ -9,10 +9,10 @@ defmodule ReqLLM.Model do
   ## Examples
 
       # Create a model with provider and options tuple
-      {:ok, model} = ReqLLM.Model.from({:openai, model: "gpt-4", temperature: 0.7})
+      {:ok, model} = ReqLLM.Model.from({:anthropic, model: "claude-3-5-sonnet", temperature: 0.7})
 
       # Create a model from string specification
-      {:ok, model} = ReqLLM.Model.from("openai:gpt-4")
+      {:ok, model} = ReqLLM.Model.from("anthropic:claude-3-5-sonnet")
 
       # Create a model directly
       model = ReqLLM.Model.new(:anthropic, "claude-3-sonnet", temperature: 0.5, max_tokens: 1000)
@@ -53,7 +53,7 @@ defmodule ReqLLM.Model do
 
   ## Parameters
 
-  - `provider` - The provider atom (e.g., `:openai`, `:anthropic`)
+  - `provider` - The provider atom (e.g., `:anthropic`)
   - `model` - The model name string (e.g., `"gpt-4"`, `"claude-3-sonnet"`)
   - `opts` - Optional keyword list of parameters
 
@@ -69,8 +69,8 @@ defmodule ReqLLM.Model do
 
   ## Examples
 
-      iex> ReqLLM.Model.new(:openai, "gpt-4")
-      %ReqLLM.Model{provider: :openai, model: "gpt-4", max_retries: 3}
+      iex> ReqLLM.Model.new(:anthropic, "claude-3-5-sonnet")
+      %ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet", max_retries: 3}
 
       iex> ReqLLM.Model.new(:anthropic, "claude-3-sonnet", temperature: 0.7, max_tokens: 1000)
       %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet", temperature: 0.7, max_tokens: 1000, max_retries: 3}
@@ -97,16 +97,16 @@ defmodule ReqLLM.Model do
   Supports:
   - Existing Model struct (returned as-is)
   - Tuple format: `{provider, opts}` where provider is atom and opts is keyword list
-  - String format: `"provider:model"` (e.g., `"openai:gpt-4"`)
+  - String format: `"provider:model"` (e.g., `"anthropic:claude-3-5-sonnet"`)
 
   ## Examples
 
       # From existing struct
-      {:ok, model} = ReqLLM.Model.from(%ReqLLM.Model{provider: :openai, model: "gpt-4"})
+      {:ok, model} = ReqLLM.Model.from(%ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet"})
 
       # From tuple with options (including metadata)
-      {:ok, model} = ReqLLM.Model.from({:openai, model: "gpt-4", temperature: 0.7, max_tokens: 1000,
-                                       capabilities: %{reasoning?: true, tool_call?: true}})
+      {:ok, model} = ReqLLM.Model.from({:anthropic, model: "claude-3-5-sonnet", temperature: 0.7, max_tokens: 1000,
+                                       capabilities: %{tool_call?: true}})
 
       # From string specification
       {:ok, model} = ReqLLM.Model.from("anthropic:claude-3-sonnet")
@@ -172,8 +172,8 @@ defmodule ReqLLM.Model do
 
   ## Examples
 
-      iex> ReqLLM.Model.from!("openai:gpt-4")
-      %ReqLLM.Model{provider: :openai, model: "gpt-4", max_retries: 3}
+      iex> ReqLLM.Model.from!("anthropic:claude-3-5-sonnet")
+      %ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet", max_retries: 3}
 
   """
   @spec from!(t() | {atom(), keyword()} | String.t()) :: t()
@@ -189,11 +189,11 @@ defmodule ReqLLM.Model do
 
   ## Examples
 
-      iex> model = %ReqLLM.Model{provider: :openai, model: "gpt-4", max_retries: 3}
+      iex> model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet", max_retries: 3}
       iex> ReqLLM.Model.valid?(model)
       true
 
-      iex> ReqLLM.Model.valid?(%{provider: :openai, model: "gpt-4"})
+      iex> ReqLLM.Model.valid?(%{provider: :anthropic, model: "claude-3-5-sonnet"})
       false
 
   """
@@ -213,7 +213,7 @@ defmodule ReqLLM.Model do
 
   ## Examples
 
-      iex> model = ReqLLM.Model.new(:openai, "gpt-4")
+      iex> model = ReqLLM.Model.new(:anthropic, "claude-3-5-sonnet")
       iex> ReqLLM.Model.with_defaults(model).capabilities
       %{reasoning?: false, tool_call?: false, supports_temperature?: true}
 
@@ -271,6 +271,8 @@ defmodule ReqLLM.Model do
     :anthropic,
     :openrouter,
     :google,
+    :xai,
+    :groq,
     :mistral,
     :togetherai,
     :cerebras,

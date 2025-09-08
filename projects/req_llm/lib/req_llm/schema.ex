@@ -1,13 +1,77 @@
 defmodule ReqLLM.Schema do
   @moduledoc """
-  JSON Schema utilities for converting NimbleOptions schemas to JSON Schema format.
+  Single schema authority for NimbleOptions ↔ JSON Schema conversion.
 
-  This module provides functions to convert NimbleOptions parameter definitions
-  into JSON Schema format for use with LLM providers that expect structured schemas.
+  This module consolidates all schema conversion logic, providing unified functions
+  for converting keyword schemas to both NimbleOptions compiled schemas and JSON Schema format.
+  Supports all common NimbleOptions types and handles nested schemas.
+
+  ## Core Functions
+
+  - `compile/1` - Convert keyword schema to NimbleOptions compiled schema
+  - `to_json/1` - Convert keyword schema to JSON Schema format  
+
+
+  ## Basic Usage
+
+      # Compile keyword schema to NimbleOptions
+      {:ok, compiled} = ReqLLM.Schema.compile([
+        name: [type: :string, required: true, doc: "User name"],
+        age: [type: :pos_integer, doc: "User age"]
+      ])
+
+      # Convert keyword schema to JSON Schema
+      json_schema = ReqLLM.Schema.to_json([
+        name: [type: :string, required: true, doc: "User name"], 
+        age: [type: :pos_integer, doc: "User age"]
+      ])
+      # => %{
+      #      "type" => "object",
+      #      "properties" => %{
+      #        "name" => %{"type" => "string", "description" => "User name"},
+      #        "age" => %{"type" => "integer", "minimum" => 1, "description" => "User age"}
+      #      },
+      #      "required" => ["name"]
+      #    }
+
+
+
+  ## Supported Types
+
+  All common NimbleOptions types are supported:
+
+  - `:string` - String type
+  - `:integer` - Integer type
+  - `:pos_integer` - Positive integer (adds minimum: 1 constraint)
+  - `:float` - Float/number type
+  - `:number` - Generic number type
+  - `:boolean` - Boolean type
+  - `{:list, type}` - Array of specified type
+  - `:map` - Object type
+  - Custom types fall back to string
+
+  ## Nested Schemas
+
+  Nested schemas are supported through recursive type handling:
+
+      schema = [
+        user: [
+          type: {:list, :map},
+          doc: "List of user objects",
+          properties: [
+            name: [type: :string, required: true],
+            email: [type: :string, required: true]
+          ]
+        ]
+      ]
+
   """
 
   @doc """
-  Compiles a NimbleOptions schema from a keyword list.
+  Compiles a keyword schema to a NimbleOptions compiled schema.
+
+  Takes a keyword list representing a NimbleOptions schema and compiles it
+  into a validated NimbleOptions schema that can be used for validation.
 
   ## Parameters
 
@@ -15,20 +79,23 @@ defmodule ReqLLM.Schema do
 
   ## Returns
 
-  - `{:ok, compiled_schema}` - Successfully compiled schema
+  - `{:ok, compiled_schema}` - Successfully compiled NimbleOptions schema
   - `{:error, error}` - Compilation error with details
 
   ## Examples
 
-      iex> ReqLLM.Schema.compile_schema([name: [type: :string, required: true]])
+      iex> ReqLLM.Schema.compile([
+      ...>   name: [type: :string, required: true],
+      ...>   age: [type: :pos_integer, default: 0]
+      ...> ])
       {:ok, compiled_schema}
 
-      iex> ReqLLM.Schema.compile_schema("invalid")
+      iex> ReqLLM.Schema.compile("invalid")
       {:error, %ReqLLM.Error.Invalid.Parameter{}}
+
   """
-  @spec compile_schema(keyword() | any()) ::
-          {:ok, NimbleOptions.t()} | {:error, ReqLLM.Error.t()}
-  def compile_schema(schema) when is_list(schema) do
+  @spec compile(keyword() | any()) :: {:ok, NimbleOptions.t()} | {:error, ReqLLM.Error.t()}
+  def compile(schema) when is_list(schema) do
     try do
       {:ok, NimbleOptions.new!(schema)}
     rescue
@@ -42,7 +109,7 @@ defmodule ReqLLM.Schema do
     end
   end
 
-  def compile_schema(schema) do
+  def compile(schema) do
     {:error,
      ReqLLM.Error.Invalid.Parameter.exception(
        parameter: "Schema must be a keyword list, got: #{inspect(schema)}"
@@ -50,14 +117,14 @@ defmodule ReqLLM.Schema do
   end
 
   @doc """
-  Converts NimbleOptions parameters to JSON Schema format.
+  Converts a keyword schema to JSON Schema format.
 
   Takes a keyword list of parameter definitions and converts them to
-  a JSON Schema object suitable for LLM tool definitions.
+  a JSON Schema object suitable for LLM tool definitions or structured data schemas.
 
   ## Parameters
 
-  - `parameters` - Keyword list of parameter definitions
+  - `schema` - Keyword list of parameter definitions
 
   ## Returns
 
@@ -65,25 +132,35 @@ defmodule ReqLLM.Schema do
 
   ## Examples
 
-      iex> ReqLLM.Schema.parameters_to_json_schema([
+      iex> ReqLLM.Schema.to_json([
       ...>   name: [type: :string, required: true, doc: "User name"],
-      ...>   age: [type: :integer, doc: "User age"]
+      ...>   age: [type: :integer, doc: "User age"],
+      ...>   tags: [type: {:list, :string}, default: [], doc: "User tags"]
       ...> ])
       %{
         "type" => "object",
         "properties" => %{
           "name" => %{"type" => "string", "description" => "User name"},
-          "age" => %{"type" => "integer", "description" => "User age"}
+          "age" => %{"type" => "integer", "description" => "User age"},
+          "tags" => %{
+            "type" => "array", 
+            "items" => %{"type" => "string"}, 
+            "description" => "User tags"
+          }
         },
         "required" => ["name"]
       }
-  """
-  @spec parameters_to_json_schema(keyword()) :: map()
-  def parameters_to_json_schema([]), do: %{"type" => "object", "properties" => %{}}
 
-  def parameters_to_json_schema(parameters) do
+      iex> ReqLLM.Schema.to_json([])
+      %{"type" => "object", "properties" => %{}}
+
+  """
+  @spec to_json(keyword()) :: map()
+  def to_json([]), do: %{"type" => "object", "properties" => %{}}
+
+  def to_json(schema) when is_list(schema) do
     {properties, required} =
-      Enum.reduce(parameters, {%{}, []}, fn {key, opts}, {props_acc, req_acc} ->
+      Enum.reduce(schema, {%{}, []}, fn {key, opts}, {props_acc, req_acc} ->
         property_name = to_string(key)
         json_prop = nimble_type_to_json_schema(opts[:type] || :string, opts)
 
@@ -93,23 +170,25 @@ defmodule ReqLLM.Schema do
         {new_props, new_req}
       end)
 
-    schema = %{
+    schema_object = %{
       "type" => "object",
       "properties" => properties
     }
 
     if required == [] do
-      schema
+      schema_object
     else
-      Map.put(schema, "required", Enum.reverse(required))
+      Map.put(schema_object, "required", Enum.reverse(required))
     end
   end
+
+  # Private helper functions
 
   @doc """
   Converts a NimbleOptions type to JSON Schema property definition.
 
   Takes a NimbleOptions type atom and options, converting them to the
-  corresponding JSON Schema property definition.
+  corresponding JSON Schema property definition with proper type mapping.
 
   ## Parameters
 
@@ -127,6 +206,10 @@ defmodule ReqLLM.Schema do
 
       iex> ReqLLM.Schema.nimble_type_to_json_schema({:list, :integer}, [])
       %{"type" => "array", "items" => %{"type" => "integer"}}
+
+      iex> ReqLLM.Schema.nimble_type_to_json_schema(:pos_integer, doc: "Positive number")
+      %{"type" => "integer", "minimum" => 1, "description" => "Positive number"}
+
   """
   @spec nimble_type_to_json_schema(atom() | tuple(), keyword()) :: map()
   def nimble_type_to_json_schema(type, opts) do
@@ -156,19 +239,86 @@ defmodule ReqLLM.Schema do
         {:list, :integer} ->
           %{"type" => "array", "items" => %{"type" => "integer"}}
 
+        {:list, :boolean} ->
+          %{"type" => "array", "items" => %{"type" => "boolean"}}
+
+        {:list, :float} ->
+          %{"type" => "array", "items" => %{"type" => "number"}}
+
+        {:list, :number} ->
+          %{"type" => "array", "items" => %{"type" => "number"}}
+
+        {:list, :pos_integer} ->
+          %{"type" => "array", "items" => %{"type" => "integer", "minimum" => 1}}
+
         {:list, item_type} ->
-          %{"type" => "array", "items" => nimble_type_to_json_schema(item_type, %{})}
+          %{"type" => "array", "items" => nimble_type_to_json_schema(item_type, [])}
 
         :map ->
           %{"type" => "object"}
 
+        {:map, _} ->
+          %{"type" => "object"}
+
+        :keyword_list ->
+          %{"type" => "object"}
+
+        :atom ->
+          %{"type" => "string"}
+
+        # Fallback to string for unknown types
         _ ->
           %{"type" => "string"}
       end
 
+    # Add description if provided
     case opts[:doc] do
       nil -> base_schema
       doc -> Map.put(base_schema, "description", doc)
     end
+  end
+
+  @doc """
+  Format a tool into Anthropic tool schema format.
+
+  ## Parameters
+
+    * `tool` - A `ReqLLM.Tool.t()` struct
+
+  ## Returns
+
+  A map containing the Anthropic tool schema format.
+
+  ## Examples
+
+      iex> tool = %ReqLLM.Tool{
+      ...>   name: "get_weather",
+      ...>   description: "Get current weather",
+      ...>   parameter_schema: [
+      ...>     location: [type: :string, required: true, doc: "City name"]
+      ...>   ],
+      ...>   callback: fn _ -> {:ok, %{}} end
+      ...> }
+      iex> ReqLLM.Schema.to_anthropic(tool)
+      %{
+        "name" => "get_weather",
+        "description" => "Get current weather",
+        "input_schema" => %{
+          "type" => "object",
+          "properties" => %{
+            "location" => %{"type" => "string", "description" => "City name"}
+          },
+          "required" => ["location"]
+        }
+      }
+
+  """
+  @spec to_anthropic(ReqLLM.Tool.t()) :: map()
+  def to_anthropic(%ReqLLM.Tool{} = tool) do
+    %{
+      "name" => tool.name,
+      "description" => tool.description,
+      "input_schema" => to_json(tool.parameter_schema)
+    }
   end
 end

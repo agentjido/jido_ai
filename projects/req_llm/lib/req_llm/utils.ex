@@ -1,7 +1,7 @@
 defmodule ReqLLM.Utils do
   @moduledoc """
   Utility functions for ReqLLM, following Vercel AI SDK patterns.
-  
+
   Provides helper functions for tool creation, schema validation, 
   and embedding similarity calculations.
   """
@@ -10,30 +10,30 @@ defmodule ReqLLM.Utils do
 
   @doc """
   Creates a Tool struct for AI model function calling.
-  
+
   This function is equivalent to Vercel AI SDK's `tool()` helper, 
   providing type-safe tool definitions with parameter validation.
-  
+
   ## Parameters
-  
+
     * `opts` - Tool definition options
-  
+
   ## Options
-  
+
     * `:name` - Tool name (required, must be valid identifier)
     * `:description` - Tool description for AI model (required)
     * `:parameters` - Parameter schema as NimbleOptions keyword list (optional)
     * `:callback` - Callback function or MFA tuple (required)
-  
+
   ## Examples
-  
+
       # Simple tool with no parameters
       tool = ReqLLM.tool(
         name: "get_time",
         description: "Get the current time",
         callback: fn _args -> {:ok, DateTime.utc_now()} end
       )
-  
+
       # Tool with parameters
       weather_tool = ReqLLM.tool(
         name: "get_weather",
@@ -44,7 +44,7 @@ defmodule ReqLLM.Utils do
         ],
         callback: {WeatherAPI, :fetch_weather}
       )
-  
+
   """
   @spec tool(keyword()) :: Tool.t()
   def tool(opts) when is_list(opts) do
@@ -53,27 +53,27 @@ defmodule ReqLLM.Utils do
 
   @doc """
   Creates a JSON schema object compatible with ReqLLM.
-  
+
   Equivalent to Vercel AI SDK's `jsonSchema()` helper, this function
   creates schema objects for structured data generation and validation.
-  
+
   ## Parameters
-  
+
     * `schema` - NimbleOptions schema definition (keyword list)
     * `opts` - Additional options (optional)
-  
+
   ## Options
-  
+
     * `:validate` - Custom validation function (optional)
-  
+
   ## Examples
-  
+
       # Basic schema
       schema = ReqLLM.json_schema([
         name: [type: :string, required: true, doc: "User name"],
         age: [type: :integer, doc: "User age"]
       ])
-  
+
       # Schema with custom validation
       schema = ReqLLM.json_schema(
         [email: [type: :string, required: true]],
@@ -85,14 +85,16 @@ defmodule ReqLLM.Utils do
           end
         end
       )
-  
+
   """
   @spec json_schema(keyword(), keyword()) :: map()
   def json_schema(schema, opts \\ []) when is_list(schema) and is_list(opts) do
     json_schema = parameters_to_json_schema(schema)
-    
+
     case opts[:validate] do
-      nil -> json_schema
+      nil ->
+        json_schema
+
       validator when is_function(validator, 1) ->
         Map.put(json_schema, :validate, validator)
     end
@@ -100,39 +102,39 @@ defmodule ReqLLM.Utils do
 
   @doc """
   Calculates cosine similarity between two embedding vectors.
-  
+
   Equivalent to Vercel AI SDK's `cosineSimilarity()` function.
   Returns a similarity score between -1 and 1, where:
   - 1.0 indicates identical vectors (maximum similarity)
   - 0.0 indicates orthogonal vectors (no similarity)
   - -1.0 indicates opposite vectors (maximum dissimilarity)
-  
+
   ## Parameters
-  
+
     * `embedding_a` - First embedding vector (list of numbers)
     * `embedding_b` - Second embedding vector (list of numbers)
-  
+
   ## Examples
-  
+
       # Identical vectors
       ReqLLM.cosine_similarity([1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
       #=> 1.0
-  
+
       # Orthogonal vectors
       ReqLLM.cosine_similarity([1.0, 0.0], [0.0, 1.0])
       #=> 0.0
-  
+
       # Opposite vectors
       ReqLLM.cosine_similarity([1.0, 0.0], [-1.0, 0.0])
       #=> -1.0
-  
+
       # Similar vectors
       ReqLLM.cosine_similarity([0.5, 0.8, 0.3], [0.6, 0.7, 0.4])
       #=> 0.9487...
-  
+
   """
   @spec cosine_similarity([number()], [number()]) :: float()
-  def cosine_similarity(embedding_a, embedding_b) 
+  def cosine_similarity(embedding_a, embedding_b)
       when is_list(embedding_a) and is_list(embedding_b) do
     if length(embedding_a) != length(embedding_b) do
       raise ArgumentError, "Embedding vectors must have the same length"
@@ -141,8 +143,8 @@ defmodule ReqLLM.Utils do
     if length(embedding_a) == 0 do
       0.0
     else
-      dot_product = 
-        embedding_a 
+      dot_product =
+        embedding_a
         |> Enum.zip(embedding_b)
         |> Enum.reduce(0, fn {a, b}, acc -> acc + a * b end)
 

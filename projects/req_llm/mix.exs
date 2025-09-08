@@ -45,6 +45,7 @@ defmodule ReqLLM.MixProject do
       {:rename_project, "~> 0.1.0"},
 
       # Dev/test dependencies
+      {:plug, "~> 1.15", only: [:test]},
       {:excoveralls, "~> 0.18", only: [:test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}

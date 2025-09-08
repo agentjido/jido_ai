@@ -8,8 +8,7 @@ defmodule ReqLLM.Error do
       invalid: ReqLLM.Error.Invalid,
       api: ReqLLM.Error.API,
       validation: ReqLLM.Error.Validation,
-      unknown: ReqLLM.Error.Unknown,
-      object_generation: ReqLLM.Error.ObjectGeneration
+      unknown: ReqLLM.Error.Unknown
     ],
     unknown_error: ReqLLM.Error.Unknown.Unknown
 

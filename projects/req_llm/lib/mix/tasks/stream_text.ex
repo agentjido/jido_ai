@@ -42,16 +42,18 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
 
     # Check for API key configuration
     provider = String.split(model_spec, ":") |> List.first()
-    api_key_var = case provider do
-      "anthropic" -> "ANTHROPIC_API_KEY"
-      "openai" -> "OPENAI_API_KEY"
-      "openrouter" -> "OPENROUTER_API_KEY"
-      _ -> nil
-    end
 
-    if api_key_var && !System.get_env(api_key_var) do
-      IO.puts("⚠️  Warning: #{api_key_var} environment variable is not set.")
-      IO.puts("   Please set it with: export #{api_key_var}=\"your-api-key\"")
+    kagi_key =
+      case provider do
+        "anthropic" -> :anthropic_api_key
+        "openai" -> :openai_api_key
+        "openrouter" -> :openrouter_api_key
+        _ -> nil
+      end
+
+    if kagi_key && !Kagi.get(kagi_key) do
+      IO.puts("⚠️  Warning: API key for #{provider} not found in Kagi keyring.")
+      IO.puts("   Please set it with: Kagi.put(#{inspect(kagi_key)}, \"your-api-key\")")
       IO.puts("")
     end
 
@@ -85,8 +87,10 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
               case chunk do
                 {_status, _error} = error_tuple ->
                   IO.puts("❌ Error in stream: #{inspect(error_tuple)}")
+
                 chunk when is_binary(chunk) ->
                   IO.write(chunk)
+
                 other ->
                   IO.puts("❌ Unexpected chunk type: #{inspect(other)}")
               end
@@ -112,6 +116,7 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
 
   defp maybe_add_option(opts_list, parsed_opts, target_key, source_key \\ nil) do
     source_key = source_key || target_key
+
     case Keyword.get(parsed_opts, source_key) do
       nil -> opts_list
       value -> Keyword.put(opts_list, target_key, value)

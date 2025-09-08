@@ -1,23 +1,23 @@
-defmodule ReqLLM.Providers.OpenAI do
+defmodule ReqLLM.Providers.Google do
   @moduledoc """
-  OpenAI provider implementation using the Provider behavior.
+  Google provider implementation using the Provider behavior.
 
-  Supports OpenAI's Chat Completions API with features including:
-  - Text generation with GPT models
+  Supports Google's Generative Language API (Gemini models) with features including:
+  - Text generation with Gemini models
   - Streaming responses
   - Tool calling
-  - Multi-modal inputs (text and images)
+  - Multi-modal inputs (text, images, audio, video)
 
   ## Configuration
 
-  Set your OpenAI API key via environment variable:
+  Set your Google API key via environment variable:
 
-      export OPENAI_API_KEY="your-api-key-here"
+      export GOOGLE_API_KEY="your-api-key-here"
 
   ## Examples
 
       # Simple text generation
-      model = ReqLLM.Model.from("openai:gpt-4")
+      model = ReqLLM.Model.from("google:gemini-1.5-flash")
       {:ok, response} = ReqLLM.generate_text(model, "Hello!")
 
       # Streaming
@@ -32,9 +32,9 @@ defmodule ReqLLM.Providers.OpenAI do
   @behaviour ReqLLM.Provider
 
   use ReqLLM.Provider.DSL,
-    id: :openai,
-    base_url: "https://api.openai.com/v1",
-    metadata: "priv/models_dev/openai.json"
+    id: :google,
+    base_url: "https://generativelanguage.googleapis.com/v1",
+    metadata: "priv/models_dev/google.json"
 
   @impl ReqLLM.Provider
   def attach(request, %ReqLLM.Model{} = model, _opts \\ []) do
@@ -47,7 +47,7 @@ defmodule ReqLLM.Providers.OpenAI do
 
     unless api_key && api_key != "" do
       raise ArgumentError,
-            "OpenAI API key required. Set via Kagi.put(#{inspect(kagi_key)}, key)"
+            "Google API key required. Set via Kagi.put(#{inspect(kagi_key)}, key)"
     end
 
     # Extract messages and options from request body
@@ -56,12 +56,15 @@ defmodule ReqLLM.Providers.OpenAI do
     # Build the request body using extracted messages
     body = build_body(messages, model, stream, tools, tool_choice)
 
+    # Google API uses a different path structure: /models/{model}:generateContent
+    api_path = "/models/#{model.model}:generateContent"
+
     request
-    |> Req.Request.put_header("authorization", "Bearer #{api_key}")
     |> Req.Request.put_header("content-type", "application/json")
     |> Req.Request.merge_options(base_url: default_base_url())
     |> Map.put(:body, Jason.encode!(body))
-    |> Map.put(:url, URI.parse("/chat/completions"))
+    |> Map.put(:url, URI.parse(api_path))
+    |> maybe_add_api_key_param(api_key)
     |> maybe_install_stream_steps(stream)
   end
 
@@ -70,19 +73,10 @@ defmodule ReqLLM.Providers.OpenAI do
     case response do
       %Req.Response{status: 200, body: body} ->
         case body do
-          %{"choices" => [%{"message" => message} | _]} ->
-            # Extract both text content and tool calls from message
-            text_chunks = 
-              case Map.get(message, "content") do
-                content when is_binary(content) and content != "" -> [ReqLLM.StreamChunk.text(content)]
-                _ -> []
-              end
-            
-            tool_call_chunks = 
-              case Map.get(message, "tool_calls") do
-                tool_calls when is_list(tool_calls) -> extract_tool_calls_as_chunks(tool_calls)
-                _ -> []
-              end
+          %{"candidates" => [%{"content" => content} | _]} ->
+            # Extract both text content and tool calls from content
+            text_chunks = extract_text_chunks(content)
+            tool_call_chunks = extract_tool_call_chunks(content)
             
             all_chunks = text_chunks ++ tool_call_chunks
             
@@ -115,8 +109,14 @@ defmodule ReqLLM.Providers.OpenAI do
   @impl ReqLLM.Provider
   def extract_usage(response, %ReqLLM.Model{} = _model) do
     case response do
-      %Req.Response{status: 200, body: %{"usage" => usage}} ->
-        {:ok, usage}
+      %Req.Response{status: 200, body: %{"usageMetadata" => usage}} ->
+        # Convert Google format to common format
+        common_usage = %{
+          "input_tokens" => Map.get(usage, "promptTokenCount", 0),
+          "output_tokens" => Map.get(usage, "candidatesTokenCount", 0),
+          "total_tokens" => Map.get(usage, "totalTokenCount", 0)
+        }
+        {:ok, common_usage}
 
       _ ->
         {:ok, %{}}
@@ -128,7 +128,7 @@ defmodule ReqLLM.Providers.OpenAI do
   defp maybe_install_stream_steps(req, _stream), do: req
 
   defp get_env_var_name do
-    case ReqLLM.Provider.Registry.get_provider_metadata(:openai) do
+    case ReqLLM.Provider.Registry.get_provider_metadata(:google) do
       {:ok, %{"provider" => %{"env" => [env_var | _]}}} ->
         env_var
 
@@ -137,13 +137,23 @@ defmodule ReqLLM.Providers.OpenAI do
         case get_in(metadata, [:provider, :env]) do
           [env_var | _] -> env_var
           # hardcoded fallback
-          _ -> "OPENAI_API_KEY"
+          _ -> "GOOGLE_API_KEY"
         end
 
       {:error, _} ->
         # fallback if metadata unavailable
-        "OPENAI_API_KEY"
+        "GOOGLE_API_KEY"
     end
+  end
+
+  defp maybe_add_api_key_param(request, api_key) do
+    # Google API uses query parameter for API key instead of header
+    current_url = Map.get(request, :url, URI.parse(""))
+    query_params = URI.decode_query(current_url.query || "")
+    new_query_params = Map.put(query_params, "key", api_key)
+    new_query = URI.encode_query(new_query_params)
+    new_url = Map.put(current_url, :query, new_query)
+    Map.put(request, :url, new_url)
   end
 
   defp extract_request_data(%{messages: messages} = body) do
@@ -164,89 +174,103 @@ defmodule ReqLLM.Providers.OpenAI do
     {[], false, [], "auto"}
   end
 
-  defp build_body(messages, %ReqLLM.Model{} = model, stream, tools, tool_choice) do
+  defp build_body(messages, %ReqLLM.Model{} = model, stream, tools, _tool_choice) do
     body = %{
-      model: model.model,
-      messages: format_messages(messages),
-      max_tokens: model.max_tokens || 4096,
-      stream: stream
+      contents: format_messages(messages),
+      generationConfig: build_generation_config(model)
     }
 
     body
-    |> maybe_add_temperature(model.temperature)
     |> maybe_add_tools(tools)
-    |> maybe_add_tool_choice(tool_choice, tools)
+    |> maybe_add_stream(stream)
+  end
+
+  defp build_generation_config(%ReqLLM.Model{} = model) do
+    config = %{}
+
+    config
+    |> maybe_add_temperature(model.temperature)
+    |> maybe_add_max_tokens(model.max_tokens)
   end
 
   defp format_messages(messages) when is_list(messages) do
     Enum.map(messages, fn
       %ReqLLM.Message{role: role, content: content} ->
-        %{role: to_string(role), content: format_content(content)}
+        %{role: format_role(role), parts: format_content(content)}
 
       %{role: role, content: content} ->
-        %{role: to_string(role), content: format_content(content)}
+        %{role: format_role(role), parts: format_content(content)}
 
       message when is_binary(message) ->
-        %{role: "user", content: message}
+        %{role: "user", parts: [%{text: message}]}
     end)
   end
 
   defp format_messages(message) when is_binary(message) do
-    [%{role: "user", content: message}]
+    [%{role: "user", parts: [%{text: message}]}]
   end
 
-  defp format_content(content) when is_binary(content), do: content
+  defp format_role(:user), do: "user"
+  defp format_role(:assistant), do: "model"
+  defp format_role(:system), do: "user"  # Google doesn't have system role, use user
+  defp format_role(role), do: to_string(role)
+
+  defp format_content(content) when is_binary(content), do: [%{text: content}]
 
   defp format_content(content) when is_list(content) do
     Enum.map(content, fn
-      %ReqLLM.Message.ContentPart{type: :text, text: text} -> %{type: "text", text: text}
-      %ReqLLM.Message.ContentPart{type: :image, data: data} -> %{type: "image_url", image_url: data}
+      %ReqLLM.Message.ContentPart{type: :text, text: text} -> %{text: text}
+      %ReqLLM.Message.ContentPart{type: :image, data: data} -> %{inlineData: %{mimeType: "image/jpeg", data: data}}
       part -> part
     end)
   end
 
-  defp format_content(content), do: to_string(content)
+  defp format_content(content), do: [%{text: to_string(content)}]
 
-  defp maybe_add_temperature(body, nil), do: body
-  defp maybe_add_temperature(body, temperature), do: Map.put(body, :temperature, temperature)
+  defp maybe_add_temperature(config, nil), do: config
+  defp maybe_add_temperature(config, temperature), do: Map.put(config, :temperature, temperature)
+
+  defp maybe_add_max_tokens(config, nil), do: config
+  defp maybe_add_max_tokens(config, max_tokens), do: Map.put(config, :maxOutputTokens, max_tokens)
 
   defp maybe_add_tools(body, []), do: body
 
   defp maybe_add_tools(body, tools) do
-    formatted_tools =
-      Enum.map(tools, fn tool ->
+    formatted_tools = %{
+      function_declarations: Enum.map(tools, fn tool ->
         %{
-          type: "function",
-          function: %{
-            name: tool.name || tool["name"],
-            description: tool.description || tool["description"],
-            parameters: tool.parameters_schema || tool["parameters_schema"] || tool["parameters"]
-          }
+          name: tool.name || tool["name"],
+          description: tool.description || tool["description"],
+          parameters: tool.parameters_schema || tool["parameters_schema"] || tool["parameters"] || %{}
         }
       end)
+    }
 
-    Map.put(body, :tools, formatted_tools)
+    Map.put(body, :tools, [formatted_tools])
   end
 
-  defp maybe_add_tool_choice(body, _tool_choice, []), do: body
-  defp maybe_add_tool_choice(body, tool_choice, _tools) when tool_choice != nil do
-    Map.put(body, :tool_choice, tool_choice)
+  defp maybe_add_stream(body, false), do: body
+  defp maybe_add_stream(body, true), do: Map.put(body, :stream, true)
+
+  defp extract_text_chunks(%{"parts" => parts}) do
+    parts
+    |> Enum.filter(fn part -> Map.has_key?(part, "text") end)
+    |> Enum.map(fn %{"text" => text} -> ReqLLM.StreamChunk.text(text) end)
   end
-  defp maybe_add_tool_choice(body, _tool_choice, _tools), do: body
 
-  defp extract_tool_calls_as_chunks(tool_calls) when is_list(tool_calls) do
-    Enum.map(tool_calls, fn tool_call ->
-      %{"function" => %{"name" => name, "arguments" => args}, "id" => id} = tool_call
+  defp extract_text_chunks(_), do: []
 
-      parsed_args =
-        case Jason.decode(args || "{}") do
-          {:ok, parsed} -> parsed
-          {:error, _} -> %{}
-        end
-
-      ReqLLM.StreamChunk.tool_call(name, parsed_args, %{id: id})
+  defp extract_tool_call_chunks(%{"parts" => parts}) do
+    parts
+    |> Enum.filter(fn part -> Map.has_key?(part, "functionCall") end)
+    |> Enum.map(fn %{"functionCall" => function_call} ->
+      name = Map.get(function_call, "name", "")
+      args = Map.get(function_call, "args", %{})
+      ReqLLM.StreamChunk.tool_call(name, args, %{})
     end)
   end
+
+  defp extract_tool_call_chunks(_), do: []
 
   defp parse_sse_events(body) when is_binary(body) do
     body
@@ -281,22 +305,15 @@ defmodule ReqLLM.Providers.OpenAI do
 
   defp convert_to_stream_chunk(%{data: data} = _event) do
     case data do
-      %{"choices" => [%{"delta" => %{"content" => content}} | _]} when is_binary(content) ->
-        ReqLLM.StreamChunk.text(content)
+      %{"candidates" => [%{"content" => %{"parts" => [%{"text" => text} | _]}} | _]} when is_binary(text) ->
+        ReqLLM.StreamChunk.text(text)
 
-      %{"choices" => [%{"delta" => %{"tool_calls" => [tool_call | _]}} | _]} ->
-        case tool_call do
-          %{"function" => %{"name" => name}} ->
-            ReqLLM.StreamChunk.tool_call(name, %{})
+      %{"candidates" => [%{"content" => %{"parts" => [%{"functionCall" => function_call} | _]}} | _]} ->
+        name = Map.get(function_call, "name", "")
+        args = Map.get(function_call, "args", %{})
+        ReqLLM.StreamChunk.tool_call(name, args, %{})
 
-          %{"function" => %{"arguments" => args}} when is_binary(args) ->
-            ReqLLM.StreamChunk.text(args)
-
-          _ ->
-            nil
-        end
-
-      %{"choices" => [%{"finish_reason" => reason} | _]} when reason != nil ->
+      %{"candidates" => [%{"finishReason" => reason} | _]} when reason != nil ->
         ReqLLM.StreamChunk.meta(%{finish_reason: reason})
 
       _ ->
