@@ -1,7 +1,0 @@
-{
-  "type": "error",
-  "error": {
-    "type": "invalid_request_error",
-    "message": "Invalid API key provided"
-  }
-}
