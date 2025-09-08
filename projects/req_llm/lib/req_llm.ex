@@ -9,7 +9,7 @@ defmodule ReqLLM do
   ## Quick Start
 
       # Simple text generation using string format
-      ReqLLM.generate_text("openai:gpt-4o", "Hello world")
+      ReqLLM.generate_text("anthropic:claude-3-5-sonnet", "Hello world")
       #=> {:ok, "Hello! How can I assist you today?"}
 
       # Structured data generation with schema validation
@@ -17,7 +17,7 @@ defmodule ReqLLM do
         name: [type: :string, required: true],
         age: [type: :pos_integer, required: true]
       ]
-      ReqLLM.generate_object("openai:gpt-4o", "Generate a person", schema)
+      ReqLLM.generate_object("anthropic:claude-3-5-sonnet", "Generate a person", schema)
       #=> {:ok, %{name: "John Doe", age: 30}}
 
   ## Model Specifications
@@ -25,45 +25,41 @@ defmodule ReqLLM do
   Multiple formats supported for maximum flexibility:
 
       # String format: "provider:model"
-      ReqLLM.generate_text("openai:gpt-4o", messages)
       ReqLLM.generate_text("anthropic:claude-3-5-sonnet-20241022", messages)
 
       # Tuple format: {provider, options}
-      ReqLLM.generate_text({:openai, model: "gpt-4o", temperature: 0.7}, messages)
+      ReqLLM.generate_text({:anthropic, model: "claude-3-5-sonnet", temperature: 0.7}, messages)
 
       # Model struct format
-      model = %ReqLLM.Model{provider: :openai, model: "gpt-4o", temperature: 0.5}
+      model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet", temperature: 0.5}
       ReqLLM.generate_text(model, messages)
 
   ## Configuration
 
-  The library uses a layered configuration system with Kagi integration:
+  ReqLLM uses the Kagi keyring for API key storage:
 
-  1. **Environment Variables**: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.
-  2. **Application Config**: `config :req_llm, provider: [api_key: "key"]`
-  3. **Runtime Session**: `ReqLLM.put_key(:openai_api_key, "session-key")`
-
-      # Get configuration values
-      ReqLLM.config([:openai, :api_key], "default-key")
+      # Store API keys in session keyring  
+      ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
+      ReqLLM.put_key(:openai_api_key, "sk-...")
+      
+      # Retrieve API keys
+      ReqLLM.api_key(:anthropic_api_key)
 
   ## Providers
 
   Built-in support for major AI providers:
 
-  - **OpenAI**: GPT-4o, GPT-4o Mini, GPT-3.5 Turbo, o1, o1-mini
   - **Anthropic**: Claude 3.5 Sonnet, Claude 3 Haiku, Claude 3 Opus
-  - **OpenRouter**: Access to 200+ models from various providers
-  - **Google**: Gemini 1.5 Pro, Gemini 1.5 Flash
 
       # Access provider modules directly
-      provider = ReqLLM.provider(:openai)
+      provider = ReqLLM.provider(:anthropic)
       provider.generate_text(model, messages, opts)
   """
 
-  alias ReqLLM.{Config, Embedding, Generation, Messages, ObjectGeneration, Utils}
+  alias ReqLLM.{Embedding, Generation, Utils}
 
   # ===========================================================================
-  # Configuration API - Delegated to ReqLLM.Config
+  # Configuration API - Direct Kagi integration
   # ===========================================================================
 
   @doc """
@@ -78,11 +74,14 @@ defmodule ReqLLM do
 
   ## Examples
 
-      ReqLLM.put_key(:openai_api_key, "sk-...")
-      ReqLLM.put_key("ANTHROPIC_API_KEY", "sk-ant-...")
+      ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
 
   """
-  defdelegate put_key(key, value), to: Config
+  @spec put_key(atom() | String.t(), term()) :: :ok
+  def put_key(key, value) do
+    normalized_key = normalize_key(key)
+    Kagi.put(normalized_key, value)
+  end
 
   @doc """
   Gets an API key from the keyring.
@@ -95,28 +94,25 @@ defmodule ReqLLM do
 
   ## Examples
 
-      ReqLLM.api_key(:openai_api_key)
+      ReqLLM.api_key(:anthropic_api_key)
       ReqLLM.api_key("ANTHROPIC_API_KEY")
-      ReqLLM.api_key("OpenAI_API_Key")
 
   """
-  defdelegate api_key(key), to: Config
+  @spec api_key(atom() | String.t()) :: String.t() | nil
+  def api_key(key) do
+    normalized_key = normalize_key(key)
+    Kagi.get(normalized_key, nil)
+  end
 
-  @doc """
-  Gets a configuration value from the keyring with keyspace support.
+  # Private helper for key normalization
+  @spec normalize_key(atom() | String.t()) :: atom()
+  defp normalize_key(key) when is_binary(key) do
+    key |> String.downcase() |> String.to_atom()
+  end
 
-  ## Parameters
-
-    * `keyspace` - Key path as atom list (e.g., [:openai, :api_key])
-    * `default` - Default value if key not found
-
-  ## Examples
-
-      ReqLLM.config([:openai, :api_key], "default-key")
-      ReqLLM.config([:anthropic, :max_tokens], 1000)
-
-  """
-  defdelegate config(keyspace, default \\ nil), to: Config
+  defp normalize_key(key) when is_atom(key) do
+    key |> Atom.to_string() |> String.downcase() |> String.to_atom()
+  end
 
   @doc """
   Creates a messages collection from a list of messages.
@@ -128,17 +124,17 @@ defmodule ReqLLM do
   ## Examples
 
       messages = [
-        ReqLLM.Messages.system("You are helpful"),
-        ReqLLM.Messages.user("Hello!")
+        ReqLLM.Context.system("You are helpful"),
+        ReqLLM.Context.user("Hello!")
       ]
       collection = ReqLLM.messages(messages)
       # Now you can use Enum functions on the collection
       user_msgs = collection |> Enum.filter(&(&1.role == :user))
 
   """
-  @spec messages([struct()]) :: Messages.t()
+  @spec messages([struct()]) :: ReqLLM.Context.t()
   def messages(message_list) when is_list(message_list) do
-    Messages.new(message_list)
+    ReqLLM.Context.new(message_list)
   end
 
   @doc """
@@ -355,74 +351,6 @@ defmodule ReqLLM do
   defdelegate with_cost(result), to: Generation
 
   # ===========================================================================
-  # Object Generation API - Delegated to ReqLLM.ObjectGeneration
-  # ===========================================================================
-
-  @doc """
-  Generates structured data using an AI model with schema validation.
-
-  Accepts flexible model specifications and generates validated structured data using the appropriate provider.
-  The response is validated against the provided NimbleOptions schema and returns a structured map.
-
-  ## Parameters
-
-    * `model_spec` - Model specification in various formats
-    * `messages` - Text prompt or list of messages
-    * `schema` - NimbleOptions schema definition for validation (keyword list)
-    * `opts` - Additional options (keyword list)
-
-  ## Options
-
-  Same as `generate_text/3` plus:
-
-    * `:output_type` - Type of output: `:object`, `:array`, `:enum`, `:no_schema` (default: `:object`)
-    * `:enum_values` - List of allowed values when output_type is `:enum`
-
-  ## Examples
-
-      schema = [
-        name: [type: :string, required: true],
-        age: [type: :pos_integer, required: true]
-      ]
-      {:ok, result} = ReqLLM.generate_object(
-        "openai:gpt-4o",
-        "Generate a person",
-        schema
-      )
-      #=> {:ok, %{name: "John Doe", age: 30}}
-
-  """
-  defdelegate generate_object(model_spec, messages, schema, opts \\ []), to: ObjectGeneration
-
-  @doc """
-  Streams structured data using an AI model with schema validation.
-
-  Accepts flexible model specifications and streams validated structured data using the appropriate provider.
-  Returns a Stream that emits validated structured data chunks as they arrive.
-
-  ## Parameters
-
-  Same as `generate_object/4`.
-
-  ## Examples
-
-      schema = [
-        name: [type: :string, required: true],
-        score: [type: :integer, required: true]
-      ]
-
-      {:ok, stream} = ReqLLM.stream_object(
-        "openai:gpt-4o",
-        "Generate player data",
-        schema
-      )
-
-      stream |> Enum.each(&IO.inspect/1)
-
-  """
-  defdelegate stream_object(model_spec, messages, schema, opts \\ []), to: ObjectGeneration
-
-  # ===========================================================================
   # Embedding API - Delegated to ReqLLM.Embedding
   # ===========================================================================
 
@@ -472,121 +400,188 @@ defmodule ReqLLM do
   """
   defdelegate embed_many(model_spec, texts, opts \\ []), to: Embedding
 
-   # ===========================================================================
-   # Vercel AI SDK Utility API - Delegated to ReqLLM.Utils
-   # ===========================================================================
+  # ===========================================================================
+  # Vercel AI SDK Utility API - Delegated to ReqLLM.Utils
+  # ===========================================================================
 
-   @doc """
-   Creates a Tool struct for AI model function calling.
+  @doc """
+  Creates a Tool struct for AI model function calling.
 
-   Equivalent to Vercel AI SDK's `tool()` helper, providing type-safe tool
-   definitions with parameter validation. This is a convenience function
-   for creating ReqLLM.Tool structs.
+  Equivalent to Vercel AI SDK's `tool()` helper, providing type-safe tool
+  definitions with parameter validation. This is a convenience function
+  for creating ReqLLM.Tool structs.
 
-   ## Parameters
+  ## Parameters
 
-     * `opts` - Tool definition options (keyword list)
+    * `opts` - Tool definition options (keyword list)
 
-   ## Options
+  ## Options
 
-     * `:name` - Tool name (required, must be valid identifier)
-     * `:description` - Tool description for AI model (required)
-     * `:parameters` - Parameter schema as NimbleOptions keyword list (optional)
-     * `:callback` - Callback function or MFA tuple (required)
+    * `:name` - Tool name (required, must be valid identifier)
+    * `:description` - Tool description for AI model (required)
+    * `:parameters` - Parameter schema as NimbleOptions keyword list (optional)
+    * `:callback` - Callback function or MFA tuple (required)
 
-   ## Examples
+  ## Examples
 
-       # Simple tool with no parameters
-       tool = ReqLLM.tool(
-         name: "get_time",
-         description: "Get the current time",
-         callback: fn _args -> {:ok, DateTime.utc_now()} end
-       )
+      # Simple tool with no parameters
+      tool = ReqLLM.tool(
+        name: "get_time",
+        description: "Get the current time",
+        callback: fn _args -> {:ok, DateTime.utc_now()} end
+      )
 
-       # Tool with parameters
-       weather_tool = ReqLLM.tool(
-         name: "get_weather",
-         description: "Get current weather for a location",
-         parameters: [
-           location: [type: :string, required: true, doc: "City name"],
-           units: [type: :string, default: "metric", doc: "Temperature units"]
-         ],
-         callback: {WeatherAPI, :fetch_weather}
-       )
+      # Tool with parameters
+      weather_tool = ReqLLM.tool(
+        name: "get_weather",
+        description: "Get current weather for a location",
+        parameters: [
+          location: [type: :string, required: true, doc: "City name"],
+          units: [type: :string, default: "metric", doc: "Temperature units"]
+        ],
+        callback: {WeatherAPI, :fetch_weather}
+      )
 
-   """
-   defdelegate tool(opts), to: Utils
+  """
+  defdelegate tool(opts), to: Utils
 
-   @doc """
-   Creates a JSON schema object compatible with ReqLLM.
+  @doc """
+  Creates a JSON schema object compatible with ReqLLM.
 
-   Equivalent to Vercel AI SDK's `jsonSchema()` helper, this function
-   creates schema objects for structured data generation and validation.
+  Equivalent to Vercel AI SDK's `jsonSchema()` helper, this function
+  creates schema objects for structured data generation and validation.
 
-   ## Parameters
+  ## Parameters
 
-     * `schema` - NimbleOptions schema definition (keyword list)
-     * `opts` - Additional options (optional)
+    * `schema` - NimbleOptions schema definition (keyword list)
+    * `opts` - Additional options (optional)
 
-   ## Options
+  ## Options
 
-     * `:validate` - Custom validation function (optional)
+    * `:validate` - Custom validation function (optional)
 
-   ## Examples
+  ## Examples
 
-       # Basic schema
-       schema = ReqLLM.json_schema([
-         name: [type: :string, required: true, doc: "User name"],
-         age: [type: :integer, doc: "User age"]
-       ])
+      # Basic schema
+      schema = ReqLLM.json_schema([
+        name: [type: :string, required: true, doc: "User name"],
+        age: [type: :integer, doc: "User age"]
+      ])
 
-       # Schema with custom validation
-       schema = ReqLLM.json_schema(
-         [email: [type: :string, required: true]],
-         validate: fn value -> 
-           if String.contains?(value["email"], "@") do
-             {:ok, value}
-           else
-             {:error, "Invalid email format"}
-           end
-         end
-       )
+      # Schema with custom validation
+      schema = ReqLLM.json_schema(
+        [email: [type: :string, required: true]],
+        validate: fn value -> 
+          if String.contains?(value["email"], "@") do
+            {:ok, value}
+          else
+            {:error, "Invalid email format"}
+          end
+        end
+      )
 
-   """
-   defdelegate json_schema(schema, opts \\ []), to: Utils
+  """
+  defdelegate json_schema(schema, opts \\ []), to: Utils
 
-   @doc """
-   Calculates cosine similarity between two embedding vectors.
+  @doc """
+  Calculates cosine similarity between two embedding vectors.
 
-   Equivalent to Vercel AI SDK's `cosineSimilarity()` function.
-   Returns a similarity score between -1 and 1, where:
-   - 1.0 indicates identical vectors (maximum similarity)
-   - 0.0 indicates orthogonal vectors (no similarity)
-   - -1.0 indicates opposite vectors (maximum dissimilarity)
+  Equivalent to Vercel AI SDK's `cosineSimilarity()` function.
+  Returns a similarity score between -1 and 1, where:
+  - 1.0 indicates identical vectors (maximum similarity)
+  - 0.0 indicates orthogonal vectors (no similarity)
+  - -1.0 indicates opposite vectors (maximum dissimilarity)
 
-   ## Parameters
+  ## Parameters
 
-     * `embedding_a` - First embedding vector (list of numbers)
-     * `embedding_b` - Second embedding vector (list of numbers)
+    * `embedding_a` - First embedding vector (list of numbers)
+    * `embedding_b` - Second embedding vector (list of numbers)
 
-   ## Examples
+  ## Examples
 
-       # Identical vectors
-       ReqLLM.cosine_similarity([1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
-       #=> 1.0
+      # Identical vectors
+      ReqLLM.cosine_similarity([1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+      #=> 1.0
 
-       # Orthogonal vectors
-       ReqLLM.cosine_similarity([1.0, 0.0], [0.0, 1.0])
-       #=> 0.0
+      # Orthogonal vectors
+      ReqLLM.cosine_similarity([1.0, 0.0], [0.0, 1.0])
+      #=> 0.0
 
-       # Opposite vectors
-       ReqLLM.cosine_similarity([1.0, 0.0], [-1.0, 0.0])
-       #=> -1.0
+      # Opposite vectors
+      ReqLLM.cosine_similarity([1.0, 0.0], [-1.0, 0.0])
+      #=> -1.0
 
-       # Similar vectors
-       ReqLLM.cosine_similarity([0.5, 0.8, 0.3], [0.6, 0.7, 0.4])
-       #=> 0.9487...
+      # Similar vectors
+      ReqLLM.cosine_similarity([0.5, 0.8, 0.3], [0.6, 0.7, 0.4])
+      #=> 0.9487...
 
-   """
-   defdelegate cosine_similarity(embedding_a, embedding_b), to: Utils
+  """
+  defdelegate cosine_similarity(embedding_a, embedding_b), to: Utils
+
+  # ===========================================================================
+  # Provider Plugin System - Core Infrastructure
+  # ===========================================================================
+
+  @doc """
+  Attaches a provider plugin to a Req request for AI model interaction.
+
+  This function bridges the Provider/Client architecture by:
+  1. Parsing the model specification into a ReqLLM.Model struct
+  2. Looking up the provider plugin from the registry
+  3. Calling the provider's attach/2 callback to configure the request
+
+  ## Parameters
+
+    * `request` - Req.Request struct to configure
+    * `model_spec` - Model specification in supported formats:
+      - String: "anthropic:claude-3-sonnet"
+      - Tuple: {:anthropic, model: "claude-3-sonnet", temperature: 0.7}
+      - Struct: %ReqLLM.Model{}
+
+  ## Returns
+
+    * `{:ok, configured_request}` - Request ready for execution
+    * `{:error, reason}` - Configuration failed
+
+  ## Examples
+
+      # Basic usage with model string
+      request = Req.Request.new(url: "/chat/completions", method: :post)
+      {:ok, configured} = ReqLLM.attach(request, "anthropic:claude-3-sonnet")
+
+      # The configured request includes:
+      # - Authentication headers
+      # - Provider-specific base URL
+      # - Request body formatting
+      # - Any provider-specific configuration
+
+  """
+  @spec attach(Req.Request.t(), String.t() | tuple() | ReqLLM.Model.t()) ::
+          {:ok, Req.Request.t()} | {:error, term()}
+  def attach(%Req.Request{} = request, model_spec) do
+    with {:ok, model} <- ReqLLM.Model.from(model_spec),
+         {:ok, provider_module} <- ReqLLM.Provider.Registry.get_provider(model.provider) do
+      configured_request = provider_module.attach(request, model)
+      {:ok, configured_request}
+    end
+  end
+
+  @doc """
+  Attaches a provider plugin with bang syntax (raises on error).
+
+  Same as `attach/2` but raises `ArgumentError` on failure instead of returning error tuples.
+
+  ## Examples
+
+      request = Req.Request.new()
+      configured = ReqLLM.attach!(request, "anthropic:claude-3-sonnet")
+
+  """
+  @spec attach!(Req.Request.t(), String.t() | tuple() | ReqLLM.Model.t()) :: Req.Request.t()
+  def attach!(request, model_spec) do
+    case attach(request, model_spec) do
+      {:ok, configured_request} -> configured_request
+      {:error, reason} -> raise ArgumentError, "Failed to attach provider: #{inspect(reason)}"
+    end
+  end
 end

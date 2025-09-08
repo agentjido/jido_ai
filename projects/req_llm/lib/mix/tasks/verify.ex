@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.ReqLLM.Verify do
+defmodule Mix.Tasks.ReqLlm.Verify do
   @moduledoc """
   Verify advertised capabilities of a model or all models from a provider.
 
@@ -83,7 +83,7 @@ defmodule Mix.Tasks.ReqLLM.Verify do
     case String.contains?(input, ":") do
       true ->
         # Full model spec like "anthropic:claude-3-sonnet"
-        ReqLLM.CapabilityVerifier.verify(input, opts)
+        ReqLLM.Capability.verify(input, opts)
 
       false ->
         # Provider-only string like "anthropic"
@@ -103,7 +103,7 @@ defmodule Mix.Tasks.ReqLLM.Verify do
           |> Enum.map(fn model_id ->
             Mix.shell().info("\n--- Verifying #{model_id} ---")
 
-            case ReqLLM.CapabilityVerifier.verify(model_id, opts) do
+            case ReqLLM.Capability.verify(model_id, opts) do
               :ok ->
                 Mix.shell().info("✅ #{model_id} passed")
                 :ok
