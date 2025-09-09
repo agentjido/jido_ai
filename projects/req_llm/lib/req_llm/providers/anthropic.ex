@@ -74,16 +74,16 @@ defmodule ReqLLM.Providers.Anthropic do
         case body do
           %{"content" => content} ->
             # Extract both text and tool calls from content
-            text_chunks = 
+            text_chunks =
               case extract_content_text(content) do
                 text when text != "" -> [ReqLLM.StreamChunk.text(text)]
                 "" -> []
               end
-            
+
             tool_call_chunks = extract_tool_calls_as_chunks(content)
-            
+
             all_chunks = text_chunks ++ tool_call_chunks
-            
+
             case all_chunks do
               [] -> {:ok, [ReqLLM.StreamChunk.text("")]}
               chunks -> {:ok, chunks}

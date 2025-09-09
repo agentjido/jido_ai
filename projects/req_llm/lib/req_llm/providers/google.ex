@@ -77,9 +77,9 @@ defmodule ReqLLM.Providers.Google do
             # Extract both text content and tool calls from content
             text_chunks = extract_text_chunks(content)
             tool_call_chunks = extract_tool_call_chunks(content)
-            
+
             all_chunks = text_chunks ++ tool_call_chunks
-            
+
             case all_chunks do
               [] -> {:error, to_error("Invalid response format", body)}
               chunks -> {:ok, chunks}
@@ -116,6 +116,7 @@ defmodule ReqLLM.Providers.Google do
           "output_tokens" => Map.get(usage, "candidatesTokenCount", 0),
           "total_tokens" => Map.get(usage, "totalTokenCount", 0)
         }
+
         {:ok, common_usage}
 
       _ ->
@@ -212,16 +213,22 @@ defmodule ReqLLM.Providers.Google do
 
   defp format_role(:user), do: "user"
   defp format_role(:assistant), do: "model"
-  defp format_role(:system), do: "user"  # Google doesn't have system role, use user
+  # Google doesn't have system role, use user
+  defp format_role(:system), do: "user"
   defp format_role(role), do: to_string(role)
 
   defp format_content(content) when is_binary(content), do: [%{text: content}]
 
   defp format_content(content) when is_list(content) do
     Enum.map(content, fn
-      %ReqLLM.Message.ContentPart{type: :text, text: text} -> %{text: text}
-      %ReqLLM.Message.ContentPart{type: :image, data: data} -> %{inlineData: %{mimeType: "image/jpeg", data: data}}
-      part -> part
+      %ReqLLM.Message.ContentPart{type: :text, text: text} ->
+        %{text: text}
+
+      %ReqLLM.Message.ContentPart{type: :image, data: data} ->
+        %{inlineData: %{mimeType: "image/jpeg", data: data}}
+
+      part ->
+        part
     end)
   end
 
@@ -237,13 +244,15 @@ defmodule ReqLLM.Providers.Google do
 
   defp maybe_add_tools(body, tools) do
     formatted_tools = %{
-      function_declarations: Enum.map(tools, fn tool ->
-        %{
-          name: tool.name || tool["name"],
-          description: tool.description || tool["description"],
-          parameters: tool.parameters_schema || tool["parameters_schema"] || tool["parameters"] || %{}
-        }
-      end)
+      function_declarations:
+        Enum.map(tools, fn tool ->
+          %{
+            name: tool.name || tool["name"],
+            description: tool.description || tool["description"],
+            parameters:
+              tool.parameters_schema || tool["parameters_schema"] || tool["parameters"] || %{}
+          }
+        end)
     }
 
     Map.put(body, :tools, [formatted_tools])
@@ -305,10 +314,15 @@ defmodule ReqLLM.Providers.Google do
 
   defp convert_to_stream_chunk(%{data: data} = _event) do
     case data do
-      %{"candidates" => [%{"content" => %{"parts" => [%{"text" => text} | _]}} | _]} when is_binary(text) ->
+      %{"candidates" => [%{"content" => %{"parts" => [%{"text" => text} | _]}} | _]}
+      when is_binary(text) ->
         ReqLLM.StreamChunk.text(text)
 
-      %{"candidates" => [%{"content" => %{"parts" => [%{"functionCall" => function_call} | _]}} | _]} ->
+      %{
+        "candidates" => [
+          %{"content" => %{"parts" => [%{"functionCall" => function_call} | _]}} | _
+        ]
+      } ->
         name = Map.get(function_call, "name", "")
         args = Map.get(function_call, "args", %{})
         ReqLLM.StreamChunk.tool_call(name, args, %{})

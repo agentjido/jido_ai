@@ -107,7 +107,7 @@ defmodule MyProvider do
 
   @impl ReqLLM.Plugin
   def attach(request, %ReqLLM.Model{} = model) do
-    api_key = ReqLLM.api_key(:my_provider_api_key)
+    api_key = ReqLLM.get_key(:my_provider_api_key)
     
     %{request |
       headers: [

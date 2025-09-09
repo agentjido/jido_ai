@@ -69,8 +69,8 @@ defmodule ReqLLM.Provider.DSL do
       metadata: "priv/models_dev/example.json"
 
         def attach(request, %ReqLLM.Model{} = model) do
-          api_key = ReqLLM.api_key(:example_api_key)
-          
+          api_key = ReqLLM.get_key(:example_api_key)
+
           request
           |> Req.Request.put_header("authorization", "Bearer \#{api_key}")
           |> Req.Request.put_header("content-type", "application/json")
@@ -128,7 +128,7 @@ defmodule ReqLLM.Provider.DSL do
       # Register provider before compilation completes
       @before_compile ReqLLM.Provider.DSL
 
-      # Implement default_base_url function 
+      # Implement default_base_url function
       def default_base_url do
         @base_url
       end
