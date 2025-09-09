@@ -19,7 +19,6 @@ defmodule ReqLLM.Capability.GenerateText do
 
   @impl true
   def verify(model, opts) do
-    model_spec = "#{model.provider}:#{model.model}"
     timeout = Keyword.get(opts, :timeout, 10_000)
 
     # Use provider_options to pass timeout to the HTTP client
@@ -30,14 +29,14 @@ defmodule ReqLLM.Capability.GenerateText do
       }
     ]
 
-    case ReqLLM.generate_text(model_spec, "Hello!", req_llm_opts) do
-      {:ok, %Req.Response{body: response}} when is_binary(response) ->
+    case ReqLLM.generate_text!(model, "Hello!", req_llm_opts) do
+      {:ok, response} when is_binary(response) ->
         trimmed = String.trim(response)
 
         if trimmed != "" do
           {:ok,
            %{
-             model_id: model_spec,
+             model_id: "#{model.provider}:#{model.model}",
              response_length: String.length(response),
              response_preview: String.slice(response, 0, 50)
            }}

@@ -1,170 +1,146 @@
-# defmodule ReqLLM.Capability.ReporterTest do
-#   use ExUnit.Case, async: false
-#   use Mimic
+defmodule ReqLLM.Capability.ReporterTest do
+  @moduledoc """
+  Unit tests for ReqLLM.Capability.Reporter output formatting.
 
-#   alias ReqLLM.Capability.Reporter
-#   alias ReqLLM.Capability.Result
+  Tests the Reporter module's dispatch logic and output formatting functions
+  without requiring network calls. Uses ExUnit.CaptureIO to verify output.
+  """
 
-#   copy Jason
-#   copy IO
+  use ReqLLM.Test.CapabilityCase
 
-#   setup :verify_on_exit!
-#   setup :set_mimic_global
+  alias ReqLLM.Capability.Reporter
 
-#   describe "dispatch/2" do
-#     test "defaults to pretty format" do
-#       results = [
-#         Result.passed("openai:gpt-4", :generate_text, 150, "success")
-#       ]
+  describe "dispatch/2" do
+    test "handles all format options correctly" do
+      test_cases = [
+        {nil, :pretty},
+        {:pretty, :pretty},
+        {:json, :json},
+        {:debug, :debug},
+        {:unknown, :pretty}
+      ]
 
-#       IO
-#       |> expect(:puts, fn output ->
-#         assert output =~ "✓"
-#         assert output =~ "openai:gpt-4"
-#         assert output =~ "generate_text"
-#         assert output =~ "(150ms)"
-#         :ok
-#       end)
+      for {input_format, expected_format} <- test_cases do
+        results = [passed_result(:generate_text)]
+        
+        output = capture_output(results, format: input_format)
+        
+        case expected_format do
+          :pretty ->
+            assert output =~ "✓"
+            assert output =~ "generate_text"
+          :json ->
+            json_data = Jason.decode!(output)
+            assert json_data["status"] == "passed"
+          :debug ->
+            assert output =~ "✓"
+            assert output =~ "generate_text"
+        end
+      end
+    end
+  end
 
-#       assert Reporter.dispatch(results, []) == :ok
-#     end
+  describe "pretty format output" do
+    test "displays correct icon and color per status" do
+      results = [
+        passed_result(:generate_text),
+        failed_result(:tool_calling, "Schema error")
+      ]
 
-#     test "uses specified format" do
-#       results = [
-#         Result.passed("openai:gpt-4", :generate_text, 150, "success")
-#       ]
+      output = capture_pretty(results)
 
-#       Jason
-#       |> expect(:encode!, fn result ->
-#         assert result.model == "openai:gpt-4"
-#         ~s({"model":"openai:gpt-4"})
-#       end)
+      assert output =~ "\e[32m✓\e[0m"  # Green checkmark for passed
+      assert output =~ "\e[31m✗\e[0m"  # Red X for failed
+    end
 
-#       IO
-#       |> expect(:puts, fn json_string ->
-#         assert json_string == ~s({"model":"openai:gpt-4"})
-#         :ok
-#       end)
+    test "formats timing edge cases correctly" do
+      results = [
+        passed_result(:test1) |> with_timing(0),
+        passed_result(:test2) |> with_timing(999), 
+        passed_result(:test3) |> with_timing(1000)
+      ]
 
-#       assert Reporter.dispatch(results, format: :json) == :ok
-#     end
-#   end
+      output = capture_pretty(results)
 
-#   describe "output_json/1" do
-#     test "outputs each result as JSON line" do
-#       results = [
-#         Result.passed("openai:gpt-4", :generate_text, 150, "success"),
-#         Result.failed("anthropic:claude", :tool_calling, 250, "error")
-#       ]
+      assert output =~ "(0ms)"
+      assert output =~ "(999ms)" 
+      assert output =~ "(1.0s)"
+    end
 
-#       Jason
-#       |> expect(:encode!, fn result ->
-#         case result.model do
-#           "anthropic:claude" -> ~s({"model":"anthropic:claude","status":"failed"})
-#           "openai:gpt-4" -> ~s({"model":"openai:gpt-4","status":"passed"})
-#         end
-#       end)
-#       |> expect(:encode!, fn result ->
-#         case result.model do
-#           "anthropic:claude" -> ~s({"model":"anthropic:claude","status":"failed"})
-#           "openai:gpt-4" -> ~s({"model":"openai:gpt-4","status":"passed"})
-#         end
-#       end)
+    test "displays results in reverse order" do
+      results = [
+        passed_result(:first),
+        passed_result(:second),
+        passed_result(:third)
+      ]
 
-#       IO
-#       |> expect(:puts, fn json -> assert json =~ "failed"; :ok end)
-#       |> expect(:puts, fn json -> assert json =~ "passed"; :ok end)
+      output = capture_pretty(results)
+      lines = String.split(String.trim(output), "\n")
 
-#       assert Reporter.output_json(results) == :ok
-#     end
-#   end
+      assert Enum.at(lines, 0) =~ "third"
+      assert Enum.at(lines, 1) =~ "second"
+      assert Enum.at(lines, 2) =~ "first"
+    end
+  end
 
-#   describe "output_pretty/1" do
-#     test "outputs formatted results with icons and timing" do
-#       results = [
-#         Result.passed("openai:gpt-4", :generate_text, 150),
-#         Result.failed("anthropic:claude", :tool_calling, 2500, "timeout")
-#       ]
+  describe "debug format output" do
+    test "shows error details for failed results only" do
+      results = [
+        passed_result(:generate_text),
+        failed_result(:tool_calling, "Schema validation failed")
+      ]
 
-#       IO
-#       |> expect(:puts, fn output ->
-#         assert output =~ "✗"
-#         assert output =~ "anthropic:claude"
-#         assert output =~ "tool_calling"
-#         assert output =~ "(2.5s)"
-#         :ok
-#       end)
-#       |> expect(:puts, fn output ->
-#         assert output =~ "✓"
-#         assert output =~ "openai:gpt-4"
-#         assert output =~ "generate_text"
-#         assert output =~ "(150ms)"
-#         :ok
-#       end)
+      output = capture_debug(results)
 
-#       assert Reporter.output_pretty(results) == :ok
-#     end
+      assert output =~ "✓"
+      assert output =~ "✗"
+      assert output =~ "Error: %{error: \"Schema validation failed\"}"
+      refute output =~ "Success details"
+    end
+  end
 
-#     test "handles timing display correctly" do
-#       results = [
-#         Result.passed("test:model", :test_cap, 500),
-#         Result.passed("test:model", :test_cap, 1500)
-#       ]
+  describe "json format output" do
+    test "outputs valid JSON for each result" do
+      results = [
+        passed_result(:generate_text),
+        failed_result(:tool_calling, "Error details")
+      ]
 
-#       IO
-#       |> expect(:puts, fn output ->
-#         assert output =~ "(1.5s)"
-#         :ok
-#       end)
-#       |> expect(:puts, fn output ->
-#         assert output =~ "(500ms)"
-#         :ok
-#       end)
+      output = capture_json(results)
+      lines = String.split(String.trim(output), "\n")
 
-#       assert Reporter.output_pretty(results) == :ok
-#     end
-#   end
+      assert length(lines) == 2
+      
+      # Results should be reversed
+      first_json = Jason.decode!(Enum.at(lines, 0))
+      second_json = Jason.decode!(Enum.at(lines, 1))
 
-#   describe "output_debug/1" do
-#     test "shows detailed error information for failed results" do
-#       results = [
-#         Result.passed("openai:gpt-4", :generate_text, 150),
-#         Result.failed("anthropic:claude", :tool_calling, 250, {:error, "Schema validation failed"})
-#       ]
+      assert first_json["capability"] == "tool_calling"
+      assert first_json["status"] == "failed"
+      assert second_json["capability"] == "generate_text"
+      assert second_json["status"] == "passed"
+    end
+  end
 
-#       IO
-#       |> expect(:puts, fn output ->
-#         assert output =~ "✗"
-#         assert output =~ "anthropic:claude"
-#         :ok
-#       end)
-#       |> expect(:puts, fn error_output ->
-#         assert error_output =~ "Error:"
-#         assert error_output =~ "Schema validation failed"
-#         :ok
-#       end)
-#       |> expect(:puts, fn output ->
-#         assert output =~ "✓"
-#         assert output =~ "openai:gpt-4"
-#         :ok
-#       end)
+  # Shared test utilities
+  
+  defp capture_output(results, opts) do
+    capture_io(fn -> Reporter.dispatch(results, opts) end)
+  end
 
-#       assert Reporter.output_debug(results) == :ok
-#     end
+  defp capture_pretty(results) do
+    capture_io(fn -> Reporter.output_pretty(results) end)
+  end
 
-#     test "does not show error details for passed results in debug mode" do
-#       results = [
-#         Result.passed("openai:gpt-4", :generate_text, 150, "success details")
-#       ]
+  defp capture_debug(results) do
+    capture_io(fn -> Reporter.output_debug(results) end)
+  end
 
-#       IO
-#       |> expect(:puts, 1, fn output ->
-#         assert output =~ "✓"
-#         refute output =~ "Error:"
-#         :ok
-#       end)
+  defp capture_json(results) do
+    capture_io(fn -> Reporter.output_json(results) end)
+  end
 
-#       assert Reporter.output_debug(results) == :ok
-#     end
-#   end
-# end
+  defp with_timing(result, latency_ms) do
+    %{result | latency_ms: latency_ms}
+  end
+end
