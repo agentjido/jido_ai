@@ -2,8 +2,8 @@ defmodule ReqLLM.Capability do
   @moduledoc """
   Core capability verification engine for ReqLLM models.
 
-  Uses ExUnit to dynamically generate and run tests for each capability
-  that a model advertises. Provides familiar test output and reporting.
+  Direct verification runner for model capabilities without ExUnit dependencies.
+  Provides clean output and reporting through the Reporter system.
 
   ## Usage
 
@@ -36,7 +36,17 @@ defmodule ReqLLM.Capability do
   def verify(model_id, opts \\ []) do
     with {:ok, model} <- ReqLLM.Model.with_metadata(model_id),
          {:ok, capabilities} <- discover_capabilities(model, opts) do
-      run_exunit_tests(capabilities, model, opts)
+      results = run_checks(capabilities, model, opts)
+
+      # Use reporter for output
+      ReqLLM.Capability.Reporter.dispatch(results, opts)
+
+      # Return success if all checks passed
+      if Enum.all?(results, &(&1.status == :passed)) do
+        :ok
+      else
+        :error
+      end
     else
       {:error, reason} ->
         Logger.error("❌ #{reason}")
@@ -125,111 +135,47 @@ defmodule ReqLLM.Capability do
   end
 
   @doc """
-  Runs ExUnit tests for the given capabilities.
+  Runs capability checks for the given capabilities.
   """
-  @spec run_exunit_tests([module()], ReqLLM.Model.t(), keyword()) :: :ok | :error
-  def run_exunit_tests(capabilities, model, opts) do
-    # Configure ExUnit (start returns :already_started if already running)
-    # dialyzer complains about unknown function but it exists at runtime
-    format = Keyword.get(opts, :format, :pretty)
-
-    # Store formatter options globally for the formatter to access
-    formatter_opts =
-      case format do
-        :json -> [mode: :json]
-        :debug -> [mode: :debug]
-        :pretty -> [mode: :pretty]
-        format when is_binary(format) -> [mode: String.to_atom(format)]
-        _ -> [mode: :pretty]
-      end
-
-    # Configure the formatter
-    ExUnit.configure(formatters: [ReqLLM.Capability.Formatter])
-
-    # Put formatter options in Application env for the formatter to access
-    Application.put_env(:req_llm, :formatter_opts, formatter_opts)
-
-    _ =
-      ExUnit.start(
-        autorun: false,
-        colors: [enabled: true],
-        timeout: Keyword.get(opts, :timeout, 10_000),
-        max_failures: if(Keyword.get(opts, :fail_fast, false), do: 1, else: :infinity)
-      )
-
-    # Generate test module dynamically - sanitize the model ID for Elixir module name
+  @spec run_checks([module()], ReqLLM.Model.t(), keyword()) :: [ReqLLM.Capability.Result.t()]
+  def run_checks(capabilities, model, opts) do
     model_id = "#{model.provider}:#{model.model}"
+    fail_fast = Keyword.get(opts, :fail_fast, false)
 
-    sanitized_model_id =
-      model_id
-      |> String.replace(~r/[^a-zA-Z0-9_]/, "_")
-      |> Macro.camelize()
+    Logger.info("Verifying #{model_id} capabilities...")
 
-    test_module_name = :"ReqLLM.CapabilityTest.#{sanitized_model_id}"
+    {results, _should_stop} =
+      Enum.reduce_while(capabilities, {[], false}, fn capability_module, {acc, _stop} ->
+        capability_id = capability_module.id()
 
-    # Build test module using AST manipulation instead of Code.eval_string
-    try do
-      build_test_module(test_module_name, capabilities, model, opts)
-    rescue
-      error ->
-        Logger.error("❌ Failed to generate tests: #{inspect(error)}")
-        :error
-    else
-      _test_module ->
-        # Run the tests
-        Logger.info("Verifying #{model_id} capabilities...")
-        # dialyzer complains about unknown function but it exists at runtime
-        result = ExUnit.run()
+        {latency_ms, verify_result} =
+          :timer.tc(fn ->
+            capability_module.verify(model, opts)
+          end)
 
-        case result do
-          %{failures: 0} -> :ok
-          _failed -> :error
-        end
-    end
-  end
+        # Convert microseconds to milliseconds
+        latency_ms = div(latency_ms, 1000)
 
-  # Build test module using AST manipulation (safer than Code.eval_string)
-  defp build_test_module(module_name, capabilities, model, opts) do
-    model_id = "#{model.provider}:#{model.model}"
+        result =
+          case verify_result do
+            {:ok, details} ->
+              ReqLLM.Capability.Result.passed(model_id, capability_id, latency_ms, details)
 
-    tests =
-      for capability_module <- capabilities do
-        capability_id = to_string(capability_module.id())
-        # Include model ID in test name for the formatter
-        test_name = "#{model_id}_#{capability_id}"
-
-        quote do
-          test unquote(test_name) do
-            case unquote(capability_module).verify(@model, @opts) do
-              {:ok, details} ->
-                # Test passes, optionally log details
-                if @opts[:format] == "debug" do
-                  IO.puts("✓ #{inspect(details)}")
-                end
-
-                assert true
-
-              {:error, reason} ->
-                flunk(unquote("#{capability_id} verification failed: ") <> inspect(reason))
-            end
+            {:error, reason} ->
+              ReqLLM.Capability.Result.failed(model_id, capability_id, latency_ms, reason)
           end
+
+        new_acc = [result | acc]
+
+        # Check if we should stop early due to fail_fast
+        if fail_fast and result.status == :failed do
+          {:halt, {new_acc, true}}
+        else
+          {:cont, {new_acc, false}}
         end
-      end
+      end)
 
-    {:module, module, _binary, _} =
-      Module.create(
-        module_name,
-        quote do
-          use ExUnit.Case, async: false
-
-          @model unquote(Macro.escape(model))
-          @opts unquote(Macro.escape(opts))
-
-          unquote_splicing(tests)
-        end,
-        Macro.Env.location(__ENV__)
-      )
-
-    module
+    # Return results in reverse order (since we built them with prepend)
+    Enum.reverse(results)
   end
 end

@@ -72,20 +72,23 @@ defmodule ReqLLM.Providers.XAI do
         case body do
           %{"choices" => [%{"message" => message} | _]} ->
             # Extract both text content and tool calls from message
-            text_chunks = 
+            text_chunks =
               case Map.get(message, "content") do
-                content when is_binary(content) and content != "" -> [ReqLLM.StreamChunk.text(content)]
-                _ -> []
+                content when is_binary(content) and content != "" ->
+                  [ReqLLM.StreamChunk.text(content)]
+
+                _ ->
+                  []
               end
-            
-            tool_call_chunks = 
+
+            tool_call_chunks =
               case Map.get(message, "tool_calls") do
                 tool_calls when is_list(tool_calls) -> extract_tool_calls_as_chunks(tool_calls)
                 _ -> []
               end
-            
+
             all_chunks = text_chunks ++ tool_call_chunks
-            
+
             case all_chunks do
               [] -> {:error, to_error("Invalid response format", body)}
               chunks -> {:ok, chunks}
@@ -199,9 +202,14 @@ defmodule ReqLLM.Providers.XAI do
 
   defp format_content(content) when is_list(content) do
     Enum.map(content, fn
-      %ReqLLM.Message.ContentPart{type: :text, text: text} -> %{type: "text", text: text}
-      %ReqLLM.Message.ContentPart{type: :image, data: data} -> %{type: "image_url", image_url: data}
-      part -> part
+      %ReqLLM.Message.ContentPart{type: :text, text: text} ->
+        %{type: "text", text: text}
+
+      %ReqLLM.Message.ContentPart{type: :image, data: data} ->
+        %{type: "image_url", image_url: data}
+
+      part ->
+        part
     end)
   end
 
@@ -229,9 +237,11 @@ defmodule ReqLLM.Providers.XAI do
   end
 
   defp maybe_add_tool_choice(body, _tool_choice, []), do: body
+
   defp maybe_add_tool_choice(body, tool_choice, _tools) when tool_choice != nil do
     Map.put(body, :tool_choice, tool_choice)
   end
+
   defp maybe_add_tool_choice(body, _tool_choice, _tools), do: body
 
   defp extract_tool_calls_as_chunks(tool_calls) when is_list(tool_calls) do

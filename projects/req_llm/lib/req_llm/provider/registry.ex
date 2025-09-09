@@ -95,6 +95,7 @@ defmodule ReqLLM.Provider.Registry do
 
       %{module: other} ->
         require Logger
+
         Logger.warning(
           "Attempted to overwrite provider #{provider_id}: existing=#{inspect(other)}, attempted=#{inspect(module)}"
         )
@@ -369,7 +370,9 @@ defmodule ReqLLM.Provider.Registry do
 
     # Log any failures in a batch
     if !Enum.empty?(failed_modules) do
-      Logger.warning("Failed to register #{length(failed_modules)} providers: #{inspect(failed_modules)}")
+      Logger.warning(
+        "Failed to register #{length(failed_modules)} providers: #{inspect(failed_modules)}"
+      )
     end
 
     # Store in persistent_term
@@ -400,24 +403,26 @@ defmodule ReqLLM.Provider.Registry do
           {:ok, {atom(), module(), map()}} | {:error, {module(), term()}}
   def extract_provider_info(module) do
     # Get provider metadata from DSL compilation
-    metadata = if Code.ensure_loaded?(module) and function_exported?(module, :metadata, 0) do
-      module.metadata()
-    else
-      %{}
-    end
+    metadata =
+      if Code.ensure_loaded?(module) and function_exported?(module, :metadata, 0) do
+        module.metadata()
+      else
+        %{}
+      end
 
     # Get provider ID from DSL function or fallback methods
-    provider_id = cond do
-      function_exported?(module, :provider_id, 0) ->
-        module.provider_id()
-      
-      function_exported?(module, :provider_info, 0) ->
-        module.provider_info().id
+    provider_id =
+      cond do
+        function_exported?(module, :provider_id, 0) ->
+          module.provider_id()
 
-      true ->
-        # Fallback: extract from module name
-        extract_provider_id_from_module_name(module)
-    end
+        function_exported?(module, :provider_info, 0) ->
+          module.provider_info().id
+
+        true ->
+          # Fallback: extract from module name
+          extract_provider_id_from_module_name(module)
+      end
 
     {:ok, {provider_id, module, metadata}}
   rescue

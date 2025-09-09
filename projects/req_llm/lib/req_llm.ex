@@ -2,8 +2,8 @@ defmodule ReqLLM do
   @moduledoc """
   Main API facade for Req AI.
 
-  Inspired by the Vercel AI SDK, provides a unified interface to AI providers with 
-  flexible model specifications, rich prompt support, configuration management, 
+  Inspired by the Vercel AI SDK, provides a unified interface to AI providers with
+  flexible model specifications, rich prompt support, configuration management,
   and structured data generation.
 
   ## Quick Start
@@ -38,12 +38,12 @@ defmodule ReqLLM do
 
   ReqLLM uses the Kagi keyring for API key storage:
 
-      # Store API keys in session keyring  
+      # Store API keys in session keyring
       ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
       ReqLLM.put_key(:openai_api_key, "sk-...")
-      
+
       # Retrieve API keys
-      ReqLLM.api_key(:anthropic_api_key)
+      ReqLLM.get_key(:anthropic_api_key)
 
   ## Providers
 
@@ -94,12 +94,12 @@ defmodule ReqLLM do
 
   ## Examples
 
-      ReqLLM.api_key(:anthropic_api_key)
-      ReqLLM.api_key("ANTHROPIC_API_KEY")
+      ReqLLM.get_key(:anthropic_api_key)
+      ReqLLM.get_key("ANTHROPIC_API_KEY")
 
   """
-  @spec api_key(atom() | String.t()) :: String.t() | nil
-  def api_key(key) do
+  @spec get_key(atom() | String.t()) :: String.t() | nil
+  def get_key(key) do
     normalized_key = normalize_key(key)
     Kagi.get(normalized_key, nil)
   end
@@ -107,11 +107,23 @@ defmodule ReqLLM do
   # Private helper for key normalization
   @spec normalize_key(atom() | String.t()) :: atom()
   defp normalize_key(key) when is_binary(key) do
-    key |> String.downcase() |> String.to_atom()
+    normalized_string = String.downcase(key)
+
+    try do
+      String.to_existing_atom(normalized_string)
+    rescue
+      ArgumentError -> String.to_atom(normalized_string)
+    end
   end
 
   defp normalize_key(key) when is_atom(key) do
-    key |> Atom.to_string() |> String.downcase() |> String.to_atom()
+    normalized_string = key |> Atom.to_string() |> String.downcase()
+
+    try do
+      String.to_existing_atom(normalized_string)
+    rescue
+      ArgumentError -> String.to_atom(normalized_string)
+    end
   end
 
   @doc """
@@ -293,22 +305,22 @@ defmodule ReqLLM do
   ## Examples
 
       # Generate text with usage info - pipeline style
-      {:ok, text, usage} = 
+      {:ok, text, usage} =
         ReqLLM.generate_text("openai:gpt-4o", "Hello")
         |> ReqLLM.with_usage()
-      
+
       usage
       #=> %{tokens: %{input: 10, output: 15}, cost: 0.00075}
 
       # Works with bang functions too (returns nil usage)
-      {:ok, text, usage} = 
+      {:ok, text, usage} =
         ReqLLM.generate_text!("openai:gpt-4o", "Hello")
         |> ReqLLM.with_usage()
-      
+
       usage  #=> nil
 
       # Stream text with usage info
-      {:ok, stream, usage} = 
+      {:ok, stream, usage} =
         ReqLLM.stream_text("openai:gpt-4o", "Hello")
         |> ReqLLM.with_usage()
 
@@ -328,22 +340,22 @@ defmodule ReqLLM do
   ## Examples
 
       # Generate text with cost info - pipeline style
-      {:ok, text, cost} = 
+      {:ok, text, cost} =
         ReqLLM.generate_text("openai:gpt-4o", "Hello")
         |> ReqLLM.with_cost()
-      
+
       cost
       #=> 0.00075
 
       # Works with bang functions too (returns nil cost)
-      {:ok, text, cost} = 
+      {:ok, text, cost} =
         ReqLLM.generate_text!("openai:gpt-4o", "Hello")
         |> ReqLLM.with_cost()
-      
+
       cost  #=> nil
 
       # Stream text with cost info - pipeline style
-      {:ok, stream, cost} = 
+      {:ok, stream, cost} =
         ReqLLM.stream_text("openai:gpt-4o", "Hello")
         |> ReqLLM.with_cost()
 
@@ -392,7 +404,7 @@ defmodule ReqLLM do
   ## Examples
 
       {:ok, embeddings} = ReqLLM.embed_many(
-        "openai:text-embedding-3-small", 
+        "openai:text-embedding-3-small",
         ["Hello", "World"]
       )
       #=> {:ok, [[0.1, -0.2, ...], [0.3, 0.4, ...]]}
@@ -471,7 +483,7 @@ defmodule ReqLLM do
       # Schema with custom validation
       schema = ReqLLM.json_schema(
         [email: [type: :string, required: true]],
-        validate: fn value -> 
+        validate: fn value ->
           if String.contains?(value["email"], "@") do
             {:ok, value}
           else

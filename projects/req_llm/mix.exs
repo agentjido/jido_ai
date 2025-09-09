@@ -9,20 +9,12 @@ defmodule ReqLLM.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
-      test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
-        coveralls: :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test,
-        "coveralls.html": :test
-      ],
-      dialyzer: [
-        plt_add_apps: [:mix],
-        flags: [:unknown, :unmatched_returns, :error_handling],
-        ignore_warnings: ".dialyzer_ignore.exs"
-      ]
+      elixirc_paths: elixirc_paths(Mix.env())
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help compile.app" to learn about applications.
   def application do
@@ -42,11 +34,10 @@ defmodule ReqLLM.MixProject do
       {:splode, "~> 0.2.3"},
       {:server_sent_event, "~> 1.0"},
       {:kagi, path: "../kagi"},
-      {:rename_project, "~> 0.1.0"},
 
       # Dev/test dependencies
       {:plug, "~> 1.15", only: [:test]},
-      {:excoveralls, "~> 0.18", only: [:test], runtime: false},
+      {:mimic, "~> 1.7", only: [:test]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
@@ -54,7 +45,6 @@ defmodule ReqLLM.MixProject do
 
   defp aliases do
     [
-      test: ["test --cover"],
       quality: [
         "format --check-formatted",
         "compile --warnings-as-errors",

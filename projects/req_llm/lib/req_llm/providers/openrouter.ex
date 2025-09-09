@@ -190,9 +190,14 @@ defmodule ReqLLM.Providers.OpenRouter do
 
   defp format_content(content) when is_list(content) do
     Enum.map(content, fn
-      %ReqLLM.Message.ContentPart{type: :text, text: text} -> %{type: "text", text: text}
-      %ReqLLM.Message.ContentPart{type: :image, data: data} -> %{type: "image_url", image_url: data}
-      part -> part
+      %ReqLLM.Message.ContentPart{type: :text, text: text} ->
+        %{type: "text", text: text}
+
+      %ReqLLM.Message.ContentPart{type: :image, data: data} ->
+        %{type: "image_url", image_url: data}
+
+      part ->
+        part
     end)
   end
 
