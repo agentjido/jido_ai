@@ -5,6 +5,7 @@ defmodule ReqLLM.Capability.StreamText do
   Verifies that a model can perform text streaming by sending
   a message and validating the streamed response.
   """
+  alias ReqLLM.StreamChunk
 
   @behaviour ReqLLM.Capability.Adapter
 
@@ -19,7 +20,6 @@ defmodule ReqLLM.Capability.StreamText do
 
   @impl true
   def verify(model, opts) do
-    model_spec = "#{model.provider}:#{model.model}"
     timeout = Keyword.get(opts, :timeout, 10_000)
 
     # Use provider_options to pass timeout to the HTTP client
@@ -30,68 +30,46 @@ defmodule ReqLLM.Capability.StreamText do
       }
     ]
 
-    try do
-      case ReqLLM.stream_text(
-             model_spec,
-             "Hello! Please respond with exactly 3 words.",
-             req_llm_opts
-           ) do
-        {:ok, %Req.Response{headers: headers, body: body}} ->
-          # Check if this is an SSE response that should be streamed
-          content_type = Map.get(headers, "content-type", []) |> List.first() || ""
+    case ReqLLM.stream_text!(model, "Hello! Please respond with exactly 3 words.", req_llm_opts) do
+      {:ok, stream} when is_struct(stream, Stream) ->
+        # Collect StreamChunk structs from the stream
+        chunks =
+          stream
+          # Limit chunks to avoid infinite streams
+          |> Enum.take(100)
+          |> Enum.to_list()
 
-          if String.contains?(content_type, "text/event-stream") do
-            if is_struct(body, Stream) do
-              # Collect ReqLLM.StreamChunk structs from the stream
-              chunks =
-                body
-                # Limit chunks to avoid infinite streams
-                |> Enum.take(100)
-                |> Enum.to_list()
+        if length(chunks) > 0 do
+          # Extract text from content StreamChunks
+          text_chunks =
+            chunks
+            |> Enum.filter(fn chunk ->
+              match?(%StreamChunk{type: :content}, chunk)
+            end)
+            |> Enum.map(fn %StreamChunk{text: text} -> text end)
+            |> Enum.reject(&is_nil/1)
 
-              if length(chunks) > 0 do
-                # Extract text from content StreamChunks
-                text_chunks =
-                  chunks
-                  |> Enum.filter(fn chunk ->
-                    match?(%ReqLLM.StreamChunk{type: :content}, chunk)
-                  end)
-                  |> Enum.map(fn %ReqLLM.StreamChunk{text: text} -> text end)
-                  |> Enum.reject(&is_nil/1)
+          full_response = Enum.join(text_chunks, "")
+          trimmed = String.trim(full_response)
 
-                full_response = Enum.join(text_chunks, "")
-                trimmed = String.trim(full_response)
-
-                if trimmed != "" do
-                  {:ok,
-                   %{
-                     model_id: model_spec,
-                     chunks_received: length(chunks),
-                     text_chunks_received: length(text_chunks),
-                     response_length: String.length(full_response),
-                     response_preview: String.slice(full_response, 0, 50)
-                   }}
-                else
-                  {:error, "Empty streamed response"}
-                end
-              else
-                {:error, "No chunks received from stream"}
-              end
-            else
-              {:error, "SSE response body is not a stream"}
-            end
+          if trimmed != "" do
+            {:ok,
+             %{
+               model_id: "#{model.provider}:#{model.model}",
+               chunks_received: length(chunks),
+               text_chunks_received: length(text_chunks),
+               response_length: String.length(full_response),
+               response_preview: String.slice(full_response, 0, 50)
+             }}
           else
-            {:error, "Response is not a streaming response (content-type: #{content_type})"}
+            {:error, "Empty streamed response"}
           end
+        else
+          {:error, "No chunks received from stream"}
+        end
 
-        {:error, reason} ->
-          {:error, reason}
-
-        other ->
-          {:error, "Unexpected response format: #{inspect(other)}"}
-      end
-    rescue
-      error -> {:error, "Exception during streaming: #{inspect(error)}"}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 end

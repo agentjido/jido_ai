@@ -24,7 +24,7 @@ defmodule ReqLLM.Providers.Anthropic do
       # Streaming
       {:ok, stream} = ReqLLM.stream_text(model, "Tell me a story", stream: true)
 
-      # Tool calling  
+      # Tool calling
       tools = [%ReqLLM.Tool{name: "get_weather", ...}]
       {:ok, response} = ReqLLM.generate_text(model, "What's the weather?", tools: tools)
 
@@ -39,11 +39,8 @@ defmodule ReqLLM.Providers.Anthropic do
 
   @impl ReqLLM.Provider
   def attach(request, %ReqLLM.Model{} = model, _opts \\ []) do
-    # Get environment variable name from metadata
-    env_var_name = get_env_var_name()
-    kagi_key = String.downcase(env_var_name) |> String.to_atom()
+    kagi_key = get_env_var_name() |> String.downcase() |> String.to_atom()
 
-    # Get API key from Kagi keyring only
     api_key = Kagi.get(kagi_key)
 
     unless api_key && api_key != "" do

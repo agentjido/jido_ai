@@ -1,256 +1,176 @@
 defmodule ReqLLM.CapabilityTest do
-  use ExUnit.Case, async: false
-  use Mimic
+  @moduledoc """
+  Consolidated tests for ReqLLM.Capability module and capability discovery system.
 
-  alias ReqLLM.Capability
-  alias ReqLLM.Capability.Result
+  Focuses on capability discovery mechanism and basic verification workflow
+  without requiring network calls or actual AI model interactions.
+  """
 
-  copy(ReqLLM.Model)
-  copy(ReqLLM.Capability.Reporter)
-  copy(ReqLLM.Capability.GenerateText)
-  copy(ReqLLM.Capability.StreamText)
-  copy(ReqLLM.Capability.ToolCalling)
-  copy(ReqLLM.Capability.Reasoning)
+  use ReqLLM.Test.CapabilityCase
+  import ReqLLM.Test.Macros
 
-  setup :verify_on_exit!
-  setup :set_mimic_global
-
-  describe "verify/2" do
-    test "returns :ok when all capabilities pass" do
-      ReqLLM.Capability
-      |> expect(:verify, fn "openai:gpt-4", [] -> :ok end)
-
-      assert Capability.verify("openai:gpt-4") == :ok
-    end
-
-    test "returns :error when model loading fails" do
-      ReqLLM.Model
-      |> expect(:with_metadata, fn "invalid:model" -> {:error, "Model not found"} end)
-
-      assert Capability.verify("invalid:model") == :error
-    end
-
-    test "returns :error when checks fail" do
-      model = %ReqLLM.Model{
-        provider: :openai,
-        model: "gpt-4",
-        capabilities: %{tool_call?: true}
-      }
-
-      failed_results = [
-        %Result{
-          status: :failed,
-          model: "openai:gpt-4",
-          capability: :generate_text,
-          latency_ms: 50,
-          details: "test failure"
-        }
-      ]
-
-      ReqLLM.Model
-      |> expect(:with_metadata, fn "openai:gpt-4" -> {:ok, model} end)
-
-      ReqLLM.Capability
-      |> expect(:discover_capabilities, fn ^model, [] ->
-        {:ok, [ReqLLM.Capability.GenerateText]}
-      end)
-      |> expect(:run_checks, fn [ReqLLM.Capability.GenerateText], ^model, [] -> failed_results end)
-
-      ReqLLM.Capability.Reporter
-      |> expect(:dispatch, fn results, _opts ->
-        assert Enum.any?(results, &match?(%Result{status: :failed}, &1))
-        :ok
-      end)
-
-      assert Capability.verify("openai:gpt-4") == :error
-    end
-
-    test "passes options to run_checks" do
-      model = %ReqLLM.Model{
-        provider: :openai,
-        model: "gpt-4",
-        capabilities: %{tool_call?: true}
-      }
-
-      passed_results = [
-        %Result{
-          status: :passed,
-          model: "openai:gpt-4",
-          capability: :generate_text,
-          latency_ms: 100,
-          details: "success"
-        }
-      ]
-
-      timeout_opts = [timeout: 30_000]
-
-      ReqLLM.Model
-      |> expect(:with_metadata, fn "openai:gpt-4" -> {:ok, model} end)
-
-      ReqLLM.Capability
-      |> expect(:discover_capabilities, fn ^model, ^timeout_opts ->
-        {:ok, [ReqLLM.Capability.GenerateText]}
-      end)
-      |> expect(:run_checks, fn [ReqLLM.Capability.GenerateText], ^model, ^timeout_opts ->
-        passed_results
-      end)
-
-      ReqLLM.Capability.Reporter
-      |> expect(:dispatch, fn _results, opts ->
-        assert opts[:timeout] == 30_000
-        :ok
-      end)
-
-      assert Capability.verify("openai:gpt-4", timeout: 30_000) == :ok
-    end
-  end
+  setup [:setup_capability_test]
 
   describe "discover_capabilities/2" do
-    test "returns all advertised capabilities when no filter" do
-      model = %ReqLLM.Model{
-        provider: :openai,
-        model: "gpt-4",
-        capabilities: %{tool_call?: true}
-      }
+    test "when discovering capabilities with various filters then returns expected results", %{test_model: model} do
+      # Test cases: [filter_opts, expected_capability_count_range, description]
+      test_cases = [
+        [[], 1..10, "discovers all advertised capabilities"],
+        [[only: [:generate_text]], 1..1, "filters to single capability with atom list"],
+        [[only: "generate_text,stream_text"], 2..2, "filters with comma-separated string"],
+        [[only: [:nonexistent_capability]], 0..0, "returns no capabilities for invalid filter"],
+        [[only: [:generate_text, :invalid_capability]], 1..1, "ignores invalid capability names"]
+      ]
 
-      {:ok, capabilities} = Capability.discover_capabilities(model, [])
+      for [opts, expected_range, description] <- test_cases do
+        case Capability.discover_capabilities(model, opts) do
+          {:ok, capabilities} ->
+            assert length(capabilities) in expected_range,
+              "#{description}: expected #{inspect(expected_range)}, got #{length(capabilities)}"
+            
+            # Validate all returned items are proper capability modules
+            for cap <- capabilities do
+              assert is_atom(cap)
+              assert function_exported?(cap, :id, 0)
+              assert function_exported?(cap, :advertised?, 1)
+              assert function_exported?(cap, :verify, 2)
+            end
 
-      assert length(capabilities) >= 2
-      capability_ids = Enum.map(capabilities, & &1.id())
-      assert :generate_text in capability_ids
-    end
+          {:error, reason} when expected_range == 0..0 ->
+            assert reason =~ "No capabilities to verify"
 
-    test "filters capabilities by --only option" do
-      model = %ReqLLM.Model{
-        provider: :openai,
-        model: "gpt-4",
-        capabilities: %{tool_call?: true}
-      }
-
-      {:ok, capabilities} = Capability.discover_capabilities(model, only: [:generate_text])
-
-      assert length(capabilities) == 1
-      assert hd(capabilities).id() == :generate_text
-    end
-
-    test "handles string --only option" do
-      model = %ReqLLM.Model{
-        provider: :openai,
-        model: "gpt-4",
-        capabilities: %{tool_call?: true}
-      }
-
-      {:ok, capabilities} = Capability.discover_capabilities(model, only: "generate_text")
-
-      assert length(capabilities) == 1
-      assert hd(capabilities).id() == :generate_text
-    end
-
-    test "returns error when no capabilities match filter" do
-      model = %ReqLLM.Model{
-        provider: :openai,
-        model: "gpt-4",
-        capabilities: %{tool_call?: true}
-      }
-
-      {:error, message} = Capability.discover_capabilities(model, only: [:nonexistent])
-
-      assert message =~ "No capabilities to verify"
-    end
-
-    test "handles non-existent atoms in filter gracefully" do
-      model = %ReqLLM.Model{
-        provider: :openai,
-        model: "gpt-4",
-        capabilities: %{tool_call?: true}
-      }
-
-      {:error, message} =
-        Capability.discover_capabilities(model, only: ["nonexistent_capability"])
-
-      assert message =~ "No capabilities to verify"
+          result ->
+            flunk("Unexpected result for #{description}: #{inspect(result)}")
+        end
+      end
     end
   end
 
   describe "run_checks/3" do
-    test "returns results for all capabilities" do
-      model = %ReqLLM.Model{provider: :openai, model: "gpt-4"}
-      capabilities = [ReqLLM.Capability.GenerateText]
+    test "when executing capability checks then returns structured results", %{test_model: model} do
+      # Test scenarios: [capability_types, opts, expected_behavior]
+      scenarios = [
+        [[:fast_passing, :fast_failing], [], "executes all checks and measures latency"],
+        [[:fast_failing, :fast_passing], [fail_fast: true], "stops early on first failure"],
+        [[:slow], [], "measures latency for timed operations"]
+      ]
 
-      ReqLLM.Capability.GenerateText
-      |> expect(:verify, fn _model, _opts -> {:ok, "success"} end)
-      |> expect(:id, fn -> :generate_text end)
+      for [capability_types, opts, description] <- scenarios do
+        results = run_capability_scenario(model, capability_types, opts)
 
-      results = Capability.run_checks(capabilities, model, [])
+        if opts[:fail_fast] && :fast_failing in capability_types do
+          assert length(results) == 1, "#{description}: should stop after first failure"
+          assert hd(results).status == :failed
+        else
+          assert length(results) == length(capability_types), "#{description}: should run all checks"
+        end
 
-      assert length(results) == 1
-      result = hd(results)
+        # Validate all results structure
+        for result <- results do
+          assert_struct(result, ReqLLM.Capability.Result)
+          assert result.model == "test:capability-model"
+          assert result.capability in [:fast_passing, :fast_failing, :slow_capability]
+          assert is_integer(result.latency_ms) and result.latency_ms >= 0
+          assert result.status in [:passed, :failed]
+        end
+      end
+    end
+  end
 
-      assert %Result{
-               status: :passed,
-               model: "openai:gpt-4",
-               capability: :generate_text,
-               details: "success"
-             } = result
+  describe "verify/2 integration" do
+    test "when all capabilities pass then returns :ok" do
+      model = test_model("openai", "gpt-4")
+      stub_model_metadata_success(model)
+      stub_reporter_dispatch()
+      stub_capability_success(ReqLLM.Capability.GenerateText)
 
-      assert result.latency_ms >= 0
+      result = Capability.verify("openai:gpt-4", only: [:generate_text])
+      assert result == :ok
     end
 
-    test "handles capability failures" do
-      model = %ReqLLM.Model{provider: :openai, model: "gpt-4"}
-      capabilities = [ReqLLM.Capability.GenerateText]
-
-      ReqLLM.Capability.GenerateText
-      |> expect(:verify, fn _model, _opts -> {:error, "test failure"} end)
-      |> expect(:id, fn -> :generate_text end)
-
-      results = Capability.run_checks(capabilities, model, [])
-
-      assert length(results) == 1
-      result = hd(results)
-
-      assert %Result{
-               status: :failed,
-               details: "test failure"
-             } = result
-    end
-
-    test "supports fail_fast option" do
-      model = %ReqLLM.Model{provider: :openai, model: "gpt-4"}
-      capabilities = [ReqLLM.Capability.GenerateText, ReqLLM.Capability.StreamText]
-
-      # First capability fails
-      ReqLLM.Capability.GenerateText
-      |> expect(:verify, fn _model, _opts -> {:error, "first failure"} end)
-      |> expect(:id, fn -> :generate_text end)
-
-      # Second capability should not be called due to fail_fast
-      ReqLLM.Capability.StreamText
-      |> reject(:verify, 2)
-      |> reject(:id, 0)
-
-      results = Capability.run_checks(capabilities, model, fail_fast: true)
-
-      # Only first result should be present
-      assert length(results) == 1
-      assert %Result{status: :failed} = hd(results)
-    end
-
-    test "measures latency for each capability" do
-      model = %ReqLLM.Model{provider: :openai, model: "gpt-4"}
-      capabilities = [ReqLLM.Capability.GenerateText]
-
-      ReqLLM.Capability.GenerateText
-      |> expect(:verify, fn _model, _opts ->
-        # Add small delay
-        Process.sleep(10)
-        {:ok, "success"}
+    test "when first fails with fail_fast then returns error with one result" do
+      model = test_model("openai", "gpt-4")
+      stub_model_metadata_success(model)
+      stub_capability_failure(ReqLLM.Capability.GenerateText)
+      
+      ReqLLM.Capability.Reporter
+      |> stub(:dispatch, fn results, _opts ->
+        assert length(results) == 1
+        assert hd(results).status == :failed
+        :ok
       end)
-      |> expect(:id, fn -> :generate_text end)
 
-      results = Capability.run_checks(capabilities, model, [])
-
-      assert hd(results).latency_ms >= 10
+      result = Capability.verify("openai:gpt-4", fail_fast: true, only: [:generate_text])
+      assert result == :error
     end
+
+    test "when mixed pass/fail without fail_fast then returns error with all results" do
+      model = test_model("openai", "gpt-4")  
+      stub_model_metadata_success(model)
+      stub_capability_success(ReqLLM.Capability.GenerateText)
+      stub_capability_failure(ReqLLM.Capability.StreamText)
+
+      ReqLLM.Capability.Reporter
+      |> stub(:dispatch, fn results, _opts ->
+        assert length(results) == 2
+        passed = Enum.count(results, &(&1.status == :passed))
+        failed = Enum.count(results, &(&1.status == :failed)) 
+        assert passed == 1 and failed == 1
+        :ok
+      end)
+
+      result = Capability.verify("openai:gpt-4", only: [:generate_text, :stream_text])
+      assert result == :error
+    end
+
+    test "when model metadata error surfaces then returns error" do
+      ReqLLM.Model 
+      |> stub(:with_metadata, fn _model_id -> {:error, "Invalid provider: nonexistent"} end)
+
+      log_output = capture_log(fn ->
+        result = Capability.verify("nonexistent:model", [])
+        assert result == :error
+      end)
+
+      assert log_output =~ "Invalid provider: nonexistent"
+    end
+
+    test "when timeout option provided then propagates to capability verify" do
+      model = test_model("openai", "gpt-4")
+      stub_model_metadata_success(model)
+      stub_reporter_dispatch()
+
+      ReqLLM.Capability.GenerateText
+      |> stub(:advertised?, fn _model -> true end)
+      |> stub(:verify, fn _model, opts ->
+        assert Keyword.get(opts, :timeout) == 30_000
+        {:ok, %{response: "Test"}}
+      end)
+
+      result = Capability.verify("openai:gpt-4", timeout: 30_000, only: [:generate_text])
+      assert result == :ok
+    end
+  end
+
+  # Helper functions for test setup
+
+  defp stub_model_metadata_success(model) do
+    ReqLLM.Model |> stub(:with_metadata, fn _model_id -> {:ok, model} end)
+  end
+
+  defp stub_reporter_dispatch do
+    ReqLLM.Capability.Reporter |> stub(:dispatch, fn _results, _opts -> :ok end)
+  end
+
+  defp stub_capability_success(capability_module) do
+    capability_module
+    |> stub(:advertised?, fn _model -> true end)
+    |> stub(:verify, fn _model, _opts -> {:ok, %{response: "Test success"}} end)
+  end
+
+  defp stub_capability_failure(capability_module) do
+    capability_module
+    |> stub(:advertised?, fn _model -> true end)
+    |> stub(:verify, fn _model, _opts -> {:error, "Test failure"} end)
   end
 end

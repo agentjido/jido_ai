@@ -56,7 +56,7 @@ defmodule ReqLLM do
       provider.generate_text(model, messages, opts)
   """
 
-  alias ReqLLM.{Embedding, Generation, Utils}
+  alias ReqLLM.{Embedding, Generation, Schema, Tool}
 
   # ===========================================================================
   # Configuration API - Direct Kagi integration
@@ -455,7 +455,10 @@ defmodule ReqLLM do
       )
 
   """
-  defdelegate tool(opts), to: Utils
+  @spec tool(keyword()) :: Tool.t()
+  def tool(opts) when is_list(opts) do
+    Tool.new!(opts)
+  end
 
   @doc """
   Creates a JSON schema object compatible with ReqLLM.
@@ -493,7 +496,18 @@ defmodule ReqLLM do
       )
 
   """
-  defdelegate json_schema(schema, opts \\ []), to: Utils
+  @spec json_schema(keyword(), keyword()) :: map()
+  def json_schema(schema, opts \\ []) when is_list(schema) and is_list(opts) do
+    json_schema = Schema.to_json(schema)
+
+    case opts[:validate] do
+      nil ->
+        json_schema
+
+      validator when is_function(validator, 1) ->
+        Map.put(json_schema, :validate, validator)
+    end
+  end
 
   @doc """
   Calculates cosine similarity between two embedding vectors.
@@ -528,7 +542,31 @@ defmodule ReqLLM do
       #=> 0.9487...
 
   """
-  defdelegate cosine_similarity(embedding_a, embedding_b), to: Utils
+  @spec cosine_similarity([number()], [number()]) :: float()
+  def cosine_similarity(embedding_a, embedding_b)
+      when is_list(embedding_a) and is_list(embedding_b) do
+    if length(embedding_a) != length(embedding_b) do
+      raise ArgumentError, "Embedding vectors must have the same length"
+    end
+
+    if length(embedding_a) == 0 do
+      0.0
+    else
+      dot_product =
+        embedding_a
+        |> Enum.zip(embedding_b)
+        |> Enum.reduce(0, fn {a, b}, acc -> acc + a * b end)
+
+      magnitude_a = :math.sqrt(Enum.reduce(embedding_a, 0, fn x, acc -> acc + x * x end))
+      magnitude_b = :math.sqrt(Enum.reduce(embedding_b, 0, fn x, acc -> acc + x * x end))
+
+      if magnitude_a == 0 or magnitude_b == 0 do
+        0.0
+      else
+        dot_product / (magnitude_a * magnitude_b)
+      end
+    end
+  end
 
   # ===========================================================================
   # Provider Plugin System - Core Infrastructure
