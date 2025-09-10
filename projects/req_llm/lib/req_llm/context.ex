@@ -76,6 +76,35 @@ defmodule ReqLLM.Context do
     end
   end
 
+  @doc """
+  Wrap a context with provider-specific tagged struct.
+
+  Takes a `ReqLLM.Context` and `ReqLLM.Model` and wraps the context
+  in the appropriate provider-specific struct for encoding/decoding.
+
+  ## Parameters
+
+    * `context` - A `ReqLLM.Context` to wrap
+    * `model` - A `ReqLLM.Model` indicating the provider
+
+  ## Returns
+
+    * Provider-specific tagged struct ready for encoding
+
+  ## Examples
+
+      context = ReqLLM.Context.new([ReqLLM.Context.user("Hello")])
+      model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
+      tagged = ReqLLM.Context.wrap(context, model)
+      #=> %ReqLLM.Providers.Anthropic{context: context}
+
+  """
+  @spec wrap(t(), ReqLLM.Model.t()) :: term()
+  def wrap(%__MODULE__{} = ctx, %ReqLLM.Model{provider: provider_atom}) do
+    {:ok, provider_mod} = ReqLLM.provider(provider_atom)
+    provider_mod.wrap_context(ctx)
+  end
+
   defp validate_system_messages(messages) do
     system_count = Enum.count(messages, &(&1.role == :system))
 

@@ -66,7 +66,7 @@ defmodule ReqLLM.Providers.Anthropic do
     # Protocol handles message translation
     body =
       context
-      |> ReqLLM.Codec.Helpers.wrap(model)
+      |> ReqLLM.Context.wrap(model)
       |> ReqLLM.Codec.encode()
       |> add_model_params(model, opts)
       |> add_sampling_params(opts)
