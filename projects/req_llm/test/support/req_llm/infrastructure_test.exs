@@ -2,7 +2,7 @@ defmodule ReqLLM.Test.InfrastructureTest do
   @moduledoc """
   Test to verify the test support infrastructure works correctly.
   """
-  
+
   use ReqLLM.Test.CapabilityCase
 
   test "fixtures create valid result structures" do
@@ -20,7 +20,7 @@ defmodule ReqLLM.Test.InfrastructureTest do
 
   test "capability stubs work correctly" do
     model = test_model("test", "stub-model")
-    
+
     # Test passing capability
     {:ok, data} = FastPassingCapability.verify(model, [])
     assert data.test == "success"
@@ -32,7 +32,7 @@ defmodule ReqLLM.Test.InfrastructureTest do
     # Test conditional capability
     model_with_tools = test_model_with_capabilities([:tool_calling])
     assert ConditionalCapability.advertised?(model_with_tools) == true
-    
+
     model_without_tools = test_model_with_capabilities([])
     assert ConditionalCapability.advertised?(model_without_tools) == false
   end
@@ -58,12 +58,13 @@ defmodule ReqLLM.Test.InfrastructureTest do
   test "run capability scenario helper works" do
     model = test_model("test", "scenario-model")
     results = run_capability_scenario(model, [:fast_passing, :fast_failing])
-    
+
     assert length(results) == 2
     assert_results_summary(results, passed: 1, failed: 1)
-    
+
     # Test with options
     results = run_capability_scenario(model, [:fast_failing, :fast_passing], fail_fast: true)
-    assert length(results) == 1  # Should stop after first failure
+    # Should stop after first failure
+    assert length(results) == 1
   end
 end

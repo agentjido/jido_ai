@@ -11,8 +11,6 @@ defmodule ReqLLM.Capability.StreamTextTest do
   alias ReqLLM.Capability.StreamText
   alias ReqLLM.StreamChunk
 
-
-
   describe "advertised?/1" do
     test "returns true for all provider types" do
       test_providers = [
@@ -129,8 +127,6 @@ defmodule ReqLLM.Capability.StreamTextTest do
                String.slice(String.duplicate("chunk ", 100), 0, 50)
     end
 
-
-
     test "handles error cases appropriately" do
       error_scenarios = [
         {"Empty stream", [], "No chunks received from stream"},
@@ -180,8 +176,6 @@ defmodule ReqLLM.Capability.StreamTextTest do
       result = StreamText.verify(model, [])
       assert {:error, "Network timeout"} = result
     end
-
-
 
     test "filters nil text from content chunks" do
       model = test_model("openai", "gpt-4")
@@ -304,7 +298,5 @@ defmodule ReqLLM.Capability.StreamTextTest do
       assert response_data.response_preview == String.slice(long_text, 0, 50)
       assert String.length(response_data.response_preview) == 50
     end
-
-
   end
 end
