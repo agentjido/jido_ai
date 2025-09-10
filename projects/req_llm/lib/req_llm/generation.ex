@@ -328,6 +328,10 @@ defmodule ReqLLM.Generation do
     prepare_request_body([%{role: "user", content: messages}], opts)
   end
 
+  defp prepare_request_body(%ReqLLM.Context{} = context, opts) do
+    prepare_request_body(ReqLLM.Context.to_list(context), opts)
+  end
+
   defp prepare_request_body(messages, opts) when is_list(messages) do
     # Build basic request body
     body = %{

@@ -1,0 +1,86 @@
+{
+  "result": {
+    "body": "Here is a short story for you:\n\nThe Unexpected Adventure\n\nIt was supposed to be a routine day for Sarah. Wake up, go to work, come home, make dinner, and go to bed - just like every other day. But that all changed when she stepped outside her front door that morning.\n\nAs Sarah walked to her car, she noticed something strange in the distance. It looked like a shimmering portal had opened up in the middle of the street. Curious, she slowly approached it, unsure of what it could be. Before she could react, a gust of wind suddenly sucked her through the portal and everything went black.\n\nWhen Sarah opened her eyes, she found herself in a strange, alien world. The sky was a deep purple color and the ground was covered in glowing, fluorescent plants. In the distance, she could see towering crystal mountains that pierced the horizon. \n\n\"Where am I?\" she wondered aloud, her voice echoing in the eerie silence.\n\nJust then, a small, floating creature appeared in front of her. It had large, bulging eyes and tentacle-like appendages. \n\n\"Welcome, traveler,\" it said in a gentle, melodic tone. \"You have been chosen to embark on a great adventure.\"\n\nSarah's heart raced as she tried to make sense of what was happening. This certainly was not the mundane day she had anticipated. But something inside her felt a surge of excitement. An adventure? On an alien world? Against her better judgement, she decided to trust the strange creature and see where this unexpected journey would take her.\n\nWith a deep breath, she said, \"Okay, I'm ready. What do I need to do?\"\n\nThe creature let out a joyful trill and beckoned her to follow. Sarah steeled her nerves and stepped forward, ready to embrace the unexpected and see what wonders this alien realm had in store.",
+    "headers": {
+      "anthropic-organization-id": [
+        "a71659e7-a922-4ff7-99de-f3ba615face1"
+      ],
+      "anthropic-ratelimit-input-tokens-limit": [
+        "100000"
+      ],
+      "anthropic-ratelimit-input-tokens-remaining": [
+        "100000"
+      ],
+      "anthropic-ratelimit-input-tokens-reset": [
+        "2025-09-10T14:30:00Z"
+      ],
+      "anthropic-ratelimit-output-tokens-limit": [
+        "20000"
+      ],
+      "anthropic-ratelimit-output-tokens-remaining": [
+        "20000"
+      ],
+      "anthropic-ratelimit-output-tokens-reset": [
+        "2025-09-10T14:30:04Z"
+      ],
+      "anthropic-ratelimit-requests-limit": [
+        "1000"
+      ],
+      "anthropic-ratelimit-requests-remaining": [
+        "999"
+      ],
+      "anthropic-ratelimit-requests-reset": [
+        "2025-09-10T14:30:00Z"
+      ],
+      "anthropic-ratelimit-tokens-limit": [
+        "120000"
+      ],
+      "anthropic-ratelimit-tokens-remaining": [
+        "120000"
+      ],
+      "anthropic-ratelimit-tokens-reset": [
+        "2025-09-10T14:30:00Z"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "97cf9eebacc2e759-DEN"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 10 Sep 2025 14:30:03 GMT"
+      ],
+      "request-id": [
+        "req_011CSzszaosjQYLfXmXG8aCN"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000; includeSubDomains; preload"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "via": [
+        "1.1 google"
+      ],
+      "x-envoy-upstream-service-time": [
+        "3173"
+      ],
+      "x-robots-tag": [
+        "none"
+      ]
+    },
+    "status": 200,
+    "type": "ok_response"
+  },
+  "provider": "anthropic",
+  "captured_at": "2025-09-10T14:30:03.453452Z"
+}

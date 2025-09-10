@@ -1,181 +1,181 @@
 defmodule ReqLLM.Capability do
   @moduledoc """
-  Core capability verification engine for ReqLLM models.
-
-  Direct verification runner for model capabilities without ExUnit dependencies.
-  Provides clean output and reporting through the Reporter system.
-
-  ## Usage
-
-      ReqLLM.Capability.verify("openai:gpt-4o")
-      ReqLLM.Capability.verify("anthropic:claude-3-sonnet", timeout: 30_000)
-
+  Model capability discovery and validation.
+  
+  This module dynamically extracts capabilities from provider metadata
+  loaded from models.dev, providing a programmatic interface to query
+  what features are supported by specific models.
   """
 
-  require Logger
+  alias ReqLLM.Provider.Registry
 
-  @doc """
-  Verifies all advertised capabilities for the given model.
-
-  ## Parameters
-
-    * `model_id` - The model identifier (e.g., "openai:gpt-4o")
-    * `opts` - Options including:
-      * `:timeout` - Request timeout in milliseconds (default: 10_000)
-      * `:only` - List of capability atoms to test (default: all advertised)
-      * `:format` - Output format (:pretty, :json, :debug)
-      * `:fail_fast` - Stop on first failure (default: false)
-
-  ## Returns
-
-    * `:ok` - All capabilities passed
-    * `:error` - At least one capability failed
-
-  """
-  @spec verify(String.t(), keyword()) :: :ok | :error
-  def verify(model_id, opts \\ []) do
-    with {:ok, model} <- ReqLLM.Model.with_metadata(model_id),
-         {:ok, capabilities} <- discover_capabilities(model, opts) do
-      results = run_checks(capabilities, model, opts)
-
-      # Use reporter for output
-      ReqLLM.Capability.Reporter.dispatch(results, opts)
-
-      # Return success if all checks passed
-      if Enum.all?(results, &(&1.status == :passed)) do
-        :ok
-      else
-        :error
-      end
-    else
-      {:error, reason} ->
-        Logger.error("❌ #{reason}")
-        :error
+  # Core capability mappings from models.dev JSON fields to our feature atoms
+  # Using functions instead of module attributes to avoid compilation issues
+  defp capability_supported?(capability, metadata) do
+    case capability do
+      # Basic generation features - all models support these
+      :max_tokens -> true
+      :system_prompt -> true
+      :metadata -> true
+      
+      # Sampling parameters
+      :temperature -> Map.get(metadata, "temperature", false)
+      :top_p -> Map.get(metadata, "top_p", false) 
+      :top_k -> Map.get(metadata, "top_k", false)
+      
+      # Advanced features
+      :tools -> Map.get(metadata, "tool_call", false)
+      :tool_choice -> Map.get(metadata, "tool_call", false)
+      :reasoning -> Map.get(metadata, "reasoning", false)
+      
+      # Response control
+      :stop_sequences -> true  # Most models support this
+      :streaming -> Map.get(metadata, "streaming", true)
+      
+      # Unknown capabilities default to false
+      _ -> false
     end
   end
 
   @doc """
-  Discovers all capability modules that should be tested for this model.
+  Get all supported capabilities for a model spec.
+  
+  ## Examples
+  
+      iex> ReqLLM.Capability.for("anthropic:claude-3-haiku-20240307")
+      [:max_tokens, :system_prompt, :temperature, :tools, :streaming, :metadata]
+      
   """
-  @spec discover_capabilities(ReqLLM.Model.t(), keyword()) ::
-          {:ok, [module()]} | {:error, String.t()}
-  def discover_capabilities(model, opts) do
-    capability_modules = get_all_capability_modules()
-
-    # Filter to only capabilities advertised by the model
-    advertised_capabilities =
-      capability_modules
-      |> Enum.filter(&capability_advertised?(&1, model))
-
-    # Further filter by --only option if provided
-    capabilities =
-      case Keyword.get(opts, :only) do
-        nil ->
-          advertised_capabilities
-
-        only_list when is_list(only_list) ->
-          only_atoms = Enum.map(only_list, &to_existing_atom_safe/1) |> Enum.reject(&is_nil/1)
-          Enum.filter(advertised_capabilities, fn mod -> mod.id() in only_atoms end)
-
-        only_string when is_binary(only_string) ->
-          only_atoms =
-            only_string
-            |> String.split(",")
-            |> Enum.map(&String.trim/1)
-            |> Enum.map(&to_existing_atom_safe/1)
-            |> Enum.reject(&is_nil/1)
-
-          Enum.filter(advertised_capabilities, fn mod -> mod.id() in only_atoms end)
-      end
-
-    model_id = "#{model.provider}:#{model.model}"
-
-    case capabilities do
-      [] -> {:error, "No capabilities to verify for model #{model_id}"}
-      caps -> {:ok, caps}
-    end
-  end
-
-  # Auto-discover all capability modules implementing the ReqLLM.Capability.Adapter behaviour
-  defp get_all_capability_modules do
-    # For now, return known modules. In the future, this could discover modules automatically
-    # using :code.all_loaded() and checking for @behaviour ReqLLM.Capability.Adapter
-    [
-      ReqLLM.Capability.GenerateText,
-      ReqLLM.Capability.StreamText,
-      ReqLLM.Capability.ToolCalling,
-      ReqLLM.Capability.Reasoning
-    ]
-  end
-
-  # Check if a capability is advertised by the model
-  defp capability_advertised?(capability_module, model) do
-    try do
-      capability_module.advertised?(model)
-    catch
-      # Catch all error types including throw, exit, and error
-      kind, reason ->
-        Logger.warning(
-          "Error checking if #{inspect(capability_module)} is advertised: #{kind}: #{inspect(reason)}"
-        )
-
-        false
-    end
-  end
-
-  # Convert string to existing atom safely, returning nil if atom doesn't exist
-  defp to_existing_atom_safe(value) when is_atom(value), do: value
-
-  defp to_existing_atom_safe(value) when is_binary(value) do
-    try do
-      String.to_existing_atom(value)
-    rescue
-      ArgumentError -> nil
-    end
-  end
-
-  @doc """
-  Runs capability checks for the given capabilities.
-  """
-  @spec run_checks([module()], ReqLLM.Model.t(), keyword()) :: [ReqLLM.Capability.Result.t()]
-  def run_checks(capabilities, model, opts) do
-    model_id = "#{model.provider}:#{model.model}"
-    fail_fast = Keyword.get(opts, :fail_fast, false)
-
-    Logger.info("Verifying #{model_id} capabilities...")
-
-    {results, _should_stop} =
-      Enum.reduce_while(capabilities, {[], false}, fn capability_module, {acc, _stop} ->
-        capability_id = capability_module.id()
-
-        {latency_ms, verify_result} =
-          :timer.tc(fn ->
-            capability_module.verify(model, opts)
-          end)
-
-        # Convert microseconds to milliseconds
-        latency_ms = div(latency_ms, 1000)
-
-        result =
-          case verify_result do
-            {:ok, details} ->
-              ReqLLM.Capability.Result.passed(model_id, capability_id, latency_ms, details)
-
-            {:error, reason} ->
-              ReqLLM.Capability.Result.failed(model_id, capability_id, latency_ms, reason)
-          end
-
-        new_acc = [result | acc]
-
-        # Check if we should stop early due to fail_fast
-        if fail_fast and result.status == :failed do
-          {:halt, {new_acc, true}}
-        else
-          {:cont, {new_acc, false}}
+  def for(model_spec) when is_binary(model_spec) do
+    case parse_model_spec(model_spec) do
+      {:ok, provider, model_name} ->
+        case get_model_metadata(provider, model_name) do
+          {:ok, metadata} ->
+            # Get all possible capabilities and filter by what's supported
+            all_capabilities = [
+              :max_tokens, :system_prompt, :temperature, :top_p, :top_k,
+              :tools, :tool_choice, :reasoning, :stop_sequences, :streaming, :metadata
+            ]
+            
+            all_capabilities
+            |> Enum.filter(&capability_supported?(&1, metadata))
+            
+          {:error, :model_not_found} ->
+            # Model doesn't exist for this provider
+            []
+            
+          {:error, _reason} ->
+            # Provider exists but metadata unavailable - fallback to basic capabilities
+            [:max_tokens, :system_prompt, :metadata]
         end
-      end)
+        
+      :error ->
+        []
+    end
+  end
 
-    # Return results in reverse order (since we built them with prepend)
-    Enum.reverse(results)
+  def for(%ReqLLM.Model{provider: provider, model: model_name}) do
+    model_spec = "#{provider}:#{model_name}"
+    __MODULE__.for(model_spec)
+  end
+
+  @doc """
+  Check if a model supports a specific feature.
+  
+  ## Examples
+  
+      iex> ReqLLM.Capability.supports?("anthropic:claude-3-sonnet-20240229", :tools)
+      true
+      
+  """
+  def supports?(model_spec, feature) when is_atom(feature) do
+    feature in __MODULE__.for(model_spec)
+  end
+
+  @doc """
+  Get all models that support a specific feature for a provider.
+  
+  ## Examples
+  
+      iex> ReqLLM.Capability.models_for(:anthropic, :reasoning)
+      ["anthropic:claude-3-5-sonnet-20241022"]
+      
+  """
+  def models_for(provider, feature) when is_atom(provider) and is_atom(feature) do
+    case Registry.list_models(provider) do
+      {:ok, model_names} ->
+        model_names
+        |> Enum.map(&"#{provider}:#{&1}")
+        |> Enum.filter(&supports?(&1, feature))
+        
+      {:error, _reason} ->
+        []
+    end
+  end
+
+  @doc """
+  Get all available models for a provider as model specs.
+  
+  ## Examples
+  
+      iex> ReqLLM.Capability.provider_models(:anthropic)
+      ["anthropic:claude-3-haiku-20240307", "anthropic:claude-3-sonnet-20240229", ...]
+      
+  """
+  def provider_models(provider) when is_atom(provider) do
+    case Registry.list_models(provider) do
+      {:ok, model_names} ->
+        Enum.map(model_names, &"#{provider}:#{&1}")
+        
+      {:error, _reason} ->
+        []
+    end
+  end
+
+  @doc """
+  Get all providers that have models supporting a feature.
+  """
+  def providers_for(feature) when is_atom(feature) do
+    Registry.list_providers()
+    |> Enum.filter(fn provider ->
+      !Enum.empty?(models_for(provider, feature))
+    end)
+  end
+
+  # Helper functions
+
+  defp parse_model_spec(model_spec) when is_binary(model_spec) do
+    case String.split(model_spec, ":", parts: 2) do
+      [provider_str, model_name] ->
+        try do
+          provider = String.to_existing_atom(provider_str)
+          {:ok, provider, model_name}
+        rescue
+          ArgumentError -> :error  # Provider atom doesn't exist
+        end
+      _ ->
+        :error
+    end
+  end
+
+  defp get_model_metadata(provider, model_name) do
+    case Registry.get_provider_metadata(provider) do
+      {:ok, provider_metadata} ->
+        # metadata may come with atom keys (new DSL) or string keys (older files)
+        models =
+          Map.get(provider_metadata, :models) ||
+          Map.get(provider_metadata, "models") ||
+          []
+
+        case Enum.find(models, fn model ->
+               (Map.get(model, :id) || Map.get(model, "id")) == model_name
+             end) do
+          nil -> {:error, :model_not_found}
+          model_metadata -> {:ok, model_metadata}
+        end
+        
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 end

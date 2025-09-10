@@ -9,7 +9,22 @@ defmodule ReqLLM.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      
+      # Documentation
+      name: "ReqLLM",
+      source_url: "https://github.com/your_org/req_llm",
+      homepage_url: "https://github.com/your_org/req_llm",
+      docs: [
+        main: "readme",
+        extras: [
+          "README.md",
+          "guides/adding_a_provider.md"
+        ],
+        groups_for_extras: [
+          Guides: ~r/guides\/.*/
+        ]
+      ]
     ]
   end
 
@@ -38,6 +53,7 @@ defmodule ReqLLM.MixProject do
       # Dev/test dependencies
       {:plug, "~> 1.15", only: [:test]},
       {:mimic, "~> 1.7", only: [:test]},
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
