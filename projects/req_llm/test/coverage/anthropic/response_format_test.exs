@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.ResponseFormatTest do
   use ExUnit.Case, async: true
   alias ReqLLM.Test.LiveFixture
+  import ReqLLM.Context
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -14,14 +15,14 @@ defmodule ReqLLM.Coverage.Anthropic.ResponseFormatTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user(
+          user(
             "Respond with valid JSON: {'greeting': 'hello', 'status': 'success'}"
           )
         ])
 
       # This should work even though response_format is provided - it should be ignored
       {:ok, response} =
-        LiveFixture.use_fixture("response_format/ignored_parameter", fn ->
+        LiveFixture.use_fixture("response_format/ignored_parameter", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             # Should be ignored
@@ -46,12 +47,12 @@ defmodule ReqLLM.Coverage.Anthropic.ResponseFormatTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.system("You must respond only with valid JSON. No other text."),
-          ReqLLM.Message.user("Create a JSON object with name='Alice' and age=30")
+          system("You must respond only with valid JSON. No other text."),
+          user("Create a JSON object with name='Alice' and age=30")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("response_format/prompt_enforced_json", fn ->
+        LiveFixture.use_fixture("response_format/prompt_enforced_json", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 100)
         end)
 
@@ -95,13 +96,13 @@ defmodule ReqLLM.Coverage.Anthropic.ResponseFormatTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user(
+          user(
             "I need info about Alice, who is 30 years old and her email is alice@example.com"
           )
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("response_format/tool_based_json", fn ->
+        LiveFixture.use_fixture("response_format/tool_based_json", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [json_tool],
@@ -130,11 +131,11 @@ defmodule ReqLLM.Coverage.Anthropic.ResponseFormatTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Tell me about Elixir programming language")
+          user("Tell me about Elixir programming language")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("response_format/default_text", fn ->
+        LiveFixture.use_fixture("response_format/default_text", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 100)
         end)
 
@@ -156,12 +157,12 @@ defmodule ReqLLM.Coverage.Anthropic.ResponseFormatTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Simple test message")
+          user("Simple test message")
         ])
 
       # Multiple unsupported OpenAI-style parameters that should be filtered out
       {:ok, response} =
-        LiveFixture.use_fixture("response_format/filtered_parameters", fn ->
+        LiveFixture.use_fixture("response_format/filtered_parameters", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             # Should be filtered

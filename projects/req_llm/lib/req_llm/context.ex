@@ -42,15 +42,6 @@ defmodule ReqLLM.Context do
     }
   end
 
-  @spec user(String.t(), map()) :: Message.t()
-  def user(content, meta \\ %{}), do: text(:user, content, meta)
-
-  @spec assistant(String.t(), map()) :: Message.t()
-  def assistant(content, meta \\ %{}), do: text(:assistant, content, meta)
-
-  @spec system(String.t(), map()) :: Message.t()
-  def system(content, meta \\ %{}), do: text(:system, content, meta)
-
   @spec with_image(atom(), String.t(), String.t(), map()) :: Message.t()
   def with_image(role, text, url, meta \\ %{}) do
     %Message{
@@ -58,6 +49,33 @@ defmodule ReqLLM.Context do
       content: [ContentPart.text(text), ContentPart.image_url(url)],
       metadata: meta
     }
+  end
+
+  # Message constructor functions that support both strings and content part arrays
+  @spec user([ContentPart.t()] | String.t(), map()) :: Message.t()
+  def user(content, meta \\ %{})
+  def user(content, meta) when is_binary(content), do: text(:user, content, meta)
+  def user(content, meta) when is_list(content) do
+    %Message{role: :user, content: content, metadata: meta}
+  end
+
+  @spec assistant([ContentPart.t()] | String.t(), map()) :: Message.t()
+  def assistant(content, meta \\ %{})
+  def assistant(content, meta) when is_binary(content), do: text(:assistant, content, meta)
+  def assistant(content, meta) when is_list(content) do
+    %Message{role: :assistant, content: content, metadata: meta}
+  end
+
+  @spec system([ContentPart.t()] | String.t(), map()) :: Message.t()
+  def system(content, meta \\ %{})
+  def system(content, meta) when is_binary(content), do: text(:system, content, meta)
+  def system(content, meta) when is_list(content) do
+    %Message{role: :system, content: content, metadata: meta}
+  end
+
+  @spec new(atom(), [ContentPart.t()], map()) :: Message.t()
+  def new(role, content, meta \\ %{}) when is_list(content) do
+    %Message{role: role, content: content, metadata: meta}
   end
 
   @spec validate(t()) :: {:ok, t()} | {:error, String.t()}
