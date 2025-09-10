@@ -22,16 +22,18 @@ defmodule ReqLLM.Capability.ReporterTest do
 
       for {input_format, expected_format} <- test_cases do
         results = [passed_result(:generate_text)]
-        
+
         output = capture_output(results, format: input_format)
-        
+
         case expected_format do
           :pretty ->
             assert output =~ "✓"
             assert output =~ "generate_text"
+
           :json ->
             json_data = Jason.decode!(output)
             assert json_data["status"] == "passed"
+
           :debug ->
             assert output =~ "✓"
             assert output =~ "generate_text"
@@ -49,21 +51,23 @@ defmodule ReqLLM.Capability.ReporterTest do
 
       output = capture_pretty(results)
 
-      assert output =~ "\e[32m✓\e[0m"  # Green checkmark for passed
-      assert output =~ "\e[31m✗\e[0m"  # Red X for failed
+      # Green checkmark for passed
+      assert output =~ "\e[32m✓\e[0m"
+      # Red X for failed
+      assert output =~ "\e[31m✗\e[0m"
     end
 
     test "formats timing edge cases correctly" do
       results = [
         passed_result(:test1) |> with_timing(0),
-        passed_result(:test2) |> with_timing(999), 
+        passed_result(:test2) |> with_timing(999),
         passed_result(:test3) |> with_timing(1000)
       ]
 
       output = capture_pretty(results)
 
       assert output =~ "(0ms)"
-      assert output =~ "(999ms)" 
+      assert output =~ "(999ms)"
       assert output =~ "(1.0s)"
     end
 
@@ -110,7 +114,7 @@ defmodule ReqLLM.Capability.ReporterTest do
       lines = String.split(String.trim(output), "\n")
 
       assert length(lines) == 2
-      
+
       # Results should be reversed
       first_json = Jason.decode!(Enum.at(lines, 0))
       second_json = Jason.decode!(Enum.at(lines, 1))
@@ -123,7 +127,7 @@ defmodule ReqLLM.Capability.ReporterTest do
   end
 
   # Shared test utilities
-  
+
   defp capture_output(results, opts) do
     capture_io(fn -> Reporter.dispatch(results, opts) end)
   end

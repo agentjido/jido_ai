@@ -10,8 +10,6 @@ defmodule ReqLLM.Capability.ReasoningTest do
 
   alias ReqLLM.Capability.Reasoning
 
-
-
   describe "advertised?/1" do
     test "returns true when model has reasoning capability" do
       model = test_model_with_capabilities([:reasoning])
@@ -38,6 +36,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
 
       for {capabilities, expected} <- test_cases do
         model = test_model("openai", "gpt-4", capabilities: capabilities)
+
         assert Reasoning.advertised?(model) == expected,
                "Expected advertised?(#{inspect(capabilities)}) to be #{expected}"
       end
@@ -48,7 +47,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
     test "successful verification with reasoning tokens" do
       model = test_model("openai", "o1-preview")
       content = "Let me think step by step:\n1. Fill the 5-gallon jug\n2. Pour into 3-gallon jug"
-      
+
       # Mock structured response with reasoning tokens
       mock_response = %Req.Response{
         status: 200,
@@ -83,7 +82,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
     test "successful verification without reasoning tokens" do
       model = test_model("openai", "gpt-4")
       content = "To solve this puzzle: Fill 5-gallon jug, pour into 3-gallon jug"
-      
+
       # Mock structured response without reasoning tokens
       mock_response = %Req.Response{
         status: 200,
@@ -117,14 +116,15 @@ defmodule ReqLLM.Capability.ReasoningTest do
 
     test "handles responses without reasoning tokens" do
       no_tokens_cases = [
-        {"structured without reasoning tokens", %{req_llm: %{usage: %{tokens: %{input: 50, output: 30}}}}},
+        {"structured without reasoning tokens",
+         %{req_llm: %{usage: %{tokens: %{input: 50, output: 30}}}}},
         {"no req_llm metadata", %{some_other_field: "value"}}
       ]
-      
+
       for {description, private_data} <- no_tokens_cases do
         model = test_model("anthropic", "claude-3-sonnet")
         content = "Here's my approach: 1. Use the 5-gallon jug 2. Transfer to 3-gallon"
-        
+
         mock_response = %Req.Response{
           status: 200,
           body: content,
@@ -146,8 +146,6 @@ defmodule ReqLLM.Capability.ReasoningTest do
       end
     end
 
-
-
     test "handles error cases appropriately" do
       model = test_model("openai", "gpt-4")
 
@@ -155,7 +153,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
       Mimic.stub(ReqLLM, :generate_text, fn _model, _prompt, _opts ->
         {:ok, %Req.Response{body: "", private: %{req_llm: %{usage: %{tokens: %{}}}}}}
       end)
-      
+
       result = Reasoning.verify(model, [])
       assert {:error, "Empty content response"} = result
 
@@ -163,7 +161,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
       Mimic.stub(ReqLLM, :generate_text, fn _model, _prompt, _opts ->
         {:ok, %Req.Response{body: "   \n\t   ", private: %{req_llm: %{usage: %{tokens: %{}}}}}}
       end)
-      
+
       result = Reasoning.verify(model, [])
       assert {:error, "Empty content response"} = result
 
@@ -171,7 +169,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
       Mimic.stub(ReqLLM, :generate_text, fn _model, _prompt, _opts ->
         {:ok, %Req.Response{body: ""}}
       end)
-      
+
       result = Reasoning.verify(model, [])
       # This will match the first pattern since private can be nil, but content is empty
       assert {:error, "Empty content response"} = result
@@ -180,7 +178,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
       Mimic.stub(ReqLLM, :generate_text, fn _model, _prompt, _opts ->
         {:error, "Network timeout"}
       end)
-      
+
       result = Reasoning.verify(model, [])
       assert {:error, "Network timeout"} = result
     end
@@ -189,10 +187,14 @@ defmodule ReqLLM.Capability.ReasoningTest do
   describe "reasoning snippet extraction" do
     test "extracts step-by-step reasoning patterns" do
       test_cases = [
-        {"Step format", "Let me solve this step by step:\n1. First approach\n2. Then consider", "First approach"},
-        {"Numbered list", "Here's the solution:\n1. Fill 5-gallon jug\n2. Pour into 3-gallon", "Fill 5-gallon jug"},
-        {"Bullet points", "Solution approach:\n* Fill the larger jug\n* Transfer to smaller", "Fill the larger jug"},
-        {"Dashes", "My reasoning:\n- Start with empty jugs\n- Fill the 5-gallon first", "Start with empty jugs"}
+        {"Step format", "Let me solve this step by step:\n1. First approach\n2. Then consider",
+         "First approach"},
+        {"Numbered list", "Here's the solution:\n1. Fill 5-gallon jug\n2. Pour into 3-gallon",
+         "Fill 5-gallon jug"},
+        {"Bullet points", "Solution approach:\n* Fill the larger jug\n* Transfer to smaller",
+         "Fill the larger jug"},
+        {"Dashes", "My reasoning:\n- Start with empty jugs\n- Fill the 5-gallon first",
+         "Start with empty jugs"}
       ]
 
       model = test_model("openai", "o1-preview")
@@ -211,6 +213,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
 
         assert {:ok, response_data} = result, "Failed for #{description}"
         assert response_data.has_reasoning_tokens == true
+
         assert String.contains?(response_data.reasoning_preview, expected_snippet_part),
                "Reasoning preview '#{response_data.reasoning_preview}' doesn't contain expected text '#{expected_snippet_part}' for #{description}"
       end
@@ -218,11 +221,16 @@ defmodule ReqLLM.Capability.ReasoningTest do
 
     test "extracts explanation sections" do
       test_cases = [
-        {"Explicit reasoning", "My reasoning: This requires careful planning", "This requires careful planning"},
-        {"Explanation section", "Explanation:\nWe need to measure exactly 4 gallons", "We need to measure exactly 4 gallons"},
-        {"Here's how pattern", "Here's how I would solve this problem", "I would solve this problem"},
-        {"Here's why pattern", "Here's why this works: The math checks out", "this works: The math checks out"},
-        {"First approach", "First, let's understand the problem constraints", "let's understand the problem constraints"}
+        {"Explicit reasoning", "My reasoning: This requires careful planning",
+         "This requires careful planning"},
+        {"Explanation section", "Explanation:\nWe need to measure exactly 4 gallons",
+         "We need to measure exactly 4 gallons"},
+        {"Here's how pattern", "Here's how I would solve this problem",
+         "I would solve this problem"},
+        {"Here's why pattern", "Here's why this works: The math checks out",
+         "this works: The math checks out"},
+        {"First approach", "First, let's understand the problem constraints",
+         "let's understand the problem constraints"}
       ]
 
       model = test_model("openai", "o1-preview")
@@ -241,7 +249,11 @@ defmodule ReqLLM.Capability.ReasoningTest do
 
         assert {:ok, response_data} = result, "Failed for #{description}"
         assert response_data.has_reasoning_tokens == true
-        assert String.contains?(response_data.reasoning_preview, String.slice(expected_snippet_start, 0, 15)),
+
+        assert String.contains?(
+                 response_data.reasoning_preview,
+                 String.slice(expected_snippet_start, 0, 15)
+               ),
                "Reasoning preview doesn't contain expected text for #{description}"
       end
     end
@@ -249,7 +261,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
     test "fallback reasoning extraction" do
       model = test_model("openai", "o1-preview")
       content = "This is a complex problem that requires multiple steps to solve properly."
-      
+
       mock_response = %Req.Response{
         body: content,
         private: %{req_llm: %{usage: %{tokens: %{reasoning: 75}}}}
@@ -273,7 +285,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
     test "truncates long content correctly" do
       model = test_model("openai", "gpt-4")
       long_content = String.duplicate("This is a very long reasoning explanation. ", 10)
-      
+
       mock_response = %Req.Response{
         body: long_content,
         private: %{req_llm: %{usage: %{tokens: %{}}}}
@@ -294,7 +306,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
     test "handles unicode content properly" do
       model = test_model("openai", "gpt-4")
       unicode_content = "Reasoning: 数学的解法 🧮 Step 1: 水の移動 💧"
-      
+
       mock_response = %Req.Response{
         body: unicode_content,
         private: %{req_llm: %{usage: %{tokens: %{}}}}
@@ -322,7 +334,8 @@ defmodule ReqLLM.Capability.ReasoningTest do
 
       # Test success format
       Mimic.stub(ReqLLM, :generate_text, fn _model, _prompt, _opts ->
-        {:ok, %Req.Response{body: "Test reasoning", private: %{req_llm: %{usage: %{tokens: %{}}}}}}
+        {:ok,
+         %Req.Response{body: "Test reasoning", private: %{req_llm: %{usage: %{tokens: %{}}}}}}
       end)
 
       result = Reasoning.verify(model, [])
@@ -347,7 +360,7 @@ defmodule ReqLLM.Capability.ReasoningTest do
         assert String.contains?(prompt, "5-gallon jug")
         assert String.contains?(prompt, "4 gallons")
         assert String.contains?(prompt, "step by step")
-        
+
         {:ok, %Req.Response{body: "Solution", private: %{req_llm: %{usage: %{tokens: %{}}}}}}
       end)
 

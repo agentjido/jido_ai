@@ -44,17 +44,18 @@ defmodule ReqLLM.Test.CapabilityCase do
       import ExUnit.CaptureIO
 
       # Import helper functions from CapabilityCase
-      import ReqLLM.Test.CapabilityCase, only: [
-        setup_capability_test: 0,
-        setup_capability_test: 1,
-        run_capability_scenario: 2,
-        run_capability_scenario: 3,
-        test_model_with_capabilities: 1,
-        test_model_with_capabilities: 2,
-        discover_and_filter: 1,
-        discover_and_filter: 2,
-        assert_results_summary: 2
-      ]
+      import ReqLLM.Test.CapabilityCase,
+        only: [
+          setup_capability_test: 0,
+          setup_capability_test: 1,
+          run_capability_scenario: 2,
+          run_capability_scenario: 3,
+          test_model_with_capabilities: 1,
+          test_model_with_capabilities: 2,
+          discover_and_filter: 1,
+          discover_and_filter: 2,
+          assert_results_summary: 2
+        ]
 
       # Convenient aliases for stub capabilities
       alias ReqLLM.Test.CapabilityStubs.{
@@ -104,7 +105,7 @@ defmodule ReqLLM.Test.CapabilityCase do
 
   """
   def run_capability_scenario(model, capability_types, opts \\ []) do
-    capabilities = 
+    capabilities =
       capability_types
       |> Enum.map(&get_capability_module/1)
       |> Enum.reject(&is_nil/1)
@@ -119,7 +120,10 @@ defmodule ReqLLM.Test.CapabilityCase do
   defp get_capability_module(:conditional), do: ReqLLM.Test.CapabilityStubs.ConditionalCapability
   defp get_capability_module(:throwing), do: ReqLLM.Test.CapabilityStubs.ThrowingCapability
   defp get_capability_module(:timeout), do: ReqLLM.Test.CapabilityStubs.TimeoutCapability
-  defp get_capability_module(:configurable), do: ReqLLM.Test.CapabilityStubs.ConfigurableCapability
+
+  defp get_capability_module(:configurable),
+    do: ReqLLM.Test.CapabilityStubs.ConfigurableCapability
+
   defp get_capability_module(_), do: nil
 
   @doc """
@@ -183,13 +187,13 @@ defmodule ReqLLM.Test.CapabilityCase do
   """
   def assert_results_summary(results, expected_counts) do
     ReqLLM.Test.Assertions.assert_result_counts(results, expected_counts)
-    
+
     # Additional validations
     for result <- results do
       assert %ReqLLM.Capability.Result{} = result
       assert result.status in [:passed, :failed]
       assert is_atom(result.capability)
-      
+
       # Details can be a map (for passed results) or string (for simple failed results)
       case result.status do
         :passed -> assert is_map(result.details)

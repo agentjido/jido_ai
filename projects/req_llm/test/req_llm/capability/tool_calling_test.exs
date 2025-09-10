@@ -10,8 +10,6 @@ defmodule ReqLLM.Capability.ToolCallingTest do
 
   alias ReqLLM.Capability.ToolCalling
 
-
-
   describe "advertised?/1" do
     test "returns true when tool_call capability is enabled" do
       test_scenarios = [
@@ -25,6 +23,7 @@ defmodule ReqLLM.Capability.ToolCallingTest do
 
       for {expected_result, capabilities} <- test_scenarios do
         model = test_model("openai", "gpt-4", capabilities: capabilities)
+
         assert ToolCalling.advertised?(model) == expected_result,
                "Expected advertised?(model with #{inspect(capabilities)}) to be #{expected_result}"
       end
@@ -39,6 +38,7 @@ defmodule ReqLLM.Capability.ToolCallingTest do
 
       for {provider, model_name} <- providers_with_tool_support do
         model = test_model(provider, model_name, capabilities: %{tool_call?: true})
+
         assert ToolCalling.advertised?(model) == true,
                "Expected #{provider}:#{model_name} with tool_call?: true to be advertised"
       end
@@ -65,9 +65,9 @@ defmodule ReqLLM.Capability.ToolCallingTest do
           "tool call with complex arguments",
           [
             %{
-              name: "get_current_weather", 
+              name: "get_current_weather",
               arguments: %{
-                location: "Tokyo, Japan", 
+                location: "Tokyo, Japan",
                 units: "celsius",
                 include_forecast: true
               }
@@ -99,8 +99,6 @@ defmodule ReqLLM.Capability.ToolCallingTest do
       end
     end
 
-
-
     test "validates tool call structure" do
       model = test_model("openai", "gpt-4")
 
@@ -124,7 +122,9 @@ defmodule ReqLLM.Capability.ToolCallingTest do
 
         result = ToolCalling.verify(model, [])
 
-        assert {:ok, response_data} = result, "Valid tool call structure '#{description}' should pass"
+        assert {:ok, response_data} = result,
+               "Valid tool call structure '#{description}' should pass"
+
         assert response_data.first_tool_name != nil
         assert response_data.first_tool_args != nil
       end
@@ -133,7 +133,7 @@ defmodule ReqLLM.Capability.ToolCallingTest do
     test "handles error cases appropriately" do
       error_scenarios = [
         {
-          "no tool calls in response", 
+          "no tool calls in response",
           {:ok, mock_http_response(%{content: "I don't need to call any tools."})},
           ~r/No tool calls received/
         },
@@ -172,8 +172,9 @@ defmodule ReqLLM.Capability.ToolCallingTest do
         end)
 
         result = ToolCalling.verify(model, [])
-        
+
         assert {:error, error_message} = result, "Error case '#{description}' should return error"
+
         assert error_message =~ expected_error_pattern,
                "Error message '#{error_message}' should match pattern #{inspect(expected_error_pattern)}"
       end
@@ -186,7 +187,7 @@ defmodule ReqLLM.Capability.ToolCallingTest do
       Mimic.stub(ReqLLM, :generate_text, fn _model, _message, opts ->
         tools = Keyword.get(opts, :tools, [])
         weather_tool = List.first(tools)
-        
+
         # Verify tool definition structure
         assert weather_tool.name == "get_current_weather"
         assert weather_tool.description =~ ~r/current weather/i
@@ -281,7 +282,7 @@ defmodule ReqLLM.Capability.ToolCallingTest do
           %{location: "Seattle, WA", units: "fahrenheit"}
         },
         {
-          "nested map arguments", 
+          "nested map arguments",
           %{
             location: "Denver, CO",
             options: %{

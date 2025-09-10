@@ -156,7 +156,7 @@ defmodule ReqLLM.Test.CapabilityStubs do
     def verify(model, _opts) do
       # Extract test config from model struct fields, not metadata
       config = Map.get(model, :test_config, %{})
-      
+
       # Configurable sleep
       if sleep_ms = config[:sleep_ms] do
         :timer.sleep(sleep_ms)
@@ -166,8 +166,10 @@ defmodule ReqLLM.Test.CapabilityStubs do
       case config[:result] do
         :error ->
           {:error, config[:error_message] || "configurable error"}
+
         :exception ->
           raise config[:exception] || "configurable exception"
+
         _ ->
           {:ok, Map.merge(%{test: "configurable_success"}, config[:data] || %{})}
       end
@@ -245,11 +247,12 @@ defmodule ReqLLM.Test.CapabilityStubs do
     }
 
     # Create base model
-    model = ReqLLM.Test.Fixtures.test_model(
-      "test",
-      "stub-model",
-      capabilities: capabilities
-    )
+    model =
+      ReqLLM.Test.Fixtures.test_model(
+        "test",
+        "stub-model",
+        capabilities: capabilities
+      )
 
     # Add test config if needed for configurable capability
     if :configurable_capability in capability_ids do

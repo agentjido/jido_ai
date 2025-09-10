@@ -27,6 +27,7 @@ defmodule ReqLLM.Capability.GenerateTextTest do
 
       for {provider, model_name} <- test_providers do
         model = test_model(to_string(provider), model_name)
+
         assert GenerateText.advertised?(model) == true,
                "Expected advertised?(#{provider}:#{model_name}) to be true"
       end
@@ -36,10 +37,12 @@ defmodule ReqLLM.Capability.GenerateTextTest do
   describe "verify/2" do
     test "successful verification across different response scenarios" do
       test_scenarios = [
-        {"Basic response", "Hello! How can I help you today?", 32, "Hello! How can I help you today?"},
+        {"Basic response", "Hello! How can I help you today?", 32,
+         "Hello! How can I help you today?"},
         {"Unicode content", "Hello! 👋 こんにちは 🌟", 16, "Hello! 👋 こんにちは 🌟"},
         {"Response with trailing whitespace", "Hello world!   \n", 16, "Hello world!   \n"},
-        {"Long response truncation", String.duplicate("This is a long response. ", 10), 250, String.slice(String.duplicate("This is a long response. ", 10), 0, 50)},
+        {"Long response truncation", String.duplicate("This is a long response. ", 10), 250,
+         String.slice(String.duplicate("This is a long response. ", 10), 0, 50)},
         {"Exactly 50 chars", String.duplicate("x", 50), 50, String.duplicate("x", 50)},
         {"Over 50 chars", String.duplicate("y", 75), 75, String.duplicate("y", 50)}
       ]
@@ -55,8 +58,12 @@ defmodule ReqLLM.Capability.GenerateTextTest do
 
         assert {:ok, response_data} = result, "Test '#{description}' should pass"
         assert response_data.model_id == "openai:gpt-4"
-        assert response_data.response_length == expected_length, "Length mismatch for '#{description}'"
-        assert response_data.response_preview == expected_preview, "Preview mismatch for '#{description}'"
+
+        assert response_data.response_length == expected_length,
+               "Length mismatch for '#{description}'"
+
+        assert response_data.response_preview == expected_preview,
+               "Preview mismatch for '#{description}'"
       end
     end
 

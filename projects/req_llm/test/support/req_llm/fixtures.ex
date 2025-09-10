@@ -86,11 +86,12 @@ defmodule ReqLLM.Test.Fixtures do
   """
   @spec test_model(String.t() | atom(), String.t(), keyword()) :: ReqLLM.Model.t()
   def test_model(provider, model, opts \\ []) do
-    capabilities = Keyword.get(opts, :capabilities, %{
-      reasoning?: false,
-      tool_call?: true,
-      supports_temperature?: true
-    })
+    capabilities =
+      Keyword.get(opts, :capabilities, %{
+        reasoning?: false,
+        tool_call?: true,
+        supports_temperature?: true
+      })
 
     ReqLLM.Model.new(
       normalize_provider(provider),
@@ -175,7 +176,7 @@ defmodule ReqLLM.Test.Fixtures do
   @spec embedding_response(keyword()) :: Req.Response.t()
   def embedding_response(opts \\ []) do
     dimensions = Keyword.get(opts, :dimensions, 1536)
-    
+
     body = %{
       "object" => "list",
       "data" => [
