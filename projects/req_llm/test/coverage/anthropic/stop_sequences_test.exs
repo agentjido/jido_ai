@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
   use ExUnit.Case, async: true
   alias ReqLLM.Test.LiveFixture
+  import ReqLLM.Context
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -12,11 +13,11 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Count from 1 to 10. Use format: Number: X")
+          user("Count from 1 to 10. Use format: Number: X")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/single_stop", fn ->
+        LiveFixture.use_fixture("stop_sequences/single_stop", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: ["Number: 5"],
@@ -43,11 +44,11 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Write a story. End with either 'THE END' or '--- FINISHED ---'")
+          user("Write a story. End with either 'THE END' or '--- FINISHED ---'")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/multiple_stops", fn ->
+        LiveFixture.use_fixture("stop_sequences/multiple_stops", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: ["THE END", "--- FINISHED ---"],
@@ -72,11 +73,11 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("List programming languages, separated by commas")
+          user("List programming languages, separated by commas")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/max_four_stops", fn ->
+        LiveFixture.use_fixture("stop_sequences/max_four_stops", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             # Exactly 4
@@ -104,11 +105,11 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Write about programming")
+          user("Write about programming")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/not_reached", fn ->
+        LiveFixture.use_fixture("stop_sequences/not_reached", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: ["NEVER_MENTIONED_PHRASE"],
@@ -133,11 +134,11 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Say hello")
+          user("Say hello")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/empty_array", fn ->
+        LiveFixture.use_fixture("stop_sequences/empty_array", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: [],
@@ -160,11 +161,11 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Write JSON: {'name': 'test', 'value': 123}")
+          user("Write JSON: {'name': 'test', 'value': 123}")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/special_chars", fn ->
+        LiveFixture.use_fixture("stop_sequences/special_chars", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: ["}"],
@@ -193,11 +194,11 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Count: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10")
+          user("Count: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/streaming_stop", fn ->
+        LiveFixture.use_fixture("stop_sequences/streaming_stop", [], fn ->
           ReqLLM.stream_text(model,
             context: context,
             stop_sequences: ["5"],

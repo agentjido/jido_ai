@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.SamplingParametersTest do
   use ExUnit.Case, async: true
   alias ReqLLM.Test.LiveFixture
+  import ReqLLM.Context
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -12,11 +13,11 @@ defmodule ReqLLM.Coverage.Anthropic.SamplingParametersTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Count from 1 to 5")
+          user("Count from 1 to 5")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("sampling/low_temperature", fn ->
+        LiveFixture.use_fixture("sampling/low_temperature", [], fn ->
           ReqLLM.generate_text(model, context: context, temperature: 0.1, max_tokens: 50)
         end)
 
@@ -35,11 +36,11 @@ defmodule ReqLLM.Coverage.Anthropic.SamplingParametersTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Write a creative haiku about programming")
+          user("Write a creative haiku about programming")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("sampling/high_temperature", fn ->
+        LiveFixture.use_fixture("sampling/high_temperature", [], fn ->
           ReqLLM.generate_text(model, context: context, temperature: 1.0, max_tokens: 100)
         end)
 
@@ -60,11 +61,11 @@ defmodule ReqLLM.Coverage.Anthropic.SamplingParametersTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Describe the color blue in 3 words")
+          user("Describe the color blue in 3 words")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("sampling/top_p_sampling", fn ->
+        LiveFixture.use_fixture("sampling/top_p_sampling", [], fn ->
           ReqLLM.generate_text(model, context: context, top_p: 0.9, max_tokens: 20)
         end)
 
@@ -87,11 +88,11 @@ defmodule ReqLLM.Coverage.Anthropic.SamplingParametersTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What comes after the number 9?")
+          user("What comes after the number 9?")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("sampling/top_k_sampling", fn ->
+        LiveFixture.use_fixture("sampling/top_k_sampling", [], fn ->
           ReqLLM.generate_text(model, context: context, top_k: 50, max_tokens: 10)
         end)
 
@@ -111,11 +112,11 @@ defmodule ReqLLM.Coverage.Anthropic.SamplingParametersTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Tell me a programming joke")
+          user("Tell me a programming joke")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("sampling/combined_sampling", fn ->
+        LiveFixture.use_fixture("sampling/combined_sampling", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             temperature: 0.7,
@@ -142,12 +143,12 @@ defmodule ReqLLM.Coverage.Anthropic.SamplingParametersTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Hello")
+          user("Hello")
         ])
 
       # Anthropic API accepts 0-2 range, but some providers might validate
       {:ok, response} =
-        LiveFixture.use_fixture("sampling/boundary_temperature", fn ->
+        LiveFixture.use_fixture("sampling/boundary_temperature", [], fn ->
           ReqLLM.generate_text(model, context: context, temperature: 2.0, max_tokens: 20)
         end)
 
@@ -159,11 +160,11 @@ defmodule ReqLLM.Coverage.Anthropic.SamplingParametersTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Say exactly: Hello World")
+          user("Say exactly: Hello World")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("sampling/zero_sampling", fn ->
+        LiveFixture.use_fixture("sampling/zero_sampling", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             temperature: 0.0,

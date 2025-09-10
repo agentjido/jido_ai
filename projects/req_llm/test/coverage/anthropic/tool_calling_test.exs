@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
   use ExUnit.Case, async: true
   alias ReqLLM.Test.LiveFixture
+  import ReqLLM.Context
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -21,11 +22,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What's the weather like in Paris?")
+          user("What's the weather like in Paris?")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/choice_auto", fn ->
+        LiveFixture.use_fixture("tool_calling/choice_auto", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [weather_tool],
@@ -57,11 +58,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What's the weather like in Tokyo?")
+          user("What's the weather like in Tokyo?")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/choice_none", fn ->
+        LiveFixture.use_fixture("tool_calling/choice_none", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [weather_tool],
@@ -106,11 +107,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
       context =
         ReqLLM.Context.new([
           # Question that doesn't need tools
-          ReqLLM.Message.user("Hello, how are you?")
+          user("Hello, how are you?")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/choice_any", fn ->
+        LiveFixture.use_fixture("tool_calling/choice_any", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [calculator_tool, weather_tool],
@@ -147,11 +148,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What's 15 multiplied by 8?")
+          user("What's 15 multiplied by 8?")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/choice_specific", fn ->
+        LiveFixture.use_fixture("tool_calling/choice_specific", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [calculator_tool, weather_tool],
@@ -189,11 +190,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Get weather for NYC and current time in EST")
+          user("Get weather for NYC and current time in EST")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/no_parallel", fn ->
+        LiveFixture.use_fixture("tool_calling/no_parallel", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [tool1, tool2],
@@ -223,11 +224,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
       # Initial request with tool call
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What's the weather in London?")
+          user("What's the weather in London?")
         ])
 
       {:ok, first_response} =
-        LiveFixture.use_fixture("tool_calling/initial_call", fn ->
+        LiveFixture.use_fixture("tool_calling/initial_call", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [weather_tool],
@@ -252,19 +253,19 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
 
       extended_context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What's the weather in London?"),
-          ReqLLM.Message.assistant([
+          user("What's the weather in London?"),
+          assistant([
             ReqLLM.Message.ContentPart.tool_call(
               tool_call.name,
               tool_call.arguments,
               tool_call_id
             )
           ]),
-          ReqLLM.Message.user([tool_result])
+          user([tool_result])
         ])
 
       {:ok, final_response} =
-        LiveFixture.use_fixture("tool_calling/with_result", fn ->
+        LiveFixture.use_fixture("tool_calling/with_result", [], fn ->
           ReqLLM.generate_text(model,
             context: extended_context,
             tools: [weather_tool],
@@ -302,8 +303,8 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
       # Simulate a conversation with multiple tool calls and results
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What's the weather and current time in Paris?"),
-          ReqLLM.Message.assistant([
+          user("What's the weather and current time in Paris?"),
+          assistant([
             ReqLLM.Message.ContentPart.tool_call(
               "get_weather",
               %{"location" => "Paris"},
@@ -311,14 +312,14 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
             ),
             ReqLLM.Message.ContentPart.tool_call("get_time", %{"location" => "Paris"}, "call_2")
           ]),
-          ReqLLM.Message.user([
+          user([
             ReqLLM.Message.ContentPart.tool_result("call_1", "Paris: 22°C, sunny"),
             ReqLLM.Message.ContentPart.tool_result("call_2", "Paris: 14:30 CEST")
           ])
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/multiple_results", fn ->
+        LiveFixture.use_fixture("tool_calling/multiple_results", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [weather_tool, time_tool],
@@ -349,11 +350,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Get data from the API"),
-          ReqLLM.Message.assistant([
+          user("Get data from the API"),
+          assistant([
             ReqLLM.Message.ContentPart.tool_call("call_api", %{"endpoint" => "/users"}, "call_1")
           ]),
-          ReqLLM.Message.user([
+          user([
             ReqLLM.Message.ContentPart.tool_result(
               "call_1",
               "Error: API endpoint not found (404)"
@@ -362,7 +363,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/error_result", fn ->
+        LiveFixture.use_fixture("tool_calling/error_result", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [api_tool],
@@ -404,11 +405,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Search for 'Elixir programming' and translate to French")
+          user("Search for 'Elixir programming' and translate to French")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/unique_ids", fn ->
+        LiveFixture.use_fixture("tool_calling/unique_ids", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [tool1, tool2],
@@ -443,11 +444,11 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
       # Step 1: Get tool call with ID
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Calculate 25 * 4")
+          user("Calculate 25 * 4")
         ])
 
       {:ok, first_response} =
-        LiveFixture.use_fixture("tool_calling/get_call_id", fn ->
+        LiveFixture.use_fixture("tool_calling/get_call_id", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [math_tool],
@@ -464,21 +465,21 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
       # Step 2: Provide result with matching ID
       extended_context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Calculate 25 * 4"),
-          ReqLLM.Message.assistant([
+          user("Calculate 25 * 4"),
+          assistant([
             ReqLLM.Message.ContentPart.tool_call(
               "calculate",
               %{"expression" => "25 * 4"},
               original_id
             )
           ]),
-          ReqLLM.Message.user([
+          user([
             ReqLLM.Message.ContentPart.tool_result(original_id, "100")
           ])
         ])
 
       {:ok, final_response} =
-        LiveFixture.use_fixture("tool_calling/matched_id_result", fn ->
+        LiveFixture.use_fixture("tool_calling/matched_id_result", [], fn ->
           ReqLLM.generate_text(model,
             context: extended_context,
             tools: [math_tool],

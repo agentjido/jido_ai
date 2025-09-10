@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
   use ExUnit.Case, async: true
   alias ReqLLM.Test.LiveFixture
+  import ReqLLM.Context
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -13,12 +14,12 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.system(system_prompt),
-          ReqLLM.Message.user("Write a simple hello world function in Elixir")
+          system(system_prompt),
+          user("Write a simple hello world function in Elixir")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("system_prompts/string_system", fn ->
+        LiveFixture.use_fixture("system_prompts/string_system", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 100)
         end)
 
@@ -44,12 +45,12 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.new(:system, system_parts),
-          ReqLLM.Message.user("Review this code: def add(a, b), do: a + b")
+          new(:system, system_parts),
+          user("Review this code: def add(a, b), do: a + b")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("system_prompts/array_system", fn ->
+        LiveFixture.use_fixture("system_prompts/array_system", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 150)
         end)
 
@@ -68,11 +69,11 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What is 2 + 2?")
+          user("What is 2 + 2?")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("system_prompts/no_system", fn ->
+        LiveFixture.use_fixture("system_prompts/no_system", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 50)
         end)
 
@@ -93,13 +94,13 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.system("You are helpful"),
-          ReqLLM.Message.user("Hello")
+          system("You are helpful"),
+          user("Hello")
         ])
 
       # This should work because our provider converts system messages properly
       {:ok, response} =
-        LiveFixture.use_fixture("system_prompts/converted_system", fn ->
+        LiveFixture.use_fixture("system_prompts/converted_system", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 50)
         end)
 
@@ -107,15 +108,16 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
     end
 
     test "multiple system messages should be handled gracefully" do
-      model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
+      _model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
 
       # Context validation should prevent multiple system messages
-      assert_raise ArgumentError, ~r/multiple system messages/i, fn ->
-        ReqLLM.Context.new([
-          ReqLLM.Message.system("First system message"),
-          ReqLLM.Message.system("Second system message"),
-          ReqLLM.Message.user("Hello")
+      assert_raise ArgumentError, ~r/should have exactly one system message/i, fn ->
+        context = ReqLLM.Context.new([
+          system("First system message"),
+          system("Second system message"),
+          user("Hello")
         ])
+        ReqLLM.Context.validate!(context)
       end
     end
   end

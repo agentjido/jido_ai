@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
   use ExUnit.Case, async: true
   alias ReqLLM.Test.LiveFixture
+  import ReqLLM.Context
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -14,13 +15,13 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user(
+          user(
             "Solve this step by step: If a train leaves station A at 2 PM going 60 mph, and another train leaves station B at 3 PM going 80 mph, and the stations are 280 miles apart, when do they meet?"
           )
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/basic_reasoning", fn ->
+        LiveFixture.use_fixture("thinking_tokens/basic_reasoning", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 2048},
@@ -49,11 +50,11 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("What's 12 + 15?")
+          user("What's 12 + 15?")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/minimal_budget", fn ->
+        LiveFixture.use_fixture("thinking_tokens/minimal_budget", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             # Minimum allowed
@@ -83,7 +84,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("""
+          user("""
           You have 3 boxes: Box A contains 2 red balls and 3 blue balls. Box B contains 4 red balls and 1 blue ball. 
           Box C contains 1 red ball and 4 blue balls. You randomly select a box, then randomly draw a ball. 
           What's the probability of drawing a red ball? Show your work.
@@ -91,7 +92,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/complex_reasoning", fn ->
+        LiveFixture.use_fixture("thinking_tokens/complex_reasoning", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 3000},
@@ -119,13 +120,13 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user(
+          user(
             "Plan a simple web application architecture. Consider frontend, backend, and database layers."
           )
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/streaming_thinking", fn ->
+        LiveFixture.use_fixture("thinking_tokens/streaming_thinking", [], fn ->
           ReqLLM.stream_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 2500},
@@ -156,11 +157,11 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Explain the concept of recursion in programming")
+          user("Explain the concept of recursion in programming")
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/disabled_thinking", fn ->
+        LiveFixture.use_fixture("thinking_tokens/disabled_thinking", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             # No thinking parameter - should be disabled by default
@@ -191,13 +192,13 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user(
+          user(
             "I need to calculate compound interest: $1000 principal, 5% annual rate, compounded monthly for 2 years. Walk me through this."
           )
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/thinking_with_tools", fn ->
+        LiveFixture.use_fixture("thinking_tokens/thinking_with_tools", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 2000},
@@ -207,7 +208,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
         end)
 
       thinking_chunks = response.chunks |> Enum.filter(&(&1.type == :thinking))
-      tool_call_chunks = response.chunks |> Enum.filter(&(&1.type == :tool_call))
+      _tool_call_chunks = response.chunks |> Enum.filter(&(&1.type == :tool_call))
       text_chunks = response.chunks |> Enum.filter(&(&1.type == :text))
 
       # Should think about the problem, possibly call tool, then explain
@@ -226,12 +227,12 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
 
       context =
         ReqLLM.Context.new([
-          ReqLLM.Message.user("Solve this puzzle: What comes next in the sequence 2, 4, 8, 16, ?")
+          user("Solve this puzzle: What comes next in the sequence 2, 4, 8, 16, ?")
         ])
 
       # Non-reasoning models should either ignore thinking parameter or return error
       result =
-        LiveFixture.use_fixture("thinking_tokens/non_reasoning_model", fn ->
+        LiveFixture.use_fixture("thinking_tokens/non_reasoning_model", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 1500},
