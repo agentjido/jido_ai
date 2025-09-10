@@ -37,8 +37,20 @@ defmodule ReqLLM.Providers.Anthropic do
     base_url: "https://api.anthropic.com/v1",
     metadata: "priv/models_dev/anthropic.json"
 
+  defstruct [:context]
+
+  @type t :: %__MODULE__{context: ReqLLM.Context.t()}
+
+  @spec new(ReqLLM.Context.t()) :: t()
+  def new(context), do: %__MODULE__{context: context}
+
   @impl ReqLLM.Provider
-  def attach(request, %ReqLLM.Model{} = model, _opts \\ []) do
+  def wrap_context(%ReqLLM.Context{} = ctx) do
+    %__MODULE__{context: ctx}
+  end
+
+  @impl ReqLLM.Provider
+  def attach(request, %ReqLLM.Model{} = model, opts \\ []) do
     kagi_key = get_env_var_name() |> String.downcase() |> String.to_atom()
 
     api_key = Kagi.get(kagi_key)
@@ -48,17 +60,25 @@ defmodule ReqLLM.Providers.Anthropic do
             "Anthropic API key required. Set via Kagi.put(#{inspect(kagi_key)}, key)"
     end
 
-    # Extract messages and options from request body
-    {messages, stream, tools} = extract_request_data(request.body)
+    # Extract context from opts or build from legacy format
+    context = extract_or_build_context(request.body, opts)
 
-    # Build the request body using extracted messages
-    body = build_body(messages, model, stream, tools)
+    # Protocol handles message translation
+    body =
+      context
+      |> ReqLLM.Codec.Helpers.wrap(model)
+      |> ReqLLM.Codec.encode()
+      |> add_model_params(model, opts)
+      |> add_sampling_params(opts)
+
+    base_url = opts[:base_url] || default_base_url()
+    stream = opts[:stream] || false
 
     request
     |> Req.Request.put_header("x-api-key", api_key)
     |> Req.Request.put_header("content-type", "application/json")
     |> Req.Request.put_header("anthropic-version", "2023-06-01")
-    |> Req.Request.merge_options(base_url: default_base_url())
+    |> Req.Request.merge_options(base_url: base_url)
     |> Map.put(:body, Jason.encode!(body))
     |> Map.put(:url, URI.parse("/messages"))
     |> maybe_install_stream_steps(stream)
@@ -68,26 +88,14 @@ defmodule ReqLLM.Providers.Anthropic do
   def parse_response(response, %ReqLLM.Model{} = _model) do
     case response do
       %Req.Response{status: 200, body: body} ->
-        case body do
-          %{"content" => content} ->
-            # Extract both text and tool calls from content
-            text_chunks =
-              case extract_content_text(content) do
-                text when text != "" -> [ReqLLM.StreamChunk.text(text)]
-                "" -> []
-              end
+        chunks =
+          body
+          |> then(&%__MODULE__{context: &1})
+          |> ReqLLM.Codec.decode()
 
-            tool_call_chunks = extract_tool_calls_as_chunks(content)
-
-            all_chunks = text_chunks ++ tool_call_chunks
-
-            case all_chunks do
-              [] -> {:ok, [ReqLLM.StreamChunk.text("")]}
-              chunks -> {:ok, chunks}
-            end
-
-          _ ->
-            {:error, to_error("Invalid response format", body)}
+        case chunks do
+          [] -> {:ok, [ReqLLM.StreamChunk.text("")]}
+          chunks -> {:ok, chunks}
         end
 
       %Req.Response{status: status, body: body} ->
@@ -123,82 +131,71 @@ defmodule ReqLLM.Providers.Anthropic do
   defp maybe_install_stream_steps(req, _stream), do: req
 
   defp get_env_var_name do
-    case ReqLLM.Provider.Registry.get_provider_metadata(:anthropic) do
-      {:ok, %{"provider" => %{"env" => [env_var | _]}}} ->
-        env_var
-
-      {:ok, metadata} ->
-        # Fallback if metadata structure is different
-        case get_in(metadata, [:provider, :env]) do
-          [env_var | _] -> env_var
-          # hardcoded fallback
-          _ -> "ANTHROPIC_API_KEY"
-        end
-
-      {:error, _} ->
-        # fallback if metadata unavailable
-        "ANTHROPIC_API_KEY"
+    with {:ok, metadata} <- ReqLLM.Provider.Registry.get_provider_metadata(:anthropic),
+         [env_var | _] <-
+           get_in(metadata, ["provider", "env"]) || get_in(metadata, [:provider, :env]) do
+      env_var
+    else
+      _ -> "ANTHROPIC_API_KEY"
     end
   end
 
-  defp extract_request_data(%{messages: messages} = body) do
-    # Extract messages, stream option, and tools from prepared request body
-    stream = Map.get(body, :stream, false)
-    tools = Map.get(body, :tools, [])
-    {messages, stream, tools}
+  defp extract_or_build_context(body, opts) do
+    cond do
+      # If context is provided in opts, use it
+      opts[:context] && is_struct(opts[:context], ReqLLM.Context) ->
+        opts[:context]
+
+      # If body has messages, build context from legacy format
+      is_map(body) && Map.has_key?(body, :messages) ->
+        build_context_from_legacy(body)
+
+      # Default: empty context with user message from body if it's a string
+      is_binary(body) ->
+        ReqLLM.Context.new([ReqLLM.Context.user(body)])
+
+      # Fallback: empty context
+      true ->
+        ReqLLM.Context.new([])
+    end
   end
 
-  defp extract_request_data(body) when is_map(body) do
-    # Fallback for unexpected body structure
-    {[], false, []}
+  defp build_context_from_legacy(%{messages: messages}) when is_list(messages) do
+    converted_messages =
+      Enum.map(messages, fn
+        %ReqLLM.Message{} = msg ->
+          msg
+
+        %{role: role, content: content} ->
+          ReqLLM.Context.text(String.to_atom(role), to_string(content))
+
+        message when is_binary(message) ->
+          ReqLLM.Context.user(message)
+      end)
+
+    ReqLLM.Context.new(converted_messages)
   end
 
-  defp extract_request_data(_body) do
-    # Fallback for non-map body
-    {[], false, []}
-  end
+  defp build_context_from_legacy(_), do: ReqLLM.Context.new([])
 
-  defp build_body(messages, %ReqLLM.Model{} = model, stream, tools) do
-    body = %{
-      model: model.model,
-      messages: format_messages(messages),
-      max_tokens: model.max_tokens || 4096,
-      stream: stream
-    }
+  defp add_model_params(body, %ReqLLM.Model{} = model, opts) do
+    tools = extract_tools_from_opts(opts)
 
     body
-    |> maybe_add_temperature(model.temperature)
+    |> Map.put(:model, model.model)
+    |> Map.put(:max_tokens, opts[:max_tokens] || model.max_tokens || 4096)
+    |> maybe_add_temperature(opts[:temperature] || model.temperature)
     |> maybe_add_tools(tools)
   end
 
-  defp format_messages(messages) when is_list(messages) do
-    Enum.map(messages, fn
-      %ReqLLM.Message{role: role, content: content} ->
-        %{role: to_string(role), content: format_content(content)}
-
-      %{role: role, content: content} ->
-        %{role: to_string(role), content: format_content(content)}
-
-      message when is_binary(message) ->
-        %{role: "user", content: message}
-    end)
+  defp add_sampling_params(body, opts) do
+    body
+    |> Map.put(:stream, opts[:stream] || false)
   end
 
-  defp format_messages(message) when is_binary(message) do
-    [%{role: "user", content: message}]
+  defp extract_tools_from_opts(opts) do
+    opts[:tools] || []
   end
-
-  defp format_content(content) when is_binary(content), do: content
-
-  defp format_content(content) when is_list(content) do
-    Enum.map(content, fn
-      %ReqLLM.Message.ContentPart{type: :text, text: text} -> %{type: "text", text: text}
-      %ReqLLM.Message.ContentPart{type: :image, data: data} -> %{type: "image", source: data}
-      part -> part
-    end)
-  end
-
-  defp format_content(content), do: to_string(content)
 
   defp maybe_add_temperature(body, nil), do: body
   defp maybe_add_temperature(body, temperature), do: Map.put(body, :temperature, temperature)
@@ -207,35 +204,12 @@ defmodule ReqLLM.Providers.Anthropic do
 
   defp maybe_add_tools(body, tools) do
     formatted_tools =
-      Enum.map(tools, fn tool ->
-        %{
-          name: tool.name || tool["name"],
-          description: tool.description || tool["description"],
-          input_schema:
-            tool.parameters_schema || tool["parameters_schema"] || tool["input_schema"]
-        }
+      Enum.map(tools, fn
+        %ReqLLM.Tool{} = tool -> ReqLLM.Tool.to_schema(tool, :anthropic)
+        tool -> tool
       end)
 
     Map.put(body, :tools, formatted_tools)
-  end
-
-  defp extract_content_text(content) when is_list(content) do
-    content
-    |> Enum.filter(&(&1["type"] == "text"))
-    |> Enum.map(& &1["text"])
-    |> Enum.join("")
-  end
-
-  defp extract_tool_calls_as_chunks(content) when is_list(content) do
-    content
-    |> Enum.filter(&(&1["type"] == "tool_use"))
-    |> Enum.map(fn tool_call ->
-      ReqLLM.StreamChunk.tool_call(
-        tool_call["name"],
-        tool_call["input"],
-        %{id: tool_call["id"]}
-      )
-    end)
   end
 
   defp parse_sse_events(body) when is_binary(body) do
@@ -302,7 +276,7 @@ defmodule ReqLLM.Providers.Anthropic do
 
   defp convert_to_stream_chunk(_), do: nil
 
-  defp to_error(reason, body, status \\ nil) do
+  defp to_error(reason, body, status) do
     error_message =
       case body do
         %{"error" => %{"message" => message}} -> message

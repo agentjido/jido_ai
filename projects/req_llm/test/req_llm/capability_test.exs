@@ -1,176 +1,114 @@
 defmodule ReqLLM.CapabilityTest do
-  @moduledoc """
-  Consolidated tests for ReqLLM.Capability module and capability discovery system.
+  use ExUnit.Case, async: true
 
-  Focuses on capability discovery mechanism and basic verification workflow
-  without requiring network calls or actual AI model interactions.
-  """
+  alias ReqLLM.Capability
 
-  use ReqLLM.Test.CapabilityCase
-  import ReqLLM.Test.Macros
-
-  setup [:setup_capability_test]
-
-  describe "discover_capabilities/2" do
-    test "when discovering capabilities with various filters then returns expected results", %{test_model: model} do
-      # Test cases: [filter_opts, expected_capability_count_range, description]
-      test_cases = [
-        [[], 1..10, "discovers all advertised capabilities"],
-        [[only: [:generate_text]], 1..1, "filters to single capability with atom list"],
-        [[only: "generate_text,stream_text"], 2..2, "filters with comma-separated string"],
-        [[only: [:nonexistent_capability]], 0..0, "returns no capabilities for invalid filter"],
-        [[only: [:generate_text, :invalid_capability]], 1..1, "ignores invalid capability names"]
-      ]
-
-      for [opts, expected_range, description] <- test_cases do
-        case Capability.discover_capabilities(model, opts) do
-          {:ok, capabilities} ->
-            assert length(capabilities) in expected_range,
-              "#{description}: expected #{inspect(expected_range)}, got #{length(capabilities)}"
-            
-            # Validate all returned items are proper capability modules
-            for cap <- capabilities do
-              assert is_atom(cap)
-              assert function_exported?(cap, :id, 0)
-              assert function_exported?(cap, :advertised?, 1)
-              assert function_exported?(cap, :verify, 2)
-            end
-
-          {:error, reason} when expected_range == 0..0 ->
-            assert reason =~ "No capabilities to verify"
-
-          result ->
-            flunk("Unexpected result for #{description}: #{inspect(result)}")
-        end
-      end
-    end
+  setup_all do
+    # Ensure application is started for provider registry
+    Application.ensure_all_started(:req_llm)
+    :ok
   end
 
-  describe "run_checks/3" do
-    test "when executing capability checks then returns structured results", %{test_model: model} do
-      # Test scenarios: [capability_types, opts, expected_behavior]
-      scenarios = [
-        [[:fast_passing, :fast_failing], [], "executes all checks and measures latency"],
-        [[:fast_failing, :fast_passing], [fail_fast: true], "stops early on first failure"],
-        [[:slow], [], "measures latency for timed operations"]
-      ]
-
-      for [capability_types, opts, description] <- scenarios do
-        results = run_capability_scenario(model, capability_types, opts)
-
-        if opts[:fail_fast] && :fast_failing in capability_types do
-          assert length(results) == 1, "#{description}: should stop after first failure"
-          assert hd(results).status == :failed
-        else
-          assert length(results) == length(capability_types), "#{description}: should run all checks"
-        end
-
-        # Validate all results structure
-        for result <- results do
-          assert_struct(result, ReqLLM.Capability.Result)
-          assert result.model == "test:capability-model"
-          assert result.capability in [:fast_passing, :fast_failing, :slow_capability]
-          assert is_integer(result.latency_ms) and result.latency_ms >= 0
-          assert result.status in [:passed, :failed]
-        end
-      end
-    end
-  end
-
-  describe "verify/2 integration" do
-    test "when all capabilities pass then returns :ok" do
-      model = test_model("openai", "gpt-4")
-      stub_model_metadata_success(model)
-      stub_reporter_dispatch()
-      stub_capability_success(ReqLLM.Capability.GenerateText)
-
-      result = Capability.verify("openai:gpt-4", only: [:generate_text])
-      assert result == :ok
-    end
-
-    test "when first fails with fail_fast then returns error with one result" do
-      model = test_model("openai", "gpt-4")
-      stub_model_metadata_success(model)
-      stub_capability_failure(ReqLLM.Capability.GenerateText)
+  describe "for/1 with model spec" do
+    test "returns capabilities for valid anthropic model" do
+      capabilities = Capability.for("anthropic:claude-3-haiku-20240307")
       
-      ReqLLM.Capability.Reporter
-      |> stub(:dispatch, fn results, _opts ->
-        assert length(results) == 1
-        assert hd(results).status == :failed
-        :ok
-      end)
-
-      result = Capability.verify("openai:gpt-4", fail_fast: true, only: [:generate_text])
-      assert result == :error
+      # Should at least have basic capabilities
+      assert :max_tokens in capabilities
+      assert :system_prompt in capabilities
+      assert :metadata in capabilities
+      
+      # May have additional capabilities based on models.dev metadata
+      assert is_list(capabilities)
+      assert length(capabilities) > 0
     end
 
-    test "when mixed pass/fail without fail_fast then returns error with all results" do
-      model = test_model("openai", "gpt-4")  
-      stub_model_metadata_success(model)
-      stub_capability_success(ReqLLM.Capability.GenerateText)
-      stub_capability_failure(ReqLLM.Capability.StreamText)
-
-      ReqLLM.Capability.Reporter
-      |> stub(:dispatch, fn results, _opts ->
-        assert length(results) == 2
-        passed = Enum.count(results, &(&1.status == :passed))
-        failed = Enum.count(results, &(&1.status == :failed)) 
-        assert passed == 1 and failed == 1
-        :ok
-      end)
-
-      result = Capability.verify("openai:gpt-4", only: [:generate_text, :stream_text])
-      assert result == :error
+    test "returns empty list for invalid model spec" do
+      assert Capability.for("invalidprovider:model") == []
+      assert Capability.for("not-a-spec") == []
     end
 
-    test "when model metadata error surfaces then returns error" do
-      ReqLLM.Model 
-      |> stub(:with_metadata, fn _model_id -> {:error, "Invalid provider: nonexistent"} end)
-
-      log_output = capture_log(fn ->
-        result = Capability.verify("nonexistent:model", [])
-        assert result == :error
-      end)
-
-      assert log_output =~ "Invalid provider: nonexistent"
-    end
-
-    test "when timeout option provided then propagates to capability verify" do
-      model = test_model("openai", "gpt-4")
-      stub_model_metadata_success(model)
-      stub_reporter_dispatch()
-
-      ReqLLM.Capability.GenerateText
-      |> stub(:advertised?, fn _model -> true end)
-      |> stub(:verify, fn _model, opts ->
-        assert Keyword.get(opts, :timeout) == 30_000
-        {:ok, %{response: "Test"}}
-      end)
-
-      result = Capability.verify("openai:gpt-4", timeout: 30_000, only: [:generate_text])
-      assert result == :ok
+    test "handles unknown provider gracefully" do
+      assert Capability.for("unknownprovider:model") == []
     end
   end
 
-  # Helper functions for test setup
-
-  defp stub_model_metadata_success(model) do
-    ReqLLM.Model |> stub(:with_metadata, fn _model_id -> {:ok, model} end)
+  describe "for/1 with Model struct" do
+    test "works with Model struct" do
+      model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-haiku-20240307"}
+      capabilities = Capability.for(model)
+      
+      assert is_list(capabilities)
+      assert :max_tokens in capabilities
+    end
   end
 
-  defp stub_reporter_dispatch do
-    ReqLLM.Capability.Reporter |> stub(:dispatch, fn _results, _opts -> :ok end)
+  describe "supports?/2" do
+    test "checks if model supports a capability" do
+      # Basic capabilities should always be supported
+      assert Capability.supports?("anthropic:claude-3-haiku-20240307", :max_tokens)
+      assert Capability.supports?("anthropic:claude-3-haiku-20240307", :system_prompt)
+      assert Capability.supports?("anthropic:claude-3-haiku-20240307", :metadata)
+      
+      # Unknown capability should return false
+      refute Capability.supports?("anthropic:claude-3-haiku-20240307", :unknown_capability)
+    end
   end
 
-  defp stub_capability_success(capability_module) do
-    capability_module
-    |> stub(:advertised?, fn _model -> true end)
-    |> stub(:verify, fn _model, _opts -> {:ok, %{response: "Test success"}} end)
+  describe "provider_models/1" do
+    test "returns model specs for anthropic provider" do
+      models = Capability.provider_models(:anthropic)
+      
+      assert is_list(models)
+      
+      if length(models) > 0 do
+        # Should be in model spec format
+        first_model = hd(models)
+        assert String.contains?(first_model, "anthropic:")
+        
+        # Should be valid model specs
+        assert String.split(first_model, ":") |> length() == 2
+      end
+    end
+
+    test "returns empty list for unknown provider" do
+      assert Capability.provider_models(:unknown_provider) == []
+    end
   end
 
-  defp stub_capability_failure(capability_module) do
-    capability_module
-    |> stub(:advertised?, fn _model -> true end)
-    |> stub(:verify, fn _model, _opts -> {:error, "Test failure"} end)
+  describe "models_for/2" do
+    test "finds models supporting basic capabilities" do
+      models = Capability.models_for(:anthropic, :max_tokens)
+      
+      # Should return some models since all models support max_tokens
+      assert is_list(models)
+      
+      # If we have anthropic models, they should all support max_tokens
+      if length(models) > 0 do
+        for model <- models do
+          assert Capability.supports?(model, :max_tokens)
+        end
+      end
+    end
+    
+    test "handles unknown capabilities" do
+      models = Capability.models_for(:anthropic, :unknown_capability)
+      assert models == []
+    end
+  end
+
+  describe "providers_for/1" do
+    test "finds providers supporting basic capabilities" do
+      providers = Capability.providers_for(:max_tokens)
+      
+      # Should include at least anthropic if it's configured
+      assert is_list(providers)
+      
+      # Each returned provider should have models supporting the capability
+      for provider <- providers do
+        provider_models = Capability.models_for(provider, :max_tokens)
+        assert length(provider_models) > 0
+      end
+    end
   end
 end

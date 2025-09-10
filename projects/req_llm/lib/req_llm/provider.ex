@@ -49,6 +49,24 @@ defmodule ReqLLM.Provider do
   """
 
   @doc """
+  Wraps a ReqLLM.Context in a provider-specific tagged struct.
+
+  This callback enables protocol-based dispatch for encoding/decoding operations
+  by wrapping the context in a provider-specific struct that implements
+  the ReqLLM.Codec protocol.
+
+  ## Parameters
+
+    * `context` - ReqLLM.Context struct containing conversation messages
+
+  ## Returns
+
+    * Provider-specific tagged wrapper struct
+
+  """
+  @callback wrap_context(ReqLLM.Context.t()) :: term()
+
+  @doc """
   Attaches provider-specific configuration to a Req request.
 
   This callback is called by `ReqLLM.attach/2` to configure the request
