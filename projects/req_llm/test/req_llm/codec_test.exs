@@ -46,7 +46,7 @@ defmodule ReqLLM.CodecTest do
       tagged = %ReqLLM.Providers.Anthropic{context: context}
       encoded = Codec.encode(tagged)
 
-      assert encoded.system == nil
+      refute Map.has_key?(encoded, :system)
       assert length(encoded.messages) == 2
     end
 
@@ -240,10 +240,10 @@ defmodule ReqLLM.CodecTest do
       tagged = %ReqLLM.Providers.Anthropic{context: context}
       encoded = Codec.encode(tagged)
 
-      # Verify encoding structure
+      # Verify encoding structure (only context-related fields)
       assert is_binary(encoded.system)
       assert is_list(encoded.messages)
-      assert is_integer(encoded.max_tokens)
+      assert length(encoded.messages) == 2  # system extracted, 2 regular messages remain
 
       # Simulate response from Anthropic
       anthropic_response = %{
@@ -318,9 +318,8 @@ defmodule ReqLLM.CodecTest do
 
       encoded = Codec.encode(tagged)
 
-      assert encoded.system == nil
+      refute Map.has_key?(encoded, :system)
       assert encoded.messages == []
-      assert is_integer(encoded.max_tokens)
     end
 
     test "handles system-only context" do
