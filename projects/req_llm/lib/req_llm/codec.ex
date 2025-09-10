@@ -9,9 +9,9 @@ defprotocol ReqLLM.Codec do
   ## Usage
 
       # Encoding: Canonical structures → Provider JSON
-      context |> ReqLLM.Codec.Helpers.wrap(model) |> ReqLLM.Codec.encode()
+      context |> ReqLLM.Context.wrap(model) |> ReqLLM.Codec.encode()
 
-      # Decoding: Provider JSON → StreamChunks  
+      # Decoding: Provider JSON → StreamChunks
       response_data |> provider_tagged_struct() |> ReqLLM.Codec.decode()
 
   ## Implementation

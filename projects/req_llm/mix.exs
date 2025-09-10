@@ -10,7 +10,7 @@ defmodule ReqLLM.MixProject do
       deps: deps(),
       aliases: aliases(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      
+
       # Documentation
       name: "ReqLLM",
       source_url: "https://github.com/your_org/req_llm",

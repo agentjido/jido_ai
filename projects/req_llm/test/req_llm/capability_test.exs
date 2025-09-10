@@ -12,12 +12,12 @@ defmodule ReqLLM.CapabilityTest do
   describe "for/1 with model spec" do
     test "returns capabilities for valid anthropic model" do
       capabilities = Capability.for("anthropic:claude-3-haiku-20240307")
-      
+
       # Should at least have basic capabilities
       assert :max_tokens in capabilities
       assert :system_prompt in capabilities
       assert :metadata in capabilities
-      
+
       # May have additional capabilities based on models.dev metadata
       assert is_list(capabilities)
       assert length(capabilities) > 0
@@ -37,7 +37,7 @@ defmodule ReqLLM.CapabilityTest do
     test "works with Model struct" do
       model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-haiku-20240307"}
       capabilities = Capability.for(model)
-      
+
       assert is_list(capabilities)
       assert :max_tokens in capabilities
     end
@@ -49,7 +49,7 @@ defmodule ReqLLM.CapabilityTest do
       assert Capability.supports?("anthropic:claude-3-haiku-20240307", :max_tokens)
       assert Capability.supports?("anthropic:claude-3-haiku-20240307", :system_prompt)
       assert Capability.supports?("anthropic:claude-3-haiku-20240307", :metadata)
-      
+
       # Unknown capability should return false
       refute Capability.supports?("anthropic:claude-3-haiku-20240307", :unknown_capability)
     end
@@ -58,14 +58,14 @@ defmodule ReqLLM.CapabilityTest do
   describe "provider_models/1" do
     test "returns model specs for anthropic provider" do
       models = Capability.provider_models(:anthropic)
-      
+
       assert is_list(models)
-      
+
       if length(models) > 0 do
         # Should be in model spec format
         first_model = hd(models)
         assert String.contains?(first_model, "anthropic:")
-        
+
         # Should be valid model specs
         assert String.split(first_model, ":") |> length() == 2
       end
@@ -79,10 +79,10 @@ defmodule ReqLLM.CapabilityTest do
   describe "models_for/2" do
     test "finds models supporting basic capabilities" do
       models = Capability.models_for(:anthropic, :max_tokens)
-      
+
       # Should return some models since all models support max_tokens
       assert is_list(models)
-      
+
       # If we have anthropic models, they should all support max_tokens
       if length(models) > 0 do
         for model <- models do
@@ -90,7 +90,7 @@ defmodule ReqLLM.CapabilityTest do
         end
       end
     end
-    
+
     test "handles unknown capabilities" do
       models = Capability.models_for(:anthropic, :unknown_capability)
       assert models == []
@@ -100,10 +100,10 @@ defmodule ReqLLM.CapabilityTest do
   describe "providers_for/1" do
     test "finds providers supporting basic capabilities" do
       providers = Capability.providers_for(:max_tokens)
-      
+
       # Should include at least anthropic if it's configured
       assert is_list(providers)
-      
+
       # Each returned provider should have models supporting the capability
       for provider <- providers do
         provider_models = Capability.models_for(provider, :max_tokens)

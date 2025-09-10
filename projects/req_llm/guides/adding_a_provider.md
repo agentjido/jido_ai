@@ -38,7 +38,7 @@ defmodule ReqLLM.Providers.OpenAI do
   @impl ReqLLM.Provider
   def attach(request, %ReqLLM.Model{} = model, opts \\ []) do
     api_key = System.fetch_env!("OPENAI_API_KEY")
-    ctx     = ReqLLM.Codec.Helpers.wrap(model, opts[:context] || default_ctx(request.body))
+    ctx     = ReqLLM.Context.wrap(opts[:context] || default_ctx(request.body), model)
 
     body =
       ctx
