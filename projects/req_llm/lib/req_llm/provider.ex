@@ -53,7 +53,7 @@ defmodule ReqLLM.Provider do
 
   This callback enables protocol-based dispatch for encoding/decoding operations
   by wrapping the context in a provider-specific struct that implements
-  the ReqLLM.Codec protocol.
+  the ReqLLM.Context.Codec protocol.
 
   ## Parameters
 

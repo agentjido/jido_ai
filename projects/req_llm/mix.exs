@@ -13,7 +13,7 @@ defmodule ReqLLM.MixProject do
 
       # Package
       package: package(),
-      
+
       # Documentation
       name: "ReqLLM",
       source_url: "https://github.com/your_org/req_llm",
@@ -56,7 +56,7 @@ defmodule ReqLLM.MixProject do
       {:typed_struct, "~> 0.3.0"},
       {:splode, "~> 0.2.3"},
       {:server_sent_event, "~> 1.0"},
-      {:kagi, path: "../kagi"},
+      {:jido_keys, path: "../jido_keys"},
 
       # Dev/test dependencies
       {:plug, "~> 1.15", only: [:test]},

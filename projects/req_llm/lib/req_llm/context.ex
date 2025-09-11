@@ -55,6 +55,7 @@ defmodule ReqLLM.Context do
   @spec user([ContentPart.t()] | String.t(), map()) :: Message.t()
   def user(content, meta \\ %{})
   def user(content, meta) when is_binary(content), do: text(:user, content, meta)
+
   def user(content, meta) when is_list(content) do
     %Message{role: :user, content: content, metadata: meta}
   end
@@ -62,6 +63,7 @@ defmodule ReqLLM.Context do
   @spec assistant([ContentPart.t()] | String.t(), map()) :: Message.t()
   def assistant(content, meta \\ %{})
   def assistant(content, meta) when is_binary(content), do: text(:assistant, content, meta)
+
   def assistant(content, meta) when is_list(content) do
     %Message{role: :assistant, content: content, metadata: meta}
   end
@@ -69,6 +71,7 @@ defmodule ReqLLM.Context do
   @spec system([ContentPart.t()] | String.t(), map()) :: Message.t()
   def system(content, meta \\ %{})
   def system(content, meta) when is_binary(content), do: text(:system, content, meta)
+
   def system(content, meta) when is_list(content) do
     %Message{role: :system, content: content, metadata: meta}
   end

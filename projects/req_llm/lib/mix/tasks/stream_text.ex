@@ -43,7 +43,7 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
     # Check for API key configuration
     provider = String.split(model_spec, ":") |> List.first()
 
-    kagi_key =
+    jido_key =
       case provider do
         "anthropic" -> :anthropic_api_key
         "openai" -> :openai_api_key
@@ -51,9 +51,9 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
         _ -> nil
       end
 
-    if kagi_key && !Kagi.get(kagi_key) do
-      IO.puts("⚠️  Warning: API key for #{provider} not found in Kagi keyring.")
-      IO.puts("   Please set it with: Kagi.put(#{inspect(kagi_key)}, \"your-api-key\")")
+    if jido_key && !JidoKeys.get(jido_key) do
+      IO.puts("⚠️  Warning: API key for #{provider} not found in JidoKeys keyring.")
+      IO.puts("   Please set it with: JidoKeys.put(#{inspect(jido_key)}, \"your-api-key\")")
       IO.puts("")
     end
 

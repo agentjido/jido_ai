@@ -1,4 +1,34 @@
-# ReqLLM
+# Req LLM
+
+Req Plugin to normalize LLM API calls across providers.
+
+- Model Metadata is sync'd from [models.dev](https://models.dev) via a mix task
+  - Metadata available for 45 providers and 665 models 
+  - Includes model capabilities and cost data
+
+- Basic data structures provided to normalize LLM interactions:
+  - Context (collection of messages)
+  - Message (individual message with content)
+  - ContentPart (typed content within messages)
+  - StreamChunk (streaming response chunks)
+  - Tool (function calling definitions)
+
+- Two levels of API provided:
+  - Direct Req API with full response metadata
+  - Vercel AI SDK style API with bang variants for convenient result unwrapping
+
+- Providers are implemented as Req plugins, composable with other Req plugins
+  - Supported providers:
+    - Anthropic
+    - Open AI
+
+  - Easily create new providers by implementing the ReqLLM.Provider behavior
+
+- Context Codec protocol used to translate between ReqLLM data structures and provider-specific formats
+- Usage tracking and cost extraction from responses
+- Comprehensive model coverage testing with local fixtures and live API calls
+
+
 
 Composable Elixir library for AI interactions built on Req. Provides unified interface to LLM providers through plugin-based architecture that normalizes provider differences behind canonical data structures and Req's HTTP pipeline.
 

@@ -1,0 +1,87 @@
+{
+  "result": {
+    "body": "**The Whispering Woods",
+    "headers": {
+      "access-control-expose-headers": [
+        "X-Request-ID"
+      ],
+      "alt-svc": [
+        "h3=\":443\"; ma=86400"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "97d74316fb1ecdc7-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Thu, 11 Sep 2025 12:45:26 GMT"
+      ],
+      "openai-organization": [
+        "epic-creative-sogybe"
+      ],
+      "openai-processing-ms": [
+        "476"
+      ],
+      "openai-project": [
+        "proj_j5AhgU4eLMRmsoO9FDg7BRD3"
+      ],
+      "openai-version": [
+        "2020-10-01"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=gKux.tZk136FolMiHSFuDESmICCKSvtvqix1rydZEoo-1757594726-1.0.1.1-B79RAiYPsm2aVh6BpWNSDAa61a6dij6.Cx8FF9I_QR33OC8.0z4xOvkRhRZfnf51O77120zZ4SeD62.l7FHTiIRLIxcbxh6piiuSMIlZWEo; path=/; expires=Thu, 11-Sep-25 13:15:26 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+        "_cfuvid=cAiIbtMWfeh9wInQ.IfQBaJDD9eID3mK9nRu_wILh78-1757594726122-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000; includeSubDomains; preload"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-envoy-upstream-service-time": [
+        "736"
+      ],
+      "x-openai-proxy-wasm": [
+        "v0.1"
+      ],
+      "x-ratelimit-limit-requests": [
+        "5000"
+      ],
+      "x-ratelimit-limit-tokens": [
+        "4000000"
+      ],
+      "x-ratelimit-remaining-requests": [
+        "4999"
+      ],
+      "x-ratelimit-remaining-tokens": [
+        "3999994"
+      ],
+      "x-ratelimit-reset-requests": [
+        "12ms"
+      ],
+      "x-ratelimit-reset-tokens": [
+        "0s"
+      ],
+      "x-request-id": [
+        "req_1692026689a84a2b9183fcb3444d38ed"
+      ]
+    },
+    "status": 200,
+    "type": "ok_response"
+  },
+  "provider": "openai",
+  "captured_at": "2025-09-11T12:45:26.111762Z"
+}

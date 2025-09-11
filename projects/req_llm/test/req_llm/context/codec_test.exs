@@ -1,7 +1,8 @@
-defmodule ReqLLM.CodecTest do
+defmodule ReqLLM.Context.CodecTest do
   use ExUnit.Case, async: true
 
-  alias ReqLLM.{Context, Message, StreamChunk, Codec}
+  alias ReqLLM.{Context, Message, StreamChunk}
+  alias ReqLLM.Context.Codec
   alias ReqLLM.Message.ContentPart
 
   describe "Anthropic codec protocol implementation" do
@@ -243,7 +244,8 @@ defmodule ReqLLM.CodecTest do
       # Verify encoding structure (only context-related fields)
       assert is_binary(encoded.system)
       assert is_list(encoded.messages)
-      assert length(encoded.messages) == 2  # system extracted, 2 regular messages remain
+      # system extracted, 2 regular messages remain
+      assert length(encoded.messages) == 2
 
       # Simulate response from Anthropic
       anthropic_response = %{
@@ -346,10 +348,10 @@ defmodule ReqLLM.CodecTest do
     test "codec returns error for unsupported tagged types" do
       unsupported_data = %{some: "data"}
 
-      result = Codec.encode(unsupported_data)
+      result = ReqLLM.Context.Codec.encode(unsupported_data)
       assert result == {:error, :not_implemented}
 
-      result = Codec.decode(unsupported_data)
+      result = ReqLLM.Context.Codec.decode(unsupported_data)
       assert result == {:error, :not_implemented}
     end
 

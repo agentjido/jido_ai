@@ -1,0 +1,87 @@
+{
+  "result": {
+    "body": "Hello!",
+    "headers": {
+      "access-control-expose-headers": [
+        "X-Request-ID"
+      ],
+      "alt-svc": [
+        "h3=\":443\"; ma=86400"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "97d73ca44f7a1aeb-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Thu, 11 Sep 2025 12:41:01 GMT"
+      ],
+      "openai-organization": [
+        "epic-creative-sogybe"
+      ],
+      "openai-processing-ms": [
+        "201"
+      ],
+      "openai-project": [
+        "proj_j5AhgU4eLMRmsoO9FDg7BRD3"
+      ],
+      "openai-version": [
+        "2020-10-01"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=Nym_hWkb59xorsCPJtNcyIk.aM01Gga0P5WxlWaAFxc-1757594461-1.0.1.1-DlMyWHg3qQjfgQYzRDSshPPITSYCAKODrPj65YMHTdPYC0gk6ArM_hDILbK5Ipgem5uSYa26Mqe8EuXQIGVLKH9jfWoV3kw4kT33grZ1TYo; path=/; expires=Thu, 11-Sep-25 13:11:01 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+        "_cfuvid=2qEGGGjVB3refmFA1_iadIJJSg4iA6vFFsS8yjye8qI-1757594461098-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000; includeSubDomains; preload"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-envoy-upstream-service-time": [
+        "217"
+      ],
+      "x-openai-proxy-wasm": [
+        "v0.1"
+      ],
+      "x-ratelimit-limit-requests": [
+        "5000"
+      ],
+      "x-ratelimit-limit-tokens": [
+        "4000000"
+      ],
+      "x-ratelimit-remaining-requests": [
+        "4999"
+      ],
+      "x-ratelimit-remaining-tokens": [
+        "3999986"
+      ],
+      "x-ratelimit-reset-requests": [
+        "12ms"
+      ],
+      "x-ratelimit-reset-tokens": [
+        "0s"
+      ],
+      "x-request-id": [
+        "req_ca7ebc7a1fc2402c9f974b77bb98e6f6"
+      ]
+    },
+    "status": 200,
+    "type": "ok_response"
+  },
+  "provider": "openai",
+  "captured_at": "2025-09-11T12:41:01.057992Z"
+}

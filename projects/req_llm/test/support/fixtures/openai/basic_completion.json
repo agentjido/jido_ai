@@ -1,0 +1,87 @@
+{
+  "result": {
+    "body": "Hello! How can I assist you today?",
+    "headers": {
+      "access-control-expose-headers": [
+        "X-Request-ID"
+      ],
+      "alt-svc": [
+        "h3=\":443\"; ma=86400"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "97d73cac993f1aeb-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Thu, 11 Sep 2025 12:41:03 GMT"
+      ],
+      "openai-organization": [
+        "epic-creative-sogybe"
+      ],
+      "openai-processing-ms": [
+        "325"
+      ],
+      "openai-project": [
+        "proj_j5AhgU4eLMRmsoO9FDg7BRD3"
+      ],
+      "openai-version": [
+        "2020-10-01"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=GHwAAyW0pwXE7UpGeTqX5R5b.jPPxoYrmb7vhpQuQwU-1757594463-1.0.1.1-Xo1aQHs.CF04L3e9AQL1oIDVPoWEsK5Dxh4YPqO8NN2eAHc9RSxk7RQH_to.J3ICqMLwjwgVvKE0BCwsttKy6fIzZGctasi6tLSx05xikd8; path=/; expires=Thu, 11-Sep-25 13:11:03 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+        "_cfuvid=Q6hXbnGTWMzuRXrysho95wKmNa9jL79nJnXt18Wi66U-1757594463159-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000; includeSubDomains; preload"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-envoy-upstream-service-time": [
+        "542"
+      ],
+      "x-openai-proxy-wasm": [
+        "v0.1"
+      ],
+      "x-ratelimit-limit-requests": [
+        "5000"
+      ],
+      "x-ratelimit-limit-tokens": [
+        "4000000"
+      ],
+      "x-ratelimit-remaining-requests": [
+        "4999"
+      ],
+      "x-ratelimit-remaining-tokens": [
+        "3999996"
+      ],
+      "x-ratelimit-reset-requests": [
+        "12ms"
+      ],
+      "x-ratelimit-reset-tokens": [
+        "0s"
+      ],
+      "x-request-id": [
+        "req_a1dabada3260414981bf39c0966445dd"
+      ]
+    },
+    "status": 200,
+    "type": "ok_response"
+  },
+  "provider": "openai",
+  "captured_at": "2025-09-11T12:41:03.116121Z"
+}

@@ -1,4 +1,4 @@
-defimpl ReqLLM.Codec, for: ReqLLM.Providers.Anthropic do
+defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic do
   def encode(%ReqLLM.Providers.Anthropic{context: ctx}) do
     {system_prompt, regular_messages} = extract_system_message(ctx)
 

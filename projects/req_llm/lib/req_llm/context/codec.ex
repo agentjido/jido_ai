@@ -1,4 +1,4 @@
-defprotocol ReqLLM.Codec do
+defprotocol ReqLLM.Context.Codec do
   @moduledoc """
   Protocol for encoding canonical ReqLLM structures to provider wire JSON and decoding provider responses back to canonical structures.
 
@@ -9,16 +9,16 @@ defprotocol ReqLLM.Codec do
   ## Usage
 
       # Encoding: Canonical structures → Provider JSON
-      context |> ReqLLM.Context.wrap(model) |> ReqLLM.Codec.encode()
+      context |> ReqLLM.Context.wrap(model) |> ReqLLM.Context.Codec.encode()
 
       # Decoding: Provider JSON → StreamChunks
-      response_data |> provider_tagged_struct() |> ReqLLM.Codec.decode()
+      response_data |> provider_tagged_struct() |> ReqLLM.Context.Codec.decode()
 
   ## Implementation
 
   Each provider implements this protocol for their specific tagged wrapper struct:
 
-      defimpl ReqLLM.Codec, for: MyProvider.Tagged do
+      defimpl ReqLLM.Context.Codec, for: MyProvider.Tagged do
         def encode(%MyProvider.Tagged{context: ctx}) do
           # Convert ReqLLM.Context to provider JSON format
         end
@@ -51,7 +51,7 @@ defprotocol ReqLLM.Codec do
       # Anthropic encoding
       context
       |> ReqLLM.Providers.Anthropic.Tagged.new()
-      |> ReqLLM.Codec.encode()
+      |> ReqLLM.Context.Codec.encode()
       #=> %{system: "...", messages: [...], max_tokens: 4096}
 
   """
@@ -78,7 +78,7 @@ defprotocol ReqLLM.Codec do
       # Anthropic decoding
       response_data
       |> ReqLLM.Providers.Anthropic.Tagged.new()
-      |> ReqLLM.Codec.decode()
+      |> ReqLLM.Context.Codec.decode()
       #=> [%ReqLLM.StreamChunk{type: :text, text: "Hello!"}]
 
   """
@@ -86,7 +86,7 @@ defprotocol ReqLLM.Codec do
   def decode(tagged_data)
 end
 
-defimpl ReqLLM.Codec, for: Any do
+defimpl ReqLLM.Context.Codec, for: Any do
   @doc """
   Default implementation for unsupported provider combinations.
 
