@@ -109,11 +109,11 @@ config :jido_workspace,
       path: "projects/kodo"
     },
     %{
-      name: "kagi",
-      upstream_url: "git@github.com:agentjido/kagi.git",
+      name: "jido_keys",
+      upstream_url: "git@github.com:agentjido/jido_keys.git",
       branch: "main",
       type: :library,
-      path: "projects/kagi"
+      path: "projects/jido_keys"
     },
     %{
       name: "req_llm",
