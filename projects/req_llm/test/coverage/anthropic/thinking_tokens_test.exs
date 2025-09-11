@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
   use ExUnit.Case, async: true
-  alias ReqLLM.Test.LiveFixture
+  alias ReqLLM.Test.LiveFixture, as: ReqFixture
+  import ReqFixture
   import ReqLLM.Context
 
   @moduletag :coverage
@@ -21,7 +22,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/basic_reasoning", [], fn ->
+        use_fixture("thinking_tokens/basic_reasoning", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 2048},
@@ -54,7 +55,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/minimal_budget", [], fn ->
+        use_fixture("thinking_tokens/minimal_budget", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             # Minimum allowed
@@ -92,7 +93,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/complex_reasoning", [], fn ->
+        use_fixture("thinking_tokens/complex_reasoning", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 3000},
@@ -126,7 +127,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/streaming_thinking", [], fn ->
+        use_fixture("thinking_tokens/streaming_thinking", [], fn ->
           ReqLLM.stream_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 2500},
@@ -161,7 +162,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/disabled_thinking", [], fn ->
+        use_fixture("thinking_tokens/disabled_thinking", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             # No thinking parameter - should be disabled by default
@@ -198,7 +199,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("thinking_tokens/thinking_with_tools", [], fn ->
+        use_fixture("thinking_tokens/thinking_with_tools", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 2000},
@@ -232,7 +233,7 @@ defmodule ReqLLM.Coverage.Anthropic.ThinkingTokensTest do
 
       # Non-reasoning models should either ignore thinking parameter or return error
       result =
-        LiveFixture.use_fixture("thinking_tokens/non_reasoning_model", [], fn ->
+        use_fixture("thinking_tokens/non_reasoning_model", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             thinking: %{type: "enabled", budget_tokens: 1500},

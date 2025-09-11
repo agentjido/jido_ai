@@ -11,6 +11,9 @@ defmodule ReqLLM.MixProject do
       aliases: aliases(),
       elixirc_paths: elixirc_paths(Mix.env()),
 
+      # Package
+      package: package(),
+      
       # Documentation
       name: "ReqLLM",
       source_url: "https://github.com/your_org/req_llm",
@@ -19,6 +22,11 @@ defmodule ReqLLM.MixProject do
         main: "readme",
         extras: [
           "README.md",
+          "guides/getting-started.md",
+          "guides/core-concepts.md",
+          "guides/api-reference.md",
+          "guides/data-structures.md",
+          "guides/capability-testing.md",
           "guides/adding_a_provider.md"
         ],
         groups_for_extras: [
@@ -56,6 +64,15 @@ defmodule ReqLLM.MixProject do
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp package do
+    [
+      description: "Composable Elixir library for AI interactions built on Req",
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/your_org/req_llm"},
+      files: ~w(lib priv mix.exs README.md LICENSE usage-rules.md)
     ]
   end
 

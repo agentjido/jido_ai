@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
   use ExUnit.Case, async: true
-  alias ReqLLM.Test.LiveFixture
+  alias ReqLLM.Test.LiveFixture, as: ReqFixture
+  import ReqFixture
   import ReqLLM.Context
 
   @moduletag :coverage
@@ -17,7 +18,7 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/single_stop", [], fn ->
+        use_fixture("stop_sequences/single_stop", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: ["Number: 5"],
@@ -48,7 +49,7 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/multiple_stops", [], fn ->
+        use_fixture("stop_sequences/multiple_stops", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: ["THE END", "--- FINISHED ---"],
@@ -77,7 +78,7 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/max_four_stops", [], fn ->
+        use_fixture("stop_sequences/max_four_stops", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             # Exactly 4
@@ -109,7 +110,7 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/not_reached", [], fn ->
+        use_fixture("stop_sequences/not_reached", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: ["NEVER_MENTIONED_PHRASE"],
@@ -138,7 +139,7 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/empty_array", [], fn ->
+        use_fixture("stop_sequences/empty_array", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: [],
@@ -165,7 +166,7 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/special_chars", [], fn ->
+        use_fixture("stop_sequences/special_chars", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             stop_sequences: ["}"],
@@ -198,7 +199,7 @@ defmodule ReqLLM.Coverage.Anthropic.StopSequencesTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("stop_sequences/streaming_stop", [], fn ->
+        use_fixture("stop_sequences/streaming_stop", [], fn ->
           ReqLLM.stream_text(model,
             context: context,
             stop_sequences: ["5"],

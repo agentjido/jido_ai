@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
   use ExUnit.Case, async: true
-  alias ReqLLM.Test.LiveFixture
+  alias ReqLLM.Test.LiveFixture, as: ReqFixture
+  import ReqFixture
   import ReqLLM.Context
 
   @moduletag :coverage
@@ -26,7 +27,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/choice_auto", [], fn ->
+        use_fixture("tool_calling/choice_auto", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [weather_tool],
@@ -62,7 +63,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/choice_none", [], fn ->
+        use_fixture("tool_calling/choice_none", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [weather_tool],
@@ -111,7 +112,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/choice_any", [], fn ->
+        use_fixture("tool_calling/choice_any", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [calculator_tool, weather_tool],
@@ -152,7 +153,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/choice_specific", [], fn ->
+        use_fixture("tool_calling/choice_specific", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [calculator_tool, weather_tool],
@@ -194,7 +195,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/no_parallel", [], fn ->
+        use_fixture("tool_calling/no_parallel", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [tool1, tool2],
@@ -228,7 +229,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, first_response} =
-        LiveFixture.use_fixture("tool_calling/initial_call", [], fn ->
+        use_fixture("tool_calling/initial_call", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [weather_tool],
@@ -265,7 +266,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, final_response} =
-        LiveFixture.use_fixture("tool_calling/with_result", [], fn ->
+        use_fixture("tool_calling/with_result", [], fn ->
           ReqLLM.generate_text(model,
             context: extended_context,
             tools: [weather_tool],
@@ -319,7 +320,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/multiple_results", [], fn ->
+        use_fixture("tool_calling/multiple_results", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [weather_tool, time_tool],
@@ -363,7 +364,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/error_result", [], fn ->
+        use_fixture("tool_calling/error_result", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [api_tool],
@@ -409,7 +410,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("tool_calling/unique_ids", [], fn ->
+        use_fixture("tool_calling/unique_ids", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [tool1, tool2],
@@ -448,7 +449,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, first_response} =
-        LiveFixture.use_fixture("tool_calling/get_call_id", [], fn ->
+        use_fixture("tool_calling/get_call_id", [], fn ->
           ReqLLM.generate_text(model,
             context: context,
             tools: [math_tool],
@@ -479,7 +480,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolCallingTest do
         ])
 
       {:ok, final_response} =
-        LiveFixture.use_fixture("tool_calling/matched_id_result", [], fn ->
+        use_fixture("tool_calling/matched_id_result", [], fn ->
           ReqLLM.generate_text(model,
             context: extended_context,
             tools: [math_tool],
