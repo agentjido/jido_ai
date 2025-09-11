@@ -1,348 +1,245 @@
 # ReqLLM
 
-A clean, composable Elixir library for AI interactions built on Req, following [Vercel AI SDK](https://ai-sdk.dev/docs/reference/ai-sdk-core) patterns.
+Composable Elixir library for AI interactions built on Req. Provides unified interface to LLM providers through plugin-based architecture that normalizes provider differences behind canonical data structures and Req's HTTP pipeline.
 
-ReqLLM provides a unified interface to AI providers through a plugin-based architecture that leverages Req's HTTP client capabilities.
+## Architecture
 
-## Features
+**Plugin-Based Normalization**: Each provider is a Req plugin. ReqLLM handles format translation via Codec protocol while Req handles HTTP transport, retries, and middleware.
 
-- **Unified API**: Consistent interface across all AI providers
-- **Plugin Architecture**: Clean separation of provider logic using Req plugins
-- **Vercel AI SDK Alignment**: Familiar patterns for JavaScript developers
-- **Streaming Support**: Real-time text generation with `ReqLLM.stream_text/3`
-- **Tool Calling**: Function calling capabilities across providers
-- **Multi-modal**: Support for text, images, and structured data
-- **Type Safety**: Comprehensive NimbleOptions validation and TypedStruct definitions
-- **Model Metadata**: Rich model information from models.dev integration
+**Provider-Agnostic Data Model**: Unified structures (Context, Message, ContentPart, StreamChunk) work across all providers. Provider-specific formats handled by Codec implementations.
 
-## Installation
+**Vercel AI SDK Patterns**: Familiar `generate_text/stream_text` API with consistent signatures. Bang variants for convenient result unwrapping.
 
-Add `req_llm` to your list of dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:req_llm, "~> 0.1.0"}
-  ]
-end
-```
+**Enhanced Metadata**: Model capabilities, limits, and cost data loaded from models.dev at compile time.
 
 ## Quick Start
 
-### Basic Text Generation
-
 ```elixir
-# Simple text generation
-model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
-{:ok, response} = ReqLLM.generate_text(model, "Hello, how are you?")
-IO.puts(response) # "Hello! I'm doing well, thank you for asking..."
+# Installation
+{:req_llm, "~> 0.1.0"}
+
+# Basic generation  
+{:ok, text} = ReqLLM.generate_text!("anthropic:claude-3-sonnet", "Hello world")
+
+# Streaming
+{:ok, stream} = ReqLLM.stream_text!("anthropic:claude-3-sonnet", "Tell a story")
+stream |> Stream.filter(&(&1.type == :text)) |> Stream.map(&(&1.text)) |> Enum.join()
 
 # With options
 {:ok, response} = ReqLLM.generate_text(
-  model, 
-  "Write a short poem", 
-  temperature: 0.8, 
-  max_tokens: 200
+  "anthropic:claude-3-sonnet",
+  "Write a haiku", 
+  temperature: 0.8,
+  max_tokens: 100
+)
+
+# Usage tracking
+{:ok, text, usage} = 
+  ReqLLM.generate_text("openai:gpt-4o", "Hello")
+  |> ReqLLM.with_usage()
+```
+
+## Model Specifications
+
+Flexible model specification formats:
+
+```elixir
+# String format
+"anthropic:claude-3-sonnet"
+
+# Tuple with options
+{:anthropic, model: "claude-3-sonnet", temperature: 0.7}
+
+# Full struct
+%ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet", temperature: 0.7}
+```
+
+## Key Management
+
+Secure key management via Kagi/JidoKeys integration:
+
+```elixir
+ReqLLM.put_key("anthropic_api_key", "sk-ant-...")
+ReqLLM.put_key("openai_api_key", "sk-...")
+
+# Providers automatically retrieve keys
+{:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello")
+```
+
+## Multimodal Content
+
+Type-safe multimodal content handling:
+
+```elixir
+import ReqLLM.Message.ContentPart
+
+messages = [
+  ReqLLM.Context.user([
+    text("Analyze this image"),
+    image_url("https://example.com/chart.png")
+  ])
+]
+
+{:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet", messages)
+```
+
+## Tool Calling
+
+Function calling with validation:
+
+```elixir
+weather_tool = ReqLLM.Tool.new!(
+  name: "get_weather",
+  description: "Get current weather",
+  parameter_schema: [
+    location: [type: :string, required: true],
+    units: [type: :string, default: "celsius"]
+  ],
+  callback: {WeatherAPI, :fetch_weather}
+)
+
+{:ok, response} = ReqLLM.generate_text(
+  "anthropic:claude-3-sonnet",
+  "What's the weather in Tokyo?",
+  tools: [weather_tool]
 )
 ```
 
-### Streaming Text Generation
+## Streaming
+
+Back-pressure aware streaming with unified chunk format:
 
 ```elixir
-model = ReqLLM.Model.from("anthropic:claude-3-sonnet-20241022")
-{:ok, stream} = ReqLLM.stream_text(model, "Tell me a story about AI", stream: true)
+{:ok, stream} = ReqLLM.stream_text!("anthropic:claude-3-sonnet", "Count to 100")
 
 stream
-|> Stream.each(fn chunk ->
-  case chunk do
-    %ReqLLM.StreamChunk{type: :text, content: text} -> 
-      IO.write(text)
-    %ReqLLM.StreamChunk{type: :meta, data: %{finish_reason: reason}} -> 
-      IO.puts("\n[Finished: #{reason}]")
-    _ -> 
-      :ok
-  end
-end)
+|> Stream.filter(&(&1.type == :text))
+|> Stream.each(&IO.write(&1.text))
 |> Stream.run()
 ```
 
-## ReqLLM.attach/2 - The Core Plugin API
+## Core Plugin API
 
-ReqLLM uses a composable plugin architecture where each provider is a Req plugin:
+Direct access to provider plugins for advanced usage:
 
 ```elixir
-# Create a base request
-request = Req.Request.new(method: :post, url: "/messages")
-
-# Attach provider-specific configuration  
-model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
-configured_request = ReqLLM.attach(request, model)
-
-# Execute the request
-{:ok, response} = Req.request(configured_request)
-
-# Parse the response using the provider's parser
-{:ok, result} = ReqLLM.Providers.Anthropic.parse(response, model)
+request = Req.new()
+|> ReqLLM.attach("anthropic:claude-3-sonnet")
+|> Req.Request.append_request_steps(custom_middleware: &add_tracing/1)
+|> Req.request(json: %{messages: messages})
 ```
 
-This plugin approach enables:
-- **Composability**: Mix and match different provider capabilities
-- **Transparency**: Full control over HTTP requests and responses  
-- **Extensibility**: Easy to add custom request/response middleware
-- **Testing**: Mock any part of the request/response cycle
+## Provider System
 
-## Provider Plugin Architecture
-
-### Basic Provider Implementation
-
-Each provider implements the `ReqLLM.Plugin` behavior:
+Clean provider implementation via DSL:
 
 ```elixir
 defmodule MyProvider do
   use ReqLLM.Provider.DSL,
-    id: :my_provider,
-    base_url: "https://api.myprovider.com/v1",
-    auth: {:header, "authorization", :bearer},
-    metadata: "priv/models_dev/my_provider.json"
+    id: :myprovider,
+    base_url: "https://api.example.com",
+    metadata: "priv/models_dev/myprovider.json"
 
-  @impl ReqLLM.Plugin
-  def attach(request, %ReqLLM.Model{} = model) do
-    api_key = ReqLLM.get_key(:my_provider_api_key)
-    
-    %{request |
-      headers: [
-        {"authorization", "Bearer #{api_key}"},
-        {"content-type", "application/json"}
-        | request.headers
-      ],
-      base_url: default_base_url(),
-      body: build_request_body(model)
-    }
-  end
+  @impl ReqLLM.Provider
+  def attach(request, model, opts), do: configure_request(request, model)
+  
+  @impl ReqLLM.Provider  
+  def parse_response(response, model), do: parse_to_chunks(response.body)
+end
 
-  @impl ReqLLM.Plugin
-  def parse(response, %ReqLLM.Model{} = _model) do
-    case response.body do
-      %{"content" => content} -> {:ok, extract_text(content)}
-      %{"error" => error} -> {:error, ReqLLM.Error.api_error(error)}
-      _ -> {:error, ReqLLM.Error.parse_error("Invalid response")}
-    end
-  end
-
-  # Private helper functions...
+# Codec implementation for format translation
+defimpl ReqLLM.Codec, for: MyProvider.Tagged do
+  def encode(%{context: ctx}), do: convert_to_provider_format(ctx)
+  def decode(%{data: data}), do: convert_to_stream_chunks(data)  
 end
 ```
-
-### Provider DSL Features
-
-The `ReqLLM.Provider.DSL` macro automatically handles:
-
-- **Plugin Registration**: Auto-registers with `ReqLLM.Provider.Registry`
-- **Metadata Loading**: Loads model data from JSON files at compile time
-- **Base URL Configuration**: Provides `default_base_url/0` callback
-- **Error Handling**: Structured error types using Splode
-
-## Advanced Usage
-
-### Tool Calling
-
-```elixir
-# Define tools with NimbleOptions schemas
-weather_tool = %ReqLLM.Tool{
-  name: "get_weather",
-  description: "Get weather for a location",
-  parameters_schema: NimbleOptions.new!(
-    location: [type: :string, required: true],
-    unit: [type: {:in, ["celsius", "fahrenheit"]}, default: "celsius"]
-  )
-}
-
-model = ReqLLM.Model.from("anthropic:claude-3-sonnet-20241022")
-{:ok, response} = ReqLLM.generate_text(
-  model, 
-  "What's the weather in San Francisco?", 
-  tools: [weather_tool]
-)
-
-# Response contains tool calls that can be executed
-```
-
-### Structured Data Generation
-
-```elixir
-# Define output schema
-person_schema = NimbleOptions.new!(
-  name: [type: :string, required: true],
-  age: [type: :integer, required: true],
-  interests: [type: {:list, :string}, default: []]
-)
-
-model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
-{:ok, person} = ReqLLM.generate_object(
-  model,
-  "Create a person profile for a software engineer",
-  schema: person_schema
-)
-
-# person = %{name: "Alex Chen", age: 32, interests: ["programming", "AI", "music"]}
-```
-
-### Multi-modal Inputs
-
-```elixir
-# Image and text input
-image_part = ReqLLM.Message.ContentPart.image("/path/to/image.jpg")
-text_part = ReqLLM.Message.ContentPart.text("What's in this image?")
-
-message = ReqLLM.Message.user([image_part, text_part])
-model = ReqLLM.Model.from("anthropic:claude-3-sonnet-20241022")
-
-{:ok, response} = ReqLLM.generate_text(model, [message])
-```
-
-## Model Specification Formats
-
-ReqLLM supports three flexible formats for specifying models:
-
-### String Format (Simple)
-```elixir
-"anthropic:claude-3-haiku-20240307"
-"anthropic:claude-3-sonnet-20241022"
-```
-
-### Tuple Format (With Options)
-```elixir
-{:anthropic, "claude-3-sonnet-20241022", temperature: 0.7, max_tokens: 1000}
-```
-
-### Model Struct Format (Full Control)
-```elixir
-%ReqLLM.Model{
-  provider: :anthropic,
-  model: "claude-3-sonnet-20241022",
-  temperature: 0.7,
-  max_tokens: 1000,
-  metadata: %{...}  # Enhanced with models.dev data
-}
-```
-
-## Configuration
-
-### Environment Variables
-
-Set your API keys via environment variables:
-
-```bash
-export ANTHROPIC_API_KEY="your-anthropic-key-here"
-```
-
-### Application Configuration
-
-Configure providers in your application config:
-
-```elixir
-config :req_llm,
-  default_provider: :anthropic,
-  default_model: "claude-3-haiku-20240307",
-  request_timeout: 30_000
-```
-
-## Supported Providers
-
-### Anthropic Claude
-- **Models**: Claude 3 family (Haiku, Sonnet, Opus)
-- **Features**: Text generation, streaming, tool calling, multi-modal
-- **API Key**: `ANTHROPIC_API_KEY`
-
-```elixir
-model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
-```
-
-*Additional providers (OpenAI, etc.) can be easily added using the plugin architecture.*
 
 ## Error Handling
 
-ReqLLM uses structured error handling with Splode:
+Structured errors via Splode:
 
 ```elixir
-case ReqLLM.generate_text(model, "Hello") do
-  {:ok, response} -> 
-    IO.puts("Success: #{response}")
-    
-  {:error, %ReqLLM.Error.API.Response{reason: reason}} ->
-    IO.puts("API Error: #{reason}")
-    
-  {:error, %ReqLLM.Error.Parse{reason: reason}} ->
-    IO.puts("Parse Error: #{reason}")
-    
-  {:error, %ReqLLM.Error.Auth{reason: reason}} ->
-    IO.puts("Auth Error: #{reason}")
+case ReqLLM.generate_text("invalid:model", "Hello") do
+  {:ok, response} -> handle_success(response)
+  {:error, %ReqLLM.Error.Invalid.Provider{}} -> handle_bad_provider()
+  {:error, %ReqLLM.Error.API.RateLimit{}} -> handle_rate_limit() 
+  {:error, error} -> handle_other_error(error)
 end
 ```
 
-## Testing
+## Capability Testing
 
-ReqLLM includes comprehensive testing utilities:
+Live testing against provider capabilities:
 
 ```elixir
-# Test provider plugins directly
-test "anthropic provider attaches correct headers" do
-  model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
-  request = Req.Request.new()
-  
-  result = ReqLLM.Providers.Anthropic.attach(request, model)
-  
-  assert {"x-api-key", _} = List.keyfind(result.headers, "x-api-key", 0)
-end
+# Fixture-based testing (default)
+mix test
 
-# Test capability verification
-test "provider supports text generation" do
-  model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
-  assert ReqLLM.Capability.supports?(model, :text_generation)
+# Live API testing  
+LIVE=true mix test
+
+# Capability verification
+test "provider supports streaming" do
+  model = ReqLLM.Model.from!("anthropic:claude-3-sonnet")
+  assert ReqLLM.Model.supports?(model, :streaming)
 end
 ```
 
-## Architecture Benefits
+## Data Structures
 
-ReqLLM's plugin architecture provides several advantages:
+**ReqLLM.Context**: Collection of messages with enumeration support
+**ReqLLM.Message**: Role-based messages with multimodal ContentPart list
+**ReqLLM.Message.ContentPart**: Typed union (text, image, tool_call, reasoning)
+**ReqLLM.Model**: Provider configuration with metadata from models.dev
+**ReqLLM.StreamChunk**: Unified streaming output format
+**ReqLLM.Tool**: Vercel-style function definitions with NimbleOptions validation
 
-1. **Separation of Concerns**: Core logic separate from provider-specific code
-2. **Composability**: Mix different providers and capabilities  
-3. **Testability**: Easy to mock and test individual components
-4. **Extensibility**: Add new providers without changing core code
-5. **Transparency**: Full access to HTTP requests and responses
-6. **Performance**: Minimal overhead with compile-time optimizations
+## Supported Providers
 
-## Comparison to Other Libraries
+**Current**: Anthropic (Claude 3 family)
+**Planned**: OpenAI, Ollama, others via plugin architecture
 
-ReqLLM focuses on simplicity and composability compared to more complex alternatives:
+New providers integrate through:
+1. `ReqLLM.Provider` behavior implementation
+2. `ReqLLM.Codec` protocol for format translation  
+3. Models.dev metadata for capabilities
 
-- **vs jido_ai**: Simpler provider system, fewer abstractions, more direct implementations
-- **vs OpenAI libraries**: Provider-agnostic, unified interface across vendors
-- **vs Custom solutions**: Type-safe, well-tested, following established patterns
+## Documentation
 
-## Contributing
+- [Getting Started](guides/getting-started.md) - Installation and first API calls
+- [Core Concepts](guides/core-concepts.md) - Architecture and design principles  
+- [API Reference](guides/api-reference.md) - Complete function reference
+- [Data Structures](guides/data-structures.md) - Advanced usage patterns
+- [Capability Testing](guides/capability-testing.md) - Testing and verification
+- [Provider System](guides/adding_a_provider.md) - Creating new providers
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Add comprehensive tests for your changes
-4. Ensure `mix quality` passes (formatting, dialyzer, tests)
-5. Commit your changes (`git commit -am 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+## Development
 
-## Vercel AI SDK Compatibility
+```bash
+# Quality checks
+mix quality
 
-ReqLLM closely follows the Vercel AI SDK patterns:
+# Test with fixtures
+mix test
 
-| Vercel AI SDK | ReqLLM Equivalent |
-|---------------|-------------------|
-| `generateText()` | `ReqLLM.generate_text/3` |
-| `streamText()` | `ReqLLM.stream_text/3` |
-| `generateObject()` | `ReqLLM.generate_object/4` |
-| `embed()` | `ReqLLM.embed/3` |
-| `tool()` | `%ReqLLM.Tool{}` struct |
+# Test against live APIs  
+LIVE=true mix test
 
-## License
+# Sync model metadata
+mix req_llm.model_sync
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Features
+
+- **Unified API**: Consistent interface across all providers
+- **Plugin Architecture**: Provider logic as composable Req plugins
+- **Type Safety**: TypedStruct definitions with NimbleOptions validation
+- **Streaming Support**: Back-pressure aware lazy streams
+- **Multimodal**: Text, images, files, reasoning content
+- **Tool Calling**: Function calling with parameter validation
+- **Cost Tracking**: Usage and cost extraction from responses
+- **Metadata Integration**: Enhanced model data from models.dev
+- **Secure Keys**: Kagi/JidoKeys integration for credential management
+- **Capability Testing**: Live verification against advertised capabilities
+
+Built for Elixir developers who need reliable, extensible AI integration without abstractions that obscure the underlying HTTP layer.

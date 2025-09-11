@@ -8,7 +8,8 @@ defmodule ReqLLM.Coverage.Anthropic.StreamingTest do
   """
   use ExUnit.Case, async: false
 
-  alias ReqLLM.Test.LiveFixture
+  alias ReqLLM.Test.LiveFixture, as: ReqFixture
+  import ReqFixture
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -17,7 +18,7 @@ defmodule ReqLLM.Coverage.Anthropic.StreamingTest do
 
   test "basic streaming" do
     result =
-      LiveFixture.use_fixture(:anthropic, "basic_streaming", fn ->
+      use_fixture(:anthropic, "basic_streaming", fn ->
         ctx = ReqLLM.Context.new([ReqLLM.Context.user("Say hello")])
         ReqLLM.stream_text(@model, ctx, max_tokens: 10)
       end)
@@ -30,7 +31,7 @@ defmodule ReqLLM.Coverage.Anthropic.StreamingTest do
 
   test "streaming with system prompt" do
     result =
-      LiveFixture.use_fixture(:anthropic, "streaming_system_prompt", fn ->
+      use_fixture(:anthropic, "streaming_system_prompt", fn ->
         ctx =
           ReqLLM.Context.new([
             ReqLLM.Context.system("Reply briefly."),

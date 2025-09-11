@@ -8,7 +8,8 @@ defmodule ReqLLM.Coverage.Anthropic.ToolsTest do
   """
   use ExUnit.Case, async: false
 
-  alias ReqLLM.Test.LiveFixture
+  alias ReqLLM.Test.LiveFixture, as: ReqFixture
+  import ReqFixture
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -32,7 +33,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolsTest do
 
   test "basic tool calling" do
     result =
-      LiveFixture.use_fixture(:anthropic, "basic_tool_calling", fn ->
+      use_fixture(:anthropic, "basic_tool_calling", fn ->
         ctx =
           ReqLLM.Context.new([
             ReqLLM.Context.user("What's the weather in Tokyo?")
@@ -49,7 +50,7 @@ defmodule ReqLLM.Coverage.Anthropic.ToolsTest do
 
   test "tool choice parameter" do
     result =
-      LiveFixture.use_fixture(:anthropic, "tool_choice_test", fn ->
+      use_fixture(:anthropic, "tool_choice_test", fn ->
         ctx =
           ReqLLM.Context.new([
             ReqLLM.Context.user("What's the weather in Paris?")

@@ -1,6 +1,7 @@
 defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
   use ExUnit.Case, async: true
-  alias ReqLLM.Test.LiveFixture
+  alias ReqLLM.Test.LiveFixture, as: ReqFixture
+  import ReqFixture
   import ReqLLM.Context
 
   @moduletag :coverage
@@ -19,7 +20,7 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("system_prompts/string_system", [], fn ->
+        use_fixture("system_prompts/string_system", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 100)
         end)
 
@@ -50,7 +51,7 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("system_prompts/array_system", [], fn ->
+        use_fixture("system_prompts/array_system", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 150)
         end)
 
@@ -73,7 +74,7 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
         ])
 
       {:ok, response} =
-        LiveFixture.use_fixture("system_prompts/no_system", [], fn ->
+        use_fixture("system_prompts/no_system", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 50)
         end)
 
@@ -100,7 +101,7 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
 
       # This should work because our provider converts system messages properly
       {:ok, response} =
-        LiveFixture.use_fixture("system_prompts/converted_system", [], fn ->
+        use_fixture("system_prompts/converted_system", [], fn ->
           ReqLLM.generate_text(model, context: context, max_tokens: 50)
         end)
 
@@ -112,11 +113,13 @@ defmodule ReqLLM.Coverage.Anthropic.SystemPromptsTest do
 
       # Context validation should prevent multiple system messages
       assert_raise ArgumentError, ~r/should have exactly one system message/i, fn ->
-        context = ReqLLM.Context.new([
-          system("First system message"),
-          system("Second system message"),
-          user("Hello")
-        ])
+        context =
+          ReqLLM.Context.new([
+            system("First system message"),
+            system("Second system message"),
+            user("Hello")
+          ])
+
         ReqLLM.Context.validate!(context)
       end
     end

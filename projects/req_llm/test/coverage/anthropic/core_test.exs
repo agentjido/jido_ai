@@ -9,7 +9,8 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
   """
   use ExUnit.Case, async: false
 
-  alias ReqLLM.Test.LiveFixture
+  alias ReqLLM.Test.LiveFixture, as: ReqFixture
+  import ReqFixture
 
   @moduletag :coverage
   @moduletag :anthropic
@@ -18,7 +19,7 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
 
   test "basic completion without system prompt" do
     result =
-      LiveFixture.use_fixture(:anthropic, "basic_completion", fn ->
+      use_fixture(:anthropic, "basic_completion", fn ->
         ctx = ReqLLM.Context.new([ReqLLM.Context.user("Hello!")])
         ReqLLM.generate_text(@model, ctx, max_tokens: 5)
       end)
@@ -31,7 +32,7 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
 
   test "completion with system prompt" do
     result =
-      LiveFixture.use_fixture(:anthropic, "system_prompt_completion", fn ->
+      use_fixture(:anthropic, "system_prompt_completion", fn ->
         ctx =
           ReqLLM.Context.new([
             ReqLLM.Context.system("You are terse. Reply with ONE word."),
@@ -49,7 +50,7 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
 
   test "temperature parameter" do
     result =
-      LiveFixture.use_fixture(:anthropic, "temperature_test", fn ->
+      use_fixture(:anthropic, "temperature_test", fn ->
         ReqLLM.generate_text(
           @model,
           "Say exactly: TEMPERATURE_TEST",
@@ -66,7 +67,7 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
 
   test "max_tokens parameter" do
     result =
-      LiveFixture.use_fixture(:anthropic, "max_tokens_test", fn ->
+      use_fixture(:anthropic, "max_tokens_test", fn ->
         ReqLLM.generate_text(
           @model,
           "Write a story",
@@ -84,7 +85,7 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
 
   test "string prompt (legacy format)" do
     result =
-      LiveFixture.use_fixture(:anthropic, "string_prompt", fn ->
+      use_fixture(:anthropic, "string_prompt", fn ->
         ReqLLM.generate_text(@model, "Hello world!", max_tokens: 5)
       end)
 
