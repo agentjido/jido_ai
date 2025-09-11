@@ -99,7 +99,11 @@ defmodule ReqLLM.Generation do
     with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
          {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         request = Req.new(method: :post, body: prepare_request_body(messages, validated_opts)),
+         request = Req.new(
+           method: :post, 
+           body: prepare_request_body(messages, validated_opts),
+           receive_timeout: 30_000
+         ),
          {:ok, configured_request} <- ReqLLM.attach(request, model),
          {:ok, %Req.Response{} = response} <- Req.request(configured_request),
          {:ok, chunks} <- provider_module.parse_response(response, model) do

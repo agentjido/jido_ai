@@ -1,24 +1,23 @@
-defmodule ReqLLM.Providers.Anthropic do
+defmodule ReqLLM.Providers.OpenAI do
   @moduledoc """
-  Anthropic provider implementation using the Provider behavior.
+  OpenAI provider implementation using the Provider behavior.
 
-  Supports Anthropic's Messages API with features including:
-  - Text generation with Claude models
+  Supports OpenAI's Chat Completions API with features including:
+  - Text generation with GPT models
   - Streaming responses
   - Tool calling
-  - Multi-modal inputs (text and images)
-  - Thinking/reasoning tokens
+  - Multi-modal inputs (text and images for vision models)
 
   ## Configuration
 
-  Set your Anthropic API key via environment variable:
+  Set your OpenAI API key via environment variable:
 
-      export ANTHROPIC_API_KEY="your-api-key-here"
+      export OPENAI_API_KEY="your-api-key-here"
 
   ## Examples
 
       # Simple text generation
-      model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
+      model = ReqLLM.Model.from("openai:gpt-4o-mini")
       {:ok, response} = ReqLLM.generate_text(model, "Hello!")
 
       # Streaming
@@ -33,9 +32,9 @@ defmodule ReqLLM.Providers.Anthropic do
   @behaviour ReqLLM.Provider
 
   use ReqLLM.Provider.DSL,
-    id: :anthropic,
-    base_url: "https://api.anthropic.com/v1",
-    metadata: "priv/models_dev/anthropic.json"
+    id: :openai,
+    base_url: "https://api.openai.com/v1",
+    metadata: "priv/models_dev/openai.json"
 
   defstruct [:context]
 
@@ -57,30 +56,32 @@ defmodule ReqLLM.Providers.Anthropic do
 
     unless api_key && api_key != "" do
       raise ArgumentError,
-            "Anthropic API key required. Set via JidoKeys.put(#{inspect(jido_key)}, key)"
+            "OpenAI API key required. Set via JidoKeys.put(#{inspect(jido_key)}, key)"
     end
 
     # Extract context from opts or build from legacy format
     context = extract_or_build_context(request.body, opts)
+    
+    # Extract other params from request body if present
+    body_params = extract_body_params(request.body)
 
     # Protocol handles message translation
     body =
       context
       |> ReqLLM.Context.wrap(model)
       |> ReqLLM.Context.Codec.encode()
-      |> add_model_params(model, opts)
-      |> add_sampling_params(opts)
+      |> add_model_params(model, Keyword.merge(body_params, opts))
+      |> add_sampling_params(Keyword.merge(body_params, opts))
 
     base_url = opts[:base_url] || default_base_url()
     stream = opts[:stream] || false
 
     request
-    |> Req.Request.put_header("x-api-key", api_key)
+    |> Req.Request.put_header("authorization", "Bearer #{api_key}")
     |> Req.Request.put_header("content-type", "application/json")
-    |> Req.Request.put_header("anthropic-version", "2023-06-01")
     |> Req.Request.merge_options(base_url: base_url)
     |> Map.put(:body, Jason.encode!(body))
-    |> Map.put(:url, URI.parse("/messages"))
+    |> Map.put(:url, URI.parse("/chat/completions"))
     |> maybe_install_stream_steps(stream)
   end
 
@@ -131,14 +132,22 @@ defmodule ReqLLM.Providers.Anthropic do
   defp maybe_install_stream_steps(req, _stream), do: req
 
   defp get_env_var_name do
-    with {:ok, metadata} <- ReqLLM.Provider.Registry.get_provider_metadata(:anthropic),
+    with {:ok, metadata} <- ReqLLM.Provider.Registry.get_provider_metadata(:openai),
          [env_var | _] <-
            get_in(metadata, ["provider", "env"]) || get_in(metadata, [:provider, :env]) do
       env_var
     else
-      _ -> "ANTHROPIC_API_KEY"
+      _ -> "OPENAI_API_KEY"
     end
   end
+
+  defp extract_body_params(body) when is_map(body) do
+    body
+    |> Map.drop([:messages])
+    |> Enum.map(fn {k, v} -> {k, v} end)
+  end
+  
+  defp extract_body_params(_), do: []
 
   defp extract_or_build_context(body, opts) do
     cond do
@@ -183,7 +192,7 @@ defmodule ReqLLM.Providers.Anthropic do
 
     body
     |> Map.put(:model, model.model)
-    |> Map.put(:max_tokens, opts[:max_tokens] || model.max_tokens || 4096)
+    |> maybe_add_max_tokens(opts[:max_tokens] || model.max_tokens)
     |> maybe_add_temperature(opts[:temperature] || model.temperature)
     |> maybe_add_tools(tools)
   end
@@ -197,6 +206,9 @@ defmodule ReqLLM.Providers.Anthropic do
     opts[:tools] || []
   end
 
+  defp maybe_add_max_tokens(body, nil), do: body
+  defp maybe_add_max_tokens(body, max_tokens), do: Map.put(body, :max_tokens, max_tokens)
+
   defp maybe_add_temperature(body, nil), do: body
   defp maybe_add_temperature(body, temperature), do: Map.put(body, :temperature, temperature)
 
@@ -205,7 +217,7 @@ defmodule ReqLLM.Providers.Anthropic do
   defp maybe_add_tools(body, tools) do
     formatted_tools =
       Enum.map(tools, fn
-        %ReqLLM.Tool{} = tool -> ReqLLM.Tool.to_schema(tool, :anthropic)
+        %ReqLLM.Tool{} = tool -> ReqLLM.Tool.to_schema(tool, :openai)
         tool -> tool
       end)
 
@@ -227,13 +239,16 @@ defmodule ReqLLM.Providers.Anthropic do
     Enum.reduce(lines, %{}, fn line, acc ->
       case String.split(line, ":", parts: 2) do
         ["data", data] ->
-          case Jason.decode(String.trim(data)) do
-            {:ok, json} -> Map.put(acc, :data, json)
-            {:error, _} -> Map.put(acc, :data, String.trim(data))
-          end
+          case String.trim(data) do
+            "[DONE]" ->
+              Map.put(acc, :done, true)
 
-        ["event", event] ->
-          Map.put(acc, :event, String.trim(event))
+            trimmed ->
+              case Jason.decode(trimmed) do
+                {:ok, json} -> Map.put(acc, :data, json)
+                {:error, _} -> Map.put(acc, :data, trimmed)
+              end
+          end
 
         _ ->
           acc
@@ -242,32 +257,29 @@ defmodule ReqLLM.Providers.Anthropic do
     |> convert_to_stream_chunk()
   end
 
+  defp convert_to_stream_chunk(%{done: true}), do: nil
+
   defp convert_to_stream_chunk(%{data: data} = _event) do
     case data do
-      %{"type" => "content_block_delta", "delta" => %{"text" => text}} ->
-        ReqLLM.StreamChunk.text(text)
-
-      %{"type" => "content_block_delta", "delta" => %{"partial_json" => json}} ->
-        ReqLLM.StreamChunk.text(json)
+      %{"choices" => [%{"delta" => %{"content" => content}} | _]} when is_binary(content) ->
+        ReqLLM.StreamChunk.text(content)
 
       %{
-        "type" => "content_block_start",
-        "content_block" => %{"type" => "tool_use", "name" => name}
+        "choices" => [
+          %{"delta" => %{"tool_calls" => [%{"function" => %{"name" => name}} | _]}} | _
+        ]
       } ->
         ReqLLM.StreamChunk.tool_call(name, %{})
 
-      %{"type" => "content_block_delta", "delta" => %{"type" => "tool_use"}} ->
-        nil
+      %{
+        "choices" => [
+          %{"delta" => %{"tool_calls" => [%{"function" => %{"arguments" => args}} | _]}} | _
+        ]
+      } ->
+        ReqLLM.StreamChunk.text(args)
 
-      %{"type" => "message_delta", "delta" => %{"stop_reason" => reason}} ->
+      %{"choices" => [%{"finish_reason" => reason} | _]} when not is_nil(reason) ->
         ReqLLM.StreamChunk.meta(%{finish_reason: reason})
-
-      %{"type" => "message_stop"} ->
-        ReqLLM.StreamChunk.meta(%{finish_reason: "stop"})
-
-      # Handle thinking blocks if present in future Claude models
-      %{"type" => "thinking_block_delta", "delta" => %{"text" => text}} ->
-        ReqLLM.StreamChunk.thinking(text)
 
       _ ->
         nil

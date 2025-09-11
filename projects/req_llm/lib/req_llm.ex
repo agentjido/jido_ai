@@ -80,7 +80,7 @@ defmodule ReqLLM do
   @spec put_key(atom() | String.t(), term()) :: :ok
   def put_key(key, value) do
     normalized_key = normalize_key(key)
-    Kagi.put(normalized_key, value)
+    JidoKeys.put(normalized_key, value)
   end
 
   @doc """
@@ -101,7 +101,7 @@ defmodule ReqLLM do
   @spec get_key(atom() | String.t()) :: String.t() | nil
   def get_key(key) do
     normalized_key = normalize_key(key)
-    Kagi.get(normalized_key, nil)
+    JidoKeys.get(normalized_key, nil)
   end
 
   # Private helper for key normalization
