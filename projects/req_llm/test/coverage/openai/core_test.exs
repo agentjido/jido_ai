@@ -25,9 +25,10 @@ defmodule ReqLLM.Coverage.OpenAI.CoreTest do
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
   end
 
   test "completion with system prompt" do
@@ -43,9 +44,10 @@ defmodule ReqLLM.Coverage.OpenAI.CoreTest do
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
   end
 
   test "temperature parameter" do
@@ -60,9 +62,10 @@ defmodule ReqLLM.Coverage.OpenAI.CoreTest do
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
   end
 
   test "max_tokens parameter" do
@@ -76,11 +79,12 @@ defmodule ReqLLM.Coverage.OpenAI.CoreTest do
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
     # Should be short due to max_tokens limit
-    assert String.length(resp.body) < 100
+    assert String.length(text) < 100
   end
 
   test "string prompt (legacy format)" do
@@ -90,8 +94,9 @@ defmodule ReqLLM.Coverage.OpenAI.CoreTest do
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
   end
 end

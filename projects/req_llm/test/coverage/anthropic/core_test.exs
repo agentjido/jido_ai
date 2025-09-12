@@ -1,12 +1,10 @@
-defmodule ReqLLM.Coverage.Anthropic.CoreTest do
+defmodule ReqLLM.Coverage.Anthropic.CoreNewTest do
   @moduledoc """
-  Core Anthropic API feature coverage tests.
-
-  Simple, direct tests for basic functionality without complex macros.
-
-  Run with LIVE=true to test against live API and capture fixtures.
-  Otherwise uses cached fixtures for fast, reliable testing.
+  First consolidated Anthropics test.
+  Uses the LiveFixture helper so it works in both offline (fixture) and
+  LIVE=true modes.
   """
+
   use ExUnit.Case, async: false
 
   alias ReqLLM.Test.LiveFixture, as: ReqFixture
@@ -25,9 +23,11 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
   end
 
   test "completion with system prompt" do
@@ -43,55 +43,47 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
   end
 
-  test "temperature parameter" do
+  test "temperature and sampling parameters" do
     result =
-      use_fixture(:anthropic, "temperature_test", fn ->
+      use_fixture(:anthropic, "sampling_params", fn ->
         ReqLLM.generate_text(
           @model,
-          "Say exactly: TEMPERATURE_TEST",
+          "Count to 3",
           temperature: 0.0,
+          top_p: 0.9,
           max_tokens: 10
         )
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
   end
 
-  test "max_tokens parameter" do
+  test "stop sequences" do
     result =
-      use_fixture(:anthropic, "max_tokens_test", fn ->
+      use_fixture(:anthropic, "stop_sequences", fn ->
         ReqLLM.generate_text(
           @model,
-          "Write a story",
-          max_tokens: 5
+          "Count from 1 to 10, then say STOP",
+          stop_sequences: ["STOP"],
+          max_tokens: 50
         )
       end)
 
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
-    # Should be short due to max_tokens limit
-    assert String.length(resp.body) < 100
-  end
-
-  test "string prompt (legacy format)" do
-    result =
-      use_fixture(:anthropic, "string_prompt", fn ->
-        ReqLLM.generate_text(@model, "Hello world!", max_tokens: 5)
-      end)
-
-    {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
+    refute String.contains?(text, "STOP")
   end
 end
