@@ -1,11 +1,11 @@
 defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.OpenAI do
-  def encode(%ReqLLM.Providers.OpenAI{context: ctx}) do
+  def encode_request(%ReqLLM.Providers.OpenAI{context: ctx}) do
     %{
       messages: encode_messages(ctx)
     }
   end
 
-  def decode(%ReqLLM.Providers.OpenAI{context: %{"choices" => choices}}) do
+  def decode_response(%ReqLLM.Providers.OpenAI{context: %{"choices" => choices}}) do
     choices
     |> Enum.flat_map(&decode_choice/1)
     |> Enum.reject(&is_nil/1)

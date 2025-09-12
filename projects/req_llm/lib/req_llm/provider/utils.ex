@@ -13,14 +13,6 @@ defmodule ReqLLM.Provider.Utils do
       iex> messages = [%{role: "user", content: "Hi"}]
       iex> ReqLLM.Provider.Utils.normalize_messages(messages)
       [%{role: "user", content: "Hi"}]
-
-      iex> spec = %{default_model: "gpt-4", models: %{"gpt-3.5" => %{}, "gpt-4" => %{}}}
-      iex> ReqLLM.Provider.Utils.default_model(spec)
-      "gpt-4"
-
-      iex> spec = %{default_model: nil, models: %{"claude-3-haiku" => %{}, "claude-3-opus" => %{}}}
-      iex> ReqLLM.Provider.Utils.default_model(spec)
-      "claude-3-haiku"
   """
 
   @doc """
@@ -57,210 +49,6 @@ defmodule ReqLLM.Provider.Utils do
 
   def normalize_messages(prompt) do
     [%{role: "user", content: to_string(prompt)}]
-  end
-
-  @doc """
-  Gets the default model for a provider spec.
-
-  Falls back to the first available model if no default is specified.
-
-  ## Parameters
-
-  - `spec` - Provider spec struct with `:default_model` and `:models` fields
-
-  ## Returns
-
-  The default model string, or `nil` if no models are available.
-
-  ## Examples
-
-      iex> spec = %{default_model: "gpt-4", models: %{"gpt-3.5" => %{}, "gpt-4" => %{}}}
-      iex> ReqLLM.Provider.Utils.default_model(spec)
-      "gpt-4"
-
-      iex> spec = %{default_model: nil, models: %{"model-a" => %{}, "model-b" => %{}}}
-      iex> ReqLLM.Provider.Utils.default_model(spec)
-      "model-a"
-
-      iex> spec = %{default_model: nil, models: %{}}
-      iex> ReqLLM.Provider.Utils.default_model(spec)
-      nil
-  """
-  @spec default_model(map()) :: binary() | nil
-  def default_model(spec) do
-    spec.default_model ||
-      case Map.keys(spec.models) do
-        [first_model | _] -> first_model
-        [] -> nil
-      end
-  end
-
-  @doc """
-  Creates standard HTTP headers for JSON API requests.
-
-  ## Parameters
-
-  - `extra_headers` - Optional list of additional header tuples to include
-
-  ## Returns
-
-  A list of header tuples with content-type set to application/json.
-
-  ## Examples
-
-      iex> ReqLLM.Provider.Utils.json_headers()
-      [{"content-type", "application/json"}]
-
-      iex> ReqLLM.Provider.Utils.json_headers([{"authorization", "Bearer token"}])
-      [{"content-type", "application/json"}, {"authorization", "Bearer token"}]
-  """
-  @spec json_headers(list()) :: list()
-  def json_headers(extra_headers \\ []) do
-    [{"content-type", "application/json"}] ++ extra_headers
-  end
-
-  @doc """
-  Parses error responses into ReqLLM.Error.API.Response exceptions.
-
-  Handles both structured error responses with message fields and fallback
-  to HTTP status codes.
-
-  ## Parameters
-
-  - `status` - HTTP status code
-  - `body` - Response body (map or other)
-
-  ## Returns
-
-  A `ReqLLM.Error.API.Response` exception struct.
-
-  ## Examples
-
-      iex> body = %{"error" => %{"message" => "Invalid API key"}}
-      iex> error = ReqLLM.Provider.Utils.parse_error_response(401, body)
-      iex> error.reason
-      "Invalid API key"
-
-      iex> error = ReqLLM.Provider.Utils.parse_error_response(500, %{})
-      iex> error.reason
-      "HTTP 500"
-  """
-  @spec parse_error_response(integer(), any()) :: ReqLLM.Error.API.Response.t()
-  def parse_error_response(status, body) do
-    error_message =
-      case body do
-        %{"error" => %{"message" => message}} -> message
-        _ -> "HTTP #{status}"
-      end
-
-    ReqLLM.Error.API.Response.exception(reason: error_message, status: status)
-  end
-
-  @doc """
-  Parses Server-Sent Event chunks for streaming responses.
-
-  Common logic for parsing SSE format used by both OpenAI and Anthropic.
-
-  ## Parameters
-
-  - `body` - Raw SSE response body
-  - `filter_event` - Event type to filter for (e.g., "data", "message")
-  - `extract_fn` - Function to extract content from parsed data
-
-  ## Returns
-
-  `{:ok, combined_content}` or `{:error, reason}`.
-
-  ## Examples
-
-      iex> body = "event: data\\ndata: {\\"choices\\": [{\\"delta\\": {\\"content\\": \\"Hello\\"}}]}\\n\\n"
-      iex> extract_fn = fn data -> get_in(data, ["choices", Access.at(0), "delta", "content"]) end
-      iex> ReqLLM.Provider.Utils.parse_sse_stream(body, "data", extract_fn)
-      {:ok, "Hello"}
-  """
-  @spec parse_sse_stream(binary(), binary() | nil, function()) ::
-          {:ok, binary()} | {:error, ReqLLM.Error.API.Response.t()}
-  def parse_sse_stream(body, filter_event, extract_fn) do
-    case ServerSentEvents.parse(body) do
-      {:ok, {events, _rest}} ->
-        if Enum.empty?(events) do
-          {:error,
-           ReqLLM.Error.API.Response.exception(reason: "No events found in streaming response")}
-        else
-          content_parts =
-            events
-            |> Enum.filter(&(&1.type == nil or &1.type == filter_event))
-            |> Enum.flat_map(& &1.lines)
-            |> Enum.reject(&(&1 in [nil, "", "[DONE]"]))
-            |> Enum.map(&Jason.decode/1)
-            |> Enum.filter(&match?({:ok, _}, &1))
-            |> Enum.map(fn {:ok, data} -> data end)
-            |> Enum.map(extract_fn)
-            |> Enum.filter(&is_binary/1)
-
-          case content_parts do
-            [] ->
-              {:error,
-               ReqLLM.Error.API.Response.exception(
-                 reason: "No content found in streaming response"
-               )}
-
-            parts ->
-              {:ok, Enum.join(parts, "")}
-          end
-        end
-
-      {:error, reason} ->
-        {:error,
-         ReqLLM.Error.API.Response.exception(reason: "SSE parse error: #{inspect(reason)}")}
-    end
-  end
-
-  @doc """
-  Safely parses JSON chunks from streaming data.
-
-  Handles malformed JSON and filters out empty or control chunks.
-
-  ## Parameters
-
-  - `raw_chunk` - Raw streaming chunk data
-
-  ## Returns
-
-  `{:ok, [parsed_data]}` or `{:error, reason}`.
-
-  ## Examples
-
-      iex> chunk = "data: {\\"test\\": \\"value\\"}\\n\\n"
-      iex> ReqLLM.Provider.Utils.parse_json_chunks(chunk)
-      {:ok, [%{"test" => "value"}]}
-  """
-  @spec parse_json_chunks(iodata()) :: {:ok, [map()]} | {:error, ReqLLM.Error.API.Response.t()}
-  def parse_json_chunks(raw_chunk) do
-    lines =
-      raw_chunk
-      |> IO.iodata_to_binary()
-      |> String.split("\n")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-
-    parsed_chunks =
-      lines
-      |> Enum.filter(&String.starts_with?(&1, "data:"))
-      |> Enum.map(&String.slice(&1, 5..-1//1))
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 in ["", "[DONE]"]))
-      |> Enum.map(&Jason.decode/1)
-
-    case Enum.find(parsed_chunks, &match?({:error, _}, &1)) do
-      {:error, reason} ->
-        {:error,
-         ReqLLM.Error.API.Response.exception(reason: "JSON decode error: #{inspect(reason)}")}
-
-      nil ->
-        valid_chunks = Enum.map(parsed_chunks, fn {:ok, data} -> data end)
-        {:ok, valid_chunks}
-    end
   end
 
   @doc """
@@ -360,32 +148,6 @@ defmodule ReqLLM.Provider.Utils do
   end
 
   @doc """
-  Extracts only generation options from a mixed options list.
-
-  Unlike `ReqLLM.Provider.Options.extract_provider_options/1`, this returns
-  only the generation options without the unused remainder.
-
-  ## Parameters
-
-  - `opts` - Mixed options list
-
-  ## Returns
-
-  Keyword list containing only generation options.
-
-  ## Examples
-
-      iex> mixed_opts = [temperature: 0.7, custom_param: "value", max_tokens: 100]
-      iex> ReqLLM.Provider.Utils.extract_generation_opts(mixed_opts)
-      [temperature: 0.7, max_tokens: 100]
-  """
-  @spec extract_generation_opts(keyword()) :: keyword()
-  def extract_generation_opts(opts) do
-    {generation_opts, _rest} = ReqLLM.Provider.Options.extract_provider_options(opts)
-    generation_opts
-  end
-
-  @doc """
   Adds context to options if present in user options, with type validation.
 
   ## Parameters
@@ -459,57 +221,6 @@ defmodule ReqLLM.Provider.Utils do
   def ensure_parsed_body(body), do: body
 
   @doc """
-  Gets the environment variable key for a provider's API authentication.
-
-  Tries to get the key from provider metadata first, then falls back
-  to the provider's `default_env_key/0` callback if implemented.
-
-  ## Parameters
-
-  - `provider_id` - Provider atom identifier (e.g., `:anthropic`)
-
-  ## Returns
-
-  The environment variable name string, or nil if not found.
-
-  ## Examples
-
-      iex> ReqLLM.Provider.Utils.get_env_key(:anthropic)
-      "ANTHROPIC_API_KEY"
-
-      iex> ReqLLM.Provider.Utils.get_env_key(:unknown)
-      nil
-  """
-  @spec get_env_key(atom()) :: String.t() | nil
-  def get_env_key(provider_id) when is_atom(provider_id) do
-    # Try metadata first
-    case ReqLLM.Provider.Registry.get_provider_metadata(provider_id) do
-      {:ok, metadata} ->
-        case get_in(metadata, ["provider", "env"]) || get_in(metadata, [:provider, :env]) do
-          [env_var | _] when is_binary(env_var) -> env_var
-          _ -> try_provider_default_env_key(provider_id)
-        end
-
-      _ ->
-        try_provider_default_env_key(provider_id)
-    end
-  end
-
-  defp try_provider_default_env_key(provider_id) do
-    case ReqLLM.Provider.get(provider_id) do
-      {:ok, provider_module} ->
-        if function_exported?(provider_module, :default_env_key, 0) do
-          provider_module.default_env_key()
-        else
-          nil
-        end
-
-      _ ->
-        nil
-    end
-  end
-
-  @doc """
   Prepares provider options using a clean pipeline approach.
 
   This is the main helper that providers can use to process user options
@@ -535,7 +246,7 @@ defmodule ReqLLM.Provider.Utils do
   @spec prepare_options!(module(), ReqLLM.Model.t(), keyword()) :: keyword()
   def prepare_options!(provider_mod, %ReqLLM.Model{} = model, user_opts) do
     user_opts
-    |> extract_generation_opts()
+    |> ReqLLM.Provider.Options.extract_generation_opts()
     |> reject_unknown!(provider_mod.supported_provider_options())
     |> validate_subset!(provider_mod.supported_provider_options())
     |> then(&Keyword.merge(provider_mod.default_provider_opts(), &1))

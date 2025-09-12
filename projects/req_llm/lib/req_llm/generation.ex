@@ -35,7 +35,6 @@ defmodule ReqLLM.Generation do
                       tools: [type: :any, doc: "List of tool definitions"],
                       tool_choice: [
                         type: {:or, [:string, :atom, :map]},
-                        default: "auto",
                         doc: "Tool choice strategy"
                       ],
                       system_prompt: [type: :string, doc: "System prompt to prepend"],
@@ -110,7 +109,7 @@ defmodule ReqLLM.Generation do
            ),
          configured_request <- provider_module.attach(request, model, request_options),
          {:ok, %Req.Response{body: tagged_response}} <- Req.request(configured_request),
-         {:ok, response} <- Response.decode(tagged_response, model) do
+         {:ok, response} <- Response.decode_response(tagged_response, model) do
       {:ok, response}
     end
   end
@@ -179,7 +178,7 @@ defmodule ReqLLM.Generation do
          request = Req.new(method: :post),
          configured_request <- provider_module.attach(request, model, request_options),
          {:ok, %Req.Response{body: tagged_response}} <- Req.request(configured_request),
-         {:ok, response} <- Response.decode(tagged_response, model) do
+         {:ok, response} <- Response.decode_response(tagged_response, model) do
       {:ok, response}
     end
   end

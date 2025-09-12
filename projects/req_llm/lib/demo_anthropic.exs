@@ -55,17 +55,59 @@ defmodule AnthropicDemo do
         IO.puts("✅ Raw request successful!")
         IO.puts("📊 HTTP Status: #{response.status}")
 
-        # Get raw JSON data directly (no wrapping anymore)
+        # Get raw JSON data and wrap it for proper decoding
         raw_data = response.body
+        IO.puts("📄 Raw response data keys: #{inspect(Map.keys(raw_data))}")
+        IO.puts("📄 Raw response content: #{inspect(raw_data["content"])}")
+        IO.puts("📄 Raw response usage: #{inspect(raw_data["usage"])}")
 
-        # Test direct decode (zero-ceremony API) using raw JSON data
-        IO.puts("📄 Raw response data: #{inspect(raw_data)}")
-        IO.puts("🔄 Testing zero-ceremony direct decode...")
+        # Test direct decode using the provider's wrap_response function
+        IO.puts("🔄 Testing zero-ceremony direct decode with wrapped response...")
 
-        case ReqLLM.Response.decode(raw_data, model) do
+        # Try both approaches: direct decode and wrapped decode
+        IO.puts("🔄 Testing direct decode (zero-ceremony API)...")
+
+        case ReqLLM.Response.Codec.decode_response(raw_data, model) do
+          {:ok, decoded_response} ->
+            IO.puts("✅ Direct decode successful!")
+            IO.puts("📝 Response text: #{ReqLLM.Response.text(decoded_response)}")
+            IO.puts("📊 Usage: #{inspect(ReqLLM.Response.usage(decoded_response))}")
+
+            IO.puts(
+              "🏁 Finish reason: #{inspect(ReqLLM.Response.finish_reason(decoded_response))}"
+            )
+
+          {:error, error} ->
+            IO.puts("❌ Direct decode failed:")
+            IO.inspect(error, pretty: true)
+        end
+
+        IO.puts("\n🔄 Testing wrapped decode (via ReqLLM.Response.decode)...")
+
+        wrapped_response = ReqLLM.Providers.Anthropic.wrap_response(raw_data)
+        IO.puts("🔧 DEBUG: Wrapped response: #{inspect(wrapped_response)}")
+
+        case ReqLLM.Response.decode_response(wrapped_response, model) do
           {:ok, decoded_response} ->
             IO.puts("✅ Zero-ceremony decode successful!")
-            IO.puts("📝 Direct decode response text: #{ReqLLM.Response.text(decoded_response)}")
+            IO.puts("📝 Response text: #{ReqLLM.Response.text(decoded_response)}")
+            IO.puts("📊 Usage: #{inspect(ReqLLM.Response.usage(decoded_response))}")
+
+            IO.puts(
+              "🏁 Finish reason: #{inspect(ReqLLM.Response.finish_reason(decoded_response))}"
+            )
+
+            # Debug: show message content structure
+            if decoded_response.message do
+              IO.puts("🔍 Message content parts: #{length(decoded_response.message.content)}")
+
+              Enum.with_index(decoded_response.message.content, 1)
+              |> Enum.each(fn {part, idx} ->
+                IO.puts("   #{idx}. #{inspect(part)}")
+              end)
+            else
+              IO.puts("❌ No message in response")
+            end
 
           {:error, error} ->
             IO.puts("❌ Zero-ceremony decode failed:")
@@ -73,7 +115,7 @@ defmodule AnthropicDemo do
         end
 
         IO.puts("\n✨ Zero-ceremony API achieved!")
-        IO.puts("📋 No wrap_response needed - direct protocol dispatch on Map type")
+        IO.puts("📋 Response wrapped and decoded using provider protocol")
 
       {:error, error} ->
         IO.puts("❌ Raw request failed:")
@@ -116,17 +158,24 @@ defmodule AnthropicDemo do
         IO.puts("✅ Context-based request successful!")
         IO.puts("📊 HTTP Status: #{response.status}")
 
-        # Get raw JSON data directly (no wrapping anymore)
+        # Get raw JSON data and wrap it for proper decoding
         raw_data = response.body
+        IO.puts("📄 Raw response data keys: #{inspect(Map.keys(raw_data))}")
 
-        # Test direct decode (zero-ceremony API) using raw JSON data
-        IO.puts("📄 Raw response data: #{inspect(raw_data)}")
-        IO.puts("🔄 Testing zero-ceremony direct decode...")
+        # Test direct decode using the provider's wrap_response function  
+        IO.puts("🔄 Testing zero-ceremony direct decode with wrapped response...")
 
-        case ReqLLM.Response.decode(raw_data, model) do
+        wrapped_response = ReqLLM.Providers.Anthropic.wrap_response(raw_data)
+
+        case ReqLLM.Response.decode_response(wrapped_response, model) do
           {:ok, decoded_response} ->
             IO.puts("✅ Response decoded!")
-            IO.puts("📝 Response: #{inspect(decoded_response)}")
+            IO.puts("📝 Response text: #{ReqLLM.Response.text(decoded_response)}")
+            IO.puts("📊 Usage: #{inspect(ReqLLM.Response.usage(decoded_response))}")
+
+            IO.puts(
+              "🏁 Finish reason: #{inspect(ReqLLM.Response.finish_reason(decoded_response))}"
+            )
 
           {:error, error} ->
             IO.puts("❌ Response decode failed:")

@@ -666,4 +666,30 @@ defmodule ReqLLM.Provider.Options do
     {standard, _custom} = extract_provider_options(opts)
     standard
   end
+
+  @doc """
+  Extracts only generation options from a mixed options list.
+
+  Unlike `extract_provider_options/1`, this returns only the generation 
+  options without the unused remainder.
+
+  ## Parameters
+
+  - `opts` - Mixed options list
+
+  ## Returns
+
+  Keyword list containing only generation options.
+
+  ## Examples
+
+      iex> mixed_opts = [temperature: 0.7, custom_param: "value", max_tokens: 100]
+      iex> ReqLLM.Provider.Options.extract_generation_opts(mixed_opts)
+      [temperature: 0.7, max_tokens: 100]
+  """
+  @spec extract_generation_opts(keyword()) :: keyword()
+  def extract_generation_opts(opts) do
+    {generation_opts, _rest} = extract_provider_options(opts)
+    generation_opts
+  end
 end

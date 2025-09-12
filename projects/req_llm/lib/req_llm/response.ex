@@ -89,12 +89,27 @@ defmodule ReqLLM.Response do
   """
   @spec tool_calls(t()) :: [term()]
   def tool_calls(%__MODULE__{message: nil}), do: []
-  def tool_calls(%__MODULE__{message: %Message{tool_calls: nil}}), do: []
-
+  
   def tool_calls(%__MODULE__{message: %Message{tool_calls: tool_calls}})
       when is_list(tool_calls) do
     tool_calls
   end
+  
+  def tool_calls(%__MODULE__{message: %Message{tool_calls: nil, content: content}})
+      when is_list(content) do
+    # Extract tool calls from content parts (e.g., for Anthropic)
+    content
+    |> Enum.filter(&(&1.type == :tool_call))
+    |> Enum.map(fn part ->
+      %{
+        name: part.tool_name,
+        arguments: part.input,
+        id: part.tool_call_id
+      }
+    end)
+  end
+  
+  def tool_calls(%__MODULE__{message: %Message{tool_calls: nil}}), do: []
 
   @doc """
   Get the finish reason for this response.
@@ -218,7 +233,7 @@ defmodule ReqLLM.Response do
   Decode provider response data into a canonical ReqLLM.Response.
 
   This is a façade function that accepts raw provider data and a model specification,
-  and directly calls the Response.Codec.decode/2 protocol for zero-ceremony decoding.
+  and directly calls the Response.Codec.decode_response/2 protocol for zero-ceremony decoding.
 
   Supports both Model struct and string inputs, automatically resolving model
   strings using Model.from!/1.
@@ -235,12 +250,12 @@ defmodule ReqLLM.Response do
 
   ## Examples
 
-      {:ok, response} = ReqLLM.Response.decode(raw_json, "anthropic:claude-3-sonnet")
-      {:ok, response} = ReqLLM.Response.decode(raw_json, model_struct)
+      {:ok, response} = ReqLLM.Response.decode_response(raw_json, "anthropic:claude-3-sonnet")
+      {:ok, response} = ReqLLM.Response.decode_response(raw_json, model_struct)
 
   """
-  @spec decode(term(), Model.t() | String.t()) :: {:ok, t()} | {:error, term()}
-  def decode(raw_data, model_input) do
+  @spec decode_response(term(), Model.t() | String.t()) :: {:ok, t()} | {:error, term()}
+  def decode_response(raw_data, model_input) do
     model = resolve_model(model_input)
     {:ok, provider_mod} = ReqLLM.Provider.get(model.provider)
 
@@ -252,7 +267,7 @@ defmodule ReqLLM.Response do
         raw_data
       end
 
-    ReqLLM.Response.Codec.decode(wrapped_data, model)
+    ReqLLM.Response.Codec.decode_response(wrapped_data, model)
   end
 
   # Helper function to resolve model input to Model struct

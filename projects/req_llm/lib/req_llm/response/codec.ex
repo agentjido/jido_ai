@@ -58,11 +58,11 @@ defprotocol ReqLLM.Response.Codec do
       # Tagged wrapper decoding (internal use)
       raw_data
       |> ReqLLM.Providers.Anthropic.Response.new(model)
-      |> ReqLLM.Response.Codec.decode()
+      |> ReqLLM.Response.Codec.decode_response()
 
   """
-  @spec decode(t()) :: {:ok, ReqLLM.Response.t()} | {:error, term()}
-  def decode(data_or_tagged)
+  @spec decode_response(t()) :: {:ok, ReqLLM.Response.t()} | {:error, term()}
+  def decode_response(data_or_tagged)
 
   @doc """
   Decode raw provider response data directly with model information.
@@ -83,12 +83,12 @@ defprotocol ReqLLM.Response.Codec do
   ## Examples
 
       # Direct decoding (zero-ceremony API)
-      ReqLLM.Response.Codec.decode(raw_anthropic_json, model)
+      ReqLLM.Response.Codec.decode_response(raw_anthropic_json, model)
       #=> {:ok, %ReqLLM.Response{context: ctx, message: msg, ...}}
 
   """
-  @spec decode(t(), ReqLLM.Model.t()) :: {:ok, ReqLLM.Response.t()} | {:error, term()}
-  def decode(raw_data, model)
+  @spec decode_response(t(), ReqLLM.Model.t()) :: {:ok, ReqLLM.Response.t()} | {:error, term()}
+  def decode_response(raw_data, model)
 
   @doc """
   Encode canonical response back to provider format (optional).
@@ -103,8 +103,8 @@ defprotocol ReqLLM.Response.Codec do
     * `{:error, :not_implemented}` if encoding is not supported
 
   """
-  @spec encode(t()) :: term() | {:error, term()}
-  def encode(tagged_response)
+  @spec encode_request(t()) :: term() | {:error, term()}
+  def encode_request(tagged_response)
 end
 
 defimpl ReqLLM.Response.Codec, for: Any do
@@ -115,7 +115,7 @@ defimpl ReqLLM.Response.Codec, for: Any do
   This ensures graceful failure when attempting to use an unsupported provider
   or when a provider hasn't implemented the response codec protocol.
   """
-  def decode(_), do: {:error, :not_implemented}
-  def decode(_, _), do: {:error, :not_implemented}
-  def encode(_), do: {:error, :not_implemented}
+  def decode_response(_), do: {:error, :not_implemented}
+  def decode_response(_, _), do: {:error, :not_implemented}
+  def encode_request(_), do: {:error, :not_implemented}
 end

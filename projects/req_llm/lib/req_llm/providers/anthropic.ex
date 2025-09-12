@@ -33,7 +33,7 @@ defmodule ReqLLM.Providers.Anthropic do
   @behaviour ReqLLM.Provider
 
   import ReqLLM.Provider.Utils,
-    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1, get_env_key: 1]
+    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
 
   use ReqLLM.Provider.DSL,
     id: :anthropic,
@@ -50,7 +50,6 @@ defmodule ReqLLM.Providers.Anthropic do
       stream: [type: :boolean, default: false],
       stop_sequences: [type: {:list, :string}],
       system: [type: :string],
-      api_version: [type: :string, default: "2023-06-01"],
       tools: [type: {:list, :map}]
     ]
 
@@ -90,7 +89,7 @@ defmodule ReqLLM.Providers.Anthropic do
       raise ReqLLM.Error.Invalid.Parameter.exception(parameter: "model: #{model.model}")
     end
 
-    api_key_env = get_env_key(:anthropic)
+    api_key_env = ReqLLM.Provider.Registry.get_env_key(:anthropic)
     api_key = JidoKeys.get(api_key_env)
 
     unless api_key && api_key != "" do
@@ -140,7 +139,7 @@ defmodule ReqLLM.Providers.Anthropic do
         %ReqLLM.Context{} = ctx ->
           ctx
           |> wrap_context()
-          |> ReqLLM.Context.Codec.encode()
+          |> ReqLLM.Context.Codec.encode_request()
 
         _ ->
           %{messages: request.options[:messages] || []}
