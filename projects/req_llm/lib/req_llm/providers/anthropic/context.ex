@@ -1,17 +1,35 @@
-defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic do
-  def encode(%ReqLLM.Providers.Anthropic{context: ctx}) do
-    {system_prompt, regular_messages} = extract_system_message(ctx)
+defmodule ReqLLM.Providers.Anthropic.Context do
+  @moduledoc false
+  defstruct [:context]
+  @type t :: %__MODULE__{context: ReqLLM.Context.t()}
+end
 
-    %{
-      messages: Enum.map(regular_messages, &encode_message/1)
-    }
+# Protocol implementation for Anthropic-specific context encoding
+defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic.Context do
+  def encode(%{context: %ReqLLM.Context{messages: messages}}) do
+    {system_prompt, regular_messages} = extract_system_message(messages)
+
+    %{messages: Enum.map(regular_messages, &encode_message/1)}
     |> maybe_put_system(system_prompt)
   end
 
-  defp maybe_put_system(map, nil), do: map
-  defp maybe_put_system(map, prompt), do: Map.put(map, :system, prompt)
+  # Handle wrapper struct with context field containing content
+  def decode(%{context: %{content: content}}) when is_list(content) do
+    content
+    |> Enum.map(&decode_content_block/1)
+    |> List.flatten()
+    |> Enum.reject(&is_nil/1)
+  end
 
-  def decode(%ReqLLM.Providers.Anthropic{context: %{content: content}}) when is_list(content) do
+  def decode(%{context: %{"content" => content}}) when is_list(content) do
+    content
+    |> Enum.map(&decode_content_block/1)
+    |> List.flatten()
+    |> Enum.reject(&is_nil/1)
+  end
+
+  # Handle direct content (for backward compatibility)
+  def decode(%{content: content}) when is_list(content) do
     content
     |> Enum.map(&decode_content_block/1)
     |> List.flatten()
@@ -19,16 +37,15 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic do
   end
 
   # Handle legacy format where content might have string keys
-  def decode(%ReqLLM.Providers.Anthropic{context: %{"content" => content}})
-      when is_list(content) do
+  def decode(%{"content" => content}) when is_list(content) do
     content
     |> Enum.map(&decode_content_block/1)
     |> List.flatten()
     |> Enum.reject(&is_nil/1)
   end
 
-  # Private translation helpers
-  defp extract_system_message(%ReqLLM.Context{messages: messages}) do
+  # Private helpers
+  defp extract_system_message(messages) do
     case Enum.split_with(messages, &(&1.role == :system)) do
       {[], regular} -> {nil, regular}
       {[%{content: [%{text: text}]}], regular} -> {text, regular}
@@ -50,13 +67,13 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic do
   defp encode_content_part(%ReqLLM.Message.ContentPart{
          type: :image,
          data: data,
-         media_type: type
+         media_type: media_type
        }) do
     %{
       "type" => "image",
       "source" => %{
         "type" => "base64",
-        "media_type" => type,
+        "media_type" => media_type,
         "data" => data
       }
     }
@@ -76,21 +93,30 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic do
     }
   end
 
+  defp encode_content_part(%ReqLLM.Message.ContentPart{
+         type: :tool_result,
+         output: output,
+         tool_call_id: id
+       }) do
+    %{
+      "type" => "tool_result",
+      "tool_use_id" => id,
+      "content" => output
+    }
+  end
+
   # Handle image_url type for compatibility
   defp encode_content_part(%ReqLLM.Message.ContentPart{type: :image_url, url: url}) do
-    # Note: This is a simplified implementation - real URLs would need processing
     %{
       "type" => "image",
       "source" => %{
         "type" => "base64",
-        # Would need proper detection
         "media_type" => "image/jpeg",
         "data" => url |> String.replace(~r/^data:image\/[^;]+;base64,/, "")
       }
     }
   end
 
-  # Decode Anthropic responses back to StreamChunks
   defp decode_content_block(%{"type" => "text", "text" => text}) do
     [ReqLLM.StreamChunk.text(text)]
   end
@@ -104,4 +130,7 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic do
   end
 
   defp decode_content_block(_unknown), do: []
+
+  defp maybe_put_system(map, nil), do: map
+  defp maybe_put_system(map, prompt), do: Map.put(map, :system, prompt)
 end

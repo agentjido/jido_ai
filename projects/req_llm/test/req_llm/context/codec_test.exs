@@ -4,7 +4,8 @@ defmodule ReqLLM.Context.CodecTest do
   alias ReqLLM.{Context, Message, StreamChunk}
   alias ReqLLM.Context.Codec
   alias ReqLLM.Message.ContentPart
-  alias ReqLLM.Providers.{Anthropic, OpenAI}
+  alias ReqLLM.Providers.{OpenAI}
+  alias ReqLLM.Providers.Anthropic
 
   # Common test fixtures
   setup do
@@ -49,7 +50,7 @@ defmodule ReqLLM.Context.CodecTest do
 
   describe "Anthropic codec implementation" do
     test "basic encoding", %{simple_context: context} do
-      tagged = %Anthropic{context: context}
+      tagged = %Anthropic.Context{context: context}
       encoded = Codec.encode(tagged)
 
       assert length(encoded.messages) == 1
@@ -58,7 +59,7 @@ defmodule ReqLLM.Context.CodecTest do
     end
 
     test "system message extraction", %{system_context: context} do
-      tagged = %Anthropic{context: context}
+      tagged = %Anthropic.Context{context: context}
       encoded = Codec.encode(tagged)
 
       assert encoded.system == "You are helpful"
@@ -74,7 +75,7 @@ defmodule ReqLLM.Context.CodecTest do
           Context.user("Hello")
         ])
 
-      tagged = %Anthropic{context: context}
+      tagged = %Anthropic.Context{context: context}
 
       assert_raise RuntimeError, "Multiple system messages not supported", fn ->
         Codec.encode(tagged)
@@ -87,7 +88,7 @@ defmodule ReqLLM.Context.CodecTest do
 
       message = %Message{role: :user, content: all_parts}
       context = Context.new([message])
-      tagged = %Anthropic{context: context}
+      tagged = %Anthropic.Context{context: context}
       encoded = Codec.encode(tagged)
 
       content = hd(encoded.messages).content
@@ -115,7 +116,7 @@ defmodule ReqLLM.Context.CodecTest do
       image_url_part = ContentPart.image_url("data:image/png;base64,iVBORw0KGgo=")
       message = %Message{role: :user, content: [image_url_part]}
       context = Context.new([message])
-      tagged = %Anthropic{context: context}
+      tagged = %Anthropic.Context{context: context}
       encoded = Codec.encode(tagged)
 
       content = hd(hd(encoded.messages).content)
@@ -138,7 +139,7 @@ defmodule ReqLLM.Context.CodecTest do
         ]
       }
 
-      tagged = %Anthropic{context: response}
+      tagged = %Anthropic.Context{context: response}
       chunks = Codec.decode(tagged)
 
       assert length(chunks) == 3
@@ -166,7 +167,7 @@ defmodule ReqLLM.Context.CodecTest do
         ]
       }
 
-      tagged = %Anthropic{context: response}
+      tagged = %Anthropic.Context{context: response}
       chunks = Codec.decode(tagged)
 
       assert length(chunks) == 2
@@ -176,14 +177,14 @@ defmodule ReqLLM.Context.CodecTest do
     test "empty context and edge cases" do
       # Empty context
       empty_context = Context.new([])
-      tagged = %Anthropic{context: empty_context}
+      tagged = %Anthropic.Context{context: empty_context}
       encoded = Codec.encode(tagged)
       assert encoded.messages == []
       refute Map.has_key?(encoded, :system)
 
       # System-only context
       system_only = Context.new([Context.system("Only system")])
-      tagged = %Anthropic{context: system_only}
+      tagged = %Anthropic.Context{context: system_only}
       encoded = Codec.encode(tagged)
       assert encoded.system == "Only system"
       assert encoded.messages == []
@@ -191,13 +192,13 @@ defmodule ReqLLM.Context.CodecTest do
       # Empty content parts
       empty_message = %Message{role: :user, content: []}
       context = Context.new([empty_message])
-      tagged = %Anthropic{context: context}
+      tagged = %Anthropic.Context{context: context}
       encoded = Codec.encode(tagged)
       assert hd(encoded.messages).content == []
 
       # Empty response
       empty_response = %{"content" => []}
-      tagged = %Anthropic{context: empty_response}
+      tagged = %Anthropic.Context{context: empty_response}
       chunks = Codec.decode(tagged)
       assert chunks == []
     end
@@ -354,7 +355,7 @@ defmodule ReqLLM.Context.CodecTest do
   describe "round-trip data integrity" do
     test "Anthropic encode-decode preserves content types", %{complex_context: context} do
       # Encode to Anthropic format
-      tagged = %Anthropic{context: context}
+      tagged = %Anthropic.Context{context: context}
       encoded = Codec.encode(tagged)
 
       # Verify encoding structure
@@ -381,7 +382,7 @@ defmodule ReqLLM.Context.CodecTest do
       }
 
       # Decode response
-      response_tagged = %Anthropic{context: response_data}
+      response_tagged = %Anthropic.Context{context: response_data}
       chunks = Codec.decode(response_tagged)
 
       assert length(chunks) == 2
@@ -433,7 +434,7 @@ defmodule ReqLLM.Context.CodecTest do
       context = Context.new([message])
 
       # Test Anthropic ordering
-      anthropic_tagged = %Anthropic{context: context}
+      anthropic_tagged = %Anthropic.Context{context: context}
       anthropic_encoded = Codec.encode(anthropic_tagged)
       anthropic_content = hd(anthropic_encoded.messages).content
       anthropic_types = Enum.map(anthropic_content, & &1["type"])
@@ -454,7 +455,7 @@ defmodule ReqLLM.Context.CodecTest do
       context = Context.new([Context.user(unicode_text)])
 
       # Test Anthropic
-      anthropic_tagged = %Anthropic{context: context}
+      anthropic_tagged = %Anthropic.Context{context: context}
       anthropic_encoded = Codec.encode(anthropic_tagged)
       assert hd(hd(anthropic_encoded.messages).content)["text"] == unicode_text
 
@@ -471,7 +472,7 @@ defmodule ReqLLM.Context.CodecTest do
       large_context = Context.new([Context.user(large_text)])
 
       # Should encode without issues
-      anthropic_tagged = %Anthropic{context: large_context}
+      anthropic_tagged = %Anthropic.Context{context: large_context}
       anthropic_encoded = Codec.encode(anthropic_tagged)
       encoded_text = hd(hd(anthropic_encoded.messages).content)["text"]
       assert String.length(encoded_text) > 15000
@@ -488,7 +489,7 @@ defmodule ReqLLM.Context.CodecTest do
       # Context with nil messages should not crash encoding
       try do
         bad_context = %Context{messages: nil}
-        tagged = %Anthropic{context: bad_context}
+        tagged = %Anthropic.Context{context: bad_context}
         # This might raise but shouldn't crash the VM
         Codec.encode(tagged)
       rescue
@@ -511,7 +512,7 @@ defmodule ReqLLM.Context.CodecTest do
       context = Context.new([message])
 
       # Should encode without crashing (providers handle missing fields)
-      anthropic_tagged = %Anthropic{context: context}
+      anthropic_tagged = %Anthropic.Context{context: context}
       anthropic_encoded = Codec.encode(anthropic_tagged)
       assert is_map(anthropic_encoded)
 

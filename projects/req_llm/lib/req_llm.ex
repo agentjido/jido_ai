@@ -201,7 +201,7 @@ defmodule ReqLLM do
   @doc """
   Generates text using an AI model with full response metadata.
 
-  Returns the complete Req.Response which includes usage data, headers, and metadata.
+  Returns a canonical ReqLLM.Response which includes usage data, context, and metadata.
   For simple text-only results, use `generate_text!/3`.
 
   ## Parameters
@@ -225,11 +225,12 @@ defmodule ReqLLM do
   ## Examples
 
       {:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello world")
-      response.body
+      ReqLLM.Response.text(response)
       #=> "Hello! How can I assist you today?"
 
       # Access usage metadata
-      {:ok, text, usage} = ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello") |> ReqLLM.with_usage()
+      ReqLLM.Response.usage(response)
+      #=> %{input_tokens: 10, output_tokens: 8}
 
   """
   defdelegate generate_text(model_spec, messages, opts \\ []), to: Generation
@@ -256,7 +257,7 @@ defmodule ReqLLM do
   @doc """
   Streams text generation using an AI model with full response metadata.
 
-  Returns the complete response containing usage data and metadata.
+  Returns a canonical ReqLLM.Response containing usage data and stream.
   For simple streaming without metadata, use `stream_text!/3`.
 
   ## Parameters
@@ -266,10 +267,11 @@ defmodule ReqLLM do
   ## Examples
 
       {:ok, response} = ReqLLM.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
-      response.body |> Enum.each(&IO.write/1)
+      ReqLLM.Response.text_stream(response) |> Enum.each(&IO.write/1)
 
       # Access usage metadata after streaming
-      {:ok, stream, usage} = ReqLLM.stream_text("anthropic:claude-3-sonnet", "Hello") |> ReqLLM.with_usage()
+      ReqLLM.Response.usage(response)
+      #=> %{input_tokens: 15, output_tokens: 42}
 
   """
   defdelegate stream_text(model_spec, messages, opts \\ []), to: Generation
@@ -306,22 +308,22 @@ defmodule ReqLLM do
 
       # Generate text with usage info - pipeline style
       {:ok, text, usage} =
-        ReqLLM.generate_text("openai:gpt-4o", "Hello")
+        ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello")
         |> ReqLLM.with_usage()
 
       usage
-      #=> %{tokens: %{input: 10, output: 15}, cost: 0.00075}
+      #=> %{input_tokens: 10, output_tokens: 15}
 
       # Works with bang functions too (returns nil usage)
       {:ok, text, usage} =
-        ReqLLM.generate_text!("openai:gpt-4o", "Hello")
+        ReqLLM.generate_text!("anthropic:claude-3-sonnet", "Hello")
         |> ReqLLM.with_usage()
 
       usage  #=> nil
 
       # Stream text with usage info
       {:ok, stream, usage} =
-        ReqLLM.stream_text("openai:gpt-4o", "Hello")
+        ReqLLM.stream_text("anthropic:claude-3-sonnet", "Hello")
         |> ReqLLM.with_usage()
 
   """
@@ -341,7 +343,7 @@ defmodule ReqLLM do
 
       # Generate text with cost info - pipeline style
       {:ok, text, cost} =
-        ReqLLM.generate_text("openai:gpt-4o", "Hello")
+        ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello")
         |> ReqLLM.with_cost()
 
       cost
@@ -349,14 +351,14 @@ defmodule ReqLLM do
 
       # Works with bang functions too (returns nil cost)
       {:ok, text, cost} =
-        ReqLLM.generate_text!("openai:gpt-4o", "Hello")
+        ReqLLM.generate_text!("anthropic:claude-3-sonnet", "Hello")
         |> ReqLLM.with_cost()
 
       cost  #=> nil
 
       # Stream text with cost info - pipeline style
       {:ok, stream, cost} =
-        ReqLLM.stream_text("openai:gpt-4o", "Hello")
+        ReqLLM.stream_text("anthropic:claude-3-sonnet", "Hello")
         |> ReqLLM.with_cost()
 
   """

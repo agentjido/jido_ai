@@ -1,16 +1,17 @@
-defmodule ReqLLM.Plugins.Splode do
+defmodule ReqLLM.Step.Error do
   @moduledoc """
-  Req plugin that integrates with Splode error handling.
+  Req step that integrates with Splode error handling.
 
-  This plugin converts HTTP error responses to structured ReqLLM.Error exceptions
+  This step converts HTTP error responses to structured ReqLLM.Error exceptions
   and handles common API error patterns. It processes both regular HTTP errors
   and API-specific error responses.
 
   ## Usage
 
-      iex> req = Req.new() |> ReqLLM.Plugins.Splode.attach()
+      request
+      |> ReqLLM.Step.Error.attach()
 
-  The plugin handles various HTTP status codes and converts them to appropriate
+  The step handles various HTTP status codes and converts them to appropriate
   ReqLLM.Error types:
 
   - 400: Bad Request → API.Request error
@@ -34,29 +35,29 @@ defmodule ReqLLM.Plugins.Splode do
   @type api_error :: %ReqLLM.Error.API.Request{}
 
   @doc """
-  Attaches the Splode error handling plugin to a Req request struct.
+  Attaches the Splode error handling step to a Req request struct.
 
   ## Parameters
     - `req` - The Req request struct
 
   ## Returns
-    - Updated Req request struct with the plugin attached
+    - Updated Req request struct with the step attached
 
   """
   @spec attach(Req.Request.t()) :: Req.Request.t()
   def attach(req) do
-    Req.Request.append_error_steps(req, splode_errors: &handle_error_response/1)
+    Req.Request.append_error_steps(req, splode_errors: &__MODULE__.handle/1)
   end
 
   @doc false
-  @spec handle_error_response({Req.Request.t(), Req.Response.t() | Exception.t()}) ::
+  @spec handle({Req.Request.t(), Req.Response.t() | Exception.t()}) ::
           {Req.Request.t(), api_error()}
-  def handle_error_response({request, %Req.Response{} = response}) do
+  def handle({request, %Req.Response{} = response}) do
     error = convert_response_to_error(request, response)
     {request, error}
   end
 
-  def handle_error_response({request, exception}) when is_exception(exception) do
+  def handle({request, exception}) when is_exception(exception) do
     error = convert_exception_to_error(request, exception)
     {request, error}
   end

@@ -39,6 +39,7 @@ ReqLLM is a composable Elixir library for AI interactions built on Req, providin
 - Use `@moduledoc` and `@doc` for comprehensive documentation
 - Prefer pattern matching over conditionals where possible
 - Use `{:ok, result}` / `{:error, reason}` tuple returns for fallible operations
+- **No inline comments in method bodies** - code should be self-explanatory through clear naming and structure
 
 ### Imports & Dependencies
 - Minimize imports, prefer explicit module calls (e.g., `ReqLLM.Model.from/1`)
