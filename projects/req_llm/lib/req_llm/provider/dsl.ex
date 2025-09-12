@@ -254,33 +254,43 @@ defmodule ReqLLM.Provider.DSL do
 
   # Private helper to build provider schema from options
   defp build_provider_schema([]) do
-    # Default to all generation keys with no defaults
+    # Return empty schema - providers must explicitly declare what they support
     quote do
-      keys = ReqLLM.Provider.Options.all_generation_keys()
-      schema_def = Enum.map(keys, fn key ->
-        ReqLLM.Provider.Options.generation_options_schema().schema[key]
-        |> case do
-          nil -> {key, []}
-          opts -> {key, opts}
-        end
-      end)
-      NimbleOptions.new!(schema_def)
+      NimbleOptions.new!([])
     end
   end
 
   defp build_provider_schema(schema_opts) when is_list(schema_opts) do
+    # Validate that all provider schema keys exist in global generation schema
+    validate_schema_keys(schema_opts)
+
     # Build schema by merging user opts with global schema defaults
     quote do
       global_schema = ReqLLM.Provider.Options.generation_options_schema().schema
-      
-      schema_def = Enum.map(unquote(schema_opts), fn {key, user_opts} ->
-        base_opts = Keyword.get(global_schema, key, [])
-        merged_opts = Keyword.merge(base_opts, user_opts)
-        {key, merged_opts}
-      end)
-      
+
+      schema_def =
+        Enum.map(unquote(schema_opts), fn {key, user_opts} ->
+          base_opts = Keyword.get(global_schema, key, [])
+          merged_opts = Keyword.merge(base_opts, user_opts)
+          {key, merged_opts}
+        end)
+
       NimbleOptions.new!(schema_def)
     end
+  end
+
+  # Compile-time validation that provider schema keys exist in global generation schema
+  defp validate_schema_keys(schema_opts) do
+    global_keys = ReqLLM.Provider.Options.all_generation_keys()
+
+    Enum.each(schema_opts, fn {key, _opts} ->
+      unless key in global_keys do
+        IO.warn(
+          "Provider schema key #{inspect(key)} does not exist in global generation schema. " <>
+            "Available keys: #{inspect(global_keys)}"
+        )
+      end
+    end)
   end
 
   # Private helper to load metadata at compile time

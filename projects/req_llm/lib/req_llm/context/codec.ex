@@ -32,7 +32,7 @@ defprotocol ReqLLM.Context.Codec do
   @fallback_to_any true
 
   @doc """
-  Encode canonical ReqLLM structures to provider wire JSON format.
+  Encode canonical ReqLLM structures to provider wire JSON format for requests.
 
   Takes a provider-specific tagged wrapper struct containing a `ReqLLM.Context`
   and converts it to the JSON format expected by that provider's API.
@@ -51,15 +51,15 @@ defprotocol ReqLLM.Context.Codec do
       # Anthropic encoding
       context
       |> ReqLLM.Providers.Anthropic.Tagged.new()
-      |> ReqLLM.Context.Codec.encode()
+      |> ReqLLM.Context.Codec.encode_request()
       #=> %{system: "...", messages: [...], max_tokens: 4096}
 
   """
-  @spec encode(t) :: term()
-  def encode(tagged_context)
+  @spec encode_request(t) :: term()
+  def encode_request(tagged_context)
 
   @doc """
-  Decode provider wire JSON back to canonical structures.
+  Decode provider wire JSON back to canonical structures from responses.
 
   Takes a provider-specific tagged wrapper struct containing response data
   and converts it to a list of `ReqLLM.StreamChunk` structs or other canonical formats.
@@ -78,12 +78,12 @@ defprotocol ReqLLM.Context.Codec do
       # Anthropic decoding
       response_data
       |> ReqLLM.Providers.Anthropic.Tagged.new()
-      |> ReqLLM.Context.Codec.decode()
+      |> ReqLLM.Context.Codec.decode_response()
       #=> [%ReqLLM.StreamChunk{type: :text, text: "Hello!"}]
 
   """
-  @spec decode(t) :: term()
-  def decode(tagged_data)
+  @spec decode_response(t) :: term()
+  def decode_response(tagged_data)
 end
 
 defimpl ReqLLM.Context.Codec, for: Any do
@@ -94,6 +94,6 @@ defimpl ReqLLM.Context.Codec, for: Any do
   This ensures graceful failure when attempting to use an unsupported provider
   or when a provider hasn't implemented the codec protocol.
   """
-  def encode(_), do: {:error, :not_implemented}
-  def decode(_), do: {:error, :not_implemented}
+  def encode_request(_), do: {:error, :not_implemented}
+  def decode_response(_), do: {:error, :not_implemented}
 end

@@ -6,7 +6,7 @@ end
 
 # Protocol implementation for Anthropic-specific context encoding
 defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic.Context do
-  def encode(%{context: %ReqLLM.Context{messages: messages}}) do
+  def encode_request(%{context: %ReqLLM.Context{messages: messages}}) do
     {system_prompt, regular_messages} = extract_system_message(messages)
 
     %{messages: Enum.map(regular_messages, &encode_message/1)}
@@ -14,14 +14,14 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic.Context do
   end
 
   # Handle wrapper struct with context field containing content
-  def decode(%{context: %{content: content}}) when is_list(content) do
+  def decode_response(%{context: %{content: content}}) when is_list(content) do
     content
     |> Enum.map(&decode_content_block/1)
     |> List.flatten()
     |> Enum.reject(&is_nil/1)
   end
 
-  def decode(%{context: %{"content" => content}}) when is_list(content) do
+  def decode_response(%{context: %{"content" => content}}) when is_list(content) do
     content
     |> Enum.map(&decode_content_block/1)
     |> List.flatten()
@@ -29,7 +29,7 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic.Context do
   end
 
   # Handle direct content (for backward compatibility)
-  def decode(%{content: content}) when is_list(content) do
+  def decode_response(%{content: content}) when is_list(content) do
     content
     |> Enum.map(&decode_content_block/1)
     |> List.flatten()
@@ -37,7 +37,7 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic.Context do
   end
 
   # Handle legacy format where content might have string keys
-  def decode(%{"content" => content}) when is_list(content) do
+  def decode_response(%{"content" => content}) when is_list(content) do
     content
     |> Enum.map(&decode_content_block/1)
     |> List.flatten()

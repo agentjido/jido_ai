@@ -43,15 +43,15 @@ defmodule ReqLLM.Context.CodecTest do
     test "returns error for unsupported types" do
       unsupported = %{some: "data"}
 
-      assert Codec.encode(unsupported) == {:error, :not_implemented}
-      assert Codec.decode(unsupported) == {:error, :not_implemented}
+      assert Codec.encode_request(unsupported) == {:error, :not_implemented}
+      assert Codec.decode_response(unsupported) == {:error, :not_implemented}
     end
   end
 
   describe "Anthropic codec implementation" do
     test "basic encoding", %{simple_context: context} do
       tagged = %Anthropic.Context{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       assert length(encoded.messages) == 1
       assert hd(encoded.messages).role == "user"
@@ -60,7 +60,7 @@ defmodule ReqLLM.Context.CodecTest do
 
     test "system message extraction", %{system_context: context} do
       tagged = %Anthropic.Context{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       assert encoded.system == "You are helpful"
       assert length(encoded.messages) == 2
@@ -78,7 +78,7 @@ defmodule ReqLLM.Context.CodecTest do
       tagged = %Anthropic.Context{context: context}
 
       assert_raise RuntimeError, "Multiple system messages not supported", fn ->
-        Codec.encode(tagged)
+        Codec.encode_request(tagged)
       end
     end
 
@@ -89,7 +89,7 @@ defmodule ReqLLM.Context.CodecTest do
       message = %Message{role: :user, content: all_parts}
       context = Context.new([message])
       tagged = %Anthropic.Context{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       content = hd(encoded.messages).content
       assert length(content) == 5
@@ -117,7 +117,7 @@ defmodule ReqLLM.Context.CodecTest do
       message = %Message{role: :user, content: [image_url_part]}
       context = Context.new([message])
       tagged = %Anthropic.Context{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       content = hd(hd(encoded.messages).content)
       assert content["type"] == "image"
@@ -140,7 +140,7 @@ defmodule ReqLLM.Context.CodecTest do
       }
 
       tagged = %Anthropic.Context{context: response}
-      chunks = Codec.decode(tagged)
+      chunks = Codec.decode_response(tagged)
 
       assert length(chunks) == 3
       assert Enum.at(chunks, 0) == StreamChunk.text("Hello!")
@@ -168,7 +168,7 @@ defmodule ReqLLM.Context.CodecTest do
       }
 
       tagged = %Anthropic.Context{context: response}
-      chunks = Codec.decode(tagged)
+      chunks = Codec.decode_response(tagged)
 
       assert length(chunks) == 2
       assert Enum.map(chunks, & &1.text) == ["Valid", "Also valid"]
@@ -178,14 +178,14 @@ defmodule ReqLLM.Context.CodecTest do
       # Empty context
       empty_context = Context.new([])
       tagged = %Anthropic.Context{context: empty_context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
       assert encoded.messages == []
       refute Map.has_key?(encoded, :system)
 
       # System-only context
       system_only = Context.new([Context.system("Only system")])
       tagged = %Anthropic.Context{context: system_only}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
       assert encoded.system == "Only system"
       assert encoded.messages == []
 
@@ -193,13 +193,13 @@ defmodule ReqLLM.Context.CodecTest do
       empty_message = %Message{role: :user, content: []}
       context = Context.new([empty_message])
       tagged = %Anthropic.Context{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
       assert hd(encoded.messages).content == []
 
       # Empty response
       empty_response = %{"content" => []}
       tagged = %Anthropic.Context{context: empty_response}
-      chunks = Codec.decode(tagged)
+      chunks = Codec.decode_response(tagged)
       assert chunks == []
     end
   end
@@ -207,7 +207,7 @@ defmodule ReqLLM.Context.CodecTest do
   describe "OpenAI codec implementation" do
     test "basic encoding", %{simple_context: context} do
       tagged = %OpenAI{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       assert length(encoded.messages) == 1
       assert hd(encoded.messages)["role"] == "user"
@@ -216,7 +216,7 @@ defmodule ReqLLM.Context.CodecTest do
 
     test "system message handling", %{system_context: context} do
       tagged = %OpenAI{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       assert length(encoded.messages) == 3
       roles = Enum.map(encoded.messages, & &1["role"])
@@ -227,7 +227,7 @@ defmodule ReqLLM.Context.CodecTest do
       # Single text becomes string
       single_text = Context.new([Context.user("Simple")])
       tagged = %OpenAI{context: single_text}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
       assert hd(encoded.messages)["content"] == "Simple"
 
       # Multi-part becomes array
@@ -235,7 +235,7 @@ defmodule ReqLLM.Context.CodecTest do
       multi_message = %Message{role: :user, content: parts}
       multi_context = Context.new([multi_message])
       tagged = %OpenAI{context: multi_context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       content = hd(encoded.messages)["content"]
       assert is_list(content)
@@ -252,7 +252,7 @@ defmodule ReqLLM.Context.CodecTest do
       message = %Message{role: :assistant, content: parts}
       context = Context.new([message])
       tagged = %OpenAI{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       content = hd(encoded.messages)["content"]
       assert length(content) == 3
@@ -279,7 +279,7 @@ defmodule ReqLLM.Context.CodecTest do
       # Text response
       text_response = %{"choices" => [%{"message" => %{"content" => "Hello world"}}]}
       tagged = %OpenAI{context: text_response}
-      chunks = Codec.decode(tagged)
+      chunks = Codec.decode_response(tagged)
       assert length(chunks) == 1
       assert hd(chunks) == StreamChunk.text("Hello world")
 
@@ -303,7 +303,7 @@ defmodule ReqLLM.Context.CodecTest do
       }
 
       tagged = %OpenAI{context: tool_response}
-      chunks = Codec.decode(tagged)
+      chunks = Codec.decode_response(tagged)
       assert length(chunks) == 1
 
       chunk = hd(chunks)
@@ -317,7 +317,7 @@ defmodule ReqLLM.Context.CodecTest do
       # Empty content
       empty_response = %{"choices" => [%{"message" => %{"content" => ""}}]}
       tagged = %OpenAI{context: empty_response}
-      chunks = Codec.decode(tagged)
+      chunks = Codec.decode_response(tagged)
       assert chunks == []
 
       # Invalid JSON in tool arguments
@@ -340,14 +340,14 @@ defmodule ReqLLM.Context.CodecTest do
       }
 
       tagged = %OpenAI{context: bad_json_response}
-      chunks = Codec.decode(tagged)
+      chunks = Codec.decode_response(tagged)
       assert length(chunks) == 1
       assert hd(chunks).arguments == %{}
 
       # Malformed responses
       malformed = %{"choices" => [%{"message" => %{}}]}
       tagged = %OpenAI{context: malformed}
-      chunks = Codec.decode(tagged)
+      chunks = Codec.decode_response(tagged)
       assert chunks == []
     end
   end
@@ -356,7 +356,7 @@ defmodule ReqLLM.Context.CodecTest do
     test "Anthropic encode-decode preserves content types", %{complex_context: context} do
       # Encode to Anthropic format
       tagged = %Anthropic.Context{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       # Verify encoding structure
       assert encoded.system == "System prompt"
@@ -383,7 +383,7 @@ defmodule ReqLLM.Context.CodecTest do
 
       # Decode response
       response_tagged = %Anthropic.Context{context: response_data}
-      chunks = Codec.decode(response_tagged)
+      chunks = Codec.decode_response(response_tagged)
 
       assert length(chunks) == 2
       assert Enum.at(chunks, 0).type == :content
@@ -394,7 +394,7 @@ defmodule ReqLLM.Context.CodecTest do
     test "OpenAI encode-decode preserves message structure", %{system_context: context} do
       # Encode to OpenAI format
       tagged = %OpenAI{context: context}
-      encoded = Codec.encode(tagged)
+      encoded = Codec.encode_request(tagged)
 
       assert length(encoded.messages) == 3
       roles = Enum.map(encoded.messages, & &1["role"])
@@ -413,7 +413,7 @@ defmodule ReqLLM.Context.CodecTest do
 
       # Decode response
       response_tagged = %OpenAI{context: response_data}
-      chunks = Codec.decode(response_tagged)
+      chunks = Codec.decode_response(response_tagged)
 
       assert length(chunks) == 1
       assert hd(chunks).type == :content
@@ -435,14 +435,14 @@ defmodule ReqLLM.Context.CodecTest do
 
       # Test Anthropic ordering
       anthropic_tagged = %Anthropic.Context{context: context}
-      anthropic_encoded = Codec.encode(anthropic_tagged)
+      anthropic_encoded = Codec.encode_request(anthropic_tagged)
       anthropic_content = hd(anthropic_encoded.messages).content
       anthropic_types = Enum.map(anthropic_content, & &1["type"])
       assert anthropic_types == ["text", "tool_use", "text", "tool_use", "text"]
 
       # Test OpenAI ordering  
       openai_tagged = %OpenAI{context: context}
-      openai_encoded = Codec.encode(openai_tagged)
+      openai_encoded = Codec.encode_request(openai_tagged)
       openai_content = hd(openai_encoded.messages)["content"]
       openai_types = Enum.map(openai_content, & &1["type"])
       # OpenAI uses "function" instead of "tool_use"
@@ -456,12 +456,12 @@ defmodule ReqLLM.Context.CodecTest do
 
       # Test Anthropic
       anthropic_tagged = %Anthropic.Context{context: context}
-      anthropic_encoded = Codec.encode(anthropic_tagged)
+      anthropic_encoded = Codec.encode_request(anthropic_tagged)
       assert hd(hd(anthropic_encoded.messages).content)["text"] == unicode_text
 
       # Test OpenAI
       openai_tagged = %OpenAI{context: context}
-      openai_encoded = Codec.encode(openai_tagged)
+      openai_encoded = Codec.encode_request(openai_tagged)
       assert hd(openai_encoded.messages)["content"] == unicode_text
     end
 
@@ -473,13 +473,13 @@ defmodule ReqLLM.Context.CodecTest do
 
       # Should encode without issues
       anthropic_tagged = %Anthropic.Context{context: large_context}
-      anthropic_encoded = Codec.encode(anthropic_tagged)
+      anthropic_encoded = Codec.encode_request(anthropic_tagged)
       encoded_text = hd(hd(anthropic_encoded.messages).content)["text"]
       assert String.length(encoded_text) > 15000
       assert encoded_text == large_text
 
       openai_tagged = %OpenAI{context: large_context}
-      openai_encoded = Codec.encode(openai_tagged)
+      openai_encoded = Codec.encode_request(openai_tagged)
       assert hd(openai_encoded.messages)["content"] == large_text
     end
   end
@@ -491,7 +491,7 @@ defmodule ReqLLM.Context.CodecTest do
         bad_context = %Context{messages: nil}
         tagged = %Anthropic.Context{context: bad_context}
         # This might raise but shouldn't crash the VM
-        Codec.encode(tagged)
+        Codec.encode_request(tagged)
       rescue
         # Expected to fail gracefully
         _ -> :ok
@@ -513,11 +513,11 @@ defmodule ReqLLM.Context.CodecTest do
 
       # Should encode without crashing (providers handle missing fields)
       anthropic_tagged = %Anthropic.Context{context: context}
-      anthropic_encoded = Codec.encode(anthropic_tagged)
+      anthropic_encoded = Codec.encode_request(anthropic_tagged)
       assert is_map(anthropic_encoded)
 
       openai_tagged = %OpenAI{context: context}
-      openai_encoded = Codec.encode(openai_tagged)
+      openai_encoded = Codec.encode_request(openai_tagged)
       assert is_map(openai_encoded)
     end
   end

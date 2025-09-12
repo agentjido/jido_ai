@@ -69,7 +69,7 @@ defmodule ReqLLM.Providers.OpenAI do
     body =
       context
       |> ReqLLM.Context.wrap(model)
-      |> ReqLLM.Context.Codec.encode()
+      |> ReqLLM.Context.Codec.encode_request()
       |> add_model_params(model, Keyword.merge(body_params, opts))
       |> add_sampling_params(Keyword.merge(body_params, opts))
 
@@ -92,7 +92,7 @@ defmodule ReqLLM.Providers.OpenAI do
         chunks =
           body
           |> then(&%__MODULE__{context: &1})
-          |> ReqLLM.Context.Codec.decode()
+          |> ReqLLM.Context.Codec.decode_response()
 
         case chunks do
           [] -> {:ok, [ReqLLM.StreamChunk.text("")]}

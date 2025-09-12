@@ -133,10 +133,10 @@ defmodule ReqLLM.Context do
   end
 
   @doc """
-  Encode a context to provider JSON format.
+  Encode a context to provider JSON format for API requests.
 
   This is a façade function that accepts a Context and model specification,
-  wraps them appropriately, and calls the Context.Codec.encode protocol.
+  wraps them appropriately, and calls the Context.Codec.encode_request protocol.
 
   Supports both Model struct and string inputs, automatically resolving model
   strings using Model.from!/1.
@@ -154,17 +154,17 @@ defmodule ReqLLM.Context do
   ## Examples
 
       # Zero-ceremony encoding with model string
-      Context.encode(context, "anthropic:claude-3-sonnet")
+      Context.encode_request(context, "anthropic:claude-3-sonnet")
       #=> %{system: "...", messages: [...], max_tokens: 4096}
 
       # Encoding with Model struct
-      Context.encode(context, model_struct)
+      Context.encode_request(context, model_struct)
 
   """
-  @spec encode(t(), ReqLLM.Model.t() | String.t()) :: term() | {:error, term()}
-  def encode(%__MODULE__{} = ctx, model_input) do
+  @spec encode_request(t(), ReqLLM.Model.t() | String.t()) :: term() | {:error, term()}
+  def encode_request(%__MODULE__{} = ctx, model_input) do
     model = resolve_model(model_input)
-    ctx |> wrap(model) |> ReqLLM.Context.Codec.encode()
+    ctx |> wrap(model) |> ReqLLM.Context.Codec.encode_request()
   end
 
   # Helper function to resolve model input to Model struct

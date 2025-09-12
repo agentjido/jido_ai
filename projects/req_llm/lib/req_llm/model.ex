@@ -467,4 +467,40 @@ defmodule ReqLLM.Model do
     end)
     |> Map.new()
   end
+
+  @doc """
+  Gets the default model for a provider spec.
+
+  Falls back to the first available model if no default is specified.
+
+  ## Parameters
+
+  - `spec` - Provider spec struct with `:default_model` and `:models` fields
+
+  ## Returns
+
+  The default model string, or `nil` if no models are available.
+
+  ## Examples
+
+      iex> spec = %{default_model: "gpt-4", models: %{"gpt-3.5" => %{}, "gpt-4" => %{}}}
+      iex> ReqLLM.Model.default_model(spec)
+      "gpt-4"
+
+      iex> spec = %{default_model: nil, models: %{"model-a" => %{}, "model-b" => %{}}}
+      iex> ReqLLM.Model.default_model(spec)
+      "model-a"
+
+      iex> spec = %{default_model: nil, models: %{}}
+      iex> ReqLLM.Model.default_model(spec)
+      nil
+  """
+  @spec default_model(map()) :: binary() | nil
+  def default_model(spec) do
+    spec.default_model ||
+      case Map.keys(spec.models) do
+        [first_model | _] -> first_model
+        [] -> nil
+      end
+  end
 end

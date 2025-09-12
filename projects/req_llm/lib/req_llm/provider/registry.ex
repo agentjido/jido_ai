@@ -734,4 +734,55 @@ defmodule ReqLLM.Provider.Registry do
   end
 
   defp atomize_json_keys(data), do: data
+
+  @doc """
+  Gets the environment variable key for a provider's API authentication.
+
+  Tries to get the key from provider metadata first, then falls back
+  to the provider's `default_env_key/0` callback if implemented.
+
+  ## Parameters
+
+  - `provider_id` - Provider atom identifier (e.g., `:anthropic`)
+
+  ## Returns
+
+  The environment variable name string, or nil if not found.
+
+  ## Examples
+
+      iex> ReqLLM.Provider.Registry.get_env_key(:anthropic)
+      "ANTHROPIC_API_KEY"
+
+      iex> ReqLLM.Provider.Registry.get_env_key(:unknown)
+      nil
+  """
+  @spec get_env_key(atom()) :: String.t() | nil
+  def get_env_key(provider_id) when is_atom(provider_id) do
+    # Try metadata first
+    case get_provider_metadata(provider_id) do
+      {:ok, metadata} ->
+        case get_in(metadata, ["provider", "env"]) || get_in(metadata, [:provider, :env]) do
+          [env_var | _] when is_binary(env_var) -> env_var
+          _ -> try_provider_default_env_key(provider_id)
+        end
+
+      _ ->
+        try_provider_default_env_key(provider_id)
+    end
+  end
+
+  defp try_provider_default_env_key(provider_id) do
+    case get_provider(provider_id) do
+      {:ok, provider_module} ->
+        if function_exported?(provider_module, :default_env_key, 0) do
+          provider_module.default_env_key()
+        else
+          nil
+        end
+
+      _ ->
+        nil
+    end
+  end
 end

@@ -31,7 +31,7 @@ defmodule AnthropicToolCallingDemo do
     Enum.each(tools, &IO.puts("   - #{&1.name}: #{&1.description}"))
 
     # Test simple tool calling with raw Req
-    test_simple_tool_calling(tools)
+    # test_simple_tool_calling(tools)
 
     # Test context-based tool calling
     test_context_tool_calling(tools)
@@ -49,7 +49,7 @@ defmodule AnthropicToolCallingDemo do
 
     context =
       ReqLLM.Context.new([
-        user("What's the current time? Also, can you calculate 15 * 8 for me?")
+        user("I need you to use the available tools to help me. Please call the get_time tool to get the current time, and use the calculator tool to calculate 15 * 8.")
       ])
 
     # Manual Req setup with tools
@@ -74,34 +74,82 @@ defmodule AnthropicToolCallingDemo do
         IO.puts("✅ Tool calling request successful!")
         IO.puts("📊 HTTP Status: #{response.status}")
 
-        # Parse the response body using codec
-        case ReqLLM.Context.Codec.decode(response.body) do
-          {:ok, decoded_context} ->
-            IO.puts("✅ Response body decoded!")
-            IO.puts("📝 Messages in response: #{length(decoded_context.messages)}")
+        # Parse the response body by wrapping it first
+        raw_data = response.body
+        IO.puts("📄 Raw response data keys: #{inspect(Map.keys(raw_data))}")
+        IO.puts("📄 Raw content sample: #{inspect(get_in(raw_data, ["content"]))}")
 
-            # Find assistant messages and check for tool calls
-            assistant_messages = Enum.filter(decoded_context.messages, &(&1.role == :assistant))
 
-            Enum.each(assistant_messages, fn msg ->
-              IO.puts("🤖 Assistant message: #{inspect(msg.content)}")
+        wrapped_response = ReqLLM.Providers.Anthropic.wrap_response(raw_data)
 
-              # Check for tool calls in message content
-              case msg.content do
-                [%{type: "tool_use"} | _] = content_blocks ->
-                  tool_calls = Enum.filter(content_blocks, &(&1.type == "tool_use"))
-                  IO.puts("🛠️  Found #{length(tool_calls)} tool calls")
+        # Debug wrapper before decode
+        IO.puts("🔍 Wrapped response structure:")
+        IO.puts("   Type: #{inspect(wrapped_response.__struct__)}")
+        IO.puts("   Payload keys: #{inspect(wrapped_response.payload |> Map.keys())}")
 
-                  Enum.each(tool_calls, fn tool_call ->
-                    IO.puts("   - Tool: #{tool_call.name}")
-                    IO.puts("   - Input: #{inspect(tool_call.input)}")
-                    execute_tool_call_raw(tool_call, tools)
-                  end)
+        # Test decoding directly
+        IO.puts("🧪 Testing direct decode...")
+        direct_result = ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(
+          wrapped_response.payload, 
+          model.model
+        )
+        IO.puts("   Direct decode result: #{inspect(direct_result |> elem(0))}")
+        case direct_result do
+          {:ok, direct_response} ->
+            IO.puts("   Direct message: #{inspect(direct_response.message != nil)}")
+            if direct_response.message do
+              IO.puts("   Direct content parts: #{length(direct_response.message.content)}")
+              Enum.each(direct_response.message.content, fn part ->
+                IO.puts("     Part: #{part.type} - #{inspect(part)}")
+              end)
+            end
+          {:error, err} ->
+            IO.puts("   Direct decode error: #{inspect(err)}")
+        end
 
-                _ ->
-                  IO.puts("💬 Text response (no tool calls)")
+        case ReqLLM.Response.decode_response(raw_data, model) do
+          {:ok, decoded_response} ->
+            IO.puts("✅ Response decoded!")
+            IO.puts("📝 Response text: #{ReqLLM.Response.text(decoded_response)}")
+
+            IO.puts(
+              "🛠️  Tool calls found: #{length(ReqLLM.Response.tool_calls(decoded_response))}"
+            )
+
+            # Extract tool calls from content parts (Anthropic specific)
+            tool_call_parts =
+              if decoded_response.message && decoded_response.message.content do
+                Enum.filter(decoded_response.message.content, &(&1.type == :tool_call))
+              else
+                []
               end
-            end)
+
+            if length(tool_call_parts) > 0 do
+              IO.puts("\n🔧 Processing tool calls:")
+
+              Enum.each(tool_call_parts, fn tool_call ->
+                IO.puts("   - Tool: #{tool_call.tool_name} (ID: #{tool_call.tool_call_id})")
+                execute_tool_call_from_response(tool_call, tools)
+              end)
+            else
+              IO.puts("💬 Text response (no tool calls)")
+            end
+
+            # Also show the raw Anthropic content structure for reference
+            if decoded_response.message && decoded_response.message.content do
+              IO.puts("\n📋 Content structure:")
+
+              Enum.with_index(decoded_response.message.content, 1)
+              |> Enum.each(fn {content, idx} ->
+                IO.puts("   #{idx}. #{inspect(content, limit: :infinity)}")
+              end)
+            else
+              IO.puts("\n📋 No message content found")
+              IO.puts("   Response keys: #{inspect(Map.keys(decoded_response))}")
+              if Map.has_key?(decoded_response, :error) do
+                IO.puts("   Error: #{inspect(decoded_response.error)}")
+              end
+            end
 
           {:error, error} ->
             IO.puts("❌ Response decode failed:")
@@ -126,10 +174,10 @@ defmodule AnthropicToolCallingDemo do
     context =
       ReqLLM.Context.new([
         system(
-          "You are a helpful assistant with access to weather, time, and calculation tools."
+          "You are a helpful assistant with access to weather, time, and calculation tools. Always use the available tools to provide accurate information."
         ),
         user(
-          "I need to plan a meeting. Can you tell me the weather in New York and calculate how much 2.5 hours at $75 per hour would cost?"
+          "I need to plan a meeting. Please use the get_weather tool to tell me the weather in New York and use the calculator tool to calculate how much 2.5 * 75 would cost."
         )
       ])
 
@@ -154,36 +202,88 @@ defmodule AnthropicToolCallingDemo do
         IO.puts("✅ Context-based tool calling request successful!")
         IO.puts("📊 HTTP Status: #{response.status}")
 
-        # Parse the response body
-        case ReqLLM.Context.Codec.decode(response.body) do
-          {:ok, decoded_context} ->
+        # Parse the response body by wrapping it first
+        raw_data = response.body
+        IO.puts("📄 Raw response data keys: #{inspect(Map.keys(raw_data))}")
+        IO.puts("📄 Raw content sample: #{inspect(get_in(raw_data, ["content"]))}")
+
+
+        wrapped_response = ReqLLM.Providers.Anthropic.wrap_response(raw_data)
+
+        # Debug wrapper before decode
+        IO.puts("🔍 Wrapped response structure:")
+        IO.puts("   Type: #{inspect(wrapped_response.__struct__)}")
+        IO.puts("   Payload keys: #{inspect(wrapped_response.payload |> Map.keys())}")
+
+        # Test decoding directly
+        IO.puts("🧪 Testing direct decode...")
+        direct_result = ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(
+          wrapped_response.payload, 
+          model.model
+        )
+        IO.puts("   Direct decode result: #{inspect(direct_result |> elem(0))}")
+        case direct_result do
+          {:ok, direct_response} ->
+            IO.puts("   Direct message: #{inspect(direct_response.message != nil)}")
+            if direct_response.message do
+              IO.puts("   Direct content parts: #{length(direct_response.message.content)}")
+              Enum.each(direct_response.message.content, fn part ->
+                IO.puts("     Part: #{part.type} - #{inspect(part)}")
+              end)
+            end
+          {:error, err} ->
+            IO.puts("   Direct decode error: #{inspect(err)}")
+        end
+
+        case ReqLLM.Response.decode_response(raw_data, model) do
+          {:ok, decoded_response} ->
             IO.puts("✅ Response decoded!")
-            IO.puts("📝 Total messages: #{length(decoded_context.messages)}")
+            IO.puts("📝 Response text: #{ReqLLM.Response.text(decoded_response)}")
 
-            # Show all messages and process tool calls
-            decoded_context.messages
-            |> Enum.with_index(1)
-            |> Enum.each(fn {msg, idx} ->
-              IO.puts("   #{idx}. #{msg.role}: #{inspect(msg.content)}")
+            IO.puts(
+              "🛠️  Tool calls found: #{length(ReqLLM.Response.tool_calls(decoded_response))}"
+            )
 
-              # Process tool calls if this is an assistant message
-              if msg.role == :assistant do
-                case msg.content do
-                  [%{type: "tool_use"} | _] = content_blocks ->
-                    tool_calls = Enum.filter(content_blocks, &(&1.type == "tool_use"))
-
-                    Enum.each(tool_calls, fn tool_call ->
-                      execute_tool_call_raw(tool_call, tools)
-                    end)
-
-                  _ ->
-                    :ok
-                end
+            # Extract tool calls from content parts (Anthropic specific)
+            tool_call_parts =
+              if decoded_response.message && decoded_response.message.content do
+                Enum.filter(decoded_response.message.content, &(&1.type == :tool_call))
+              else
+                []
               end
-            end)
+
+            if length(tool_call_parts) > 0 do
+              IO.puts("\n🔧 Processing tool calls:")
+
+              Enum.with_index(tool_call_parts, 1)
+              |> Enum.each(fn {tool_call, idx} ->
+                IO.puts("   #{idx}. Tool: #{tool_call.tool_name} (ID: #{tool_call.tool_call_id})")
+                execute_tool_call_from_response(tool_call, tools)
+              end)
+            else
+              IO.puts("💬 Text response (no tool calls)")
+            end
+
+            # Show the full message structure for debugging
+            IO.puts("\n🔍 Message structure:")
+            if decoded_response.message do
+              IO.puts("   Role: #{decoded_response.message.role}")
+              IO.puts("   Content parts: #{length(decoded_response.message.content)}")
+
+              Enum.with_index(decoded_response.message.content, 1)
+              |> Enum.each(fn {content, idx} ->
+                IO.puts("   #{idx}. #{inspect(content, limit: :infinity)}")
+              end)
+            else
+              IO.puts("   ❌ No message found in response")
+              IO.puts("   Response keys: #{inspect(Map.keys(decoded_response))}")
+              if Map.has_key?(decoded_response, :error) do
+                IO.puts("   Error: #{inspect(decoded_response.error)}")
+              end
+            end
 
           {:error, error} ->
-            IO.puts("❌ Context decode failed:")
+            IO.puts("❌ Response decode failed:")
             IO.inspect(error, pretty: true)
         end
 
@@ -193,10 +293,13 @@ defmodule AnthropicToolCallingDemo do
     end
   end
 
-  defp execute_tool_call_raw(tool_call, available_tools) do
-    name = tool_call.name
+  defp execute_tool_call_from_response(
+         %ReqLLM.Message.ContentPart{type: :tool_call} = tool_call,
+         available_tools
+       ) do
+    name = tool_call.tool_name
     args = tool_call.input || %{}
-    id = tool_call.id
+    id = tool_call.tool_call_id
 
     IO.puts("\n🔧 Executing tool: #{name} (ID: #{id})")
     IO.puts("   Arguments: #{inspect(args)}")
@@ -219,6 +322,8 @@ defmodule AnthropicToolCallingDemo do
         end
     end
   end
+
+
 
   defp create_demo_tools do
     [
