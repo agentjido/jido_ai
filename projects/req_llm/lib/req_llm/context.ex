@@ -23,6 +23,8 @@ defmodule ReqLLM.Context do
   alias ReqLLM.Message
   alias ReqLLM.Message.ContentPart
 
+  @derive Jason.Encoder
+
   typedstruct enforce: true do
     field(:messages, [Message.t()], default: [])
   end

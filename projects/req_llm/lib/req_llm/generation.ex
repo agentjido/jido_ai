@@ -24,6 +24,7 @@ defmodule ReqLLM.Generation do
                         doc: "Maximum number of tokens to generate"
                       ],
                       top_p: [type: :float, doc: "Nucleus sampling parameter"],
+                      top_k: [type: :pos_integer, doc: "Top-k sampling parameter"],
                       presence_penalty: [
                         type: :float,
                         doc: "Penalize new tokens based on presence"
@@ -31,6 +32,18 @@ defmodule ReqLLM.Generation do
                       frequency_penalty: [
                         type: :float,
                         doc: "Penalize new tokens based on frequency"
+                      ],
+                      stop_sequences: [
+                        type: {:list, :string},
+                        doc: "Stop sequences to halt generation"
+                      ],
+                      response_format: [
+                        type: :map,
+                        doc: "Format for the response (e.g., JSON mode)"
+                      ],
+                      thinking: [
+                        type: :boolean,
+                        doc: "Enable thinking/reasoning tokens (beta feature)"
                       ],
                       tools: [type: :any, doc: "List of tool definitions"],
                       tool_choice: [

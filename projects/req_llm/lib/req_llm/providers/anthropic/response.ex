@@ -34,6 +34,9 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
     rescue
       error ->
         {:error, error}
+    catch
+      {:decode_error, reason} ->
+        {:error, %ReqLLM.Error.API.Response{reason: reason}}
     end
   end
 
@@ -88,6 +91,9 @@ defimpl ReqLLM.Response.Codec, for: Map do
         result
       rescue
         error -> {:error, error}
+      catch
+        {:decode_error, reason} ->
+          {:error, %ReqLLM.Error.API.Response{reason: reason}}
       end
     else
       {:error, :not_implemented}
@@ -136,13 +142,21 @@ defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
       case raw_content do
         content when is_list(content) ->
           # Call decode_content_blocks directly since we just need to convert content blocks
-          chunks =
-            content
-            |> Enum.map(&decode_content_block/1)
-            |> List.flatten()
-            |> Enum.reject(&is_nil/1)
+          results = Enum.map(content, &decode_content_block/1)
 
-          chunks
+          # Check for errors in results
+          case Enum.find(results, &match?({:error, _}, &1)) do
+            {:error, reason} ->
+              throw({:decode_error, reason})
+
+            nil ->
+              chunks =
+                results
+                |> List.flatten()
+                |> Enum.reject(&is_nil/1)
+
+              chunks
+          end
 
         _ ->
           []
@@ -247,6 +261,10 @@ defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
   # Helper functions for content decoding (copied from Context)
   def decode_content_block(%{"type" => "text", "text" => text}) when is_binary(text) do
     [ReqLLM.StreamChunk.text(text)]
+  end
+
+  def decode_content_block(%{"type" => "text", "text" => nil}) do
+    {:error, "Text content cannot be nil"}
   end
 
   def decode_content_block(%{"type" => "text"}) do
