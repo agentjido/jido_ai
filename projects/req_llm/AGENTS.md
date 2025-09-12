@@ -9,6 +9,8 @@ ReqLLM is a composable Elixir library for AI interactions built on Req, providin
 - `mix test` - Run all tests
 - `mix test test/req_llm_test.exs` - Run specific test file
 - `mix test --only describe:"model/1 top-level API"` - Run specific describe block
+- `LIVE=true mix test` - Run the same test suites against the real APIs and (re)generate fixtures
+- `FIXTURE_FILTER=anthropic mix test` - Limit fixture regeneration to a single provider (supported by LiveFixture)
 - `mix compile` - Compile the project
 - `mix quality` or `mix q` - Run quality checks (format, compile --warnings-as-errors, dialyzer, credo)
 
@@ -24,8 +26,11 @@ ReqLLM is a composable Elixir library for AI interactions built on Req, providin
 - `lib/req_llm.ex` - Main API facade with generate_text/3, stream_text/3, generate_object/4
 - `lib/req_llm/` - Core modules (Model, Provider, Plugin, Error structures)
 - `lib/req_llm/providers/` - Provider-specific implementations (Anthropic, etc.)
-- `test/` - Test files following ExUnit patterns
-- `test/support/` - Test support modules and helpers
+- `test/` - Consolidated capability-oriented test suites
+  - `core_test.exs`, `streaming_test.exs`, `tool_calling_test.exs`, etc.
+  - `coverage/<provider>/` - Optional provider-specific capability tests
+  - `support/` - shared helpers (e.g. `live_fixture.ex`, factories)
+  - Test files are intentionally few and broad; new behavior should extend an existing suite when possible instead of adding many micro-tests
 
 ### Plugin Architecture
 - Each provider implements `ReqLLM.Plugin` behavior with `attach/2` and `parse/2` callbacks
@@ -55,8 +60,27 @@ ReqLLM is a composable Elixir library for AI interactions built on Req, providin
 - Use Splode error types: `ReqLLM.Error.API`, `ReqLLM.Error.Parse`, `ReqLLM.Error.Auth`
 - Include helpful error messages and context in error structs
 
-### Testing
-- Use ExUnit with `async: true` for most tests
-- Group related tests in `describe` blocks
-- Use descriptive test names that explain the expected behavior
-- Mock HTTP requests using Mimic for provider integration tests
+### Testing & Fixture Workflow
+- Tests are grouped by *capability*, not by individual function-call
+- All suites use `ReqLLM.Test.LiveFixture.use_fixture/3` to abstract live vs cached responses
+- Cached JSON fixtures live next to the test in `fixtures/<provider>/<test_name>.json` and are automatically written when the `LIVE=true` env-var is set
+- Most suites run `async: true`. Suites that write fixtures are forced to synchronous execution via `@moduletag :capture_log`
+- Mimic is still used for boundary mocks (timeouts, network-errors) that cannot be recorded
+
+```elixir
+defmodule CoreTest do
+  use ReqLLM.Test.LiveFixture, provider: :openai
+  use ExUnit.Case, async: true
+
+  describe "generate_text/3" do
+    test "basic happy-path" do
+      {:ok, text} =
+        use_fixture(:provider, "core-basic", fn ->
+          ReqLLM.generate_text!("openai:gpt-4o", "Hello!")
+        end)
+
+      assert text =~ "Hello"
+    end
+  end
+end
+```

@@ -1,11 +1,11 @@
 defmodule ReqLLM.Test.LiveFixture do
   @moduledoc """
   Simple test fixture helper for live API calls vs cached responses.
-  
+
   Set LIVE=true to run against live APIs and cache results.
   Otherwise, use cached fixtures for fast testing.
   """
-  
+
   require Logger
 
   @doc """
@@ -29,12 +29,12 @@ defmodule ReqLLM.Test.LiveFixture do
   defp save_fixture(provider, name, result) do
     fixture_path = fixture_path(provider, name)
     File.mkdir_p!(Path.dirname(fixture_path))
-    
+
     fixture_data = %{
       captured_at: DateTime.utc_now() |> DateTime.to_iso8601(),
       result: serialize_result(result)
     }
-    
+
     File.write!(fixture_path, Jason.encode!(fixture_data, pretty: true))
     Logger.debug("Saved fixture: #{provider}/#{name}")
   end
@@ -55,11 +55,11 @@ defmodule ReqLLM.Test.LiveFixture do
   # Load result from JSON fixture  
   defp load_fixture(provider, name) do
     fixture_path = fixture_path(provider, name)
-    
+
     unless File.exists?(fixture_path) do
       raise "Fixture not found: #{fixture_path}. Run with LIVE=true to capture it."
     end
-    
+
     fixture_path
     |> File.read!()
     |> Jason.decode!()
@@ -88,7 +88,7 @@ defmodule ReqLLM.Test.LiveFixture do
   defp rebuild_response(data) do
     %ReqLLM.Response{
       id: data["id"],
-      model: data["model"], 
+      model: data["model"],
       context: rebuild_context(data["context"]),
       message: rebuild_message(data["message"]),
       stream?: data["stream?"] || false,
@@ -101,11 +101,13 @@ defmodule ReqLLM.Test.LiveFixture do
   end
 
   defp rebuild_context(nil), do: nil
+
   defp rebuild_context(%{"messages" => messages}) do
     %ReqLLM.Context{messages: Enum.map(messages, &rebuild_message/1)}
   end
 
   defp rebuild_message(nil), do: nil
+
   defp rebuild_message(%{"role" => role, "content" => content} = data) do
     %ReqLLM.Message{
       role: String.to_atom(role),
@@ -121,7 +123,7 @@ defmodule ReqLLM.Test.LiveFixture do
     %ReqLLM.Message.ContentPart{
       type: String.to_atom(type),
       text: data["text"],
-      url: data["url"], 
+      url: data["url"],
       data: data["data"],
       media_type: data["media_type"],
       filename: data["filename"],
