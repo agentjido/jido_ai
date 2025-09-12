@@ -1,4 +1,4 @@
-defmodule Mix.Tasks.ReqLLM.ModelSync do
+defmodule Mix.Tasks.ReqLlm.ModelSync do
   @moduledoc """
   Simplified model synchronization task.
 

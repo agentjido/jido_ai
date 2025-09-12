@@ -89,12 +89,12 @@ defmodule ReqLLM.Response do
   """
   @spec tool_calls(t()) :: [term()]
   def tool_calls(%__MODULE__{message: nil}), do: []
-  
+
   def tool_calls(%__MODULE__{message: %Message{tool_calls: tool_calls}})
       when is_list(tool_calls) do
     tool_calls
   end
-  
+
   def tool_calls(%__MODULE__{message: %Message{tool_calls: nil, content: content}})
       when is_list(content) do
     # Extract tool calls from content parts (e.g., for Anthropic)
@@ -108,7 +108,7 @@ defmodule ReqLLM.Response do
       }
     end)
   end
-  
+
   def tool_calls(%__MODULE__{message: %Message{tool_calls: nil}}), do: []
 
   @doc """

@@ -3,6 +3,144 @@
     {
       "attachment": true,
       "cost": {
+        "cache_read": 0.08,
+        "cache_write": 1,
+        "input": 0.8,
+        "output": 4
+      },
+      "experimental": true,
+      "id": "claude-3-5-haiku",
+      "knowledge": "2024-07-31",
+      "last_updated": "2024-10-22",
+      "limit": {
+        "context": 200000,
+        "output": 8192
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Claude Haiku 3.5",
+      "open_weights": false,
+      "provider": "opencode",
+      "provider_model_id": "claude-3-5-haiku",
+      "reasoning": false,
+      "release_date": "2024-10-22",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": true,
+      "cost": {
+        "cache_read": 1.5,
+        "cache_write": 18.75,
+        "input": 15,
+        "output": 75,
+        "reasoning": 75
+      },
+      "experimental": true,
+      "id": "claude-opus-4-1",
+      "knowledge": "2025-03-31",
+      "last_updated": "2025-08-05",
+      "limit": {
+        "context": 200000,
+        "output": 32000
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Claude Opus 4.1",
+      "open_weights": false,
+      "provider": "opencode",
+      "provider_model_id": "claude-opus-4-1",
+      "reasoning": true,
+      "release_date": "2025-08-05",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": true,
+      "cost": {
+        "cache_read": 0.3,
+        "cache_write": 3.75,
+        "input": 3,
+        "output": 15,
+        "reasoning": 15
+      },
+      "experimental": true,
+      "id": "claude-sonnet-4",
+      "knowledge": "2025-03-31",
+      "last_updated": "2025-05-22",
+      "limit": {
+        "context": 200000,
+        "output": 64000
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Claude Sonnet 4",
+      "open_weights": false,
+      "provider": "opencode",
+      "provider_model_id": "claude-sonnet-4",
+      "reasoning": true,
+      "release_date": "2025-05-22",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": true,
+      "cost": {
+        "cache_read": 0.125,
+        "input": 1.25,
+        "output": 10,
+        "reasoning": 10
+      },
+      "experimental": true,
+      "id": "gpt-5",
+      "knowledge": "2024-09-30",
+      "last_updated": "2025-08-07",
+      "limit": {
+        "context": 400000,
+        "output": 128000
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "GPT-5",
+      "open_weights": false,
+      "provider": "opencode",
+      "provider_model_id": "gpt-5",
+      "reasoning": true,
+      "release_date": "2025-08-07",
+      "temperature": false,
+      "tool_call": true
+    },
+    {
+      "attachment": true,
+      "cost": {
         "cache_read": 0,
         "cache_write": 0,
         "input": 0,
@@ -35,10 +173,41 @@
     {
       "attachment": false,
       "cost": {
-        "input": 0.3,
-        "output": 1.2
+        "input": 0.6,
+        "output": 2.5
       },
-      "id": "qwen/qwen3-coder",
+      "experimental": true,
+      "id": "kimi-k2",
+      "knowledge": "2024-10",
+      "last_updated": "2025-09-05",
+      "limit": {
+        "context": 262144,
+        "output": 262144
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Kimi K2",
+      "open_weights": true,
+      "provider": "opencode",
+      "provider_model_id": "kimi-k2",
+      "reasoning": false,
+      "release_date": "2025-09-05",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 0.45,
+        "output": 1.8
+      },
+      "id": "qwen3-coder",
       "knowledge": "2025-04",
       "last_updated": "2025-07-23",
       "limit": {
@@ -56,7 +225,7 @@
       "name": "Qwen3 Coder",
       "open_weights": true,
       "provider": "opencode",
-      "provider_model_id": "qwen/qwen3-coder",
+      "provider_model_id": "qwen3-coder",
       "reasoning": false,
       "release_date": "2025-07-23",
       "temperature": true,

@@ -42,16 +42,6 @@ defmodule ReqLLM.Generation do
                       reasoning: [
                         type: {:in, [nil, false, true, "low", "auto", "high"]},
                         doc: "Request reasoning tokens from the model"
-                      ],
-                      stream_format: [
-                        type: {:in, [:sse, :chunked, :json]},
-                        default: :sse,
-                        doc: "Provider specific streaming transport format"
-                      ],
-                      chunk_timeout: [
-                        type: :pos_integer,
-                        default: 30_000,
-                        doc: "How long to wait between chunks before aborting (ms)"
                       ]
                     )
 
@@ -100,16 +90,10 @@ defmodule ReqLLM.Generation do
          {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
          context <- build_context(messages, validated_opts),
-         # Merge model options with validated opts for request options
-         request_options <- prepare_request_options(context, model, validated_opts),
-         request =
-           Req.new(
-             method: :post,
-             receive_timeout: 30_000
-           ),
-         configured_request <- provider_module.attach(request, model, request_options),
-         {:ok, %Req.Response{body: tagged_response}} <- Req.request(configured_request),
-         {:ok, response} <- Response.decode_response(tagged_response, model) do
+         {:ok, configured_request} <-
+           provider_module.prepare_request(:chat, model, context, validated_opts),
+         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request),
+         {:ok, response} <- Response.decode_response(decoded_response, model) do
       {:ok, response}
     end
   end
@@ -174,11 +158,10 @@ defmodule ReqLLM.Generation do
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
          stream_opts = Keyword.put(validated_opts, :stream?, true),
          context <- build_context(messages, stream_opts),
-         request_options <- prepare_request_options(context, model, stream_opts),
-         request = Req.new(method: :post),
-         configured_request <- provider_module.attach(request, model, request_options),
-         {:ok, %Req.Response{body: tagged_response}} <- Req.request(configured_request),
-         {:ok, response} <- Response.decode_response(tagged_response, model) do
+         {:ok, configured_request} <-
+           provider_module.prepare_request(:chat, model, context, stream_opts),
+         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request),
+         {:ok, response} <- Response.decode_response(decoded_response, model) do
       {:ok, response}
     end
   end
@@ -207,103 +190,6 @@ defmodule ReqLLM.Generation do
   def stream_text!(model_spec, messages, opts \\ []) do
     case stream_text(model_spec, messages, opts) do
       {:ok, response} -> {:ok, Response.text_stream(response)}
-      {:error, error} -> {:error, error}
-    end
-  end
-
-  @doc """
-  Extracts token usage information from a ReqLLM result.
-
-  Designed to be used in a pipeline after `generate_text` or `stream_text` calls.
-  Works with both Response objects (from `generate_text/3`) and plain results (from `generate_text!/3`).
-
-  ## Parameters
-
-    * `result` - The result tuple from any ReqLLM function
-
-  ## Examples
-
-      # Generate text with usage info - pipeline style
-      {:ok, text, usage} = 
-        ReqLLM.Generation.generate_text("openai:gpt-4o", "Hello")
-        |> ReqLLM.Generation.with_usage()
-      
-      usage
-      #=> %{tokens: %{input: 10, output: 15}, cost: 0.00075}
-
-      # Works with bang functions too (returns nil usage)
-      {:ok, text, usage} = 
-        ReqLLM.Generation.generate_text!("openai:gpt-4o", "Hello")
-        |> ReqLLM.Generation.with_usage()
-      
-      usage  #=> nil
-
-      # Stream text with usage info
-      {:ok, stream, usage} = 
-        ReqLLM.Generation.stream_text("openai:gpt-4o", "Hello")
-        |> ReqLLM.Generation.with_usage()
-
-  """
-  @spec with_usage({:ok, any()} | {:error, term()}) ::
-          {:ok, String.t() | Enumerable.t(), map() | nil} | {:error, term()}
-  def with_usage({:ok, %Response{} = response}) do
-    # Extract usage from ReqLLM.Response
-    usage = Response.usage(response)
-
-    content =
-      if response.stream?, do: Response.text_stream(response), else: Response.text(response)
-
-    {:ok, content, usage}
-  end
-
-  def with_usage({:ok, result}) do
-    # Graceful passthrough for results without response metadata (like from bang functions)
-    {:ok, result, nil}
-  end
-
-  def with_usage({:error, error}) do
-    {:error, error}
-  end
-
-  @doc """
-  Extracts cost information from a ReqLLM result.
-
-  Designed to be used in a pipeline after `generate_text` or `stream_text` calls.
-  Works with both Response objects (from `generate_text/3`) and plain results (from `generate_text!/3`).
-
-  ## Parameters
-
-    * `result` - The result tuple from any ReqLLM function
-
-  ## Examples
-
-      # Generate text with cost info - pipeline style
-      {:ok, text, cost} = 
-        ReqLLM.Generation.generate_text("openai:gpt-4o", "Hello")
-        |> ReqLLM.Generation.with_cost()
-      
-      cost
-      #=> 0.00075
-
-      # Works with bang functions too (returns nil cost)
-      {:ok, text, cost} = 
-        ReqLLM.Generation.generate_text!("openai:gpt-4o", "Hello")
-        |> ReqLLM.Generation.with_cost()
-      
-      cost  #=> nil
-
-      # Stream text with cost info - pipeline style
-      {:ok, stream, cost} = 
-        ReqLLM.Generation.stream_text("openai:gpt-4o", "Hello")
-        |> ReqLLM.Generation.with_cost()
-
-  """
-  @spec with_cost({:ok, any()} | {:error, term()}) ::
-          {:ok, String.t() | Enumerable.t(), float() | nil} | {:error, term()}
-  def with_cost(result) do
-    case with_usage(result) do
-      {:ok, content, %{cost: cost}} -> {:ok, content, cost}
-      {:ok, content, _} -> {:ok, content, nil}
       {:error, error} -> {:error, error}
     end
   end
@@ -349,34 +235,6 @@ defmodule ReqLLM.Generation do
       system_text when is_binary(system_text) ->
         system_msg = Context.system(system_text)
         Context.new([system_msg | Context.to_list(context)])
-    end
-  end
-
-  defp prepare_request_options(context, model, validated_opts) do
-    # Build options that the provider attach/3 function expects
-    model_options =
-      [
-        model: model.model,
-        context: context,
-        temperature: validated_opts[:temperature],
-        max_tokens: validated_opts[:max_tokens],
-        top_p: validated_opts[:top_p],
-        presence_penalty: validated_opts[:presence_penalty],
-        frequency_penalty: validated_opts[:frequency_penalty],
-        tools: validated_opts[:tools],
-        tool_choice: validated_opts[:tool_choice],
-        stream: validated_opts[:stream?],
-        system: validated_opts[:system_prompt]
-      ]
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-
-    # Add provider-specific options if present
-    case validated_opts[:provider_options] do
-      nil ->
-        model_options
-
-      provider_opts when is_map(provider_opts) ->
-        Keyword.merge(model_options, Map.to_list(provider_opts))
     end
   end
 end

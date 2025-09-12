@@ -4,7 +4,7 @@ defmodule ReqLLM.Context.CodecTest do
   alias ReqLLM.{Context, Message, StreamChunk}
   alias ReqLLM.Context.Codec
   alias ReqLLM.Message.ContentPart
-  alias ReqLLM.Providers.{OpenAI}
+  alias ReqLLM.Providers.OpenAI
   alias ReqLLM.Providers.Anthropic
 
   # Common test fixtures
@@ -206,7 +206,7 @@ defmodule ReqLLM.Context.CodecTest do
 
   describe "OpenAI codec implementation" do
     test "basic encoding", %{simple_context: context} do
-      tagged = %OpenAI{context: context}
+      tagged = %OpenAI.Context{context: context}
       encoded = Codec.encode_request(tagged)
 
       assert length(encoded.messages) == 1
@@ -215,7 +215,7 @@ defmodule ReqLLM.Context.CodecTest do
     end
 
     test "system message handling", %{system_context: context} do
-      tagged = %OpenAI{context: context}
+      tagged = %OpenAI.Context{context: context}
       encoded = Codec.encode_request(tagged)
 
       assert length(encoded.messages) == 3
@@ -226,7 +226,7 @@ defmodule ReqLLM.Context.CodecTest do
     test "content encoding - single text vs multi-part" do
       # Single text becomes string
       single_text = Context.new([Context.user("Simple")])
-      tagged = %OpenAI{context: single_text}
+      tagged = %OpenAI.Context{context: single_text}
       encoded = Codec.encode_request(tagged)
       assert hd(encoded.messages)["content"] == "Simple"
 
@@ -234,7 +234,7 @@ defmodule ReqLLM.Context.CodecTest do
       parts = [ContentPart.text("Text"), ContentPart.image("data", "image/png")]
       multi_message = %Message{role: :user, content: parts}
       multi_context = Context.new([multi_message])
-      tagged = %OpenAI{context: multi_context}
+      tagged = %OpenAI.Context{context: multi_context}
       encoded = Codec.encode_request(tagged)
 
       content = hd(encoded.messages)["content"]
@@ -251,7 +251,7 @@ defmodule ReqLLM.Context.CodecTest do
 
       message = %Message{role: :assistant, content: parts}
       context = Context.new([message])
-      tagged = %OpenAI{context: context}
+      tagged = %OpenAI.Context{context: context}
       encoded = Codec.encode_request(tagged)
 
       content = hd(encoded.messages)["content"]
@@ -278,7 +278,7 @@ defmodule ReqLLM.Context.CodecTest do
     test "response decoding - text and tool calls" do
       # Text response
       text_response = %{"choices" => [%{"message" => %{"content" => "Hello world"}}]}
-      tagged = %OpenAI{context: text_response}
+      tagged = %OpenAI.Context{context: text_response}
       chunks = Codec.decode_response(tagged)
       assert length(chunks) == 1
       assert hd(chunks) == StreamChunk.text("Hello world")
@@ -302,7 +302,7 @@ defmodule ReqLLM.Context.CodecTest do
         ]
       }
 
-      tagged = %OpenAI{context: tool_response}
+      tagged = %OpenAI.Context{context: tool_response}
       chunks = Codec.decode_response(tagged)
       assert length(chunks) == 1
 
@@ -316,7 +316,7 @@ defmodule ReqLLM.Context.CodecTest do
     test "response decoding edge cases" do
       # Empty content
       empty_response = %{"choices" => [%{"message" => %{"content" => ""}}]}
-      tagged = %OpenAI{context: empty_response}
+      tagged = %OpenAI.Context{context: empty_response}
       chunks = Codec.decode_response(tagged)
       assert chunks == []
 
@@ -339,14 +339,14 @@ defmodule ReqLLM.Context.CodecTest do
         ]
       }
 
-      tagged = %OpenAI{context: bad_json_response}
+      tagged = %OpenAI.Context{context: bad_json_response}
       chunks = Codec.decode_response(tagged)
       assert length(chunks) == 1
       assert hd(chunks).arguments == %{}
 
       # Malformed responses
       malformed = %{"choices" => [%{"message" => %{}}]}
-      tagged = %OpenAI{context: malformed}
+      tagged = %OpenAI.Context{context: malformed}
       chunks = Codec.decode_response(tagged)
       assert chunks == []
     end
@@ -393,7 +393,7 @@ defmodule ReqLLM.Context.CodecTest do
 
     test "OpenAI encode-decode preserves message structure", %{system_context: context} do
       # Encode to OpenAI format
-      tagged = %OpenAI{context: context}
+      tagged = %OpenAI.Context{context: context}
       encoded = Codec.encode_request(tagged)
 
       assert length(encoded.messages) == 3
@@ -412,7 +412,7 @@ defmodule ReqLLM.Context.CodecTest do
       }
 
       # Decode response
-      response_tagged = %OpenAI{context: response_data}
+      response_tagged = %OpenAI.Context{context: response_data}
       chunks = Codec.decode_response(response_tagged)
 
       assert length(chunks) == 1
@@ -441,7 +441,7 @@ defmodule ReqLLM.Context.CodecTest do
       assert anthropic_types == ["text", "tool_use", "text", "tool_use", "text"]
 
       # Test OpenAI ordering  
-      openai_tagged = %OpenAI{context: context}
+      openai_tagged = %OpenAI.Context{context: context}
       openai_encoded = Codec.encode_request(openai_tagged)
       openai_content = hd(openai_encoded.messages)["content"]
       openai_types = Enum.map(openai_content, & &1["type"])
@@ -460,7 +460,7 @@ defmodule ReqLLM.Context.CodecTest do
       assert hd(hd(anthropic_encoded.messages).content)["text"] == unicode_text
 
       # Test OpenAI
-      openai_tagged = %OpenAI{context: context}
+      openai_tagged = %OpenAI.Context{context: context}
       openai_encoded = Codec.encode_request(openai_tagged)
       assert hd(openai_encoded.messages)["content"] == unicode_text
     end
@@ -478,7 +478,7 @@ defmodule ReqLLM.Context.CodecTest do
       assert String.length(encoded_text) > 15000
       assert encoded_text == large_text
 
-      openai_tagged = %OpenAI{context: large_context}
+      openai_tagged = %OpenAI.Context{context: large_context}
       openai_encoded = Codec.encode_request(openai_tagged)
       assert hd(openai_encoded.messages)["content"] == large_text
     end
@@ -516,7 +516,7 @@ defmodule ReqLLM.Context.CodecTest do
       anthropic_encoded = Codec.encode_request(anthropic_tagged)
       assert is_map(anthropic_encoded)
 
-      openai_tagged = %OpenAI{context: context}
+      openai_tagged = %OpenAI.Context{context: context}
       openai_encoded = Codec.encode_request(openai_tagged)
       assert is_map(openai_encoded)
     end

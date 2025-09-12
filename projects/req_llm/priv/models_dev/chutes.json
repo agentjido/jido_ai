@@ -416,6 +416,64 @@
     {
       "attachment": false,
       "cost": {
+        "input": 0.06664,
+        "output": 0.266688
+      },
+      "id": "moonshotai/Kimi-Dev-72B",
+      "last_updated": "2024-12-01",
+      "limit": {
+        "context": 131072,
+        "output": 131072
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Kimi Dev 72B",
+      "open_weights": false,
+      "provider": "chutes",
+      "provider_model_id": "moonshotai/Kimi-Dev-72B",
+      "reasoning": false,
+      "release_date": "2024-12-01",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 0.296176,
+        "output": 1.18528
+      },
+      "id": "moonshotai/Kimi-K2-Instruct-0905",
+      "last_updated": "2024-09-05",
+      "limit": {
+        "context": 262144,
+        "output": 262144
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Kimi K2 Instruct 0905",
+      "open_weights": false,
+      "provider": "chutes",
+      "provider_model_id": "moonshotai/Kimi-K2-Instruct-0905",
+      "reasoning": false,
+      "release_date": "2024-09-05",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
         "input": 0.15,
         "output": 0.59
       },
@@ -439,6 +497,36 @@
       "provider_model_id": "moonshotai/Kimi-K2-Instruct-75k",
       "reasoning": false,
       "release_date": "2025-08-01",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 0.02499,
+        "output": 0.100008
+      },
+      "id": "moonshotai/Kimi-VL-A3B-Thinking",
+      "last_updated": "2024-12-01",
+      "limit": {
+        "context": 131072,
+        "output": 131072
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Kimi VL A3B Thinking",
+      "open_weights": false,
+      "provider": "chutes",
+      "provider_model_id": "moonshotai/Kimi-VL-A3B-Thinking",
+      "reasoning": true,
+      "release_date": "2024-12-01",
       "temperature": true,
       "tool_call": true
     },

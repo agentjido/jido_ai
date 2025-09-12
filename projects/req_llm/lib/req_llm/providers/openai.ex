@@ -6,18 +6,18 @@ defmodule ReqLLM.Providers.OpenAI do
   - Text generation with GPT models
   - Streaming responses
   - Tool calling
-  - Multi-modal inputs (text and images for vision models)
+  - Multi-modal inputs (text and images)
 
   ## Configuration
 
-  Set your OpenAI API key via environment variable:
+  Set your OpenAI API key via JidoKeys:
 
-      export OPENAI_API_KEY="your-api-key-here"
+      JidoKeys.put("OPENAI_API_KEY", "your-api-key-here")
 
   ## Examples
 
       # Simple text generation
-      model = ReqLLM.Model.from("openai:gpt-4o-mini")
+      model = ReqLLM.Model.from("openai:gpt-4")
       {:ok, response} = ReqLLM.generate_text(model, "Hello!")
 
       # Streaming
@@ -31,281 +31,188 @@ defmodule ReqLLM.Providers.OpenAI do
 
   @behaviour ReqLLM.Provider
 
+  import ReqLLM.Provider.Utils,
+    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
+
   use ReqLLM.Provider.DSL,
     id: :openai,
     base_url: "https://api.openai.com/v1",
-    metadata: "priv/models_dev/openai.json"
+    metadata: "priv/models_dev/openai.json",
+    default_env_key: "OPENAI_API_KEY",
+    context_wrapper: ReqLLM.Providers.OpenAI.Context,
+    response_wrapper: ReqLLM.Providers.OpenAI.Response,
+    provider_schema: [
+      temperature: [type: :float, default: 0.7],
+      max_tokens: [type: :pos_integer, default: 1024],
+      stream: [type: :boolean, default: false],
+      tools: [type: {:list, :map}],
+      top_p: [type: :float],
+      frequency_penalty: [type: :float],
+      presence_penalty: [type: :float],
+      stop: [type: {:or, [{:list, :string}, :string]}]
+    ]
 
-  defstruct [:context]
+  @doc """
+  Attaches the OpenAI plugin to a Req request.
 
-  @type t :: %__MODULE__{context: ReqLLM.Context.t()}
+  ## Parameters
 
-  @spec new(ReqLLM.Context.t()) :: t()
-  def new(context), do: %__MODULE__{context: context}
+    * `request` - The Req request to attach to
+    * `model_input` - The model (ReqLLM.Model struct, string, or tuple) that triggers this provider
+    * `opts` - Options keyword list (validated against comprehensive schema)
 
+  ## Request Options
+
+    * `:temperature` - Controls randomness (0.0-2.0). Defaults to 0.7
+    * `:max_tokens` - Maximum tokens to generate. Defaults to 1024
+    * `:stream?` - Enable streaming responses. Defaults to false
+    * `:base_url` - Override base URL. Defaults to provider default
+    * `:messages` - Chat messages to send
+    * All options from ReqLLM.Provider.Options schemas are supported
+
+  """
   @impl ReqLLM.Provider
-  def wrap_context(%ReqLLM.Context{} = ctx) do
-    %__MODULE__{context: ctx}
+  def prepare_request(:chat, model_input, %ReqLLM.Context{} = context, opts) do
+    with {:ok, model} <- ReqLLM.Model.from(model_input) do
+      http_opts = Keyword.get(opts, :req_http_options, [])
+
+      request =
+        Req.new([url: "/chat/completions", method: :post, receive_timeout: 30_000] ++ http_opts)
+        |> attach(model, Keyword.put(opts, :context, context))
+
+      {:ok, request}
+    end
   end
 
-  @impl ReqLLM.Provider
-  def attach(request, %ReqLLM.Model{} = model, opts \\ []) do
-    jido_key = get_env_var_name() |> String.downcase() |> String.to_atom()
+  def prepare_request(operation, _model, _input, _opts) do
+    {:error,
+     ReqLLM.Error.Invalid.Parameter.exception(
+       parameter:
+         "operation: #{inspect(operation)} not supported by OpenAI provider. Supported operations: [:chat]"
+     )}
+  end
 
-    api_key = JidoKeys.get(jido_key)
+  @spec attach(Req.Request.t(), ReqLLM.Model.t() | String.t() | {atom(), keyword()}, keyword()) ::
+          Req.Request.t()
+  @impl ReqLLM.Provider
+  def attach(%Req.Request{} = request, model_input, user_opts \\ []) do
+    %ReqLLM.Model{} = model = ReqLLM.Model.from!(model_input)
+
+    unless model.provider == provider_id() do
+      raise ReqLLM.Error.Invalid.Provider.exception(provider: model.provider)
+    end
+
+    unless ReqLLM.Provider.Registry.model_exists?("#{provider_id()}:#{model.model}") do
+      raise ReqLLM.Error.Invalid.Parameter.exception(parameter: "model: #{model.model}")
+    end
+
+    api_key_env = ReqLLM.Provider.Registry.get_env_key(:openai)
+    api_key = JidoKeys.get(api_key_env)
 
     unless api_key && api_key != "" do
-      raise ArgumentError,
-            "OpenAI API key required. Set via JidoKeys.put(#{inspect(jido_key)}, key)"
+      raise ReqLLM.Error.Invalid.Parameter.exception(
+              parameter: "api_key (set via JidoKeys.put(#{inspect(api_key_env)}, key))"
+            )
     end
 
-    # Extract context from opts or build from legacy format
-    context = extract_or_build_context(request.body, opts)
+    # Extract tools separately to avoid validation issues
+    {tools, other_opts} = Keyword.pop(user_opts, :tools, [])
 
-    # Extract other params from request body if present
-    body_params = extract_body_params(request.body)
+    # Prepare validated options and extract what Req needs
+    opts = prepare_options!(__MODULE__, model, other_opts)
 
-    # Protocol handles message translation
-    body =
-      context
-      |> ReqLLM.Context.wrap(model)
-      |> ReqLLM.Context.Codec.encode_request()
-      |> add_model_params(model, Keyword.merge(body_params, opts))
-      |> add_sampling_params(Keyword.merge(body_params, opts))
-
-    base_url = opts[:base_url] || default_base_url()
-    stream = opts[:stream] || false
+    # Add tools back after validation
+    opts = Keyword.put(opts, :tools, tools)
+    base_url = Keyword.get(user_opts, :base_url, default_base_url())
+    req_keys = __MODULE__.supported_provider_options() ++ [:model, :context]
 
     request
+    |> Req.Request.register_options(req_keys)
+    |> Req.Request.merge_options(Keyword.take(opts, req_keys) ++ [base_url: base_url])
     |> Req.Request.put_header("authorization", "Bearer #{api_key}")
-    |> Req.Request.put_header("content-type", "application/json")
-    |> Req.Request.merge_options(base_url: base_url)
-    |> Map.put(:body, Jason.encode!(body))
-    |> Map.put(:url, URI.parse("/chat/completions"))
-    |> maybe_install_stream_steps(stream)
+    |> ReqLLM.Step.Error.attach()
+    |> Req.Request.append_request_steps(llm_encode_body: &__MODULE__.encode_body/1)
+    |> ReqLLM.Step.Stream.maybe_attach(opts[:stream])
+    |> Req.Request.append_response_steps(llm_decode_response: &__MODULE__.decode_response/1)
+    |> ReqLLM.Step.Usage.attach(model)
   end
 
   @impl ReqLLM.Provider
-  def parse_response(response, %ReqLLM.Model{} = _model) do
-    case response do
-      %Req.Response{status: 200, body: body} ->
-        chunks =
-          body
-          |> then(&%__MODULE__{context: &1})
-          |> ReqLLM.Context.Codec.decode_response()
-
-        case chunks do
-          [] -> {:ok, [ReqLLM.StreamChunk.text("")]}
-          chunks -> {:ok, chunks}
-        end
-
-      %Req.Response{status: status, body: body} ->
-        {:error, to_error("API error", body, status)}
+  def extract_usage(body, _model) when is_map(body) do
+    case body do
+      %{"usage" => usage} -> {:ok, usage}
+      _ -> {:error, :no_usage_found}
     end
   end
 
+  def extract_usage(_, _), do: {:error, :invalid_body}
+
+  # Req pipeline steps
   @impl ReqLLM.Provider
-  def parse_stream(response, %ReqLLM.Model{} = _model) do
-    case response do
-      %Req.Response{status: 200, body: body} when is_binary(body) ->
-        chunks = parse_sse_events(body)
-        {:ok, Stream.filter(chunks, &(!is_nil(&1)))}
-
-      %Req.Response{status: status, body: body} ->
-        {:error, to_error("Streaming API error", body, status)}
-    end
-  end
-
-  @impl ReqLLM.Provider
-  def extract_usage(response, %ReqLLM.Model{} = _model) do
-    case response do
-      %Req.Response{status: 200, body: %{"usage" => usage}} ->
-        {:ok, usage}
-
-      _ ->
-        {:ok, %{}}
-    end
-  end
-
-  # Private helper functions
-
-  defp maybe_install_stream_steps(req, _stream), do: req
-
-  defp get_env_var_name do
-    with {:ok, metadata} <- ReqLLM.Provider.Registry.get_provider_metadata(:openai),
-         [env_var | _] <-
-           get_in(metadata, ["provider", "env"]) || get_in(metadata, [:provider, :env]) do
-      env_var
-    else
-      _ -> "OPENAI_API_KEY"
-    end
-  end
-
-  defp extract_body_params(body) when is_map(body) do
-    body
-    |> Map.drop([:messages])
-    |> Enum.map(fn {k, v} -> {k, v} end)
-  end
-
-  defp extract_body_params(_), do: []
-
-  defp extract_or_build_context(body, opts) do
-    cond do
-      # If context is provided in opts, use it
-      opts[:context] && is_struct(opts[:context], ReqLLM.Context) ->
-        opts[:context]
-
-      # If body has messages, build context from legacy format
-      is_map(body) && Map.has_key?(body, :messages) ->
-        build_context_from_legacy(body)
-
-      # Default: empty context with user message from body if it's a string
-      is_binary(body) ->
-        ReqLLM.Context.new([ReqLLM.Context.user(body)])
-
-      # Fallback: empty context
-      true ->
-        ReqLLM.Context.new([])
-    end
-  end
-
-  defp build_context_from_legacy(%{messages: messages}) when is_list(messages) do
-    converted_messages =
-      Enum.map(messages, fn
-        %ReqLLM.Message{} = msg ->
-          msg
-
-        %{role: role, content: content} ->
-          ReqLLM.Context.text(String.to_atom(role), to_string(content))
-
-        message when is_binary(message) ->
-          ReqLLM.Context.user(message)
-      end)
-
-    ReqLLM.Context.new(converted_messages)
-  end
-
-  defp build_context_from_legacy(_), do: ReqLLM.Context.new([])
-
-  defp add_model_params(body, %ReqLLM.Model{} = model, opts) do
-    tools = extract_tools_from_opts(opts)
-
-    body
-    |> Map.put(:model, model.model)
-    |> maybe_add_max_tokens(opts[:max_tokens] || model.max_tokens)
-    |> maybe_add_temperature(opts[:temperature])
-    |> maybe_add_tools(tools)
-  end
-
-  defp add_sampling_params(body, opts) do
-    body
-    |> Map.put(:stream, opts[:stream] || false)
-  end
-
-  defp extract_tools_from_opts(opts) do
-    opts[:tools] || []
-  end
-
-  defp maybe_add_max_tokens(body, nil), do: body
-  defp maybe_add_max_tokens(body, max_tokens), do: Map.put(body, :max_tokens, max_tokens)
-
-  defp maybe_add_temperature(body, nil), do: body
-  defp maybe_add_temperature(body, temperature), do: Map.put(body, :temperature, temperature)
-
-  defp maybe_add_tools(body, []), do: body
-
-  defp maybe_add_tools(body, tools) do
-    formatted_tools =
-      Enum.map(tools, fn
-        %ReqLLM.Tool{} = tool -> ReqLLM.Tool.to_schema(tool, :openai)
-        tool -> tool
-      end)
-
-    Map.put(body, :tools, formatted_tools)
-  end
-
-  defp parse_sse_events(body) when is_binary(body) do
-    body
-    |> String.split("\n\n")
-    |> Enum.map(&parse_sse_event/1)
-    |> Enum.reject(&is_nil/1)
-  end
-
-  defp parse_sse_event(""), do: nil
-
-  defp parse_sse_event(chunk) when is_binary(chunk) do
-    lines = String.split(String.trim(chunk), "\n")
-
-    Enum.reduce(lines, %{}, fn line, acc ->
-      case String.split(line, ":", parts: 2) do
-        ["data", data] ->
-          case String.trim(data) do
-            "[DONE]" ->
-              Map.put(acc, :done, true)
-
-            trimmed ->
-              case Jason.decode(trimmed) do
-                {:ok, json} -> Map.put(acc, :data, json)
-                {:error, _} -> Map.put(acc, :data, trimmed)
-              end
-          end
+  def encode_body(request) do
+    context_data =
+      case request.options[:context] do
+        %ReqLLM.Context{} = ctx ->
+          ctx
+          |> wrap_context()
+          |> ReqLLM.Context.Codec.encode_request()
 
         _ ->
-          acc
+          %{messages: request.options[:messages] || []}
       end
-    end)
-    |> convert_to_stream_chunk()
-  end
 
-  defp convert_to_stream_chunk(%{done: true}), do: nil
+    tools_data =
+      case request.options[:tools] do
+        tools when is_list(tools) and length(tools) > 0 ->
+          %{tools: Enum.map(tools, &ReqLLM.Schema.to_openai_format/1)}
 
-  defp convert_to_stream_chunk(%{data: data} = _event) do
-    case data do
-      %{"choices" => [%{"delta" => %{"content" => content}} | _]} when is_binary(content) ->
-        ReqLLM.StreamChunk.text(content)
+        _ ->
+          %{}
+      end
 
+    body =
       %{
-        "choices" => [
-          %{"delta" => %{"tool_calls" => [%{"function" => %{"name" => name}} | _]}} | _
-        ]
-      } ->
-        ReqLLM.StreamChunk.tool_call(name, %{})
+        model: request.options[:model] || request.options[:id],
+        temperature: request.options[:temperature],
+        max_tokens: request.options[:max_tokens],
+        stream: request.options[:stream]
+      }
+      |> Map.merge(context_data)
+      |> Map.merge(tools_data)
+      |> maybe_put(:top_p, request.options[:top_p])
+      |> maybe_put(:frequency_penalty, request.options[:frequency_penalty])
+      |> maybe_put(:presence_penalty, request.options[:presence_penalty])
+      |> maybe_put(:stop, request.options[:stop])
 
-      %{
-        "choices" => [
-          %{"delta" => %{"tool_calls" => [%{"function" => %{"arguments" => args}} | _]}} | _
-        ]
-      } ->
-        ReqLLM.StreamChunk.text(args)
+    try do
+      encoded_body = Jason.encode!(body)
 
-      %{"choices" => [%{"finish_reason" => reason} | _]} when not is_nil(reason) ->
-        ReqLLM.StreamChunk.meta(%{finish_reason: reason})
-
-      _ ->
-        nil
+      request
+      |> Req.Request.put_header("content-type", "application/json")
+      |> Map.put(:body, encoded_body)
+    rescue
+      error ->
+        reraise error, __STACKTRACE__
     end
   end
 
-  defp convert_to_stream_chunk(_), do: nil
-
-  defp to_error(reason, body, status) do
-    error_message =
-      case body do
-        %{"error" => %{"message" => message}} -> message
-        %{"error" => error} when is_binary(error) -> error
-        _ -> reason
-      end
-
-    case status do
-      nil ->
-        ReqLLM.Error.API.Response.exception(reason: error_message, response_body: body)
+  @impl ReqLLM.Provider
+  def decode_response({req, resp}) do
+    case resp.status do
+      200 ->
+        body = ensure_parsed_body(resp.body)
+        # Return raw parsed data directly - no wrapping needed
+        {req, %{resp | body: body}}
 
       status ->
-        ReqLLM.Error.API.Response.exception(
-          reason: error_message,
-          status: status,
-          response_body: body
-        )
+        err =
+          ReqLLM.Error.API.Response.exception(
+            reason: "OpenAI API error",
+            status: status,
+            response_body: resp.body
+          )
+
+        {req, err}
     end
   end
 end

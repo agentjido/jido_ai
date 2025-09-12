@@ -496,8 +496,8 @@
     {
       "attachment": false,
       "cost": {
-        "input": 0.15,
-        "output": 0.6
+        "input": 0.072,
+        "output": 0.28
       },
       "id": "openai/gpt-oss-120b",
       "last_updated": "2025-08-05",

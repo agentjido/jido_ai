@@ -8,6 +8,7 @@ defmodule ReqLLM.Provider do
 
   ## Provider Responsibilities
 
+  - **Request Preparation**: Configure operation-specific requests via `prepare_request/4`
   - **Request Configuration**: Set headers, base URLs, authentication via `attach/3`
   - **Body Encoding**: Transform Context to provider-specific JSON via `encode_body/1`
   - **Response Parsing**: Decode API responses via `decode_response/1`
@@ -29,6 +30,15 @@ defmodule ReqLLM.Provider do
           metadata: "priv/models_dev/myprovider.json"
 
         @impl ReqLLM.Provider
+        def prepare_request(operation, model, messages, opts) do
+          with {:ok, request} <- Req.new(base_url: "https://api.example.com/v1"),
+               request <- add_auth_headers(request),
+               request <- add_operation_specific_config(request, operation) do
+            {:ok, request}
+          end
+        end
+
+        @impl ReqLLM.Provider
         def attach(request, model, opts) do
           request
           |> add_auth_headers()
@@ -46,6 +56,55 @@ defmodule ReqLLM.Provider do
       end
 
   """
+
+  @type operation :: :chat | :embed | :moderate | atom()
+
+  @doc """
+  Prepares a new request for a specific operation type.
+
+  This callback creates and configures a new Req request from scratch for the
+  given operation, model, and parameters. It should handle all operation-specific
+  configuration including authentication, headers, and base URLs.
+
+  ## Parameters
+
+    * `operation` - The type of operation (:chat, :embed, :moderate, etc.)
+    * `model` - The ReqLLM.Model struct or model identifier
+    * `data` - Operation-specific data (messages for chat, text for embed, etc.)
+    * `opts` - Additional options (stream, temperature, etc.)
+
+  ## Returns
+
+    * `{:ok, Req.Request.t()}` - Successfully configured request
+    * `{:error, Exception.t()}` - Configuration error (using Splode exception types)
+
+  ## Examples
+
+      # Chat operation
+      def prepare_request(:chat, model, messages, opts) do
+        {:ok, request} = Req.new(base_url: "https://api.anthropic.com")
+        request = add_auth_headers(request)
+        request = put_in(request.options[:json], %{
+          model: model.name,
+          messages: messages,
+          stream: opts[:stream] || false
+        })
+        {:ok, request}
+      end
+
+      # Embedding operation  
+      def prepare_request(:embed, model, text, opts) do
+        {:ok, request} = Req.new(base_url: "https://api.anthropic.com/v1/embed")
+        {:ok, add_auth_headers(request)}
+      end
+
+  """
+  @callback prepare_request(
+              operation(),
+              ReqLLM.Model.t() | term(),
+              term(),
+              keyword()
+            ) :: {:ok, Req.Request.t()} | {:error, Exception.t()}
 
   @doc """
   Attaches provider-specific configuration to a Req request.
