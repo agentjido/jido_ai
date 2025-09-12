@@ -28,7 +28,7 @@ defmodule ReqLLM.Embedding do
 
     * `model_spec` - Model specification in various formats:
       - String format: `"openai:text-embedding-3-small"`
-      - Tuple format: `{:openai, model: "text-embedding-3-small", dimensions: 1536}`
+      - Tuple format: `{:openai, "text-embedding-3-small", dimensions: 1536}`
       - Model struct: `%ReqLLM.Model{}`
     * `text` - Text to embed as a string
     * `opts` - Optional generation options

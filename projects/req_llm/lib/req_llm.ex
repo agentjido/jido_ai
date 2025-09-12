@@ -28,7 +28,7 @@ defmodule ReqLLM do
       ReqLLM.generate_text("anthropic:claude-3-5-sonnet-20241022", messages)
 
       # Tuple format: {provider, options}
-      ReqLLM.generate_text({:anthropic, model: "claude-3-5-sonnet", temperature: 0.7}, messages)
+      ReqLLM.generate_text({:anthropic, "claude-3-5-sonnet", temperature: 0.7}, messages)
 
       # Model struct format
       model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet", temperature: 0.5}
@@ -177,7 +177,7 @@ defmodule ReqLLM do
 
     * `model_spec` - Model specification in various formats:
       - String format: `"anthropic:claude-3-sonnet"`
-      - Tuple format: `{:anthropic, model: "claude-3-sonnet", temperature: 0.7}`
+      - Tuple format: `{:anthropic, "claude-3-sonnet", temperature: 0.7}`
       - Model struct: `%ReqLLM.Model{}`
 
   ## Examples
@@ -185,7 +185,7 @@ defmodule ReqLLM do
       ReqLLM.model("anthropic:claude-3-sonnet")
       #=> {:ok, %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet"}}
 
-      ReqLLM.model({:anthropic, model: "claude-3-sonnet", temperature: 0.5})
+      ReqLLM.model({:anthropic, "claude-3-sonnet", temperature: 0.5})
       #=> {:ok, %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet", temperature: 0.5}}
 
   """
@@ -585,7 +585,7 @@ defmodule ReqLLM do
     * `request` - Req.Request struct to configure
     * `model_spec` - Model specification in supported formats:
       - String: "anthropic:claude-3-sonnet"
-      - Tuple: {:anthropic, model: "claude-3-sonnet", temperature: 0.7}
+      - Tuple: {:anthropic, "claude-3-sonnet", temperature: 0.7}
       - Struct: %ReqLLM.Model{}
 
   ## Returns

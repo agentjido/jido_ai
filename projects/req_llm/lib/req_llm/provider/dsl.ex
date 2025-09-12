@@ -98,11 +98,30 @@ defmodule ReqLLM.Provider.DSL do
 
   """
 
+  @doc """
+  Sigil for defining lists of atoms from space-separated words.
+
+  ## Examples
+
+      ~a[temperature max_tokens top_p]  # => [:temperature, :max_tokens, :top_p]
+  """
+
+  # defmacro sigil_a({:<<>>, _, [string]}, _mods) do
+  #   list =
+  #     string
+  #     |> String.split(~r/\s+/, trim: true)
+  #     |> Enum.map(&String.to_atom/1)
+
+  #   Macro.escape(list)
+  # end
+
   defmacro __using__(opts) do
     # Validate required options
     id = Keyword.fetch!(opts, :id)
     base_url = Keyword.fetch!(opts, :base_url)
     metadata_path = Keyword.get(opts, :metadata)
+    provider_options = Keyword.get(opts, :provider_options)
+    provider_defaults = Keyword.get(opts, :provider_defaults, [])
 
     unless is_atom(id) do
       raise ArgumentError, "Provider :id must be an atom, got: #{inspect(id)}"
@@ -119,6 +138,8 @@ defmodule ReqLLM.Provider.DSL do
       @provider_id unquote(id)
       @base_url unquote(base_url)
       @metadata_path unquote(metadata_path)
+      @supported_provider_options unquote(provider_options)
+      @default_provider_opts unquote(provider_defaults)
 
       # Set external resource if metadata file exists
       if @metadata_path do
@@ -141,9 +162,16 @@ defmodule ReqLLM.Provider.DSL do
     # Get the compiled module's attributes
     provider_id = Module.get_attribute(env.module, :provider_id)
     metadata_path = Module.get_attribute(env.module, :metadata_path)
+    supported_provider_options = Module.get_attribute(env.module, :supported_provider_options)
+    default_provider_opts = Module.get_attribute(env.module, :default_provider_opts)
 
     # Load metadata if file exists
     metadata = load_metadata(metadata_path)
+
+    # Default to all generation keys if not specified
+    final_provider_options =
+      supported_provider_options ||
+        quote(do: ReqLLM.Provider.Options.all_generation_keys())
 
     quote do
       # Store metadata as module attribute
@@ -152,6 +180,13 @@ defmodule ReqLLM.Provider.DSL do
       # Optional helpers for accessing provider info
       def metadata, do: @req_llm_metadata
       def provider_id, do: unquote(provider_id)
+
+      # Provider option helpers
+      def supported_provider_options, do: unquote(final_provider_options)
+      def default_provider_opts, do: unquote(default_provider_opts || [])
+
+      def provider_schema,
+        do: ReqLLM.Provider.Options.generation_subset_schema(supported_provider_options())
     end
   end
 

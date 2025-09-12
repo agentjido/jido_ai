@@ -48,103 +48,60 @@ defmodule ReqLLM.Plugins.Stream do
   end
 
   @doc false
-  @spec process_sse_response(Req.Response.t()) :: Req.Response.t()
-  def process_sse_response(response) do
-    content_type = Req.Response.get_header(response, "content-type") |> List.first()
+  @spec process_sse_response({Req.Request.t(), Req.Response.t()}) ::
+          {Req.Request.t(), Req.Response.t()}
+  def process_sse_response({req, resp} = pair) do
+    content_type =
+      case Req.Response.get_header(resp, "content-type") do
+        [ct | _] -> ct
+        ct when is_binary(ct) -> ct
+        _ -> nil
+      end
 
     if content_type && String.contains?(content_type, "text/event-stream") do
-      stream = parse_sse_stream(response.body)
-      %{response | body: stream}
+      stream = parse_sse_stream(resp.body)
+      {req, %{resp | body: stream}}
     else
-      response
+      pair
     end
   end
 
   @spec parse_sse_stream(binary() | Enumerable.t()) :: Enumerable.t()
   defp parse_sse_stream(body) when is_binary(body) do
-    body
-    |> String.split("\n\n")
-    |> Stream.map(&parse_sse_chunk/1)
+    {events, _remaining} = ServerSentEvents.parse(body)
+
+    events
+    |> Stream.map(&process_sse_event/1)
     |> Stream.reject(&is_nil/1)
   end
 
   defp parse_sse_stream(stream) when is_struct(stream, Stream) do
     stream
-    |> Stream.transform("", &accumulate_chunks/2)
-    |> Stream.map(&parse_sse_chunk/1)
+    |> Stream.transform("", &accumulate_and_parse/2)
+    |> Stream.flat_map(& &1)
+    |> Stream.map(&process_sse_event/1)
     |> Stream.reject(&is_nil/1)
   end
 
-  @spec accumulate_chunks(binary(), binary()) :: {[binary()], binary()}
-  defp accumulate_chunks(chunk, buffer) do
+  @spec accumulate_and_parse(binary(), binary()) :: {[map()], binary()}
+  defp accumulate_and_parse(chunk, buffer) do
     combined = buffer <> chunk
-    parts = String.split(combined, "\n\n")
-
-    case parts do
-      [single] ->
-        {[], single}
-
-      [_ | _] ->
-        {complete_chunks, incomplete} = Enum.split(parts, -1)
-        {complete_chunks, List.last(incomplete) || ""}
-    end
+    {events, remaining} = ServerSentEvents.parse(combined)
+    {events, remaining}
   end
 
-  @spec parse_sse_chunk(binary()) :: map() | nil
-  defp parse_sse_chunk(""), do: nil
-
-  defp parse_sse_chunk(chunk) when is_binary(chunk) do
-    chunk
-    |> String.trim()
-    |> String.split("\n")
-    |> Enum.reduce(%{}, &parse_sse_line/2)
-    |> case do
-      %{data: _} = parsed -> parsed
-      _ -> nil
-    end
-  end
-
-  @spec parse_sse_line(binary(), map()) :: map()
-  defp parse_sse_line(line, acc) do
-    case String.split(line, ":", parts: 2) do
-      [field, value] ->
-        field = String.trim(field)
-        value = String.trim(value)
-
-        case field do
-          "data" ->
-            parsed_data = try_parse_json(value)
-            Map.put(acc, :data, parsed_data)
-
-          "event" ->
-            Map.put(acc, :event, value)
-
-          "id" ->
-            Map.put(acc, :id, value)
-
-          "retry" ->
-            case Integer.parse(value) do
-              {int_value, _} -> Map.put(acc, :retry, int_value)
-              _ -> acc
-            end
-
-          _ ->
-            acc
-        end
-
-      [field] ->
-        field = String.trim(field)
-
-        if field == "data" do
-          Map.put(acc, :data, "")
-        else
-          acc
-        end
+  @spec process_sse_event(map()) :: map() | nil
+  defp process_sse_event(%{data: data} = event) when is_binary(data) do
+    case try_parse_json(data) do
+      parsed when is_map(parsed) ->
+        %{event | data: parsed}
 
       _ ->
-        acc
+        event
     end
   end
+
+  defp process_sse_event(event), do: event
 
   @spec try_parse_json(binary()) :: map() | binary()
   defp try_parse_json(value) do

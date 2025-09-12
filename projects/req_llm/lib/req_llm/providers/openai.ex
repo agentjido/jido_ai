@@ -61,7 +61,7 @@ defmodule ReqLLM.Providers.OpenAI do
 
     # Extract context from opts or build from legacy format
     context = extract_or_build_context(request.body, opts)
-    
+
     # Extract other params from request body if present
     body_params = extract_body_params(request.body)
 
@@ -146,7 +146,7 @@ defmodule ReqLLM.Providers.OpenAI do
     |> Map.drop([:messages])
     |> Enum.map(fn {k, v} -> {k, v} end)
   end
-  
+
   defp extract_body_params(_), do: []
 
   defp extract_or_build_context(body, opts) do
@@ -193,7 +193,7 @@ defmodule ReqLLM.Providers.OpenAI do
     body
     |> Map.put(:model, model.model)
     |> maybe_add_max_tokens(opts[:max_tokens] || model.max_tokens)
-    |> maybe_add_temperature(opts[:temperature] || model.temperature)
+    |> maybe_add_temperature(opts[:temperature])
     |> maybe_add_tools(tools)
   end
 

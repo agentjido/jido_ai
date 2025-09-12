@@ -55,7 +55,7 @@ defmodule ReqLLM.MixProject do
       {:nimble_options, "~> 1.1"},
       {:typed_struct, "~> 0.3.0"},
       {:splode, "~> 0.2.3"},
-      {:server_sent_event, "~> 1.0"},
+      {:server_sent_events, "~> 0.2"},
       {:jido_keys, path: "../jido_keys"},
 
       # Dev/test dependencies

@@ -49,7 +49,7 @@ The [`ReqLLM.Model`](/Users/mhostetler/Source/Jido/jido_workspace/projects/req_l
 
 # From tuple with configuration
 {:ok, model} = ReqLLM.Model.from({:anthropic, 
-  model: "claude-3-5-sonnet", 
+  "claude-3-5-sonnet", 
   temperature: 0.7, 
   max_tokens: 1000
 })

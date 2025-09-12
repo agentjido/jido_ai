@@ -176,8 +176,8 @@ ReqLLM accepts flexible model specifications:
 
 ### Tuple Format
 ```elixir
-{:anthropic, model: "claude-3-sonnet", temperature: 0.7}
-{:openai, model: "gpt-4o", max_tokens: 1000}
+{:anthropic, "claude-3-sonnet", temperature: 0.7}
+{:openai, "gpt-4o", max_tokens: 1000}
 ```
 
 ### Struct Format

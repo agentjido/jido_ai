@@ -86,7 +86,7 @@ ReqLLM.stream_text!(model_spec, messages, opts)
 
 - **`model_spec`**: Flexible model specification
   - String: `"anthropic:claude-3-sonnet"`
-  - Tuple: `{:anthropic, model: "claude-3-sonnet", temperature: 0.7}`
+  - Tuple: `{:anthropic, "claude-3-sonnet", temperature: 0.7}`
   - Struct: `%ReqLLM.Model{}`
 
 - **`messages`**: Prompt or conversation
