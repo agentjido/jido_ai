@@ -10,6 +10,8 @@ defmodule ReqLLM.Message do
 
   alias ReqLLM.Message.ContentPart
 
+  @derive Jason.Encoder
+
   typedstruct enforce: true do
     field(:role, :user | :assistant | :system | :tool, enforce: true)
     field(:content, [ContentPart.t()], default: [])

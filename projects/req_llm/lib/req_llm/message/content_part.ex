@@ -14,6 +14,8 @@ defmodule ReqLLM.Message.ContentPart do
 
   use TypedStruct
 
+  @derive Jason.Encoder
+
   typedstruct enforce: true do
     field(:type, :text | :image_url | :image | :file | :tool_call | :tool_result | :reasoning,
       enforce: true

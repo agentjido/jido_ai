@@ -48,9 +48,11 @@ defmodule ReqLLM.Providers.Anthropic do
       top_p: [type: :float],
       top_k: [type: :pos_integer],
       stream: [type: :boolean, default: false],
-      stop_sequences: [type: {:list, :string}],
+      stop_sequences: [type: {:list, :string}, default: []],
       system: [type: :string],
-      tools: [type: {:list, :map}]
+      tools: [type: {:list, :map}],
+      response_format: [type: :map],
+      thinking: [type: :boolean, default: false]
     ]
 
   @default_api_version "2023-06-01"
@@ -152,9 +154,86 @@ defmodule ReqLLM.Providers.Anthropic do
 
   def extract_usage(_, _), do: {:error, :invalid_body}
 
+  # Helper functions for beta feature support
+  defp maybe_set_beta_header(request) do
+    beta_flags = encode_beta_flags(request.options)
+
+    if beta_flags == [] do
+      request
+    else
+      beta_header = Enum.join(beta_flags, ",")
+      Req.Request.put_header(request, "anthropic-beta", beta_header)
+    end
+  end
+
+  defp encode_beta_flags(opts) do
+    Enum.flat_map(opts, fn
+      {:thinking, true} -> ["thinking-2024-12-19"]
+      _ -> []
+    end)
+  end
+
+  # Parameter validation helpers
+  defp validate_parameter_ranges(opts) do
+    with :ok <- validate_temperature(opts[:temperature]),
+         :ok <- validate_top_p(opts[:top_p]),
+         :ok <- validate_top_k(opts[:top_k]),
+         :ok <- validate_max_tokens(opts[:max_tokens]),
+         :ok <- validate_stop_sequences(opts[:stop_sequences]) do
+      :ok
+    end
+  end
+
+  defp validate_temperature(nil), do: :ok
+  defp validate_temperature(temp) when is_number(temp) and temp >= 0.0 and temp <= 1.0, do: :ok
+
+  defp validate_temperature(temp),
+    do: {:error, "temperature must be between 0.0 and 1.0, got #{temp}"}
+
+  defp validate_top_p(nil), do: :ok
+  defp validate_top_p(top_p) when is_number(top_p) and top_p >= 0.0 and top_p <= 1.0, do: :ok
+  defp validate_top_p(top_p), do: {:error, "top_p must be between 0.0 and 1.0, got #{top_p}"}
+
+  defp validate_top_k(nil), do: :ok
+  defp validate_top_k(top_k) when is_integer(top_k) and top_k >= 1 and top_k <= 500, do: :ok
+  defp validate_top_k(top_k), do: {:error, "top_k must be between 1 and 500, got #{top_k}"}
+
+  defp validate_max_tokens(nil), do: :ok
+
+  defp validate_max_tokens(max_tokens)
+       when is_integer(max_tokens) and max_tokens >= 1 and max_tokens <= 4096,
+       do: :ok
+
+  defp validate_max_tokens(max_tokens),
+    do: {:error, "max_tokens must be between 1 and 4096, got #{max_tokens}"}
+
+  defp validate_stop_sequences(nil), do: :ok
+  defp validate_stop_sequences([]), do: :ok
+
+  defp validate_stop_sequences(sequences) when is_list(sequences) and length(sequences) <= 4,
+    do: :ok
+
+  defp validate_stop_sequences(sequences),
+    do:
+      {:error,
+       "stop_sequences must be a list of at most 4 strings, got #{length(sequences)} items"}
+
+  # Special handling for thinking parameter - only include when true
+  defp maybe_put_thinking(body, true), do: Map.put(body, :thinking, true)
+  defp maybe_put_thinking(body, _), do: body
+
   # Req pipeline steps
   @impl ReqLLM.Provider
   def encode_body(request) do
+    # Validate parameter ranges before proceeding
+    case validate_parameter_ranges(request.options) do
+      :ok ->
+        nil
+
+      {:error, reason} ->
+        raise ReqLLM.Error.Invalid.Parameter.exception(parameter: reason)
+    end
+
     context_data =
       case request.options[:context] do
         %ReqLLM.Context{} = ctx ->
@@ -185,6 +264,11 @@ defmodule ReqLLM.Providers.Anthropic do
       |> Map.merge(context_data)
       |> Map.merge(tools_data)
       |> maybe_put(:system, request.options[:system])
+      |> maybe_put(:top_p, request.options[:top_p])
+      |> maybe_put(:top_k, request.options[:top_k])
+      |> maybe_put(:stop_sequences, request.options[:stop_sequences])
+      |> maybe_put(:response_format, request.options[:response_format])
+      |> maybe_put_thinking(request.options[:thinking])
 
     try do
       encoded_body = Jason.encode!(body)
@@ -192,6 +276,7 @@ defmodule ReqLLM.Providers.Anthropic do
       request
       |> Req.Request.put_header("content-type", "application/json")
       |> Map.put(:body, encoded_body)
+      |> maybe_set_beta_header()
     rescue
       error ->
         reraise error, __STACKTRACE__

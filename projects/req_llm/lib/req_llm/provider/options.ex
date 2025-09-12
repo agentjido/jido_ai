@@ -340,6 +340,11 @@ defmodule ReqLLM.Provider.Options do
                                  type: {:in, [nil, false, true, "low", "auto", "high"]},
                                  doc: "Request reasoning/thinking tokens from the model"
                                ],
+                               thinking: [
+                                 type: :boolean,
+                                 doc:
+                                   "Enable thinking/reasoning tokens (Anthropic-specific beta feature)"
+                               ],
 
                                # Streaming
                                stream: [

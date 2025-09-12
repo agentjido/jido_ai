@@ -28,6 +28,8 @@ defmodule ReqLLM.Response do
 
   alias ReqLLM.{Context, Message, Model}
 
+  @derive {Jason.Encoder, except: [:stream]}
+
   typedstruct enforce: true do
     # ---------- Core ----------
     # Provider id of the turn
