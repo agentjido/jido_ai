@@ -587,9 +587,16 @@ defmodule ReqLLM.Provider.Options do
       {[temperature: 0.7, max_tokens: 100], [custom_param: "value"]}
   """
   def extract_provider_options(opts) do
+    # Handle stream? -> stream alias for backward compatibility
+    opts_with_aliases =
+      case Keyword.pop(opts, :stream?) do
+        {nil, rest} -> rest
+        {stream_value, rest} -> Keyword.put(rest, :stream, stream_value)
+      end
+
     known_keys = all_generation_keys()
 
-    {standard, custom} = Keyword.split(opts, known_keys)
+    {standard, custom} = Keyword.split(opts_with_aliases, known_keys)
 
     {standard, custom}
   end

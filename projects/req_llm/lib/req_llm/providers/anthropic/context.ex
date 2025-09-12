@@ -117,8 +117,12 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic.Context do
     }
   end
 
-  defp decode_content_block(%{"type" => "text", "text" => text}) do
+  defp decode_content_block(%{"type" => "text", "text" => text}) when is_binary(text) do
     [ReqLLM.StreamChunk.text(text)]
+  end
+
+  defp decode_content_block(%{"type" => "text"}) do
+    []
   end
 
   defp decode_content_block(%{"type" => "tool_use", "id" => id, "name" => name, "input" => input}) do

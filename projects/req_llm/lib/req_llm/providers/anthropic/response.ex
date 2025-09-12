@@ -21,30 +21,18 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
   @doc """
   Decode wrapped Anthropic response struct with model information.
   """
-  def decode_response(%{payload: data} = wrapped_response, %Model{provider: :anthropic} = model)
+  def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :anthropic} = model)
       when is_map(data) do
-    IO.puts("🔍 Wrapped response in protocol: #{inspect(wrapped_response)}")
-    IO.puts("🔍 Data extracted: #{inspect(data)}")
-    IO.puts("🔍 Pattern match result: data keys = #{inspect(Map.keys(data))}")
-    
     try do
-      result = ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(
-        data,
-        model.model || "unknown"
-      )
-      IO.puts("🔧 Protocol decode result: #{inspect(result |> elem(0))}")
-      case result do
-        {:ok, response} ->
-          IO.puts("🔧 Protocol decoded message: #{inspect(response.message != nil)}")
-          if response.message do
-            IO.puts("🔧 Protocol content parts: #{length(response.message.content)}")
-          end
-        {:error, _} -> IO.puts("🔧 Protocol decode had error")
-      end
+      result =
+        ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(
+          data,
+          model.model || "unknown"
+        )
+
       result
     rescue
       error ->
-        IO.puts("🚨 Protocol decode error: #{inspect(error)}")
         {:error, error}
     end
   end
@@ -69,12 +57,10 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
     {:ok, response}
   end
 
-  def decode_response(wrapped_response, model) do
-    IO.puts("🚨 Fallback decode_response called!")
-    IO.puts("   Response: #{inspect(wrapped_response)}")
-    IO.puts("   Model: #{inspect(model)}")
+  def decode_response(_wrapped_response, _model) do
     {:error, :unsupported_provider}
   end
+
   def encode_request(_), do: {:error, :not_implemented}
 end
 
@@ -83,30 +69,41 @@ defimpl ReqLLM.Response.Codec, for: Map do
   alias ReqLLM.{Response, Context, Message, StreamChunk, Model}
 
   @doc """
-  Direct decoding from raw Anthropic Map response data.
+  Direct decoding from raw Map response data.
 
-  Only handles Anthropic provider maps; other providers will get not_implemented.
+  Handles both Anthropic and OpenAI provider maps; other providers will get not_implemented.
   """
   def decode_response(_data), do: {:error, :not_implemented}
 
   def decode_response(data, %Model{provider: :anthropic} = model) when is_map(data) do
     # Only handle maps that look like Anthropic responses (have id, model, or content keys)
     if Map.has_key?(data, "id") or Map.has_key?(data, "model") or Map.has_key?(data, "content") do
-      IO.puts("🗺️  Map protocol decode called!")
       try do
-        result = ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(
-          data,
-          model.model || "unknown"
-        )
-        IO.puts("🗺️  Map protocol result: #{inspect(result |> elem(0))}")
-        case result do
-          {:ok, response} ->
-            IO.puts("🗺️  Map decoded message: #{inspect(response.message != nil)}")
-            if response.message do
-              IO.puts("🗺️  Map content parts: #{length(response.message.content)}")
-            end
-          {:error, _} -> IO.puts("🗺️  Map decode had error")
-        end
+        result =
+          ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(
+            data,
+            model.model || "unknown"
+          )
+
+        result
+      rescue
+        error -> {:error, error}
+      end
+    else
+      {:error, :not_implemented}
+    end
+  end
+
+  def decode_response(data, %Model{provider: :openai} = model) when is_map(data) do
+    # Only handle maps that look like OpenAI responses
+    if Map.has_key?(data, "choices") or Map.has_key?(data, "id") or Map.has_key?(data, "object") do
+      try do
+        result =
+          ReqLLM.Providers.OpenAI.ResponseDecoder.decode_openai_json(
+            data,
+            model.model || "unknown"
+          )
+
         result
       rescue
         error -> {:error, error}
@@ -118,10 +115,6 @@ defimpl ReqLLM.Response.Codec, for: Map do
 
   def decode_response(_data, _model), do: {:error, :unsupported_provider}
   def encode_request(_), do: {:error, :not_implemented}
-
-  # Use shared implementation
-  defp decode_anthropic_json(data, model),
-    do: ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(data, model)
 end
 
 defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
@@ -130,8 +123,6 @@ defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
 
   # Shared implementation for decoding Anthropic JSON
   def decode_anthropic_json(data, model) when is_map(data) do
-    IO.puts("🔧 decode_anthropic_json called with data keys: #{inspect(Map.keys(data))}")
-    
     # Extract basic response information
     id = Map.get(data, "id", "unknown")
     model_name = Map.get(data, "model", model || "unknown")
@@ -139,29 +130,21 @@ defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
     finish_reason = parse_finish_reason(Map.get(data, "stop_reason"))
 
     # Convert Anthropic content to StreamChunks using Context.Codec
-    IO.puts("🧩 Content extraction starting...")
     raw_content = Map.get(data, "content")
-    IO.puts("   Raw content: #{inspect(raw_content)}")
-    
+
     content_chunks =
       case raw_content do
         content when is_list(content) ->
-          IO.puts("   Content is list with #{length(content)} items")
           # Call decode_content_blocks directly since we just need to convert content blocks
-          chunks = content
-          |> Enum.map(&decode_content_block/1)
-          |> List.flatten()
-          |> Enum.reject(&is_nil/1)
-          
-          IO.puts("   Decoded to #{length(chunks)} chunks")
-          Enum.with_index(chunks)
-          |> Enum.each(fn {chunk, idx} ->
-            IO.puts("     Chunk #{idx}: #{inspect(chunk)}")
-          end)
+          chunks =
+            content
+            |> Enum.map(&decode_content_block/1)
+            |> List.flatten()
+            |> Enum.reject(&is_nil/1)
+
           chunks
 
         _ ->
-          IO.puts("   Content is not a list: #{inspect(raw_content)}")
           []
       end
 
@@ -190,15 +173,8 @@ defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
   end
 
   def build_message_from_chunks(chunks) when is_list(chunks) do
-    IO.puts("🔨 Building message from #{length(chunks)} chunks")
-    Enum.with_index(chunks)
-    |> Enum.each(fn {chunk, idx} ->
-      IO.puts("   Chunk #{idx}: #{inspect(chunk)}")
-    end)
-    
     case chunks do
       [] ->
-        IO.puts("🔨 No chunks, returning nil")
         nil
 
       _ ->
@@ -208,22 +184,15 @@ defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
           |> Enum.map(&chunk_to_content_part/1)
           |> Enum.reject(&is_nil/1)
 
-        IO.puts("🔨 Converted to #{length(content_parts)} content parts")
-        Enum.with_index(content_parts)
-        |> Enum.each(fn {part, idx} ->
-          IO.puts("   Part #{idx}: #{inspect(part)}")
-        end)
-
         if content_parts != [] do
           message = %Message{
             role: :assistant,
             content: content_parts,
             metadata: %{}
           }
-          IO.puts("🔨 Created message: #{inspect(message != nil)}")
+
           message
         else
-          IO.puts("🔨 No content parts, returning nil")
           nil
         end
     end
@@ -276,8 +245,12 @@ defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
   def parse_finish_reason(_), do: nil
 
   # Helper functions for content decoding (copied from Context)
-  def decode_content_block(%{"type" => "text", "text" => text}) do
+  def decode_content_block(%{"type" => "text", "text" => text}) when is_binary(text) do
     [ReqLLM.StreamChunk.text(text)]
+  end
+
+  def decode_content_block(%{"type" => "text"}) do
+    []
   end
 
   def decode_content_block(%{"type" => "tool_use", "id" => id, "name" => name, "input" => input}) do

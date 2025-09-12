@@ -345,14 +345,17 @@ defmodule ReqLLM.Schema do
       ...> }
       iex> ReqLLM.Schema.to_openai_format(tool)
       %{
-        "name" => "get_weather",
-        "description" => "Get current weather",
-        "parameters" => %{
-          "type" => "object",
-          "properties" => %{
-            "location" => %{"type" => "string", "description" => "City name"}
-          },
-          "required" => ["location"]
+        "type" => "function",
+        "function" => %{
+          "name" => "get_weather",
+          "description" => "Get current weather",
+          "parameters" => %{
+            "type" => "object",
+            "properties" => %{
+              "location" => %{"type" => "string", "description" => "City name"}
+            },
+            "required" => ["location"]
+          }
         }
       }
 
@@ -360,9 +363,12 @@ defmodule ReqLLM.Schema do
   @spec to_openai_format(ReqLLM.Tool.t()) :: map()
   def to_openai_format(%ReqLLM.Tool{} = tool) do
     %{
-      "name" => tool.name,
-      "description" => tool.description,
-      "parameters" => to_json(tool.parameter_schema)
+      "type" => "function",
+      "function" => %{
+        "name" => tool.name,
+        "description" => tool.description,
+        "parameters" => to_json(tool.parameter_schema)
+      }
     }
   end
 end

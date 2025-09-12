@@ -75,6 +75,27 @@ defmodule ReqLLM.Providers.Anthropic do
     * All options from ReqLLM.Provider.Options schemas are supported
 
   """
+  @impl ReqLLM.Provider
+  def prepare_request(:chat, model_input, %ReqLLM.Context{} = context, opts) do
+    with {:ok, model} <- ReqLLM.Model.from(model_input) do
+      http_opts = Keyword.get(opts, :req_http_options, [])
+
+      request =
+        Req.new([url: "/messages", method: :post, receive_timeout: 30_000] ++ http_opts)
+        |> attach(model, Keyword.put(opts, :context, context))
+
+      {:ok, request}
+    end
+  end
+
+  def prepare_request(operation, _model, _input, _opts) do
+    {:error,
+     ReqLLM.Error.Invalid.Parameter.exception(
+       parameter:
+         "operation: #{inspect(operation)} not supported by Anthropic provider. Supported operations: [:chat]"
+     )}
+  end
+
   @spec attach(Req.Request.t(), ReqLLM.Model.t() | String.t() | {atom(), keyword()}, keyword()) ::
           Req.Request.t()
   @impl ReqLLM.Provider

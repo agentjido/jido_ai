@@ -1,121 +1,280 @@
-# Adding a New Provider to ReqLLM  
-_A practical, end-to-end guide_
+# Adding a new provider to **ReqLLM**
 
-This document explains everything you need to ship a first–class provider (e.g. OpenAI, Gemini) **and test it** inside ReqLLM. Follow the sections in order; the checklist at the end summarises the steps.
+_Rev. 2024-06 – compatible with the Anthropic/Gemini v2 architecture_
+
+This guide shows how to write and test a **first-class provider** (e.g. OpenAI, Gemini) for ReqLLM.  
+
+* the `prepare_request/4` callback,
+* protocol–based context/response encoding,
+* a declarative DSL for registration & option validation,
+* first-class error structs (aka *Splode* errors), and
+* a Live-Fixture powered test strategy.
+
+Follow the steps below; a checklist is at the end.
 
 ---
 
-## 1. Provider implementation architecture
-
-### 1.1 Create the provider module
+## 1. Provider module – the new skeleton
 
 ```
-lib/req_llm/providers/openai.ex
+lib/req_llm/providers/my_provider.ex
 ```
 
 ```elixir
-defmodule ReqLLM.Providers.OpenAI do
-  @moduledoc "OpenAI provider (Chat Completions v1)."
+defmodule ReqLLM.Providers.MyProvider do
+  @moduledoc "MyProvider – Messages/Chat API."
 
-  @behaviour ReqLLM.Provider          # ❶ required behaviour
+  @behaviour ReqLLM.Provider           # ❶ mandatory behaviour
 
-  use ReqLLM.Provider.DSL,            # ❷ declarative metadata/registration
-    id: :openai,
-    base_url: "https://api.openai.com/v1",
-    metadata: "priv/models_dev/openai.json"  # capability map, see §3
+  import ReqLLM.Provider.Utils,
+    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
 
-  defstruct [:context]                # ❸ lightweight struct that wraps Context
+  use ReqLLM.Provider.DSL,            # �② declarative registration
+    id: :my_provider,
+    base_url: "https://api.my-provider.com/v1",
+    metadata: "priv/models_dev/my_provider.json",
+    context_wrapper: ReqLLM.Providers.MyProvider.Context,
+    response_wrapper: ReqLLM.Providers.MyProvider.Response,
+    default_env_key: "MY_PROVIDER_API_KEY",
+    provider_schema: [                # ❸ validated request options
+      temperature: [type: :float, default: 0.7],
+      max_tokens: [type: :pos_integer, default: 1024],
+      stream:      [type: :boolean,   default: false],
+      system:      [type: :string],
+      tools:       [type: {:list, :map}]
+    ]
 
-  @type t :: %__MODULE__{context: ReqLLM.Context.t()}
-
-  # ❹ Behaviour callbacks ---------------------------------------------------
-
-  # Wrap a ReqLLM.Context in your struct
+  @doc """
+  Build an outbound Req pipeline for the `:chat` operation.
+  """
   @impl ReqLLM.Provider
-  def wrap_context(%ReqLLM.Context{} = ctx), do: %__MODULE__{context: ctx}
+  def prepare_request(:chat, model_input, %ReqLLM.Context{} = ctx, user_opts) do
+    with {:ok, model} <- ReqLLM.Model.from(model_input) do
+      req =
+        Req.new(url: "/messages", method: :post, receive_timeout: 30_000)
+        |> attach(model, Keyword.put(user_opts, :context, ctx))
 
-  # Attach request options, headers, URL, body…
+      {:ok, req}
+    end
+  end
+
+  # Fallback for unsupported operations
+  def prepare_request(op, _, _, _),
+      do:
+        {:error,
+         ReqLLM.Error.Invalid.Parameter.exception(
+           parameter: "operation #{inspect(op)} not supported"
+         )}
+
+  @doc "Low-level Req attachment – installs headers, validation, steps."
   @impl ReqLLM.Provider
-  def attach(request, %ReqLLM.Model{} = model, opts \\ []) do
-    api_key = System.fetch_env!("OPENAI_API_KEY")
-    ctx     = ReqLLM.Context.wrap(opts[:context] || default_ctx(request.body), model)
+  def attach(%Req.Request{} = req, model_input, user_opts \\ []) do
+    model = ReqLLM.Model.from!(model_input)
+    ensure_correct_provider!(model)
 
-    body =
-      ctx
-      |> ReqLLM.Codec.encode()
-      |> Map.merge(model_params(model, opts))
-      |> Map.put(:stream, opts[:stream] || false)
+    api_key = fetch_api_key!()
 
-    request
+    # -- 1. separate tools before validation
+    {tools, other_opts} = Keyword.pop(user_opts, :tools, [])
+
+    # -- 2. validate / coerce options via provider_schema
+    opts = prepare_options!(__MODULE__, model, other_opts) |> Keyword.put(:tools, tools)
+
+    # -- 3. install into Req pipeline
+    req
+    |> Req.Request.register_options(__MODULE__.supported_provider_options() ++ [:model, :context])
+    |> Req.Request.merge_options(Keyword.take(opts, [:stream, :model, :context]) ++
+                                 [base_url: Keyword.get(user_opts, :base_url, default_base_url())])
     |> Req.Request.put_header("authorization", "Bearer #{api_key}")
+    |> ReqLLM.Step.Error.attach()
+    |> Req.Request.append_request_steps(llm_encode_body: &encode_body/1)
+    |> ReqLLM.Step.Stream.maybe_attach(opts[:stream])
+    |> Req.Request.append_response_steps(llm_decode_response: &decode_response/1)
+    |> ReqLLM.Step.Usage.attach(model)
+  end
+
+  # -- Req step: request encoding --------------------------------------------
+  @impl ReqLLM.Provider
+  def encode_body(req) do
+    body =
+      %{
+        model:       req.options[:model],
+        temperature: req.options[:temperature],
+        max_tokens:  req.options[:max_tokens],
+        stream:      req.options[:stream]
+      }
+      |> Map.merge(tools_payload(req.options[:tools]))
+      |> Map.merge(context_payload(req.options[:context]))
+      |> maybe_put(:system, req.options[:system])
+
+    encoded = Jason.encode!(body)
+
+    req
     |> Req.Request.put_header("content-type", "application/json")
-    |> Req.Request.merge_options(base_url: opts[:base_url] || default_base_url())
-    |> Map.put(:body, Jason.encode!(body))
-    |> Map.put(:url, URI.parse("/chat/completions"))
-    |> maybe_install_stream_steps(opts[:stream])
+    |> Map.put(:body, encoded)
   end
 
-  # Parse the final non-streaming response
+  # -- Req step: response decoding -------------------------------------------
   @impl ReqLLM.Provider
-  def parse_response(%Req.Response{status: 200, body: body}, _model) do
-    chunks = %__MODULE__{context: body} |> ReqLLM.Codec.decode()
-    {:ok, chunks}
+  def decode_response({req, %{status: 200} = resp}) do
+    parsed =
+      resp.body
+      |> ensure_parsed_body()
+      |> ReqLLM.Response.Codec.decode_response(req.options[:model])
+
+    {req, parsed}
   end
-  def parse_response(%Req.Response{status: status, body: body}, _), do:
-    {:error, to_error("API error", body, status)}
 
-  # Parse chunked Server-Sent-Events
-  @impl ReqLLM.Provider
-  def parse_stream(%Req.Response{status: 200, body: chunk}, _model) when is_binary(chunk) do
-    {:ok, chunk |> parse_sse() |> Stream.reject(&is_nil/1)}
+  def decode_response({req, resp}) do
+    err =
+      ReqLLM.Error.API.Response.exception(
+        status: resp.status,
+        reason: "MyProvider API error",
+        response_body: resp.body
+      )
+
+    {req, err}
   end
-  # …
 
-  # Optional: usage extraction
+  # -- Usage extraction (optional) -------------------------------------------
   @impl ReqLLM.Provider
-  def extract_usage(%Req.Response{body: %{"usage" => u}}, _), do: {:ok, u}
-  def extract_usage(_, _), do: {:ok, %{}}
+  def extract_usage(%{"usage" => u}, _), do: {:ok, u}
+  def extract_usage(_, _), do: {:error, :no_usage}
 
-  # -------------------------------------------------------------------------
-  # private helpers (model_params/parse_sse/to_error/…)
+  # -- helpers ---------------------------------------------------------------
+
+  defp tools_payload([]), do: %{}
+  defp tools_payload(tools),
+    do: %{tools: Enum.map(tools, &ReqLLM.Schema.to_my_provider_format/1)}
+
+  defp context_payload(%ReqLLM.Context{} = ctx),
+    do:
+      ctx
+      |> wrap_context()
+      |> ReqLLM.Context.Codec.encode_request()
+
+  defp context_payload(_), do: %{}
+
+  defp ensure_correct_provider!(%ReqLLM.Model{provider: ^provider_id?()}), do: :ok
+  defp ensure_correct_provider!(_),
+    do: raise ReqLLM.Error.Invalid.Provider.exception(provider: :mismatch)
+
+  defp fetch_api_key! do
+    key = JidoKeys.get(default_env_key())
+    if key in [nil, ""], do: raise(ReqLLM.Error.Invalid.Parameter,
+                                   parameter: "API key '#{default_env_key()}' not set")
+    key
+  end
 end
 ```
 
-Key points:
+### Key changes vs. the legacy guide
 
-1. **`@behaviour ReqLLM.Provider`** – forces you to implement all required callbacks.  
-2. **`use ReqLLM.Provider.DSL`** –  
-   • registers the provider under `:openai`  
-   • injects compile-time metadata helpers (`default_base_url/0`, etc.)  
-3. The struct is only a thin wrapper; do **not** keep API-specific state here.  
-4. Keep `attach/3`, `parse_response/2`, `parse_stream/2`, `extract_usage/2` small; delegate heavy lifting to helper functions to keep them readable.
+1. **`prepare_request/4`**  
+   *Entry-point invoked by high-level helpers (`generate_text/4`, etc.).*  
+   Returns `{:ok, %Req.Request{}}` **already wired** with all steps.
 
-### 1.2 Implement the Codec
+2. **Context & Response protocols** (`ReqLLM.Context.Codec`, `ReqLLM.Response.Codec`)  
+   Provide **pluggable wire-format translation**.  
+   *Context* handles outbound encoding and inbound partial chunk decoding;  
+   *Response* turns the final provider JSON (or stream) into a typed
+   `ReqLLM.Response` struct.
 
-Codec translates between **ReqLLM's generic context/stream chunks** and the provider-specific wire format.
+3. **`use ReqLLM.Provider.DSL`**  
+   • Registers the provider under a stable atom (`:my_provider`).  
+   • Generates helpers (`provider_id/0`, `default_base_url/0`, …).  
+   • Bakes option validation (`provider_schema:`) through NimbleOptions.  
+   • Lets you specify custom `context_wrapper` & `response_wrapper` structs.
+
+4. **Splode errors** (`ReqLLM.Error.*`)  
+   Never return raw tuples.  
+   Raise `ReqLLM.Error.Invalid.Parameter`, `ReqLLM.Error.API.Response`, …  
+   The `ReqLLM.Step.Error` pipeline step catches and converts them to `{:error, error}`.
+
+5. **`ReqLLM.Schema`** – tool definitions  
+   A single authority to turn NimbleOptions schemas ↔ JSON-Schema.  
+   Implement a helper (`to_my_provider_format/1`) if your API's shape diverges.
+
+6. **Streaming**  
+   Plug `ReqLLM.Step.Stream.maybe_attach/2`; it installs SSE parsing and dispatches
+   chunks through Context-codec logic.  
+   The Response codec receives an actual `Stream.t()` when `stream?: true`.
+
+---
+
+## 2. Context & Response codec modules
 
 ```
-lib/req_llm/providers/openai/codec.ex
+lib/req_llm/providers/my_provider/context.ex
 ```
 
 ```elixir
-defimpl ReqLLM.Codec, for: ReqLLM.Providers.OpenAI do
-  # OUTBOUND  (Context → provider JSON)
-  def encode(%ReqLLM.Providers.OpenAI{context: ctx}) do
-    %{
-      messages: Enum.map(ctx.messages, &encode_msg/1)
-    }
+defmodule ReqLLM.Providers.MyProvider.Context do
+  defstruct [:context]
+  @type t :: %__MODULE__{context: ReqLLM.Context.t()}
+end
+
+# Outbound & inbound translation
+defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.MyProvider.Context do
+  # OUTBOUND ---------------------------------------------------------------
+  def encode_request(%{context: %ReqLLM.Context{messages: msgs}}) do
+    %{messages: Enum.map(msgs, &encode_msg/1)}
   end
 
-  # INBOUND (provider JSON → list(StreamChunk.t()))
-  def decode(%ReqLLM.Providers.OpenAI{context: %{"choices" => choices}}) do
-    choices
-    |> Enum.flat_map(fn %{"message" => %{"content" => text}} ->
-      [ReqLLM.StreamChunk.text(text)]
-    end)
+  # INBOUND  (chunk list)
+  def decode_response(%{"content" => blocks}) when is_list(blocks) do
+    blocks
+    |> Enum.map(&decode_block/1)
+    |> List.flatten()
   end
 
-  # helper(s)…
+  # helpers ...
+end
+```
+
+```
+lib/req_llm/providers/my_provider/response.ex
+```
+
+```elixir
+defmodule ReqLLM.Providers.MyProvider.Response do
+  defstruct [:payload]
+  @type t :: %__MODULE__{payload: term()}
+end
+
+defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.MyProvider.Response do
+  alias ReqLLM.{Response, Context}
+
+  # Final non-streaming
+  def decode_response(%{payload: data}, model) when is_map(data) do
+    with {:ok, chunks} <- ReqLLM.Context.Codec.decode_response(data),
+         message       <- build_message(chunks) do
+      resp = %Response{
+        id: Map.get(data, "id"),
+        model: Map.get(data, "model", model.model),
+        context: %Context{messages: [message]},
+        message: message,
+        stream?: false,
+        usage: Map.get(data, "usage", %{}),
+        finish_reason: Map.get(data, "finish_reason")
+      }
+
+      {:ok, resp}
+    end
+  end
+
+  # Streaming variant receives a Stream.t()
+  def decode_response(%{payload: %Stream{} = stream}, model) do
+    {:ok,
+     %Response{
+       id: "stream",
+       model: model.model,
+       context: %Context{messages: []},
+       stream?: true,
+       stream: stream,
+       usage: %{}
+     }}
+  end
 end
 ```
 
@@ -123,142 +282,91 @@ Start with **text only**; add images, tool calls, thinking tokens later.
 
 ---
 
-## 2. Capability system
+## 3. Capability metadata
 
-* Capabilities determine which high-level features a model supports (`:streaming`, `:tools`, `:temperature`, …).  
-* The lookup is **data-driven**: `priv/models_dev/openai.json` contains a top-level `"provider"` section plus a `"models"` list.
+`priv/models_dev/my_provider.json`
 
-Example snippet:
-
-```json
+```jsonc
 {
   "provider": {
-    "env": ["OPENAI_API_KEY"]
+    "env": ["MY_PROVIDER_API_KEY"]
   },
   "models": [
     {
-      "id": "gpt-4o-mini",
+      "id": "small-1",
       "max_tokens": 8192,
-      "temperature": true,
-      "top_p": true,
       "streaming": true,
       "tool_call": true,
-      "reasoning": false
+      "temperature": true,
+      "top_p": true
     }
   ]
 }
 ```
 
-Rules:
-
-1. Every boolean field maps to a capability inside `ReqLLM.Capability` (see mapping in `capability.ex`).  
-2. Add **new JSON keys** if the feature is brand-new, then extend the mapping function so the new capability becomes discoverable.  
-3. Put the file under `priv/models_dev/`; the `metadata:` path in the DSL must match.
+New flags → add mapping in `ReqLLM.Capability.from_json/1`.
 
 ---
 
-## 3. Testing strategy with the LiveFixture system
-
-### 3.1 Why two kinds of tests?
-
-1. **Unit tests** – No network, pure functions (codec, helpers, error mapping).  
-2. **Coverage tests** – Exercise the real HTTP stack. They run in two modes:
-   • **Fixture mode (default)** – Reads canned JSON so CI is fast, deterministic, and free.  
-   • **Live mode** – `LIVE=true mix test` will hit the real API and overwrite/add fixtures.
-
-### 3.2 Directory layout
+## 4. Testing with **LiveFixture**
 
 ```
-test/
-└── coverage/
-    └── openai/            # provider-specific suite
-        ├── core_test.exs  # basic happy-path tests
-        ├── streaming_test.exs
-        └── ...
-fixtures/
-└── openai/
-    ├── basic_completion.json
-    ├── streaming_delta.json
-    └── ...
+test/coverage/my_provider/core_test.exs
 ```
-
-The fixtures folder is automatically created by `ReqLLM.Test.LiveFixture`.
-
-### 3.3 Writing a coverage test
 
 ```elixir
-defmodule ReqLLM.Coverage.OpenAI.CoreTest do
+defmodule ReqLLM.Coverage.MyProvider.CoreTest do
   use ExUnit.Case, async: false
   @moduletag :coverage
-  @moduletag :openai
+  @moduletag :my_provider
 
   alias ReqLLM.Test.LiveFixture
-  @model "openai:gpt-4o-mini"
+  @model "my_provider:small-1"
 
   test "simple completion" do
-    result = LiveFixture.use_fixture(:openai, "simple_completion", fn ->
-      ctx = ReqLLM.Context.new([ReqLLM.Context.user("Ping!")])
-      ReqLLM.generate_text(@model, ctx, max_tokens: 3, temperature: 0)
-    end)
+    result =
+      LiveFixture.use_fixture(:my_provider, "simple_completion", fn ->
+        ctx = ReqLLM.Context.new([ReqLLM.Context.user("ping?")])
+        ReqLLM.generate_text(@model, ctx, max_tokens: 3, temperature: 0)
+      end)
 
     {:ok, resp} = result
-    assert resp.status == 200
-    assert resp.body =~ "Pong"
+    assert resp.message.content |> Enum.at(0) |> Map.get(:text) =~ "pong"
   end
 end
 ```
 
-Guidelines:
+Run:
 
-* Keep prompts **deterministic** (temperature `0`, short `max_tokens`) to minimise drift.  
-* Wrap every network call with `LiveFixture.use_fixture/3` – the helper decides whether to hit the live API.  
-* Make at least one streaming test to verify `parse_stream/2`.
-
-### 3.4 Running tests
-
-* All unit tests  
-  ```bash
-  mix test --exclude coverage
-  ```
-* Coverage tests (fixture mode)  
-  ```bash
-  mix test --only coverage
-  ```
-* Live round-trip against real API (updates fixtures)  
-  ```bash
-  LIVE=true mix test --only coverage --only openai   # single provider
-  ```
-* CI (recommended): run both
-  ```bash
-  mix test --exclude coverage      # fast unit layer
-  mix test --only coverage         # fixture layer
-  ```
+```
+mix test --exclude coverage          # unit only
+mix test --only coverage             # fixture layer (offline)
+LIVE=true mix test --only coverage   # re-record fixtures (paid API)
+```
 
 ---
 
-## 4. Best practices
+## 5. Best practices
 
-1. **Respect rate-limits** – throttle in `attach/3` if needed.  
-2. **Cheapest model first** – pick the smallest public model for fixtures.  
-3. **One fixture per feature** – easier updates and targeted re-recording.  
-4. **Never commit secrets** – rely on `provider.provider.env` list for env var names.  
-5. **Keep code symmetric** – everything added to `encode/1` must be handled in `decode/1`.  
-6. **Stream minimal data** – in streaming tests, stop after a handful of chunks to curb cost.  
-7. **Update fixtures proactively** – run `LIVE=true mix test --only coverage --only openai` after API changes.  
-8. **Document quirks** in the module's `@moduledoc`: max token limits, unsupported params, etc.
+1. Keep `prepare_request/4` tiny – put heavy logic in private helpers.  
+2. **No global state**; the provider struct merely wraps `ReqLLM.Context`.  
+3. All added fields in `encode_request/1` **must** be reversed in `decode_response/1`.  
+4. Raise `ReqLLM.Error.*` from helpers; never leak `{:error, term}` tuples.  
+5. Guard against missing API keys with `fetch_api_key!`.  
+6. Use the cheapest model for fixtures; deterministic prompts (`temperature: 0`).  
+7. Document quirks in `@moduledoc`.
 
 ---
 
-## 5. Developer checklist
+## 6. Developer checklist
 
-- [ ] Create `lib/req_llm/providers/<provider>.ex` with Provider behaviour + DSL.  
-- [ ] Add `lib/req_llm/providers/<provider>/codec.ex` implementing `ReqLLM.Codec`.  
-- [ ] Create `priv/models_dev/<provider>.json` with model list & capability flags.  
-- [ ] Write unit tests for codec, helpers.  
-- [ ] Add coverage test suite under `test/coverage/<provider>/`.  
-- [ ] Record initial fixtures:
-      `LIVE=true mix test --only coverage --only <provider>`  
-- [ ] Document required env vars in the @moduledoc and JSON metadata.  
-- [ ] Submit PR. CI must pass both unit and fixture layers.
+- [ ] `lib/req_llm/providers/<provider>.ex` with behaviour + DSL + prepare_request/4  
+- [ ] `lib/req_llm/providers/<provider>/context.ex` implementing `ReqLLM.Context.Codec`  
+- [ ] `lib/req_llm/providers/<provider>/response.ex` implementing `ReqLLM.Response.Codec`  
+- [ ] `priv/models_dev/<provider>.json` capability map  
+- [ ] Unit tests for encode/decode helpers  
+- [ ] Coverage tests + fixtures under `test/coverage/<provider>/`  
+- [ ] Run `LIVE=true mix test --only coverage --only <provider>` for first recording  
+- [ ] CI must pass unit + fixture layers  
 
-Happy hacking & welcome to the ReqLLM provider ecosystem!
+Welcome to the ReqLLM ecosystem – happy hacking!  

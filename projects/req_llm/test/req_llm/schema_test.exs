@@ -270,19 +270,22 @@ defmodule ReqLLM.SchemaTest do
       result = Schema.to_openai_format(tool)
 
       assert result == %{
-               "name" => "search",
-               "description" => "Search for items",
-               "parameters" => %{
-                 "type" => "object",
-                 "properties" => %{
-                   "query" => %{"type" => "string", "description" => "Search query"},
-                   "limit" => %{
-                     "type" => "integer",
-                     "minimum" => 1,
-                     "description" => "Maximum results"
-                   }
-                 },
-                 "required" => ["query"]
+               "type" => "function",
+               "function" => %{
+                 "name" => "search",
+                 "description" => "Search for items",
+                 "parameters" => %{
+                   "type" => "object",
+                   "properties" => %{
+                     "query" => %{"type" => "string", "description" => "Search query"},
+                     "limit" => %{
+                       "type" => "integer",
+                       "minimum" => 1,
+                       "description" => "Maximum results"
+                     }
+                   },
+                   "required" => ["query"]
+                 }
                }
              }
     end
@@ -298,11 +301,14 @@ defmodule ReqLLM.SchemaTest do
       result = Schema.to_openai_format(tool)
 
       assert result == %{
-               "name" => "ping",
-               "description" => "Health check",
-               "parameters" => %{
-                 "type" => "object",
-                 "properties" => %{}
+               "type" => "function",
+               "function" => %{
+                 "name" => "ping",
+                 "description" => "Health check",
+                 "parameters" => %{
+                   "type" => "object",
+                   "properties" => %{}
+                 }
                }
              }
     end
@@ -321,11 +327,11 @@ defmodule ReqLLM.SchemaTest do
 
       result = Schema.to_openai_format(tool)
 
-      assert result["parameters"]["properties"]["tags"]["type"] == "array"
-      assert result["parameters"]["properties"]["tags"]["items"]["type"] == "string"
-      assert result["parameters"]["properties"]["enabled"]["type"] == "boolean"
-      assert result["parameters"]["properties"]["config"]["type"] == "object"
-      assert result["parameters"]["required"] == ["tags"]
+      assert result["function"]["parameters"]["properties"]["tags"]["type"] == "array"
+      assert result["function"]["parameters"]["properties"]["tags"]["items"]["type"] == "string"
+      assert result["function"]["parameters"]["properties"]["enabled"]["type"] == "boolean"
+      assert result["function"]["parameters"]["properties"]["config"]["type"] == "object"
+      assert result["function"]["parameters"]["required"] == ["tags"]
     end
   end
 end
