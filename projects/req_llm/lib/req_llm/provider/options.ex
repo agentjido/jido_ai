@@ -20,7 +20,8 @@ defmodule ReqLLM.Provider.Options do
                              id: [
                                type: :atom,
                                required: true,
-                               doc: "Unique identifier for the provider (e.g., :anthropic, :openai)"
+                               doc:
+                                 "Unique identifier for the provider (e.g., :anthropic, :openai)"
                              ],
                              name: [
                                type: :string,
@@ -46,7 +47,8 @@ defmodule ReqLLM.Provider.Options do
                              ],
                              api_key: [
                                type: :string,
-                               doc: "API key for authentication (can also be set via environment variable)"
+                               doc:
+                                 "API key for authentication (can also be set via environment variable)"
                              ],
                              organization_id: [
                                type: :string,
@@ -54,7 +56,8 @@ defmodule ReqLLM.Provider.Options do
                              ],
                              project_id: [
                                type: :string,
-                               doc: "Project ID for providers that require it (e.g., Google Vertex AI)"
+                               doc:
+                                 "Project ID for providers that require it (e.g., Google Vertex AI)"
                              ],
                              region: [
                                type: :string,
@@ -87,71 +90,73 @@ defmodule ReqLLM.Provider.Options do
 
   # Model capability options schema
   @model_capabilities_schema NimbleOptions.new!(
-                                id: [
-                                  type: :string,
-                                  required: true,
-                                  doc: "Model identifier"
-                                ],
-                                provider_model_id: [
-                                  type: :string,
-                                  doc: "Provider-specific model ID (may differ from generic ID)"
-                                ],
-                                name: [
-                                  type: :string,
-                                  doc: "Human-readable model name"
-                                ],
-                                modalities: [
-                                  type: :map,
-                                  doc: "Supported input/output modalities",
-                                  keys: [
-                                    input: [
-                                      type: {:list, {:in, [:text, :image, :audio, :video, :document]}},
-                                      doc: "Supported input modalities"
-                                    ],
-                                    output: [
-                                      type: {:list, {:in, [:text, :image, :audio, :video]}},
-                                      doc: "Supported output modalities"
-                                    ]
-                                  ]
-                                ],
-                                attachment: [
-                                  type: :boolean,
-                                  default: false,
-                                  doc: "Whether the model supports file attachments"
-                                ],
-                                reasoning: [
-                                  type: :boolean,
-                                  default: false,
-                                  doc: "Whether the model supports explicit reasoning/thinking tokens"
-                                ],
-                                tool_call: [
-                                  type: :boolean,
-                                  default: false,
-                                  doc: "Whether the model supports function/tool calling"
-                                ],
-                                temperature: [
-                                  type: :boolean,
-                                  default: true,
-                                  doc: "Whether the model supports temperature parameter"
-                                ],
-                                open_weights: [
-                                  type: :boolean,
-                                  default: false,
-                                  doc: "Whether the model weights are open source"
-                                ],
-                                knowledge: [
-                                  type: :string,
-                                  doc: "Knowledge cutoff date (YYYY-MM or YYYY-MM-DD format)"
-                                ],
-                                release_date: [
-                                  type: :string,
-                                  doc: "Model release date (YYYY-MM-DD format)"
-                                ],
-                                last_updated: [
-                                  type: :string,
-                                  doc: "Last update date (YYYY-MM-DD format)"
-                                ]
-                              )
+                               id: [
+                                 type: :string,
+                                 required: true,
+                                 doc: "Model identifier"
+                               ],
+                               provider_model_id: [
+                                 type: :string,
+                                 doc: "Provider-specific model ID (may differ from generic ID)"
+                               ],
+                               name: [
+                                 type: :string,
+                                 doc: "Human-readable model name"
+                               ],
+                               modalities: [
+                                 type: :map,
+                                 doc: "Supported input/output modalities",
+                                 keys: [
+                                   input: [
+                                     type:
+                                       {:list, {:in, [:text, :image, :audio, :video, :document]}},
+                                     doc: "Supported input modalities"
+                                   ],
+                                   output: [
+                                     type: {:list, {:in, [:text, :image, :audio, :video]}},
+                                     doc: "Supported output modalities"
+                                   ]
+                                 ]
+                               ],
+                               attachment: [
+                                 type: :boolean,
+                                 default: false,
+                                 doc: "Whether the model supports file attachments"
+                               ],
+                               reasoning: [
+                                 type: :boolean,
+                                 default: false,
+                                 doc:
+                                   "Whether the model supports explicit reasoning/thinking tokens"
+                               ],
+                               tool_call: [
+                                 type: :boolean,
+                                 default: false,
+                                 doc: "Whether the model supports function/tool calling"
+                               ],
+                               temperature: [
+                                 type: :boolean,
+                                 default: true,
+                                 doc: "Whether the model supports temperature parameter"
+                               ],
+                               open_weights: [
+                                 type: :boolean,
+                                 default: false,
+                                 doc: "Whether the model weights are open source"
+                               ],
+                               knowledge: [
+                                 type: :string,
+                                 doc: "Knowledge cutoff date (YYYY-MM or YYYY-MM-DD format)"
+                               ],
+                               release_date: [
+                                 type: :string,
+                                 doc: "Model release date (YYYY-MM-DD format)"
+                               ],
+                               last_updated: [
+                                 type: :string,
+                                 doc: "Last update date (YYYY-MM-DD format)"
+                               ]
+                             )
 
   # Model limit options schema
   @model_limits_schema NimbleOptions.new!(
@@ -217,241 +222,246 @@ defmodule ReqLLM.Provider.Options do
 
   # Generation parameter options schema
   @generation_options_schema NimbleOptions.new!(
-                                # Core generation parameters
-                                temperature: [
-                                  type: :float,
-                                  doc: "Controls randomness in output (0.0 to 2.0, provider-dependent)"
-                                ],
-                                max_tokens: [
-                                  type: :pos_integer,
-                                  doc: "Maximum number of tokens to generate"
-                                ],
-                                top_p: [
-                                  type: :float,
-                                  doc: "Nucleus sampling parameter (0.0 to 1.0)"
-                                ],
-                                top_k: [
-                                  type: :pos_integer,
-                                  doc: "Top-k sampling parameter"
-                                ],
-                                frequency_penalty: [
-                                  type: :float,
-                                  doc: "Penalize tokens based on frequency in the output (-2.0 to 2.0)"
-                                ],
-                                presence_penalty: [
-                                  type: :float,
-                                  doc: "Penalize tokens based on presence in the output (-2.0 to 2.0)"
-                                ],
-                                repetition_penalty: [
-                                  type: :float,
-                                  doc: "Alternative repetition penalty (provider-specific)"
-                                ],
-                                
-                                # Sampling control
-                                seed: [
-                                  type: :integer,
-                                  doc: "Random seed for deterministic generation"
-                                ],
-                                stop: [
-                                  type: {:or, [:string, {:list, :string}]},
-                                  doc: "Stop sequences to end generation"
-                                ],
-                                stop_sequences: [
-                                  type: {:list, :string},
-                                  doc: "Alternative name for stop sequences (provider-specific)"
-                                ],
-                                
-                                # Output format
-                                response_format: [
-                                  type: {:or, [:map, :string]},
-                                  doc: "Response format specification (e.g., JSON mode)"
-                                ],
-                                json_mode: [
-                                  type: :boolean,
-                                  doc: "Enable JSON output mode"
-                                ],
-                                
-                                # Advanced sampling
-                                n: [
-                                  type: :pos_integer,
-                                  default: 1,
-                                  doc: "Number of completions to generate"
-                                ],
-                                best_of: [
-                                  type: :pos_integer,
-                                  doc: "Generate best_of completions and return the best one"
-                                ],
-                                logprobs: [
-                                  type: {:or, [:boolean, :pos_integer]},
-                                  doc: "Include log probabilities in the response"
-                                ],
-                                echo: [
-                                  type: :boolean,
-                                  doc: "Echo the prompt in the response"
-                                ],
-                                logit_bias: [
-                                  type: :map,
-                                  doc: "Token ID to bias value mapping"
-                                ],
-                                
-                                # Tool/Function calling
-                                tools: [
-                                  type: {:list, :map},
-                                  doc: "List of available tools/functions"
-                                ],
-                                tool_choice: [
-                                  type: {:or, [:string, :atom, :map]},
-                                  doc: "Tool selection strategy (auto, none, required, or specific tool)"
-                                ],
-                                functions: [
-                                  type: {:list, :map},
-                                  doc: "Legacy function definitions (deprecated in favor of tools)"
-                                ],
-                                function_call: [
-                                  type: {:or, [:string, :map]},
-                                  doc: "Legacy function call strategy (deprecated)"
-                                ],
-                                
-                                # System and context
-                                system_prompt: [
-                                  type: :string,
-                                  doc: "System prompt to set context"
-                                ],
-                                system: [
-                                  type: :string,
-                                  doc: "Alternative name for system prompt"
-                                ],
-                                user: [
-                                  type: :string,
-                                  doc: "User identifier for tracking"
-                                ],
-                                
-                                # Reasoning (for models that support it)
-                                reasoning: [
-                                  type: {:in, [nil, false, true, "low", "auto", "high"]},
-                                  doc: "Request reasoning/thinking tokens from the model"
-                                ],
-                                
-                                # Streaming
-                                stream: [
-                                  type: :boolean,
-                                  default: false,
-                                  doc: "Enable streaming response"
-                                ],
-                                stream_format: [
-                                  type: {:in, [:sse, :chunked, :json, :text]},
-                                  default: :sse,
-                                  doc: "Streaming transport format"
-                                ],
-                                chunk_timeout: [
-                                  type: :pos_integer,
-                                  default: 30_000,
-                                  doc: "Timeout between stream chunks in milliseconds"
-                                ],
-                                
-                                # Provider-specific
-                                provider_options: [
-                                  type: :map,
-                                  doc: "Provider-specific options that don't fit standard parameters"
-                                ],
-                                
-                                # Safety and moderation
-                                safety_settings: [
-                                  type: {:list, :map},
-                                  doc: "Safety filter settings (Google, Anthropic)"
-                                ],
-                                moderation: [
-                                  type: :boolean,
-                                  doc: "Enable content moderation"
-                                ],
-                                
-                                # Caching (provider-specific)
-                                cache_control: [
-                                  type: :map,
-                                  doc: "Cache control settings for providers that support caching"
-                                ],
-                                use_cache: [
-                                  type: :boolean,
-                                  doc: "Enable response caching"
-                                ]
-                              )
+                               # Core generation parameters
+                               temperature: [
+                                 type: :float,
+                                 doc:
+                                   "Controls randomness in output (0.0 to 2.0, provider-dependent)"
+                               ],
+                               max_tokens: [
+                                 type: :pos_integer,
+                                 doc: "Maximum number of tokens to generate"
+                               ],
+                               top_p: [
+                                 type: :float,
+                                 doc: "Nucleus sampling parameter (0.0 to 1.0)"
+                               ],
+                               top_k: [
+                                 type: :pos_integer,
+                                 doc: "Top-k sampling parameter"
+                               ],
+                               frequency_penalty: [
+                                 type: :float,
+                                 doc:
+                                   "Penalize tokens based on frequency in the output (-2.0 to 2.0)"
+                               ],
+                               presence_penalty: [
+                                 type: :float,
+                                 doc:
+                                   "Penalize tokens based on presence in the output (-2.0 to 2.0)"
+                               ],
+                               repetition_penalty: [
+                                 type: :float,
+                                 doc: "Alternative repetition penalty (provider-specific)"
+                               ],
+
+                               # Sampling control
+                               seed: [
+                                 type: :integer,
+                                 doc: "Random seed for deterministic generation"
+                               ],
+                               stop: [
+                                 type: {:or, [:string, {:list, :string}]},
+                                 doc: "Stop sequences to end generation"
+                               ],
+                               stop_sequences: [
+                                 type: {:list, :string},
+                                 doc: "Alternative name for stop sequences (provider-specific)"
+                               ],
+
+                               # Output format
+                               response_format: [
+                                 type: {:or, [:map, :string]},
+                                 doc: "Response format specification (e.g., JSON mode)"
+                               ],
+                               json_mode: [
+                                 type: :boolean,
+                                 doc: "Enable JSON output mode"
+                               ],
+
+                               # Advanced sampling
+                               n: [
+                                 type: :pos_integer,
+                                 default: 1,
+                                 doc: "Number of completions to generate"
+                               ],
+                               best_of: [
+                                 type: :pos_integer,
+                                 doc: "Generate best_of completions and return the best one"
+                               ],
+                               logprobs: [
+                                 type: {:or, [:boolean, :pos_integer]},
+                                 doc: "Include log probabilities in the response"
+                               ],
+                               echo: [
+                                 type: :boolean,
+                                 doc: "Echo the prompt in the response"
+                               ],
+                               logit_bias: [
+                                 type: :map,
+                                 doc: "Token ID to bias value mapping"
+                               ],
+
+                               # Tool/Function calling
+                               tools: [
+                                 type: {:list, :map},
+                                 doc: "List of available tools/functions"
+                               ],
+                               tool_choice: [
+                                 type: {:or, [:string, :atom, :map]},
+                                 doc:
+                                   "Tool selection strategy (auto, none, required, or specific tool)"
+                               ],
+                               functions: [
+                                 type: {:list, :map},
+                                 doc: "Legacy function definitions (deprecated in favor of tools)"
+                               ],
+                               function_call: [
+                                 type: {:or, [:string, :map]},
+                                 doc: "Legacy function call strategy (deprecated)"
+                               ],
+
+                               # System and context
+                               system_prompt: [
+                                 type: :string,
+                                 doc: "System prompt to set context"
+                               ],
+                               system: [
+                                 type: :string,
+                                 doc: "Alternative name for system prompt"
+                               ],
+                               user: [
+                                 type: :string,
+                                 doc: "User identifier for tracking"
+                               ],
+
+                               # Reasoning (for models that support it)
+                               reasoning: [
+                                 type: {:in, [nil, false, true, "low", "auto", "high"]},
+                                 doc: "Request reasoning/thinking tokens from the model"
+                               ],
+
+                               # Streaming
+                               stream: [
+                                 type: :boolean,
+                                 default: false,
+                                 doc: "Enable streaming response"
+                               ],
+                               stream_format: [
+                                 type: {:in, [:sse, :chunked, :json, :text]},
+                                 default: :sse,
+                                 doc: "Streaming transport format"
+                               ],
+                               chunk_timeout: [
+                                 type: :pos_integer,
+                                 default: 30_000,
+                                 doc: "Timeout between stream chunks in milliseconds"
+                               ],
+
+                               # Provider-specific
+                               provider_options: [
+                                 type: :map,
+                                 doc:
+                                   "Provider-specific options that don't fit standard parameters"
+                               ],
+
+                               # Safety and moderation
+                               safety_settings: [
+                                 type: {:list, :map},
+                                 doc: "Safety filter settings (Google, Anthropic)"
+                               ],
+                               moderation: [
+                                 type: :boolean,
+                                 doc: "Enable content moderation"
+                               ],
+
+                               # Caching (provider-specific)
+                               cache_control: [
+                                 type: :map,
+                                 doc: "Cache control settings for providers that support caching"
+                               ],
+                               use_cache: [
+                                 type: :boolean,
+                                 doc: "Enable response caching"
+                               ]
+                             )
 
   # Complete options schema combining all categories
   @complete_options_schema NimbleOptions.new!(
-                              provider: [
-                                type: :keyword_list,
-                                doc: "Provider configuration options",
-                                keys: @provider_options_schema.schema
-                              ],
-                              capabilities: [
-                                type: :keyword_list,
-                                doc: "Model capability options",
-                                keys: @model_capabilities_schema.schema
-                              ],
-                              limits: [
-                                type: :keyword_list,
-                                doc: "Model limit options",
-                                keys: @model_limits_schema.schema
-                              ],
-                              cost: [
-                                type: :keyword_list,
-                                doc: "Model cost options",
-                                keys: @model_cost_schema.schema
-                              ],
-                              generation: [
-                                type: :keyword_list,
-                                doc: "Generation parameter options",
-                                keys: @generation_options_schema.schema
-                              ]
-                            )
+                             provider: [
+                               type: :keyword_list,
+                               doc: "Provider configuration options",
+                               keys: @provider_options_schema.schema
+                             ],
+                             capabilities: [
+                               type: :keyword_list,
+                               doc: "Model capability options",
+                               keys: @model_capabilities_schema.schema
+                             ],
+                             limits: [
+                               type: :keyword_list,
+                               doc: "Model limit options",
+                               keys: @model_limits_schema.schema
+                             ],
+                             cost: [
+                               type: :keyword_list,
+                               doc: "Model cost options",
+                               keys: @model_cost_schema.schema
+                             ],
+                             generation: [
+                               type: :keyword_list,
+                               doc: "Generation parameter options",
+                               keys: @generation_options_schema.schema
+                             ]
+                           )
 
   @doc """
   Provider-level configuration options.
-  
+
   These options configure the provider connection and authentication.
   """
   def provider_options_schema, do: @provider_options_schema
 
   @doc """
   Model capability options.
-  
+
   These options describe what features and modalities a model supports.
   """
   def model_capabilities_schema, do: @model_capabilities_schema
 
   @doc """
   Model limit options.
-  
+
   These options define the constraints and limits of a model.
   """
   def model_limits_schema, do: @model_limits_schema
 
   @doc """
   Model cost options.
-  
+
   These options define the pricing structure for a model.
   """
   def model_cost_schema, do: @model_cost_schema
 
   @doc """
   Generation parameter options.
-  
+
   These are runtime options that can be passed when generating text.
   """
   def generation_options_schema, do: @generation_options_schema
 
   @doc """
   Complete options schema combining all option categories.
-  
+
   This can be used for validating a complete set of provider and generation options.
   """
   def complete_options_schema, do: @complete_options_schema
 
   @doc """
   Validates provider options against the schema.
-  
+
   ## Examples
-  
+
       iex> ReqLLM.Provider.Options.validate_provider_options(
       ...>   id: :openai,
       ...>   base_url: "https://api.openai.com/v1",
@@ -465,9 +475,9 @@ defmodule ReqLLM.Provider.Options do
 
   @doc """
   Validates generation options against the schema.
-  
+
   ## Examples
-  
+
       iex> ReqLLM.Provider.Options.validate_generation_options(
       ...>   temperature: 0.7,
       ...>   max_tokens: 1000,
@@ -481,9 +491,9 @@ defmodule ReqLLM.Provider.Options do
 
   @doc """
   Validates model capabilities against the schema.
-  
+
   ## Examples
-  
+
       iex> ReqLLM.Provider.Options.validate_capabilities(
       ...>   id: "gpt-4",
       ...>   reasoning: true,
@@ -497,9 +507,9 @@ defmodule ReqLLM.Provider.Options do
 
   @doc """
   Validates model limits against the schema.
-  
+
   ## Examples
-  
+
       iex> ReqLLM.Provider.Options.validate_limits(
       ...>   context: 128000,
       ...>   output: 4096
@@ -512,9 +522,9 @@ defmodule ReqLLM.Provider.Options do
 
   @doc """
   Validates model cost options against the schema.
-  
+
   ## Examples
-  
+
       iex> ReqLLM.Provider.Options.validate_cost(
       ...>   input: 3.0,
       ...>   output: 15.0
@@ -567,28 +577,28 @@ defmodule ReqLLM.Provider.Options do
 
   @doc """
   Extracts provider-specific options from a mixed options list.
-  
+
   This is useful for separating standard options from provider-specific ones.
-  
+
   ## Examples
-  
+
       iex> opts = [temperature: 0.7, max_tokens: 100, custom_param: "value"]
       iex> ReqLLM.Provider.Options.extract_provider_options(opts)
       {[temperature: 0.7, max_tokens: 100], [custom_param: "value"]}
   """
   def extract_provider_options(opts) do
     known_keys = all_generation_keys()
-    
+
     {standard, custom} = Keyword.split(opts, known_keys)
-    
+
     {standard, custom}
   end
 
   @doc """
   Merges options with defaults, respecting provider-specific overrides.
-  
+
   ## Examples
-  
+
       iex> defaults = [temperature: 0.7, max_tokens: 1000]
       iex> user_opts = [temperature: 0.9]
       iex> ReqLLM.Provider.Options.merge_with_defaults(user_opts, defaults)
@@ -599,8 +609,54 @@ defmodule ReqLLM.Provider.Options do
   end
 
   @doc """
+  Returns a NimbleOptions schema that contains only the requested generation keys.
+
+  ## Examples
+
+      iex> schema = ReqLLM.Provider.Options.generation_subset_schema([:temperature, :max_tokens])
+      iex> NimbleOptions.validate([temperature: 0.7], schema)
+      {:ok, [temperature: 0.7]}
+  """
+  def generation_subset_schema(keys) when is_list(keys) do
+    wanted = Keyword.take(@generation_options_schema.schema, keys)
+    NimbleOptions.new!(wanted)
+  end
+
+  @doc """
+  Validates generation options against a subset of supported keys.
+
+  ## Examples
+
+      iex> ReqLLM.Provider.Options.validate_generation_options(
+      ...>   [temperature: 0.7, max_tokens: 100],
+      ...>   only: [:temperature, :max_tokens]
+      ...> )
+      {:ok, [temperature: 0.7, max_tokens: 100]}
+  """
+  def validate_generation_options(opts, only: keys) do
+    schema = generation_subset_schema(keys)
+    NimbleOptions.validate(opts, schema)
+  end
+
+  @doc """
+  Filters generation options to only include supported keys.
+
+  This is a pure filter function that doesn't validate - it just removes
+  unsupported keys from the options.
+
+  ## Examples
+
+      iex> opts = [temperature: 0.7, unsupported_key: "value", max_tokens: 100]
+      iex> ReqLLM.Provider.Options.filter_generation_options(opts, [:temperature, :max_tokens])
+      [temperature: 0.7, max_tokens: 100]
+  """
+  def filter_generation_options(opts, keys) when is_list(keys) do
+    Keyword.take(opts, keys)
+  end
+
+  @doc """
   Filters options to only include those supported by a specific provider.
-  
+
   This function would typically be implemented by each provider to filter
   out unsupported options.
   """

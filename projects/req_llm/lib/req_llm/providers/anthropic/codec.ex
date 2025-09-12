@@ -11,7 +11,16 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.Anthropic do
   defp maybe_put_system(map, nil), do: map
   defp maybe_put_system(map, prompt), do: Map.put(map, :system, prompt)
 
-  def decode(%ReqLLM.Providers.Anthropic{context: %{"content" => content}}) do
+  def decode(%ReqLLM.Providers.Anthropic{context: %{content: content}}) when is_list(content) do
+    content
+    |> Enum.map(&decode_content_block/1)
+    |> List.flatten()
+    |> Enum.reject(&is_nil/1)
+  end
+
+  # Handle legacy format where content might have string keys
+  def decode(%ReqLLM.Providers.Anthropic{context: %{"content" => content}})
+      when is_list(content) do
     content
     |> Enum.map(&decode_content_block/1)
     |> List.flatten()

@@ -69,7 +69,7 @@ ReqLLM.generate_text!("anthropic:claude-3-haiku", prompt)
 ```elixir
 # With options
 ReqLLM.generate_text!(
-  {:anthropic, model: "claude-3-5-sonnet", temperature: 0.7}, 
+  {:anthropic, "claude-3-5-sonnet", temperature: 0.7}, 
   prompt
 )
 ```

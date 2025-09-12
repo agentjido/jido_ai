@@ -78,7 +78,7 @@ Flexible model specification formats:
 "anthropic:claude-3-sonnet"
 
 # Tuple with options
-{:anthropic, model: "claude-3-sonnet", temperature: 0.7}
+{:anthropic, "claude-3-sonnet", temperature: 0.7}
 
 # Full struct
 %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet", temperature: 0.7}

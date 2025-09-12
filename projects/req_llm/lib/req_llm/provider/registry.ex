@@ -168,14 +168,27 @@ defmodule ReqLLM.Provider.Registry do
   def get_model(provider_id, model_name) when is_atom(provider_id) and is_binary(model_name) do
     with {:ok, provider_info} <- get_provider_info(provider_id),
          {:ok, model_metadata} <- find_model_metadata(provider_info, model_name) do
-      # Create model with basic fields, metadata is stored in provider registry
-      model = %ReqLLM.Model{
-        provider: provider_id,
-        model: model_name
-      }
+      # Create enhanced model with structured fields populated from metadata
+      limit = get_in(model_metadata, ["limit"]) |> map_string_keys_to_atoms()
 
-      # Add metadata separately for backward compatibility
-      model_with_metadata = Map.put(model, :_metadata, model_metadata)
+      modalities =
+        get_in(model_metadata, ["modalities"])
+        |> map_string_keys_to_atoms()
+        |> convert_modality_values()
+
+      capabilities = build_capabilities_from_metadata(model_metadata)
+      cost = get_in(model_metadata, ["cost"]) |> map_string_keys_to_atoms()
+
+      enhanced_model =
+        ReqLLM.Model.new(provider_id, model_name,
+          limit: limit,
+          modalities: modalities,
+          capabilities: capabilities,
+          cost: cost
+        )
+
+      # Add raw metadata for backward compatibility and additional fields
+      model_with_metadata = Map.put(enhanced_model, :_metadata, model_metadata)
       {:ok, model_with_metadata}
     end
   end
@@ -236,6 +249,77 @@ defmodule ReqLLM.Provider.Registry do
     get_registry()
     |> Map.keys()
     |> Enum.sort()
+  end
+
+  @doc """
+  Lists only fully implemented providers (have modules).
+
+  ## Returns
+
+  List of provider atoms that can actually make API calls.
+
+  ## Examples
+
+      ReqLLM.Provider.Registry.list_implemented_providers()
+      #=> [:anthropic, :openai]
+
+  """
+  @spec list_implemented_providers() :: [atom()]
+  def list_implemented_providers do
+    get_registry()
+    |> Enum.filter(fn {_id, info} -> Map.get(info, :implemented, false) end)
+    |> Enum.map(fn {id, _info} -> id end)
+    |> Enum.sort()
+  end
+
+  @doc """
+  Lists providers that exist only as metadata (no implementation).
+
+  ## Returns
+
+  List of provider atoms that have metadata but no implementation.
+
+  ## Examples
+
+      ReqLLM.Provider.Registry.list_metadata_only_providers()
+      #=> [:mistral, :openrouter, :groq]
+
+  """
+  @spec list_metadata_only_providers() :: [atom()]
+  def list_metadata_only_providers do
+    get_registry()
+    |> Enum.filter(fn {_id, info} -> !Map.get(info, :implemented, true) end)
+    |> Enum.map(fn {id, _info} -> id end)
+    |> Enum.sort()
+  end
+
+  @doc """
+  Checks if a provider is fully implemented.
+
+  ## Parameters
+
+    * `provider_id` - The provider identifier (atom)
+
+  ## Returns
+
+    * `true` - Provider has both module and metadata
+    * `false` - Provider is metadata-only or doesn't exist
+
+  ## Examples
+
+      ReqLLM.Provider.Registry.implemented?(:anthropic)
+      #=> true
+
+      ReqLLM.Provider.Registry.implemented?(:mistral)  
+      #=> false (metadata-only)
+
+  """
+  @spec implemented?(atom()) :: boolean()
+  def implemented?(provider_id) when is_atom(provider_id) do
+    case get_provider_info(provider_id) do
+      {:ok, info} -> Map.get(info, :implemented, false)
+      {:error, _} -> false
+    end
   end
 
   @doc """
@@ -359,7 +443,7 @@ defmodule ReqLLM.Provider.Registry do
       |> Task.async_stream(&extract_provider_info/1, ordered: false, timeout: 5000)
       |> Enum.reduce({%{}, []}, fn
         {:ok, {:ok, {id, module, metadata}}}, {acc, failed} ->
-          {Map.put(acc, id, %{module: module, metadata: metadata}), failed}
+          {Map.put(acc, id, %{module: module, metadata: metadata, implemented: true}), failed}
 
         {:ok, {:error, {module, error}}}, {acc, failed} ->
           {acc, [{module, error} | failed]}
@@ -367,6 +451,10 @@ defmodule ReqLLM.Provider.Registry do
         {:exit, reason}, {acc, failed} ->
           {acc, [{:unknown_module, reason} | failed]}
       end)
+
+    # Also register JSON-only providers (providers without modules)
+    json_only_registry = register_json_only_providers(registry_map)
+    final_registry = Map.merge(registry_map, json_only_registry)
 
     # Log any failures in a batch
     if !Enum.empty?(failed_modules) do
@@ -376,8 +464,11 @@ defmodule ReqLLM.Provider.Registry do
     end
 
     # Store in persistent_term
-    :persistent_term.put(@registry_key, registry_map)
-    Logger.debug("Provider registry initialized with #{map_size(registry_map)} providers")
+    :persistent_term.put(@registry_key, final_registry)
+
+    Logger.debug(
+      "Provider registry initialized with #{map_size(final_registry)} providers (#{map_size(registry_map)} with modules, #{map_size(json_only_registry)} metadata-only)"
+    )
 
     :ok
   end
@@ -506,4 +597,141 @@ defmodule ReqLLM.Provider.Registry do
     ArgumentError ->
       {:error, "Unknown provider in specification"}
   end
+
+  # Whitelist of safe metadata keys to convert to atoms (copied from Model module)
+  @safe_metadata_keys ~w[
+    input output context text image reasoning tool_call temperature
+    cache_read cache_write limit modalities capabilities cost
+  ]
+
+  defp map_string_keys_to_atoms(nil), do: nil
+
+  defp map_string_keys_to_atoms(map) when is_map(map) do
+    Map.new(map, fn
+      {key, value} when is_binary(key) and key in @safe_metadata_keys ->
+        atom_key = String.to_existing_atom(key)
+        {atom_key, value}
+
+      {key, value} when is_binary(key) ->
+        # Keep unsafe keys as strings to prevent atom leakage
+        {key, value}
+
+      {key, value} ->
+        {key, value}
+    end)
+  rescue
+    ArgumentError ->
+      # If any safe key doesn't exist as an atom, just return the map as-is
+      map
+  end
+
+  defp build_capabilities_from_metadata(metadata) do
+    %{
+      reasoning: Map.get(metadata, "reasoning", false),
+      tool_call: Map.get(metadata, "tool_call", false),
+      temperature: Map.get(metadata, "temperature", false),
+      attachment: Map.get(metadata, "attachment", false)
+    }
+  end
+
+  # Convert modality string values to atoms
+  defp convert_modality_values(nil), do: nil
+
+  defp convert_modality_values(modalities) when is_map(modalities) do
+    modalities
+    |> Enum.map(fn
+      {:input, values} when is_list(values) ->
+        {:input, Enum.map(values, &String.to_atom/1)}
+
+      {:output, values} when is_list(values) ->
+        {:output, Enum.map(values, &String.to_atom/1)}
+
+      {key, value} ->
+        {key, value}
+    end)
+    |> Map.new()
+  end
+
+  @doc false
+  # Register providers that exist only as JSON metadata files
+  defp register_json_only_providers(existing_registry) do
+    priv_dir = Application.app_dir(:req_llm, "priv")
+    models_dir = Path.join(priv_dir, "models_dev")
+
+    if File.dir?(models_dir) do
+      models_dir
+      |> File.ls!()
+      |> Enum.filter(&String.ends_with?(&1, ".json"))
+      |> Enum.map(&String.trim_trailing(&1, ".json"))
+      |> Enum.reduce(%{}, fn filename, acc ->
+        provider_id = filename_to_provider_atom(filename)
+
+        # Skip if already registered or if we can't convert to atom
+        if provider_id && !Map.has_key?(existing_registry, provider_id) do
+          case load_json_metadata(models_dir, filename) do
+            {:ok, metadata} ->
+              Map.put(acc, provider_id, %{module: nil, metadata: metadata, implemented: false})
+
+            {:error, _} ->
+              acc
+          end
+        else
+          acc
+        end
+      end)
+    else
+      %{}
+    end
+  end
+
+  @doc false
+  # Convert filename to provider atom
+  defp filename_to_provider_atom(filename) do
+    # Convert hyphenated names to underscored atoms, but keep original if it's already valid
+    atom_candidate = String.replace(filename, "-", "_")
+
+    # Try to create atom safely
+    try do
+      String.to_atom(atom_candidate)
+    rescue
+      SystemLimitError ->
+        # Atom table is full
+        nil
+    end
+  end
+
+  @doc false
+  # Load metadata from a JSON file for a provider
+  defp load_json_metadata(models_dir, filename) do
+    file_path = Path.join(models_dir, "#{filename}.json")
+
+    with {:ok, content} <- File.read(file_path),
+         {:ok, data} <- Jason.decode(content) do
+      # Convert string keys to atom keys for easier access  
+      {:ok, atomize_json_keys(data)}
+    end
+  end
+
+  @doc false
+  # Helper to recursively convert string keys to atoms (for known keys only)
+  defp atomize_json_keys(data) when is_map(data) do
+    data
+    |> Enum.map(fn
+      {"models", value} -> {:models, atomize_json_keys(value)}
+      {"capabilities", value} -> {:capabilities, value}
+      {"pricing", value} -> {:pricing, atomize_json_keys(value)}
+      {"context_length", value} -> {:context_length, value}
+      {"id", value} -> {:id, value}
+      {"input", value} -> {:input, value}
+      {"output", value} -> {:output, value}
+      {key, value} -> {key, atomize_json_keys(value)}
+    end)
+    |> Map.new()
+  end
+
+  defp atomize_json_keys(data) when is_list(data) do
+    Enum.map(data, &atomize_json_keys/1)
+  end
+
+  defp atomize_json_keys(data), do: data
 end

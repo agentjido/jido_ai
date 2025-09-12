@@ -181,7 +181,7 @@ defmodule ReqLLM.Provider.Utils do
   @spec parse_sse_stream(binary(), binary() | nil, function()) ::
           {:ok, binary()} | {:error, ReqLLM.Error.API.Response.t()}
   def parse_sse_stream(body, filter_event, extract_fn) do
-    case ServerSentEvent.parse_all(body) do
+    case ServerSentEvents.parse(body) do
       {:ok, {events, _rest}} ->
         if Enum.empty?(events) do
           {:error,
@@ -261,5 +261,226 @@ defmodule ReqLLM.Provider.Utils do
         valid_chunks = Enum.map(parsed_chunks, fn {:ok, data} -> data end)
         {:ok, valid_chunks}
     end
+  end
+
+  @doc """
+  Conditionally attaches streaming step to a request.
+
+  Adds the stream step for SSE parsing when streaming is enabled.
+
+  ## Parameters
+
+  - `request` - The Req request to potentially modify
+  - `stream_enabled` - Whether streaming is enabled
+
+  ## Returns
+
+  The request, with streaming step attached if needed.
+
+  ## Examples
+
+      iex> request = %Req.Request{}
+      iex> ReqLLM.Provider.Utils.maybe_append_stream_step(request, true)
+      # Returns request with stream step attached
+
+      iex> ReqLLM.Provider.Utils.maybe_append_stream_step(request, false)
+      # Returns original request unchanged
+  """
+  @spec maybe_append_stream_step(Req.Request.t(), boolean()) :: Req.Request.t()
+  def maybe_append_stream_step(req, true), do: ReqLLM.Plugins.Stream.attach(req)
+  def maybe_append_stream_step(req, _), do: req
+
+  @doc """
+  Conditionally puts a value into a keyword list or map if the value is not nil.
+
+  ## Parameters
+
+  - `opts` - Keyword list or map to potentially modify
+  - `key` - Key to add
+  - `value` - Value to add (if not nil)
+
+  ## Returns
+
+  The keyword list or map, with key-value pair added if value is not nil.
+
+  ## Examples
+
+      iex> ReqLLM.Provider.Utils.maybe_put([], :name, "John")
+      [name: "John"]
+
+      iex> ReqLLM.Provider.Utils.maybe_put(%{}, :name, "John")
+      %{name: "John"}
+
+      iex> ReqLLM.Provider.Utils.maybe_put([], :name, nil)
+      []
+
+      iex> ReqLLM.Provider.Utils.maybe_put(%{}, :name, nil)
+      %{}
+  """
+  @spec maybe_put(keyword() | map(), atom(), term()) :: keyword() | map()
+  def maybe_put(opts, _key, nil), do: opts
+  def maybe_put(opts, key, value) when is_list(opts), do: Keyword.put(opts, key, value)
+  def maybe_put(opts, key, value) when is_map(opts), do: Map.put(opts, key, value)
+
+  @doc """
+  Raises an error if unknown options are present.
+
+  ## Parameters
+
+  - `opts` - Options to validate
+  - `allowed` - List of allowed option keys
+
+  ## Returns
+
+  The original options if all keys are allowed.
+
+  ## Raises
+
+  `ReqLLM.Error.Invalid.Parameter` if unknown options are found.
+
+  ## Examples
+
+      iex> ReqLLM.Provider.Utils.reject_unknown!([temperature: 0.7], [:temperature, :max_tokens])
+      [temperature: 0.7]
+
+      iex> ReqLLM.Provider.Utils.reject_unknown!([bad_key: "value"], [:temperature])
+      ** (ReqLLM.Error.Invalid.Parameter) unsupported options: [:bad_key]
+  """
+  @spec reject_unknown!(keyword(), [atom()]) :: keyword()
+  def reject_unknown!(opts, allowed) do
+    case Keyword.keys(opts) -- allowed do
+      [] ->
+        opts
+
+      unknown ->
+        raise ReqLLM.Error.Invalid.Parameter.exception(
+                parameter: "unsupported options: #{inspect(unknown)}"
+              )
+    end
+  end
+
+  @doc """
+  Validates generation options against a subset schema, raising on error.
+
+  ## Parameters
+
+  - `opts` - Options to validate
+  - `allowed_keys` - Keys to include in validation schema
+
+  ## Returns
+
+  The validated options.
+
+  ## Raises
+
+  `NimbleOptions.ValidationError` if validation fails.
+
+  ## Examples
+
+      iex> ReqLLM.Provider.Utils.validate_subset!([temperature: 0.7], [:temperature, :max_tokens])
+      [temperature: 0.7]
+  """
+  @spec validate_subset!(keyword(), [atom()]) :: keyword()
+  def validate_subset!(opts, allowed_keys) do
+    schema = ReqLLM.Provider.Options.generation_subset_schema(allowed_keys)
+    NimbleOptions.validate!(opts, schema)
+  end
+
+  @doc """
+  Extracts only generation options from a mixed options list.
+
+  Unlike `ReqLLM.Provider.Options.extract_provider_options/1`, this returns
+  only the generation options without the unused remainder.
+
+  ## Parameters
+
+  - `opts` - Mixed options list
+
+  ## Returns
+
+  Keyword list containing only generation options.
+
+  ## Examples
+
+      iex> mixed_opts = [temperature: 0.7, custom_param: "value", max_tokens: 100]
+      iex> ReqLLM.Provider.Utils.extract_generation_opts(mixed_opts)
+      [temperature: 0.7, max_tokens: 100]
+  """
+  @spec extract_generation_opts(keyword()) :: keyword()
+  def extract_generation_opts(opts) do
+    {generation_opts, _rest} = ReqLLM.Provider.Options.extract_provider_options(opts)
+    generation_opts
+  end
+
+  @doc """
+  Adds context to options if present in user options, with type validation.
+
+  ## Parameters
+
+  - `opts` - Current options keyword list
+  - `user_opts` - Original user options to check for context
+
+  ## Returns
+
+  Options with context added if present.
+
+  ## Raises
+
+  `ReqLLM.Error.Invalid.Parameter` if context is not a ReqLLM.Context struct.
+
+  ## Examples
+
+      iex> context = %ReqLLM.Context{messages: []}
+      iex> ReqLLM.Provider.Utils.maybe_put_context([model: "gpt-4"], [context: context])
+      [model: "gpt-4", context: context]
+  """
+  @spec maybe_put_context(keyword(), keyword()) :: keyword()
+  def maybe_put_context(opts, user_opts) do
+    case Keyword.get(user_opts, :context) do
+      %ReqLLM.Context{} = ctx ->
+        Keyword.put(opts, :context, ctx)
+
+      nil ->
+        opts
+
+      other ->
+        raise ReqLLM.Error.Invalid.Parameter.exception(
+                parameter: "context must be ReqLLM.Context, got: #{inspect(other)}"
+              )
+    end
+  end
+
+  @doc """
+  Prepares provider options using a clean pipeline approach.
+
+  This is the main helper that providers can use to process user options
+  into a clean, validated keyword list ready for the Req request.
+
+  ## Parameters
+
+  - `provider_mod` - The provider module (must implement supported_provider_options/0 and default_provider_opts/0)
+  - `model` - ReqLLM.Model struct
+  - `user_opts` - Raw user options
+
+  ## Returns
+
+  Validated and processed options keyword list.
+
+  ## Examples
+
+      iex> model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-haiku"}
+      iex> user_opts = [temperature: 0.7, max_tokens: 1000]
+      iex> ReqLLM.Provider.Utils.prepare_options!(MyProvider, model, user_opts)
+      [temperature: 0.7, max_tokens: 1000, model: "claude-3-haiku"]
+  """
+  @spec prepare_options!(module(), ReqLLM.Model.t(), keyword()) :: keyword()
+  def prepare_options!(provider_mod, %ReqLLM.Model{} = model, user_opts) do
+    user_opts
+    |> extract_generation_opts()
+    |> reject_unknown!(provider_mod.supported_provider_options())
+    |> validate_subset!(provider_mod.supported_provider_options())
+    |> then(&Keyword.merge(provider_mod.default_provider_opts(), &1))
+    |> Keyword.put(:model, model.model)
+    |> maybe_put_context(user_opts)
   end
 end
