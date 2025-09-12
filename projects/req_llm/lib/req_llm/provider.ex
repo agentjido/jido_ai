@@ -3,21 +3,20 @@ defmodule ReqLLM.Provider do
   Behavior for LLM provider implementations.
 
   Providers implement this behavior to handle model-specific request configuration,
-  response parsing, and streaming. Each provider is a Req plugin that uses the
-  standard Req request/response pipeline.
+  body encoding, response parsing, and usage extraction. Each provider is a Req plugin
+  that uses the standard Req request/response pipeline.
 
   ## Provider Responsibilities
 
-  - **Request Configuration**: Set headers, base URLs, authentication
-  - **Body Building**: Format messages and options for provider API
-  - **Response Parsing**: Convert API responses to standardized format
-  - **Streaming**: Handle Server-Sent Events and convert to StreamChunk stream
-  - **Usage Extraction**: Parse usage/cost data from responses
+  - **Request Configuration**: Set headers, base URLs, authentication via `attach/3`
+  - **Body Encoding**: Transform Context to provider-specific JSON via `encode_body/1`
+  - **Response Parsing**: Decode API responses via `decode_response/1`
+  - **Usage Extraction**: Parse usage/cost data via `extract_usage/2` (optional)
 
   ## Implementation Pattern
 
-  Providers use `ReqLLM.Provider.DSL` to define their configuration and then
-  implement the callbacks defined in this behavior.
+  Providers use `ReqLLM.Provider.DSL` to define their configuration and implement
+  the required callbacks as Req pipeline steps.
 
   ## Examples
 
@@ -31,120 +30,113 @@ defmodule ReqLLM.Provider do
 
         @impl ReqLLM.Provider
         def attach(request, model, opts) do
-          # Configure request for this provider
           request
           |> add_auth_headers()
-          |> set_body_and_url()
+          |> Req.Request.append_request_steps(llm_encode_body: &encode_body/1)
+          |> Req.Request.append_response_steps(llm_decode_response: &decode_response/1)
         end
 
-        @impl ReqLLM.Provider
-        def parse_response(response, model) do
-          # Parse non-streaming response
-          {:ok, [%ReqLLM.StreamChunk{type: :text, text: "..."}]}
+        def encode_body(request) do
+          # Transform request.options[:context] to provider JSON
         end
 
-        # ... other callbacks
+        def decode_response({req, resp}) do
+          # Parse response body and return {req, updated_resp}
+        end
       end
 
   """
 
   @doc """
-  Wraps a ReqLLM.Context in a provider-specific tagged struct.
-
-  This callback enables protocol-based dispatch for encoding/decoding operations
-  by wrapping the context in a provider-specific struct that implements
-  the ReqLLM.Context.Codec protocol.
-
-  ## Parameters
-
-    * `context` - ReqLLM.Context struct containing conversation messages
-
-  ## Returns
-
-    * Provider-specific tagged wrapper struct
-
-  """
-  @callback wrap_context(ReqLLM.Context.t()) :: term()
-
-  @doc """
   Attaches provider-specific configuration to a Req request.
 
-  This callback is called by `ReqLLM.attach/2` to configure the request
-  for the specific provider. It should set up authentication, base URLs,
-  request bodies, and any provider-specific headers.
+  This callback configures the request for the specific provider by setting up
+  authentication, base URLs, and registering request/response pipeline steps.
 
   ## Parameters
 
     * `request` - The Req.Request struct to configure
     * `model` - The ReqLLM.Model struct with model specification
-    * `opts` - Additional options (messages, tools, etc.)
+    * `opts` - Additional options (messages, tools, streaming, etc.)
 
   ## Returns
 
-    * `Req.Request.t()` - The configured request ready for execution
+    * `Req.Request.t()` - The configured request with pipeline steps attached
 
   """
   @callback attach(Req.Request.t(), ReqLLM.Model.t(), keyword()) :: Req.Request.t()
 
   @doc """
-  Parses a non-streaming API response into StreamChunk format.
+  Encodes request body for provider API.
 
-  This callback processes successful API responses and converts them
-  into a standardized list of StreamChunk structs.
+  This callback is typically used as a Req request step that transforms the
+  request options (especially `:context`) into the provider-specific JSON body.
 
   ## Parameters
 
-    * `response` - The Req.Response struct from the API
-    * `model` - The ReqLLM.Model struct used for the request
+    * `request` - The Req.Request struct with options to encode
 
   ## Returns
 
-    * `{:ok, [ReqLLM.StreamChunk.t()]}` - Parsed response as chunks
-    * `{:error, term()}` - Parse error
+    * `Req.Request.t()` - Request with encoded body
 
   """
-  @callback parse_response(Req.Response.t(), ReqLLM.Model.t()) ::
-              {:ok, [ReqLLM.StreamChunk.t()]} | {:error, term()}
+  @callback encode_body(Req.Request.t()) :: Req.Request.t()
 
   @doc """
-  Parses a streaming API response into a StreamChunk stream.
+  Decodes provider API response.
 
-  This callback processes Server-Sent Events responses and converts them
-  into a lazy Stream of StreamChunk structs for back-pressure handling.
+  This callback is typically used as a Req response step that transforms the
+  raw API response into a standardized format for ReqLLM consumption.
 
   ## Parameters
 
-    * `response` - The Req.Response struct with streaming body
-    * `model` - The ReqLLM.Model struct used for the request
+    * `request_response` - Tuple of {Req.Request.t(), Req.Response.t()}
 
   ## Returns
 
-    * `{:ok, Stream.t()}` - Lazy stream of ReqLLM.StreamChunk structs
-    * `{:error, term()}` - Parse error
+    * `{Req.Request.t(), Req.Response.t() | Exception.t()}` - Decoded response or error
 
   """
-  @callback parse_stream(Req.Response.t(), ReqLLM.Model.t()) ::
-              {:ok, Stream.t()} | {:error, term()}
+  @callback decode_response({Req.Request.t(), Req.Response.t()}) ::
+              {Req.Request.t(), Req.Response.t() | Exception.t()}
 
   @doc """
-  Extracts usage/cost metadata from API response.
+  Extracts usage/cost metadata from response body (optional).
 
-  This callback parses usage information (token counts, costs) from
-  the API response for telemetry and billing purposes.
+  This callback is called by `ReqLLM.Step.Usage` if the provider module
+  exports this function. It allows custom usage extraction beyond the
+  standard formats.
 
   ## Parameters
 
-    * `response` - The Req.Response struct from the API
-    * `model` - The ReqLLM.Model struct used for the request
+    * `body` - The response body (typically a map)
+    * `model` - The ReqLLM.Model struct (may be nil)
 
   ## Returns
 
-    * `{:ok, map()}` - Usage metadata map
+    * `{:ok, map()}` - Usage metadata map with keys like `:input`, `:output`
     * `{:error, term()}` - Extraction error
 
   """
-  @callback extract_usage(Req.Response.t(), ReqLLM.Model.t()) ::
+  @callback extract_usage(term(), ReqLLM.Model.t() | nil) ::
               {:ok, map()} | {:error, term()}
+
+  @doc """
+  Returns the default environment variable name for API authentication.
+
+  This callback provides the fallback environment variable name when the
+  provider metadata doesn't specify one. Generated automatically by the
+  DSL if `default_env_key` is provided.
+
+  ## Returns
+
+    * `String.t()` - Environment variable name (e.g., "ANTHROPIC_API_KEY")
+
+  """
+  @callback default_env_key() :: String.t()
+
+  @optional_callbacks [extract_usage: 2, default_env_key: 0]
 
   @doc """
   Registry function to get provider module for a provider ID.
@@ -171,7 +163,7 @@ defmodule ReqLLM.Provider do
   def get!(provider_id) do
     case get(provider_id) do
       {:ok, module} -> module
-      {:error, reason} -> raise ArgumentError, "Provider not found: #{inspect(reason)}"
+      {:error, _reason} -> raise ReqLLM.Error.Invalid.Provider.exception(provider: provider_id)
     end
   end
 end

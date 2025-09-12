@@ -11,7 +11,7 @@ defmodule ReqLLM.Generation do
   with proper error handling.
   """
 
-  alias ReqLLM.Model
+  alias ReqLLM.{Model, Context, Response}
 
   # Base text generation schema - shared by generate_text and stream_text
   @text_opts_schema NimbleOptions.new!(
@@ -59,7 +59,7 @@ defmodule ReqLLM.Generation do
   @doc """
   Generates text using an AI model with full response metadata.
 
-  Returns the complete Req.Response which includes usage data, headers, and metadata.
+  Returns a canonical ReqLLM.Response which includes usage data, context, and metadata.
   For simple text-only results, use `generate_text!/3`.
 
   ## Parameters
@@ -83,60 +83,35 @@ defmodule ReqLLM.Generation do
   ## Examples
 
       {:ok, response} = ReqLLM.Generation.generate_text("anthropic:claude-3-sonnet", "Hello world")
-      response.body
+      ReqLLM.Response.text(response)
       #=> "Hello! How can I assist you today?"
 
       # Access usage metadata
-      {:ok, text, usage} = ReqLLM.Generation.generate_text("anthropic:claude-3-sonnet", "Hello") |> ReqLLM.Generation.with_usage()
+      ReqLLM.Response.usage(response)
+      #=> %{input_tokens: 10, output_tokens: 8}
 
   """
   @spec generate_text(
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword()
-        ) :: {:ok, Req.Response.t()} | {:error, term()}
+        ) :: {:ok, Response.t()} | {:error, term()}
   def generate_text(model_spec, messages, opts \\ []) do
     with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
          {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         context <- build_context(messages, validated_opts),
+         # Merge model options with validated opts for request options
+         request_options <- prepare_request_options(context, model, validated_opts),
          request =
            Req.new(
              method: :post,
-             body: prepare_request_body(messages, validated_opts),
              receive_timeout: 30_000
            ),
-         {:ok, configured_request} <- ReqLLM.attach(request, model),
-         {:ok, %Req.Response{} = response} <- Req.request(configured_request),
-         {:ok, chunks} <- provider_module.parse_response(response, model) do
-      # Extract text and tool calls from chunks and put them in response body
-      text_chunks = Enum.filter(chunks, &(&1.type == :content))
-      tool_call_chunks = Enum.filter(chunks, &(&1.type == :tool_call))
-
-      # Build response body based on what chunks we have
-      body =
-        case {text_chunks, tool_call_chunks} do
-          {[], []} ->
-            ""
-
-          {text_chunks, []} ->
-            # Only text content
-            Enum.map_join(text_chunks, "", & &1.text)
-
-          {[], tool_call_chunks} ->
-            # Only tool calls
-            %{tool_calls: convert_chunks_to_tool_calls(tool_call_chunks)}
-
-          {text_chunks, tool_call_chunks} ->
-            # Both text and tool calls
-            text = Enum.map_join(text_chunks, "", & &1.text)
-
-            %{
-              text: text,
-              tool_calls: convert_chunks_to_tool_calls(tool_call_chunks)
-            }
-        end
-
-      {:ok, %Req.Response{response | body: body}}
+         configured_request <- provider_module.attach(request, model, request_options),
+         {:ok, %Req.Response{body: tagged_response}} <- Req.request(configured_request),
+         {:ok, response} <- Response.decode(tagged_response, model) do
+      {:ok, response}
     end
   end
 
@@ -164,7 +139,7 @@ defmodule ReqLLM.Generation do
         ) :: {:ok, String.t()} | {:error, term()}
   def generate_text!(model_spec, messages, opts \\ []) do
     case generate_text(model_spec, messages, opts) do
-      {:ok, %Req.Response{body: body}} -> {:ok, body}
+      {:ok, response} -> {:ok, Response.text(response)}
       {:error, error} -> {:error, error}
     end
   end
@@ -172,7 +147,7 @@ defmodule ReqLLM.Generation do
   @doc """
   Streams text generation using an AI model with full response metadata.
 
-  Returns the complete response containing usage data and metadata.
+  Returns a canonical ReqLLM.Response containing usage data and stream.
   For simple streaming without metadata, use `stream_text!/3`.
 
   ## Parameters
@@ -182,27 +157,30 @@ defmodule ReqLLM.Generation do
   ## Examples
 
       {:ok, response} = ReqLLM.Generation.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
-      response.body |> Enum.each(&IO.write/1)
+      ReqLLM.Response.text_stream(response) |> Enum.each(&IO.write/1)
 
-      # Access usage metadata after streaming
-      {:ok, stream, usage} = ReqLLM.Generation.stream_text("anthropic:claude-3-sonnet", "Hello") |> ReqLLM.Generation.with_usage()
+      # Access usage metadata after streaming  
+      ReqLLM.Response.usage(response)
+      #=> %{input_tokens: 15, output_tokens: 42}
 
   """
   @spec stream_text(
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword()
-        ) :: {:ok, Req.Response.t()} | {:error, term()}
+        ) :: {:ok, Response.t()} | {:error, term()}
   def stream_text(model_spec, messages, opts \\ []) do
     with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
          {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
          stream_opts = Keyword.put(validated_opts, :stream?, true),
-         request = Req.new(method: :post, body: prepare_request_body(messages, stream_opts)),
-         {:ok, configured_request} <- ReqLLM.attach(request, model),
-         {:ok, %Req.Response{} = response} <- Req.request(configured_request),
-         {:ok, stream} <- provider_module.parse_stream(response, model) do
-      {:ok, %Req.Response{response | body: stream}}
+         context <- build_context(messages, stream_opts),
+         request_options <- prepare_request_options(context, model, stream_opts),
+         request = Req.new(method: :post),
+         configured_request <- provider_module.attach(request, model, request_options),
+         {:ok, %Req.Response{body: tagged_response}} <- Req.request(configured_request),
+         {:ok, response} <- Response.decode(tagged_response, model) do
+      {:ok, response}
     end
   end
 
@@ -229,7 +207,7 @@ defmodule ReqLLM.Generation do
         ) :: {:ok, Enumerable.t()} | {:error, term()}
   def stream_text!(model_spec, messages, opts \\ []) do
     case stream_text(model_spec, messages, opts) do
-      {:ok, %Req.Response{body: body}} -> {:ok, body}
+      {:ok, response} -> {:ok, Response.text_stream(response)}
       {:error, error} -> {:error, error}
     end
   end
@@ -269,10 +247,14 @@ defmodule ReqLLM.Generation do
   """
   @spec with_usage({:ok, any()} | {:error, term()}) ::
           {:ok, String.t() | Enumerable.t(), map() | nil} | {:error, term()}
-  def with_usage({:ok, %Req.Response{body: body} = response}) do
-    # Extract usage from response private data
-    usage = get_in(response.private, [:req_llm, :usage])
-    {:ok, body, usage}
+  def with_usage({:ok, %Response{} = response}) do
+    # Extract usage from ReqLLM.Response
+    usage = Response.usage(response)
+
+    content =
+      if response.stream?, do: Response.text_stream(response), else: Response.text(response)
+
+    {:ok, content, usage}
   end
 
   def with_usage({:ok, result}) do
@@ -329,53 +311,73 @@ defmodule ReqLLM.Generation do
 
   # Private helper functions
 
-  defp prepare_request_body(messages, opts) when is_binary(messages) do
-    prepare_request_body([%{role: "user", content: messages}], opts)
+  defp build_context(messages, opts) when is_binary(messages) do
+    context = Context.new([Context.user(messages)])
+    add_system_prompt(context, opts)
   end
 
-  defp prepare_request_body(%ReqLLM.Context{} = context, opts) do
-    prepare_request_body(ReqLLM.Context.to_list(context), opts)
+  defp build_context(%Context{} = context, opts) do
+    add_system_prompt(context, opts)
   end
 
-  defp prepare_request_body(messages, opts) when is_list(messages) do
-    # Build basic request body
-    body = %{
-      messages: normalize_messages(messages)
-    }
+  defp build_context(messages, opts) when is_list(messages) do
+    # Convert plain message maps to Context if needed
+    message_structs =
+      Enum.map(messages, fn
+        %ReqLLM.Message{} = message ->
+          message
 
-    # Add model-level options to body
-    body
-    |> add_if_present(:max_tokens, opts[:max_tokens])
-    |> add_if_present(:temperature, opts[:temperature])
-    |> add_if_present(:top_p, opts[:top_p])
-    |> add_if_present(:presence_penalty, opts[:presence_penalty])
-    |> add_if_present(:frequency_penalty, opts[:frequency_penalty])
-    |> add_if_present(:tools, opts[:tools])
-    |> add_if_present(:tool_choice, opts[:tool_choice])
-    |> add_streaming_option(opts[:stream?])
+        %{role: role, content: content} = message ->
+          Context.text(
+            String.to_existing_atom(to_string(role)),
+            content,
+            Map.get(message, :metadata, %{})
+          )
+
+        other ->
+          other
+      end)
+
+    context = Context.new(message_structs)
+    add_system_prompt(context, opts)
   end
 
-  defp normalize_messages(messages) do
-    Enum.map(messages, fn
-      %{role: _, content: _} = message -> message
-      %ReqLLM.Message{} = message -> Map.from_struct(message)
-      other -> other
-    end)
+  defp add_system_prompt(%Context{} = context, opts) do
+    case opts[:system_prompt] do
+      nil ->
+        context
+
+      system_text when is_binary(system_text) ->
+        system_msg = Context.system(system_text)
+        Context.new([system_msg | Context.to_list(context)])
+    end
   end
 
-  defp add_if_present(body, _key, nil), do: body
-  defp add_if_present(body, key, value), do: Map.put(body, key, value)
+  defp prepare_request_options(context, model, validated_opts) do
+    # Build options that the provider attach/3 function expects
+    model_options =
+      [
+        model: model.model,
+        context: context,
+        temperature: validated_opts[:temperature],
+        max_tokens: validated_opts[:max_tokens],
+        top_p: validated_opts[:top_p],
+        presence_penalty: validated_opts[:presence_penalty],
+        frequency_penalty: validated_opts[:frequency_penalty],
+        tools: validated_opts[:tools],
+        tool_choice: validated_opts[:tool_choice],
+        stream: validated_opts[:stream?],
+        system: validated_opts[:system_prompt]
+      ]
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
 
-  defp add_streaming_option(body, true), do: Map.put(body, :stream, true)
-  defp add_streaming_option(body, _), do: body
+    # Add provider-specific options if present
+    case validated_opts[:provider_options] do
+      nil ->
+        model_options
 
-  defp convert_chunks_to_tool_calls(tool_call_chunks) do
-    Enum.map(tool_call_chunks, fn chunk ->
-      %{
-        name: chunk.name,
-        arguments: chunk.arguments,
-        id: get_in(chunk.metadata, [:id])
-      }
-    end)
+      provider_opts when is_map(provider_opts) ->
+        Keyword.merge(model_options, Map.to_list(provider_opts))
+    end
   end
 end

@@ -173,7 +173,7 @@ defmodule ReqLLM.SchemaTest do
     end
   end
 
-  describe "to_anthropic/1" do
+  describe "to_anthropic_format/1" do
     setup do
       tool = %Tool{
         name: "search",
@@ -189,7 +189,7 @@ defmodule ReqLLM.SchemaTest do
     end
 
     test "formats tool with parameters", %{tool: tool} do
-      result = Schema.to_anthropic(tool)
+      result = Schema.to_anthropic_format(tool)
 
       assert result == %{
                "name" => "search",
@@ -217,7 +217,7 @@ defmodule ReqLLM.SchemaTest do
         callback: fn _ -> {:ok, %{}} end
       }
 
-      result = Schema.to_anthropic(tool)
+      result = Schema.to_anthropic_format(tool)
 
       assert result == %{
                "name" => "ping",
@@ -241,13 +241,91 @@ defmodule ReqLLM.SchemaTest do
         callback: fn _ -> {:ok, %{}} end
       }
 
-      result = Schema.to_anthropic(tool)
+      result = Schema.to_anthropic_format(tool)
 
       assert result["input_schema"]["properties"]["tags"]["type"] == "array"
       assert result["input_schema"]["properties"]["tags"]["items"]["type"] == "string"
       assert result["input_schema"]["properties"]["enabled"]["type"] == "boolean"
       assert result["input_schema"]["properties"]["config"]["type"] == "object"
       assert result["input_schema"]["required"] == ["tags"]
+    end
+  end
+
+  describe "to_openai_format/1" do
+    setup do
+      tool = %Tool{
+        name: "search",
+        description: "Search for items",
+        parameter_schema: [
+          query: [type: :string, required: true, doc: "Search query"],
+          limit: [type: :pos_integer, doc: "Maximum results"]
+        ],
+        callback: fn _ -> {:ok, %{}} end
+      }
+
+      {:ok, tool: tool}
+    end
+
+    test "formats tool with parameters", %{tool: tool} do
+      result = Schema.to_openai_format(tool)
+
+      assert result == %{
+               "name" => "search",
+               "description" => "Search for items",
+               "parameters" => %{
+                 "type" => "object",
+                 "properties" => %{
+                   "query" => %{"type" => "string", "description" => "Search query"},
+                   "limit" => %{
+                     "type" => "integer",
+                     "minimum" => 1,
+                     "description" => "Maximum results"
+                   }
+                 },
+                 "required" => ["query"]
+               }
+             }
+    end
+
+    test "formats tool without parameters" do
+      tool = %Tool{
+        name: "ping",
+        description: "Health check",
+        parameter_schema: [],
+        callback: fn _ -> {:ok, %{}} end
+      }
+
+      result = Schema.to_openai_format(tool)
+
+      assert result == %{
+               "name" => "ping",
+               "description" => "Health check",
+               "parameters" => %{
+                 "type" => "object",
+                 "properties" => %{}
+               }
+             }
+    end
+
+    test "formats tool with complex parameter types" do
+      tool = %Tool{
+        name: "complex_tool",
+        description: "Tool with various parameter types",
+        parameter_schema: [
+          tags: [type: {:list, :string}, required: true, doc: "List of tags"],
+          enabled: [type: :boolean, doc: "Whether enabled"],
+          config: [type: :map, doc: "Configuration object"]
+        ],
+        callback: fn _ -> {:ok, %{}} end
+      }
+
+      result = Schema.to_openai_format(tool)
+
+      assert result["parameters"]["properties"]["tags"]["type"] == "array"
+      assert result["parameters"]["properties"]["tags"]["items"]["type"] == "string"
+      assert result["parameters"]["properties"]["enabled"]["type"] == "boolean"
+      assert result["parameters"]["properties"]["config"]["type"] == "object"
+      assert result["parameters"]["required"] == ["tags"]
     end
   end
 end

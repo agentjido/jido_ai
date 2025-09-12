@@ -30,6 +30,9 @@ defmodule ReqLLM.Provider.DSL do
     * `:id` - Unique provider identifier (required atom)
     * `:base_url` - Default API base URL (required string)
     * `:metadata` - Path to JSON metadata file (optional string)
+    * `:context_wrapper` - Module name for context wrapper struct (optional atom)
+    * `:response_wrapper` - Module name for response wrapper struct (optional atom)
+    * `:provider_schema` - NimbleOptions schema defining supported options and defaults (optional keyword list)
 
   ## Generated Code
 
@@ -66,7 +69,15 @@ defmodule ReqLLM.Provider.DSL do
       use ReqLLM.Provider.DSL,
       id: :example,
       base_url: "https://api.example.com/v1",
-      metadata: "priv/models_dev/example.json"
+      metadata: "priv/models_dev/example.json",
+      context_wrapper: ReqLLM.Providers.Example.Context,
+      response_wrapper: ReqLLM.Providers.Example.Response,
+      provider_schema: [
+        temperature: [type: :float, default: 0.7],
+        max_tokens: [type: :pos_integer, default: 1024],
+        stream: [type: :boolean, default: false],
+        api_version: [type: :string, default: "2023-06-01"]
+      ]
 
         def attach(request, %ReqLLM.Model{} = model) do
           api_key = ReqLLM.get_key(:example_api_key)
@@ -120,8 +131,10 @@ defmodule ReqLLM.Provider.DSL do
     id = Keyword.fetch!(opts, :id)
     base_url = Keyword.fetch!(opts, :base_url)
     metadata_path = Keyword.get(opts, :metadata)
-    provider_options = Keyword.get(opts, :provider_options)
-    provider_defaults = Keyword.get(opts, :provider_defaults, [])
+    provider_schema = Keyword.get(opts, :provider_schema, [])
+    default_env_key = Keyword.get(opts, :default_env_key)
+    context_wrapper = Keyword.get(opts, :context_wrapper)
+    response_wrapper = Keyword.get(opts, :response_wrapper)
 
     unless is_atom(id) do
       raise ArgumentError, "Provider :id must be an atom, got: #{inspect(id)}"
@@ -131,6 +144,11 @@ defmodule ReqLLM.Provider.DSL do
       raise ArgumentError, "Provider :base_url must be a string, got: #{inspect(base_url)}"
     end
 
+    if default_env_key && !is_binary(default_env_key) do
+      raise ArgumentError,
+            "Provider :default_env_key must be a string, got: #{inspect(default_env_key)}"
+    end
+
     quote do
       # Implement Req plugin pattern (no formal behaviour needed)
 
@@ -138,8 +156,10 @@ defmodule ReqLLM.Provider.DSL do
       @provider_id unquote(id)
       @base_url unquote(base_url)
       @metadata_path unquote(metadata_path)
-      @supported_provider_options unquote(provider_options)
-      @default_provider_opts unquote(provider_defaults)
+      @provider_schema_opts unquote(provider_schema)
+      @default_env_key unquote(default_env_key)
+      @context_wrapper unquote(context_wrapper)
+      @response_wrapper unquote(response_wrapper)
 
       # Set external resource if metadata file exists
       if @metadata_path do
@@ -162,31 +182,104 @@ defmodule ReqLLM.Provider.DSL do
     # Get the compiled module's attributes
     provider_id = Module.get_attribute(env.module, :provider_id)
     metadata_path = Module.get_attribute(env.module, :metadata_path)
-    supported_provider_options = Module.get_attribute(env.module, :supported_provider_options)
-    default_provider_opts = Module.get_attribute(env.module, :default_provider_opts)
+    provider_schema_opts = Module.get_attribute(env.module, :provider_schema_opts)
+    default_env_key = Module.get_attribute(env.module, :default_env_key)
+    context_wrapper = Module.get_attribute(env.module, :context_wrapper)
+    response_wrapper = Module.get_attribute(env.module, :response_wrapper)
 
     # Load metadata if file exists
     metadata = load_metadata(metadata_path)
 
-    # Default to all generation keys if not specified
-    final_provider_options =
-      supported_provider_options ||
-        quote(do: ReqLLM.Provider.Options.all_generation_keys())
+    # Build provider schema from opts, falling back to all generation keys if empty
+    provider_schema_definition = build_provider_schema(provider_schema_opts)
 
     quote do
       # Store metadata as module attribute
       @req_llm_metadata unquote(Macro.escape(metadata))
+
+      # Build the provider schema at compile time
+      @provider_schema unquote(provider_schema_definition)
 
       # Optional helpers for accessing provider info
       def metadata, do: @req_llm_metadata
       def provider_id, do: unquote(provider_id)
 
       # Provider option helpers
-      def supported_provider_options, do: unquote(final_provider_options)
-      def default_provider_opts, do: unquote(default_provider_opts || [])
+      def supported_provider_options do
+        @provider_schema.schema |> Keyword.keys()
+      end
 
-      def provider_schema,
-        do: ReqLLM.Provider.Options.generation_subset_schema(supported_provider_options())
+      def default_provider_opts do
+        @provider_schema.schema
+        |> Enum.filter(fn {_key, opts} -> Keyword.has_key?(opts, :default) end)
+        |> Enum.map(fn {key, opts} -> {key, opts[:default]} end)
+      end
+
+      def provider_schema, do: @provider_schema
+
+      # Generate default_env_key callback if provided
+      unquote(
+        if default_env_key do
+          quote do
+            def default_env_key, do: unquote(default_env_key)
+          end
+        end
+      )
+
+      # Generate wrap_context callback if wrapper is provided
+      unquote(
+        if context_wrapper do
+          quote do
+            @doc false
+            def wrap_context(%ReqLLM.Context{} = ctx) do
+              struct!(unquote(context_wrapper), context: ctx)
+            end
+          end
+        end
+      )
+
+      # Generate wrap_response callback if wrapper is provided
+      unquote(
+        if response_wrapper do
+          quote do
+            @doc false
+            def wrap_response(data) do
+              struct!(unquote(response_wrapper), payload: data)
+            end
+          end
+        end
+      )
+    end
+  end
+
+  # Private helper to build provider schema from options
+  defp build_provider_schema([]) do
+    # Default to all generation keys with no defaults
+    quote do
+      keys = ReqLLM.Provider.Options.all_generation_keys()
+      schema_def = Enum.map(keys, fn key ->
+        ReqLLM.Provider.Options.generation_options_schema().schema[key]
+        |> case do
+          nil -> {key, []}
+          opts -> {key, opts}
+        end
+      end)
+      NimbleOptions.new!(schema_def)
+    end
+  end
+
+  defp build_provider_schema(schema_opts) when is_list(schema_opts) do
+    # Build schema by merging user opts with global schema defaults
+    quote do
+      global_schema = ReqLLM.Provider.Options.generation_options_schema().schema
+      
+      schema_def = Enum.map(unquote(schema_opts), fn {key, user_opts} ->
+        base_opts = Keyword.get(global_schema, key, [])
+        merged_opts = Keyword.merge(base_opts, user_opts)
+        {key, merged_opts}
+      end)
+      
+      NimbleOptions.new!(schema_def)
     end
   end
 

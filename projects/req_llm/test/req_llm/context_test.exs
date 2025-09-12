@@ -211,7 +211,7 @@ defmodule ReqLLM.ContextTest do
 
       wrapped = Context.wrap(context, model)
 
-      assert %ReqLLM.Providers.Anthropic{context: ^context} = wrapped
+      assert %ReqLLM.Providers.Anthropic.Context{context: ^context} = wrapped
     end
   end
 

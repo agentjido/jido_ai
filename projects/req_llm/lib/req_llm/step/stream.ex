@@ -1,16 +1,17 @@
-defmodule ReqLLM.Plugins.Stream do
+defmodule ReqLLM.Step.Stream do
   @moduledoc """
-  Req plugin for handling Server-Sent Events (SSE).
+  Req step for handling Server-Sent Events (SSE).
 
-  This plugin processes "text/event-stream" responses and converts them into
+  This step processes "text/event-stream" responses and converts them into
   enumerable chunks for streaming AI responses. Non-streaming responses are
   passed through unchanged.
 
   ## Usage
 
-      iex> req = Req.new() |> ReqLLM.Plugins.Stream.attach()
+      request
+      |> ReqLLM.Step.Stream.attach()
 
-  The plugin automatically detects SSE responses by content type and processes
+  The step automatically detects SSE responses by content type and processes
   them into structured chunks. Each chunk contains:
 
   - `event` - The event type (e.g., "delta", "done")
@@ -33,24 +34,47 @@ defmodule ReqLLM.Plugins.Stream do
   """
 
   @doc """
-  Attaches the SSE streaming plugin to a Req request struct.
+  Attaches the SSE streaming step to a Req request struct.
 
   ## Parameters
     - `req` - The Req request struct
 
   ## Returns
-    - Updated Req request struct with the plugin attached
+    - Updated Req request struct with the step attached
 
   """
   @spec attach(Req.Request.t()) :: Req.Request.t()
   def attach(req) do
-    Req.Request.append_response_steps(req, stream_sse: &process_sse_response/1)
+    Req.Request.append_response_steps(req, stream_sse: &__MODULE__.handle/1)
   end
 
+  @doc """
+  Conditionally attaches the SSE streaming step to a Req request struct.
+
+  ## Parameters
+    - `req` - The Req request struct
+    - `stream_enabled` - Whether streaming is enabled
+
+  ## Returns
+    - Updated Req request struct with the step attached if streaming is enabled
+
+  ## Examples
+
+      # Streaming enabled - step attached
+      request |> ReqLLM.Step.Stream.maybe_attach(true)
+
+      # Streaming disabled - request unchanged
+      request |> ReqLLM.Step.Stream.maybe_attach(false)
+
+  """
+  @spec maybe_attach(Req.Request.t(), boolean()) :: Req.Request.t()
+  def maybe_attach(req, true), do: attach(req)
+  def maybe_attach(req, _), do: req
+
   @doc false
-  @spec process_sse_response({Req.Request.t(), Req.Response.t()}) ::
+  @spec handle({Req.Request.t(), Req.Response.t()}) ::
           {Req.Request.t(), Req.Response.t()}
-  def process_sse_response({req, resp} = pair) do
+  def handle({req, resp} = pair) do
     content_type =
       case Req.Response.get_header(resp, "content-type") do
         [ct | _] -> ct

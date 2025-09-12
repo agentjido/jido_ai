@@ -243,9 +243,10 @@ defmodule ReqLLM.Tool do
 
   """
   @spec to_schema(t(), atom()) :: map()
-  def to_schema(%__MODULE__{} = tool, provider \\ :anthropic) do
+  def to_schema(%__MODULE__{} = tool, provider \\ :openai) do
     case provider do
-      :anthropic -> ReqLLM.Schema.to_anthropic(tool)
+      :anthropic -> ReqLLM.Schema.to_anthropic_format(tool)
+      :openai -> ReqLLM.Schema.to_openai_format(tool)
       other -> raise ArgumentError, "Unknown provider #{inspect(other)}"
     end
   end
@@ -253,18 +254,18 @@ defmodule ReqLLM.Tool do
   @doc """
   Converts a Tool to JSON Schema format for LLM integration.
 
-  Backward compatibility function that defaults to Anthropic format.
+  Backward compatibility function that defaults to OpenAI format.
   Use `to_schema/2` for explicit provider selection.
 
   ## Examples
 
       json_schema = ReqLLM.Tool.to_json_schema(tool)
-      # Equivalent to: ReqLLM.Tool.to_schema(tool, :anthropic)
+      # Equivalent to: ReqLLM.Tool.to_schema(tool, :openai)
 
   """
   @spec to_json_schema(t()) :: map()
   def to_json_schema(%__MODULE__{} = tool) do
-    to_schema(tool, :anthropic)
+    to_schema(tool, :openai)
   end
 
   @doc """

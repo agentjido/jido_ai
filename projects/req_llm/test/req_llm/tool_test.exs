@@ -335,11 +335,11 @@ defmodule ReqLLM.ToolTest do
       assert input_schema["properties"] == %{}
     end
 
-    test "defaults to anthropic provider", %{simple_tool: tool} do
+    test "defaults to openai provider", %{simple_tool: tool} do
       default_schema = Tool.to_schema(tool)
-      anthropic_schema = Tool.to_schema(tool, :anthropic)
+      openai_schema = Tool.to_schema(tool, :openai)
 
-      assert default_schema == anthropic_schema
+      assert default_schema == openai_schema
     end
 
     test "raises for unknown provider", %{simple_tool: tool} do
@@ -348,13 +348,13 @@ defmodule ReqLLM.ToolTest do
       end
 
       assert_raise ArgumentError, ~r/Unknown provider/, fn ->
-        Tool.to_schema(tool, :openai)
+        Tool.to_schema(tool, :unknown_provider_2)
       end
     end
   end
 
   describe "to_json_schema/1 (backward compatibility)" do
-    test "defaults to anthropic format" do
+    test "defaults to openai format" do
       {:ok, tool} =
         Tool.new(
           name: "compat_tool",
@@ -364,9 +364,9 @@ defmodule ReqLLM.ToolTest do
         )
 
       compat_schema = Tool.to_json_schema(tool)
-      anthropic_schema = Tool.to_schema(tool, :anthropic)
+      openai_schema = Tool.to_schema(tool, :openai)
 
-      assert compat_schema == anthropic_schema
+      assert compat_schema == openai_schema
     end
   end
 

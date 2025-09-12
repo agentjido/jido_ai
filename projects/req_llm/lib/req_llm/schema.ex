@@ -299,7 +299,7 @@ defmodule ReqLLM.Schema do
       ...>   ],
       ...>   callback: fn _ -> {:ok, %{}} end
       ...> }
-      iex> ReqLLM.Schema.to_anthropic(tool)
+      iex> ReqLLM.Schema.to_anthropic_format(tool)
       %{
         "name" => "get_weather",
         "description" => "Get current weather",
@@ -313,12 +313,56 @@ defmodule ReqLLM.Schema do
       }
 
   """
-  @spec to_anthropic(ReqLLM.Tool.t()) :: map()
-  def to_anthropic(%ReqLLM.Tool{} = tool) do
+  @spec to_anthropic_format(ReqLLM.Tool.t()) :: map()
+  def to_anthropic_format(%ReqLLM.Tool{} = tool) do
     %{
       "name" => tool.name,
       "description" => tool.description,
       "input_schema" => to_json(tool.parameter_schema)
+    }
+  end
+
+  @doc """
+  Format a tool into OpenAI tool schema format.
+
+  ## Parameters
+
+    * `tool` - A `ReqLLM.Tool.t()` struct
+
+  ## Returns
+
+  A map containing the OpenAI tool schema format.
+
+  ## Examples
+
+      iex> tool = %ReqLLM.Tool{
+      ...>   name: "get_weather",
+      ...>   description: "Get current weather",
+      ...>   parameter_schema: [
+      ...>     location: [type: :string, required: true, doc: "City name"]
+      ...>   ],
+      ...>   callback: fn _ -> {:ok, %{}} end
+      ...> }
+      iex> ReqLLM.Schema.to_openai_format(tool)
+      %{
+        "name" => "get_weather",
+        "description" => "Get current weather",
+        "parameters" => %{
+          "type" => "object",
+          "properties" => %{
+            "location" => %{"type" => "string", "description" => "City name"}
+          },
+          "required" => ["location"]
+        }
+      }
+
+  """
+  @spec to_openai_format(ReqLLM.Tool.t()) :: map()
+  def to_openai_format(%ReqLLM.Tool{} = tool) do
+    %{
+      "name" => tool.name,
+      "description" => tool.description,
+      "parameters" => to_json(tool.parameter_schema)
     }
   end
 end

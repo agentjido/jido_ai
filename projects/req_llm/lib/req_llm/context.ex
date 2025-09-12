@@ -117,13 +117,61 @@ defmodule ReqLLM.Context do
       context = ReqLLM.Context.new([ReqLLM.Context.user("Hello")])
       model = ReqLLM.Model.from("anthropic:claude-3-haiku-20240307")
       tagged = ReqLLM.Context.wrap(context, model)
-      #=> %ReqLLM.Providers.Anthropic{context: context}
+      #=> %ReqLLM.Providers.Anthropic.Context{context: context}
 
   """
   @spec wrap(t(), ReqLLM.Model.t()) :: term()
   def wrap(%__MODULE__{} = ctx, %ReqLLM.Model{provider: provider_atom}) do
-    {:ok, provider_mod} = ReqLLM.provider(provider_atom)
-    provider_mod.wrap_context(ctx)
+    {:ok, provider_mod} = ReqLLM.Provider.get(provider_atom)
+
+    if function_exported?(provider_mod, :wrap_context, 1) do
+      provider_mod.wrap_context(ctx)
+    else
+      # fallback for providers that implement protocol directly on Context
+      ctx
+    end
+  end
+
+  @doc """
+  Encode a context to provider JSON format.
+
+  This is a façade function that accepts a Context and model specification,
+  wraps them appropriately, and calls the Context.Codec.encode protocol.
+
+  Supports both Model struct and string inputs, automatically resolving model
+  strings using Model.from!/1.
+
+  ## Parameters
+
+    * `context` - A `ReqLLM.Context` to encode
+    * `model` - Model specification (Model struct or string like "anthropic:claude-3-sonnet")
+
+  ## Returns
+
+    * Provider-specific JSON structure ready for API transmission
+    * `{:error, reason}` if encoding fails
+
+  ## Examples
+
+      # Zero-ceremony encoding with model string
+      Context.encode(context, "anthropic:claude-3-sonnet")
+      #=> %{system: "...", messages: [...], max_tokens: 4096}
+
+      # Encoding with Model struct
+      Context.encode(context, model_struct)
+
+  """
+  @spec encode(t(), ReqLLM.Model.t() | String.t()) :: term() | {:error, term()}
+  def encode(%__MODULE__{} = ctx, model_input) do
+    model = resolve_model(model_input)
+    ctx |> wrap(model) |> ReqLLM.Context.Codec.encode()
+  end
+
+  # Helper function to resolve model input to Model struct
+  defp resolve_model(%ReqLLM.Model{} = model), do: model
+
+  defp resolve_model(model_string) when is_binary(model_string) do
+    ReqLLM.Model.from!(model_string)
   end
 
   defp validate_system_messages(messages) do

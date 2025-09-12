@@ -264,33 +264,6 @@ defmodule ReqLLM.Provider.Utils do
   end
 
   @doc """
-  Conditionally attaches streaming step to a request.
-
-  Adds the stream step for SSE parsing when streaming is enabled.
-
-  ## Parameters
-
-  - `request` - The Req request to potentially modify
-  - `stream_enabled` - Whether streaming is enabled
-
-  ## Returns
-
-  The request, with streaming step attached if needed.
-
-  ## Examples
-
-      iex> request = %Req.Request{}
-      iex> ReqLLM.Provider.Utils.maybe_append_stream_step(request, true)
-      # Returns request with stream step attached
-
-      iex> ReqLLM.Provider.Utils.maybe_append_stream_step(request, false)
-      # Returns original request unchanged
-  """
-  @spec maybe_append_stream_step(Req.Request.t(), boolean()) :: Req.Request.t()
-  def maybe_append_stream_step(req, true), do: ReqLLM.Plugins.Stream.attach(req)
-  def maybe_append_stream_step(req, _), do: req
-
-  @doc """
   Conditionally puts a value into a keyword list or map if the value is not nil.
 
   ## Parameters
@@ -447,6 +420,92 @@ defmodule ReqLLM.Provider.Utils do
         raise ReqLLM.Error.Invalid.Parameter.exception(
                 parameter: "context must be ReqLLM.Context, got: #{inspect(other)}"
               )
+    end
+  end
+
+  @doc """
+  Ensures the response body is parsed from JSON if it's binary.
+
+  Common utility for providers to ensure they have parsed JSON data
+  instead of raw binary response bodies.
+
+  ## Parameters
+
+  - `body` - Response body that may be binary JSON or already parsed
+
+  ## Returns
+
+  Parsed body (map/list) or original body if parsing fails.
+
+  ## Examples
+
+      iex> ReqLLM.Provider.Utils.ensure_parsed_body(~s({"message": "hello"}))
+      %{"message" => "hello"}
+
+      iex> ReqLLM.Provider.Utils.ensure_parsed_body(%{"already" => "parsed"})
+      %{"already" => "parsed"}
+
+      iex> ReqLLM.Provider.Utils.ensure_parsed_body("invalid json")
+      "invalid json"
+  """
+  @spec ensure_parsed_body(term()) :: term()
+  def ensure_parsed_body(body) when is_binary(body) do
+    case Jason.decode(body) do
+      {:ok, parsed} -> parsed
+      {:error, _} -> body
+    end
+  end
+
+  def ensure_parsed_body(body), do: body
+
+  @doc """
+  Gets the environment variable key for a provider's API authentication.
+
+  Tries to get the key from provider metadata first, then falls back
+  to the provider's `default_env_key/0` callback if implemented.
+
+  ## Parameters
+
+  - `provider_id` - Provider atom identifier (e.g., `:anthropic`)
+
+  ## Returns
+
+  The environment variable name string, or nil if not found.
+
+  ## Examples
+
+      iex> ReqLLM.Provider.Utils.get_env_key(:anthropic)
+      "ANTHROPIC_API_KEY"
+
+      iex> ReqLLM.Provider.Utils.get_env_key(:unknown)
+      nil
+  """
+  @spec get_env_key(atom()) :: String.t() | nil
+  def get_env_key(provider_id) when is_atom(provider_id) do
+    # Try metadata first
+    case ReqLLM.Provider.Registry.get_provider_metadata(provider_id) do
+      {:ok, metadata} ->
+        case get_in(metadata, ["provider", "env"]) || get_in(metadata, [:provider, :env]) do
+          [env_var | _] when is_binary(env_var) -> env_var
+          _ -> try_provider_default_env_key(provider_id)
+        end
+
+      _ ->
+        try_provider_default_env_key(provider_id)
+    end
+  end
+
+  defp try_provider_default_env_key(provider_id) do
+    case ReqLLM.Provider.get(provider_id) do
+      {:ok, provider_module} ->
+        if function_exported?(provider_module, :default_env_key, 0) do
+          provider_module.default_env_key()
+        else
+          nil
+        end
+
+      _ ->
+        nil
     end
   end
 
