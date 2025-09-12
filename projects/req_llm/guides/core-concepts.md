@@ -1,28 +1,8 @@
-# Core Concepts: ReqLLM Architecture Guide
+# Core Concepts
 
-ReqLLM provides a unified, composable interface to AI providers through a sophisticated plugin-based architecture. This guide explains the fundamental design patterns, data flow, and architectural principles that make ReqLLM both powerful and extensible.
+ReqLLM = Req (HTTP) + Provider Plugins (format) + Canonical Data Model
 
-## Overview: Plugin-Based Normalization
-
-ReqLLM's core innovation is **plugin-based normalization** - a clean separation between HTTP transport concerns (handled by Req) and format translation concerns (handled by ReqLLM providers). This approach enables:
-
-- **Unified Interface**: Work with any AI provider using the same API
-- **HTTP Reuse**: Leverage Req's battle-tested HTTP infrastructure
-- **Composability**: Insert custom middleware at any point in the request pipeline
-- **Extensibility**: Add new providers with minimal code
-
-```elixir
-# Same interface across all providers
-ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello")
-ReqLLM.generate_text("openai:gpt-4", "Hello")
-ReqLLM.generate_text("custom:my-model", "Hello")
-```
-
-## 1. Provider-Agnostic Data Model
-
-ReqLLM defines a canonical data model that abstracts away provider differences while preserving rich functionality.
-
-### Core Data Structures
+## Data Model
 
 ```
 ReqLLM.Model          # Model configuration with metadata
@@ -40,8 +20,6 @@ ReqLLM.Tool           # Function definitions with validation
 
 ### Model Abstraction
 
-Models encapsulate provider information, generation parameters, and capability metadata:
-
 ```elixir
 %ReqLLM.Model{
   provider: :anthropic,
@@ -56,9 +34,7 @@ Models encapsulate provider information, generation parameters, and capability m
 }
 ```
 
-### Multimodal Content Support
-
-`ContentPart` enables rich, multimodal conversations:
+### Multimodal Content
 
 ```elixir
 message = %ReqLLM.Message{
@@ -72,9 +48,7 @@ message = %ReqLLM.Message{
 }
 ```
 
-### Unified Streaming Format
-
-All providers produce standardized `StreamChunk` structures:
+### Unified Streaming
 
 ```elixir
 # Text content
@@ -90,44 +64,23 @@ All providers produce standardized `StreamChunk` structures:
 %StreamChunk{type: :meta, metadata: %{finish_reason: "stop"}}
 ```
 
-## 2. Plugin-Based Architecture
+## Plugin Architecture
 
-Each AI provider is implemented as a Req plugin that handles format translation while delegating transport to Req.
-
-### Provider as Plugin Pattern
+Provider = module that implements ReqLLM.Provider and a Codec.
 
 ```elixir
 defmodule ReqLLM.Providers.Anthropic do
-  @behaviour ReqLLM.Provider
-  
-  # Auto-loads metadata and registers with system
   use ReqLLM.Provider.DSL,
     id: :anthropic,
     base_url: "https://api.anthropic.com/v1",
     metadata: "priv/models_dev/anthropic.json"
 
-  @impl ReqLLM.Provider
-  def attach(request, model, opts \\ []) do
-    # Configure HTTP request for Anthropic API
-    request
-    |> Req.Request.put_header("anthropic-version", "2023-06-01")
-    |> Req.Request.put_header("x-api-key", get_api_key())
-    |> Map.put(:body, encode_request(model, opts))
-  end
-  
-  @impl ReqLLM.Provider
-  def parse_response(response, model) do
-    # Convert Anthropic response to ReqLLM chunks
-    response.body
-    |> decode_anthropic_format()
-    |> convert_to_stream_chunks()
-  end
+  def attach(req, model, _opts),  do: encode_request(req, model)
+  def parse_response(resp, model), do: decode_response(resp, model)
 end
 ```
 
-### Request Flow Architecture
-
-The complete request flow demonstrates clean separation of concerns:
+### Request Flow
 
 ```
 User API Call
@@ -147,68 +100,37 @@ Provider Parsing
 Canonical Response
 ```
 
-### Core Bridge: ReqLLM.attach/2
-
-The `attach/2` function is the bridge between ReqLLM's abstractions and Req's HTTP pipeline:
+### Composable Middleware
 
 ```elixir
-def attach(%Req.Request{} = request, model_spec) do
-  with {:ok, model} <- ReqLLM.Model.from(model_spec),
-       {:ok, provider_module} <- ReqLLM.provider(model.provider) do
-    # Provider configures the HTTP request
-    configured_request = provider_module.attach(request, model)
-    {:ok, configured_request}
-  end
-end
-```
-
-This enables powerful composition:
-
-```elixir
-# Start with base request
 request = Req.new()
-
-# Add custom middleware
-request = request
 |> Req.Request.append_request_steps(log_request: &log_request/1)
 |> Req.Request.append_response_steps(cache_response: &cache/1)
 
-# Attach provider-specific configuration
 {:ok, configured} = ReqLLM.attach(request, "anthropic:claude-3-sonnet")
-
-# Execute with all middleware
 {:ok, response} = Req.request(configured)
 ```
 
-## 3. Codec Protocol for Format Translation
+## Codec Protocol
 
-ReqLLM uses Elixir protocols to handle format translation between canonical structures and provider-specific APIs.
-
-### Protocol Definition
+Format translation between canonical structures and provider APIs.
 
 ```elixir
 defprotocol ReqLLM.Codec do
-  @doc "Encode canonical ReqLLM structures to provider JSON format"
   def encode(tagged_context)
-
-  @doc "Decode provider response JSON to canonical StreamChunks"  
   def decode(tagged_response)
 end
 ```
 
-### Provider-Tagged Wrappers
-
-Each provider defines a lightweight wrapper struct for protocol dispatch:
+### Provider Implementation
 
 ```elixir
 defmodule ReqLLM.Providers.Anthropic do
   defstruct [:context]
-  @type t :: %__MODULE__{context: ReqLLM.Context.t()}
 end
 
 defimpl ReqLLM.Codec, for: ReqLLM.Providers.Anthropic do
   def encode(%ReqLLM.Providers.Anthropic{context: ctx}) do
-    # Transform ReqLLM.Context → Anthropic Messages API format
     %{
       messages: format_messages(ctx),
       system: extract_system_prompt(ctx)
@@ -216,7 +138,6 @@ defimpl ReqLLM.Codec, for: ReqLLM.Providers.Anthropic do
   end
   
   def decode(%ReqLLM.Providers.Anthropic{context: response}) do
-    # Transform Anthropic response → List of ReqLLM.StreamChunk
     response["content"]
     |> Enum.map(&convert_content_block/1)
     |> List.flatten()
@@ -240,129 +161,60 @@ Provider.Tagged{context: response}
 List of ReqLLM.StreamChunk (canonical)
 ```
 
-## 4. Req Integration and HTTP Capabilities
+## Req Integration
 
-ReqLLM leverages Req's mature HTTP infrastructure rather than reimplementing transport concerns.
+Transport vs Format separation:
 
-### Transport vs Format Separation
+**Transport (Req):**
+- Connection pooling
+- SSL/TLS 
+- Streaming (SSE)
+- Retries & error handling
 
-**Transport Layer (Handled by Req):**
-- Connection management and pooling
-- SSL/TLS handling
-- Request/response lifecycle
-- Compression and encoding
-- Error handling and retries
-- Streaming (Server-Sent Events)
-
-**Format Layer (Handled by ReqLLM):**
-- Model specification and validation
-- Message format normalization
+**Format (ReqLLM):**
+- Model validation
+- Message normalization  
 - Response standardization
-- Tool calling abstraction
-- Usage extraction and cost calculation
-- Provider-specific error translation
+- Usage extraction
 
-### Middleware Composition
-
-ReqLLM's plugin architecture enables seamless middleware composition:
+### Generation Flow
 
 ```elixir
-# Custom logging middleware
-request = Req.new()
-|> Req.Request.append_request_steps(log_request: fn req ->
-  Logger.info("Calling #{req.url}")
-  req
-end)
-|> Req.Request.append_response_steps(log_response: fn {req, resp} ->
-  Logger.info("Response: #{resp.status}")
-  {req, resp}
-end)
+# API call
+ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello")
 
-# Add tracing
-request = request
-|> Req.Request.append_request_steps(trace_start: &start_trace/1)
-|> Req.Request.append_response_steps(trace_end: &end_trace/1)
-
-# Attach ReqLLM provider
-{:ok, configured} = ReqLLM.attach(request, "anthropic:claude-3-sonnet")
-
-# All middleware runs in order
-{:ok, response} = Req.request(configured)
-```
-
-### Built-in ReqLLM Plugins
-
-ReqLLM includes several HTTP-level plugins:
-
-```elixir
-# Usage tracking
-request = ReqLLM.Plugins.Usage.attach(request, model)
-# → Extracts token counts and costs
-
-# Streaming support  
-request = ReqLLM.Plugins.Stream.attach(request)
-# → Processes Server-Sent Events
-
-# Error handling
-request = ReqLLM.Plugins.Splode.attach(request)  
-# → Converts HTTP errors to ReqLLM.Error structs
-```
-
-## 5. Request/Response Flow
-
-### Complete Generation Flow
-
-Here's how a complete text generation request flows through the system:
-
-```elixir
-# 1. API call with model specification
-ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello world")
-
-# 2. Model resolution
+# Model resolution  
 {:ok, model} = ReqLLM.Model.from("anthropic:claude-3-sonnet")
-#=> %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet"}
 
-# 3. Provider lookup  
+# Provider lookup
 {:ok, provider} = ReqLLM.provider(:anthropic)
-#=> ReqLLM.Providers.Anthropic
 
-# 4. Base request creation
-request = Req.new(method: :post)
+# Request creation & attachment
+{:ok, configured} = ReqLLM.attach(Req.new(), model)
 
-# 5. Provider attachment (format translation)
-{:ok, configured} = ReqLLM.attach(request, model)
-# Provider adds headers, authentication, request body
-
-# 6. HTTP execution
+# HTTP execution
 {:ok, http_response} = Req.request(configured) 
 
-# 7. Response parsing (format translation)
+# Response parsing
 {:ok, chunks} = provider.parse_response(http_response, model)
-
-# 8. Result processing
-{:ok, final_text} = process_chunks(chunks)
 ```
 
 ### Streaming Flow
 
-Streaming follows the same pattern with continuous chunk processing:
-
 ```elixir
 {:ok, response} = ReqLLM.stream_text("anthropic:claude-3-sonnet", "Tell a story")
 
-# Response contains a lazy stream
 response.body
-|> Stream.filter(&(&1.type == :content))  # Only content chunks
-|> Stream.map(&(&1.text))                 # Extract text
-|> Stream.each(&IO.write/1)               # Output incrementally
+|> Stream.filter(&(&1.type == :content))
+|> Stream.map(&(&1.text))
+|> Stream.each(&IO.write/1)
 |> Stream.run()
 ```
 
-## 6. Benefits of This Architecture
+## Provider System
 
-### 1. Composability and Extensibility
+### Creating Providers
 
-**Easy Provider Addition:**
 ```elixir
 defmodule ReqLLM.Providers.CustomProvider do
   use ReqLLM.Provider.DSL,
@@ -374,36 +226,18 @@ defmodule ReqLLM.Providers.CustomProvider do
 end
 ```
 
-**Middleware Integration:**
-```elixir
-# Existing Req middleware works seamlessly
-ReqLLM.generate_text("custom:my-model", "Hello", 
-  retry: [max_retries: 3, delay: 100]
-)
-```
+### Integration Points
 
-### 2. Separation of Concerns
+1. `ReqLLM.Provider` behavior implementation
+2. `ReqLLM.Codec` protocol for format translation  
+3. Models.dev metadata for capabilities
 
-- **HTTP Transport**: Connection management, retries, headers
-- **Format Translation**: Provider-specific API handling
-- **Core Logic**: Business logic works with canonical structures
-- **Testing**: Mock at HTTP level or format level independently
+## Testing
 
-### 3. Reusability
-
-ReqLLM doesn't reimplement HTTP concerns:
-
-- Connection pooling from Finch
-- SSL/TLS from Erlang/OTP
-- Streaming from Req
-- Error handling from existing patterns
-
-### 4. Testability
-
-The architecture enables comprehensive testing:
+The architecture enables testing at multiple levels:
 
 ```elixir
-# Test format translation in isolation
+# Format translation in isolation
 test "anthropic codec encodes tool calls" do
   context = ReqLLM.Context.new([...])
   tagged = %ReqLLM.Providers.Anthropic{context: context}
@@ -412,7 +246,7 @@ test "anthropic codec encodes tool calls" do
   assert encoded["messages"] |> hd() |> get_in(["content", "type"]) == "tool_use"
 end
 
-# Test complete integration with HTTP mocking
+# Complete integration with fixtures
 test "full generation flow" do
   use_fixture :anthropic, "basic_generation", fn ->
     {:ok, response} = ReqLLM.generate_text("anthropic:claude-3-haiku", "Hello")
@@ -421,34 +255,14 @@ test "full generation flow" do
 end
 ```
 
-### 5. Observability
+## Observability
 
-Standard Req patterns enable rich observability:
+Standard Req middleware enables monitoring:
 
 ```elixir
-# Request/response logging
 request = Req.new()
 |> ReqLLM.Middleware.RequestLogger.attach()
 |> ReqLLM.Middleware.ResponseLogger.attach()
-
-# Distributed tracing
-request = request
 |> ReqLLM.Middleware.Tracing.attach(trace_id: "req_123")
-
-# Metrics collection
-request = request  
 |> ReqLLM.Middleware.Metrics.attach()
 ```
-
-## Summary
-
-ReqLLM's architecture achieves a clean separation between transport and format concerns through:
-
-- **Provider-agnostic data model** that works across all AI providers
-- **Plugin-based normalization** where each provider handles only format translation
-- **Codec protocol system** for efficient, type-safe format conversion
-- **Req integration** that leverages mature HTTP infrastructure
-- **Composable middleware** enabling custom logging, caching, tracing
-- **Unified streaming** with standardized chunk formats
-
-This design provides immediate productivity for simple use cases while maintaining extensibility for complex applications, making ReqLLM both powerful and approachable for Elixir developers building AI-powered applications.

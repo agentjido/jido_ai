@@ -241,43 +241,68 @@ defmodule WeatherAPI do
 end
 ```
 
-## Testing Best Practices
+## Testing, Fixtures & Live Mode
 
 ### Fixture vs Live Testing
 
+ReqLLM records all successful HTTP interactions into deterministic JSON fixtures so the default `mix test` run is fast, offline and free. When you need fresh ground-truth data, turn on live mode.
+
 **Best Practice**: Use fixtures for CI, live testing for capability verification.
 
-```elixir
-# Default fixture-based testing
+```bash
+# Default – use cached fixtures
 mix test
 
-# Live API testing for verification
-LIVE=true mix test
+# Regenerate or create new fixtures
+LIVE=true mix test                   # all providers
+FIXTURE_FILTER=openai LIVE=true mix test  # single provider
+
+# CI uses cached fixtures by default; live runs can be scheduled nightly.
+```
+
+### Using ReqLLM.Test.LiveFixture
+
+- `use ReqLLM.Test.LiveFixture, provider: :anthropic` injects `use_fixture/3`
+- `use_fixture(name, opts \\ [], fun)` returns the *value* your anonymous function produced but transparently stores/reads the HTTP transcript
+- By convention, `name` mirrors the `describe` title in snake-case
+- When `LIVE=true` the first live call's response is written; subsequent tests in the same run read the just-written file to avoid double billing
+- Fixtures are stored under `test/fixtures/#{provider}/#{name}.json`
+- NEVER commit new fixtures that include secrets; the helper automatically strips auth headers, but review before committing
+
+```elixir
+defmodule CoreTest do
+  use ReqLLM.Test.LiveFixture, provider: :openai
+  use ExUnit.Case, async: true
+
+  describe "generate_text/3" do
+    test "basic happy-path" do
+      {:ok, text} =
+        use_fixture("core-basic") do
+          ReqLLM.generate_text!("openai:gpt-4o", "Hello!")
+        end
+
+      assert text =~ "Hello"
+    end
+  end
+end
 ```
 
 **Test Structure**: Organize tests by capability, not just function.
 
 ```elixir
-defmodule ReqLLMTest do
-  use ExUnit.Case
-  
-  describe "text generation capabilities" do
-    test "generates coherent responses" do
-      model = ReqLLM.Model.from!("anthropic:claude-3-sonnet")
-      
-      {:ok, response} = ReqLLM.generate_text(model, "What is 2+2?")
-      assert response =~ ~r/4|four/i
-    end
-  end
-  
-  describe "streaming capabilities" do
-    test "produces incremental chunks" do
-      model = ReqLLM.Model.from!("anthropic:claude-3-sonnet") 
-      
-      {:ok, stream} = ReqLLM.stream_text!(model, "Count to 5")
-      
-      chunks = Enum.take(stream, 10)
-      assert Enum.any?(chunks, &(&1.type == :text))
+defmodule StreamingTest do
+  use ReqLLM.Test.LiveFixture, provider: :anthropic
+  use ExUnit.Case, async: true
+
+  describe "stream_text/3" do
+    test "returns :text chunks" do
+      stream =
+        use_fixture("streaming-basic") do
+          {:ok, s} = ReqLLM.stream_text!("anthropic:claude-3-sonnet", "Count to 3")
+          s
+        end
+
+      assert Enum.any?(stream, &(&1.type == :text))
     end
   end
 end
@@ -299,6 +324,9 @@ test "provider supports advertised capabilities" do
   {:ok, _} = ReqLLM.generate_text(model, "Hello", tools: [simple_tool()])
 end
 ```
+
+**Q: Why not mock everything?**  
+A: Recorded fixtures give us realistic provider semantics, enforce backwards-compat with the vendor and make refactors measurable.
 
 ## Advanced Usage Patterns
 
