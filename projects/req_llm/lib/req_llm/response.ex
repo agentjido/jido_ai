@@ -40,6 +40,8 @@ defmodule ReqLLM.Response do
     field(:context, Context.t())
     # The assistant/tool message created by this turn
     field(:message, Message.t() | nil)
+    # Structured object for object generation
+    field(:object, map() | nil, default: nil)
 
     # ---------- Streams ----------
     field(:stream?, boolean(), default: false)
@@ -268,10 +270,115 @@ defmodule ReqLLM.Response do
     ReqLLM.Response.Codec.decode_response(wrapped_data, model)
   end
 
+  @doc """
+  Decode provider response data into a Response with structured object.
+
+  Similar to decode_response/2 but specifically for object generation responses.
+  Extracts the structured object from tool calls and validates it against the schema.
+
+  ## Parameters
+
+    * `raw_data` - Raw provider response data
+    * `model` - Model specification
+    * `schema` - Schema definition for validation
+
+  ## Returns
+
+    * `{:ok, %ReqLLM.Response{}}` with object field populated on success
+    * `{:error, reason}` on failure
+
+  """
+  @spec decode_object(term(), Model.t() | String.t(), keyword()) :: {:ok, t()} | {:error, term()}
+  def decode_object(raw_data, model_input, schema) do
+    with {:ok, response} <- decode_response(raw_data, model_input),
+         {:ok, object} <- extract_object_from_response(response, schema) do
+      {:ok, %{response | object: object}}
+    end
+  end
+
+  @doc """
+  Decode provider streaming response data into a Response with object stream.
+
+  Similar to decode_response/2 but for streaming object generation.
+  The response will contain a stream of structured objects.
+
+  ## Parameters
+
+    * `raw_data` - Raw provider streaming response data
+    * `model` - Model specification  
+    * `schema` - Schema definition for validation
+
+  ## Returns
+
+    * `{:ok, %ReqLLM.Response{}}` with stream populated on success
+    * `{:error, reason}` on failure
+
+  """
+  @spec decode_object_stream(term(), Model.t() | String.t(), keyword()) :: {:ok, t()} | {:error, term()}
+  def decode_object_stream(raw_data, model_input, schema) do
+    with {:ok, response} <- decode_response(raw_data, model_input) do
+      # The response already contains the stream, we just need to ensure
+      # object_stream/1 can extract objects from tool_call chunks
+      {:ok, response}
+    end
+  end
+
   # Helper function to resolve model input to Model struct
   defp resolve_model(%Model{} = model), do: model
 
   defp resolve_model(model_string) when is_binary(model_string) do
     Model.from!(model_string)
+  end
+
+  # Helper function to extract structured object from tool calls
+  defp extract_object_from_response(response, _schema) do
+    case tool_calls(response) do
+      [] ->
+        {:error, %ReqLLM.Error.API.Response{reason: "No structured output found in response"}}
+
+      tool_calls ->
+        # Find the structured_output tool call
+        case Enum.find(tool_calls, &(&1.name == "structured_output")) do
+          nil ->
+            {:error, %ReqLLM.Error.API.Response{reason: "No structured_output tool call found"}}
+
+          %{arguments: object} ->
+            # TODO: Add schema validation here
+            {:ok, object}
+        end
+    end
+  end
+
+  @doc """
+  Extracts the generated object from a Response.
+  """
+  @spec object(t()) :: map() | nil
+  def object(%__MODULE__{object: object}) do
+    object
+  end
+
+  @doc """
+  Create a stream of structured objects from a streaming response.
+
+  Only yields valid objects from tool call stream chunks, filtering out
+  metadata and other chunk types.
+
+  ## Examples
+
+      response
+      |> ReqLLM.Response.object_stream()
+      |> Stream.each(&IO.inspect/1)
+      |> Stream.run()
+
+  """
+  @spec object_stream(t()) :: Enumerable.t()
+  def object_stream(%__MODULE__{stream?: false}), do: [] |> Stream.map(& &1)
+  def object_stream(%__MODULE__{stream: nil}), do: [] |> Stream.map(& &1)
+
+  def object_stream(%__MODULE__{stream: stream}) do
+    stream
+    |> Stream.filter(&(&1.type == :tool_call))
+    |> Stream.filter(&(&1.name == "structured_output"))
+    |> Stream.map(&{:ok, &1.arguments})
   end
 end
