@@ -1,7 +1,9 @@
 defmodule ReqLLM.ModelMetadataTest do
   use ExUnit.Case, async: true
-  import ExUnit.CaptureLog
+
   import ExUnit.CaptureIO
+  import ExUnit.CaptureLog
+
   alias ReqLLM.Model
 
   @moduletag timeout: 60_000
@@ -121,7 +123,7 @@ defmodule ReqLLM.ModelMetadataTest do
 
   # Validate the basic structure of a parsed model
   defp validate_model_structure(parsed_model, model_data, model_spec) do
-    unless Model.valid?(parsed_model) do
+    if !Model.valid?(parsed_model) do
       throw({model_spec, "Invalid model structure"})
     end
 
@@ -130,14 +132,14 @@ defmodule ReqLLM.ModelMetadataTest do
     expected_provider = String.replace(provider_str, "-", "_") |> String.to_atom()
     expected_model_id = Map.get(model_data, "id")
 
-    unless parsed_model.provider == expected_provider do
+    if parsed_model.provider != expected_provider do
       throw(
         {model_spec,
          "Provider mismatch: expected #{expected_provider}, got #{parsed_model.provider}"}
       )
     end
 
-    unless parsed_model.model == expected_model_id do
+    if parsed_model.model != expected_model_id do
       throw(
         {model_spec,
          "Model ID mismatch: expected #{expected_model_id}, got #{parsed_model.model}"}
@@ -266,14 +268,14 @@ defmodule ReqLLM.ModelMetadataTest do
         # Convert strings to atoms for comparison
         expected_atoms = Enum.map(expected_values, &String.to_atom/1)
 
-        if MapSet.new(expected_atoms) != MapSet.new(parsed_values) do
+        if MapSet.new(expected_atoms) == MapSet.new(parsed_values) do
+          acc
+        else
           [
             {model_spec,
              "Modalities.#{key} mismatch: expected #{inspect(expected_atoms)}, got #{inspect(parsed_values)}"}
             | acc
           ]
-        else
-          acc
         end
       rescue
         ArgumentError ->
@@ -298,14 +300,14 @@ defmodule ReqLLM.ModelMetadataTest do
       expected_value = Map.get(model_data, json_key, false)
       parsed_value = Map.get(parsed_capabilities, struct_key, false)
 
-      if expected_value != parsed_value do
+      if expected_value == parsed_value do
+        acc
+      else
         [
           {model_spec,
            "Capability #{struct_key} mismatch: expected #{expected_value}, got #{parsed_value}"}
           | acc
         ]
-      else
-        acc
       end
     end)
   end

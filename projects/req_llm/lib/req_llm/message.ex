@@ -29,8 +29,7 @@ defmodule ReqLLM.Message do
     def inspect(%{role: role, content: parts}, opts) do
       summary =
         parts
-        |> Enum.map(& &1.type)
-        |> Enum.join(",")
+        |> Enum.map_join(",", & &1.type)
 
       Inspect.Algebra.concat(["#Message<", Inspect.Algebra.to_doc(role, opts), " ", summary, ">"])
     end

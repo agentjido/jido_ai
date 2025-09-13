@@ -44,7 +44,7 @@ defmodule ReqLLM.Response do
     # ---------- Streams ----------
     field(:stream?, boolean(), default: false)
     # Stream of StreamChunk when stream? == true
-    field(:stream, Stream.t() | nil, default: nil)
+    field(:stream, Enumerable.t() | nil, default: nil)
 
     # ---------- Metadata ----------
     field(:usage, %{optional(atom()) => integer()} | nil)
@@ -74,8 +74,7 @@ defmodule ReqLLM.Response do
   def text(%__MODULE__{message: %Message{content: content}}) do
     content
     |> Enum.filter(&(&1.type == :text))
-    |> Enum.map(& &1.text)
-    |> Enum.join("")
+    |> Enum.map_join("", & &1.text)
   end
 
   @doc """
@@ -164,7 +163,7 @@ defmodule ReqLLM.Response do
       |> Stream.run()
 
   """
-  @spec text_stream(t()) :: Stream.t()
+  @spec text_stream(t()) :: Enumerable.t()
   def text_stream(%__MODULE__{stream?: false}), do: [] |> Stream.map(& &1)
   def text_stream(%__MODULE__{stream: nil}), do: [] |> Stream.map(& &1)
 
@@ -190,45 +189,42 @@ defmodule ReqLLM.Response do
   def join_stream(%__MODULE__{stream: nil} = response), do: {:ok, response}
 
   def join_stream(%__MODULE__{stream: stream} = response) do
-    try do
-      # Collect all stream chunks
-      chunks = Enum.to_list(stream)
+    # Collect all stream chunks
+    chunks = Enum.to_list(stream)
 
-      # Build message from content chunks
-      content_text =
-        chunks
-        |> Enum.filter(&(&1.type == :content))
-        |> Enum.map(& &1.text)
-        |> Enum.join("")
+    # Build message from content chunks
+    content_text =
+      chunks
+      |> Enum.filter(&(&1.type == :content))
+      |> Enum.map_join("", & &1.text)
 
-      # Extract final usage and metadata from meta chunks
-      final_usage =
-        chunks
-        |> Enum.filter(&(&1.type == :meta))
-        |> Enum.reduce(response.usage, fn chunk, acc ->
-          Map.merge(acc || %{}, chunk.usage || %{})
-        end)
+    # Extract final usage and metadata from meta chunks
+    final_usage =
+      chunks
+      |> Enum.filter(&(&1.type == :meta))
+      |> Enum.reduce(response.usage, fn chunk, acc ->
+        Map.merge(acc || %{}, chunk.usage || %{})
+      end)
 
-      # Build the assistant message
-      message = %Message{
-        role: :assistant,
-        content: [%{type: :text, text: content_text}],
-        metadata: %{}
-      }
+    # Build the assistant message
+    message = %Message{
+      role: :assistant,
+      content: [%{type: :text, text: content_text}],
+      metadata: %{}
+    }
 
-      # Update response with materialized data
-      updated_response = %{
-        response
-        | message: message,
-          usage: final_usage,
-          stream?: false,
-          stream: nil
-      }
+    # Update response with materialized data
+    updated_response = %{
+      response
+      | message: message,
+        usage: final_usage,
+        stream?: false,
+        stream: nil
+    }
 
-      {:ok, updated_response}
-    rescue
-      error -> {:error, error}
-    end
+    {:ok, updated_response}
+  rescue
+    error -> {:error, error}
   end
 
   @doc """

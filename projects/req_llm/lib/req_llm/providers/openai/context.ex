@@ -162,10 +162,7 @@ defimpl ReqLLM.Context.Codec, for: ReqLLM.Providers.OpenAI.Context do
   end
 
   # Handle tool calls without explicit type field (assume function)
-  defp decode_tool_call(%{
-         "id" => id,
-         "function" => %{"name" => name, "arguments" => args_json}
-       }) do
+  defp decode_tool_call(%{"id" => id, "function" => %{"name" => name, "arguments" => args_json}}) do
     case Jason.decode(args_json || "{}") do
       {:ok, args} -> ReqLLM.StreamChunk.tool_call(name, args, %{id: id})
       {:error, _} -> ReqLLM.StreamChunk.tool_call(name, %{}, %{id: id})

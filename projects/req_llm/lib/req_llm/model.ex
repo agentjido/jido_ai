@@ -81,7 +81,7 @@ defmodule ReqLLM.Model do
   @spec new(atom(), String.t(), keyword()) :: t()
   def new(provider, model, opts \\ []) when is_atom(provider) and is_binary(model) do
     limit = Keyword.get(opts, :limit)
-    default_max_tokens = if limit, do: Map.get(limit, :output), else: nil
+    default_max_tokens = if limit, do: Map.get(limit, :output)
 
     %__MODULE__{
       provider: provider,
@@ -150,15 +150,16 @@ defmodule ReqLLM.Model do
     end
   end
 
+  @dialyzer {:nowarn_function, from: 1}
   def from(provider_model_string) when is_binary(provider_model_string) do
     case String.split(provider_model_string, ":", parts: 2) do
       [provider_str, model_name] when provider_str != "" and model_name != "" ->
         case parse_provider(provider_str) do
           {:ok, provider} ->
-            # Try to get metadata from provider registry first
+            # Try to get metadata from provider registry, fallback to basic model
             case ReqLLM.Provider.Registry.get_model(provider, model_name) do
-              {:ok, model_with_metadata} ->
-                {:ok, model_with_metadata}
+              {:ok, _} = result ->
+                result
 
               {:error, _} ->
                 # Fallback to creating basic model without metadata
@@ -455,7 +456,7 @@ defmodule ReqLLM.Model do
 
   defp convert_modality_values(modalities) when is_map(modalities) do
     modalities
-    |> Enum.map(fn
+    |> Map.new(fn
       {:input, values} when is_list(values) ->
         {:input, Enum.map(values, &String.to_atom/1)}
 
@@ -465,7 +466,6 @@ defmodule ReqLLM.Model do
       {key, value} ->
         {key, value}
     end)
-    |> Map.new()
   end
 
   @doc """

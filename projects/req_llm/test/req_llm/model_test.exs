@@ -1,7 +1,9 @@
 defmodule ReqLLM.ModelTest do
   use ExUnit.Case, async: true
-  import ExUnit.CaptureLog
+
   import ExUnit.CaptureIO
+  import ExUnit.CaptureLog
+
   alias ReqLLM.Model
 
   doctest ReqLLM.Model
@@ -295,7 +297,7 @@ defmodule ReqLLM.ModelTest do
         end
       end
 
-      assert length(models_with_metadata) > 0, "Should have models with metadata"
+      assert not Enum.empty?(models_with_metadata), "Should have models with metadata"
     end
 
     test "provider name parsing handles hyphens correctly" do

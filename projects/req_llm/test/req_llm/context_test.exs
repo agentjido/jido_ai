@@ -324,7 +324,7 @@ defmodule ReqLLM.ContextTest do
     test "empty context enumeration" do
       context = Context.new()
 
-      assert Enum.count(context) == 0
+      assert Enum.empty?(context)
       assert Enum.to_list(context) == []
     end
 
@@ -342,7 +342,10 @@ defmodule ReqLLM.ContextTest do
 
       assert length(context.messages) == 2
 
-      assert String.length(List.last(context.messages).content |> List.first() |> Map.get(:text)) ==
+      assert List.last(context.messages).content
+             |> List.first()
+             |> Map.get(:text)
+             |> String.length() ==
                10_000
     end
   end

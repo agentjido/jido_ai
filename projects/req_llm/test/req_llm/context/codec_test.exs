@@ -1,11 +1,11 @@
 defmodule ReqLLM.Context.CodecTest do
   use ExUnit.Case, async: true
 
-  alias ReqLLM.{Context, Message, StreamChunk}
   alias ReqLLM.Context.Codec
   alias ReqLLM.Message.ContentPart
-  alias ReqLLM.Providers.OpenAI
   alias ReqLLM.Providers.Anthropic
+  alias ReqLLM.Providers.OpenAI
+  alias ReqLLM.{Context, Message, StreamChunk}
 
   # Common test fixtures
   setup do

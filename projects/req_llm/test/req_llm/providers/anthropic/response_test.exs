@@ -1,10 +1,10 @@
 defmodule ReqLLM.Providers.Anthropic.ResponseTest do
   use ExUnit.Case, async: true
 
-  alias ReqLLM.{Response, Model, Context, Message}
-  alias ReqLLM.Response.Codec
-  alias ReqLLM.Providers.Anthropic
   alias ReqLLM.Message.ContentPart
+  alias ReqLLM.Providers.Anthropic
+  alias ReqLLM.Response.Codec
+  alias ReqLLM.{Response, Model, Context, Message}
 
   describe "Anthropic.Response struct" do
     setup do

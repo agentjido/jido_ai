@@ -16,8 +16,9 @@ defmodule ReqLLM.ProviderTest.Core do
     quote bind_quoted: [provider: provider, model: model] do
       use ExUnit.Case, async: false
 
+      import ReqLLM.Test.LiveFixture
+
       alias ReqLLM.Test.LiveFixture, as: ReqFixture
-      import ReqFixture
 
       @moduletag :coverage
       @moduletag provider

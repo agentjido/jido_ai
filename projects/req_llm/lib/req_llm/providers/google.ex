@@ -32,9 +32,6 @@ defmodule ReqLLM.Providers.Google do
 
   @behaviour ReqLLM.Provider
 
-  import ReqLLM.Provider.Utils,
-    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
-
   use ReqLLM.Provider.DSL,
     id: :google,
     base_url: "https://generativelanguage.googleapis.com/v1beta",
@@ -53,6 +50,9 @@ defmodule ReqLLM.Providers.Google do
         doc: "Number of response candidates to generate"
       ]
     ]
+
+  import ReqLLM.Provider.Utils,
+    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
 
   @doc """
   Attaches the Google plugin to a Req request.
@@ -104,18 +104,18 @@ defmodule ReqLLM.Providers.Google do
   def attach(%Req.Request{} = request, model_input, user_opts \\ []) do
     %ReqLLM.Model{} = model = ReqLLM.Model.from!(model_input)
 
-    unless model.provider == provider_id() do
+    if model.provider != provider_id() do
       raise ReqLLM.Error.Invalid.Provider.exception(provider: model.provider)
     end
 
-    unless ReqLLM.Provider.Registry.model_exists?("#{provider_id()}:#{model.model}") do
+    if !ReqLLM.Provider.Registry.model_exists?("#{provider_id()}:#{model.model}") do
       raise ReqLLM.Error.Invalid.Parameter.exception(parameter: "model: #{model.model}")
     end
 
     api_key_env = ReqLLM.Provider.Registry.get_env_key(:google)
     api_key = JidoKeys.get(api_key_env)
 
-    unless api_key && api_key != "" do
+    if !(api_key && api_key != "") do
       raise ReqLLM.Error.Invalid.Parameter.exception(
               parameter: "api_key (set via JidoKeys.put(#{inspect(api_key_env)}, key))"
             )
@@ -159,9 +159,8 @@ defmodule ReqLLM.Providers.Google do
   defp validate_parameter_ranges(opts) do
     with :ok <- validate_temperature(opts[:temperature]),
          :ok <- validate_top_p(opts[:top_p]),
-         :ok <- validate_top_k(opts[:top_k]),
-         :ok <- validate_max_tokens(opts[:max_tokens]) do
-      :ok
+         :ok <- validate_top_k(opts[:top_k]) do
+      validate_max_tokens(opts[:max_tokens])
     end
   end
 
@@ -181,12 +180,9 @@ defmodule ReqLLM.Providers.Google do
 
   defp validate_max_tokens(nil), do: :ok
 
-  defp validate_max_tokens(max_tokens)
-       when is_integer(max_tokens) and max_tokens >= 1,
-       do: :ok
+  defp validate_max_tokens(max_tokens) when is_integer(max_tokens) and max_tokens >= 1, do: :ok
 
-  defp validate_max_tokens(max_tokens),
-    do: {:error, "max_tokens must be >= 1, got #{max_tokens}"}
+  defp validate_max_tokens(max_tokens), do: {:error, "max_tokens must be >= 1, got #{max_tokens}"}
 
   # Req pipeline steps
   @impl ReqLLM.Provider
@@ -213,7 +209,7 @@ defmodule ReqLLM.Providers.Google do
 
     tools_data =
       case request.options[:tools] do
-        tools when is_list(tools) and length(tools) > 0 ->
+        tools when is_list(tools) and (is_list(tools) and tools != []) ->
           %{
             tools: [%{functionDeclarations: Enum.map(tools, &ReqLLM.Tool.to_schema(&1, :google))}]
           }

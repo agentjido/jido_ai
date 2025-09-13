@@ -17,8 +17,9 @@ defmodule ReqLLM.ProviderTest.ToolCalling do
     quote bind_quoted: [provider: provider, model: model] do
       use ExUnit.Case, async: false
 
+      import ReqLLM.Test.LiveFixture
+
       alias ReqLLM.Test.LiveFixture, as: ReqFixture
-      import ReqFixture
 
       @moduletag :coverage
       @moduletag provider
@@ -48,7 +49,7 @@ defmodule ReqLLM.ProviderTest.ToolCalling do
 
               # xAI reasoning models need more tokens for tool calling
               max_tokens = if unquote(provider) == :xai, do: 500, else: 100
-              
+
               ReqLLM.generate_text(
                 unquote(model),
                 "What's the weather like in Paris, France?",

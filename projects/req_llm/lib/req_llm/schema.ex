@@ -96,17 +96,15 @@ defmodule ReqLLM.Schema do
   """
   @spec compile(keyword() | any()) :: {:ok, NimbleOptions.t()} | {:error, ReqLLM.Error.t()}
   def compile(schema) when is_list(schema) do
-    try do
-      {:ok, NimbleOptions.new!(schema)}
-    rescue
-      e ->
-        {:error,
-         ReqLLM.Error.Validation.Error.exception(
-           tag: :invalid_schema,
-           reason: "Invalid schema: #{Exception.message(e)}",
-           context: [schema: schema]
-         )}
-    end
+    {:ok, NimbleOptions.new!(schema)}
+  rescue
+    e ->
+      {:error,
+       ReqLLM.Error.Validation.Error.exception(
+         tag: :invalid_schema,
+         reason: "Invalid schema: #{Exception.message(e)}",
+         context: [schema: schema]
+       )}
   end
 
   def compile(schema) do

@@ -266,4 +266,52 @@ defmodule ReqLLM.StreamChunk do
 
   defp validate_by_type(%{type: unknown_type}),
     do: {:error, "Unknown chunk type: #{inspect(unknown_type)}"}
+
+  defimpl Inspect do
+    def inspect(%{type: type} = chunk, opts) do
+      content_desc =
+        case type do
+          :content ->
+            text_preview = inspect_text(chunk.text, 20)
+            "#{text_preview}"
+
+          :thinking ->
+            text_preview = inspect_text(chunk.text, 20)
+            "thinking: #{text_preview}"
+
+          :tool_call ->
+            args_preview =
+              if map_size(chunk.arguments || %{}) > 0 do
+                "(...)"
+              else
+                "()"
+              end
+
+            "#{chunk.name}#{args_preview}"
+
+          :meta ->
+            meta_keys = chunk.metadata |> Map.keys() |> Enum.join(",")
+            "meta: #{meta_keys}"
+        end
+
+      Inspect.Algebra.concat([
+        "#StreamChunk<",
+        Inspect.Algebra.to_doc(type, opts),
+        " ",
+        content_desc,
+        ">"
+      ])
+    end
+
+    defp inspect_text(nil, _), do: "nil"
+
+    defp inspect_text(text, max_length) when is_binary(text) do
+      if String.length(text) > max_length do
+        truncated = String.slice(text, 0, max_length)
+        "\"#{truncated}...\""
+      else
+        "\"#{text}\""
+      end
+    end
+  end
 end

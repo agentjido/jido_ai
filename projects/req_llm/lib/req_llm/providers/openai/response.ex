@@ -44,14 +44,12 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.OpenAI.Response do
 
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :openai} = model)
       when is_map(data) do
-    try do
-      result =
-        ReqLLM.Providers.OpenAI.ResponseDecoder.decode_openai_json(data, model.model || "unknown")
+    result =
+      ReqLLM.Providers.OpenAI.ResponseDecoder.decode_openai_json(data, model.model || "unknown")
 
-      result
-    rescue
-      error -> {:error, error}
-    end
+    result
+  rescue
+    error -> {:error, error}
   end
 
   def decode_response(_wrapped_response, _model) do
@@ -162,8 +160,6 @@ defmodule ReqLLM.Providers.OpenAI.ResponseDecoder do
             content: content_parts,
             metadata: %{}
           }
-        else
-          nil
         end
     end
   end

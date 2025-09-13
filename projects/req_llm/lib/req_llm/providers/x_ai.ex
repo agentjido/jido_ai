@@ -55,9 +55,6 @@ defmodule ReqLLM.Providers.XAI do
 
   @behaviour ReqLLM.Provider
 
-  import ReqLLM.Provider.Utils,
-    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
-
   use ReqLLM.Provider.DSL,
     id: :xai,
     base_url: "https://api.x.ai/v1",
@@ -66,33 +63,35 @@ defmodule ReqLLM.Providers.XAI do
     context_wrapper: ReqLLM.Providers.XAI.Context,
     response_wrapper: ReqLLM.Providers.XAI.Response,
     provider_schema: [
-      # xAI-specific Live Search functionality
       live_search: [
         type: :boolean,
         default: false,
         doc: "Enable Live Search for real-time information access (additional cost applies)"
       ],
-
-      # xAI reasoning parameters (Note: Grok 4 doesn't support reasoning_effort)
+      # xAI-specific Live Search functionality
       reasoning_effort: [
         type: {:in, ~w(none default low medium high)},
         doc: "Reasoning effort level (not supported by Grok 4)"
       ],
 
-      # xAI caching control
+      # xAI reasoning parameters (Note: Grok 4 doesn't support reasoning_effort)
       enable_cached_prompt: [
         type: :boolean,
         default: true,
         doc: "Enable automatic caching for repeated prompts to reduce costs"
       ],
 
-      # Model-specific performance controls
+      # xAI caching control
       service_tier: [
         type: {:in, ~w(auto default performance)},
         doc: "Performance tier for xAI requests"
       ]
     ]
 
+  import ReqLLM.Provider.Utils,
+    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
+
+  # Model-specific performance controls
   @doc """
   Attaches the xAI plugin to a Req request.
 
@@ -144,14 +143,14 @@ defmodule ReqLLM.Providers.XAI do
   def attach(%Req.Request{} = request, model_input, user_opts \\ []) do
     %ReqLLM.Model{} = model = ReqLLM.Model.from!(model_input)
 
-    unless model.provider == provider_id() do
+    if model.provider != provider_id() do
       raise ReqLLM.Error.Invalid.Provider.exception(provider: model.provider)
     end
 
     api_key_env = ReqLLM.Provider.Registry.get_env_key(:xai)
     api_key = JidoKeys.get(api_key_env)
 
-    unless api_key && api_key != "" do
+    if !(api_key && api_key != "") do
       raise ReqLLM.Error.Invalid.Parameter.exception(
               parameter: "api_key (set via JidoKeys.put(#{inspect(api_key_env)}, key))"
             )
@@ -257,7 +256,7 @@ defmodule ReqLLM.Providers.XAI do
     # Handle tools if provided
     body =
       case request.options[:tools] do
-        tools when is_list(tools) and length(tools) > 0 ->
+        tools when is_list(tools) and (is_list(tools) and tools != []) ->
           body = Map.put(body, :tools, Enum.map(tools, &ReqLLM.Tool.to_schema(&1, :openai)))
 
           # Handle tool_choice if provided, default to "auto" for xAI

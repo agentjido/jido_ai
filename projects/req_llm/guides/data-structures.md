@@ -1,6 +1,6 @@
 # Data Structures Guide
 
-This guide provides a comprehensive overview of ReqLLM's core data structures and their practical usage patterns. ReqLLM is built around six primary data structures that work together to provide a unified, provider-agnostic interface for AI interactions.
+ReqLLM 1.0.0-rc.1 core data structures and practical usage patterns. Six primary structures provide unified, provider-agnostic AI interactions.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ This guide provides a comprehensive overview of ReqLLM's core data structures an
 
 ## Core Structure Overview
 
-ReqLLM's data structures follow a hierarchical design:
+Hierarchical data structure design:
 
 ```
 ReqLLM.Model          # Model configuration and capabilities
@@ -31,17 +31,13 @@ ReqLLM.StreamChunk    # Streaming response chunks
 ReqLLM.Tool           # Function calling definitions
 ```
 
-These structures are designed to be:
-- **Provider-agnostic**: Work consistently across all AI providers
-- **Type-safe**: Use discriminated unions and TypedStruct for compile-time guarantees
-- **Composable**: Immutable structures that work well with Elixir's functional patterns
-- **Extensible**: Metadata fields allow evolution without breaking changes
+Design principles: provider-agnostic, type-safe with discriminated unions, composable immutable structures, extensible via metadata.
 
 ## Model Configuration
 
 ### Basic Model Creation
 
-The [`ReqLLM.Model`](/Users/mhostetler/Source/Jido/jido_workspace/projects/req_llm/lib/req_llm/model.ex) struct represents AI model configurations with provider information, runtime parameters, and optional metadata.
+`ReqLLM.Model` struct represents AI model configurations with provider information, runtime parameters, and optional metadata.
 
 ```elixir
 # From string specification (simplest)
@@ -105,7 +101,7 @@ end
 
 ### Building Conversations
 
-The [`ReqLLM.Context`](/Users/mhostetler/Source/Jido/jido_workspace/projects/req_llm/lib/req_llm/context.ex) struct manages conversation history as a collection of messages with convenient constructor functions.
+`ReqLLM.Context` struct manages conversation history as a collection of messages with convenient constructor functions.
 
 ```elixir
 import ReqLLM.Context
@@ -125,7 +121,7 @@ context = Context.new([
 
 ### Message Composition Patterns
 
-Messages always contain lists of [`ContentPart`](/Users/mhostetler/Source/Jido/jido_workspace/projects/req_llm/lib/req_llm/message/content_part.ex) structs, eliminating polymorphism:
+Messages always contain lists of `ContentPart` structs, eliminating polymorphism:
 
 ```elixir
 # Text-only message (still uses list)
@@ -174,7 +170,7 @@ end)
 
 ### Content Type Overview
 
-[`ReqLLM.Message.ContentPart`](/Users/mhostetler/Source/Jido/jido_workspace/projects/req_llm/lib/req_llm/message/content_part.ex) supports multiple content types through a discriminated union:
+`ReqLLM.Message.ContentPart` supports multiple content types through a discriminated union:
 
 ```elixir
 # Text content
@@ -186,7 +182,7 @@ reasoning_part = ContentPart.reasoning("Let me think step by step...")
 # Image from URL
 image_url_part = ContentPart.image_url("https://example.com/chart.jpg")
 
-# Image from binary data
+# Image from binary data  
 {:ok, image_data} = File.read("photo.png")
 image_part = ContentPart.image(image_data, "image/png")
 
@@ -271,7 +267,7 @@ context = compare_images.(image_urls)
 
 ### Basic Tool Definition
 
-The [`ReqLLM.Tool`](/Users/mhostetler/Source/Jido/jido_workspace/projects/req_llm/lib/req_llm/tool.ex) struct defines functions that AI models can call:
+`ReqLLM.Tool` struct defines functions that AI models can call:
 
 ```elixir
 # Simple weather tool
@@ -393,7 +389,7 @@ context_with_results = execute_tools_in_context.(response1.context, tools)
 
 ### Basic Streaming
 
-The [`ReqLLM.StreamChunk`](/Users/mhostetler/Source/Jido/jido_workspace/projects/req_llm/lib/req_llm/stream_chunk.ex) struct provides a unified format for streaming responses:
+`ReqLLM.StreamChunk` struct provides a unified format for streaming responses with fields `type`, `text`, `name`, `arguments`, `metadata`:
 
 ```elixir
 {:ok, response} = ReqLLM.stream_text(model, context)
@@ -585,66 +581,20 @@ end
 ### Custom Validation Patterns
 
 ```elixir
-# Validation pipeline
-defmodule ConversationValidator do
-  def validate_conversation(context) do
-    with {:ok, context} <- validate_message_flow(context),
-         {:ok, context} <- validate_content_safety(context),
-         {:ok, context} <- validate_message_limits(context) do
-      {:ok, context}
+# Simple validation
+defmodule ContextValidator do
+  def validate(context) do
+    cond do
+      length(context.messages) > 100 -> {:error, "Too many messages"}
+      alternates_properly?(context) -> {:ok, context}
+      true -> {:error, "Invalid role flow"}
     end
   end
   
-  defp validate_message_flow(context) do
-    # Ensure proper role alternation
+  defp alternates_properly?(context) do
     roles = Enum.map(context.messages, & &1.role)
-    
-    case roles do
-      [:system | rest] -> validate_user_assistant_flow(rest)
-      other -> validate_user_assistant_flow(other)
-    end
-    |> case do
-      :ok -> {:ok, context}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-  
-  defp validate_user_assistant_flow([]), do: :ok
-  defp validate_user_assistant_flow([:user, :assistant | rest]), 
-    do: validate_user_assistant_flow(rest)
-  defp validate_user_assistant_flow([:user]), do: :ok
-  defp validate_user_assistant_flow(_), 
-    do: {:error, "Invalid conversation flow - must alternate user/assistant"}
-  
-  defp validate_content_safety(context) do
-    # Check for inappropriate content
-    has_unsafe_content = context.messages
-    |> Enum.any?(fn msg ->
-      msg.content
-      |> Enum.any?(fn part ->
-        part.type == :text and contains_unsafe_content?(part.text)
-      end)
-    end)
-    
-    if has_unsafe_content do
-      {:error, "Conversation contains unsafe content"}
-    else
-      {:ok, context}
-    end
-  end
-  
-  defp validate_message_limits(context) do
-    if length(context.messages) > 100 do
-      {:error, "Too many messages in conversation"}
-    else
-      {:ok, context}
-    end
-  end
-  
-  defp contains_unsafe_content?(text) do
-    # Simple content filter
-    unsafe_patterns = ["password", "secret", "private key"]
-    Enum.any?(unsafe_patterns, &String.contains?(String.downcase(text), &1))
+    # Check user/assistant alternation logic here
+    true
   end
 end
 ```
@@ -654,289 +604,79 @@ end
 ### Conversation Templates
 
 ```elixir
-# Reusable conversation builders
-defmodule ConversationTemplates do
+# Reusable templates
+defmodule Templates do
   import ReqLLM.Context
   alias ReqLLM.Message.ContentPart
   
-  def code_review_template(code, language) do
+  def code_review(code, language) do
     Context.new([
-      system("""
-      You are an expert code reviewer. Analyze code for:
-      - Best practices and conventions
-      - Potential bugs or issues
-      - Performance improvements
-      - Security concerns
-      Provide specific, actionable feedback.
-      """),
+      system("You are a code reviewer. Provide concise, actionable feedback."),
       user([
-        ContentPart.text("Please review this #{language} code:"),
+        ContentPart.text("Review this #{language} code:"),
         ContentPart.text("```#{language}\n#{code}\n```")
       ])
     ])
   end
   
-  def document_analysis_template(documents) do
-    system_msg = system("""
-    You are a document analyst. Examine documents for:
-    - Key insights and themes
-    - Data patterns and trends
-    - Recommendations and action items
-    Provide structured analysis with evidence.
-    """)
-    
+  def document_analysis(files) do
     content_parts = [ContentPart.text("Analyze these documents:")] ++
-      Enum.flat_map(documents, fn {name, data, type} ->
-        [
-          ContentPart.text("Document: #{name}"),
-          ContentPart.file(data, name, type)
-        ]
+      Enum.map(files, fn {data, name, type} ->
+        ContentPart.file(data, name, type)
       end)
     
-    Context.new([system_msg, user(content_parts)])
-  end
-  
-  def research_template(topic, sources \\ []) do
-    base_content = [
-      ContentPart.text("Research topic: #{topic}")
-    ]
-    
-    source_content = if sources != [] do
-      [ContentPart.text("Reference sources:")] ++
-        Enum.map(sources, fn url ->
-          ContentPart.text("- #{url}")
-        end)
-    else
-      []
-    end
-    
     Context.new([
-      system("You are a research assistant. Provide comprehensive, well-sourced analysis."),
-      user(base_content ++ source_content)
+      system("You are a document analyst. Provide key insights."),
+      user(content_parts)
     ])
   end
 end
 
 # Usage
-{:ok, elixir_code} = File.read("my_module.ex")
-context = ConversationTemplates.code_review_template(elixir_code, "elixir")
+context = Templates.code_review("def hello, do: :world", "elixir")
 {:ok, response} = ReqLLM.generate_text(model, context)
 ```
 
-### Pipeline Composition
+### Analysis Pipeline
 
 ```elixir
-# Functional composition pipeline
-defmodule AIWorkflow do
-  def create_analysis_pipeline(model) do
-    fn input ->
-      input
-      |> prepare_context()
-      |> add_system_context()
-      |> validate_input()
-      |> execute_generation(model)
-      |> process_response()
-      |> extract_insights()
-    end
-  end
-  
-  defp prepare_context(%{text: text, images: images}) do
-    content_parts = [ContentPart.text(text)] ++
-      Enum.map(images, fn {url, description} ->
-        [
-          ContentPart.text("Image: #{description}"),
-          ContentPart.image_url(url)
-        ]
-      end)
-      |> List.flatten()
-    
-    ReqLLM.Context.new([
-      ReqLLM.Context.user(content_parts)
+# Simple analysis pipeline
+defmodule SimpleAnalysis do
+  def analyze(text, model) do
+    context = ReqLLM.Context.new([
+      ReqLLM.Context.system("You are a data analyst. Provide concise insights."),
+      ReqLLM.Context.user(text)
     ])
-  end
-  
-  defp add_system_context(context) do
-    system_message = ReqLLM.Context.system("""
-    You are an expert analyst. Provide detailed insights based on 
-    the provided text and visual content. Structure your response with:
-    1. Executive summary
-    2. Detailed analysis
-    3. Key recommendations
-    """)
     
-    %{context | messages: [system_message | context.messages]}
-  end
-  
-  defp validate_input(context) do
-    case ConversationValidator.validate_conversation(context) do
-      {:ok, context} -> context
-      {:error, reason} -> raise ArgumentError, reason
-    end
-  end
-  
-  defp execute_generation(context, model) do
-    case ReqLLM.generate_text(model, context, max_tokens: 2000) do
-      {:ok, response} -> response
-      {:error, reason} -> raise RuntimeError, "Generation failed: #{inspect(reason)}"
-    end
-  end
-  
-  defp process_response(response) do
-    # Extract structured content
-    content = response.context.messages
+    {:ok, response} = ReqLLM.generate_text(model, context)
+    
+    response.context.messages
     |> List.last()
     |> Map.get(:content, [])
-    |> Enum.filter(&(&1.type == :text))
-    |> Enum.map(&(&1.text))
-    |> Enum.join("")
-    
-    %{raw_response: response, content: content}
-  end
-  
-  defp extract_insights(%{content: content} = result) do
-    # Parse structured sections
-    sections = content
-    |> String.split(~r/\n(?=\d+\.|\*\*|\#)/)
-    |> Enum.map(&String.trim/1)
-    |> Enum.reject(&(&1 == ""))
-    
-    summary = sections
-    |> Enum.find(&String.contains?(&1, "summary"))
-    |> case do
-      nil -> "No summary found"
-      text -> String.replace(text, ~r/^\d+\.\s*|^\*\*.*?\*\*\s*/, "")
-    end
-    
-    %{result | summary: summary, sections: sections}
+    |> Enum.find(&(&1.type == :text))
+    |> Map.get(:text, "")
   end
 end
 
 # Usage
-pipeline = AIWorkflow.create_analysis_pipeline(model)
-
-result = pipeline.(%{
-  text: "Quarterly sales report shows 15% growth...",
-  images: [
-    {"https://example.com/chart1.png", "Sales trend chart"},
-    {"https://example.com/chart2.png", "Regional breakdown"}
-  ]
-})
-
-IO.puts("Summary: #{result.summary}")
+analysis = SimpleAnalysis.analyze("Sales increased 15%", model)
 ```
 
 ### Multi-Model Orchestration
 
 ```elixir
-# Orchestrate multiple models for different tasks
-defmodule MultiModelWorkflow do
-  def analyze_with_specialists(content, models) do
-    # Use different models for different specialties
-    %{
-      text_model: text_model,
-      vision_model: vision_model, 
-      reasoning_model: reasoning_model
-    } = models
-    
-    tasks = [
-      Task.async(fn -> analyze_text(content, text_model) end),
-      Task.async(fn -> analyze_images(content, vision_model) end),
-      Task.async(fn -> synthesize_insights(content, reasoning_model) end)
-    ]
-    
-    [text_analysis, image_analysis, synthesis] = Task.await_many(tasks, 30_000)
-    
-    combine_analyses(text_analysis, image_analysis, synthesis)
-  end
-  
-  defp analyze_text(content, model) do
-    context = ReqLLM.Context.new([
-      ReqLLM.Context.system("You specialize in text analysis and summarization."),
-      ReqLLM.Context.user(extract_text_parts(content))
-    ])
-    
-    {:ok, response} = ReqLLM.generate_text(model, context)
-    extract_content(response)
-  end
-  
-  defp analyze_images(content, model) do
-    image_parts = extract_image_parts(content)
-    
-    if image_parts != [] do
-      context = ReqLLM.Context.new([
-        ReqLLM.Context.system("You specialize in visual analysis and interpretation."),
-        ReqLLM.Context.user([ContentPart.text("Analyze these images:")] ++ image_parts)
-      ])
-      
-      {:ok, response} = ReqLLM.generate_text(model, context)
-      extract_content(response)
-    else
-      "No images to analyze"
-    end
-  end
-  
-  defp synthesize_insights(content, model) do
-    # Wait for other analyses to complete, then synthesize
-    Process.sleep(1000)  # Simple coordination
-    
-    context = ReqLLM.Context.new([
-      ReqLLM.Context.system("You synthesize insights from multiple analyses into actionable recommendations."),
-      ReqLLM.Context.user("Provide overall insights and recommendations based on the content.")
-    ])
-    
-    {:ok, response} = ReqLLM.generate_text(model, context)
-    extract_content(response)
-  end
-  
-  defp combine_analyses(text_analysis, image_analysis, synthesis) do
-    %{
-      text_insights: text_analysis,
-      visual_insights: image_analysis,
-      recommendations: synthesis,
-      timestamp: DateTime.utc_now()
-    }
-  end
-  
-  defp extract_text_parts(content) do
-    content
-    |> Enum.filter(&(&1.type == :text))
-  end
-  
-  defp extract_image_parts(content) do
-    content
-    |> Enum.filter(&(&1.type in [:image, :image_url]))
-  end
-  
-  defp extract_content(response) do
-    response.context.messages
-    |> List.last()
-    |> Map.get(:content, [])
-    |> Enum.find(&(&1.type == :text))
-    |> case do
-      nil -> ""
-      part -> part.text
-    end
-  end
-end
+# Use different models for specialized tasks
+text_model = ReqLLM.Model.from!("anthropic:claude-3-haiku")
+vision_model = ReqLLM.Model.from!("anthropic:claude-3-5-sonnet")
 
-# Usage with multiple models
-models = %{
-  text_model: ReqLLM.Model.from!("anthropic:claude-3-haiku"),      # Fast text processing
-  vision_model: ReqLLM.Model.from!("anthropic:claude-3-5-sonnet"), # Vision capabilities
-  reasoning_model: ReqLLM.Model.from!("anthropic:claude-3-opus")   # Complex reasoning
-}
+# Text analysis
+{:ok, text_result} = ReqLLM.generate_text(text_model, text_context)
 
-multimodal_content = [
-  ContentPart.text("Q3 sales exceeded expectations with 15% growth..."),
-  ContentPart.image_url("https://example.com/sales_chart.png"),
-  ContentPart.text("Customer satisfaction scores improved across all regions...")
-]
+# Vision analysis  
+{:ok, vision_result} = ReqLLM.generate_text(vision_model, image_context)
 
-result = MultiModelWorkflow.analyze_with_specialists(multimodal_content, models)
-
-IO.puts("Text Analysis: #{result.text_insights}")
-IO.puts("Visual Analysis: #{result.visual_insights}")
-IO.puts("Recommendations: #{result.recommendations}")
+# Combine results
+final_analysis = text_result.content <> " " <> vision_result.content
 ```
 
-This comprehensive guide demonstrates ReqLLM's data structures in practical scenarios. The type-safe, provider-agnostic design enables complex AI workflows while maintaining clean, composable code. Each structure builds upon the others to create a powerful foundation for AI application development.
+ReqLLM 1.0.0-rc.1 provides type-safe, provider-agnostic data structures for building composable AI workflows. Each structure builds on the others to create a unified foundation for AI application development.

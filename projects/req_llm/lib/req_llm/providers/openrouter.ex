@@ -9,7 +9,7 @@ defmodule ReqLLM.Providers.OpenRouter do
 
   OpenRouter supports tool calling with compatible models using OpenAI-compatible format.
   Confirmed working models:
-  
+
   - `openrouter:openai/gpt-4` 
   - `openrouter:openai/gpt-4-turbo`
   - `openrouter:openai/gpt-3.5-turbo`
@@ -39,9 +39,6 @@ defmodule ReqLLM.Providers.OpenRouter do
 
   @behaviour ReqLLM.Provider
 
-  import ReqLLM.Provider.Utils,
-    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
-
   use ReqLLM.Provider.DSL,
     id: :openrouter,
     base_url: "https://openrouter.ai/api/v1",
@@ -50,11 +47,11 @@ defmodule ReqLLM.Providers.OpenRouter do
     context_wrapper: ReqLLM.Providers.OpenRouter.Context,
     response_wrapper: ReqLLM.Providers.OpenRouter.Response,
     provider_schema: [
-      # OpenRouter-specific options
       repetition_penalty: [
         type: :float,
         doc: "Repetition penalty for reducing repetitive text"
       ],
+      # OpenRouter-specific options
       top_logprobs: [
         type: :pos_integer,
         doc: "Number of top log probabilities to return"
@@ -84,6 +81,9 @@ defmodule ReqLLM.Providers.OpenRouter do
         doc: "List of transforms to apply"
       ]
     ]
+
+  import ReqLLM.Provider.Utils,
+    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
 
   @doc """
   Attaches the OpenRouter plugin to a Req request.
@@ -132,14 +132,14 @@ defmodule ReqLLM.Providers.OpenRouter do
   def attach(%Req.Request{} = request, model_input, user_opts \\ []) do
     %ReqLLM.Model{} = model = ReqLLM.Model.from!(model_input)
 
-    unless model.provider == provider_id() do
+    if model.provider != provider_id() do
       raise ReqLLM.Error.Invalid.Provider.exception(provider: model.provider)
     end
 
     api_key_env = ReqLLM.Provider.Registry.get_env_key(:openrouter)
     api_key = JidoKeys.get(api_key_env)
 
-    unless api_key && api_key != "" do
+    if !(api_key && api_key != "") do
       raise ReqLLM.Error.Invalid.Parameter.exception(
               parameter: "api_key (set via JidoKeys.put(#{inspect(api_key_env)}, key))"
             )
@@ -188,9 +188,8 @@ defmodule ReqLLM.Providers.OpenRouter do
          :ok <- validate_frequency_penalty(opts[:frequency_penalty]),
          :ok <- validate_presence_penalty(opts[:presence_penalty]),
          :ok <- validate_repetition_penalty(opts[:repetition_penalty]),
-         :ok <- validate_min_p(opts[:min_p]),
-         :ok <- validate_top_a(opts[:top_a]) do
-      :ok
+         :ok <- validate_min_p(opts[:min_p]) do
+      validate_top_a(opts[:top_a])
     end
   end
 
@@ -210,12 +209,9 @@ defmodule ReqLLM.Providers.OpenRouter do
 
   defp validate_max_tokens(nil), do: :ok
 
-  defp validate_max_tokens(max_tokens)
-       when is_integer(max_tokens) and max_tokens >= 1,
-       do: :ok
+  defp validate_max_tokens(max_tokens) when is_integer(max_tokens) and max_tokens >= 1, do: :ok
 
-  defp validate_max_tokens(max_tokens),
-    do: {:error, "max_tokens must be >= 1, got #{max_tokens}"}
+  defp validate_max_tokens(max_tokens), do: {:error, "max_tokens must be >= 1, got #{max_tokens}"}
 
   defp validate_frequency_penalty(nil), do: :ok
 
@@ -305,7 +301,7 @@ defmodule ReqLLM.Providers.OpenRouter do
     # Handle tools if provided
     body =
       case request.options[:tools] do
-        tools when is_list(tools) and length(tools) > 0 ->
+        tools when is_list(tools) and (is_list(tools) and tools != []) ->
           Map.put(body, :tools, Enum.map(tools, &ReqLLM.Tool.to_schema(&1, :openai)))
 
         _ ->

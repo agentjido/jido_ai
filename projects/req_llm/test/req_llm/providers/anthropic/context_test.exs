@@ -1,10 +1,10 @@
 defmodule ReqLLM.Providers.Anthropic.ContextTest do
   use ExUnit.Case, async: true
 
-  alias ReqLLM.{Context, Message}
   alias ReqLLM.Context.Codec
-  alias ReqLLM.Providers.Anthropic
   alias ReqLLM.Message.ContentPart
+  alias ReqLLM.Providers.Anthropic
+  alias ReqLLM.{Context, Message}
 
   describe "Anthropic.Context struct" do
     test "creates struct with context field" do

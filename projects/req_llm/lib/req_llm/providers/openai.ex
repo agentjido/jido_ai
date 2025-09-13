@@ -31,9 +31,6 @@ defmodule ReqLLM.Providers.OpenAI do
 
   @behaviour ReqLLM.Provider
 
-  import ReqLLM.Provider.Utils,
-    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
-
   use ReqLLM.Provider.DSL,
     id: :openai,
     base_url: "https://api.openai.com/v1",
@@ -41,10 +38,12 @@ defmodule ReqLLM.Providers.OpenAI do
     default_env_key: "OPENAI_API_KEY",
     context_wrapper: ReqLLM.Providers.OpenAI.Context,
     response_wrapper: ReqLLM.Providers.OpenAI.Response,
-    provider_schema: [
-      # OpenAI currently shares core options - no provider-specific options yet
-    ]
+    provider_schema: []
 
+  import ReqLLM.Provider.Utils,
+    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
+
+  # OpenAI currently shares core options - no provider-specific options yet
   @doc """
   Attaches the OpenAI plugin to a Req request.
 
@@ -91,18 +90,18 @@ defmodule ReqLLM.Providers.OpenAI do
   def attach(%Req.Request{} = request, model_input, user_opts \\ []) do
     %ReqLLM.Model{} = model = ReqLLM.Model.from!(model_input)
 
-    unless model.provider == provider_id() do
+    if model.provider != provider_id() do
       raise ReqLLM.Error.Invalid.Provider.exception(provider: model.provider)
     end
 
-    unless ReqLLM.Provider.Registry.model_exists?("#{provider_id()}:#{model.model}") do
+    if !ReqLLM.Provider.Registry.model_exists?("#{provider_id()}:#{model.model}") do
       raise ReqLLM.Error.Invalid.Parameter.exception(parameter: "model: #{model.model}")
     end
 
     api_key_env = ReqLLM.Provider.Registry.get_env_key(:openai)
     api_key = JidoKeys.get(api_key_env)
 
-    unless api_key && api_key != "" do
+    if !(api_key && api_key != "") do
       raise ReqLLM.Error.Invalid.Parameter.exception(
               parameter: "api_key (set via JidoKeys.put(#{inspect(api_key_env)}, key))"
             )
@@ -156,7 +155,7 @@ defmodule ReqLLM.Providers.OpenAI do
 
     tools_data =
       case request.options[:tools] do
-        tools when is_list(tools) and length(tools) > 0 ->
+        tools when is_list(tools) and (is_list(tools) and tools != []) ->
           %{tools: Enum.map(tools, &ReqLLM.Schema.to_openai_format/1)}
 
         _ ->
