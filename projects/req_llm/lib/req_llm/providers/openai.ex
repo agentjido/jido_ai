@@ -119,16 +119,23 @@ defmodule ReqLLM.Providers.OpenAI do
             )
     end
 
-    # Extract tools separately to avoid validation issues
-    {tools, other_opts} = Keyword.pop(user_opts, :tools, [])
+    # Extract special keys that shouldn't be validated
+    {tools, temp_opts} = Keyword.pop(user_opts, :tools, [])
+    {operation, temp_opts} = Keyword.pop(temp_opts, :operation, nil)
+    {text, other_opts} = Keyword.pop(temp_opts, :text, nil)
 
     # Prepare validated options and extract what Req needs
     opts = prepare_options!(__MODULE__, model, other_opts)
 
-    # Add tools back after validation
-    opts = Keyword.put(opts, :tools, tools)
+    # Add back the special keys after validation
+    opts = 
+      opts
+      |> Keyword.put(:tools, tools)
+      |> maybe_put(:operation, operation)
+      |> maybe_put(:text, text)
+
     base_url = Keyword.get(user_opts, :base_url, default_base_url())
-    req_keys = __MODULE__.supported_provider_options() ++ [:model, :context]
+    req_keys = __MODULE__.supported_provider_options() ++ [:model, :context, :operation, :text]
 
     request
     |> Req.Request.register_options(req_keys)
