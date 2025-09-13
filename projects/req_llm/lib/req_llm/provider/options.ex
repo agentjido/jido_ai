@@ -661,7 +661,9 @@ defmodule ReqLLM.Provider.Options do
         {stream_value, rest} -> Keyword.put(rest, :stream, stream_value)
       end
 
-    known_keys = all_generation_keys()
+    # Exclude provider_options from being treated as a standard generation option
+    # since it's a meta-container, not an actual parameter
+    known_keys = all_generation_keys() |> Enum.reject(&(&1 == :provider_options))
 
     {standard, custom} = Keyword.split(opts_with_aliases, known_keys)
 

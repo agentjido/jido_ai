@@ -209,7 +209,8 @@ defmodule ReqLLM.Provider.DSL do
         # Return both core generation options and provider-specific options
         core_options = ReqLLM.Provider.Options.all_generation_keys()
         provider_options = @provider_schema.schema |> Keyword.keys()
-        core_options ++ provider_options
+        # Exclude :provider_options as it's a meta-key, not an actual validation target
+        (core_options ++ provider_options) |> Enum.reject(&(&1 == :provider_options))
       end
 
       def default_provider_opts do

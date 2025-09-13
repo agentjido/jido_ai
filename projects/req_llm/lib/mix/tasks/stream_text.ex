@@ -68,6 +68,7 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
       |> maybe_add_option(opts, :system_prompt, :system)
       |> maybe_add_option(opts, :max_tokens)
       |> maybe_add_option(opts, :temperature)
+      |> Enum.reject(fn {_key, val} -> is_nil(val) end)
 
     start_time = System.monotonic_time(:millisecond)
 
@@ -99,6 +100,11 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
               :ok
           end
         end
+
+         # Debug output for empty responses
+         if length(chunks) == 0 and not quiet do
+           IO.puts("⚠️ No chunks received from stream")
+         end
 
         if !quiet, do: IO.puts("")
 
