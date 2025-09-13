@@ -24,7 +24,7 @@ defmodule ReqLLM.ProviderTest.Streaming do
 
       # TODO: Implement streaming test macros
       # Will include tests for stream_text/3, chunk handling, etc.
-      
+
       # Example tests that could be implemented:
       #
       # test "basic streaming completion" do

@@ -246,10 +246,15 @@ defmodule ReqLLM.Provider.DSL do
       unquote(
         if response_wrapper do
           quote do
+            # 1. Avoid double wrapping (can happen in tests)
             @doc false
-            def wrap_response(data) do
-              struct!(unquote(response_wrapper), payload: data)
-            end
+            def wrap_response(%unquote(response_wrapper){} = already_wrapped),
+              do: already_wrapped
+
+            # 2. Wrap everything (including streams) in provider-specific struct
+            @doc false
+            def wrap_response(data),
+              do: struct!(unquote(response_wrapper), payload: data)
           end
         end
       )

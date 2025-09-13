@@ -226,7 +226,7 @@ defmodule ReqLLM.Generation do
       {:ok, response} = ReqLLM.Generation.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
       ReqLLM.Response.text_stream(response) |> Enum.each(&IO.write/1)
 
-      # Access usage metadata after streaming  
+      # Access usage metadata after streaming
       ReqLLM.Response.usage(response)
       #=> %{input_tokens: 15, output_tokens: 42}
 
@@ -241,7 +241,7 @@ defmodule ReqLLM.Generation do
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
          schema <- dynamic_schema(provider_module),
          {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
-         stream_opts = Keyword.put(validated_opts, :stream?, true),
+         stream_opts = Keyword.put(validated_opts, :stream, true),
          context <- build_context(messages, stream_opts),
          {:ok, configured_request} <-
            provider_module.prepare_request(:chat, model, context, stream_opts),
@@ -321,5 +321,117 @@ defmodule ReqLLM.Generation do
         system_msg = Context.system(system_text)
         Context.new([system_msg | Context.to_list(context)])
     end
+  end
+
+  @doc """
+  Generates structured data using an AI model with schema validation.
+
+  This is a placeholder implementation that returns `:not_implemented`.
+  The actual implementation will be added later.
+
+  ## Parameters
+
+    * `model_spec` - Model specification in various formats
+    * `messages` - Text prompt or list of messages
+    * `schema` - Schema definition for structured output
+    * `opts` - Additional options (keyword list)
+
+  ## Returns
+
+    `{:error, :not_implemented}` - Placeholder response
+
+  """
+  @spec generate_object(
+          String.t() | {atom(), keyword()} | struct(),
+          String.t() | list(),
+          keyword(),
+          keyword()
+        ) :: {:error, :not_implemented}
+  def generate_object(_model_spec, _messages, _schema, _opts \\ []) do
+    {:error, :not_implemented}
+  end
+
+  @doc """
+  Streams structured data generation using an AI model with schema validation.
+
+  This is a placeholder implementation that returns `:not_implemented`.
+  The actual implementation will be added later.
+
+  ## Parameters
+
+    * `model_spec` - Model specification in various formats
+    * `messages` - Text prompt or list of messages
+    * `schema` - Schema definition for structured output
+    * `opts` - Additional options (keyword list)
+
+  ## Returns
+
+    `{:error, :not_implemented}` - Placeholder response
+
+  """
+  @spec stream_object(
+          String.t() | {atom(), keyword()} | struct(),
+          String.t() | list(),
+          keyword(),
+          keyword()
+        ) :: {:error, :not_implemented}
+  def stream_object(_model_spec, _messages, _schema, _opts \\ []) do
+    {:error, :not_implemented}
+  end
+
+  @doc """
+  Generates structured data using an AI model, returning only the object content.
+
+  This is a placeholder implementation that returns `:not_implemented`.
+  The actual implementation will be added later.
+
+  ## Parameters
+
+    * `model_spec` - Model specification in various formats
+    * `messages` - Text prompt or list of messages
+    * `schema` - Schema definition for structured output
+    * `opts` - Additional options (keyword list)
+
+  ## Returns
+
+    `{:error, :not_implemented}` - Placeholder response
+
+  """
+  @spec generate_object!(
+          String.t() | {atom(), keyword()} | struct(),
+          String.t() | list(),
+          keyword(),
+          keyword()
+        ) :: {:error, :not_implemented}
+  def generate_object!(_model_spec, _messages, _schema, _opts \\ []) do
+    {:error, :not_implemented}
+  end
+
+  @doc """
+  Streams structured data generation using an AI model, returning only the stream.
+
+  This is a placeholder implementation that returns `:not_implemented`.
+  The actual implementation will be added later.
+
+  ## Parameters
+
+    * `model_spec` - Model specification in various formats
+    * `messages` - Text prompt or list of messages
+    * `schema` - Schema definition for structured output
+    * `opts` - Additional options (keyword list)
+
+  ## Returns
+
+    `{:error, :not_implemented}` - Placeholder response
+
+  """
+  @spec stream_object!(
+          String.t() | {atom(), keyword()} | struct(),
+          String.t() | list(),
+          keyword(),
+          keyword()
+        ) :: {:error, :not_implemented}
+  def stream_object!(_model_spec, _messages, _schema, _opts \\ []) do
+    {:error, :not_implemented}
   end
 end

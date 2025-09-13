@@ -20,6 +20,32 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Groq.Response do
   @doc """
   Decode wrapped Groq response struct with model information.
   """
+  def decode_response(
+        %{payload: stream} = _wrapped_response,
+        %Model{provider: :groq} = model
+      )
+      when is_struct(stream, Stream) do
+    # Convert SSE events to StreamChunks
+    chunk_stream =
+      stream
+      |> Stream.flat_map(&decode_sse_event/1)
+      |> Stream.reject(&is_nil/1)
+
+    response = %Response{
+      id: "stream-#{System.unique_integer([:positive])}",
+      model: model.model || "unknown",
+      context: %Context{messages: []},
+      message: nil,
+      stream?: true,
+      stream: chunk_stream,
+      usage: %{input_tokens: 0, output_tokens: 0, total_tokens: 0},
+      finish_reason: nil,
+      provider_meta: %{}
+    }
+
+    {:ok, response}
+  end
+
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :groq} = model)
       when is_map(data) do
     try do
@@ -35,31 +61,47 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Groq.Response do
     end
   end
 
-  def decode_response(
-        %{payload: stream} = _wrapped_response,
-        %Model{provider: :groq} = model
-      )
-      when is_struct(stream, Stream) do
-    response = %Response{
-      id: "streaming-response",
-      model: model.model || "unknown",
-      context: %Context{messages: []},
-      message: nil,
-      stream?: true,
-      stream: stream,
-      usage: %{input_tokens: 0, output_tokens: 0, total_tokens: 0},
-      finish_reason: nil,
-      provider_meta: %{}
-    }
-
-    {:ok, response}
-  end
-
   def decode_response(_wrapped_response, _model) do
     {:error, :unsupported_provider}
   end
 
   def encode_request(_), do: {:error, :not_implemented}
+
+  # SSE Event decoding for streaming responses (Groq uses OpenAI-compatible format)
+  defp decode_sse_event(%{event: "completion", data: %{"choices" => [%{"delta" => delta} | _]}}) do
+    decode_groq_delta(delta)
+  end
+
+  defp decode_sse_event(%{data: %{"choices" => [%{"delta" => delta} | _]}}) do
+    decode_groq_delta(delta)
+  end
+
+  defp decode_sse_event(_event), do: []
+
+  defp decode_groq_delta(%{"content" => content}) when is_binary(content) and content != "" do
+    [StreamChunk.text(content)]
+  end
+
+  defp decode_groq_delta(%{"tool_calls" => tool_calls}) when is_list(tool_calls) do
+    tool_calls
+    |> Enum.map(&decode_tool_call_delta/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp decode_groq_delta(_), do: []
+
+  defp decode_tool_call_delta(%{
+         "id" => id,
+         "type" => "function",
+         "function" => %{"name" => name, "arguments" => args_json}
+       }) do
+    case Jason.decode(args_json || "{}") do
+      {:ok, args} -> StreamChunk.tool_call(name, args, %{id: id})
+      {:error, _} -> nil
+    end
+  end
+
+  defp decode_tool_call_delta(_), do: nil
 end
 
 defmodule ReqLLM.Providers.Groq.ResponseDecoder do

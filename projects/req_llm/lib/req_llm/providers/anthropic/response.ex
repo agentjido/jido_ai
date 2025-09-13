@@ -21,6 +21,32 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
   @doc """
   Decode wrapped Anthropic response struct with model information.
   """
+  def decode_response(
+        %{payload: stream} = _wrapped_response,
+        %Model{provider: :anthropic} = model
+      )
+      when is_struct(stream, Stream) do
+    # Convert SSE events to StreamChunks
+    chunk_stream =
+      stream
+      |> Stream.flat_map(&decode_sse_event/1)
+      |> Stream.reject(&is_nil/1)
+
+    response = %Response{
+      id: "stream-#{System.unique_integer([:positive])}",
+      model: model.model || "unknown",
+      context: %Context{messages: []},
+      message: nil,
+      stream?: true,
+      stream: chunk_stream,
+      usage: %{input_tokens: 0, output_tokens: 0, total_tokens: 0},
+      finish_reason: nil,
+      provider_meta: %{}
+    }
+
+    {:ok, response}
+  end
+
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :anthropic} = model)
       when is_map(data) do
     try do
@@ -40,31 +66,29 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
     end
   end
 
-  def decode_response(
-        %{payload: stream} = _wrapped_response,
-        %Model{provider: :anthropic} = model
-      )
-      when is_struct(stream, Stream) do
-    response = %Response{
-      id: "streaming-response",
-      model: model.model || "unknown",
-      context: %Context{messages: []},
-      message: nil,
-      stream?: true,
-      stream: stream,
-      usage: %{input_tokens: 0, output_tokens: 0, total_tokens: 0},
-      finish_reason: nil,
-      provider_meta: %{}
-    }
-
-    {:ok, response}
-  end
-
   def decode_response(_wrapped_response, _model) do
     {:error, :unsupported_provider}
   end
 
   def encode_request(_), do: {:error, :not_implemented}
+
+  # SSE Event decoding for streaming responses
+  defp decode_sse_event(%{event: "content_block_delta", data: %{"delta" => %{"text" => text}}}) do
+    [StreamChunk.text(text)]
+  end
+
+  defp decode_sse_event(%{event: "thinking_block_delta", data: %{"delta" => %{"text" => text}}}) do
+    [StreamChunk.thinking(text)]
+  end
+
+  defp decode_sse_event(%{
+         event: "tool_use_delta",
+         data: %{"delta" => %{"type" => "tool_call", "name" => name, "input" => input}}
+       }) do
+    [StreamChunk.tool_call(name, input)]
+  end
+
+  defp decode_sse_event(_event), do: []
 end
 
 # Protocol implementation for direct Map decoding (zero-ceremony API)

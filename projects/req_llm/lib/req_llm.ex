@@ -280,6 +280,119 @@ defmodule ReqLLM do
   """
   defdelegate stream_text!(model_spec, messages, opts \\ []), to: Generation
 
+  @doc """
+  Generates structured data using an AI model with schema validation.
+
+  Equivalent to Vercel AI SDK's `generateObject()` function, this method
+  generates structured data according to a provided schema and validates
+  the output against that schema.
+
+  ## Parameters
+
+    * `model_spec` - Model specification in various formats
+    * `messages` - Text prompt or list of messages
+    * `schema` - Schema definition for structured output
+    * `opts` - Additional options (keyword list)
+
+  ## Options
+
+    * `:output` - Output type: `:object`, `:array`, `:enum`, or `:no_schema`
+    * `:mode` - Generation mode: `:auto`, `:json`, or `:tool`
+    * `:schema_name` - Optional name for the schema
+    * `:schema_description` - Optional description for the schema
+    * `:enum` - List of possible values (for enum output)
+    * `:temperature` - Control randomness in responses (0.0 to 2.0)
+    * `:max_tokens` - Limit the length of the response
+    * `:provider_options` - Provider-specific options
+
+  ## Examples
+
+      # Generate a structured object
+      schema = [
+        name: [type: :string, required: true],
+        age: [type: :pos_integer, required: true]
+      ]
+      {:ok, object} = ReqLLM.generate_object("anthropic:claude-3-sonnet", "Generate a person", schema)
+      #=> {:ok, %{name: "John Doe", age: 30}}
+
+      # Generate an array of objects
+      {:ok, objects} = ReqLLM.generate_object(
+        "anthropic:claude-3-sonnet",
+        "Generate 3 heroes",
+        schema,
+        output: :array
+      )
+
+  """
+  defdelegate generate_object(model_spec, messages, schema, opts \\ []), to: Generation
+
+  @doc """
+  Generates structured data using an AI model, returning only the object content.
+
+  This is a convenience function that extracts just the object from the response.
+  For access to usage metadata and other response data, use `generate_object/4`.
+
+  ## Parameters
+
+  Same as `generate_object/4`.
+
+  ## Examples
+
+      {:ok, object} = ReqLLM.generate_object!("anthropic:claude-3-sonnet", "Generate a person", schema)
+      object
+      #=> %{name: "John Doe", age: 30}
+
+  """
+  defdelegate generate_object!(model_spec, messages, schema, opts \\ []), to: Generation
+
+  @doc """
+  Streams structured data generation using an AI model with schema validation.
+
+  Equivalent to Vercel AI SDK's `streamObject()` function, this method
+  streams structured data generation according to a provided schema.
+
+  ## Parameters
+
+    * `model_spec` - Model specification in various formats
+    * `messages` - Text prompt or list of messages
+    * `schema` - Schema definition for structured output
+    * `opts` - Additional options (keyword list)
+
+  ## Options
+
+    Same as `generate_object/4`.
+
+  ## Examples
+
+      # Stream structured object generation
+      schema = [
+        name: [type: :string, required: true],
+        description: [type: :string, required: true]
+      ]
+      {:ok, stream} = ReqLLM.stream_object("anthropic:claude-3-sonnet", "Generate a character", schema)
+      stream |> Enum.each(&IO.inspect/1)
+
+  """
+  defdelegate stream_object(model_spec, messages, schema, opts \\ []), to: Generation
+
+  @doc """
+  Streams structured data generation using an AI model, returning only the stream.
+
+  This is a convenience function that extracts just the stream from the response.
+  For access to usage metadata and other response data, use `stream_object/4`.
+
+  ## Parameters
+
+  Same as `stream_object/4`.
+
+  ## Examples
+
+      {:ok, stream} = ReqLLM.stream_object!("anthropic:claude-3-sonnet", "Generate a character", schema)
+      stream |> Enum.each(&IO.inspect/1)
+
+  """
+  defdelegate stream_object!(model_spec, messages, schema, opts \\ []), to: Generation
+
   # ===========================================================================
   # Embedding API - Delegated to ReqLLM.Embedding
   # ===========================================================================

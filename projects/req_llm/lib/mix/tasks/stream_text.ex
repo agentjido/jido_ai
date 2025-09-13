@@ -101,10 +101,10 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
           end
         end
 
-         # Debug output for empty responses
-         if length(chunks) == 0 and not quiet do
-           IO.puts("⚠️ No chunks received from stream")
-         end
+        # Debug output for empty responses
+        if length(chunks) == 0 and not quiet do
+          IO.puts("⚠️ No chunks received from stream")
+        end
 
         if !quiet, do: IO.puts("")
 

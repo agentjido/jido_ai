@@ -21,6 +21,32 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Google.Response do
   @doc """
   Decode wrapped Google response struct with model information.
   """
+  def decode_response(
+        %{payload: stream} = _wrapped_response,
+        %Model{provider: :google} = model
+      )
+      when is_struct(stream, Stream) do
+    # Convert SSE events to StreamChunks
+    chunk_stream =
+      stream
+      |> Stream.flat_map(&decode_sse_event/1)
+      |> Stream.reject(&is_nil/1)
+
+    response = %Response{
+      id: "stream-#{System.unique_integer([:positive])}",
+      model: model.model || "unknown",
+      context: %Context{messages: []},
+      message: nil,
+      stream?: true,
+      stream: chunk_stream,
+      usage: %{input_tokens: 0, output_tokens: 0, total_tokens: 0},
+      finish_reason: nil,
+      provider_meta: %{}
+    }
+
+    {:ok, response}
+  end
+
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :google} = model)
       when is_map(data) do
     try do
@@ -40,31 +66,30 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Google.Response do
     end
   end
 
-  def decode_response(
-        %{payload: stream} = _wrapped_response,
-        %Model{provider: :google} = model
-      )
-      when is_struct(stream, Stream) do
-    response = %Response{
-      id: "streaming-response",
-      model: model.model || "unknown",
-      context: %Context{messages: []},
-      message: nil,
-      stream?: true,
-      stream: stream,
-      usage: %{input_tokens: 0, output_tokens: 0, total_tokens: 0},
-      finish_reason: nil,
-      provider_meta: %{}
-    }
-
-    {:ok, response}
-  end
-
   def decode_response(_wrapped_response, _model) do
     {:error, :unsupported_provider}
   end
 
   def encode_request(_), do: {:error, :not_implemented}
+
+  # SSE Event decoding for streaming responses
+  defp decode_sse_event(%{data: %{"candidates" => [%{"content" => %{"parts" => parts}} | _]}}) do
+    parts
+    |> Enum.flat_map(&decode_google_part/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp decode_sse_event(_event), do: []
+
+  defp decode_google_part(%{"text" => text}) when is_binary(text) and text != "" do
+    [StreamChunk.text(text)]
+  end
+
+  defp decode_google_part(%{"functionCall" => %{"name" => name, "args" => args}}) do
+    [StreamChunk.tool_call(name, args)]
+  end
+
+  defp decode_google_part(_), do: []
 end
 
 # Note: Map protocol implementation is handled in anthropic/response.ex to avoid conflicts

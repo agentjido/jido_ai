@@ -248,12 +248,12 @@ defmodule ReqLLM.Providers.Anthropic do
     body =
       %{
         model: request.options[:model] || request.options[:id],
-        temperature: request.options[:temperature],
-        max_tokens: request.options[:max_tokens],
         stream: request.options[:stream]
       }
       |> Map.merge(context_data)
       |> Map.merge(tools_data)
+      |> maybe_put(:temperature, request.options[:temperature])
+      |> maybe_put(:max_tokens, request.options[:max_tokens])
       |> maybe_put(:system, request.options[:system])
       |> maybe_put(:top_p, request.options[:top_p])
       |> maybe_put(:top_k, request.options[:top_k])

@@ -25,7 +25,7 @@ defmodule ReqLLM.ProviderTest.ToolCalling do
 
       # TODO: Implement tool calling test macros
       # Will include tests for generate_object/4, tool schemas, etc.
-      
+
       # Example tests that could be implemented:
       #
       # test "basic tool calling" do
