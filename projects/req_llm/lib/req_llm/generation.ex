@@ -171,14 +171,13 @@ defmodule ReqLLM.Generation do
   def generate_text(model_spec, messages, opts \\ []) do
     with {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         schema <- dynamic_schema(provider_module),
+         schema = dynamic_schema(provider_module),
          {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
-         context <- build_context(messages, validated_opts),
+         context = build_context(messages, validated_opts),
          {:ok, configured_request} <-
            provider_module.prepare_request(:chat, model, context, validated_opts),
-         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request),
-         {:ok, response} <- Response.decode_response(decoded_response, model) do
-      {:ok, response}
+         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
+      Response.decode_response(decoded_response, model)
     end
   end
 
@@ -239,15 +238,14 @@ defmodule ReqLLM.Generation do
   def stream_text(model_spec, messages, opts \\ []) do
     with {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         schema <- dynamic_schema(provider_module),
+         schema = dynamic_schema(provider_module),
          {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
          stream_opts = Keyword.put(validated_opts, :stream, true),
-         context <- build_context(messages, stream_opts),
+         context = build_context(messages, stream_opts),
          {:ok, configured_request} <-
            provider_module.prepare_request(:chat, model, context, stream_opts),
-         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request),
-         {:ok, response} <- Response.decode_response(decoded_response, model) do
-      {:ok, response}
+         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
+      Response.decode_response(decoded_response, model)
     end
   end
 

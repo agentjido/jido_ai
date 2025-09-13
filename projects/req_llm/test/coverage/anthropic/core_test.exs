@@ -13,9 +13,10 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
     provider: :anthropic,
     model: "anthropic:claude-3-haiku-20240307"
 
+  import ReqLLM.Test.LiveFixture
+
   # Anthropic-specific tests
-  alias ReqLLM.Test.LiveFixture, as: ReqFixture
-  import ReqFixture
+  # alias ReqLLM.Test.LiveFixture, as: ReqFixture
 
   test "temperature and sampling parameters" do
     result =

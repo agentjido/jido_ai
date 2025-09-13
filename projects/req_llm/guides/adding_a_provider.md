@@ -1,16 +1,27 @@
 # Adding a new provider to **ReqLLM**
 
-_Rev. 2024-06 – compatible with the Anthropic/Gemini v2 architecture_
+_Rev. 2025-01 – ReqLLM 1.0.0-rc.1_
 
-This guide shows how to write and test a **first-class provider** (e.g. OpenAI, Gemini) for ReqLLM.  
+## Developer checklist
 
-* the `prepare_request/4` callback,
-* protocol–based context/response encoding,
-* a declarative DSL for registration & option validation,
-* first-class error structs (aka *Splode* errors), and
-* a Live-Fixture powered test strategy.
+- [ ] `lib/req_llm/providers/<provider>.ex` with behaviour + DSL + prepare_request/4  
+- [ ] `lib/req_llm/providers/<provider>/context.ex` implementing `ReqLLM.Context.Codec`  
+- [ ] `lib/req_llm/providers/<provider>/response.ex` implementing `ReqLLM.Response.Codec`  
+- [ ] `priv/models_dev/<provider>.json` capability metadata  
+- [ ] Unit tests for encode/decode helpers  
+- [ ] Coverage tests + fixtures under `test/coverage/<provider>/`  
+- [ ] Run `LIVE=true mix test --only coverage --only <provider>` for first recording  
+- [ ] CI must pass unit + fixture layers  
 
-Follow the steps below; a checklist is at the end.
+## Overview
+
+This guide shows how to write a **first-class provider** for ReqLLM using:
+
+* The `prepare_request/4` callback
+* Protocol-based context/response encoding
+* Declarative DSL for registration & option validation
+* Structured error handling with Splode errors
+* Capability-based testing with LiveFixture
 
 ---
 
@@ -37,11 +48,7 @@ defmodule ReqLLM.Providers.MyProvider do
     response_wrapper: ReqLLM.Providers.MyProvider.Response,
     default_env_key: "MY_PROVIDER_API_KEY",
     provider_schema: [                # ❸ validated request options
-      temperature: [type: :float, default: 0.7],
-      max_tokens: [type: :pos_integer, default: 1024],
-      stream:      [type: :boolean,   default: false],
-      system:      [type: :string],
-      tools:       [type: {:list, :map}]
+    # Provider-specific options only - core options handled centrally
     ]
 
   @doc """
@@ -68,28 +75,47 @@ defmodule ReqLLM.Providers.MyProvider do
 
   @doc "Low-level Req attachment – installs headers, validation, steps."
   @impl ReqLLM.Provider
-  def attach(%Req.Request{} = req, model_input, user_opts \\ []) do
-    model = ReqLLM.Model.from!(model_input)
-    ensure_correct_provider!(model)
+  def attach(%Req.Request{} = request, model_input, user_opts \\ []) do
+    %ReqLLM.Model{} = model = ReqLLM.Model.from!(model_input)
 
-    api_key = fetch_api_key!()
+    # Validate provider match
+    unless model.provider == provider_id() do
+      raise ReqLLM.Error.Invalid.Provider.exception(provider: model.provider)
+    end
 
-    # -- 1. separate tools before validation
+    # Validate model exists in registry
+    unless ReqLLM.Provider.Registry.model_exists?("#{provider_id()}:#{model.model}") do
+      raise ReqLLM.Error.Invalid.Parameter.exception(parameter: "model: #{model.model}")
+    end
+
+    # Get API key from JidoKeys
+    api_key_env = ReqLLM.Provider.Registry.get_env_key(provider_id())
+    api_key = JidoKeys.get(api_key_env)
+
+    unless api_key && api_key != "" do
+      raise ReqLLM.Error.Invalid.Parameter.exception(
+              parameter: "api_key (set via JidoKeys.put(#{inspect(api_key_env)}, key))"
+            )
+    end
+
+    # Extract tools separately to avoid validation issues
     {tools, other_opts} = Keyword.pop(user_opts, :tools, [])
 
-    # -- 2. validate / coerce options via provider_schema
-    opts = prepare_options!(__MODULE__, model, other_opts) |> Keyword.put(:tools, tools)
+    # Prepare validated options
+    opts = prepare_options!(__MODULE__, model, other_opts)
+    opts = Keyword.put(opts, :tools, tools)
+    base_url = Keyword.get(user_opts, :base_url, default_base_url())
+    req_keys = __MODULE__.supported_provider_options() ++ [:model, :context]
 
-    # -- 3. install into Req pipeline
-    req
-    |> Req.Request.register_options(__MODULE__.supported_provider_options() ++ [:model, :context])
-    |> Req.Request.merge_options(Keyword.take(opts, [:stream, :model, :context]) ++
-                                 [base_url: Keyword.get(user_opts, :base_url, default_base_url())])
+    # Build Req pipeline
+    request
+    |> Req.Request.register_options(req_keys)
+    |> Req.Request.merge_options(Keyword.take(opts, req_keys) ++ [base_url: base_url])
     |> Req.Request.put_header("authorization", "Bearer #{api_key}")
     |> ReqLLM.Step.Error.attach()
-    |> Req.Request.append_request_steps(llm_encode_body: &encode_body/1)
+    |> Req.Request.append_request_steps(llm_encode_body: &__MODULE__.encode_body/1)
     |> ReqLLM.Step.Stream.maybe_attach(opts[:stream])
-    |> Req.Request.append_response_steps(llm_decode_response: &decode_response/1)
+    |> Req.Request.append_response_steps(llm_decode_response: &__MODULE__.decode_response/1)
     |> ReqLLM.Step.Usage.attach(model)
   end
 
@@ -116,24 +142,23 @@ defmodule ReqLLM.Providers.MyProvider do
 
   # -- Req step: response decoding -------------------------------------------
   @impl ReqLLM.Provider
-  def decode_response({req, %{status: 200} = resp}) do
-    parsed =
-      resp.body
-      |> ensure_parsed_body()
-      |> ReqLLM.Response.Codec.decode_response(req.options[:model])
-
-    {req, parsed}
-  end
-
   def decode_response({req, resp}) do
-    err =
-      ReqLLM.Error.API.Response.exception(
-        status: resp.status,
-        reason: "MyProvider API error",
-        response_body: resp.body
-      )
+    case resp.status do
+      200 ->
+        body = ensure_parsed_body(resp.body)
+        # Return raw parsed data directly - no wrapping needed
+        {req, %{resp | body: body}}
 
-    {req, err}
+      status ->
+        err =
+          ReqLLM.Error.API.Response.exception(
+            reason: "MyProvider API error",
+            status: status,
+            response_body: resp.body
+          )
+
+        {req, err}
+    end
   end
 
   # -- Usage extraction (optional) -------------------------------------------
@@ -155,50 +180,28 @@ defmodule ReqLLM.Providers.MyProvider do
 
   defp context_payload(_), do: %{}
 
-  defp ensure_correct_provider!(%ReqLLM.Model{provider: ^provider_id?()}), do: :ok
-  defp ensure_correct_provider!(_),
-    do: raise ReqLLM.Error.Invalid.Provider.exception(provider: :mismatch)
 
-  defp fetch_api_key! do
-    key = JidoKeys.get(default_env_key())
-    if key in [nil, ""], do: raise(ReqLLM.Error.Invalid.Parameter,
-                                   parameter: "API key '#{default_env_key()}' not set")
-    key
-  end
 end
 ```
 
-### Key changes vs. the legacy guide
+### Key changes in ReqLLM 1.0.0-rc.1
 
-1. **`prepare_request/4`**  
-   *Entry-point invoked by high-level helpers (`generate_text/4`, etc.).*  
-   Returns `{:ok, %Req.Request{}}` **already wired** with all steps.
+1. **Provider validation**  
+   Use `model.provider == provider_id()` instead of `ensure_correct_provider!()`.
+   DSL generates `provider_id/0` helper automatically.
 
-2. **Context & Response protocols** (`ReqLLM.Context.Codec`, `ReqLLM.Response.Codec`)  
-   Provide **pluggable wire-format translation**.  
-   *Context* handles outbound encoding and inbound partial chunk decoding;  
-   *Response* turns the final provider JSON (or stream) into a typed
-   `ReqLLM.Response` struct.
+2. **Model registry**  
+   Validate models via `ReqLLM.Provider.Registry.model_exists?/1`.
 
-3. **`use ReqLLM.Provider.DSL`**  
-   • Registers the provider under a stable atom (`:my_provider`).  
-   • Generates helpers (`provider_id/0`, `default_base_url/0`, …).  
-   • Bakes option validation (`provider_schema:`) through NimbleOptions.  
-   • Lets you specify custom `context_wrapper` & `response_wrapper` structs.
+3. **API key handling**  
+   Use `JidoKeys.get/1` with registry-provided env key instead of direct env access.
 
-4. **Splode errors** (`ReqLLM.Error.*`)  
-   Never return raw tuples.  
-   Raise `ReqLLM.Error.Invalid.Parameter`, `ReqLLM.Error.API.Response`, …  
-   The `ReqLLM.Step.Error` pipeline step catches and converts them to `{:error, error}`.
+4. **Core options centralized**  
+   `provider_schema` now only for provider-specific options.
+   Temperature, max_tokens, system, stream handled centrally.
 
-5. **`ReqLLM.Schema`** – tool definitions  
-   A single authority to turn NimbleOptions schemas ↔ JSON-Schema.  
-   Implement a helper (`to_my_provider_format/1`) if your API's shape diverges.
-
-6. **Streaming**  
-   Plug `ReqLLM.Step.Stream.maybe_attach/2`; it installs SSE parsing and dispatches
-   chunks through Context-codec logic.  
-   The Response codec receives an actual `Stream.t()` when `stream?: true`.
+5. **Response decoding simplified**  
+   Return `{req, %{resp | body: parsed_body}}` directly - no wrapper struct needed.
 
 ---
 
@@ -304,15 +307,25 @@ Start with **text only**; add images, tool calls, thinking tokens later.
 }
 ```
 
-New flags → add mapping in `ReqLLM.Capability.from_json/1`.
+New flags → add mapping in the provider's capability metadata.
 
 ---
 
-## 4. Testing with **LiveFixture**
+## 4. Capability testing
+
+Create provider-specific tests under `test/coverage/<provider>/`. 
+See [capability-testing.md](capability-testing.md) for comprehensive testing guide.
+
+Basic structure:
 
 ```
-test/coverage/my_provider/core_test.exs
+test/coverage/my_provider/
+├── core_test.exs         # Text generation
+├── streaming_test.exs    # Streaming responses  
+└── tool_calling_test.exs # Function calling
 ```
+
+Example:
 
 ```elixir
 defmodule ReqLLM.Coverage.MyProvider.CoreTest do
@@ -323,50 +336,37 @@ defmodule ReqLLM.Coverage.MyProvider.CoreTest do
   alias ReqLLM.Test.LiveFixture
   @model "my_provider:small-1"
 
-  test "simple completion" do
-    result =
-      LiveFixture.use_fixture(:my_provider, "simple_completion", fn ->
-        ctx = ReqLLM.Context.new([ReqLLM.Context.user("ping?")])
-        ReqLLM.generate_text(@model, ctx, max_tokens: 3, temperature: 0)
+  test "basic completion" do
+    {:ok, resp} =
+      LiveFixture.use_fixture(:my_provider, "basic_completion", fn ->
+        ReqLLM.generate_text(@model, "Hello!", max_tokens: 10, temperature: 0)
       end)
 
-    {:ok, resp} = result
-    assert resp.message.content |> Enum.at(0) |> Map.get(:text) =~ "pong"
+    assert is_binary(resp.message.content)
   end
 end
 ```
 
-Run:
+Commands:
 
-```
-mix test --exclude coverage          # unit only
-mix test --only coverage             # fixture layer (offline)
-LIVE=true mix test --only coverage   # re-record fixtures (paid API)
+```bash
+mix test --only my_provider                    # Provider tests only
+LIVE=true mix test --only my_provider          # Record fixtures
+FIXTURE_FILTER=my_provider mix test            # Regenerate specific provider
 ```
 
 ---
 
 ## 5. Best practices
 
-1. Keep `prepare_request/4` tiny – put heavy logic in private helpers.  
-2. **No global state**; the provider struct merely wraps `ReqLLM.Context`.  
-3. All added fields in `encode_request/1` **must** be reversed in `decode_response/1`.  
-4. Raise `ReqLLM.Error.*` from helpers; never leak `{:error, term}` tuples.  
-5. Guard against missing API keys with `fetch_api_key!`.  
-6. Use the cheapest model for fixtures; deterministic prompts (`temperature: 0`).  
-7. Document quirks in `@moduledoc`.
+* Keep `prepare_request/4` minimal - delegate to `attach/3`
+* Use `provider_id()` helper for validation, not hardcoded atoms
+* Provider schema only for provider-specific options 
+* Use `JidoKeys` for API key management
+* Return raw parsed response body from `decode_response/1`
+* Test with cheapest model using `temperature: 0` for deterministic fixtures
+* Start with text-only support, add multimodal features incrementally
 
 ---
 
-## 6. Developer checklist
-
-- [ ] `lib/req_llm/providers/<provider>.ex` with behaviour + DSL + prepare_request/4  
-- [ ] `lib/req_llm/providers/<provider>/context.ex` implementing `ReqLLM.Context.Codec`  
-- [ ] `lib/req_llm/providers/<provider>/response.ex` implementing `ReqLLM.Response.Codec`  
-- [ ] `priv/models_dev/<provider>.json` capability map  
-- [ ] Unit tests for encode/decode helpers  
-- [ ] Coverage tests + fixtures under `test/coverage/<provider>/`  
-- [ ] Run `LIVE=true mix test --only coverage --only <provider>` for first recording  
-- [ ] CI must pass unit + fixture layers  
-
-Welcome to the ReqLLM ecosystem – happy hacking!  
+Welcome to ReqLLM 1.0!  

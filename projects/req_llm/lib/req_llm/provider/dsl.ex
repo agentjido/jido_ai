@@ -136,11 +136,11 @@ defmodule ReqLLM.Provider.DSL do
     context_wrapper = Keyword.get(opts, :context_wrapper)
     response_wrapper = Keyword.get(opts, :response_wrapper)
 
-    unless is_atom(id) do
+    if !is_atom(id) do
       raise ArgumentError, "Provider :id must be an atom, got: #{inspect(id)}"
     end
 
-    unless is_binary(base_url) do
+    if !is_binary(base_url) do
       raise ArgumentError, "Provider :base_url must be a string, got: #{inspect(base_url)}"
     end
 
@@ -248,13 +248,11 @@ defmodule ReqLLM.Provider.DSL do
           quote do
             # 1. Avoid double wrapping (can happen in tests)
             @doc false
-            def wrap_response(%unquote(response_wrapper){} = already_wrapped),
-              do: already_wrapped
+            def wrap_response(%unquote(response_wrapper){} = already_wrapped), do: already_wrapped
 
             # 2. Wrap everything (including streams) in provider-specific struct
             @doc false
-            def wrap_response(data),
-              do: struct!(unquote(response_wrapper), payload: data)
+            def wrap_response(data), do: struct!(unquote(response_wrapper), payload: data)
           end
         end
       )
@@ -326,7 +324,7 @@ defmodule ReqLLM.Provider.DSL do
   # Helper to recursively convert string keys to atoms (for known keys only)
   defp atomize_keys(data) when is_map(data) do
     data
-    |> Enum.map(fn
+    |> Map.new(fn
       {"models", value} -> {:models, atomize_keys(value)}
       {"capabilities", value} -> {:capabilities, value}
       {"pricing", value} -> {:pricing, atomize_keys(value)}
@@ -336,7 +334,6 @@ defmodule ReqLLM.Provider.DSL do
       {"output", value} -> {:output, value}
       {key, value} -> {key, atomize_keys(value)}
     end)
-    |> Map.new()
   end
 
   defp atomize_keys(data) when is_list(data) do

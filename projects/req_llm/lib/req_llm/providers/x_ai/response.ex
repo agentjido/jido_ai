@@ -20,10 +20,7 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.XAI.Response do
   @doc """
   Decode wrapped xAI response struct with model information.
   """
-  def decode_response(
-        %{payload: stream} = _wrapped_response,
-        %Model{provider: :xai} = model
-      )
+  def decode_response(%{payload: stream} = _wrapped_response, %Model{provider: :xai} = model)
       when is_struct(stream, Stream) do
     # Convert SSE events to StreamChunks
     chunk_stream =
@@ -48,17 +45,15 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.XAI.Response do
 
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :xai} = model)
       when is_map(data) do
-    try do
-      result =
-        ReqLLM.Providers.XAI.ResponseDecoder.decode_xai_json(
-          data,
-          model.model || "unknown"
-        )
+    result =
+      ReqLLM.Providers.XAI.ResponseDecoder.decode_xai_json(
+        data,
+        model.model || "unknown"
+      )
 
-      result
-    rescue
-      error -> {:error, error}
-    end
+    result
+  rescue
+    error -> {:error, error}
   end
 
   def decode_response(_wrapped_response, _model) do
@@ -184,8 +179,6 @@ defmodule ReqLLM.Providers.XAI.ResponseDecoder do
             content: content_parts,
             metadata: %{}
           }
-        else
-          nil
         end
     end
   end
@@ -210,8 +203,7 @@ defmodule ReqLLM.Providers.XAI.ResponseDecoder do
 
   def chunk_to_content_part(_), do: nil
 
-  defp decode_xai_message(%{"content" => content})
-       when is_binary(content) and content != "" do
+  defp decode_xai_message(%{"content" => content}) when is_binary(content) and content != "" do
     [ReqLLM.StreamChunk.text(content)]
   end
 
@@ -254,8 +246,7 @@ defmodule ReqLLM.Providers.XAI.ResponseDecoder do
 
   defp decode_xai_message(_), do: []
 
-  defp decode_xai_delta(%{"content" => content})
-       when is_binary(content) and content != "" do
+  defp decode_xai_delta(%{"content" => content}) when is_binary(content) and content != "" do
     [ReqLLM.StreamChunk.text(content)]
   end
 
@@ -294,11 +285,8 @@ defmodule ReqLLM.Providers.XAI.ResponseDecoder do
 
   # xAI uses OpenAI-compatible usage format with possible extensions
   def parse_usage(
-        %{
-          "prompt_tokens" => input,
-          "completion_tokens" => output,
-          "total_tokens" => total
-        } = usage
+        %{"prompt_tokens" => input, "completion_tokens" => output, "total_tokens" => total} =
+          usage
       ) do
     base_usage = %{
       input_tokens: input,
@@ -315,11 +303,7 @@ defmodule ReqLLM.Providers.XAI.ResponseDecoder do
 
   # Handle already-converted format (from fixtures)
   def parse_usage(
-        %{
-          "input_tokens" => input,
-          "output_tokens" => output,
-          "total_tokens" => total
-        } = usage
+        %{"input_tokens" => input, "output_tokens" => output, "total_tokens" => total} = usage
       ) do
     base_usage = %{
       input_tokens: input,

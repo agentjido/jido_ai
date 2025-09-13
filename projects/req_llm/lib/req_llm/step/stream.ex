@@ -77,9 +77,8 @@ defmodule ReqLLM.Step.Stream do
   def handle({req, resp} = pair) do
     content_type =
       case Req.Response.get_header(resp, "content-type") do
-        [ct | _] -> ct
-        ct when is_binary(ct) -> ct
-        _ -> nil
+        [ct | _] when is_binary(ct) -> ct
+        [] -> nil
       end
 
     if content_type && String.contains?(content_type, "text/event-stream") do

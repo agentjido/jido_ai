@@ -1,5 +1,6 @@
 defmodule ReqLLM.Message.ContentPartTest do
   use ExUnit.Case, async: true
+
   alias ReqLLM.Message.ContentPart
 
   describe "text/1 and text/2" do

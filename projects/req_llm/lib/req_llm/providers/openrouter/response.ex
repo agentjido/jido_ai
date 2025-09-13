@@ -48,17 +48,15 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.OpenRouter.Response do
 
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :openrouter} = model)
       when is_map(data) do
-    try do
-      result =
-        ReqLLM.Providers.OpenRouter.ResponseDecoder.decode_openrouter_json(
-          data,
-          model.model || "unknown"
-        )
+    result =
+      ReqLLM.Providers.OpenRouter.ResponseDecoder.decode_openrouter_json(
+        data,
+        model.model || "unknown"
+      )
 
-      result
-    rescue
-      error -> {:error, error}
-    end
+    result
+  rescue
+    error -> {:error, error}
   end
 
   def decode_response(_wrapped_response, _model) do
@@ -176,8 +174,6 @@ defmodule ReqLLM.Providers.OpenRouter.ResponseDecoder do
             content: content_parts,
             metadata: %{}
           }
-        else
-          nil
         end
     end
   end

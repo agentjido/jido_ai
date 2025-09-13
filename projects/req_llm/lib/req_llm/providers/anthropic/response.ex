@@ -49,21 +49,19 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
 
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :anthropic} = model)
       when is_map(data) do
-    try do
-      result =
-        ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(
-          data,
-          model.model || "unknown"
-        )
+    result =
+      ReqLLM.Providers.Anthropic.ResponseDecoder.decode_anthropic_json(
+        data,
+        model.model || "unknown"
+      )
 
-      result
-    rescue
-      error ->
-        {:error, error}
-    catch
-      {:decode_error, reason} ->
-        {:error, %ReqLLM.Error.API.Response{reason: reason}}
-    end
+    result
+  rescue
+    error ->
+      {:error, error}
+  catch
+    {:decode_error, reason} ->
+      {:error, %ReqLLM.Error.API.Response{reason: reason}}
   end
 
   def decode_response(_wrapped_response, _model) do
@@ -279,8 +277,6 @@ defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
           }
 
           message
-        else
-          nil
         end
     end
   end

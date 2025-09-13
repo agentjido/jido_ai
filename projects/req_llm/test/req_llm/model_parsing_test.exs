@@ -1,7 +1,9 @@
 defmodule ReqLLM.ModelParsingTest do
   use ExUnit.Case, async: true
-  import ExUnit.CaptureLog
+
   import ExUnit.CaptureIO
+  import ExUnit.CaptureLog
+
   alias ReqLLM.Model
 
   @moduletag timeout: 60_000
@@ -143,7 +145,7 @@ defmodule ReqLLM.ModelParsingTest do
             end
           end
 
-          assert length(models_with_metadata) > 0
+          refute Enum.empty?(models_with_metadata)
         end)
       end)
     end

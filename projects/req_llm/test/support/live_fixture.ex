@@ -22,7 +22,7 @@ defmodule ReqLLM.Test.LiveFixture do
     end
   end
 
-  def live_mode?() do
+  def live_mode? do
     System.get_env("LIVE") in ["1", "true", "TRUE"]
   end
 
@@ -67,7 +67,7 @@ defmodule ReqLLM.Test.LiveFixture do
   defp load_fixture(provider, name) do
     fixture_path = fixture_path(provider, name)
 
-    unless File.exists?(fixture_path) do
+    if !File.exists?(fixture_path) do
       raise "Fixture not found: #{fixture_path}. Run with LIVE=true to capture it."
     end
 

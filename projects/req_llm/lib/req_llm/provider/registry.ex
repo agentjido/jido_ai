@@ -166,30 +166,39 @@ defmodule ReqLLM.Provider.Registry do
   @spec get_model(atom(), String.t()) ::
           {:ok, ReqLLM.Model.t()} | {:error, :provider_not_found | :model_not_found}
   def get_model(provider_id, model_name) when is_atom(provider_id) and is_binary(model_name) do
-    with {:ok, provider_info} <- get_provider_info(provider_id),
-         {:ok, model_metadata} <- find_model_metadata(provider_info, model_name) do
-      # Create enhanced model with structured fields populated from metadata
-      limit = get_in(model_metadata, ["limit"]) |> map_string_keys_to_atoms()
+    case get_provider_info(provider_id) do
+      {:ok, provider_info} ->
+        case find_model_metadata(provider_info, model_name) do
+          {:ok, model_metadata} ->
+            # Create enhanced model with structured fields populated from metadata
+            limit = get_in(model_metadata, ["limit"]) |> map_string_keys_to_atoms()
 
-      modalities =
-        get_in(model_metadata, ["modalities"])
-        |> map_string_keys_to_atoms()
-        |> convert_modality_values()
+            modalities =
+              get_in(model_metadata, ["modalities"])
+              |> map_string_keys_to_atoms()
+              |> convert_modality_values()
 
-      capabilities = build_capabilities_from_metadata(model_metadata)
-      cost = get_in(model_metadata, ["cost"]) |> map_string_keys_to_atoms()
+            capabilities = build_capabilities_from_metadata(model_metadata)
+            cost = get_in(model_metadata, ["cost"]) |> map_string_keys_to_atoms()
 
-      enhanced_model =
-        ReqLLM.Model.new(provider_id, model_name,
-          limit: limit,
-          modalities: modalities,
-          capabilities: capabilities,
-          cost: cost
-        )
+            enhanced_model =
+              ReqLLM.Model.new(provider_id, model_name,
+                limit: limit,
+                modalities: modalities,
+                capabilities: capabilities,
+                cost: cost
+              )
 
-      # Add raw metadata for backward compatibility and additional fields
-      model_with_metadata = Map.put(enhanced_model, :_metadata, model_metadata)
-      {:ok, model_with_metadata}
+            # Add raw metadata for backward compatibility and additional fields
+            model_with_metadata = Map.put(enhanced_model, :_metadata, model_metadata)
+            {:ok, model_with_metadata}
+
+          error ->
+            error
+        end
+
+      error ->
+        error
     end
   end
 
@@ -211,11 +220,14 @@ defmodule ReqLLM.Provider.Registry do
       #=> ** (ArgumentError) Provider not found: unknown
 
   """
-  @spec get_model!(String.t()) :: ReqLLM.Model.t()
+  @dialyzer {:nowarn_function, get_model!: 1}
+  @spec get_model!(String.t()) :: ReqLLM.Model.t() | no_return()
   def get_model!(model_spec) when is_binary(model_spec) do
     case parse_model_spec(model_spec) do
       {:ok, provider_id, model_name} ->
-        case get_model(provider_id, model_name) do
+        result = get_model(provider_id, model_name)
+
+        case result do
           {:ok, model} ->
             model
 
@@ -224,6 +236,9 @@ defmodule ReqLLM.Provider.Registry do
 
           {:error, :model_not_found} ->
             raise ArgumentError, "Model not found: #{provider_id}:#{model_name}"
+
+          _ ->
+            raise ArgumentError, "Failed to retrieve model: #{provider_id}:#{model_name}"
         end
 
       {:error, reason} ->
@@ -370,7 +385,7 @@ defmodule ReqLLM.Provider.Registry do
       #=> {:error, :not_found}
 
   """
-  @spec list_models(atom()) :: {:ok, [String.t()]} | {:error, :not_found}
+  @spec list_models(atom()) :: {:ok, [String.t()]} | {:error, :provider_not_found}
   def list_models(provider_id) when is_atom(provider_id) do
     case get_provider_info(provider_id) do
       {:ok, %{metadata: %{models: models}}} when is_list(models) ->
@@ -412,6 +427,7 @@ defmodule ReqLLM.Provider.Registry do
 
   """
   @spec model_exists?(String.t()) :: boolean()
+  @dialyzer {:nowarn_function, model_exists?: 1}
   def model_exists?(model_spec) when is_binary(model_spec) do
     case parse_model_spec(model_spec) do
       {:ok, provider_id, model_name} ->
@@ -639,7 +655,7 @@ defmodule ReqLLM.Provider.Registry do
 
   defp convert_modality_values(modalities) when is_map(modalities) do
     modalities
-    |> Enum.map(fn
+    |> Map.new(fn
       {:input, values} when is_list(values) ->
         {:input, Enum.map(values, &String.to_atom/1)}
 
@@ -649,7 +665,6 @@ defmodule ReqLLM.Provider.Registry do
       {key, value} ->
         {key, value}
     end)
-    |> Map.new()
   end
 
   @doc false
@@ -716,7 +731,7 @@ defmodule ReqLLM.Provider.Registry do
   # Helper to recursively convert string keys to atoms (for known keys only)
   defp atomize_json_keys(data) when is_map(data) do
     data
-    |> Enum.map(fn
+    |> Map.new(fn
       {"models", value} -> {:models, atomize_json_keys(value)}
       {"capabilities", value} -> {:capabilities, value}
       {"pricing", value} -> {:pricing, atomize_json_keys(value)}
@@ -726,7 +741,6 @@ defmodule ReqLLM.Provider.Registry do
       {"output", value} -> {:output, value}
       {key, value} -> {key, atomize_json_keys(value)}
     end)
-    |> Map.new()
   end
 
   defp atomize_json_keys(data) when is_list(data) do
@@ -766,9 +780,6 @@ defmodule ReqLLM.Provider.Registry do
           [env_var | _] when is_binary(env_var) -> env_var
           _ -> try_provider_default_env_key(provider_id)
         end
-
-      _ ->
-        try_provider_default_env_key(provider_id)
     end
   end
 
@@ -777,8 +788,6 @@ defmodule ReqLLM.Provider.Registry do
       {:ok, provider_module} ->
         if function_exported?(provider_module, :default_env_key, 0) do
           provider_module.default_env_key()
-        else
-          nil
         end
 
       _ ->

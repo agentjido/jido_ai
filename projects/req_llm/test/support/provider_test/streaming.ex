@@ -16,8 +16,9 @@ defmodule ReqLLM.ProviderTest.Streaming do
     quote bind_quoted: [provider: provider, model: model] do
       use ExUnit.Case, async: false
 
+      import ReqLLM.Test.LiveFixture
+
       alias ReqLLM.Test.LiveFixture, as: ReqFixture
-      import ReqFixture
 
       @moduletag :coverage
       @moduletag provider
@@ -38,7 +39,7 @@ defmodule ReqLLM.ProviderTest.Streaming do
 
             # Basic validations
             assert is_list(chunks)
-            assert length(chunks) > 0
+            refute Enum.empty?(chunks)
 
             # Verify chunks are proper StreamChunk structs
             assert Enum.all?(chunks, fn chunk ->

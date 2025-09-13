@@ -197,8 +197,7 @@ defmodule ReqLLM.Context do
     def inspect(%{messages: msgs}, opts) do
       roles =
         msgs
-        |> Enum.map(& &1.role)
-        |> Enum.join(",")
+        |> Enum.map_join(",", & &1.role)
 
       Inspect.Algebra.concat([
         "#Context<",

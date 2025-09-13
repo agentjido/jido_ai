@@ -69,10 +69,6 @@ defmodule ReqLLM.Capability do
           {:error, :model_not_found} ->
             # Model doesn't exist for this provider
             []
-
-          {:error, _reason} ->
-            # Provider exists but metadata unavailable - fallback to basic capabilities
-            [:max_tokens, :system_prompt, :metadata]
         end
 
       :error ->
@@ -113,9 +109,6 @@ defmodule ReqLLM.Capability do
         model_names
         |> Enum.map(&"#{provider}:#{&1}")
         |> Enum.filter(&supports?(&1, feature))
-
-      {:error, _reason} ->
-        []
     end
   end
 
@@ -181,9 +174,6 @@ defmodule ReqLLM.Capability do
           nil -> {:error, :model_not_found}
           model_metadata -> {:ok, model_metadata}
         end
-
-      {:error, reason} ->
-        {:error, reason}
     end
   end
 end

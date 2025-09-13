@@ -28,9 +28,6 @@ defmodule ReqLLM.Providers.Groq do
 
   @behaviour ReqLLM.Provider
 
-  import ReqLLM.Provider.Utils,
-    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
-
   use ReqLLM.Provider.DSL,
     id: :groq,
     base_url: "https://api.groq.com/openai/v1",
@@ -39,39 +36,39 @@ defmodule ReqLLM.Providers.Groq do
     context_wrapper: ReqLLM.Providers.Groq.Context,
     response_wrapper: ReqLLM.Providers.Groq.Response,
     provider_schema: [
-      # Groq-specific performance and service options
       service_tier: [
         type: {:in, ~w(auto on_demand flex performance)},
         doc: "Performance tier for Groq requests"
       ],
-
-      # Reasoning capabilities
+      # Groq-specific performance and service options
       reasoning_effort: [
         type: {:in, ~w(none default low medium high)},
         doc: "Reasoning effort level"
       ],
+      # Reasoning capabilities
       reasoning_format: [
         type: :string,
         doc: "Format for reasoning output"
       ],
-
-      # Search and compound features
       search_settings: [
         type: :map,
         doc: "Web search configuration with include/exclude domains"
       ],
+      # Search and compound features
       compound_custom: [
         type: :map,
         doc: "Custom configuration for Compound systems"
       ],
-
-      # OpenAI-compatible options that Groq supports
       logit_bias: [
         type: :map,
         doc: "Logit bias adjustments for tokens"
       ]
     ]
 
+  import ReqLLM.Provider.Utils,
+    only: [prepare_options!: 3, maybe_put: 3, ensure_parsed_body: 1]
+
+  # OpenAI-compatible options that Groq supports
   @doc """
   Attaches the Groq plugin to a Req request.
 
@@ -122,14 +119,14 @@ defmodule ReqLLM.Providers.Groq do
   def attach(%Req.Request{} = request, model_input, user_opts \\ []) do
     %ReqLLM.Model{} = model = ReqLLM.Model.from!(model_input)
 
-    unless model.provider == provider_id() do
+    if model.provider != provider_id() do
       raise ReqLLM.Error.Invalid.Provider.exception(provider: model.provider)
     end
 
     api_key_env = ReqLLM.Provider.Registry.get_env_key(:groq)
     api_key = JidoKeys.get(api_key_env)
 
-    unless api_key && api_key != "" do
+    if !(api_key && api_key != "") do
       raise ReqLLM.Error.Invalid.Parameter.exception(
               parameter: "api_key (set via JidoKeys.put(#{inspect(api_key_env)}, key))"
             )
@@ -221,7 +218,7 @@ defmodule ReqLLM.Providers.Groq do
     # Handle tools if provided
     body =
       case request.options[:tools] do
-        tools when is_list(tools) and length(tools) > 0 ->
+        tools when is_list(tools) and (is_list(tools) and tools != []) ->
           body = Map.put(body, :tools, Enum.map(tools, &ReqLLM.Tool.to_schema(&1, :openai)))
 
           # Handle tool_choice if provided

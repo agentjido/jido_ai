@@ -368,29 +368,38 @@ defmodule ReqLLM.Tool do
   end
 
   defp call_callback({module, function}, input) do
-    try do
-      apply(module, function, [input])
-    rescue
-      error ->
-        {:error, "Callback execution failed: #{Exception.message(error)}"}
-    end
+    apply(module, function, [input])
+  rescue
+    error ->
+      {:error, "Callback execution failed: #{Exception.message(error)}"}
   end
 
   defp call_callback({module, function, args}, input) do
-    try do
-      apply(module, function, args ++ [input])
-    rescue
-      error ->
-        {:error, "Callback execution failed: #{Exception.message(error)}"}
-    end
+    apply(module, function, args ++ [input])
+  rescue
+    error ->
+      {:error, "Callback execution failed: #{Exception.message(error)}"}
   end
 
   defp call_callback(fun, input) when is_function(fun, 1) do
-    try do
-      fun.(input)
-    rescue
-      error ->
-        {:error, "Callback execution failed: #{Exception.message(error)}"}
+    fun.(input)
+  rescue
+    error ->
+      {:error, "Callback execution failed: #{Exception.message(error)}"}
+  end
+
+  defimpl Inspect do
+    def inspect(%{name: name, parameter_schema: schema}, opts) do
+      param_count = length(schema)
+      param_desc = if param_count == 0, do: "no params", else: "#{param_count} params"
+
+      Inspect.Algebra.concat([
+        "#Tool<",
+        Inspect.Algebra.to_doc(name, opts),
+        " ",
+        param_desc,
+        ">"
+      ])
     end
   end
 end

@@ -21,10 +21,7 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Google.Response do
   @doc """
   Decode wrapped Google response struct with model information.
   """
-  def decode_response(
-        %{payload: stream} = _wrapped_response,
-        %Model{provider: :google} = model
-      )
+  def decode_response(%{payload: stream} = _wrapped_response, %Model{provider: :google} = model)
       when is_struct(stream, Stream) do
     # Convert SSE events to StreamChunks
     chunk_stream =
@@ -49,21 +46,19 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Google.Response do
 
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :google} = model)
       when is_map(data) do
-    try do
-      result =
-        ReqLLM.Providers.Google.ResponseDecoder.decode_google_json(
-          data,
-          model.model || "unknown"
-        )
+    result =
+      ReqLLM.Providers.Google.ResponseDecoder.decode_google_json(
+        data,
+        model.model || "unknown"
+      )
 
-      result
-    rescue
-      error ->
-        {:error, error}
-    catch
-      {:decode_error, reason} ->
-        {:error, %ReqLLM.Error.API.Response{reason: reason}}
-    end
+    result
+  rescue
+    error ->
+      {:error, error}
+  catch
+    {:decode_error, reason} ->
+      {:error, %ReqLLM.Error.API.Response{reason: reason}}
   end
 
   def decode_response(_wrapped_response, _model) do
@@ -163,8 +158,6 @@ defmodule ReqLLM.Providers.Google.ResponseDecoder do
           }
 
           message
-        else
-          nil
         end
     end
   end

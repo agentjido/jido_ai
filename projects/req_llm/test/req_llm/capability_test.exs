@@ -20,7 +20,7 @@ defmodule ReqLLM.CapabilityTest do
 
       # May have additional capabilities based on models.dev metadata
       assert is_list(capabilities)
-      assert length(capabilities) > 0
+      refute Enum.empty?(capabilities)
     end
 
     test "returns empty list for invalid model spec" do
@@ -61,7 +61,7 @@ defmodule ReqLLM.CapabilityTest do
 
       assert is_list(models)
 
-      if length(models) > 0 do
+      if not Enum.empty?(models) do
         # Should be in model spec format
         first_model = hd(models)
         assert String.contains?(first_model, "anthropic:")
@@ -84,7 +84,7 @@ defmodule ReqLLM.CapabilityTest do
       assert is_list(models)
 
       # If we have anthropic models, they should all support max_tokens
-      if length(models) > 0 do
+      if not Enum.empty?(models) do
         for model <- models do
           assert Capability.supports?(model, :max_tokens)
         end
@@ -107,7 +107,7 @@ defmodule ReqLLM.CapabilityTest do
       # Each returned provider should have models supporting the capability
       for provider <- providers do
         provider_models = Capability.models_for(provider, :max_tokens)
-        assert length(provider_models) > 0
+        refute Enum.empty?(provider_models)
       end
     end
   end

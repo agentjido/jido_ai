@@ -8,6 +8,8 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
   """
   use Mix.Task
 
+  @preferred_cli_env ["req.llm.stream_text": :dev]
+  @spec run([String.t()]) :: :ok
   @impl Mix.Task
   def run(args) do
     Application.ensure_all_started(:req_llm)
@@ -102,7 +104,7 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
         end
 
         # Debug output for empty responses
-        if length(chunks) == 0 and not quiet do
+        if Enum.empty?(chunks) and not quiet do
           IO.puts("⚠️ No chunks received from stream")
         end
 
@@ -113,6 +115,7 @@ defmodule Mix.Tasks.Req.Llm.StreamText do
         end
 
         if !quiet, do: IO.puts("✅ Completed")
+        :ok
 
       {:error, error} ->
         IO.puts("❌ Error: #{inspect(error)}")

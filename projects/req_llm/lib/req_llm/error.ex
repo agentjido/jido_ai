@@ -185,6 +185,62 @@ defmodule ReqLLM.Error do
     end
   end
 
+  defmodule API.SchemaValidation do
+    @moduledoc "Error for when generated objects don't match the expected schema."
+    use Splode.Error,
+      fields: [:message, :errors, :json_path, :value],
+      class: :api
+
+    @spec message(map()) :: String.t()
+    def message(%{message: message}) when is_binary(message) do
+      message
+    end
+
+    def message(%{errors: errors, json_path: json_path})
+        when is_list(errors) and is_binary(json_path) do
+      "Schema validation failed at #{json_path}: #{format_errors(errors)}"
+    end
+
+    def message(%{errors: errors}) when is_list(errors) do
+      "Schema validation failed: #{format_errors(errors)}"
+    end
+
+    def message(_) do
+      "Schema validation failed"
+    end
+
+    defp format_errors(errors) do
+      errors
+      |> Enum.take(3)
+      |> Enum.map_join(", ", &to_string/1)
+    end
+  end
+
+  defmodule API.JSONDecode do
+    @moduledoc "Error for when we can't parse the JSON response."
+    use Splode.Error,
+      fields: [:message, :partial, :raw_response, :position],
+      class: :api
+
+    @spec message(map()) :: String.t()
+    def message(%{message: message}) when is_binary(message) do
+      "JSON decode error: #{message}"
+    end
+
+    def message(%{partial: partial, position: position})
+        when is_binary(partial) and is_integer(position) do
+      "JSON decode error at position #{position}. Partial: #{String.slice(partial, 0, 50)}..."
+    end
+
+    def message(%{partial: partial}) when is_binary(partial) do
+      "JSON decode error. Partial: #{String.slice(partial, 0, 50)}..."
+    end
+
+    def message(_) do
+      "JSON decode error"
+    end
+  end
+
   @doc """
   Creates a validation error with the given tag, reason, and context.
 

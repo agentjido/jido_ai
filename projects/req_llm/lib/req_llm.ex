@@ -580,7 +580,7 @@ defmodule ReqLLM do
       raise ArgumentError, "Embedding vectors must have the same length"
     end
 
-    if length(embedding_a) == 0 do
+    if embedding_a == [] do
       0.0
     else
       dot_product =

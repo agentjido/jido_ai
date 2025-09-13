@@ -20,10 +20,7 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Groq.Response do
   @doc """
   Decode wrapped Groq response struct with model information.
   """
-  def decode_response(
-        %{payload: stream} = _wrapped_response,
-        %Model{provider: :groq} = model
-      )
+  def decode_response(%{payload: stream} = _wrapped_response, %Model{provider: :groq} = model)
       when is_struct(stream, Stream) do
     # Convert SSE events to StreamChunks
     chunk_stream =
@@ -48,17 +45,15 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Groq.Response do
 
   def decode_response(%{payload: data} = _wrapped_response, %Model{provider: :groq} = model)
       when is_map(data) do
-    try do
-      result =
-        ReqLLM.Providers.Groq.ResponseDecoder.decode_groq_json(
-          data,
-          model.model || "unknown"
-        )
+    result =
+      ReqLLM.Providers.Groq.ResponseDecoder.decode_groq_json(
+        data,
+        model.model || "unknown"
+      )
 
-      result
-    rescue
-      error -> {:error, error}
-    end
+    result
+  rescue
+    error -> {:error, error}
   end
 
   def decode_response(_wrapped_response, _model) do
@@ -176,8 +171,6 @@ defmodule ReqLLM.Providers.Groq.ResponseDecoder do
             content: content_parts,
             metadata: %{}
           }
-        else
-          nil
         end
     end
   end
@@ -202,8 +195,7 @@ defmodule ReqLLM.Providers.Groq.ResponseDecoder do
 
   def chunk_to_content_part(_), do: nil
 
-  defp decode_groq_message(%{"content" => content})
-       when is_binary(content) and content != "" do
+  defp decode_groq_message(%{"content" => content}) when is_binary(content) and content != "" do
     [ReqLLM.StreamChunk.text(content)]
   end
 
@@ -222,8 +214,7 @@ defmodule ReqLLM.Providers.Groq.ResponseDecoder do
 
   defp decode_groq_message(_), do: []
 
-  defp decode_groq_delta(%{"content" => content})
-       when is_binary(content) and content != "" do
+  defp decode_groq_delta(%{"content" => content}) when is_binary(content) and content != "" do
     [ReqLLM.StreamChunk.text(content)]
   end
 

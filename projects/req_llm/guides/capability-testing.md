@@ -17,7 +17,7 @@ By default, tests use cached fixtures for fast, reliable testing:
 
 ```bash
 mix test                    # Uses fixtures
-mix test --only anthropic   # Test specific provider with fixtures
+mix test --only openai      # Test specific provider with fixtures
 ```
 
 ### Live Mode
@@ -26,7 +26,7 @@ Set `LIVE=true` to test against real APIs and capture new fixtures:
 
 ```bash
 LIVE=true mix test                    # Run all tests live
-LIVE=true mix test --only anthropic   # Test specific provider live
+LIVE=true mix test --only openai      # Test specific provider live
 LIVE=true mix test --only coverage    # Run coverage tests live
 ```
 
@@ -36,26 +36,34 @@ LIVE=true mix test --only coverage    # Run coverage tests live
 - Overwrite existing fixtures with new responses
 - Require valid API keys for each provider
 
+## Quality & CI
+
+CI runs `mix quality` alias before tests. Locally:
+
+```bash
+mix quality    # or mix q - runs format, compile --warnings-as-errors, dialyzer, credo
+```
+
 ## Test Organization
 
 ### Directory Structure
 
 ```
 test/
-├── coverage/              # Provider capability coverage tests
+├── coverage/                 # Provider capability coverage tests
 │   ├── anthropic/
-│   │   ├── core_test.exs           # Basic generation
-│   │   ├── streaming_test.exs      # Streaming responses
-│   │   ├── tools_test.exs          # Tool calling
-│   │   ├── thinking_tokens_test.exs # Reasoning capabilities
-│   │   └── sampling_parameters_test.exs # Temperature, top-p, etc.
-│   └── openai/            # Similar structure for each provider
+│   │   ├── core_test.exs            # Basic generation
+│   │   ├── streaming_test.exs       # Streaming responses
+│   │   └── tool_calling_test.exs    # Tool calling
+│   └── openai/               # Similar structure for each provider
 ├── support/
-│   ├── fixtures/          # Cached API responses
+│   ├── fixtures/             # Cached API responses
 │   │   ├── anthropic/
 │   │   └── openai/
-│   └── live_fixture.ex    # Test fixture system
-└── req_llm_test.exs      # Core library tests
+│   ├── live_fixture.ex       # Test fixture system
+│   └── provider_test/        # Shared test macros
+├── req_llm/
+└── req_llm_test.exs         # Core library tests
 ```
 
 ### Test Tags
@@ -64,7 +72,7 @@ Tests use ExUnit tags for organization:
 
 ```elixir
 @moduletag :coverage       # Coverage test
-@moduletag :anthropic      # Provider-specific
+@moduletag :openai         # Provider-specific
 @moduletag :streaming      # Feature-specific
 @moduletag :tools          # Capability-specific
 ```
@@ -72,18 +80,37 @@ Tests use ExUnit tags for organization:
 Run specific test groups:
 ```bash
 mix test --only coverage
-mix test --only anthropic
+mix test --only openai
 mix test --only streaming
 ```
 
 ## Writing Capability Tests
 
-### Basic Pattern
+### Using Provider Test Macros
 
-Use the `LiveFixture` module for capability testing:
+ReqLLM uses shared test macros to eliminate duplication while maintaining clear per-provider organization:
 
 ```elixir
 defmodule ReqLLM.Coverage.MyProvider.CoreTest do
+  use ReqLLM.ProviderTest.Core,
+    provider: :my_provider,
+    model: "my_provider:my-model"
+
+  # Provider-specific tests can be added here
+end
+```
+
+Available macros:
+- `ReqLLM.ProviderTest.Core` - Basic text generation
+- `ReqLLM.ProviderTest.Streaming` - Streaming responses  
+- `ReqLLM.ProviderTest.ToolCalling` - Tool/function calling
+
+### Manual Testing with LiveFixture
+
+For custom tests, use the LiveFixture API directly:
+
+```elixir
+defmodule ReqLLM.Coverage.MyProvider.CustomTest do
   use ExUnit.Case, async: false
   
   import ReqLLM.Test.LiveFixture
@@ -100,9 +127,10 @@ defmodule ReqLLM.Coverage.MyProvider.CoreTest do
     end)
     
     {:ok, resp} = result
-    assert is_binary(resp.body)
-    assert resp.body != ""
-    assert resp.status == 200
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
+    assert text != ""
+    assert resp.id != nil
   end
 end
 ```
@@ -123,29 +151,9 @@ test "temperature parameter works as advertised" do
     end)
     
     {:ok, resp} = result
-    assert resp.status == 200
+    assert resp.id != nil
   else
     skip("Model does not advertise temperature support")
-  end
-end
-
-test "provider supports advertised capabilities" do
-  # Get all capabilities from metadata
-  capabilities = ReqLLM.Capability.for(@model)
-  
-  # Test each advertised capability
-  if :tools in capabilities do
-    # Test tool calling functionality
-    use_fixture(:my_provider, "tool_test", fn ->
-      # Tool calling test implementation
-    end)
-  end
-  
-  if :streaming in capabilities do
-    # Test streaming functionality
-    use_fixture(:my_provider, "streaming_test", fn ->
-      # Streaming test implementation
-    end)
   end
 end
 ```
@@ -169,7 +177,7 @@ describe "tool calling capabilities" do
   }
 
   test "basic tool calling" do
-    use_fixture("tool_calling/basic", [], fn ->
+    result = use_fixture(:my_provider, "tool_calling_basic", fn ->
       ctx = ReqLLM.Context.new([
         ReqLLM.Context.user("What's the weather in Paris?")
       ])
@@ -179,11 +187,14 @@ describe "tool calling capabilities" do
         max_tokens: 200
       )
     end)
+    
+    {:ok, resp} = result
+    assert resp.id != nil
   end
   
   test "tool choice control" do
     if ReqLLM.Capability.supports?(@model, :tool_choice) do
-      use_fixture("tool_calling/choice_specific", [], fn ->
+      result = use_fixture(:my_provider, "tool_choice_specific", fn ->
         ctx = ReqLLM.Context.new([
           ReqLLM.Context.user("Tell me about weather")
         ])
@@ -193,13 +204,16 @@ describe "tool calling capabilities" do
           tool_choice: %{type: "tool", name: "get_weather"}
         )
       end)
+      
+      {:ok, resp} = result
+      assert resp.id != nil
     else
       skip("Model does not support tool choice control")
     end
   end
 
   test "tool result handling" do
-    use_fixture("tool_calling/with_result", [], fn ->
+    result = use_fixture(:my_provider, "tool_with_result", fn ->
       ctx = ReqLLM.Context.new([
         ReqLLM.Context.user("What's the weather like?"),
         ReqLLM.Context.assistant("", tool_calls: [
@@ -210,6 +224,9 @@ describe "tool calling capabilities" do
       
       ReqLLM.generate_text(@model, ctx, tools: [@weather_tool])
     end)
+    
+    {:ok, resp} = result
+    assert resp.id != nil
   end
 end
 ```
@@ -224,24 +241,16 @@ test "streaming text generation" do
     result = use_fixture(:my_provider, "streaming_test", fn ->
       ctx = ReqLLM.Context.new([ReqLLM.Context.user("Tell me a story")])
       
-      {:ok, stream} = ReqLLM.stream_text(@model, ctx, max_tokens: 100)
+      {:ok, resp} = ReqLLM.stream_text(@model, ctx, max_tokens: 100)
       
-      # Collect all chunks
-      chunks = Enum.to_list(stream)
-      
-      # Verify streaming behavior
-      assert length(chunks) > 1, "Should receive multiple chunks"
-      
-      # Last chunk should have finish_reason
-      last_chunk = List.last(chunks)
-      assert Map.has_key?(last_chunk, :finish_reason)
-      
-      # Return full response for fixture
-      text = chunks |> Enum.map_join("", & &1.content)
-      %{text: text, chunks: length(chunks)}
+      # LiveFixture automatically materializes streams
+      resp
     end)
     
-    assert result.chunks > 1
+    {:ok, resp} = result
+    assert resp.id != nil
+    text = ReqLLM.Response.text(resp)
+    assert is_binary(text)
   else
     skip("Model does not support streaming")
   end
@@ -258,7 +267,7 @@ test "image input processing" do
   input_modalities = get_in(modalities, [:input]) || []
   
   if "image" in input_modalities do
-    use_fixture(:my_provider, "image_input", fn ->
+    result = use_fixture(:my_provider, "image_input", fn ->
       # Base64 encoded test image
       image_data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
       
@@ -275,6 +284,9 @@ test "image input processing" do
       
       ReqLLM.generate_text(@model, ctx, max_tokens: 100)
     end)
+    
+    {:ok, resp} = result
+    assert resp.id != nil
   else
     skip("Model does not support image input")
   end
@@ -290,14 +302,16 @@ Fixtures are stored as JSON with metadata:
 ```json
 {
   "captured_at": "2024-01-15T10:30:00Z",
-  "provider": "anthropic",
   "result": {
-    "type": "ok_response",
-    "status": 200,
-    "body": "Hello there! How can I assist you today?",
-    "headers": {
-      "content-type": "application/json",
-      "anthropic-ratelimit-requests-remaining": "999"
+    "type": "ok_req_llm_response",
+    "data": {
+      "id": "resp_123",
+      "model": "openai:gpt-4o",
+      "message": {
+        "role": "assistant",
+        "content": [{"type": "text", "text": "Hello there!"}]
+      },
+      "usage": {"input_tokens": 5, "output_tokens": 3}
     }
   }
 }
@@ -305,7 +319,7 @@ Fixtures are stored as JSON with metadata:
 
 ### Fixture Organization
 
-Organize fixtures by provider and capability:
+Organize fixtures by provider and test name:
 
 ```
 test/support/fixtures/
@@ -313,20 +327,29 @@ test/support/fixtures/
 │   ├── basic_completion.json
 │   ├── system_prompt_completion.json
 │   ├── temperature_test.json
-│   ├── streaming/
-│   │   ├── basic_streaming.json
-│   │   └── streaming_with_tools.json
-│   ├── tool_calling/
-│   │   ├── choice_auto.json
-│   │   ├── choice_specific.json
-│   │   └── with_result.json
-│   └── thinking_tokens/
-│       ├── basic_reasoning.json
-│       └── streaming_thinking.json
+│   ├── streaming_test.json
+│   ├── tool_calling_basic.json
+│   ├── tool_choice_specific.json
+│   └── tool_with_result.json
 └── openai/
     ├── basic_completion.json
-    └── tool_calling/
-        └── function_call.json
+    └── tool_calling_basic.json
+```
+
+### LiveFixture API Changes (1.0.0-rc.1)
+
+The LiveFixture API now requires the provider as the first argument:
+
+```elixir
+# Current API (1.0.0-rc.1)
+use_fixture(:provider_atom, "fixture_name", fn ->
+  # test code
+end)
+
+# Old API (deprecated)
+use_fixture("fixture_name", [], fn ->
+  # test code  
+end)
 ```
 
 ### Fixture Best Practices
@@ -338,7 +361,7 @@ test/support/fixtures/
 
 ```elixir
 # Good fixture usage
-use_fixture("sampling/low_temperature", [], fn ->
+use_fixture(:openai, "low_temperature", fn ->
   ReqLLM.generate_text(@model, ctx, 
     temperature: 0.1,  # Deterministic
     max_tokens: 20     # Minimal
@@ -352,19 +375,21 @@ end)
 
 1. **Create provider module** with DSL
 2. **Add metadata file** in `priv/models_dev/`
-3. **Create coverage tests** for each capability
+3. **Create coverage tests** using provider macros
 4. **Run live tests** to capture fixtures
 5. **Validate capabilities** match implementation
 
 ```bash
-# Create provider tests
-mix req_llm.gen.provider MyProvider
+# Create provider tests using macros
+# test/coverage/my_provider/core_test.exs
+# test/coverage/my_provider/streaming_test.exs
+# test/coverage/my_provider/tool_calling_test.exs
 
 # Run live tests to capture fixtures
 LIVE=true mix test --only coverage --only my_provider
 
-# Validate capabilities
-mix req_llm.validate_provider MyProvider
+# Quality check
+mix quality
 ```
 
 ### Ongoing Verification
@@ -385,60 +410,14 @@ LIVE=true mix test --only coverage
 LIVE=true mix test --only anthropic --only coverage
 ```
 
-## Models.dev Integration
-
-### Metadata Synchronization
-
-ReqLLM syncs with Models.dev for current model metadata:
-
-```bash
-# Sync all provider metadata
-mix req_llm.sync_models
-
-# Verify metadata consistency
-mix req_llm.validate_metadata
-
-# List models by capability
-mix req_llm.models --capability tools
-mix req_llm.models --provider anthropic
-```
-
-### Testing Against Metadata
-
-Verify implementation matches Models.dev data:
-
-```elixir
-test "metadata matches implementation" do
-  # Get Models.dev metadata
-  {:ok, metadata} = ReqLLM.Provider.Registry.get_model_metadata(
-    :anthropic, "claude-3-haiku-20240307"
-  )
-  
-  # Test each advertised capability
-  if metadata["tool_call"] do
-    # Verify tool calling actually works
-    use_fixture("metadata_verification/tools", [], fn ->
-      # Tool calling test
-    end)
-  end
-  
-  if metadata["reasoning"] do
-    # Verify reasoning/thinking tokens work
-    use_fixture("metadata_verification/reasoning", [], fn ->
-      # Reasoning test
-    end)
-  end
-end
-```
-
 ## Best Practices
 
 ### Test Organization
 
-1. **Group by capability** - Organize tests around features, not just providers
-2. **Use descriptive names** - Test names should explain what capability is tested
-3. **Tag appropriately** - Use ExUnit tags for selective test execution
-4. **Minimize dependencies** - Each test should be self-contained
+1. **Use provider macros** - Leverage shared test patterns for consistency
+2. **Group by capability** - Organize tests around features, not just providers
+3. **Use descriptive names** - Test names should explain what capability is tested
+4. **Tag appropriately** - Use ExUnit tags for selective test execution
 
 ### Fixture Management
 
@@ -449,9 +428,7 @@ end
 
 ### Error Handling
 
-1. **Test error conditions** - Verify proper error handling for invalid requests
-2. **Check API limits** - Test behavior at rate limits and token limits
-3. **Validate responses** - Ensure responses match expected format
+Test error conditions with proper fixture handling:
 
 ```elixir
 test "handles invalid model gracefully" do
@@ -461,7 +438,6 @@ test "handles invalid model gracefully" do
   
   {:error, error} = result
   assert %ReqLLM.Error.API{} = error
-  assert error.status_code == 404
 end
 ```
 

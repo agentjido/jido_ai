@@ -157,8 +157,8 @@ defmodule ReqLLM.Step.Usage do
   end
 
   # Calculates cost based on token usage and model pricing
-  @spec compute_cost(%{input: non_neg_integer, output: non_neg_integer}, ReqLLM.Model.t()) ::
-          {:ok, float() | nil} | :error
+  @spec compute_cost(%{input: any(), output: any(), reasoning: any()}, ReqLLM.Model.t()) ::
+          {:ok, float() | nil}
   defp compute_cost(%{input: _input_tokens, output: _output_tokens}, %ReqLLM.Model{cost: nil}) do
     {:ok, nil}
   end

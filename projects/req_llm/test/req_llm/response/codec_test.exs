@@ -1,10 +1,10 @@
 defmodule ReqLLM.Response.CodecTest do
   use ExUnit.Case, async: true
 
-  alias ReqLLM.{Response, Model, Context, Message}
-  alias ReqLLM.Response.Codec
   alias ReqLLM.Message.ContentPart
   alias ReqLLM.Providers.Anthropic
+  alias ReqLLM.Response.Codec
+  alias ReqLLM.{Response, Model, Context, Message}
 
   # Common test fixtures
   setup do
