@@ -26,7 +26,7 @@ defmodule ReqLLM.Providers.XAI do
 
       # Using Live Search (Grok models only)
       {:ok, response} = ReqLLM.generate_text(
-        model, 
+        model,
         "What's the latest news about AI?",
         provider_options: [live_search: true]
       )
@@ -37,6 +37,19 @@ defmodule ReqLLM.Providers.XAI do
   - Grok 4 does not support `presence_penalty`, `frequency_penalty`, or `stop` parameters
   - Live Search is available for real-time information (additional cost applies)
   - Knowledge cutoff is November 2024 for Grok 3 and Grok 4 models
+
+  ## Reasoning Token Budget
+
+  Grok models use a two-phase approach with internal reasoning before tool execution.
+  Ensure adequate token limits when using tool calling:
+
+      # Insufficient for tool calling
+      ReqLLM.generate_text(model, "weather query", tools: tools, max_tokens: 100)
+
+      # Adequate for reasoning + tool execution
+      ReqLLM.generate_text(model, "weather query", tools: tools, max_tokens: 500)
+
+  The provider automatically defaults to 500 tokens for Grok models when `max_tokens` is not specified.
 
   """
 
@@ -76,7 +89,6 @@ defmodule ReqLLM.Providers.XAI do
       # Model-specific performance controls
       service_tier: [
         type: {:in, ~w(auto default performance)},
-        default: "auto",
         doc: "Performance tier for xAI requests"
       ]
     ]
@@ -216,7 +228,7 @@ defmodule ReqLLM.Providers.XAI do
       %{model: model_name}
       |> Map.merge(context_data)
       |> maybe_put(:temperature, request.options[:temperature])
-      |> maybe_put(:max_tokens, request.options[:max_tokens])
+      |> maybe_put(:max_tokens, request.options[:max_tokens] || default_max_tokens(model_name))
       |> maybe_put(:top_p, request.options[:top_p])
       |> maybe_put(:stream, request.options[:stream])
       |> maybe_put(:user, request.options[:user])
@@ -248,9 +260,9 @@ defmodule ReqLLM.Providers.XAI do
         tools when is_list(tools) and length(tools) > 0 ->
           body = Map.put(body, :tools, Enum.map(tools, &ReqLLM.Tool.to_schema(&1, :openai)))
 
-          # Handle tool_choice if provided
+          # Handle tool_choice if provided, default to "auto" for xAI
           case request.options[:tool_choice] do
-            nil -> body
+            nil -> Map.put(body, :tool_choice, "auto")
             choice -> Map.put(body, :tool_choice, choice)
           end
 
@@ -299,6 +311,19 @@ defmodule ReqLLM.Providers.XAI do
         {req, err}
     end
   end
+
+  # Default token limits for different model types
+  defp default_max_tokens(model_name) when is_binary(model_name) do
+    if String.starts_with?(model_name, "grok-") do
+      # Adequate for reasoning + tool execution
+      500
+    else
+      # Fallback used elsewhere in library
+      1024
+    end
+  end
+
+  defp default_max_tokens(_), do: 1024
 
   # Private helper to identify Grok 4 models
   defp is_grok_4_model?(model_name) when is_binary(model_name) do

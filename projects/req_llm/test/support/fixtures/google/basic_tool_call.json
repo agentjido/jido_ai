@@ -2,10 +2,58 @@
   "result": {
     "data": {
       "error": null,
-      "id": "google-response-1757771612863067",
-      "message": null,
+      "id": "google-response-1757782628322110",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "data": null,
+            "input": {
+              "location": "Paris, France"
+            },
+            "output": null,
+            "type": "tool_call",
+            "filename": null,
+            "metadata": {},
+            "text": null,
+            "url": null,
+            "media_type": null,
+            "tool_call_id": null,
+            "tool_name": "get_weather"
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
       "context": {
-        "messages": []
+        "messages": [
+          {
+            "name": null,
+            "metadata": {},
+            "role": "assistant",
+            "content": [
+              {
+                "data": null,
+                "input": {
+                  "location": "Paris, France"
+                },
+                "output": null,
+                "type": "tool_call",
+                "filename": null,
+                "metadata": {},
+                "text": null,
+                "url": null,
+                "media_type": null,
+                "tool_call_id": null,
+                "tool_name": "get_weather"
+              }
+            ],
+            "tool_call_id": null,
+            "tool_calls": null
+          }
+        ]
       },
       "usage": {
         "input_tokens": 45,
@@ -19,10 +67,10 @@
       "finish_reason": "stop",
       "provider_meta": {
         "modelVersion": "gemini-1.5-flash",
-        "responseId": "UXfFaOraFqin1MkPtsKE6Qc"
+        "responseId": "X6LFaL-kHcSt1MkP38P4uAY"
       }
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T13:53:32.863513Z"
+  "captured_at": "2025-09-13T16:57:08.321906Z"
 }

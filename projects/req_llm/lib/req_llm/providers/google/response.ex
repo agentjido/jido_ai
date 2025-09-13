@@ -239,7 +239,12 @@ defmodule ReqLLM.Providers.Google.ResponseDecoder do
     [ReqLLM.StreamChunk.text(text)]
   end
 
-  defp decode_content_part(%{"function_call" => %{"name" => name, "args" => args}}) do
+  # defp decode_content_part(%{"function_call" => %{"name" => name, "args" => args}}) do
+  #   [ReqLLM.StreamChunk.tool_call(name, args, %{})]
+  # end
+
+  # Google returns camel-case keys in JSON responses
+  defp decode_content_part(%{"functionCall" => %{"name" => name, "args" => args}}) do
     [ReqLLM.StreamChunk.tool_call(name, args, %{})]
   end
 

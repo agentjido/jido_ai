@@ -210,8 +210,10 @@ defmodule ReqLLM.Providers.Groq do
       |> maybe_put(:seed, request.options[:seed])
       # Groq-specific provider options
       |> maybe_put(:logit_bias, request.options[:logit_bias])
-      |> maybe_put(:service_tier, request.options[:service_tier])
-      |> maybe_put(:reasoning_effort, request.options[:reasoning_effort])
+      # Skip service_tier if it's "auto" (not available on free tier)
+      |> maybe_put_groq_service_tier(request.options[:service_tier])
+      # Skip reasoning_effort if it's "default" (problematic default value)
+      |> maybe_put_groq_reasoning_effort(request.options[:reasoning_effort])
       |> maybe_put(:reasoning_format, request.options[:reasoning_format])
       |> maybe_put(:search_settings, request.options[:search_settings])
       |> maybe_put(:compound_custom, request.options[:compound_custom])
@@ -273,4 +275,13 @@ defmodule ReqLLM.Providers.Groq do
         {req, err}
     end
   end
+
+  # Private helper functions for Groq-specific parameter handling
+  defp maybe_put_groq_service_tier(body, "auto"), do: body
+  defp maybe_put_groq_service_tier(body, nil), do: body
+  defp maybe_put_groq_service_tier(body, value), do: maybe_put(body, :service_tier, value)
+
+  defp maybe_put_groq_reasoning_effort(body, "default"), do: body
+  defp maybe_put_groq_reasoning_effort(body, nil), do: body
+  defp maybe_put_groq_reasoning_effort(body, value), do: maybe_put(body, :reasoning_effort, value)
 end

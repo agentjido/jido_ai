@@ -46,11 +46,14 @@ defmodule ReqLLM.ProviderTest.ToolCalling do
                 )
               ]
 
+              # xAI reasoning models need more tokens for tool calling
+              max_tokens = if unquote(provider) == :xai, do: 500, else: 100
+              
               ReqLLM.generate_text(
                 unquote(model),
                 "What's the weather like in Paris, France?",
                 tools: tools,
-                max_tokens: 100
+                max_tokens: max_tokens
               )
             end)
 

@@ -215,7 +215,20 @@ defmodule ReqLLM.Providers.XAI.ResponseDecoder do
     [ReqLLM.StreamChunk.text(content)]
   end
 
-  # Handle xAI reasoning models that put content in reasoning_content
+  # Handle xAI reasoning models with tool calls (both reasoning content and tool calls)
+  defp decode_xai_message(%{
+         "content" => "",
+         "reasoning_content" => reasoning_content,
+         "tool_calls" => tool_calls
+       })
+       when is_binary(reasoning_content) and reasoning_content != "" and is_list(tool_calls) do
+    # Return tool calls only - reasoning content is internal
+    tool_calls
+    |> Enum.map(&decode_tool_call/1)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  # Handle xAI reasoning models that put content in reasoning_content (no tool calls)
   defp decode_xai_message(%{"content" => "", "reasoning_content" => reasoning_content})
        when is_binary(reasoning_content) and reasoning_content != "" do
     [ReqLLM.StreamChunk.text(reasoning_content)]

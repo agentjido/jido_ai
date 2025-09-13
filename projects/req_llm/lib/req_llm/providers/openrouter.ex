@@ -5,6 +5,17 @@ defmodule ReqLLM.Providers.OpenRouter do
   OpenRouter is a unified API for accessing multiple AI models through a single endpoint.
   It normalizes request/response schemas and provides model routing capabilities.
 
+  ## Tool Calling Support
+
+  OpenRouter supports tool calling with compatible models using OpenAI-compatible format.
+  Confirmed working models:
+  
+  - `openrouter:openai/gpt-4` 
+  - `openrouter:openai/gpt-4-turbo`
+  - `openrouter:openai/gpt-3.5-turbo`
+  - `openrouter:anthropic/claude-3-haiku`
+  - `openrouter:google/gemini-2.0-flash-001`
+
   ## Configuration
 
   Set your OpenRouter API key via environment variable:
