@@ -22,7 +22,10 @@ defmodule ReqLLM.Providers.Anthropic.StreamDecoder do
 
   # Handle content block start for tool calls
   defp handle_event(
-         %{event: "content_block_start", data: %{"content_block" => %{"type" => "tool_use", "id" => id, "name" => name}}},
+         %{
+           event: "content_block_start",
+           data: %{"content_block" => %{"type" => "tool_use", "id" => id, "name" => name}}
+         },
          state
        ) do
     # Initialize tool call in state but don't emit yet
@@ -32,7 +35,10 @@ defmodule ReqLLM.Providers.Anthropic.StreamDecoder do
 
   # Handle input JSON delta events for tool calls
   defp handle_event(
-         %{event: "content_block_delta", data: %{"delta" => %{"type" => "input_json_delta", "partial_json" => partial_json}}},
+         %{
+           event: "content_block_delta",
+           data: %{"delta" => %{"type" => "input_json_delta", "partial_json" => partial_json}}
+         },
          state
        ) do
     # Find the active tool call - assumes single active tool call for now
@@ -52,10 +58,7 @@ defmodule ReqLLM.Providers.Anthropic.StreamDecoder do
   end
 
   # Handle content block stop for tool calls - this is when we emit the complete tool call
-  defp handle_event(
-         %{event: "content_block_stop"},
-         state
-       ) do
+  defp handle_event(%{event: "content_block_stop"}, state) do
     # Find the active tool call and emit it with complete arguments
     case find_active_tool_call(state) do
       {id, tool_call} ->
@@ -69,7 +72,9 @@ defmodule ReqLLM.Providers.Anthropic.StreamDecoder do
 
           {:error, _reason} ->
             # If JSON parsing fails, emit with empty args as fallback
-            chunk = StreamChunk.tool_call(tool_call.name, %{}, %{id: id, error: :json_parse_failed})
+            chunk =
+              StreamChunk.tool_call(tool_call.name, %{}, %{id: id, error: :json_parse_failed})
+
             new_state = update_in(state, [:tool_calls], &Map.delete(&1, id))
             {[chunk], new_state}
         end
@@ -86,7 +91,10 @@ defmodule ReqLLM.Providers.Anthropic.StreamDecoder do
   end
 
   # Handle thinking block deltas
-  defp handle_event(%{event: "thinking_block_delta", data: %{"delta" => %{"text" => text}}}, state) do
+  defp handle_event(
+         %{event: "thinking_block_delta", data: %{"delta" => %{"text" => text}}},
+         state
+       ) do
     {[StreamChunk.thinking(text)], state}
   end
 
@@ -129,7 +137,9 @@ defmodule ReqLLM.Providers.Anthropic.StreamDecoder do
   defp parse_accumulated_json(tool_call) when is_map(tool_call) do
     # If no accumulated_json field, check for existing args or return empty
     case Map.get(tool_call, :accumulated_json) do
-      nil -> {:ok, Map.get(tool_call, :args, %{})}
+      nil ->
+        {:ok, Map.get(tool_call, :args, %{})}
+
       json_str when is_binary(json_str) ->
         case Jason.decode(json_str) do
           {:ok, parsed} -> {:ok, parsed}
@@ -139,15 +149,4 @@ defmodule ReqLLM.Providers.Anthropic.StreamDecoder do
   end
 
   defp parse_accumulated_json(_), do: {:ok, %{}}
-
-  # Helper to parse usage from message delta
-  defp parse_usage(%{"input_tokens" => input, "output_tokens" => output}) do
-    %{
-      input_tokens: input,
-      output_tokens: output,
-      total_tokens: input + output
-    }
-  end
-
-  defp parse_usage(_), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
 end

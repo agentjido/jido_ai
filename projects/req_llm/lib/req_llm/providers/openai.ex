@@ -82,7 +82,7 @@ defmodule ReqLLM.Providers.OpenAI do
 
       request =
         Req.new([url: "/embeddings", method: :post, receive_timeout: 30_000] ++ http_opts)
-        |> attach(model, Keyword.merge(opts, [text: text, operation: :embedding]))
+        |> attach(model, Keyword.merge(opts, text: text, operation: :embedding))
 
       {:ok, request}
     end
@@ -128,7 +128,7 @@ defmodule ReqLLM.Providers.OpenAI do
     opts = prepare_options!(__MODULE__, model, other_opts)
 
     # Add back the special keys after validation
-    opts = 
+    opts =
       opts
       |> Keyword.put(:tools, tools)
       |> maybe_put(:operation, operation)

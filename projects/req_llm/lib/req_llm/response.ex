@@ -314,13 +314,12 @@ defmodule ReqLLM.Response do
     * `{:error, reason}` on failure
 
   """
-  @spec decode_object_stream(term(), Model.t() | String.t(), keyword()) :: {:ok, t()} | {:error, term()}
-  def decode_object_stream(raw_data, model_input, schema) do
-    with {:ok, response} <- decode_response(raw_data, model_input) do
-      # The response already contains the stream, we just need to ensure
-      # object_stream/1 can extract objects from tool_call chunks
-      {:ok, response}
-    end
+  @spec decode_object_stream(term(), Model.t() | String.t(), keyword()) ::
+          {:ok, t()} | {:error, term()}
+  def decode_object_stream(raw_data, model_input, _schema) do
+    decode_response(raw_data, model_input)
+    # The response already contains the stream, we just need to ensure
+    # object_stream/1 can extract objects from tool_call chunks
   end
 
   # Helper function to resolve model input to Model struct
@@ -379,6 +378,6 @@ defmodule ReqLLM.Response do
     stream
     |> Stream.filter(&(&1.type == :tool_call))
     |> Stream.filter(&(&1.name == "structured_output"))
-    |> Stream.map(&(&1.arguments))
+    |> Stream.map(& &1.arguments)
   end
 end
