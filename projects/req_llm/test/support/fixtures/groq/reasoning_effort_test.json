@@ -1,0 +1,76 @@
+{
+  "result": {
+    "data": {
+      "error": null,
+      "id": "chatcmpl-c5657a0f-1b36-4c42-904a-0649e53d8f91",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "data": null,
+            "input": null,
+            "output": null,
+            "type": "text",
+            "filename": null,
+            "metadata": {},
+            "text": "Photosynthesis is a process by which plants, algae, and some bacteria convert light energy from the sun into chemical energy in the form of glucose (a type of sugar). This process involves the following steps:\n\n1. **Absorption of light**: Chlorophyll and other pigments in the plant absorb light energy from the sun.\n2. **Water absorption**: The plant absorbs water from the soil through its roots.\n3. **Carbon dioxide absorption**: The plant absorbs carbon dioxide from the air through small",
+            "url": null,
+            "media_type": null,
+            "tool_call_id": null,
+            "tool_name": null
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
+      "context": {
+        "messages": [
+          {
+            "name": null,
+            "metadata": {},
+            "role": "assistant",
+            "content": [
+              {
+                "data": null,
+                "input": null,
+                "output": null,
+                "type": "text",
+                "filename": null,
+                "metadata": {},
+                "text": "Photosynthesis is a process by which plants, algae, and some bacteria convert light energy from the sun into chemical energy in the form of glucose (a type of sugar). This process involves the following steps:\n\n1. **Absorption of light**: Chlorophyll and other pigments in the plant absorb light energy from the sun.\n2. **Water absorption**: The plant absorbs water from the soil through its roots.\n3. **Carbon dioxide absorption**: The plant absorbs carbon dioxide from the air through small",
+                "url": null,
+                "media_type": null,
+                "tool_call_id": null,
+                "tool_name": null
+              }
+            ],
+            "tool_call_id": null,
+            "tool_calls": null
+          }
+        ]
+      },
+      "usage": {
+        "input_tokens": 40,
+        "output_tokens": 100,
+        "total_tokens": 140
+      },
+      "model": "llama-3.1-8b-instant",
+      "stream?": false,
+      "finish_reason": "length",
+      "provider_meta": {
+        "created": 1757725078,
+        "object": "chat.completion",
+        "service_tier": "on_demand",
+        "system_fingerprint": "fp_46fc01befd",
+        "usage_breakdown": null,
+        "x_groq": {
+          "id": "req_01k5098csnf1bty4xcmgeqcsyc"
+        }
+      }
+    },
+    "type": "ok_req_llm_response"
+  },
+  "captured_at": "2025-09-13T00:57:58.649540Z"
+}

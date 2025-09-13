@@ -55,6 +55,79 @@ defmodule ReqLLM.Generation do
                       reasoning: [
                         type: {:in, [nil, false, true, "low", "auto", "high"]},
                         doc: "Request reasoning tokens from the model"
+                      ],
+                      candidate_count: [
+                        type: :pos_integer,
+                        doc: "Number of response candidates to generate (Google-specific)"
+                      ],
+                      # OpenRouter-specific parameters
+                      repetition_penalty: [
+                        type: :float,
+                        doc: "Penalize repeated tokens (OpenRouter-specific)"
+                      ],
+                      logit_bias: [
+                        type: :map,
+                        doc: "Logit bias adjustments for tokens"
+                      ],
+                      top_logprobs: [
+                        type: :pos_integer,
+                        doc: "Number of top log probabilities to return"
+                      ],
+                      min_p: [
+                        type: :float,
+                        doc: "Minimum probability threshold for tokens (OpenRouter-specific)"
+                      ],
+                      top_a: [
+                        type: :float,
+                        doc: "Top-a sampling parameter (OpenRouter-specific)"
+                      ],
+                      user: [
+                        type: :string,
+                        doc: "User identifier for tracking/abuse detection"
+                      ],
+                      models: [
+                        type: {:list, :string},
+                        doc: "Alternative model list for routing (OpenRouter-specific)"
+                      ],
+                      provider: [
+                        type: :map,
+                        doc: "Provider routing preferences (OpenRouter-specific)"
+                      ],
+                      usage: [
+                        type: :map,
+                        doc: "Usage tracking preferences (OpenRouter-specific)"
+                      ],
+                      transforms: [
+                        type: {:list, :string},
+                        doc: "Prompt transforms to apply (OpenRouter-specific)"
+                      ],
+                      seed: [
+                        type: :pos_integer,
+                        doc: "Seed for deterministic outputs"
+                      ],
+                      # Groq-specific parameters
+                      service_tier: [
+                        type: :string,
+                        doc:
+                          "Performance tier: auto, on_demand, flex, performance (Groq-specific)"
+                      ],
+                      reasoning_effort: [
+                        type: :string,
+                        doc:
+                          "Reasoning effort level: none, default, low, medium, high (Groq-specific)"
+                      ],
+                      reasoning_format: [
+                        type: :string,
+                        doc: "Format for reasoning output (Groq-specific)"
+                      ],
+                      search_settings: [
+                        type: :map,
+                        doc:
+                          "Web search configuration with include/exclude domains (Groq-specific)"
+                      ],
+                      compound_custom: [
+                        type: :map,
+                        doc: "Custom configuration for Compound systems (Groq-specific)"
                       ]
                     )
 

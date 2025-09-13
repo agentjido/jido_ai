@@ -8,10 +8,10 @@ defmodule ReqLLM.Coverage.OpenAI.CoreTest do
   Run with LIVE=true to test against live API and capture fixtures.
   Otherwise uses cached fixtures for fast, reliable testing.
   """
-  
+
   use ReqLLM.ProviderTest.Core,
-      provider: :openai,
-      model: "openai:gpt-4o-mini"
+    provider: :openai,
+    model: "openai:gpt-4o-mini"
 
   # OpenAI-specific tests can be added here
   # For example: logprobs, function calling specifics, etc.

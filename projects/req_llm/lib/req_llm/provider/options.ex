@@ -388,6 +388,68 @@ defmodule ReqLLM.Provider.Options do
                                use_cache: [
                                  type: :boolean,
                                  doc: "Enable response caching"
+                               ],
+                               candidate_count: [
+                                 type: :pos_integer,
+                                 doc:
+                                   "Number of response candidates to generate (Google-specific)"
+                               ],
+
+                               # OpenRouter-specific parameters
+                               top_logprobs: [
+                                 type: :pos_integer,
+                                 doc:
+                                   "Number of top log probabilities to return (OpenRouter-specific)"
+                               ],
+                               min_p: [
+                                 type: :float,
+                                 doc:
+                                   "Minimum probability threshold for tokens (OpenRouter-specific)"
+                               ],
+                               top_a: [
+                                 type: :float,
+                                 doc: "Top-a sampling parameter (OpenRouter-specific)"
+                               ],
+                               models: [
+                                 type: {:list, :string},
+                                 doc: "Alternative model list for routing (OpenRouter-specific)"
+                               ],
+                               provider: [
+                                 type: :map,
+                                 doc: "Provider routing preferences (OpenRouter-specific)"
+                               ],
+                               usage: [
+                                 type: :map,
+                                 doc: "Usage tracking preferences (OpenRouter-specific)"
+                               ],
+                               transforms: [
+                                 type: {:list, :string},
+                                 doc: "Prompt transforms to apply (OpenRouter-specific)"
+                               ],
+
+                               # Groq-specific parameters
+                               service_tier: [
+                                 type: :string,
+                                 doc:
+                                   "Performance tier: auto, on_demand, flex, performance (Groq-specific)"
+                               ],
+                               reasoning_effort: [
+                                 type: :string,
+                                 doc:
+                                   "Reasoning effort level: none, default, low, medium, high (Groq-specific)"
+                               ],
+                               reasoning_format: [
+                                 type: :string,
+                                 doc: "Format for reasoning output (Groq-specific)"
+                               ],
+                               search_settings: [
+                                 type: :map,
+                                 doc:
+                                   "Web search configuration with include/exclude domains (Groq-specific)"
+                               ],
+                               compound_custom: [
+                                 type: :map,
+                                 doc: "Custom configuration for Compound systems (Groq-specific)"
                                ]
                              )
 

@@ -10,8 +10,8 @@ defmodule ReqLLM.Coverage.Anthropic.CoreTest do
   """
 
   use ReqLLM.ProviderTest.Core,
-      provider: :anthropic,
-      model: "anthropic:claude-3-haiku-20240307"
+    provider: :anthropic,
+    model: "anthropic:claude-3-haiku-20240307"
 
   # Anthropic-specific tests
   alias ReqLLM.Test.LiveFixture, as: ReqFixture

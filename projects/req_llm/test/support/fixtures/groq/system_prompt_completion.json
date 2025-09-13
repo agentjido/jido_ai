@@ -1,0 +1,76 @@
+{
+  "result": {
+    "data": {
+      "error": null,
+      "id": "chatcmpl-ebc08bcf-4715-4ab1-80af-568df189bab1",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "data": null,
+            "input": null,
+            "output": null,
+            "type": "text",
+            "filename": null,
+            "metadata": {},
+            "text": "Hello.",
+            "url": null,
+            "media_type": null,
+            "tool_call_id": null,
+            "tool_name": null
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
+      "context": {
+        "messages": [
+          {
+            "name": null,
+            "metadata": {},
+            "role": "assistant",
+            "content": [
+              {
+                "data": null,
+                "input": null,
+                "output": null,
+                "type": "text",
+                "filename": null,
+                "metadata": {},
+                "text": "Hello.",
+                "url": null,
+                "media_type": null,
+                "tool_call_id": null,
+                "tool_name": null
+              }
+            ],
+            "tool_call_id": null,
+            "tool_calls": null
+          }
+        ]
+      },
+      "usage": {
+        "input_tokens": 47,
+        "output_tokens": 3,
+        "total_tokens": 50
+      },
+      "model": "llama-3.1-8b-instant",
+      "stream?": false,
+      "finish_reason": "stop",
+      "provider_meta": {
+        "created": 1757725079,
+        "object": "chat.completion",
+        "service_tier": "on_demand",
+        "system_fingerprint": "fp_46fc01befd",
+        "usage_breakdown": null,
+        "x_groq": {
+          "id": "req_01k5098dd1fh5stdhwabeyybqc"
+        }
+      }
+    },
+    "type": "ok_req_llm_response"
+  },
+  "captured_at": "2025-09-13T00:57:59.169685Z"
+}
