@@ -81,6 +81,33 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
     [StreamChunk.thinking(text)]
   end
 
+  # Handle tool_use content block start
+  defp decode_sse_event(%{
+         event: "content_block_start",
+         data: %{"content_block" => %{"type" => "tool_use", "id" => id, "name" => name}}
+       }) do
+    # Store the tool call metadata for when we get the input
+    # For now, we emit the tool call immediately with empty args - this could be improved
+    # to reconstruct the full JSON from input_json_delta events
+    [StreamChunk.tool_call(name, %{}, %{id: id, partial: true})]
+  end
+
+  # Handle tool input JSON delta (partial JSON for tool arguments)
+  defp decode_sse_event(%{
+         event: "content_block_delta",
+         data: %{"delta" => %{"type" => "input_json_delta"}}
+       }) do
+    # For now, we'll skip partial JSON parsing - this would need to be reconstructed
+    # from multiple events to get the full tool arguments
+    []
+  end
+
+  # Handle content block stop for tool_use
+  defp decode_sse_event(%{event: "content_block_stop"}) do
+    # This indicates the end of a content block
+    []
+  end
+
   defp decode_sse_event(%{
          event: "tool_use_delta",
          data: %{"delta" => %{"type" => "tool_call", "name" => name, "input" => input}}

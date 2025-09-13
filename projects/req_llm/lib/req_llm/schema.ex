@@ -371,4 +371,48 @@ defmodule ReqLLM.Schema do
       }
     }
   end
+
+  @doc """
+  Format a tool into Google tool schema format.
+
+  ## Parameters
+
+    * `tool` - A `ReqLLM.Tool.t()` struct
+
+  ## Returns
+
+  A map containing the Google tool schema format.
+
+  ## Examples
+
+      iex> tool = %ReqLLM.Tool{
+      ...>   name: "get_weather",
+      ...>   description: "Get current weather",
+      ...>   parameter_schema: [
+      ...>     location: [type: :string, required: true, doc: "City name"]
+      ...>   ],
+      ...>   callback: fn _ -> {:ok, %{}} end
+      ...> }
+      iex> ReqLLM.Schema.to_google_format(tool)
+      %{
+        "name" => "get_weather",
+        "description" => "Get current weather",
+        "parameters" => %{
+          "type" => "object",
+          "properties" => %{
+            "location" => %{"type" => "string", "description" => "City name"}
+          },
+          "required" => ["location"]
+        }
+      }
+
+  """
+  @spec to_google_format(ReqLLM.Tool.t()) :: map()
+  def to_google_format(%ReqLLM.Tool{} = tool) do
+    %{
+      "name" => tool.name,
+      "description" => tool.description,
+      "parameters" => to_json(tool.parameter_schema)
+    }
+  end
 end

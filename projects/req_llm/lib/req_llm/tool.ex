@@ -247,6 +247,7 @@ defmodule ReqLLM.Tool do
     case provider do
       :anthropic -> ReqLLM.Schema.to_anthropic_format(tool)
       :openai -> ReqLLM.Schema.to_openai_format(tool)
+      :google -> ReqLLM.Schema.to_google_format(tool)
       other -> raise ArgumentError, "Unknown provider #{inspect(other)}"
     end
   end
