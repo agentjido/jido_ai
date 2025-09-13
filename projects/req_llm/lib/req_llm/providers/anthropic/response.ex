@@ -26,11 +26,8 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
         %Model{provider: :anthropic} = model
       )
       when is_struct(stream, Stream) do
-    # Convert SSE events to StreamChunks
-    chunk_stream =
-      stream
-      |> Stream.flat_map(&decode_sse_event/1)
-      |> Stream.reject(&is_nil/1)
+    # Use the new StreamDecoder to properly handle tool call accumulation
+    chunk_stream = ReqLLM.Providers.Anthropic.StreamDecoder.build_stream(stream)
 
     response = %Response{
       id: "stream-#{System.unique_integer([:positive])}",
@@ -69,51 +66,6 @@ defimpl ReqLLM.Response.Codec, for: ReqLLM.Providers.Anthropic.Response do
   end
 
   def encode_request(_), do: {:error, :not_implemented}
-
-  # SSE Event decoding for streaming responses
-  defp decode_sse_event(%{event: "content_block_delta", data: %{"delta" => %{"text" => text}}}) do
-    [StreamChunk.text(text)]
-  end
-
-  defp decode_sse_event(%{event: "thinking_block_delta", data: %{"delta" => %{"text" => text}}}) do
-    [StreamChunk.thinking(text)]
-  end
-
-  # Handle tool_use content block start
-  defp decode_sse_event(%{
-         event: "content_block_start",
-         data: %{"content_block" => %{"type" => "tool_use", "id" => id, "name" => name}}
-       }) do
-    # Store the tool call metadata for when we get the input
-    # For now, we emit the tool call immediately with empty args - this could be improved
-    # to reconstruct the full JSON from input_json_delta events
-    [StreamChunk.tool_call(name, %{}, %{id: id, partial: true})]
-  end
-
-  # Handle tool input JSON delta (partial JSON for tool arguments)
-  defp decode_sse_event(%{
-         event: "content_block_delta",
-         data: %{"delta" => %{"type" => "input_json_delta"}}
-       }) do
-    # For now, we'll skip partial JSON parsing - this would need to be reconstructed
-    # from multiple events to get the full tool arguments
-    []
-  end
-
-  # Handle content block stop for tool_use
-  defp decode_sse_event(%{event: "content_block_stop"}) do
-    # This indicates the end of a content block
-    []
-  end
-
-  defp decode_sse_event(%{
-         event: "tool_use_delta",
-         data: %{"delta" => %{"type" => "tool_call", "name" => name, "input" => input}}
-       }) do
-    [StreamChunk.tool_call(name, input)]
-  end
-
-  defp decode_sse_event(_event), do: []
 end
 
 # Protocol implementation for direct Map decoding (zero-ceremony API)

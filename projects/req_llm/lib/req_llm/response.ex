@@ -379,6 +379,6 @@ defmodule ReqLLM.Response do
     stream
     |> Stream.filter(&(&1.type == :tool_call))
     |> Stream.filter(&(&1.name == "structured_output"))
-    |> Stream.map(&{:ok, &1.arguments})
+    |> Stream.map(&(&1.arguments))
   end
 end
