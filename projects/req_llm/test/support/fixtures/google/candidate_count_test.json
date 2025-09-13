@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "google-response-1757723921354148",
+      "id": "google-response-1757783957894854",
       "message": {
         "name": null,
         "metadata": {},
@@ -15,7 +15,7 @@
             "type": "text",
             "filename": null,
             "metadata": {},
-            "text": "1. Hello there!\n2. Good to see you.\n3. Greetings and salutations",
+            "text": "1. Hello there!\n2. Good day to you.\n3. Greetings and salutations",
             "url": null,
             "media_type": null,
             "tool_call_id": null,
@@ -39,7 +39,7 @@
                 "type": "text",
                 "filename": null,
                 "metadata": {},
-                "text": "1. Hello there!\n2. Good to see you.\n3. Greetings and salutations",
+                "text": "1. Hello there!\n2. Good day to you.\n3. Greetings and salutations",
                 "url": null,
                 "media_type": null,
                 "tool_call_id": null,
@@ -63,10 +63,10 @@
       "finish_reason": "length",
       "provider_meta": {
         "modelVersion": "gemini-1.5-flash",
-        "responseId": "Eb3EaK65AZ-p_uMP6M3A0Q8"
+        "responseId": "lafFaLeeIc6m_uMPn-vfyQQ"
       }
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:38:41.354877Z"
+  "captured_at": "2025-09-13T17:19:17.895027Z"
 }

@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "9c765797-5a62-51c2-9789-25a9dbcb6159_us-east-1",
+      "id": "556b2274-9d92-7665-21ac-357f26691571_us-east-1",
       "message": {
         "name": null,
         "metadata": {},
@@ -61,7 +61,7 @@
       "stream?": false,
       "finish_reason": "length",
       "provider_meta": {
-        "created": 1757729065,
+        "created": 1757783779,
         "live_search_used": null,
         "object": "chat.completion",
         "system_fingerprint": "fp_6a09108ff5",
@@ -70,5 +70,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T02:04:26.558620Z"
+  "captured_at": "2025-09-13T17:16:19.893813Z"
 }

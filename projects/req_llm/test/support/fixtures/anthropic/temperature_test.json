@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "msg_01FzuHo3PQvf6JSjEz2UeWnH",
+      "id": "msg_01ApdybyNZ2wJp57cWbWbTLk",
       "message": {
         "name": null,
         "metadata": {},
@@ -52,11 +52,11 @@
         ]
       },
       "usage": {
+        "service_tier": "standard",
         "cache_creation_input_tokens": 0,
         "cache_read_input_tokens": 0,
         "input_tokens": 14,
         "output_tokens": 7,
-        "service_tier": "standard",
         "total_tokens": 21
       },
       "model": "claude-3-haiku-20240307",
@@ -70,5 +70,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:19:12.725805Z"
+  "captured_at": "2025-09-13T17:16:29.094630Z"
 }

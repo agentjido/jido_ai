@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "gen-1757724464-PKWnBHR3A5bxFX3ISDr8",
+      "id": "gen-1757783800-MupMc9WoZwPZ2reXhCmu",
       "message": {
         "name": null,
         "metadata": {},
@@ -60,7 +60,7 @@
       "stream?": false,
       "finish_reason": "length",
       "provider_meta": {
-        "created": 1757724464,
+        "created": 1757783800,
         "native_finish_reason": "length",
         "object": "chat.completion",
         "provider": "Anthropic"
@@ -68,5 +68,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:47:44.898918Z"
+  "captured_at": "2025-09-13T17:16:40.871587Z"
 }

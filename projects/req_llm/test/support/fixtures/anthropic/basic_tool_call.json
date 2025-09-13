@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "msg_01UA1oKXBycuugp5VEFRecLJ",
+      "id": "msg_01Dn47GCA593wb5bT5UKoHxY",
       "message": {
         "name": null,
         "metadata": {},
@@ -33,7 +33,7 @@
             "text": null,
             "url": null,
             "media_type": null,
-            "tool_call_id": "toolu_0187bYJ1hhf7HZLCS8iwB6QD",
+            "tool_call_id": "toolu_01Xf3X3kAzBv1mf7xxKTAu6d",
             "tool_name": "get_weather"
           }
         ],
@@ -72,7 +72,7 @@
                 "text": null,
                 "url": null,
                 "media_type": null,
-                "tool_call_id": "toolu_0187bYJ1hhf7HZLCS8iwB6QD",
+                "tool_call_id": "toolu_01Xf3X3kAzBv1mf7xxKTAu6d",
                 "tool_name": "get_weather"
               }
             ],
@@ -100,5 +100,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T13:53:54.042815Z"
+  "captured_at": "2025-09-13T17:16:27.624710Z"
 }

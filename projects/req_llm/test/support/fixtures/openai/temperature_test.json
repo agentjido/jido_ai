@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "chatcmpl-CF8H8I2nnM93mCMFWL3i4ZFO1yOqW",
+      "id": "chatcmpl-CFO9Rv2op9t5KLD45h90BwKKSgVFE",
       "message": {
         "name": null,
         "metadata": {},
@@ -60,7 +60,7 @@
       "stream?": false,
       "finish_reason": "stop",
       "provider_meta": {
-        "created": 1757722766,
+        "created": 1757783793,
         "object": "chat.completion",
         "service_tier": "default",
         "system_fingerprint": "fp_560af6e559"
@@ -68,5 +68,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:19:27.291706Z"
+  "captured_at": "2025-09-13T17:16:33.477521Z"
 }

@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "3bac12ac-1148-365f-f667-f68e0ed4ed42_us-east-1",
+      "id": "d6680a87-e398-90aa-8278-706158a37a4a_us-east-1",
       "message": {
         "name": null,
         "metadata": {},
@@ -15,7 +15,7 @@
             "type": "text",
             "filename": null,
             "metadata": {},
-            "text": "First, the user asked for a short joke. I need to keep it brief and simple.\n\nA good joke typically has a setup and a punchline. It should be clean and family-friendly since there's no indication otherwise.\n\nLet me think of a classic",
+            "text": "First, the user asked for a short joke. I need to recall or come up with a short, clean joke that's appropriate and engaging.\n\nA good short joke should be:\n- Concise: Keep it under 50 words if possible.\n- Funny",
             "url": null,
             "media_type": null,
             "tool_call_id": null,
@@ -39,7 +39,7 @@
                 "type": "text",
                 "filename": null,
                 "metadata": {},
-                "text": "First, the user asked for a short joke. I need to keep it brief and simple.\n\nA good joke typically has a setup and a punchline. It should be clean and family-friendly since there's no indication otherwise.\n\nLet me think of a classic",
+                "text": "First, the user asked for a short joke. I need to recall or come up with a short, clean joke that's appropriate and engaging.\n\nA good short joke should be:\n- Concise: Keep it under 50 words if possible.\n- Funny",
                 "url": null,
                 "media_type": null,
                 "tool_call_id": null,
@@ -61,7 +61,7 @@
       "stream?": false,
       "finish_reason": "length",
       "provider_meta": {
-        "created": 1757729054,
+        "created": 1757783783,
         "live_search_used": null,
         "object": "chat.completion",
         "system_fingerprint": "fp_6a09108ff5",
@@ -70,5 +70,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T02:04:15.031707Z"
+  "captured_at": "2025-09-13T17:16:24.400457Z"
 }

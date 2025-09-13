@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "gen-1757724463-xiHPRPt9KRtKKy0rjgwb",
+      "id": "gen-1757783798-wzIRijedcMZTDPW9qZxO",
       "message": {
         "name": null,
         "metadata": {},
@@ -15,7 +15,7 @@
             "type": "text",
             "filename": null,
             "metadata": {},
-            "text": "Hello! It's nice",
+            "text": "Hello there! It's",
             "url": null,
             "media_type": null,
             "tool_call_id": null,
@@ -39,7 +39,7 @@
                 "type": "text",
                 "filename": null,
                 "metadata": {},
-                "text": "Hello! It's nice",
+                "text": "Hello there! It's",
                 "url": null,
                 "media_type": null,
                 "tool_call_id": null,
@@ -60,7 +60,7 @@
       "stream?": false,
       "finish_reason": "length",
       "provider_meta": {
-        "created": 1757724463,
+        "created": 1757783798,
         "native_finish_reason": "length",
         "object": "chat.completion",
         "provider": "Anthropic"
@@ -68,5 +68,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:47:44.324031Z"
+  "captured_at": "2025-09-13T17:16:38.648567Z"
 }

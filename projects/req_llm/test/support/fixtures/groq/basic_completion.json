@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "chatcmpl-a6364d7f-6c63-47c6-92f1-fc8d97d169ec",
+      "id": "chatcmpl-ed325584-7a8f-4e5d-b46c-bfcf1f666b28",
       "message": {
         "name": null,
         "metadata": {},
@@ -15,7 +15,7 @@
             "type": "text",
             "filename": null,
             "metadata": {},
-            "text": "Hello, how can I",
+            "text": "Hello! It's nice",
             "url": null,
             "media_type": null,
             "tool_call_id": null,
@@ -39,7 +39,7 @@
                 "type": "text",
                 "filename": null,
                 "metadata": {},
-                "text": "Hello, how can I",
+                "text": "Hello! It's nice",
                 "url": null,
                 "media_type": null,
                 "tool_call_id": null,
@@ -60,17 +60,17 @@
       "stream?": false,
       "finish_reason": "length",
       "provider_meta": {
-        "created": 1757726387,
+        "created": 1757783811,
         "object": "chat.completion",
         "service_tier": "on_demand",
-        "system_fingerprint": "fp_55d70a61e4",
+        "system_fingerprint": "fp_46fc01befd",
         "usage_breakdown": null,
         "x_groq": {
-          "id": "req_01k50agbe1evpbxhm49r996j88"
+          "id": "req_01k5218s57fjatky2rcr39e9rc"
         }
       }
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T01:19:47.859355Z"
+  "captured_at": "2025-09-13T17:16:51.413792Z"
 }

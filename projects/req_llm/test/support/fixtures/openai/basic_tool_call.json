@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "chatcmpl-CFMUqpOLUTZZtkdMB7vAfS6AQLMnz",
+      "id": "chatcmpl-CFO9SPtp849cJjIfvDAGKoswUJamR",
       "message": {
         "name": null,
         "metadata": {},
@@ -20,7 +20,7 @@
             "text": null,
             "url": null,
             "media_type": null,
-            "tool_call_id": "call_5lA85g3Ws31A243TX03VRW2V",
+            "tool_call_id": "call_CWjFPlOM4XMrPYzpRhap8LxT",
             "tool_name": "get_weather"
           }
         ],
@@ -46,7 +46,7 @@
                 "text": null,
                 "url": null,
                 "media_type": null,
-                "tool_call_id": "call_5lA85g3Ws31A243TX03VRW2V",
+                "tool_call_id": "call_CWjFPlOM4XMrPYzpRhap8LxT",
                 "tool_name": "get_weather"
               }
             ],
@@ -64,7 +64,7 @@
       "stream?": false,
       "finish_reason": "tool_calls",
       "provider_meta": {
-        "created": 1757777432,
+        "created": 1757783794,
         "object": "chat.completion",
         "service_tier": "default",
         "system_fingerprint": "fp_560af6e559"
@@ -72,5 +72,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T15:30:32.963855Z"
+  "captured_at": "2025-09-13T17:16:35.447074Z"
 }

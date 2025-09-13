@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "stream-7",
+      "id": "stream-133",
       "message": {
         "name": null,
         "metadata": {},
@@ -10,7 +10,7 @@
         "content": [
           {
             "type": "text",
-            "text": "Hello! I'm an AI assistant created by Anthropic. It's nice to meet you."
+            "text": "Hello! It's nice to meet you. How can I assist you today?"
           }
         ],
         "tool_call_id": null,
@@ -31,5 +31,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T13:14:29.628880Z"
+  "captured_at": "2025-09-13T17:16:17.792994Z"
 }
