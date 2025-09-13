@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "9676351e-c9a6-5271-924a-64ce4580e12e_us-east-1",
+      "id": "7f8a1061-a91d-708d-2d37-775267e7ea82_us-east-1",
       "message": {
         "name": null,
         "metadata": {},
@@ -15,7 +15,7 @@
             "type": "text",
             "filename": null,
             "metadata": {},
-            "text": "First, the user said: \"Count from 1 to 3.\" This seems straightforward. It's asking me to count numbers from 1 to 3.\n\nAs an AI, I should respond in a helpful and accurate way. The simplest response would",
+            "text": "First, the user said: \"Count from 1 to 3.\" This seems straightforward. They want me to count the numbers from 1 to 3.\n\nAs an AI, I should respond helpfully and accurately. Counting from 1 to",
             "url": null,
             "media_type": null,
             "tool_call_id": null,
@@ -39,7 +39,7 @@
                 "type": "text",
                 "filename": null,
                 "metadata": {},
-                "text": "First, the user said: \"Count from 1 to 3.\" This seems straightforward. It's asking me to count numbers from 1 to 3.\n\nAs an AI, I should respond in a helpful and accurate way. The simplest response would",
+                "text": "First, the user said: \"Count from 1 to 3.\" This seems straightforward. They want me to count the numbers from 1 to 3.\n\nAs an AI, I should respond helpfully and accurately. Counting from 1 to",
                 "url": null,
                 "media_type": null,
                 "tool_call_id": null,
@@ -61,7 +61,7 @@
       "stream?": false,
       "finish_reason": "length",
       "provider_meta": {
-        "created": 1757729055,
+        "created": 1757783780,
         "live_search_used": null,
         "object": "chat.completion",
         "system_fingerprint": "fp_6a09108ff5",
@@ -70,5 +70,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T02:04:16.049970Z"
+  "captured_at": "2025-09-13T17:16:21.824248Z"
 }

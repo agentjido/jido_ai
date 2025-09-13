@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "google-response-1757723919893249",
+      "id": "google-response-1757783809064296",
       "message": {
         "name": null,
         "metadata": {},
@@ -15,7 +15,7 @@
             "type": "text",
             "filename": null,
             "metadata": {},
-            "text": "Hello there!\n",
+            "text": "Hello there!  How",
             "url": null,
             "media_type": null,
             "tool_call_id": null,
@@ -39,7 +39,7 @@
                 "type": "text",
                 "filename": null,
                 "metadata": {},
-                "text": "Hello there!\n",
+                "text": "Hello there!  How",
                 "url": null,
                 "media_type": null,
                 "tool_call_id": null,
@@ -53,20 +53,20 @@
       },
       "usage": {
         "input_tokens": 2,
-        "output_tokens": 4,
-        "total_tokens": 6,
+        "output_tokens": 5,
+        "total_tokens": 7,
         "cached_content_token_count": 0,
-        "total_token_count": 6
+        "total_token_count": 7
       },
       "model": "gemini-1.5-flash",
       "stream?": false,
-      "finish_reason": "stop",
+      "finish_reason": "length",
       "provider_meta": {
         "modelVersion": "gemini-1.5-flash",
-        "responseId": "D73EaNz7Idmf_uMP6Nff0Qg"
+        "responseId": "AKfFaMDYNJGS_uMPjPGliA0"
       }
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:38:39.893402Z"
+  "captured_at": "2025-09-13T17:16:49.065301Z"
 }

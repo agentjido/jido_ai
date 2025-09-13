@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "google-response-1757723922800787",
+      "id": "google-response-1757783810618199",
       "message": {
         "name": null,
         "metadata": {},
@@ -63,10 +63,10 @@
       "finish_reason": "length",
       "provider_meta": {
         "modelVersion": "gemini-1.5-flash",
-        "responseId": "Er3EaJeXGqW6_uMPi-Sz2A8"
+        "responseId": "AqfFaL7GGLGi_uMPr4if0QQ"
       }
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:38:42.801626Z"
+  "captured_at": "2025-09-13T17:16:50.618678Z"
 }

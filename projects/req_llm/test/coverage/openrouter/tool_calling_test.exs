@@ -11,5 +11,5 @@ defmodule ReqLLM.Coverage.OpenRouter.ToolCallingTest do
 
   use ReqLLM.ProviderTest.ToolCalling,
     provider: :openrouter,
-    model: "openrouter:anthropic/claude-3-haiku"
+    model: "openrouter:openai/gpt-4o-mini"
 end

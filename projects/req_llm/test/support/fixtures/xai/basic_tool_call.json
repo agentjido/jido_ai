@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "b54c8d3f-bc8b-6d1d-3abb-339922cd8b44_us-east-1",
+      "id": "b2db3883-f3d2-86f1-14f7-bb480b2deed7_us-east-1",
       "message": {
         "name": null,
         "metadata": {},
@@ -20,7 +20,7 @@
             "text": null,
             "url": null,
             "media_type": null,
-            "tool_call_id": "call_19043840",
+            "tool_call_id": "call_49617208",
             "tool_name": "get_weather"
           }
         ],
@@ -46,7 +46,7 @@
                 "text": null,
                 "url": null,
                 "media_type": null,
-                "tool_call_id": "call_19043840",
+                "tool_call_id": "call_49617208",
                 "tool_name": "get_weather"
               }
             ],
@@ -58,14 +58,14 @@
       "usage": {
         "input_tokens": 309,
         "output_tokens": 28,
-        "total_tokens": 686,
+        "total_tokens": 707,
         "live_search_sources": 0
       },
       "model": "grok-3-mini",
       "stream?": false,
       "finish_reason": "tool_calls",
       "provider_meta": {
-        "created": 1757783212,
+        "created": 1757783802,
         "live_search_used": null,
         "object": "chat.completion",
         "system_fingerprint": "fp_6a09108ff5",
@@ -74,5 +74,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T17:06:57.813184Z"
+  "captured_at": "2025-09-13T17:16:48.757163Z"
 }

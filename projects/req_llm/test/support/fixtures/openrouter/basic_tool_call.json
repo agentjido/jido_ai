@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "gen-1757777930-4ffFCYOrlvYem95Tr37A",
+      "id": "gen-1757783998-xbeRiOu51gVWZQ7gUqXu",
       "message": {
         "name": null,
         "metadata": {},
@@ -11,8 +11,7 @@
           {
             "data": null,
             "input": {
-              "location": "Paris, France",
-              "unit": "metric"
+              "location": "Paris, France"
             },
             "output": null,
             "type": "tool_call",
@@ -21,7 +20,7 @@
             "text": null,
             "url": null,
             "media_type": null,
-            "tool_call_id": "toolu_012FH9G19jJCSJ3y49z1m28w",
+            "tool_call_id": "call_G0xAOy2uXY2ttjTbSXDHIhSC",
             "tool_name": "get_weather"
           }
         ],
@@ -38,8 +37,7 @@
               {
                 "data": null,
                 "input": {
-                  "location": "Paris, France",
-                  "unit": "metric"
+                  "location": "Paris, France"
                 },
                 "output": null,
                 "type": "tool_call",
@@ -48,7 +46,7 @@
                 "text": null,
                 "url": null,
                 "media_type": null,
-                "tool_call_id": "toolu_012FH9G19jJCSJ3y49z1m28w",
+                "tool_call_id": "call_G0xAOy2uXY2ttjTbSXDHIhSC",
                 "tool_name": "get_weather"
               }
             ],
@@ -58,21 +56,22 @@
         ]
       },
       "usage": {
-        "input_tokens": 374,
-        "output_tokens": 72,
-        "total_tokens": 446
+        "input_tokens": 78,
+        "output_tokens": 16,
+        "total_tokens": 94
       },
-      "model": "anthropic/claude-3-haiku",
+      "model": "openai/gpt-4o-mini",
       "stream?": false,
       "finish_reason": "tool_calls",
       "provider_meta": {
-        "created": 1757777930,
+        "created": 1757783998,
         "native_finish_reason": "tool_calls",
         "object": "chat.completion",
-        "provider": "Anthropic"
+        "provider": "OpenAI",
+        "system_fingerprint": "fp_560af6e559"
       }
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T15:38:51.924578Z"
+  "captured_at": "2025-09-13T17:19:58.836612Z"
 }

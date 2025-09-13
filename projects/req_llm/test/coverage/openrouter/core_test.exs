@@ -77,7 +77,7 @@ defmodule ReqLLM.Coverage.OpenRouter.CoreTest do
             max_tokens: 10,
             temperature: 0.7,
             # Set minimum probability threshold
-            min_p: 0.1
+            provider_options: [min_p: 0.1]
           )
         end)
 

@@ -26,7 +26,7 @@ defmodule ReqLLM.Coverage.Google.CoreTest do
             max_tokens: 20,
             temperature: 0.9,
             # Google supports 1-8 candidates
-            candidate_count: 1
+            provider_options: [candidate_count: 1]
           )
         end)
 
