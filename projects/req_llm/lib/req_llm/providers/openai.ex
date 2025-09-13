@@ -76,11 +76,23 @@ defmodule ReqLLM.Providers.OpenAI do
     end
   end
 
+  def prepare_request(:embedding, model_input, text, opts) do
+    with {:ok, model} <- ReqLLM.Model.from(model_input) do
+      http_opts = Keyword.get(opts, :req_http_options, [])
+
+      request =
+        Req.new([url: "/embeddings", method: :post, receive_timeout: 30_000] ++ http_opts)
+        |> attach(model, Keyword.merge(opts, [text: text, operation: :embedding]))
+
+      {:ok, request}
+    end
+  end
+
   def prepare_request(operation, _model, _input, _opts) do
     {:error,
      ReqLLM.Error.Invalid.Parameter.exception(
        parameter:
-         "operation: #{inspect(operation)} not supported by OpenAI provider. Supported operations: [:chat]"
+         "operation: #{inspect(operation)} not supported by OpenAI provider. Supported operations: [:chat, :embedding]"
      )}
   end
 
@@ -142,6 +154,28 @@ defmodule ReqLLM.Providers.OpenAI do
   # Req pipeline steps
   @impl ReqLLM.Provider
   def encode_body(request) do
+    body =
+      case request.options[:operation] do
+        :embedding ->
+          encode_embedding_body(request)
+
+        _ ->
+          encode_chat_body(request)
+      end
+
+    try do
+      encoded_body = Jason.encode!(body)
+
+      request
+      |> Req.Request.put_header("content-type", "application/json")
+      |> Map.put(:body, encoded_body)
+    rescue
+      error ->
+        reraise error, __STACKTRACE__
+    end
+  end
+
+  defp encode_chat_body(request) do
     context_data =
       case request.options[:context] do
         %ReqLLM.Context{} = ctx ->
@@ -162,30 +196,30 @@ defmodule ReqLLM.Providers.OpenAI do
           %{}
       end
 
-    body =
-      %{
-        model: request.options[:model] || request.options[:id],
-        temperature: request.options[:temperature],
-        max_tokens: request.options[:max_tokens],
-        stream: request.options[:stream]
-      }
-      |> Map.merge(context_data)
-      |> Map.merge(tools_data)
-      |> maybe_put(:top_p, request.options[:top_p])
-      |> maybe_put(:frequency_penalty, request.options[:frequency_penalty])
-      |> maybe_put(:presence_penalty, request.options[:presence_penalty])
-      |> maybe_put(:stop, request.options[:stop])
+    %{
+      model: request.options[:model] || request.options[:id],
+      temperature: request.options[:temperature],
+      max_tokens: request.options[:max_tokens],
+      stream: request.options[:stream]
+    }
+    |> Map.merge(context_data)
+    |> Map.merge(tools_data)
+    |> maybe_put(:top_p, request.options[:top_p])
+    |> maybe_put(:frequency_penalty, request.options[:frequency_penalty])
+    |> maybe_put(:presence_penalty, request.options[:presence_penalty])
+    |> maybe_put(:stop, request.options[:stop])
+  end
 
-    try do
-      encoded_body = Jason.encode!(body)
+  defp encode_embedding_body(request) do
+    input = request.options[:text]
 
-      request
-      |> Req.Request.put_header("content-type", "application/json")
-      |> Map.put(:body, encoded_body)
-    rescue
-      error ->
-        reraise error, __STACKTRACE__
-    end
+    %{
+      model: request.options[:model] || request.options[:id],
+      input: input
+    }
+    |> maybe_put(:dimensions, request.options[:dimensions])
+    |> maybe_put(:encoding_format, request.options[:encoding_format])
+    |> maybe_put(:user, request.options[:user])
   end
 
   @impl ReqLLM.Provider

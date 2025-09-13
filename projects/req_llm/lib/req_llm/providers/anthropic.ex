@@ -80,11 +80,45 @@ defmodule ReqLLM.Providers.Anthropic do
     end
   end
 
+  def prepare_request(:object, model_input, %ReqLLM.Context{} = context, compiled_schema, opts) do
+    # For object generation, we need to add the structured output tool
+    # Extract the original schema from the compiled NimbleOptions
+    json_schema = ReqLLM.Schema.to_json(compiled_schema.schema)
+    
+    # Create the structured_output tool
+    structured_output_tool = ReqLLM.Tool.new!([
+      name: "structured_output", 
+      description: "Generate structured output matching the provided schema",
+      parameter_schema: compiled_schema.schema,
+      callback: fn _args -> {:ok, "structured output generated"} end
+    ])
+    
+    # Add the tool to the options
+    opts_with_tool = Keyword.update(opts, :tools, [structured_output_tool], fn tools ->
+      [structured_output_tool | tools]
+    end)
+    
+    # Force the model to use our structured output tool by setting tool_choice
+    opts_with_choice = Keyword.put(opts_with_tool, :tool_choice, %{
+      type: "tool",
+      name: "structured_output"
+    })
+    
+    # Ensure max_tokens is set for tool calling
+    opts_with_max_tokens = case Keyword.get(opts_with_choice, :max_tokens) do
+      nil -> Keyword.put(opts_with_choice, :max_tokens, 4096)
+      _value -> opts_with_choice
+    end
+    
+    # Use the regular chat preparation with our modified options
+    prepare_request(:chat, model_input, context, opts_with_max_tokens)
+  end
+
   def prepare_request(operation, _model, _input, _opts) do
     {:error,
      ReqLLM.Error.Invalid.Parameter.exception(
        parameter:
-         "operation: #{inspect(operation)} not supported by Anthropic provider. Supported operations: [:chat]"
+         "operation: #{inspect(operation)} not supported by Anthropic provider. Supported operations: [:chat, :object]"
      )}
   end
 

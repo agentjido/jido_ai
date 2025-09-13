@@ -324,19 +324,35 @@ defmodule ReqLLM.Generation do
   @doc """
   Generates structured data using an AI model with schema validation.
 
-  This is a placeholder implementation that returns `:not_implemented`.
-  The actual implementation will be added later.
+  Returns a canonical ReqLLM.Response which includes the generated object, usage data,
+  context, and metadata. For simple object-only results, use `generate_object!/4`.
 
   ## Parameters
 
     * `model_spec` - Model specification in various formats
     * `messages` - Text prompt or list of messages
-    * `schema` - Schema definition for structured output
+    * `schema` - Schema definition for structured output (keyword list)
     * `opts` - Additional options (keyword list)
 
-  ## Returns
+  ## Options
 
-    `{:error, :not_implemented}` - Placeholder response
+    * `:temperature` - Control randomness in responses (0.0 to 2.0)
+    * `:max_tokens` - Limit the length of the response
+    * `:top_p` - Nucleus sampling parameter
+    * `:presence_penalty` - Penalize new tokens based on presence
+    * `:frequency_penalty` - Penalize new tokens based on frequency
+    * `:system_prompt` - System prompt to prepend
+    * `:provider_options` - Provider-specific options
+
+  ## Examples
+
+      {:ok, response} = ReqLLM.Generation.generate_object("anthropic:claude-3-sonnet", "Generate a person", person_schema)
+      ReqLLM.Response.object(response)
+      #=> %{name: "Alice Smith", age: 30, occupation: "Engineer"}
+
+      # Access usage metadata
+      ReqLLM.Response.usage(response)
+      #=> %{input_tokens: 25, output_tokens: 15}
 
   """
   @spec generate_object(
@@ -344,27 +360,46 @@ defmodule ReqLLM.Generation do
           String.t() | list(),
           keyword(),
           keyword()
-        ) :: {:error, :not_implemented}
-  def generate_object(_model_spec, _messages, _schema, _opts \\ []) do
-    {:error, :not_implemented}
+        ) :: {:ok, Response.t()} | {:error, term()}
+  def generate_object(model_spec, messages, object_schema, opts \\ []) do
+    with {:ok, model} <- Model.from(model_spec),
+         {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         options_schema = dynamic_schema(provider_module),
+         {:ok, validated_opts} <- NimbleOptions.validate(opts, options_schema),
+         {:ok, compiled_schema} <- ReqLLM.Schema.compile(object_schema),
+         context = build_context(messages, validated_opts),
+         {:ok, configured_request} <-
+           provider_module.prepare_request(:object, model, context, compiled_schema, validated_opts),
+         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
+      Response.decode_object(decoded_response, model, object_schema)
+    end
   end
 
   @doc """
   Streams structured data generation using an AI model with schema validation.
 
-  This is a placeholder implementation that returns `:not_implemented`.
-  The actual implementation will be added later.
+  Returns a canonical ReqLLM.Response containing usage data and object stream.
+  For simple object streaming without metadata, use `stream_object!/4`.
 
   ## Parameters
 
     * `model_spec` - Model specification in various formats
     * `messages` - Text prompt or list of messages
-    * `schema` - Schema definition for structured output
+    * `schema` - Schema definition for structured output (keyword list)
     * `opts` - Additional options (keyword list)
 
-  ## Returns
+  ## Options
 
-    `{:error, :not_implemented}` - Placeholder response
+  Same as `generate_object/4`.
+
+  ## Examples
+
+      {:ok, response} = ReqLLM.Generation.stream_object("anthropic:claude-3-sonnet", "Generate a person", person_schema)
+      ReqLLM.Response.object_stream(response) |> Enum.each(&IO.inspect/1)
+
+      # Access usage metadata after streaming
+      ReqLLM.Response.usage(response)
+      #=> %{input_tokens: 25, output_tokens: 15}
 
   """
   @spec stream_object(
@@ -372,27 +407,37 @@ defmodule ReqLLM.Generation do
           String.t() | list(),
           keyword(),
           keyword()
-        ) :: {:error, :not_implemented}
-  def stream_object(_model_spec, _messages, _schema, _opts \\ []) do
-    {:error, :not_implemented}
+        ) :: {:ok, Response.t()} | {:error, term()}
+  def stream_object(model_spec, messages, object_schema, opts \\ []) do
+    with {:ok, model} <- Model.from(model_spec),
+         {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         options_schema = dynamic_schema(provider_module),
+         {:ok, validated_opts} <- NimbleOptions.validate(opts, options_schema),
+         {:ok, compiled_schema} <- ReqLLM.Schema.compile(object_schema),
+         stream_opts = Keyword.put(validated_opts, :stream, true),
+         context = build_context(messages, stream_opts),
+         {:ok, configured_request} <-
+           provider_module.prepare_request(:object, model, context, compiled_schema, stream_opts),
+         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
+      Response.decode_object_stream(decoded_response, model, object_schema)
+    end
   end
 
   @doc """
   Generates structured data using an AI model, returning only the object content.
 
-  This is a placeholder implementation that returns `:not_implemented`.
-  The actual implementation will be added later.
+  This is a convenience function that extracts just the object from the response.
+  For access to usage metadata and other response data, use `generate_object/4`.
 
   ## Parameters
 
-    * `model_spec` - Model specification in various formats
-    * `messages` - Text prompt or list of messages
-    * `schema` - Schema definition for structured output
-    * `opts` - Additional options (keyword list)
+  Same as `generate_object/4`.
 
-  ## Returns
+  ## Examples
 
-    `{:error, :not_implemented}` - Placeholder response
+      {:ok, object} = ReqLLM.Generation.generate_object!("anthropic:claude-3-sonnet", "Generate a person", person_schema)
+      object
+      #=> %{name: "Alice Smith", age: 30, occupation: "Engineer"}
 
   """
   @spec generate_object!(
@@ -400,27 +445,28 @@ defmodule ReqLLM.Generation do
           String.t() | list(),
           keyword(),
           keyword()
-        ) :: {:error, :not_implemented}
-  def generate_object!(_model_spec, _messages, _schema, _opts \\ []) do
-    {:error, :not_implemented}
+        ) :: {:ok, map()} | {:error, term()}
+  def generate_object!(model_spec, messages, object_schema, opts \\ []) do
+    case generate_object(model_spec, messages, object_schema, opts) do
+      {:ok, response} -> {:ok, Response.object(response)}
+      {:error, error} -> {:error, error}
+    end
   end
 
   @doc """
   Streams structured data generation using an AI model, returning only the stream.
 
-  This is a placeholder implementation that returns `:not_implemented`.
-  The actual implementation will be added later.
+  This is a convenience function that extracts just the stream from the response.
+  For access to usage metadata and other response data, use `stream_object/4`.
 
   ## Parameters
 
-    * `model_spec` - Model specification in various formats
-    * `messages` - Text prompt or list of messages
-    * `schema` - Schema definition for structured output
-    * `opts` - Additional options (keyword list)
+  Same as `stream_object/4`.
 
-  ## Returns
+  ## Examples
 
-    `{:error, :not_implemented}` - Placeholder response
+      {:ok, stream} = ReqLLM.Generation.stream_object!("anthropic:claude-3-sonnet", "Generate a person", person_schema)
+      stream |> Enum.each(&IO.inspect/1)
 
   """
   @spec stream_object!(
@@ -428,8 +474,11 @@ defmodule ReqLLM.Generation do
           String.t() | list(),
           keyword(),
           keyword()
-        ) :: {:error, :not_implemented}
-  def stream_object!(_model_spec, _messages, _schema, _opts \\ []) do
-    {:error, :not_implemented}
+        ) :: {:ok, Enumerable.t()} | {:error, term()}
+  def stream_object!(model_spec, messages, object_schema, opts \\ []) do
+    case stream_object(model_spec, messages, object_schema, opts) do
+      {:ok, response} -> {:ok, Response.object_stream(response)}
+      {:error, error} -> {:error, error}
+    end
   end
 end
