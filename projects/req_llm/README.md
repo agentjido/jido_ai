@@ -21,24 +21,46 @@ Req plugin that gives a uniform, provider-agnostic Elixir API for Large Language
 ## Quick Start
 
 ```elixir
-# mix.exs
-{:req_llm, "~> 0.1.0"}
+# Configure API keys
+ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
 
-# Configure at runtime
-ReqLLM.put_key(:anthropic_api_key, "sk-...")
+model = "anthropic:claude-3-sonnet"
 
-# One-shot generation (bang variant unwraps the text directly)
-{:ok, text} = ReqLLM.generate_text!("anthropic:claude-3-sonnet", "Hello")
+# Simple text generation
+{:ok, text} = ReqLLM.generate_text!(model, "Hello world")
+#=> {:ok, "Hello! How can I assist you today?"}
 
-# Streaming
-{:ok, stream} = ReqLLM.stream_text!("anthropic:claude-3-sonnet", "Tell a story")
+# Structured data generation
+schema = [name: [type: :string, required: true], age: [type: :pos_integer]]
+{:ok, person} = ReqLLM.generate_object!(model, "Generate a person", schema)
+#=> {:ok, %{name: "John Doe", age: 30}}
 
-# Non-bang variant returns a ReqLLM.Response struct — inspect usage directly
-{:ok, response} = ReqLLM.generate_text("openai:gpt-4o", "Hello")
-IO.inspect(response.usage)
+# With system prompts and parameters
+{:ok, response} = ReqLLM.generate_text(
+  "anthropic:claude-3-sonnet",
+  [
+    system("You are a helpful coding assistant"),
+    user("Explain recursion in Elixir")
+  ],
+  temperature: 0.7,
+  max_tokens: 200
+)
 
-# or explicitly
-usage = ReqLLM.Response.usage(response)
+# Tool calling
+weather_tool = ReqLLM.tool(
+  name: "get_weather",
+  description: "Get current weather for a location",
+  parameter_schema: [
+    location: [type: :string, required: true, doc: "City name"]
+  ],
+  callback: fn args -> {:ok, "Sunny, 72°F"} end
+)
+
+{:ok, response} = ReqLLM.generate_text(
+  "anthropic:claude-3-sonnet",
+  "What's the weather in Paris?",
+  tools: [weather_tool]
+)
 ```
 
 ## Docs

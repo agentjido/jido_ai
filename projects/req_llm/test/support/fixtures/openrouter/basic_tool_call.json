@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "gen-1757771360-FqCYIbtvqUtRJExbaFmA",
+      "id": "gen-1757777930-4ffFCYOrlvYem95Tr37A",
       "message": {
         "name": null,
         "metadata": {},
@@ -10,16 +10,19 @@
         "content": [
           {
             "data": null,
-            "input": null,
+            "input": {
+              "location": "Paris, France",
+              "unit": "metric"
+            },
             "output": null,
-            "type": "text",
+            "type": "tool_call",
             "filename": null,
             "metadata": {},
-            "text": "Okay, let's check the weather in Paris, France:",
+            "text": null,
             "url": null,
             "media_type": null,
-            "tool_call_id": null,
-            "tool_name": null
+            "tool_call_id": "toolu_012FH9G19jJCSJ3y49z1m28w",
+            "tool_name": "get_weather"
           }
         ],
         "tool_call_id": null,
@@ -34,16 +37,19 @@
             "content": [
               {
                 "data": null,
-                "input": null,
+                "input": {
+                  "location": "Paris, France",
+                  "unit": "metric"
+                },
                 "output": null,
-                "type": "text",
+                "type": "tool_call",
                 "filename": null,
                 "metadata": {},
-                "text": "Okay, let's check the weather in Paris, France:",
+                "text": null,
                 "url": null,
                 "media_type": null,
-                "tool_call_id": null,
-                "tool_name": null
+                "tool_call_id": "toolu_012FH9G19jJCSJ3y49z1m28w",
+                "tool_name": "get_weather"
               }
             ],
             "tool_call_id": null,
@@ -53,14 +59,14 @@
       },
       "usage": {
         "input_tokens": 374,
-        "output_tokens": 86,
-        "total_tokens": 460
+        "output_tokens": 72,
+        "total_tokens": 446
       },
       "model": "anthropic/claude-3-haiku",
       "stream?": false,
       "finish_reason": "tool_calls",
       "provider_meta": {
-        "created": 1757771360,
+        "created": 1757777930,
         "native_finish_reason": "tool_calls",
         "object": "chat.completion",
         "provider": "Anthropic"
@@ -68,5 +74,5 @@
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T13:49:21.418175Z"
+  "captured_at": "2025-09-13T15:38:51.924578Z"
 }
