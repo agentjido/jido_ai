@@ -42,14 +42,7 @@ defmodule ReqLLM.Providers.OpenAI do
     context_wrapper: ReqLLM.Providers.OpenAI.Context,
     response_wrapper: ReqLLM.Providers.OpenAI.Response,
     provider_schema: [
-      temperature: [type: :float, default: 0.7],
-      max_tokens: [type: :pos_integer, default: 1024],
-      stream: [type: :boolean, default: false],
-      tools: [type: {:list, :map}],
-      top_p: [type: :float],
-      frequency_penalty: [type: :float],
-      presence_penalty: [type: :float],
-      stop: [type: {:or, [{:list, :string}, :string]}]
+      # OpenAI currently shares core options - no provider-specific options yet
     ]
 
   @doc """

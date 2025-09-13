@@ -261,34 +261,26 @@ defmodule ReqLLM.Provider.DSL do
   end
 
   defp build_provider_schema(schema_opts) when is_list(schema_opts) do
-    # Validate that all provider schema keys exist in global generation schema
+    # Validate that provider schema keys don't overlap with core generation schema
     validate_schema_keys(schema_opts)
 
-    # Build schema by merging user opts with global schema defaults
+    # Build schema directly from provider-specific options
     quote do
-      global_schema = ReqLLM.Provider.Options.generation_options_schema().schema
-
-      schema_def =
-        Enum.map(unquote(schema_opts), fn {key, user_opts} ->
-          base_opts = Keyword.get(global_schema, key, [])
-          merged_opts = Keyword.merge(base_opts, user_opts)
-          {key, merged_opts}
-        end)
-
-      NimbleOptions.new!(schema_def)
+      NimbleOptions.new!(unquote(schema_opts))
     end
   end
 
-  # Compile-time validation that provider schema keys exist in global generation schema
+  # Compile-time validation that provider schema keys don't overlap with core options
   defp validate_schema_keys(schema_opts) do
-    global_keys = ReqLLM.Provider.Options.all_generation_keys()
+    core_keys = ReqLLM.Generation.schema().schema |> Keyword.keys()
 
     Enum.each(schema_opts, fn {key, _opts} ->
-      unless key in global_keys do
-        IO.warn(
-          "Provider schema key #{inspect(key)} does not exist in global generation schema. " <>
-            "Available keys: #{inspect(global_keys)}"
-        )
+      if key in core_keys do
+        raise CompileError,
+          description:
+            "Provider schema key #{inspect(key)} conflicts with core generation option. " <>
+              "Core keys: #{inspect(core_keys)}. " <>
+              "Provider-specific options should be unique to the provider."
       end
     end)
   end

@@ -13,123 +13,120 @@ defmodule ReqLLM.Generation do
 
   alias ReqLLM.{Model, Context, Response}
 
-  # Base text generation schema - shared by generate_text and stream_text
-  @text_opts_schema NimbleOptions.new!(
-                      temperature: [
-                        type: :float,
-                        doc: "Controls randomness in the output (0.0 to 2.0)"
-                      ],
-                      max_tokens: [
-                        type: :pos_integer,
-                        doc: "Maximum number of tokens to generate"
-                      ],
-                      top_p: [type: :float, doc: "Nucleus sampling parameter"],
-                      top_k: [type: :pos_integer, doc: "Top-k sampling parameter"],
-                      presence_penalty: [
-                        type: :float,
-                        doc: "Penalize new tokens based on presence"
-                      ],
-                      frequency_penalty: [
-                        type: :float,
-                        doc: "Penalize new tokens based on frequency"
-                      ],
-                      stop_sequences: [
-                        type: {:list, :string},
-                        doc: "Stop sequences to halt generation"
-                      ],
-                      response_format: [
-                        type: :map,
-                        doc: "Format for the response (e.g., JSON mode)"
-                      ],
-                      thinking: [
-                        type: :boolean,
-                        doc: "Enable thinking/reasoning tokens (beta feature)"
-                      ],
-                      tools: [type: :any, doc: "List of tool definitions"],
-                      tool_choice: [
-                        type: {:or, [:string, :atom, :map]},
-                        doc: "Tool choice strategy"
-                      ],
-                      system_prompt: [type: :string, doc: "System prompt to prepend"],
-                      provider_options: [type: :map, doc: "Provider-specific options"],
-                      reasoning: [
-                        type: {:in, [nil, false, true, "low", "auto", "high"]},
-                        doc: "Request reasoning tokens from the model"
-                      ],
-                      candidate_count: [
-                        type: :pos_integer,
-                        doc: "Number of response candidates to generate (Google-specific)"
-                      ],
-                      # OpenRouter-specific parameters
-                      repetition_penalty: [
-                        type: :float,
-                        doc: "Penalize repeated tokens (OpenRouter-specific)"
-                      ],
-                      logit_bias: [
-                        type: :map,
-                        doc: "Logit bias adjustments for tokens"
-                      ],
-                      top_logprobs: [
-                        type: :pos_integer,
-                        doc: "Number of top log probabilities to return"
-                      ],
-                      min_p: [
-                        type: :float,
-                        doc: "Minimum probability threshold for tokens (OpenRouter-specific)"
-                      ],
-                      top_a: [
-                        type: :float,
-                        doc: "Top-a sampling parameter (OpenRouter-specific)"
-                      ],
-                      user: [
-                        type: :string,
-                        doc: "User identifier for tracking/abuse detection"
-                      ],
-                      models: [
-                        type: {:list, :string},
-                        doc: "Alternative model list for routing (OpenRouter-specific)"
-                      ],
-                      provider: [
-                        type: :map,
-                        doc: "Provider routing preferences (OpenRouter-specific)"
-                      ],
-                      usage: [
-                        type: :map,
-                        doc: "Usage tracking preferences (OpenRouter-specific)"
-                      ],
-                      transforms: [
-                        type: {:list, :string},
-                        doc: "Prompt transforms to apply (OpenRouter-specific)"
-                      ],
-                      seed: [
-                        type: :pos_integer,
-                        doc: "Seed for deterministic outputs"
-                      ],
-                      # Groq-specific parameters
-                      service_tier: [
-                        type: :string,
-                        doc:
-                          "Performance tier: auto, on_demand, flex, performance (Groq-specific)"
-                      ],
-                      reasoning_effort: [
-                        type: :string,
-                        doc:
-                          "Reasoning effort level: none, default, low, medium, high (Groq-specific)"
-                      ],
-                      reasoning_format: [
-                        type: :string,
-                        doc: "Format for reasoning output (Groq-specific)"
-                      ],
-                      search_settings: [
-                        type: :map,
-                        doc:
-                          "Web search configuration with include/exclude domains (Groq-specific)"
-                      ],
-                      compound_custom: [
-                        type: :map,
-                        doc: "Custom configuration for Compound systems (Groq-specific)"
-                      ]
-                    )
+  @base_schema NimbleOptions.new!(
+                 temperature: [
+                   type: :float,
+                   doc: "Controls randomness in the output (0.0 to 2.0)"
+                 ],
+                 max_tokens: [
+                   type: :pos_integer,
+                   doc: "Maximum number of tokens to generate"
+                 ],
+                 top_p: [
+                   type: :float,
+                   doc: "Nucleus sampling parameter"
+                 ],
+                 top_k: [
+                   type: :pos_integer,
+                   doc: "Top-k sampling parameter"
+                 ],
+                 presence_penalty: [
+                   type: :float,
+                   doc: "Penalize new tokens based on presence"
+                 ],
+                 frequency_penalty: [
+                   type: :float,
+                   doc: "Penalize new tokens based on frequency"
+                 ],
+                 stop_sequences: [
+                   type: {:list, :string},
+                   doc: "Stop sequences to halt generation"
+                 ],
+                 response_format: [
+                   type: :map,
+                   doc: "Format for the response (e.g., JSON mode)"
+                 ],
+                 thinking: [
+                   type: :boolean,
+                   doc: "Enable thinking/reasoning tokens (beta feature)"
+                 ],
+                 tools: [
+                   type: :any,
+                   doc: "List of tool definitions"
+                 ],
+                 tool_choice: [
+                   type: {:or, [:string, :atom, :map]},
+                   doc: "Tool choice strategy"
+                 ],
+                 system_prompt: [
+                   type: :string,
+                   doc: "System prompt to prepend"
+                 ],
+                 provider_options: [
+                   type: {:or, [:map, {:list, :any}]},
+                   doc: "Provider-specific options (keyword list or map)",
+                   default: []
+                 ],
+                 reasoning: [
+                   type: {:in, [nil, false, true, "low", "auto", "high"]},
+                   doc: "Request reasoning tokens from the model"
+                 ],
+                 seed: [
+                   type: :pos_integer,
+                   doc: "Seed for deterministic outputs"
+                 ],
+                 user: [
+                   type: :string,
+                   doc: "User identifier for tracking/abuse detection"
+                 ]
+               )
+
+  @doc """
+  Returns the base generation options schema.
+
+  This schema contains only vendor-neutral options. Provider-specific options
+  should be validated separately by each provider.
+  """
+  @spec schema :: NimbleOptions.t()
+  def schema, do: @base_schema
+
+  @doc """
+  Builds a dynamic schema by composing the base schema with provider-specific options.
+
+  This function takes a provider module and creates a unified schema where provider-specific
+  options are nested under the :provider_options key with proper validation.
+
+  ## Parameters
+
+    * `provider_mod` - Provider module that defines provider_schema/0 function
+
+  ## Examples
+
+      schema = ReqLLM.Generation.dynamic_schema(ReqLLM.Providers.Groq)
+      NimbleOptions.validate([temperature: 0.7, provider_options: [service_tier: "auto"]], schema)
+      #=> {:ok, [temperature: 0.7, provider_options: [service_tier: "auto"]]}
+
+  """
+  @spec dynamic_schema(module()) :: NimbleOptions.t()
+  def dynamic_schema(provider_mod) do
+    if function_exported?(provider_mod, :provider_schema, 0) do
+      provider_keys = provider_mod.provider_schema().schema
+
+      # Update the :provider_options key with provider-specific nested schema
+      updated_schema =
+        Keyword.update!(@base_schema.schema, :provider_options, fn opt ->
+          Keyword.merge(opt,
+            type: :keyword_list,
+            keys: provider_keys,
+            default: []
+          )
+        end)
+
+      NimbleOptions.new!(updated_schema)
+    else
+      @base_schema
+    end
+  end
 
   @doc """
   Generates text using an AI model with full response metadata.
@@ -172,9 +169,10 @@ defmodule ReqLLM.Generation do
           keyword()
         ) :: {:ok, Response.t()} | {:error, term()}
   def generate_text(model_spec, messages, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
-         {:ok, model} <- Model.from(model_spec),
+    with {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         schema <- dynamic_schema(provider_module),
+         {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
          context <- build_context(messages, validated_opts),
          {:ok, configured_request} <-
            provider_module.prepare_request(:chat, model, context, validated_opts),
@@ -239,9 +237,10 @@ defmodule ReqLLM.Generation do
           keyword()
         ) :: {:ok, Response.t()} | {:error, term()}
   def stream_text(model_spec, messages, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
-         {:ok, model} <- Model.from(model_spec),
+    with {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         schema <- dynamic_schema(provider_module),
+         {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
          stream_opts = Keyword.put(validated_opts, :stream?, true),
          context <- build_context(messages, stream_opts),
          {:ok, configured_request} <-

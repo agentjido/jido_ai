@@ -39,24 +39,39 @@ defmodule ReqLLM.Providers.Groq do
     context_wrapper: ReqLLM.Providers.Groq.Context,
     response_wrapper: ReqLLM.Providers.Groq.Response,
     provider_schema: [
-      temperature: [type: :float, default: 0.7],
-      max_tokens: [type: :pos_integer, default: 1024],
-      top_p: [type: :float],
-      stream: [type: :boolean, default: false],
-      system: [type: :string],
-      tools: [type: {:list, :map}],
-      tool_choice: [type: {:or, [:string, :map]}],
-      response_format: [type: :map],
-      frequency_penalty: [type: :float],
-      presence_penalty: [type: :float],
-      logit_bias: [type: :map],
-      user: [type: :string],
-      service_tier: [type: :string],
-      reasoning_effort: [type: :string],
-      reasoning_format: [type: :string],
-      search_settings: [type: :map],
-      compound_custom: [type: :map],
-      seed: [type: :pos_integer]
+      # Groq-specific performance and service options
+      service_tier: [
+        type: {:in, ~w(auto on_demand flex performance)},
+        default: "auto",
+        doc: "Performance tier for Groq requests"
+      ],
+
+      # Reasoning capabilities
+      reasoning_effort: [
+        type: {:in, ~w(none default low medium high)},
+        default: "default",
+        doc: "Reasoning effort level"
+      ],
+      reasoning_format: [
+        type: :string,
+        doc: "Format for reasoning output"
+      ],
+
+      # Search and compound features
+      search_settings: [
+        type: :map,
+        doc: "Web search configuration with include/exclude domains"
+      ],
+      compound_custom: [
+        type: :map,
+        doc: "Custom configuration for Compound systems"
+      ],
+
+      # OpenAI-compatible options that Groq supports
+      logit_bias: [
+        type: :map,
+        doc: "Logit bias adjustments for tokens"
+      ]
     ]
 
   @doc """
@@ -122,14 +137,18 @@ defmodule ReqLLM.Providers.Groq do
             )
     end
 
-    # Extract tools separately to avoid validation issues
-    {tools, other_opts} = Keyword.pop(user_opts, :tools, [])
+    # Extract provider-specific options (already validated by dynamic schema)
+    provider_opts = Keyword.get(user_opts, :provider_options, [])
 
-    # Prepare validated options and extract what Req needs
-    opts = prepare_options!(__MODULE__, model, other_opts)
+    # Remove provider_options from main opts since we handle them separately
+    {_provider_options, core_opts} = Keyword.pop(user_opts, :provider_options, [])
 
-    # Add tools back after validation
-    opts = Keyword.put(opts, :tools, tools)
+    # Prepare validated core options
+    opts = prepare_options!(__MODULE__, model, core_opts)
+
+    # Merge provider-specific options into opts for encoding
+    opts = Keyword.merge(opts, provider_opts)
+
     base_url = Keyword.get(user_opts, :base_url, default_base_url())
     req_keys = __MODULE__.supported_provider_options() ++ [:model, :context]
 
@@ -156,85 +175,9 @@ defmodule ReqLLM.Providers.Groq do
 
   def extract_usage(_, _), do: {:error, :invalid_body}
 
-  # Parameter validation helpers
-  defp validate_parameter_ranges(opts) do
-    with :ok <- validate_temperature(opts[:temperature]),
-         :ok <- validate_top_p(opts[:top_p]),
-         :ok <- validate_max_tokens(opts[:max_tokens]),
-         :ok <- validate_frequency_penalty(opts[:frequency_penalty]),
-         :ok <- validate_presence_penalty(opts[:presence_penalty]),
-         :ok <- validate_service_tier(opts[:service_tier]),
-         :ok <- validate_reasoning_effort(opts[:reasoning_effort]) do
-      :ok
-    end
-  end
-
-  defp validate_temperature(nil), do: :ok
-  defp validate_temperature(temp) when is_number(temp) and temp >= 0.0 and temp <= 2.0, do: :ok
-
-  defp validate_temperature(temp),
-    do: {:error, "temperature must be between 0.0 and 2.0, got #{temp}"}
-
-  defp validate_top_p(nil), do: :ok
-  defp validate_top_p(top_p) when is_number(top_p) and top_p > 0.0 and top_p <= 1.0, do: :ok
-  defp validate_top_p(top_p), do: {:error, "top_p must be between 0.0 and 1.0, got #{top_p}"}
-
-  defp validate_max_tokens(nil), do: :ok
-
-  defp validate_max_tokens(max_tokens)
-       when is_integer(max_tokens) and max_tokens >= 1,
-       do: :ok
-
-  defp validate_max_tokens(max_tokens),
-    do: {:error, "max_tokens must be >= 1, got #{max_tokens}"}
-
-  defp validate_frequency_penalty(nil), do: :ok
-
-  defp validate_frequency_penalty(penalty)
-       when is_number(penalty) and penalty >= -2.0 and penalty <= 2.0,
-       do: :ok
-
-  defp validate_frequency_penalty(penalty),
-    do: {:error, "frequency_penalty must be between -2.0 and 2.0, got #{penalty}"}
-
-  defp validate_presence_penalty(nil), do: :ok
-
-  defp validate_presence_penalty(penalty)
-       when is_number(penalty) and penalty >= -2.0 and penalty <= 2.0,
-       do: :ok
-
-  defp validate_presence_penalty(penalty),
-    do: {:error, "presence_penalty must be between -2.0 and 2.0, got #{penalty}"}
-
-  defp validate_service_tier(nil), do: :ok
-
-  defp validate_service_tier(tier) when tier in ~w(auto on_demand flex performance),
-    do: :ok
-
-  defp validate_service_tier(tier),
-    do: {:error, "service_tier must be one of: auto, on_demand, flex, performance, got #{tier}"}
-
-  defp validate_reasoning_effort(nil), do: :ok
-
-  defp validate_reasoning_effort(effort) when effort in ~w(none default low medium high),
-    do: :ok
-
-  defp validate_reasoning_effort(effort),
-    do:
-      {:error, "reasoning_effort must be one of: none, default, low, medium, high, got #{effort}"}
-
   # Req pipeline steps
   @impl ReqLLM.Provider
   def encode_body(request) do
-    # Validate parameter ranges before proceeding
-    case validate_parameter_ranges(request.options) do
-      :ok ->
-        nil
-
-      {:error, reason} ->
-        raise ReqLLM.Error.Invalid.Parameter.exception(parameter: reason)
-    end
-
     context_data =
       case request.options[:context] do
         %ReqLLM.Context{} = ctx ->
@@ -259,14 +202,15 @@ defmodule ReqLLM.Providers.Groq do
       |> maybe_put(:stream, request.options[:stream])
       |> maybe_put(:frequency_penalty, request.options[:frequency_penalty])
       |> maybe_put(:presence_penalty, request.options[:presence_penalty])
-      |> maybe_put(:logit_bias, request.options[:logit_bias])
       |> maybe_put(:user, request.options[:user])
+      |> maybe_put(:seed, request.options[:seed])
+      # Groq-specific provider options
+      |> maybe_put(:logit_bias, request.options[:logit_bias])
       |> maybe_put(:service_tier, request.options[:service_tier])
       |> maybe_put(:reasoning_effort, request.options[:reasoning_effort])
       |> maybe_put(:reasoning_format, request.options[:reasoning_format])
       |> maybe_put(:search_settings, request.options[:search_settings])
       |> maybe_put(:compound_custom, request.options[:compound_custom])
-      |> maybe_put(:seed, request.options[:seed])
 
     # Handle tools if provided
     body =

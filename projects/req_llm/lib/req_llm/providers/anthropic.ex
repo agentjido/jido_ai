@@ -43,16 +43,7 @@ defmodule ReqLLM.Providers.Anthropic do
     context_wrapper: ReqLLM.Providers.Anthropic.Context,
     response_wrapper: ReqLLM.Providers.Anthropic.Response,
     provider_schema: [
-      temperature: [type: :float, default: 0.7],
-      max_tokens: [type: :pos_integer, default: 1024],
-      top_p: [type: :float],
-      top_k: [type: :pos_integer],
-      stream: [type: :boolean, default: false],
-      stop_sequences: [type: {:list, :string}, default: []],
-      system: [type: :string],
-      tools: [type: {:list, :map}],
-      response_format: [type: :map],
-      thinking: [type: :boolean, default: false]
+      # Anthropic currently shares core options - no provider-specific options yet
     ]
 
   @default_api_version "2023-06-01"

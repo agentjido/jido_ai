@@ -24,8 +24,10 @@ defmodule ReqLLM.Coverage.Groq.CoreTest do
 
           ReqLLM.generate_text("groq:llama-3.1-8b-instant", ctx,
             max_tokens: 20,
-            temperature: 0.7
-            # Note: service_tier may require paid plan
+            temperature: 0.7,
+            provider_options: [
+              service_tier: "auto"
+            ]
           )
         end)
 
@@ -47,8 +49,10 @@ defmodule ReqLLM.Coverage.Groq.CoreTest do
 
           ReqLLM.generate_text("groq:llama-3.1-8b-instant", ctx,
             max_tokens: 100,
-            temperature: 0.7
-            # Note: reasoning_effort may not be supported by all models
+            temperature: 0.7,
+            provider_options: [
+              reasoning_effort: "medium"
+            ]
           )
         end)
 
