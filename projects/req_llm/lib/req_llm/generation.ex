@@ -369,7 +369,13 @@ defmodule ReqLLM.Generation do
          {:ok, compiled_schema} <- ReqLLM.Schema.compile(object_schema),
          context = build_context(messages, validated_opts),
          {:ok, configured_request} <-
-           provider_module.prepare_request(:object, model, context, compiled_schema, validated_opts),
+           provider_module.prepare_request(
+             :object,
+             model,
+             context,
+             compiled_schema,
+             validated_opts
+           ),
          {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
       Response.decode_object(decoded_response, model, object_schema)
     end

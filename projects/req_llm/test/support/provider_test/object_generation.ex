@@ -50,11 +50,11 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
 
           # Extract the object from the response
           object = ReqLLM.Response.object(response)
-          
+
           # Verify it's a valid map with expected structure
           assert is_map(object)
           assert map_size(object) > 0
-          
+
           # Verify required fields are present
           assert Map.has_key?(object, "name")
           assert Map.has_key?(object, "age")
@@ -62,12 +62,12 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
           assert is_integer(object["age"])
           assert object["name"] != ""
           assert object["age"] > 0
-          
+
           # Verify optional fields if present
           if Map.has_key?(object, "occupation") do
             assert is_binary(object["occupation"])
           end
-          
+
           if Map.has_key?(object, "hobbies") do
             assert is_list(object["hobbies"])
             assert Enum.all?(object["hobbies"], &is_binary/1)
@@ -98,7 +98,7 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
             assert response.stream?
 
             # Get the object stream and collect objects
-            objects = 
+            objects =
               response
               |> ReqLLM.Response.object_stream()
               |> Enum.to_list()
@@ -113,7 +113,7 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
 
             # Verify required fields are present and not empty
             assert Map.has_key?(first_object, "name")
-            assert Map.has_key?(first_object, "age") 
+            assert Map.has_key?(first_object, "age")
             assert is_binary(first_object["name"])
             assert first_object["name"] != ""
             assert is_integer(first_object["age"])
@@ -126,7 +126,7 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
             # Cached mode: response was materialized from stream
             # Extract object from the materialized response  
             object = ReqLLM.Response.object(response)
-            
+
             assert is_map(object)
             assert map_size(object) > 0
             assert Map.has_key?(object, "name")
@@ -143,7 +143,11 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
             company_name: [type: :string, required: true, doc: "Name of the company"],
             founded_year: [type: :pos_integer, required: true, doc: "Year company was founded"],
             headquarters_city: [type: :string, required: true, doc: "City where HQ is located"],
-            headquarters_country: [type: :string, required: true, doc: "Country where HQ is located"],
+            headquarters_country: [
+              type: :string,
+              required: true,
+              doc: "Country where HQ is located"
+            ],
             employee_count: [type: :pos_integer, doc: "Approximate number of employees"],
             industry: [type: :string, doc: "Primary industry or sector"],
             key_products: [type: {:list, :string}, doc: "Main products or services"]
@@ -162,13 +166,20 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
 
           # Extract the object
           object = ReqLLM.Response.object(response)
-          
+
           # Verify complex object structure
           assert is_map(object)
-          assert map_size(object) >= 4  # At least the required fields
+          # At least the required fields
+          assert map_size(object) >= 4
 
           # Verify all required fields
-          required_fields = ["company_name", "founded_year", "headquarters_city", "headquarters_country"]
+          required_fields = [
+            "company_name",
+            "founded_year",
+            "headquarters_city",
+            "headquarters_country"
+          ]
+
           for field <- required_fields do
             assert Map.has_key?(object, field), "Missing required field: #{field}"
             assert object[field] != nil, "Required field #{field} is nil"
@@ -222,14 +233,14 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
 
           # Extract objects
           non_stream_object = ReqLLM.Response.object(non_stream_response)
-          
+
           if ReqLLM.Test.LiveFixture.live_mode?() do
             # Live streaming mode
-            [stream_object | _] = 
+            [stream_object | _] =
               stream_response
               |> ReqLLM.Response.object_stream()
               |> Enum.to_list()
-          
+
             # Both should be valid objects with same structure
             assert is_map(non_stream_object) and map_size(non_stream_object) > 0
             assert is_map(stream_object) and map_size(stream_object) > 0
@@ -237,7 +248,7 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
             # Both should have required fields
             for field <- ["title", "author", "word_count"] do
               assert Map.has_key?(non_stream_object, field)
-              assert Map.has_key?(stream_object, field) 
+              assert Map.has_key?(stream_object, field)
             end
 
             # Field types should be consistent
@@ -248,7 +259,7 @@ defmodule ReqLLM.ProviderTest.ObjectGeneration do
           else
             # Cached mode - both should be materialized objects
             stream_object = ReqLLM.Response.object(stream_response)
-            
+
             assert is_map(non_stream_object) and map_size(non_stream_object) > 0
             assert is_map(stream_object) and map_size(stream_object) > 0
           end
