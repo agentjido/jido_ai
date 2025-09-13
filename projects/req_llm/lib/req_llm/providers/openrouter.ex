@@ -39,28 +39,39 @@ defmodule ReqLLM.Providers.OpenRouter do
     context_wrapper: ReqLLM.Providers.OpenRouter.Context,
     response_wrapper: ReqLLM.Providers.OpenRouter.Response,
     provider_schema: [
-      temperature: [type: :float, default: 0.7],
-      max_tokens: [type: :pos_integer, default: 1024],
-      top_p: [type: :float],
-      top_k: [type: :pos_integer],
-      stream: [type: :boolean, default: false],
-      system: [type: :string],
-      tools: [type: {:list, :map}],
-      response_format: [type: :map],
-      frequency_penalty: [type: :float],
-      presence_penalty: [type: :float],
-      repetition_penalty: [type: :float],
-      logit_bias: [type: :map],
-      top_logprobs: [type: :pos_integer],
-      min_p: [type: :float],
-      top_a: [type: :float],
-      user: [type: :string],
-      models: [type: {:list, :string}],
-      provider: [type: :map],
-      reasoning: [type: :map],
-      usage: [type: :map],
-      transforms: [type: {:list, :string}],
-      seed: [type: :pos_integer]
+      # OpenRouter-specific options
+      repetition_penalty: [
+        type: :float,
+        doc: "Repetition penalty for reducing repetitive text"
+      ],
+      top_logprobs: [
+        type: :pos_integer,
+        doc: "Number of top log probabilities to return"
+      ],
+      min_p: [
+        type: :float,
+        doc: "Minimum probability threshold"
+      ],
+      top_a: [
+        type: :float,
+        doc: "Top-a sampling parameter"
+      ],
+      models: [
+        type: {:list, :string},
+        doc: "List of models to route between"
+      ],
+      provider: [
+        type: :map,
+        doc: "Provider-specific routing configuration"
+      ],
+      usage: [
+        type: :map,
+        doc: "Usage tracking configuration"
+      ],
+      transforms: [
+        type: {:list, :string},
+        doc: "List of transforms to apply"
+      ]
     ]
 
   @doc """

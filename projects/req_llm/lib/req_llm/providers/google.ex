@@ -43,16 +43,15 @@ defmodule ReqLLM.Providers.Google do
     context_wrapper: ReqLLM.Providers.Google.Context,
     response_wrapper: ReqLLM.Providers.Google.Response,
     provider_schema: [
-      temperature: [type: :float, default: 0.7],
-      max_tokens: [type: :pos_integer, default: 1024],
-      top_p: [type: :float],
-      top_k: [type: :pos_integer],
-      stream: [type: :boolean, default: false],
-      system: [type: :string],
-      tools: [type: {:list, :map}],
-      response_format: [type: :map],
-      safety_settings: [type: {:list, :map}],
-      candidate_count: [type: :pos_integer, default: 1]
+      safety_settings: [
+        type: {:list, :map},
+        doc: "Safety filter settings for content generation"
+      ],
+      candidate_count: [
+        type: :pos_integer,
+        default: 1,
+        doc: "Number of response candidates to generate"
+      ]
     ]
 
   @doc """

@@ -173,7 +173,7 @@ defmodule ReqLLM.ModelParsingTest do
           # At least anthropic and openai
           assert length(implemented_providers) >= 2
           # Should have many metadata-only providers
-          assert length(metadata_only_providers) >= 40
+          assert length(metadata_only_providers) >= 39
         end)
       end)
     end

@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "chatcmpl-d9a507f9-ae37-423d-8501-63470c366ec6",
+      "id": "chatcmpl-a16fe41b-fcbb-400d-8736-bfb0a4c3a644",
       "message": {
         "name": null,
         "metadata": {},
@@ -60,17 +60,17 @@
       "stream?": false,
       "finish_reason": "length",
       "provider_meta": {
-        "created": 1757725077,
+        "created": 1757726386,
         "object": "chat.completion",
         "service_tier": "on_demand",
-        "system_fingerprint": "fp_510c177af0",
+        "system_fingerprint": "fp_55d70a61e4",
         "usage_breakdown": null,
         "x_groq": {
-          "id": "req_01k5098bs8fgzse5t4s49txgwp"
+          "id": "req_01k50agah7e0qa4rpdd5pdg9dt"
         }
       }
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:57:57.558014Z"
+  "captured_at": "2025-09-13T01:19:47.211964Z"
 }
