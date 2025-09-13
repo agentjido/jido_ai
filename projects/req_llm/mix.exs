@@ -56,11 +56,9 @@ defmodule ReqLLM.MixProject do
       {:typed_struct, "~> 0.3.0"},
       {:splode, "~> 0.2.3"},
       {:server_sent_events, "~> 0.2"},
-      {:jido_keys, path: "../jido_keys"},
+      {:jido_keys, "~> 1.0"},
 
       # Dev/test dependencies
-      {:plug, "~> 1.15", only: [:test]},
-      {:mimic, "~> 1.7", only: [:test]},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}

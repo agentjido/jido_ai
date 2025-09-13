@@ -2,7 +2,7 @@
   "result": {
     "data": {
       "error": null,
-      "id": "chatcmpl-CF8H8D00a4GPU4cOkNxQI07pjmF9d",
+      "id": "msg_01Uu2eW6Csi7UTmWR9LbhHX5",
       "message": {
         "name": null,
         "metadata": {},
@@ -15,7 +15,7 @@
             "type": "text",
             "filename": null,
             "metadata": {},
-            "text": "Hello! How can I",
+            "text": "Here is a short story",
             "url": null,
             "media_type": null,
             "tool_call_id": null,
@@ -39,7 +39,7 @@
                 "type": "text",
                 "filename": null,
                 "metadata": {},
-                "text": "Hello! How can I",
+                "text": "Here is a short story",
                 "url": null,
                 "media_type": null,
                 "tool_call_id": null,
@@ -52,21 +52,23 @@
         ]
       },
       "usage": {
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
         "input_tokens": 10,
         "output_tokens": 5,
+        "service_tier": "standard",
         "total_tokens": 15
       },
-      "model": "gpt-4o-mini-2024-07-18",
+      "model": "claude-3-haiku-20240307",
       "stream?": false,
       "finish_reason": "length",
       "provider_meta": {
-        "created": 1757722766,
-        "object": "chat.completion",
-        "service_tier": "default",
-        "system_fingerprint": "fp_8bda4d3a2c"
+        "role": "assistant",
+        "stop_sequence": null,
+        "type": "message"
       }
     },
     "type": "ok_req_llm_response"
   },
-  "captured_at": "2025-09-13T00:19:26.297480Z"
+  "captured_at": "2025-09-13T00:19:11.348085Z"
 }
