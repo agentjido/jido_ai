@@ -42,13 +42,14 @@ defmodule ReqLLM.ProviderTest.Streaming do
 
             # Verify chunks are proper StreamChunk structs
             assert Enum.all?(chunks, fn chunk ->
-              match?(%ReqLLM.StreamChunk{}, chunk)
-            end)
+                     match?(%ReqLLM.StreamChunk{}, chunk)
+                   end)
 
             # Verify at least one chunk has text content (including thinking for reasoning models)
             assert Enum.any?(chunks, fn chunk ->
-              chunk.type in [:text, :content, :thinking] and is_binary(chunk.text) and chunk.text != ""
-            end)
+                     chunk.type in [:text, :content, :thinking] and is_binary(chunk.text) and
+                       chunk.text != ""
+                   end)
 
             # Verify response has final message when joined
             {:ok, joined_response} = ReqLLM.Response.join_stream(response)
@@ -58,7 +59,7 @@ defmodule ReqLLM.ProviderTest.Streaming do
             # Cached mode: response was materialized, test final result
             assert response.message
             assert response.message.content
-            
+
             # Verify we have some content (may be empty for thinking-only responses)
             text = ReqLLM.Response.text(response)
             assert is_binary(text)

@@ -23,40 +23,54 @@ defmodule ReqLLM.ProviderTest.ToolCalling do
       @moduletag :coverage
       @moduletag provider
 
-      # TODO: Implement tool calling test macros
-      # Will include tests for generate_object/4, tool schemas, etc.
+      describe "tool calling" do
+        test "basic tool calling with get_weather function" do
+          {:ok, response} =
+            use_fixture(unquote(provider), "basic_tool_call", fn ->
+              tools = [
+                ReqLLM.tool(
+                  name: "get_weather",
+                  description: "Get current weather information for a location",
+                  parameter_schema: [
+                    location: [
+                      type: :string,
+                      required: true,
+                      doc: "The city and state, e.g. San Francisco, CA"
+                    ],
+                    unit: [
+                      type: {:in, ["celsius", "fahrenheit"]},
+                      doc: "The temperature unit to use"
+                    ]
+                  ],
+                  callback: fn _args -> {:ok, "Weather data would go here"} end
+                )
+              ]
 
-      # Example tests that could be implemented:
-      #
-      # test "basic tool calling" do
-      #   result =
-      #     use_fixture(unquote(provider), "basic_tool_call", fn ->
-      #       tools = [
-      #         %{
-      #           "type" => "function",
-      #           "function" => %{
-      #             "name" => "get_weather",
-      #             "description" => "Get weather information",
-      #             "parameters" => %{
-      #               "type" => "object",
-      #               "properties" => %{
-      #                 "location" => %{"type" => "string"}
-      #               }
-      #             }
-      #           }
-      #         }
-      #       ]
-      #
-      #       ReqLLM.generate_object(
-      #         unquote(model),
-      #         "What's the weather in Paris?",
-      #         tools
-      #       )
-      #     end)
-      #
-      #   {:ok, resp} = result
-      #   assert resp.tool_calls != nil
-      # end
+              ReqLLM.generate_text(
+                unquote(model),
+                "What's the weather like in Paris, France?",
+                tools: tools,
+                max_tokens: 100
+              )
+            end)
+
+          # Verify we got a successful response
+          assert response.message
+          assert response.message.content
+
+          # Find tool call in content
+          tool_call_content =
+            Enum.find(response.message.content, fn content ->
+              content.type == :tool_call
+            end)
+
+          assert tool_call_content, "Expected to find tool_call in message content"
+          assert tool_call_content.tool_name == "get_weather"
+          assert tool_call_content.input
+          assert tool_call_content.input["location"]
+          assert is_binary(tool_call_content.input["location"])
+        end
+      end
     end
   end
 end

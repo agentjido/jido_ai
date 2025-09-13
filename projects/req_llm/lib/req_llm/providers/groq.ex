@@ -42,14 +42,12 @@ defmodule ReqLLM.Providers.Groq do
       # Groq-specific performance and service options
       service_tier: [
         type: {:in, ~w(auto on_demand flex performance)},
-        default: "auto",
         doc: "Performance tier for Groq requests"
       ],
 
       # Reasoning capabilities
       reasoning_effort: [
         type: {:in, ~w(none default low medium high)},
-        default: "default",
         doc: "Reasoning effort level"
       ],
       reasoning_format: [
@@ -137,14 +135,20 @@ defmodule ReqLLM.Providers.Groq do
             )
     end
 
+    # Extract tools separately to avoid validation issues
+    {tools, other_opts} = Keyword.pop(user_opts, :tools, [])
+
     # Extract provider-specific options (already validated by dynamic schema)
-    provider_opts = Keyword.get(user_opts, :provider_options, [])
+    provider_opts = Keyword.get(other_opts, :provider_options, [])
 
     # Remove provider_options from main opts since we handle them separately
-    {_provider_options, core_opts} = Keyword.pop(user_opts, :provider_options, [])
+    {_provider_options, core_opts} = Keyword.pop(other_opts, :provider_options, [])
 
     # Prepare validated core options
     opts = prepare_options!(__MODULE__, model, core_opts)
+
+    # Add tools back after validation
+    opts = Keyword.put(opts, :tools, tools)
 
     # Merge provider-specific options into opts for encoding
     opts = Keyword.merge(opts, provider_opts)

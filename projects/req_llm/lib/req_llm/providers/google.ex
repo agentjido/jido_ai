@@ -37,7 +37,7 @@ defmodule ReqLLM.Providers.Google do
 
   use ReqLLM.Provider.DSL,
     id: :google,
-    base_url: "https://generativelanguage.googleapis.com/v1",
+    base_url: "https://generativelanguage.googleapis.com/v1beta",
     metadata: "priv/models_dev/google.json",
     default_env_key: "GOOGLE_API_KEY",
     context_wrapper: ReqLLM.Providers.Google.Context,
@@ -214,7 +214,9 @@ defmodule ReqLLM.Providers.Google do
     tools_data =
       case request.options[:tools] do
         tools when is_list(tools) and length(tools) > 0 ->
-          %{tools: %{function_declarations: Enum.map(tools, &ReqLLM.Tool.to_schema(&1, :google))}}
+          %{
+            tools: [%{functionDeclarations: Enum.map(tools, &ReqLLM.Tool.to_schema(&1, :google))}]
+          }
 
         _ ->
           %{}

@@ -145,14 +145,20 @@ defmodule ReqLLM.Providers.XAI do
             )
     end
 
+    # Extract tools separately to avoid validation issues
+    {tools, other_opts} = Keyword.pop(user_opts, :tools, [])
+
     # Extract provider-specific options (already validated by dynamic schema)
-    provider_opts = Keyword.get(user_opts, :provider_options, [])
+    provider_opts = Keyword.get(other_opts, :provider_options, [])
 
     # Remove provider_options from main opts since we handle them separately
-    {_provider_options, core_opts} = Keyword.pop(user_opts, :provider_options, [])
+    {_provider_options, core_opts} = Keyword.pop(other_opts, :provider_options, [])
 
     # Prepare validated core options
     opts = prepare_options!(__MODULE__, model, core_opts)
+
+    # Add tools back after validation
+    opts = Keyword.put(opts, :tools, tools)
 
     # Merge provider-specific options into opts for encoding
     opts = Keyword.merge(opts, provider_opts)
