@@ -180,14 +180,14 @@ defmodule ReqLLM.Coverage.XAI.CoreTest do
         end)
 
       {:ok, resp} = result
-      
+
       # Check that we have basic response structure
       assert is_binary(resp.id)
       assert is_map(resp.usage)
       # Usage might have string keys from the API
       input_tokens = Map.get(resp.usage, :input_tokens) || Map.get(resp.usage, "input_tokens")
       assert input_tokens > 0
-      
+
       # Check provider_meta for xAI-specific fields
       assert is_map(resp.provider_meta)
     end
