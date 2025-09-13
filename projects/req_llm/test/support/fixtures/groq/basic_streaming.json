@@ -1,0 +1,7 @@
+{
+  "result": {
+    "error": "%ReqLLM.Error.API.Request{reason: \"Provider response error (400): Groq API error\", status: nil, response_body: nil, request_body: \"{\\\"messages\\\":[{\\\"content\\\":\\\"Hello world!\\\",\\\"role\\\":\\\"user\\\"}],\\\"stream\\\":true,\\\"model\\\":\\\"llama-3.1-8b-instant\\\",\\\"max_tokens\\\":20,\\\"service_tier\\\":\\\"auto\\\",\\\"reasoning_effort\\\":\\\"default\\\"}\", cause: %ReqLLM.Error.API.Response{reason: \"Groq API error\", response_body: %{\"error\" => %{\"message\" => \"`service_tier` `auto` is not available for this org. You can check your plan at https://console.groq.com/settings/billing/plans, and upgrade to access the required service tier.\", \"type\" => \"invalid_request_error\"}}, status: 400, splode: nil, bread_crumbs: [], vars: [], path: [], stacktrace: #Splode.Stacktrace<>, class: :api}, splode: nil, bread_crumbs: [], vars: [], path: [], stacktrace: #Splode.Stacktrace<>, class: :api}",
+    "type": "error"
+  },
+  "captured_at": "2025-09-13T13:14:11.430964Z"
+}

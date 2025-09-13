@@ -1,0 +1,35 @@
+{
+  "result": {
+    "data": {
+      "error": null,
+      "id": "stream-7",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hello! I'm an AI assistant created by Anthropic. It's nice to meet you."
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
+      "context": {
+        "messages": []
+      },
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0
+      },
+      "model": "anthropic/claude-3-haiku",
+      "stream?": false,
+      "finish_reason": null,
+      "provider_meta": {}
+    },
+    "type": "ok_req_llm_response"
+  },
+  "captured_at": "2025-09-13T13:14:29.628880Z"
+}
