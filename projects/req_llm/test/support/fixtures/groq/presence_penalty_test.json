@@ -1,0 +1,76 @@
+{
+  "result": {
+    "data": {
+      "error": null,
+      "id": "chatcmpl-596af751-1c5f-4786-9c88-de2d6d90a64e",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "data": null,
+            "input": null,
+            "output": null,
+            "type": "text",
+            "filename": null,
+            "metadata": {},
+            "text": "**The Fascinating World of Cats and Dogs**\n\nCats and dogs are two of the most popular pets in the world, known for their unique characteristics, personalities, and abilities. For centuries, humans have been fascinated by these animals, keeping them as",
+            "url": null,
+            "media_type": null,
+            "tool_call_id": null,
+            "tool_name": null
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
+      "context": {
+        "messages": [
+          {
+            "name": null,
+            "metadata": {},
+            "role": "assistant",
+            "content": [
+              {
+                "data": null,
+                "input": null,
+                "output": null,
+                "type": "text",
+                "filename": null,
+                "metadata": {},
+                "text": "**The Fascinating World of Cats and Dogs**\n\nCats and dogs are two of the most popular pets in the world, known for their unique characteristics, personalities, and abilities. For centuries, humans have been fascinated by these animals, keeping them as",
+                "url": null,
+                "media_type": null,
+                "tool_call_id": null,
+                "tool_name": null
+              }
+            ],
+            "tool_call_id": null,
+            "tool_calls": null
+          }
+        ]
+      },
+      "usage": {
+        "input_tokens": 40,
+        "output_tokens": 50,
+        "total_tokens": 90
+      },
+      "model": "llama-3.1-8b-instant",
+      "stream?": false,
+      "finish_reason": "length",
+      "provider_meta": {
+        "created": 1757725078,
+        "object": "chat.completion",
+        "service_tier": "on_demand",
+        "system_fingerprint": "fp_55d70a61e4",
+        "usage_breakdown": null,
+        "x_groq": {
+          "id": "req_01k5098cazf1bvx91j6d6bx7yv"
+        }
+      }
+    },
+    "type": "ok_req_llm_response"
+  },
+  "captured_at": "2025-09-13T00:57:58.276027Z"
+}

@@ -1,12 +1,12 @@
 defmodule ReqLLM.ProviderTest do
   @moduledoc """
   Shared test macros for provider-specific testing.
-  
+
   Provides a flexible macro system to eliminate duplication across provider test suites.
   Each macro contains common test scenarios that work across different LLM providers.
-  
+
   ## Usage
-  
+
       defmodule ReqLLM.Coverage.OpenAI.CoreTest do
         use ReqLLM.ProviderTest.Core,
             provider: :openai,
@@ -14,9 +14,9 @@ defmodule ReqLLM.ProviderTest do
         
         # Provider-specific tests can be added here
       end
-  
+
   ## Available Macros
-  
+
   - `Core` - Basic text generation functionality (prompts, parameters, responses)
   - `Streaming` - Stream-based text generation (planned)  
   - `ToolCalling` - Tool/function calling capabilities (planned)
@@ -25,27 +25,27 @@ defmodule ReqLLM.ProviderTest do
   defmodule Core do
     @moduledoc """
     Core text generation functionality tests.
-    
+
     Tests basic completion features that should work across all LLM providers:
     - Simple prompts with and without system messages
     - Parameter handling (temperature, max_tokens, etc.)  
     - Response parsing and validation
     - String vs Context input formats
     """
-    
+
     defmacro __using__(opts) do
       provider = Keyword.fetch!(opts, :provider)
       model = Keyword.fetch!(opts, :model)
-      
+
       quote bind_quoted: [provider: provider, model: model] do
         use ExUnit.Case, async: false
-        
+
         alias ReqLLM.Test.LiveFixture, as: ReqFixture
         import ReqFixture
-        
+
         @moduletag :coverage
         @moduletag provider
-        
+
         test "basic completion without system prompt" do
           result =
             use_fixture(unquote(provider), "basic_completion", fn ->
@@ -135,13 +135,13 @@ defmodule ReqLLM.ProviderTest do
   defmodule Streaming do
     @moduledoc """
     Streaming text generation tests (planned).
-    
+
     Tests stream-based generation features:
     - Basic streaming with text chunks
     - Stream interruption and error handling
     - Chunk validation and parsing
     """
-    
+
     defmacro __using__(_opts) do
       quote do
         # TODO: Implement streaming test macros
@@ -153,14 +153,14 @@ defmodule ReqLLM.ProviderTest do
   defmodule ToolCalling do
     @moduledoc """
     Tool/function calling tests (planned).
-    
+
     Tests tool calling capabilities:
     - Tool definition and registration  
     - Parameter schema validation
     - Tool execution and result handling
     - Multi-tool scenarios
     """
-    
+
     defmacro __using__(_opts) do
       quote do
         # TODO: Implement tool calling test macros

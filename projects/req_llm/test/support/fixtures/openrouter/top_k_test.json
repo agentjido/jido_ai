@@ -1,0 +1,72 @@
+{
+  "result": {
+    "data": {
+      "error": null,
+      "id": "gen-1757724463-enyI4OqoaCs2jjkZVX2N",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "data": null,
+            "input": null,
+            "output": null,
+            "type": "text",
+            "filename": null,
+            "metadata": {},
+            "text": "Hello!",
+            "url": null,
+            "media_type": null,
+            "tool_call_id": null,
+            "tool_name": null
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
+      "context": {
+        "messages": [
+          {
+            "name": null,
+            "metadata": {},
+            "role": "assistant",
+            "content": [
+              {
+                "data": null,
+                "input": null,
+                "output": null,
+                "type": "text",
+                "filename": null,
+                "metadata": {},
+                "text": "Hello!",
+                "url": null,
+                "media_type": null,
+                "tool_call_id": null,
+                "tool_name": null
+              }
+            ],
+            "tool_call_id": null,
+            "tool_calls": null
+          }
+        ]
+      },
+      "usage": {
+        "input_tokens": 9,
+        "output_tokens": 5,
+        "total_tokens": 14
+      },
+      "model": "anthropic/claude-3-haiku",
+      "stream?": false,
+      "finish_reason": "stop",
+      "provider_meta": {
+        "created": 1757724463,
+        "native_finish_reason": "stop",
+        "object": "chat.completion",
+        "provider": "Anthropic"
+      }
+    },
+    "type": "ok_req_llm_response"
+  },
+  "captured_at": "2025-09-13T00:47:43.622698Z"
+}

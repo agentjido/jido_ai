@@ -1,0 +1,76 @@
+{
+  "result": {
+    "data": {
+      "error": null,
+      "id": "chatcmpl-d9a507f9-ae37-423d-8501-63470c366ec6",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "data": null,
+            "input": null,
+            "output": null,
+            "type": "text",
+            "filename": null,
+            "metadata": {},
+            "text": "**The Mysterious Island",
+            "url": null,
+            "media_type": null,
+            "tool_call_id": null,
+            "tool_name": null
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
+      "context": {
+        "messages": [
+          {
+            "name": null,
+            "metadata": {},
+            "role": "assistant",
+            "content": [
+              {
+                "data": null,
+                "input": null,
+                "output": null,
+                "type": "text",
+                "filename": null,
+                "metadata": {},
+                "text": "**The Mysterious Island",
+                "url": null,
+                "media_type": null,
+                "tool_call_id": null,
+                "tool_name": null
+              }
+            ],
+            "tool_call_id": null,
+            "tool_calls": null
+          }
+        ]
+      },
+      "usage": {
+        "input_tokens": 38,
+        "output_tokens": 5,
+        "total_tokens": 43
+      },
+      "model": "llama-3.1-8b-instant",
+      "stream?": false,
+      "finish_reason": "length",
+      "provider_meta": {
+        "created": 1757725077,
+        "object": "chat.completion",
+        "service_tier": "on_demand",
+        "system_fingerprint": "fp_510c177af0",
+        "usage_breakdown": null,
+        "x_groq": {
+          "id": "req_01k5098bs8fgzse5t4s49txgwp"
+        }
+      }
+    },
+    "type": "ok_req_llm_response"
+  },
+  "captured_at": "2025-09-13T00:57:57.558014Z"
+}

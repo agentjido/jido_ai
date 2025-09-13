@@ -1,0 +1,72 @@
+{
+  "result": {
+    "data": {
+      "error": null,
+      "id": "gen-1757724466-AqkuoTgeFAc3ddDbgmJw",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "data": null,
+            "input": null,
+            "output": null,
+            "type": "text",
+            "filename": null,
+            "metadata": {},
+            "text": "Cats and Dogs: Companions and Contrasts\n\nCats and dogs are two of the most popular household pets worldwide. While they may seem like polar opposites, these furry companions share some similarities and offer unique joys to their owners",
+            "url": null,
+            "media_type": null,
+            "tool_call_id": null,
+            "tool_name": null
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
+      "context": {
+        "messages": [
+          {
+            "name": null,
+            "metadata": {},
+            "role": "assistant",
+            "content": [
+              {
+                "data": null,
+                "input": null,
+                "output": null,
+                "type": "text",
+                "filename": null,
+                "metadata": {},
+                "text": "Cats and Dogs: Companions and Contrasts\n\nCats and dogs are two of the most popular household pets worldwide. While they may seem like polar opposites, these furry companions share some similarities and offer unique joys to their owners",
+                "url": null,
+                "media_type": null,
+                "tool_call_id": null,
+                "tool_name": null
+              }
+            ],
+            "tool_call_id": null,
+            "tool_calls": null
+          }
+        ]
+      },
+      "usage": {
+        "input_tokens": 12,
+        "output_tokens": 50,
+        "total_tokens": 62
+      },
+      "model": "anthropic/claude-3-haiku",
+      "stream?": false,
+      "finish_reason": "length",
+      "provider_meta": {
+        "created": 1757724466,
+        "native_finish_reason": "length",
+        "object": "chat.completion",
+        "provider": "Anthropic"
+      }
+    },
+    "type": "ok_req_llm_response"
+  },
+  "captured_at": "2025-09-13T00:47:47.125120Z"
+}

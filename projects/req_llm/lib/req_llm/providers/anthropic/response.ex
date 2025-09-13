@@ -119,6 +119,28 @@ defimpl ReqLLM.Response.Codec, for: Map do
     end
   end
 
+  def decode_response(data, %Model{provider: :google} = model) when is_map(data) do
+    # Only handle maps that look like Google responses (have candidates or usageMetadata keys)
+    if Map.has_key?(data, "candidates") or Map.has_key?(data, "usageMetadata") do
+      try do
+        result =
+          ReqLLM.Providers.Google.ResponseDecoder.decode_google_json(
+            data,
+            model.model || "unknown"
+          )
+
+        result
+      rescue
+        error -> {:error, error}
+      catch
+        {:decode_error, reason} ->
+          {:error, %ReqLLM.Error.API.Response{reason: reason}}
+      end
+    else
+      {:error, :not_implemented}
+    end
+  end
+
   def decode_response(_data, _model), do: {:error, :unsupported_provider}
   def encode_request(_), do: {:error, :not_implemented}
 end
