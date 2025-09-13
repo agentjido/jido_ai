@@ -1,0 +1,74 @@
+{
+  "result": {
+    "data": {
+      "error": null,
+      "id": "9676351e-c9a6-5271-924a-64ce4580e12e_us-east-1",
+      "message": {
+        "name": null,
+        "metadata": {},
+        "role": "assistant",
+        "content": [
+          {
+            "data": null,
+            "input": null,
+            "output": null,
+            "type": "text",
+            "filename": null,
+            "metadata": {},
+            "text": "First, the user said: \"Count from 1 to 3.\" This seems straightforward. It's asking me to count numbers from 1 to 3.\n\nAs an AI, I should respond in a helpful and accurate way. The simplest response would",
+            "url": null,
+            "media_type": null,
+            "tool_call_id": null,
+            "tool_name": null
+          }
+        ],
+        "tool_call_id": null,
+        "tool_calls": null
+      },
+      "context": {
+        "messages": [
+          {
+            "name": null,
+            "metadata": {},
+            "role": "assistant",
+            "content": [
+              {
+                "data": null,
+                "input": null,
+                "output": null,
+                "type": "text",
+                "filename": null,
+                "metadata": {},
+                "text": "First, the user said: \"Count from 1 to 3.\" This seems straightforward. It's asking me to count numbers from 1 to 3.\n\nAs an AI, I should respond in a helpful and accurate way. The simplest response would",
+                "url": null,
+                "media_type": null,
+                "tool_call_id": null,
+                "tool_name": null
+              }
+            ],
+            "tool_call_id": null,
+            "tool_calls": null
+          }
+        ]
+      },
+      "usage": {
+        "input_tokens": 14,
+        "output_tokens": 0,
+        "total_tokens": 64,
+        "live_search_sources": 0
+      },
+      "model": "grok-3-mini",
+      "stream?": false,
+      "finish_reason": "length",
+      "provider_meta": {
+        "created": 1757729055,
+        "live_search_used": null,
+        "object": "chat.completion",
+        "system_fingerprint": "fp_6a09108ff5",
+        "x_xai": null
+      }
+    },
+    "type": "ok_req_llm_response"
+  },
+  "captured_at": "2025-09-13T02:04:16.049970Z"
+}

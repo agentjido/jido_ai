@@ -206,7 +206,10 @@ defmodule ReqLLM.Provider.DSL do
 
       # Provider option helpers
       def supported_provider_options do
-        @provider_schema.schema |> Keyword.keys()
+        # Return both core generation options and provider-specific options
+        core_options = ReqLLM.Provider.Options.all_generation_keys()
+        provider_options = @provider_schema.schema |> Keyword.keys()
+        core_options ++ provider_options
       end
 
       def default_provider_opts do
