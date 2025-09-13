@@ -59,13 +59,11 @@ defmodule ReqLLM do
   alias ReqLLM.{Embedding, Generation, Schema, Tool}
 
   # ===========================================================================
-  # Configuration API - Direct Kagi integration
+  # Configuration API - Direct JidoKeys integration
   # ===========================================================================
 
   @doc """
   Stores an API key in the session keyring.
-
-  Key normalization is handled automatically (case-insensitive).
 
   ## Parameters
 
@@ -79,14 +77,11 @@ defmodule ReqLLM do
   """
   @spec put_key(atom() | String.t(), term()) :: :ok
   def put_key(key, value) do
-    normalized_key = normalize_key(key)
-    JidoKeys.put(normalized_key, value)
+    JidoKeys.put(key, value)
   end
 
   @doc """
   Gets an API key from the keyring.
-
-  Key lookup is case-insensitive and accepts both atoms and strings.
 
   ## Parameters
 
@@ -100,38 +95,15 @@ defmodule ReqLLM do
   """
   @spec get_key(atom() | String.t()) :: String.t() | nil
   def get_key(key) do
-    normalized_key = normalize_key(key)
-    JidoKeys.get(normalized_key, nil)
-  end
-
-  # Private helper for key normalization
-  @spec normalize_key(atom() | String.t()) :: atom()
-  defp normalize_key(key) when is_binary(key) do
-    normalized_string = String.downcase(key)
-
-    try do
-      String.to_existing_atom(normalized_string)
-    rescue
-      ArgumentError -> String.to_atom(normalized_string)
-    end
-  end
-
-  defp normalize_key(key) when is_atom(key) do
-    normalized_string = key |> Atom.to_string() |> String.downcase()
-
-    try do
-      String.to_existing_atom(normalized_string)
-    rescue
-      ArgumentError -> String.to_atom(normalized_string)
-    end
+    JidoKeys.get(key, nil)
   end
 
   @doc """
-  Creates a messages collection from a list of messages.
+  Creates a context from a list of messages, a single message struct, or a string.
 
   ## Parameters
 
-    * `messages` - List of Message structs
+    * `messages` - List of Message structs, a single Message struct, or a string
 
   ## Examples
 
@@ -139,14 +111,28 @@ defmodule ReqLLM do
         ReqLLM.Context.system("You are helpful"),
         ReqLLM.Context.user("Hello!")
       ]
-      collection = ReqLLM.messages(messages)
-      # Now you can use Enum functions on the collection
-      user_msgs = collection |> Enum.filter(&(&1.role == :user))
+      ctx = ReqLLM.context(messages)
+      # Now you can use Enum functions on the context
+      user_msgs = ctx |> Enum.filter(&(&1.role == :user))
+
+      # Single message struct
+      ctx = ReqLLM.context(ReqLLM.Context.user("Hello!"))
+
+      # String prompt
+      ctx = ReqLLM.context("Hello!")
 
   """
-  @spec messages([struct()]) :: ReqLLM.Context.t()
-  def messages(message_list) when is_list(message_list) do
+  @spec context([struct()] | struct() | String.t()) :: ReqLLM.Context.t()
+  def context(message_list) when is_list(message_list) do
     ReqLLM.Context.new(message_list)
+  end
+
+  def context(%ReqLLM.Message{} = message) do
+    ReqLLM.Context.new([message])
+  end
+
+  def context(prompt) when is_binary(prompt) do
+    ReqLLM.Context.new([ReqLLM.Context.user(prompt)])
   end
 
   @doc """
