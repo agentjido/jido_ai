@@ -14,7 +14,8 @@ defmodule ReqLLM.Test.LiveFixture do
   def use_fixture(provider, fixture_name, test_func) do
     if live_mode?() do
       result = test_func.()
-      save_fixture(provider, fixture_name, result)
+      materialized_result = materialize_streams(result)
+      save_fixture(provider, fixture_name, materialized_result)
       result
     else
       load_fixture(provider, fixture_name)
@@ -24,6 +25,16 @@ defmodule ReqLLM.Test.LiveFixture do
   def live_mode?() do
     System.get_env("LIVE") in ["1", "true", "TRUE"]
   end
+
+  # Materialize streaming responses before saving to fixtures
+  defp materialize_streams({:ok, %ReqLLM.Response{stream?: true} = resp}) do
+    case ReqLLM.Response.join_stream(resp) do
+      {:ok, materialized_resp} -> {:ok, materialized_resp}
+      error -> error
+    end
+  end
+
+  defp materialize_streams(result), do: result
 
   # Save result to JSON fixture
   defp save_fixture(provider, name, result) do
