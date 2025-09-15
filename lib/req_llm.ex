@@ -2,14 +2,14 @@ defmodule ReqLLM do
   @moduledoc """
   Main API facade for Req AI.
 
-  Inspired by the Vercel AI SDK, provides a unified interface to AI providers with 
-  flexible model specifications, rich prompt support, configuration management, 
+  Inspired by the Vercel AI SDK, provides a unified interface to AI providers with
+  flexible model specifications, rich prompt support, configuration management,
   and structured data generation.
 
   ## Quick Start
 
       # Simple text generation using string format
-      ReqLLM.generate_text("openai:gpt-4o", "Hello world")
+      ReqLLM.generate_text("anthropic:claude-3-5-sonnet", "Hello world")
       #=> {:ok, "Hello! How can I assist you today?"}
 
       # Structured data generation with schema validation
@@ -17,7 +17,7 @@ defmodule ReqLLM do
         name: [type: :string, required: true],
         age: [type: :pos_integer, required: true]
       ]
-      ReqLLM.generate_object("openai:gpt-4o", "Generate a person", schema)
+      ReqLLM.generate_object("anthropic:claude-3-5-sonnet", "Generate a person", schema)
       #=> {:ok, %{name: "John Doe", age: 30}}
 
   ## Model Specifications
@@ -25,140 +25,69 @@ defmodule ReqLLM do
   Multiple formats supported for maximum flexibility:
 
       # String format: "provider:model"
-      ReqLLM.generate_text("openai:gpt-4o", messages)
       ReqLLM.generate_text("anthropic:claude-3-5-sonnet-20241022", messages)
 
       # Tuple format: {provider, options}
-      ReqLLM.generate_text({:openai, model: "gpt-4o", temperature: 0.7}, messages)
+      ReqLLM.generate_text({:anthropic, "claude-3-5-sonnet", temperature: 0.7}, messages)
 
       # Model struct format
-      model = %ReqLLM.Model{provider: :openai, model: "gpt-4o", temperature: 0.5}
+      model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet", temperature: 0.5}
       ReqLLM.generate_text(model, messages)
 
   ## Configuration
 
-  The library uses a layered configuration system with Kagi integration:
+  ReqLLM uses the Kagi keyring for API key storage:
 
-  1. **Environment Variables**: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.
-  2. **Application Config**: `config :req_llm, provider: [api_key: "key"]`
-  3. **Runtime Session**: `ReqLLM.put_key(:openai_api_key, "session-key")`
+      # Store API keys in session keyring
+      ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
+      ReqLLM.put_key(:openai_api_key, "sk-...")
 
-      # Get configuration values
-      ReqLLM.config([:openai, :api_key], "default-key")
+      # Retrieve API keys
+      ReqLLM.get_key(:anthropic_api_key)
 
   ## Providers
 
   Built-in support for major AI providers:
 
-  - **OpenAI**: GPT-4o, GPT-4o Mini, GPT-3.5 Turbo, o1, o1-mini
   - **Anthropic**: Claude 3.5 Sonnet, Claude 3 Haiku, Claude 3 Opus
-  - **OpenRouter**: Access to 200+ models from various providers
-  - **Google**: Gemini 1.5 Pro, Gemini 1.5 Flash
 
       # Access provider modules directly
-      provider = ReqLLM.provider(:openai)
+      provider = ReqLLM.provider(:anthropic)
       provider.generate_text(model, messages, opts)
   """
 
-  alias Kagi
-  alias ReqLLM.Messages
+  alias ReqLLM.{Embedding, Generation, Schema, Tool}
 
   # ===========================================================================
-  # NimbleOptions Compiled Schemas for validation
+  # Configuration API - Direct JidoKeys integration
   # ===========================================================================
 
-  # Base text generation schema - shared by generate_text and stream_text
-  @text_opts_schema NimbleOptions.new!(
-                      temperature: [
-                        type: :float,
-                        doc: "Controls randomness in the output (0.0 to 2.0)"
-                      ],
-                      max_tokens: [
-                        type: :pos_integer,
-                        doc: "Maximum number of tokens to generate"
-                      ],
-                      top_p: [type: :float, doc: "Nucleus sampling parameter"],
-                      presence_penalty: [
-                        type: :float,
-                        doc: "Penalize new tokens based on presence"
-                      ],
-                      frequency_penalty: [
-                        type: :float,
-                        doc: "Penalize new tokens based on frequency"
-                      ],
-                      tools: [type: :any, doc: "List of tool definitions"],
-                      tool_choice: [
-                        type: {:or, [:string, :atom, :map]},
-                        default: "auto",
-                        doc: "Tool choice strategy"
-                      ],
-                      system_prompt: [type: :string, doc: "System prompt to prepend"],
-                      provider_options: [type: :map, doc: "Provider-specific options"],
-                      reasoning: [
-                        type: {:in, [nil, false, true, "low", "auto", "high"]},
-                        doc: "Request reasoning tokens from the model"
-                      ]
-                    )
+  @doc """
+  Stores an API key in the session keyring.
 
-  # Object generation schema - extends text options with additional fields
-  @object_opts_schema NimbleOptions.new!(
-                        temperature: [
-                          type: :float,
-                          doc: "Controls randomness in the output (0.0 to 2.0)"
-                        ],
-                        max_tokens: [
-                          type: :pos_integer,
-                          doc: "Maximum number of tokens to generate"
-                        ],
-                        top_p: [type: :float, doc: "Nucleus sampling parameter"],
-                        presence_penalty: [
-                          type: :float,
-                          doc: "Penalize new tokens based on presence"
-                        ],
-                        frequency_penalty: [
-                          type: :float,
-                          doc: "Penalize new tokens based on frequency"
-                        ],
-                        tools: [type: :any, doc: "List of tool definitions"],
-                        tool_choice: [
-                          type: {:or, [:string, :atom, :map]},
-                          default: "auto",
-                          doc: "Tool choice strategy"
-                        ],
-                        system_prompt: [type: :string, doc: "System prompt to prepend"],
-                        provider_options: [type: :map, doc: "Provider-specific options"],
-                        output_type: [
-                          type: {:in, [:object, :array, :enum, :no_schema]},
-                          default: :object,
-                          doc: "Type of output structure"
-                        ],
-                        enum_values: [
-                          type: {:list, :string},
-                          doc: "Allowed values when output_type is :enum"
-                        ],
-                        reasoning: [
-                          type: {:in, [nil, false, true, "low", "auto", "high"]},
-                          doc: "Request reasoning tokens from the model"
-                        ]
-                      )
+  Keys from .env files are automatically loaded via JidoKeys+Dotenvy integration, 
+  so you typically don't need to call this manually. Just add keys to your .env file.
 
-  # Embedding schema - shared by embed and embed_many
-  @embed_opts_schema NimbleOptions.new!(
-                       dimensions: [
-                         type: :pos_integer,
-                         doc: "Number of dimensions for embeddings"
-                       ],
-                       provider_options: [type: :map, doc: "Provider-specific options"]
-                     )
+  ## Parameters
 
-  # ===========================================================================
-  # Configuration API - Simple facades for common operations
-  # ===========================================================================
+    * `key` - The configuration key (atom or string)
+    * `value` - The value to store
+
+  ## Examples
+
+      # Manual key setting (optional - .env keys are auto-loaded)
+      ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
+
+  """
+  @spec put_key(atom() | String.t(), term()) :: :ok
+  def put_key(key, value) do
+    JidoKeys.put(key, value)
+  end
 
   @doc """
   Gets an API key from the keyring.
 
-  Key lookup is case-insensitive and accepts both atoms and strings.
+  Keys from .env files are automatically loaded via JidoKeys+Dotenvy integration.
 
   ## Parameters
 
@@ -166,63 +95,50 @@ defmodule ReqLLM do
 
   ## Examples
 
-      ReqLLM.api_key(:openai_api_key)
-      ReqLLM.api_key("ANTHROPIC_API_KEY")
-      ReqLLM.api_key("OpenAI_API_Key")
+      ReqLLM.get_key(:anthropic_api_key)
+      ReqLLM.get_key("ANTHROPIC_API_KEY")  # Auto-loaded from .env
 
   """
-  @spec api_key(atom() | String.t()) :: String.t() | nil
-  def api_key(key) when is_atom(key) do
-    Kagi.get(key, nil)
-  end
-
-  def api_key(key) when is_binary(key) do
-    normalized = String.downcase(key)
-    Kagi.get(normalized, nil)
+  @spec get_key(atom() | String.t()) :: String.t() | nil
+  def get_key(key) do
+    JidoKeys.get(key, nil)
   end
 
   @doc """
-  Gets a configuration value from the keyring with keyspace support.
+  Creates a context from a list of messages, a single message struct, or a string.
 
   ## Parameters
 
-    * `keyspace` - Key path as atom list (e.g., [:openai, :api_key])
-    * `default` - Default value if key not found
-
-  ## Examples
-
-      ReqLLM.config([:openai, :api_key], "default-key")
-      ReqLLM.config([:anthropic, :max_tokens], 1000)
-
-  """
-  @spec config(list(atom()), term()) :: term()
-  def config(keyspace, default \\ nil) when is_list(keyspace) do
-    # Implementation will delegate to Kagi
-    # This is a stub
-    default
-  end
-
-  @doc """
-  Creates a messages collection from a list of messages.
-
-  ## Parameters
-
-    * `messages` - List of Message structs
+    * `messages` - List of Message structs, a single Message struct, or a string
 
   ## Examples
 
       messages = [
-        ReqLLM.Messages.system("You are helpful"),
-        ReqLLM.Messages.user("Hello!")
+        ReqLLM.Context.system("You are helpful"),
+        ReqLLM.Context.user("Hello!")
       ]
-      collection = ReqLLM.messages(messages)
-      # Now you can use Enum functions on the collection
-      user_msgs = collection |> Enum.filter(&(&1.role == :user))
+      ctx = ReqLLM.context(messages)
+      # Now you can use Enum functions on the context
+      user_msgs = ctx |> Enum.filter(&(&1.role == :user))
+
+      # Single message struct
+      ctx = ReqLLM.context(ReqLLM.Context.user("Hello!"))
+
+      # String prompt
+      ctx = ReqLLM.context("Hello!")
 
   """
-  @spec messages([struct()]) :: Messages.t()
-  def messages(message_list) when is_list(message_list) do
-    Messages.new(message_list)
+  @spec context([struct()] | struct() | String.t()) :: ReqLLM.Context.t()
+  def context(message_list) when is_list(message_list) do
+    ReqLLM.Context.new(message_list)
+  end
+
+  def context(%ReqLLM.Message{} = message) do
+    ReqLLM.Context.new([message])
+  end
+
+  def context(prompt) when is_binary(prompt) do
+    ReqLLM.Context.new([ReqLLM.Context.user(prompt)])
   end
 
   @doc """
@@ -253,7 +169,7 @@ defmodule ReqLLM do
 
     * `model_spec` - Model specification in various formats:
       - String format: `"anthropic:claude-3-sonnet"`
-      - Tuple format: `{:anthropic, model: "claude-3-sonnet", temperature: 0.7}`
+      - Tuple format: `{:anthropic, "claude-3-sonnet", temperature: 0.7}`
       - Model struct: `%ReqLLM.Model{}`
 
   ## Examples
@@ -261,7 +177,7 @@ defmodule ReqLLM do
       ReqLLM.model("anthropic:claude-3-sonnet")
       #=> {:ok, %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet"}}
 
-      ReqLLM.model({:anthropic, model: "claude-3-sonnet", temperature: 0.5})
+      ReqLLM.model({:anthropic, "claude-3-sonnet", temperature: 0.5})
       #=> {:ok, %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet", temperature: 0.5}}
 
   """
@@ -271,13 +187,13 @@ defmodule ReqLLM do
   end
 
   # ===========================================================================
-  # Core API Methods - Stubs following Vercel AI SDK patterns
+  # Text Generation API - Delegated to ReqLLM.Generation
   # ===========================================================================
 
   @doc """
   Generates text using an AI model with full response metadata.
 
-  Returns the complete Req.Response which includes usage data, headers, and metadata.
+  Returns a canonical ReqLLM.Response which includes usage data, context, and metadata.
   For simple text-only results, use `generate_text!/3`.
 
   ## Parameters
@@ -301,33 +217,15 @@ defmodule ReqLLM do
   ## Examples
 
       {:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello world")
-      response.body
+      ReqLLM.Response.text(response)
       #=> "Hello! How can I assist you today?"
 
       # Access usage metadata
-      {:ok, text, usage} = ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello") |> ReqLLM.with_usage()
+      ReqLLM.Response.usage(response)
+      #=> %{input_tokens: 10, output_tokens: 8}
 
   """
-  @spec generate_text(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t() | list(),
-          keyword()
-        ) :: {:ok, Req.Response.t()} | {:error, term()}
-  def generate_text(model_spec, messages, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
-         {:ok, model} <- ReqLLM.Model.from(model_spec),
-         {:ok, provider_module} <- provider(model.provider) do
-      # Always return full response for metadata access
-      enhanced_opts = Keyword.put(validated_opts, :return_response, true)
-      provider_module.generate_text(model, messages, enhanced_opts)
-    else
-      {:error, :not_found} ->
-        {:error, ReqLLM.Error.Invalid.Provider.exception(provider: "unknown")}
-
-      error ->
-        error
-    end
-  end
+  defdelegate generate_text(model_spec, messages, opts \\ []), to: Generation
 
   @doc """
   Generates text using an AI model, returning only the text content.
@@ -346,22 +244,12 @@ defmodule ReqLLM do
       #=> "Hello! How can I assist you today?"
 
   """
-  @spec generate_text!(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t() | list(),
-          keyword()
-        ) :: {:ok, String.t()} | {:error, term()}
-  def generate_text!(model_spec, messages, opts \\ []) do
-    case generate_text(model_spec, messages, opts) do
-      {:ok, %Req.Response{body: body}} -> {:ok, body}
-      {:error, error} -> {:error, error}
-    end
-  end
+  defdelegate generate_text!(model_spec, messages, opts \\ []), to: Generation
 
   @doc """
   Streams text generation using an AI model with full response metadata.
 
-  Returns the complete response containing usage data and metadata.
+  Returns a canonical ReqLLM.Response containing usage data and stream.
   For simple streaming without metadata, use `stream_text!/3`.
 
   ## Parameters
@@ -371,36 +259,14 @@ defmodule ReqLLM do
   ## Examples
 
       {:ok, response} = ReqLLM.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
-      response.body |> Enum.each(&IO.write/1)
+      ReqLLM.Response.text_stream(response) |> Enum.each(&IO.write/1)
 
       # Access usage metadata after streaming
-      {:ok, stream, usage} = ReqLLM.stream_text("anthropic:claude-3-sonnet", "Hello") |> ReqLLM.with_usage()
+      ReqLLM.Response.usage(response)
+      #=> %{input_tokens: 15, output_tokens: 42}
 
   """
-  @spec stream_text(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t() | list(),
-          keyword()
-        ) :: {:ok, Req.Response.t()} | {:error, term()}
-  def stream_text(model_spec, messages, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @text_opts_schema),
-         {:ok, model} <- ReqLLM.Model.from(model_spec),
-         {:ok, provider_module} <- provider(model.provider) do
-      # Always return full response for metadata access
-      enhanced_opts =
-        validated_opts
-        |> Keyword.put(:stream?, true)
-        |> Keyword.put(:return_response, true)
-
-      provider_module.stream_text(model, messages, enhanced_opts)
-    else
-      {:error, :not_found} ->
-        {:error, ReqLLM.Error.Invalid.Provider.exception(provider: "unknown")}
-
-      error ->
-        error
-    end
-  end
+  defdelegate stream_text(model_spec, messages, opts \\ []), to: Generation
 
   @doc """
   Streams text generation using an AI model, returning only the stream.
@@ -418,91 +284,59 @@ defmodule ReqLLM do
       stream |> Enum.each(&IO.write/1)
 
   """
-  @spec stream_text!(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t() | list(),
-          keyword()
-        ) :: {:ok, Enumerable.t()} | {:error, term()}
-  def stream_text!(model_spec, messages, opts \\ []) do
-    case stream_text(model_spec, messages, opts) do
-      {:ok, %Req.Response{body: body}} -> {:ok, body}
-      {:error, error} -> {:error, error}
-    end
-  end
+  defdelegate stream_text!(model_spec, messages, opts \\ []), to: Generation
 
   @doc """
   Generates structured data using an AI model with schema validation.
 
-  Accepts flexible model specifications and generates validated structured data using the appropriate provider.
-  The response is validated against the provided NimbleOptions schema and returns a structured map.
+  Equivalent to Vercel AI SDK's `generateObject()` function, this method
+  generates structured data according to a provided schema and validates
+  the output against that schema.
 
   ## Parameters
 
     * `model_spec` - Model specification in various formats
     * `messages` - Text prompt or list of messages
-    * `schema` - NimbleOptions schema definition for validation (keyword list)
+    * `schema` - Schema definition for structured output
     * `opts` - Additional options (keyword list)
 
   ## Options
 
-  Same as `generate_text/3` plus:
-
-    * `:output_type` - Type of output: `:object`, `:array`, `:enum`, `:no_schema` (default: `:object`)
-    * `:enum_values` - List of allowed values when output_type is `:enum`
+    * `:output` - Output type: `:object`, `:array`, `:enum`, or `:no_schema`
+    * `:mode` - Generation mode: `:auto`, `:json`, or `:tool`
+    * `:schema_name` - Optional name for the schema
+    * `:schema_description` - Optional description for the schema
+    * `:enum` - List of possible values (for enum output)
+    * `:temperature` - Control randomness in responses (0.0 to 2.0)
+    * `:max_tokens` - Limit the length of the response
+    * `:provider_options` - Provider-specific options
 
   ## Examples
 
+      # Generate a structured object
       schema = [
         name: [type: :string, required: true],
         age: [type: :pos_integer, required: true]
       ]
-      {:ok, result} = ReqLLM.generate_object(
-        "openai:gpt-4o",
-        "Generate a person",
-        schema
-      )
+      {:ok, object} = ReqLLM.generate_object("anthropic:claude-3-sonnet", "Generate a person", schema)
       #=> {:ok, %{name: "John Doe", age: 30}}
 
+      # Generate an array of objects
+      {:ok, objects} = ReqLLM.generate_object(
+        "anthropic:claude-3-sonnet",
+        "Generate 3 heroes",
+        schema,
+        output: :array
+      )
+
   """
-  @spec generate_object(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t() | list(),
-          keyword(),
-          keyword()
-        ) :: {:ok, map() | list() | String.t()} | {:error, ReqLLM.Error.t()}
-  def generate_object(model_spec, messages, schema, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @object_opts_schema),
-         {:ok, compiled_schema} <- compile_schema(schema),
-         {:ok, tool} <- create_response_tool(schema),
-         enhanced_opts <- prepare_tool_opts(validated_opts, tool),
-         {:ok, response} <- generate_text(model_spec, messages, enhanced_opts),
-         {:ok, model} <- ReqLLM.Model.from(model_spec),
-         {:ok, provider_module} <- provider(model.provider),
-         {:ok, tool_args} <- parse_tool_response(response, provider_module),
-         {:ok, validated_result} <- validate_result(tool_args, compiled_schema) do
-      {:ok, validated_result}
-    else
-      {:error, %NimbleOptions.ValidationError{} = error} ->
-        {:error,
-         ReqLLM.Error.Validation.Error.exception(
-           tag: :invalid_options,
-           reason: Exception.message(error),
-           context: []
-         )}
-
-      {:error, :not_found} ->
-        {:error, ReqLLM.Error.Invalid.Provider.exception(provider: "unknown")}
-
-      error ->
-        error
-    end
-  end
+  defdelegate generate_object(model_spec, messages, schema, opts \\ []), to: Generation
 
   @doc """
-  Streams structured data using an AI model with schema validation.
+  Generates structured data using an AI model, returning only the object content.
 
-  Accepts flexible model specifications and streams validated structured data using the appropriate provider.
-  Returns a Stream that emits validated structured data chunks as they arrive.
+  This is a convenience function that extracts just the object from the response.
+  For access to usage metadata and other response data, use `generate_object/4`.
 
   ## Parameters
 
@@ -510,63 +344,64 @@ defmodule ReqLLM do
 
   ## Examples
 
+      {:ok, object} = ReqLLM.generate_object!("anthropic:claude-3-sonnet", "Generate a person", schema)
+      object
+      #=> %{name: "John Doe", age: 30}
+
+  """
+  defdelegate generate_object!(model_spec, messages, schema, opts \\ []), to: Generation
+
+  @doc """
+  Streams structured data generation using an AI model with schema validation.
+
+  Equivalent to Vercel AI SDK's `streamObject()` function, this method
+  streams structured data generation according to a provided schema.
+
+  ## Parameters
+
+    * `model_spec` - Model specification in various formats
+    * `messages` - Text prompt or list of messages
+    * `schema` - Schema definition for structured output
+    * `opts` - Additional options (keyword list)
+
+  ## Options
+
+    Same as `generate_object/4`.
+
+  ## Examples
+
+      # Stream structured object generation
       schema = [
         name: [type: :string, required: true],
-        score: [type: :integer, required: true]
+        description: [type: :string, required: true]
       ]
-
-      {:ok, stream} = ReqLLM.stream_object(
-        "openai:gpt-4o",
-        "Generate player data",
-        schema
-      )
-
+      {:ok, stream} = ReqLLM.stream_object("anthropic:claude-3-sonnet", "Generate a character", schema)
       stream |> Enum.each(&IO.inspect/1)
 
   """
-  @spec stream_object(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t() | list(),
-          keyword(),
-          keyword()
-        ) :: {:ok, Enumerable.t()} | {:error, term()}
-  def stream_object(model_spec, messages, schema, opts \\ []) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @object_opts_schema),
-         {:ok, compiled_schema} <- compile_schema(schema),
-         {:ok, tool} <- create_response_tool(schema),
-         enhanced_opts <- prepare_tool_opts(validated_opts, tool),
-         streaming_opts <- Keyword.merge(enhanced_opts, stream?: true, return_response: true),
-         {:ok, response} <- stream_text(model_spec, messages, streaming_opts),
-         {:ok, model} <- ReqLLM.Model.from(model_spec),
-         {:ok, provider_module} <- provider(model.provider) do
-      # Build the validating stream
-      validating_stream =
-        build_validating_stream(
-          response.body,
-          provider_module,
-          compiled_schema,
-          "response_object"
-        )
+  defdelegate stream_object(model_spec, messages, schema, opts \\ []), to: Generation
 
-      # Return the stream in the same response structure for consistency
-      updated_response = %{response | body: validating_stream}
-      {:ok, updated_response}
-    else
-      {:error, %NimbleOptions.ValidationError{} = error} ->
-        {:error,
-         ReqLLM.Error.Validation.Error.exception(
-           tag: :invalid_options,
-           reason: Exception.message(error),
-           context: []
-         )}
+  @doc """
+  Streams structured data generation using an AI model, returning only the stream.
 
-      {:error, :not_found} ->
-        {:error, ReqLLM.Error.Invalid.Provider.exception(provider: "unknown")}
+  This is a convenience function that extracts just the stream from the response.
+  For access to usage metadata and other response data, use `stream_object/4`.
 
-      error ->
-        error
-    end
-  end
+  ## Parameters
+
+  Same as `stream_object/4`.
+
+  ## Examples
+
+      {:ok, stream} = ReqLLM.stream_object!("anthropic:claude-3-sonnet", "Generate a character", schema)
+      stream |> Enum.each(&IO.inspect/1)
+
+  """
+  defdelegate stream_object!(model_spec, messages, schema, opts \\ []), to: Generation
+
+  # ===========================================================================
+  # Embedding API - Delegated to ReqLLM.Embedding
+  # ===========================================================================
 
   @doc """
   Generates embeddings for a single text input.
@@ -588,18 +423,7 @@ defmodule ReqLLM do
       #=> {:ok, [0.1, -0.2, 0.3, ...]}
 
   """
-  @spec embed(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t(),
-          keyword()
-        ) :: {:ok, list(float())} | {:error, term()}
-  def embed(_model_spec, text, opts \\ []) when is_binary(text) do
-    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @embed_opts_schema) do
-      # Implementation will delegate to provider
-      # This is a stub
-      {:error, ReqLLM.Error.Invalid.NotImplemented.exception(feature: "embed")}
-    end
-  end
+  defdelegate embed(model_spec, text, opts \\ []), to: Embedding
 
   @doc """
   Generates embeddings for multiple text inputs.
@@ -617,368 +441,167 @@ defmodule ReqLLM do
   ## Examples
 
       {:ok, embeddings} = ReqLLM.embed_many(
-        "openai:text-embedding-3-small", 
+        "openai:text-embedding-3-small",
         ["Hello", "World"]
       )
       #=> {:ok, [[0.1, -0.2, ...], [0.3, 0.4, ...]]}
 
   """
-  @spec embed_many(
-          String.t() | {atom(), keyword()} | struct(),
-          list(String.t()),
-          keyword()
-        ) :: {:ok, list(list(float()))} | {:error, term()}
-  def embed_many(_model_spec, texts, opts \\ []) when is_list(texts) do
-    with {:ok, _validated_opts} <- NimbleOptions.validate(opts, @embed_opts_schema) do
-      # Implementation will delegate to provider
-      # This is a stub
-      {:error, ReqLLM.Error.Invalid.NotImplemented.exception(feature: "embed_many")}
-    end
-  end
+  defdelegate embed_many(model_spec, texts, opts \\ []), to: Embedding
+
+  # ===========================================================================
+  # Vercel AI SDK Utility API - Delegated to ReqLLM.Utils
+  # ===========================================================================
 
   @doc """
-  Extracts token usage information from a ReqLLM result.
+  Creates a Tool struct for AI model function calling.
 
-  Designed to be used in a pipeline after `generate_text` or `stream_text` calls.
-  Works with both Response objects (from `generate_text/3`) and plain results (from `generate_text!/3`).
+  Equivalent to Vercel AI SDK's `tool()` helper, providing type-safe tool
+  definitions with parameter validation. This is a convenience function
+  for creating ReqLLM.Tool structs.
 
   ## Parameters
 
-    * `result` - The result tuple from any ReqLLM function
+    * `opts` - Tool definition options (keyword list)
+
+  ## Options
+
+    * `:name` - Tool name (required, must be valid identifier)
+    * `:description` - Tool description for AI model (required)
+    * `:parameters` - Parameter schema as NimbleOptions keyword list (optional)
+    * `:callback` - Callback function or MFA tuple (required)
 
   ## Examples
 
-      # Generate text with usage info - pipeline style
-      {:ok, text, usage} = 
-        ReqLLM.generate_text("openai:gpt-4o", "Hello")
-        |> ReqLLM.with_usage()
-      
-      usage
-      #=> %{tokens: %{input: 10, output: 15}, cost: 0.00075}
+      # Simple tool with no parameters
+      tool = ReqLLM.tool(
+        name: "get_time",
+        description: "Get the current time",
+        callback: fn _args -> {:ok, DateTime.utc_now()} end
+      )
 
-      # Works with bang functions too (returns nil usage)
-      {:ok, text, usage} = 
-        ReqLLM.generate_text!("openai:gpt-4o", "Hello")
-        |> ReqLLM.with_usage()
-      
-      usage  #=> nil
-
-      # Stream text with usage info
-      {:ok, stream, usage} = 
-        ReqLLM.stream_text("openai:gpt-4o", "Hello")
-        |> ReqLLM.with_usage()
+      # Tool with parameters
+      weather_tool = ReqLLM.tool(
+        name: "get_weather",
+        description: "Get current weather for a location",
+        parameters: [
+          location: [type: :string, required: true, doc: "City name"],
+          units: [type: :string, default: "metric", doc: "Temperature units"]
+        ],
+        callback: {WeatherAPI, :fetch_weather}
+      )
 
   """
-  @spec with_usage({:ok, any()} | {:error, term()}) ::
-          {:ok, String.t() | Enumerable.t(), map() | nil} | {:error, term()}
-  def with_usage({:ok, %Req.Response{body: body} = response}) do
-    # Extract usage from response private data
-    usage = get_in(response.private, [:req_llm, :usage])
-    {:ok, body, usage}
-  end
-
-  def with_usage({:ok, result}) do
-    # Graceful passthrough for results without response metadata (like from bang functions)
-    {:ok, result, nil}
-  end
-
-  def with_usage({:error, error}) do
-    {:error, error}
+  @spec tool(keyword()) :: Tool.t()
+  def tool(opts) when is_list(opts) do
+    Tool.new!(opts)
   end
 
   @doc """
-  Extracts cost information from a ReqLLM result.
+  Creates a JSON schema object compatible with ReqLLM.
 
-  Designed to be used in a pipeline after `generate_text` or `stream_text` calls.
-  Works with both Response objects (from `generate_text/3`) and plain results (from `generate_text!/3`).
+  Equivalent to Vercel AI SDK's `jsonSchema()` helper, this function
+  creates schema objects for structured data generation and validation.
 
   ## Parameters
 
-    * `result` - The result tuple from any ReqLLM function
+    * `schema` - NimbleOptions schema definition (keyword list)
+    * `opts` - Additional options (optional)
+
+  ## Options
+
+    * `:validate` - Custom validation function (optional)
 
   ## Examples
 
-      # Generate text with cost info - pipeline style
-      {:ok, text, cost} = 
-        ReqLLM.generate_text("openai:gpt-4o", "Hello")
-        |> ReqLLM.with_cost()
-      
-      cost
-      #=> 0.00075
+      # Basic schema
+      schema = ReqLLM.json_schema([
+        name: [type: :string, required: true, doc: "User name"],
+        age: [type: :integer, doc: "User age"]
+      ])
 
-      # Works with bang functions too (returns nil cost)
-      {:ok, text, cost} = 
-        ReqLLM.generate_text!("openai:gpt-4o", "Hello")
-        |> ReqLLM.with_cost()
-      
-      cost  #=> nil
-
-      # Stream text with cost info - pipeline style
-      {:ok, stream, cost} = 
-        ReqLLM.stream_text("openai:gpt-4o", "Hello")
-        |> ReqLLM.with_cost()
-
-  """
-  @spec with_cost({:ok, any()} | {:error, term()}) ::
-          {:ok, String.t() | Enumerable.t(), float() | nil} | {:error, term()}
-  def with_cost(result) do
-    case with_usage(result) do
-      {:ok, content, %{cost: cost}} -> {:ok, content, cost}
-      {:ok, content, _} -> {:ok, content, nil}
-      {:error, error} -> {:error, error}
-    end
-  end
-
-  # Private helper functions for generate_object/4
-
-  defp compile_schema(schema) when is_list(schema) do
-    try do
-      {:ok, NimbleOptions.new!(schema)}
-    rescue
-      e ->
-        {:error,
-         ReqLLM.Error.Validation.Error.exception(
-           tag: :invalid_schema,
-           reason: "Invalid schema: #{Exception.message(e)}",
-           context: [schema: schema]
-         )}
-    end
-  end
-
-  defp compile_schema(schema) do
-    {:error,
-     ReqLLM.Error.Invalid.Parameter.exception(
-       parameter: "Schema must be a keyword list, got: #{inspect(schema)}"
-     )}
-  end
-
-  defp create_response_tool(schema) do
-    ReqLLM.Tool.new(
-      name: "response_object",
-      description: "Return the response for the user request as arguments",
-      parameters: schema,
-      callback: fn args -> {:ok, args} end
-    )
-  end
-
-  defp prepare_tool_opts(validated_opts, tool) do
-    # Remove generate_object-specific options that don't apply to generate_text
-    text_opts =
-      validated_opts
-      |> Keyword.delete(:output_type)
-      |> Keyword.delete(:enum_values)
-
-    # Convert Tool struct to format expected by providers
-    provider_tool = convert_tool_for_provider(tool)
-
-    text_opts
-    |> Keyword.put(:tools, [provider_tool])
-    |> Keyword.put(:tool_choice, "response_object")
-  end
-
-  defp convert_tool_for_provider(%ReqLLM.Tool{} = tool) do
-    %{
-      name: tool.name,
-      description: tool.description,
-      parameters_schema: parameters_to_json_schema(tool.parameters)
-    }
-  end
-
-  # Import the private function from ReqLLM.Tool 
-  defp parameters_to_json_schema([]), do: %{"type" => "object", "properties" => %{}}
-
-  defp parameters_to_json_schema(parameters) do
-    {properties, required} =
-      Enum.reduce(parameters, {%{}, []}, fn {key, opts}, {props_acc, req_acc} ->
-        property_name = to_string(key)
-        json_prop = nimble_type_to_json_schema(opts[:type] || :string, opts)
-
-        new_props = Map.put(props_acc, property_name, json_prop)
-        new_req = if opts[:required], do: [property_name | req_acc], else: req_acc
-
-        {new_props, new_req}
-      end)
-
-    schema = %{
-      "type" => "object",
-      "properties" => properties
-    }
-
-    if required == [] do
-      schema
-    else
-      Map.put(schema, "required", Enum.reverse(required))
-    end
-  end
-
-  defp nimble_type_to_json_schema(type, opts) do
-    base_schema =
-      case type do
-        :string ->
-          %{"type" => "string"}
-
-        :integer ->
-          %{"type" => "integer"}
-
-        :pos_integer ->
-          %{"type" => "integer", "minimum" => 1}
-
-        :float ->
-          %{"type" => "number"}
-
-        :number ->
-          %{"type" => "number"}
-
-        :boolean ->
-          %{"type" => "boolean"}
-
-        {:list, :string} ->
-          %{"type" => "array", "items" => %{"type" => "string"}}
-
-        {:list, :integer} ->
-          %{"type" => "array", "items" => %{"type" => "integer"}}
-
-        {:list, item_type} ->
-          %{"type" => "array", "items" => nimble_type_to_json_schema(item_type, %{})}
-
-        :map ->
-          %{"type" => "object"}
-
-        _ ->
-          %{"type" => "string"}
-      end
-
-    case opts[:doc] do
-      nil -> base_schema
-      doc -> Map.put(base_schema, "description", doc)
-    end
-  end
-
-  defp parse_tool_response(%Req.Response{body: %{tool_calls: tool_calls}}, _provider_module)
-       when is_list(tool_calls) and tool_calls != [] do
-    case Enum.find(tool_calls, &(&1[:name] == "response_object")) do
-      %{arguments: args} ->
-        {:ok, args}
-
-      nil ->
-        {:error,
-         ReqLLM.Error.API.Response.exception(
-           reason: "No response_object tool call found in response"
-         )}
-    end
-  end
-
-  defp parse_tool_response(%Req.Response{body: body}, provider_module) do
-    case provider_module.parse_tool_call(body, "response_object") do
-      {:ok, args} ->
-        {:ok, args}
-
-      {:error, :tool_not_found} ->
-        {:error,
-         ReqLLM.Error.API.Response.exception(
-           reason: "No response_object tool call found in response"
-         )}
-
-      {:error, :no_tool_calls} ->
-        {:error, ReqLLM.Error.API.Response.exception(reason: "No tool calls found in response")}
-
-      {:error, reason} ->
-        {:error,
-         ReqLLM.Error.API.Response.exception(
-           reason: "Failed to parse tool call: #{inspect(reason)}"
-         )}
-    end
-  end
-
-  defp validate_result(tool_args, compiled_schema) do
-    case NimbleOptions.validate(tool_args, compiled_schema) do
-      {:ok, validated_result} ->
-        {:ok, validated_result}
-
-      {:error, error} ->
-        {:error,
-         ReqLLM.Error.Validation.Error.exception(
-           tag: :result_validation,
-           reason: Exception.message(error),
-           context: [result: tool_args]
-         )}
-    end
-  end
-
-  # Helper functions for stream_object/4
-
-  defp build_validating_stream(stream, provider_module, compiled_schema, _tool_name) do
-    Stream.resource(
-      fn -> stream_tool_init(provider_module) end,
-      fn state ->
-        case Enum.take(stream, 1) do
-          [] ->
-            {:halt, state}
-
-          [chunk] ->
-            case stream_tool_accumulate(provider_module, chunk, state) do
-              {:ok, new_state} ->
-                {[], new_state}
-
-              {:ok, new_state, completed_args} ->
-                case validate_all(completed_args, compiled_schema) do
-                  {:ok, validated_results} ->
-                    {validated_results, new_state}
-
-                  {:error, error} ->
-                    raise error
-                end
-
-              {:error, error} ->
-                raise ReqLLM.Error.API.Response.exception(
-                        reason: "Stream processing error: #{inspect(error)}"
-                      )
-            end
-        end
-      end,
-      fn _state -> :ok end
-    )
-  end
-
-  defp stream_tool_init(provider_module) do
-    if function_exported?(provider_module, :stream_tool_init, 1) do
-      provider_module.stream_tool_init("response_object")
-    else
-      %{}
-    end
-  end
-
-  defp stream_tool_accumulate(provider_module, chunk, state) do
-    if function_exported?(provider_module, :stream_tool_accumulate, 3) do
-      provider_module.stream_tool_accumulate(chunk, "response_object", state)
-    else
-      {:error, :not_implemented}
-    end
-  end
-
-  defp validate_all(args_list, compiled_schema) when is_list(args_list) do
-    try do
-      validated =
-        Enum.map(args_list, fn args ->
-          case NimbleOptions.validate(args, compiled_schema) do
-            {:ok, validated_args} -> validated_args
-            {:error, error} -> throw({:validation_error, error})
+      # Schema with custom validation
+      schema = ReqLLM.json_schema(
+        [email: [type: :string, required: true]],
+        validate: fn value ->
+          if String.contains?(value["email"], "@") do
+            {:ok, value}
+          else
+            {:error, "Invalid email format"}
           end
-        end)
+        end
+      )
 
-      {:ok, validated}
-    catch
-      {:validation_error, error} ->
-        {:error,
-         ReqLLM.Error.Validation.Error.exception(
-           tag: :result_validation,
-           reason: Exception.message(error),
-           context: [result: args_list]
-         )}
+  """
+  @spec json_schema(keyword(), keyword()) :: map()
+  def json_schema(schema, opts \\ []) when is_list(schema) and is_list(opts) do
+    json_schema = Schema.to_json(schema)
+
+    case opts[:validate] do
+      nil ->
+        json_schema
+
+      validator when is_function(validator, 1) ->
+        Map.put(json_schema, :validate, validator)
     end
   end
 
-  defp validate_all(args, compiled_schema) do
-    validate_all([args], compiled_schema)
+  @doc """
+  Calculates cosine similarity between two embedding vectors.
+
+  Equivalent to Vercel AI SDK's `cosineSimilarity()` function.
+  Returns a similarity score between -1 and 1, where:
+  - 1.0 indicates identical vectors (maximum similarity)
+  - 0.0 indicates orthogonal vectors (no similarity)
+  - -1.0 indicates opposite vectors (maximum dissimilarity)
+
+  ## Parameters
+
+    * `embedding_a` - First embedding vector (list of numbers)
+    * `embedding_b` - Second embedding vector (list of numbers)
+
+  ## Examples
+
+      # Identical vectors
+      ReqLLM.cosine_similarity([1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+      #=> 1.0
+
+      # Orthogonal vectors
+      ReqLLM.cosine_similarity([1.0, 0.0], [0.0, 1.0])
+      #=> 0.0
+
+      # Opposite vectors
+      ReqLLM.cosine_similarity([1.0, 0.0], [-1.0, 0.0])
+      #=> -1.0
+
+      # Similar vectors
+      ReqLLM.cosine_similarity([0.5, 0.8, 0.3], [0.6, 0.7, 0.4])
+      #=> 0.9487...
+
+  """
+  @spec cosine_similarity([number()], [number()]) :: float()
+  def cosine_similarity(embedding_a, embedding_b)
+      when is_list(embedding_a) and is_list(embedding_b) do
+    if length(embedding_a) != length(embedding_b) do
+      raise ArgumentError, "Embedding vectors must have the same length"
+    end
+
+    if embedding_a == [] do
+      0.0
+    else
+      dot_product =
+        embedding_a
+        |> Enum.zip(embedding_b)
+        |> Enum.reduce(0, fn {a, b}, acc -> acc + a * b end)
+
+      magnitude_a = :math.sqrt(Enum.reduce(embedding_a, 0, fn x, acc -> acc + x * x end))
+      magnitude_b = :math.sqrt(Enum.reduce(embedding_b, 0, fn x, acc -> acc + x * x end))
+
+      if magnitude_a == 0 or magnitude_b == 0 do
+        0.0
+      else
+        dot_product / (magnitude_a * magnitude_b)
+      end
+    end
   end
 end

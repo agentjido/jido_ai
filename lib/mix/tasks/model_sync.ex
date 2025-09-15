@@ -1,4 +1,6 @@
-defmodule Mix.Tasks.ReqLLM.ModelSync do
+defmodule Mix.Tasks.ReqLlm.ModelSync do
+  @shortdoc "Synchronize model data from models.dev API"
+
   @moduledoc """
   Simplified model synchronization task.
 
@@ -24,9 +26,9 @@ defmodule Mix.Tasks.ReqLLM.ModelSync do
 
   use Mix.Task
 
-  @shortdoc "Synchronize model data from models.dev API"
-
   require Logger
+
+  @preferred_cli_env ["req_llm.model_sync": :dev]
 
   # API endpoint
   @models_dev_api "https://models.dev/api.json"
@@ -48,6 +50,7 @@ defmodule Mix.Tasks.ReqLLM.ModelSync do
     dependencies
   ]
 
+  @spec run([String.t()]) :: :ok
   @impl Mix.Task
   def run(args) do
     {:ok, _} = Application.ensure_all_started(:req_llm)
@@ -66,6 +69,7 @@ defmodule Mix.Tasks.ReqLLM.ModelSync do
     case execute_sync(verbose?) do
       :ok ->
         IO.puts("Model synchronization completed successfully")
+        :ok
 
       {:error, reason} ->
         IO.puts("Synchronization failed: #{reason}")

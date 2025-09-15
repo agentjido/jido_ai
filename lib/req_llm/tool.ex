@@ -1,6 +1,6 @@
 defmodule ReqLLM.Tool do
   @moduledoc """
-  Represents a tool/function that can be called by AI models.
+  Simplified tool definition for AI model function calling.
 
   Tools enable AI models to call external functions, perform actions, and retrieve information.
   Each tool has a name, description, parameters schema, and a callback function to execute.
@@ -11,7 +11,7 @@ defmodule ReqLLM.Tool do
       {:ok, tool} = ReqLLM.Tool.new(
         name: "get_weather",
         description: "Get current weather for a location",
-        parameters: [
+        parameter_schema: [
           location: [type: :string, required: true, doc: "City name"]
         ],
         callback: {WeatherService, :get_current_weather}
@@ -20,11 +20,14 @@ defmodule ReqLLM.Tool do
       # Execute the tool
       {:ok, result} = ReqLLM.Tool.execute(tool, %{location: "San Francisco"})
 
+      # Get provider-specific schema
+      anthropic_schema = ReqLLM.Tool.to_schema(tool, :anthropic)
+
   ## Parameters Schema
 
   Parameters are defined using NimbleOptions-compatible keyword lists:
 
-      parameters: [
+      parameter_schema: [
         location: [type: :string, required: true, doc: "City name"],
         units: [type: :string, default: "celsius", doc: "Temperature units"]
       ]
@@ -42,46 +45,12 @@ defmodule ReqLLM.Tool do
       # Anonymous function
       callback: fn args -> {:ok, "result"} end
 
-  ## Tool Definition Examples
+  ## Provider Schema Formats
 
-      # Weather tool with validation
-      weather_tool = ReqLLM.Tool.new!(
-        name: "get_weather",
-        description: "Get weather information for a location",
-        parameters: [
-          location: [type: :string, required: true, doc: "City or location name"],
-          units: [type: :string, default: "metric", doc: "Temperature units (metric/imperial)"]
-        ],
-        callback: {WeatherAPI, :fetch_weather}
-      )
+  Tools can be converted to provider-specific formats:
 
-      # Calculator tool with multiple parameters
-      calc_tool = ReqLLM.Tool.new!(
-        name: "calculate",
-        description: "Perform mathematical calculations",
-        parameters: [
-          operation: [type: :string, required: true, doc: "Math operation (+, -, *, /)"],
-          a: [type: :number, required: true, doc: "First number"],
-          b: [type: :number, required: true, doc: "Second number"]
-        ],
-        callback: fn %{operation: op, a: a, b: b} ->
-          case op do
-            "+" -> {:ok, a + b}
-            "-" -> {:ok, a - b}
-            "*" -> {:ok, a * b}
-            "/" when b != 0 -> {:ok, a / b}
-            "/" -> {:error, "Division by zero"}
-            _ -> {:error, "Unknown operation"}
-          end
-        end
-      )
-
-  ## JSON Schema Export
-
-  Tools can be exported to JSON Schema format for LLM integration:
-
-      json_schema = ReqLLM.Tool.to_json_schema(tool)
-      # Returns OpenAI function calling compatible schema
+      # Anthropic tool format
+      anthropic_schema = ReqLLM.Tool.to_schema(tool, :anthropic)
 
   """
 
@@ -96,15 +65,15 @@ defmodule ReqLLM.Tool do
 
     field(:name, String.t(), enforce: true)
     field(:description, String.t(), enforce: true)
-    field(:parameters, keyword() | nil, default: [])
+    field(:parameter_schema, keyword(), default: [])
+    field(:compiled, term() | nil, default: nil)
     field(:callback, callback(), enforce: true)
-    field(:schema, NimbleOptions.t() | nil, default: nil)
   end
 
   @type tool_opts :: [
           name: String.t(),
           description: String.t(),
-          parameters: keyword(),
+          parameter_schema: keyword(),
           callback: callback()
         ]
 
@@ -120,7 +89,7 @@ defmodule ReqLLM.Tool do
                    required: true,
                    doc: "Tool description for AI model"
                  ],
-                 parameters: [
+                 parameter_schema: [
                    type: :keyword_list,
                    default: [],
                    doc: "Parameter schema as keyword list"
@@ -143,7 +112,7 @@ defmodule ReqLLM.Tool do
 
     * `:name` - Tool name (required, must be valid identifier)
     * `:description` - Tool description for AI model (required)
-    * `:parameters` - Parameter schema as NimbleOptions keyword list (optional)
+    * `:parameter_schema` - Parameter schema as NimbleOptions keyword list (optional)
     * `:callback` - Callback function or MFA tuple (required)
 
   ## Examples
@@ -151,7 +120,7 @@ defmodule ReqLLM.Tool do
       {:ok, tool} = ReqLLM.Tool.new(
         name: "get_weather",
         description: "Get current weather",
-        parameters: [
+        parameter_schema: [
           location: [type: :string, required: true]
         ],
         callback: {WeatherService, :get_weather}
@@ -163,13 +132,13 @@ defmodule ReqLLM.Tool do
     with {:ok, validated_opts} <- NimbleOptions.validate(opts, @tool_schema),
          :ok <- validate_name(validated_opts[:name]),
          :ok <- validate_callback(validated_opts[:callback]),
-         {:ok, parameter_schema} <- build_parameter_schema(validated_opts[:parameters]) do
+         {:ok, compiled_schema} <- compile_parameter_schema(validated_opts[:parameter_schema]) do
       tool = %__MODULE__{
         name: validated_opts[:name],
         description: validated_opts[:description],
-        parameters: validated_opts[:parameters],
-        callback: validated_opts[:callback],
-        schema: parameter_schema
+        parameter_schema: validated_opts[:parameter_schema],
+        compiled: compiled_schema,
+        callback: validated_opts[:callback]
       }
 
       {:ok, tool}
@@ -252,70 +221,52 @@ defmodule ReqLLM.Tool do
   end
 
   @doc """
-  Executes a tool with the given input parameters, raising on error.
+  Converts a Tool to provider-specific schema format.
 
-  See `execute/2` for details.
+  Returns a map containing the provider's expected tool format with
+  tool name, description, and parameter definitions.
+
+  ## Parameters
+
+    * `tool` - Tool struct
+    * `provider` - Provider atom (`:anthropic`)
 
   ## Examples
 
-      result = ReqLLM.Tool.execute!(tool, %{location: "San Francisco"})
-      #=> %{temperature: 72, conditions: "sunny"}
+      # Anthropic tool format
+      anthropic_schema = ReqLLM.Tool.to_schema(tool, :anthropic)
+      #=> %{
+      #     "name" => "get_weather",
+      #     "description" => "Get current weather",
+      #     "input_schema" => %{...}
+      #   }
 
   """
-  @spec execute!(t(), map()) :: term() | no_return()
-  def execute!(tool, input) do
-    case execute(tool, input) do
-      {:ok, result} -> result
-      {:error, error} -> raise error
+  @spec to_schema(t(), atom()) :: map()
+  def to_schema(%__MODULE__{} = tool, provider \\ :openai) do
+    case provider do
+      :anthropic -> ReqLLM.Schema.to_anthropic_format(tool)
+      :openai -> ReqLLM.Schema.to_openai_format(tool)
+      :google -> ReqLLM.Schema.to_google_format(tool)
+      other -> raise ArgumentError, "Unknown provider #{inspect(other)}"
     end
   end
 
   @doc """
   Converts a Tool to JSON Schema format for LLM integration.
 
-  Returns a map containing OpenAI function calling compatible schema with
-  tool name, description, and parameter definitions.
+  Backward compatibility function that defaults to OpenAI format.
+  Use `to_schema/2` for explicit provider selection.
 
   ## Examples
 
-      tool = ReqLLM.Tool.new!(
-        name: "get_weather",
-        description: "Get current weather",
-        parameters: [
-          location: [type: :string, required: true, doc: "City name"],
-          units: [type: :string, default: "celsius", doc: "Temperature units"]
-        ],
-        callback: {WeatherService, :get_weather}
-      )
-
       json_schema = ReqLLM.Tool.to_json_schema(tool)
-      #=> %{
-      #     "type" => "function",
-      #     "function" => %{
-      #       "name" => "get_weather",
-      #       "description" => "Get current weather",
-      #       "parameters" => %{
-      #         "type" => "object",
-      #         "properties" => %{
-      #           "location" => %{"type" => "string", "description" => "City name"},
-      #           "units" => %{"type" => "string", "description" => "Temperature units"}
-      #         },
-      #         "required" => ["location"]
-      #       }
-      #     }
-      #   }
+      # Equivalent to: ReqLLM.Tool.to_schema(tool, :openai)
 
   """
   @spec to_json_schema(t()) :: map()
   def to_json_schema(%__MODULE__{} = tool) do
-    %{
-      "type" => "function",
-      "function" => %{
-        "name" => tool.name,
-        "description" => tool.description,
-        "parameters" => parameters_to_json_schema(tool.parameters)
-      }
-    }
+    to_schema(tool, :openai)
   end
 
   @doc """
@@ -376,20 +327,15 @@ defmodule ReqLLM.Tool do
      "Invalid callback: #{inspect(callback)}. Must be {module, function}, {module, function, args}, or function/1"}
   end
 
-  defp build_parameter_schema([]), do: {:ok, nil}
+  defp compile_parameter_schema([]), do: {:ok, nil}
 
-  defp build_parameter_schema(parameters) when is_list(parameters) do
-    try do
-      {:ok, NimbleOptions.new!(parameters)}
-    rescue
-      e ->
-        {:error, "Invalid parameter schema: #{Exception.message(e)}"}
-    end
+  defp compile_parameter_schema(parameter_schema) when is_list(parameter_schema) do
+    ReqLLM.Schema.compile(parameter_schema)
   end
 
-  defp validate_input(%__MODULE__{schema: nil}, input), do: {:ok, input}
+  defp validate_input(%__MODULE__{compiled: nil}, input), do: {:ok, input}
 
-  defp validate_input(%__MODULE__{schema: schema}, input) do
+  defp validate_input(%__MODULE__{compiled: schema}, input) do
     # Convert string keys to atoms for validation
     normalized_input = normalize_input_keys(input)
 
@@ -422,98 +368,38 @@ defmodule ReqLLM.Tool do
   end
 
   defp call_callback({module, function}, input) do
-    try do
-      apply(module, function, [input])
-    rescue
-      error ->
-        {:error, "Callback execution failed: #{Exception.message(error)}"}
-    end
+    apply(module, function, [input])
+  rescue
+    error ->
+      {:error, "Callback execution failed: #{Exception.message(error)}"}
   end
 
   defp call_callback({module, function, args}, input) do
-    try do
-      apply(module, function, args ++ [input])
-    rescue
-      error ->
-        {:error, "Callback execution failed: #{Exception.message(error)}"}
-    end
+    apply(module, function, args ++ [input])
+  rescue
+    error ->
+      {:error, "Callback execution failed: #{Exception.message(error)}"}
   end
 
   defp call_callback(fun, input) when is_function(fun, 1) do
-    try do
-      fun.(input)
-    rescue
-      error ->
-        {:error, "Callback execution failed: #{Exception.message(error)}"}
-    end
+    fun.(input)
+  rescue
+    error ->
+      {:error, "Callback execution failed: #{Exception.message(error)}"}
   end
 
-  defp parameters_to_json_schema([]), do: %{"type" => "object", "properties" => %{}}
+  defimpl Inspect do
+    def inspect(%{name: name, parameter_schema: schema}, opts) do
+      param_count = length(schema)
+      param_desc = if param_count == 0, do: "no params", else: "#{param_count} params"
 
-  defp parameters_to_json_schema(parameters) do
-    {properties, required} =
-      Enum.reduce(parameters, {%{}, []}, fn {key, opts}, {props_acc, req_acc} ->
-        property_name = to_string(key)
-        json_prop = nimble_type_to_json_schema(opts[:type] || :string, opts)
-
-        new_props = Map.put(props_acc, property_name, json_prop)
-        new_req = if opts[:required], do: [property_name | req_acc], else: req_acc
-
-        {new_props, new_req}
-      end)
-
-    schema = %{
-      "type" => "object",
-      "properties" => properties
-    }
-
-    if required == [] do
-      schema
-    else
-      Map.put(schema, "required", Enum.reverse(required))
-    end
-  end
-
-  defp nimble_type_to_json_schema(type, opts) do
-    base_schema =
-      case type do
-        :string ->
-          %{"type" => "string"}
-
-        :integer ->
-          %{"type" => "integer"}
-
-        :pos_integer ->
-          %{"type" => "integer", "minimum" => 1}
-
-        :float ->
-          %{"type" => "number"}
-
-        :number ->
-          %{"type" => "number"}
-
-        :boolean ->
-          %{"type" => "boolean"}
-
-        {:list, :string} ->
-          %{"type" => "array", "items" => %{"type" => "string"}}
-
-        {:list, :integer} ->
-          %{"type" => "array", "items" => %{"type" => "integer"}}
-
-        {:list, item_type} ->
-          %{"type" => "array", "items" => nimble_type_to_json_schema(item_type, %{})}
-
-        :map ->
-          %{"type" => "object"}
-
-        _ ->
-          %{"type" => "string"}
-      end
-
-    case opts[:doc] do
-      nil -> base_schema
-      doc -> Map.put(base_schema, "description", doc)
+      Inspect.Algebra.concat([
+        "#Tool<",
+        Inspect.Algebra.to_doc(name, opts),
+        " ",
+        param_desc,
+        ">"
+      ])
     end
   end
 end

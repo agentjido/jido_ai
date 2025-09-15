@@ -10,8 +10,8 @@
       "knowledge": "2025-08",
       "last_updated": "2025-09-05",
       "limit": {
-        "context": 131000,
-        "output": 131000
+        "context": 262144,
+        "output": 262144
       },
       "modalities": {
         "input": [

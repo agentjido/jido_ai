@@ -8,11 +8,14 @@ defmodule ReqLLM.Model do
 
   ## Examples
 
-      # Create a model with provider and options tuple
-      {:ok, model} = ReqLLM.Model.from({:openai, model: "gpt-4", temperature: 0.7})
+      # Create a model with 3-tuple format (preferred)
+      {:ok, model} = ReqLLM.Model.from({:anthropic, "claude-3-5-sonnet", temperature: 0.7})
+
+      # Create a model with legacy 2-tuple format
+      {:ok, model} = ReqLLM.Model.from({:anthropic, model: "claude-3-5-sonnet", temperature: 0.7})
 
       # Create a model from string specification
-      {:ok, model} = ReqLLM.Model.from("openai:gpt-4")
+      {:ok, model} = ReqLLM.Model.from("anthropic:claude-3-5-sonnet")
 
       # Create a model directly
       model = ReqLLM.Model.new(:anthropic, "claude-3-sonnet", temperature: 0.5, max_tokens: 1000)
@@ -25,18 +28,19 @@ defmodule ReqLLM.Model do
   @type cost :: %{input: float(), output: float()}
   @type limit :: %{context: non_neg_integer(), output: non_neg_integer()}
   @type capabilities :: %{
-          reasoning?: boolean(),
-          tool_call?: boolean(),
-          supports_temperature?: boolean()
+          reasoning: boolean(),
+          tool_call: boolean(),
+          temperature: boolean(),
+          attachment: boolean()
         }
 
+  @derive {Jason.Encoder, only: [:provider, :model, :max_tokens, :max_retries]}
   typedstruct do
     @typedoc "An AI model configuration"
 
     # Required runtime fields
     field(:provider, atom(), enforce: true)
     field(:model, String.t(), enforce: true)
-    field(:temperature, float() | nil)
     field(:max_tokens, non_neg_integer() | nil)
     field(:max_retries, non_neg_integer() | nil, default: 3)
 
@@ -52,38 +56,39 @@ defmodule ReqLLM.Model do
 
   ## Parameters
 
-  - `provider` - The provider atom (e.g., `:openai`, `:anthropic`)
+  - `provider` - The provider atom (e.g., `:anthropic`)
   - `model` - The model name string (e.g., `"gpt-4"`, `"claude-3-sonnet"`)
   - `opts` - Optional keyword list of parameters
 
   ## Options
 
-  - `:temperature` - Temperature for generation (0.0 to 2.0)
-  - `:max_tokens` - Maximum tokens to generate
+  - `:max_tokens` - Maximum tokens the model can generate (defaults to model's output limit)
   - `:max_retries` - Maximum retry attempts (default: 3)
   - `:limit` - Token limits map with `:context` and `:output` keys
   - `:modalities` - Input/output modalities map with lists of supported types
-  - `:capabilities` - Model capabilities like `:reasoning?`, `:tool_call?`, `:supports_temperature?`
+  - `:capabilities` - Model capabilities like `:reasoning`, `:tool_call`, `:temperature`, `:attachment`
   - `:cost` - Pricing information with `:input` and `:output` cost per 1K tokens
 
   ## Examples
 
-      iex> ReqLLM.Model.new(:openai, "gpt-4")
-      %ReqLLM.Model{provider: :openai, model: "gpt-4", max_retries: 3}
+      iex> ReqLLM.Model.new(:anthropic, "claude-3-5-sonnet")
+      %ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet", max_tokens: nil, max_retries: 3}
 
-      iex> ReqLLM.Model.new(:anthropic, "claude-3-sonnet", temperature: 0.7, max_tokens: 1000)
-      %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet", temperature: 0.7, max_tokens: 1000, max_retries: 3}
+      iex> ReqLLM.Model.new(:anthropic, "claude-3-sonnet", max_tokens: 1000)
+      %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet", max_tokens: 1000, max_retries: 3}
 
   """
   @spec new(atom(), String.t(), keyword()) :: t()
   def new(provider, model, opts \\ []) when is_atom(provider) and is_binary(model) do
+    limit = Keyword.get(opts, :limit)
+    default_max_tokens = if limit, do: Map.get(limit, :output)
+
     %__MODULE__{
       provider: provider,
       model: model,
-      temperature: Keyword.get(opts, :temperature),
-      max_tokens: Keyword.get(opts, :max_tokens),
+      max_tokens: Keyword.get(opts, :max_tokens, default_max_tokens),
       max_retries: Keyword.get(opts, :max_retries, 3),
-      limit: Keyword.get(opts, :limit),
+      limit: limit,
       modalities: Keyword.get(opts, :modalities),
       capabilities: Keyword.get(opts, :capabilities),
       cost: Keyword.get(opts, :cost)
@@ -95,25 +100,37 @@ defmodule ReqLLM.Model do
 
   Supports:
   - Existing Model struct (returned as-is)
-  - Tuple format: `{provider, opts}` where provider is atom and opts is keyword list
-  - String format: `"provider:model"` (e.g., `"openai:gpt-4"`)
+  - 3-tuple format: `{provider, model, opts}` where provider is atom, model is string, opts is keyword list
+  - 2-tuple format (legacy): `{provider, opts}` where provider is atom and opts is keyword list with `:model` key
+  - String format: `"provider:model"` (e.g., `"anthropic:claude-3-5-sonnet"`)
 
   ## Examples
 
       # From existing struct
-      {:ok, model} = ReqLLM.Model.from(%ReqLLM.Model{provider: :openai, model: "gpt-4"})
+      {:ok, model} = ReqLLM.Model.from(%ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet"})
 
-      # From tuple with options (including metadata)
-      {:ok, model} = ReqLLM.Model.from({:openai, model: "gpt-4", temperature: 0.7, max_tokens: 1000,
-                                       capabilities: %{reasoning?: true, tool_call?: true}})
+      # From 3-tuple format (preferred)
+      {:ok, model} = ReqLLM.Model.from({:anthropic, "claude-3-5-sonnet", max_tokens: 1000})
+
+      # From 2-tuple format (legacy support)
+      {:ok, model} = ReqLLM.Model.from({:anthropic, model: "claude-3-5-sonnet", max_tokens: 1000,
+                                       capabilities: %{tool_call: true}})
 
       # From string specification
       {:ok, model} = ReqLLM.Model.from("anthropic:claude-3-sonnet")
 
   """
-  @spec from(t() | {atom(), keyword()} | String.t()) :: {:ok, t()} | {:error, term()}
+  @spec from(t() | {atom(), String.t(), keyword()} | {atom(), keyword()} | String.t()) ::
+          {:ok, t()} | {:error, term()}
   def from(%__MODULE__{} = model), do: {:ok, model}
 
+  # New 3-tuple format: {provider, model, opts}
+  def from({provider, model, opts})
+      when is_atom(provider) and is_binary(model) and is_list(opts) do
+    {:ok, new(provider, model, opts)}
+  end
+
+  # Legacy 2-tuple format: {provider, opts} with model in opts
   def from({provider, opts}) when is_atom(provider) and is_list(opts) do
     case Keyword.get(opts, :model) do
       nil ->
@@ -133,12 +150,21 @@ defmodule ReqLLM.Model do
     end
   end
 
+  @dialyzer {:nowarn_function, from: 1}
   def from(provider_model_string) when is_binary(provider_model_string) do
     case String.split(provider_model_string, ":", parts: 2) do
       [provider_str, model_name] when provider_str != "" and model_name != "" ->
         case parse_provider(provider_str) do
           {:ok, provider} ->
-            {:ok, new(provider, model_name)}
+            # Try to get metadata from provider registry, fallback to basic model
+            case ReqLLM.Provider.Registry.get_model(provider, model_name) do
+              {:ok, _} = result ->
+                result
+
+              {:error, _} ->
+                # Fallback to creating basic model without metadata
+                {:ok, new(provider, model_name)}
+            end
 
           {:error, reason} ->
             {:error,
@@ -171,11 +197,12 @@ defmodule ReqLLM.Model do
 
   ## Examples
 
-      iex> ReqLLM.Model.from!("openai:gpt-4")
-      %ReqLLM.Model{provider: :openai, model: "gpt-4", max_retries: 3}
+      iex> model = ReqLLM.Model.from!("anthropic:claude-3-haiku-20240307")
+      iex> {model.provider, model.model, model.max_tokens}
+      {:anthropic, "claude-3-haiku-20240307", 4096}
 
   """
-  @spec from!(t() | {atom(), keyword()} | String.t()) :: t()
+  @spec from!(t() | {atom(), String.t(), keyword()} | {atom(), keyword()} | String.t()) :: t()
   def from!(input) do
     case from(input) do
       {:ok, model} -> model
@@ -188,11 +215,11 @@ defmodule ReqLLM.Model do
 
   ## Examples
 
-      iex> model = %ReqLLM.Model{provider: :openai, model: "gpt-4", max_retries: 3}
+      iex> model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-5-sonnet", max_tokens: 4096, max_retries: 3}
       iex> ReqLLM.Model.valid?(model)
       true
 
-      iex> ReqLLM.Model.valid?(%{provider: :openai, model: "gpt-4"})
+      iex> ReqLLM.Model.valid?(%{provider: :anthropic, model: "claude-3-5-sonnet"})
       false
 
   """
@@ -212,16 +239,22 @@ defmodule ReqLLM.Model do
 
   ## Examples
 
-      iex> model = ReqLLM.Model.new(:openai, "gpt-4")
+      iex> model = ReqLLM.Model.new(:anthropic, "claude-3-5-sonnet")
       iex> ReqLLM.Model.with_defaults(model).capabilities
-      %{reasoning?: false, tool_call?: false, supports_temperature?: true}
+      %{reasoning: false, tool_call: false, temperature: true, attachment: false}
 
   """
   @spec with_defaults(t()) :: t()
   def with_defaults(%__MODULE__{} = model) do
     default_limit = %{context: 128_000, output: 4_096}
     default_modalities = %{input: [:text], output: [:text]}
-    default_capabilities = %{reasoning?: false, tool_call?: false, supports_temperature?: true}
+
+    default_capabilities = %{
+      reasoning: false,
+      tool_call: false,
+      temperature: true,
+      attachment: false
+    }
 
     %{
       model
@@ -251,7 +284,10 @@ defmodule ReqLLM.Model do
       enhanced_model = %{
         base_model
         | limit: get_in(full_metadata, ["limit"]) |> map_string_keys_to_atoms(),
-          modalities: get_in(full_metadata, ["modalities"]) |> map_string_keys_to_atoms(),
+          modalities:
+            get_in(full_metadata, ["modalities"])
+            |> map_string_keys_to_atoms()
+            |> convert_modality_values(),
           capabilities: build_capabilities_from_metadata(full_metadata),
           cost: get_in(full_metadata, ["cost"]) |> map_string_keys_to_atoms()
       }
@@ -263,30 +299,63 @@ defmodule ReqLLM.Model do
   defp merge_with_defaults(nil, defaults), do: defaults
   defp merge_with_defaults(existing, defaults), do: Map.merge(defaults, existing)
 
-  # Define a whitelist of valid provider atoms based on currently supported providers
+  # Define a comprehensive list of valid provider atoms based on available metadata
   # These atoms are safe because they're defined at compile time, not from user input
+  # Note: Not all providers are fully implemented - some are metadata-only
   @valid_providers [
-    :openai,
-    :anthropic,
-    :openrouter,
-    :google,
-    :mistral,
-    :togetherai,
-    :cerebras,
-    :deepseek,
-    :inference,
-    :submodel,
-    :venice,
-    :v0,
-    :zhipuai,
     :alibaba,
-    :fastrouter
+    :amazon_bedrock,
+    :anthropic,
+    :azure,
+    :baseten,
+    :cerebras,
+    :chutes,
+    :cloudflare_workers_ai,
+    :deepinfra,
+    :deepseek,
+    :fastrouter,
+    :fireworks_ai,
+    :github_copilot,
+    :github_models,
+    :google,
+    :google_vertex,
+    :google_vertex_anthropic,
+    :groq,
+    :huggingface,
+    :inception,
+    :inference,
+    :llama,
+    :lmstudio,
+    :mistral,
+    :modelscope,
+    :moonshotai,
+    :moonshotai_cn,
+    :morph,
+    :nvidia,
+    :openai,
+    :opencode,
+    :openrouter,
+    :requesty,
+    :submodel,
+    :synthetic,
+    :togetherai,
+    :upstage,
+    :v0,
+    :venice,
+    :vercel,
+    :wandb,
+    :xai,
+    :zai,
+    :zhipuai
   ]
 
   defp parse_provider(str) when is_binary(str) do
+    # Convert hyphenated provider names to underscored atoms
+    atom_candidate = String.replace(str, "-", "_")
+
     # Only use String.to_existing_atom to prevent atom table leaks
     try do
-      atom = String.to_existing_atom(str)
+      atom = String.to_existing_atom(atom_candidate)
 
       if atom in @valid_providers do
         {:ok, atom}
@@ -375,9 +444,63 @@ defmodule ReqLLM.Model do
 
   defp build_capabilities_from_metadata(metadata) do
     %{
-      reasoning?: Map.get(metadata, "reasoning", false),
-      tool_call?: Map.get(metadata, "tool_call", false),
-      supports_temperature?: Map.get(metadata, "temperature", false)
+      reasoning: Map.get(metadata, "reasoning", false),
+      tool_call: Map.get(metadata, "tool_call", false),
+      temperature: Map.get(metadata, "temperature", false),
+      attachment: Map.get(metadata, "attachment", false)
     }
+  end
+
+  # Convert modality string values to atoms
+  defp convert_modality_values(nil), do: nil
+
+  defp convert_modality_values(modalities) when is_map(modalities) do
+    modalities
+    |> Map.new(fn
+      {:input, values} when is_list(values) ->
+        {:input, Enum.map(values, &String.to_atom/1)}
+
+      {:output, values} when is_list(values) ->
+        {:output, Enum.map(values, &String.to_atom/1)}
+
+      {key, value} ->
+        {key, value}
+    end)
+  end
+
+  @doc """
+  Gets the default model for a provider spec.
+
+  Falls back to the first available model if no default is specified.
+
+  ## Parameters
+
+  - `spec` - Provider spec struct with `:default_model` and `:models` fields
+
+  ## Returns
+
+  The default model string, or `nil` if no models are available.
+
+  ## Examples
+
+      iex> spec = %{default_model: "gpt-4", models: %{"gpt-3.5" => %{}, "gpt-4" => %{}}}
+      iex> ReqLLM.Model.default_model(spec)
+      "gpt-4"
+
+      iex> spec = %{default_model: nil, models: %{"model-a" => %{}, "model-b" => %{}}}
+      iex> ReqLLM.Model.default_model(spec)
+      "model-a"
+
+      iex> spec = %{default_model: nil, models: %{}}
+      iex> ReqLLM.Model.default_model(spec)
+      nil
+  """
+  @spec default_model(map()) :: binary() | nil
+  def default_model(spec) do
+    spec.default_model ||
+      case Map.keys(spec.models) do
+        [first_model | _] -> first_model
+        [] -> nil
+      end
   end
 end

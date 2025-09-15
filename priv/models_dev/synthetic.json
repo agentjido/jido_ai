@@ -3,70 +3,10 @@
     {
       "attachment": false,
       "cost": {
-        "input": 0.2,
-        "output": 0.6
-      },
-      "id": "Qwen/qwen-3-235b-a22b-instruct-2507",
-      "knowledge": "2025-04",
-      "last_updated": "2025-07-21",
-      "limit": {
-        "context": 256000,
-        "output": 32000
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "Qwen 3 235B Instruct",
-      "open_weights": true,
-      "provider": "synthetic",
-      "provider_model_id": "Qwen/qwen-3-235b-a22b-instruct-2507",
-      "reasoning": false,
-      "release_date": "2025-04-28",
-      "temperature": true,
-      "tool_call": true
-    },
-    {
-      "attachment": false,
-      "cost": {
-        "input": 2,
-        "output": 2
-      },
-      "id": "Qwen/qwen-3-coder-480b",
-      "knowledge": "2025-04",
-      "last_updated": "2025-07-23",
-      "limit": {
-        "context": 256000,
-        "output": 32000
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "Qwen 3 Coder 480B",
-      "open_weights": true,
-      "provider": "synthetic",
-      "provider_model_id": "Qwen/qwen-3-coder-480b",
-      "reasoning": false,
-      "release_date": "2025-07-23",
-      "temperature": true,
-      "tool_call": true
-    },
-    {
-      "attachment": false,
-      "cost": {
         "input": 0.8,
         "output": 0.8
       },
-      "id": "Qwen/qwen2.5-coder-32b-instruct",
+      "id": "hf:Qwen/Qwen2.5-Coder-32B-Instruct",
       "knowledge": "2024-10",
       "last_updated": "2024-11-11",
       "limit": {
@@ -84,7 +24,7 @@
       "name": "Qwen2.5-Coder-32B-Instruct",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "Qwen/qwen2.5-coder-32b-instruct",
+      "provider_model_id": "hf:Qwen/Qwen2.5-Coder-32B-Instruct",
       "reasoning": false,
       "release_date": "2024-11-11",
       "temperature": true,
@@ -93,10 +33,40 @@
     {
       "attachment": false,
       "cost": {
+        "input": 0.2,
+        "output": 0.6
+      },
+      "id": "hf:Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "knowledge": "2025-04",
+      "last_updated": "2025-07-21",
+      "limit": {
+        "context": 256000,
+        "output": 32000
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Qwen 3 235B Instruct",
+      "open_weights": true,
+      "provider": "synthetic",
+      "provider_model_id": "hf:Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "reasoning": false,
+      "release_date": "2025-04-28",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
         "input": 0.65,
         "output": 3
       },
-      "id": "Qwen/qwen3-235b-a22b-thinking-2507",
+      "id": "hf:Qwen/Qwen3-235B-A22B-Thinking-2507",
       "knowledge": "2025-04",
       "last_updated": "2025-07-25",
       "limit": {
@@ -114,9 +84,39 @@
       "name": "Qwen3 235B A22B Thinking 2507",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "Qwen/qwen3-235b-a22b-thinking-2507",
+      "provider_model_id": "hf:Qwen/Qwen3-235B-A22B-Thinking-2507",
       "reasoning": true,
       "release_date": "2025-07-25",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 2,
+        "output": 2
+      },
+      "id": "hf:Qwen/Qwen3-Coder-480B-A35B-Instruct",
+      "knowledge": "2025-04",
+      "last_updated": "2025-07-23",
+      "limit": {
+        "context": 256000,
+        "output": 32000
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Qwen 3 Coder 480B",
+      "open_weights": true,
+      "provider": "synthetic",
+      "provider_model_id": "hf:Qwen/Qwen3-Coder-480B-A35B-Instruct",
+      "reasoning": false,
+      "release_date": "2025-07-23",
       "temperature": true,
       "tool_call": true
     },
@@ -126,7 +126,7 @@
         "input": 0.55,
         "output": 2.19
       },
-      "id": "deepseek-ai/DeepSeek-R1",
+      "id": "hf:deepseek-ai/DeepSeek-R1",
       "knowledge": "2025-01",
       "last_updated": "2025-01-20",
       "limit": {
@@ -144,7 +144,7 @@
       "name": "DeepSeek R1",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "deepseek-ai/DeepSeek-R1",
+      "provider_model_id": "hf:deepseek-ai/DeepSeek-R1",
       "reasoning": true,
       "release_date": "2025-01-20",
       "temperature": true,
@@ -156,7 +156,7 @@
         "input": 3,
         "output": 8
       },
-      "id": "deepseek-ai/DeepSeek-R1-0528",
+      "id": "hf:deepseek-ai/DeepSeek-R1-0528",
       "last_updated": "2025-08-01",
       "limit": {
         "context": 128000,
@@ -173,7 +173,7 @@
       "name": "DeepSeek R1 (0528)",
       "open_weights": false,
       "provider": "synthetic",
-      "provider_model_id": "deepseek-ai/DeepSeek-R1-0528",
+      "provider_model_id": "hf:deepseek-ai/DeepSeek-R1-0528",
       "reasoning": true,
       "release_date": "2025-08-01",
       "temperature": true,
@@ -185,7 +185,7 @@
         "input": 1.25,
         "output": 1.25
       },
-      "id": "deepseek-ai/DeepSeek-V3",
+      "id": "hf:deepseek-ai/DeepSeek-V3",
       "knowledge": "2024-07",
       "last_updated": "2025-05-29",
       "limit": {
@@ -203,7 +203,7 @@
       "name": "DeepSeek V3",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "deepseek-ai/DeepSeek-V3",
+      "provider_model_id": "hf:deepseek-ai/DeepSeek-V3",
       "reasoning": true,
       "release_date": "2025-01-20",
       "temperature": true,
@@ -215,7 +215,7 @@
         "input": 1.2,
         "output": 1.2
       },
-      "id": "deepseek-ai/DeepSeek-V3-0324",
+      "id": "hf:deepseek-ai/DeepSeek-V3-0324",
       "last_updated": "2025-08-01",
       "limit": {
         "context": 128000,
@@ -232,7 +232,7 @@
       "name": "DeepSeek V3 (0324)",
       "open_weights": false,
       "provider": "synthetic",
-      "provider_model_id": "deepseek-ai/DeepSeek-V3-0324",
+      "provider_model_id": "hf:deepseek-ai/DeepSeek-V3-0324",
       "reasoning": false,
       "release_date": "2025-08-01",
       "temperature": true,
@@ -244,7 +244,7 @@
         "input": 0.56,
         "output": 1.68
       },
-      "id": "deepseek-ai/DeepSeek-V3.1",
+      "id": "hf:deepseek-ai/DeepSeek-V3.1",
       "last_updated": "2025-08-21",
       "limit": {
         "context": 128000,
@@ -261,7 +261,7 @@
       "name": "DeepSeek V3.1",
       "open_weights": false,
       "provider": "synthetic",
-      "provider_model_id": "deepseek-ai/DeepSeek-V3.1",
+      "provider_model_id": "hf:deepseek-ai/DeepSeek-V3.1",
       "reasoning": false,
       "release_date": "2025-08-21",
       "temperature": true,
@@ -273,7 +273,7 @@
         "input": 3,
         "output": 3
       },
-      "id": "meta-llama/Llama-3.1-405B-Instruct",
+      "id": "hf:meta-llama/Llama-3.1-405B-Instruct",
       "knowledge": "2023-12",
       "last_updated": "2024-07-23",
       "limit": {
@@ -291,7 +291,7 @@
       "name": "Llama-3.1-405B-Instruct",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "meta-llama/Llama-3.1-405B-Instruct",
+      "provider_model_id": "hf:meta-llama/Llama-3.1-405B-Instruct",
       "reasoning": true,
       "release_date": "2024-07-23",
       "temperature": true,
@@ -303,7 +303,7 @@
         "input": 0.9,
         "output": 0.9
       },
-      "id": "meta-llama/Llama-3.1-70B-Instruct",
+      "id": "hf:meta-llama/Llama-3.1-70B-Instruct",
       "knowledge": "2023-12",
       "last_updated": "2024-07-23",
       "limit": {
@@ -321,7 +321,7 @@
       "name": "Llama-3.1-70B-Instruct",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "meta-llama/Llama-3.1-70B-Instruct",
+      "provider_model_id": "hf:meta-llama/Llama-3.1-70B-Instruct",
       "reasoning": true,
       "release_date": "2024-07-23",
       "temperature": true,
@@ -333,7 +333,7 @@
         "input": 0.2,
         "output": 0.2
       },
-      "id": "meta-llama/Llama-3.1-8B-Instruct",
+      "id": "hf:meta-llama/Llama-3.1-8B-Instruct",
       "knowledge": "2023-12",
       "last_updated": "2024-07-23",
       "limit": {
@@ -351,67 +351,9 @@
       "name": "Llama-3.1-8B-Instruct",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "meta-llama/Llama-3.1-8B-Instruct",
+      "provider_model_id": "hf:meta-llama/Llama-3.1-8B-Instruct",
       "reasoning": true,
       "release_date": "2024-07-23",
-      "temperature": true,
-      "tool_call": true
-    },
-    {
-      "attachment": false,
-      "cost": {
-        "input": 0.06,
-        "output": 0.06
-      },
-      "id": "meta-llama/Llama-3.2-1B-Instruct",
-      "last_updated": "2024-10-24",
-      "limit": {
-        "context": 128000,
-        "output": 60000
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "Llama-3.2-1B-Instruct",
-      "open_weights": true,
-      "provider": "synthetic",
-      "provider_model_id": "meta-llama/Llama-3.2-1B-Instruct",
-      "reasoning": false,
-      "release_date": "2024-09-18",
-      "temperature": true,
-      "tool_call": true
-    },
-    {
-      "attachment": false,
-      "cost": {
-        "input": 0.06,
-        "output": 0.06
-      },
-      "id": "meta-llama/Llama-3.2-3B-Instruct",
-      "last_updated": "2024-10-24",
-      "limit": {
-        "context": 128000,
-        "output": 128000
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "Llama-3.2-3B-Instruct",
-      "open_weights": true,
-      "provider": "synthetic",
-      "provider_model_id": "meta-llama/Llama-3.2-3B-Instruct",
-      "reasoning": false,
-      "release_date": "2024-09-18",
       "temperature": true,
       "tool_call": true
     },
@@ -421,7 +363,7 @@
         "input": 0.9,
         "output": 0.9
       },
-      "id": "meta-llama/Llama-3.3-70B-Instruct",
+      "id": "hf:meta-llama/Llama-3.3-70B-Instruct",
       "knowledge": "2023-12",
       "last_updated": "2024-12-06",
       "limit": {
@@ -439,7 +381,7 @@
       "name": "Llama-3.3-70B-Instruct",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "meta-llama/Llama-3.3-70B-Instruct",
+      "provider_model_id": "hf:meta-llama/Llama-3.3-70B-Instruct",
       "reasoning": true,
       "release_date": "2024-12-06",
       "temperature": true,
@@ -451,7 +393,7 @@
         "input": 0.22,
         "output": 0.88
       },
-      "id": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+      "id": "hf:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
       "knowledge": "2024-08",
       "last_updated": "2025-04-05",
       "limit": {
@@ -470,7 +412,7 @@
       "name": "Llama-4-Maverick-17B-128E-Instruct-FP8",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+      "provider_model_id": "hf:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
       "reasoning": false,
       "release_date": "2025-04-05",
       "temperature": true,
@@ -482,7 +424,7 @@
         "input": 0.15,
         "output": 0.6
       },
-      "id": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+      "id": "hf:meta-llama/Llama-4-Scout-17B-16E-Instruct",
       "knowledge": "2024-08",
       "last_updated": "2025-04-05",
       "limit": {
@@ -501,7 +443,7 @@
       "name": "Llama-4-Scout-17B-16E-Instruct",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+      "provider_model_id": "hf:meta-llama/Llama-4-Scout-17B-16E-Instruct",
       "reasoning": false,
       "release_date": "2025-04-05",
       "temperature": true,
@@ -513,7 +455,7 @@
         "input": 0.6,
         "output": 2.5
       },
-      "id": "moonshotai/Kimi-K2-Instruct",
+      "id": "hf:moonshotai/Kimi-K2-Instruct",
       "knowledge": "2024-10",
       "last_updated": "2025-07-11",
       "limit": {
@@ -531,9 +473,39 @@
       "name": "Kimi K2",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "moonshotai/Kimi-K2-Instruct",
+      "provider_model_id": "hf:moonshotai/Kimi-K2-Instruct",
       "reasoning": false,
       "release_date": "2025-07-11",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 1.2,
+        "output": 1.2
+      },
+      "id": "hf:moonshotai/Kimi-K2-Instruct-0905",
+      "knowledge": "2024-10",
+      "last_updated": "2025-09-05",
+      "limit": {
+        "context": 128000,
+        "output": 32768
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Kimi K2 0905",
+      "open_weights": true,
+      "provider": "synthetic",
+      "provider_model_id": "hf:moonshotai/Kimi-K2-Instruct-0905",
+      "reasoning": false,
+      "release_date": "2025-09-05",
       "temperature": true,
       "tool_call": true
     },
@@ -543,7 +515,7 @@
         "input": 0.1,
         "output": 0.1
       },
-      "id": "openai/gpt-oss-120b",
+      "id": "hf:openai/gpt-oss-120b",
       "last_updated": "2025-08-05",
       "limit": {
         "context": 128000,
@@ -560,7 +532,7 @@
       "name": "GPT OSS 120B",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "openai/gpt-oss-120b",
+      "provider_model_id": "hf:openai/gpt-oss-120b",
       "reasoning": true,
       "release_date": "2025-08-05",
       "temperature": true,
@@ -572,7 +544,7 @@
         "input": 0.55,
         "output": 2.19
       },
-      "id": "zai-org/glm-4.5",
+      "id": "hf:zai-org/GLM-4.5",
       "knowledge": "2025-04",
       "last_updated": "2025-07-28",
       "limit": {
@@ -590,7 +562,7 @@
       "name": "GLM 4.5",
       "open_weights": true,
       "provider": "synthetic",
-      "provider_model_id": "zai-org/glm-4.5",
+      "provider_model_id": "hf:zai-org/GLM-4.5",
       "reasoning": true,
       "release_date": "2025-07-28",
       "temperature": true,

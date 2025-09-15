@@ -1,52 +1,105 @@
 # AGENTS.md - ReqLLM Development Guide
 
-## Commands
+## Project Overview
+ReqLLM is a composable Elixir library for AI interactions built on Req, providing a unified interface to AI providers through a plugin-based architecture.
 
-- **Test**: `mix test` (all), `mix test test/path/to/specific_test.exs` (single file), `mix test --trace` (verbose)
-- **Quality**: `mix quality` (runs format, compile with warnings, dialyzer, credo)
-- **Format**: `mix format` (format code), `mix format --check-formatted` (verify formatting)
-- **Compile**: `mix compile` (basic), `mix compile --warnings-as-errors` (strict)
-- **Type Check**: `mix dialyzer`
-- **Coverage**: `mix test --cover` (basic coverage report)
-- **Scripts**: Always use `mix run script_name.exs` to run test scripts - avoids Mix.install conflicts
+## Common Commands
 
-## Architecture
+### Build & Test
+- `mix test` - Run all tests using cached fixtures
+- `mix test test/req_llm_test.exs` - Run specific test file
+- `mix test --only describe:"model/1 top-level API"` - Run specific describe block
+- `mix test --only openai` - Run tests for specific provider using ExUnit tags
+- `mix test --only coverage` - Run capability coverage tests
+- `LIVE=true mix test` - Run against real APIs and (re)generate fixtures
+- `LIVE=true mix test --only openai` - Regenerate fixtures for single provider
+- `mix compile` - Compile the project
+- `mix quality` or `mix q` - Run quality checks (format, compile --warnings-as-errors, dialyzer, credo)
 
-ReqLLM is a simplified Elixir library for AI interactions built on Req HTTP client:
+### Code Quality
+- `mix format` - Format Elixir code
+- `mix format --check-formatted` - Check if code is properly formatted
+- `mix dialyzer` - Run Dialyzer type analysis
+- `mix credo --strict` - Run Credo linting
 
-- **Core**: [`lib/req_llm.ex`](lib/req_llm.ex) - Main API facade
-- **Messages**: [`lib/req_llm/message.ex`](lib/req_llm/message.ex) - Multi-modal message structures
-- **ObjectSchema**: [`lib/req_llm/object_schema.ex`](lib/req_llm/object_schema.ex) - Schema definitions with JSON Schema export
-- **Error**: [`lib/req_llm/error.ex`](lib/req_llm/error.ex) - Splode-based error handling
-- **Provider**: [`lib/req_llm/provider/`](lib/req_llm/provider/) - Simple provider system with Registry and Behavior
+## Architecture & Structure
 
-## SDLC
+### Core Structure
+- `lib/req_llm.ex` - Main API facade with generate_text/3, stream_text/3, generate_object/4
+- `lib/req_llm/` - Core modules (Model, Provider, Error structures, protocols)
+- `lib/req_llm/providers/` - Provider-specific implementations (Anthropic, OpenAI, etc.)
+- `test/` - Consolidated capability-oriented test suites
+  - `coverage/<provider>/` - Provider-specific capability tests  
+  - `support/` - shared helpers (e.g. `live_fixture.ex`, provider test macros)
+  - Test files are intentionally few and broad; new behavior should extend an existing suite when possible instead of adding many micro-tests
 
-- **Coverage Goal**: Target 75%+ test coverage (simpler than jido_ai's 90%+)
-- **Code Quality**: Use `mix quality` to run all checks
-  - Fix all compiler warnings
-  - Fix all dialyzer warnings
-  - Add `@spec` to all public functions
-  - Add `@doc` to all public functions and `@moduledoc` to all modules
+### Core Data Structures
+- `ReqLLM.Context` - Conversation history as a collection of messages
+- `ReqLLM.Message` - Single conversation message with multi-modal content support
+- `ReqLLM.Message.ContentPart` - Individual content piece (text, image, tool call, etc.)
+- `ReqLLM.Tool` - Function calling definition with schema and callback
+- `ReqLLM.StreamChunk` - Unified streaming response format across providers
+- `ReqLLM.Model` - AI model configuration with provider and parameters
+- `ReqLLM.Response` - High-level LLM response with context and metadata
 
-## Code Style
+### Provider Architecture
+- Each provider implements `ReqLLM.Provider` behavior with callbacks:
+  - `prepare_request/4` - Configure operation-specific requests
+  - `attach/3` - Set up authentication and Req pipeline steps
+  - `encode_body/1` - Transform context to provider JSON
+  - `decode_response/1` - Parse API responses
+  - `extract_usage/2` - Extract usage/cost data (optional)
+- Providers use `ReqLLM.Provider.DSL` macro for registration and metadata loading
+- Core API uses provider's `attach/3` to compose Req requests with provider-specific steps
 
-- **Comments Rule**: NEVER add inline comments within method boundaries. Keep code self-documenting. Only use module-level docs (@moduledoc, @doc).
-- **Formatting**: Uses `mix format`, line length max 120 chars
-- **Types**: Add `@spec` to all public functions, use TypedStruct for data structures
-- **Docs**: `@moduledoc` for modules, `@doc` for public functions with examples
-- **Testing**: Mirror lib structure in test/, use ExUnit, target 75%+ coverage, keep tests terse and focused
-- **Error Handling**: Use Splode for consistent error handling, return `{:ok, result}` or `{:error, reason}` tuples
-- **Dependencies**: Minimal deps (req, jason, typed_struct, splode, nimble_options)
-- **Naming**: `snake_case` for functions/variables, `PascalCase` for modules
-- **Simplicity**: Keep it simple - fewer abstractions than jido_ai, more direct implementations
+### Protocol System
+- `ReqLLM.Context.Codec` - Protocol for encoding/decoding contexts to/from provider wire formats
+- `ReqLLM.Response.Codec` - Protocol for decoding provider responses to canonical Response structs
+- Each provider implements these protocols for their specific data formats
 
-## Project Goals
+## Code Style & Conventions
 
-ReqLLM is designed to be a simpler, more focused alternative to jido_ai with:
+### General Style
+- Follow standard Elixir conventions and use `mix format` for consistent formatting
+- Use `@moduledoc` and `@doc` for comprehensive documentation
+- Prefer pattern matching over conditionals where possible
+- Use `{:ok, result}` / `{:error, reason}` tuple returns for fallible operations
+- **No inline comments in method bodies** - code should be self-explanatory through clear naming and structure
 
-1. **Simplified Provider System**: Minimal registry, direct implementations
-2. **Clean Message Structures**: Multi-modal support without complexity
-3. **Focused ObjectSchema**: JSON Schema export for LLM integration
-4. **Consistent Error Handling**: Splode-based error management
-5. **High Quality, Low Complexity**: 75%+ coverage with terse, focused tests
+### Imports & Dependencies
+- Minimize imports, prefer explicit module calls (e.g., `ReqLLM.Model.from/1`)
+- Group deps in mix.exs: runtime deps first, then dev/test deps with `, only: [:dev, :test]`
+
+### Types & Validation
+- Use TypedStruct for structured data with `@type` definitions
+- Validate options with NimbleOptions schemas in public APIs
+- Use Splode for structured error handling with specific error types
+
+### Error Handling
+- Return `{:ok, result}` or `{:error, %ReqLLM.Error{}}` tuples
+- Use Splode error types: `ReqLLM.Error.API`, `ReqLLM.Error.Parse`, `ReqLLM.Error.Auth`
+- Include helpful error messages and context in error structs
+
+### Testing & Fixture Workflow
+- Tests are grouped by *capability*, not by individual function-call
+- All suites use `ReqLLM.Test.LiveFixture.use_fixture/3` to abstract live vs cached responses
+- Cached JSON fixtures live next to the test in `fixtures/<provider>/<test_name>.json` and are automatically written when the `LIVE=true` env-var is set
+- Most suites run `async: true`. Suites that write fixtures are forced to synchronous execution via `@moduletag :capture_log`
+
+```elixir
+defmodule CoreTest do
+  use ReqLLM.Test.LiveFixture, provider: :openai
+  use ExUnit.Case, async: true
+
+  describe "generate_text/3" do
+    test "basic happy-path" do
+      {:ok, text} =
+        use_fixture(:provider, "core-basic", fn ->
+          ReqLLM.generate_text!("openai:gpt-4o", "Hello!")
+        end)
+
+      assert text =~ "Hello"
+    end
+  end
+end
+```
