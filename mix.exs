@@ -42,6 +42,7 @@ defmodule ReqLLM.MixProject do
           "guides/core-concepts.md",
           "guides/api-reference.md",
           "guides/data-structures.md",
+          "guides/model-metadata.md",
           "guides/capability-testing.md",
           "guides/adding_a_provider.md"
         ],
@@ -72,7 +73,7 @@ defmodule ReqLLM.MixProject do
       {:typed_struct, "~> 0.3.0"},
       {:splode, "~> 0.2.3"},
       {:server_sent_events, "~> 0.2"},
-      {:jido_keys, "~> 1.0"},
+      {:jido_keys, "~> 1.0", optional: true},
 
       # Dev/test dependencies
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
