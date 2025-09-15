@@ -58,7 +58,6 @@ defmodule Jido.Ai.MixProject do
       # Jido
       jido_dep(:jido, "../jido", "~> 1.3.0"),
       jido_dep(:jido_action, "../jido_action", "~> 1.3.0"),
-      jido_dep(:kagi, "../kagi", "~> 0.1.0"),
 
       # Deps
       {:dotenvy, "~> 1.1.0"},
