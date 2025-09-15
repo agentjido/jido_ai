@@ -1,0 +1,284 @@
+%{
+title: "Introducing ReqLLM: Req Plugins for LLM Interactions",
+author: "Mike Hostetler",
+tags: ~w(agent jido req elixir),
+description: "Easy Req based LLM interactions in Elixir for multiple AI providers"
+}
+
+---
+
+Building AI-powered applications in Elixir has always presented a challenge: how do you maintain the composability, middleware advantages, and robustness that make Elixir great while working with diverse AI providers? Each provider has its own API format, authentication method, and quirks. Most existing solutions force you to learn provider-specific SDKs or sacrifice the powerful HTTP middleware ecosystem that tools like [Req](https://github.com/wojtekmach/req) provide.
+
+Today, we're excited to announce **[ReqLLM](https://github.com/agentjido/req_llm)** – a composable Elixir library that brings the full power of the Req ecosystem to LLM interactions through a unified, plugin-based architecture.
+
+## The Missing Piece in Elixir's AI Ecosystem
+
+Elixir has a fantastic ecosystem of LLM libraries. Projects like [Instructor](https://github.com/thmsmlr/instructor_ex) bring structured outputs to Elixir, and [LangChain](https://github.com/brainlid/langchain) offers comprehensive AI application frameworks. These libraries have paved the way for sophisticated AI integrations in our community.
+
+However, as LLM knowledge has spread and more developers are building AI features, many prefer the straightforward simplicity that [Req](https://github.com/wojtekmach/req) brings to HTTP interactions. Developers want that same elegant, middleware-driven approach for AI – but with the complexity of different providers normalized away and a rich API that handles the common patterns.
+
+The challenge remains:
+
+- **Provider differences**: Each AI provider has unique API formats, authentication, and capabilities
+- **Missing Req benefits**: Existing solutions don't leverage Req's powerful middleware and instrumentation
+- **Repetitive boilerplate**: Similar patterns (streaming, cost tracking, error handling) get reimplemented
+- **Model metadata management**: Keeping track of capabilities, costs, and limits across providers
+
+ReqLLM fills this gap by combining Req's beloved simplicity with a unified interface that normalizes provider differences while exposing their unique strengths.
+
+## Quick Start: From Zero to AI in Minutes
+
+Let's see ReqLLM in action. After adding it to your `mix.exs` (available on [GitHub](https://github.com/agentjido/req_llm)):
+
+```elixir
+def deps do
+  [
+    {:req_llm, "~> 1.0-rc"}
+  ]
+end
+```
+
+You can start generating text with just a few lines:
+
+```elixir
+# Configure your API key securely in memory
+ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
+
+# Simple text generation
+{:ok, text} = ReqLLM.generate_text!("anthropic:claude-3-sonnet", "Hello world")
+#=> {:ok, "Hello! How can I assist you today?"}
+```
+
+But ReqLLM goes far beyond simple text generation. Here's structured data generation with automatic validation:
+
+```elixir
+# Generate structured data with schema validation
+schema = [name: [type: :string, required: true], age: [type: :pos_integer]]
+{:ok, person} = ReqLLM.generate_object!("openai:gpt-4", "Generate a person", schema)
+#=> {:ok, %{name: "John Doe", age: 30}}
+```
+
+Need tool calling? ReqLLM makes it effortless:
+
+```elixir
+weather_tool = ReqLLM.tool(
+  name: "get_weather",
+  description: "Get current weather for a location",
+  parameter_schema: [location: [type: :string, required: true]],
+  callback: fn args -> {:ok, "Sunny, 72°F"} end
+)
+
+{:ok, response} = ReqLLM.generate_text(
+  "anthropic:claude-3-sonnet",
+  "What's the weather in Paris?",
+  tools: [weather_tool]
+)
+```
+
+## A Rich Feature Set Built for Production
+
+### Massive Provider Support with Auto-Sync
+
+ReqLLM sync'd metadata for **45 providers and 665+ models** from [models.dev](https://models.dev). This includes cost information, context lengths, and capability data – all kept up-to-date with a simple `mix req_llm.models.sync` command.
+
+We currently ship 6 providers with ReqLLM: OpenAI, Anthropic, Google, Groq, xAI, and OpenRouter. We plan to add more in the future, and wrote a guide for developers to add their own providers.
+
+Whether you're using OpenAI, Anthropic, Google, Groq, xAI, or OpenRouter, the API remains consistent while preserving each provider's unique capabilities.
+
+### Typed Data Structures Throughout
+
+Every interaction in ReqLLM uses well-defined, typed structs that normalize provider differences:
+
+- `Context` and `Message` for conversations
+- `ContentPart` for multimodal content
+- `StreamChunk` for real-time responses
+- `Tool` for function calling
+- `Response` for the final LLM response
+
+Each provider's unique response format is automatically converted into these common Elixir structs, making it trivial to switch models in your code. All structs implement `Jason.Encoder`, making them perfect for logging, persistence, or debugging.
+
+### Built-in Streaming and Cost Tracking
+
+Streaming is a first-class citizen in ReqLLM. Every streamed chunk is a structured `StreamChunk` with consistent metadata:
+
+```elixir
+ReqLLM.stream_text!("openai:gpt-4", "Write a short story")
+|> Stream.each(&IO.write(&1.text))
+|> Stream.run()
+```
+
+Every response includes detailed usage and cost information automatically calculated using up-to-date pricing data:
+
+```elixir
+response.usage
+#=> %ReqLLM.Usage{
+#     input_tokens: 8, output_tokens: 12, total_tokens: 20,
+#     input_cost: 0.00024, output_cost: 0.00036, total_cost: 0.0006
+#   }
+```
+
+### Secure Key Management
+
+ReqLLM integrates with [JidoKeys](https://hex.pm/packages/jido_keys) for easy key management, powered by the [Dotenvy](https://hex.pm/packages/dotenvy) library.
+
+```elixir
+ReqLLM.put_key(:openai_api_key, "sk-...")
+# Keys are automatically resolved when making requests
+```
+
+### Two Levels of Control
+
+ReqLLM provides both high-level ergonomic helpers (like `generate_text/3`) and low-level Req plugin access for advanced use cases. This means you can start simple and drop down to full HTTP control when needed:
+
+```elixir
+# High-level API
+{:ok, text} = ReqLLM.generate_text("openai:gpt-4", "Hello")
+
+# Low-level Req plugin API for advanced control
+request =
+  Req.new(url: "/chat/completions", method: :post)
+  |> OpenAI.attach(model, context: context, temperature: 0.7)
+  |> Req.Request.put_header("custom-header", "value")
+```
+
+## Providers are Just Req Plugins
+
+The unlock of ReqLLM lies in its architecture: every AI provider is implemented as a standard Req plugin. This means you get all the composability, middleware, and extensibility that makes Req powerful, while working with AI APIs.
+
+Each provider implements the `ReqLLM.Plugin` behavior with two simple callbacks:
+
+- `attach/2` - Configures the Req request with headers, URL, and options
+- `parse/2` - Converts the provider's response format into ReqLLM structs
+
+This plugin architecture means you can drop down to the full Req API whenever needed:
+
+```elixir
+alias ReqLLM.Providers.Anthropic
+
+# Start with a basic Req request
+request = Req.new(url: "/messages", method: :post)
+
+# Attach the Anthropic provider plugin
+model = ReqLLM.Model.from!("anthropic:claude-3-sonnet")
+context = ReqLLM.Context.new([
+  ReqLLM.Context.user("Explain quantum computing")
+])
+
+request = Anthropic.attach(request, model,
+  context: context,
+  temperature: 0.7,
+  max_tokens: 1000
+)
+
+# Add your own middleware
+request = request
+  |> Req.Request.put_header("x-custom-tracking", "my-session-id")
+  |> Req.Request.register_options([:custom_retry_count])
+  |> Req.Request.append_request_steps(my_custom_step: &my_retry_logic/1)
+
+# Execute the request
+{:ok, response} = Req.request(request)
+
+# The response is parsed into ReqLLM structs automatically
+%ReqLLM.Response{
+  message: %ReqLLM.Message{content: [%{text: "Quantum computing is..."}]},
+  usage: %{total_tokens: 150, total_cost: 0.0045}
+} = response
+```
+
+### Provider-Specific Configuration
+
+Each provider can expose its unique capabilities while maintaining the common interface:
+
+```elixir
+# Anthropic with system prompts and tool use
+request =
+  Req.new()
+  |> Anthropic.attach(model,
+    context: context,
+    system: "You are a helpful coding assistant",
+    tools: [my_code_search_tool],
+    tool_choice: "auto"
+  )
+
+# OpenAI with function calling and response format
+request =
+  Req.new()
+  |> OpenAI.attach(model,
+    context: context,
+    functions: [weather_function],
+    response_format: %{type: "json_object"}
+  )
+
+# Google with safety settings
+request =
+  Req.new()
+  |> Google.attach(model,
+    context: context,
+    safety_settings: [
+      %{category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE"}
+    ]
+  )
+```
+
+### Streaming with Full Control
+
+The plugin architecture extends to streaming, giving you fine-grained control over real-time responses:
+
+```elixir
+# Set up streaming request
+request =
+  Req.new(url: "/chat/completions", method: :post)
+  |> OpenAI.attach(model, context: context, stream: true)
+  |> Req.Request.put_header("accept", "text/event-stream")
+
+# Stream with custom processing
+{:ok, response} = Req.request(request,
+  into: fn {:data, chunk}, acc ->
+    # Custom chunk processing logic
+    parsed_chunk = OpenAI.parse_stream_chunk(chunk)
+    IO.write(parsed_chunk.delta.content)
+    {:cont, [parsed_chunk | acc]}
+  end
+)
+```
+
+### Middleware Composition
+
+Because providers are Req plugins, you can compose them with the entire Req middleware ecosystem:
+
+```elixir
+request =
+  Req.new()
+  |> Req.Request.prepend_request_steps(auth: &add_custom_auth/1)
+  |> Req.Request.append_request_steps(
+    rate_limit: &check_rate_limits/1,
+    retry: &custom_retry_logic/1
+  )
+  |> Req.Request.append_response_steps(
+    log_usage: &log_token_usage/1,
+    cache: &cache_expensive_responses/1
+  )
+  |> Anthropic.attach(model, context: context)
+
+{:ok, response} = Req.request(request)
+```
+
+This architecture means ReqLLM doesn't reinvent HTTP client patterns – it extends them. Your existing Req knowledge transfers directly, and you can leverage the entire ecosystem of Req plugins and middleware.
+
+Whether you're building chatbots, content generators, or AI-powered workflows, ReqLLM brings the composability and reliability of the Req ecosystem to your AI integrations. Try it out and let us know what you build!
+
+## Acknowledgments
+
+ReqLLM stands on the shoulders of the excellent work done by the Elixir AI community. Special thanks to:
+
+- **[Instructor](https://github.com/thmsmlr/instructor_ex)** by Thomas Miller for pioneering structured LLM outputs in Elixir
+- **[LangChain](https://github.com/brainlid/langchain)** by Mark Ericksen for comprehensive AI application patterns
+- **[Req](https://github.com/wojtekmach/req)** by Wojtek Mach for the composable HTTP client that inspired this approach
+- All the maintainers and contributors who have built the foundation that makes projects like ReqLLM possible
+
+The diversity of approaches in our ecosystem makes Elixir stronger, and we're excited to contribute another option that serves developers who value Req's simplicity and composability.
+
+---
+
+_ReqLLM is part of the [Jido](https://github.com/agentjido/jido) AI ecosystem, bringing composable, production-ready AI tools to Elixir developers. Check out the [ReqLLM repository](https://github.com/agentjido/req_llm) on GitHub to get started._
