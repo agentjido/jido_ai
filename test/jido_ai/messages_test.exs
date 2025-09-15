@@ -211,8 +211,8 @@ defmodule Jido.AI.MessagesTest do
                Messages.validate_messages("not a list")
     end
 
-    test "returns :ok for empty list" do
-      assert :ok = Messages.validate_messages([])
+    test "returns error for empty list" do
+      assert {:error, "Message list cannot be empty"} = Messages.validate_messages([])
     end
   end
 

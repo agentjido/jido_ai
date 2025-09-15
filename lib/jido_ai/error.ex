@@ -7,6 +7,7 @@ defmodule Jido.AI.Error do
     error_classes: [
       invalid: Jido.AI.Error.Invalid,
       api: Jido.AI.Error.API,
+      validation: Jido.AI.Error.Validation,
       unknown: Jido.AI.Error.Unknown,
       object_generation: Jido.AI.Error.ObjectGeneration
     ],
@@ -20,6 +21,11 @@ defmodule Jido.AI.Error do
   defmodule API do
     @moduledoc "Error class for API-related failures and HTTP errors."
     use Splode.ErrorClass, class: :api
+  end
+
+  defmodule Validation do
+    @moduledoc "Error class for validation failures and parameter errors."
+    use Splode.ErrorClass, class: :validation
   end
 
   defmodule Unknown do
@@ -53,6 +59,25 @@ defmodule Jido.AI.Error do
     end
   end
 
+  defmodule Validation.Error do
+    @moduledoc "Error for parameter validation failures."
+    use Splode.Error,
+      fields: [:tag, :reason, :context],
+      class: :validation
+
+    @typedoc "Validation error returned by Jido.AI"
+    @type t() :: %__MODULE__{
+            tag: atom(),
+            reason: String.t(),
+            context: keyword()
+          }
+
+    @spec message(map()) :: String.t()
+    def message(%{reason: reason}) do
+      reason
+    end
+  end
+
   defmodule Unknown.Unknown do
     @moduledoc "Error for unexpected or unhandled errors."
     use Splode.Error, fields: [:error], class: :unknown
@@ -61,5 +86,19 @@ defmodule Jido.AI.Error do
     def message(%{error: error}) do
       "Unknown error: #{inspect(error)}"
     end
+  end
+
+  @doc """
+  Creates a validation error with the given tag, reason, and context.
+
+  ## Examples
+
+      iex> Jido.AI.Error.validation_error(:invalid_model_spec, "Bad model", model: "test")
+      %Jido.AI.Error.Validation.Error{tag: :invalid_model_spec, reason: "Bad model", context: [model: "test"]}
+
+  """
+  @spec validation_error(atom(), String.t(), keyword()) :: Jido.AI.Error.Validation.Error.t()
+  def validation_error(tag, reason, context \\ []) do
+    Jido.AI.Error.Validation.Error.exception(tag: tag, reason: reason, context: context)
   end
 end

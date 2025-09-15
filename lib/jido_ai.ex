@@ -206,58 +206,15 @@ defmodule Jido.AI do
   - **Anthropic**: Claude 3.5 Sonnet, Claude 3 Haiku, Claude 3 Opus
   - **OpenRouter**: Access to 200+ models from various providers
   - **Google**: Gemini 1.5 Pro, Gemini 1.5 Flash
-  - **Meta**: Llama models via OpenRouter
-  - **Mistral**: Mixtral and Mistral models
 
       # Access provider modules directly
       provider = Jido.AI.provider(:openai)
       provider.generate_text(model, messages, opts)
   """
 
-  alias Jido.AI.{Keyring, Message, Model, ObjectSchema, ToolIntegration}
-
-  # ===========================================================================
-  # NimbleOptions schemas
-  # ===========================================================================
-
-  @generate_object_opts_schema [
-    output_type: [
-      type: {:in, [:object, :array, :enum, :no_schema]},
-      default: :object,
-      doc: "Type of structured output to generate"
-    ],
-    enum_values: [
-      type: {:list, :string},
-      doc: "Allowed values when output_type is :enum"
-    ],
-    system_prompt: [
-      type: :string,
-      doc: "Optional system prompt to prepend to the conversation"
-    ],
-    actions: [
-      type: {:list, :atom},
-      default: [],
-      doc: "List of Jido Action modules to make available as tools"
-    ],
-    tools: [
-      type: {:list, :any},
-      default: [],
-      doc: "Raw tool definitions (alternative to actions)"
-    ],
-    temperature: [
-      type: :float,
-      doc: "Control randomness in responses (0.0-1.0)"
-    ],
-    max_tokens: [
-      type: :pos_integer,
-      doc: "Maximum number of tokens in the response"
-    ],
-    provider_options: [
-      type: :map,
-      default: %{},
-      doc: "Provider-specific options"
-    ]
-  ]
+  alias Jido.Action.Tool
+  alias Jido.AI.Messages
+  alias Jido.AI.{Keyring, Message, Model, ObjectSchema, Util}
 
   # ===========================================================================
   # Configuration API - Simple facades for common operations
@@ -425,7 +382,7 @@ defmodule Jido.AI do
       - Model struct: `%Jido.AI.Model{}`
       - String format: `"openrouter:anthropic/claude-3.5-sonnet"` (important supported format)
       - Tuple format: `{:openrouter, model: "anthropic/claude-3.5-sonnet", temperature: 0.7}`
-    * `prompt` - Text prompt to generate from (string or list of messages)
+    * `messages` - Messages for generation (string or list of Message structs)
     * `opts` - Additional options (keyword list), including:
       - `system_prompt` - Optional system prompt to prepend to the conversation (string or nil)
       - `actions` - List of Jido Action modules to make available as tools
@@ -474,28 +431,90 @@ defmodule Jido.AI do
 
   """
 
-  # 3-arity: model_spec, prompt, opts
+  @generate_text_opts_schema [
+    temperature: [
+      type: {:custom, Util, :validate_temperature, []},
+      doc: "Sampling temperature in the OpenAI range 0.0 – 2.0"
+    ],
+    max_tokens: [
+      type: :pos_integer,
+      doc: "Maximum number of tokens to generate (provider default when nil)"
+    ],
+    system_prompt: [
+      type: {:or, [:string, nil]},
+      doc: "Optional system prompt prepended to the conversation"
+    ],
+    actions: [
+      type: {:custom, Jido.Util, :validate_actions, []},
+      default: [],
+      doc: "List of Jido Action modules to expose as tools"
+    ],
+    tools: [
+      type: {:list, :map},
+      default: [],
+      doc: "Raw tool definitions (alternative to :actions)"
+    ],
+    provider_options: [
+      type: :keyword_list,
+      default: [],
+      doc: "Options forwarded verbatim to the provider adapter"
+    ]
+  ]
+
+  @generate_object_opts_schema [
+    output_type: [
+      type: {:in, [:object, :array, :enum, :no_schema]},
+      default: :object,
+      doc: "Type of output to generate"
+    ],
+    enum_values: [
+      type: {:list, :string},
+      default: [],
+      doc: "List of allowed values when output_type is :enum"
+    ],
+    temperature: [
+      type: {:custom, Util, :validate_temperature, []},
+      doc: "Sampling temperature in the OpenAI range 0.0 – 2.0"
+    ],
+    max_tokens: [
+      type: :pos_integer,
+      doc: "Maximum number of tokens to generate (provider default when nil)"
+    ],
+    system_prompt: [
+      type: {:or, [:string, nil]},
+      doc: "Optional system prompt prepended to the conversation"
+    ],
+    actions: [
+      type: {:custom, Jido.Util, :validate_actions, []},
+      default: [],
+      doc: "List of Jido Action modules to expose as tools"
+    ],
+    tools: [
+      type: {:list, :map},
+      default: [],
+      doc: "Raw tool definitions (alternative to :actions)"
+    ],
+    provider_options: [
+      type: :keyword_list,
+      default: [],
+      doc: "Options forwarded verbatim to the provider adapter"
+    ]
+  ]
+
   @spec generate_text(
           Model.t() | {atom(), keyword()} | String.t(),
           String.t() | [Message.t()],
           keyword()
         ) :: {:ok, String.t()} | {:error, term()}
-  def generate_text(model_spec, prompt, opts) when (is_binary(prompt) or is_list(prompt)) and is_list(opts) do
+  def generate_text(model_spec, messages, opts \\ []) when is_binary(messages) or is_list(messages) do
     opts = process_tool_options(opts)
 
-    with {:ok, model} <- ensure_model_struct(model_spec),
-         {:ok, provider_module} <- provider(model.provider) do
-      provider_module.generate_text(model, prompt, opts)
+    with {:ok, model} <- Jido.AI.model(model_spec),
+         {:ok, provider} <- Jido.AI.provider(model.provider),
+         {:ok, messages} <- Messages.validate(messages),
+         {:ok, validated_opts} <- Util.validate_schema(opts, @generate_text_opts_schema) do
+      provider.generate_text(model, messages, validated_opts)
     end
-  end
-
-  # 2-arity: model_spec, prompt (backward compatible)
-  @spec generate_text(
-          Model.t() | {atom(), keyword()} | String.t(),
-          String.t() | [Message.t()]
-        ) :: {:ok, String.t()} | {:error, term()}
-  def generate_text(model_spec, prompt) when is_binary(prompt) or is_list(prompt) do
-    generate_text(model_spec, prompt, [])
   end
 
   @doc """
@@ -554,28 +573,20 @@ defmodule Jido.AI do
 
   """
 
-  # 3-arity: model_spec, prompt, opts
   @spec stream_text(
           Model.t() | {atom(), keyword()} | String.t(),
           String.t() | [Message.t()],
           keyword()
         ) :: {:ok, Enumerable.t()} | {:error, term()}
-  def stream_text(model_spec, prompt, opts) when (is_binary(prompt) or is_list(prompt)) and is_list(opts) do
+  def stream_text(model_spec, messages, opts \\ []) when is_binary(messages) or is_list(messages) do
     opts = process_tool_options(opts)
 
-    with {:ok, model} <- ensure_model_struct(model_spec),
-         {:ok, provider_module} <- provider(model.provider) do
-      provider_module.stream_text(model, prompt, opts)
+    with {:ok, model} <- Jido.AI.model(model_spec),
+         {:ok, provider} <- Jido.AI.provider(model.provider),
+         {:ok, messages} <- Messages.validate(messages),
+         {:ok, validated_opts} <- Util.validate_schema(opts, @generate_text_opts_schema) do
+      provider.stream_text(model, messages, validated_opts)
     end
-  end
-
-  # 2-arity: model_spec, prompt (backward compatible)
-  @spec stream_text(
-          Model.t() | {atom(), keyword()} | String.t(),
-          String.t() | [Message.t()]
-        ) :: {:ok, Enumerable.t()} | {:error, term()}
-  def stream_text(model_spec, prompt) when is_binary(prompt) or is_list(prompt) do
-    stream_text(model_spec, prompt, [])
   end
 
   @doc """
@@ -658,16 +669,16 @@ defmodule Jido.AI do
           keyword(),
           keyword()
         ) :: {:ok, map()} | {:error, term()}
-  def generate_object(model_spec, prompt, schema, opts)
-      when (is_binary(prompt) or is_list(prompt)) and is_list(schema) and is_list(opts) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @generate_object_opts_schema),
-         {:ok, object_schema} <- build_object_schema(schema, validated_opts),
-         {:ok, model} <- ensure_model_struct(model_spec),
-         {:ok, provider_module} <- provider(model.provider) do
-      # Process tool options
-      processed_opts = process_tool_options(validated_opts)
+  def generate_object(model_spec, messages, schema, opts \\ [])
+      when (is_binary(messages) or is_list(messages)) and is_list(schema) and is_list(opts) do
+    opts = process_tool_options(opts)
 
-      case provider_module.generate_object(model, prompt, object_schema, processed_opts) do
+    with {:ok, model} <- Jido.AI.model(model_spec),
+         {:ok, provider} <- Jido.AI.provider(model.provider),
+         {:ok, messages} <- Messages.validate(messages),
+         {:ok, validated_opts} <- Util.validate_schema(opts, @generate_object_opts_schema),
+         {:ok, object_schema} <- build_object_schema(schema, validated_opts) do
+      case provider.generate_object(model, messages, object_schema, validated_opts) do
         {:ok, raw_result} ->
           ObjectSchema.validate(object_schema, raw_result)
 
@@ -725,23 +736,23 @@ defmodule Jido.AI do
 
   """
 
-  # 4-arity: model_spec, prompt, schema, opts
+  # 4-arity: model_spec, messages, schema, opts
   @spec stream_object(
           Model.t() | {atom(), keyword()} | String.t(),
           String.t() | [Message.t()],
           keyword(),
           keyword()
         ) :: {:ok, Enumerable.t()} | {:error, term()}
-  def stream_object(model_spec, prompt, schema, opts)
-      when (is_binary(prompt) or is_list(prompt)) and is_list(schema) and is_list(opts) do
-    with {:ok, validated_opts} <- NimbleOptions.validate(opts, @generate_object_opts_schema),
-         {:ok, object_schema} <- build_object_schema(schema, validated_opts),
-         {:ok, model} <- ensure_model_struct(model_spec),
-         {:ok, provider_module} <- provider(model.provider) do
-      # Process tool options
-      processed_opts = process_tool_options(validated_opts)
+  def stream_object(model_spec, messages, schema, opts \\ [])
+      when (is_binary(messages) or is_list(messages)) and is_list(schema) and is_list(opts) do
+    opts = process_tool_options(opts)
 
-      case provider_module.stream_object(model, prompt, object_schema, processed_opts) do
+    with {:ok, model} <- Jido.AI.model(model_spec),
+         {:ok, provider} <- Jido.AI.provider(model.provider),
+         {:ok, messages} <- Messages.validate(messages),
+         {:ok, validated_opts} <- Util.validate_schema(opts, @generate_object_opts_schema),
+         {:ok, object_schema} <- build_object_schema(schema, validated_opts) do
+      case provider.stream_object(model, messages, object_schema, validated_opts) do
         {:ok, stream} ->
           # Validate each chunk in the stream
           validated_stream =
@@ -761,12 +772,6 @@ defmodule Jido.AI do
   end
 
   @doc false
-  @spec ensure_model_struct(Model.t() | {atom(), keyword()} | String.t()) ::
-          {:ok, Model.t()} | {:error, String.t()}
-  defp ensure_model_struct(%Model{} = model), do: {:ok, model}
-  defp ensure_model_struct(model_spec), do: model(model_spec)
-
-  @doc false
   @spec process_tool_options(keyword()) :: keyword()
   defp process_tool_options(opts) do
     {actions, opts} = Keyword.pop(opts, :actions, [])
@@ -774,9 +779,16 @@ defmodule Jido.AI do
 
     tools =
       cond do
-        actions != [] -> ToolIntegration.actions_to_tools(actions, :openai)
-        tools_opt != [] -> tools_opt
-        true -> []
+        actions != [] ->
+          actions
+          |> Enum.map(&Tool.to_tool/1)
+          |> Enum.map(&convert_tool_to_openai_format/1)
+
+        tools_opt != [] ->
+          tools_opt
+
+        true ->
+          []
       end
 
     if tools == [] do
@@ -784,6 +796,21 @@ defmodule Jido.AI do
     else
       Keyword.put(opts, :tools, tools)
     end
+  end
+
+  @doc false
+  @spec convert_tool_to_openai_format(%{name: String.t(), description: String.t(), parameters_schema: map()}) :: %{
+          String.t() => String.t() | map()
+        }
+  defp convert_tool_to_openai_format(%{name: name, description: description, parameters_schema: schema}) do
+    %{
+      type: "function",
+      function: %{
+        "name" => name,
+        "description" => description,
+        "parameters" => schema
+      }
+    }
   end
 
   @doc false

@@ -100,7 +100,11 @@ defmodule Jido.AI.Provider.Util.Options do
     acc = base_provider_opts
 
     # Extract provider options from function level opts
-    function_provider_opts = Keyword.get(function_opts, :provider_options, %{})
+    function_provider_opts = 
+      case Keyword.get(function_opts, :provider_options, %{}) do
+        opts when is_map(opts) -> opts
+        _ -> %{}
+      end
     acc = deep_merge_provider_options(acc, function_provider_opts)
 
     # Extract provider options from messages (if prompt is message list)
