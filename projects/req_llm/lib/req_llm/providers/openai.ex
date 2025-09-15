@@ -10,9 +10,13 @@ defmodule ReqLLM.Providers.OpenAI do
 
   ## Configuration
 
-  Set your OpenAI API key via JidoKeys:
+  Set your OpenAI API key via JidoKeys (automatically picks up from .env):
 
-      JidoKeys.put("OPENAI_API_KEY", "your-api-key-here")
+  # Option 1: Set directly in JidoKeys  
+    ReqLLM.put_key(:openai_api_key, "sk-...")
+    
+    # Option 2: Add to .env file (automatically loaded via JidoKeys+Dotenvy)
+    OPENAI_API_KEY=sk-...
 
   ## Examples
 

@@ -51,10 +51,19 @@ usage = ReqLLM.Response.usage(response)
 
 ## Key Management
 
+ReqLLM uses JidoKeys for secure API key storage with automatic .env pickup:
+
 ```elixir
+# Option 1: Set keys directly  
 ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
 ReqLLM.put_key("OPENAI_API_KEY", "sk-...")
-# Providers automatically retrieve keys
+
+# Option 2: Keys from .env are automatically loaded via JidoKeys+Dotenvy
+# Just add to your .env file:
+# ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=sk-...
+
+# Providers automatically retrieve keys from JidoKeys
 ```
 
 ## Message Context

@@ -11,9 +11,13 @@ defmodule ReqLLM.Providers.Google do
 
   ## Configuration
 
-  Set your Google API key via environment variable:
+  Set your Google API key via JidoKeys (automatically picks up from .env):
 
-      export GOOGLE_API_KEY="your-api-key-here"
+      # Option 1: Set directly in JidoKeys
+      ReqLLM.put_key(:google_api_key, "AIza...")
+      
+      # Option 2: Add to .env file (automatically loaded via JidoKeys+Dotenvy)
+      GOOGLE_API_KEY=AIza...
 
   ## Examples
 

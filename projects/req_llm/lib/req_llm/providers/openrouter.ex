@@ -18,9 +18,13 @@ defmodule ReqLLM.Providers.OpenRouter do
 
   ## Configuration
 
-  Set your OpenRouter API key via environment variable:
+  Set your OpenRouter API key via JidoKeys (automatically picks up from .env):
 
-      export OPENROUTER_API_KEY="your-api-key-here"
+      # Option 1: Set directly in JidoKeys
+      ReqLLM.put_key(:openrouter_api_key, "sk-or-...")
+      
+      # Option 2: Add to .env file (automatically loaded via JidoKeys+Dotenvy)
+      OPENROUTER_API_KEY=sk-or-...
 
   ## Examples
 

@@ -446,10 +446,11 @@ end
 Handle API keys and environment variables properly:
 
 ```elixir
-# Skip tests if API key not available
+# Skip tests if API key not available  
+# Keys are automatically loaded from .env via JidoKeys+Dotenvy
 setup do
   unless ReqLLM.get_key(:anthropic_api_key) do
-    skip("ANTHROPIC_API_KEY not configured")
+    skip("ANTHROPIC_API_KEY not configured in .env or JidoKeys")
   end
   :ok
 end

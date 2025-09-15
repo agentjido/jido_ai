@@ -49,6 +49,8 @@ end
 # Configure API keys using JidoKeys (secure, in-memory storage)
 ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
 
+# Keys in .env are automatically picked up via the JidoKeys package via Dotenvy
+
 model = "anthropic:claude-3-sonnet"
 
 # Simple text generation
@@ -93,7 +95,7 @@ ReqLLM.stream_text!(model, "Write a short story")
 |> Stream.run()
 
 # Embeddings
-{:ok, embeddings} = ReqLLM.generate_embeddings("openai:text-embedding-3-small", ["Hello", "World"])
+{:ok, embeddings} = ReqLLM.embed_many("openai:text-embedding-3-small", ["Hello", "World"])
 ```
 
 ## Provider Support

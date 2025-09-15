@@ -7,9 +7,13 @@ defmodule ReqLLM.Providers.XAI do
 
   ## Configuration
 
-  Set your xAI API key via JidoKeys:
+  Set your xAI API key via JidoKeys (automatically picks up from .env):
 
-      JidoKeys.put("XAI_API_KEY", "your-api-key-here")
+  # Option 1: Set directly in JidoKeys
+    ReqLLM.put_key(:xai_api_key, "xai-...")
+    
+    # Option 2: Add to .env file (automatically loaded via JidoKeys+Dotenvy)
+    XAI_API_KEY=xai-...
 
   ## Examples
 

@@ -11,9 +11,13 @@ defmodule ReqLLM.Providers.Anthropic do
 
   ## Configuration
 
-  Set your Anthropic API key via environment variable:
+  Set your Anthropic API key via JidoKeys (automatically picks up from .env):
 
-      export ANTHROPIC_API_KEY="your-api-key-here"
+      # Option 1: Set directly in JidoKeys
+      ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
+      
+      # Option 2: Add to .env file (automatically loaded via JidoKeys+Dotenvy)
+      ANTHROPIC_API_KEY=sk-ant-...
 
   ## Examples
 

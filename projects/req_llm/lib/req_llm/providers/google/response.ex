@@ -91,7 +91,7 @@ end
 
 defmodule ReqLLM.Providers.Google.ResponseDecoder do
   @moduledoc false
-  alias ReqLLM.{Response, Context, Message, StreamChunk, Model}
+  alias ReqLLM.{Response, Context, Message, StreamChunk}
 
   # Shared implementation for decoding Google JSON
   def decode_google_json(data, model) when is_map(data) do
