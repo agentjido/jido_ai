@@ -35,6 +35,7 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
 
   # Directory structure
   @providers_dir "priv/models_dev"
+  @patches_dir "priv/models_local"
 
   # Fields we don't need from models.dev that should be filtered out
   @unused_fields ~w[
@@ -85,7 +86,8 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
     File.mkdir_p!(@providers_dir)
 
     with {:ok, models_data} <- fetch_models_dev_data(verbose?) do
-      save_provider_files(models_data, verbose?)
+      merged_data = merge_local_patches(models_data, verbose?)
+      save_provider_files(merged_data, verbose?)
     end
   end
 
@@ -221,5 +223,96 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
 
   defp get_provider_config(_provider_id) do
     %{}
+  end
+
+  defp merge_local_patches(models_data, verbose?) do
+    if File.exists?(@patches_dir) do
+      patch_files = Path.wildcard(Path.join(@patches_dir, "*.json"))
+
+      if verbose? && !Enum.empty?(patch_files) do
+        IO.puts("Found #{length(patch_files)} patch files to merge")
+      end
+
+      Enum.reduce(patch_files, models_data, fn patch_file, acc ->
+        case load_patch_file(patch_file, verbose?) do
+          {:ok, provider_id, patch_data} ->
+            merge_patch_data(acc, provider_id, patch_data, verbose?)
+
+          {:error, _reason} ->
+            acc
+        end
+      end)
+    else
+      if verbose? do
+        IO.puts("No patches directory found (#{@patches_dir})")
+      end
+
+      models_data
+    end
+  end
+
+  defp load_patch_file(patch_file, verbose?) do
+    case File.read(patch_file) do
+      {:ok, content} ->
+        case Jason.decode(content) do
+          {:ok, %{"provider" => %{"id" => provider_id}, "models" => patch_models}} ->
+            if verbose? do
+              IO.puts(
+                "  Loading patch: #{Path.basename(patch_file)} (#{length(patch_models)} models)"
+              )
+            end
+
+            {:ok, provider_id, patch_models}
+
+          {:ok, _} ->
+            IO.puts("Warning: Invalid patch file structure: #{patch_file}")
+            {:error, :invalid_structure}
+
+          {:error, error} ->
+            IO.puts("Warning: Failed to parse patch file #{patch_file}: #{inspect(error)}")
+            {:error, :json_parse_error}
+        end
+
+      {:error, error} ->
+        IO.puts("Warning: Failed to read patch file #{patch_file}: #{inspect(error)}")
+        {:error, :file_read_error}
+    end
+  end
+
+  defp merge_patch_data(models_data, provider_id, patch_models, verbose?) do
+    case Map.get(models_data, provider_id) do
+      nil ->
+        if verbose? do
+          IO.puts("    Skipping patch for unknown provider: #{provider_id}")
+        end
+
+        models_data
+
+      provider_data ->
+        existing_models = provider_data["models"] || %{}
+
+        # Convert patch models list to map for easier merging
+        patch_models_map =
+          patch_models
+          |> Map.new(fn model -> {model["id"], model} end)
+
+        # Merge patch models into existing models (patches override)
+        merged_models = Map.merge(existing_models, patch_models_map)
+
+        if verbose? do
+          added_count =
+            map_size(patch_models_map) -
+              map_size(Map.take(existing_models, Map.keys(patch_models_map)))
+
+          updated_count = map_size(patch_models_map) - added_count
+
+          IO.puts(
+            "    Provider #{provider_id}: added #{added_count}, updated #{updated_count} models"
+          )
+        end
+
+        updated_provider_data = Map.put(provider_data, "models", merged_models)
+        Map.put(models_data, provider_id, updated_provider_data)
+    end
   end
 end
