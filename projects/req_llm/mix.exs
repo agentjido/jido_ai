@@ -11,10 +11,19 @@ defmodule ReqLLM.MixProject do
       aliases: aliases(),
       elixirc_paths: elixirc_paths(Mix.env()),
 
+      # Test coverage
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.github": :test
+      ],
+
       # Dialyzer configuration
       dialyzer: [
-        plt_add_apps: [:mix],
-        plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
+        plt_add_apps: [:mix]
       ],
 
       # Package
@@ -68,19 +77,19 @@ defmodule ReqLLM.MixProject do
       # Dev/test dependencies
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.7", runtime: false},
-      {:quokka, "~> 2.11", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:quokka, "~> 2.11", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: [:dev, :test], runtime: false}
     ]
   end
 
   defp package do
     [
-      description: "Composable Elixir library for AI interactions built on Req",
+      description: "Composable Elixir library for LLM interactions built on Req",
       licenses: ["Apache-2.0"],
       maintainers: ["Mike Hostetler"],
       links: %{"GitHub" => "https://github.com/agentjido/req_llm"},
-      files:
-        ~w(lib priv mix.exs LICENSE CHANGELOG.md README.md usage-rules.md guides .formatter.exs)
+      files: ~w(lib priv mix.exs LICENSE README.md AGENTS.md usage-rules.md guides .formatter.exs)
     ]
   end
 

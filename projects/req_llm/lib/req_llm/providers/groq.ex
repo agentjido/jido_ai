@@ -7,9 +7,13 @@ defmodule ReqLLM.Providers.Groq do
 
   ## Configuration
 
-  Set your Groq API key via environment variable:
+  Set your Groq API key via JidoKeys (automatically picks up from .env):
 
-      export GROQ_API_KEY="your-api-key-here"
+      # Option 1: Set directly in JidoKeys
+      ReqLLM.put_key(:groq_api_key, "gsk_...")
+      
+      # Option 2: Add to .env file (automatically loaded via JidoKeys+Dotenvy)
+      GROQ_API_KEY=gsk_...
 
   ## Examples
 

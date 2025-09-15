@@ -194,7 +194,7 @@ end
    Validate models via `ReqLLM.Provider.Registry.model_exists?/1`.
 
 3. **API key handling**  
-   Use `JidoKeys.get/1` with registry-provided env key instead of direct env access.
+   Use `JidoKeys.get/1` with registry-provided env key. Keys are automatically loaded from .env via JidoKeys+Dotenvy integration, or can be set directly via `ReqLLM.put_key/2`.
 
 4. **Core options centralized**  
    `provider_schema` now only for provider-specific options.
@@ -362,7 +362,7 @@ FIXTURE_FILTER=my_provider mix test            # Regenerate specific provider
 * Keep `prepare_request/4` minimal - delegate to `attach/3`
 * Use `provider_id()` helper for validation, not hardcoded atoms
 * Provider schema only for provider-specific options 
-* Use `JidoKeys` for API key management
+* Use `JidoKeys` for API key management - keys are automatically loaded from .env files
 * Return raw parsed response body from `decode_response/1`
 * Test with cheapest model using `temperature: 0` for deterministic fixtures
 * Start with text-only support, add multimodal features incrementally

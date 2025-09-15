@@ -65,6 +65,9 @@ defmodule ReqLLM do
   @doc """
   Stores an API key in the session keyring.
 
+  Keys from .env files are automatically loaded via JidoKeys+Dotenvy integration, 
+  so you typically don't need to call this manually. Just add keys to your .env file.
+
   ## Parameters
 
     * `key` - The configuration key (atom or string)
@@ -72,6 +75,7 @@ defmodule ReqLLM do
 
   ## Examples
 
+      # Manual key setting (optional - .env keys are auto-loaded)
       ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
 
   """
@@ -83,6 +87,8 @@ defmodule ReqLLM do
   @doc """
   Gets an API key from the keyring.
 
+  Keys from .env files are automatically loaded via JidoKeys+Dotenvy integration.
+
   ## Parameters
 
     * `key` - The configuration key (atom or string, case-insensitive)
@@ -90,7 +96,7 @@ defmodule ReqLLM do
   ## Examples
 
       ReqLLM.get_key(:anthropic_api_key)
-      ReqLLM.get_key("ANTHROPIC_API_KEY")
+      ReqLLM.get_key("ANTHROPIC_API_KEY")  # Auto-loaded from .env
 
   """
   @spec get_key(atom() | String.t()) :: String.t() | nil

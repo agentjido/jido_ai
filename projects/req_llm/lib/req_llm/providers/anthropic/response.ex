@@ -148,7 +148,7 @@ end
 
 defmodule ReqLLM.Providers.Anthropic.ResponseDecoder do
   @moduledoc false
-  alias ReqLLM.{Response, Context, Message, StreamChunk, Model}
+  alias ReqLLM.{Response, Context, Message, StreamChunk}
 
   # Shared implementation for decoding Anthropic JSON
   def decode_anthropic_json(data, model) when is_map(data) do

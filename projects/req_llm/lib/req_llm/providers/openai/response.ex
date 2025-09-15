@@ -97,7 +97,7 @@ end
 
 defmodule ReqLLM.Providers.OpenAI.ResponseDecoder do
   @moduledoc false
-  alias ReqLLM.{Response, Context, Message, StreamChunk, Model}
+  alias ReqLLM.{Response, Context, Message, StreamChunk}
 
   def decode_openai_json(data, model) when is_map(data) do
     # Extract basic response information
