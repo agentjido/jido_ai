@@ -11,7 +11,9 @@ defmodule ReqLLM.Generation do
   with proper error handling.
   """
 
-  alias ReqLLM.{Model, Context, Response}
+  alias ReqLLM.{Context, Model, Response}
+
+  require Logger
 
   @base_schema NimbleOptions.new!(
                  temperature: [
@@ -78,6 +80,11 @@ defmodule ReqLLM.Generation do
                  user: [
                    type: :string,
                    doc: "User identifier for tracking/abuse detection"
+                 ],
+                 on_unsupported: [
+                   type: {:in, [:warn, :error, :ignore]},
+                   doc: "How to handle unsupported parameter translations",
+                   default: :warn
                  ]
                )
 
@@ -173,9 +180,12 @@ defmodule ReqLLM.Generation do
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
          schema = dynamic_schema(provider_module),
          {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
-         context = build_context(messages, validated_opts),
+         {translated_opts, warnings} <-
+           translate_provider_options(provider_module, :chat, model, validated_opts),
+         :ok <- handle_warnings(translated_opts, warnings),
+         context = build_context(messages, translated_opts),
          {:ok, configured_request} <-
-           provider_module.prepare_request(:chat, model, context, validated_opts),
+           provider_module.prepare_request(:chat, model, context, translated_opts),
          {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
       Response.decode_response(decoded_response, model)
     end
@@ -186,6 +196,7 @@ defmodule ReqLLM.Generation do
 
   This is a convenience function that extracts just the text from the response.
   For access to usage metadata and other response data, use `generate_text/3`.
+  Raises on error.
 
   ## Parameters
 
@@ -193,8 +204,7 @@ defmodule ReqLLM.Generation do
 
   ## Examples
 
-      {:ok, text} = ReqLLM.Generation.generate_text!("anthropic:claude-3-sonnet", "Hello world")
-      text
+      ReqLLM.Generation.generate_text!("anthropic:claude-3-sonnet", "Hello world")
       #=> "Hello! How can I assist you today?"
 
   """
@@ -202,11 +212,11 @@ defmodule ReqLLM.Generation do
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword()
-        ) :: {:ok, String.t()} | {:error, term()}
+        ) :: String.t() | no_return()
   def generate_text!(model_spec, messages, opts \\ []) do
     case generate_text(model_spec, messages, opts) do
-      {:ok, response} -> {:ok, Response.text(response)}
-      {:error, error} -> {:error, error}
+      {:ok, response} -> Response.text(response)
+      {:error, error} -> raise error
     end
   end
 
@@ -240,7 +250,10 @@ defmodule ReqLLM.Generation do
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
          schema = dynamic_schema(provider_module),
          {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
-         stream_opts = Keyword.put(validated_opts, :stream, true),
+         {translated_opts, warnings} <-
+           translate_provider_options(provider_module, :chat, model, validated_opts),
+         :ok <- handle_warnings(translated_opts, warnings),
+         stream_opts = Keyword.put(translated_opts, :stream, true),
          context = build_context(messages, stream_opts),
          {:ok, configured_request} <-
            provider_module.prepare_request(:chat, model, context, stream_opts),
@@ -254,6 +267,7 @@ defmodule ReqLLM.Generation do
 
   This is a convenience function that extracts just the stream from the response.
   For access to usage metadata and other response data, use `stream_text/3`.
+  Raises on error.
 
   ## Parameters
 
@@ -261,23 +275,45 @@ defmodule ReqLLM.Generation do
 
   ## Examples
 
-      {:ok, stream} = ReqLLM.Generation.stream_text!("anthropic:claude-3-sonnet", "Tell me a story")
-      stream |> Enum.each(&IO.write/1)
+      ReqLLM.Generation.stream_text!("anthropic:claude-3-sonnet", "Tell me a story")
+      |> Enum.each(&IO.write/1)
 
   """
   @spec stream_text!(
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword()
-        ) :: {:ok, Enumerable.t()} | {:error, term()}
+        ) :: Enumerable.t() | no_return()
   def stream_text!(model_spec, messages, opts \\ []) do
     case stream_text(model_spec, messages, opts) do
-      {:ok, response} -> {:ok, Response.text_stream(response)}
-      {:error, error} -> {:error, error}
+      {:ok, response} -> Response.text_stream(response)
+      {:error, error} -> raise error
     end
   end
 
   # Private helper functions
+
+  defp translate_provider_options(provider_mod, operation, model, opts) do
+    if function_exported?(provider_mod, :translate_options, 3) do
+      provider_mod.translate_options(operation, model, opts)
+    else
+      {opts, []}
+    end
+  end
+
+  defp handle_warnings(opts, warnings) do
+    case opts[:on_unsupported] || :warn do
+      :ignore ->
+        :ok
+
+      :warn ->
+        Enum.each(warnings, &Logger.warning/1)
+        :ok
+
+      :error ->
+        if warnings == [], do: :ok, else: {:error, {:unsupported_options, warnings}}
+    end
+  end
 
   defp build_context(messages, opts) when is_binary(messages) do
     context = Context.new([Context.user(messages)])
@@ -366,15 +402,18 @@ defmodule ReqLLM.Generation do
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
          options_schema = dynamic_schema(provider_module),
          {:ok, validated_opts} <- NimbleOptions.validate(opts, options_schema),
+         {translated_opts, warnings} <-
+           translate_provider_options(provider_module, :object, model, validated_opts),
+         :ok <- handle_warnings(translated_opts, warnings),
          {:ok, compiled_schema} <- ReqLLM.Schema.compile(object_schema),
-         context = build_context(messages, validated_opts),
+         context = build_context(messages, translated_opts),
          {:ok, configured_request} <-
            provider_module.prepare_request(
              :object,
              model,
              context,
              compiled_schema,
-             validated_opts
+             translated_opts
            ),
          {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
       Response.decode_object(decoded_response, model, object_schema)
@@ -419,8 +458,11 @@ defmodule ReqLLM.Generation do
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
          options_schema = dynamic_schema(provider_module),
          {:ok, validated_opts} <- NimbleOptions.validate(opts, options_schema),
+         {translated_opts, warnings} <-
+           translate_provider_options(provider_module, :object, model, validated_opts),
+         :ok <- handle_warnings(translated_opts, warnings),
          {:ok, compiled_schema} <- ReqLLM.Schema.compile(object_schema),
-         stream_opts = Keyword.put(validated_opts, :stream, true),
+         stream_opts = Keyword.put(translated_opts, :stream, true),
          context = build_context(messages, stream_opts),
          {:ok, configured_request} <-
            provider_module.prepare_request(:object, model, context, compiled_schema, stream_opts),
@@ -434,6 +476,7 @@ defmodule ReqLLM.Generation do
 
   This is a convenience function that extracts just the object from the response.
   For access to usage metadata and other response data, use `generate_object/4`.
+  Raises on error.
 
   ## Parameters
 
@@ -441,8 +484,7 @@ defmodule ReqLLM.Generation do
 
   ## Examples
 
-      {:ok, object} = ReqLLM.Generation.generate_object!("anthropic:claude-3-sonnet", "Generate a person", person_schema)
-      object
+      ReqLLM.Generation.generate_object!("anthropic:claude-3-sonnet", "Generate a person", person_schema)
       #=> %{name: "Alice Smith", age: 30, occupation: "Engineer"}
 
   """
@@ -451,11 +493,11 @@ defmodule ReqLLM.Generation do
           String.t() | list(),
           keyword(),
           keyword()
-        ) :: {:ok, map()} | {:error, term()}
+        ) :: map() | no_return()
   def generate_object!(model_spec, messages, object_schema, opts \\ []) do
     case generate_object(model_spec, messages, object_schema, opts) do
-      {:ok, response} -> {:ok, Response.object(response)}
-      {:error, error} -> {:error, error}
+      {:ok, response} -> Response.object(response)
+      {:error, error} -> raise error
     end
   end
 
@@ -464,6 +506,7 @@ defmodule ReqLLM.Generation do
 
   This is a convenience function that extracts just the stream from the response.
   For access to usage metadata and other response data, use `stream_object/4`.
+  Raises on error.
 
   ## Parameters
 
@@ -471,8 +514,8 @@ defmodule ReqLLM.Generation do
 
   ## Examples
 
-      {:ok, stream} = ReqLLM.Generation.stream_object!("anthropic:claude-3-sonnet", "Generate a person", person_schema)
-      stream |> Enum.each(&IO.inspect/1)
+      ReqLLM.Generation.stream_object!("anthropic:claude-3-sonnet", "Generate a person", person_schema)
+      |> Enum.each(&IO.inspect/1)
 
   """
   @spec stream_object!(
@@ -480,11 +523,11 @@ defmodule ReqLLM.Generation do
           String.t() | list(),
           keyword(),
           keyword()
-        ) :: {:ok, Enumerable.t()} | {:error, term()}
+        ) :: Enumerable.t() | no_return()
   def stream_object!(model_spec, messages, object_schema, opts \\ []) do
     case stream_object(model_spec, messages, object_schema, opts) do
-      {:ok, response} -> {:ok, Response.object_stream(response)}
-      {:error, error} -> {:error, error}
+      {:ok, response} -> Response.object_stream(response)
+      {:error, error} -> raise error
     end
   end
 end

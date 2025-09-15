@@ -1,0 +1,107 @@
+{
+  "provider": {
+    "id": "openai",
+    "name": "OpenAI",
+    "base_url": "https://api.openai.com/v1",
+    "env": ["OPENAI_API_KEY"],
+    "doc": "AI model provider"
+  },
+  "models": [
+    {
+      "id": "text-embedding-3-small",
+      "name": "Text Embedding 3 Small",
+      "provider": "openai",
+      "provider_model_id": "text-embedding-3-small",
+      "type": "embedding",
+      "attachment": false,
+      "open_weights": false,
+      "reasoning": false,
+      "temperature": false,
+      "tool_call": false,
+      "knowledge": "2024-01",
+      "release_date": "2024-01-25",
+      "last_updated": "2024-01-25",
+      "cost": {
+        "input": 0.00002,
+        "output": 0.0
+      },
+      "limit": {
+        "context": 8191,
+        "output": 0
+      },
+      "modalities": {
+        "input": ["text"],
+        "output": ["embedding"]
+      },
+      "dimensions": {
+        "min": 1,
+        "max": 1536,
+        "default": 1536
+      }
+    },
+    {
+      "id": "text-embedding-3-large",
+      "name": "Text Embedding 3 Large", 
+      "provider": "openai",
+      "provider_model_id": "text-embedding-3-large",
+      "type": "embedding",
+      "attachment": false,
+      "open_weights": false,
+      "reasoning": false,
+      "temperature": false,
+      "tool_call": false,
+      "knowledge": "2024-01",
+      "release_date": "2024-01-25",
+      "last_updated": "2024-01-25",
+      "cost": {
+        "input": 0.00013,
+        "output": 0.0
+      },
+      "limit": {
+        "context": 8191,
+        "output": 0
+      },
+      "modalities": {
+        "input": ["text"],
+        "output": ["embedding"]
+      },
+      "dimensions": {
+        "min": 1,
+        "max": 3072,
+        "default": 3072
+      }
+    },
+    {
+      "id": "text-embedding-ada-002",
+      "name": "Text Embedding Ada 002",
+      "provider": "openai", 
+      "provider_model_id": "text-embedding-ada-002",
+      "type": "embedding",
+      "attachment": false,
+      "open_weights": false,
+      "reasoning": false,
+      "temperature": false,
+      "tool_call": false,
+      "knowledge": "2021-09",
+      "release_date": "2021-09-01",
+      "last_updated": "2021-09-01",
+      "cost": {
+        "input": 0.0001,
+        "output": 0.0
+      },
+      "limit": {
+        "context": 8191,
+        "output": 0
+      },
+      "modalities": {
+        "input": ["text"],
+        "output": ["embedding"]
+      },
+      "dimensions": {
+        "min": 1536,
+        "max": 1536,
+        "default": 1536
+      }
+    }
+  ]
+}

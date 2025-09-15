@@ -724,6 +724,114 @@
       "release_date": "2024-06-26",
       "temperature": false,
       "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 1.3e-4,
+        "output": 0.0
+      },
+      "dimensions": {
+        "default": 3072,
+        "max": 3072,
+        "min": 1
+      },
+      "id": "text-embedding-3-large",
+      "knowledge": "2024-01",
+      "last_updated": "2024-01-25",
+      "limit": {
+        "context": 8191,
+        "output": 0
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "embedding"
+        ]
+      },
+      "name": "Text Embedding 3 Large",
+      "open_weights": false,
+      "provider": "openai",
+      "provider_model_id": "text-embedding-3-large",
+      "reasoning": false,
+      "release_date": "2024-01-25",
+      "temperature": false,
+      "tool_call": false,
+      "type": "embedding"
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 2.0e-5,
+        "output": 0.0
+      },
+      "dimensions": {
+        "default": 1536,
+        "max": 1536,
+        "min": 1
+      },
+      "id": "text-embedding-3-small",
+      "knowledge": "2024-01",
+      "last_updated": "2024-01-25",
+      "limit": {
+        "context": 8191,
+        "output": 0
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "embedding"
+        ]
+      },
+      "name": "Text Embedding 3 Small",
+      "open_weights": false,
+      "provider": "openai",
+      "provider_model_id": "text-embedding-3-small",
+      "reasoning": false,
+      "release_date": "2024-01-25",
+      "temperature": false,
+      "tool_call": false,
+      "type": "embedding"
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 0.0001,
+        "output": 0.0
+      },
+      "dimensions": {
+        "default": 1536,
+        "max": 1536,
+        "min": 1536
+      },
+      "id": "text-embedding-ada-002",
+      "knowledge": "2021-09",
+      "last_updated": "2021-09-01",
+      "limit": {
+        "context": 8191,
+        "output": 0
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "embedding"
+        ]
+      },
+      "name": "Text Embedding Ada 002",
+      "open_weights": false,
+      "provider": "openai",
+      "provider_model_id": "text-embedding-ada-002",
+      "reasoning": false,
+      "release_date": "2021-09-01",
+      "temperature": false,
+      "tool_call": false,
+      "type": "embedding"
     }
   ],
   "provider": {

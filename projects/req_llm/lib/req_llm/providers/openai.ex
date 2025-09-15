@@ -12,9 +12,9 @@ defmodule ReqLLM.Providers.OpenAI do
 
   Set your OpenAI API key via JidoKeys (automatically picks up from .env):
 
-  # Option 1: Set directly in JidoKeys  
+  # Option 1: Set directly in JidoKeys
     ReqLLM.put_key(:openai_api_key, "sk-...")
-    
+
     # Option 2: Add to .env file (automatically loaded via JidoKeys+Dotenvy)
     OPENAI_API_KEY=sk-...
 
@@ -114,14 +114,7 @@ defmodule ReqLLM.Providers.OpenAI do
       raise ReqLLM.Error.Invalid.Parameter.exception(parameter: "model: #{model.model}")
     end
 
-    api_key_env = ReqLLM.Provider.Registry.get_env_key(:openai)
-    api_key = JidoKeys.get(api_key_env)
-
-    if !(api_key && api_key != "") do
-      raise ReqLLM.Error.Invalid.Parameter.exception(
-              parameter: "api_key (set via JidoKeys.put(#{inspect(api_key_env)}, key))"
-            )
-    end
+    api_key = ReqLLM.Keys.get!(model, user_opts)
 
     # Extract special keys that shouldn't be validated
     {tools, temp_opts} = Keyword.pop(user_opts, :tools, [])
@@ -161,6 +154,41 @@ defmodule ReqLLM.Providers.OpenAI do
   end
 
   def extract_usage(_, _), do: {:error, :invalid_body}
+
+  @impl ReqLLM.Provider
+  def translate_options(:chat, %ReqLLM.Model{model: <<"o1", _::binary>>}, opts) do
+    # O1 models: rename max_tokens and drop temperature
+    # Apply transformations sequentially to avoid conflicts
+    {opts_after_rename, rename_warnings} =
+      translate_rename(opts, :max_tokens, :max_completion_tokens)
+
+    {final_opts, drop_warnings} =
+      translate_drop(
+        opts_after_rename,
+        :temperature,
+        "OpenAI o1 models do not support :temperature – dropped"
+      )
+
+    {final_opts, rename_warnings ++ drop_warnings}
+  end
+
+  def translate_options(:chat, %ReqLLM.Model{model: <<"o3", _::binary>>}, opts) do
+    # O3 models: rename max_tokens and drop temperature
+    # Apply transformations sequentially to avoid conflicts
+    {opts_after_rename, rename_warnings} =
+      translate_rename(opts, :max_tokens, :max_completion_tokens)
+
+    {final_opts, drop_warnings} =
+      translate_drop(
+        opts_after_rename,
+        :temperature,
+        "OpenAI o3 models do not support :temperature – dropped"
+      )
+
+    {final_opts, rename_warnings ++ drop_warnings}
+  end
+
+  def translate_options(_operation, _model, opts), do: {opts, []}
 
   # Req pipeline steps
   @impl ReqLLM.Provider
@@ -207,12 +235,29 @@ defmodule ReqLLM.Providers.OpenAI do
           %{}
       end
 
+    # Determine which token parameter to use based on model
+    model_name = request.options[:model] || request.options[:id]
+
+    {max_key, max_value} =
+      case model_name do
+        <<"o1", _::binary>> ->
+          {:max_completion_tokens,
+           request.options[:max_tokens] || request.options[:max_completion_tokens]}
+
+        <<"o3", _::binary>> ->
+          {:max_completion_tokens,
+           request.options[:max_tokens] || request.options[:max_completion_tokens]}
+
+        _ ->
+          {:max_tokens, request.options[:max_tokens] || request.options[:max_completion_tokens]}
+      end
+
     %{
-      model: request.options[:model] || request.options[:id],
-      temperature: request.options[:temperature],
-      max_tokens: request.options[:max_tokens],
+      model: model_name,
       stream: request.options[:stream]
     }
+    |> maybe_put(:temperature, request.options[:temperature])
+    |> maybe_put(max_key, max_value)
     |> Map.merge(context_data)
     |> Map.merge(tools_data)
     |> maybe_put(:top_p, request.options[:top_p])

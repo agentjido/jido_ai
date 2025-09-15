@@ -39,6 +39,7 @@ end
 - **Usage & cost extraction** on every response (`response.usage`)
 - **Plugin-based provider system**
   - Anthropic, OpenAI, Groq, Google, xAI and OpenRouter included
+  - Automatic parameter translation for model-specific requirements
   - Easily extendable with new providers (see [Adding a Provider Guide](guides/adding_a_provider.md))
 - **Context Codec protocol** converts ReqLLM structs to provider wire formats
 - **Extensive test matrix** (local fixtures + optional live calls)
@@ -46,21 +47,27 @@ end
 ## Quick Start
 
 ```elixir
-# Configure API keys using JidoKeys (secure, in-memory storage)
+# Configure API keys (recommended approach)
 ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
 
-# Keys in .env are automatically picked up via the JidoKeys package via Dotenvy
+# Override per-request (highest priority)
+# Per-request: ReqLLM.generate_text(model, "hi", api_key: "sk-live-...")
+
+# Alternative methods:
+# Environment: System.put_env("ANTHROPIC_API_KEY", "sk-ant-...")  
+# Application: Application.put_env(:req_llm, :anthropic_api_key, "sk-ant-...")
+# .env files are auto-loaded via JidoKeys integration
 
 model = "anthropic:claude-3-sonnet"
 
 # Simple text generation
-{:ok, text} = ReqLLM.generate_text!(model, "Hello world")
-#=> {:ok, "Hello! How can I assist you today?"}
+ReqLLM.generate_text!(model, "Hello world")
+#=> "Hello! How can I assist you today?"
 
 # Structured data generation
 schema = [name: [type: :string, required: true], age: [type: :pos_integer]]
-{:ok, person} = ReqLLM.generate_object!(model, "Generate a person", schema)
-#=> {:ok, %{name: "John Doe", age: 30}}
+person = ReqLLM.generate_object!(model, "Generate a person", schema)
+#=> %{name: "John Doe", age: 30}
 
 # With system prompts and parameters
 {:ok, response} = ReqLLM.generate_text(
@@ -109,20 +116,41 @@ ReqLLM.stream_text!(model, "Write a short story")
 | xAI        | ✓    | ✓         | ✓     | ✗          |
 | OpenRouter | ✓    | ✓         | ✓     | ✗          |
 
-## API Key Management with JidoKeys
+## API Key Management
 
-ReqLLM uses [JidoKeys](https://hex.pm/packages/jido_keys) for secure in-memory key storage. Keys are never written to disk by default:
+ReqLLM provides flexible API key management with clear precedence order:
+
+1. **Per-request keys** (highest priority)
+2. **ReqLLM.put_key** (recommended - secure in-memory storage)
+3. **Application configuration**
+4. **Environment variables**
+5. **JidoKeys** (.env auto-loading)
 
 ```elixir
-# Store keys in memory
-ReqLLM.put_key(:openai_api_key, System.get_env("OPENAI_API_KEY"))
-ReqLLM.put_key(:anthropic_api_key, System.get_env("ANTHROPIC_API_KEY"))
+# Recommended: Secure in-memory storage
+ReqLLM.put_key(:openai_api_key, "sk-...")
+ReqLLM.put_key(:anthropic_api_key, "sk-ant-...")
 
-# Or load from environment variables automatically
-ReqLLM.put_key(:openai_api_key, {:env, "OPENAI_API_KEY"})
+# Per-request override (highest priority)
+ReqLLM.generate_text("openai:gpt-4", "Hello", api_key: "sk-...")
 
-# Keys are automatically resolved when making requests
-ReqLLM.generate_text!("openai:gpt-4", "Hello")
+# Alternative: Application configuration
+Application.put_env(:req_llm, :openai_api_key, "sk-...")
+
+# Alternative: Environment variables
+System.put_env("OPENAI_API_KEY", "sk-...")
+
+# .env files are automatically loaded via JidoKeys integration
+# OPENAI_API_KEY=sk-...
+# ANTHROPIC_API_KEY=sk-ant-...
+
+# Helper functions show expected keys
+ReqLLM.Keys.env_var_name(:openai)    #=> "OPENAI_API_KEY"
+ReqLLM.Keys.config_key(:openai)      #=> :openai_api_key
+
+# Debug key source (useful for troubleshooting)
+{:ok, key, source} = ReqLLM.Keys.get(:openai)
+#=> {:ok, "sk-...", :jido}  # Shows key came from ReqLLM.put_key
 ```
 
 ## Usage Cost Tracking
