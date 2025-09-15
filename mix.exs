@@ -23,7 +23,9 @@ defmodule JidoWorkspace.MixProject do
   defp deps do
     [
       {:table_rex, "~> 4.0"},
-      {:git_cli, "~> 0.3"}
+      {:git_cli, "~> 0.3"},
+      {:yaml_elixir, "~> 2.10"},
+      {:jason, "~> 1.4"}
     ]
   end
 
@@ -50,7 +52,14 @@ defmodule JidoWorkspace.MixProject do
       
       # Hex publishing commands
       "hex.publish.all": ["hex_publish"],
-      "version.check": ["version.check"]
+      "version.check": ["version.check"],
+      
+      # Roadmap commands
+      "roadmap.status": ["roadmap.status"],
+      "roadmap.todo": ["roadmap.todo"],
+      "roadmap.idea": ["roadmap.idea"],
+      "roadmap.milestone": ["roadmap.milestone"],
+      "roadmap.lint": ["roadmap.lint"]
     ]
   end
 end

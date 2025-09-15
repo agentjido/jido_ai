@@ -15,32 +15,24 @@ review: {{review_date}}
 
 ## Sub-Milestones
 - **{{milestone_number}}.1 – {{phase_name}}** (target {{target_date}})
-  - [ ] Link to specific tasks below
-  - [ ] Another deliverable
+  - Add specific deliverables here
 - **{{milestone_number}}.2 – {{phase_name}}** (target {{target_date}})
-  - [ ] Next phase deliverables
-  - [ ] Testing and validation
+  - Add phase deliverables here
 - **{{milestone_number}}.3 – {{phase_name}}** (target {{target_date}})
-  - [ ] Final deliverables
-  - [ ] Documentation and completion
+  - Add final deliverables here
 
 ## Task List
 > Use GitHub-style checkboxes so progress renders in PRs
 
-- [ ] TASK-ID: Short description *(owner, estimate)*
-- [ ] FEAT-1: Implement core functionality *(@alice, 3d)*
-- [ ] DOC-1: Write user documentation *(@bob, 1d)*
-- [ ] TEST-1: Add integration tests *(@alice, 2d)*
+Add your tasks here using the format:
+- TASK-ID: Description *(owner, estimate)*
 
 ## Risks & Mitigations
-- **Risk**: Brief description of potential issue
-  - *Mitigation*: How we'll address or monitor this risk
-- **Risk**: Another potential blocker
-  - *Mitigation*: Backup plan or early detection strategy
+- **Risk**: Description of potential issue
+  - *Mitigation*: How to address or monitor this risk
 
 ## Dependencies
-- [ ] External dependency or blocker
-- [ ] Another team's deliverable we're waiting for
+Add any external dependencies here
 
 ## Links & References
 - Issues: #123, #456
