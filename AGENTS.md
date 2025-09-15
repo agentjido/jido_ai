@@ -39,6 +39,14 @@ JidoWorkspace is a git subtree-powered monorepo workspace manager for the Jido e
 - `mix version.check` - Check version consistency across projects
 - `mix hex_validate` - Validate packages for publishing
 
+**Roadmap Management:**
+- `mix roadmap.status` - Show all tasks across roadmap files
+- `mix roadmap.todo [--owner @user] [--project name]` - Show personal tasks
+- `mix roadmap.milestone new --project <name> [--edit]` - Create new milestone
+- `mix roadmap.milestone close --milestone <N> --project <name>` - Close milestone
+- `mix roadmap.idea "<idea>"` - Quick idea capture
+- `mix roadmap.lint [--fix]` - Validate roadmap files
+
 ### Convenient Aliases
 - `mix ws.pull` - Same as `ws.git.pull`
 - `mix ws.push` - Same as `ws.git.push`
