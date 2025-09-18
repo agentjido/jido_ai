@@ -5,7 +5,7 @@ defmodule LangchainDemo do
   alias LangChain.Chains.LLMChain
   alias Jido.AI.Keyring
   alias LangChain.Function
-  alias Jido.Actions.Arithmetic.{Add, Subtract}
+  alias Jido.Tools.Arithmetic.{Add, Subtract}
 
   def chat do
     # Create a chat model
