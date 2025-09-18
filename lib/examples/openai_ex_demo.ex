@@ -301,7 +301,7 @@ defmodule OpenAIExDemo do
     #     }
     #   """)
 
-    tool = Jido.Tools.Arithmetic.Add.to_tool()
+    tool = Jido.Actions.Arithmetic.Add.to_tool()
     # Tool: %{
     #   function: #Function<3.116548139/2 in Jido.Action.Tool.to_tool/1>,
     #   name: "add",
