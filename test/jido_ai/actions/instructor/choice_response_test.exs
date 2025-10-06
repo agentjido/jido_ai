@@ -2,10 +2,10 @@ defmodule Jido.AI.Actions.Instructor.ChoiceResponseTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.Actions.Instructor.ChoiceResponse
   alias Jido.AI.Actions.Instructor
-  alias Jido.AI.Prompt
+  alias Jido.AI.Actions.Instructor.ChoiceResponse
   alias Jido.AI.Model
+  alias Jido.AI.Prompt
 
   @moduletag :capture_log
 

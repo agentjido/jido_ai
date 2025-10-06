@@ -3,13 +3,13 @@ defmodule JidoTest.AI.Actions.PromptOptionsTest do
   use Mimic
   @moduletag :capture_log
 
-  alias Jido.AI.Prompt
-  alias Jido.AI.Model
-  alias Jido.AI.Actions.Langchain
   alias Jido.AI.Actions.Instructor
+  alias Jido.AI.Actions.Langchain
   alias Jido.AI.Actions.OpenaiEx
-  alias LangChain.ChatModels.ChatOpenAI
+  alias Jido.AI.Model
+  alias Jido.AI.Prompt
   alias LangChain.Chains.LLMChain
+  alias LangChain.ChatModels.ChatOpenAI
 
   # Add correct module imports for mocking
   setup do

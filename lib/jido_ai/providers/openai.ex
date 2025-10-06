@@ -5,6 +5,7 @@ defmodule Jido.AI.Provider.OpenAI do
   Implements the ProviderBehavior for OpenAI's specific API.
   """
   @behaviour Jido.AI.Model.Provider.Adapter
+  alias Jido.AI.Model
   alias Jido.AI.Provider
   alias Jido.AI.Provider.Helpers
 
@@ -106,7 +107,7 @@ defmodule Jido.AI.Provider.OpenAI do
   end
 
   @impl true
-  def base_url() do
+  def base_url do
     @base_url
   end
 
@@ -128,7 +129,7 @@ defmodule Jido.AI.Provider.OpenAI do
   @impl true
   def validate_model_opts(opts) do
     {:ok,
-     %Jido.AI.Model{
+     %Model{
        id: opts[:model] || "openai_default",
        name: opts[:model_name] || "OpenAI Model",
        provider: :openai
@@ -161,7 +162,7 @@ defmodule Jido.AI.Provider.OpenAI do
       {:error, "model is required for OpenAI models"}
     else
       # Create the model struct with all necessary fields
-      model = %Jido.AI.Model{
+      model_struct = %Model{
         id: Keyword.get(opts, :id, "openai_#{model}"),
         name: Keyword.get(opts, :name, "OpenAI #{model}"),
         provider: :openai,
@@ -171,17 +172,18 @@ defmodule Jido.AI.Provider.OpenAI do
         temperature: Keyword.get(opts, :temperature, 0.7),
         max_tokens: Keyword.get(opts, :max_tokens, 1024),
         max_retries: Keyword.get(opts, :max_retries, 0),
-        architecture: %Jido.AI.Model.Architecture{
+        architecture: %Model.Architecture{
           modality: Keyword.get(opts, :modality, "text"),
           tokenizer: Keyword.get(opts, :tokenizer, "unknown"),
           instruct_type: Keyword.get(opts, :instruct_type)
         },
         description: Keyword.get(opts, :description, "OpenAI model"),
         created: System.system_time(:second),
-        endpoints: []
+        endpoints: [],
+        reqllm_id: Model.compute_reqllm_id(:openai, model)
       }
 
-      {:ok, model}
+      {:ok, model_struct}
     end
   end
 
@@ -206,7 +208,7 @@ defmodule Jido.AI.Provider.OpenAI do
     headers = request_headers(opts)
 
     # Ensure the models directory exists
-    base_dir = Jido.AI.Provider.base_dir()
+    base_dir = Provider.base_dir()
     provider_dir = Path.join(base_dir, @provider_path)
     model_dir = Path.join(provider_dir, "models")
 

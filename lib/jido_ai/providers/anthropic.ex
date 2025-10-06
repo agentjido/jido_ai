@@ -5,9 +5,9 @@ defmodule Jido.AI.Provider.Anthropic do
   Implements the ProviderBehavior for Anthropic's specific API.
   """
   @behaviour Jido.AI.Model.Provider.Adapter
+  alias Jido.AI.Model
   alias Jido.AI.Provider
   alias Jido.AI.Provider.Helpers
-  alias Jido.AI.Model
 
   @base_url "https://api.anthropic.com/v1"
   @api_version "2023-06-01"
@@ -23,23 +23,15 @@ defmodule Jido.AI.Provider.Anthropic do
   # --header "anthropic-version: 2023-06-01"
 
   @provider_id :anthropic
-  @provider_path "anthropic"
 
   @impl true
-  def request_headers(opts) do
-    api_key = Helpers.get_api_key(opts, "ANTHROPIC_API_KEY", :anthropic_api_key)
-    api_version = Keyword.get(opts, :api_version, @api_version)
-
-    base_headers = %{
+  def request_headers(_opts) do
+    # Headers are now handled internally by ReqLLM
+    # This function is kept for adapter behavior compatibility
+    %{
       "Content-Type" => "application/json",
-      "anthropic-version" => api_version
+      "anthropic-version" => @api_version
     }
-
-    if api_key do
-      Map.put(base_headers, "x-api-key", api_key)
-    else
-      base_headers
-    end
   end
 
   @impl true
@@ -56,59 +48,44 @@ defmodule Jido.AI.Provider.Anthropic do
 
   @impl true
   @doc """
-  Lists available models from local cache or API.
+  Lists available models from the Model Registry.
+
+  This function delegates to the Model Registry which provides access to
+  Anthropic models through ReqLLM integration.
 
   ## Options
-    - refresh: boolean - Whether to force refresh from API (default: false)
-    - api_key: string - Anthropic API key (optional)
+    - refresh: boolean - Ignored (models come from ReqLLM)
 
   Returns a tuple with {:ok, models} on success or {:error, reason} on failure.
   """
-  def list_models(opts \\ []) do
-    refresh = Keyword.get(opts, :refresh, false)
-    models_file = Helpers.get_models_file_path(@provider_path)
-
-    cond do
-      # If refresh requested, fetch from API
-      refresh ->
-        fetch_and_cache_models(opts)
-
-      # If local file exists, try reading from it
-      File.exists?(models_file) ->
-        Helpers.read_models_from_cache(@provider_path, &process_models/1)
-
-      # Otherwise fetch from API
-      true ->
-        fetch_and_cache_models(opts)
-    end
+  def list_models(_opts \\ []) do
+    # Delegate to Model Registry which gets models from ReqLLM
+    alias Jido.AI.Model.Registry
+    Registry.list_models(@provider_id)
   end
 
   @impl true
   @doc """
-  Fetches a specific model by ID from the API or cache.
+  Fetches a specific model by ID from the Model Registry.
 
   ## Options
-    - refresh: boolean - Whether to force refresh from API (default: false)
-    - api_key: string - Anthropic API key (optional)
+    - refresh: boolean - Ignored (models come from ReqLLM)
 
   Returns a tuple with {:ok, model} on success or {:error, reason} on failure.
   """
-  def model(model, opts \\ []) do
-    refresh = Keyword.get(opts, :refresh, false)
+  def model(model_id, _opts \\ []) do
+    # Delegate to Model Registry
+    alias Jido.AI.Model.Registry
 
-    # Check if we should refresh or try to get from cache first
-    if refresh do
-      fetch_model_from_api(model, opts)
-    else
-      # Try to get from cache first, fallback to API if not found
-      case Helpers.fetch_model_from_cache(@provider_path, model, opts, &process_single_model/2) do
-        {:ok, model} ->
-          {:ok, model}
+    case Registry.list_models(@provider_id) do
+      {:ok, models} ->
+        case Enum.find(models, fn m -> m.id == model_id or m.name == model_id end) do
+          nil -> {:error, "Model not found: #{model_id}"}
+          model -> {:ok, model}
+        end
 
-        {:error, _reason} ->
-          # If not found in cache, try API
-          fetch_model_from_api(model, opts)
-      end
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -132,7 +109,7 @@ defmodule Jido.AI.Provider.Anthropic do
   end
 
   @impl true
-  def base_url() do
+  def base_url do
     @base_url
   end
 
@@ -173,7 +150,7 @@ defmodule Jido.AI.Provider.Anthropic do
       {:error, "model is required for Anthropic models"}
     else
       # Create the model struct with all necessary fields
-      model = %Model{
+      model_struct = %Model{
         id: Keyword.get(opts, :id, "anthropic_#{model}"),
         name: Keyword.get(opts, :name, "Anthropic #{model}"),
         provider: :anthropic,
@@ -190,127 +167,16 @@ defmodule Jido.AI.Provider.Anthropic do
         },
         description: Keyword.get(opts, :description, "Anthropic Claude model"),
         created: System.system_time(:second),
-        endpoints: []
+        endpoints: [],
+        reqllm_id: Model.compute_reqllm_id(:anthropic, model)
       }
 
-      {:ok, model}
+      {:ok, model_struct}
     end
   end
 
   @impl true
   def transform_model_to_clientmodel(_client_atom, _model) do
     {:error, "Not implemented yet"}
-  end
-
-  # Private helper functions
-
-  defp fetch_and_cache_models(opts) do
-    provider = definition()
-    url = base_url() <> "/models"
-    headers = request_headers(opts)
-
-    Helpers.fetch_and_cache_models(provider, url, headers, @provider_path, &process_models/1)
-  end
-
-  defp fetch_model_from_api(model, opts) do
-    provider = definition()
-    url = base_url() <> "/models/#{model}"
-    headers = request_headers(opts)
-
-    # Ensure the models directory exists
-    base_dir = Jido.AI.Provider.base_dir()
-    provider_dir = Path.join(base_dir, @provider_path)
-    model_dir = Path.join(provider_dir, "models")
-
-    # Create the models directory if it doesn't exist
-    unless File.exists?(model_dir) do
-      File.mkdir_p!(model_dir)
-    end
-
-    Helpers.fetch_model_from_api(
-      provider,
-      url,
-      headers,
-      model,
-      @provider_path,
-      &process_single_model/2,
-      opts
-    )
-  end
-
-  defp process_models(models) when is_list(models) do
-    Enum.map(models, fn model ->
-      %{
-        id: model["id"],
-        name: model["display_name"] || model["name"] || model["id"],
-        description: model["description"] || "",
-        created: model["created_at"] || model["created"],
-        max_tokens: model["max_tokens_to_sample"],
-        context_length: model["context_window"],
-        capabilities: extract_capabilities(model),
-        tier: determine_tier(model),
-        provider: @provider_id
-      }
-    end)
-  end
-
-  defp process_models(_), do: []
-
-  defp process_single_model(model_data, model) when is_map(model_data) do
-    %{
-      id: model_data["id"] || model,
-      name: model_data["display_name"] || model_data["name"] || model_data["id"] || model,
-      description: model_data["description"] || "",
-      created: model_data["created_at"] || model_data["created"],
-      max_tokens: model_data["max_tokens_to_sample"],
-      context_length: model_data["context_window"],
-      capabilities: extract_capabilities(model_data),
-      tier: determine_tier(model_data),
-      provider: @provider_id
-    }
-  end
-
-  defp process_single_model(_, model),
-    do: %{id: model, name: model, provider: @provider_id}
-
-  # Extract capabilities based on the model's name and other properties
-  defp extract_capabilities(model) do
-    model = model["id"] || ""
-
-    %{
-      # All Claude models support chat
-      chat: true,
-      # Anthropic doesn't offer embedding models
-      embedding: false,
-      # Claude 3 models support image input
-      image: String.contains?(model, "opus") || String.contains?(model, "sonnet"),
-      # Claude 3 models support vision
-      vision: String.contains?(model, "opus") || String.contains?(model, "sonnet"),
-      # Claude 3 models are multimodal
-      multimodal: String.contains?(model, "opus") || String.contains?(model, "sonnet"),
-      # Anthropic doesn't offer audio models
-      audio: false,
-      # All Claude models have good code capabilities
-      code: true
-    }
-  end
-
-  # Determine the tier based on model characteristics
-  defp determine_tier(model) do
-    model = model["id"] || ""
-
-    cond do
-      # Advanced tier for top models
-      String.contains?(model, "opus") ->
-        %{value: :advanced, description: "High-performance model"}
-
-      # Standard tier for mid-range models
-      String.contains?(model, "sonnet") ->
-        %{value: :standard, description: "Balanced performance and cost"}
-
-      # Basic tier for everything else
-      true ->
-        %{value: :basic, description: "Entry-level model"}
-    end
   end
 end

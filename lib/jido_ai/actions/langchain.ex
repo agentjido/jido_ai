@@ -143,10 +143,10 @@ defmodule Jido.AI.Actions.Langchain do
   require Logger
   alias Jido.AI.Model
   alias Jido.AI.Prompt
-  alias LangChain.ChatModels.{ChatOpenAI, ChatAnthropic}
-  alias LangChain.Message
   alias LangChain.Chains.LLMChain
+  alias LangChain.ChatModels.{ChatAnthropic, ChatOpenAI}
   alias LangChain.Function
+  alias LangChain.Message
 
   @valid_providers [:openai, :anthropic, :openrouter]
 

@@ -1,6 +1,6 @@
 defmodule Examples.ToolAgent02 do
   alias Jido.AI.Agent
-  alias Jido.Actions.Arithmetic.{Add, Subtract, Multiply, Divide}
+  alias Jido.Actions.Arithmetic.{Add, Divide, Multiply, Subtract}
   require Logger
 
   def demo do

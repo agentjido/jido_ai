@@ -3,8 +3,8 @@ defmodule JidoTest.AI.Prompt.TemplateTest do
   doctest Jido.AI.Prompt.Template
   @moduletag :capture_log
 
-  alias Jido.AI.Prompt.Template
   alias Jido.AI.Prompt.MessageItem
+  alias Jido.AI.Prompt.Template
 
   describe "new/1 and new!/1" do
     test "creates a template with defaults" do

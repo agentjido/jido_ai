@@ -2,10 +2,10 @@ defmodule Jido.AI.Actions.Instructor.ChatResponseTest do
   use ExUnit.Case
   use Mimic
 
-  alias Jido.AI.Actions.Instructor.ChatResponse
   alias Jido.AI.Actions.Instructor
-  alias Jido.AI.Prompt
+  alias Jido.AI.Actions.Instructor.ChatResponse
   alias Jido.AI.Model
+  alias Jido.AI.Prompt
 
   @moduletag :capture_log
 

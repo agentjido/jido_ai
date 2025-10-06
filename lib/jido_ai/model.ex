@@ -2,6 +2,8 @@ defmodule Jido.AI.Model do
   use TypedStruct
   require Logger
 
+  alias Jido.AI.Provider
+
   typedstruct module: Architecture do
     field(:instruct_type, String.t() | nil)
     field(:modality, String.t())
@@ -41,7 +43,68 @@ defmodule Jido.AI.Model do
     field(:temperature, float(), default: 0.7)
     field(:max_tokens, non_neg_integer(), default: 1024)
     field(:max_retries, non_neg_integer(), default: 0)
+    # ReqLLM integration field
+    field(:reqllm_id, String.t())
+    # Enhanced ReqLLM metadata fields
+    field(:capabilities, map())
+    field(:modalities, map())
+    field(:cost, map())
   end
+
+  @doc """
+  Computes the ReqLLM ID from provider and model information.
+
+  The ReqLLM ID follows the format "provider:model" which is used by ReqLLM
+  to identify specific models across different providers.
+
+  ## Parameters
+    - provider: atom representing the provider (e.g., :openai, :anthropic)
+    - model: string representing the model name (e.g., "gpt-4o", "claude-3-5-haiku")
+
+  ## Returns
+    - String in "provider:model" format
+
+  ## Examples
+
+      iex> Jido.AI.Model.compute_reqllm_id(:openai, "gpt-4o")
+      "openai:gpt-4o"
+
+      iex> Jido.AI.Model.compute_reqllm_id(:anthropic, "claude-3-5-haiku")
+      "anthropic:claude-3-5-haiku"
+  """
+  @spec compute_reqllm_id(atom(), String.t()) :: String.t()
+  def compute_reqllm_id(provider, model) when is_atom(provider) and is_binary(model) do
+    "#{provider}:#{model}"
+  end
+
+  def compute_reqllm_id(provider, model) do
+    "#{provider}:#{model}"
+  end
+
+  @doc """
+  Ensures a model struct has the reqllm_id field populated.
+
+  If the reqllm_id is missing or nil, it will be computed from the provider and model fields.
+  If provider or model is missing, the reqllm_id will remain as is.
+
+  ## Parameters
+    - model: A %Jido.AI.Model{} struct
+
+  ## Returns
+    - Updated model struct with reqllm_id populated
+  """
+  @spec ensure_reqllm_id(__MODULE__.t()) :: __MODULE__.t()
+  def ensure_reqllm_id(%__MODULE__{reqllm_id: nil, provider: provider, model: model} = struct)
+      when not is_nil(provider) and not is_nil(model) do
+    %{struct | reqllm_id: compute_reqllm_id(provider, model)}
+  end
+
+  def ensure_reqllm_id(%__MODULE__{reqllm_id: "", provider: provider, model: model} = struct)
+      when not is_nil(provider) and not is_nil(model) do
+    %{struct | reqllm_id: compute_reqllm_id(provider, model)}
+  end
+
+  def ensure_reqllm_id(%__MODULE__{} = struct), do: struct
 
   @doc """
   Creates a model struct from various input formats.
@@ -50,6 +113,8 @@ defmodule Jido.AI.Model do
   - An existing %Jido.AI.Model{} struct (pass-through)
   - A tuple of {provider, opts} where provider is an atom and opts is a keyword list
   - A category tuple of {:category, category, class}
+
+  The function automatically computes and sets the `reqllm_id` field for ReqLLM integration.
 
   ## Parameters
     - input: The input to create a model from
@@ -61,7 +126,7 @@ defmodule Jido.AI.Model do
   ## Examples
 
       iex> Jido.AI.Model.from({:anthropic, [model: "claude-3-5-haiku"]})
-      {:ok, %Jido.AI.Model{provider: :anthropic, model: "claude-3-5-haiku", ...}}
+      {:ok, %Jido.AI.Model{provider: :anthropic, model: "claude-3-5-haiku", reqllm_id: "anthropic:claude-3-5-haiku", ...}}
 
       iex> Jido.AI.Model.from(%Jido.AI.Model{provider: :openai, model: "gpt-4"})
       {:ok, %Jido.AI.Model{provider: :openai, model: "gpt-4", ...}}
@@ -71,11 +136,11 @@ defmodule Jido.AI.Model do
     case input do
       # Already a Model struct
       %__MODULE__{} = model ->
-        {:ok, model}
+        {:ok, ensure_reqllm_id(model)}
 
       # A provider tuple
       {provider, opts} when is_atom(provider) and is_list(opts) ->
-        case Jido.AI.Provider.get_adapter_by_id(provider) do
+        case Provider.get_adapter_by_id(provider) do
           {:ok, adapter_module} ->
             adapter_module.build(opts)
 
@@ -87,6 +152,8 @@ defmodule Jido.AI.Model do
       {:category, category, class} when is_atom(category) and is_atom(class) ->
         # For now, create a basic model with category info
         # This could be enhanced to map to specific providers based on category/class
+        model_name = "#{category}_#{class}"
+
         {:ok,
          %__MODULE__{
            id: "#{category}_#{class}",
@@ -101,7 +168,8 @@ defmodule Jido.AI.Model do
            endpoints: [],
            base_url: "",
            api_key: "",
-           model: "#{category}_#{class}"
+           model: model_name,
+           reqllm_id: compute_reqllm_id(category, model_name)
          }}
 
       other ->

@@ -2,10 +2,10 @@ defmodule Jido.AI.Actions.Instructor.BooleanResponseTest do
   use ExUnit.Case
   use Mimic
 
-  alias Jido.AI.Actions.Instructor.BooleanResponse
   alias Jido.AI.Actions.Instructor
-  alias Jido.AI.Prompt
+  alias Jido.AI.Actions.Instructor.BooleanResponse
   alias Jido.AI.Model
+  alias Jido.AI.Prompt
 
   @moduletag :capture_log
 

@@ -2,9 +2,9 @@ defmodule Jido.Examples.InstructorDemo do
   @moduledoc """
   A demo module showcasing how to use Jido.AI with Instructor for structured prompting.
   """
-  alias Jido.AI.Prompt
-  alias Jido.AI.Actions.Instructor.{ChatCompletion, ChoiceResponse, BooleanResponse}
+  alias Jido.AI.Actions.Instructor.{BooleanResponse, ChatCompletion, ChoiceResponse}
   alias Jido.AI.Model
+  alias Jido.AI.Prompt
 
   defmodule ResponseSchema do
     use Ecto.Schema

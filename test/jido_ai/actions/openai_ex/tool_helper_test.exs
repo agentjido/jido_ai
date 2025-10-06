@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.OpenaiEx.ToolHelperTest do
   use ExUnit.Case, async: true
-  alias Jido.AI.Actions.OpenaiEx.ToolHelper
   alias Jido.Actions.Arithmetic.Add
+  alias Jido.AI.Actions.OpenaiEx.ToolHelper
 
   @moduletag :capture_log
 

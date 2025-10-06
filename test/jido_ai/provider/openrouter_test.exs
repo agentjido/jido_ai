@@ -2,8 +2,8 @@ defmodule Jido.AI.Provider.OpenRouterTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.Provider.OpenRouter
   alias Jido.AI.Keyring
+  alias Jido.AI.Provider.OpenRouter
 
   @moduletag :capture_log
   @moduletag :tmp_dir

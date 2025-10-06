@@ -1,11 +1,11 @@
 defmodule LangchainDemo do
-  alias LangChain.ChatModels.ChatOpenAI
-  alias LangChain.ChatModels.ChatAnthropic
-  alias LangChain.Message
-  alias LangChain.Chains.LLMChain
-  alias Jido.AI.Keyring
-  alias LangChain.Function
   alias Jido.Actions.Arithmetic.{Add, Subtract}
+  alias Jido.AI.Keyring
+  alias LangChain.Chains.LLMChain
+  alias LangChain.ChatModels.ChatAnthropic
+  alias LangChain.ChatModels.ChatOpenAI
+  alias LangChain.Function
+  alias LangChain.Message
 
   def chat do
     # Create a chat model

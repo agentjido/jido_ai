@@ -2,15 +2,15 @@ defmodule JidoTest.AI.Actions.LangchainTest do
   use ExUnit.Case, async: false
   use Mimic
   require Logger
+  alias Finch
+  alias Jido.Actions.Arithmetic.Add
   alias Jido.AI.Actions.Langchain, as: LangchainAction
   alias Jido.AI.Model
   alias Jido.AI.Prompt
-  alias LangChain.ChatModels.ChatOpenAI
-  alias LangChain.ChatModels.ChatAnthropic
-  alias LangChain.Message
   alias LangChain.Chains.LLMChain
-  alias Jido.Actions.Arithmetic.Add
-  alias Finch
+  alias LangChain.ChatModels.ChatAnthropic
+  alias LangChain.ChatModels.ChatOpenAI
+  alias LangChain.Message
 
   @moduletag :capture_log
 

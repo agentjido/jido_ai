@@ -6,10 +6,10 @@ defmodule JidoTest.AI.Actions.Langchain.ToolResponseTest do
   @moduletag :unit
   @moduletag :capture_log
 
-  alias Jido.AI.Actions.Langchain.ToolResponse
-  alias Jido.AI.Actions.Langchain, as: LangchainAction
-  alias Jido.AI.Prompt
   alias Jido.Actions.Arithmetic.{Add, Subtract}
+  alias Jido.AI.Actions.Langchain, as: LangchainAction
+  alias Jido.AI.Actions.Langchain.ToolResponse
+  alias Jido.AI.Prompt
 
   setup :set_mimic_global
 

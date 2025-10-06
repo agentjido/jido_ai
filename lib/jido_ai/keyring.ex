@@ -29,6 +29,9 @@ defmodule Jido.AI.Keyring do
   use GenServer
   require Logger
 
+  alias Jido.AI.Keyring.JidoKeysHybrid
+  alias Jido.AI.ReqLlmBridge.KeyringIntegration
+
   @session_registry :jido_ai_keyring_sessions
   @default_name __MODULE__
   @default_env_table_prefix :jido_ai_env_cache
@@ -118,26 +121,24 @@ defmodule Jido.AI.Keyring do
 
   @doc false
   defp load_from_env do
-    try do
-      env_dir_prefix = Path.expand("./envs/")
-      current_env = get_environment()
+    env_dir_prefix = Path.expand("./envs/")
+    current_env = get_environment()
 
-      env_sources =
-        Dotenvy.source!([
-          Path.join(File.cwd!(), ".env"),
-          Path.absname(".env", env_dir_prefix),
-          Path.absname(".#{current_env}.env", env_dir_prefix),
-          Path.absname(".#{current_env}.overrides.env", env_dir_prefix),
-          System.get_env()
-        ])
+    env_sources =
+      Dotenvy.source!([
+        Path.join(File.cwd!(), ".env"),
+        Path.absname(".env", env_dir_prefix),
+        Path.absname(".#{current_env}.env", env_dir_prefix),
+        Path.absname(".#{current_env}.overrides.env", env_dir_prefix),
+        System.get_env()
+      ])
 
-      Enum.reduce(env_sources, %{}, fn {key, value}, acc ->
-        atom_key = env_var_to_atom(key)
-        Map.put(acc, atom_key, value)
-      end)
-    rescue
-      _ -> %{}
-    end
+    Enum.reduce(env_sources, %{}, fn {key, value}, acc ->
+      atom_key = env_var_to_atom(key)
+      Map.put(acc, atom_key, value)
+    end)
+  rescue
+    _ -> %{}
   end
 
   @doc false
@@ -195,10 +196,54 @@ defmodule Jido.AI.Keyring do
   """
   @spec get(GenServer.server(), atom(), term(), pid()) :: term()
   def get(server \\ @default_name, key, default \\ nil, pid \\ self()) when is_atom(key) do
+    # Enhanced: Use JidoKeys hybrid integration for better session fallback
     case get_session_value(server, key, pid) do
-      nil -> get_env_value(server, key, default)
-      value -> value
+      nil ->
+        # Delegate to JidoKeys hybrid for enhanced security and runtime config
+        JidoKeysHybrid.get_global_value(key, default)
+
+      value ->
+        # Apply JidoKeys filtering to session values for security
+        JidoKeysHybrid.filter_sensitive_data(value)
     end
+  end
+
+  @doc """
+  Gets a value with ReqLLM integration support.
+
+  This function extends the standard get/4 with ReqLLM integration, supporting
+  per-request key overrides and unified key precedence across both Jido and ReqLLM systems.
+
+  ## Parameters
+
+    * `server` - The server to query (default: #{@default_name})
+    * `key` - The key to look up (as an atom)
+    * `default` - The default value if key is not found
+    * `pid` - The process ID to check session values for (default: current process)
+    * `req_options` - Per-request options (may contain :api_key overrides for ReqLLM calls)
+
+  Returns the value if found, otherwise returns the default value.
+
+  ## Examples
+
+      # Standard usage (backward compatible)
+      api_key = Keyring.get_with_reqllm(:openai_api_key, "default")
+
+      # With per-request override for ReqLLM calls
+      options = %{api_key: "override-key"}
+      api_key = Keyring.get_with_reqllm(:openai_api_key, "default", self(), options)
+  """
+  @spec get_with_reqllm(GenServer.server(), atom(), term(), pid(), map()) :: term()
+  def get_with_reqllm(
+        server \\ @default_name,
+        key,
+        default \\ nil,
+        pid \\ self(),
+        req_options \\ %{}
+      )
+      when is_atom(key) do
+    # Use the KeyringIntegration module for unified key resolution
+    KeyringIntegration.get(server, key, default, pid, req_options)
   end
 
   @doc """
@@ -214,30 +259,35 @@ defmodule Jido.AI.Keyring do
   """
   @spec get_env_value(GenServer.server(), atom(), term()) :: term()
   def get_env_value(server \\ @default_name, key, default \\ nil) when is_atom(key) do
-    # Get the ETS table reference from the GenServer state
-    case GenServer.call(server, :get_env_table) do
-      {:error, :env_table_not_found} ->
-        default
+    # Enhanced: Try JidoKeys first, then fallback to ETS for compatibility
+    case JidoKeysHybrid.get_global_value(key, nil) do
+      nil ->
+        # Fallback to existing ETS-based lookup for backward compatibility
+        get_env_value_from_ets(server, key, default)
 
-      env_table when is_atom(env_table) or is_reference(env_table) ->
-        # First try the regular key in ETS (fast lookup)
-        case :ets.lookup(env_table, key) do
-          [{^key, value}] ->
-            value
-
-          [] ->
-            # If not found, try the LiveBook prefixed version
-            livebook_key = to_livebook_key(key)
-
-            case :ets.lookup(env_table, livebook_key) do
-              [{^livebook_key, value}] -> value
-              [] -> default
-            end
-        end
-
-      _ ->
-        default
+      value ->
+        value
     end
+  end
+
+  @doc """
+  Gets environment-only values with ReqLLM integration support.
+
+  This function extends get_env_value/3 with ReqLLM awareness for better
+  integration with provider-specific environment variables.
+
+  ## Parameters
+
+    * `server` - The server to query (default: #{@default_name})
+    * `key` - The key to look up (as an atom)
+    * `default` - The default value if key is not found
+
+  Returns the environment value if found, otherwise returns the default value.
+  """
+  @spec get_env_value_with_reqllm(GenServer.server(), atom(), term()) :: term()
+  def get_env_value_with_reqllm(server \\ @default_name, key, default \\ nil) when is_atom(key) do
+    # Use the KeyringIntegration module for ReqLLM-aware environment resolution
+    KeyringIntegration.get_env_value(server, key, default)
   end
 
   @doc """
@@ -255,8 +305,14 @@ defmodule Jido.AI.Keyring do
   """
   @spec set_session_value(GenServer.server(), atom(), term(), pid()) :: :ok
   def set_session_value(server \\ @default_name, key, value, pid \\ self()) when is_atom(key) do
+    # Enhanced: Apply JidoKeys security filtering before storing session values
+    filtered_value = JidoKeysHybrid.filter_sensitive_data(value)
+
     registry = GenServer.call(server, :get_registry)
-    :ets.insert(registry, {{pid, key}, value})
+    :ets.insert(registry, {{pid, key}, filtered_value})
+
+    # Enhanced: Log session operations with security filtering
+    JidoKeysHybrid.safe_log_key_operation(key, :set_session, :keyring)
     :ok
   end
 
@@ -314,6 +370,35 @@ defmodule Jido.AI.Keyring do
     registry = GenServer.call(server, :get_registry)
     :ets.match_delete(registry, {{pid, :_}, :_})
     :ok
+  end
+
+  @doc """
+  Sets a runtime configuration value through JidoKeys integration.
+
+  This function provides enhanced runtime configuration capabilities through
+  JidoKeys.put/2, allowing for dynamic configuration updates with security filtering.
+
+  ## Parameters
+
+    * `key` - The configuration key (atom or string)
+    * `value` - The value to set (must be a binary)
+
+  ## Returns
+
+    * `:ok` on success
+    * `{:error, reason}` on failure
+
+  ## Examples
+
+      iex> Keyring.set_runtime_value(:openai_api_key, "sk-...")
+      :ok
+
+      iex> Keyring.set_runtime_value("test_config", "test_value")
+      :ok
+  """
+  @spec set_runtime_value(atom() | String.t(), String.t()) :: :ok | {:error, term()}
+  def set_runtime_value(key, value) when is_binary(value) do
+    JidoKeysHybrid.set_runtime_value(key, value)
   end
 
   @impl true
@@ -379,11 +464,9 @@ defmodule Jido.AI.Keyring do
   """
   @spec get_env_var(String.t(), term()) :: String.t() | term()
   def get_env_var(key, default \\ nil) do
-    try do
-      Dotenvy.env!(key, :string)
-    rescue
-      _ -> default
-    end
+    Dotenvy.env!(key, :string)
+  rescue
+    _ -> default
   end
 
   @doc """
@@ -409,6 +492,35 @@ defmodule Jido.AI.Keyring do
   end
 
   def terminate(_reason, _state), do: :ok
+
+  @doc false
+  @spec get_env_value_from_ets(GenServer.server(), atom(), term()) :: term()
+  defp get_env_value_from_ets(server, key, default) do
+    # Original ETS-based lookup logic preserved for backward compatibility
+    case GenServer.call(server, :get_env_table) do
+      {:error, :env_table_not_found} ->
+        default
+
+      env_table when is_atom(env_table) or is_reference(env_table) ->
+        # First try the regular key in ETS (fast lookup)
+        case :ets.lookup(env_table, key) do
+          [{^key, value}] ->
+            value
+
+          [] ->
+            # If not found, try the LiveBook prefixed version
+            livebook_key = to_livebook_key(key)
+
+            case :ets.lookup(env_table, livebook_key) do
+              [{^livebook_key, value}] -> value
+              [] -> default
+            end
+        end
+
+      _ ->
+        default
+    end
+  end
 
   @doc false
   @spec to_livebook_key(atom()) :: atom()
