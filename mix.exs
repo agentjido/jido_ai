@@ -66,7 +66,7 @@ defmodule Jido.Ai.MixProject do
       {:req, "~> 0.5.8"},
       {:openai_ex, "~> 0.9.0"},
       {:instructor, "~> 0.1.0"},
-      {:langchain, "~> 0.3.1"},
+      {:langchain, "~> 0.4.0"},
 
       # Testing
       {:credo, "~> 1.7", only: [:dev, :test]},
