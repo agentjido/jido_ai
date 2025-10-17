@@ -2,26 +2,147 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
   @shortdoc "Synchronize model data from models.dev API"
 
   @moduledoc """
-  Simplified model synchronization task.
+  Synchronize AI model catalog and pricing data from the models.dev API.
 
-  This task fetches model data from models.dev API (which now includes cost data)
-  and saves provider JSON files to the /priv directory.
+  This task fetches comprehensive model information including capabilities, pricing,
+  and provider details from models.dev API and generates local JSON files for use
+  by the ReqLLM library. Essential for keeping model data up-to-date.
 
   ## Usage
 
-      # Sync models from models.dev
+      mix req_llm.model_sync [options]
+
+  ## Options
+
+      --verbose               Show detailed progress and statistics during sync
+
+  ## Examples
+
+      # Basic synchronization (quiet mode)
       mix req_llm.model_sync
 
-      # Verbose output
+      # Detailed synchronization with progress information
       mix req_llm.model_sync --verbose
+
+  ## What This Task Does
+
+  1. **Fetches Model Data**: Downloads complete model catalog from models.dev API
+  2. **Processes Providers**: Extracts and organizes data by AI provider
+  3. **Merges Local Patches**: Applies any local model customizations
+  4. **Generates Files**: Creates JSON files for each provider
+  5. **Updates Code**: Regenerates ValidProviders module with available providers
 
   ## Output Structure
 
-      priv/models_dev/providers/
-      ├── anthropic.json         # Anthropic models with cost data
-      ├── openai.json            # OpenAI models with cost data
-      ├── google.json            # Google models with cost data
-      └── ...                    # All other providers
+  After running, the following files are created/updated:
+
+      priv/models_dev/
+      ├── anthropic.json         # Anthropic models (Claude, etc.)
+      ├── openai.json            # OpenAI models (GPT-4, GPT-3.5, etc.)
+      ├── google.json            # Google models (Gemini, etc.)
+      ├── groq.json              # Groq models
+      ├── xai.json               # xAI models (Grok, etc.)
+      ├── openrouter.json        # OpenRouter proxy models
+      └── ...                    # Additional providers as available
+
+      lib/req_llm/provider/generated/
+      └── valid_providers.ex     # Generated list of valid provider atoms
+
+  ## Data Sources
+
+  **Primary**: models.dev API (https://models.dev/api.json)
+  - Official model specifications
+  - Current pricing information  
+  - Provider configuration details
+  - Model capabilities and limits
+
+  **Local Patches**: priv/models_local/*.json (optional)
+  - Custom model definitions
+  - Provider-specific overrides
+  - Local testing models
+  - Model exclusions
+
+  ## Provider Information Included
+
+  For each provider, the following data is synchronized:
+
+      - Provider ID and display name
+      - Base API URL and authentication requirements
+      - Environment variable names for API keys
+      - Complete model catalog with IDs and names
+      - Pricing information (input/output token costs)
+      - Model capabilities (context length, supported features)
+      - Provider-specific configuration requirements
+
+  ## Local Customization
+
+  You can add local model definitions by creating JSON files in:
+
+      priv/models_local/
+      ├── custom_provider.json
+      └── model_overrides.json
+
+  Local patch files should follow this structure:
+
+      {
+        "provider": {
+          "id": "custom_provider",
+          "name": "My Custom Provider"
+        },
+        "models": [
+          {
+            "id": "custom-model-1",
+            "name": "Custom Model 1",
+            "pricing": {
+              "input": 0.001,
+              "output": 0.002
+            }
+          }
+        ]
+      }
+
+  To exclude models from a provider:
+
+      {
+        "provider": {
+          "id": "xai"
+        },
+        "exclude": [
+          "grok-vision-beta"
+        ]
+      }
+
+  ## When to Run This Task
+
+  - **After library updates**: When ReqLLM is updated to ensure model compatibility
+  - **New provider support**: When providers add new models or change pricing
+  - **Regular maintenance**: Weekly or monthly to keep pricing current
+  - **Before production**: Always sync before deploying to production
+
+  ## Error Handling
+
+  Common issues and solutions:
+
+  - **Network errors**: Check internet connection and models.dev API status
+  - **API changes**: models.dev API structure may change, requiring code updates  
+  - **File permissions**: Ensure write access to priv/ and lib/ directories
+  - **Invalid patches**: Local patch files must follow valid JSON structure
+
+  ## Integration with ReqLLM
+
+  The synchronized data is automatically used by:
+
+  - Provider validation during model selection
+  - Cost estimation for usage tracking
+  - Model capability detection
+  - Provider configuration and authentication setup
+
+  ## Development Notes
+
+  - Task runs in :dev environment by default
+  - Generates Elixir modules that are compiled into the application
+  - Provider IDs are normalized (kebab-case to snake_case atoms)
+  - Model data is pruned to remove unnecessary fields for efficiency
   """
 
   use Mix.Task
@@ -60,6 +181,9 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
       OptionParser.parse(args,
         switches: [
           verbose: :boolean
+        ],
+        aliases: [
+          v: :verbose
         ]
       )
 
@@ -125,16 +249,17 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
   defp save_provider_files(models_data, verbose?) do
     models_data
     |> Enum.each(fn {provider_id, provider_data} ->
-      models = process_provider_models(provider_data["models"] || %{}, provider_id)
+      normalized_id = normalize_provider_id(provider_id)
+      models = process_provider_models(provider_data["models"] || %{}, normalized_id)
 
       if not Enum.empty?(models) do
-        provider_file = Path.join(@providers_dir, "#{provider_id}.json")
-        config = get_provider_config(provider_id)
+        provider_file = Path.join(@providers_dir, "#{normalized_id}.json")
+        config = get_provider_config(normalized_id)
 
         provider_json = %{
           "provider" => %{
-            "id" => provider_id,
-            "name" => provider_data["name"] || format_provider_name(provider_id),
+            "id" => normalized_id,
+            "name" => provider_data["name"] || format_provider_name(normalized_id),
             "base_url" => config["base_url"],
             "env" => config["env"] || [],
             "doc" => provider_data["description"] || "AI model provider"
@@ -145,10 +270,21 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
         File.write!(provider_file, Jason.encode!(provider_json, pretty: true))
 
         if verbose? do
-          IO.puts("  Saved #{length(models)} models for #{provider_id}")
+          IO.puts("  Saved #{length(models)} models for #{normalized_id}")
         end
       end
     end)
+
+    # Generate ValidProviders module
+    provider_ids =
+      models_data
+      |> Enum.filter(fn {_provider_id, provider_data} ->
+        models = provider_data["models"] || %{}
+        not Enum.empty?(models)
+      end)
+      |> Enum.map(fn {provider_id, _provider_data} -> normalize_provider_id(provider_id) end)
+
+    generate_valid_providers_module(provider_ids, verbose?)
 
     :ok
   end
@@ -176,6 +312,10 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
     providers_data
     |> Enum.map(fn {_, provider} -> map_size(provider["models"] || %{}) end)
     |> Enum.sum()
+  end
+
+  defp normalize_provider_id(provider_id) do
+    String.replace(provider_id, "-", "_")
   end
 
   defp format_provider_name(provider_id) do
@@ -235,8 +375,8 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
 
       Enum.reduce(patch_files, models_data, fn patch_file, acc ->
         case load_patch_file(patch_file, verbose?) do
-          {:ok, provider_id, patch_data} ->
-            merge_patch_data(acc, provider_id, patch_data, verbose?)
+          {:ok, provider_data, patch_payload} ->
+            merge_patch_data(acc, provider_data, patch_payload, verbose?)
 
           {:error, _reason} ->
             acc
@@ -255,14 +395,23 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
     case File.read(patch_file) do
       {:ok, content} ->
         case Jason.decode(content) do
-          {:ok, %{"provider" => %{"id" => provider_id}, "models" => patch_models}} ->
+          {:ok, %{"provider" => provider_data, "models" => patch_models}} ->
             if verbose? do
               IO.puts(
                 "  Loading patch: #{Path.basename(patch_file)} (#{length(patch_models)} models)"
               )
             end
 
-            {:ok, provider_id, patch_models}
+            {:ok, provider_data, {:models, patch_models}}
+
+          {:ok, %{"provider" => provider_data, "exclude" => exclusions}} ->
+            if verbose? do
+              IO.puts(
+                "  Loading exclusions: #{Path.basename(patch_file)} (#{length(exclusions)} models)"
+              )
+            end
+
+            {:ok, provider_data, {:exclude, exclusions}}
 
           {:ok, _} ->
             IO.puts("Warning: Invalid patch file structure: #{patch_file}")
@@ -279,25 +428,74 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
     end
   end
 
-  defp merge_patch_data(models_data, provider_id, patch_models, verbose?) do
+  defp merge_patch_data(models_data, provider_data, {:exclude, exclusions}, verbose?) do
+    provider_id = normalize_provider_id(provider_data["id"])
+
     case Map.get(models_data, provider_id) do
       nil ->
         if verbose? do
-          IO.puts("    Skipping patch for unknown provider: #{provider_id}")
+          IO.puts("    Skipping exclusions for unknown provider: #{provider_id}")
         end
 
         models_data
 
-      provider_data ->
-        existing_models = provider_data["models"] || %{}
+      existing_provider_data ->
+        existing_models = existing_provider_data["models"] || %{}
 
-        # Convert patch models list to map for easier merging
+        exclusion_set = MapSet.new(exclusions)
+        filtered_models = Map.drop(existing_models, MapSet.to_list(exclusion_set))
+
+        if verbose? do
+          excluded_count = map_size(existing_models) - map_size(filtered_models)
+          IO.puts("    Provider #{provider_id}: excluded #{excluded_count} models")
+        end
+
+        updated_provider_data = Map.put(existing_provider_data, "models", filtered_models)
+        Map.put(models_data, provider_id, updated_provider_data)
+    end
+  end
+
+  defp merge_patch_data(models_data, provider_data, {:models, patch_models}, verbose?) do
+    provider_id = normalize_provider_id(provider_data["id"])
+
+    case Map.get(models_data, provider_id) do
+      nil ->
         patch_models_map =
           patch_models
           |> Map.new(fn model -> {model["id"], model} end)
 
-        # Merge patch models into existing models (patches override)
-        merged_models = Map.merge(existing_models, patch_models_map)
+        provider_config = get_provider_config(provider_id)
+
+        new_provider_data = %{
+          "provider" => %{
+            "id" => provider_id,
+            "name" => provider_data["name"] || format_provider_name(provider_id),
+            "doc" => provider_data["doc"] || "AI model provider",
+            "base_url" => provider_data["base_url"] || provider_config["base_url"],
+            "env" => provider_data["env"] || provider_config["env"] || []
+          },
+          "models" => patch_models_map
+        }
+
+        if verbose? do
+          IO.puts(
+            "    Provider #{provider_id}: created net-new provider with #{map_size(patch_models_map)} models"
+          )
+        end
+
+        Map.put(models_data, provider_id, new_provider_data)
+
+      existing_provider_data ->
+        existing_models = existing_provider_data["models"] || %{}
+
+        patch_models_map =
+          patch_models
+          |> Map.new(fn model -> {model["id"], model} end)
+
+        merged_models =
+          Map.merge(existing_models, patch_models_map, fn _key, existing, patch ->
+            Map.merge(existing, patch)
+          end)
 
         if verbose? do
           added_count =
@@ -311,8 +509,56 @@ defmodule Mix.Tasks.ReqLlm.ModelSync do
           )
         end
 
-        updated_provider_data = Map.put(provider_data, "models", merged_models)
+        updated_provider_data = Map.put(existing_provider_data, "models", merged_models)
         Map.put(models_data, provider_id, updated_provider_data)
+    end
+  end
+
+  defp generate_valid_providers_module(provider_ids, verbose?) do
+    if verbose? do
+      IO.puts("Generating ValidProviders module with #{length(provider_ids)} providers")
+    end
+
+    provider_atoms =
+      provider_ids
+      |> Enum.sort()
+      |> Enum.uniq()
+      |> Enum.map(&String.to_atom/1)
+
+    module_code =
+      """
+      defmodule ReqLLM.Provider.Generated.ValidProviders do
+        @moduledoc false
+
+        @doc \"\"\"
+        Returns the list of valid provider atoms.
+        
+        This module is auto-generated by the model sync task.
+        Do not edit manually.
+        \"\"\"
+        @providers #{inspect(provider_atoms, limit: :infinity)}
+        
+        @spec list() :: [atom()]
+        def list, do: @providers
+        
+        @spec member?(atom()) :: boolean()
+        def member?(atom), do: atom in @providers
+      end
+      """
+
+    # Ensure directory exists
+    generated_dir = "lib/req_llm/provider/generated"
+    File.mkdir_p!(generated_dir)
+
+    # Write the generated module
+    module_path = Path.join(generated_dir, "valid_providers.ex")
+    File.write!(module_path, module_code)
+
+    # Format the generated file
+    Code.format_file!(module_path) |> then(&File.write!(module_path, &1))
+
+    if verbose? do
+      IO.puts("  Generated #{module_path}")
     end
   end
 end

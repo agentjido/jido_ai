@@ -1,0 +1,81 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJpbnB1dCI6IkhlbGxvIHdvcmxkIiwibW9kZWwiOiJ0ZXh0LWVtYmVkZGluZy0zLWxhcmdlIn0="
+    },
+    "canonical_json": {
+      "input": "Hello world",
+      "model": "text-embedding-3-large"
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.openai.com/v1/embeddings"
+  },
+  "response": {
+    "body": {
+      "error": {
+        "code": "invalid_api_key",
+        "message": "Incorrect API key provided: test-key***enai. You can find your API key at https://platform.openai.com/account/api-keys.",
+        "param": null,
+        "type": "invalid_request_error"
+      }
+    },
+    "headers": {
+      "alt-svc": [
+        "h3=\":443\"; ma=86400"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "9897d56e9ebc8c0a-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json; charset=utf-8"
+      ],
+      "date": [
+        "Sat, 04 Oct 2025 21:39:45 GMT"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=6r7NHTo7nv0tLafgxFjyTnYxqtlFQw5m47OJWsUmG4I-1759613985-1.0.1.1-NkeL2JNjso0EcJNkK3pY1M0A2qHtwnlerptmC97GfbEmkMuEarB_In9zMN39gqLmi98Ba96TB_2VZt0RpSJG9CuCQ1kZOB8m8zwTA5n0uUo; path=/; expires=Sat, 04-Oct-25 22:09:45 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+        "_cfuvid=NnE3sK9R1_hYSGc8ttKGMwFHO85XVKa_rHun79K5HK0-1759613985132-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000; includeSubDomains; preload"
+      ],
+      "vary": [
+        "Origin"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-envoy-upstream-service-time": [
+        "23"
+      ],
+      "x-openai-proxy-wasm": [
+        "v0.1"
+      ],
+      "x-request-id": [
+        "req_d04198188fad49899768d201a7247fc5"
+      ]
+    },
+    "status": 401
+  }
+}

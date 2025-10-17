@@ -1,0 +1,138 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfY29tcGxldGlvbl90b2tlbnMiOjEwMDAsIm1lc3NhZ2VzIjpbeyJjb250ZW50IjoiVGVsbCBtZSBhIGpva2UgYWJvdXQgY2F0cyIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6Imdyb2stY29kZS1mYXN0LTEiLCJzZWVkIjo0Miwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuMCwidG9vbHMiOlt7ImZ1bmN0aW9uIjp7ImRlc2NyaXB0aW9uIjoiR2V0IGN1cnJlbnQgd2VhdGhlciBpbmZvcm1hdGlvbiBmb3IgYSBsb2NhdGlvbiIsIm5hbWUiOiJnZXRfd2VhdGhlciIsInBhcmFtZXRlcnMiOnsiYWRkaXRpb25hbFByb3BlcnRpZXMiOmZhbHNlLCJwcm9wZXJ0aWVzIjp7ImxvY2F0aW9uIjp7InR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbImxvY2F0aW9uIl0sInR5cGUiOiJvYmplY3QifX0sInR5cGUiOiJmdW5jdGlvbiJ9XX0="
+    },
+    "canonical_json": {
+      "max_completion_tokens": 1000,
+      "messages": [
+        {
+          "content": "Tell me a joke about cats",
+          "role": "user"
+        }
+      ],
+      "model": "grok-code-fast-1",
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0,
+      "tools": [
+        {
+          "function": {
+            "description": "Get current weather information for a location",
+            "name": "get_weather",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "location": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "location"
+              ],
+              "type": "object"
+            }
+          },
+          "type": "function"
+        }
+      ]
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.x.ai/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "Why don't cats play poker in the jungle? Too many cheetahs!",
+            "refusal": null,
+            "role": "assistant"
+          }
+        }
+      ],
+      "created": 1760471281,
+      "id": "3e155064-1dce-2d5a-42f3-9faf075e2b89_us-east-1",
+      "model": "grok-code-fast-1",
+      "object": "chat.completion",
+      "system_fingerprint": "fp_10f00c862d",
+      "usage": {
+        "completion_tokens": 15,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 161,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "prompt_tokens": 385,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 320,
+          "image_tokens": 0,
+          "text_tokens": 385
+        },
+        "total_tokens": 561
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "access-control-expose-headers": [
+        "*"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "98e997855ebaf8d7-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Tue, 14 Oct 2025 19:48:04 GMT"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=DZpO8mWzoLkQUEa439OXazC26f2_ZYQUTSSGQbrPdmA-1760471284-1.0.1.1-6KaOuZhUTUuVVu1uBqDxp0ZSJWcO2afHGaiYy_vXfsKpWFJAVdV8GILxlKVjlA6dyPcOF8jDeq9SGxqJgsgCURN0M0NshM0RTHWOMVGat5g; path=/; expires=Tue, 14-Oct-25 20:18:04 GMT; domain=.x.ai; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "origin, access-control-request-method, access-control-request-headers"
+      ],
+      "x-request-id": [
+        "00-2e2377da12d322a31d41353ca1c79739-a1a7fc4b0059ce68-01"
+      ],
+      "x-zero-data-retention": [
+        "false"
+      ]
+    },
+    "status": 200
+  }
+}

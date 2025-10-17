@@ -4,38 +4,53 @@ title: "[Bug]: "
 labels: ["bug"]
 
 body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider (if applicable)
+      placeholder: "anthropic, openai, google, etc."
+    validations:
+      required: false
+
+  - type: input
+    id: model
+    attributes:
+      label: Model (if applicable)
+      placeholder: "claude-3-5-sonnet-20241022"
+    validations:
+      required: false
+
   - type: textarea
     id: bug_description
     attributes:
       label: Bug Description
-      description: Clear description of the bug
+      description: What's broken?
     validations:
       required: true
 
   - type: textarea
-    id: reproduction_steps
+    id: reproduction
     attributes:
-      label: Steps to Reproduce
+      label: Reproduction Code
       placeholder: |
-        1. Step one
-        2. Step two
-        3. See error
+        ```elixir
+        {:ok, response} = ReqLLM.generate_text("provider:model", "prompt")
+        ```
+      render: elixir
     validations:
       required: true
 
   - type: textarea
-    id: expected_behavior
+    id: expected
     attributes:
       label: Expected Behavior
-      description: What should happen?
     validations:
       required: true
 
   - type: textarea
-    id: actual_behavior
+    id: actual
     attributes:
       label: Actual Behavior
-      description: What actually happens?
     validations:
       required: true
 
@@ -44,16 +59,8 @@ body:
     attributes:
       label: Environment
       placeholder: |
-        - Package version: x.x.x
-        - Elixir version: x.x.x
-        - OTP version: x.x
+        - ReqLLM: 1.0.0-rc.5
+        - Elixir: 1.17.0
+        - OTP: 27
     validations:
       required: true
-
-  - type: textarea
-    id: additional_context
-    attributes:
-      label: Additional Context
-      description: Any other relevant information
-    validations:
-      required: false

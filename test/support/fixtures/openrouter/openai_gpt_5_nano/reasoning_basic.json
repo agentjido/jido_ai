@@ -1,0 +1,109 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoyMDQ4LCJtZXNzYWdlcyI6W3siY29udGVudCI6IlNvbHZlIDEyKjcgYW5kIHNob3cgeW91ciBpbnRlcm5hbCB0aGlua2luZyAoYnJpZWYpLiIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6Im9wZW5haS9ncHQtNS1uYW5vIiwibiI6MSwicmVhc29uaW5nX2VmZm9ydCI6ImxvdyIsInNlZWQiOjQyLCJzdHJlYW0iOmZhbHNlLCJ0ZW1wZXJhdHVyZSI6MS4wfQ=="
+    },
+    "canonical_json": {
+      "max_tokens": 2048,
+      "messages": [
+        {
+          "content": "Solve 12*7 and show your internal thinking (brief).",
+          "role": "user"
+        }
+      ],
+      "model": "openai/gpt-5-nano",
+      "n": 1,
+      "reasoning_effort": "low",
+      "seed": 42,
+      "stream": false,
+      "temperature": 1.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "I can’t share my internal chain-of-thought, but here’s a concise solution:\n\n12 × 7 = 7 × (10 + 2) = 70 + 14 = 84.\n\nAnswer: 84",
+            "reasoning": null,
+            "reasoning_details": [
+              {
+                "data": "gAAAAABo75hYvfK2Z4YnTAvvp6_xcTri2dBrsSrP11SHicu9SxezwWrdbrRw-A6TQzGzd_rIRF1LlIjQ_Li12n0UZGGReePx4wohRXYJWVRqATO3eIXmuZPhVNupAeKbnhpILyGDeIbacEd120CrxI5RsbVSfi9vT_q5X6Vbam9pc5WDCITrT4mM5Dt3j8xLYREwJqIvYoLQFOSKYKwsxfGqjBEUavlgBWZtzCyfb9xDRLiJWriay45xnUJWBunkPEJ8pP0km2-3aUds_MaSq6v-u8-cvoIPpohzl26OObCf32kl4px5i_CSuJLPAMm9aKt4UTBMtIaRuB9WvwylU_DHQhoENTDkR7EAjqIxt-UI0xnO2LdxpF3GpmrQgK0alrniRIocvD7OfWxqkBcq6TIVTMBAwgexQljDzbkeoBaNia8M7n0eWTpEwRLASQh1z_1U5beJwGR8xdDftJlLYN88TQeuLgt0nowOLPOIH2tSmmBCwIElLw0kXfHfOVl3e3mzrfoKcXLSQ8K1eC8a8qUlHXKopDjkGIIcsk-awcuKCjSqoTX2zsOw2UqTNHI30YZrnjGhzsR_AjZ_uSgqq3V3l2zDSNS7q1z4aeWtiuPaEe4atY-rbjmJaRR9QECIDPZ5tdJy3TGQSwcIiDldtJ7TiEn_ib9nHeKsTRIjImNNMyCy55pR566ARy5M01P7BrrAT6OpP4I6i8ftM52XSd0_oRrxVCZQ19BRraxb6sb0v270yqqcvwTkA3SrOROT8HB9zYY3bCWCy1kWsdVGH50lC42LARUFc5OENGQqRDW80KE3zdT-ipwl3-Ch-gQdoLcCAq_3UyxIG2om0MqY4dDRYoX-UfRhO2Uk_6gKBlb3zsQp-NkkJBqTaR5VbT312oXPKk1SUwbtWd4DNe3FsptNPy092hp_E9p6lu3fYxU_hovm30_Zv0wYtgXtDcxPbYprzsc3cQJ2irXNx_oGz2IxVYkveh9XMJf2RgsMBX-fOcwZfngzs2rJA9ucIH-tOVB9Rk5z6iioJvx2XuOJbAwFmlQ6zXDaZmsWiXZhrgvOBwmkaY-fmF8julm2Pu3bND0ZpMkotq3Ld7JYcOqAfctv9gInSaCDedj71fJjXX3ADZC7dHkQLnt-4SoFHQEWXAzlNIIiYohy_yG9V-S9nCvoTM3Rwq15udiqyzXEQGzo8tIcDEA_rDdP1kFEvGJcP9LUiZL8HM-wHqSrR2GrY_2xKmIdf1R0BwmBGdBBVOvEVcz4fORL3udI_NXBV2g98dZtidCpmLIEX9jxOgU1RzZ8bOolz7hA2eQ9yutaQSbFFRB3RctrlUUAb_b2FOdaILRtulTqK4Yi4SiiFI1vY9nsTb4ZOClz1yQlORh8x4ppLJA7jmLd83D4ho-W24IS7Ft9eas22Q2pJQx6qJfkVTWWlCIDVMJ9A0f8aJB6ZBH-keWrQNsvO74=",
+                "format": "openai-responses-v1",
+                "id": "rs_00af77a271dcb4ef0168ef9857fb548196be8889f3e8532cce",
+                "index": 0,
+                "type": "reasoning.encrypted"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "completed"
+        }
+      ],
+      "created": 1760532567,
+      "id": "gen-1760532567-bV5b5qWsyDOJT9TGF27R",
+      "model": "openai/gpt-5-nano",
+      "object": "chat.completion",
+      "provider": "OpenAI",
+      "usage": {
+        "completion_tokens": 116,
+        "prompt_tokens": 19,
+        "total_tokens": 135
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef6fc27c7061c9-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:49:27 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

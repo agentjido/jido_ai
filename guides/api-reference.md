@@ -1,6 +1,6 @@
 # API Reference
 
-Complete reference for ReqLLM 1.0.0-rc.1 public API. Provides Vercel AI SDK-inspired functions with consistent signatures across streaming and non-streaming modes.
+Complete reference for ReqLLM public API. Provides Vercel AI SDK-inspired functions with consistent signatures across streaming and non-streaming modes.
 
 ## Text Generation
 
@@ -17,12 +17,12 @@ Returns a canonical ReqLLM.Response with usage data, context, and metadata.
 **Examples:**
 ```elixir
 # Simple text generation
-{:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet", "Hello world")
+{:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet-20240229", "Hello world")
 ReqLLM.Response.text(response)  # => "Hello! How can I assist you today?"
 
 # With options
 {:ok, response} = ReqLLM.generate_text(
-  "anthropic:claude-3-sonnet", 
+  "anthropic:claude-3-sonnet-20240229", 
   "Write a haiku",
   temperature: 0.8,
   max_tokens: 100
@@ -33,7 +33,7 @@ ctx = ReqLLM.context([
   ReqLLM.Context.system("You are a helpful assistant"),
   ReqLLM.Context.user("What's 2+2?")
 ])
-{:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet", ctx)
+{:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet-20240229", ctx)
 ```
 
 ### generate_text!/3
@@ -41,12 +41,12 @@ ctx = ReqLLM.context([
 Generate text returning only the text content.
 
 ```elixir
-@spec generate_text!(model_spec, messages, opts) :: {:ok, String.t()} | {:error, Splode.t()}
+@spec generate_text!(model_spec, messages, opts) :: String.t() | no_return()
 ```
 
 **Examples:**
 ```elixir
-ReqLLM.generate_text!("anthropic:claude-3-sonnet", "Hello")
+ReqLLM.generate_text!("anthropic:claude-3-sonnet-20240229", "Hello")
 # => "Hello! How can I assist you today?"
 ```
 
@@ -62,7 +62,7 @@ Returns a canonical ReqLLM.Response containing usage data and stream.
 
 **Examples:**
 ```elixir
-{:ok, response} = ReqLLM.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
+{:ok, response} = ReqLLM.stream_text("anthropic:claude-3-sonnet-20240229", "Tell me a story")
 ReqLLM.Response.text_stream(response) |> Enum.each(&IO.write/1)
 
 # Access usage after streaming
@@ -74,12 +74,12 @@ ReqLLM.Response.usage(response)
 Stream text generation returning only the stream.
 
 ```elixir
-@spec stream_text!(model_spec, messages, opts) :: {:ok, Stream.t()} | {:error, Splode.t()}
+@spec stream_text!(model_spec, messages, opts) :: Stream.t() | no_return()
 ```
 
 **Examples:**
 ```elixir
-ReqLLM.stream_text!("anthropic:claude-3-sonnet", "Count to 10")
+ReqLLM.stream_text!("anthropic:claude-3-sonnet-20240229", "Count to 10")
 |> Enum.each(&IO.write/1)
 ```
 
@@ -101,7 +101,7 @@ schema = [
   name: [type: :string, required: true],
   age: [type: :pos_integer, required: true]
 ]
-{:ok, response} = ReqLLM.generate_object("anthropic:claude-3-sonnet", "Generate a person", schema)
+{:ok, response} = ReqLLM.generate_object("anthropic:claude-3-sonnet-20240229", "Generate a person", schema)
 ```
 
 ### generate_object!/4
@@ -109,7 +109,7 @@ schema = [
 Generate structured data returning only the object.
 
 ```elixir
-@spec generate_object!(model_spec, messages, schema, opts) :: {:ok, term()} | {:error, Splode.t()}
+@spec generate_object!(model_spec, messages, schema, opts) :: term() | no_return()
 ```
 
 ### stream_object/4
@@ -125,7 +125,7 @@ Stream structured data generation.
 Stream structured data returning only the stream.
 
 ```elixir
-@spec stream_object!(model_spec, messages, schema, opts) :: {:ok, Stream.t()} | {:error, Splode.t()}
+@spec stream_object!(model_spec, messages, schema, opts) :: Stream.t() | no_return()
 ```
 
 ## Embedding Functions
@@ -164,14 +164,14 @@ ReqLLM accepts flexible model specifications:
 ### String Format
 ```elixir
 "provider:model"
-"anthropic:claude-3-sonnet"
+"anthropic:claude-3-sonnet-20240229"
 "openai:gpt-4o"
 "ollama:llama3"
 ```
 
 ### Tuple Format
 ```elixir
-{:anthropic, "claude-3-sonnet", temperature: 0.7}
+{:anthropic, "claude-3-sonnet-20240229", temperature: 0.7}
 {:openai, "gpt-4o", max_tokens: 1000}
 ```
 
@@ -179,7 +179,7 @@ ReqLLM accepts flexible model specifications:
 ```elixir
 %ReqLLM.Model{
   provider: :anthropic,
-  model: "claude-3-sonnet", 
+  model: "claude-3-sonnet-20240229", 
   temperature: 0.7,
   max_tokens: 1000
 }
@@ -196,7 +196,7 @@ ReqLLM accepts flexible model specifications:
 - `:stop` - Stop sequences (string or list)
 
 ### Context and Tools
-- `:system` - System message for the model
+- `:system_prompt` - System message for the model
 - `:context` - Conversation context as ReqLLM.Context
 - `:tools` - List of tool definitions for function calling
 - `:tool_choice` - Tool selection strategy (`:auto`, `:required`, specific tool)
@@ -210,7 +210,7 @@ ReqLLM accepts flexible model specifications:
 ctx = ReqLLM.context("Hello")
 
 {:ok, response} = ReqLLM.generate_text(
-  "anthropic:claude-3-sonnet",
+  "anthropic:claude-3-sonnet-20240229",
   ctx,
   temperature: 0.8,
   max_tokens: 500,
@@ -258,7 +258,7 @@ Create tool definitions for function calling:
 weather_tool = ReqLLM.tool(
   name: "get_weather",
   description: "Get current weather for a location",
-  parameters: [
+  parameter_schema: [
     location: [type: :string, required: true],
     units: [type: :string, default: "metric"]
   ],
@@ -266,7 +266,7 @@ weather_tool = ReqLLM.tool(
 )
 
 {:ok, response} = ReqLLM.generate_text(
-  "anthropic:claude-3-sonnet",
+  "anthropic:claude-3-sonnet-20240229",
   "What's the weather in Paris?",
   tools: [weather_tool]
 )

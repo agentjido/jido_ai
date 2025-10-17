@@ -1,0 +1,190 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJpbnB1dCI6W3siY29udGVudCI6W3sidGV4dCI6IlVzZSB0aGUgYWRkIHRvb2wgdG8gY29tcHV0ZSAyICsgMy4gQWZ0ZXIgdGhlIHRvb2wgcmVzdWx0IGFycml2ZXMsIHJlc3BvbmQgd2l0aCAnc3VtPTx2YWx1ZT4nLiIsInR5cGUiOiJpbnB1dF90ZXh0In1dLCJyb2xlIjoidXNlciJ9LHsiY2FsbF9pZCI6ImNhbGxfUEhzRjZwOGZxdk5zWXhmbmdDbTBnRjBGIiwib3V0cHV0Ijoie1wiZXJyb3JcIjpcIlRvb2wgZXhlY3V0aW9uIGZhaWxlZFwifSIsInR5cGUiOiJmdW5jdGlvbl9jYWxsX291dHB1dCJ9XSwibWF4X291dHB1dF90b2tlbnMiOjEwMDAwLCJtb2RlbCI6Im80LW1pbmkiLCJwcmV2aW91c19yZXNwb25zZV9pZCI6InJlc3BfMGI2ZjI1MzU1OWIzODU4MDAwNjhlZmJlODA1ZDE0ODE5MGExMjcyNThlYTAxZmYyN2QiLCJzdHJlYW0iOmZhbHNlfQ=="
+    },
+    "canonical_json": {
+      "input": [
+        {
+          "content": [
+            {
+              "text": "Use the add tool to compute 2 + 3. After the tool result arrives, respond with 'sum=<value>'.",
+              "type": "input_text"
+            }
+          ],
+          "role": "user"
+        },
+        {
+          "call_id": "call_PHsF6p8fqvNsYxfngCm0gF0F",
+          "output": "{\"error\":\"Tool execution failed\"}",
+          "type": "function_call_output"
+        }
+      ],
+      "max_output_tokens": 10000,
+      "model": "o4-mini",
+      "previous_response_id": "resp_0b6f253559b385800068efbe805d148190a127258ea01ff27d",
+      "stream": false
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.openai.com/v1/responses"
+  },
+  "response": {
+    "body": {
+      "background": false,
+      "billing": {
+        "payer": "developer"
+      },
+      "created_at": 1760542339,
+      "error": null,
+      "id": "resp_0b6f253559b385800068efbe8391cc8190baa0fa04505925ac",
+      "incomplete_details": null,
+      "instructions": null,
+      "max_output_tokens": 10000,
+      "max_tool_calls": null,
+      "metadata": {},
+      "model": "o4-mini-2025-04-16",
+      "object": "response",
+      "output": [
+        {
+          "id": "rs_0b6f253559b385800068efbe8433988190acfa9904b5fe78a5",
+          "summary": [],
+          "type": "reasoning"
+        },
+        {
+          "content": [
+            {
+              "annotations": [],
+              "logprobs": [],
+              "text": "sum=5",
+              "type": "output_text"
+            }
+          ],
+          "id": "msg_0b6f253559b385800068efbe8884208190bdb168e68f7ad660",
+          "role": "assistant",
+          "status": "completed",
+          "type": "message"
+        }
+      ],
+      "parallel_tool_calls": true,
+      "previous_response_id": "resp_0b6f253559b385800068efbe805d148190a127258ea01ff27d",
+      "prompt_cache_key": null,
+      "reasoning": {
+        "effort": "medium",
+        "summary": null
+      },
+      "safety_identifier": null,
+      "service_tier": "default",
+      "status": "completed",
+      "store": true,
+      "temperature": 1.0,
+      "text": {
+        "format": {
+          "type": "text"
+        },
+        "verbosity": "medium"
+      },
+      "tool_choice": "auto",
+      "tools": [],
+      "top_logprobs": 0,
+      "top_p": 1.0,
+      "truncation": "disabled",
+      "usage": {
+        "input_tokens": 328,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 457,
+        "output_tokens_details": {
+          "reasoning_tokens": 448
+        },
+        "total_tokens": 785
+      },
+      "user": null
+    },
+    "headers": {
+      "alt-svc": [
+        "h3=\":443\"; ma=86400"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "98f05e55ec7c507c-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 15:32:24 GMT"
+      ],
+      "openai-organization": [
+        "epic-creative-sogybe"
+      ],
+      "openai-processing-ms": [
+        "5332"
+      ],
+      "openai-project": [
+        "proj_j5AhgU4eLMRmsoO9FDg7BRD3"
+      ],
+      "openai-version": [
+        "2020-10-01"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=1pEfGp.4vC9bF3tClIv29VmdYwqTq2IwGel6.qhZMkA-1760542344-1.0.1.1-Rtwfxi6r.qPuZjJQEkAssSaOGfe7P2Kn3xOYRh9zaH0A.mwsP0SsSUJJQK.SywgII4.TK_Kq_7hb3VPu5D2QIW.e1RsnW7ODvpYGpyjwFks; path=/; expires=Wed, 15-Oct-25 16:02:24 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+        "_cfuvid=_1HsRCDazAfHPRObh2Hn2cHzWiPPi6m4vJODnNEs5OY-1760542344920-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000; includeSubDomains; preload"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-envoy-upstream-service-time": [
+        "5338"
+      ],
+      "x-ratelimit-limit-requests": [
+        "10000"
+      ],
+      "x-ratelimit-limit-tokens": [
+        "10000000"
+      ],
+      "x-ratelimit-remaining-requests": [
+        "9999"
+      ],
+      "x-ratelimit-remaining-tokens": [
+        "9999465"
+      ],
+      "x-ratelimit-reset-requests": [
+        "6ms"
+      ],
+      "x-ratelimit-reset-tokens": [
+        "3ms"
+      ],
+      "x-request-id": [
+        "req_38c9ef5a852a42bb82e2784834ef34a7"
+      ]
+    },
+    "status": 200
+  }
+}

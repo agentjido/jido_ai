@@ -1,6 +1,6 @@
 defmodule ReqLLM.Tool do
   @moduledoc """
-  Simplified tool definition for AI model function calling.
+  Tool definition for AI model function calling.
 
   Tools enable AI models to call external functions, perform actions, and retrieve information.
   Each tool has a name, description, parameters schema, and a callback function to execute.
@@ -52,6 +52,15 @@ defmodule ReqLLM.Tool do
       # Anthropic tool format
       anthropic_schema = ReqLLM.Tool.to_schema(tool, :anthropic)
 
+  ## Functions
+
+    * `new/1` - Creates a new Tool from the given options
+    * `new!/1` - Creates a new Tool from the given options, raising on error
+    * `execute/2` - Executes a tool with the given input parameters
+    * `to_schema/2` - Converts a Tool to provider-specific schema format
+    * `to_json_schema/1` - Converts a Tool to JSON Schema format for LLM integration
+    * `valid_name?/1` - Validates a tool name for compliance with function calling standards
+
   """
 
   use TypedStruct
@@ -68,6 +77,7 @@ defmodule ReqLLM.Tool do
     field(:parameter_schema, keyword(), default: [])
     field(:compiled, term() | nil, default: nil)
     field(:callback, callback(), enforce: true)
+    field(:strict, boolean(), default: false)
   end
 
   @type tool_opts :: [
@@ -98,6 +108,11 @@ defmodule ReqLLM.Tool do
                    type: :any,
                    required: true,
                    doc: "Callback function or MFA tuple"
+                 ],
+                 strict: [
+                   type: :boolean,
+                   default: false,
+                   doc: "Enable strict mode for OpenAI structured outputs"
                  ]
                )
 
@@ -138,7 +153,8 @@ defmodule ReqLLM.Tool do
         description: validated_opts[:description],
         parameter_schema: validated_opts[:parameter_schema],
         compiled: compiled_schema,
-        callback: validated_opts[:callback]
+        callback: validated_opts[:callback],
+        strict: validated_opts[:strict] || false
       }
 
       {:ok, tool}
@@ -229,7 +245,7 @@ defmodule ReqLLM.Tool do
   ## Parameters
 
     * `tool` - Tool struct
-    * `provider` - Provider atom (`:anthropic`)
+    * `provider` - Provider atom (`:anthropic`, `:openai`, `:google`, `:amazon_bedrock_converse`)
 
   ## Examples
 
@@ -241,6 +257,16 @@ defmodule ReqLLM.Tool do
       #     "input_schema" => %{...}
       #   }
 
+      # Bedrock Converse tool format
+      bedrock_schema = ReqLLM.Tool.to_schema(tool, :amazon_bedrock_converse)
+      #=> %{
+      #     "toolSpec" => %{
+      #       "name" => "get_weather",
+      #       "description" => "Get current weather",
+      #       "inputSchema" => %{"json" => %{...}}
+      #     }
+      #   }
+
   """
   @spec to_schema(t(), atom()) :: map()
   def to_schema(%__MODULE__{} = tool, provider \\ :openai) do
@@ -248,6 +274,7 @@ defmodule ReqLLM.Tool do
       :anthropic -> ReqLLM.Schema.to_anthropic_format(tool)
       :openai -> ReqLLM.Schema.to_openai_format(tool)
       :google -> ReqLLM.Schema.to_google_format(tool)
+      :amazon_bedrock_converse -> ReqLLM.Schema.to_bedrock_converse_format(tool)
       other -> raise ArgumentError, "Unknown provider #{inspect(other)}"
     end
   end
@@ -336,7 +363,6 @@ defmodule ReqLLM.Tool do
   defp validate_input(%__MODULE__{compiled: nil}, input), do: {:ok, input}
 
   defp validate_input(%__MODULE__{compiled: schema}, input) do
-    # Convert string keys to atoms for validation
     normalized_input = normalize_input_keys(input)
 
     case NimbleOptions.validate(normalized_input, schema) do
@@ -371,21 +397,30 @@ defmodule ReqLLM.Tool do
     apply(module, function, [input])
   rescue
     error ->
-      {:error, "Callback execution failed: #{Exception.message(error)}"}
+      {:error,
+       ReqLLM.Error.Unknown.Unknown.exception(
+         error: "Callback execution failed: #{Exception.message(error)}"
+       )}
   end
 
   defp call_callback({module, function, args}, input) do
     apply(module, function, args ++ [input])
   rescue
     error ->
-      {:error, "Callback execution failed: #{Exception.message(error)}"}
+      {:error,
+       ReqLLM.Error.Unknown.Unknown.exception(
+         error: "Callback execution failed: #{Exception.message(error)}"
+       )}
   end
 
   defp call_callback(fun, input) when is_function(fun, 1) do
     fun.(input)
   rescue
     error ->
-      {:error, "Callback execution failed: #{Exception.message(error)}"}
+      {:error,
+       ReqLLM.Error.Unknown.Unknown.exception(
+         error: "Callback execution failed: #{Exception.message(error)}"
+       )}
   end
 
   defimpl Inspect do

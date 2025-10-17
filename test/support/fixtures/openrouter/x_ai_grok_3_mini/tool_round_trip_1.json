@@ -1,0 +1,157 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjo4MTksIm1lc3NhZ2VzIjpbeyJjb250ZW50IjoiVXNlIHRoZSBhZGQgdG9vbCB0byBjb21wdXRlIDIgKyAzLiBBZnRlciB0aGUgdG9vbCByZXN1bHQgYXJyaXZlcywgcmVzcG9uZCB3aXRoICdzdW09PHZhbHVlPicuIiwicm9sZSI6InVzZXIifV0sIm1vZGVsIjoieC1haS9ncm9rLTMtbWluaSIsIm4iOjEsInNlZWQiOjQyLCJzdHJlYW0iOmZhbHNlLCJ0ZW1wZXJhdHVyZSI6MC4wLCJ0b29sX2Nob2ljZSI6eyJmdW5jdGlvbiI6eyJuYW1lIjoiYWRkIn0sInR5cGUiOiJmdW5jdGlvbiJ9LCJ0b29scyI6W3siZnVuY3Rpb24iOnsiZGVzY3JpcHRpb24iOiJBZGQgdHdvIGludGVnZXJzIiwibmFtZSI6ImFkZCIsInBhcmFtZXRlcnMiOnsiYWRkaXRpb25hbFByb3BlcnRpZXMiOmZhbHNlLCJwcm9wZXJ0aWVzIjp7ImEiOnsidHlwZSI6ImludGVnZXIifSwiYiI6eyJ0eXBlIjoiaW50ZWdlciJ9fSwicmVxdWlyZWQiOlsiYSIsImIiXSwidHlwZSI6Im9iamVjdCJ9fSwidHlwZSI6ImZ1bmN0aW9uIn1dfQ=="
+    },
+    "canonical_json": {
+      "max_tokens": 819,
+      "messages": [
+        {
+          "content": "Use the add tool to compute 2 + 3. After the tool result arrives, respond with 'sum=<value>'.",
+          "role": "user"
+        }
+      ],
+      "model": "x-ai/grok-3-mini",
+      "n": 1,
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0,
+      "tool_choice": {
+        "function": {
+          "name": "add"
+        },
+        "type": "function"
+      },
+      "tools": [
+        {
+          "function": {
+            "description": "Add two integers",
+            "name": "add",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "a": {
+                  "type": "integer"
+                },
+                "b": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "a",
+                "b"
+              ],
+              "type": "object"
+            }
+          },
+          "type": "function"
+        }
+      ]
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "tool_calls",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": " ",
+            "reasoning": "First, the user wants me to use the \"add\" function to compute 2 + 3. The available functions include \"add\", which takes two integers, a and b.\n\nI need to call this function by outputting a JSON in the specified format, enclosed in <function_call> tags.\n\nThe format is: <function_call>{\"action\": \"function_name\", \"action_input\": {\"parameter\": \"argument\"}}</function_call>\n\nFor the \"add\" function, the action is \"add\", and the action_input should be an object with \"a\" and \"b\", both integers.\n\nSo, for 2 + 3, I should set a to 2 and b to 3.\n\nAfter calling the function, the user says: \"After the tool result arrives, respond with 'sum=<value>'.\" But as per my instructions, I just need to make the function call in my response. The system will handle the execution and provide the result, I assume.\n\nMy response should only include the function call, and I shouldn't add any other text unless necessary. The instructions say: \"Keep your response to user clear; please do not make your response verbose!\"\n\nSo, I should not add extra explanations. Just the function call.\n\nThe user specified to respond with 'sum=<value>' after the tool result, but that's for after the function call. In this response, I only need to make the call.\n\nFinally, structure: Use <function_call> tags around the JSON.\n\nJSON: {\"action\": \"add\", \"action_input\": {\"a\": 2, \"b\": 3}}\n\nThat seems correct.",
+            "reasoning_details": [
+              {
+                "format": "unknown",
+                "index": 0,
+                "text": "First, the user wants me to use the \"add\" function to compute 2 + 3. The available functions include \"add\", which takes two integers, a and b.\n\nI need to call this function by outputting a JSON in the specified format, enclosed in <function_call> tags.\n\nThe format is: <function_call>{\"action\": \"function_name\", \"action_input\": {\"parameter\": \"argument\"}}</function_call>\n\nFor the \"add\" function, the action is \"add\", and the action_input should be an object with \"a\" and \"b\", both integers.\n\nSo, for 2 + 3, I should set a to 2 and b to 3.\n\nAfter calling the function, the user says: \"After the tool result arrives, respond with 'sum=<value>'.\" But as per my instructions, I just need to make the function call in my response. The system will handle the execution and provide the result, I assume.\n\nMy response should only include the function call, and I shouldn't add any other text unless necessary. The instructions say: \"Keep your response to user clear; please do not make your response verbose!\"\n\nSo, I should not add extra explanations. Just the function call.\n\nThe user specified to respond with 'sum=<value>' after the tool result, but that's for after the function call. In this response, I only need to make the call.\n\nFinally, structure: Use <function_call> tags around the JSON.\n\nJSON: {\"action\": \"add\", \"action_input\": {\"a\": 2, \"b\": 3}}\n\nThat seems correct.",
+                "type": "reasoning.text"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "function": {
+                  "arguments": "{\"a\":2,\"b\":3}",
+                  "name": "add"
+                },
+                "id": "call_43898601",
+                "index": 0,
+                "type": "function"
+              }
+            ]
+          },
+          "native_finish_reason": "tool_calls"
+        }
+      ],
+      "created": 1760532559,
+      "id": "gen-1760532559-O2ZnXuGNlX4Ua0VpvOd3",
+      "model": "x-ai/grok-3-mini",
+      "object": "chat.completion",
+      "provider": "xAI",
+      "system_fingerprint": "fp_4fae27f477",
+      "usage": {
+        "completion_tokens": 359,
+        "completion_tokens_details": {
+          "reasoning_tokens": 329
+        },
+        "prompt_tokens": 187,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 4
+        },
+        "total_tokens": 546
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef6f8ff943eb5d-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:49:19 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

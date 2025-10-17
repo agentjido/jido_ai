@@ -1,0 +1,100 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjozMDAwLCJtZXNzYWdlcyI6W3siY29udGVudCI6IldyaXRlIGEgdmVyeSBsb25nIHN0b3J5IGFib3V0IGRyYWdvbnMgYW5kIGFkdmVudHVyZXMiLCJyb2xlIjoidXNlciJ9XSwibW9kZWwiOiJkZWVwc2Vlay9kZWVwc2Vlay1jaGF0LXYzLjEiLCJuIjoxLCJyZWFzb25pbmdfZWZmb3J0IjoibG93Iiwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuNX0="
+    },
+    "canonical_json": {
+      "max_tokens": 3000,
+      "messages": [
+        {
+          "content": "Write a very long story about dragons and adventures",
+          "role": "user"
+        }
+      ],
+      "model": "deepseek/deepseek-chat-v3.1",
+      "n": 1,
+      "reasoning_effort": "low",
+      "stream": false,
+      "temperature": 0.5
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "length",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "Of course. Here is a very long story about dragons, forgotten lore, and the adventure of a lifetime.\n\n***\n\n### **The Keeper of Cinder-Spire**\n\nThe village of Emberfell was so named for the way the setting sun, dipping behind the jagged teeth of the Dragon’s Jaw mountains, would set the high snows ablaze with a deep, smoldering crimson, as if the very peaks were made of cooling embers. For the folk who lived in its shadow, the mountains were a boundary, a warning, and the source of all their stories. And the greatest of those stories was of the Last Dragon.\n\nLira, the blacksmith’s daughter, knew the story by heart. She’d heard it from Old Man Hemlock, who’d heard it from his grandfather, who swore he’d seen it with his own eyes: a beast of scale and shadow, whose wings could blot out the sun and whose breath could turn stone to soup. It was said to slumber deep within the highest peak, Cinder-Spire, guarding a hoard not of gold, but of forgotten magic from the Age of Wonders. The story was a comfort and a caution. The dragon was gone, but the memory kept children from wandering too far and gave the adults a sense of living in a place of significance, even if that significance was centuries old.\n\nLira, however, was a practical soul. At seventeen, her world was made of tangible things: the heat of the forge, the weight of a hammer, the satisfying ring of steel on anvil. Dragons were for bedtime tales. Her reality was mending ploughshares, shoeing horses, and dreaming of a day when she might craft a sword worthy of a king’s guard, a dream that felt as distant and mythical as the beast of Cinder-Spire.\n\nThat changed on the day the sky turned to iron and the stars fell.\n\nIt began with a sound—a deep, subterranean groan that shuddered up through the soles of her boots. The forge-fire flickered. Then came a series of sharp *cracks* from high above, like the world itself splitting apart. Rushing outside, Lira watched, her heart a cold stone in her chest, as a shower of brilliant, burning fragments rained down from the peak of Cinder-Spire. They weren’t stars. They were chunks of the mountain, glowing with an inner fire, crashing into the higher slopes and setting the ancient pines alight.\n\nBut one piece, larger than the rest, trailing a tail of brilliant blue flame, screamed through the atmosphere not towards the slopes, but towards the village. It struck the earth on the outskirts of Emberfell with a concussion that knocked Lira off her feet. The impact site was not a crater of destruction, but a circle of scorched earth, and at its center, half-buried in the soil, was an object.\n\nIt was a scale. Larger than a shield, it was a perfect, curved plate of a material that was both obsidian and something more. It drank the light, yet shimmered with a faint, pulsating, deep blue luminescence, like a nebula captured in stone. It was warm to the touch and hummed with a low, potent energy that vibrated through Lira’s arm. This was no rock. This was *dragon*.\n\nThe village was thrown into panic. Some saw it as an omen of doom, a sign the slumbering beast was awakening. Others, like the avaricious Mayor Borin, saw it as a ticket to wealth, a scaleshard that could buy the entire valley. As arguments erupted, Lira stood her ground, her fingers still tingling from the scale’s touch. She alone felt it wasn’t a threat or a treasure. It was a… message. A distress call.\n\nThat night, as the village council debated selling the scale to passing merchants, the scale chose its keeper. In the dead of night, its blue light flared, and a single, searingly clear image burned itself into Lira’s mind: a vast, dark chamber deep within the mountain, a magnificent, ancient dragon, its scales dull and cracked, chained by glowing, malevolent crystals that pulsed with a sickly green light. She felt its agony, its immense age, and its desperate, fading hope. The image was accompanied by a single, echoing word that was not a sound, but a feeling in her soul: *Come.*\n\nShe knew, with a certainty that eclipsed all logic, that the dragon, whose name her mind understood as Ignis, was not a monster to be feared, but a guardian who had failed. And whatever was poisoning him and causing the mountain to break apart was a threat far greater than any old story.\n\nShe acted before first light. Sneaking into the mayor’s lodge, she took the scale. It was lighter than it looked, and she fashioned a sling for it on her back. She packed supplies, her father’s best hunting knife, and a determined resolve. She was leaving Emberfell. She was going to Cinder-Spire.\n\nHer journey began alone, but not for long. As she reached the treeline, a figure emerged from the dawn mist. It was Kael, the village outcast. A man in his thirties, he was once a scholar from a distant city, exiled for his “heretical” theories about dragons being intelligent allies, not mindless beasts. He was drawn by the energy of the scale and had seen Lira’s purposeful exit.\n\n“The scale sings,” he said, his eyes alight with a keen intelligence. “And you are listening. You know, don’t you? The stories are wrong.”\n\nLira was wary, but his words resonated. She showed him the scale. Kael’s breath hitched. “It’s a keystone,” he whispered. “A part of his life-force. He’s dying, and he’s called a keeper to him. You.”\n\nWith Kael as her guide and translator of the ancient lore, their duo became a trio a day later when they were ambushed by a silent, swift-moving creature among the rocks. It wasn’t a beast, but a young woman, her skin painted with ash, her clothes made of woven shadow-stuff. She held a knife to Kael’ throat until Lira lowered the scale, its blue light flaring softly.\n\nThe woman recoiled, her eyes wide with awe. “The Heart-of-the-Mountain… you carry its pain,” she said, her voice like the rustle of dry leaves. She was Elara, of the Ash-Singers, a secretive tribe that lived in the high reaches, who had long served as silent watchers of the slumbering guardian. They had felt the corruption spreading through the stone, the sickness in the mountain’s heart.\n\n“The chains that bind him are not metal,” Elara said, joining them without another word. “They are Geode-Shards, crystals of a fell energy that feeds on life. Something… someone… implanted them in his chamber. We have tried to reach him, but the paths are guarded.”\n\n“Guarded by what?” Lira asked.\n\nElara’s face was grim. “The Stone-Scoured. Those who were lost to the mountain’s anger, now twisted into creatures of living rock and malice.”\n\nTheir adventure became a treacherous climb through a waking nightmare. The mountain was alive, and it was furious. They navigated tunnels that breathed out poisonous fumes, crossed chasms over rivers of molten rock stirred from their millennial slumber, and were constantly harried by the Stone-Scoured—shambling, terrifying figures whose touch could petrify flesh. Kael’s knowledge of ancient architecture helped them find hidden passes and decipher warnings carved into the stone millennia ago. Elara’s stealth and affinity with the mountain’s rhythms kept them one step ahead of the worst dangers.\n\nLira, armed with only her knife and the scale, found her own role. The scale was a key. It could seal a fissure of deadly gas with a pulse of blue light, or calm a river of lava momentarily, creating a path. It responded to her will, to her growing connection to Ignis. She could feel his pain ebb and flow like a tide, a constant, agonizing reminder of what was at stake.\n\nAfter weeks of arduous travel, they found the entrance to the Inner Sanctum: a vast archway carved with intricate runes that depicted dragons and humans working together to shape the world, a history utterly forgotten by mankind. The archway was sealed by a door of pure, black obsidian.\n\n“The tales spoke of a lock without a key,” Kael murmured, running his fingers over the seamless surface.\n\nLira knew what to do. She unslung the scale from her back. As she approached, the scale’s blue light intensified, and the humming became a resonant chord. The obsidian door rippled like water. She pressed the scale against it. It melted into the surface, fitting into a perfect, scale-shaped indentation she hadn’t seen before. With a deep, grinding shudder that echoed through the entire mountain, the great door slid open.\n\nThe chamber within was beyond comprehension. It was a cathedral-sized geode, its walls a glittering tapestry of amethyst, citrine, and emerald crystals that glowed with their own soft light. The air thrummed with ancient power. And in the center, on a dais of natural rock, lay Ignis.\n\nHe was vaster than any story had ever described, a creature of sublime and terrible beauty. His body was the color of a starless night, etched with patterns that resembled constellations. But now, those patterns were broken. Thick, vicious shards of glowing green crystal—the Geode-Shards—were driven into his shoulders, his wings, his chest. Pulses of sickly energy ran from the crystals into him, and with each pulse, his great body spasmed in silent agony. His scales were cracked and oozing a dull, metallic substance. His eyes, large as millstones, were closed, but Lira could feel the immense effort it took him to merely exist.\n\nScattered around the chamber were wonders: tablets of gold inscribed with lost knowledge, artifacts of impossible design, the hoard of a being who valued memory over currency. But Lira had eyes only for the dragon.\n\nShe stepped forward, the scale on her back blazing like a blue star. At her approach, one of Ignis’s eyes slowly opened. The iris was a pool of molten gold, slitted with agony, but in its depths shone a profound, weary intelligence.\n\nA voice, old as the bedrock and warm as a forge-fire, spoke directly in her mind. *You came, Little Keeper. I had hoped… but dared not believe.*\n\n“We’re here to help,” Lira said, her voice small but steady in the immense space. “How do we break the chains?”\n\n*The shards are not merely physical,* Ignis’s thought-voice rumbled. *They are anchors for a parasitic consciousness, a thing of greed and consumption that slumbers deep below. It seeks to drain my life to awaken itself. You cannot break them with force. You must… harmonize.*\n\nHe showed her. The blue light of her scale was a frequency of pure, ordering energy. The green light of the shards was chaos and consumption. By focusing the scale’s energy, she could cancel out the shard’s resonance, shattering them.\n\nThe task was immense. Each shard was a fortress of dark energy. Kael and Elara stood guard as Lira approached the first one, placed over the dragon’s heart. As she focused, pouring all her will, her hope, her newfound purpose into the scale, a beam of pure cerulean light struck the green crystal. The conflict was immediate. The shard fought back, lashing out with tendrils of corrosive energy. The chamber trembled. From the tunnels outside, they heard the enraged shrieks of the Stone-Scoured, drawn to protect the source of their corruption.\n\nKael and Elara fought a desperate battle at the doorway, Kael using a crystal-tipped staff that could shatter the Scoured, Elara moving like a shadow, her knives finding the weak points in the living rock. Meanwhile, Lira wrestled with the shard. Sweat poured down her face. She felt like she was trying to hold back a tidal wave with her bare hands. Just as her strength began to fail, she felt a new presence—the immense, gentle strength of Ignis flowing into her, supporting her. Together, keeper and dragon pushed.\n\nWith a sound like a thousand mirrors breaking, the first Geode-Shard exploded into harmless dust.\n\nOne down. Five to go.\n\nThe process repeated, each shard a unique and draining battle. With each one destroyed, Ignis grew stronger, his scales regaining their luster, the light in his eyes burning brighter. The mountain itself seemed to sigh in relief. But the deeper corruption was awakening. The entity below, feeling its anchors vanish, began to rise.\n\nAs the last shard shattered, Ignis rose to his full height for the first time in centuries. His wings unfurled, casting a shadow that filled the chamber. He let out a roar that was not of anger,",
+            "reasoning": "Hmm, the user wants a very long story about dragons and adventures. They're likely looking for an immersive fantasy tale with rich world-building and epic stakes. I should craft a narrative that feels grand yet personal, with a hero's journey arc and mythical creatures.\n\nI'll start with a humble protagonist in a remote setting to create contrast with the eventual scale of the adventure. The dragon should be ancient and intelligent, not just a monster - perhaps a guardian of forgotten knowledge. The conflict could involve preserving wisdom versus destructive power, which adds philosophical depth.\n\nThe story needs gradual escalation: from local mystery to global threat, with allies gathered along the way. The climax should involve both physical confrontation and moral choices. For length, I'll include detailed descriptions of settings and character interactions while maintaining narrative momentum.\n\nThe ending should circle back to the beginning thematically, showing how the protagonist has changed. Maybe the library becomes a new center of learning, echoing the dragon's original purpose but with human stewardship.",
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "length"
+        }
+      ],
+      "created": 1760547307,
+      "id": "gen-1760547307-TDO9fgtNJUlm75FnQFF8",
+      "model": "deepseek/deepseek-chat-v3.1",
+      "object": "chat.completion",
+      "provider": "DeepInfra",
+      "usage": {
+        "completion_tokens": 3000,
+        "prompt_tokens": 13,
+        "prompt_tokens_details": null,
+        "total_tokens": 3013
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98f0d79faeeee810-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 16:55:07 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

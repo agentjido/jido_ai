@@ -1,0 +1,132 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoyMDQ4LCJtZXNzYWdlcyI6W3siY29udGVudCI6IlNvbHZlIDEyKjcgYW5kIHNob3cgeW91ciBpbnRlcm5hbCB0aGlua2luZyAoYnJpZWYpLiIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6ImdwdC1vc3MtMTIwYiIsInNlZWQiOjQyLCJzdHJlYW0iOmZhbHNlLCJ0ZW1wZXJhdHVyZSI6MS4wfQ=="
+    },
+    "canonical_json": {
+      "max_tokens": 2048,
+      "messages": [
+        {
+          "content": "Solve 12*7 and show your internal thinking (brief).",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-oss-120b",
+      "seed": 42,
+      "stream": false,
+      "temperature": 1.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.cerebras.ai/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "**Internal thinking (brief):**  \n- Multiply 12 by 7.  \n- 10 × 7 = 70 and 2 × 7 = 14.  \n- Add the partial products: 70 + 14 = 84.\n\n**Answer:** 12 × 7 = 84.",
+            "reasoning": "We need to compute 12*7 = 84. Provide internal thinking briefly.",
+            "role": "assistant"
+          }
+        }
+      ],
+      "created": 1760396439,
+      "id": "chatcmpl-49c89568-be1d-49bf-b50f-908835145b36",
+      "model": "gpt-oss-120b",
+      "object": "chat.completion",
+      "system_fingerprint": "fp_8a8c0bd8448557718491",
+      "time_info": {
+        "completion_time": 0.055960642,
+        "created": 1760396439,
+        "prompt_time": 0.013140741,
+        "queue_time": 1.216302976,
+        "total_time": 1.286773443222046
+      },
+      "usage": {
+        "completion_tokens": 99,
+        "prompt_tokens": 80,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 179
+      }
+    },
+    "headers": {
+      "alt-svc": [
+        "h3=\":443\"; ma=86400"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "98e27453fe3af32d-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Mon, 13 Oct 2025 23:00:41 GMT"
+      ],
+      "inference-id": [
+        "chatcmpl-49c89568-be1d-49bf-b50f-908835145b36"
+      ],
+      "referrer-policy": [
+        "strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=8A4X0fLEDL1oagIA95HQm027AiBg93LVmm2GMwzLueY-1760396441-1.0.1.1-1Vael.PwUD5c3P9k20SyqFx68gssxn_gF4z7.5NYKukBwc3QnPspCHN9gfpUwc3fNqZxfbXlnElOKmTdUISW6roYdonXsEWUvTGo6xQrsRY; path=/; expires=Mon, 13-Oct-25 23:30:41 GMT; domain=.api.cerebras.ai; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=3600; includeSubDomains"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-ratelimit-limit-requests-day": [
+        "1440000"
+      ],
+      "x-ratelimit-limit-tokens-minute": [
+        "1000000"
+      ],
+      "x-ratelimit-remaining-requests-day": [
+        "1439987"
+      ],
+      "x-ratelimit-remaining-tokens-minute": [
+        "999540"
+      ],
+      "x-ratelimit-reset-requests-day": [
+        "3558.9399979114532"
+      ],
+      "x-ratelimit-reset-tokens-minute": [
+        "18.939997911453247"
+      ],
+      "x-request-id": [
+        "98e27453fe3af32d-ORD"
+      ]
+    },
+    "status": 200
+  }
+}

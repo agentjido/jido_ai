@@ -201,17 +201,17 @@
     {
       "attachment": true,
       "cost": {
-        "cache_read": 0.3,
-        "cache_write": 0.3,
-        "input": 3,
-        "output": 15
+        "cache_read": 0.1,
+        "cache_write": 1.25,
+        "input": 1,
+        "output": 5
       },
-      "id": "claude-3-sonnet-20240229",
-      "knowledge": "2023-08-31",
-      "last_updated": "2024-03-04",
+      "id": "claude-haiku-4-5-20251001",
+      "knowledge": "2025-02-31",
+      "last_updated": "2025-10-15",
       "limit": {
         "context": 200000,
-        "output": 4096
+        "output": 64000
       },
       "modalities": {
         "input": [
@@ -222,12 +222,12 @@
           "text"
         ]
       },
-      "name": "Claude Sonnet 3",
+      "name": "Claude Haiku 4.5",
       "open_weights": false,
       "provider": "anthropic",
-      "provider_model_id": "claude-3-sonnet-20240229",
-      "reasoning": false,
-      "release_date": "2024-03-04",
+      "provider_model_id": "claude-haiku-4-5-20251001",
+      "reasoning": true,
+      "release_date": "2025-10-15",
       "temperature": true,
       "tool_call": true
     },
@@ -327,6 +327,39 @@
       "provider_model_id": "claude-sonnet-4-20250514",
       "reasoning": true,
       "release_date": "2025-05-22",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": true,
+      "cost": {
+        "cache_read": 0.3,
+        "cache_write": 3.75,
+        "input": 3,
+        "output": 15
+      },
+      "id": "claude-sonnet-4-5-20250929",
+      "knowledge": "2025-07-31",
+      "last_updated": "2025-09-29",
+      "limit": {
+        "context": 200000,
+        "output": 64000
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Claude Sonnet 4.5",
+      "open_weights": false,
+      "provider": "anthropic",
+      "provider_model_id": "claude-sonnet-4-5-20250929",
+      "reasoning": true,
+      "release_date": "2025-09-29",
       "temperature": true,
       "tool_call": true
     }

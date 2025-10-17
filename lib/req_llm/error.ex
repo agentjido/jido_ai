@@ -42,6 +42,18 @@ defmodule ReqLLM.Error do
     end
   end
 
+  defmodule Invalid.Capability do
+    @moduledoc "Error for unsupported model capabilities."
+    use Splode.Error, fields: [:message, :missing], class: :invalid
+
+    @spec message(map()) :: String.t()
+    def message(%{message: msg}) when is_binary(msg), do: msg
+
+    def message(%{missing: missing}) do
+      "Unsupported capabilities: #{inspect(missing)}"
+    end
+  end
+
   defmodule API.Request do
     @moduledoc "Error for API request failures, HTTP errors, and network issues."
     use Splode.Error,
@@ -107,9 +119,29 @@ defmodule ReqLLM.Error do
     @moduledoc "Error for unknown or unsupported providers."
     use Splode.Error, fields: [:provider], class: :invalid
 
+    @typedoc "Error for unknown provider"
+    @type t() :: %__MODULE__{
+            provider: atom()
+          }
+
     @spec message(map()) :: String.t()
     def message(%{provider: provider}) do
       "Unknown provider: #{provider}"
+    end
+  end
+
+  defmodule Invalid.Provider.NotImplemented do
+    @moduledoc "Error for providers that exist but have no implementation (metadata-only)."
+    use Splode.Error, fields: [:provider], class: :invalid
+
+    @typedoc "Error for metadata-only providers"
+    @type t() :: %__MODULE__{
+            provider: atom()
+          }
+
+    @spec message(map()) :: String.t()
+    def message(%{provider: provider}) do
+      "Provider not implemented (metadata-only): #{provider}"
     end
   end
 
@@ -238,6 +270,18 @@ defmodule ReqLLM.Error do
 
     def message(_) do
       "JSON decode error"
+    end
+  end
+
+  defmodule API.Stream do
+    @moduledoc "Error for stream processing failures."
+    use Splode.Error,
+      fields: [:reason, :cause],
+      class: :api
+
+    @spec message(map()) :: String.t()
+    def message(%{reason: reason}) do
+      reason
     end
   end
 

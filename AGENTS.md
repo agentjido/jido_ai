@@ -1,7 +1,9 @@
 # AGENTS.md - ReqLLM Development Guide
 
+**IMPORTANT: DO NOT WRITE COMMENTS INTO THE BODY OF ANY FUNCTIONS.**
+
 ## Project Overview
-ReqLLM is a composable Elixir library for AI interactions built on Req, providing a unified interface to AI providers through a plugin-based architecture.
+ReqLLM is a composable Elixir library for AI interactions built on Req, providing a unified interface to AI providers through a plugin-based architecture. The library uses OpenAI Chat Completions as the baseline API standard, with providers implementing translation layers for non-compatible APIs.
 
 ## Common Commands
 
@@ -9,29 +11,56 @@ ReqLLM is a composable Elixir library for AI interactions built on Req, providin
 - `mix test` - Run all tests using cached fixtures
 - `mix test test/req_llm_test.exs` - Run specific test file
 - `mix test --only describe:"model/1 top-level API"` - Run specific describe block
-- `mix test --only openai` - Run tests for specific provider using ExUnit tags
-- `mix test --only coverage` - Run capability coverage tests
 - `LIVE=true mix test` - Run against real APIs and (re)generate fixtures
-- `LIVE=true mix test --only openai` - Regenerate fixtures for single provider
+- `REQ_LLM_DEBUG=1 mix test` - Run tests with verbose fixture debugging output
 - `mix compile` - Compile the project
 - `mix quality` or `mix q` - Run quality checks (format, compile --warnings-as-errors, dialyzer, credo)
+
+### Coverage Validation
+- `mix mc` or `mix req_llm.model_compat` - Show models with passing fixtures
+- `mix mc "*:*"` - Validate all models (parallel, fixture-based)
+- `mix mc --sample` - Validate sample model subset (config/config.exs)
+- `mix mc anthropic` - Validate all Anthropic models
+- `mix mc "openai:gpt-4o"` - Validate specific model
+- `mix mc "xai:*" --record` - Re-record fixtures for xAI models
+- `mix mc --available` - List all models from registry (priv/models_dev/)
+
+**Coverage System Architecture:**
+- **Model Registry**: `priv/models_dev/*.json` (synced via `mix req_llm.model_sync`)
+- **Fixture State**: `priv/supported_models.json` (auto-generated artifact)
+- **Parallel Execution**: Tests run concurrently for speed
+- **State Tracking**: Skips models with passing fixtures unless `--record` or `--record-all`
+
+#### Test Filtering with Semantic Tags
+ReqLLM uses structured key/value tags for precise test filtering:
+
+**Tag Dimensions:**
+- `category` - Test type (`:core`, `:streaming`, `:tools`, `:embedding`)
+- `provider` - LLM provider (`:anthropic`, `:openai`, `:google`, `:groq`, `:openrouter`, `:xai`)
+
+**Examples:**
+- `mix test --only "category:core"` - Run all core tests
+- `mix test --only "provider:anthropic"` - Run Anthropic tests only
+- `mix test --only "category:core" --only "provider:openrouter"` - Run OpenRouter core tests
+- `LIVE=true mix test --only "category:core" --only "provider:anthropic"` - Regenerate Anthropic core fixtures
 
 ### Code Quality
 - `mix format` - Format Elixir code
 - `mix format --check-formatted` - Check if code is properly formatted
 - `mix dialyzer` - Run Dialyzer type analysis
-- `mix credo --strict` - Run Credo linting
+- `mix credo --strict` - Run Credo linting (includes custom rule to enforce no comments in function bodies)
 
 ## Architecture & Structure
 
 ### Core Structure
 - `lib/req_llm.ex` - Main API facade with generate_text/3, stream_text/3, generate_object/4
-- `lib/req_llm/` - Core modules (Model, Provider, Error structures, protocols)
+- `lib/req_llm/` - Core modules (Model, Provider, Error structures)
 - `lib/req_llm/providers/` - Provider-specific implementations (Anthropic, OpenAI, etc.)
-- `test/` - Consolidated capability-oriented test suites
-  - `coverage/<provider>/` - Provider-specific capability tests  
-  - `support/` - shared helpers (e.g. `live_fixture.ex`, provider test macros)
-  - Test files are intentionally few and broad; new behavior should extend an existing suite when possible instead of adding many micro-tests
+- `test/` - Three-tier testing architecture (see `test/AGENTS.md` for detailed testing guide)
+  - `test/req_llm/` - Core package tests (NO API calls, unit tests with mocks)
+  - `test/provider/` - Mocked provider-specific tests (NO API calls, tests provider nuances)
+  - `test/coverage/` - Live API coverage tests (fixture-based, high-level API only)
+  - `test/support/` - Shared helpers (live fixtures, HTTP mocks, test macros)
 
 ### Core Data Structures
 - `ReqLLM.Context` - Conversation history as a collection of messages
@@ -44,20 +73,23 @@ ReqLLM is a composable Elixir library for AI interactions built on Req, providin
 
 ### Provider Architecture
 - Each provider implements `ReqLLM.Provider` behavior with callbacks:
-  - `prepare_request/4` - Configure operation-specific requests
-  - `attach/3` - Set up authentication and Req pipeline steps
-  - `encode_body/1` - Transform context to provider JSON
-  - `decode_response/1` - Parse API responses
+  - `prepare_request/4` - Configure operation-specific requests (non-streaming only)
+  - `attach/3` - Set up authentication and Req pipeline steps (non-streaming only)
+  - `encode_body/1` - Transform context to provider JSON (non-streaming only)
+  - `decode_response/1` - Parse API responses (non-streaming only)
+  - `attach_stream/4` - Build complete Finch streaming request (streaming only, optional)
+  - `decode_sse_event/2` - Decode provider SSE events to StreamChunk structs (streaming only, optional)
   - `extract_usage/2` - Extract usage/cost data (optional)
   - `translate_options/3` - Provider-specific parameter translation (optional)
 - Providers use `ReqLLM.Provider.DSL` macro for registration and metadata loading
-- Core API uses provider's `attach/3` to compose Req requests with provider-specific steps
+- **Non-streaming**: Core API uses provider's `attach/3` to compose Req requests with provider-specific steps
+- **Streaming**: Uses Finch with provider's `attach_stream/4` to build streaming requests and `decode_sse_event/2` to parse SSE events
 - **Options Translation**: Providers can implement `translate_options/3` to handle model-specific parameter requirements (e.g., OpenAI o1 models require `max_completion_tokens` instead of `max_tokens`)
 
-### Protocol System
-- `ReqLLM.Context.Codec` - Protocol for encoding/decoding contexts to/from provider wire formats
-- `ReqLLM.Response.Codec` - Protocol for decoding provider responses to canonical Response structs
-- Each provider implements these protocols for their specific data formats
+### Encoding/Decoding System
+- Provider callbacks handle encoding/decoding requests and responses
+- Built-in defaults provide OpenAI-style wire format handling
+- Providers can override `encode_body/1` and `decode_response/1` for custom formats
 
 ## Code Style & Conventions
 

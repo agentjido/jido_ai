@@ -1,10 +1,13 @@
 defmodule ReqLLM.MixProject do
   use Mix.Project
 
+  @version "1.0.0-rc.7"
+  @source_url "https://github.com/agentjido/req_llm"
+
   def project do
     [
       app: :req_llm,
-      version: "1.0.0-rc.1",
+      version: @version,
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -12,18 +15,12 @@ defmodule ReqLLM.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
 
       # Test coverage
-      test_coverage: [tool: ExCoveralls],
-      preferred_cli_env: [
-        coveralls: :test,
-        "coveralls.detail": :test,
-        "coveralls.post": :test,
-        "coveralls.html": :test,
-        "coveralls.github": :test
-      ],
+      test_coverage: [tool: ExCoveralls, export: "cov", exclude: [:coverage]],
 
       # Dialyzer configuration
       dialyzer: [
-        plt_add_apps: [:mix]
+        plt_add_apps: [:mix],
+        ignore_warnings: ".dialyzer_ignore.exs"
       ],
 
       # Package
@@ -31,24 +28,37 @@ defmodule ReqLLM.MixProject do
 
       # Documentation
       name: "ReqLLM",
-      source_url: "https://github.com/agentjido/req_llm",
-      homepage_url: "https://github.com/agentjido/req_llm",
-      source_ref: "v1.0.0-rc.1",
+      source_url: @source_url,
+      homepage_url: @source_url,
+      source_ref: "v#{@version}",
       docs: [
         main: "readme",
         extras: [
           "README.md",
+          "CONTRIBUTING.md",
           "guides/getting-started.md",
           "guides/core-concepts.md",
           "guides/api-reference.md",
           "guides/data-structures.md",
           "guides/model-metadata.md",
-          "guides/capability-testing.md",
+          "guides/coverage-testing.md",
           "guides/adding_a_provider.md"
         ],
         groups_for_extras: [
           Guides: ~r/guides\/.*/
         ]
+      ]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.github": :test
       ]
     ]
   end
@@ -59,7 +69,7 @@ defmodule ReqLLM.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :xmerl],
       mod: {ReqLLM.Application, []}
     ]
   end
@@ -67,30 +77,36 @@ defmodule ReqLLM.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:req, "~> 0.5"},
       {:jason, "~> 1.4"},
+      {:jido_keys, "~> 1.0"},
       {:nimble_options, "~> 1.1"},
-      {:typed_struct, "~> 0.3.0"},
-      {:splode, "~> 0.2.3"},
+      {:req, "~> 0.5"},
+      {:ex_aws_auth, "~> 1.0", optional: true},
       {:server_sent_events, "~> 0.2"},
-      {:jido_keys, "~> 1.0", optional: true},
+      {:splode, "~> 0.2.3"},
+      {:typed_struct, "~> 0.3.0"},
+      {:uniq, "~> 0.6"},
 
       # Dev/test dependencies
+      {:bandit, "~> 1.8", only: :dev, runtime: false},
+      {:tidewave, "~> 0.5", only: :dev, runtime: false},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:quokka, "~> 2.11", only: [:dev, :test], runtime: false},
-      {:excoveralls, "~> 0.18", only: [:dev, :test], runtime: false}
+      {:quokka, "== 2.11.2", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: [:dev, :test], runtime: false},
+      {:plug, "~> 1.0", only: [:dev, :test], runtime: false}
     ]
   end
 
   defp package do
     [
-      description: "Composable Elixir library for LLM interactions built on Req",
+      description: "Composable Elixir library for LLM interactions built on Req & Finch",
       licenses: ["Apache-2.0"],
       maintainers: ["Mike Hostetler"],
-      links: %{"GitHub" => "https://github.com/agentjido/req_llm"},
-      files: ~w(lib priv mix.exs LICENSE README.md AGENTS.md usage-rules.md guides .formatter.exs)
+      links: %{"GitHub" => @source_url, "Agent Jido" => "https://agentjido.xyz"},
+      files:
+        ~w(lib priv mix.exs LICENSE README.md CONTRIBUTING.md AGENTS.md usage-rules.md guides .formatter.exs)
     ]
   end
 
@@ -102,7 +118,8 @@ defmodule ReqLLM.MixProject do
         "dialyzer",
         "credo --strict"
       ],
-      q: ["quality"]
+      q: ["quality"],
+      mc: ["req_llm.model_compat"]
     ]
   end
 end
