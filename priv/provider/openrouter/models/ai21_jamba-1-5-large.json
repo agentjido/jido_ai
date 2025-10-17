@@ -1,0 +1,37 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Other"
+    },
+    "created": 1724371200,
+    "description": "Jamba 1.5 Large is part of AI21's new family of open models, offering superior speed, efficiency, and quality.\n\nIt features a 256K effective context window, the longest among open models, enabling improved performance on tasks like document summarization and analysis.\n\nBuilt on a novel SSM-Transformer architecture, it outperforms larger models like Llama 3.1 70B on benchmarks while maintaining resource efficiency.\n\nRead their [announcement](https://www.ai21.com/blog/announcing-jamba-model-family) to learn more.",
+    "endpoints": [
+      {
+        "context_length": 256000,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "AI21 | ai21/jamba-1-5-large",
+        "pricing": {
+          "completion": "0.000008",
+          "image": "0",
+          "prompt": "0.000002",
+          "request": "0"
+        },
+        "provider_name": "AI21",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop"
+        ]
+      }
+    ],
+    "id": "ai21/jamba-1-5-large",
+    "name": "AI21: Jamba 1.5 Large"
+  }
+}

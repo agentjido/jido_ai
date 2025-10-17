@@ -1,0 +1,20 @@
+{
+  "id": "gpt-3.5-turbo-instruct",
+  "name": "gpt-3.5-turbo-instruct",
+  "description": "",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "standard",
+    "description": "Balanced performance and cost"
+  },
+  "created": 1692901427,
+  "owned_by": "system"
+}

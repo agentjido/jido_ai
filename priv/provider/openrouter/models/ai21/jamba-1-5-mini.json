@@ -1,0 +1,25 @@
+{
+  "id": "ai21/jamba-1-5-mini",
+  "name": "AI21: Jamba 1.5 Mini",
+  "description": "Jamba 1.5 Mini is the world's first production-grade Mamba-based model, combining SSM and Transformer architectures for a 256K context window and high efficiency.\n\nIt works with 9 languages and can handle various writing and analysis tasks as well as or better than similar small models.\n\nThis model uses less computer memory and works faster with longer texts than previous designs.\n\nRead their [announcement](https://www.ai21.com/blog/announcing-jamba-model-family) to learn more.",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Other",
+    "instruct_type": null
+  },
+  "created": 1724371200,
+  "endpoints": []
+}

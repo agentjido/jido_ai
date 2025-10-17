@@ -1,0 +1,69 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "openchat",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1701129600,
+    "description": "OpenChat 7B is a library of open-source language models, fine-tuned with \"C-RLFT (Conditioned Reinforcement Learning Fine-Tuning)\" - a strategy inspired by offline reinforcement learning. It has been trained on mixed-quality data without preference labels.\n\n- For OpenChat fine-tuned on Mistral 7B, check out [OpenChat 7B](/models/openchat/openchat-7b).\n- For OpenChat fine-tuned on Llama 8B, check out [OpenChat 8B](/models/openchat/openchat-8b).\n\n#open-source",
+    "endpoints": [
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "DeepInfra | openchat/openchat-7b",
+        "pricing": {
+          "completion": "0.000000055",
+          "image": "0",
+          "prompt": "0.000000055",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "fp16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 8192,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Lepton | openchat/openchat-7b",
+        "pricing": {
+          "completion": "0.00000007",
+          "image": "0",
+          "prompt": "0.00000007",
+          "request": "0"
+        },
+        "provider_name": "Lepton",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      }
+    ],
+    "id": "openchat/openchat-7b",
+    "name": "OpenChat 3.5 7B"
+  }
+}

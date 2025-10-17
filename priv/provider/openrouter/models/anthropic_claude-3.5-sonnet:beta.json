@@ -1,0 +1,38 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Claude"
+    },
+    "created": 1729555200,
+    "description": "New Claude 3.5 Sonnet delivers better-than-Opus capabilities, faster-than-Sonnet speeds, at the same Sonnet prices. Sonnet is particularly good at:\n\n- Coding: Scores ~49% on SWE-Bench Verified, higher than the last best score, and without any fancy prompt scaffolding\n- Data science: Augments human data science expertise; navigates unstructured data while using multiple tools for insights\n- Visual processing: excelling at interpreting charts, graphs, and images, accurately transcribing text to derive insights beyond just the text alone\n- Agentic tasks: exceptional tool use, making it great at agentic tasks (i.e. complex, multi-step problem solving tasks that require engaging with other systems)\n\n#multimodal",
+    "endpoints": [
+      {
+        "context_length": 200000,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "Anthropic | anthropic/claude-3.5-sonnet:beta",
+        "pricing": {
+          "completion": "0.000015",
+          "image": "0.0048",
+          "prompt": "0.000003",
+          "request": "0"
+        },
+        "provider_name": "Anthropic",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "stop"
+        ]
+      }
+    ],
+    "id": "anthropic/claude-3.5-sonnet:beta",
+    "name": "Anthropic: Claude 3.5 Sonnet (self-moderated)"
+  }
+}

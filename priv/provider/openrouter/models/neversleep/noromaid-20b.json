@@ -1,0 +1,25 @@
+{
+  "id": "neversleep/noromaid-20b",
+  "name": "Noromaid 20B",
+  "description": "A collab between IkariDev and Undi. This merge is suitable for RP, ERP, and general knowledge.\n\n#merge #uncensored",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Llama2",
+    "instruct_type": "alpaca"
+  },
+  "created": 1700956800,
+  "endpoints": []
+}

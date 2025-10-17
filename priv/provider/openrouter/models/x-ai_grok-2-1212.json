@@ -1,0 +1,44 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Grok"
+    },
+    "created": 1734232814,
+    "description": "Grok 2 1212 introduces significant enhancements to accuracy, instruction adherence, and multilingual support, making it a powerful and flexible choice for developers seeking a highly steerable, intelligent model.",
+    "endpoints": [
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "xAI | x-ai/grok-2-1212",
+        "pricing": {
+          "completion": "0.00001",
+          "image": "0",
+          "prompt": "0.000002",
+          "request": "0"
+        },
+        "provider_name": "xAI",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "x-ai/grok-2-1212",
+    "name": "xAI: Grok 2 1212"
+  }
+}

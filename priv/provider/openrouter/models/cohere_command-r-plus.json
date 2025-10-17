@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Cohere"
+    },
+    "created": 1712188800,
+    "description": "Command R+ is a new, 104B-parameter LLM from Cohere. It's useful for roleplay, general consumer usecases, and Retrieval Augmented Generation (RAG).\n\nIt offers multilingual support for ten key languages to facilitate global business operations. See benchmarks and the launch post [here](https://txt.cohere.com/command-r-plus-microsoft-azure/).\n\nUse of this model is subject to Cohere's [Usage Policy](https://docs.cohere.com/docs/usage-policy) and [SaaS Agreement](https://cohere.com/saas-agreement).",
+    "endpoints": [
+      {
+        "context_length": 128000,
+        "max_completion_tokens": 4000,
+        "max_prompt_tokens": null,
+        "name": "Cohere | cohere/command-r-plus",
+        "pricing": {
+          "completion": "0.00001425",
+          "image": "0",
+          "prompt": "0.00000285",
+          "request": "0"
+        },
+        "provider_name": "Cohere",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "seed",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "cohere/command-r-plus",
+    "name": "Cohere: Command R+"
+  }
+}

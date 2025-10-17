@@ -1,0 +1,44 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Grok"
+    },
+    "created": 1729382400,
+    "description": "Grok Beta is xAI's experimental language model with state-of-the-art reasoning capabilities, best for complex and multi-step use cases.\n\nIt is the successor of [Grok 2](https://x.ai/blog/grok-2) with enhanced context length.",
+    "endpoints": [
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "xAI | x-ai/grok-beta",
+        "pricing": {
+          "completion": "0.000015",
+          "image": "0",
+          "prompt": "0.000005",
+          "request": "0"
+        },
+        "provider_name": "xAI",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "x-ai/grok-beta",
+    "name": "xAI: Grok Beta"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "google/palm-2-chat-bison",
+  "name": "Google: PaLM 2 Chat",
+  "description": "PaLM 2 is a language model by Google with improved multilingual, reasoning and coding capabilities.",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "PaLM",
+    "instruct_type": null
+  },
+  "created": 1689811200,
+  "endpoints": []
+}

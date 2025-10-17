@@ -1,0 +1,37 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Gemini"
+    },
+    "created": 1702425600,
+    "description": "Google's flagship text generation model. Designed to handle natural language tasks, multiturn text and code chat, and code generation.\n\nSee the benchmarks and prompting guidelines from [Deepmind](https://deepmind.google/technologies/gemini/).\n\nUsage of Gemini is subject to Google's [Gemini Terms of Use](https://ai.google.dev/terms).",
+    "endpoints": [
+      {
+        "context_length": 32760,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "Google | google/gemini-pro",
+        "pricing": {
+          "completion": "0.0000015",
+          "image": "0.0025",
+          "prompt": "0.0000005",
+          "request": "0"
+        },
+        "provider_name": "Google",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "tools",
+          "tool_choice",
+          "stop"
+        ]
+      }
+    ],
+    "id": "google/gemini-pro",
+    "name": "Google: Gemini Pro 1.0"
+  }
+}

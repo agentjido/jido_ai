@@ -1,0 +1,41 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "llama3",
+      "modality": "text->text",
+      "tokenizer": "Llama3"
+    },
+    "created": 1734377303,
+    "description": "EVA Llama 3.33 70b is a roleplay and storywriting specialist model. It is a full-parameter finetune of [Llama-3.3-70B-Instruct](https://openrouter.ai/meta-llama/llama-3.3-70b-instruct) on mixture of synthetic and natural data.\n\nIt uses Celeste 70B 0.1 data mixture, greatly expanding it to improve versatility, creativity and \"flavor\" of the resulting model\n\nThis model was built with Llama by Meta.\n",
+    "endpoints": [
+      {
+        "context_length": 16384,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "Featherless | eva-unit-01/eva-llama-3.33-70b",
+        "pricing": {
+          "completion": "0.000006",
+          "image": "0",
+          "prompt": "0.000004",
+          "request": "0"
+        },
+        "provider_name": "Featherless",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      }
+    ],
+    "id": "eva-unit-01/eva-llama-3.33-70b",
+    "name": "EVA Llama 3.33 70B"
+  }
+}

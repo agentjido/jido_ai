@@ -1,0 +1,98 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "gemma",
+      "modality": "text->text",
+      "tokenizer": "Gemini"
+    },
+    "created": 1719532800,
+    "description": "Gemma 2 9B by Google is an advanced, open-source language model that sets a new standard for efficiency and performance in its size class.\n\nDesigned for a wide variety of tasks, it empowers developers and researchers to build innovative applications, while maintaining accessibility, safety, and cost-effectiveness.\n\nSee the [launch announcement](https://blog.google/technology/developers/google-gemma-2/) for more details. Usage of Gemma is subject to Google's [Gemma Terms of Use](https://ai.google.dev/gemma/terms).",
+    "endpoints": [
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": 4096,
+        "name": "Lepton | google/gemma-2-9b-it:free",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "Lepton",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      },
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": 4096,
+        "name": "DeepInfra | google/gemma-2-9b-it:free",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "Chutes | google/gemma-2-9b-it:free",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "Chutes",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "top_k",
+          "min_p",
+          "repetition_penalty",
+          "logprobs",
+          "logit_bias",
+          "top_logprobs"
+        ]
+      }
+    ],
+    "id": "google/gemma-2-9b-it:free",
+    "name": "Google: Gemma 2 9B (free)"
+  }
+}

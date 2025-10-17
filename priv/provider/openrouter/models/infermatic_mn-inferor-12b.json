@@ -1,0 +1,41 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "mistral",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1731464428,
+    "description": "Inferor 12B is a merge of top roleplay models, expert on immersive narratives and storytelling.\n\nThis model was merged using the [Model Stock](https://arxiv.org/abs/2403.19522) merge method using [anthracite-org/magnum-v4-12b](https://openrouter.ai/anthracite-org/magnum-v4-72b) as a base.\n",
+    "endpoints": [
+      {
+        "context_length": 16384,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "Featherless | infermatic/mn-inferor-12b",
+        "pricing": {
+          "completion": "0.0000012",
+          "image": "0",
+          "prompt": "0.0000008",
+          "request": "0"
+        },
+        "provider_name": "Featherless",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      }
+    ],
+    "id": "infermatic/mn-inferor-12b",
+    "name": "Infermatic: Mistral Nemo Inferor 12B"
+  }
+}

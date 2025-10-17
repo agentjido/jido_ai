@@ -1,0 +1,37 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Other"
+    },
+    "created": 1738351721,
+    "description": "OpenAI o3-mini is a cost-efficient language model optimized for STEM reasoning tasks, particularly excelling in science, mathematics, and coding.\n\nThis model supports the `reasoning_effort` parameter, which can be set to \"high\", \"medium\", or \"low\" to control the thinking time of the model. The default is \"medium\". OpenRouter also offers the model slug `openai/o3-mini-high` to default the parameter to \"high\".\n\nThe model features three adjustable reasoning effort levels and supports key developer capabilities including function calling, structured outputs, and streaming, though it does not include vision processing capabilities.\n\nThe model demonstrates significant improvements over its predecessor, with expert testers preferring its responses 56% of the time and noting a 39% reduction in major errors on complex questions. With medium reasoning effort settings, o3-mini matches the performance of the larger o1 model on challenging reasoning evaluations like AIME and GPQA, while maintaining lower latency and cost.",
+    "endpoints": [
+      {
+        "context_length": 200000,
+        "max_completion_tokens": 100000,
+        "max_prompt_tokens": null,
+        "name": "OpenAI | openai/o3-mini-2025-01-31",
+        "pricing": {
+          "completion": "0.0000044",
+          "image": "0",
+          "prompt": "0.0000011",
+          "request": "0"
+        },
+        "provider_name": "OpenAI",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "seed",
+          "max_tokens",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "openai/o3-mini",
+    "name": "OpenAI: o3 Mini"
+  }
+}

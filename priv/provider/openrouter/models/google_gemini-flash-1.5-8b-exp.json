@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Gemini"
+    },
+    "created": 1724803200,
+    "description": "Gemini Flash 1.5 8B Experimental is an experimental, 8B parameter version of the [Gemini Flash 1.5](/models/google/gemini-flash-1.5) model.\n\nUsage of Gemini is subject to Google's [Gemini Terms of Use](https://ai.google.dev/terms).\n\n#multimodal\n\nNote: This model is currently experimental and not suitable for production use-cases, and may be heavily rate-limited.",
+    "endpoints": [
+      {
+        "context_length": 1000000,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "Google AI Studio | google/gemini-flash-1.5-8b-exp",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "Google AI Studio",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "google/gemini-flash-1.5-8b-exp",
+    "name": "Google: Gemini Flash 1.5 8B Experimental"
+  }
+}

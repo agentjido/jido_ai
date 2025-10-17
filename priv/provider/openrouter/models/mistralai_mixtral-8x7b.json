@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "none",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1702166400,
+    "description": "Mixtral 8x7B is a pretrained generative Sparse Mixture of Experts, by Mistral AI. Incorporates 8 experts (feed-forward networks) for a total of 47B parameters. Base model (not fine-tuned for instructions) - see [Mixtral 8x7B Instruct](/models/mistralai/mixtral-8x7b-instruct) for an instruct-tuned model.\n\n#moe",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Together | mistralai/mixtral-8x7b",
+        "pricing": {
+          "completion": "0.0000006",
+          "image": "0",
+          "prompt": "0.0000006",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "mistralai/mixtral-8x7b",
+    "name": "Mistral: Mixtral 8x7B (base)"
+  }
+}

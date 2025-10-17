@@ -1,69 +1,267 @@
-# JidoWorkspace
+# Jido AI
 
-Git subtree-powered monorepo workspace manager for the Jido ecosystem.
+Jido AI is an extension of the Jido framework for building AI Agents and Workflows in Elixir. At present, it provides a single action for interacting with Anthropic's Claude models via the Instructor library.
 
-## Quick Start
+## Installation
 
-```bash
-# Daily sync - pull all projects and compile
-mix morning
-
-# Run tests across all projects  
-mix ws.test
-
-# Run quality checks across all projects
-mix ws.quality
-
-# Check dependencies across all projects
-mix ws.deps --check
+```elixir
+def deps do
+  [
+    {:jido, "~> 1.2.0"},
+    {:jido_ai, "~> 0.5.2"},
+  ]
+end
 ```
 
-## Workspace Management
+## Configuration
 
-```bash
-mix workspace.pull              # Pull all projects
-mix workspace.pull <project>    # Pull specific project
-mix workspace.push <project>    # Push to upstream
-mix workspace.status            # Show workspace status
-mix workspace.add <name> <url>  # Add new project
+You will need to properly configure the `Instructor` library to use the Anthropic adapter:
+
+```elixir
+# config/config.exs
+config :instructor,
+  adapter: Instructor.Adapters.Anthropic,
+  anthropic: [
+    api_key: System.get_env("ANTHROPIC_API_KEY")
+  ]
 ```
 
-## Development Setup
+## Supported Providers
 
-**External developers** (default): Uses Hex packages automatically.
+Jido AI supports multiple LLM providers:
 
-**Workspace developers**: Dependencies automatically switch to local path dependencies when project directories exist - no configuration needed.
+- Anthropic (Claude models)
+- OpenAI (GPT models)
+- OpenRouter (proxy for multiple models)
+- Cloudflare (Workers AI models)
+- Google (Gemini models)
 
-## Hex Publishing
+### Using Google Gemini
 
-The workspace includes automated Hex publishing for all ecosystem packages.
+To use Google's Gemini models with the OpenAI-compatible API:
 
-### Commands
+```elixir
+# Set your Google API key
+Jido.AI.Keyring.set_session_value(:google_api_key, "your_gemini_api_key")
 
-```bash
-mix hex.publish.all    # Publish all modified projects to Hex
-mix version.check      # Check version consistency across projects  
-mix hex_validate      # Validate Hex metadata before publishing
+# Create a model using the Google provider
+{:ok, model} = Jido.AI.Model.from({:google, [model: "gemini-2.0-flash"]})
+
+# Use the model with the OpenaiEx action
+result = Jido.AI.Actions.OpenaiEx.run(
+  %{
+    model: model,
+    messages: [
+      %{role: :user, content: "Tell me about Elixir programming language"}
+    ],
+    temperature: 0.7
+  },
+  %{}
+)
+
+# Handle the result
+case result do
+  {:ok, %{content: content, tool_results: _}} ->
+    IO.puts("Response: #{content}")
+  {:error, %{reason: reason, details: details}} ->
+    IO.puts("Error: #{reason} - #{inspect(details)}")
+end
 ```
 
-### Publishing Workflow
+You can also set the Google API key using environment variables:
 
-1. **Version Check**: `mix version.check` to ensure consistency
-2. **Validation**: `mix hex_validate` to check metadata
-3. **Publish**: `mix hex.publish.all` to publish all modified packages
-4. **Publishing handled automatically**: Hex dependencies are used automatically when publishing
+```
+GOOGLE_API_KEY=your_gemini_api_key
+```
 
-### Key Notes
+## Prompt and Message Handling
 
-- The `jido_dep` helper automatically switches between local paths and Hex packages
-- No environment variable configuration needed
-- Publishing validates dependencies are pointing to Hex, not local paths
+Jido AI provides a robust system for handling prompts and messages when interacting with LLMs.
 
-## Projects
+### MessageItem
 
-- **jido** - Core Jido library
-- **jido_action** - Composable action framework with AI integration  
-- **jido_signal** - Event-driven messaging and workflow system
+The `Jido.AI.Prompt.MessageItem` module is used to represent messages in conversations with LLMs. It supports:
 
-See [AGENTS.md](AGENTS.md) for detailed commands and architecture.
+- Basic text messages with different roles (user, assistant, system, function)
+- Rich content including images and files
+- Template-based messages using EEx
 
+```elixir
+alias Jido.AI.Prompt.MessageItem
+
+# Create a simple user message
+user_msg = MessageItem.new(%{role: :user, content: "Hello"})
+
+# Create a system message
+system_msg = MessageItem.new(%{role: :system, content: "You are a helpful assistant"})
+
+# Create a message with rich content (image)
+rich_msg = MessageItem.new_multipart(:user, [
+  MessageItem.text_part("Check out this image:"),
+  MessageItem.image_part("https://example.com/image.jpg")
+])
+
+# Create a message with a template
+template_msg = MessageItem.new(%{
+  role: :system,
+  content: "You are a <%= @assistant_type %>",
+  engine: :eex
+})
+```
+
+For more details on MessageItem usage, refer to the documentation.
+
+## Example
+
+Here's how to use Jido AI with Jido.Exec to get structured information about US politicians. See the [examples/politician.ex](examples/politician.ex) for more a full example.
+
+```elixir
+# Define a simple workflow
+defmodule JidoAi.Examples.Politician do
+  defmodule Schema do
+    use Ecto.Schema
+    use Instructor
+    @primary_key false
+    embedded_schema do
+      field(:first_name, :string)
+      field(:last_name, :string)
+
+      embeds_many :offices_held, Office, primary_key: false do
+        field(:office, Ecto.Enum,
+          values: [:president, :vice_president, :governor, :congress, :senate]
+        )
+
+        field(:from_date, :date)
+        field(:to_date, :date)
+      end
+    end
+  end
+
+  use Jido.Action,
+    name: "politician",
+    description: "A description of United States Politicians and the offices that they held",
+    schema: [
+      query: [type: :string, required: true, doc: "The query to search for"]
+    ]
+
+  def run(params, _context) do
+    # Run the Anthropic ChatCompletion action
+    JidoAi.Actions.Anthropic.ChatCompletion.run(
+      %{
+        model: "claude-3-5-haiku-latest",
+        messages: [
+          %{
+            role: "user",
+            content: params.query
+          }
+        ],
+        response_model: Schema,
+        temperature: 0.5,
+        max_tokens: 1000
+      },
+      %{}
+    )
+    |> case do
+      {:ok, %{result: politician}} -> {:ok, %{result: politician}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+end
+
+# Run the workflow
+iex> {:ok, result} = Jido.Exec.run(JidoAi.Examples.Politician, %{query: "Tell me about Barack Obama's political career"})
+iex> result.result
+%JidoAi.Examples.Politician.Schema{
+  first_name: "Barack",
+  last_name: "Obama",
+  offices_held: [
+    %JidoAi.Examples.Politician.Schema.Office{
+      office: :senate,
+      from_date: ~D[2005-01-03],
+      to_date: ~D[2008-11-16]
+    },
+    %JidoAi.Examples.Politician.Schema.Office{
+      office: :president,
+      from_date: ~D[2009-01-20],
+      to_date: ~D[2017-01-20]
+    }
+  ]
+}
+```
+
+The example demonstrates how JidoAi can:
+
+- Write Actions that can wrap other Actions
+- Use Jido.Exec to orchestrate AI operations
+- Parse natural language queries about politicians
+- Return structured data using Ecto schemas
+- Handle complex nested data structures
+- Provide type validation through Ecto's type system
+
+Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
+and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
+be found at <https://hexdocs.pm/jido_ai>.
+
+## LLM Keyring
+
+The Jido.AI application includes a Keyring system that manages API keys for various LLM providers. The Keyring is a singleton GenServer that helps to manage LLM keys for convenience, not for security.
+
+### Key Sources
+
+Keys are loaded with the following priority:
+
+1. Environment variables (highest priority)
+2. Application environment
+3. Default values (lowest priority)
+
+### Session-based Keys
+
+Keys can also be set on a per-session (per-process) basis. This allows different parts of your application to use different API keys without affecting other processes.
+
+### Usage
+
+```elixir
+# Get a key (checks session keys first, then environment keys)
+api_key = Jido.AI.Keyring.get_key(:anthropic)
+
+# Get only the environment-level key
+env_key = Jido.AI.Keyring.get_env_key(:anthropic)
+
+# Set a session-specific key (only affects the current process)
+Jido.AI.Keyring.set_session_key(:anthropic, "my_session_key")
+
+# Clear a session key
+Jido.AI.Keyring.clear_session_key(:anthropic)
+
+# Clear all session keys for the current process
+Jido.AI.Keyring.clear_all_session_keys()
+
+# Check if a key is valid (non-nil and non-empty)
+Jido.AI.Keyring.has_valid_key?(api_key)
+
+# Test if a key is valid by making an API request
+Jido.AI.Keyring.test_key(:anthropic, api_key)
+```
+
+### Configuration
+
+You can configure keys in your `config.exs` file:
+
+```elixir
+config :jido_ai, :instructor,
+  anthropic: [
+    api_key: "your_anthropic_key"
+  ]
+
+config :jido_ai, :openai,
+  api_key: "your_openai_key"
+```
+
+Or using environment variables:
+
+```
+ANTHROPIC_API_KEY=your_anthropic_key
+OPENAI_API_KEY=your_openai_key
+```
+
+Environment variables take precedence over application configuration.

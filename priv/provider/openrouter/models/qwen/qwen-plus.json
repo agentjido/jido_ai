@@ -1,0 +1,25 @@
+{
+  "id": "qwen/qwen-plus",
+  "name": "Qwen: Qwen-Plus",
+  "description": "Qwen-Plus, based on the Qwen2.5 foundation model, is a 131K context model with a balanced performance, speed, and cost combination.",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Qwen",
+    "instruct_type": null
+  },
+  "created": 1738409840,
+  "endpoints": []
+}

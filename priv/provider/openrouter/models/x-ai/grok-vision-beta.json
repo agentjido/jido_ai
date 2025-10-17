@@ -1,0 +1,25 @@
+{
+  "id": "x-ai/grok-vision-beta",
+  "name": "xAI: Grok Vision Beta",
+  "description": "Grok Vision Beta is xAI's experimental language model with vision capability.\n\n",
+  "capabilities": {
+    "code": false,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text+image->text",
+    "tokenizer": "Grok",
+    "instruct_type": null
+  },
+  "created": 1731976624,
+  "endpoints": []
+}

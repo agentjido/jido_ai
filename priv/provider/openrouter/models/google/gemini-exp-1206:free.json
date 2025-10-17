@@ -1,0 +1,25 @@
+{
+  "id": "google/gemini-exp-1206:free",
+  "name": "Google: Gemini Experimental 1206 (free)",
+  "description": "Experimental release (December 6, 2024) of Gemini.",
+  "capabilities": {
+    "code": false,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text+image->text",
+    "tokenizer": "Gemini",
+    "instruct_type": null
+  },
+  "created": 1733507713,
+  "endpoints": []
+}
