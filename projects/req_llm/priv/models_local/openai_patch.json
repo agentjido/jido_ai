@@ -8,6 +8,109 @@
   },
   "models": [
     {
+      "id": "gpt-3.5-turbo",
+      "api": "chat"
+    },
+    {
+      "id": "gpt-4",
+      "api": "chat",
+      "supports_strict_tools": true
+    },
+    {
+      "id": "gpt-4-turbo",
+      "api": "chat",
+      "supports_strict_tools": true
+    },
+    {
+      "id": "gpt-4o",
+      "api": "chat",
+      "supports_strict_tools": true
+    },
+    {
+      "id": "gpt-4o-2024-05-13",
+      "api": "chat",
+      "supports_strict_tools": true
+    },
+    {
+      "id": "gpt-4o-2024-08-06",
+      "api": "chat",
+      "supports_json_schema_response_format": true,
+      "supports_strict_tools": true
+    },
+    {
+      "id": "gpt-4o-2024-11-20",
+      "api": "chat",
+      "supports_json_schema_response_format": true,
+      "supports_strict_tools": true
+    },
+    {
+      "id": "gpt-4o-mini",
+      "api": "chat",
+      "supports_json_schema_response_format": true,
+      "supports_strict_tools": true
+    },
+    {
+      "id": "o1",
+      "api": "responses"
+    },
+    {
+      "id": "o3",
+      "api": "responses"
+    },
+    {
+      "id": "o3-mini",
+      "api": "responses"
+    },
+    {
+      "id": "o3-pro",
+      "api": "responses"
+    },
+    {
+      "id": "o4-mini",
+      "api": "responses"
+    },
+    {
+      "id": "gpt-4.1",
+      "api": "responses"
+    },
+    {
+      "id": "gpt-4.1-mini",
+      "api": "responses"
+    },
+    {
+      "id": "gpt-4.1-nano",
+      "api": "responses"
+    },
+    {
+      "id": "gpt-5",
+      "api": "responses"
+    },
+    {
+      "id": "gpt-5-chat-latest",
+      "api": "responses",
+      "reasoning": false,
+      "tool_call": false,
+      "temperature": true
+    },
+    {
+      "id": "gpt-5-codex",
+      "api": "responses",
+      "reasoning": false,
+      "tool_call": false
+    },
+    {
+      "id": "gpt-5-mini",
+      "api": "responses"
+    },
+    {
+      "id": "gpt-5-nano",
+      "api": "responses"
+    },
+    {
+      "id": "codex-mini-latest",
+      "api": "responses"
+    },
+    {
       "id": "text-embedding-3-small",
       "name": "Text Embedding 3 Small",
       "provider": "openai",
@@ -41,7 +144,7 @@
     },
     {
       "id": "text-embedding-3-large",
-      "name": "Text Embedding 3 Large", 
+      "name": "Text Embedding 3 Large",
       "provider": "openai",
       "provider_model_id": "text-embedding-3-large",
       "type": "embedding",
@@ -74,7 +177,7 @@
     {
       "id": "text-embedding-ada-002",
       "name": "Text Embedding Ada 002",
-      "provider": "openai", 
+      "provider": "openai",
       "provider_model_id": "text-embedding-ada-002",
       "type": "embedding",
       "attachment": false,

@@ -21,3 +21,10 @@ req_llm-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Conductor
+.conductor/
+
+# Language Servers
+.elixir_ls
+.expert

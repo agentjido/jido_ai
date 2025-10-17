@@ -170,7 +170,8 @@ defmodule ReqLLM.Schema do
 
     schema_object = %{
       "type" => "object",
-      "properties" => properties
+      "properties" => properties,
+      "additionalProperties" => false
     }
 
     if required == [] do
@@ -249,6 +250,32 @@ defmodule ReqLLM.Schema do
         {:list, :pos_integer} ->
           %{"type" => "array", "items" => %{"type" => "integer", "minimum" => 1}}
 
+        # Handle {:list, {:in, choices}} for arrays with enum constraints - must be before general {:list, item_type}
+        {:list, {:in, choices}} when is_list(choices) ->
+          %{"type" => "array", "items" => %{"type" => "string", "enum" => choices}}
+
+        {:list, {:in, first..last//_step}} ->
+          %{
+            "type" => "array",
+            "items" => %{"type" => "integer", "minimum" => first, "maximum" => last}
+          }
+
+        {:list, {:in, %MapSet{} = choices}} ->
+          %{
+            "type" => "array",
+            "items" => %{"type" => "string", "enum" => MapSet.to_list(choices)}
+          }
+
+        {:list, {:in, choices}} when is_struct(choices) ->
+          try do
+            %{
+              "type" => "array",
+              "items" => %{"type" => "string", "enum" => Enum.to_list(choices)}
+            }
+          rescue
+            _ -> %{"type" => "array", "items" => %{"type" => "string"}}
+          end
+
         {:list, item_type} ->
           %{"type" => "array", "items" => nimble_type_to_json_schema(item_type, [])}
 
@@ -263,6 +290,23 @@ defmodule ReqLLM.Schema do
 
         :atom ->
           %{"type" => "string"}
+
+        # Handle :in type for enums and ranges
+        {:in, choices} when is_list(choices) ->
+          %{"type" => "string", "enum" => choices}
+
+        {:in, first..last//_step} ->
+          %{"type" => "integer", "minimum" => first, "maximum" => last}
+
+        {:in, %MapSet{} = choices} ->
+          %{"type" => "string", "enum" => MapSet.to_list(choices)}
+
+        {:in, choices} when is_struct(choices) ->
+          try do
+            %{"type" => "string", "enum" => Enum.to_list(choices)}
+          rescue
+            _ -> %{"type" => "string"}
+          end
 
         # Fallback to string for unknown types
         _ ->
@@ -360,13 +404,22 @@ defmodule ReqLLM.Schema do
   """
   @spec to_openai_format(ReqLLM.Tool.t()) :: map()
   def to_openai_format(%ReqLLM.Tool{} = tool) do
+    function_def = %{
+      "name" => tool.name,
+      "description" => tool.description,
+      "parameters" => to_json(tool.parameter_schema)
+    }
+
+    function_def =
+      if tool.strict do
+        Map.put(function_def, "strict", true)
+      else
+        function_def
+      end
+
     %{
       "type" => "function",
-      "function" => %{
-        "name" => tool.name,
-        "description" => tool.description,
-        "parameters" => to_json(tool.parameter_schema)
-      }
+      "function" => function_def
     }
   end
 
@@ -407,10 +460,136 @@ defmodule ReqLLM.Schema do
   """
   @spec to_google_format(ReqLLM.Tool.t()) :: map()
   def to_google_format(%ReqLLM.Tool{} = tool) do
+    json_schema = to_json(tool.parameter_schema)
+    parameters = Map.delete(json_schema, "additionalProperties")
+
     %{
       "name" => tool.name,
       "description" => tool.description,
-      "parameters" => to_json(tool.parameter_schema)
+      "parameters" => parameters
     }
+  end
+
+  @doc """
+  Format a tool into AWS Bedrock Converse API tool schema format.
+
+  ## Parameters
+
+    * `tool` - A `ReqLLM.Tool.t()` struct
+
+  ## Returns
+
+  A map containing the Bedrock Converse tool schema format.
+
+  ## Examples
+
+      iex> tool = %ReqLLM.Tool{
+      ...>   name: "get_weather",
+      ...>   description: "Get current weather",
+      ...>   parameter_schema: [
+      ...>     location: [type: :string, required: true, doc: "City name"]
+      ...>   ],
+      ...>   callback: fn _ -> {:ok, %{}} end
+      ...> }
+      iex> ReqLLM.Schema.to_bedrock_converse_format(tool)
+      %{
+        "toolSpec" => %{
+          "name" => "get_weather",
+          "description" => "Get current weather",
+          "inputSchema" => %{
+            "json" => %{
+              "type" => "object",
+              "properties" => %{
+                "location" => %{"type" => "string", "description" => "City name"}
+              },
+              "required" => ["location"]
+            }
+          }
+        }
+      }
+
+  """
+  @spec to_bedrock_converse_format(ReqLLM.Tool.t()) :: map()
+  def to_bedrock_converse_format(%ReqLLM.Tool{} = tool) do
+    %{
+      "toolSpec" => %{
+        "name" => tool.name,
+        "description" => tool.description,
+        "inputSchema" => %{
+          "json" => to_json(tool.parameter_schema)
+        }
+      }
+    }
+  end
+
+  @doc """
+  Validate data against a keyword schema.
+
+  Takes a data map and validates it against a NimbleOptions-style keyword schema.
+  The data is first converted to keyword format for NimbleOptions validation.
+
+  ## Parameters
+
+    * `data` - Map of data to validate
+    * `schema` - Keyword schema definition
+
+  ## Returns
+
+    * `{:ok, validated_data}` - Successfully validated data
+    * `{:error, error}` - Validation error with details
+
+  ## Examples
+
+      iex> schema = [name: [type: :string, required: true], age: [type: :integer]]
+      iex> data = %{"name" => "Alice", "age" => 30}
+      iex> ReqLLM.Schema.validate(data, schema)
+      {:ok, [name: "Alice", age: 30]}
+
+      iex> schema = [name: [type: :string, required: true]]  
+      iex> data = %{"age" => 30}
+      iex> ReqLLM.Schema.validate(data, schema)
+      {:error, %ReqLLM.Error.Validation.Error{...}}
+
+  """
+  @spec validate(map(), keyword()) :: {:ok, keyword()} | {:error, ReqLLM.Error.t()}
+  def validate(data, schema) when is_map(data) and is_list(schema) do
+    with {:ok, compiled_schema} <- compile(schema) do
+      # Convert string keys to atoms for NimbleOptions validation
+      keyword_data =
+        data
+        |> Enum.map(fn {k, v} ->
+          key = if is_binary(k), do: String.to_existing_atom(k), else: k
+          {key, v}
+        end)
+
+      case NimbleOptions.validate(keyword_data, compiled_schema) do
+        {:ok, validated_data} ->
+          {:ok, validated_data}
+
+        {:error, %NimbleOptions.ValidationError{} = error} ->
+          {:error,
+           ReqLLM.Error.Validation.Error.exception(
+             tag: :schema_validation_failed,
+             reason: Exception.message(error),
+             context: [data: data, schema: schema]
+           )}
+      end
+    end
+  rescue
+    ArgumentError ->
+      # Handle the case where string keys don't exist as atoms
+      {:error,
+       ReqLLM.Error.Validation.Error.exception(
+         tag: :invalid_keys,
+         reason: "Data contains keys that don't match schema field names",
+         context: [data: data, schema: schema]
+       )}
+  end
+
+  def validate(data, _schema) do
+    {:error,
+     ReqLLM.Error.Invalid.Parameter.exception(
+       parameter: "Data must be a map, got: #{inspect(data)}"
+     )}
   end
 end

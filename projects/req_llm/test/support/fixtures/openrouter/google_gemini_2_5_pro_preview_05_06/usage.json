@@ -1,0 +1,114 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjo1MDAsIm1lc3NhZ2VzIjpbeyJjb250ZW50IjoiSGkgdGhlcmUhIiwicm9sZSI6InVzZXIifV0sIm1vZGVsIjoiZ29vZ2xlL2dlbWluaS0yLjUtcHJvLXByZXZpZXctMDUtMDYiLCJuIjoxLCJzZWVkIjo0Miwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuMH0="
+    },
+    "canonical_json": {
+      "max_tokens": 500,
+      "messages": [
+        {
+          "content": "Hi there!",
+          "role": "user"
+        }
+      ],
+      "model": "google/gemini-2.5-pro-preview-05-06",
+      "n": 1,
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "Hello there! How can I help you today?",
+            "reasoning": "**Assessing User Input**\n\nI've pinpointed the user's \"Hi there!\" as the opening salvo. My analysis reveals it's a friendly, non-committal greeting—a social nicety designed to kickstart a dialogue. I'm now considering what's implied in this simple phrase.\n\n\n**Crafting the Perfect Response**\n\nI'm refining the response strategy. I'm leaning towards a friendly yet efficient greeting. I'm weighing the pros and cons of mirroring the user's tone versus maintaining a slightly more formal, helpful demeanor. I'm also working on ensuring that the greeting includes a clear invitation for the user to state their needs or ask a question.\n\n\n**Developing a Greeting Strategy**\n\nI'm now focused on crafting the perfect opening. The analysis reveals an initial \"Hi there!\" requires a carefully constructed response. My goal is to be friendly, helpful, and to encourage the user to continue. I'm currently weighing the options: a simple reciprocation, a prompt for the user, and more conversational options, like \"What's on your mind?\" I'm considering which of these best aligns with the overall persona I am to project.\n\n\n",
+            "reasoning_details": [
+              {
+                "format": "unknown",
+                "index": 0,
+                "text": "**Assessing User Input**\n\nI've pinpointed the user's \"Hi there!\" as the opening salvo. My analysis reveals it's a friendly, non-committal greeting—a social nicety designed to kickstart a dialogue. I'm now considering what's implied in this simple phrase.\n\n\n**Crafting the Perfect Response**\n\nI'm refining the response strategy. I'm leaning towards a friendly yet efficient greeting. I'm weighing the pros and cons of mirroring the user's tone versus maintaining a slightly more formal, helpful demeanor. I'm also working on ensuring that the greeting includes a clear invitation for the user to state their needs or ask a question.\n\n\n**Developing a Greeting Strategy**\n\nI'm now focused on crafting the perfect opening. The analysis reveals an initial \"Hi there!\" requires a carefully constructed response. My goal is to be friendly, helpful, and to encourage the user to continue. I'm currently weighing the options: a simple reciprocation, a prompt for the user, and more conversational options, like \"What's on your mind?\" I'm considering which of these best aligns with the overall persona I am to project.\n\n\n",
+                "type": "reasoning.text"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "STOP"
+        }
+      ],
+      "created": 1760532489,
+      "id": "gen-1760532489-t62Qq2Zh5v2FSIhlBGrd",
+      "model": "google/gemini-2.5-pro",
+      "object": "chat.completion",
+      "provider": "Google",
+      "usage": {
+        "completion_tokens": 489,
+        "completion_tokens_details": {
+          "image_tokens": 0,
+          "reasoning_tokens": 479
+        },
+        "prompt_tokens": 3,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 492
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef6ddb1828e1b4-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:48:11 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

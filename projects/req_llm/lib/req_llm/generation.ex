@@ -11,128 +11,23 @@ defmodule ReqLLM.Generation do
   with proper error handling.
   """
 
-  alias ReqLLM.{Context, Model, Response}
+  alias ReqLLM.{Model, Response}
 
   require Logger
-
-  @base_schema NimbleOptions.new!(
-                 temperature: [
-                   type: :float,
-                   doc: "Controls randomness in the output (0.0 to 2.0)"
-                 ],
-                 max_tokens: [
-                   type: :pos_integer,
-                   doc: "Maximum number of tokens to generate"
-                 ],
-                 top_p: [
-                   type: :float,
-                   doc: "Nucleus sampling parameter"
-                 ],
-                 top_k: [
-                   type: :pos_integer,
-                   doc: "Top-k sampling parameter"
-                 ],
-                 presence_penalty: [
-                   type: :float,
-                   doc: "Penalize new tokens based on presence"
-                 ],
-                 frequency_penalty: [
-                   type: :float,
-                   doc: "Penalize new tokens based on frequency"
-                 ],
-                 stop_sequences: [
-                   type: {:list, :string},
-                   doc: "Stop sequences to halt generation"
-                 ],
-                 response_format: [
-                   type: :map,
-                   doc: "Format for the response (e.g., JSON mode)"
-                 ],
-                 thinking: [
-                   type: :boolean,
-                   doc: "Enable thinking/reasoning tokens (beta feature)"
-                 ],
-                 tools: [
-                   type: :any,
-                   doc: "List of tool definitions"
-                 ],
-                 tool_choice: [
-                   type: {:or, [:string, :atom, :map]},
-                   doc: "Tool choice strategy"
-                 ],
-                 system_prompt: [
-                   type: :string,
-                   doc: "System prompt to prepend"
-                 ],
-                 provider_options: [
-                   type: {:or, [:map, {:list, :any}]},
-                   doc: "Provider-specific options (keyword list or map)",
-                   default: []
-                 ],
-                 reasoning: [
-                   type: {:in, [nil, false, true, "low", "auto", "high"]},
-                   doc: "Request reasoning tokens from the model"
-                 ],
-                 seed: [
-                   type: :pos_integer,
-                   doc: "Seed for deterministic outputs"
-                 ],
-                 user: [
-                   type: :string,
-                   doc: "User identifier for tracking/abuse detection"
-                 ],
-                 on_unsupported: [
-                   type: {:in, [:warn, :error, :ignore]},
-                   doc: "How to handle unsupported parameter translations",
-                   default: :warn
-                 ]
-               )
 
   @doc """
   Returns the base generation options schema.
 
-  This schema contains only vendor-neutral options. Provider-specific options
-  should be validated separately by each provider.
+  This schema delegates to ReqLLM.Provider.Options.generation_schema/0 which is
+  the canonical runtime options schema. Provider-specific options should be
+  validated separately by each provider via Provider.Options.process/4.
+
+  For the complete schema including provider extensions, use:
+      Provider.Options.compose_schema(Provider.Options.generation_schema(), provider_mod)
   """
   @spec schema :: NimbleOptions.t()
-  def schema, do: @base_schema
-
-  @doc """
-  Builds a dynamic schema by composing the base schema with provider-specific options.
-
-  This function takes a provider module and creates a unified schema where provider-specific
-  options are nested under the :provider_options key with proper validation.
-
-  ## Parameters
-
-    * `provider_mod` - Provider module that defines provider_schema/0 function
-
-  ## Examples
-
-      schema = ReqLLM.Generation.dynamic_schema(ReqLLM.Providers.Groq)
-      NimbleOptions.validate([temperature: 0.7, provider_options: [service_tier: "auto"]], schema)
-      #=> {:ok, [temperature: 0.7, provider_options: [service_tier: "auto"]]}
-
-  """
-  @spec dynamic_schema(module()) :: NimbleOptions.t()
-  def dynamic_schema(provider_mod) do
-    if function_exported?(provider_mod, :provider_schema, 0) do
-      provider_keys = provider_mod.provider_schema().schema
-
-      # Update the :provider_options key with provider-specific nested schema
-      updated_schema =
-        Keyword.update!(@base_schema.schema, :provider_options, fn opt ->
-          Keyword.merge(opt,
-            type: :keyword_list,
-            keys: provider_keys,
-            default: []
-          )
-        end)
-
-      NimbleOptions.new!(updated_schema)
-    else
-      @base_schema
-    end
+  def schema do
+    ReqLLM.Provider.Options.generation_schema()
   end
 
   @doc """
@@ -170,6 +65,7 @@ defmodule ReqLLM.Generation do
       #=> %{input_tokens: 10, output_tokens: 8}
 
   """
+
   @spec generate_text(
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
@@ -178,16 +74,21 @@ defmodule ReqLLM.Generation do
   def generate_text(model_spec, messages, opts \\ []) do
     with {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         schema = dynamic_schema(provider_module),
-         {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
-         {translated_opts, warnings} <-
-           translate_provider_options(provider_module, :chat, model, validated_opts),
-         :ok <- handle_warnings(translated_opts, warnings),
-         context = build_context(messages, translated_opts),
-         {:ok, configured_request} <-
-           provider_module.prepare_request(:chat, model, context, translated_opts),
-         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
-      Response.decode_response(decoded_response, model)
+         {:ok, request} <- provider_module.prepare_request(:chat, model, messages, opts),
+         {:ok, %Req.Response{status: status, body: decoded_response}} when status in 200..299 <-
+           Req.request(request) do
+      {:ok, decoded_response}
+    else
+      {:ok, %Req.Response{status: status, body: body}} ->
+        {:error,
+         ReqLLM.Error.API.Request.exception(
+           reason: "HTTP #{status}: Request failed",
+           status: status,
+           response_body: body
+         )}
+
+      {:error, error} ->
+        {:error, error}
     end
   end
 
@@ -244,117 +145,52 @@ defmodule ReqLLM.Generation do
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword()
-        ) :: {:ok, Response.t()} | {:error, term()}
+        ) :: {:ok, ReqLLM.StreamResponse.t()} | {:error, term()}
   def stream_text(model_spec, messages, opts \\ []) do
     with {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         schema = dynamic_schema(provider_module),
-         {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
-         {translated_opts, warnings} <-
-           translate_provider_options(provider_module, :chat, model, validated_opts),
-         :ok <- handle_warnings(translated_opts, warnings),
-         stream_opts = Keyword.put(translated_opts, :stream, true),
-         context = build_context(messages, stream_opts),
-         {:ok, configured_request} <-
-           provider_module.prepare_request(:chat, model, context, stream_opts),
-         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
-      Response.decode_response(decoded_response, model)
+         {:ok, context} <- ReqLLM.Context.normalize(messages, opts) do
+      ReqLLM.Streaming.start_stream(provider_module, model, context, opts)
     end
   end
 
   @doc """
-  Streams text generation using an AI model, returning only the stream.
+  **DEPRECATED**: This function will be removed in a future version.
 
-  This is a convenience function that extracts just the stream from the response.
-  For access to usage metadata and other response data, use `stream_text/3`.
-  Raises on error.
+  The streaming API has been redesigned to return a composite `StreamResponse` struct
+  that provides both the stream and metadata. Use `stream_text/3` instead:
 
-  ## Parameters
+      {:ok, response} = ReqLLM.Generation.stream_text(model, messages)
+      response.stream |> Enum.each(&IO.write/1)
 
-  Same as `stream_text/3`.
+  For simple text extraction, use:
 
-  ## Examples
-
-      ReqLLM.Generation.stream_text!("anthropic:claude-3-sonnet", "Tell me a story")
-      |> Enum.each(&IO.write/1)
-
+      text = ReqLLM.StreamResponse.text(response)
   """
+  @deprecated "Use stream_text/3 with StreamResponse instead"
   @spec stream_text!(
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword()
         ) :: Enumerable.t() | no_return()
-  def stream_text!(model_spec, messages, opts \\ []) do
-    case stream_text(model_spec, messages, opts) do
-      {:ok, response} -> Response.text_stream(response)
-      {:error, error} -> raise error
-    end
-  end
+  def stream_text!(_model_spec, _messages, _opts \\ []) do
+    IO.warn("""
+    ReqLLM.Generation.stream_text!/3 is deprecated and will be removed in a future version.
 
-  # Private helper functions
+    Please migrate to the new streaming API:
 
-  defp translate_provider_options(provider_mod, operation, model, opts) do
-    if function_exported?(provider_mod, :translate_options, 3) do
-      provider_mod.translate_options(operation, model, opts)
-    else
-      {opts, []}
-    end
-  end
+    Old code:
+        ReqLLM.Generation.stream_text!(model, messages) |> Enum.each(&IO.write/1)
 
-  defp handle_warnings(opts, warnings) do
-    case opts[:on_unsupported] || :warn do
-      :ignore ->
-        :ok
+    New code:
+        {:ok, response} = ReqLLM.Generation.stream_text(model, messages)
+        response.stream |> Enum.each(&IO.write/1)
 
-      :warn ->
-        Enum.each(warnings, &Logger.warning/1)
-        :ok
+    Or for simple text extraction:
+        text = ReqLLM.StreamResponse.text(response)
+    """)
 
-      :error ->
-        if warnings == [], do: :ok, else: {:error, {:unsupported_options, warnings}}
-    end
-  end
-
-  defp build_context(messages, opts) when is_binary(messages) do
-    context = Context.new([Context.user(messages)])
-    add_system_prompt(context, opts)
-  end
-
-  defp build_context(%Context{} = context, opts) do
-    add_system_prompt(context, opts)
-  end
-
-  defp build_context(messages, opts) when is_list(messages) do
-    # Convert plain message maps to Context if needed
-    message_structs =
-      Enum.map(messages, fn
-        %ReqLLM.Message{} = message ->
-          message
-
-        %{role: role, content: content} = message ->
-          Context.text(
-            String.to_existing_atom(to_string(role)),
-            content,
-            Map.get(message, :metadata, %{})
-          )
-
-        other ->
-          other
-      end)
-
-    context = Context.new(message_structs)
-    add_system_prompt(context, opts)
-  end
-
-  defp add_system_prompt(%Context{} = context, opts) do
-    case opts[:system_prompt] do
-      nil ->
-        context
-
-      system_text when is_binary(system_text) ->
-        system_msg = Context.system(system_text)
-        Context.new([system_msg | Context.to_list(context)])
-    end
+    :ok
   end
 
   @doc """
@@ -400,74 +236,24 @@ defmodule ReqLLM.Generation do
   def generate_object(model_spec, messages, object_schema, opts \\ []) do
     with {:ok, model} <- Model.from(model_spec),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         options_schema = dynamic_schema(provider_module),
-         {:ok, validated_opts} <- NimbleOptions.validate(opts, options_schema),
-         {translated_opts, warnings} <-
-           translate_provider_options(provider_module, :object, model, validated_opts),
-         :ok <- handle_warnings(translated_opts, warnings),
          {:ok, compiled_schema} <- ReqLLM.Schema.compile(object_schema),
-         context = build_context(messages, translated_opts),
-         {:ok, configured_request} <-
-           provider_module.prepare_request(
-             :object,
-             model,
-             context,
-             compiled_schema,
-             translated_opts
-           ),
-         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
-      Response.decode_object(decoded_response, model, object_schema)
-    end
-  end
+         opts_with_schema = Keyword.put(opts, :compiled_schema, compiled_schema),
+         {:ok, request} <-
+           provider_module.prepare_request(:object, model, messages, opts_with_schema),
+         {:ok, %Req.Response{status: status, body: decoded_response}} when status in 200..299 <-
+           Req.request(request) do
+      {:ok, decoded_response}
+    else
+      {:ok, %Req.Response{status: status, body: body}} ->
+        {:error,
+         ReqLLM.Error.API.Request.exception(
+           reason: "HTTP #{status}: Request failed",
+           status: status,
+           response_body: body
+         )}
 
-  @doc """
-  Streams structured data generation using an AI model with schema validation.
-
-  Returns a canonical ReqLLM.Response containing usage data and object stream.
-  For simple object streaming without metadata, use `stream_object!/4`.
-
-  ## Parameters
-
-    * `model_spec` - Model specification in various formats
-    * `messages` - Text prompt or list of messages
-    * `schema` - Schema definition for structured output (keyword list)
-    * `opts` - Additional options (keyword list)
-
-  ## Options
-
-  Same as `generate_object/4`.
-
-  ## Examples
-
-      {:ok, response} = ReqLLM.Generation.stream_object("anthropic:claude-3-sonnet", "Generate a person", person_schema)
-      ReqLLM.Response.object_stream(response) |> Enum.each(&IO.inspect/1)
-
-      # Access usage metadata after streaming
-      ReqLLM.Response.usage(response)
-      #=> %{input_tokens: 25, output_tokens: 15}
-
-  """
-  @spec stream_object(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t() | list(),
-          keyword(),
-          keyword()
-        ) :: {:ok, Response.t()} | {:error, term()}
-  def stream_object(model_spec, messages, object_schema, opts \\ []) do
-    with {:ok, model} <- Model.from(model_spec),
-         {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         options_schema = dynamic_schema(provider_module),
-         {:ok, validated_opts} <- NimbleOptions.validate(opts, options_schema),
-         {translated_opts, warnings} <-
-           translate_provider_options(provider_module, :object, model, validated_opts),
-         :ok <- handle_warnings(translated_opts, warnings),
-         {:ok, compiled_schema} <- ReqLLM.Schema.compile(object_schema),
-         stream_opts = Keyword.put(translated_opts, :stream, true),
-         context = build_context(messages, stream_opts),
-         {:ok, configured_request} <-
-           provider_module.prepare_request(:object, model, context, compiled_schema, stream_opts),
-         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
-      Response.decode_object_stream(decoded_response, model, object_schema)
+      {:error, error} ->
+        {:error, error}
     end
   end
 
@@ -502,32 +288,126 @@ defmodule ReqLLM.Generation do
   end
 
   @doc """
-  Streams structured data generation using an AI model, returning only the stream.
+  Streams structured data generation using an AI model with schema validation.
 
-  This is a convenience function that extracts just the stream from the response.
-  For access to usage metadata and other response data, use `stream_object/4`.
-  Raises on error.
+  Returns a `ReqLLM.StreamResponse` that provides both real-time structured data streaming
+  and concurrent metadata collection. Uses the same Finch-based streaming infrastructure
+  as `stream_text/3` with HTTP/2 multiplexing and connection pooling.
 
   ## Parameters
 
-  Same as `stream_object/4`.
+    * `model_spec` - Model specification in various formats
+    * `messages` - Text prompt or list of messages
+    * `schema` - Schema definition for structured output (keyword list)
+    * `opts` - Additional options (keyword list)
+
+  ## Options
+
+  Same as `generate_object/4`.
+
+  ## Returns
+
+    * `{:ok, stream_response}` - StreamResponse with object stream and metadata task
+    * `{:error, reason}` - Request failed or invalid parameters
 
   ## Examples
+
+      # Stream structured data generation
+      {:ok, response} = ReqLLM.Generation.stream_object("anthropic:claude-3-sonnet", "Generate a person", person_schema)
+
+      # Process structured chunks as they arrive
+      response.stream
+      |> Stream.filter(&(&1.type in [:content, :tool_call]))
+      |> Stream.each(&IO.inspect/1)
+      |> Stream.run()
+
+      # Concurrent metadata collection
+      usage = ReqLLM.StreamResponse.usage(response)
+      #=> %{input_tokens: 25, output_tokens: 15, total_cost: 0.045}
+
+  ## Structure Notes
+
+  Object streaming may include both content chunks (partial JSON) and tool_call chunks
+  depending on the provider's structured output implementation. Use appropriate filtering
+  based on your needs.
+
+  """
+  @spec stream_object(
+          String.t() | {atom(), keyword()} | struct(),
+          String.t() | list(),
+          keyword(),
+          keyword()
+        ) :: {:ok, ReqLLM.StreamResponse.t()} | {:error, term()}
+  def stream_object(model_spec, messages, object_schema, opts \\ []) do
+    with {:ok, model} <- Model.from(model_spec),
+         {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         {:ok, compiled_schema} <- ReqLLM.Schema.compile(object_schema),
+         {:ok, prepared_req} <-
+           provider_module.prepare_request(
+             :object,
+             model,
+             messages,
+             Keyword.put(opts, :compiled_schema, compiled_schema)
+           ) do
+      prepared_context = prepared_req.options[:context] || %ReqLLM.Context{messages: []}
+
+      stream_opts =
+        opts
+        |> Keyword.merge(Map.to_list(prepared_req.options))
+        |> Keyword.put(:stream, true)
+        |> Keyword.put_new(:operation, :object)
+
+      ReqLLM.Streaming.start_stream(provider_module, model, prepared_context, stream_opts)
+    end
+  end
+
+  @doc """
+  **DEPRECATED**: This function will be removed in a future version.
+
+  The streaming API has been redesigned to return a composite `StreamResponse` struct
+  that provides both the stream and metadata. Use `stream_object/4` instead:
+
+      {:ok, response} = ReqLLM.Generation.stream_object(model, messages, schema)
+      response.stream |> Enum.each(&IO.inspect/1)
+
+  For simple object extraction, use:
+
+      object = ReqLLM.StreamResponse.object(response)
+
+  ## Legacy Parameters
+
+  Same as `stream_object/4`.
+
+  ## Legacy Examples
 
       ReqLLM.Generation.stream_object!("anthropic:claude-3-sonnet", "Generate a person", person_schema)
       |> Enum.each(&IO.inspect/1)
 
   """
+  @deprecated "Use stream_object/4 with StreamResponse instead"
   @spec stream_object!(
           String.t() | {atom(), keyword()} | struct(),
           String.t() | list(),
           keyword(),
           keyword()
         ) :: Enumerable.t() | no_return()
-  def stream_object!(model_spec, messages, object_schema, opts \\ []) do
-    case stream_object(model_spec, messages, object_schema, opts) do
-      {:ok, response} -> Response.object_stream(response)
-      {:error, error} -> raise error
-    end
+  def stream_object!(_model_spec, _messages, _object_schema, _opts \\ []) do
+    IO.warn("""
+    ReqLLM.Generation.stream_object!/4 is deprecated and will be removed in a future version.
+
+    Please migrate to the new streaming API:
+
+    Old code:
+        ReqLLM.Generation.stream_object!(model, messages, schema) |> Enum.each(&IO.inspect/1)
+
+    New code:
+        {:ok, response} = ReqLLM.Generation.stream_object(model, messages, schema)
+        response.stream |> Enum.each(&IO.inspect/1)
+
+    Or for simple object extraction:
+        object = ReqLLM.StreamResponse.object(response)
+    """)
+
+    :ok
   end
 end

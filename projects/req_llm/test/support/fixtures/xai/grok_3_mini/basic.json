@@ -1,0 +1,118 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfY29tcGxldGlvbl90b2tlbnMiOjUwLCJtZXNzYWdlcyI6W3siY29udGVudCI6IkhlbGxvIHdvcmxkISIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6Imdyb2stMy1taW5pIiwic2VlZCI6NDIsInN0cmVhbSI6ZmFsc2UsInRlbXBlcmF0dXJlIjowLjB9"
+    },
+    "canonical_json": {
+      "max_completion_tokens": 50,
+      "messages": [
+        {
+          "content": "Hello world!",
+          "role": "user"
+        }
+      ],
+      "model": "grok-3-mini",
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.x.ai/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "Hello! I'm Grok, an AI created by xAI to be helpful, truthful, and a bit witty. What's on your mind today? 😊",
+            "reasoning_content": "First, the user said \"Hello world!\" This is a common greeting, often used as a starting point in programming, like the classic \"Hello, World!\" program. But here, it's just a casual hello.\n\nAs Grok, I'm an AI built by xAI, and I'm supposed to be helpful, truthful, and not based on other companies' models. My response should align with that.\n\nPossible ways to respond:\n\n1. **Mirror the greeting:** Keep it simple and friendly, like \"Hello! How can I help you today?\"\n\n2. **Add some personality:** Since I'm Grok, I could reference my background or make it fun. For example, mention xAI or add a witty remark.\n\n3. **Engage further:** Ask a question to continue the conversation, as I'm designed to be helpful.\n\nKey principles:\n\n- **Helpful:** Offer assistance if needed.\n\n- **Truthful:** Stick to facts; don't fabricate anything.\n\n- **Maximal truth:** Ensure my response is accurate and straightforward.\n\nThis might be a test or a simple interaction. If it's the first message, I should introduce myself briefly.\n\nStructure a response:\n\n- Start with a greeting back.\n\n- Introduce myself if appropriate.\n\n- Ask how I can help.\n\nFinal response idea:\n\n\"Hello! I'm Grok, an AI created by xAI. Nice to meet you. What can I do for you today?\"\n\nThis is friendly, informative, and engaging.",
+            "refusal": null,
+            "role": "assistant"
+          }
+        }
+      ],
+      "created": 1760471299,
+      "id": "e57babd3-a0a6-14d8-680c-b0fe86b7a31e_us-east-1",
+      "model": "grok-3-mini",
+      "object": "chat.completion",
+      "system_fingerprint": "fp_4fae27f477",
+      "usage": {
+        "completion_tokens": 31,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 290,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "prompt_tokens": 10,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 3,
+          "image_tokens": 0,
+          "text_tokens": 10
+        },
+        "total_tokens": 331
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "access-control-expose-headers": [
+        "*"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "98e997f33fc6a3d4-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Tue, 14 Oct 2025 19:48:24 GMT"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=pvR3iv18yawAzzi9_8P0YrrEKuZyKXM6UvcTKBoolMI-1760471304-1.0.1.1-mwwu9Rb39ZZ6ACuVcitBtE9QZ3oB_CRSGwVwTzrC5mtP_UkuiaauD9wYQROkAjcMX4K7pXOeW_Si4ontGN724vTtOHO2LIxDCQ3Zm6gWUQA; path=/; expires=Tue, 14-Oct-25 20:18:24 GMT; domain=.x.ai; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "origin, access-control-request-method, access-control-request-headers"
+      ],
+      "x-request-id": [
+        "00-c6008e2f98b612ad7e4c9e1151cbc972-2b27227a005a87d5-01"
+      ],
+      "x-zero-data-retention": [
+        "false"
+      ]
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfY29tcGxldGlvbl90b2tlbnMiOjEwMCwibWVzc2FnZXMiOlt7ImNvbnRlbnQiOiJXcml0ZSBhIHZlcnkgbG9uZyBzdG9yeSBhYm91dCBkcmFnb25zIGFuZCBhZHZlbnR1cmVzIiwicm9sZSI6InVzZXIifV0sIm1vZGVsIjoiZ3Jvay00LWZhc3Qtbm9uLXJlYXNvbmluZyIsInN0cmVhbSI6ZmFsc2UsInRlbXBlcmF0dXJlIjowLjV9"
+    },
+    "canonical_json": {
+      "max_completion_tokens": 100,
+      "messages": [
+        {
+          "content": "Write a very long story about dragons and adventures",
+          "role": "user"
+        }
+      ],
+      "model": "grok-4-fast-non-reasoning",
+      "stream": false,
+      "temperature": 0.5
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.x.ai/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "length",
+          "index": 0,
+          "message": {
+            "content": "### The Emberheart Chronicles: Wings of Destiny\n\nIn the ancient realm of Eldoria, where jagged mountains pierced the clouds and vast forests whispered secrets to the wind, dragons were not mere legends but living guardians of the land. The greatest among them was Ignis, a majestic crimson dragon whose scales gleamed like molten rubies under the sun. Ignis had roamed the skies for centuries, his wings spanning wider than the tallest spires of the elven citadels. But peace in Eld",
+            "refusal": null,
+            "role": "assistant"
+          }
+        }
+      ],
+      "created": 1760471272,
+      "id": "e34af6ec-e6a8-9354-aea7-fbeaf428227b_us-east-1",
+      "model": "grok-4-fast-non-reasoning",
+      "object": "chat.completion",
+      "system_fingerprint": "fp_e7507192a3",
+      "usage": {
+        "completion_tokens": 100,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "prompt_tokens": 177,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 161,
+          "image_tokens": 0,
+          "text_tokens": 177
+        },
+        "total_tokens": 277
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "access-control-expose-headers": [
+        "*"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "98e9974caf14b947-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-security-policy-report-only": [
+        "script-src 'none'; connect-src 'none'; report-uri https://csp-reporting.cloudflare.com/cdn-cgi/script_monitor/report?m=YYSSMYK_Z5k5HHteGcPzSpC54Rry470wp89Dkp7LEYU-1760471274-1.0.1.1-CNpzHCQNipo0_Fpg86tFYIb.9TgbSzQbdiFmtB5RNNKpQM2_zLhtXv40mPwQmDsHmvuEgKictvUtRfKPIBixjEJqbtp63YIxO1qd76bySZOe7UGjPV2du6fLULNR00Km9VWpPoz1SP7GLpV6mq8CtCXHZZBzl8.YE6bpma9GiI8; report-to cf-csp-endpoint"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Tue, 14 Oct 2025 19:47:54 GMT"
+      ],
+      "report-to": [
+        "{\"endpoints\":[{\"url\":\"https:\\/\\/csp-reporting.cloudflare.com\\/cdn-cgi\\/script_monitor\\/report?m=YYSSMYK_Z5k5HHteGcPzSpC54Rry470wp89Dkp7LEYU-1760471274-1.0.1.1-CNpzHCQNipo0_Fpg86tFYIb.9TgbSzQbdiFmtB5RNNKpQM2_zLhtXv40mPwQmDsHmvuEgKictvUtRfKPIBixjEJqbtp63YIxO1qd76bySZOe7UGjPV2du6fLULNR00Km9VWpPoz1SP7GLpV6mq8CtCXHZZBzl8.YE6bpma9GiI8\"}],\"group\":\"cf-csp-endpoint\",\"max_age\":86400}"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=go8Jt0w4GTTADUa.N6rh6LwgJ2HCdFWtem0Qloje74w-1760471274-1.0.1.1-tEtoEPjoi.16NwZSZO5IZAL9orqiA5ogtqE1kkqowIBTTfRAzVNZAmEDZl53wjb9ETAN7B_Gooo5oo9EWk3FLdQBtEI5SbMT_y_gRK96P7o; path=/; expires=Tue, 14-Oct-25 20:17:54 GMT; domain=.x.ai; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "origin, access-control-request-method, access-control-request-headers"
+      ],
+      "x-request-id": [
+        "00-8ba73040c2adb268d2f1986be37b2863-2743ac44005ad6e8-01"
+      ],
+      "x-zero-data-retention": [
+        "false"
+      ]
+    },
+    "status": 200
+  }
+}

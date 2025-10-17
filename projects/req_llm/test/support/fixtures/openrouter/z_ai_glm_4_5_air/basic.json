@@ -1,0 +1,111 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoyMDAwLCJtZXNzYWdlcyI6W3siY29udGVudCI6IkhlbGxvIHdvcmxkISIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6InotYWkvZ2xtLTQuNS1haXIiLCJuIjoxLCJyZWFzb25pbmdfZWZmb3J0IjoibG93Iiwic2VlZCI6NDIsInN0cmVhbSI6ZmFsc2UsInRlbXBlcmF0dXJlIjowLjB9"
+    },
+    "canonical_json": {
+      "max_tokens": 2000,
+      "messages": [
+        {
+          "content": "Hello world!",
+          "role": "user"
+        }
+      ],
+      "model": "z-ai/glm-4.5-air",
+      "n": 1,
+      "reasoning_effort": "low",
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "\nHello! 👋 Here's a classic \"Hello World!\" program in Python:\n\n```python\nprint(\"Hello, World!\")\n```\n\n### Explanation:\n- `print()` is a built-in Python function that outputs text to the console.\n- `\"Hello, World!\"` is a string literal (text) passed to the function.\n\n### How to run it:\n1. Save the code in a file named `hello.py`.\n2. Run it from your terminal:  \n   ```bash\n   python hello.py\n   ```\n\n### Output:\n```\nHello, World!\n```\n\nLet me know if you'd like this in another language or need more details! 😊",
+            "reasoning": "We are going to create a simple \"Hello World!\" program in Python.\n Since the user just said \"Hello world!\", we can assume they want a classic hello world program.\n However, note that the user might be testing the system or just starting a conversation.\n Let's respond with a friendly greeting and then provide the code for a hello world program in Python.",
+            "reasoning_details": [
+              {
+                "format": "unknown",
+                "index": 0,
+                "text": "We are going to create a simple \"Hello World!\" program in Python.\n Since the user just said \"Hello world!\", we can assume they want a classic hello world program.\n However, note that the user might be testing the system or just starting a conversation.\n Let's respond with a friendly greeting and then provide the code for a hello world program in Python.",
+                "type": "reasoning.text"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "stop"
+        }
+      ],
+      "created": 1760532672,
+      "id": "gen-1760532672-lc1Ck726GHcSrHuIkQ31",
+      "model": "z-ai/glm-4.5-air",
+      "object": "chat.completion",
+      "provider": "Z.AI",
+      "usage": {
+        "completion_tokens": 211,
+        "prompt_tokens": 8,
+        "prompt_tokens_details": {
+          "cached_tokens": 4
+        },
+        "total_tokens": 219
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef72502d6fe822-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:51:13 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

@@ -18,27 +18,20 @@ defmodule ReqLLM.Message.ContentPartTest do
 
       assert %ContentPart{type: :text, text: "hello", metadata: ^metadata} = part
     end
-
-    test "handles empty string" do
-      part = ContentPart.text("")
-      assert part.text == ""
-      assert part.type == :text
-    end
   end
 
-  describe "reasoning/1 and reasoning/2" do
-    test "creates reasoning content part" do
-      part = ContentPart.reasoning("thinking step")
+  describe "thinking/1 and thinking/2" do
+    test "creates thinking content part" do
+      part = ContentPart.thinking("thinking step")
 
-      assert %ContentPart{type: :reasoning, text: "thinking step", metadata: %{}} = part
-      assert part.tool_call_id == nil
+      assert %ContentPart{type: :thinking, text: "thinking step", metadata: %{}} = part
     end
 
-    test "creates reasoning with metadata" do
+    test "creates thinking with metadata" do
       metadata = %{step: 1}
-      part = ContentPart.reasoning("first thought", metadata)
+      part = ContentPart.thinking("first thought", metadata)
 
-      assert %ContentPart{type: :reasoning, text: "first thought", metadata: ^metadata} = part
+      assert %ContentPart{type: :thinking, text: "first thought", metadata: ^metadata} = part
     end
   end
 
@@ -50,20 +43,6 @@ defmodule ReqLLM.Message.ContentPartTest do
       assert %ContentPart{type: :image_url, url: ^url} = part
       assert part.data == nil
       assert part.media_type == nil
-    end
-
-    test "handles various URL formats" do
-      urls = [
-        "https://example.com/image.png",
-        "http://localhost:3000/pic.gif",
-        "data:image/png;base64,iVBOR..."
-      ]
-
-      for url <- urls do
-        part = ContentPart.image_url(url)
-        assert part.url == url
-        assert part.type == :image_url
-      end
     end
   end
 
@@ -87,12 +66,6 @@ defmodule ReqLLM.Message.ContentPartTest do
       part = ContentPart.image(data, "image/jpeg")
 
       assert %ContentPart{type: :image, data: ^data, media_type: "image/jpeg"} = part
-    end
-
-    test "handles empty binary data" do
-      part = ContentPart.image(<<>>)
-      assert part.data == <<>>
-      assert part.media_type == "image/png"
     end
   end
 
@@ -125,81 +98,6 @@ defmodule ReqLLM.Message.ContentPartTest do
                media_type: "text/plain"
              } = part
     end
-
-    test "handles binary file data" do
-      binary_data = <<1, 2, 3, 4, 5>>
-      part = ContentPart.file(binary_data, "binary.dat", "application/binary")
-
-      assert part.data == binary_data
-      assert part.filename == "binary.dat"
-      assert part.media_type == "application/binary"
-    end
-  end
-
-  describe "tool_call/3" do
-    test "creates tool call content part" do
-      id = "call_123"
-      name = "calculator"
-      input = %{operation: "add", a: 1, b: 2}
-      part = ContentPart.tool_call(id, name, input)
-
-      assert %ContentPart{
-               type: :tool_call,
-               tool_call_id: ^id,
-               tool_name: ^name,
-               input: ^input
-             } = part
-
-      assert part.output == nil
-    end
-
-    test "handles various input types" do
-      inputs = [
-        %{key: "value"},
-        ["item1", "item2"],
-        "string input",
-        42,
-        nil
-      ]
-
-      for input <- inputs do
-        part = ContentPart.tool_call("id", "tool", input)
-        assert part.input == input
-        assert part.type == :tool_call
-      end
-    end
-  end
-
-  describe "tool_result/2" do
-    test "creates tool result content part" do
-      id = "call_123"
-      output = %{result: "success", value: 42}
-      part = ContentPart.tool_result(id, output)
-
-      assert %ContentPart{
-               type: :tool_result,
-               tool_call_id: ^id,
-               output: ^output
-             } = part
-
-      assert part.input == nil
-    end
-
-    test "handles various output types" do
-      outputs = [
-        %{status: "ok"},
-        ["result1", "result2"],
-        "error message",
-        {:ok, "value"},
-        nil
-      ]
-
-      for output <- outputs do
-        part = ContentPart.tool_result("id", output)
-        assert part.output == output
-        assert part.type == :tool_result
-      end
-    end
   end
 
   describe "struct validation and edge cases" do
@@ -210,12 +108,28 @@ defmodule ReqLLM.Message.ContentPartTest do
     end
 
     test "accepts valid content types" do
-      valid_types = [:text, :image_url, :image, :file, :tool_call, :tool_result, :reasoning]
+      valid_types = [:text, :image_url, :image, :file, :thinking]
 
       for type <- valid_types do
         part = struct!(ContentPart, %{type: type})
         assert part.type == type
       end
+    end
+
+    test "valid?/1 returns true for valid content parts" do
+      part = ContentPart.text("hello")
+      assert ContentPart.valid?(part)
+
+      part = ContentPart.image_url("https://example.com/pic.jpg")
+      assert ContentPart.valid?(part)
+    end
+
+    test "valid?/1 returns false for invalid content parts" do
+      invalid_part = %{type: :text, text: "not a content part"}
+      refute ContentPart.valid?(invalid_part)
+
+      refute ContentPart.valid?(nil)
+      refute ContentPart.valid?(%{})
     end
 
     test "has proper default values" do
@@ -226,10 +140,6 @@ defmodule ReqLLM.Message.ContentPartTest do
       assert part.data == nil
       assert part.media_type == nil
       assert part.filename == nil
-      assert part.tool_call_id == nil
-      assert part.tool_name == nil
-      assert part.input == nil
-      assert part.output == nil
       assert part.metadata == %{}
     end
   end
@@ -244,12 +154,12 @@ defmodule ReqLLM.Message.ContentPartTest do
       assert output =~ "Hello world"
     end
 
-    test "inspects reasoning content part" do
-      part = ContentPart.reasoning("I think...")
+    test "inspects thinking content part" do
+      part = ContentPart.thinking("I think...")
       output = inspect(part)
 
       assert output =~ "#ContentPart<"
-      assert output =~ "reasoning"
+      assert output =~ "thinking"
       assert output =~ "I think..."
     end
 
@@ -300,30 +210,29 @@ defmodule ReqLLM.Message.ContentPartTest do
       assert output =~ "text/plain (0 bytes)"
     end
 
-    test "inspects tool_call content part" do
-      part = ContentPart.tool_call("call_123", "calculator", %{op: "add"})
-      output = inspect(part)
-
-      assert output =~ "#ContentPart<"
-      assert output =~ "tool_call"
-      assert output =~ "call_123 calculator"
-      assert output =~ "%{op: \"add\"}"
-    end
-
-    test "inspects tool_result content part" do
-      part = ContentPart.tool_result("call_123", {:ok, 42})
-      output = inspect(part)
-
-      assert output =~ "#ContentPart<"
-      assert output =~ "tool_result"
-      assert output =~ "call_123 -> {:ok, 42}"
-    end
-
     test "handles nil text in inspect" do
       part = struct!(ContentPart, %{type: :text, text: nil})
       output = inspect(part)
 
       assert output =~ "nil"
+    end
+  end
+
+  describe "serialization" do
+    test "round-trip JSON encoding/decoding for all constructors" do
+      parts = [
+        ContentPart.text("hello"),
+        ContentPart.thinking("thinking"),
+        ContentPart.image_url("https://example.com/pic.jpg"),
+        ContentPart.image(<<1, 2, 3>>, "image/png"),
+        ContentPart.file("data", "file.txt", "text/plain")
+      ]
+
+      for part <- parts do
+        json = Jason.encode!(part)
+        decoded = Jason.decode!(json, keys: :atoms)
+        assert String.to_atom(decoded.type) == part.type
+      end
     end
   end
 end

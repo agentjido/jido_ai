@@ -1,0 +1,186 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJpbnB1dCI6W3siY29udGVudCI6W3sidGV4dCI6IldyaXRlIGEgdmVyeSBsb25nIHN0b3J5IGFib3V0IGRyYWdvbnMgYW5kIGFkdmVudHVyZXMiLCJ0eXBlIjoiaW5wdXRfdGV4dCJ9XSwicm9sZSI6InVzZXIifV0sIm1heF9vdXRwdXRfdG9rZW5zIjozMDAwLCJtb2RlbCI6ImdwdC01LW5hbm8iLCJzdHJlYW0iOmZhbHNlfQ=="
+    },
+    "canonical_json": {
+      "input": [
+        {
+          "content": [
+            {
+              "text": "Write a very long story about dragons and adventures",
+              "type": "input_text"
+            }
+          ],
+          "role": "user"
+        }
+      ],
+      "max_output_tokens": 3000,
+      "model": "gpt-5-nano",
+      "stream": false
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.openai.com/v1/responses"
+  },
+  "response": {
+    "body": {
+      "background": false,
+      "billing": {
+        "payer": "developer"
+      },
+      "created_at": 1760405709,
+      "error": null,
+      "id": "resp_0ad84d94f043df2f0068eda8cd6cd48196a6fc12855e0ef68b",
+      "incomplete_details": {
+        "reason": "max_output_tokens"
+      },
+      "instructions": null,
+      "max_output_tokens": 3000,
+      "max_tool_calls": null,
+      "metadata": {},
+      "model": "gpt-5-nano-2025-08-07",
+      "object": "response",
+      "output": [
+        {
+          "id": "rs_0ad84d94f043df2f0068eda8ce10c48196ab106d628763b5bf",
+          "summary": [],
+          "type": "reasoning"
+        },
+        {
+          "content": [
+            {
+              "annotations": [],
+              "logprobs": [],
+              "text": "Emberlight: A Dragon’s Tale of Maps, Winds, and Grand Adventures\n\nPrologue: The Day the Rain Learned to Listen\n\nIn the village tucked beneath the long shoulder of the mountain called the Spine, where rain came down in silver ribbons and the wind sounded like an old storyteller muttering in a broken tongue, there lived a girl named Mira. Her hair carried the color of weathered parchment, and her eyes carried the shimmer of a map just unfolded—curious, tracking, always expecting there to be more lines beyond what anyone else could see. Mira was a cartographer’s apprentice, which meant she learned to read not only the trees and rivers but the stories people told about them—the stories that sometimes turned into routes, and routes, into journeys.\n\nHer master, Old Jorah, was a man who could sew a compass from thread and starfire if he so desired, but he preferred to mend a map until it breathed again with possible futures. He had once claimed, with the seriousness only a mapmaker could muster, that every journey begins with two questions: where is the end, and who is brave enough to ask why.\n\nOn a day that began with a storm already well underway, Mira found herself at the cliff-edge market that hung over the valley’s lip, where vendors sold wind-s dried bread and glass beads that clinked with every gust. It was there, under a tarred awning as the world outside grew a little darker and more coppery with rain, that a little dragon—no bigger than a thundercloud, scales like smoldering ash and eyes bright as molten gold—flitted down and landed atop a barrel filled with brass buckles.\n\nThe hatchling shook itself, snorting a soft puff of smoke that smelled of rain and something ancient. People cried out, alarmed, certain that a demon or a storm-wind had taken a new shape. But Mira saw something else first: the hatchling did not seek shelter from the rain; it sought Mira. It put its head on one side, watching her with that steady, old-souled gaze that dragons often wore in stories when they were wary of us but meant us no harm.\n\n“Curiosity is not a crime,” Mira whispered to the hatchling, half to reassure herself, half to invite trust. The hatchling tilted its head, as if understanding the claim, and then, with a surprising gentleness, nudged a small wooden box from beneath the barrel with the tip of its tail.\n\nInside lay a broken compass—the kind that had once belonged to a navigator of old wars and even older truths. The compass needle was split in two, half-gray and half-sunlit, spinning not toward any known cardinal, but toward something Mira’s eyes had never learned to name: a path of ember and memory, a direction that promised not the next street but the next story.\n\nOld Jorah arrived, stepping through the rain like a man stepping through a door that had no hinge. He knelt beside Mira, inspecting the dragon’s box, the compass, the dragon itself with a scholar’s careful attention and a mapmaker’s stubborn hope.\n\n“Easy now,” he murmured, though his eyes shone with a spark of childlike wonder as old as the valley’s stones. “We’ve read about such hatchlings in the old volumes, the ones that fall from unlikely dawns.”\n\nThe hatchling cocked its head toward Mira again, as if to say, I’ve chosen you. And Mira—whose heart beat to the rhythm of rivers she’d never seen and mountains she’d only traced in pencil—felt the truth like a new line drawn across her palm: the future might be a map, but the map would never be hers alone to hold.\n\nChapter One: The Map That Could Not Be Folded\n\nThe next days in the valley grew crowded with questions and coincidences. The compass, once broken, seemed to mend itself in the presence of Mira’s weathered maps, and the hatchling—she learned to call him Cinder—began learning to speak in tiny drifts of heat and breath, a language the wayward wind sometimes learned to understand if it listened long enough.\n\nA week after the storm, a rumor began in the market of a place called The Sky Gate, high in the World Spine, a ridge of jagged ice and wind carved into the heavens. Those who spoke of it claimed there lay a book—the Sky Atlas—that could tell a dragon how to fly not merely with wings but with intention, with the power to map destinies as though one’s life were a coastline to be charted, not a horizon to be crossed. And with the Sky Atlas came a danger: a rumor that a shadow dragon named Myrath sought to seize it, to swell his own flame with wind-stolen fire and plunge the world’s skies into a silence so complete that even the mountains would stop listening.\n\nMira, with her apprentice’s stubborn hunger for evidence, found the path easier to glimpse when Cinder’s presence drew out directions from the world itself. The compass hummed when a route worth taking lurked just beyond the clamor of daily life—the old river carving its way to the sea, the forgotten cave behind the waterfall in the west, the mountain pass where the wind sang in a language Mira almost remembered from childhood, a lullaby of air and ash.\n\nOld Jorah, who had seen more maps than the valley would ever know, cautioned Mira against chasing every rumor. “A map is a promise that you will not lose your way, but you must choose what your way will be,” he told her. Yet he also recognized, in the way old men sometimes recognize a stubborn light in a new generation, that Mira’s stubborn light was exactly what the valley needed. And so, with Cinder perched upon Mira’s left shoulder like a small sun on a map’s edge, they set out.\n\nThey traveled by rivers that argued with gravity and by winds that refused to be tamed. They learned to read weather as one reads a book—by noticing how sentences begin with a run of dark clouds and end with a breath of clear blue, by listening to the way a storm plans its punctuation. Mira drew maps of the routes they took, marking not only rivers and cliffs but the moments when courage showed up, when a decision turned a corner into a path of light.\n\nOn the third day of their travel, the trio encountered a different traveler—a dragon named Ar",
+              "type": "output_text"
+            }
+          ],
+          "id": "msg_0ad84d94f043df2f0068eda8d7f6a88196afd96e374391bec3",
+          "role": "assistant",
+          "status": "incomplete",
+          "type": "message"
+        }
+      ],
+      "parallel_tool_calls": true,
+      "previous_response_id": null,
+      "prompt_cache_key": null,
+      "reasoning": {
+        "effort": "medium",
+        "summary": null
+      },
+      "safety_identifier": null,
+      "service_tier": "default",
+      "status": "incomplete",
+      "store": true,
+      "temperature": 1.0,
+      "text": {
+        "format": {
+          "type": "text"
+        },
+        "verbosity": "medium"
+      },
+      "tool_choice": "auto",
+      "tools": [],
+      "top_logprobs": 0,
+      "top_p": 1.0,
+      "truncation": "disabled",
+      "usage": {
+        "input_tokens": 15,
+        "input_tokens_details": {
+          "cached_tokens": 0
+        },
+        "output_tokens": 2985,
+        "output_tokens_details": {
+          "reasoning_tokens": 1664
+        },
+        "total_tokens": 3000
+      },
+      "user": null
+    },
+    "headers": {
+      "alt-svc": [
+        "h3=\":443\"; ma=86400"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "98e356a2581f6159-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Tue, 14 Oct 2025 01:35:28 GMT"
+      ],
+      "openai-organization": [
+        "epic-creative-sogybe"
+      ],
+      "openai-processing-ms": [
+        "18723"
+      ],
+      "openai-project": [
+        "proj_j5AhgU4eLMRmsoO9FDg7BRD3"
+      ],
+      "openai-version": [
+        "2020-10-01"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=6PxAR.ZKFxRcTbH5dvNg17tGEgMwFF98CUg5_41_EeQ-1760405728-1.0.1.1-H1qZ9v9u04whuaA8z2w4yi1kvadGgt4P2bR6YjUspSvdnjj_MisAPknitJ6X6V14By18ddp_CpxGr5cxbC6perGiKhNcNuO1EQEuJBf5Rl0; path=/; expires=Tue, 14-Oct-25 02:05:28 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+        "_cfuvid=SAMKCFmEQdNsQtVJKSuMBRuwg3Ve4jI0JDdyiq_MNdQ-1760405728059-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000; includeSubDomains; preload"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-envoy-upstream-service-time": [
+        "18825"
+      ],
+      "x-ratelimit-limit-requests": [
+        "10000"
+      ],
+      "x-ratelimit-limit-tokens": [
+        "10000000"
+      ],
+      "x-ratelimit-remaining-requests": [
+        "9999"
+      ],
+      "x-ratelimit-remaining-tokens": [
+        "9999768"
+      ],
+      "x-ratelimit-reset-requests": [
+        "6ms"
+      ],
+      "x-ratelimit-reset-tokens": [
+        "1ms"
+      ],
+      "x-request-id": [
+        "req_996a60ba70114ac59b90323769fee092"
+      ]
+    },
+    "status": 200
+  }
+}

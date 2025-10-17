@@ -12,12 +12,27 @@ defmodule ReqLLM.Embedding do
 
   alias ReqLLM.Model
 
-  # List of supported embedding models
-  @embedding_models [
-    "openai:text-embedding-3-small",
-    "openai:text-embedding-3-large",
-    "openai:text-embedding-ada-002"
-  ]
+  # Get embedding models dynamically from metadata
+  defp get_embedding_models do
+    ReqLLM.Provider.Registry.list_providers()
+    |> Enum.flat_map(fn provider ->
+      case ReqLLM.Provider.Registry.get_provider_metadata(provider) do
+        {:ok, %{models: models}} when is_list(models) ->
+          models
+          |> Enum.filter(fn model ->
+            Map.get(model, "type") == "embedding" or Map.get(model, :type) == "embedding"
+          end)
+          |> Enum.map(fn model ->
+            model_id = Map.get(model, :id) || Map.get(model, "id")
+            if model_id, do: "#{provider}:#{model_id}"
+          end)
+          |> Enum.filter(&(!is_nil(&1)))
+
+        _ ->
+          []
+      end
+    end)
+  end
 
   @base_schema NimbleOptions.new!(
                  dimensions: [
@@ -37,6 +52,15 @@ defmodule ReqLLM.Embedding do
                    type: {:or, [:map, {:list, :any}]},
                    doc: "Provider-specific options (keyword list or map)",
                    default: []
+                 ],
+                 req_http_options: [
+                   type: {:or, [:map, {:list, :any}]},
+                   doc: "Req-specific options (keyword list or map)",
+                   default: []
+                 ],
+                 fixture: [
+                   type: {:or, [:string, {:tuple, [:atom, :string]}]},
+                   doc: "HTTP fixture for testing (provider inferred from model if string)"
                  ]
                )
 
@@ -46,11 +70,11 @@ defmodule ReqLLM.Embedding do
   ## Examples
 
       ReqLLM.Embedding.supported_models()
-      #=> ["openai:text-embedding-3-small", "openai:text-embedding-3-large", "openai:text-embedding-ada-002"]
+      #=> ["openai:text-embedding-3-small", "openai:text-embedding-3-large", "openai:text-embedding-ada-002", "google:gemini-embedding-001"]
 
   """
   @spec supported_models() :: [String.t()]
-  def supported_models, do: @embedding_models
+  def supported_models, do: get_embedding_models()
 
   @doc """
   Validates that a model supports embedding operations.
@@ -74,8 +98,32 @@ defmodule ReqLLM.Embedding do
     with {:ok, model} <- Model.from(model_spec) do
       model_string = "#{model.provider}:#{model.model}"
 
-      if model_string in @embedding_models do
-        {:ok, model}
+      # Check if model is in the embedding models list
+      embedding_models = get_embedding_models()
+
+      if model_string in embedding_models do
+        # Also verify the provider supports embedding operations
+        case ReqLLM.provider(model.provider) do
+          {:ok, provider_module} ->
+            # Test if provider can prepare embedding request
+            case provider_module.prepare_request(:embedding, model, "test", []) do
+              {:ok, _} ->
+                {:ok, model}
+
+              {:error, _} ->
+                {:error,
+                 ReqLLM.Error.Invalid.Parameter.exception(
+                   parameter:
+                     "model: #{model_string} provider does not support embedding operations"
+                 )}
+            end
+
+          {:error, _} ->
+            {:error,
+             ReqLLM.Error.Invalid.Parameter.exception(
+               parameter: "model: #{model_string} provider not found"
+             )}
+        end
       else
         {:error,
          ReqLLM.Error.Invalid.Parameter.exception(
@@ -94,41 +142,15 @@ defmodule ReqLLM.Embedding do
   def schema, do: @base_schema
 
   @doc """
-  Builds a dynamic schema by composing the base schema with provider-specific options.
+  Generates embeddings for single or multiple text inputs.
 
-  ## Parameters
-
-    * `provider_mod` - Provider module that defines provider_schema/0 function
-
-  """
-  @spec dynamic_schema(module()) :: NimbleOptions.t()
-  def dynamic_schema(provider_mod) do
-    if function_exported?(provider_mod, :provider_schema, 0) do
-      provider_keys = provider_mod.provider_schema().schema
-
-      # Update the :provider_options key with provider-specific nested schema
-      updated_schema =
-        Keyword.update!(@base_schema.schema, :provider_options, fn opt ->
-          Keyword.merge(opt,
-            type: :keyword_list,
-            keys: provider_keys,
-            default: []
-          )
-        end)
-
-      NimbleOptions.new!(updated_schema)
-    else
-      @base_schema
-    end
-  end
-
-  @doc """
-  Generates embeddings for a single text input.
+  Accepts either a single string or a list of strings, automatically handling
+  both cases using pattern matching.
 
   ## Parameters
 
     * `model_spec` - Model specification in various formats
-    * `text` - Text to generate embeddings for
+    * `input` - Text string or list of text strings to generate embeddings for
     * `opts` - Additional options (keyword list)
 
   ## Options
@@ -140,67 +162,84 @@ defmodule ReqLLM.Embedding do
 
   ## Examples
 
+      # Single text input
       {:ok, embedding} = ReqLLM.Embedding.embed("openai:text-embedding-3-small", "Hello world")
       #=> {:ok, [0.1, -0.2, 0.3, ...]}
 
-  """
-  @spec embed(
-          String.t() | {atom(), keyword()} | struct(),
-          String.t(),
-          keyword()
-        ) :: {:ok, [float()]} | {:error, term()}
-  def embed(model_spec, text, opts \\ []) do
-    with {:ok, model} <- validate_model(model_spec),
-         {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         schema = dynamic_schema(provider_module),
-         {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
-         {:ok, configured_request} <-
-           provider_module.prepare_request(:embedding, model, text, validated_opts),
-         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
-      extract_single_embedding(decoded_response)
-    end
-  end
-
-  @doc """
-  Generates embeddings for multiple text inputs.
-
-  ## Parameters
-
-    * `model_spec` - Model specification in various formats
-    * `texts` - List of texts to generate embeddings for
-    * `opts` - Additional options (keyword list)
-
-  ## Options
-
-  Same as `embed/3`.
-
-  ## Examples
-
-      {:ok, embeddings} = ReqLLM.Embedding.embed_many(
+      # Multiple text inputs
+      {:ok, embeddings} = ReqLLM.Embedding.embed(
         "openai:text-embedding-3-small",
         ["Hello", "World"]
       )
       #=> {:ok, [[0.1, -0.2, ...], [0.3, 0.4, ...]]}
 
   """
-  @spec embed_many(
+  @spec embed(
           String.t() | {atom(), keyword()} | struct(),
-          [String.t()],
+          String.t() | [String.t()],
           keyword()
-        ) :: {:ok, [[float()]]} | {:error, term()}
-  def embed_many(model_spec, texts, opts \\ []) when is_list(texts) do
+        ) :: {:ok, [float()] | [[float()]]} | {:error, term()}
+  def embed(model_spec, input, opts \\ [])
+
+  def embed(model_spec, text, opts) when is_binary(text) do
     with {:ok, model} <- validate_model(model_spec),
+         :ok <- validate_input(text),
          {:ok, provider_module} <- ReqLLM.provider(model.provider),
-         schema = dynamic_schema(provider_module),
-         {:ok, validated_opts} <- NimbleOptions.validate(opts, schema),
-         {:ok, configured_request} <-
-           provider_module.prepare_request(:embedding, model, texts, validated_opts),
-         {:ok, %Req.Response{body: decoded_response}} <- Req.request(configured_request) do
-      extract_multiple_embeddings(decoded_response)
+         {:ok, request} <- provider_module.prepare_request(:embedding, model, text, opts),
+         {:ok, %Req.Response{status: status, body: decoded_response}} when status in 200..299 <-
+           Req.request(request) do
+      extract_single_embedding(decoded_response)
+    else
+      {:ok, %Req.Response{status: status, body: body}} ->
+        {:error,
+         ReqLLM.Error.API.Request.exception(
+           reason: "HTTP #{status}: Request failed",
+           status: status,
+           response_body: body
+         )}
+
+      {:error, error} ->
+        {:error, error}
     end
   end
 
-  # Private helper functions
+  def embed(model_spec, texts, opts) when is_list(texts) do
+    with {:ok, model} <- validate_model(model_spec),
+         :ok <- validate_input(texts),
+         {:ok, provider_module} <- ReqLLM.provider(model.provider),
+         {:ok, request} <- provider_module.prepare_request(:embedding, model, texts, opts),
+         {:ok, %Req.Response{status: status, body: decoded_response}} when status in 200..299 <-
+           Req.request(request) do
+      extract_multiple_embeddings(decoded_response)
+    else
+      {:ok, %Req.Response{status: status, body: body}} ->
+        {:error,
+         ReqLLM.Error.API.Request.exception(
+           reason: "HTTP #{status}: Request failed",
+           status: status,
+           response_body: body
+         )}
+
+      {:error, error} ->
+        {:error, error}
+    end
+  end
+
+  defp validate_input("") do
+    {:error, ReqLLM.Error.Invalid.Parameter.exception(parameter: "text: cannot be empty")}
+  end
+
+  defp validate_input(text) when is_binary(text) do
+    :ok
+  end
+
+  defp validate_input([]) do
+    {:error, ReqLLM.Error.Invalid.Parameter.exception(parameter: "texts: cannot be empty")}
+  end
+
+  defp validate_input(texts) when is_list(texts) do
+    :ok
+  end
 
   defp extract_single_embedding(%{"data" => [%{"embedding" => embedding}]}) do
     {:ok, embedding}

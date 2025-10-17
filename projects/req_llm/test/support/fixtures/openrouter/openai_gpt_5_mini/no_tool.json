@@ -1,0 +1,136 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoyNTYwMCwibWVzc2FnZXMiOlt7ImNvbnRlbnQiOiJUZWxsIG1lIGEgam9rZSBhYm91dCBjYXRzIiwicm9sZSI6InVzZXIifV0sIm1vZGVsIjoib3BlbmFpL2dwdC01LW1pbmkiLCJuIjoxLCJyZWFzb25pbmdfZWZmb3J0IjoibG93Iiwic2VlZCI6NDIsInN0cmVhbSI6ZmFsc2UsInRlbXBlcmF0dXJlIjowLjAsInRvb2xzIjpbeyJmdW5jdGlvbiI6eyJkZXNjcmlwdGlvbiI6IkdldCBjdXJyZW50IHdlYXRoZXIgaW5mb3JtYXRpb24gZm9yIGEgbG9jYXRpb24iLCJuYW1lIjoiZ2V0X3dlYXRoZXIiLCJwYXJhbWV0ZXJzIjp7ImFkZGl0aW9uYWxQcm9wZXJ0aWVzIjpmYWxzZSwicHJvcGVydGllcyI6eyJsb2NhdGlvbiI6eyJ0eXBlIjoic3RyaW5nIn19LCJyZXF1aXJlZCI6WyJsb2NhdGlvbiJdLCJ0eXBlIjoib2JqZWN0In19LCJ0eXBlIjoiZnVuY3Rpb24ifV19"
+    },
+    "canonical_json": {
+      "max_tokens": 25600,
+      "messages": [
+        {
+          "content": "Tell me a joke about cats",
+          "role": "user"
+        }
+      ],
+      "model": "openai/gpt-5-mini",
+      "n": 1,
+      "reasoning_effort": "low",
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0,
+      "tools": [
+        {
+          "function": {
+            "description": "Get current weather information for a location",
+            "name": "get_weather",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "location": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "location"
+              ],
+              "type": "object"
+            }
+          },
+          "type": "function"
+        }
+      ]
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "Why did the cat sit on the computer?  \nTo keep an eye on the mouse.",
+            "reasoning": "**Crafting a cat joke**\n\nThe user is asking for a simple cat joke, so I’ll keep it short and fun! A one-liner should be sufficient, as it keeps things concise. I want to make sure the humor is safe and lighthearted. I'll deliver the joke and maybe offer a short follow-up option, but I’ll stick to just one joke for clarity. Let’s think about what would be a whimsical and amusing cat joke!",
+            "reasoning_details": [
+              {
+                "format": "openai-responses-v1",
+                "index": 0,
+                "summary": "**Crafting a cat joke**\n\nThe user is asking for a simple cat joke, so I’ll keep it short and fun! A one-liner should be sufficient, as it keeps things concise. I want to make sure the humor is safe and lighthearted. I'll deliver the joke and maybe offer a short follow-up option, but I’ll stick to just one joke for clarity. Let’s think about what would be a whimsical and amusing cat joke!",
+                "type": "reasoning.summary"
+              },
+              {
+                "data": "gAAAAABo75jLAhnQJNXkMnPPC6XTOXCnsA354t8OQpEG2faxNOenF5nMa0riEzXAu7ougut7-Jf1CehISRMOXFtd6xv7RR8QPGUjBpi_WElTeGltLboBUWO2oJwRtAUGYJdwms2ObgOrVSARg-NZN8XAmU9mVv9PlAqYbo05DKESJLX5yspARjApCzrgoG0YhE3Sj0MFIuQs1npBMwMOeFMoj8qmZr-jF4MSILIg64HQMo2bq4N706qCt0gXYrfnCfp_7TDMWKduMGGsKFiineqT_0K6YOO0R1_l6Ibi4a2KLLJ60tET4Aun-0gEDilyNKfK-cUk7jM2zb8o0T0sVQ9RFtxFQggQtWls0zQdvdTZ0kb2fkyD_rDRi25EIgIdXxhat3pztRTnWZEkDM7x3QLnHx6nXz1ONdbhgIzAtz-TmzfY9t8_IdzXQK5uJpWLKeeT_XqKUOQUGz3z3mXCeLFNfMp3ixp0uE-ADiv__WKqDSNcUg7X7DvEQtafaswxai_yOD7oqCJAOTbGZZ4QqYb1Ze40wa9tM2Gq795Hdg3PfGfWcn4__xbsAMs36LM9uxL8apXrVDq6aoIw_uNIQBDuR_Vmph64PUiC1LT5WGELtP_XGmVBEdwzPCxpZQ61T7N3WI_hUmtQ8z1NayWwSWnzIKW1vQOYuZZEpuOxzsm-DPvi0qPP2EJQ1U-p3hZOunAwHRoRf0tLF5miRq0EDjijuU_6SexxbjHekZdfbjq61yZuFnb_SgrS_pCMgs5WtS7bOkRQevlJYLzWQxOY4bhPOa8BgUY0QVaTN772Jm4yTiUtM6zpWls69A84t8d1d3qDut99LduWSReuhVjA_SKrkGVDmy9pfje0sVt5s8M4QYDxkLvv20vuxWdmYSCkbIB2FgkHn8CV9hefCfqH0Q_ceaVcikg6oitXnbMOO5H0Tbu_TkGXUyj2ifH7zhDOTsLbVkk8il7M0bfaBNqIW61wnhopvgdYx7eaQH0grx8jqwUkUQDU0d0jxPufn1XUbsBoZjPqAIbTzhz_EbEQsjpXf-VSBGBMEgsXPsSpchmrq_s3GjPKpkIpiMzn-riYNU3VqnvvrwKmg_ATJhjVAseFtPaN5Cvpj_o0zofT-wIaoykzihgODzJoeFXd4MN9vHOrhGTG-zsW",
+                "format": "openai-responses-v1",
+                "id": "rs_0dd52068da5e87c70168ef98c696248193ad9960290843e198",
+                "index": 0,
+                "type": "reasoning.encrypted"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "completed"
+        }
+      ],
+      "created": 1760532677,
+      "id": "gen-1760532677-haI7YfuJZmZ1X5TMZ8lv",
+      "model": "openai/gpt-5-mini",
+      "object": "chat.completion",
+      "provider": "OpenAI",
+      "usage": {
+        "completion_tokens": 24,
+        "prompt_tokens": 50,
+        "total_tokens": 74
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef7274de34f92b-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:51:18 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

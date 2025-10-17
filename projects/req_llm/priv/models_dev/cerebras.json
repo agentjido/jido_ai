@@ -60,6 +60,12 @@
       "tool_call": true
     },
     {
+      "id": "qwen-3-235b-a22b-thinking-2507",
+      "provider": "cerebras",
+      "provider_model_id": "qwen-3-235b-a22b-thinking-2507",
+      "reasoning": false
+    },
+    {
       "attachment": false,
       "cost": {
         "input": 2,
