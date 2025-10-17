@@ -109,6 +109,8 @@ defmodule ReqLLM.Provider.DSL do
 
   """
 
+  require Logger
+
   @doc """
   Sigil for defining lists of atoms from space-separated words.
 
@@ -116,16 +118,6 @@ defmodule ReqLLM.Provider.DSL do
 
       ~a[temperature max_tokens top_p]  # => [:temperature, :max_tokens, :top_p]
   """
-
-  # defmacro sigil_a({:<<>>, _, [string]}, _mods) do
-  #   list =
-  #     string
-  #     |> String.split(~r/\s+/, trim: true)
-  #     |> Enum.map(&String.to_atom/1)
-
-  #   Macro.escape(list)
-  # end
-
   defmacro __using__(opts) do
     # Validate required options
     id = Keyword.fetch!(opts, :id)
@@ -150,9 +142,8 @@ defmodule ReqLLM.Provider.DSL do
     end
 
     quote do
-      # Implement Req plugin pattern (no formal behaviour needed)
+      use ReqLLM.Provider.Defaults
 
-      # Store configuration for use in callbacks
       @provider_id unquote(id)
       @base_url unquote(base_url)
       @metadata_path unquote(metadata_path)
@@ -161,15 +152,12 @@ defmodule ReqLLM.Provider.DSL do
       @context_wrapper unquote(context_wrapper)
       @response_wrapper unquote(response_wrapper)
 
-      # Set external resource if metadata file exists
       if @metadata_path do
         @external_resource @metadata_path
       end
 
-      # Register provider before compilation completes
       @before_compile ReqLLM.Provider.DSL
 
-      # Implement default_base_url function
       def default_base_url do
         @base_url
       end
@@ -190,8 +178,9 @@ defmodule ReqLLM.Provider.DSL do
     # Load metadata if file exists
     metadata = load_metadata(metadata_path)
 
-    # Build provider schema from opts, falling back to all generation keys if empty
+    # Build provider schema and extended generation schema
     provider_schema_definition = build_provider_schema(provider_schema_opts)
+    extended_schema_definition = build_extended_generation_schema(provider_schema_opts)
 
     quote do
       # Store metadata as module attribute
@@ -200,17 +189,17 @@ defmodule ReqLLM.Provider.DSL do
       # Build the provider schema at compile time
       @provider_schema unquote(provider_schema_definition)
 
+      # Build the extended generation schema (base + provider options)
+      @extended_generation_schema unquote(extended_schema_definition)
+
       # Optional helpers for accessing provider info
       def metadata, do: @req_llm_metadata
       def provider_id, do: unquote(provider_id)
 
       # Provider option helpers
       def supported_provider_options do
-        # Return both core generation options and provider-specific options
-        core_options = ReqLLM.Provider.Options.all_generation_keys()
-        provider_options = @provider_schema.schema |> Keyword.keys()
-        # Exclude :provider_options as it's a meta-key, not an actual validation target
-        (core_options ++ provider_options) |> Enum.reject(&(&1 == :provider_options))
+        # Return keys from the merged schema
+        @extended_generation_schema.schema |> Keyword.keys()
       end
 
       def default_provider_opts do
@@ -220,6 +209,8 @@ defmodule ReqLLM.Provider.DSL do
       end
 
       def provider_schema, do: @provider_schema
+
+      def provider_extended_generation_schema, do: @extended_generation_schema
 
       # Translation helper functions available to all providers
       @doc false
@@ -316,17 +307,30 @@ defmodule ReqLLM.Provider.DSL do
     end
   end
 
+  # Private helper to build extended generation schema (base + provider options)
+  defp build_extended_generation_schema(provider_schema_opts) do
+    quote do
+      # Get the base generation schema and merge with provider-specific options
+      base_schema = ReqLLM.Provider.Options.generation_schema().schema
+      provider_options = unquote(provider_schema_opts)
+
+      # Merge the schemas - provider options extend base options
+      merged_schema = Keyword.merge(base_schema, provider_options)
+      NimbleOptions.new!(merged_schema)
+    end
+  end
+
   # Compile-time validation that provider schema keys don't overlap with core options
   defp validate_schema_keys(schema_opts) do
-    core_keys = ReqLLM.Generation.schema().schema |> Keyword.keys()
+    core_keys = ReqLLM.Provider.Options.generation_schema().schema |> Keyword.keys()
 
     Enum.each(schema_opts, fn {key, _opts} ->
       if key in core_keys do
-        raise CompileError,
-          description:
-            "Provider schema key #{inspect(key)} conflicts with core generation option. " <>
-              "Core keys: #{inspect(core_keys)}. " <>
-              "Provider-specific options should be unique to the provider."
+        IO.warn(
+          "Provider schema key #{inspect(key)} conflicts with core generation option. " <>
+            "This will be an error in a future version. " <>
+            "Consider using a provider-specific name to avoid conflicts."
+        )
       end
     end)
   end
@@ -346,16 +350,16 @@ defmodule ReqLLM.Provider.DSL do
               atomize_keys(data)
 
             {:error, error} ->
-              IO.warn("Failed to parse JSON metadata from #{path}: #{inspect(error)}")
+              Logger.warning("Failed to parse JSON metadata from #{path}: #{inspect(error)}")
               %{}
           end
 
         {:error, error} ->
-          IO.warn("Failed to read metadata file #{path}: #{inspect(error)}")
+          Logger.warning("Failed to read metadata file #{path}: #{inspect(error)}")
           %{}
       end
     else
-      IO.warn("Metadata file not found: #{path}")
+      Logger.warning("Metadata file not found: #{path}")
       %{}
     end
   end

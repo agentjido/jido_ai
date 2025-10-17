@@ -1,0 +1,109 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoyMDAwLCJtZXNzYWdlcyI6W3siY29udGVudCI6IkhlbGxvIHdvcmxkISIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6InotYWkvZ2xtLTQuNSIsIm4iOjEsInJlYXNvbmluZ19lZmZvcnQiOiJsb3ciLCJzZWVkIjo0Miwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuMH0="
+    },
+    "canonical_json": {
+      "max_tokens": 2000,
+      "messages": [
+        {
+          "content": "Hello world!",
+          "role": "user"
+        }
+      ],
+      "model": "z-ai/glm-4.5",
+      "n": 1,
+      "reasoning_effort": "low",
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "Here's a simple \"Hello world!\" program in Python:\n\n```python\nprint(\"Hello world!\")\n```\n\n### Explanation:\n1. **`print()`**: This is a built-in Python function that outputs text to the console.\n2. **`\"Hello world!\"`**: This is the string of text we want to display. Strings in Python are enclosed in either single (`'`) or double (`\"`) quotes.\n\n### How to Run:\n1. Save the code in a file named `hello.py`.\n2. Open a terminal/command prompt.\n3. Navigate to the directory containing the file.\n4. Run the command:  \n   ```bash\n   python hello.py\n   ```\n5. Output:  \n   ```\n   Hello world!\n   ```\n\nThis program is the traditional starting point for learning any programming language, demonstrating basic output functionality.",
+            "reasoning": "\nWe are starting with a simple \"Hello world!\" program.\n Since the user said \"Hello world!\", we can respond in kind.\n However, note that the instruction says to output the final answer within ```your code```.\n But the user's input is just a greeting, so we can write a program that prints \"Hello world!\".\n\n Let's write a simple Python program that prints \"Hello world!\".",
+            "reasoning_details": [
+              {
+                "format": "unknown",
+                "index": 0,
+                "text": "\nWe are starting with a simple \"Hello world!\" program.\n Since the user said \"Hello world!\", we can respond in kind.\n However, note that the instruction says to output the final answer within ```your code```.\n But the user's input is just a greeting, so we can write a program that prints \"Hello world!\".\n\n Let's write a simple Python program that prints \"Hello world!\".",
+                "type": "reasoning.text"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "stop"
+        }
+      ],
+      "created": 1760545836,
+      "id": "gen-1760545826-1zHIEap5gnZE6nniMkrv",
+      "model": "z-ai/glm-4.5",
+      "object": "chat.completion",
+      "provider": "DeepInfra",
+      "usage": {
+        "completion_tokens": 255,
+        "prompt_tokens": 8,
+        "prompt_tokens_details": null,
+        "total_tokens": 263
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98f0b3799bbeeac0-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 16:30:36 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

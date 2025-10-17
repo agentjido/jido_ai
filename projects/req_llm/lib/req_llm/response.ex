@@ -14,7 +14,7 @@ defmodule ReqLLM.Response do
       # Basic response usage
       {:ok, response} = ReqLLM.generate_text("anthropic:claude-3-sonnet", context)
       response.text()  #=> "Hello! I'm Claude."
-      response.usage()  #=> %{input_tokens: 12, output_tokens: 4}
+      response.usage()  #=> %{input_tokens: 12, output_tokens: 4, total_cost: 0.016}
 
       # Multi-turn conversation (no manual context building)
       {:ok, response2} = ReqLLM.generate_text("anthropic:claude-3-sonnet", response.context)
@@ -49,8 +49,8 @@ defmodule ReqLLM.Response do
     field(:stream, Enumerable.t() | nil, default: nil)
 
     # ---------- Metadata ----------
-    field(:usage, %{optional(atom()) => integer()} | nil)
-    field(:finish_reason, atom() | String.t() | nil)
+    field(:usage, map() | nil)
+    field(:finish_reason, :stop | :length | :tool_calls | :content_filter | :error | nil)
     # Raw provider extras
     field(:provider_meta, map(), default: %{})
 
@@ -62,7 +62,8 @@ defmodule ReqLLM.Response do
   Extract text content from the response message.
 
   Returns the concatenated text from all content parts in the assistant message.
-  For streaming responses, this may be nil until the stream is joined.
+  Returns nil when no message is present. For streaming responses, this may be nil
+  until the stream is joined.
 
   ## Examples
 
@@ -70,8 +71,8 @@ defmodule ReqLLM.Response do
       "Hello! I'm Claude and I can help you with questions."
 
   """
-  @spec text(t()) :: String.t()
-  def text(%__MODULE__{message: nil}), do: ""
+  @spec text(t()) :: String.t() | nil
+  def text(%__MODULE__{message: nil}), do: nil
 
   def text(%__MODULE__{message: %Message{content: content}}) do
     content
@@ -80,9 +81,30 @@ defmodule ReqLLM.Response do
   end
 
   @doc """
+  Extract thinking/reasoning content from the response message.
+
+  Returns the concatenated thinking content if the message contains thinking parts, empty string otherwise.
+
+  ## Examples
+
+      iex> ReqLLM.Response.thinking(response)
+      "The user is asking about the weather..."
+
+  """
+  @spec thinking(t()) :: String.t() | nil
+  def thinking(%__MODULE__{message: nil}), do: nil
+
+  def thinking(%__MODULE__{message: %Message{content: content}}) do
+    content
+    |> Enum.filter(&(&1.type == :thinking))
+    |> Enum.map_join("", & &1.text)
+  end
+
+  @doc """
   Extract tool calls from the response message.
 
   Returns a list of tool calls if the message contains them, empty list otherwise.
+  Always returns normalized maps with `.name` and `.arguments` fields.
 
   ## Examples
 
@@ -98,20 +120,6 @@ defmodule ReqLLM.Response do
     tool_calls
   end
 
-  def tool_calls(%__MODULE__{message: %Message{tool_calls: nil, content: content}})
-      when is_list(content) do
-    # Extract tool calls from content parts (e.g., for Anthropic)
-    content
-    |> Enum.filter(&(&1.type == :tool_call))
-    |> Enum.map(fn part ->
-      %{
-        name: part.tool_name,
-        arguments: part.input,
-        id: part.tool_call_id
-      }
-    end)
-  end
-
   def tool_calls(%__MODULE__{message: %Message{tool_calls: nil}}), do: []
 
   @doc """
@@ -123,7 +131,7 @@ defmodule ReqLLM.Response do
       :stop
 
   """
-  @spec finish_reason(t()) :: atom() | String.t() | nil
+  @spec finish_reason(t()) :: :stop | :length | :tool_calls | :content_filter | :error | nil
   def finish_reason(%__MODULE__{finish_reason: reason}), do: reason
 
   @doc """
@@ -132,11 +140,36 @@ defmodule ReqLLM.Response do
   ## Examples
 
       iex> ReqLLM.Response.usage(response)
-      %{input_tokens: 12, output_tokens: 8, total_tokens: 20}
+      %{input_tokens: 12, output_tokens: 8, total_tokens: 20, reasoning_tokens: 64, input_cost: 0.01, output_cost: 0.02, total_cost: 0.03}
 
   """
-  @spec usage(t()) :: %{optional(atom()) => integer()} | nil
+  @spec usage(t()) :: map() | nil
   def usage(%__MODULE__{usage: usage}), do: usage
+
+  @doc """
+  Get reasoning token count from the response usage.
+
+  Returns the number of reasoning tokens used by reasoning models (GPT-5, o1, o3, etc.)
+  during their internal thinking process. Returns 0 if no reasoning tokens were used.
+
+  ## Examples
+
+      iex> ReqLLM.Response.reasoning_tokens(response)
+      64
+
+  """
+  @spec reasoning_tokens(t()) :: integer()
+  def reasoning_tokens(%__MODULE__{usage: %{reasoning_tokens: tokens}}) when is_integer(tokens),
+    do: tokens
+
+  def reasoning_tokens(%__MODULE__{usage: usage}) when is_map(usage) do
+    # Try various possible keys for reasoning tokens
+    usage[:reasoning_tokens] || usage["reasoning_tokens"] || usage[:reasoning] ||
+      usage["reasoning"] || get_in(usage, [:completion_tokens_details, :reasoning_tokens]) ||
+      get_in(usage, ["completion_tokens_details", "reasoning_tokens"]) || 0
+  end
+
+  def reasoning_tokens(%__MODULE__{}), do: 0
 
   @doc """
   Check if the response completed successfully without errors.
@@ -166,13 +199,40 @@ defmodule ReqLLM.Response do
 
   """
   @spec text_stream(t()) :: Enumerable.t()
-  def text_stream(%__MODULE__{stream?: false}), do: [] |> Stream.map(& &1)
-  def text_stream(%__MODULE__{stream: nil}), do: [] |> Stream.map(& &1)
+  def text_stream(%__MODULE__{stream?: false}), do: []
+  def text_stream(%__MODULE__{stream: nil}), do: []
 
   def text_stream(%__MODULE__{stream: stream}) do
     stream
     |> Stream.filter(&(&1.type == :content))
     |> Stream.map(& &1.text)
+  end
+
+  # ---------- Stream Helpers ----------
+
+  @doc """
+  Create a stream of structured objects from a streaming response.
+
+  Only yields valid objects from tool call stream chunks, filtering out
+  metadata and other chunk types.
+
+  ## Examples
+
+      response
+      |> ReqLLM.Response.object_stream()
+      |> Stream.each(&IO.inspect/1)
+      |> Stream.run()
+
+  """
+  @spec object_stream(t()) :: Enumerable.t()
+  def object_stream(%__MODULE__{stream?: false}), do: []
+  def object_stream(%__MODULE__{stream: nil}), do: []
+
+  def object_stream(%__MODULE__{stream: stream}) do
+    stream
+    |> Stream.filter(&(&1.type == :tool_call))
+    |> Stream.filter(&(&1.name == "structured_output"))
+    |> Stream.map(& &1.arguments)
   end
 
   @doc """
@@ -191,49 +251,14 @@ defmodule ReqLLM.Response do
   def join_stream(%__MODULE__{stream: nil} = response), do: {:ok, response}
 
   def join_stream(%__MODULE__{stream: stream} = response) do
-    # Collect all stream chunks
-    chunks = Enum.to_list(stream)
-
-    # Build message from content chunks
-    content_text =
-      chunks
-      |> Enum.filter(&(&1.type == :content))
-      |> Enum.map_join("", & &1.text)
-
-    # Extract final usage and metadata from meta chunks
-    final_usage =
-      chunks
-      |> Enum.filter(&(&1.type == :meta))
-      |> Enum.reduce(response.usage, fn chunk, acc ->
-        Map.merge(acc || %{}, chunk.usage || %{})
-      end)
-
-    # Build the assistant message
-    message = %Message{
-      role: :assistant,
-      content: [%{type: :text, text: content_text}],
-      metadata: %{}
-    }
-
-    # Update response with materialized data
-    updated_response = %{
-      response
-      | message: message,
-        usage: final_usage,
-        stream?: false,
-        stream: nil
-    }
-
-    {:ok, updated_response}
-  rescue
-    error -> {:error, error}
+    ReqLLM.Response.Stream.join(stream, response)
   end
 
   @doc """
   Decode provider response data into a canonical ReqLLM.Response.
 
   This is a façade function that accepts raw provider data and a model specification,
-  and directly calls the Response.Codec.decode_response/2 protocol for zero-ceremony decoding.
+  and directly calls the provider's decode_response/1 callback for zero-ceremony decoding.
 
   Supports both Model struct and string inputs, automatically resolving model
   strings using Model.from!/1.
@@ -256,18 +281,31 @@ defmodule ReqLLM.Response do
   """
   @spec decode_response(term(), Model.t() | String.t()) :: {:ok, t()} | {:error, term()}
   def decode_response(raw_data, model_input) do
-    model = resolve_model(model_input)
-    {:ok, provider_mod} = ReqLLM.Provider.get(model.provider)
+    model = if is_binary(model_input), do: Model.from!(model_input), else: model_input
 
-    wrapped_data =
-      if function_exported?(provider_mod, :wrap_response, 1) do
-        provider_mod.wrap_response(raw_data)
-      else
-        # fallback for providers that implement protocol directly
-        raw_data
-      end
+    case ReqLLM.Provider.Registry.get_provider(model.provider) do
+      {:ok, provider_mod} ->
+        wrapped_data =
+          if function_exported?(provider_mod, :wrap_response, 1) do
+            provider_mod.wrap_response(raw_data)
+          else
+            raw_data
+          end
 
-    ReqLLM.Response.Codec.decode_response(wrapped_data, model)
+        # Construct minimal request/response structs to invoke provider's decode_response callback
+        # without an actual HTTP request (for manual decoding of saved/raw API responses)
+        fixture_request = %Req.Request{private: %{req_llm_model: model}}
+        fixture_response = %Req.Response{body: wrapped_data, status: 200}
+        {_req, result} = provider_mod.decode_response({fixture_request, fixture_response})
+
+        case result do
+          %Req.Response{body: %ReqLLM.Response{} = response} -> {:ok, response}
+          error -> {:error, error}
+        end
+
+      {:error, error} ->
+        {:error, error}
+    end
   end
 
   @doc """
@@ -305,7 +343,7 @@ defmodule ReqLLM.Response do
   ## Parameters
 
     * `raw_data` - Raw provider streaming response data
-    * `model` - Model specification  
+    * `model` - Model specification
     * `schema` - Schema definition for validation
 
   ## Returns
@@ -322,15 +360,8 @@ defmodule ReqLLM.Response do
     # object_stream/1 can extract objects from tool_call chunks
   end
 
-  # Helper function to resolve model input to Model struct
-  defp resolve_model(%Model{} = model), do: model
-
-  defp resolve_model(model_string) when is_binary(model_string) do
-    Model.from!(model_string)
-  end
-
   # Helper function to extract structured object from tool calls
-  defp extract_object_from_response(response, _schema) do
+  defp extract_object_from_response(response, schema) do
     case tool_calls(response) do
       [] ->
         {:error, %ReqLLM.Error.API.Response{reason: "No structured output found in response"}}
@@ -342,8 +373,20 @@ defmodule ReqLLM.Response do
             {:error, %ReqLLM.Error.API.Response{reason: "No structured_output tool call found"}}
 
           %{arguments: object} ->
-            # TODO: Add schema validation here
-            {:ok, object}
+            # Validate the extracted object against the original schema
+            case ReqLLM.Schema.validate(object, schema) do
+              {:ok, _validated_data} ->
+                {:ok, object}
+
+              {:error, validation_error} ->
+                {:error,
+                 %ReqLLM.Error.API.Response{
+                   reason:
+                     "Structured output failed schema validation: #{Exception.message(validation_error)}",
+                   status: 422,
+                   response_body: object
+                 }}
+            end
         end
     end
   end
@@ -357,27 +400,55 @@ defmodule ReqLLM.Response do
   end
 
   @doc """
-  Create a stream of structured objects from a streaming response.
+  Unwraps the object from a structured output response, regardless of mode used.
 
-  Only yields valid objects from tool call stream chunks, filtering out
-  metadata and other chunk types.
+  Handles extraction from:
+  - json_schema mode: parses from content
+  - tool modes: extracts from tool call arguments
 
   ## Examples
 
-      response
-      |> ReqLLM.Response.object_stream()
-      |> Stream.each(&IO.inspect/1)
-      |> Stream.run()
+      {:ok, object} = ReqLLM.Response.unwrap_object(response)
+      #=> {:ok, %{"name" => "John", "age" => 30}}
 
   """
-  @spec object_stream(t()) :: Enumerable.t()
-  def object_stream(%__MODULE__{stream?: false}), do: [] |> Stream.map(& &1)
-  def object_stream(%__MODULE__{stream: nil}), do: [] |> Stream.map(& &1)
+  @spec unwrap_object(t()) :: {:ok, map()} | {:error, term()}
+  def unwrap_object(%__MODULE__{object: object}) when not is_nil(object) do
+    {:ok, object}
+  end
 
-  def object_stream(%__MODULE__{stream: stream}) do
-    stream
-    |> Stream.filter(&(&1.type == :tool_call))
-    |> Stream.filter(&(&1.name == "structured_output"))
-    |> Stream.map(& &1.arguments)
+  def unwrap_object(%__MODULE__{message: nil}) do
+    {:error, %ReqLLM.Error.API.Response{reason: "No message in response"}}
+  end
+
+  def unwrap_object(%__MODULE__{message: %Message{content: content}}) do
+    text_content =
+      content
+      |> Enum.filter(&(&1.type == :text))
+      |> Enum.map_join("", & &1.text)
+
+    tool_call_content =
+      content
+      |> Enum.find(&(&1.type == :tool_call && &1.tool_name == "structured_output"))
+
+    cond do
+      tool_call_content != nil ->
+        {:ok, tool_call_content.input}
+
+      text_content != "" ->
+        case Jason.decode(text_content) do
+          {:ok, object} when is_map(object) ->
+            {:ok, object}
+
+          {:ok, _other} ->
+            {:error, %ReqLLM.Error.API.Response{reason: "Decoded JSON is not an object"}}
+
+          {:error, _} ->
+            {:error, %ReqLLM.Error.API.Response{reason: "Failed to parse JSON from text content"}}
+        end
+
+      true ->
+        {:error, %ReqLLM.Error.API.Response{reason: "No structured output found in response"}}
+    end
   end
 end

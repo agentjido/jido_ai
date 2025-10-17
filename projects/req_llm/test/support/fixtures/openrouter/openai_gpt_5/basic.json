@@ -1,0 +1,115 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoyMDAwLCJtZXNzYWdlcyI6W3siY29udGVudCI6IkhlbGxvIHdvcmxkISIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6Im9wZW5haS9ncHQtNSIsIm4iOjEsInJlYXNvbmluZ19lZmZvcnQiOiJsb3ciLCJzZWVkIjo0Miwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuMH0="
+    },
+    "canonical_json": {
+      "max_tokens": 2000,
+      "messages": [
+        {
+          "content": "Hello world!",
+          "role": "user"
+        }
+      ],
+      "model": "openai/gpt-5",
+      "n": 1,
+      "reasoning_effort": "low",
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "Hello! How can I help you today?",
+            "reasoning": "I think I need to give a simple greeting to the user. A friendly, concise response would be best. I could say something like, \"Hello! How can I help you today?\" It feels welcoming and sets a positive tone for our interaction. I want to make sure the user feels comfortable reaching out with their questions or requests, so being straightforward yet friendly is key. Let's see how the user responds!",
+            "reasoning_details": [
+              {
+                "format": "openai-responses-v1",
+                "index": 0,
+                "summary": "I think I need to give a simple greeting to the user. A friendly, concise response would be best. I could say something like, \"Hello! How can I help you today?\" It feels welcoming and sets a positive tone for our interaction. I want to make sure the user feels comfortable reaching out with their questions or requests, so being straightforward yet friendly is key. Let's see how the user responds!",
+                "type": "reasoning.summary"
+              },
+              {
+                "data": "gAAAAABo75gbVqyNO2d2o6X1ecRFa5pkHUzKb0g6865PaZqU1D4V7ZPOYmZVQSYpgL5BWLPdE1Yvjpix5G4989TqHvD9d30IG0u4jmq4eC-eC6v8IkGX6K0xK1JfkCGligzT0DzC57c36l_nPKgr3KP-Qx_GF1U5VCApuY_6MPV1Qoxb8d_k2jajaboB6uDtm2YaRygaJaO7-8KXtlJOJXyXMnoEijFjaC3-2yAKHHD2dwDUjgC9ox_xyU4ObBGfXqta3ZIRlC7JBmITSgOhOrofg46I_KDe0Hldm0aG9uLtiS4gfJJOUD7HDG1mrLIViBle6f5rR0zSXk_f9IaSbh_AFJpsOnXsc3CGAykBItOrMR4rRNf4FUXgnMOPWHAEuwbYvNvdITev8fgu8qfi60woCYCdESW7eD3qaslzGwKsvrve_2ylPxDxXXjY0KrAZF6f3hnfXj6MD7ipm6JY5eZFPAs7xPxq1EdY29io4waBm2Glwg9XcYr_OeKu4LIkMKjwos--mxxsHq68NLkfkNNrgkYClBDdn4aSzPHCBR10iaDKdhMznOaKguxTFXrtJEttFe6CKT3ICdqqHtQqnoH2e1zN4IiBbeYU4xXupmEi5O8Ep1DxGJ7Tgk-05-jO0HOUGihkb7U9Nv24iMjyj9ej7g2QFKe8X6fuA_hLkDpPxAUdw5NF2JTDpqy2y88BAHWu2CAomeDoCiZm06xhq1xcxfuT-aUP-69V-KnZeg2pOsa1Ku2hkVRbXZmoqTBA9iPZCtvlNDoEUBQ6Q2dhZtt4EV5JDuDj6C59LCZeUhKnO-RotSYiloJjfN5Imjc4mynIrBB0Pph80XyOXzHvjAWGNgb1GE6pNoNLpMA0Wfh8ShKYdbgnJJI72spjsCMKMR7l4zQ9kE823GqSofNAkMQa9RXuduk8FLXCupQNcy8BBQ05id8iQZs=",
+                "format": "openai-responses-v1",
+                "id": "rs_0979ed425449eaf60168ef98195d1c8193b7caf341cb5395a3",
+                "index": 0,
+                "type": "reasoning.encrypted"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "completed"
+        }
+      ],
+      "created": 1760532504,
+      "id": "gen-1760532504-hWhtOsR3cxSsfXvdP990",
+      "model": "openai/gpt-5",
+      "object": "chat.completion",
+      "provider": "OpenAI",
+      "usage": {
+        "completion_tokens": 15,
+        "prompt_tokens": 9,
+        "total_tokens": 24
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef6e3b19ecf163-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:48:25 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

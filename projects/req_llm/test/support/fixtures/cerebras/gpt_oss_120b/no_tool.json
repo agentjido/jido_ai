@@ -1,0 +1,154 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjo2NTUyLCJtZXNzYWdlcyI6W3siY29udGVudCI6IlRlbGwgbWUgYSBqb2tlIGFib3V0IGNhdHMiLCJyb2xlIjoidXNlciJ9XSwibW9kZWwiOiJncHQtb3NzLTEyMGIiLCJzZWVkIjo0Miwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuMCwidG9vbHMiOlt7ImZ1bmN0aW9uIjp7ImRlc2NyaXB0aW9uIjoiR2V0IGN1cnJlbnQgd2VhdGhlciBpbmZvcm1hdGlvbiBmb3IgYSBsb2NhdGlvbiIsIm5hbWUiOiJnZXRfd2VhdGhlciIsInBhcmFtZXRlcnMiOnsiYWRkaXRpb25hbFByb3BlcnRpZXMiOmZhbHNlLCJwcm9wZXJ0aWVzIjp7ImxvY2F0aW9uIjp7InR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbImxvY2F0aW9uIl0sInR5cGUiOiJvYmplY3QifSwic3RyaWN0Ijp0cnVlfSwidHlwZSI6ImZ1bmN0aW9uIn1dfQ=="
+    },
+    "canonical_json": {
+      "max_tokens": 6552,
+      "messages": [
+        {
+          "content": "Tell me a joke about cats",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-oss-120b",
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0,
+      "tools": [
+        {
+          "function": {
+            "description": "Get current weather information for a location",
+            "name": "get_weather",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "location": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "location"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          },
+          "type": "function"
+        }
+      ]
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.cerebras.ai/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "Why did the cat sit on the computer?\n\nBecause it wanted to keep an eye on the mouse! 😺",
+            "reasoning": "User wants a joke about cats. Simple. Provide a cat joke.",
+            "role": "assistant"
+          }
+        }
+      ],
+      "created": 1760396446,
+      "id": "chatcmpl-a0ebb5d6-4d2c-4cec-9df0-f8d37e394ad6",
+      "model": "gpt-oss-120b",
+      "object": "chat.completion",
+      "system_fingerprint": "fp_8a8c0bd8448557718491",
+      "time_info": {
+        "completion_time": 0.032038511,
+        "created": 1760396446,
+        "prompt_time": 0.003410503,
+        "queue_time": 0.004590643,
+        "total_time": 0.04150986671447754
+      },
+      "usage": {
+        "completion_tokens": 46,
+        "prompt_tokens": 127,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 173
+      }
+    },
+    "headers": {
+      "alt-svc": [
+        "h3=\":443\"; ma=86400"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "98e2747bfd5af32d-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Mon, 13 Oct 2025 23:00:46 GMT"
+      ],
+      "inference-id": [
+        "chatcmpl-a0ebb5d6-4d2c-4cec-9df0-f8d37e394ad6"
+      ],
+      "referrer-policy": [
+        "strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=3zr_9MX7ILzypeE7eaZ3AdTpjkAMkwkI5SVmXZb1tAs-1760396446-1.0.1.1-AhhKZJjSQJswE3JeZ.ZpZSPcBAmaFQCBrd_UIRsOUsw7pjcroLN1Tyu9nD9E6m9en1bUDdJ8CM_cFBrlsfL5.UWIRAwcWuY_NsURpPrFVCk; path=/; expires=Mon, 13-Oct-25 23:30:46 GMT; domain=.api.cerebras.ai; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=3600; includeSubDomains"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-ratelimit-limit-requests-day": [
+        "1440000"
+      ],
+      "x-ratelimit-limit-tokens-minute": [
+        "1000000"
+      ],
+      "x-ratelimit-remaining-requests-day": [
+        "1439979"
+      ],
+      "x-ratelimit-remaining-tokens-minute": [
+        "995153"
+      ],
+      "x-ratelimit-reset-requests-day": [
+        "3553.7798244953156"
+      ],
+      "x-ratelimit-reset-tokens-minute": [
+        "13.779824495315552"
+      ],
+      "x-request-id": [
+        "98e2747bfd5af32d-ORD"
+      ]
+    },
+    "status": 200
+  }
+}

@@ -63,6 +63,66 @@
     {
       "attachment": false,
       "cost": {
+        "input": 0.25,
+        "output": 1
+      },
+      "id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "knowledge": "2025-04",
+      "last_updated": "2025-09-11",
+      "limit": {
+        "context": 262144,
+        "output": 66536
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Qwen3-Next-80B-A3B-Instruct",
+      "open_weights": true,
+      "provider": "huggingface",
+      "provider_model_id": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "reasoning": false,
+      "release_date": "2025-09-11",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "input": 0.3,
+        "output": 2
+      },
+      "id": "Qwen/Qwen3-Next-80B-A3B-Thinking",
+      "knowledge": "2025-04",
+      "last_updated": "2025-09-11",
+      "limit": {
+        "context": 262144,
+        "output": 131072
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Qwen3-Next-80B-A3B-Thinking",
+      "open_weights": true,
+      "provider": "huggingface",
+      "provider_model_id": "Qwen/Qwen3-Next-80B-A3B-Thinking",
+      "reasoning": false,
+      "release_date": "2025-09-11",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
         "input": 3,
         "output": 5
       },
@@ -153,6 +213,36 @@
     {
       "attachment": false,
       "cost": {
+        "input": 1,
+        "output": 3
+      },
+      "id": "moonshotai/Kimi-K2-Instruct-0905",
+      "knowledge": "2024-10",
+      "last_updated": "2025-09-04",
+      "limit": {
+        "context": 262144,
+        "output": 16384
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "Kimi-K2-Instruct-0905",
+      "open_weights": true,
+      "provider": "huggingface",
+      "provider_model_id": "moonshotai/Kimi-K2-Instruct-0905",
+      "reasoning": false,
+      "release_date": "2025-09-04",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
         "input": 0.6,
         "output": 2.2
       },
@@ -207,6 +297,37 @@
       "provider_model_id": "zai-org/GLM-4.5-Air",
       "reasoning": true,
       "release_date": "2025-07-28",
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "attachment": false,
+      "cost": {
+        "cache_read": 0.11,
+        "input": 0.6,
+        "output": 2.2
+      },
+      "id": "zai-org/GLM-4.6",
+      "knowledge": "2025-04",
+      "last_updated": "2025-09-30",
+      "limit": {
+        "context": 200000,
+        "output": 128000
+      },
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "GLM-4.6",
+      "open_weights": true,
+      "provider": "huggingface",
+      "provider_model_id": "zai-org/GLM-4.6",
+      "reasoning": true,
+      "release_date": "2025-09-30",
       "temperature": true,
       "tool_call": true
     }

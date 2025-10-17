@@ -1,0 +1,115 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoxMCwibWVzc2FnZXMiOlt7ImNvbnRlbnQiOiJIaSB0aGVyZSEiLCJyb2xlIjoidXNlciJ9XSwibW9kZWwiOiJ4LWFpL2dyb2stMy1taW5pLWJldGEiLCJuIjoxLCJzZWVkIjo0Miwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuMH0="
+    },
+    "canonical_json": {
+      "max_tokens": 10,
+      "messages": [
+        {
+          "content": "Hi there!",
+          "role": "user"
+        }
+      ],
+      "model": "x-ai/grok-3-mini-beta",
+      "n": 1,
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "length",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "Hi! How can I help you today? ",
+            "reasoning": "First, the user said, \"Hi there!\" which is a casual greeting. As an AI assistant, I should respond in a friendly and engaging manner to build rapport.\n\nMy role is to be helpful, truthful, and engaging, based on the system prompt. I need to keep responses clear and not verbose, so I'll aim for concise yet polite.\n\nPossible responses:\n- A simple greeting back, like \"Hi! How can I help you today?\"\n- This invites further interaction, which is good since the user might have a question or just be starting a conversation.\n\nIf this is the start of a conversation, I should be prepared for anything, but for now, respond appropriately.\n\nEnsure my response aligns with being Grok, built by xAI. I don't need to mention that unless relevant.\n\nFinal response structure:\n- Start with a greeting.\n- Offer assistance to make it useful.\n\nSomething like: \"Hi! I'm Grok, here to help. What's on your mind?\"\n\nThat might be a bit long, but it's clear. To keep it non-verbose: \"Hi! How can I assist you?\"\n\nYes, that works.",
+            "reasoning_details": [
+              {
+                "format": "unknown",
+                "index": 0,
+                "text": "First, the user said, \"Hi there!\" which is a casual greeting. As an AI assistant, I should respond in a friendly and engaging manner to build rapport.\n\nMy role is to be helpful, truthful, and engaging, based on the system prompt. I need to keep responses clear and not verbose, so I'll aim for concise yet polite.\n\nPossible responses:\n- A simple greeting back, like \"Hi! How can I help you today?\"\n- This invites further interaction, which is good since the user might have a question or just be starting a conversation.\n\nIf this is the start of a conversation, I should be prepared for anything, but for now, respond appropriately.\n\nEnsure my response aligns with being Grok, built by xAI. I don't need to mention that unless relevant.\n\nFinal response structure:\n- Start with a greeting.\n- Offer assistance to make it useful.\n\nSomething like: \"Hi! I'm Grok, here to help. What's on your mind?\"\n\nThat might be a bit long, but it's clear. To keep it non-verbose: \"Hi! How can I assist you?\"\n\nYes, that works.",
+                "type": "reasoning.text"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "length"
+        }
+      ],
+      "created": 1760532604,
+      "id": "gen-1760532604-n1ijGaPdDVdsxhgs8R04",
+      "model": "x-ai/grok-3-mini",
+      "object": "chat.completion",
+      "provider": "xAI",
+      "system_fingerprint": "fp_4fae27f477",
+      "usage": {
+        "completion_tokens": 238,
+        "completion_tokens_details": {
+          "reasoning_tokens": 228
+        },
+        "prompt_tokens": 10,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 2
+        },
+        "total_tokens": 248
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef70acffb91923-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:50:05 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

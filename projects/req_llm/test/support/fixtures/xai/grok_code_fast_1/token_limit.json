@@ -1,0 +1,116 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfY29tcGxldGlvbl90b2tlbnMiOjEwMCwibWVzc2FnZXMiOlt7ImNvbnRlbnQiOiJXcml0ZSBhIHZlcnkgbG9uZyBzdG9yeSBhYm91dCBkcmFnb25zIGFuZCBhZHZlbnR1cmVzIiwicm9sZSI6InVzZXIifV0sIm1vZGVsIjoiZ3Jvay1jb2RlLWZhc3QtMSIsInN0cmVhbSI6ZmFsc2UsInRlbXBlcmF0dXJlIjowLjV9"
+    },
+    "canonical_json": {
+      "max_completion_tokens": 100,
+      "messages": [
+        {
+          "content": "Write a very long story about dragons and adventures",
+          "role": "user"
+        }
+      ],
+      "model": "grok-code-fast-1",
+      "stream": false,
+      "temperature": 0.5
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://api.x.ai/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "length",
+          "index": 0,
+          "message": {
+            "content": "# The Dragon's Legacy\n\n## Chapter 1: The Forgotten Valley\n\nIn the shadowed valleys of Eldoria, where ancient mountains pierced the sky like jagged teeth, lived a young blacksmith named Thorne. Orphaned at a tender age, Thorne had grown up forging swords and shields in the forge of Master Garrick, a grizzled old man whose tales of dragons and heroes fueled Thorne's dreams. But dragons were mere legends now—beasts of myth that had vanished centuries ago, or so the elders",
+            "refusal": null,
+            "role": "assistant"
+          }
+        }
+      ],
+      "created": 1760471271,
+      "id": "870ff72d-9bca-7cbc-a5f1-7b68031f0932_us-east-1",
+      "model": "grok-code-fast-1",
+      "object": "chat.completion",
+      "system_fingerprint": "fp_10f00c862d",
+      "usage": {
+        "completion_tokens": 100,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 340,
+          "rejected_prediction_tokens": 0
+        },
+        "num_sources_used": 0,
+        "prompt_tokens": 213,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 192,
+          "image_tokens": 0,
+          "text_tokens": 213
+        },
+        "total_tokens": 653
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "access-control-expose-headers": [
+        "*"
+      ],
+      "cf-cache-status": [
+        "DYNAMIC"
+      ],
+      "cf-ray": [
+        "98e997455fa6f8d7-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Tue, 14 Oct 2025 19:47:56 GMT"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "set-cookie": [
+        "__cf_bm=MiTHgF4blYL.K31MEaDsoqtEsuJDtNXdDWkshyDggdE-1760471276-1.0.1.1-q_hq8uN7h.zg.LX5nYiZkeFQ_1cR2z4jqEznU3u88BpYUzViFaP4fcv3k2Z8_uxCgRlNebh7bW5YF_SINz42iUIhw4wsA.UvT78Wooe.szI; path=/; expires=Tue, 14-Oct-25 20:17:56 GMT; domain=.x.ai; HttpOnly; Secure; SameSite=None"
+      ],
+      "strict-transport-security": [
+        "max-age=31536000"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "origin, access-control-request-method, access-control-request-headers"
+      ],
+      "x-request-id": [
+        "00-0892c7828b407b93f2e198400daae828-56e8630f005aaa54-01"
+      ],
+      "x-zero-data-retention": [
+        "false"
+      ]
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoyMDQ4LCJtZXNzYWdlcyI6W3siY29udGVudCI6IlNvbHZlIDEyKjcgYW5kIHNob3cgeW91ciBpbnRlcm5hbCB0aGlua2luZyAoYnJpZWYpLiIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6Im9wZW5haS9vNC1taW5pIiwibiI6MSwicmVhc29uaW5nX2VmZm9ydCI6ImxvdyIsInNlZWQiOjQyLCJzdHJlYW0iOmZhbHNlLCJ0ZW1wZXJhdHVyZSI6MS4wfQ=="
+    },
+    "canonical_json": {
+      "max_tokens": 2048,
+      "messages": [
+        {
+          "content": "Solve 12*7 and show your internal thinking (brief).",
+          "role": "user"
+        }
+      ],
+      "model": "openai/o4-mini",
+      "n": 1,
+      "reasoning_effort": "low",
+      "seed": 42,
+      "stream": false,
+      "temperature": 1.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "12 × 7 = 84\n\nBrief rationale (concise):  \n• 10 × 7 = 70  \n• 2 × 7 = 14  \n• Sum: 70 + 14 = 84",
+            "reasoning": null,
+            "reasoning_details": [
+              {
+                "data": "gAAAAABo75h5LbdyT9HKB_if972jsU9jUD4pag3H64s6KGHm52nObJ7SSV_YPulHQQcIoufvQ9rRCppmYJEXUNXGjm5GubdMst5mkah9kfHPCop9ONk8K5Nt6gAOLSV9veDer_xps6R9oRyAADrtkps7t8z9MDpw5-rBsy3G2WT4P0IzvKWBRUBaJNzDfLYt8FkM42MpfSdv7o7DW8mSNn_TWncNV54wq-bu6SuA_wsjpZiQBodmPCsbE8B9uZp7v6GHroo6flqPfenSSHfi2sXWi69Qx2b59oxAixMFVfs5qxHiq1poZaShEOF3NAHbqTuaskUrAEHRUnbKxMIYGP5a7u9srZ6pwnlFLCFAdaSe7THsaeLnW_dq4YACYfMACmrH97N7pniRqxJucULatCCmPEigswIInB5bUheAeHrxKS8DHu6iFc_P7JqAwLdUDozt_crHjElMWhG9MAQm3NKSJRDKDeJyWUUMOePwfAI1RneInNKjsZzqZBQV3Gvdo6jFuPL5uLpycdWZx6SctNZGXKPsTxC8frG_GfhdZL-earxnKyCcnRsB47llKheltLPEg_yYXeelfPZaPnBUxHwot0MKWW88pwscbPIuWyzP0CzLeHnyLTpmcEYOpEZ519kR1aQiawFZvtHmM7n-OpGFQJ7OvlaiK0yvraeeeKdyOekZRF7ixefr4U4DUVDo7AcU4_Nr1hHHxuw0wn4PMRPCm3HWO2MKyfVuMZO6wgEHFiNP-R_sf6Ip74J18oKdKAyrj9fXGCuj9vBnwKek8uD4k3uZzm4gorimV667b6c-7jXCd45KsnaoHlpTHOlEt7zdXWflHOZzKXTQcSvlJTmE1dnxeqqhgjU1PT6qmWahDd6Ui7glpFwwrwWd-ROpIvrtfYdiQPkg-SxFXGDsCeh0bEf4MtCl8b_97_HciqYhJ0AqDl6NSEb1hdLXrzsGQJyRrTeFQpCW-sXvoMkKq8oiz6W9lB0987UMJ1A0Ca0w05UmfcwsNXGXutJUXH2LnwoXC_4Evk1mnnQfxsJorn5clg3dS0dNy_7Mbi_sqmR3PwnlS-ImVPHnOEunEWpPMJmdfAsH90yW9wWSLgt_GT7wsKSJ0zIgK9stJAor3fdPDznZY8iYFtENRs1S8TOU8jo2ai9DAxfL4GrECEFq7gnOxkIkWZfPjw6u23Kk1Z7Q5FA2zwXbRpQ=",
+                "format": "openai-responses-v1",
+                "id": "rs_09a20512b35f66000168ef98773f648195bac94cc614dc6aee",
+                "index": 0,
+                "type": "reasoning.encrypted"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "completed"
+        }
+      ],
+      "created": 1760532598,
+      "id": "gen-1760532598-sjTQB0uyQOH7JaawDROG",
+      "model": "openai/o4-mini",
+      "object": "chat.completion",
+      "provider": "OpenAI",
+      "usage": {
+        "completion_tokens": 52,
+        "prompt_tokens": 19,
+        "total_tokens": 71
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef7084e9c6f790-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:49:58 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

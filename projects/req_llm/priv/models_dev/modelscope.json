@@ -156,36 +156,6 @@
         "input": 0,
         "output": 0
       },
-      "id": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-      "knowledge": "2025-04",
-      "last_updated": "2025-07-23",
-      "limit": {
-        "context": 262144,
-        "output": 66536
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "Qwen3-Coder-480B-A35B-Instruct",
-      "open_weights": true,
-      "provider": "modelscope",
-      "provider_model_id": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-      "reasoning": false,
-      "release_date": "2025-07-23",
-      "temperature": true,
-      "tool_call": true
-    },
-    {
-      "attachment": false,
-      "cost": {
-        "input": 0,
-        "output": 0
-      },
       "id": "ZhipuAI/GLM-4.5",
       "knowledge": "2025-04",
       "last_updated": "2025-07-28",
@@ -207,36 +177,6 @@
       "provider_model_id": "ZhipuAI/GLM-4.5",
       "reasoning": true,
       "release_date": "2025-07-28",
-      "temperature": true,
-      "tool_call": true
-    },
-    {
-      "attachment": false,
-      "cost": {
-        "input": 0,
-        "output": 0
-      },
-      "id": "moonshotai/Kimi-K2-Instruct",
-      "knowledge": "2024-10",
-      "last_updated": "2025-07-14",
-      "limit": {
-        "context": 128000,
-        "output": 16384
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "Kimi-K2-Instruct",
-      "open_weights": true,
-      "provider": "modelscope",
-      "provider_model_id": "moonshotai/Kimi-K2-Instruct",
-      "reasoning": false,
-      "release_date": "2025-07-14",
       "temperature": true,
       "tool_call": true
     }

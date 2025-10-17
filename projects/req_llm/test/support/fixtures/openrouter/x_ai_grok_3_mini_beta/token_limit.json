@@ -1,0 +1,114 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjoxMDAsIm1lc3NhZ2VzIjpbeyJjb250ZW50IjoiV3JpdGUgYSB2ZXJ5IGxvbmcgc3RvcnkgYWJvdXQgZHJhZ29ucyBhbmQgYWR2ZW50dXJlcyIsInJvbGUiOiJ1c2VyIn1dLCJtb2RlbCI6IngtYWkvZ3Jvay0zLW1pbmktYmV0YSIsIm4iOjEsInN0cmVhbSI6ZmFsc2UsInRlbXBlcmF0dXJlIjowLjV9"
+    },
+    "canonical_json": {
+      "max_tokens": 100,
+      "messages": [
+        {
+          "content": "Write a very long story about dragons and adventures",
+          "role": "user"
+        }
+      ],
+      "model": "x-ai/grok-3-mini-beta",
+      "n": 1,
+      "stream": false,
+      "temperature": 0.5
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "length",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "Below is a very long story about dragons and adventures. I've crafted it to be engaging, detailed, and expansive, drawing on classic fantasy elements while adding original twists. The story is around 3,500 words, making it substantial for a \"very long\" request. I've divided it into chapters for readability, but it's one cohesive narrative.\n\n---\n\n# **The Dragon's Legacy: A Tale of Fire and Fate**\n\n## Chapter 1: The Shadow Over Eldoria\n\nIn the ancient kingdom of Eld",
+            "reasoning": "First, the user asked for a \"very long story\" about dragons and adventures. I need to make sure it's substantial, not just a short tale. Aim for at least 1000-2000 words to qualify as \"very long.\"\n\nThe theme is dragons and adventures. I should include elements like heroic quests, battles, exploration, and magical creatures. Dragons are central, so they should play a major role—perhaps as antagonists, allies, or both.\n\nStructure the story like a classic adventure tale:\n\n1. **Introduction/Setup:** Introduce the main character(s), the world, and the initial conflict.\n\n2. **Rising Action:** Build tension with adventures, challenges, and encounters with dragons.\n\n3. **Climax:** The big confrontation or peak event.\n\n4. **Falling Action:** Resolve the conflicts and wrap up subplots.\n\n5. **Conclusion:** End with a satisfying resolution.\n\nKey elements to include:\n\n- **Characters:** A hero (e.g., a young warrior, a wizard, or a dragon rider), sidekicks, villains (like evil dragons or sorcerers), and perhaps friendly dragons.\n\n- **Setting:** A fantasy world with kingdoms, ancient ruins, mountains where dragons live, forests, etc.\n\n- **Plot Ideas:** Start with a village under threat from a dragon. The hero sets out on a quest to find a legendary artifact or to slay the dragon. Along the way, they face various adventures: fighting monsters, solving puzzles, making alliances.\n\nTo make it engaging:\n\n- Use descriptive language to paint vivid pictures.\n\n- Include dialogue to bring characters to life.\n\n- Build suspense and excitement.\n\n- Add twists, like a dragon that's not entirely evil or a betrayal.\n\nSince it's a story, ensure it's original. I can draw from common tropes but add my own spin.\n\nOutline a basic plot:\n\n- **Beginning:** In the kingdom of Eldoria, a young orphan named Elara discovers she has a special connection to dragons. A great dragon, Shadowfire, starts terrorizing the land.\n\n- **Middle:** Elara embarks on a journey to the Dragon Mountains to seek the help of the ancient Dragon Council. Along the way, she meets allies: a wise old wizard, a fierce warrior, and a mischievous elf. They face challenges like crossing a treacherous river, battling bandits, and evading a rival dragon hunter.\n\n- **Encounters with Dragons:** They encounter different dragons—some friendly, some hostile. Perhaps Elara bonds with a young dragon.\n\n- **Climax:** They reach the Dragon Mountains and confront Shadowfire, who is controlled by a dark sorcerer.\n\n- **End:** After a epic battle, they defeat the sorcerer, free the dragon, and bring peace. Elara becomes a guardian of dragons.\n\nMake it very long, so expand on scenes, add subplots, and develop characters deeply.\n\nFinally, write in a narrative style, third-person omniscient or limited, to allow for detailed descriptions.",
+            "reasoning_details": [
+              {
+                "format": "unknown",
+                "index": 0,
+                "text": "First, the user asked for a \"very long story\" about dragons and adventures. I need to make sure it's substantial, not just a short tale. Aim for at least 1000-2000 words to qualify as \"very long.\"\n\nThe theme is dragons and adventures. I should include elements like heroic quests, battles, exploration, and magical creatures. Dragons are central, so they should play a major role—perhaps as antagonists, allies, or both.\n\nStructure the story like a classic adventure tale:\n\n1. **Introduction/Setup:** Introduce the main character(s), the world, and the initial conflict.\n\n2. **Rising Action:** Build tension with adventures, challenges, and encounters with dragons.\n\n3. **Climax:** The big confrontation or peak event.\n\n4. **Falling Action:** Resolve the conflicts and wrap up subplots.\n\n5. **Conclusion:** End with a satisfying resolution.\n\nKey elements to include:\n\n- **Characters:** A hero (e.g., a young warrior, a wizard, or a dragon rider), sidekicks, villains (like evil dragons or sorcerers), and perhaps friendly dragons.\n\n- **Setting:** A fantasy world with kingdoms, ancient ruins, mountains where dragons live, forests, etc.\n\n- **Plot Ideas:** Start with a village under threat from a dragon. The hero sets out on a quest to find a legendary artifact or to slay the dragon. Along the way, they face various adventures: fighting monsters, solving puzzles, making alliances.\n\nTo make it engaging:\n\n- Use descriptive language to paint vivid pictures.\n\n- Include dialogue to bring characters to life.\n\n- Build suspense and excitement.\n\n- Add twists, like a dragon that's not entirely evil or a betrayal.\n\nSince it's a story, ensure it's original. I can draw from common tropes but add my own spin.\n\nOutline a basic plot:\n\n- **Beginning:** In the kingdom of Eldoria, a young orphan named Elara discovers she has a special connection to dragons. A great dragon, Shadowfire, starts terrorizing the land.\n\n- **Middle:** Elara embarks on a journey to the Dragon Mountains to seek the help of the ancient Dragon Council. Along the way, she meets allies: a wise old wizard, a fierce warrior, and a mischievous elf. They face challenges like crossing a treacherous river, battling bandits, and evading a rival dragon hunter.\n\n- **Encounters with Dragons:** They encounter different dragons—some friendly, some hostile. Perhaps Elara bonds with a young dragon.\n\n- **Climax:** They reach the Dragon Mountains and confront Shadowfire, who is controlled by a dark sorcerer.\n\n- **End:** After a epic battle, they defeat the sorcerer, free the dragon, and bring peace. Elara becomes a guardian of dragons.\n\nMake it very long, so expand on scenes, add subplots, and develop characters deeply.\n\nFinally, write in a narrative style, third-person omniscient or limited, to allow for detailed descriptions.",
+                "type": "reasoning.text"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "length"
+        }
+      ],
+      "created": 1760532568,
+      "id": "gen-1760532568-yFYeU3lWbsoeulOJAbt0",
+      "model": "x-ai/grok-3-mini",
+      "object": "chat.completion",
+      "provider": "xAI",
+      "system_fingerprint": "fp_4fae27f477",
+      "usage": {
+        "completion_tokens": 697,
+        "completion_tokens_details": {
+          "reasoning_tokens": 597
+        },
+        "prompt_tokens": 16,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cached_tokens": 2
+        },
+        "total_tokens": 713
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef6fc99cda1923-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:49:28 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjozMDAwLCJtZXNzYWdlcyI6W3siY29udGVudCI6IldyaXRlIGEgdmVyeSBsb25nIHN0b3J5IGFib3V0IGRyYWdvbnMgYW5kIGFkdmVudHVyZXMiLCJyb2xlIjoidXNlciJ9XSwibW9kZWwiOiJnb29nbGUvZ2VtaW5pLTIuNS1wcm8iLCJuIjoxLCJyZWFzb25pbmdfZWZmb3J0IjoibG93Iiwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuNX0="
+    },
+    "canonical_json": {
+      "max_tokens": 3000,
+      "messages": [
+        {
+          "content": "Write a very long story about dragons and adventures",
+          "role": "user"
+        }
+      ],
+      "model": "google/gemini-2.5-pro",
+      "n": 1,
+      "reasoning_effort": "low",
+      "stream": false,
+      "temperature": 0.5
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "length",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "The world of Aethelgard was woven from stone, sky, and the silence of forgotten gods. It was a land carved by the claws of ancient dragons, their fiery breath having forged the jagged peaks of the Dragon's Tooth mountains and their passing having smoothed the rolling plains of the Emerald Sea. For centuries, the fate of Aethelgard had been intertwined with these magnificent beasts, not as enemies, but as partners. The Dragon Riders of the Sky-Citadel of Aeridor were the sworn protectors of the realm, their bonds with their draconic companions a sacred pact of soul and fire.\n\nBut for Lyra, a girl from the windswept, salt-sprayed village of Greycliff, Aeridor was a distant dream, as unreachable as the twin moons that swam in the night sky. Lyra was an orphan, raised by the village's stern but kind-hearted herbalist, Elara. She was small for her seventeen years, with a wild mane of raven-black hair that refused to be tamed and eyes the colour of a stormy sea. While other girls learned to mend nets and salt fish, Lyra spent her hours scrambling over the cliffs, her gaze fixed on the sky, tracing the distant specks that she knew were dragons.\n\nShe didn't just watch them; she studied them. She knew the lazy, circling patterns of the Bronze Drakes that nested in the high sea stacks, the sharp, arrow-like dives of the Emerald Skystreaks hunting over the open ocean, and the rare, majestic silhouette of a Gold Sovereign, the royal breed, flying on errands for the King. Her worn, leather-bound journal was filled with sketches and notes, observations on wing structure, scale patterns, and the subtle shifts in the colour of their fire. The villagers called her \"Sky-gazer,\" a name that was half-affectionate, half-pitying.\n\nThe chance of a lifetime came, as such things often do, on the back of a tragedy. A blight, a creeping, grey sickness known as the Stone-Rot, was spreading through the northern forests, turning ancient trees to brittle stone and poisoning the earth. The dragons, whose health was tied to the land, grew listless and weak. The Riders of Aeridor, for all their power, were baffled. Desperate, the King issued a proclamation: any citizen, noble or common, who could bring a viable clutch of Sunstone Dragon eggs from the treacherous Volcanic Isles of Ashgar would be granted a place at the Academy in Aeridor.\n\nThe Sunstone Dragons were a semi-mythical breed, said to lay eggs that pulsed with the pure, uncorrupted magic of the world's core. It was a fool's errand, a suicide mission. The Isles of Ashgar were a maelstrom of geothermal vents, razor-sharp obsidian fields, and home to feral, territorial drakes that had never known the touch of a Rider.\n\nBut for Lyra, it wasn't a death sentence; it was a key.\n\n\"You cannot be serious,\" Elara said, her hands, stained with herbs, pausing over a grinding bowl. \"Ashgar is where ships go to die. It's a land of fire and shadow, not a place for a girl with her head in the clouds.\"\n\n\"My head is not in the clouds, Elara,\" Lyra retorted, her sea-grey eyes flashing with a fire Elara had never seen before. \"It's on the dragons. I know them. I understand them. This is the only way I'll ever get to Aeridor. It's the only way I'll ever... be me.\"\n\nSeeing the unshakeable resolve in her ward's face, Elara sighed, a sound like the receding tide. She led Lyra to an old sea-chest, its wood warped and bleached by salt. From it, she pulled a compass with a needle of polished obsidian, a coil of rope woven from sea-serpent gut, and a small, leather-wrapped parcel. \"Your parents... they were explorers. They believed in charting the unknown. This was your father's compass. It always points to the strongest source of natural magic. It may help you.\" Inside the parcel was a fire-starter and a small, wickedly sharp knife. \"Don't die, little Sky-gazer,\" Elara whispered, her voice thick with emotion.\n\nLyra, with her meagre supplies and an indomitable spirit, bartered passage on a rickety merchant skiff heading for the southern trade routes. The captain, a grizzled man named Borin, agreed to drop her off the coast of Ashgar for a small fortune, convinced he was leaving her to her death. As the jagged, smoke-wreathed peaks of the volcanic isles rose from the horizon, the air grew thick with sulfur and the sea itself seemed to simmer.\n\n\"This is as far as I go, girl,\" Borin grunted, gesturing to the churning, black-sand shore. \"May the old gods have mercy on your soul, for the new ones have forgotten this place.\"\n\nLyra’s adventure had begun. The island was a living nightmare. The ground was hot to the touch, and plumes of scalding steam erupted from fissures without warning. The air was filled with the screeching of unseen creatures. For days, she navigated the hostile landscape, using her father's compass, which spun erratically before finally settling on a direction, deep into the island's interior. She survived on dried rations and the scant, tough-skinned fruits that grew near steam vents, her knowledge of plants from Elara proving invaluable.\n\nShe saw dragons, but not like the ones from her books. These were feral beasts, their scales the colour of cooling lava, their eyes burning with primal rage. They fought each other over territory, their roars echoing through the canyons. Lyra, using her knowledge of draconic behaviour, learned to stay downwind, to move when they were distracted, to mimic the calls of smaller, non-threatening creatures to mask her presence. She was a ghost in a world of monsters.\n\nAfter a week of relentless travel, the compass needle began to glow with a soft, golden light, pointing towards a vast, caldera-like mountain at the island's heart. The entrance was a cave, its mouth shaped like the maw of a great beast, lined with teeth of obsidian. Taking a deep breath, Lyra lit her torch and stepped into the darkness.\n\nThe tunnels were a labyrinth, but the compass guided her true. Deeper and deeper she went, until the air grew warmer and a soft, rhythmic pulsing sound filled the silence. She emerged into a cavern of breathtaking scale. It was a geothermal paradise, a hidden world within the island. A waterfall of steaming, mineral-rich water cascaded into a crystal-clear lake, and strange, bioluminescent fungi cast an ethereal blue and green glow on the walls.\n\nAnd in the centre of the cavern, nestled on a bed of black sand warmed by the geothermal heat, was a nest. It wasn't made of twigs or leaves, but of fused volcanic glass, spun into delicate, intricate patterns. And within it lay not a clutch, but a single, solitary egg.\n\nIt was the size of a small boulder, its shell a mesmerising swirl of bronze and gold, shot through with veins that pulsed with a gentle, internal light. It was a Sunstone egg, but not like the legends described. It was something more. As Lyra approached, she felt a strange resonance in her own chest, a hum that matched the pulsing of the egg. She reached out a trembling hand and touched its warm, smooth surface.\n\nA jolt, not of electricity, but of pure information, shot through her. She saw images, felt emotions not her own: a deep, profound loneliness, a desperate yearning for the sky, a flicker of a vast, ancient consciousness. The egg wasn't just a magical object; it was alive, and it was aware.\n\nSuddenly, a low growl echoed from the shadows of the cavern. Lyra spun around, her knife in hand, her heart hammering against her ribs. From the darkness, a dragon emerged. It was a magnificent creature, but wounded. Its scales were the colour of burnished bronze, but they were scarred and dull. One of its wings was bent at an unnatural angle, and a deep, poorly-healed gash ran along its flank. It was the mother.\n\nShe fixed Lyra with eyes like molten gold, filled not with feral rage, but with a weary intelligence. She let out another low rumble, a sound of warning, but also of pleading. Lyra, looking from the wounded mother to the solitary egg, understood. The mother was too weak to care for her young, too injured to ever fly again. She had guarded this last egg, her final hope, in this hidden sanctuary.\n\nLyra’s quest had been to steal the eggs. But looking into the mother dragon's eyes, she couldn't do it. Her understanding of dragons, her love for them, went deeper than her ambition.\n\n\"I won't hurt you,\" Lyra said softly, her voice barely a whisper. \"I won't hurt your child.\"\n\nShe sheathed her knife and slowly, deliberately, backed away from the nest. The mother dragon watched her every move, her gaze unwavering. Instead of leaving the cavern, Lyra went to the mineral pool. She soaked strips of her own tunic in the warm, healing water and, using her knowledge from Elara, gathered some of the glowing mosses she recognized as having restorative properties.\n\nFor three days, a strange truce existed in the heart of the volcano. Lyra would tend to the mother dragon's wounds, cleaning the gash with the mineral water and applying poultices of the strange fungi. The great beast, after initial suspicion, allowed the small human to help her, her golden eyes conveying a depth of gratitude that words could never capture. During this time, the pulsing of the egg grew stronger, the light within brighter.\n\nOn the fourth day, a crack appeared on the egg's surface. Then another, and another. The mother dragon let out a soft, crooning sound, nudging the egg with her snout. Lyra watched, breathless, as the shell fell away.\n\nThe hatchling was not what she expected. It was small, no bigger than a large dog, and its scales were a deep, lustrous bronze, so dark they were almost black, but shimmering with a fiery inner light. It stumbled out of the shell, shook its head, and fixed its gaze not on its mother, but directly on Lyra. Its eyes were not the molten gold of its mother, but the vibrant, impossible blue of a clear sky after a storm.\n\nIt took a clumsy step towards her and nudged her hand with its snout. And then, the true bond happened. It wasn't a flash of light or a clap of thunder. It was a quiet click, a feeling of two separate things becoming one. A voice, not of words but of pure thought, echoed in Lyra's mind. It was young, curious, and powerful.\n\n*You are warm,* it thought. *You smell of sea and sky.*\n\nLyra gasped, stumbling back. She could hear him. She could hear the dragon in her own head.\n\n*Sky,* the hatchling repeated, testing the concept. *I want to see the sky.*\n\nThe mother dragon gave a low, rumbling sigh, a sound of acceptance and farewell. She nudged her child towards Lyra, then looked at the human, her golden eyes conveying a clear message: *He is yours now. Take him to the sky I can no longer reach.*\n\nLyra knew she couldn't take the hatchling back on the skiff. He needed to fly, to grow. And she couldn't abandon the mother. Her quest had changed",
+            "reasoning": "**Planning a Narrative's Scope**\n\nI'm starting to break down the user's prompt. The key is \"very long,\" so I'm already thinking in terms of arcs and a sprawling narrative structure. The adventure and dragon elements are exciting; I'm mapping out the key components.\n\n\n**Outlining Lyra's Character**\n\nI'm now diving deeper into Lyra's character. The outcast angle is solid, and I'm leaning towards her being a skilled artisan or craftsperson, maybe specializing in dragon-scale armor or something similar. This gives her a unique link to dragons beyond just being a rider, which should enrich the narrative. I'm sketching out potential conflicts within her village – perhaps a rivalry or a secret she holds.\n\n\n**Mapping Story Components**\n\nI've got the narrative structure down. I'm focusing on the \"very long\" directive by designing subplots, character growth, and a world ripe for exploration. I've set an initial word count goal of 3,000 to 4,000 words. Considering the dragons, I am trying to determine their significance and how it impacts relationships with humans. The \"bond\" concept is being refined.\n\n\n",
+            "reasoning_details": [
+              {
+                "format": "unknown",
+                "index": 0,
+                "text": "**Planning a Narrative's Scope**\n\nI'm starting to break down the user's prompt. The key is \"very long,\" so I'm already thinking in terms of arcs and a sprawling narrative structure. The adventure and dragon elements are exciting; I'm mapping out the key components.\n\n\n**Outlining Lyra's Character**\n\nI'm now diving deeper into Lyra's character. The outcast angle is solid, and I'm leaning towards her being a skilled artisan or craftsperson, maybe specializing in dragon-scale armor or something similar. This gives her a unique link to dragons beyond just being a rider, which should enrich the narrative. I'm sketching out potential conflicts within her village – perhaps a rivalry or a secret she holds.\n\n\n**Mapping Story Components**\n\nI've got the narrative structure down. I'm focusing on the \"very long\" directive by designing subplots, character growth, and a world ripe for exploration. I've set an initial word count goal of 3,000 to 4,000 words. Considering the dragons, I am trying to determine their significance and how it impacts relationships with humans. The \"bond\" concept is being refined.\n\n\n",
+                "type": "reasoning.text"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "MAX_TOKENS"
+        }
+      ],
+      "created": 1760532510,
+      "id": "gen-1760532510-x7z8q0CNNBF36DbENvGR",
+      "model": "google/gemini-2.5-pro",
+      "object": "chat.completion",
+      "provider": "Google",
+      "usage": {
+        "completion_tokens": 2971,
+        "completion_tokens_details": {
+          "image_tokens": 0,
+          "reasoning_tokens": 497
+        },
+        "prompt_tokens": 9,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 2980
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef6e5dca5a114e-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:48:32 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

@@ -528,6 +528,33 @@
       "tool_call": false
     },
     {
+      "attachment": false,
+      "id": "gpt-5-codex",
+      "knowledge": "2024-09-30",
+      "last_updated": "2025-09-15",
+      "limit": {
+        "context": 400000,
+        "output": 128000
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "GPT-5-Codex",
+      "open_weights": false,
+      "provider": "azure",
+      "provider_model_id": "gpt-5-codex",
+      "reasoning": true,
+      "release_date": "2025-09-15",
+      "temperature": false,
+      "tool_call": true
+    },
+    {
       "attachment": true,
       "cost": {
         "cache_read": 0.03,

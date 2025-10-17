@@ -1,6 +1,6 @@
 # Data Structures Guide
 
-ReqLLM 1.0.0-rc.1 core data structures and practical usage patterns. Six primary structures provide unified, provider-agnostic AI interactions.
+ReqLLM core data structures and practical usage patterns. Six primary structures provide unified, provider-agnostic AI interactions.
 
 ## Table of Contents
 
@@ -72,9 +72,9 @@ model = ReqLLM.Model.new(:anthropic, "claude-3-5-sonnet",
     output: [:text]
   },
   capabilities: %{
-    reasoning?: true,
-    tool_call?: true,
-    supports_temperature?: true
+    reasoning: true,
+    tool_call: true,
+    supports_temperature: true
   },
   cost: %{input: 3.0, output: 15.0}  # Per 1K tokens
 )
@@ -143,7 +143,7 @@ complex_message = %ReqLLM.Message{
 }
 
 # Adding to existing context
-updated_context = Context.add_message(context, complex_message)
+updated_context = ReqLLM.Context.new(context.messages ++ [complex_message])
 ```
 
 ### Context Enumeration and Manipulation
@@ -177,7 +177,7 @@ end)
 text_part = ContentPart.text("Explain this data")
 
 # Reasoning content (for models supporting chain-of-thought)
-reasoning_part = ContentPart.reasoning("Let me think step by step...")
+thinking_part = ContentPart.thinking("Let me think step by step...")
 
 # Image from URL
 image_url_part = ContentPart.image_url("https://example.com/chart.jpg")
@@ -395,7 +395,7 @@ context_with_results = execute_tools_in_context.(response1.context, tools)
 {:ok, response} = ReqLLM.stream_text(model, context)
 
 # Basic text streaming
-response.body
+response.stream
 |> Stream.filter(&(&1.type == :content))
 |> Stream.map(&(&1.text))
 |> Stream.each(&IO.write/1)
@@ -407,7 +407,7 @@ response.body
 ```elixir
 # Stream processor with chunk type handling
 process_stream = fn stream ->
-  stream.body
+  stream.stream
   |> Stream.each(fn chunk ->
     case chunk.type do
       :content -> 
@@ -445,7 +445,7 @@ stream_with_accumulation = fn model, context ->
   {:ok, response} = ReqLLM.stream_text(model, context)
   
   {final_content, tool_calls, metadata} = 
-    response.body
+    response.stream
     |> Enum.reduce({"", [], %{}}, fn chunk, {content, tools, meta} ->
       case chunk.type do
         :content -> 
@@ -480,7 +480,7 @@ IO.puts("\n\nFinal result: #{result.content}")
 stream_with_tools = fn model, context, tools ->
   {:ok, response} = ReqLLM.stream_text(model, context, tools: tools)
   
-  response.body
+  response.stream
   |> Stream.transform(%{}, fn chunk, state ->
     case chunk.type do
       :content ->
@@ -679,4 +679,4 @@ vision_model = ReqLLM.Model.from!("anthropic:claude-3-5-sonnet")
 final_analysis = text_result.content <> " " <> vision_result.content
 ```
 
-ReqLLM 1.0.0-rc.1 provides type-safe, provider-agnostic data structures for building composable AI workflows. Each structure builds on the others to create a unified foundation for AI application development.
+ReqLLM provides type-safe, provider-agnostic data structures for building composable AI workflows. Each structure builds on the others to create a unified foundation for AI application development.

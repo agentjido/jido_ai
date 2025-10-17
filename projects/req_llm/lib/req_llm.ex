@@ -154,10 +154,13 @@ defmodule ReqLLM do
       #=> {:ok, ReqLLM.Providers.Anthropic}
 
       ReqLLM.provider(:unknown)
-      #=> {:error, :not_found}
+      #=> {:error, %ReqLLM.Error.Invalid.Provider{provider: :unknown}}
 
   """
-  @spec provider(atom()) :: {:ok, module()} | {:error, :not_found}
+  @spec provider(atom()) ::
+          {:ok, module()}
+          | {:error,
+             ReqLLM.Error.Invalid.Provider.t() | ReqLLM.Error.Invalid.Provider.NotImplemented.t()}
   def provider(provider) when is_atom(provider) do
     ReqLLM.Provider.Registry.fetch(provider)
   end
@@ -185,6 +188,26 @@ defmodule ReqLLM do
   def model(model_spec) do
     ReqLLM.Model.from(model_spec)
   end
+
+  @doc """
+  Get all supported capabilities for a model.
+
+  Returns a list of capability atoms that the model supports based on provider metadata.
+
+  ## Parameters
+
+    * `model_spec` - Model specification in various formats
+
+  ## Examples
+
+      ReqLLM.capabilities("anthropic:claude-3-haiku")
+      #=> [:max_tokens, :system_prompt, :temperature, :tools, :streaming]
+
+      model = %ReqLLM.Model{provider: :anthropic, model: "claude-3-sonnet"}
+      ReqLLM.capabilities(model)
+      #=> [:max_tokens, :system_prompt, :temperature, :tools, :streaming, :reasoning]
+  """
+  defdelegate capabilities(model_spec), to: ReqLLM.Capability
 
   # ===========================================================================
   # Text Generation API - Delegated to ReqLLM.Generation
@@ -247,45 +270,98 @@ defmodule ReqLLM do
   defdelegate generate_text!(model_spec, messages, opts \\ []), to: Generation
 
   @doc """
-  Streams text generation using an AI model with full response metadata.
+  Streams text generation using an AI model with concurrent metadata collection.
 
-  Returns a canonical ReqLLM.Response containing usage data and stream.
-  For simple streaming without metadata, use `stream_text!/3`.
+  Returns a `ReqLLM.StreamResponse` that provides both real-time token streaming
+  and asynchronous metadata collection (usage, finish_reason). This enables
+  zero-latency content delivery while collecting billing/usage data concurrently.
+
+  The streaming implementation uses Finch directly for production-grade performance
+  with HTTP/2 multiplexing and automatic connection pooling.
 
   ## Parameters
 
   Same as `generate_text/3`.
 
+  ## Returns
+
+    * `{:ok, stream_response}` - StreamResponse with stream and metadata task
+    * `{:error, reason}` - Request failed or invalid parameters
+
   ## Examples
 
+      # Real-time streaming
       {:ok, response} = ReqLLM.stream_text("anthropic:claude-3-sonnet", "Tell me a story")
-      ReqLLM.Response.text_stream(response) |> Enum.each(&IO.write/1)
+      response
+      |> ReqLLM.StreamResponse.tokens()
+      |> Stream.each(&IO.write/1)
+      |> Stream.run()
 
-      # Access usage metadata after streaming
-      ReqLLM.Response.usage(response)
-      #=> %{input_tokens: 15, output_tokens: 42}
+      # Concurrent metadata collection
+      usage = ReqLLM.StreamResponse.usage(response)
+      #=> %{input_tokens: 15, output_tokens: 42, total_cost: 0.087}
+
+      # Simple text collection
+      text = ReqLLM.StreamResponse.text(response)
+
+      # Backward compatibility
+      {:ok, legacy_response} = ReqLLM.StreamResponse.to_response(response)
+
+  ## StreamResponse Fields
+
+    * `stream` - Lazy enumerable of `StreamChunk` structs for real-time consumption
+    * `metadata_task` - Concurrent Task collecting usage and finish_reason
+    * `cancel` - Function to terminate streaming and cleanup resources
+    * `model` - Model specification that generated this response
+    * `context` - Updated conversation context including assistant's response
+
+  ## Performance Notes
+
+  The stream is lazy and supports backpressure. Metadata collection happens
+  concurrently and won't block token delivery. Use cancellation for early
+  termination to free resources.
 
   """
   defdelegate stream_text(model_spec, messages, opts \\ []), to: Generation
 
   @doc """
-  Streams text generation using an AI model, returning only the stream.
+  **DEPRECATED**: This function will be removed in a future version.
 
-  This is a convenience function that extracts just the stream from the response.
-  For access to usage metadata and other response data, use `stream_text/3`.
-  Raises on error.
+  The streaming API has been redesigned to return a composite `StreamResponse` struct
+  that provides both the stream and metadata. Use `stream_text/3` instead:
 
-  ## Parameters
+      {:ok, response} = ReqLLM.stream_text(model, messages)
+      response.stream |> Enum.each(&IO.write/1)
 
-  Same as `stream_text/3`.
+  For simple text extraction, use:
 
-  ## Examples
+      text = ReqLLM.StreamResponse.text(response)
 
-      ReqLLM.stream_text!("anthropic:claude-3-sonnet", "Tell me a story")
-      |> Enum.each(&IO.write/1)
+  ## Legacy Behavior
 
+  This function currently returns `:ok` and logs a deprecation warning.
+  It will be formally removed in the next major version.
   """
-  defdelegate stream_text!(model_spec, messages, opts \\ []), to: Generation
+  @deprecated "Use stream_text/3 with StreamResponse instead"
+  def stream_text!(_model_spec, _messages, _opts \\ []) do
+    IO.warn("""
+    ReqLLM.stream_text!/3 is deprecated and will be removed in a future version.
+
+    Please migrate to the new streaming API:
+
+    Old code:
+        ReqLLM.stream_text!(model, messages) |> Enum.each(&IO.write/1)
+
+    New code:
+        {:ok, response} = ReqLLM.stream_text(model, messages)
+        response.stream |> Enum.each(&IO.write/1)
+
+    Or for simple text extraction:
+        text = ReqLLM.StreamResponse.text(response)
+    """)
+
+    :ok
+  end
 
   @doc """
   Generates structured data using an AI model with schema validation.
@@ -382,35 +458,63 @@ defmodule ReqLLM do
   defdelegate stream_object(model_spec, messages, schema, opts \\ []), to: Generation
 
   @doc """
-  Streams structured data generation using an AI model, returning only the stream.
+  **DEPRECATED**: This function will be removed in a future version.
 
-  This is a convenience function that extracts just the stream from the response.
-  For access to usage metadata and other response data, use `stream_object/4`.
-  Raises on error.
+  The streaming API has been redesigned to return a composite `StreamResponse` struct
+  that provides both the stream and metadata. Use `stream_object/4` instead:
 
-  ## Parameters
+      {:ok, response} = ReqLLM.stream_object(model, messages, schema)
+      response.stream |> Enum.each(&IO.inspect/1)
+
+  For simple object extraction, use:
+
+      object = ReqLLM.StreamResponse.object(response)
+
+  ## Legacy Parameters
 
   Same as `stream_object/4`.
 
-  ## Examples
+  ## Legacy Examples
 
       ReqLLM.stream_object!("anthropic:claude-3-sonnet", "Generate a character", schema)
       |> Enum.each(&IO.inspect/1)
 
   """
-  defdelegate stream_object!(model_spec, messages, schema, opts \\ []), to: Generation
+  @deprecated "Use stream_object/4 with StreamResponse instead"
+  def stream_object!(_model_spec, _messages, _schema, _opts \\ []) do
+    IO.warn("""
+    ReqLLM.stream_object!/4 is deprecated and will be removed in a future version.
+
+    Please migrate to the new streaming API:
+
+    Old code:
+        ReqLLM.stream_object!(model, messages, schema) |> Enum.each(&IO.inspect/1)
+
+    New code:
+        {:ok, response} = ReqLLM.stream_object(model, messages, schema)
+        response.stream |> Enum.each(&IO.inspect/1)
+
+    Or for simple object extraction:
+        object = ReqLLM.StreamResponse.object(response)
+    """)
+
+    :ok
+  end
 
   # ===========================================================================
   # Embedding API - Delegated to ReqLLM.Embedding
   # ===========================================================================
 
   @doc """
-  Generates embeddings for a single text input.
+  Generates embeddings for single or multiple text inputs.
+
+  Accepts either a single string or a list of strings, automatically handling
+  both cases using pattern matching.
 
   ## Parameters
 
     * `model_spec` - Model specification in various formats
-    * `text` - Text to generate embeddings for
+    * `input` - Text string or list of text strings to generate embeddings for
     * `opts` - Additional options (keyword list)
 
   ## Options
@@ -420,35 +524,19 @@ defmodule ReqLLM do
 
   ## Examples
 
+      # Single text input
       {:ok, embedding} = ReqLLM.embed("openai:text-embedding-3-small", "Hello world")
       #=> {:ok, [0.1, -0.2, 0.3, ...]}
 
-  """
-  defdelegate embed(model_spec, text, opts \\ []), to: Embedding
-
-  @doc """
-  Generates embeddings for multiple text inputs.
-
-  ## Parameters
-
-    * `model_spec` - Model specification in various formats
-    * `texts` - List of texts to generate embeddings for
-    * `opts` - Additional options (keyword list)
-
-  ## Options
-
-  Same as `embed/3`.
-
-  ## Examples
-
-      {:ok, embeddings} = ReqLLM.embed_many(
+      # Multiple text inputs
+      {:ok, embeddings} = ReqLLM.embed(
         "openai:text-embedding-3-small",
         ["Hello", "World"]
       )
       #=> {:ok, [[0.1, -0.2, ...], [0.3, 0.4, ...]]}
 
   """
-  defdelegate embed_many(model_spec, texts, opts \\ []), to: Embedding
+  defdelegate embed(model_spec, input, opts \\ []), to: Embedding
 
   # ===========================================================================
   # Vercel AI SDK Utility API - Delegated to ReqLLM.Utils

@@ -1,0 +1,104 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJjb250ZW50cyI6W3sicGFydHMiOlt7InRleHQiOiJXcml0ZSBhIHZlcnkgbG9uZyBzdG9yeSBhYm91dCBkcmFnb25zIGFuZCBhZHZlbnR1cmVzIn1dLCJyb2xlIjoidXNlciJ9XSwiZ2VuZXJhdGlvbkNvbmZpZyI6eyJjYW5kaWRhdGVDb3VudCI6MSwibWF4T3V0cHV0VG9rZW5zIjozMDAwLCJ0ZW1wZXJhdHVyZSI6MC41fX0="
+    },
+    "canonical_json": {
+      "contents": [
+        {
+          "parts": [
+            {
+              "text": "Write a very long story about dragons and adventures"
+            }
+          ],
+          "role": "user"
+        }
+      ],
+      "generationConfig": {
+        "candidateCount": 1,
+        "maxOutputTokens": 3000,
+        "temperature": 0.5
+      }
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%5BREDACTED%3Akey%5D"
+  },
+  "response": {
+    "body": {
+      "candidates": [
+        {
+          "content": {
+            "parts": [
+              {
+                "text": "The wind howled a mournful dirge across the jagged peaks of the Dragon's Maw, a sound Elara knew intimately. For eighteen years, she had lived in the shadow of those mountains, in the small, forgotten village of Oakhaven, where the only dragons spoken of were ancient legends, whispered around crackling hearths – tales of fire and fury, of wisdom and destruction. She was an orphan, a solitary soul whose only companion was a tattered book of myths, its pages brittle with age, filled with intricate sketches of scaled behemoths.\n\nOne crisp autumn evening, as the last rays of the sun bled across the sky, painting the peaks in hues of bruised purple and angry orange, the legends became terrifying reality. A shadow, vast and winged, fell over Oakhaven. It wasn't the majestic, noble dragons of her book, but something darker, twisted. Its scales were the colour of storm clouds, its eyes glowed with malevolent emerald fire, and its roar ripped through the air, a sound of pure, unadulterated malice.\n\nPanic erupted. Villagers scattered, their screams echoing against the stone houses. Elara, frozen by a mixture of terror and morbid fascination, watched as the monstrous dragon descended, its talons tearing at the rooftops, its breath a searing torrent of emerald flame that turned wood and stone to ash. This was Malakor, the Shadow Dragon, a name whispered in the deepest, most ancient lore, a creature thought long banished. He sought something, a relic, a source of power hidden in the very foundations of the world, and Oakhaven, unbeknownst to its inhabitants, lay atop a minor ley line, a faint pulse of ancient magic Malakor was drawn to.\n\nJust as Malakor prepared to unleash another devastating blast, a streak of brilliant gold and crimson erupted from the highest peak of the Dragon's Maw. It was a dragon of impossible beauty, its scales shimmering like polished bronze, its wings unfurling like sails of pure fire. Its roar was a challenge, a clarion call that shook the very ground. This was Ignis, the Elder of the Sunstone Clan, a guardian, a protector, awoken by the encroaching darkness.\n\nThe two titans clashed above Oakhaven. Fire met shadow, light battled darkness. The sky became a canvas of elemental fury, streaks of emerald and gold crisscrossing, thunderous roars shaking the very foundations of the world. Elara, huddled behind a fallen cart, watched in awe and terror. She saw Ignis, majestic and powerful, but also ancient and weary, his movements carrying the weight of centuries. Malakor, though younger, fought with a savage, unyielding ferocity, his shadow magic draining the light, corrupting the air itself.\n\nIn a desperate maneuver, Ignis managed to drive Malakor back, but not without cost. A searing blast of shadow fire struck Ignis's wing, sending him spiraling downwards, crashing into the outskirts of the village, his golden scales dulled by ash and pain. Malakor, roaring in triumph, circled once, then vanished into the swirling storm clouds, leaving behind a trail of fear and destruction.\n\nElara, driven by an impulse she couldn't explain, ran towards the fallen dragon. The villagers, terrified, fled in the opposite direction. Ignis lay amidst the rubble, his breathing ragged, his magnificent wings twisted at an unnatural angle. His eyes, the colour of molten gold, met Elara's. There was no fear in them, only immense pain and a flicker of something else – recognition.\n\n\"Child,\" a voice rumbled in her mind, not spoken aloud, but a deep, resonant thought. \"The darkness awakens. My strength wanes. The world needs a champion.\"\n\nElara, trembling, reached out a hand, instinctively touching a warm, smooth scale near his head. A jolt, like static electricity, passed between them, but it was more than that – it was a connection, a whisper of ancient power, a shared understanding. Ignis let out a soft sigh, a plume of smoke escaping his nostrils. \"You... you feel the bond. It is faint, but it is there. A human, chosen by fate.\"\n\nAnd so began Elara's adventure. Ignis, too injured to fly, could only offer guidance. He revealed that Malakor sought the five legendary Dragonstones, ancient artifacts imbued with the pure elemental energies of the world. If united, they would grant Malakor unimaginable power, enough to plunge the world into eternal shadow. \"You must find them, Elara,\" Ignis urged, his voice growing weaker. \"Before he does. You must ride me, guide me, be my eyes and my strength.\"\n\nElara, a simple village girl, felt the weight of the world settle on her shoulders. But looking into Ignis's ancient, pleading eyes, she knew she couldn't refuse. Her journey began not with a soaring flight, but with days of arduous travel, Ignis painstakingly dragging himself across the land, Elara tending to his wounds, learning to communicate with him through the burgeoning mental link. She learned of the Dragon Clans: the fiery Sunstone, the ethereal Whisperwind, the stoic Earthshapers, the mysterious Deepscales, and the corrupted Shadowscales, to which Malakor once belonged.\n\nTheir first quest was for the Sunstone of Aethel, said to be hidden in the treacherous Sunstone Peaks, deep within the territory of Ignis's own clan. The journey was fraught with peril. They navigated crumbling mountain passes, evaded packs of shadow-wargs, creatures twisted by Malakor's influence, and learned to rely on each other. Elara, initially clumsy and fearful, grew agile and sharp-witted. Ignis, though weakened, taught her the subtle ways of the land, how to read"
+              }
+            ],
+            "role": "model"
+          },
+          "finishReason": "MAX_TOKENS",
+          "index": 0
+        }
+      ],
+      "modelVersion": "gemini-2.5-flash",
+      "responseId": "kYztaLvUFpXhjMcP2IruuAg",
+      "usageMetadata": {
+        "candidatesTokenCount": 1214,
+        "promptTokenCount": 10,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 10
+          }
+        ],
+        "thoughtsTokenCount": 1784,
+        "totalTokenCount": 3008
+      }
+    },
+    "headers": {
+      "alt-svc": [
+        "h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"
+      ],
+      "content-type": [
+        "application/json; charset=UTF-8"
+      ],
+      "date": [
+        "Mon, 13 Oct 2025 23:34:41 GMT"
+      ],
+      "server": [
+        "scaffolding on HTTPServer2"
+      ],
+      "server-timing": [
+        "gfet4t7; dur=21774"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Origin",
+        "X-Origin",
+        "Referer"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ],
+      "x-frame-options": [
+        "SAMEORIGIN"
+      ],
+      "x-xss-protection": [
+        "0"
+      ]
+    },
+    "status": 200
+  }
+}

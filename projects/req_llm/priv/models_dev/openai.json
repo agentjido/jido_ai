@@ -1,37 +1,13 @@
 {
   "models": [
     {
-      "attachment": true,
-      "cost": {
-        "cache_read": 0.375,
-        "input": 1.5,
-        "output": 6
-      },
+      "api": "responses",
       "id": "codex-mini-latest",
-      "knowledge": "2024-04",
-      "last_updated": "2025-05-16",
-      "limit": {
-        "context": 200000,
-        "output": 100000
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "Codex Mini",
-      "open_weights": false,
       "provider": "openai",
-      "provider_model_id": "codex-mini-latest",
-      "reasoning": true,
-      "release_date": "2025-05-16",
-      "temperature": false,
-      "tool_call": true
+      "provider_model_id": "codex-mini-latest"
     },
     {
+      "api": "chat",
       "attachment": false,
       "cost": {
         "cache_read": 1.25,
@@ -63,6 +39,7 @@
       "tool_call": false
     },
     {
+      "api": "chat",
       "attachment": true,
       "cost": {
         "input": 30,
@@ -89,10 +66,12 @@
       "provider_model_id": "gpt-4",
       "reasoning": false,
       "release_date": "2023-11-06",
+      "supports_strict_tools": true,
       "temperature": true,
       "tool_call": true
     },
     {
+      "api": "chat",
       "attachment": true,
       "cost": {
         "input": 10,
@@ -120,10 +99,12 @@
       "provider_model_id": "gpt-4-turbo",
       "reasoning": false,
       "release_date": "2023-11-06",
+      "supports_strict_tools": true,
       "temperature": true,
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 0.5,
@@ -156,6 +137,7 @@
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 0.1,
@@ -188,6 +170,7 @@
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 0.03,
@@ -220,6 +203,7 @@
       "tool_call": true
     },
     {
+      "api": "chat",
       "attachment": true,
       "cost": {
         "cache_read": 1.25,
@@ -228,7 +212,7 @@
       },
       "id": "gpt-4o",
       "knowledge": "2023-09",
-      "last_updated": "2024-05-13",
+      "last_updated": "2024-08-06",
       "limit": {
         "context": 128000,
         "output": 16384
@@ -248,10 +232,115 @@
       "provider_model_id": "gpt-4o",
       "reasoning": false,
       "release_date": "2024-05-13",
+      "supports_strict_tools": true,
       "temperature": true,
       "tool_call": true
     },
     {
+      "api": "chat",
+      "attachment": true,
+      "cost": {
+        "input": 5,
+        "output": 15
+      },
+      "id": "gpt-4o-2024-05-13",
+      "knowledge": "2023-09",
+      "last_updated": "2024-05-13",
+      "limit": {
+        "context": 128000,
+        "output": 4096
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "GPT-4o (2024-05-13)",
+      "open_weights": false,
+      "provider": "openai",
+      "provider_model_id": "gpt-4o-2024-05-13",
+      "reasoning": false,
+      "release_date": "2024-05-13",
+      "supports_strict_tools": true,
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "api": "chat",
+      "attachment": true,
+      "cost": {
+        "cache_read": 1.25,
+        "input": 2.5,
+        "output": 10
+      },
+      "id": "gpt-4o-2024-08-06",
+      "knowledge": "2023-09",
+      "last_updated": "2024-08-06",
+      "limit": {
+        "context": 128000,
+        "output": 16384
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "GPT-4o (2024-08-06)",
+      "open_weights": false,
+      "provider": "openai",
+      "provider_model_id": "gpt-4o-2024-08-06",
+      "reasoning": false,
+      "release_date": "2024-08-06",
+      "supports_json_schema_response_format": true,
+      "supports_strict_tools": true,
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "api": "chat",
+      "attachment": true,
+      "cost": {
+        "cache_read": 1.25,
+        "input": 2.5,
+        "output": 10
+      },
+      "id": "gpt-4o-2024-11-20",
+      "knowledge": "2023-09",
+      "last_updated": "2024-11-20",
+      "limit": {
+        "context": 128000,
+        "output": 16384
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "GPT-4o (2024-11-20)",
+      "open_weights": false,
+      "provider": "openai",
+      "provider_model_id": "gpt-4o-2024-11-20",
+      "reasoning": false,
+      "release_date": "2024-11-20",
+      "supports_json_schema_response_format": true,
+      "supports_strict_tools": true,
+      "temperature": true,
+      "tool_call": true
+    },
+    {
+      "api": "chat",
       "attachment": true,
       "cost": {
         "cache_read": 0.08,
@@ -280,10 +369,13 @@
       "provider_model_id": "gpt-4o-mini",
       "reasoning": false,
       "release_date": "2024-07-18",
+      "supports_json_schema_response_format": true,
+      "supports_strict_tools": true,
       "temperature": true,
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 0.13,
@@ -316,6 +408,7 @@
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "input": 1.25,
@@ -341,12 +434,46 @@
       "open_weights": false,
       "provider": "openai",
       "provider_model_id": "gpt-5-chat-latest",
-      "reasoning": true,
+      "reasoning": false,
       "release_date": "2025-08-07",
       "temperature": true,
       "tool_call": false
     },
     {
+      "api": "responses",
+      "attachment": false,
+      "cost": {
+        "cache_read": 0.125,
+        "input": 1.25,
+        "output": 10
+      },
+      "id": "gpt-5-codex",
+      "knowledge": "2024-09-30",
+      "last_updated": "2025-09-15",
+      "limit": {
+        "context": 400000,
+        "output": 128000
+      },
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "name": "GPT-5-Codex",
+      "open_weights": false,
+      "provider": "openai",
+      "provider_model_id": "gpt-5-codex",
+      "reasoning": false,
+      "release_date": "2025-09-15",
+      "temperature": false,
+      "tool_call": false
+    },
+    {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 0.03,
@@ -379,6 +506,7 @@
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 0.01,
@@ -411,6 +539,7 @@
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 7.5,
@@ -443,99 +572,7 @@
       "tool_call": true
     },
     {
-      "attachment": false,
-      "cost": {
-        "cache_read": 0.55,
-        "input": 1.1,
-        "output": 4.4
-      },
-      "id": "o1-mini",
-      "knowledge": "2023-09",
-      "last_updated": "2024-09-12",
-      "limit": {
-        "context": 128000,
-        "output": 65536
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "o1-mini",
-      "open_weights": false,
-      "provider": "openai",
-      "provider_model_id": "o1-mini",
-      "reasoning": true,
-      "release_date": "2024-09-12",
-      "temperature": false,
-      "tool_call": false
-    },
-    {
-      "attachment": false,
-      "cost": {
-        "cache_read": 7.5,
-        "input": 15,
-        "output": 60
-      },
-      "id": "o1-preview",
-      "knowledge": "2023-09",
-      "last_updated": "2024-09-12",
-      "limit": {
-        "context": 128000,
-        "output": 32768
-      },
-      "modalities": {
-        "input": [
-          "text"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "o1-preview",
-      "open_weights": false,
-      "provider": "openai",
-      "provider_model_id": "o1-preview",
-      "reasoning": true,
-      "release_date": "2024-09-12",
-      "temperature": true,
-      "tool_call": false
-    },
-    {
-      "attachment": true,
-      "cost": {
-        "input": 150,
-        "output": 600
-      },
-      "id": "o1-pro",
-      "knowledge": "2023-09",
-      "last_updated": "2025-03-19",
-      "limit": {
-        "context": 200000,
-        "output": 100000
-      },
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "o1-pro",
-      "open_weights": false,
-      "provider": "openai",
-      "provider_model_id": "o1-pro",
-      "reasoning": true,
-      "release_date": "2025-03-19",
-      "temperature": false,
-      "tool_call": true
-    },
-    {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 0.5,
@@ -568,38 +605,7 @@
       "tool_call": true
     },
     {
-      "attachment": true,
-      "cost": {
-        "cache_read": 2.5,
-        "input": 10,
-        "output": 40
-      },
-      "id": "o3-deep-research",
-      "knowledge": "2024-05",
-      "last_updated": "2024-06-26",
-      "limit": {
-        "context": 200000,
-        "output": 100000
-      },
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "o3-deep-research",
-      "open_weights": false,
-      "provider": "openai",
-      "provider_model_id": "o3-deep-research",
-      "reasoning": true,
-      "release_date": "2024-06-26",
-      "temperature": false,
-      "tool_call": true
-    },
-    {
+      "api": "responses",
       "attachment": false,
       "cost": {
         "cache_read": 0.55,
@@ -631,6 +637,7 @@
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "input": 20,
@@ -662,6 +669,7 @@
       "tool_call": true
     },
     {
+      "api": "responses",
       "attachment": true,
       "cost": {
         "cache_read": 0.28,
@@ -690,38 +698,6 @@
       "provider_model_id": "o4-mini",
       "reasoning": true,
       "release_date": "2025-04-16",
-      "temperature": false,
-      "tool_call": true
-    },
-    {
-      "attachment": true,
-      "cost": {
-        "cache_read": 0.5,
-        "input": 2,
-        "output": 8
-      },
-      "id": "o4-mini-deep-research",
-      "knowledge": "2024-05",
-      "last_updated": "2024-06-26",
-      "limit": {
-        "context": 200000,
-        "output": 100000
-      },
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "name": "o4-mini-deep-research",
-      "open_weights": false,
-      "provider": "openai",
-      "provider_model_id": "o4-mini-deep-research",
-      "reasoning": true,
-      "release_date": "2024-06-26",
       "temperature": false,
       "tool_call": true
     },

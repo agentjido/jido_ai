@@ -13,6 +13,7 @@ defmodule ReqLLM.Provider do
   - **Body Encoding**: Transform Context to provider-specific JSON via `encode_body/1`
   - **Response Parsing**: Decode API responses via `decode_response/1`
   - **Usage Extraction**: Parse usage/cost data via `extract_usage/2` (optional)
+  - **Streaming Configuration**: Build complete streaming requests via `attach_stream/4` (recommended)
 
   ## Implementation Pattern
 
@@ -46,6 +47,23 @@ defmodule ReqLLM.Provider do
           |> Req.Request.append_response_steps(llm_decode_response: &decode_response/1)
         end
 
+        @impl ReqLLM.Provider
+        def attach_stream(model, context, opts, _finch_name) do
+          operation = Keyword.get(opts, :operation, :chat)
+          processed_opts = ReqLLM.Provider.Options.process!(__MODULE__, operation, model, Keyword.merge(opts, stream: true, context: context))
+          
+          with {:ok, req} <- prepare_request(operation, model, context, processed_opts),
+               req <- attach(req, model, processed_opts),
+               {req, _resp} <- encode_body(req) do
+            url = URI.to_string(req.url)
+            headers = req.headers |> Enum.map(fn {k, [v | _]} -> {k, v} end)
+            body = req.body
+            
+            finch_request = Finch.build(:post, url, headers, body)
+            {:ok, finch_request}
+          end
+        end
+
         def encode_body(request) do
           # Transform request.options[:context] to provider JSON
         end
@@ -72,6 +90,7 @@ defmodule ReqLLM.Provider do
     * `model` - The ReqLLM.Model struct or model identifier
     * `data` - Operation-specific data (messages for chat, text for embed, etc.)
     * `opts` - Additional options (stream, temperature, etc.)
+      - For `:object` operations, opts includes `:compiled_schema` with the schema definition
 
   ## Returns
 
@@ -90,6 +109,13 @@ defmodule ReqLLM.Provider do
           stream: opts[:stream] || false
         })
         {:ok, request}
+      end
+
+      # Object generation with schema
+      def prepare_request(:object, model, context, opts) do
+        compiled_schema = Keyword.fetch!(opts, :compiled_schema)
+        # Use compiled_schema.schema for tool definitions
+        prepare_request(:chat, model, context, updated_opts)
       end
 
       # Embedding operation  
@@ -182,6 +208,31 @@ defmodule ReqLLM.Provider do
               {:ok, map()} | {:error, term()}
 
   @doc """
+  Normalizes a model ID for metadata lookup (optional).
+
+  This callback allows providers to normalize model identifiers before looking up
+  metadata in the provider's model registry. Useful when providers have multiple
+  aliases or formats for the same underlying model (e.g., regional inference profiles).
+
+  ## Parameters
+
+    * `model_id` - The model identifier string to normalize
+
+  ## Returns
+
+    * `String.t()` - The normalized model ID for metadata lookup
+
+  ## Examples
+
+      # AWS Bedrock inference profiles - strip region prefix for metadata lookup
+      def normalize_model_id("us.anthropic.claude-3-sonnet"), do: "anthropic.claude-3-sonnet"
+      def normalize_model_id("eu.meta.llama-3"), do: "meta.llama-3"
+      def normalize_model_id(model_id), do: model_id
+
+  If this callback is not implemented, the model ID is used as-is for metadata lookup.
+  """
+  @callback normalize_model_id(String.t()) :: String.t()
+  @doc """
   Translates canonical options to provider-specific parameters (optional).
 
   This callback allows providers to modify option keys and values before
@@ -233,24 +284,282 @@ defmodule ReqLLM.Provider do
   """
   @callback default_env_key() :: String.t()
 
-  @optional_callbacks [extract_usage: 2, default_env_key: 0, translate_options: 3]
-
   @doc """
-  Registry function to get provider module for a provider ID.
+  Decode provider SSE event to list of StreamChunk structs for streaming responses.
+
+  This is called by ReqLLM.StreamServer during real-time streaming to convert
+  provider-specific SSE events into canonical StreamChunk structures. For terminal
+  events (like "[DONE]"), providers should return metadata chunks with usage
+  information and finish reasons.
 
   ## Parameters
 
-    * `provider_id` - Atom identifying the provider (e.g., :anthropic)
+    * `event` - The SSE event data (typically a map)
+    * `model` - The ReqLLM.Model struct
 
   ## Returns
 
-    * `{:ok, module()}` - Provider module that implements this behavior
-    * `{:error, term()}` - Provider not found
+    * `[ReqLLM.StreamChunk.t()]` - List of decoded stream chunks (may be empty)
+
+  ## Terminal Metadata
+
+  For terminal SSE events, providers should return metadata chunks:
+
+      # Final usage and completion metadata
+      ReqLLM.StreamChunk.meta(%{
+        usage: %{input_tokens: 10, output_tokens: 25},
+        finish_reason: :stop,
+        terminal?: true
+      })
+
+  ## Examples
+
+      def decode_sse_event(%{data: %{"choices" => [%{"delta" => delta}]}}, _model) do
+        case delta do
+          %{"content" => content} when content != "" ->
+            [ReqLLM.StreamChunk.text(content)]
+          _ ->
+            []
+        end
+      end
+
+      # Handle terminal [DONE] event
+      def decode_sse_event(%{data: "[DONE]"}, _model) do
+        # Provider should have accumulated usage data
+        [ReqLLM.StreamChunk.meta(%{terminal?: true})]
+      end
 
   """
-  @spec get(atom()) :: {:ok, module()} | {:error, term()}
-  def get(provider_id) do
-    ReqLLM.Provider.Registry.get_provider(provider_id)
+  @callback decode_sse_event(map(), ReqLLM.Model.t()) :: [ReqLLM.StreamChunk.t()]
+
+  @doc """
+  Initialize provider-specific streaming state (optional).
+
+  This callback allows providers to set up stateful transformations for streaming
+  responses. The returned state will be threaded through `decode_sse_event/3` calls
+  and passed to `flush_stream_state/2` when the stream ends.
+
+  ## Parameters
+
+    * `model` - The ReqLLM.Model struct
+
+  ## Returns
+
+  Provider-specific state of any type. Commonly a map with transformation state.
+
+  ## Examples
+
+      # Initialize state for <think> tag parsing
+      def init_stream_state(_model) do
+        %{mode: :text, buffer: ""}
+      end
+
+  """
+  @callback init_stream_state(ReqLLM.Model.t()) :: any()
+
+  @doc """
+  Decode SSE event with provider-specific state (optional, alternative to decode_sse_event/2).
+
+  This stateful variant of `decode_sse_event/2` allows providers to maintain state
+  across streaming chunks. Use this when your provider needs to accumulate data or
+  track parsing state across multiple SSE events.
+
+  If both `decode_sse_event/3` and `decode_sse_event/2` are defined, the 3-arity
+  version takes precedence during streaming.
+
+  ## Parameters
+
+    * `event` - Parsed SSE event map with `:event`, `:data`, etc.
+    * `model` - The ReqLLM.Model struct
+    * `provider_state` - Current provider state from `init_stream_state/1`
+
+  ## Returns
+
+  `{chunks, new_provider_state}` where:
+    * `chunks` - List of StreamChunk structs to emit
+    * `new_provider_state` - Updated state for next event
+
+  ## Examples
+
+      def decode_sse_event(event, model, state) do
+        chunks = ReqLLM.Provider.Defaults.default_decode_sse_event(event, model)
+        
+        Enum.reduce(chunks, {[], state}, fn chunk, {acc, st} ->
+          case chunk.type do
+            :content ->
+              {emitted, new_st} = transform_content(st, chunk.text)
+              {acc ++ emitted, new_st}
+            _ ->
+              {acc ++ [chunk], st}
+          end
+        end)
+      end
+
+  """
+  @callback decode_sse_event(map(), ReqLLM.Model.t(), any()) ::
+              {[ReqLLM.StreamChunk.t()], any()}
+
+  @doc """
+  Flush buffered provider state when stream ends (optional).
+
+  This callback is invoked when the stream completes, allowing providers to emit
+  any buffered content that hasn't been sent yet. This is useful for stateful
+  transformations that may hold partial data waiting for completion signals.
+
+  ## Parameters
+
+    * `model` - The ReqLLM.Model struct
+    * `provider_state` - Final provider state from last `decode_sse_event/3`
+
+  ## Returns
+
+  `{chunks, new_provider_state}` where:
+    * `chunks` - List of final StreamChunk structs to emit
+    * `new_provider_state` - Updated state (often with buffer cleared)
+
+  ## Examples
+
+      def flush_stream_state(_model, %{buffer: ""} = state) do
+        {[], state}
+      end
+
+      def flush_stream_state(_model, %{mode: :thinking, buffer: text} = state) do
+        {[ReqLLM.StreamChunk.thinking(text)], %{state | buffer: ""}}
+      end
+
+  """
+  @callback flush_stream_state(ReqLLM.Model.t(), any()) ::
+              {[ReqLLM.StreamChunk.t()], any()}
+
+  @doc """
+  Parse raw binary stream protocol data into events.
+
+  This callback allows providers to implement custom streaming protocols (SSE, AWS Event Stream,
+  etc.) while maintaining a consistent interface. The default implementation uses SSE parsing.
+
+  ## Parameters
+
+    * `chunk` - Raw binary chunk from the HTTP stream
+    * `buffer` - Accumulated buffer from previous incomplete chunks
+
+  ## Returns
+
+    * `{:ok, events, rest}` - Successfully parsed events with remaining buffer data
+    * `{:incomplete, buffer}` - Need more data, return the accumulated buffer
+    * `{:error, reason}` - Parse error
+
+  ## Examples
+
+      # Default SSE implementation (provided automatically)
+      def parse_stream_protocol(chunk, buffer) do
+        data = buffer <> chunk
+        {events, new_buffer} = ReqLLM.Streaming.SSE.accumulate_and_parse(data, "")
+        {:ok, events, new_buffer}
+      end
+
+      # Custom binary protocol (e.g., AWS Event Stream)
+      def parse_stream_protocol(chunk, buffer) do
+        data = buffer <> chunk
+        case ReqLLM.AWSEventStream.parse_binary(data) do
+          {:ok, events, rest} -> {:ok, events, rest}
+          {:incomplete, data} -> {:incomplete, data}
+          {:error, reason} -> {:error, reason}
+        end
+      end
+
+  """
+  @callback parse_stream_protocol(binary(), binary()) ::
+              {:ok, [map()], binary()} | {:incomplete, binary()} | {:error, term()}
+
+  @doc """
+  Build complete Finch request for streaming operations.
+
+  This callback creates a complete Finch.Request struct for streaming operations,
+  allowing providers to specify their streaming endpoint, headers, and request body
+  format. This consolidates streaming request preparation into a single callback.
+
+  ## Parameters
+
+    * `model` - The ReqLLM.Model struct
+    * `context` - The Context with messages to stream
+    * `opts` - Additional options (temperature, max_tokens, etc.)
+    * `finch_name` - Finch process name for connection pooling
+
+  ## Returns
+
+    * `{:ok, Finch.Request.t()}` - Successfully built streaming request
+    * `{:error, Exception.t()}` - Request building error
+
+  ## Examples
+
+      def attach_stream(model, context, opts, _finch_name) do
+        url = "https://api.openai.com/v1/chat/completions"
+        api_key = ReqLLM.Keys.get!(model, opts)
+        headers = [
+          {"Authorization", "Bearer " <> api_key},
+          {"Content-Type", "application/json"}
+        ]
+        
+        body = Jason.encode!(%{
+          model: model.model,
+          messages: encode_messages(context.messages),
+          stream: true
+        })
+        
+        request = Finch.build(:post, url, headers, body)
+        {:ok, request}
+      end
+
+      # Anthropic with different endpoint and headers
+      def attach_stream(model, context, opts, _finch_name) do
+        url = "https://api.anthropic.com/v1/messages"
+        api_key = ReqLLM.Keys.get!(model, opts)
+        headers = [
+          {"Authorization", "Bearer " <> api_key},
+          {"Content-Type", "application/json"},
+          {"anthropic-version", "2023-06-01"}
+        ]
+        
+        body = Jason.encode!(%{
+          model: model.model,
+          messages: encode_anthropic_messages(context),
+          stream: true
+        })
+        
+        request = Finch.build(:post, url, headers, body)
+        {:ok, request}
+      end
+
+  """
+  @callback attach_stream(
+              ReqLLM.Model.t(),
+              ReqLLM.Context.t(),
+              keyword(),
+              atom()
+            ) :: {:ok, Finch.Request.t()} | {:error, Exception.t()}
+
+  @optional_callbacks [
+    normalize_model_id: 1,
+    extract_usage: 2,
+    default_env_key: 0,
+    translate_options: 3,
+    decode_sse_event: 2,
+    decode_sse_event: 3,
+    init_stream_state: 1,
+    flush_stream_state: 2,
+    parse_stream_protocol: 2,
+    attach_stream: 4
+  ]
+
+  @doc """
+  Default implementation of parse_stream_protocol using SSE parsing.
+
+  Providers can override this to implement custom streaming protocols.
+  """
+  def parse_stream_protocol(chunk, buffer) do
+    _data = buffer <> chunk
+    {events, new_buffer} = ReqLLM.Streaming.SSE.accumulate_and_parse(chunk, buffer)
+    {:ok, events, new_buffer}
   end
 
   @doc """
@@ -258,9 +567,12 @@ defmodule ReqLLM.Provider do
   """
   @spec get!(atom()) :: module()
   def get!(provider_id) do
-    case get(provider_id) do
-      {:ok, module} -> module
-      {:error, _reason} -> raise ReqLLM.Error.Invalid.Provider.exception(provider: provider_id)
+    case ReqLLM.Provider.Registry.get_provider(provider_id) do
+      {:ok, module} ->
+        module
+
+      {:error, error} ->
+        raise error
     end
   end
 end

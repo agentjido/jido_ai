@@ -1,0 +1,87 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjo1MDAsIm1lc3NhZ2VzIjpbeyJjb250ZW50IjoiR2VuZXJhdGUgYSBzb2Z0d2FyZSBlbmdpbmVlciBwcm9maWxlIiwicm9sZSI6InVzZXIifV0sIm1vZGVsIjoiZ29vZ2xlL2dlbWluaS0yLjUtcHJvLXByZXZpZXctMDYtMDUiLCJuIjoxLCJyZWFzb25pbmdfZWZmb3J0IjoibG93Iiwic2VlZCI6NDIsInN0cmVhbSI6dHJ1ZSwic3RyZWFtX29wdGlvbnMiOnsiaW5jbHVkZV91c2FnZSI6dHJ1ZX0sInRlbXBlcmF0dXJlIjowLjAsInRvb2xfY2hvaWNlIjp7ImZ1bmN0aW9uIjp7Im5hbWUiOiJzdHJ1Y3R1cmVkX291dHB1dCJ9LCJ0eXBlIjoiZnVuY3Rpb24ifSwidG9vbHMiOlt7ImZ1bmN0aW9uIjp7ImRlc2NyaXB0aW9uIjoiR2VuZXJhdGUgc3RydWN0dXJlZCBvdXRwdXQgbWF0Y2hpbmcgdGhlIHByb3ZpZGVkIHNjaGVtYSIsIm5hbWUiOiJzdHJ1Y3R1cmVkX291dHB1dCIsInBhcmFtZXRlcnMiOnsiYWRkaXRpb25hbFByb3BlcnRpZXMiOmZhbHNlLCJwcm9wZXJ0aWVzIjp7ImFnZSI6eyJkZXNjcmlwdGlvbiI6IlBlcnNvbidzIGFnZSBpbiB5ZWFycyIsIm1pbmltdW0iOjEsInR5cGUiOiJpbnRlZ2VyIn0sIm5hbWUiOnsiZGVzY3JpcHRpb24iOiJQZXJzb24ncyBmdWxsIG5hbWUiLCJ0eXBlIjoic3RyaW5nIn0sIm9jY3VwYXRpb24iOnsiZGVzY3JpcHRpb24iOiJQZXJzb24ncyBqb2Igb3IgcHJvZmVzc2lvbiIsInR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbIm5hbWUiLCJhZ2UiXSwidHlwZSI6Im9iamVjdCJ9fSwidHlwZSI6ImZ1bmN0aW9uIn1dfQ=="
+    },
+    "canonical_json": {
+      "max_tokens": 500,
+      "messages": [
+        {
+          "content": "Generate a software engineer profile",
+          "role": "user"
+        }
+      ],
+      "model": "google/gemini-2.5-pro-preview-06-05",
+      "n": 1,
+      "reasoning_effort": "low",
+      "seed": 42,
+      "stream": true,
+      "stream_options": {
+        "include_usage": true
+      },
+      "temperature": 0.0,
+      "tool_choice": {
+        "function": {
+          "name": "structured_output"
+        },
+        "type": "function"
+      },
+      "tools": [
+        {
+          "function": {
+            "description": "Generate structured output matching the provided schema",
+            "name": "structured_output",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "age": {
+                  "description": "Person's age in years",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "name": {
+                  "description": "Person's full name",
+                  "type": "string"
+                },
+                "occupation": {
+                  "description": "Person's job or profession",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "age"
+              ],
+              "type": "object"
+            }
+          },
+          "type": "function"
+        }
+      ]
+    },
+    "headers": {
+      "accept": "text/event-stream",
+      "authorization": "[REDACTED:authorization]",
+      "content-type": "application/json"
+    },
+    "method": "POST",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "b64": "OiBPUEVOUk9VVEVSIFBST0NFU1NJTkcKCjogT1BFTlJPVVRFUiBQUk9DRVNTSU5HCgo6IE9QRU5ST1VURVIgUFJPQ0VTU0lORwoKOiBPUEVOUk9VVEVSIFBST0NFU1NJTkcKCjogT1BFTlJPVVRFUiBQUk9DRVNTSU5HCgo6IE9QRU5ST1VURVIgUFJPQ0VTU0lORwoKZGF0YTogeyJpZCI6Imdlbi0xNzYwNTMyNTI2LWVmZjNrYjNCYzRqN1lYYmpDQmhUIiwicHJvdmlkZXIiOiJHb29nbGUiLCJtb2RlbCI6Imdvb2dsZS9nZW1pbmktMi41LXBybyIsIm9iamVjdCI6ImNoYXQuY29tcGxldGlvbi5jaHVuayIsImNyZWF0ZWQiOjE3NjA1MzI1MjYsImNob2ljZXMiOlt7ImluZGV4IjowLCJkZWx0YSI6eyJyb2xlIjoiYXNzaXN0YW50IiwiY29udGVudCI6IiIsInJlYXNvbmluZyI6IioqRGVmaW5pbmcgdGhlIFBhcmFtZXRlcnMqKlxuXG5JJ20gc3RhcnRpbmcgdG8gd3Jlc3RsZSB3aXRoIGhvdyB0byBhcHByb2FjaCB0aGlzIFwic29mdHdhcmUgZW5naW5lZXIgcHJvZmlsZVwiIGlkZWEuIE15IHRvb2wncyBzdHJ1Y3R1cmUsIHNwZWNpZmljYWxseSBgc3RydWN0dXJlZF9vdXRwdXRgLCBzZWVtcyBsaW1pdGluZy4gQWdlIGFuZCBuYW1lIGFyZSBlYXN5LCBidXQgXCJvY2N1cGF0aW9uXCIgZmVlbHMgdG9vIGJyb2FkLiBJIG5lZWQgdG8gZmluZCBhIHdheSB0byBnZXQgdXNlZnVsIGRhdGEgb3V0LCBpbiBsaWdodCBvZiBteSBjb25zdHJhaW50cy5cblxuXG4iLCJyZWFzb25pbmdfZGV0YWlscyI6W3sidHlwZSI6InJlYXNvbmluZy50ZXh0IiwidGV4dCI6IioqRGVmaW5pbmcgdGhlIFBhcmFtZXRlcnMqKlxuXG5JJ20gc3RhcnRpbmcgdG8gd3Jlc3RsZSB3aXRoIGhvdyB0byBhcHByb2FjaCB0aGlzIFwic29mdHdhcmUgZW5naW5lZXIgcHJvZmlsZVwiIGlkZWEuIE15IHRvb2wncyBzdHJ1Y3R1cmUsIHNwZWNpZmljYWxseSBgc3RydWN0dXJlZF9vdXRwdXRgLCBzZWVtcyBsaW1pdGluZy4gQWdlIGFuZCBuYW1lIGFyZSBlYXN5LCBidXQgXCJvY2N1cGF0aW9uXCIgZmVlbHMgdG9vIGJyb2FkLiBJIG5lZWQgdG8gZmluZCBhIHdheSB0byBnZXQgdXNlZnVsIGRhdGEgb3V0LCBpbiBsaWdodCBvZiBteSBjb25zdHJhaW50cy5cblxuXG4iLCJmb3JtYXQiOiJ1bmtub3duIiwiaW5kZXgiOjB9XX0sImZpbmlzaF9yZWFzb24iOm51bGwsIm5hdGl2ZV9maW5pc2hfcmVhc29uIjpudWxsLCJsb2dwcm9icyI6bnVsbH1dfQoKZGF0YTogeyJpZCI6Imdlbi0xNzYwNTMyNTI2LWVmZjNrYjNCYzRqN1lYYmpDQmhUIiwicHJvdmlkZXIiOiJHb29nbGUiLCJtb2RlbCI6Imdvb2dsZS9nZW1pbmktMi41LXBybyIsIm9iamVjdCI6ImNoYXQuY29tcGxldGlvbi5jaHVuayIsImNyZWF0ZWQiOjE3NjA1MzI1MjYsImNob2ljZXMiOlt7ImluZGV4IjowLCJkZWx0YSI6eyJyb2xlIjoiYXNzaXN0YW50IiwiY29udGVudCI6bnVsbCwidG9vbF9jYWxscyI6W3siaW5kZXgiOjAsImlkIjoidG9vbF8wX3N0cnVjdHVyZWRfb3V0cHV0XzR3aXZvbFN3ZVFsRjByTEk1YlpJIiwidHlwZSI6ImZ1bmN0aW9uIiwiZnVuY3Rpb24iOnsibmFtZSI6InN0cnVjdHVyZWRfb3V0cHV0IiwiYXJndW1lbnRzIjoie1wibmFtZVwiOlwiSm9obiBEb2VcIixcIm9jY3VwYXRpb25cIjpcIlNvZnR3YXJlIEVuZ2luZWVyXCIsXCJhZ2VcIjozMH0ifX1dfSwiZmluaXNoX3JlYXNvbiI6InRvb2xfY2FsbHMiLCJuYXRpdmVfZmluaXNoX3JlYXNvbiI6IlNUT1AiLCJsb2dwcm9icyI6bnVsbH1dfQoKZGF0YTogeyJpZCI6Imdlbi0xNzYwNTMyNTI2LWVmZjNrYjNCYzRqN1lYYmpDQmhUIiwicHJvdmlkZXIiOiJHb29nbGUiLCJtb2RlbCI6Imdvb2dsZS9nZW1pbmktMi41LXBybyIsIm9iamVjdCI6ImNoYXQuY29tcGxldGlvbi5jaHVuayIsImNyZWF0ZWQiOjE3NjA1MzI1MjYsImNob2ljZXMiOlt7ImluZGV4IjowLCJkZWx0YSI6eyJyb2xlIjoiYXNzaXN0YW50IiwiY29udGVudCI6IiJ9LCJmaW5pc2hfcmVhc29uIjpudWxsLCJuYXRpdmVfZmluaXNoX3JlYXNvbiI6bnVsbCwibG9ncHJvYnMiOm51bGx9XSwidXNhZ2UiOnsicHJvbXB0X3Rva2VucyI6NDEsImNvbXBsZXRpb25fdG9rZW5zIjo2NiwidG90YWxfdG9rZW5zIjoxMDcsImNvc3QiOjAuMDAwNzExMjUsImlzX2J5b2siOmZhbHNlLCJwcm9tcHRfdG9rZW5zX2RldGFpbHMiOnsiY2FjaGVkX3Rva2VucyI6MCwiYXVkaW9fdG9rZW5zIjowfSwiY29zdF9kZXRhaWxzIjp7InVwc3RyZWFtX2luZmVyZW5jZV9jb3N0IjpudWxsLCJ1cHN0cmVhbV9pbmZlcmVuY2VfcHJvbXB0X2Nvc3QiOjAuMDAwMDUxMjUsInVwc3RyZWFtX2luZmVyZW5jZV9jb21wbGV0aW9uc19jb3N0IjowLjAwMDY2fSwiY29tcGxldGlvbl90b2tlbnNfZGV0YWlscyI6eyJyZWFzb25pbmdfdG9rZW5zIjo1NSwiaW1hZ2VfdG9rZW5zIjowfX19CgpkYXRhOiBbRE9ORV0KCg=="
+    },
+    "headers": {
+      "access-control-allow-origin": "*",
+      "cache-control": "no-cache",
+      "cf-ray": "98ef6ec18c1aa6ee-ORD",
+      "content-type": "text/event-stream",
+      "date": "Wed, 15 Oct 2025 12:48:49 GMT",
+      "permissions-policy": "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")",
+      "referrer-policy": "no-referrer, strict-origin-when-cross-origin",
+      "server": "cloudflare",
+      "x-content-type-options": "nosniff"
+    },
+    "status": 200
+  }
+}

@@ -23,7 +23,7 @@ defmodule ReqLLM.Provider.Registry do
       {:ok, module} = ReqLLM.Provider.Registry.get_provider(:anthropic)
       module #=> ReqLLM.Providers.Anthropic
 
-      # Get model information  
+      # Get model information
       {:ok, model} = ReqLLM.Provider.Registry.get_model(:anthropic, "claude-3-sonnet")
       model.metadata.context_length #=> 200000
 
@@ -63,7 +63,7 @@ defmodule ReqLLM.Provider.Registry do
   ## Parameters
 
     * `provider_id` - Unique identifier for the provider (atom)
-    * `module` - The provider module implementing Req plugin pattern  
+    * `module` - The provider module implementing Req plugin pattern
     * `metadata` - Provider metadata including supported models
 
   ## Examples
@@ -74,33 +74,41 @@ defmodule ReqLLM.Provider.Registry do
       })
 
   """
-  @spec register(atom(), module(), map()) :: :ok | {:error, {:already_registered, module()}}
+  @spec register(atom(), module(), map()) ::
+          :ok | {:error, {:already_registered, module()} | {:validation_error, term()}}
   def register(provider_id, module, metadata) when is_atom(provider_id) and is_atom(module) do
     current_providers = get_registry()
 
-    case Map.get(current_providers, provider_id) do
-      nil ->
-        updated_registry =
-          Map.put(current_providers, provider_id, %{
-            module: module,
-            metadata: metadata || %{}
-          })
+    # Validate metadata if provided
+    case validate_metadata(metadata) do
+      :ok ->
+        case Map.get(current_providers, provider_id) do
+          nil ->
+            updated_registry =
+              Map.put(current_providers, provider_id, %{
+                module: module,
+                metadata: metadata || %{}
+              })
 
-        :persistent_term.put(@registry_key, updated_registry)
-        :ok
+            :persistent_term.put(@registry_key, updated_registry)
+            :ok
 
-      %{module: ^module} ->
-        # Idempotent registration
-        :ok
+          %{module: ^module} ->
+            # Idempotent registration
+            :ok
 
-      %{module: other} ->
-        require Logger
+          %{module: other} ->
+            require Logger
 
-        Logger.warning(
-          "Attempted to overwrite provider #{provider_id}: existing=#{inspect(other)}, attempted=#{inspect(module)}"
-        )
+            Logger.warning(
+              "Attempted to overwrite provider #{provider_id}: existing=#{inspect(other)}, attempted=#{inspect(module)}"
+            )
 
-        {:error, {:already_registered, other}}
+            {:error, {:already_registered, other}}
+        end
+
+      {:error, validation_error} ->
+        {:error, {:validation_error, validation_error}}
     end
   end
 
@@ -114,7 +122,8 @@ defmodule ReqLLM.Provider.Registry do
   ## Returns
 
     * `{:ok, module}` - Provider module found
-    * `{:error, :not_found}` - Provider not registered
+    * `{:error, %ReqLLM.Error.Invalid.Provider{}}` - Provider not registered
+    * `{:error, %ReqLLM.Error.Invalid.Provider.NotImplemented{}}` - Provider exists but has no implementation (metadata-only)
 
   ## Examples
 
@@ -122,21 +131,33 @@ defmodule ReqLLM.Provider.Registry do
       module #=> ReqLLM.Providers.Anthropic
 
       ReqLLM.Provider.Registry.get_provider(:unknown)
-      #=> {:error, :not_found}
+      #=> {:error, %ReqLLM.Error.Invalid.Provider{provider: :unknown}}
 
   """
-  @spec get_provider(atom()) :: {:ok, module()} | {:error, :not_found}
+  @spec get_provider(atom()) ::
+          {:ok, module()}
+          | {:error,
+             ReqLLM.Error.Invalid.Provider.t() | ReqLLM.Error.Invalid.Provider.NotImplemented.t()}
   def get_provider(provider_id) when is_atom(provider_id) do
     case get_registry() do
-      %{^provider_id => %{module: module}} -> {:ok, module}
-      _ -> {:error, :not_found}
+      %{^provider_id => %{module: nil}} ->
+        {:error, ReqLLM.Error.Invalid.Provider.NotImplemented.exception(provider: provider_id)}
+
+      %{^provider_id => %{module: module}} ->
+        {:ok, module}
+
+      _ ->
+        {:error, ReqLLM.Error.Invalid.Provider.exception(provider: provider_id)}
     end
   end
 
   @doc """
   Alias for get_provider/1 to match legacy API expectations.
   """
-  @spec fetch(atom()) :: {:ok, module()} | {:error, :not_found}
+  @spec fetch(atom()) ::
+          {:ok, module()}
+          | {:error,
+             ReqLLM.Error.Invalid.Provider.t() | ReqLLM.Error.Invalid.Provider.NotImplemented.t()}
   def fetch(provider_id), do: get_provider(provider_id)
 
   @doc """
@@ -168,18 +189,36 @@ defmodule ReqLLM.Provider.Registry do
   def get_model(provider_id, model_name) when is_atom(provider_id) and is_binary(model_name) do
     case get_provider_info(provider_id) do
       {:ok, provider_info} ->
-        case find_model_metadata(provider_info, model_name) do
+        # Normalize model name if provider implements normalize_model_id/1
+        normalized_model_name =
+          case provider_info.module do
+            nil ->
+              model_name
+
+            provider_module ->
+              if function_exported?(provider_module, :normalize_model_id, 1) do
+                provider_module.normalize_model_id(model_name)
+              else
+                model_name
+              end
+          end
+
+        case find_model_metadata(provider_info, normalized_model_name) do
           {:ok, model_metadata} ->
             # Create enhanced model with structured fields populated from metadata
-            limit = get_in(model_metadata, ["limit"]) |> map_string_keys_to_atoms()
+            limit =
+              get_in(model_metadata, ["limit"])
+              |> ReqLLM.Metadata.map_string_keys_to_atoms()
 
             modalities =
               get_in(model_metadata, ["modalities"])
-              |> map_string_keys_to_atoms()
-              |> convert_modality_values()
+              |> ReqLLM.Metadata.map_string_keys_to_atoms()
+              |> ReqLLM.Metadata.convert_modality_values()
 
-            capabilities = build_capabilities_from_metadata(model_metadata)
-            cost = get_in(model_metadata, ["cost"]) |> map_string_keys_to_atoms()
+            capabilities = ReqLLM.Metadata.build_capabilities_from_metadata(model_metadata)
+
+            cost =
+              get_in(model_metadata, ["cost"]) |> ReqLLM.Metadata.map_string_keys_to_atoms()
 
             enhanced_model =
               ReqLLM.Model.new(provider_id, model_name,
@@ -325,7 +364,7 @@ defmodule ReqLLM.Provider.Registry do
       ReqLLM.Provider.Registry.implemented?(:anthropic)
       #=> true
 
-      ReqLLM.Provider.Registry.implemented?(:mistral)  
+      ReqLLM.Provider.Registry.implemented?(:mistral)
       #=> false (metadata-only)
 
   """
@@ -483,7 +522,7 @@ defmodule ReqLLM.Provider.Registry do
     :persistent_term.put(@registry_key, final_registry)
 
     Logger.debug(
-      "Provider registry initialized with #{map_size(final_registry)} providers (#{map_size(registry_map)} with modules, #{map_size(json_only_registry)} metadata-only)"
+      "ReqLLM provider registry initialized with #{map_size(final_registry)} providers (#{map_size(registry_map)} implemented, #{map_size(json_only_registry)} metadata-only)"
     )
 
     :ok
@@ -571,6 +610,7 @@ defmodule ReqLLM.Provider.Registry do
     :persistent_term.get(@registry_key, %{})
   end
 
+  @spec get_provider_info(atom()) :: {:ok, map()} | {:error, :provider_not_found}
   defp get_provider_info(provider_id) do
     case get_registry() do
       %{^provider_id => provider_info} -> {:ok, provider_info}
@@ -612,59 +652,6 @@ defmodule ReqLLM.Provider.Registry do
   rescue
     ArgumentError ->
       {:error, "Unknown provider in specification"}
-  end
-
-  # Whitelist of safe metadata keys to convert to atoms (copied from Model module)
-  @safe_metadata_keys ~w[
-    input output context text image reasoning tool_call temperature
-    cache_read cache_write limit modalities capabilities cost
-  ]
-
-  defp map_string_keys_to_atoms(nil), do: nil
-
-  defp map_string_keys_to_atoms(map) when is_map(map) do
-    Map.new(map, fn
-      {key, value} when is_binary(key) and key in @safe_metadata_keys ->
-        atom_key = String.to_existing_atom(key)
-        {atom_key, value}
-
-      {key, value} when is_binary(key) ->
-        # Keep unsafe keys as strings to prevent atom leakage
-        {key, value}
-
-      {key, value} ->
-        {key, value}
-    end)
-  rescue
-    ArgumentError ->
-      # If any safe key doesn't exist as an atom, just return the map as-is
-      map
-  end
-
-  defp build_capabilities_from_metadata(metadata) do
-    %{
-      reasoning: Map.get(metadata, "reasoning", false),
-      tool_call: Map.get(metadata, "tool_call", false),
-      temperature: Map.get(metadata, "temperature", false),
-      attachment: Map.get(metadata, "attachment", false)
-    }
-  end
-
-  # Convert modality string values to atoms
-  defp convert_modality_values(nil), do: nil
-
-  defp convert_modality_values(modalities) when is_map(modalities) do
-    modalities
-    |> Map.new(fn
-      {:input, values} when is_list(values) ->
-        {:input, Enum.map(values, &String.to_atom/1)}
-
-      {:output, values} when is_list(values) ->
-        {:output, Enum.map(values, &String.to_atom/1)}
-
-      {key, value} ->
-        {key, value}
-    end)
   end
 
   @doc false
@@ -722,7 +709,7 @@ defmodule ReqLLM.Provider.Registry do
 
     with {:ok, content} <- File.read(file_path),
          {:ok, data} <- Jason.decode(content) do
-      # Convert string keys to atom keys for easier access  
+      # Convert string keys to atom keys for easier access
       {:ok, atomize_json_keys(data)}
     end
   end
@@ -749,6 +736,196 @@ defmodule ReqLLM.Provider.Registry do
 
   defp atomize_json_keys(data), do: data
 
+  # Validates provider metadata using the consolidated ReqLLM.Metadata module
+  defp validate_metadata(nil), do: :ok
+  defp validate_metadata(%{} = metadata) when metadata == %{}, do: :ok
+
+  defp validate_metadata(metadata) when is_map(metadata) do
+    with {:ok, _} <- validate_provider_config(metadata),
+         {:ok, _} <- validate_models_metadata(metadata) do
+      :ok
+    else
+      {:error, _} = error -> error
+    end
+  end
+
+  defp validate_metadata(_), do: {:error, "Metadata must be a map"}
+
+  # Validate provider-level configuration
+  defp validate_provider_config(metadata) do
+    case Map.get(metadata, :provider) || Map.get(metadata, "provider") do
+      nil ->
+        {:ok, nil}
+
+      provider_config when is_map(provider_config) ->
+        # Only validate if the config has the required fields for connection validation
+        if Map.has_key?(provider_config, :id) or Map.has_key?(provider_config, "id") do
+          # Convert string keys to atoms before validation
+          normalized_config = normalize_keys_for_validation(provider_config)
+          ReqLLM.Metadata.validate(:connection, normalized_config)
+        else
+          {:ok, provider_config}
+        end
+
+      _ ->
+        {:ok, nil}
+    end
+  end
+
+  # Validate models metadata within provider metadata
+  defp validate_models_metadata(metadata) do
+    models = Map.get(metadata, :models) || Map.get(metadata, "models") || []
+
+    case models do
+      [] ->
+        {:ok, []}
+
+      models_list when is_list(models_list) ->
+        validate_each_model(models_list)
+
+      _ ->
+        {:error, "Models must be a list"}
+    end
+  end
+
+  # Validate each model in the models list
+  defp validate_each_model(models) do
+    # Filter out invalid models rather than failing validation entirely
+    valid_models =
+      Enum.filter(models, fn model ->
+        case validate_single_model(model) do
+          {:ok, _} -> true
+          {:error, _} -> false
+        end
+      end)
+
+    {:ok, valid_models}
+  end
+
+  # Validate a single model's metadata
+  defp validate_single_model(model) when is_map(model) do
+    with {:ok, _} <- validate_model_capabilities(model),
+         {:ok, _} <- validate_model_limits(model),
+         {:ok, _} <- validate_model_costs(model) do
+      {:ok, model}
+    end
+  end
+
+  # Allow simple string models (for backward compatibility and tests)
+  defp validate_single_model(model) when is_binary(model), do: {:ok, model}
+
+  defp validate_single_model(_), do: {:error, "Model must be a map or string"}
+
+  # Validate capabilities section of model metadata
+  defp validate_model_capabilities(model) do
+    case extract_model_section(model, ["capabilities", :capabilities]) do
+      nil ->
+        {:ok, nil}
+
+      capabilities when is_map(capabilities) ->
+        # Only validate if it looks like a proper capabilities structure
+        if has_validation_keys?(capabilities, [:id]) do
+          # Convert string keys to atoms before validation
+          normalized_capabilities = normalize_keys_for_validation(capabilities)
+          ReqLLM.Metadata.validate(:capabilities, normalized_capabilities)
+        else
+          {:ok, capabilities}
+        end
+
+      _ ->
+        {:ok, nil}
+    end
+  end
+
+  # Validate limits section of model metadata
+  defp validate_model_limits(model) do
+    case extract_model_section(model, ["limit", :limit, "limits", :limits]) do
+      nil ->
+        {:ok, nil}
+
+      limits when is_map(limits) ->
+        # Only validate if it looks like a proper limits structure
+        if has_validation_keys?(limits, [:context]) do
+          # Convert string keys to atoms before validation
+          normalized_limits = normalize_keys_for_validation(limits)
+          ReqLLM.Metadata.validate(:limits, normalized_limits)
+        else
+          {:ok, limits}
+        end
+
+      _ ->
+        {:ok, nil}
+    end
+  end
+
+  # Validate costs section of model metadata
+  defp validate_model_costs(model) do
+    case extract_model_section(model, ["cost", :cost, "costs", :costs]) do
+      nil ->
+        {:ok, nil}
+
+      costs when is_map(costs) ->
+        # Only validate if it looks like a proper costs structure
+        if has_validation_keys?(costs, [:input, :output]) do
+          # Convert string keys to atoms before validation
+          normalized_costs = normalize_keys_for_validation(costs)
+          ReqLLM.Metadata.validate(:costs, normalized_costs)
+        else
+          {:ok, costs}
+        end
+
+      _ ->
+        {:ok, nil}
+    end
+  end
+
+  # Helper to extract a section from model using multiple possible keys
+  defp extract_model_section(model, keys) do
+    Enum.find_value(keys, fn key ->
+      Map.get(model, key)
+    end)
+  end
+
+  # Helper to check if a map has any of the expected validation keys
+  defp has_validation_keys?(map, expected_keys) do
+    Enum.any?(expected_keys, fn key ->
+      Map.has_key?(map, key) or Map.has_key?(map, to_string(key))
+    end)
+  end
+
+  # Helper to convert string keys to atoms for NimbleOptions validation
+  defp normalize_keys_for_validation(data) when is_map(data) do
+    data
+    |> Map.new(fn
+      {key, value} when is_binary(key) ->
+        # Convert known string keys to atoms safely
+        atom_key =
+          try do
+            String.to_existing_atom(key)
+          rescue
+            ArgumentError ->
+              # If atom doesn't exist, create it for common validation keys
+              if key in ~w(id input output context capabilities reasoning tool_call modalities limit cost costs) do
+                String.to_atom(key)
+              else
+                # Keep as string if not a known validation key
+                key
+              end
+          end
+
+        {atom_key, normalize_keys_for_validation(value)}
+
+      {key, value} ->
+        {key, normalize_keys_for_validation(value)}
+    end)
+  end
+
+  defp normalize_keys_for_validation(data) when is_list(data) do
+    Enum.map(data, &normalize_keys_for_validation/1)
+  end
+
+  defp normalize_keys_for_validation(data), do: data
+
   @doc """
   Gets the environment variable key for a provider's API authentication.
 
@@ -774,12 +951,13 @@ defmodule ReqLLM.Provider.Registry do
   @spec get_env_key(atom()) :: String.t() | nil
   def get_env_key(provider_id) when is_atom(provider_id) do
     # Try metadata first
-    case get_provider_metadata(provider_id) do
-      {:ok, metadata} ->
-        case get_in(metadata, ["provider", "env"]) || get_in(metadata, [:provider, :env]) do
-          [env_var | _] when is_binary(env_var) -> env_var
-          _ -> try_provider_default_env_key(provider_id)
-        end
+    with {:ok, metadata} <- get_provider_metadata(provider_id),
+         env_list when is_list(env_list) <-
+           get_in(metadata, ["provider", "env"]) || get_in(metadata, [:provider, :env]),
+         [env_var | _] when is_binary(env_var) <- env_list do
+      env_var
+    else
+      _ -> try_provider_default_env_key(provider_id)
     end
   end
 
@@ -787,7 +965,11 @@ defmodule ReqLLM.Provider.Registry do
     case get_provider(provider_id) do
       {:ok, provider_module} ->
         if function_exported?(provider_module, :default_env_key, 0) do
-          provider_module.default_env_key()
+          try do
+            provider_module.default_env_key()
+          rescue
+            _ -> nil
+          end
         end
 
       _ ->

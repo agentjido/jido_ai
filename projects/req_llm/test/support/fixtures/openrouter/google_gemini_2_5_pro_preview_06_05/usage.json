@@ -1,0 +1,114 @@
+{
+  "request": {
+    "body": {
+      "b64": "eyJtYXhfdG9rZW5zIjo1MDAsIm1lc3NhZ2VzIjpbeyJjb250ZW50IjoiSGkgdGhlcmUhIiwicm9sZSI6InVzZXIifV0sIm1vZGVsIjoiZ29vZ2xlL2dlbWluaS0yLjUtcHJvLXByZXZpZXctMDYtMDUiLCJuIjoxLCJzZWVkIjo0Miwic3RyZWFtIjpmYWxzZSwidGVtcGVyYXR1cmUiOjAuMH0="
+    },
+    "canonical_json": {
+      "max_tokens": 500,
+      "messages": [
+        {
+          "content": "Hi there!",
+          "role": "user"
+        }
+      ],
+      "model": "google/gemini-2.5-pro-preview-06-05",
+      "n": 1,
+      "seed": 42,
+      "stream": false,
+      "temperature": 0.0
+    },
+    "headers": {
+      "accept-encoding": [
+        "gzip"
+      ],
+      "authorization": "[REDACTED:authorization]",
+      "content-type": [
+        "application/json"
+      ],
+      "user-agent": [
+        "req/0.5.15"
+      ]
+    },
+    "method": "post",
+    "url": "https://openrouter.ai/api/v1/chat/completions"
+  },
+  "response": {
+    "body": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "Hello there! How can I help you today?",
+            "reasoning": "**Processing User Greetings**\n\nI've recognized the user's friendly \"Hi there!\" and analyzed it as an invitation to chat. My current task is to formulate a fitting, engaging response to initiate a conversation. I am now focused on crafting an appropriate reply.\n\n\n**Composing the Reply**\n\nI've decided to prioritize a greeting that's both friendly and directly helpful. I'm leaning towards \"Hello there! How can I help you today?\" as it acknowledges their greeting while clearly offering assistance. The goal is to create a warm and welcoming tone to invite further interaction.\n\n\n**Finalizing the Greeting**\n\nI'm now carefully reviewing my response options. I've decided to prioritize clarity and approachability. The options I'm currently considering balance efficiency with friendliness. My objective now is to select the most suitable and welcoming option, ensuring a positive initial interaction. I am now refining the perfect opening line.\n\n\n",
+            "reasoning_details": [
+              {
+                "format": "unknown",
+                "index": 0,
+                "text": "**Processing User Greetings**\n\nI've recognized the user's friendly \"Hi there!\" and analyzed it as an invitation to chat. My current task is to formulate a fitting, engaging response to initiate a conversation. I am now focused on crafting an appropriate reply.\n\n\n**Composing the Reply**\n\nI've decided to prioritize a greeting that's both friendly and directly helpful. I'm leaning towards \"Hello there! How can I help you today?\" as it acknowledges their greeting while clearly offering assistance. The goal is to create a warm and welcoming tone to invite further interaction.\n\n\n**Finalizing the Greeting**\n\nI'm now carefully reviewing my response options. I've decided to prioritize clarity and approachability. The options I'm currently considering balance efficiency with friendliness. My objective now is to select the most suitable and welcoming option, ensuring a positive initial interaction. I am now refining the perfect opening line.\n\n\n",
+                "type": "reasoning.text"
+              }
+            ],
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "STOP"
+        }
+      ],
+      "created": 1760532529,
+      "id": "gen-1760532529-W8KjHQJbUW9qkUbcOq33",
+      "model": "google/gemini-2.5-pro",
+      "object": "chat.completion",
+      "provider": "Google",
+      "usage": {
+        "completion_tokens": 489,
+        "completion_tokens_details": {
+          "image_tokens": 0,
+          "reasoning_tokens": 479
+        },
+        "prompt_tokens": 3,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "total_tokens": 492
+      }
+    },
+    "headers": {
+      "access-control-allow-origin": [
+        "*"
+      ],
+      "cf-ray": [
+        "98ef6ed44939fa17-ORD"
+      ],
+      "connection": [
+        "keep-alive"
+      ],
+      "content-type": [
+        "application/json"
+      ],
+      "date": [
+        "Wed, 15 Oct 2025 12:48:51 GMT"
+      ],
+      "permissions-policy": [
+        "payment=(self \"https://checkout.stripe.com\" \"https://connect-js.stripe.com\" \"https://js.stripe.com\" \"https://*.js.stripe.com\" \"https://hooks.stripe.com\")"
+      ],
+      "referrer-policy": [
+        "no-referrer, strict-origin-when-cross-origin"
+      ],
+      "server": [
+        "cloudflare"
+      ],
+      "transfer-encoding": [
+        "chunked"
+      ],
+      "vary": [
+        "Accept-Encoding"
+      ],
+      "x-content-type-options": [
+        "nosniff"
+      ]
+    },
+    "status": 200
+  }
+}

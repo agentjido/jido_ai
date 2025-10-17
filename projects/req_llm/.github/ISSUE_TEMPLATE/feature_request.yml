@@ -4,53 +4,53 @@ title: "[Feature]: "
 labels: ["enhancement"]
 
 body:
-  - type: textarea
-    id: feature_summary
-    attributes:
-      label: Feature Summary
-      description: Brief summary of the requested feature
-    validations:
-      required: true
-
-  - type: textarea
-    id: problem_description
-    attributes:
-      label: Problem Description
-      description: What problem does this solve?
-    validations:
-      required: true
-
-  - type: textarea
-    id: proposed_solution
-    attributes:
-      label: Proposed Solution
-      description: How should this work?
-    validations:
-      required: true
-
-  - type: textarea
-    id: use_cases
-    attributes:
-      label: Use Cases
-      description: When would this be useful?
-    validations:
-      required: true
-
   - type: dropdown
-    id: priority
+    id: feature_type
     attributes:
-      label: Priority
+      label: Feature Type
       options:
-        - "Nice to have"
-        - "Important"
-        - "Critical"
+        - New provider
+        - Provider feature extension
+        - Core library enhancement
+        - Documentation
+        - Other
     validations:
       required: true
 
-  - type: textarea
-    id: additional_context
+  - type: input
+    id: provider
     attributes:
-      label: Additional Context
-      description: Any other relevant information
+      label: Provider (if applicable)
+      placeholder: "anthropic, openai, ollama, etc."
     validations:
       required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What feature do you want and why?
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example Usage
+      placeholder: |
+        ```elixir
+        {:ok, response} = ReqLLM.your_feature(...)
+        ```
+    validations:
+      required: false
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Can you contribute this?
+      options:
+        - "Yes, I can submit a PR"
+        - "Yes, with guidance"
+        - "No"
+    validations:
+      required: true

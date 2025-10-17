@@ -4,29 +4,30 @@
 
 Brief description of what this PR accomplishes.
 
-## Type of Change
+## Type of Contribution
 
-- [ ] Bug fix
-- [ ] New feature  
-- [ ] Breaking change
-- [ ] Documentation
-- [ ] Refactoring
-- [ ] Performance improvement
-- [ ] Tests
-- [ ] Build/CI
-
-## Testing
-
-- [ ] Tests added/updated
-- [ ] Manual testing performed
-- [ ] All tests pass
+- [ ] **Core Library** - Changes to core modules or data structures
+- [ ] **New Provider** - Adding a new LLM provider
+- [ ] **Provider Feature** - Adding capabilities to existing provider
+- [ ] **Bug Fix** - Fixing existing functionality
+- [ ] **Documentation** - Docs/guides only
 
 ## Checklist
 
-- [ ] Code formatted and linted
-- [ ] Code quality checks passed (dialyzer & credo warnings/errors fixed)
-- [ ] Documentation updated if needed
-- [ ] Breaking changes documented (if any)
+- [ ] Tests pass (`mix test`)
+- [ ] Quality checks pass (`mix quality`)
+- [ ] Documentation updated
+- [ ] CHANGELOG.md updated
+
+### If Provider Changes
+- [ ] Fixtures generated (`mix mc "provider:*" --record`)
+- [ ] Model compatibility passes (`mix mc "provider:*"`)
+
+**Model Compatibility Output:**
+```
+# Paste output if provider changes
+
+```
 
 ## Related Issues
 
