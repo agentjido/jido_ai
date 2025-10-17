@@ -1,0 +1,25 @@
+{
+  "id": "deepseek/deepseek-r1-distill-llama-70b:free",
+  "name": "DeepSeek: R1 Distill Llama 70B (free)",
+  "description": "DeepSeek R1 Distill Llama 70B is a distilled large language model based on [Llama-3.3-70B-Instruct](/meta-llama/llama-3.3-70b-instruct), using outputs from [DeepSeek R1](/deepseek/deepseek-r1). The model combines advanced distillation techniques to achieve high performance across multiple benchmarks, including:\n\n- AIME 2024 pass@1: 70.0\n- MATH-500 pass@1: 94.5\n- CodeForces Rating: 1633\n\nThe model leverages fine-tuning from DeepSeek R1's outputs, enabling competitive performance comparable to larger frontier models.",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Llama3",
+    "instruct_type": "deepseek-r1"
+  },
+  "created": 1737663169,
+  "endpoints": []
+}

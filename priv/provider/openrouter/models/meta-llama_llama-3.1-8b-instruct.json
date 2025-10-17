@@ -1,0 +1,365 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "llama3",
+      "modality": "text->text",
+      "tokenizer": "Llama3"
+    },
+    "created": 1721692800,
+    "description": "Meta's latest class of model (Llama 3.1) launched with a variety of sizes & flavors. This 8B instruct-tuned version is fast and efficient.\n\nIt has demonstrated strong performance compared to leading closed-source models in human evaluations.\n\nTo read more about the model release, [click here](https://ai.meta.com/blog/meta-llama-3-1/). Usage of this model is subject to [Meta's Acceptable Use Policy](https://llama.meta.com/llama3/use-policy/).",
+    "endpoints": [
+      {
+        "context_length": 131072,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "DeepInfra | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.00000005",
+          "image": "0",
+          "prompt": "0.00000002",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 131000,
+        "max_completion_tokens": 131000,
+        "max_prompt_tokens": null,
+        "name": "Lambda | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.00000004",
+          "image": "0",
+          "prompt": "0.000000025",
+          "request": "0"
+        },
+        "provider_name": "Lambda",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs",
+          "response_format"
+        ]
+      },
+      {
+        "context_length": 16384,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "InferenceNet | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.00000003",
+          "image": "0",
+          "prompt": "0.00000003",
+          "request": "0"
+        },
+        "provider_name": "InferenceNet",
+        "quantization": "fp16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "top_k",
+          "min_p",
+          "logit_bias",
+          "top_logprobs"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "max_completion_tokens": 8000,
+        "max_prompt_tokens": null,
+        "name": "Groq | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.00000008",
+          "image": "0",
+          "prompt": "0.00000005",
+          "request": "0"
+        },
+        "provider_name": "Groq",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "response_format",
+          "top_logprobs",
+          "logprobs",
+          "logit_bias",
+          "seed"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Lepton | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.00000007",
+          "image": "0",
+          "prompt": "0.00000007",
+          "request": "0"
+        },
+        "provider_name": "Lepton",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Friendli | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.0000001",
+          "image": "0",
+          "prompt": "0.0000001",
+          "request": "0"
+        },
+        "provider_name": "Friendli",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "logprobs",
+          "top_logprobs",
+          "top_k",
+          "min_p",
+          "repetition_penalty",
+          "response_format",
+          "structured_outputs"
+        ]
+      },
+      {
+        "context_length": 32768,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Hyperbolic | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.0000001",
+          "image": "0",
+          "prompt": "0.0000001",
+          "request": "0"
+        },
+        "provider_name": "Hyperbolic",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "logprobs",
+          "top_logprobs",
+          "seed",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "repetition_penalty"
+        ]
+      },
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": 4096,
+        "name": "SambaNova | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.0000002",
+          "image": "0",
+          "prompt": "0.0000001",
+          "request": "0"
+        },
+        "provider_name": "SambaNova",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "stop"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Cloudflare | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.00000015",
+          "image": "0",
+          "prompt": "0.00000015",
+          "request": "0"
+        },
+        "provider_name": "Cloudflare",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "seed",
+          "repetition_penalty",
+          "frequency_penalty",
+          "presence_penalty"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Kluster | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.00000018",
+          "image": "0",
+          "prompt": "0.00000018",
+          "request": "0"
+        },
+        "provider_name": "Kluster",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "reasoning",
+          "include_reasoning",
+          "temperature"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Together | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.00000018",
+          "image": "0",
+          "prompt": "0.00000018",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Fireworks | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.0000002",
+          "image": "0",
+          "prompt": "0.0000002",
+          "request": "0"
+        },
+        "provider_name": "Fireworks",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "response_format",
+          "structured_outputs",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs"
+        ]
+      },
+      {
+        "context_length": 131072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Avian | meta-llama/llama-3.1-8b-instruct",
+        "pricing": {
+          "completion": "0.0000002",
+          "image": "0",
+          "prompt": "0.0000002",
+          "request": "0"
+        },
+        "provider_name": "Avian",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "response_format",
+          "seed"
+        ]
+      }
+    ],
+    "id": "meta-llama/llama-3.1-8b-instruct",
+    "name": "Meta: Llama 3.1 8B Instruct"
+  }
+}

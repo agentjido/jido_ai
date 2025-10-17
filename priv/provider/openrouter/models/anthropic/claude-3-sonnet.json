@@ -1,0 +1,25 @@
+{
+  "id": "anthropic/claude-3-sonnet",
+  "name": "Anthropic: Claude 3 Sonnet",
+  "description": "Claude 3 Sonnet is an ideal balance of intelligence and speed for enterprise workloads. Maximum utility at a lower price, dependable, balanced for scaled deployments.\n\nSee the launch announcement and benchmark results [here](https://www.anthropic.com/news/claude-3-family)\n\n#multimodal",
+  "capabilities": {
+    "code": false,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text+image->text",
+    "tokenizer": "Claude",
+    "instruct_type": null
+  },
+  "created": 1709596800,
+  "endpoints": []
+}

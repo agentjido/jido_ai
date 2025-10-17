@@ -1,0 +1,44 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "mistral",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1695859200,
+    "description": "A 7.3B parameter model that outperforms Llama 2 13B on all benchmarks, with optimizations for speed and context length.",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Together | mistralai/mistral-7b-instruct-v0.1",
+        "pricing": {
+          "completion": "0.0000002",
+          "image": "0",
+          "prompt": "0.0000002",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "mistralai/mistral-7b-instruct-v0.1",
+    "name": "Mistral: Mistral 7B Instruct v0.1"
+  }
+}

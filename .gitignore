@@ -10,6 +10,9 @@
 # Where third-party dependencies like ExDoc output generated docs.
 /doc/
 
+# Ignore .fetch files in case you like to edit your project deps locally.
+/.fetch
+
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 
@@ -17,26 +20,11 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-jido_workspace-*.tar
+jido_ai-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+.elixir_ls
 
-# Workspace status cache
-/.cache/
-
-# Env Vars
-.env
-.env*
-
-# Node.js artifacts from presentations
-presentations/*/node_modules/
-presentations/*/dist/
-presentations/*/.nuxt/
-presentations/*/.output/
-
-# Humanlayer Thoughts
-thoughts/
-
-# tmp
-shelf/
+# AI Docs
+PLAN.md

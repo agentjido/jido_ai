@@ -1,0 +1,37 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Other"
+    },
+    "created": 1738013808,
+    "description": "Sonar is lightweight, affordable, fast, and simple to use — now featuring citations and the ability to customize sources. It is designed for companies seeking to integrate lightweight question-and-answer features optimized for speed.",
+    "endpoints": [
+      {
+        "context_length": 127072,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Perplexity | perplexity/sonar",
+        "pricing": {
+          "completion": "0.000001",
+          "image": "0",
+          "prompt": "0.000001",
+          "request": "0.005"
+        },
+        "provider_name": "Perplexity",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "frequency_penalty",
+          "presence_penalty"
+        ]
+      }
+    ],
+    "id": "perplexity/sonar",
+    "name": "Perplexity: Sonar"
+  }
+}

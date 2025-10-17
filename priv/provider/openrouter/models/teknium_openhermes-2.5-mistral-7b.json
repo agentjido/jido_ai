@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "chatml",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1700438400,
+    "description": "A continuation of [OpenHermes 2 model](/models/teknium/openhermes-2-mistral-7b), trained on additional code datasets.\nPotentially the most interesting finding from training on a good ratio (est. of around 7-14% of the total dataset) of code instruction was that it has boosted several non-code benchmarks, including TruthfulQA, AGIEval, and GPT4All suite. It did however reduce BigBench benchmark score, but the net gain overall is significant.",
+    "endpoints": [
+      {
+        "context_length": 4096,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "Novita | teknium/openhermes-2.5-mistral-7b",
+        "pricing": {
+          "completion": "0.00000017",
+          "image": "0",
+          "prompt": "0.00000017",
+          "request": "0"
+        },
+        "provider_name": "Novita",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "top_k",
+          "min_p",
+          "repetition_penalty",
+          "logit_bias"
+        ]
+      }
+    ],
+    "id": "teknium/openhermes-2.5-mistral-7b",
+    "name": "OpenHermes 2.5 Mistral 7B"
+  }
+}

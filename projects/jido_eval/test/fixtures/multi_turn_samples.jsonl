@@ -1,2 +1,0 @@
-{"id": "conv_1", "conversation": [{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi!"}], "tags": {"turns": "2"}}
-{"id": "conv_2", "conversation": [{"role": "user", "content": "What's the weather?"}, {"role": "assistant", "content": "It's sunny!"}, {"role": "user", "content": "Perfect!"}], "reference": "Should provide weather info", "rubrics": {"accuracy": "good"}}

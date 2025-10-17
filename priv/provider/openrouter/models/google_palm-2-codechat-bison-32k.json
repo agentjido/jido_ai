@@ -1,0 +1,39 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "PaLM"
+    },
+    "created": 1698969600,
+    "description": "PaLM 2 fine-tuned for chatbot conversations that help with code-related questions.",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "Google | google/palm-2-codechat-bison-32k",
+        "pricing": {
+          "completion": "0.000002",
+          "image": "0",
+          "prompt": "0.000001",
+          "request": "0"
+        },
+        "provider_name": "Google",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "google/palm-2-codechat-bison-32k",
+    "name": "Google: PaLM 2 Code Chat 32k"
+  }
+}

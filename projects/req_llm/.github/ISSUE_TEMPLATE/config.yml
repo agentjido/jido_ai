@@ -1,8 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: Documentation
-    url: https://github.com/agentjido/req_llm/blob/main/README.md
-    about: Check the documentation for usage examples
-  - name: Discussions
-    url: https://github.com/agentjido/req_llm/discussions
-    about: Ask questions and discuss ideas

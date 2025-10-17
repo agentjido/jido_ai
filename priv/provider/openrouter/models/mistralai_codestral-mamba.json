@@ -1,0 +1,41 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1721347200,
+    "description": "A 7.3B parameter Mamba-based model designed for code and reasoning tasks.\n\n- Linear time inference, allowing for theoretically infinite sequence lengths\n- 256k token context window\n- Optimized for quick responses, especially beneficial for code productivity\n- Performs comparably to state-of-the-art transformer models in code and reasoning tasks\n- Available under the Apache 2.0 license for free use, modification, and distribution",
+    "endpoints": [
+      {
+        "context_length": 256000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Mistral | mistralai/codestral-mamba",
+        "pricing": {
+          "completion": "0.00000025",
+          "image": "0",
+          "prompt": "0.00000025",
+          "request": "0"
+        },
+        "provider_name": "Mistral",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "response_format",
+          "seed"
+        ]
+      }
+    ],
+    "id": "mistralai/codestral-mamba",
+    "name": "Mistral: Codestral Mamba"
+  }
+}

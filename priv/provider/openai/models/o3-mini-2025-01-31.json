@@ -1,0 +1,20 @@
+{
+  "id": "o3-mini-2025-01-31",
+  "name": "o3-mini-2025-01-31",
+  "description": "",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": false,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "created": 1738010200,
+  "owned_by": "system"
+}

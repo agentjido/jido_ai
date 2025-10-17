@@ -1,0 +1,31 @@
+{
+  "id": "gemini-2.0-flash",
+  "name": "Gemini 2.0 Flash",
+  "description": "Google's most advanced model in the Flash family, optimized for high-volume, real-time use cases. Delivers strong performance with low latency.",
+  "capabilities": {
+    "code": true,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "architecture": {
+    "modality": "text+image->text",
+    "tokenizer": "gemini",
+    "instruct_type": "gemini"
+  },
+  "created": 1717344000,
+  "endpoints": [
+    {
+      "name": "chat/completions",
+      "context_length": 8192,
+      "provider_name": "google",
+      "pricing": {
+        "prompt": 0.00007,
+        "completion": 0.00021
+      }
+    }
+  ]
+}

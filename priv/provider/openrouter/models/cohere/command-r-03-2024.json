@@ -1,0 +1,25 @@
+{
+  "id": "cohere/command-r-03-2024",
+  "name": "Cohere: Command R (03-2024)",
+  "description": "Command-R is a 35B parameter model that performs conversational language tasks at a higher quality, more reliably, and with a longer context than previous models. It can be used for complex workflows like code generation, retrieval augmented generation (RAG), tool use, and agents.\n\nRead the launch post [here](https://txt.cohere.com/command-r/).\n\nUse of this model is subject to Cohere's [Usage Policy](https://docs.cohere.com/docs/usage-policy) and [SaaS Agreement](https://cohere.com/saas-agreement).",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Cohere",
+    "instruct_type": null
+  },
+  "created": 1709341200,
+  "endpoints": []
+}

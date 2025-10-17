@@ -1,0 +1,123 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1738255409,
+    "description": "Mistral Small 3 is a 24B-parameter language model optimized for low-latency performance across common AI tasks. Released under the Apache 2.0 license, it features both pre-trained and instruction-tuned versions designed for efficient local deployment.\n\nThe model achieves 81% accuracy on the MMLU benchmark and performs competitively with larger models like Llama 3.3 70B and Qwen 32B, while operating at three times the speed on equivalent hardware. [Read the blog post about the model here.](https://mistral.ai/news/mistral-small-3/)",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "DeepInfra | mistralai/mistral-small-24b-instruct-2501",
+        "pricing": {
+          "completion": "0.00000014",
+          "image": "0",
+          "prompt": "0.00000007",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 32000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Mistral | mistralai/mistral-small-24b-instruct-2501",
+        "pricing": {
+          "completion": "0.0000003",
+          "image": "0",
+          "prompt": "0.0000001",
+          "request": "0"
+        },
+        "provider_name": "Mistral",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "response_format",
+          "structured_outputs",
+          "seed"
+        ]
+      },
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Together | mistralai/mistral-small-24b-instruct-2501",
+        "pricing": {
+          "completion": "0.0000008",
+          "image": "0",
+          "prompt": "0.0000008",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      },
+      {
+        "context_length": 32768,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Fireworks | mistralai/mistral-small-24b-instruct-2501",
+        "pricing": {
+          "completion": "0.0000009",
+          "image": "0",
+          "prompt": "0.0000009",
+          "request": "0"
+        },
+        "provider_name": "Fireworks",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "response_format",
+          "structured_outputs",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs"
+        ]
+      }
+    ],
+    "id": "mistralai/mistral-small-24b-instruct-2501",
+    "name": "Mistral: Mistral Small 3"
+  }
+}

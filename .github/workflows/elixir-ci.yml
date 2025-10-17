@@ -1,0 +1,66 @@
+name: Mix Test
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MIX_ENV: test
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        versions:
+          - elixir: "1.17"
+            otp: "27"
+          - elixir: "1.18"
+            otp: "27"
+          - elixir: "1.18"
+            otp: "28"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.versions.otp }}
+          elixir-version: ${{ matrix.versions.elixir }}
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check compilation warnings
+        run: mix compile --warnings-as-errors
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Check for unused dependencies
+        run: mix deps.unlock --check-unused
+
+      - name: Run Credo
+        run: mix credo
+
+      - name: Run tests with coverage
+        run: mix coveralls.github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

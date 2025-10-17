@@ -1,0 +1,41 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Cohere"
+    },
+    "created": 1710374400,
+    "description": "Command is an instruction-following conversational model that performs language tasks with high quality, more reliably and with a longer context than our base generative models.\n\nUse of this model is subject to Cohere's [Usage Policy](https://docs.cohere.com/docs/usage-policy) and [SaaS Agreement](https://cohere.com/saas-agreement).",
+    "endpoints": [
+      {
+        "context_length": 4096,
+        "max_completion_tokens": 4000,
+        "max_prompt_tokens": null,
+        "name": "Cohere | cohere/command",
+        "pricing": {
+          "completion": "0.0000019",
+          "image": "0",
+          "prompt": "0.00000095",
+          "request": "0"
+        },
+        "provider_name": "Cohere",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "seed",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "cohere/command",
+    "name": "Cohere: Command"
+  }
+}

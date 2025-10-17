@@ -1,0 +1,69 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Gemini"
+    },
+    "created": 1738768044,
+    "description": "Gemini 2.0 Pro Experimental is a bleeding-edge version of the Gemini 2.0 Pro model. Because it's currently experimental, it will be **heavily rate-limited** by Google.\n\nUsage of Gemini is subject to Google's [Gemini Terms of Use](https://ai.google.dev/terms).\n\n#multimodal",
+    "endpoints": [
+      {
+        "context_length": 2000000,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "Google | google/gemini-2.0-pro-exp-02-05:free",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "Google",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "response_format",
+          "structured_outputs"
+        ]
+      },
+      {
+        "context_length": 2000000,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "Google AI Studio | google/gemini-2.0-pro-exp-02-05:free",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "Google AI Studio",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "google/gemini-2.0-pro-exp-02-05:free",
+    "name": "Google: Gemini Pro 2.0 Experimental (free)"
+  }
+}

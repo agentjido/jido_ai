@@ -1,0 +1,25 @@
+{
+  "id": "perplexity/sonar-reasoning",
+  "name": "Perplexity: Sonar Reasoning",
+  "description": "Sonar Reasoning is a reasoning model provided by Perplexity based on [DeepSeek R1](/deepseek/deepseek-r1).\n\nIt allows developers to utilize long chain of thought with built-in web search. Sonar Reasoning is uncensored and hosted in US datacenters. ",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Other",
+    "instruct_type": null
+  },
+  "created": 1738131107,
+  "endpoints": []
+}

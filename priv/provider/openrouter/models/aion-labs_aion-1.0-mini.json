@@ -1,0 +1,36 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Other"
+    },
+    "created": 1738697107,
+    "description": "Aion-1.0-Mini 32B parameter model is a distilled version of the DeepSeek-R1 model, designed for strong performance in reasoning domains such as mathematics, coding, and logic. It is a modified variant of a FuseAI model that outperforms R1-Distill-Qwen-32B and R1-Distill-Llama-70B, with benchmark results available on its [Hugging Face page](https://huggingface.co/FuseAI/FuseO1-DeepSeekR1-QwQ-SkyT1-32B-Preview), independently replicated for verification.",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 32768,
+        "max_prompt_tokens": null,
+        "name": "AionLabs | aion-labs/aion-1.0-mini",
+        "pricing": {
+          "completion": "0.0000014",
+          "image": "0",
+          "prompt": "0.0000007",
+          "request": "0"
+        },
+        "provider_name": "AionLabs",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "reasoning",
+          "include_reasoning"
+        ]
+      }
+    ],
+    "id": "aion-labs/aion-1.0-mini",
+    "name": "AionLabs: Aion-1.0-Mini"
+  }
+}

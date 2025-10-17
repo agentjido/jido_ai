@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "chatml",
+      "modality": "text->text",
+      "tokenizer": "Other"
+    },
+    "created": 1711670400,
+    "description": "DBRX is a new open source large language model developed by Databricks. At 132B, it outperforms existing open source LLMs like Llama 2 70B and [Mixtral-8x7b](/models/mistralai/mixtral-8x7b) on standard industry benchmarks for language understanding, programming, math, and logic.\n\nIt uses a fine-grained mixture-of-experts (MoE) architecture. 36B parameters are active on any input. It was pre-trained on 12T tokens of text and code data. Compared to other open MoE models like Mixtral-8x7B and Grok-1, DBRX is fine-grained, meaning it uses a larger number of smaller experts.\n\nSee the launch announcement and benchmark results [here](https://www.databricks.com/blog/introducing-dbrx-new-state-art-open-llm).\n\n#moe",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Together | databricks/dbrx-instruct",
+        "pricing": {
+          "completion": "0.0000012",
+          "image": "0",
+          "prompt": "0.0000012",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "databricks/dbrx-instruct",
+    "name": "Databricks: DBRX 132B Instruct"
+  }
+}

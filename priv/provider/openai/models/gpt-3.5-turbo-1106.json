@@ -1,0 +1,20 @@
+{
+  "id": "gpt-3.5-turbo-1106",
+  "name": "gpt-3.5-turbo-1106",
+  "description": "",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "standard",
+    "description": "Balanced performance and cost"
+  },
+  "created": 1698959748,
+  "owned_by": "system"
+}

@@ -1,0 +1,37 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Nova"
+    },
+    "created": 1733437363,
+    "description": "Amazon Nova Lite 1.0 is a very low-cost multimodal model from Amazon that focused on fast processing of image, video, and text inputs to generate text output. Amazon Nova Lite can handle real-time customer interactions, document analysis, and visual question-answering tasks with high accuracy.\n\nWith an input context of 300K tokens, it can analyze multiple images or up to 30 minutes of video in a single input.",
+    "endpoints": [
+      {
+        "context_length": 300000,
+        "max_completion_tokens": 5120,
+        "max_prompt_tokens": null,
+        "name": "Amazon Bedrock | amazon/nova-lite-v1",
+        "pricing": {
+          "completion": "0.00000024",
+          "image": "0.00009",
+          "prompt": "0.00000006",
+          "request": "0"
+        },
+        "provider_name": "Amazon Bedrock",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "stop"
+        ]
+      }
+    ],
+    "id": "amazon/nova-lite-v1",
+    "name": "Amazon: Nova Lite 1.0"
+  }
+}

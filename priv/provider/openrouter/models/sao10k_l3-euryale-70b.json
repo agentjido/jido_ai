@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "llama3",
+      "modality": "text->text",
+      "tokenizer": "Llama3"
+    },
+    "created": 1718668800,
+    "description": "Euryale 70B v2.1 is a model focused on creative roleplay from [Sao10k](https://ko-fi.com/sao10k).\n\n- Better prompt adherence.\n- Better anatomy / spatial awareness.\n- Adapts much better to unique and custom formatting / reply formats.\n- Very creative, lots of unique swipes.\n- Is not restrictive during roleplays.",
+    "endpoints": [
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "DeepInfra | sao10k/l3-euryale-70b",
+        "pricing": {
+          "completion": "0.0000008",
+          "image": "0",
+          "prompt": "0.0000007",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      }
+    ],
+    "id": "sao10k/l3-euryale-70b",
+    "name": "Sao10k: Llama 3 Euryale 70B v2.1"
+  }
+}

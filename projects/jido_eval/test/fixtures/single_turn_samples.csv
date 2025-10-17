@@ -1,4 +1,0 @@
-id,user_input,retrieved_contexts,reference_contexts,response,multi_responses,reference,rubrics,tags
-sample_1,"What is AI?","context1;context2","ref1","AI is artificial intelligence","Response A;Response B","Ground truth","accuracy:high;relevance:good","category:tech;difficulty:easy"
-sample_2,"Hello","","","Hi there!","","Expected greeting","politeness:high","category:greeting"
-sample_3,"How are you?","context3","ref2;ref3","I'm doing well","Good;Fine;Great","I'm fine","tone:positive","category:personal;mood:friendly"
