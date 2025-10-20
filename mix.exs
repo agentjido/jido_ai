@@ -28,8 +28,13 @@ defmodule Jido.Ai.MixProject do
       consolidate_protocols: Mix.env() != :test,
 
       # Coverage
-      test_coverage: [tool: ExCoveralls, export: "cov"],
-      preferred_cli_env: [
+      test_coverage: [tool: ExCoveralls, export: "cov"]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
         coveralls: :test,
         "coveralls.github": :test,
         "coveralls.lcov": :test,
