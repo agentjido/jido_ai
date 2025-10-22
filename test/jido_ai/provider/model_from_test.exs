@@ -12,7 +12,13 @@ defmodule JidoTest.AI.Model.FromTest do
         base_url: "https://api.anthropic.com/v1"
       }
 
-      assert {:ok, ^original} = Model.from(original)
+      {:ok, result} = Model.from(original)
+
+      # The result should have all original fields plus the computed reqllm_id
+      assert result.provider == original.provider
+      assert result.model == original.model
+      assert result.base_url == original.base_url
+      assert result.reqllm_id == "anthropic:claude-3-5-haiku"
     end
 
     test "with a tuple: anthropic provider" do

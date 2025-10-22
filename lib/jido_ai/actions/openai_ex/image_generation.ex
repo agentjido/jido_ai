@@ -88,6 +88,9 @@ defmodule Jido.AI.Actions.OpenaiEx.ImageGeneration do
 
   require Logger
   alias Jido.AI.Model
+  alias Jido.AI.Provider.Google
+  alias Jido.AI.Provider.OpenRouter
+  alias OpenaiEx
   alias OpenaiEx.Images
 
   @valid_providers [:openai, :openrouter, :google]
@@ -207,22 +210,22 @@ defmodule Jido.AI.Actions.OpenaiEx.ImageGeneration do
 
   @spec maybe_add_base_url(OpenaiEx.t(), Model.t()) :: OpenaiEx.t()
   defp maybe_add_base_url(client, %Model{provider: :openrouter}) do
-    OpenaiEx.with_base_url(client, Jido.AI.Provider.OpenRouter.base_url())
+    OpenaiEx.with_base_url(client, OpenRouter.base_url())
   end
 
   defp maybe_add_base_url(client, %Model{provider: :google}) do
-    OpenaiEx.with_base_url(client, Jido.AI.Provider.Google.base_url())
+    OpenaiEx.with_base_url(client, Google.base_url())
   end
 
   defp maybe_add_base_url(client, _), do: client
 
   @spec maybe_add_headers(OpenaiEx.t(), Model.t()) :: OpenaiEx.t()
   defp maybe_add_headers(client, %Model{provider: :openrouter}) do
-    OpenaiEx.with_additional_headers(client, Jido.AI.Provider.OpenRouter.request_headers([]))
+    OpenaiEx.with_additional_headers(client, OpenRouter.request_headers([]))
   end
 
   defp maybe_add_headers(client, %Model{provider: :google}) do
-    OpenaiEx.with_additional_headers(client, Jido.AI.Provider.Google.request_headers([]))
+    OpenaiEx.with_additional_headers(client, Google.request_headers([]))
   end
 
   defp maybe_add_headers(client, _), do: client

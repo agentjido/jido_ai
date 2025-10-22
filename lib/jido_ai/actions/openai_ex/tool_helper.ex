@@ -70,6 +70,23 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelper do
     * `{:error, reason}` - if the tool call cannot be handled
   """
   @spec handle_tool_call(map(), [module()]) :: {:ok, term()} | {:error, term()}
+  # Handle OpenAI format with function key
+  def handle_tool_call(
+        %{function: %{name: name, arguments: arguments}} = _tool_call,
+        available_actions
+      ) do
+    with {:ok, arguments} <- Jason.decode(arguments),
+         {:ok, action} <- find_action(name, available_actions),
+         {:ok, params} <- convert_params(arguments, action),
+         {:ok, result} <- execute_action(action, params) do
+      {:ok, result}
+    else
+      {:error, reason} -> {:error, reason}
+      error -> {:error, "Failed to handle tool call: #{inspect(error)}"}
+    end
+  end
+
+  # Handle flat format (legacy)
   def handle_tool_call(%{name: name, arguments: arguments} = _tool_call, available_actions) do
     with {:ok, arguments} <- Jason.decode(arguments),
          {:ok, action} <- find_action(name, available_actions),
@@ -104,8 +121,16 @@ defmodule Jido.AI.Actions.OpenaiEx.ToolHelper do
       %{tool_calls: tool_calls} when is_list(tool_calls) ->
         results =
           Enum.map(tool_calls, fn tool_call ->
+            # Extract tool name from either OpenAI format or flat format
+            tool_name =
+              case tool_call do
+                %{function: %{name: name}} -> name
+                %{name: name} -> name
+                _ -> "unknown"
+              end
+
             case handle_tool_call(tool_call, available_actions) do
-              {:ok, result} -> {:ok, %{tool: tool_call.name, result: result}}
+              {:ok, result} -> {:ok, %{tool: tool_name, result: result}}
               error -> error
             end
           end)

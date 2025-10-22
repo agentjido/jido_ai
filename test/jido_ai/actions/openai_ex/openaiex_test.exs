@@ -1,27 +1,22 @@
 defmodule JidoTest.AI.Actions.OpenaiExTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   use Mimic
   require Logger
+  alias Jido.Actions.Arithmetic.Add
   alias Jido.AI.Actions.OpenaiEx, as: OpenaiExAction
   alias Jido.AI.Model
   alias Jido.AI.Prompt
-  alias OpenaiEx.Chat
-  alias OpenaiEx.ChatMessage
-  alias Jido.Actions.Arithmetic.Add
-
-  # Define test response model at module level
-  defmodule TestResponse do
-    use Ecto.Schema
-
-    embedded_schema do
-      field(:message, :string)
-    end
-  end
 
   @moduletag :capture_log
 
   # Add global mock setup
   setup :set_mimic_global
+
+  setup do
+    # Copy ReqLLM for mocking since the implementation now uses ReqLLM
+    copy(ReqLLM)
+    :ok
+  end
 
   describe "run/2" do
     setup do
@@ -53,11 +48,9 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
       params: params,
       context: context
     } do
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
-        {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
+      # Mock ReqLLM since the implementation now uses ReqLLM
+      expect(ReqLLM, :generate_text, fn "openai:gpt-4", _messages, _opts ->
+        {:ok, %{text: "Test response", usage: %{prompt_tokens: 10, completion_tokens: 5}}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
@@ -75,11 +68,9 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
         max_tokens: 1024
       }
 
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
-        {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
+      # Mock ReqLLM since the implementation now uses ReqLLM
+      expect(ReqLLM, :generate_text, fn "openai:gpt-4", _messages, _opts ->
+        {:ok, %{text: "Test response", usage: %{prompt_tokens: 10, completion_tokens: 5}}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
@@ -106,11 +97,9 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
         max_tokens: 1024
       }
 
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
-        {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
+      # Mock ReqLLM since the implementation now uses ReqLLM
+      expect(ReqLLM, :generate_text, fn "openai:gpt-4", _messages, _opts ->
+        {:ok, %{text: "Test response", usage: %{prompt_tokens: 10, completion_tokens: 5}}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
@@ -134,11 +123,9 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
           seed: 123
         })
 
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
-        {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
+      # Mock ReqLLM since the implementation now uses ReqLLM
+      expect(ReqLLM, :generate_text, fn "openai:gpt-4", _messages, _opts ->
+        {:ok, %{text: "Test response", usage: %{prompt_tokens: 10, completion_tokens: 5}}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
@@ -149,15 +136,19 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
       # Add streaming parameter
       params = Map.put(params, :stream, true)
 
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
+      # Mock ReqLLM.stream_text (not generate_text) for streaming
+      expect(ReqLLM, :stream_text, fn "openai:gpt-4", _messages, opts ->
+        # Verify streaming is enabled
+        assert opts[:stream] == true
 
-      # Use create instead of create_stream
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
-        {:ok,
-         Stream.map(["Hello", ", ", "world", "!"], fn chunk ->
-           %{choices: [%{delta: %{content: chunk}}]}
-         end)}
+        # Return a stream that yields chunks in ReqLLM format
+        # (get_chunk_content expects delta at chunk level, not under choices)
+        stream =
+          Stream.map(["Hello", ", ", "world", "!"], fn chunk ->
+            %{delta: %{content: chunk, role: "assistant"}}
+          end)
+
+        {:ok, stream}
       end)
 
       {:ok, stream} = OpenaiExAction.run(params, context)
@@ -166,7 +157,8 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
         stream
         |> Enum.to_list()
         |> Enum.map(fn chunk ->
-          chunk.choices |> List.first() |> Map.get(:delta) |> Map.get(:content)
+          # ReqLlmBridge transforms chunks to have delta directly
+          chunk.delta.content
         end)
 
       assert chunks == ["Hello", ", ", "world", "!"]
@@ -185,13 +177,11 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
         | model: model
       }
 
-      # Mock the OpenRouter client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-      expect(OpenaiEx, :with_base_url, fn client, _url -> client end)
-      expect(OpenaiEx, :with_additional_headers, fn client, _headers -> client end)
-
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
-        {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
+      # Mock ReqLLM for OpenRouter
+      expect(ReqLLM, :generate_text, fn "openrouter:anthropic/claude-3-sonnet",
+                                        _messages,
+                                        _opts ->
+        {:ok, %{text: "Test response", usage: %{prompt_tokens: 10, completion_tokens: 5}}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
@@ -202,50 +192,17 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
       # Add tool configuration to params
       params = Map.put(params, :tools, [Add])
 
-      # Log the tool conversion result
-      Logger.info("Add.to_tool(): #{inspect(Add.to_tool())}")
+      # Mock ReqLLM with tools
+      expect(ReqLLM, :generate_text, fn "openai:gpt-4", _messages, opts ->
+        # Verify tools are passed
+        assert is_list(opts[:tools])
+        assert length(opts[:tools]) == 1
 
-      # Create expected chat request with tools
-      expected_messages = [
-        ChatMessage.user("Hello, how are you?"),
-        ChatMessage.assistant("I'm doing well, thank you!")
-      ]
+        # Verify tool is a ReqLLM.Tool struct (converted from OpenAI format)
+        tool = List.first(opts[:tools])
+        assert is_struct(tool, ReqLLM.Tool)
 
-      expected_req =
-        Chat.Completions.new(
-          model: "gpt-4",
-          messages: expected_messages,
-          temperature: 0.7,
-          max_tokens: 1024
-        )
-        |> Map.put(:tools, [
-          %{
-            type: "function",
-            function: %{
-              name: "add",
-              description: "Adds two numbers",
-              parameters: %{
-                type: "object",
-                required: ["value", "amount"],
-                properties: %{
-                  "amount" => %{type: "string", description: "The second number to add"},
-                  "value" => %{type: "string", description: "The first number to add"}
-                }
-              }
-            }
-          }
-        ])
-
-      # Log the expected request
-      Logger.info("Expected request: #{inspect(expected_req)}")
-
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, req ->
-        # Log the actual request
-        Logger.info("Actual request: #{inspect(req)}")
-        {:ok, %{choices: [%{message: %{content: "Test response"}}]}}
+        {:ok, %{text: "Test response", usage: %{prompt_tokens: 10, completion_tokens: 5}}}
       end)
 
       assert {:ok, %{content: "Test response", tool_results: []}} =
@@ -256,62 +213,26 @@ defmodule JidoTest.AI.Actions.OpenaiExTest do
       # Add tool configuration to params
       params = Map.put(params, :tools, [Add])
 
-      # Log the tool conversion result
-      Logger.info("Add.to_tool(): #{inspect(Add.to_tool())}")
+      # Mock ReqLLM to return a response with tool calls in OpenAI format
+      expect(ReqLLM, :generate_text, fn "openai:gpt-4", _messages, opts ->
+        # Verify tools are passed
+        assert is_list(opts[:tools])
 
-      # Create expected chat request with tools
-      expected_messages = [
-        ChatMessage.user("Hello, how are you?"),
-        ChatMessage.assistant("I'm doing well, thank you!")
-      ]
-
-      expected_req =
-        Chat.Completions.new(
-          model: "gpt-4",
-          messages: expected_messages,
-          temperature: 0.7,
-          max_tokens: 1024
-        )
-        |> Map.put(:tools, [
-          %{
-            type: "function",
-            function: %{
-              name: "add",
-              description: "Adds two numbers",
-              parameters: %{
-                type: "object",
-                required: ["value", "amount"],
-                properties: %{
-                  "amount" => %{type: "string", description: "The second number to add"},
-                  "value" => %{type: "string", description: "The first number to add"}
-                }
-              }
-            }
-          }
-        ])
-
-      # Log the expected request
-      Logger.info("Expected request: #{inspect(expected_req)}")
-
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Chat.Completions, :create, fn _client, _req ->
+        # Return response with tool calls in OpenAI format (with function key)
         {:ok,
          %{
-           choices: [
+           text: "Let me calculate that for you.",
+           tool_calls: [
              %{
-               message: %{
-                 content: "Let me calculate that for you.",
-                 tool_calls: [
-                   %{
-                     name: "add",
-                     arguments: Jason.encode!(%{"value" => "5", "amount" => "3"})
-                   }
-                 ]
+               id: "call_abc123",
+               type: "function",
+               function: %{
+                 name: "add",
+                 arguments: "{\"value\":\"5\",\"amount\":\"3\"}"
                }
              }
-           ]
+           ],
+           usage: %{prompt_tokens: 10, completion_tokens: 5}
          }}
       end)
 

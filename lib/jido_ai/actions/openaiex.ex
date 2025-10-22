@@ -82,11 +82,13 @@ defmodule Jido.AI.Actions.OpenaiEx do
     ]
 
   require Logger
+  alias Jido.AI.Actions.OpenaiEx.ToolHelper
   alias Jido.AI.Model
   alias Jido.AI.Prompt
+  alias Jido.AI.ReqLlmBridge
   alias OpenaiEx.Chat
   alias OpenaiEx.ChatMessage
-  alias Jido.AI.Actions.OpenaiEx.ToolHelper
+  alias ReqLLM.Provider.Generated.ValidProviders
 
   @valid_providers [:openai, :openrouter, :google]
 
@@ -283,105 +285,232 @@ defmodule Jido.AI.Actions.OpenaiEx do
   defp maybe_add_param(req, key, value), do: Map.put(req, key, value)
 
   defp make_request(model, chat_req) do
-    client =
-      OpenaiEx.new(model.api_key)
-      |> maybe_add_base_url(model)
-      |> maybe_add_headers(model)
-      |> maybe_remove_auth_header(model)
-
-    Logger.debug("Making request with client: #{inspect(client)}", module: __MODULE__)
+    Logger.debug("Making request with ReqLLM", module: __MODULE__)
     Logger.debug("Chat request: #{inspect(chat_req)}", module: __MODULE__)
 
-    case model.provider do
-      :google ->
-        make_google_request(model, chat_req, client)
+    # Convert OpenaiEx ChatMessage format to Jido format for ReqLLM
+    messages = convert_chat_messages_to_jido_format(chat_req.messages)
 
-      _ ->
-        Chat.Completions.create(client, chat_req)
-    end
-  end
+    # Build ReqLLM options from chat_req
+    opts = build_req_llm_options_from_chat_req(chat_req, model)
 
-  defp make_google_request(model, chat_req, client) do
-    google_req = %{
-      contents: [
-        %{
-          parts: [
-            %{
-              text: hd(chat_req.messages).content
-            }
-          ]
-        }
-      ],
-      generationConfig: %{
-        temperature: chat_req.temperature,
-        maxOutputTokens: chat_req.max_tokens
-      }
-    }
+    # Use ReqLLM with the model's reqllm_id
+    case ReqLLM.generate_text(model.reqllm_id, messages, opts) do
+      {:ok, response} ->
+        # Convert ReqLLM response through bridge first, then to OpenaiEx format
+        converted = ReqLlmBridge.convert_response(response)
+        {:ok, convert_to_openai_response_format(converted)}
 
-    url = "#{model.base_url}#{model.model}:generateContent"
-    Logger.debug("Google URL: #{url}", module: __MODULE__)
-    Logger.debug("Google request: #{inspect(google_req)}", module: __MODULE__)
-
-    case Req.post(url, json: google_req, headers: client._http_headers) do
-      {:ok, %{status: 200, body: body}} ->
-        {:ok, %{choices: [%{message: %{content: extract_google_response(body)}}]}}
-
-      {:ok, %{status: status, body: body}} ->
-        {:error, %{reason: "Google API error", details: %{status: status, body: body}}}
-
-      {:error, reason} ->
-        {:error, %{reason: "Google request failed", details: reason}}
+      {:error, error} ->
+        # Map ReqLLM errors to existing error patterns
+        ReqLlmBridge.map_error({:error, error})
     end
   end
 
   defp make_streaming_request(model, chat_req) do
-    client =
-      OpenaiEx.new(model.api_key)
-      |> maybe_add_base_url(model)
-      |> maybe_add_headers(model)
-
-    Logger.debug("Making streaming request with client: #{inspect(client)}", module: __MODULE__)
+    Logger.debug("Making streaming request with ReqLLM", module: __MODULE__)
     Logger.debug("Chat request: #{inspect(chat_req)}", module: __MODULE__)
 
-    Chat.Completions.create(client, chat_req)
+    # Convert OpenaiEx ChatMessage format to Jido format for ReqLLM
+    messages = convert_chat_messages_to_jido_format(chat_req.messages)
+
+    # Build ReqLLM options from chat_req with streaming enabled
+    opts = build_req_llm_options_from_chat_req(chat_req, model) |> Keyword.put(:stream, true)
+
+    # Use ReqLLM streaming with the model's reqllm_id
+    case ReqLLM.stream_text(model.reqllm_id, messages, opts) do
+      {:ok, stream} ->
+        # Convert ReqLLM stream to Jido AI compatible format using bridge functions
+        converted_stream = ReqLlmBridge.convert_streaming_response(stream)
+        {:ok, converted_stream}
+
+      {:error, error} ->
+        # Map ReqLLM streaming errors to existing error patterns
+        ReqLlmBridge.map_streaming_error({:error, error})
+    end
   end
 
-  defp extract_google_response(%{
-         "candidates" => [%{"content" => %{"parts" => [%{"text" => text}]}} | _]
-       }) do
-    text
-  end
+  # Helper functions for ReqLLM integration
 
-  defp extract_google_response(body) do
-    Logger.error("Unexpected Google API response: #{inspect(body)}", module: __MODULE__)
-    {:error, %{reason: "Unexpected response format", details: inspect(body)}}
-  end
+  defp convert_chat_messages_to_jido_format(chat_messages) do
+    Enum.map(chat_messages, fn
+      %{role: role, content: content} ->
+        %{role: role, content: content}
 
-  defp maybe_add_base_url(client, %Model{provider: :openrouter}) do
-    OpenaiEx.with_base_url(client, Jido.AI.Provider.OpenRouter.base_url())
-  end
+      # Handle OpenaiEx ChatMessage structs
+      %module{} = msg when module in [ChatMessage] ->
+        %{role: msg.role, content: msg.content}
 
-  defp maybe_add_base_url(client, %Model{provider: :google}) do
-    OpenaiEx.with_base_url(client, Jido.AI.Provider.Google.base_url())
-  end
-
-  defp maybe_add_base_url(client, _), do: client
-
-  defp maybe_add_headers(client, %Model{provider: :openrouter}) do
-    OpenaiEx.with_additional_headers(client, Jido.AI.Provider.OpenRouter.request_headers([]))
-  end
-
-  defp maybe_add_headers(client, %Model{provider: :google}) do
-    OpenaiEx.with_additional_headers(client, Jido.AI.Provider.Google.request_headers([]))
-  end
-
-  defp maybe_add_headers(client, _), do: client
-
-  defp maybe_remove_auth_header(client, %Model{provider: :google}) do
-    Map.update!(client, :_http_headers, fn headers ->
-      Enum.reject(headers, fn {key, _} -> key == "Authorization" end)
+      # Handle other message formats
+      msg when is_map(msg) ->
+        %{role: msg[:role] || msg["role"], content: msg[:content] || msg["content"]}
     end)
   end
 
-  defp maybe_remove_auth_header(client, _), do: client
+  defp build_req_llm_options_from_chat_req(chat_req, model) do
+    opts = []
+
+    # Set API key via JidoKeys if available
+    if model.api_key do
+      provider_atom = extract_provider_from_reqllm_id(model.reqllm_id)
+
+      if provider_atom do
+        env_var_name = ReqLLM.Keys.env_var_name(provider_atom)
+        JidoKeys.put(env_var_name, model.api_key)
+      end
+    end
+
+    # Add other parameters from chat_req
+    opts =
+      if Map.get(chat_req, :temperature),
+        do: [{:temperature, Map.get(chat_req, :temperature)} | opts],
+        else: opts
+
+    opts =
+      if Map.get(chat_req, :max_tokens),
+        do: [{:max_tokens, Map.get(chat_req, :max_tokens)} | opts],
+        else: opts
+
+    opts =
+      if Map.get(chat_req, :top_p), do: [{:top_p, Map.get(chat_req, :top_p)} | opts], else: opts
+
+    opts =
+      if Map.get(chat_req, :frequency_penalty),
+        do: [{:frequency_penalty, Map.get(chat_req, :frequency_penalty)} | opts],
+        else: opts
+
+    opts =
+      if Map.get(chat_req, :presence_penalty),
+        do: [{:presence_penalty, Map.get(chat_req, :presence_penalty)} | opts],
+        else: opts
+
+    opts = if Map.get(chat_req, :stop), do: [{:stop, Map.get(chat_req, :stop)} | opts], else: opts
+
+    opts =
+      if Map.get(chat_req, :tools),
+        do: [{:tools, convert_tools_for_reqllm(Map.get(chat_req, :tools))} | opts],
+        else: opts
+
+    opts =
+      if Map.get(chat_req, :tool_choice),
+        do: [{:tool_choice, Map.get(chat_req, :tool_choice)} | opts],
+        else: opts
+
+    opts
+  end
+
+  defp extract_provider_from_reqllm_id(reqllm_id) do
+    provider_str =
+      reqllm_id
+      |> String.split(":")
+      |> hd()
+
+    # Create a safe string-to-atom mapping from ReqLLM's valid providers
+    # This avoids creating arbitrary atoms from user input
+    valid_providers =
+      ValidProviders.list()
+      |> Map.new(fn atom -> {to_string(atom), atom} end)
+
+    Map.get(valid_providers, provider_str)
+  end
+
+  defp convert_tools_for_reqllm(tools) when is_list(tools) do
+    # Convert OpenAI format tool maps to ReqLLM.Tool structs
+    Enum.map(tools, fn tool ->
+      case tool do
+        %{type: "function", function: func} ->
+          # Use ReqLLM.Tool.new/1 to create proper tool structs
+          {:ok, reqllm_tool} =
+            ReqLLM.Tool.new(
+              name: func[:name] || func["name"],
+              description: func[:description] || func["description"],
+              parameter_schema:
+                convert_parameters_to_schema(func[:parameters] || func["parameters"]),
+              callback: fn _args -> {:ok, "Tool not executable in test"} end
+            )
+
+          reqllm_tool
+
+        # Already a ReqLLM.Tool struct
+        %ReqLLM.Tool{} = t ->
+          t
+
+        # Fallback for other formats
+        _ ->
+          tool
+      end
+    end)
+  end
+
+  defp convert_parameters_to_schema(nil), do: []
+
+  defp convert_parameters_to_schema(params) when is_map(params) do
+    # Convert OpenAI parameter format to NimbleOptions format
+    # OpenAI format: %{type: "object", properties: %{...}, required: [...]}
+    # NimbleOptions format: keyword list
+    properties = params[:properties] || params["properties"] || %{}
+    required = params[:required] || params["required"] || []
+
+    Enum.map(properties, fn {key, prop} ->
+      key_atom = if is_binary(key), do: String.to_atom(key), else: key
+      type = get_nimble_type(prop[:type] || prop["type"])
+      is_required = key in required || to_string(key) in required
+
+      opts = [
+        type: type,
+        required: is_required,
+        doc: prop[:description] || prop["description"] || ""
+      ]
+
+      {key_atom, opts}
+    end)
+  end
+
+  defp get_nimble_type("string"), do: :string
+  defp get_nimble_type("integer"), do: :integer
+  defp get_nimble_type("number"), do: :float
+  defp get_nimble_type("boolean"), do: :boolean
+  defp get_nimble_type("array"), do: {:list, :any}
+  defp get_nimble_type("object"), do: :map
+  defp get_nimble_type(_), do: :any
+
+  defp convert_to_openai_response_format(%{content: content} = response) do
+    # Convert ReqLLM response to OpenAI format expected by ToolHelper
+    %{
+      choices: [
+        %{
+          message: %{
+            content: content,
+            role: "assistant",
+            tool_calls: Map.get(response, :tool_calls, [])
+          },
+          finish_reason: Map.get(response, :finish_reason, "stop"),
+          index: 0
+        }
+      ],
+      usage: Map.get(response, :usage, %{}),
+      model: "unknown"
+    }
+  end
+
+  defp convert_to_openai_response_format(response) when is_map(response) do
+    # Handle other ReqLLM response formats
+    content = response[:content] || response["content"] || ""
+
+    %{
+      choices: [
+        %{
+          message: %{
+            content: content,
+            role: "assistant",
+            tool_calls: response[:tool_calls] || response["tool_calls"] || []
+          },
+          finish_reason: response[:finish_reason] || response["finish_reason"] || "stop",
+          index: 0
+        }
+      ],
+      usage: response[:usage] || response["usage"] || %{},
+      model: "unknown"
+    }
+  end
 end

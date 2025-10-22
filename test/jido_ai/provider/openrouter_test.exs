@@ -2,8 +2,8 @@ defmodule Jido.AI.Provider.OpenRouterTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.Provider.OpenRouter
   alias Jido.AI.Keyring
+  alias Jido.AI.Provider.OpenRouter
 
   @moduletag :capture_log
   @moduletag :tmp_dir
@@ -21,6 +21,9 @@ defmodule Jido.AI.Provider.OpenRouterTest do
     models_dir = Path.join(provider_dir, "models")
     File.mkdir_p!(provider_dir)
     File.mkdir_p!(models_dir)
+
+    # Copy modules for mocking
+    copy(Jido.AI.Model.Registry)
 
     # Mock Dotenvy.source! to return an empty map by default
     stub(Dotenvy, :source!, fn _sources -> %{} end)
@@ -74,117 +77,75 @@ defmodule Jido.AI.Provider.OpenRouterTest do
       assert headers["Content-Type"] == "application/json"
     end
 
-    test "adds API key from options" do
+    test "headers handled internally by ReqLLM" do
+      # Authorization headers are now handled internally by ReqLLM
+      # This function only returns base headers for compatibility
       headers = OpenRouter.request_headers(api_key: "test-key")
-      assert headers["Authorization"] == "Bearer test-key"
+
+      # Should not include Authorization - that's handled by ReqLLM
+      refute Map.has_key?(headers, "Authorization")
+
+      # But should include the base headers
+      assert headers["HTTP-Referer"] == "https://agentjido.xyz"
+      assert headers["X-Title"] == "Jido AI"
     end
 
-    test "adds API key from environment" do
-      # Mock Keyring.get to return our test key
-      expect(Keyring, :get, fn :openrouter_api_key -> "env-key" end)
-
+    test "environment keys handled by ReqLLM" do
+      # Environment-based authentication is now handled by ReqLLM/Keyring
+      # This function just returns base headers
       headers = OpenRouter.request_headers([])
-      assert headers["Authorization"] == "Bearer env-key"
+
+      # Should not include Authorization
+      refute Map.has_key?(headers, "Authorization")
     end
   end
 
   describe "list_models/1" do
-    test "fetches and processes models from API" do
-      mock_models = %{
-        "data" => [
-          %{
-            "id" => "anthropic/claude-3-opus",
-            "name" => "Claude 3 Opus",
-            "description" => "Most powerful Claude model",
-            "created" => 1_234_567_890,
-            "architecture" => %{
-              "modality" => "text",
-              "instruct_type" => "claude",
-              "tokenizer" => "claude"
-            },
-            "endpoints" => [
-              %{
-                "name" => "claude-3-opus",
-                "provider_name" => "anthropic",
-                "context_length" => 200_000,
-                "pricing" => %{
-                  "prompt" => 0.015,
-                  "completion" => 0.075
-                }
-              }
-            ]
-          }
-        ]
-      }
+    test "fetches models from Registry" do
+      # Now delegates to Model Registry which gets models from ReqLLM
+      # The registry should have OpenRouter models available
+      assert {:ok, models} = OpenRouter.list_models()
 
-      Req
-      |> expect(:get, fn _url, _opts ->
-        {:ok, %{status: 200, body: mock_models}}
-      end)
+      # Should return some models from the registry
+      assert is_list(models)
+      assert length(models) > 0
 
-      assert {:ok, models} = OpenRouter.list_models(refresh: true)
-      assert length(models) == 1
+      # Models should be properly formatted
       model = List.first(models)
-      assert model.id == "anthropic/claude-3-opus"
-      assert model.name == "Claude 3 Opus"
-      assert model.capabilities.chat == true
+      assert is_struct(model, Jido.AI.Model)
+      assert model.provider == :openrouter
     end
 
-    test "handles API errors gracefully" do
-      Req
-      |> expect(:get, fn _url, _opts ->
-        {:error, "Connection failed"}
+    test "handles registry errors gracefully" do
+      # Mock the Registry to return an error
+      alias Jido.AI.Model.Registry
+
+      expect(Registry, :list_models, fn :openrouter ->
+        {:error, "Registry unavailable"}
       end)
 
-      assert {:error, _} = OpenRouter.list_models(refresh: true)
+      assert {:error, _} = OpenRouter.list_models()
     end
   end
 
   describe "model/2" do
-    test "fetches specific model details", %{test_dir: tmp_dir} do
-      # Create the nested directory structure for the model
-      model = "anthropic/claude-3-opus"
-      model_dir_path = Path.join([tmp_dir, "openrouter", "models", Path.dirname(model)])
-      File.mkdir_p!(model_dir_path)
+    test "fetches specific model from Registry" do
+      # Now delegates to Model Registry which gets model from ReqLLM
+      # First, get a list of available models to find a real one
+      {:ok, models} = OpenRouter.list_models()
+      real_model = List.first(models)
 
-      mock_model = %{
-        "data" => %{
-          "id" => model,
-          "name" => "Claude 3 Opus",
-          "description" => "Most powerful Claude model",
-          "created" => 1_234_567_890,
-          "architecture" => %{
-            "modality" => "text",
-            "instruct_type" => "claude"
-          },
-          "endpoints" => [
-            %{
-              "name" => "claude-3-opus",
-              "provider_name" => "anthropic",
-              "context_length" => 200_000
-            }
-          ]
-        }
-      }
-
-      Req
-      |> expect(:get, fn _url, _opts ->
-        {:ok, %{status: 200, body: mock_model}}
-      end)
-
-      assert {:ok, model_result} = OpenRouter.model(model, refresh: true)
-      assert model_result.name == "Claude 3 Opus"
-      assert model_result.capabilities.chat == true
-      assert model_result.id == model
+      # Fetch that specific model
+      assert {:ok, model_result} = OpenRouter.model(real_model.id)
+      assert model_result.id == real_model.id
+      assert model_result.provider == :openrouter
+      assert is_struct(model_result, Jido.AI.Model)
     end
 
-    test "handles model fetch errors" do
-      Req
-      |> expect(:get, fn _url, _opts ->
-        {:ok, %{status: 404, body: %{"error" => "Model not found"}}}
-      end)
-
-      assert {:error, _} = OpenRouter.model("invalid/model", refresh: true)
+    test "handles model not found errors" do
+      # Try to fetch a model that doesn't exist in the registry
+      assert {:error, reason} = OpenRouter.model("nonexistent/invalid-model-12345")
+      assert reason =~ "Model not found"
     end
   end
 end

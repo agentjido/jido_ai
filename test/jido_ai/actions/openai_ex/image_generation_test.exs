@@ -5,6 +5,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ImageGenerationTest do
   alias Jido.AI.Actions.OpenaiEx.ImageGeneration
   alias Jido.AI.Model
   alias OpenaiEx
+  alias OpenaiEx.Images.Generate
 
   @moduletag :capture_log
 
@@ -39,7 +40,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ImageGenerationTest do
     } do
       # Create expected request
       expected_req =
-        OpenaiEx.Images.Generate.new(
+        Generate.new(
           model: "dall-e-3",
           prompt: "A beautiful sunset over the ocean"
         )
@@ -68,7 +69,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ImageGenerationTest do
 
       # Create expected request
       expected_req =
-        OpenaiEx.Images.Generate.new(
+        Generate.new(
           model: "dall-e-3",
           prompt: "A beautiful sunset over the ocean",
           n: 2
@@ -107,7 +108,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ImageGenerationTest do
 
       # Create expected request
       expected_req =
-        OpenaiEx.Images.Generate.new(
+        Generate.new(
           model: "dall-e-3",
           prompt: "A beautiful sunset over the ocean",
           size: "1024x1792",
@@ -147,7 +148,7 @@ defmodule JidoTest.AI.Actions.OpenaiEx.ImageGenerationTest do
 
       # Create expected request
       expected_req =
-        OpenaiEx.Images.Generate.new(
+        Generate.new(
           model: "stability/sdxl",
           prompt: "A beautiful sunset over the ocean"
         )

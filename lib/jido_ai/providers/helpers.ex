@@ -12,6 +12,7 @@ defmodule Jido.AI.Provider.Helpers do
 
   require Logger
   alias Jido.AI.Keyring
+  alias Jido.AI.Provider
 
   defp model_patterns do
     [
@@ -72,7 +73,7 @@ defmodule Jido.AI.Provider.Helpers do
   Gets the path to the models file for a provider.
   """
   def get_models_file_path(provider_path) do
-    base_dir = Jido.AI.Provider.base_dir()
+    base_dir = Provider.base_dir()
     provider_dir = Path.join(base_dir, provider_path)
     Path.join(provider_dir, "models.json")
   end
@@ -81,7 +82,7 @@ defmodule Jido.AI.Provider.Helpers do
   Gets the path to a specific model file for a provider.
   """
   def get_model_file_path(provider_path, model) do
-    base_dir = Jido.AI.Provider.base_dir()
+    base_dir = Provider.base_dir()
     provider_dir = Path.join(base_dir, provider_path)
     model_dir = Path.join(provider_dir, "models")
     Path.join(model_dir, "#{model}.json")
@@ -114,11 +115,9 @@ defmodule Jido.AI.Provider.Helpers do
 
   # Helper function to parse JSON with proper error handling
   defp parse_json(json) do
-    try do
-      Jason.decode(json)
-    rescue
-      e -> {:error, "Invalid JSON: #{inspect(e)}"}
-    end
+    Jason.decode(json)
+  rescue
+    e -> {:error, "Invalid JSON: #{inspect(e)}"}
   end
 
   @doc """

@@ -1,5 +1,5 @@
 defmodule JidoTest.AI.ProviderTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   alias Jido.AI.Provider
 
   describe "base_dir/0" do

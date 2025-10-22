@@ -29,9 +29,16 @@ defmodule Jido.AI.Provider.GoogleTest do
     assert definition.name == "Google"
   end
 
-  test "request_headers/2 includes proper API key in headers" do
+  test "request_headers/2 returns base headers" do
+    # API key handling is now done by ReqLLM internally
+    # This function returns base headers for compatibility
     headers = Google.request_headers(api_key: @test_api_key)
-    assert headers["x-goog-api-key"] == @test_api_key
+
+    # Should not include API key - that's handled by ReqLLM
+    refute Map.has_key?(headers, "x-goog-api-key")
+
+    # But should have base headers
+    assert is_map(headers)
   end
 
   test "build/1 creates a valid model struct with required parameters" do
@@ -63,40 +70,34 @@ defmodule Jido.AI.Provider.GoogleTest do
     assert {:error, _} = Google.build(model_data)
   end
 
-  test "list_models/1 fetches and processes models from API" do
-    models_response = %{
-      "models" => [
-        %{
-          "name" => "models/gemini-2.0-flash",
-          "displayName" => "Gemini 2.0 Flash",
-          "description" => "Google's Flash model",
-          "inputTokenLimit" => 30_720,
-          "outputTokenLimit" => 2048,
-          "supportedGenerationMethods" => ["generateContent", "countTokens"],
-          "temperature" => 0.7,
-          "topK" => 1,
-          "topP" => 1,
-          "version" => "001"
-        }
-      ]
-    }
+  test "list_models/1 fetches models from Registry" do
+    # Now delegates to Model Registry which gets models from ReqLLM
+    # The registry should have Google models available
+    assert {:ok, models} = Google.list_models(api_key: @test_api_key)
 
-    Req
-    |> expect(:get, fn url, opts ->
-      assert String.contains?(url, "generativelanguage.googleapis.com")
-      assert Keyword.get(opts, :auth) == nil
-      {:ok, %Req.Response{status: 200, body: models_response}}
-    end)
+    # Should return some models from the registry
+    assert is_list(models)
+    assert length(models) > 0
 
-    {:ok, [model]} = Google.list_models(api_key: @test_api_key)
-    assert model.id == "gemini-2.0-flash"
-    assert model.name == "Gemini 2.0 Flash"
+    # Models should be properly formatted
+    model = List.first(models)
+    assert is_struct(model, Jido.AI.Model)
     assert model.provider == :google
+
+    # Should have at least some Gemini models
+    gemini_models = Enum.filter(models, fn m -> String.contains?(m.id, "gemini") end)
+    assert length(gemini_models) > 0
   end
 
-  test "normalize/2 validates proper Gemini model IDs" do
+  test "normalize/2 normalizes Gemini model IDs" do
+    # Strips "models/" prefix from Google model format
     assert {:ok, "gemini-2.0-flash"} = Google.normalize("models/gemini-2.0-flash", [])
     assert {:ok, "gemini-2.0-flash-lite"} = Google.normalize("models/gemini-2.0-flash-lite", [])
-    assert {:error, _} = Google.normalize("invalid-model", [])
+
+    # Accepts models without prefix
+    assert {:ok, "gemini-2.5-flash"} = Google.normalize("gemini-2.5-flash", [])
+
+    # Note: normalize doesn't validate model existence, just normalizes format
+    assert {:ok, "invalid-model"} = Google.normalize("invalid-model", [])
   end
 end

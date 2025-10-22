@@ -30,6 +30,10 @@ defmodule Jido.Ai.MixProject do
       # Coverage
       test_coverage: [tool: ExCoveralls, export: "cov"],
       preferred_cli_env: [
+        "test.unit": :test,
+        "test.integration": :test,
+        "test.providers": :test,
+        "test.all": :test,
         coveralls: :test,
         "coveralls.github": :test,
         "coveralls.lcov": :test,
@@ -64,9 +68,8 @@ defmodule Jido.Ai.MixProject do
 
       # Clients
       {:req, "~> 0.5.8"},
+      {:req_llm, "~> 1.0.0-rc"},
       {:openai_ex, "~> 0.9.0"},
-      {:instructor, "~> 0.1.0"},
-      {:langchain, "~> 0.3.1"},
 
       # Testing
       {:credo, "~> 1.7", only: [:dev, :test]},
@@ -105,7 +108,13 @@ defmodule Jido.Ai.MixProject do
 
   defp aliases do
     [
-      # test: "test --trace",
+      # Memory-friendly test aliases
+      "test.unit": "test --exclude integration_testing --exclude provider_validation",
+      "test.integration": "test --only integration_testing --max-cases 1",
+      "test.providers": "test --only provider_validation --max-cases 1",
+      "test.all": ["test.unit", "test.integration", "test.providers"],
+
+      # Other aliases
       docs: "docs -f html --open",
       q: ["quality"],
       quality: [
@@ -141,7 +150,39 @@ defmodule Jido.Ai.MixProject do
         {"guides/prompt.md", title: "Prompting"},
         {"guides/providers.md", title: "LLM Providers"},
         {"guides/agent-skill.md", title: "Agent & Skill"},
-        {"guides/actions.md", title: "Actions"}
+        {"guides/actions.md", title: "Actions"},
+
+        # Provider Guides
+        {"guides/providers/provider-matrix.md", title: "Provider Matrix"},
+        {"guides/providers/high-performance.md", title: "High-Performance Providers"},
+        {"guides/providers/specialized.md", title: "Specialized Providers"},
+        {"guides/providers/local-models.md", title: "Local & Self-Hosted"},
+        {"guides/providers/enterprise.md", title: "Enterprise Providers"},
+        {"guides/providers/regional.md", title: "Regional Providers"},
+
+        # Migration Guides
+        {"guides/migration/from-legacy-providers.md", title: "Migration from Legacy"},
+        {"guides/migration/breaking-changes.md", title: "Breaking Changes"},
+        {"guides/migration/reqllm-integration.md", title: "ReqLLM Architecture"},
+
+        # Feature Guides
+        {"guides/features/rag-integration.md", title: "RAG Integration"},
+        {"guides/features/code-execution.md", title: "Code Execution"},
+        {"guides/features/plugins.md", title: "Plugins & Extensions"},
+        {"guides/features/fine-tuning.md", title: "Fine-Tuning"},
+        {"guides/features/context-windows.md", title: "Context Windows"},
+        {"guides/features/advanced-parameters.md", title: "Advanced Parameters"},
+
+        # Troubleshooting
+        {"guides/troubleshooting.md", title: "Troubleshooting"}
+      ],
+      groups_for_extras: [
+        "Getting Started":
+          ~r/guides\/(getting-started|keyring|prompt|providers|agent-skill|actions)\.md/,
+        Providers: ~r/guides\/providers\/.*/,
+        Migration: ~r/guides\/migration\/.*/,
+        Features: ~r/guides\/features\/.*/,
+        Troubleshooting: ~r/guides\/troubleshooting.*/
       ]
     ]
   end

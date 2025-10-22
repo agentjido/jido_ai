@@ -4,12 +4,20 @@ defmodule JidoTest.AI.Actions.OpenaiEx.EmbeddingsTest do
   require Logger
   alias Jido.AI.Actions.OpenaiEx.Embeddings
   alias Jido.AI.Model
-  alias OpenaiEx
 
   @moduletag :capture_log
 
   # Add global mock setup
   setup :set_mimic_global
+
+  setup :verify_on_exit!
+
+  setup do
+    # Copy ReqLLM modules for mocking
+    copy(ReqLLM)
+    copy(ReqLLM.Embedding)
+    :ok
+  end
 
   describe "run/2" do
     setup do
@@ -32,25 +40,11 @@ defmodule JidoTest.AI.Actions.OpenaiEx.EmbeddingsTest do
       params: params,
       context: context
     } do
-      # Create expected request
-      expected_req =
-        OpenaiEx.Embeddings.new(
-          model: "text-embedding-ada-002",
-          input: "Hello, world!"
-        )
-
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Embeddings, :create, fn _client, ^expected_req ->
-        {:ok,
-         %{
-           data: [
-             %{
-               embedding: [0.1, 0.2, 0.3]
-             }
-           ]
-         }}
+      # Mock ReqLLM.Embedding.embed/3 call
+      expect(ReqLLM.Embedding, :embed, fn "openai:text-embedding-ada-002",
+                                          ["Hello, world!"],
+                                          [] ->
+        {:ok, [[0.1, 0.2, 0.3]]}
       end)
 
       assert {:ok, %{embeddings: [[0.1, 0.2, 0.3]]}} = Embeddings.run(params, context)
@@ -63,24 +57,11 @@ defmodule JidoTest.AI.Actions.OpenaiEx.EmbeddingsTest do
       # Update params with multiple inputs
       params = %{params | input: ["Hello", "World"]}
 
-      # Create expected request
-      expected_req =
-        OpenaiEx.Embeddings.new(
-          model: "text-embedding-ada-002",
-          input: ["Hello", "World"]
-        )
-
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Embeddings, :create, fn _client, ^expected_req ->
-        {:ok,
-         %{
-           data: [
-             %{embedding: [0.1, 0.2, 0.3]},
-             %{embedding: [0.4, 0.5, 0.6]}
-           ]
-         }}
+      # Mock ReqLLM.Embedding.embed/3 call
+      expect(ReqLLM.Embedding, :embed, fn "openai:text-embedding-ada-002",
+                                          ["Hello", "World"],
+                                          [] ->
+        {:ok, [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]}
       end)
 
       assert {:ok, %{embeddings: [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]}} =
@@ -98,27 +79,11 @@ defmodule JidoTest.AI.Actions.OpenaiEx.EmbeddingsTest do
           encoding_format: :base64
         })
 
-      # Create expected request
-      expected_req =
-        OpenaiEx.Embeddings.new(
-          model: "text-embedding-ada-002",
-          input: "Hello, world!",
-          dimensions: 1024,
-          encoding_format: :base64
-        )
-
-      # Mock the OpenAI client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-
-      expect(OpenaiEx.Embeddings, :create, fn _client, ^expected_req ->
-        {:ok,
-         %{
-           data: [
-             %{
-               embedding: [0.1, 0.2, 0.3]
-             }
-           ]
-         }}
+      # Mock ReqLLM.Embedding.embed/3 call with options
+      expect(ReqLLM.Embedding, :embed, fn "openai:text-embedding-ada-002",
+                                          ["Hello, world!"],
+                                          [encoding_format: :base64, dimensions: 1024] ->
+        {:ok, [[0.1, 0.2, 0.3]]}
       end)
 
       assert {:ok, %{embeddings: [[0.1, 0.2, 0.3]]}} = Embeddings.run(params, context)
@@ -139,27 +104,11 @@ defmodule JidoTest.AI.Actions.OpenaiEx.EmbeddingsTest do
         | model: model
       }
 
-      # Create expected request
-      expected_req =
-        OpenaiEx.Embeddings.new(
-          model: "openai/text-embedding-3-large",
-          input: "Hello, world!"
-        )
-
-      # Mock the OpenRouter client
-      expect(OpenaiEx, :new, fn "test-api-key" -> %OpenaiEx{} end)
-      expect(OpenaiEx, :with_base_url, fn client, _url -> client end)
-      expect(OpenaiEx, :with_additional_headers, fn client, _headers -> client end)
-
-      expect(OpenaiEx.Embeddings, :create, fn _client, ^expected_req ->
-        {:ok,
-         %{
-           data: [
-             %{
-               embedding: [0.1, 0.2, 0.3]
-             }
-           ]
-         }}
+      # Mock ReqLLM.Embedding.embed/3 call for OpenRouter
+      expect(ReqLLM.Embedding, :embed, fn "openrouter:openai/text-embedding-3-large",
+                                          ["Hello, world!"],
+                                          [] ->
+        {:ok, [[0.1, 0.2, 0.3]]}
       end)
 
       assert {:ok, %{embeddings: [[0.1, 0.2, 0.3]]}} = Embeddings.run(params, context)
@@ -188,12 +137,13 @@ defmodule JidoTest.AI.Actions.OpenaiEx.EmbeddingsTest do
               tokenizer: "unknown",
               instruct_type: nil
             },
-            endpoints: []
+            endpoints: [],
+            # This will trigger provider validation error
+            reqllm_id: "invalid_provider:test-model"
           }
       }
 
-      assert {:error,
-              "Invalid provider: :invalid_provider. Must be one of: [:openai, :openrouter, :google]"} =
+      assert {:error, "Model validation failed: Unsupported provider: invalid_provider"} =
                Embeddings.run(params, context)
     end
 
