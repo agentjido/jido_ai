@@ -146,7 +146,9 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
       assert updated_splitter2.done == false
     end
 
-    test "sets done to true when all tokens are processed", %{large_splitter: %Splitter{} = splitter} do
+    test "sets done to true when all tokens are processed", %{
+      large_splitter: %Splitter{} = splitter
+    } do
       # Set the offset to almost the end
       splitter = %Splitter{splitter | offset: 90}
 
@@ -232,7 +234,9 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
     assert splitter.done == false
   end
 
-  test "marks splitter as done when offset reaches end of tokens", %{test_splitter: %Splitter{} = splitter} do
+  test "marks splitter as done when offset reaches end of tokens", %{
+    test_splitter: %Splitter{} = splitter
+  } do
     # Set the offset to the length of input_tokens to simulate completion
     updated_splitter = %Splitter{splitter | offset: length(splitter.input_tokens)}
 
