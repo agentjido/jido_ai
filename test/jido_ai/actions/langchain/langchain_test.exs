@@ -150,14 +150,18 @@ defmodule JidoTest.AI.Actions.LangchainTest do
       expect(LLMChain, :add_messages, fn chain, messages ->
         assert chain == expected_chain
         assert length(messages) == 1
-        assert hd(messages).content == "Hello, how are you?"
+        content = hd(messages).content
+        assert is_list(content)
+        assert hd(content).content == "Hello, how are you?"
         chain
       end)
 
       # Don't need to mock LLMChain.run as Finch is mocked instead
 
-      assert {:ok, %{content: "Test response", tool_results: []}} =
-               LangchainAction.run(params, context)
+      assert {:ok, result} = LangchainAction.run(params, context)
+      assert result.tool_results == []
+      assert is_list(result.content)
+      assert hd(result.content).content == "Test response"
     end
 
     test "successfully processes a valid request with Anthropic model", %{
@@ -214,14 +218,18 @@ defmodule JidoTest.AI.Actions.LangchainTest do
       expect(LLMChain, :add_messages, fn chain, messages ->
         assert chain == expected_chain
         assert length(messages) == 1
-        assert hd(messages).content == "Hello, how are you?"
+        content = hd(messages).content
+        assert is_list(content)
+        assert hd(content).content == "Hello, how are you?"
         chain
       end)
 
       # Don't need to mock LLMChain.run as Finch is mocked instead
 
-      assert {:ok, %{content: "Test response", tool_results: []}} =
-               LangchainAction.run(params, context)
+      assert {:ok, result} = LangchainAction.run(params, context)
+      assert result.tool_results == []
+      assert is_list(result.content)
+      assert hd(result.content).content == "Test response"
     end
 
     test "successfully processes a valid request with tools", %{
@@ -272,7 +280,9 @@ defmodule JidoTest.AI.Actions.LangchainTest do
       expect(LLMChain, :add_messages, fn chain, messages ->
         assert chain == expected_chain
         assert length(messages) == 1
-        assert hd(messages).content == "Hello, how are you?"
+        content = hd(messages).content
+        assert is_list(content)
+        assert hd(content).content == "Hello, how are you?"
         chain
       end)
 
@@ -465,12 +475,16 @@ defmodule JidoTest.AI.Actions.LangchainTest do
       expect(LLMChain, :add_messages, fn chain, messages ->
         assert chain == expected_chain
         assert length(messages) == 1
-        assert hd(messages).content == "Hello, how are you?"
+        content = hd(messages).content
+        assert is_list(content)
+        assert hd(content).content == "Hello, how are you?"
         chain
       end)
 
-      assert {:ok, %{content: "Test response", tool_results: []}} =
-               LangchainAction.run(params, context)
+      assert {:ok, result} = LangchainAction.run(params, context)
+      assert result.tool_results == []
+      assert is_list(result.content)
+      assert hd(result.content).content == "Test response"
     end
   end
 end

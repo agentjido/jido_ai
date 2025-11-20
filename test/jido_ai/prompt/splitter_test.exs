@@ -146,7 +146,9 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
       assert updated_splitter2.done == false
     end
 
-    test "sets done to true when all tokens are processed", %{large_splitter: splitter} do
+    test "sets done to true when all tokens are processed", %{
+      large_splitter: %Splitter{} = splitter
+    } do
       # Set the offset to almost the end
       splitter = %Splitter{splitter | offset: 90}
 
@@ -162,7 +164,7 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
     end
 
     # Test the get_slice private function behavior through next_chunk
-    test "get_slice returns done when splitter is done", %{done_splitter: splitter} do
+    test "get_slice returns done when splitter is done", %{done_splitter: %Splitter{} = splitter} do
       # Create a custom splitter that's done but with a different offset
       # This will test the private get_slice function's behavior when done is true
       custom_splitter = %Splitter{
@@ -181,7 +183,7 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
   end
 
   # Helper function to simulate next_chunk with our mock tokenizer
-  defp next_chunk_with_mocks(splitter, bespoke_input) do
+  defp next_chunk_with_mocks(%Splitter{} = splitter, bespoke_input) do
     # Simulate what next_chunk would do with our mock tokenizer
     bespoke_tokens = MockTokenizer.encode(bespoke_input, splitter.model) |> length()
     remaining_tokens = splitter.model.context - bespoke_tokens
@@ -232,7 +234,9 @@ defmodule JidoTest.AI.Prompt.SplitterTest do
     assert splitter.done == false
   end
 
-  test "marks splitter as done when offset reaches end of tokens", %{test_splitter: splitter} do
+  test "marks splitter as done when offset reaches end of tokens", %{
+    test_splitter: %Splitter{} = splitter
+  } do
     # Set the offset to the length of input_tokens to simulate completion
     updated_splitter = %Splitter{splitter | offset: length(splitter.input_tokens)}
 
