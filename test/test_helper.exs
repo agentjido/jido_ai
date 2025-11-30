@@ -39,18 +39,14 @@ if Code.loaded?(Mimic) do
   Mimic.copy(Req)
   Mimic.copy(System)
   Mimic.copy(Finch)
-  Mimic.copy(OpenaiEx)
-  Mimic.copy(OpenaiEx.Chat.Completions)
-  Mimic.copy(OpenaiEx.Embeddings)
-  Mimic.copy(OpenaiEx.Images)
   Mimic.copy(Dotenvy)
   Mimic.copy(Jido.AI.Keyring)
   Mimic.copy(Jido.Exec)
-  Mimic.copy(Jido.AI.Actions.OpenaiEx)
   # GEPA test infrastructure
   Mimic.copy(Jido.AI.Actions.Internal.ChatResponse)
   Mimic.copy(Jido.Agent.Server)
   # ReqLLM integration testing
   Mimic.copy(ReqLLM)
   Mimic.copy(ReqLLM.Model)
+  Mimic.copy(ReqLLM.Embedding)
 end

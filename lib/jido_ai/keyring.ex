@@ -5,9 +5,10 @@ defmodule Jido.AI.Keyring do
   This module serves as the source of truth for configuration values, with a hierarchical loading priority:
 
   1. Session values (per-process overrides)
-  2. Environment variables (via Dotenvy)
-  3. Application environment (under :jido_ai, :keyring)
-  4. Default values
+  2. ReqLLM key resolution (via ReqLLM.get_key/1)
+  3. Environment variables (via Dotenvy)
+  4. Application environment (under :jido_ai, :keyring)
+  5. Default values
 
   The keyring supports both global environment values and process-specific session values,
   allowing for flexible configuration management in different contexts.
@@ -28,8 +29,6 @@ defmodule Jido.AI.Keyring do
 
   use GenServer
   require Logger
-
-  alias Jido.AI.Keyring.JidoKeysHybrid
 
   @session_registry :jido_ai_keyring_sessions
   @default_name __MODULE__
@@ -112,7 +111,7 @@ defmodule Jido.AI.Keyring do
     end)
 
     Logger.debug(
-      "[Jido.AI.Keyring] Initializing environment variables with ETS optimization (table: #{env_table_name})"
+      "[Jido.AI.Keyring] Initialized with ETS table: #{env_table_name}"
     )
 
     {:ok, %{keys: keys, registry: registry, env_table: env_table, env_table_name: env_table_name}}
@@ -195,15 +194,16 @@ defmodule Jido.AI.Keyring do
   """
   @spec get(GenServer.server(), atom(), term(), pid()) :: term()
   def get(server \\ @default_name, key, default \\ nil, pid \\ self()) when is_atom(key) do
-    # Enhanced: Use JidoKeys hybrid integration for better session fallback
     case get_session_value(server, key, pid) do
       nil ->
-        # Delegate to JidoKeys hybrid for enhanced security and runtime config
-        JidoKeysHybrid.get_global_value(key, default)
+        # Check ReqLLM first, then fall back to ETS
+        case ReqLLM.get_key(key) do
+          nil -> get_env_value_from_ets(server, key, default)
+          value -> value
+        end
 
       value ->
-        # Apply JidoKeys filtering to session values for security
-        JidoKeysHybrid.filter_sensitive_data(value)
+        value
     end
   end
 
@@ -244,7 +244,7 @@ defmodule Jido.AI.Keyring do
     # First check session value
     case get_session_value(server, key, pid) do
       nil ->
-        # Then check ReqLLM/JidoKeys
+        # Then check ReqLLM
         case ReqLLM.get_key(key) do
           nil -> default
           value -> value
@@ -268,14 +268,10 @@ defmodule Jido.AI.Keyring do
   """
   @spec get_env_value(GenServer.server(), atom(), term()) :: term()
   def get_env_value(server \\ @default_name, key, default \\ nil) when is_atom(key) do
-    # Enhanced: Try JidoKeys first, then fallback to ETS for compatibility
-    case JidoKeysHybrid.get_global_value(key, nil) do
-      nil ->
-        # Fallback to existing ETS-based lookup for backward compatibility
-        get_env_value_from_ets(server, key, default)
-
-      value ->
-        value
+    # Try ReqLLM first, then fallback to ETS
+    case ReqLLM.get_key(key) do
+      nil -> get_env_value_from_ets(server, key, default)
+      value -> value
     end
   end
 
@@ -298,7 +294,7 @@ defmodule Jido.AI.Keyring do
     # First check environment directly
     case get_env_value(server, key, nil) do
       nil ->
-        # Then check ReqLLM/JidoKeys
+        # Then check ReqLLM
         case ReqLLM.get_key(key) do
           nil -> default
           value -> value
@@ -324,14 +320,8 @@ defmodule Jido.AI.Keyring do
   """
   @spec set_session_value(GenServer.server(), atom(), term(), pid()) :: :ok
   def set_session_value(server \\ @default_name, key, value, pid \\ self()) when is_atom(key) do
-    # Enhanced: Apply JidoKeys security filtering before storing session values
-    filtered_value = JidoKeysHybrid.filter_sensitive_data(value)
-
     registry = GenServer.call(server, :get_registry)
-    :ets.insert(registry, {{pid, key}, filtered_value})
-
-    # Enhanced: Log session operations with security filtering
-    JidoKeysHybrid.safe_log_key_operation(key, :set_session, :keyring)
+    :ets.insert(registry, {{pid, key}, value})
     :ok
   end
 
@@ -389,35 +379,6 @@ defmodule Jido.AI.Keyring do
     registry = GenServer.call(server, :get_registry)
     :ets.match_delete(registry, {{pid, :_}, :_})
     :ok
-  end
-
-  @doc """
-  Sets a runtime configuration value through JidoKeys integration.
-
-  This function provides enhanced runtime configuration capabilities through
-  JidoKeys.put/2, allowing for dynamic configuration updates with security filtering.
-
-  ## Parameters
-
-    * `key` - The configuration key (atom or string)
-    * `value` - The value to set (must be a binary)
-
-  ## Returns
-
-    * `:ok` on success
-    * `{:error, reason}` on failure
-
-  ## Examples
-
-      iex> Keyring.set_runtime_value(:openai_api_key, "sk-...")
-      :ok
-
-      iex> Keyring.set_runtime_value("test_config", "test_value")
-      :ok
-  """
-  @spec set_runtime_value(atom() | String.t(), String.t()) :: :ok | {:error, term()}
-  def set_runtime_value(key, value) when is_binary(value) do
-    JidoKeysHybrid.set_runtime_value(key, value)
   end
 
   @impl true
@@ -515,7 +476,6 @@ defmodule Jido.AI.Keyring do
   @doc false
   @spec get_env_value_from_ets(GenServer.server(), atom(), term()) :: term()
   defp get_env_value_from_ets(server, key, default) do
-    # Original ETS-based lookup logic preserved for backward compatibility
     case GenServer.call(server, :get_env_table) do
       {:error, :env_table_not_found} ->
         default

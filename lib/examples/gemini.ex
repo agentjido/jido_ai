@@ -2,8 +2,7 @@ defmodule JidoAi.Examples.Gemini do
   @moduledoc """
   Example demonstrating how to use Google's Gemini models with Jido AI.
 
-  This example shows how to use the Model.from/1 function to create a Gemini model
-  and use it with the OpenaiEx action to generate text.
+  This example shows how to use ReqLLM directly to generate text with Gemini.
 
   ## Usage
 
@@ -20,38 +19,21 @@ defmodule JidoAi.Examples.Gemini do
   Or add it to your .env file.
   """
 
-  alias Jido.AI.Actions.OpenaiEx
-  alias Jido.AI.Keyring
-  alias Jido.AI.Model
-
   def run do
-    # Create a Gemini model
-    {:ok, model} =
-      Model.from(
-        {:google,
-         [
-           model: "gemini-2.0-flash",
-           api_key: Keyring.get(:google_api_key)
-         ]}
-      )
+    # Call ReqLLM directly with the Gemini model
+    messages = [
+      %{role: :user, content: "Explain the concept of functional programming in Elixir"}
+    ]
 
-    # Call the OpenaiEx action with the model
-    {:ok, result} =
-      OpenaiEx.run(
-        %{
-          model: model,
-          messages: [
-            %{role: :user, content: "Explain the concept of functional programming in Elixir"}
-          ],
-          temperature: 0.7,
-          max_tokens: 500
-        },
-        %{}
-      )
+    case ReqLLM.generate_text("google:gemini-2.0-flash", messages, temperature: 0.7, max_tokens: 500) do
+      {:ok, result} ->
+        # Print the result
+        IO.puts("\n\nGemini Response:\n")
+        IO.puts(result.content)
+        IO.puts("\n")
 
-    # Print the result
-    IO.puts("\n\nGemini Response:\n")
-    IO.puts(result.content)
-    IO.puts("\n")
+      {:error, error} ->
+        IO.puts("\n\nError: #{inspect(error)}\n")
+    end
   end
 end

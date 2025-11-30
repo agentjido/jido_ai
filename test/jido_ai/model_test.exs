@@ -10,16 +10,13 @@ defmodule JidoTest.AI.ModelTest do
                Model.validate_model_opts(
                  {:anthropic,
                   [
-                    id: "anthropic_test",
-                    name: "Test Model",
-                    modality: "text",
                     model: "claude-3-5-haiku"
                   ]}
                )
 
-      assert model.id == "anthropic_test"
-      assert model.name == "Test Model"
-      assert model.architecture.modality == "text"
+      # ReqLLM.Model has different fields
+      assert %ReqLLM.Model{} = model
+      assert model.provider == :anthropic
       assert model.model == "claude-3-5-haiku"
     end
 
@@ -28,44 +25,34 @@ defmodule JidoTest.AI.ModelTest do
                Model.validate_model_opts(
                  {:anthropic,
                   [
-                    id: "anthropic_test",
-                    name: "Test Model",
-                    modality: "text",
                     model: "claude-3-5-haiku",
                     capabilities: [:chat]
                   ]}
                )
 
-      assert model.id == "anthropic_test"
-      assert model.name == "Test Model"
-      assert model.architecture.modality == "text"
+      # ReqLLM.Model has different fields
+      assert %ReqLLM.Model{} = model
+      assert model.provider == :anthropic
       assert model.model == "claude-3-5-haiku"
+      assert model.capabilities == [:chat]
     end
 
     test "validates provider atom" do
       assert {:ok, model} =
                Model.validate_model_opts({:anthropic, [model: "claude-3-5-haiku"]})
 
-      assert model.id == "anthropic_claude-3-5-haiku"
-      assert model.name == "Anthropic claude-3-5-haiku"
-      assert model.architecture.modality == "text"
+      # ReqLLM.Model has different fields
+      assert %ReqLLM.Model{} = model
+      assert model.provider == :anthropic
       assert model.model == "claude-3-5-haiku"
     end
-
-    # test "validates category-based model" do
-    #   assert {:ok, model} = Model.validate_model_opts({:category, :chat, :fastest})
-
-    #   assert model.id == "chat_fastest"
-    #   assert model.name == "chat fastest Model"
-    #   assert model.description =~ "Category-based model"
-    # end
 
     test "rejects invalid provider" do
       assert {:error, message} = Model.validate_model_opts(:invalid_provider)
       assert message =~ "Invalid model specification"
     end
 
-    test "rejects missing model for Anthropic" do
+    test "rejects missing model for provider" do
       assert {:error, message} =
                Model.validate_model_opts(
                  {:anthropic,
@@ -76,7 +63,7 @@ defmodule JidoTest.AI.ModelTest do
                   ]}
                )
 
-      assert message == "model is required for Anthropic models"
+      assert message =~ "model option is required"
     end
   end
 

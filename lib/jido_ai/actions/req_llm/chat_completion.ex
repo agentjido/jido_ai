@@ -255,7 +255,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
           base_opts
       end
 
-    # ReqLLM handles authentication internally via JidoKeys
+    # ReqLLM handles authentication internally via environment variables
     {:ok, opts_with_tools}
   end
 

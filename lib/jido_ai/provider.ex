@@ -3,21 +3,10 @@ defmodule Jido.AI.Provider do
   require Logger
   alias Jido.AI.Model
   alias Jido.AI.Model.Registry.Adapter
-  alias Jido.AI.Provider.Anthropic
-  alias Jido.AI.Provider.Cloudflare
-  alias Jido.AI.Provider.Google
   alias Jido.AI.Provider.Helpers
-  alias Jido.AI.Provider.OpenAI
-  alias Jido.AI.Provider.OpenRouter
 
-  # Legacy hardcoded providers for fallback
-  @legacy_providers [
-    {:openrouter, OpenRouter},
-    {:anthropic, Anthropic},
-    {:openai, OpenAI},
-    {:cloudflare, Cloudflare},
-    {:google, Google}
-  ]
+  # All providers are now backed by ReqLLM
+  @legacy_providers []
 
   @type provider_id :: atom()
   @type provider_type :: :direct | :proxy
@@ -354,11 +343,8 @@ defmodule Jido.AI.Provider do
     end
   end
 
-  defp module_for(:anthropic), do: Anthropic
-  defp module_for(:cloudflare), do: Cloudflare
-  defp module_for(:openai), do: OpenAI
-  defp module_for(:openrouter), do: OpenRouter
-  defp module_for(:google), do: Google
+  # All providers are now ReqLLM-backed, so module_for returns :reqllm_backed
+  defp module_for(_provider), do: :reqllm_backed
 
   @doc """
   Lists all cached models across all providers.
