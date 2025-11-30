@@ -20,7 +20,9 @@ defmodule Examples.ConversationManager.BasicChat do
       :ok = Examples.ConversationManager.BasicChat.end_chat(conv_id)
   """
 
-  alias Jido.AI.ReqLlmBridge.ToolIntegrationManager
+  alias Jido.AI.Conversation.Manager, as: ConversationManager
+  alias Jido.AI.Tools.Manager, as: ToolsManager
+  alias Jido.AI.Model
 
   @doc """
   Run the basic chat example demonstrating multi-turn conversation.
@@ -30,16 +32,15 @@ defmodule Examples.ConversationManager.BasicChat do
     IO.puts("  Conversation Manager: Basic Multi-Turn Chat")
     IO.puts(String.duplicate("=", 70) <> "\n")
 
-    IO.puts("📝 **Example:** Weather Assistant with Conversation History")
-    IO.puts("Demonstrates stateful multi-turn conversations with tool calls\n")
+    IO.puts("This example demonstrates stateful multi-turn conversations with tool calls\n")
     IO.puts(String.duplicate("-", 70) <> "\n")
 
     # Start conversation with weather tool
-    IO.puts("🔧 **Starting conversation with WeatherAction...**")
+    IO.puts("Starting conversation with WeatherAction...")
 
     case start_chat([MockWeatherAction]) do
       {:ok, conv_id} ->
-        IO.puts("✓ Conversation started: #{String.slice(conv_id, 0, 8)}...\n")
+        IO.puts("Conversation started: #{String.slice(conv_id, 0, 8)}...\n")
 
         # Conversation flow
         conversation_flow(conv_id)
@@ -49,10 +50,10 @@ defmodule Examples.ConversationManager.BasicChat do
 
         # Cleanup
         end_chat(conv_id)
-        IO.puts("\n✓ Conversation ended successfully")
+        IO.puts("\nConversation ended successfully")
 
       {:error, reason} ->
-        IO.puts("❌ **Error:** Failed to start conversation: #{inspect(reason)}")
+        IO.puts("Error: Failed to start conversation: #{inspect(reason)}")
     end
 
     IO.puts("\n" <> String.duplicate("=", 70))
@@ -61,137 +62,112 @@ defmodule Examples.ConversationManager.BasicChat do
   @doc """
   Starts a new conversation with the given tools.
   """
-  def start_chat(tools, options \\ %{}) do
-    default_options = %{
-      model: "gpt-4",
-      temperature: 0.7,
-      max_tokens: 1000,
-      max_tool_calls: 5
-    }
+  def start_chat(tools, options \\ []) do
+    # Create model - defaults to GPT-4
+    model_spec = Keyword.get(options, :model, {:openai, [model: "gpt-4"]})
 
-    merged_options = Map.merge(default_options, options)
+    case Model.from(model_spec) do
+      {:ok, model} ->
+        system_prompt = Keyword.get(options, :system_prompt, "You are a helpful assistant with access to tools.")
 
-    ToolIntegrationManager.start_conversation(tools, merged_options)
+        ConversationManager.create(model,
+          system_prompt: system_prompt,
+          options: %{
+            temperature: Keyword.get(options, :temperature, 0.7),
+            max_tokens: Keyword.get(options, :max_tokens, 1000)
+          }
+        )
+
+      {:error, reason} ->
+        {:error, {:model_error, reason}}
+    end
   end
 
   @doc """
   Sends a message in the conversation and gets a response.
   """
-  def chat(conversation_id, message) do
-    ToolIntegrationManager.continue_conversation(conversation_id, message)
+  def chat(conversation_id, message, tools \\ [MockWeatherAction]) do
+    ToolsManager.process(conversation_id, message, tools, max_iterations: 5)
   end
 
   @doc """
   Ends the conversation and cleans up resources.
   """
   def end_chat(conversation_id) do
-    ToolIntegrationManager.end_conversation(conversation_id)
+    ConversationManager.delete(conversation_id)
   end
 
   @doc """
   Gets the conversation history.
   """
   def get_history(conversation_id) do
-    ToolIntegrationManager.get_conversation_history(conversation_id)
+    ConversationManager.get_messages(conversation_id)
   end
 
   # Private Functions
 
   defp conversation_flow(conv_id) do
     # Turn 1: Ask about weather in Paris
-    IO.puts("💬 **User:** What's the weather like in Paris?")
+    IO.puts("User: What's the weather like in Paris?")
 
     case chat(conv_id, "What's the weather like in Paris?") do
       {:ok, response} ->
         display_response(response, 1)
 
       {:error, reason} ->
-        IO.puts("❌ Error: #{inspect(reason)}\n")
+        IO.puts("Error: #{inspect(reason)}\n")
     end
 
     # Short delay for readability
     Process.sleep(500)
 
     # Turn 2: Ask about weather in London
-    IO.puts("💬 **User:** And what about London?")
+    IO.puts("User: And what about London?")
 
     case chat(conv_id, "And what about London?") do
       {:ok, response} ->
         display_response(response, 2)
 
       {:error, reason} ->
-        IO.puts("❌ Error: #{inspect(reason)}\n")
+        IO.puts("Error: #{inspect(reason)}\n")
     end
 
     # Short delay for readability
     Process.sleep(500)
 
     # Turn 3: Ask comparative question (uses context)
-    IO.puts("💬 **User:** Which city is warmer?")
+    IO.puts("User: Which city is warmer?")
 
     case chat(conv_id, "Which city is warmer?") do
       {:ok, response} ->
         display_response(response, 3)
 
       {:error, reason} ->
-        IO.puts("❌ Error: #{inspect(reason)}\n")
+        IO.puts("Error: #{inspect(reason)}\n")
     end
   end
 
   defp display_response(response, turn_number) do
-    IO.puts("\n🤖 **Assistant (Turn #{turn_number}):**")
+    IO.puts("\nAssistant (Turn #{turn_number}):")
 
-    # Display content
     content = Map.get(response, :content, "")
 
     if content != "" do
       IO.puts("   #{content}")
     end
 
-    # Display tool calls if any
-    tool_calls = Map.get(response, :tool_calls, [])
+    tool_calls_made = Map.get(response, :tool_calls_made, 0)
 
-    if length(tool_calls) > 0 do
-      IO.puts("\n   🔧 Tool Calls Made:")
-
-      Enum.each(tool_calls, fn tool_call ->
-        function = Map.get(tool_call, :function, %{})
-        name = Map.get(function, :name, "unknown")
-        args = Map.get(function, :arguments, %{})
-
-        IO.puts("      • #{name}(#{format_args(args)})")
-      end)
-    end
-
-    # Display usage stats if available
-    usage = Map.get(response, :usage, %{})
-
-    if map_size(usage) > 0 do
-      total = Map.get(usage, :total_tokens, 0)
-      IO.puts("\n   📊 Tokens Used: #{total}")
+    if tool_calls_made > 0 do
+      IO.puts("\n   Tool iterations: #{tool_calls_made}")
     end
 
     IO.puts("")
   end
 
-  defp format_args(args) when is_map(args) do
-    args
-    |> Enum.map(fn {k, v} -> "#{k}: \"#{v}\"" end)
-    |> Enum.join(", ")
-  end
-
-  defp format_args(args) when is_binary(args) do
-    case Jason.decode(args) do
-      {:ok, decoded} -> format_args(decoded)
-      {:error, _} -> args
-    end
-  end
-
-  defp format_args(args), do: inspect(args)
-
   defp display_conversation_history(conv_id) do
     IO.puts(String.duplicate("-", 70))
-    IO.puts("\n📜 **Conversation History:**\n")
+    IO.puts("\nConversation History:\n")
 
     case get_history(conv_id) do
       {:ok, history} ->
@@ -200,22 +176,20 @@ defmodule Examples.ConversationManager.BasicChat do
         history
         |> Enum.with_index(1)
         |> Enum.each(fn {msg, idx} ->
-          role = Map.get(msg, :role, "unknown")
-          content = Map.get(msg, :content, "")
-          timestamp = Map.get(msg, :timestamp)
+          role = msg.role
+          content = msg.content
 
-          # Format role
           role_display =
             case role do
-              "user" -> "👤 User"
-              "assistant" -> "🤖 Assistant"
-              "tool" -> "🔧 Tool"
-              _ -> role
+              :user -> "User"
+              :assistant -> "Assistant"
+              :tool -> "Tool"
+              :system -> "System"
+              _ -> to_string(role)
             end
 
           IO.puts("   #{idx}. #{role_display}")
 
-          # Show content preview
           preview =
             if String.length(content) > 60 do
               String.slice(content, 0, 60) <> "..."
@@ -224,18 +198,11 @@ defmodule Examples.ConversationManager.BasicChat do
             end
 
           IO.puts("      \"#{preview}\"")
-
-          # Show timestamp if available
-          if timestamp do
-            time_str = Calendar.strftime(timestamp, "%H:%M:%S")
-            IO.puts("      ⏰ #{time_str}")
-          end
-
           IO.puts("")
         end)
 
       {:error, reason} ->
-        IO.puts("   ❌ Error retrieving history: #{inspect(reason)}")
+        IO.puts("   Error retrieving history: #{inspect(reason)}")
     end
   end
 end
@@ -294,14 +261,14 @@ defmodule Examples.ConversationManager.MockWeatherAction do
           if units == "celsius", do: {20, "Partly cloudy"}, else: {68, "Partly cloudy"}
       end
 
-    unit_symbol = if units == "celsius", do: "°C", else: "°F"
+    unit_symbol = if units == "celsius", do: "C", else: "F"
 
     %{
       location: location,
       temperature: temp,
       units: units,
       description: description,
-      formatted: "#{temp}#{unit_symbol}, #{description}"
+      formatted: "#{temp} #{unit_symbol}, #{description}"
     }
   end
 end
