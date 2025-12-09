@@ -25,10 +25,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
     end
 
     test "validates model format" do
-      result = ChatCompletion.run(%{
-        model: "invalid",
-        prompt: Prompt.new(:user, "Hello")
-      }, %{})
+      result =
+        ChatCompletion.run(
+          %{
+            model: "invalid",
+            prompt: Prompt.new(:user, "Hello")
+          },
+          %{}
+        )
+
       assert {:error, _} = result
     end
 
@@ -117,11 +122,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
         {:ok, mock_chat_response("Response")}
       end)
 
-      {:ok, _result} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        temperature: 0.2
-      }, %{})
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            temperature: 0.2
+          },
+          %{}
+        )
     end
 
     test "passes max_tokens parameter" do
@@ -133,11 +142,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
         {:ok, mock_chat_response("Response")}
       end)
 
-      {:ok, _result} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        max_tokens: 2048
-      }, %{})
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            max_tokens: 2048
+          },
+          %{}
+        )
     end
 
     test "passes top_p parameter" do
@@ -149,11 +162,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
         {:ok, mock_chat_response("Response")}
       end)
 
-      {:ok, _result} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        top_p: 0.9
-      }, %{})
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            top_p: 0.9
+          },
+          %{}
+        )
     end
 
     test "passes stop sequences" do
@@ -165,11 +182,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
         {:ok, mock_chat_response("Response")}
       end)
 
-      {:ok, _result} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        stop: ["END", "STOP"]
-      }, %{})
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            stop: ["END", "STOP"]
+          },
+          %{}
+        )
     end
 
     test "passes frequency_penalty and presence_penalty" do
@@ -182,12 +203,16 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
         {:ok, mock_chat_response("Response")}
       end)
 
-      {:ok, _result} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        frequency_penalty: 0.5,
-        presence_penalty: 0.3
-      }, %{})
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            frequency_penalty: 0.5,
+            presence_penalty: 0.3
+          },
+          %{}
+        )
     end
 
     test "uses default values when parameters not provided" do
@@ -209,9 +234,13 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
       model = {:openai, [model: "gpt-4"]}
       prompt = Prompt.new(:user, "What's the weather?")
 
-      response = mock_chat_response("I'll check the weather", tool_calls: [
-        %{name: "get_weather", arguments: %{"location" => "Tokyo"}}
-      ])
+      response =
+        mock_chat_response("I'll check the weather",
+          tool_calls: [
+            %{name: "get_weather", arguments: %{"location" => "Tokyo"}}
+          ]
+        )
+
       mock_generate_text(response)
 
       {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
@@ -227,10 +256,14 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
       model = {:openai, [model: "gpt-4"]}
       prompt = Prompt.new(:user, "Search and calculate")
 
-      response = mock_chat_response("Running tools", tool_calls: [
-        %{name: "search", arguments: %{"query" => "test"}},
-        %{name: "calculate", arguments: %{"expression" => "2+2"}}
-      ])
+      response =
+        mock_chat_response("Running tools",
+          tool_calls: [
+            %{name: "search", arguments: %{"query" => "test"}},
+            %{name: "calculate", arguments: %{"expression" => "2+2"}}
+          ]
+        )
+
       mock_generate_text(response)
 
       {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
@@ -261,11 +294,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
 
       mock_stream_text(chunks)
 
-      {:ok, stream} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        stream: true
-      }, %{})
+      {:ok, stream} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            stream: true
+          },
+          %{}
+        )
 
       assert is_struct(stream, Stream) or is_function(stream)
     end
@@ -277,11 +314,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
 
       mock_stream_text(chunks)
 
-      {:ok, stream} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        stream: true
-      }, %{})
+      {:ok, stream} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            stream: true
+          },
+          %{}
+        )
 
       collected = Enum.to_list(stream)
       assert length(collected) == 3
@@ -296,11 +337,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
         {:ok, Stream.map([], & &1)}
       end)
 
-      {:ok, _stream} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        stream: true
-      }, %{})
+      {:ok, _stream} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            stream: true
+          },
+          %{}
+        )
     end
 
     test "handles streaming errors" do
@@ -309,11 +354,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
 
       mock_stream_text_error(%{reason: :connection_error})
 
-      {:error, error} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        stream: true
-      }, %{})
+      {:error, error} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            stream: true
+          },
+          %{}
+        )
 
       assert error.reason == :connection_error
     end
@@ -336,19 +385,27 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
     test "returns error for invalid model specification" do
       prompt = Prompt.new(:user, "Test")
 
-      result = ChatCompletion.run(%{
-        model: "not-a-valid-model",
-        prompt: prompt
-      }, %{})
+      result =
+        ChatCompletion.run(
+          %{
+            model: "not-a-valid-model",
+            prompt: prompt
+          },
+          %{}
+        )
 
       assert match?({:error, _}, result)
     end
 
     test "handles missing provider" do
-      result = ChatCompletion.run(%{
-        model: %Model{provider: :nonexistent, model: "test"},
-        prompt: Prompt.new(:user, "Hello")
-      }, %{})
+      result =
+        ChatCompletion.run(
+          %{
+            model: %Model{provider: :nonexistent, model: "test"},
+            prompt: Prompt.new(:user, "Hello")
+          },
+          %{}
+        )
 
       assert {:error, _} = result
     end
@@ -388,6 +445,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
           %{"name" => "test_tool", "arguments" => %{"arg" => "value"}}
         ]
       }
+
       mock_generate_text(response)
 
       {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})

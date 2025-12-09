@@ -110,9 +110,7 @@ defmodule Jido.AI.Keyring do
       :ets.insert(env_table, {livebook_key, value})
     end)
 
-    Logger.debug(
-      "[Jido.AI.Keyring] Initialized with ETS table: #{env_table_name}"
-    )
+    Logger.debug("[Jido.AI.Keyring] Initialized with ETS table: #{env_table_name}")
 
     {:ok, %{keys: keys, registry: registry, env_table: env_table, env_table_name: env_table_name}}
   end

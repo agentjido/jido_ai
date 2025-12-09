@@ -290,11 +290,11 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.ReasoningEvaluator do
         response
       )
 
-    score = score + (if has_connectors, do: 0.3, else: 0.0)
+    score = score + if has_connectors, do: 0.3, else: 0.0
 
     # Check for proper sentence structure
     has_proper_sentences = Regex.match?(~r/[A-Z][^.!?]*[.!?]/, response)
-    score = score + (if has_proper_sentences, do: 0.3, else: 0.0)
+    score = score + if has_proper_sentences, do: 0.3, else: 0.0
 
     min(score, 1.0)
   end

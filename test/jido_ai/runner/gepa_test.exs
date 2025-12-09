@@ -364,9 +364,10 @@ defmodule Jido.AI.Runner.GEPATest do
       # Check that at least one prompt contains the seed text
       prompt_texts = Enum.map(best_prompts, & &1.prompt)
 
-      has_seed_1 = Enum.any?(prompt_texts, fn text ->
-        String.contains?(text, "Solve step by step")
-      end)
+      has_seed_1 =
+        Enum.any?(prompt_texts, fn text ->
+          String.contains?(text, "Solve step by step")
+        end)
 
       assert has_seed_1, "Expected at least one prompt based on 'Solve step by step'"
     end
@@ -404,9 +405,10 @@ defmodule Jido.AI.Runner.GEPATest do
 
       # At least some prompts should be based on seeds
       # (Evolution may select out some seeds based on fitness)
-      has_any_seed = Enum.any?(prompt_texts, fn text ->
-        Enum.any?(seeds, fn seed -> String.contains?(text, seed) end)
-      end)
+      has_any_seed =
+        Enum.any?(prompt_texts, fn text ->
+          Enum.any?(seeds, fn seed -> String.contains?(text, seed) end)
+        end)
 
       assert has_any_seed, "Expected at least one prompt based on seed prompts"
       assert length(best_prompts) > 0

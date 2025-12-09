@@ -314,7 +314,7 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.SummarizationEvaluator do
 
     # Check for sentence structure (periods, proper capitalization)
     has_sentences = Regex.match?(~r/[A-Z][^.!?]*[.!?]/, summary)
-    score = score + (if has_sentences, do: 0.3, else: 0.0)
+    score = score + if has_sentences, do: 0.3, else: 0.0
 
     # Check for logical connectors
     connectors = [
@@ -335,7 +335,7 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.SummarizationEvaluator do
     has_connectors =
       Enum.any?(connectors, &String.contains?(String.downcase(summary), &1))
 
-    score = score + (if has_connectors, do: 0.2, else: 0.0)
+    score = score + if has_connectors, do: 0.2, else: 0.0
 
     # Check it's not just a list of keywords
     is_keyword_list = Regex.match?(~r/^[\w\s,]+$/, summary) && String.contains?(summary, ",")
@@ -343,7 +343,7 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.SummarizationEvaluator do
 
     # Check for complete sentences (not ending mid-sentence)
     ends_properly = Regex.match?(~r/[.!?]$/, String.trim(summary))
-    score = score + (if ends_properly, do: 0.1, else: 0.0)
+    score = score + if ends_properly, do: 0.1, else: 0.0
 
     min(score, 1.0)
   end

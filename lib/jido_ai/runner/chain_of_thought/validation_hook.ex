@@ -59,6 +59,7 @@ defmodule Jido.AI.Runner.ChainOfThought.ValidationHook do
 
   alias Jido.AI.Actions.TextCompletion
   alias Jido.AI.Model
+  alias Jido.AI.Prompt
   alias Jido.AI.Runner.ChainOfThought.{ErrorHandler, ExecutionHook, PlanningHook}
 
   typedstruct module: ValidationResult do
@@ -417,7 +418,7 @@ defmodule Jido.AI.Runner.ChainOfThought.ValidationHook do
     Keep your reflection concise (2-3 sentences).
     """
 
-    prompt = Jido.AI.Prompt.new(:user, template)
+    prompt = Prompt.new(:user, template)
     {:ok, prompt}
   end
 

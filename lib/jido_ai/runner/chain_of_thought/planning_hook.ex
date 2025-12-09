@@ -48,6 +48,7 @@ defmodule Jido.AI.Runner.ChainOfThought.PlanningHook do
 
   alias Jido.AI.Actions.TextCompletion
   alias Jido.AI.Model
+  alias Jido.AI.Prompt
   alias Jido.AI.Runner.ChainOfThought.ErrorHandler
 
   typedstruct module: PlanningReasoning do
@@ -219,7 +220,7 @@ defmodule Jido.AI.Runner.ChainOfThought.PlanningHook do
     Provide clear, concise analysis focused on strategic planning.
     """
 
-    prompt = Jido.AI.Prompt.new(:user, template)
+    prompt = Prompt.new(:user, template)
     {:ok, prompt}
   end
 

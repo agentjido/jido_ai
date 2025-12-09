@@ -100,11 +100,15 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
     end
 
     test "Model.from with keyword list options" do
-      {:ok, model} = Model.from({:openai, [
-        model: "gpt-4",
-        max_tokens: 1024,
-        temperature: 0.7
-      ]})
+      {:ok, model} =
+        Model.from(
+          {:openai,
+           [
+             model: "gpt-4",
+             max_tokens: 1024,
+             temperature: 0.7
+           ]}
+        )
 
       assert model.provider == :openai
       assert model.model == "gpt-4"
@@ -121,6 +125,7 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
       {:ok, models} = Registry.list_models(:openai)
 
       assert is_list(models)
+
       Enum.each(models, fn model ->
         assert model.provider == :openai
       end)
@@ -160,11 +165,15 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
       legacy_model = %Jido.AI.Model{provider: :openai, model: "gpt-4"}
 
       # New ChatCompletion API
-      {:ok, result} = ChatCompletion.run(%{
-        model: legacy_model,
-        prompt: prompt,
-        temperature: 0.5
-      }, %{})
+      {:ok, result} =
+        ChatCompletion.run(
+          %{
+            model: legacy_model,
+            prompt: prompt,
+            temperature: 0.5
+          },
+          %{}
+        )
 
       assert result.content == "Mixed response"
     end
@@ -252,10 +261,14 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
       prompt = Prompt.new(:user, "Test")
 
       # Missing provider
-      result = ChatCompletion.run(%{
-        model: %Jido.AI.Model{provider: nil, model: "gpt-4"},
-        prompt: prompt
-      }, %{})
+      result =
+        ChatCompletion.run(
+          %{
+            model: %Jido.AI.Model{provider: nil, model: "gpt-4"},
+            prompt: prompt
+          },
+          %{}
+        )
 
       assert match?({:error, _}, result)
     end
@@ -301,9 +314,13 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
     test "tool results format is preserved" do
       prompt = Prompt.new(:user, "Use tool")
 
-      response = mock_chat_response("Using tool", tool_calls: [
-        %{name: "search", arguments: %{"query" => "test"}}
-      ])
+      response =
+        mock_chat_response("Using tool",
+          tool_calls: [
+            %{name: "search", arguments: %{"query" => "test"}}
+          ]
+        )
+
       mock_generate_text(response)
 
       legacy_model = %Jido.AI.Model{provider: :openai, model: "gpt-4"}
@@ -327,11 +344,16 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
       mock_stream_text(mock_stream_chunks(["Hello", " ", "world!"]))
 
       legacy_model = %Jido.AI.Model{provider: :openai, model: "gpt-4"}
-      {:ok, result} = ChatCompletion.run(%{
-        model: legacy_model,
-        prompt: prompt,
-        stream: true
-      }, %{})
+
+      {:ok, result} =
+        ChatCompletion.run(
+          %{
+            model: legacy_model,
+            prompt: prompt,
+            stream: true
+          },
+          %{}
+        )
 
       # Result should be a stream or collected chunks
       assert result != nil
@@ -352,11 +374,16 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
       end)
 
       legacy_model = %Jido.AI.Model{provider: :openai, model: "gpt-4"}
-      {:ok, _result} = ChatCompletion.run(%{
-        model: legacy_model,
-        prompt: prompt,
-        temperature: 0.3
-      }, %{})
+
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: legacy_model,
+            prompt: prompt,
+            temperature: 0.3
+          },
+          %{}
+        )
     end
 
     test "max_tokens parameter passes through" do
@@ -368,11 +395,16 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
       end)
 
       legacy_model = %Jido.AI.Model{provider: :openai, model: "gpt-4"}
-      {:ok, _result} = ChatCompletion.run(%{
-        model: legacy_model,
-        prompt: prompt,
-        max_tokens: 500
-      }, %{})
+
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: legacy_model,
+            prompt: prompt,
+            max_tokens: 500
+          },
+          %{}
+        )
     end
 
     test "stop sequences parameter passes through" do
@@ -384,11 +416,16 @@ defmodule JidoTest.AI.BackwardCompatibilityTest do
       end)
 
       legacy_model = %Jido.AI.Model{provider: :openai, model: "gpt-4"}
-      {:ok, _result} = ChatCompletion.run(%{
-        model: legacy_model,
-        prompt: prompt,
-        stop: ["END", "STOP"]
-      }, %{})
+
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: legacy_model,
+            prompt: prompt,
+            stop: ["END", "STOP"]
+          },
+          %{}
+        )
     end
   end
 end

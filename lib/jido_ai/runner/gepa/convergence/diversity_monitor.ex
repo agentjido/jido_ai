@@ -78,7 +78,7 @@ defmodule Jido.AI.Runner.GEPA.Convergence.DiversityMonitor do
     field(:patience, pos_integer(), default: 3)
     field(:patience_counter, non_neg_integer(), default: 0)
     field(:diversity_collapsed, boolean(), default: false)
-    field(:trend, Jido.AI.Runner.GEPA.Convergence.DiversityMonitor.trend(), default: :unknown)
+    field(:trend, trend(), default: :unknown)
     field(:max_history, pos_integer(), default: 100)
     field(:config, map(), default: %{})
   end

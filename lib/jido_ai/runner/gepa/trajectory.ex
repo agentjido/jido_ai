@@ -484,7 +484,7 @@ defmodule Jido.AI.Runner.GEPA.Trajectory do
   end
 
   @doc false
-  @spec importance_to_level(importance()) :: non_neg_integer()
+  @spec importance_to_level(Jido.AI.Runner.GEPA.Trajectory.importance()) :: non_neg_integer()
   defp importance_to_level(:low), do: 0
   defp importance_to_level(:medium), do: 1
   defp importance_to_level(:high), do: 2

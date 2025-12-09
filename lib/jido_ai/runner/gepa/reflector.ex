@@ -125,7 +125,7 @@ defmodule Jido.AI.Runner.GEPA.Reflector do
 
     field(:analysis, String.t(), enforce: true)
     field(:root_causes, list(String.t()), default: [])
-    field(:suggestions, list(Jido.AI.Runner.GEPA.Reflector.Suggestion.t()), default: [])
+    field(:suggestions, list(Suggestion.t()), default: [])
     field(:expected_improvement, String.t())
     field(:confidence, Jido.AI.Runner.GEPA.Reflector.confidence(), default: :medium)
     field(:needs_clarification, boolean(), default: false)
@@ -141,9 +141,9 @@ defmodule Jido.AI.Runner.GEPA.Reflector do
     """
 
     field(:id, String.t(), enforce: true)
-    field(:initial_request, Jido.AI.Runner.GEPA.Reflector.ReflectionRequest.t(), enforce: true)
+    field(:initial_request, ReflectionRequest.t(), enforce: true)
     field(:turns, list(map()), default: [])
-    field(:reflections, list(Jido.AI.Runner.GEPA.Reflector.ParsedReflection.t()), default: [])
+    field(:reflections, list(ParsedReflection.t()), default: [])
     field(:max_turns, pos_integer(), default: 3)
     field(:current_turn, non_neg_integer(), default: 0)
     field(:completed, boolean(), default: false)

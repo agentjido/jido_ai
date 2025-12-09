@@ -59,9 +59,13 @@ defmodule Jido.AI.Actions.ReqLlm.ToolResponseTest do
     test "includes tool calls in response" do
       prompt = Prompt.new(:user, "Search for weather")
 
-      response = mock_chat_response("I'll search", tool_calls: [
-        %{name: "search", arguments: %{"query" => "weather"}}
-      ])
+      response =
+        mock_chat_response("I'll search",
+          tool_calls: [
+            %{name: "search", arguments: %{"query" => "weather"}}
+          ]
+        )
+
       mock_generate_text(response)
 
       {:ok, result} = ToolResponse.run(%{prompt: prompt}, %{})
@@ -75,10 +79,14 @@ defmodule Jido.AI.Actions.ReqLlm.ToolResponseTest do
     test "handles multiple tool calls" do
       prompt = Prompt.new(:user, "Calculate and search")
 
-      response = mock_chat_response("Running tools", tool_calls: [
-        %{name: "calculate", arguments: %{"expr" => "2+2"}},
-        %{name: "search", arguments: %{"q" => "test"}}
-      ])
+      response =
+        mock_chat_response("Running tools",
+          tool_calls: [
+            %{name: "calculate", arguments: %{"expr" => "2+2"}},
+            %{name: "search", arguments: %{"q" => "test"}}
+          ]
+        )
+
       mock_generate_text(response)
 
       {:ok, result} = ToolResponse.run(%{prompt: prompt}, %{})
@@ -115,10 +123,14 @@ defmodule Jido.AI.Actions.ReqLlm.ToolResponseTest do
         {:ok, mock_chat_response("Helpful response")}
       end)
 
-      {:ok, result} = ToolResponse.run(%{
-        message: "Hello",
-        prompt: base_prompt
-      }, %{})
+      {:ok, result} =
+        ToolResponse.run(
+          %{
+            message: "Hello",
+            prompt: base_prompt
+          },
+          %{}
+        )
 
       assert result.result == "Helpful response"
     end
@@ -146,10 +158,14 @@ defmodule Jido.AI.Actions.ReqLlm.ToolResponseTest do
         {:ok, mock_chat_response("Response")}
       end)
 
-      {:ok, _result} = ToolResponse.run(%{
-        prompt: prompt,
-        temperature: 0.2
-      }, %{})
+      {:ok, _result} =
+        ToolResponse.run(
+          %{
+            prompt: prompt,
+            temperature: 0.2
+          },
+          %{}
+        )
     end
 
     test "uses default temperature of 0.7" do
@@ -186,10 +202,14 @@ defmodule Jido.AI.Actions.ReqLlm.ToolResponseTest do
     test "handles invalid model" do
       prompt = Prompt.new(:user, "Hello")
 
-      result = ToolResponse.run(%{
-        model: %Model{provider: :invalid, model: "test"},
-        prompt: prompt
-      }, %{})
+      result =
+        ToolResponse.run(
+          %{
+            model: %Model{provider: :invalid, model: "test"},
+            prompt: prompt
+          },
+          %{}
+        )
 
       assert match?({:error, _}, result)
     end

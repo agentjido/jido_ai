@@ -14,13 +14,13 @@ defmodule Jido.AI.Conversation.Message do
   typedstruct do
     @typedoc "A conversation message"
 
-    field :id, String.t(), enforce: true
-    field :role, :system | :user | :assistant | :tool, enforce: true
-    field :content, String.t(), default: ""
-    field :tool_calls, list(map()), default: []
-    field :tool_call_id, String.t()
-    field :name, String.t()
-    field :timestamp, DateTime.t(), enforce: true
+    field(:id, String.t(), enforce: true)
+    field(:role, :system | :user | :assistant | :tool, enforce: true)
+    field(:content, String.t(), default: "")
+    field(:tool_calls, list(map()), default: [])
+    field(:tool_call_id, String.t())
+    field(:name, String.t())
+    field(:timestamp, DateTime.t(), enforce: true)
   end
 
   @doc """

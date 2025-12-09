@@ -1,6 +1,7 @@
 defmodule Jido.AI.Runner.ProgramOfThoughtTest do
   use ExUnit.Case, async: true
 
+  alias Jido.AI.Actions.CoT.ProgramOfThought, as: ProgramOfThoughtAction
   alias Jido.AI.Runner.ProgramOfThought.{
     ProblemClassifier,
     ProgramExecutor,
@@ -478,7 +479,7 @@ defmodule Jido.AI.Runner.ProgramOfThoughtTest do
     # Requires LLM
     test "solves simple percentage problem" do
       action =
-        Jido.AI.Actions.CoT.ProgramOfThought.new!(%{
+        ProgramOfThoughtAction.new!(%{
           problem: "What is 15% of 240?",
           timeout: 5000,
           generate_explanation: false
@@ -497,7 +498,7 @@ defmodule Jido.AI.Runner.ProgramOfThoughtTest do
     # Requires LLM
     test "solves financial calculation problem" do
       action =
-        Jido.AI.Actions.CoT.ProgramOfThought.new!(%{
+        ProgramOfThoughtAction.new!(%{
           problem: "Calculate simple interest on $1000 at 5% for 10 years",
           domain: :financial,
           timeout: 5000

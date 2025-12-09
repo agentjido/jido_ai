@@ -96,7 +96,7 @@ defmodule JidoAI.Runner.GEPA.Crossover do
 
     field(:prompt_id, String.t(), enforce: true)
     field(:raw_text, String.t(), enforce: true)
-    field(:segments, list(JidoAI.Runner.GEPA.Crossover.PromptSegment.t()), default: [])
+    field(:segments, list(PromptSegment.t()), default: [])
     field(:structure_type, :simple | :structured | :complex, default: :simple)
     field(:metadata, map(), default: %{})
   end
@@ -178,8 +178,8 @@ defmodule JidoAI.Runner.GEPA.Crossover do
     field(:parent_ids, list(String.t()), enforce: true)
     field(:offspring_prompts, list(String.t()), default: [])
     field(:strategy_used, JidoAI.Runner.GEPA.Crossover.crossover_strategy(), enforce: true)
-    field(:segments_exchanged, list(JidoAI.Runner.GEPA.Crossover.PromptSegment.t()), default: [])
-    field(:segments_blended, list(JidoAI.Runner.GEPA.Crossover.PromptSegment.t()), default: [])
+    field(:segments_exchanged, list(PromptSegment.t()), default: [])
+    field(:segments_blended, list(PromptSegment.t()), default: [])
     field(:validated, boolean(), default: false)
     field(:validation_score, float() | nil)
     field(:metadata, map(), default: %{})

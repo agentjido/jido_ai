@@ -46,6 +46,7 @@ defmodule Jido.AI.Runner.ChainOfThought.ExecutionHook do
 
   alias Jido.AI.Actions.TextCompletion
   alias Jido.AI.Model
+  alias Jido.AI.Prompt
   alias Jido.AI.Runner.ChainOfThought.ErrorHandler
 
   typedstruct module: ExecutionStep do
@@ -270,7 +271,7 @@ defmodule Jido.AI.Runner.ChainOfThought.ExecutionHook do
     Provide clear, structured analysis focused on execution planning.
     """
 
-    prompt = Jido.AI.Prompt.new(:user, template)
+    prompt = Prompt.new(:user, template)
     {:ok, prompt}
   end
 

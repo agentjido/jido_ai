@@ -29,6 +29,7 @@ defmodule Jido.AI.Runner.GEPA.TestHelper do
   alias Jido.AI.Runner.GEPA.Evaluator.EvaluationResult
   alias Jido.AI.Runner.GEPA.TestFixtures
   alias Jido.AI.Runner.GEPA.Trajectory
+  alias Jido.Signal.ID, as: SignalID
 
   @doc """
   Sets up a mock model in the test context.
@@ -91,7 +92,7 @@ defmodule Jido.AI.Runner.GEPA.TestHelper do
         # This prevents issues with concurrent agent lifecycle management
         {:ok,
          %Jido.Signal{
-           id: Jido.Signal.ID.generate!(),
+           id: SignalID.generate!(),
            type: "jido.agent.internal.ok",
            source: "/mock/agent",
            data: %{status: :ok}
@@ -364,7 +365,7 @@ defmodule Jido.AI.Runner.GEPA.TestHelper do
   # Build a mock Signal response for Server.call
   defp build_mock_signal(mock, prompt) do
     %Jido.Signal{
-      id: Jido.Signal.ID.generate!(),
+      id: SignalID.generate!(),
       type: "jido.agent.out.instruction.result",
       source: "/mock/agent",
       data: %{

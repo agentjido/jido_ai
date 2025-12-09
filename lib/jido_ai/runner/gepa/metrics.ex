@@ -101,7 +101,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     # Contains collections of metric values organized by type,
     # enabling statistical analysis and fitness calculation.
 
-    field(:values, %{optional(metric_type()) => list(MetricValue.t())}, default: %{})
+    field(:values, %{optional(Jido.AI.Runner.GEPA.Metrics.metric_type()) => list(MetricValue.t())}, default: %{})
     field(:task_ids, MapSet.t(), default: MapSet.new())
     field(:metadata, map(), default: %{})
     field(:created_at, DateTime.t(), enforce: true)
@@ -154,7 +154,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
       metrics = Metrics.add_metric(metrics, :latency, 1234, task_id: "task_1")
       metrics = Metrics.add_metric(metrics, :quality_score, 0.85, metadata: %{model: "gpt-4"})
   """
-  @spec add_metric(t(), metric_type(), metric_value(), keyword()) :: t()
+  @spec add_metric(t(), Jido.AI.Runner.GEPA.Metrics.metric_type(), Jido.AI.Runner.GEPA.Metrics.metric_value(), keyword()) :: t()
   def add_metric(%__MODULE__{} = metrics, type, value, opts \\ [])
       when is_atom(type) and is_number(value) do
     task_id = Keyword.get(opts, :task_id)
@@ -217,7 +217,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
 
   Map of metric_type => aggregation_stats
   """
-  @spec aggregate(t(), keyword()) :: %{optional(metric_type()) => aggregation_stats()}
+  @spec aggregate(t(), keyword()) :: %{optional(Jido.AI.Runner.GEPA.Metrics.metric_type()) => aggregation_stats()}
   def aggregate(%__MODULE__{} = metrics, opts \\ []) do
     types = Keyword.get(opts, :types, Map.keys(metrics.values))
     task_id = Keyword.get(opts, :task_id)
@@ -264,7 +264,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
 
   Map with :lower, :upper, :mean, :confidence keys, or nil if insufficient data
   """
-  @spec confidence_interval(t(), metric_type(), keyword()) :: map() | nil
+  @spec confidence_interval(t(), Jido.AI.Runner.GEPA.Metrics.metric_type(), keyword()) :: map() | nil
   def confidence_interval(%__MODULE__{} = metrics, type, opts \\ []) do
     confidence_level = Keyword.get(opts, :confidence_level, 0.95)
     task_id = Keyword.get(opts, :task_id)
@@ -344,7 +344,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
       stats = Metrics.get_stats(metrics, :success_rate)
       # => %{mean: 0.95, median: 1.0, variance: 0.01, ...}
   """
-  @spec get_stats(t(), metric_type(), keyword()) :: aggregation_stats() | nil
+  @spec get_stats(t(), Jido.AI.Runner.GEPA.Metrics.metric_type(), keyword()) :: aggregation_stats() | nil
   def get_stats(%__MODULE__{} = metrics, type, opts \\ []) do
     task_id = Keyword.get(opts, :task_id)
 
@@ -369,7 +369,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
       count = Metrics.count(metrics, :success_rate)
       # => 10
   """
-  @spec count(t(), metric_type()) :: non_neg_integer()
+  @spec count(t(), Jido.AI.Runner.GEPA.Metrics.metric_type()) :: non_neg_integer()
   def count(%__MODULE__{} = metrics, type) do
     metrics.values
     |> Map.get(type, [])
@@ -533,7 +533,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     end
   end
 
-  @spec default_weights() :: %{metric_type() => float()}
+  @spec default_weights() :: %{Jido.AI.Runner.GEPA.Metrics.metric_type() => float()}
   defp default_weights do
     %{
       success_rate: 0.4,
@@ -544,8 +544,8 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     }
   end
 
-  @spec calculate_weighted_fitness(%{metric_type() => aggregation_stats()}, %{
-          metric_type() => float()
+  @spec calculate_weighted_fitness(%{Jido.AI.Runner.GEPA.Metrics.metric_type() => aggregation_stats()}, %{
+          Jido.AI.Runner.GEPA.Metrics.metric_type() => float()
         }) :: float()
   defp calculate_weighted_fitness(aggregated, weights) do
     total_weight =
@@ -575,7 +575,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     end
   end
 
-  @spec calculate_geometric_fitness(%{metric_type() => aggregation_stats()}) :: float()
+  @spec calculate_geometric_fitness(%{Jido.AI.Runner.GEPA.Metrics.metric_type() => aggregation_stats()}) :: float()
   defp calculate_geometric_fitness(aggregated) do
     if map_size(aggregated) == 0 do
       0.0
@@ -591,7 +591,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     end
   end
 
-  @spec normalize_metric_value(metric_type(), number()) :: float()
+  @spec normalize_metric_value(Jido.AI.Runner.GEPA.Metrics.metric_type(), number()) :: float()
   defp normalize_metric_value(:latency, value) do
     # Normalize latency: lower is better
     # Assume reasonable range is 0-10000ms

@@ -25,6 +25,8 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
 
   use TypedStruct
 
+  alias Jido.AI.Runner.GEPA.Reflector.Suggestion, as: ReflectorSuggestion
+
   # Type definitions
 
   @type edit_operation :: :insert | :replace | :delete | :move
@@ -130,11 +132,11 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
 
     field(:id, String.t(), enforce: true)
     field(:operation, Jido.AI.Runner.GEPA.SuggestionGeneration.edit_operation(), enforce: true)
-    field(:location, Jido.AI.Runner.GEPA.SuggestionGeneration.PromptLocation.t(), enforce: true)
+    field(:location, PromptLocation.t(), enforce: true)
     field(:content, String.t() | nil)
     field(:target_text, String.t() | nil)
 
-    field(:source_suggestion, Jido.AI.Runner.GEPA.Reflector.Suggestion.t(), enforce: true)
+    field(:source_suggestion, ReflectorSuggestion.t(), enforce: true)
     field(:rationale, String.t(), enforce: true)
     field(:impact_score, float(), default: 0.5)
     field(:priority, :high | :medium | :low, default: :medium)
@@ -234,11 +236,11 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
 
     field(
       :prompt_structure,
-      Jido.AI.Runner.GEPA.SuggestionGeneration.PromptStructure.t(),
+      PromptStructure.t(),
       enforce: true
     )
 
-    field(:edits, list(Jido.AI.Runner.GEPA.SuggestionGeneration.PromptEdit.t()), default: [])
+    field(:edits, list(PromptEdit.t()), default: [])
     field(:total_edits, non_neg_integer(), default: 0)
     field(:high_impact_edits, non_neg_integer(), default: 0)
     field(:conflicts_resolved, non_neg_integer(), default: 0)
@@ -279,7 +281,7 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
         }
     """
 
-    field(:edits, list(Jido.AI.Runner.GEPA.SuggestionGeneration.PromptEdit.t()), enforce: true)
+    field(:edits, list(PromptEdit.t()), enforce: true)
 
     field(
       :conflict_type,
@@ -294,6 +296,6 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
     )
 
     field(:resolved, boolean(), default: false)
-    field(:selected_edit, Jido.AI.Runner.GEPA.SuggestionGeneration.PromptEdit.t() | nil)
+    field(:selected_edit, PromptEdit.t() | nil)
   end
 end

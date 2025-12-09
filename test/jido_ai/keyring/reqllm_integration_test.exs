@@ -74,9 +74,13 @@ defmodule JidoTest.AI.Keyring.ReqLLMIntegrationTest do
         end
       end)
 
-      assert Keyring.get_with_reqllm(Keyring, :anthropic_api_key, nil, self(), %{}) == "anthropic-key"
+      assert Keyring.get_with_reqllm(Keyring, :anthropic_api_key, nil, self(), %{}) ==
+               "anthropic-key"
+
       assert Keyring.get_with_reqllm(Keyring, :google_api_key, nil, self(), %{}) == "google-key"
-      assert Keyring.get_with_reqllm(Keyring, :openrouter_api_key, nil, self(), %{}) == "openrouter-key"
+
+      assert Keyring.get_with_reqllm(Keyring, :openrouter_api_key, nil, self(), %{}) ==
+               "openrouter-key"
     end
   end
 
@@ -147,10 +151,11 @@ defmodule JidoTest.AI.Keyring.ReqLLMIntegrationTest do
       Keyring.set_session_value(:process_test, "main-process")
 
       # Spawn a new process and check it doesn't see the session value
-      task = Task.async(fn ->
-        stub(ReqLLM, :get_key, fn _key -> nil end)
-        Keyring.get_with_reqllm(Keyring, :process_test, "other-process", self(), %{})
-      end)
+      task =
+        Task.async(fn ->
+          stub(ReqLLM, :get_key, fn _key -> nil end)
+          Keyring.get_with_reqllm(Keyring, :process_test, "other-process", self(), %{})
+        end)
 
       result = Task.await(task)
       assert result == "other-process"

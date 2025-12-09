@@ -168,9 +168,9 @@ defmodule Jido.AI.Runner.GEPA.Diversity do
 
     field(:generation, non_neg_integer(), enforce: true)
     field(:population_size, non_neg_integer(), enforce: true)
-    field(:metrics, Jido.AI.Runner.GEPA.Diversity.DiversityMetrics.t(), enforce: true)
-    field(:similarity_matrix, Jido.AI.Runner.GEPA.Diversity.SimilarityMatrix.t() | nil)
-    field(:novelty_scores, list(Jido.AI.Runner.GEPA.Diversity.NoveltyScore.t()), default: [])
+    field(:metrics, DiversityMetrics.t(), enforce: true)
+    field(:similarity_matrix, SimilarityMatrix.t() | nil)
+    field(:novelty_scores, list(NoveltyScore.t()), default: [])
     field(:action_recommended, atom(), default: :none)
     field(:computed_at, DateTime.t(), enforce: true)
     field(:metadata, map(), default: %{})

@@ -6,8 +6,8 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
   alias Jido.AI.Model
   alias Jido.AI.Runner.ChainOfThought
   alias Jido.AI.Runner.SelfConsistency
-  alias Jido.AI.Runner.TreeOfThoughts.ThoughtGenerator
   alias Jido.AI.Runner.TreeOfThoughts.ThoughtEvaluator
+  alias Jido.AI.Runner.TreeOfThoughts.ThoughtGenerator
 
   @moduletag :capture_log
   @moduletag :reqllm_integration
@@ -46,10 +46,11 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
     end
 
     test "accepts model from agent state config" do
-      agent = build_test_agent_with_config(%{
-        model: "claude-3-5-sonnet-latest",
-        mode: :zero_shot
-      })
+      agent =
+        build_test_agent_with_config(%{
+          model: "claude-3-5-sonnet-latest",
+          mode: :zero_shot
+        })
 
       # With no pending instructions, runs successfully
       {:ok, _agent, _directives} = ChainOfThought.run(agent)
@@ -103,14 +104,15 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         "I calculated carefully. The answer is 10."
       end
 
-      {:ok, result} = SelfConsistency.run(
-        problem: "What is 5 + 5?",
-        sample_count: 5,
-        reasoning_fn: reasoning_fn,
-        parallel: false,
-        min_consensus: 0.3,
-        quality_threshold: 0.1
-      )
+      {:ok, result} =
+        SelfConsistency.run(
+          problem: "What is 5 + 5?",
+          sample_count: 5,
+          reasoning_fn: reasoning_fn,
+          parallel: false,
+          min_consensus: 0.3,
+          quality_threshold: 0.1
+        )
 
       assert Map.has_key?(result, :answer)
       assert Map.has_key?(result, :confidence)
@@ -123,14 +125,15 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         "Valid reasoning path. The answer is 12."
       end
 
-      {:ok, result} = SelfConsistency.run(
-        problem: "Test problem",
-        sample_count: 5,
-        reasoning_fn: reasoning_fn,
-        parallel: false,
-        min_consensus: 0.3,
-        quality_threshold: 0.1
-      )
+      {:ok, result} =
+        SelfConsistency.run(
+          problem: "Test problem",
+          sample_count: 5,
+          reasoning_fn: reasoning_fn,
+          parallel: false,
+          min_consensus: 0.3,
+          quality_threshold: 0.1
+        )
 
       assert is_list(result.paths)
     end
@@ -141,14 +144,15 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         "I calculated carefully. The final answer is 10."
       end
 
-      {:ok, result} = SelfConsistency.run(
-        problem: "What is 10?",
-        sample_count: 3,
-        temperature: 0.8,
-        reasoning_fn: reasoning_fn,
-        min_consensus: 0.3,
-        quality_threshold: 0.1
-      )
+      {:ok, result} =
+        SelfConsistency.run(
+          problem: "What is 10?",
+          sample_count: 3,
+          temperature: 0.8,
+          reasoning_fn: reasoning_fn,
+          min_consensus: 0.3,
+          quality_threshold: 0.1
+        )
 
       assert Map.has_key?(result, :answer)
     end
@@ -159,13 +163,14 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         "Unique reasoning path #{i}. The final answer is #{i * 100}."
       end
 
-      result = SelfConsistency.run(
-        problem: "Ambiguous problem",
-        sample_count: 5,
-        min_consensus: 0.9,
-        reasoning_fn: reasoning_fn,
-        quality_threshold: 0.1
-      )
+      result =
+        SelfConsistency.run(
+          problem: "Ambiguous problem",
+          sample_count: 5,
+          min_consensus: 0.9,
+          reasoning_fn: reasoning_fn,
+          quality_threshold: 0.1
+        )
 
       # Should fail due to insufficient consensus
       assert match?({:error, {:insufficient_consensus, _}}, result)
@@ -179,15 +184,16 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
       end
 
       # Test majority voting
-      {:ok, result} = SelfConsistency.run(
-        problem: "What is 6 + 6?",
-        sample_count: 5,
-        voting_strategy: :majority,
-        reasoning_fn: reasoning_fn,
-        parallel: false,
-        min_consensus: 0.3,
-        quality_threshold: 0.1
-      )
+      {:ok, result} =
+        SelfConsistency.run(
+          problem: "What is 6 + 6?",
+          sample_count: 5,
+          voting_strategy: :majority,
+          reasoning_fn: reasoning_fn,
+          parallel: false,
+          min_consensus: 0.3,
+          quality_threshold: 0.1
+        )
 
       # Should have a valid answer
       assert Map.has_key?(result, :answer)
@@ -205,13 +211,14 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         ["Approach 1: Direct", "Approach 2: Indirect", "Approach 3: Hybrid"]
       end
 
-      {:ok, thoughts} = ThoughtGenerator.generate(
-        problem: "Solve 4+5",
-        parent_state: %{},
-        strategy: :sampling,
-        beam_width: 3,
-        thought_fn: thoughts_fn
-      )
+      {:ok, thoughts} =
+        ThoughtGenerator.generate(
+          problem: "Solve 4+5",
+          parent_state: %{},
+          strategy: :sampling,
+          beam_width: 3,
+          thought_fn: thoughts_fn
+        )
 
       assert length(thoughts) == 3
     end
@@ -221,13 +228,14 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         ["Initial approach", "Refined approach", "Alternative"]
       end
 
-      {:ok, thoughts} = ThoughtGenerator.generate(
-        problem: "Complex problem",
-        parent_state: %{step: 1},
-        strategy: :proposal,
-        beam_width: 3,
-        thought_fn: thoughts_fn
-      )
+      {:ok, thoughts} =
+        ThoughtGenerator.generate(
+          problem: "Complex problem",
+          parent_state: %{step: 1},
+          strategy: :proposal,
+          beam_width: 3,
+          thought_fn: thoughts_fn
+        )
 
       assert length(thoughts) == 3
     end
@@ -257,13 +265,14 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         ["Custom thought 1", "Custom thought 2", "Custom thought 3"]
       end
 
-      {:ok, thoughts} = ThoughtGenerator.generate(
-        problem: "Test problem",
-        parent_state: %{},
-        strategy: :sampling,
-        beam_width: 3,
-        thought_fn: thoughts_fn
-      )
+      {:ok, thoughts} =
+        ThoughtGenerator.generate(
+          problem: "Test problem",
+          parent_state: %{},
+          strategy: :sampling,
+          beam_width: 3,
+          thought_fn: thoughts_fn
+        )
 
       assert is_list(thoughts)
       assert length(thoughts) == 3
@@ -276,13 +285,14 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         ["Only one thought"]
       end
 
-      {:ok, thoughts} = ThoughtGenerator.generate(
-        problem: "Test",
-        parent_state: %{},
-        strategy: :sampling,
-        beam_width: 5,
-        thought_fn: thoughts_fn
-      )
+      {:ok, thoughts} =
+        ThoughtGenerator.generate(
+          problem: "Test",
+          parent_state: %{},
+          strategy: :sampling,
+          beam_width: 5,
+          thought_fn: thoughts_fn
+        )
 
       assert length(thoughts) == 1
     end
@@ -298,22 +308,24 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
       end
 
       # Sampling strategy
-      {:ok, sampling_thoughts} = ThoughtGenerator.generate(
-        problem: "Test",
-        parent_state: %{},
-        strategy: :sampling,
-        beam_width: 3,
-        thought_fn: proposal_fn
-      )
+      {:ok, sampling_thoughts} =
+        ThoughtGenerator.generate(
+          problem: "Test",
+          parent_state: %{},
+          strategy: :sampling,
+          beam_width: 3,
+          thought_fn: proposal_fn
+        )
 
       # Proposal strategy
-      {:ok, proposal_thoughts} = ThoughtGenerator.generate(
-        problem: "Test",
-        parent_state: %{},
-        strategy: :proposal,
-        beam_width: 3,
-        thought_fn: proposal_fn
-      )
+      {:ok, proposal_thoughts} =
+        ThoughtGenerator.generate(
+          problem: "Test",
+          parent_state: %{},
+          strategy: :proposal,
+          beam_width: 3,
+          thought_fn: proposal_fn
+        )
 
       assert length(sampling_thoughts) == 3
       assert length(proposal_thoughts) == 3
@@ -330,12 +342,13 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         0.75
       end
 
-      {:ok, score} = ThoughtEvaluator.evaluate(
-        thought: "Test thought",
-        problem: "Solve this problem",
-        strategy: :value,
-        evaluation_fn: eval_fn
-      )
+      {:ok, score} =
+        ThoughtEvaluator.evaluate(
+          thought: "Test thought",
+          problem: "Solve this problem",
+          strategy: :value,
+          evaluation_fn: eval_fn
+        )
 
       assert score == 0.75
       assert score >= 0.0 and score <= 1.0
@@ -358,11 +371,12 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         end
       end
 
-      {:ok, scores} = ThoughtEvaluator.evaluate_batch(thoughts, [
-        problem: "Test problem",
-        strategy: :value,
-        evaluation_fn: eval_fn
-      ])
+      {:ok, scores} =
+        ThoughtEvaluator.evaluate_batch(thoughts,
+          problem: "Test problem",
+          strategy: :value,
+          evaluation_fn: eval_fn
+        )
 
       assert length(scores) == 3
       # Optimal should score highest
@@ -370,11 +384,12 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
     end
 
     test "uses heuristic evaluation as fallback" do
-      {:ok, score} = ThoughtEvaluator.evaluate(
-        thought: "A reasonable solution approach",
-        problem: "Test problem",
-        strategy: :heuristic
-      )
+      {:ok, score} =
+        ThoughtEvaluator.evaluate(
+          thought: "A reasonable solution approach",
+          problem: "Test problem",
+          strategy: :heuristic
+        )
 
       assert is_float(score)
       assert score >= 0.0 and score <= 1.0
@@ -404,12 +419,13 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         min(1.0, String.length(thought) / 50.0)
       end
 
-      {:ok, score} = ThoughtEvaluator.evaluate(
-        thought: "This is a longer thought with more content",
-        problem: "Complex problem",
-        strategy: :value,
-        evaluation_fn: eval_fn
-      )
+      {:ok, score} =
+        ThoughtEvaluator.evaluate(
+          thought: "This is a longer thought with more content",
+          problem: "Complex problem",
+          strategy: :value,
+          evaluation_fn: eval_fn
+        )
 
       assert is_float(score)
       assert score > 0.5
@@ -419,12 +435,13 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
       # Hybrid uses both value (needs eval_fn) and heuristic
       eval_fn = fn _opts -> 0.7 end
 
-      {:ok, score} = ThoughtEvaluator.evaluate(
-        thought: "Try to calculate the result step by step",
-        problem: "Test problem",
-        strategy: :hybrid,
-        evaluation_fn: eval_fn
-      )
+      {:ok, score} =
+        ThoughtEvaluator.evaluate(
+          thought: "Try to calculate the result step by step",
+          problem: "Test problem",
+          strategy: :hybrid,
+          evaluation_fn: eval_fn
+        )
 
       assert is_float(score)
       assert score >= 0.0 and score <= 1.0
@@ -433,13 +450,14 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
     test "evaluation with different num_votes configurations" do
       eval_fn = fn _opts -> 0.7 end
 
-      {:ok, score} = ThoughtEvaluator.evaluate(
-        thought: "Test thought",
-        problem: "Test problem",
-        strategy: :vote,
-        num_votes: 5,
-        evaluation_fn: eval_fn
-      )
+      {:ok, score} =
+        ThoughtEvaluator.evaluate(
+          thought: "Test thought",
+          problem: "Test problem",
+          strategy: :vote,
+          num_votes: 5,
+          evaluation_fn: eval_fn
+        )
 
       assert score == 0.7
     end
@@ -459,13 +477,14 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
     test "ThoughtGenerator accepts provider:model format" do
       thoughts_fn = fn _opts -> ["Thought"] end
 
-      {:ok, _thoughts} = ThoughtGenerator.generate(
-        problem: "Test",
-        parent_state: %{},
-        beam_width: 1,
-        model: "anthropic:claude-3-5-haiku",
-        thought_fn: thoughts_fn
-      )
+      {:ok, _thoughts} =
+        ThoughtGenerator.generate(
+          problem: "Test",
+          parent_state: %{},
+          beam_width: 1,
+          model: "anthropic:claude-3-5-haiku",
+          thought_fn: thoughts_fn
+        )
     end
 
     test "Model.from converts to ReqLLM.Model for runners" do
@@ -480,8 +499,10 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
       agent = build_test_agent()
 
       providers = [
-        "gpt-4",           # OpenAI
-        "claude-3-5-haiku" # Anthropic
+        # OpenAI
+        "gpt-4",
+        # Anthropic
+        "claude-3-5-haiku"
       ]
 
       # With no instructions, no LLM call needed
@@ -546,14 +567,15 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         "I analyzed the problem carefully. The answer is 42."
       end
 
-      {:ok, result} = SelfConsistency.run(
-        problem: "Parallel test",
-        sample_count: 5,
-        parallel: true,
-        reasoning_fn: reasoning_fn,
-        min_consensus: 0.3,
-        quality_threshold: 0.1
-      )
+      {:ok, result} =
+        SelfConsistency.run(
+          problem: "Parallel test",
+          sample_count: 5,
+          parallel: true,
+          reasoning_fn: reasoning_fn,
+          min_consensus: 0.3,
+          quality_threshold: 0.1
+        )
 
       assert length(result.paths) >= 1
     end
@@ -564,14 +586,15 @@ defmodule JidoTest.AI.Runner.ReqLLMIntegrationTest do
         "After careful analysis, the answer is 42."
       end
 
-      {:ok, result} = SelfConsistency.run(
-        problem: "Sequential test",
-        sample_count: 3,
-        parallel: false,
-        reasoning_fn: reasoning_fn,
-        min_consensus: 0.3,
-        quality_threshold: 0.1
-      )
+      {:ok, result} =
+        SelfConsistency.run(
+          problem: "Sequential test",
+          sample_count: 3,
+          parallel: false,
+          reasoning_fn: reasoning_fn,
+          min_consensus: 0.3,
+          quality_threshold: 0.1
+        )
 
       assert length(result.paths) >= 1
     end

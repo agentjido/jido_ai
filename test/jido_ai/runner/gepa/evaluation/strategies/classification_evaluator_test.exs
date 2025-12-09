@@ -399,7 +399,9 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.ClassificationEvaluatorTest 
         classification_consistency: 1.0
       }
 
-      fitness_perfect = ClassificationEvaluator.calculate_classification_fitness(0.5, perfect_accuracy)
+      fitness_perfect =
+        ClassificationEvaluator.calculate_classification_fitness(0.5, perfect_accuracy)
+
       fitness_poor = ClassificationEvaluator.calculate_classification_fitness(0.5, poor_accuracy)
 
       # Correct label (0.7) should score higher than perfect calibration+consistency (0.3)

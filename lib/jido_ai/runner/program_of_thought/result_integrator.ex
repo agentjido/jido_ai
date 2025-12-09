@@ -30,6 +30,8 @@ defmodule Jido.AI.Runner.ProgramOfThought.ResultIntegrator do
 
   require Logger
 
+  alias Jido.AI.Actions.ReqLlm.ChatCompletion
+
   @doc """
   Integrates execution result with explanation and validation.
 
@@ -263,7 +265,7 @@ defmodule Jido.AI.Runner.ProgramOfThought.ResultIntegrator do
     }
 
     try do
-      case Jido.AI.Actions.ReqLlm.ChatCompletion.run(params, context) do
+      case ChatCompletion.run(params, context) do
         {:ok, result, _context} ->
           content = extract_content(result)
           {:ok, content}

@@ -154,7 +154,8 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.CodeEvaluator do
     # Try to extract code from markdown code blocks
     case Regex.run(~r/```(?:\w+)?\n(.*?)\n```/s, text) do
       [_, code] -> String.trim(code)
-      nil -> text  # No code blocks, use entire text
+      # No code blocks, use entire text
+      nil -> text
     end
   end
 

@@ -180,27 +180,27 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.QuestionAnsweringEvaluatorTe
     end
   end
 
-  describe "is_grounded_in_context?/2" do
+  describe "grounded_in_context?/2" do
     test "returns true when answer is grounded in context" do
       answer = "Paris is the capital"
       context = "Paris is the capital of France"
 
-      assert QuestionAnsweringEvaluator.is_grounded_in_context?(answer, context) == true
+      assert QuestionAnsweringEvaluator.grounded_in_context?(answer, context) == true
     end
 
     test "returns false when answer contains hallucinations" do
       answer = "London is made of gold"
       context = "London is a city in England"
 
-      assert QuestionAnsweringEvaluator.is_grounded_in_context?(answer, context) == false
+      assert QuestionAnsweringEvaluator.grounded_in_context?(answer, context) == false
     end
 
     test "returns false when context is nil" do
-      assert QuestionAnsweringEvaluator.is_grounded_in_context?("answer", nil) == false
+      assert QuestionAnsweringEvaluator.grounded_in_context?("answer", nil) == false
     end
 
     test "returns false for empty answer" do
-      assert QuestionAnsweringEvaluator.is_grounded_in_context?("", "context") == false
+      assert QuestionAnsweringEvaluator.grounded_in_context?("", "context") == false
     end
   end
 

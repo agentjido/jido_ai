@@ -122,11 +122,15 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
     end
 
     test "tuple converts to ReqLLM.Model with metadata" do
-      {:ok, model} = Model.from({:openai, [
-        model: "gpt-4",
-        max_tokens: 2048,
-        temperature: 0.5
-      ]})
+      {:ok, model} =
+        Model.from(
+          {:openai,
+           [
+             model: "gpt-4",
+             max_tokens: 2048,
+             temperature: 0.5
+           ]}
+        )
 
       assert is_struct(model, ReqLLM.Model)
       assert model.provider == :openai
@@ -245,10 +249,14 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
     test "ChatCompletion with invalid model returns error" do
       prompt = Prompt.new(:user, "Test")
 
-      result = ChatCompletion.run(%{
-        model: "not-a-model",
-        prompt: prompt
-      }, %{})
+      result =
+        ChatCompletion.run(
+          %{
+            model: "not-a-model",
+            prompt: prompt
+          },
+          %{}
+        )
 
       assert match?({:error, _}, result)
     end
@@ -276,11 +284,16 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
       end)
 
       {:ok, model} = Model.from({:openai, [model: "gpt-4"]})
-      {:ok, _result} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        temperature: 0.2
-      }, %{})
+
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            temperature: 0.2
+          },
+          %{}
+        )
     end
 
     test "max_tokens flows through system" do
@@ -292,11 +305,16 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
       end)
 
       {:ok, model} = Model.from({:openai, [model: "gpt-4"]})
-      {:ok, _result} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        max_tokens: 500
-      }, %{})
+
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            max_tokens: 500
+          },
+          %{}
+        )
     end
 
     test "stop sequences flow through system" do
@@ -308,11 +326,16 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
       end)
 
       {:ok, model} = Model.from({:openai, [model: "gpt-4"]})
-      {:ok, _result} = ChatCompletion.run(%{
-        model: model,
-        prompt: prompt,
-        stop: ["END"]
-      }, %{})
+
+      {:ok, _result} =
+        ChatCompletion.run(
+          %{
+            model: model,
+            prompt: prompt,
+            stop: ["END"]
+          },
+          %{}
+        )
     end
   end
 
@@ -324,9 +347,13 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
     test "tool calls flow through system" do
       prompt = Prompt.new(:user, "Call a tool")
 
-      response = mock_chat_response("I'll use the tool", tool_calls: [
-        %{name: "search", arguments: %{"query" => "test"}}
-      ])
+      response =
+        mock_chat_response("I'll use the tool",
+          tool_calls: [
+            %{name: "search", arguments: %{"query" => "test"}}
+          ]
+        )
+
       mock_generate_text(response)
 
       {:ok, model} = Model.from({:openai, [model: "gpt-4"]})
@@ -341,10 +368,14 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
     test "multiple tool calls flow through system" do
       prompt = Prompt.new(:user, "Multiple tools")
 
-      response = mock_chat_response("Using tools", tool_calls: [
-        %{name: "tool1", arguments: %{"a" => 1}},
-        %{name: "tool2", arguments: %{"b" => 2}}
-      ])
+      response =
+        mock_chat_response("Using tools",
+          tool_calls: [
+            %{name: "tool1", arguments: %{"a" => 1}},
+            %{name: "tool2", arguments: %{"b" => 2}}
+          ]
+        )
+
       mock_generate_text(response)
 
       {:ok, model} = Model.from({:anthropic, [model: "claude-3-5-sonnet"]})

@@ -98,16 +98,12 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.TaskEvaluator do
 
     case dispatch_to_evaluator(task_type, prompt, opts) do
       {:ok, result} ->
-        Logger.debug(
-          "Task evaluation completed (type: #{task_type}, fitness: #{result.fitness})"
-        )
+        Logger.debug("Task evaluation completed (type: #{task_type}, fitness: #{result.fitness})")
 
         {:ok, result}
 
       {:error, reason} = error ->
-        Logger.warning(
-          "Task evaluation failed (type: #{task_type}, reason: #{inspect(reason)})"
-        )
+        Logger.warning("Task evaluation failed (type: #{task_type}, reason: #{inspect(reason)})")
 
         error
     end
@@ -191,7 +187,8 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.TaskEvaluator do
   end
 
   @doc false
-  @spec dispatch_to_batch_evaluator(atom(), list(prompt()), keyword()) :: list(evaluation_result())
+  @spec dispatch_to_batch_evaluator(atom(), list(prompt()), keyword()) ::
+          list(evaluation_result())
   defp dispatch_to_batch_evaluator(:code_generation, prompts, opts) do
     # Use CodeEvaluator batch evaluation
     CodeEvaluator.evaluate_batch(prompts, opts)

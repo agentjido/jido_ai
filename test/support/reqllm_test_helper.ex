@@ -25,6 +25,8 @@ defmodule JidoTest.ReqLLMTestHelper do
   import Mimic
   import ExUnit.Assertions
 
+  alias Jido.AI.Prompt
+
   @doc """
   Sets up mocked ReqLLM.generate_text responses.
 
@@ -300,7 +302,7 @@ defmodule JidoTest.ReqLLMTestHelper do
   """
   def create_test_prompt(content, opts \\ []) do
     role = Keyword.get(opts, :role, :user)
-    Jido.AI.Prompt.new(role, content)
+    Prompt.new(role, content)
   end
 
   @doc """

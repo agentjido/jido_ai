@@ -68,6 +68,7 @@ defmodule Jido.AI.Actions.CoT.GenerateElixirCode do
       ]
     ]
 
+  alias Jido.AI.Actions.ReqLlm.ChatCompletion
   alias Jido.AI.Runner.ChainOfThought.StructuredCode.{ProgramAnalyzer, ReasoningTemplates}
 
   @impl true
@@ -293,7 +294,7 @@ defmodule Jido.AI.Actions.CoT.GenerateElixirCode do
 
     # Try to use Jido.AI.Actions.ReqLlm.ChatCompletion if available
     try do
-      case Jido.AI.Actions.ReqLlm.ChatCompletion.run(params, context) do
+      case ChatCompletion.run(params, context) do
         {:ok, result, _context} ->
           # Extract content from response
           content =

@@ -76,7 +76,8 @@ defmodule Jido.AI.Actions.TextCompletion do
   end
 
   @doc false
-  @spec build_reqllm_model(Model.t() | ReqLLM.Model.t(), map()) :: {:ok, tuple()} | {:error, term()}
+  @spec build_reqllm_model(Model.t() | ReqLLM.Model.t(), map()) ::
+          {:ok, tuple()} | {:error, term()}
   defp build_reqllm_model(%ReqLLM.Model{} = model, params) do
     # Already a ReqLLM.Model, build tuple directly
     reqllm_tuple =

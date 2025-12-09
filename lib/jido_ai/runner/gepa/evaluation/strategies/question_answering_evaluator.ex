@@ -222,7 +222,7 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.QuestionAnsweringEvaluator d
         0.7
 
       # If context provided, check if answer is grounded in context
-      context && is_grounded_in_context?(answer, context) ->
+      context && grounded_in_context?(answer, context) ->
         0.6
 
       # No match
@@ -269,9 +269,9 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.QuestionAnsweringEvaluator d
   def extract_words(_), do: []
 
   @doc false
-  def is_grounded_in_context?(_answer, nil), do: false
+  def grounded_in_context?(_answer, nil), do: false
 
-  def is_grounded_in_context?(answer, context) do
+  def grounded_in_context?(answer, context) do
     # Check if answer content comes from context
     answer_words = extract_words(answer)
     context_words = extract_words(context)

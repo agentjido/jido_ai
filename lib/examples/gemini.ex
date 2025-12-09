@@ -25,7 +25,10 @@ defmodule JidoAi.Examples.Gemini do
       %{role: :user, content: "Explain the concept of functional programming in Elixir"}
     ]
 
-    case ReqLLM.generate_text("google:gemini-2.0-flash", messages, temperature: 0.7, max_tokens: 500) do
+    case ReqLLM.generate_text("google:gemini-2.0-flash", messages,
+           temperature: 0.7,
+           max_tokens: 500
+         ) do
       {:ok, result} ->
         # Print the result
         IO.puts("\n\nGemini Response:\n")

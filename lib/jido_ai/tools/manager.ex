@@ -31,6 +31,7 @@ defmodule Jido.AI.Tools.Manager do
 
   require Logger
 
+  alias Jido.AI.Actions.ReqLlm.ChatCompletion
   alias Jido.AI.Conversation.Manager, as: ConversationManager
   alias Jido.AI.Tools.SchemaConverter
 
@@ -211,7 +212,15 @@ defmodule Jido.AI.Tools.Manager do
     end
   end
 
-  defp handle_llm_response(response, conversation, tools, action_map, context, iterations_left, opts) do
+  defp handle_llm_response(
+         response,
+         conversation,
+         tools,
+         action_map,
+         context,
+         iterations_left,
+         opts
+       ) do
     content = Map.get(response, :content, "")
     tool_calls = extract_tool_calls(response)
 
@@ -291,7 +300,13 @@ defmodule Jido.AI.Tools.Manager do
 
     case call_llm_stream(state.conversation.model, messages, state.tools) do
       {:ok, llm_stream} ->
-        new_state = %{state | phase: :streaming, current_stream: llm_stream, accumulated_content: ""}
+        new_state = %{
+          state
+          | phase: :streaming,
+            current_stream: llm_stream,
+            accumulated_content: ""
+        }
+
         stream_next(new_state)
 
       {:error, reason} ->
@@ -512,7 +527,7 @@ defmodule Jido.AI.Tools.Manager do
     }
 
     # Use ChatCompletion action
-    case Jido.AI.Actions.ReqLlm.ChatCompletion.run(params, %{timeout: timeout}) do
+    case ChatCompletion.run(params, %{timeout: timeout}) do
       {:ok, response} -> {:ok, response}
       {:error, reason} -> {:error, reason}
     end
@@ -526,7 +541,7 @@ defmodule Jido.AI.Tools.Manager do
       stream: true
     }
 
-    case Jido.AI.Actions.ReqLlm.ChatCompletion.run(params, %{}) do
+    case ChatCompletion.run(params, %{}) do
       {:ok, stream} -> {:ok, stream}
       {:error, reason} -> {:error, reason}
     end
@@ -574,9 +589,15 @@ defmodule Jido.AI.Tools.Manager do
     end
   end
 
-  defp get_tool_call_arguments(%{function: %{arguments: args}}), do: get_tool_call_arguments(%{arguments: args})
-  defp get_tool_call_arguments(%{"arguments" => args}), do: get_tool_call_arguments(%{arguments: args})
-  defp get_tool_call_arguments(%{"function" => f}), do: get_tool_call_arguments(%{function: atomize_keys(f)})
+  defp get_tool_call_arguments(%{function: %{arguments: args}}),
+    do: get_tool_call_arguments(%{arguments: args})
+
+  defp get_tool_call_arguments(%{"arguments" => args}),
+    do: get_tool_call_arguments(%{arguments: args})
+
+  defp get_tool_call_arguments(%{"function" => f}),
+    do: get_tool_call_arguments(%{function: atomize_keys(f)})
+
   defp get_tool_call_arguments(_), do: %{}
 
   defp get_tool_call_id(%{id: id}), do: id

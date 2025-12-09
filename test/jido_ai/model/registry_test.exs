@@ -181,7 +181,10 @@ defmodule JidoTest.AI.Model.RegistryTest do
       # All returned models should support text modality
       Enum.each(models, fn model ->
         case model.modalities do
-          nil -> :ok  # Unknown modality allowed
+          # Unknown modality allowed
+          nil ->
+            :ok
+
           modalities ->
             input = Map.get(modalities, :input, [])
             assert :text in input or input == []
@@ -199,13 +202,15 @@ defmodule JidoTest.AI.Model.RegistryTest do
     end
 
     test "combines multiple filters" do
-      {:ok, models} = Registry.discover_models([
-        provider: :openai,
-        capability: :tool_call
-      ])
+      {:ok, models} =
+        Registry.discover_models(
+          provider: :openai,
+          capability: :tool_call
+        )
 
       Enum.each(models, fn model ->
         assert model.provider == :openai
+
         if model.capabilities do
           assert Map.get(model.capabilities, :tool_call, false) == true
         end
@@ -214,10 +219,11 @@ defmodule JidoTest.AI.Model.RegistryTest do
 
     test "returns empty list when no models match filters" do
       # Use impossible combination
-      {:ok, models} = Registry.discover_models([
-        provider: :openai,
-        min_context_length: 999_999_999
-      ])
+      {:ok, models} =
+        Registry.discover_models(
+          provider: :openai,
+          min_context_length: 999_999_999
+        )
 
       assert is_list(models)
       # Should be empty or very small
@@ -296,7 +302,9 @@ defmodule JidoTest.AI.Model.RegistryTest do
       |> Enum.each(fn model ->
         # Cost may be nil or a map
         case model.cost do
-          nil -> :ok
+          nil ->
+            :ok
+
           cost when is_map(cost) ->
             # If present, should have input/output costs
             assert Map.has_key?(cost, :input) or is_nil(cost[:input])

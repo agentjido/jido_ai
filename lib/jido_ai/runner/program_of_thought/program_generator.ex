@@ -43,6 +43,8 @@ defmodule Jido.AI.Runner.ProgramOfThought.ProgramGenerator do
 
   require Logger
 
+  alias Jido.AI.Actions.ReqLlm.ChatCompletion
+
   @doc """
   Generates an executable program for the given problem.
 
@@ -208,7 +210,7 @@ defmodule Jido.AI.Runner.ProgramOfThought.ProgramGenerator do
     }
 
     try do
-      case Jido.AI.Actions.ReqLlm.ChatCompletion.run(params, context) do
+      case ChatCompletion.run(params, context) do
         {:ok, result, _context} ->
           content = extract_content(result)
           {:ok, content}

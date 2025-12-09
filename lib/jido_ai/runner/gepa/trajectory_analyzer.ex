@@ -155,7 +155,7 @@ defmodule Jido.AI.Runner.GEPA.TrajectoryAnalyzer do
     Highlights key differences that may explain performance variation.
     """
 
-    field(:differences, list(Jido.AI.Runner.GEPA.TrajectoryAnalyzer.Difference.t()), default: [])
+    field(:differences, list(Difference.t()), default: [])
     field(:success_advantages, list(String.t()), default: [])
     field(:failure_disadvantages, list(String.t()), default: [])
     field(:key_insights, list(String.t()), default: [])
@@ -172,15 +172,15 @@ defmodule Jido.AI.Runner.GEPA.TrajectoryAnalyzer do
     field(:trajectory_id, String.t(), enforce: true)
     field(:outcome, Trajectory.outcome(), enforce: true)
 
-    field(:failure_points, list(Jido.AI.Runner.GEPA.TrajectoryAnalyzer.FailurePoint.t()),
+    field(:failure_points, list(FailurePoint.t()),
       default: []
     )
 
-    field(:reasoning_issues, list(Jido.AI.Runner.GEPA.TrajectoryAnalyzer.ReasoningIssue.t()),
+    field(:reasoning_issues, list(ReasoningIssue.t()),
       default: []
     )
 
-    field(:success_indicators, list(Jido.AI.Runner.GEPA.TrajectoryAnalyzer.SuccessIndicator.t()),
+    field(:success_indicators, list(SuccessIndicator.t()),
       default: []
     )
 

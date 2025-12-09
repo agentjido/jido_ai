@@ -194,7 +194,9 @@ defmodule Jido.AI.Runner.GEPA.Evaluation.Strategies.ReasoningEvaluatorTest do
     end
 
     test "gives medium score for response without connectors" do
-      response = "The first step is conversion. The second step is multiplication. The final result is 12."
+      response =
+        "The first step is conversion. The second step is multiplication. The final result is 12."
+
       clarity = ReasoningEvaluator.assess_clarity(response)
       assert clarity >= 0.3 && clarity <= 0.7
     end
