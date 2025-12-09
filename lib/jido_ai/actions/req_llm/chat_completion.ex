@@ -268,6 +268,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
         final_opts =
           opts_with_tools
           |> Keyword.put(:api_key, api_key)
+
         # Note: Headers are no longer passed to ReqLLM in the new version
         # ReqLLM handles authentication internally via the API key
 

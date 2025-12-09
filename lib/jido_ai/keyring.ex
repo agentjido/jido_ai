@@ -541,20 +541,23 @@ defmodule Jido.AI.Keyring do
   defp get_reqllm_or_env_value(server, key, default) do
     # Try to get value through ReqLLM.Keys for API keys
     provider = extract_provider_from_key(key)
-      if provider do
-        case ReqLLM.Keys.get(provider, []) do
-          {:ok, value, _source} ->
-            if is_binary(value) and value != "" do
-              value
-            else
-              get_env_value_from_ets(server, key, default)
-            end
-          {:error, _} -> get_env_value_from_ets(server, key, default)
-        end
-      else
-        # For non-API keys, use standard environment lookup
-        get_env_value_from_ets(server, key, default)
+
+    if provider do
+      case ReqLLM.Keys.get(provider, []) do
+        {:ok, value, _source} ->
+          if is_binary(value) and value != "" do
+            value
+          else
+            get_env_value_from_ets(server, key, default)
+          end
+
+        {:error, _} ->
+          get_env_value_from_ets(server, key, default)
       end
+    else
+      # For non-API keys, use standard environment lookup
+      get_env_value_from_ets(server, key, default)
+    end
   rescue
     _ -> get_env_value_from_ets(server, key, default)
   end
@@ -621,6 +624,7 @@ defmodule Jido.AI.Keyring do
 
   defp extract_provider_from_key(key) do
     key_str = key |> to_string() |> String.replace("_api_key", "")
+
     try do
       String.to_atom(key_str)
     rescue

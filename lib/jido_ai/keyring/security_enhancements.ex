@@ -453,6 +453,7 @@ defmodule Jido.AI.Keyring.SecurityEnhancements do
   defp redact_sensitive_strings(value), do: value
 
   defp validate_and_convert_key(key) when is_atom(key), do: {:ok, key}
+
   defp validate_and_convert_key(key) when is_binary(key) do
     # Use safe atom conversion
     case safe_string_to_atom(key) do
