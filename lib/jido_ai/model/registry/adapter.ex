@@ -255,10 +255,10 @@ defmodule Jido.AI.Model.Registry.Adapter do
 
         # Estimate total models based on sample
         estimated_total =
-          if length(sample_providers) > 0 do
-            trunc(total_models * length(providers) / length(sample_providers))
-          else
+          if Enum.empty?(sample_providers) do
             0
+          else
+            trunc(total_models * length(providers) / length(sample_providers))
           end
 
         health_info = %{

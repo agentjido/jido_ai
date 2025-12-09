@@ -132,8 +132,12 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     # Extract options from prompt if available
     prompt_opts =
       case params[:prompt] do
-        %Prompt{options: options} when is_list(options) and length(options) > 0 ->
-          Map.new(options)
+        %Prompt{options: options} when is_list(options) and not is_nil(options) ->
+          if Enum.empty?(options) do
+            %{}
+          else
+            Map.new(options)
+          end
 
         _ ->
           %{}
@@ -239,7 +243,10 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     # Add tools if provided
     opts_with_tools =
       case params[:tools] do
-        tools when is_list(tools) and length(tools) > 0 ->
+        [] ->
+          base_opts
+
+        tools when is_list(tools) ->
           case ToolBuilder.batch_convert(tools) do
             {:ok, tool_descriptors} ->
               # Extract tool specs for ReqLLM

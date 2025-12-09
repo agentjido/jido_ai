@@ -137,11 +137,11 @@ defmodule Mix.Tasks.Jido.Ai.Models do
       Keyword.get(opts, :all, false) ->
         fetch_all_providers(verbose: verbose, refresh: refresh)
 
-      specific_model && length(args) > 0 ->
+      specific_model && not Enum.empty?(args) ->
         provider_id = List.first(args)
         fetch_specific_model(provider_id, specific_model, verbose: verbose, refresh: refresh)
 
-      length(args) > 0 ->
+      not Enum.empty?(args) ->
         provider_id = List.first(args)
         handle_provider_operation(provider_id, opts)
 
@@ -515,7 +515,7 @@ defmodule Mix.Tasks.Jido.Ai.Models do
       end)
 
     # Show legacy providers first
-    if length(legacy_providers) > 0 do
+    unless Enum.empty?(legacy_providers) do
       IO.puts("\nFully Implemented (Legacy Adapters):")
 
       Enum.each(legacy_providers, fn provider ->
@@ -524,7 +524,7 @@ defmodule Mix.Tasks.Jido.Ai.Models do
     end
 
     # Show ReqLLM-backed providers
-    if length(reqllm_providers) > 0 do
+    unless Enum.empty?(reqllm_providers) do
       IO.puts("\nAvailable via ReqLLM Integration:")
 
       reqllm_providers
@@ -760,10 +760,10 @@ defmodule Mix.Tasks.Jido.Ai.Models do
       |> Enum.filter(fn {_cap, enabled} -> enabled end)
       |> Enum.map(fn {cap, _} -> cap end)
 
-    if length(enabled_caps) > 0 do
-      Enum.join(enabled_caps, ", ")
-    else
+    if Enum.empty?(enabled_caps) do
       "none"
+    else
+      Enum.join(enabled_caps, ", ")
     end
   end
 
@@ -775,10 +775,10 @@ defmodule Mix.Tasks.Jido.Ai.Models do
     flags = if Map.get(caps, :reasoning), do: ["R" | flags], else: flags
     flags = if Map.get(caps, :attachment), do: ["A" | flags], else: flags
 
-    if length(flags) > 0 do
-      " [#{Enum.join(flags, "")}]"
-    else
+    if Enum.empty?(flags) do
       ""
+    else
+      " [#{Enum.join(flags, "")}]"
     end
   end
 

@@ -404,23 +404,23 @@ defmodule Jido.AI.ReqLlmBridge.ResponseAggregator do
     base_metadata = %{
       processing_time_ms: processing_time,
       tools_executed: length(extract_tool_results(response)),
-      has_tool_calls: length(extract_tool_calls(response)) > 0,
+      has_tool_calls: not Enum.empty?(extract_tool_calls(response)),
       response_type: determine_response_type(response)
     }
 
     # Include any errors that occurred during tool execution
     tool_errors = extract_tool_errors(response)
 
-    if length(tool_errors) > 0 do
-      Map.put(base_metadata, :tool_errors, tool_errors)
-    else
+    if Enum.empty?(tool_errors) do
       base_metadata
+    else
+      Map.put(base_metadata, :tool_errors, tool_errors)
     end
   end
 
   defp determine_response_type(response) do
     has_content = String.length(extract_base_content(response)) > 0
-    has_tools = length(extract_tool_results(response)) > 0
+    has_tools = not Enum.empty?(extract_tool_results(response))
 
     case {has_content, has_tools} do
       {true, true} -> :content_with_tools

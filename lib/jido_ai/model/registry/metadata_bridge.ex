@@ -285,11 +285,11 @@ defmodule Jido.AI.Model.Registry.MetadataBridge do
         features =
           if Map.get(caps, :attachment), do: ["file attachments" | features], else: features
 
-        if length(features) > 0 do
+        if Enum.empty?(features) do
+          base_description
+        else
           feature_text = Enum.join(features, ", ")
           "#{base_description} with #{feature_text} capabilities"
-        else
-          base_description
         end
     end
   end

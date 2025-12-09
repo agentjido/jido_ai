@@ -691,7 +691,7 @@ defmodule Jido.AI.ReqLlmBridge.ConversationManager do
       :ets.delete(@table_name, id)
     end)
 
-    if length(expired_conversations) > 0 do
+    unless Enum.empty?(expired_conversations) do
       Logger.info("Cleaned up #{length(expired_conversations)} expired conversations")
     end
   end

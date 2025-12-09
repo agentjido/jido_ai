@@ -330,7 +330,7 @@ defmodule Mix.Tasks.Jido.Validate.Modalities do
     Mix.shell().info("Multi-Modal Models:")
     Mix.shell().info("  Total multi-modal models: #{length(results.multimodal_models)}")
 
-    if length(results.multimodal_models) > 0 do
+    unless Enum.empty?(results.multimodal_models) do
       Mix.shell().info("\n  Top multi-modal models:")
 
       results.multimodal_models
