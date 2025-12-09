@@ -40,7 +40,7 @@ defmodule Jido.AI.Prompt.Splitter do
   def next_chunk(tok, bespoke_input) do
     bespoke_tokens = Tokenizer.encode(bespoke_input, tok.model) |> length()
     remaining_tokens = tok.model.context - bespoke_tokens
-    {slice, tok} = get_slice(tok, remaining_tokens)
+    {slice, %Jido.AI.Prompt.Splitter{} = tok} = get_slice(tok, remaining_tokens)
 
     tok =
       if tok.offset >= length(tok.input_tokens) do
@@ -56,7 +56,7 @@ defmodule Jido.AI.Prompt.Splitter do
     {"", tok}
   end
 
-  defp get_slice(tok, num_tokens) do
+  defp get_slice(%Jido.AI.Prompt.Splitter{} = tok, num_tokens) do
     slice = Enum.slice(tok.input_tokens, tok.offset, num_tokens)
     tokens = length(slice)
     output = Tokenizer.decode(slice, tok.model)
