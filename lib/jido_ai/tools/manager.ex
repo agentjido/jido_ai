@@ -215,54 +215,52 @@ defmodule Jido.AI.Tools.Manager do
     content = Map.get(response, :content, "")
     tool_calls = extract_tool_calls(response)
 
-    cond do
+    if tool_calls != [] do
       # Has tool calls - execute and continue loop
-      tool_calls != [] ->
-        # Save assistant message with tool calls
+      # Save assistant message with tool calls
+      :ok =
+        ConversationManager.add_message(
+          conversation.id,
+          :assistant,
+          content,
+          tool_calls: tool_calls
+        )
+
+      # Execute tools
+      tool_results = execute_tools(tool_calls, action_map, context)
+
+      # Add tool results to conversation
+      Enum.each(tool_results, fn result ->
+        output =
+          case result.output do
+            s when is_binary(s) -> s
+            other -> Jason.encode!(other)
+          end
+
         :ok =
           ConversationManager.add_message(
             conversation.id,
-            :assistant,
-            content,
-            tool_calls: tool_calls
+            :tool,
+            output,
+            tool_call_id: result.tool_call_id,
+            name: result.name
           )
+      end)
 
-        # Execute tools
-        tool_results = execute_tools(tool_calls, action_map, context)
-
-        # Add tool results to conversation
-        Enum.each(tool_results, fn result ->
-          output =
-            case result.output do
-              s when is_binary(s) -> s
-              other -> Jason.encode!(other)
-            end
-
-          :ok =
-            ConversationManager.add_message(
-              conversation.id,
-              :tool,
-              output,
-              tool_call_id: result.tool_call_id,
-              name: result.name
-            )
-        end)
-
-        # Get updated conversation and continue loop
-        {:ok, updated_conversation} = ConversationManager.get(conversation.id)
-        process_loop(updated_conversation, tools, action_map, context, iterations_left - 1, opts)
-
+      # Get updated conversation and continue loop
+      {:ok, updated_conversation} = ConversationManager.get(conversation.id)
+      process_loop(updated_conversation, tools, action_map, context, iterations_left - 1, opts)
+    else
       # No tool calls - final response
-      true ->
-        # Save final assistant message
-        :ok = ConversationManager.add_message(conversation.id, :assistant, content)
+      # Save final assistant message
+      :ok = ConversationManager.add_message(conversation.id, :assistant, content)
 
-        {:ok,
-         %{
-           content: content,
-           conversation_id: conversation.id,
-           tool_calls_made: @default_max_iterations - iterations_left
-         }}
+      {:ok,
+       %{
+         content: content,
+         conversation_id: conversation.id,
+         tool_calls_made: @default_max_iterations - iterations_left
+       }}
     end
   end
 
@@ -321,9 +319,6 @@ defmodule Jido.AI.Tools.Manager do
 
       {:done, final_response} ->
         handle_stream_response(final_response, state)
-
-      {:error, reason} ->
-        {[{:error, reason}], %{state | done: true}}
     end
   end
 
@@ -373,39 +368,37 @@ defmodule Jido.AI.Tools.Manager do
     content = Map.get(response, :content, state.accumulated_content)
     tool_calls = extract_tool_calls(response)
 
-    cond do
-      tool_calls != [] ->
-        # Save assistant message with tool calls
-        :ok =
-          ConversationManager.add_message(
-            state.conversation.id,
-            :assistant,
-            content,
-            tool_calls: tool_calls
-          )
+    if tool_calls != [] do
+      # Save assistant message with tool calls
+      :ok =
+        ConversationManager.add_message(
+          state.conversation.id,
+          :assistant,
+          content,
+          tool_calls: tool_calls
+        )
 
-        # Emit tool call notifications
-        tool_chunks = Enum.map(tool_calls, fn tc -> {:tool_call, tc} end)
+      # Emit tool call notifications
+      tool_chunks = Enum.map(tool_calls, fn tc -> {:tool_call, tc} end)
 
-        new_state = %{
-          state
-          | phase: :execute_tools,
-            pending_tool_calls: tool_calls,
-            current_stream: nil
-        }
+      new_state = %{
+        state
+        | phase: :execute_tools,
+          pending_tool_calls: tool_calls,
+          current_stream: nil
+      }
 
-        {tool_chunks, new_state}
+      {tool_chunks, new_state}
+    else
+      # Final response
+      :ok = ConversationManager.add_message(state.conversation.id, :assistant, content)
 
-      true ->
-        # Final response
-        :ok = ConversationManager.add_message(state.conversation.id, :assistant, content)
+      final = %{
+        content: content,
+        conversation_id: state.conversation.id
+      }
 
-        final = %{
-          content: content,
-          conversation_id: state.conversation.id
-        }
-
-        {[{:done, final}], %{state | done: true}}
+      {[{:done, final}], %{state | done: true}}
     end
   end
 
@@ -471,40 +464,38 @@ defmodule Jido.AI.Tools.Manager do
   end
 
   defp execute_single_tool(action_module, args, context, id, name) do
-    try do
-      # Convert string keys to atoms for the action
-      atom_args = atomize_keys(args)
+    # Convert string keys to atoms for the action
+    atom_args = atomize_keys(args)
 
-      case action_module.run(atom_args, context) do
-        {:ok, result} ->
-          %{
-            tool_call_id: id,
-            name: name,
-            output: result,
-            error: nil
-          }
+    case action_module.run(atom_args, context) do
+      {:ok, result} ->
+        %{
+          tool_call_id: id,
+          name: name,
+          output: result,
+          error: nil
+        }
 
-        {:error, reason} ->
-          Logger.warning("[Tools.Manager] Tool #{name} failed: #{inspect(reason)}")
-
-          %{
-            tool_call_id: id,
-            name: name,
-            output: %{error: inspect(reason)},
-            error: reason
-          }
-      end
-    rescue
-      e ->
-        Logger.error("[Tools.Manager] Tool #{name} raised: #{Exception.message(e)}")
+      {:error, reason} ->
+        Logger.warning("[Tools.Manager] Tool #{name} failed: #{inspect(reason)}")
 
         %{
           tool_call_id: id,
           name: name,
-          output: %{error: Exception.message(e)},
-          error: e
+          output: %{error: inspect(reason)},
+          error: reason
         }
     end
+  rescue
+    e ->
+      Logger.error("[Tools.Manager] Tool #{name} raised: #{Exception.message(e)}")
+
+      %{
+        tool_call_id: id,
+        name: name,
+        output: %{error: Exception.message(e)},
+        error: e
+      }
   end
 
   # =============================================================================

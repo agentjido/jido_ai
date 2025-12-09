@@ -297,7 +297,6 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     end
   end
 
-
   defp format_response(%{content: content, tool_calls: tool_calls}) when is_list(tool_calls) do
     formatted_tools =
       Enum.map(tool_calls, fn tool ->

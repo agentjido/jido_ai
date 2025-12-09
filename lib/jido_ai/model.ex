@@ -49,8 +49,6 @@ defmodule Jido.AI.Model do
     field(:cost, map())
   end
 
-
-
   @doc """
   Creates a model struct from various input formats.
 

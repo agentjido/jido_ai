@@ -91,9 +91,10 @@ defmodule Jido.AI.Actions.TextCompletion do
 
   defp build_reqllm_model(%Model{} = model, params) do
     # Convert Jido.AI.Model to ReqLLM.Model
-    with {:ok, reqllm_model} <- Jido.AI.Model.from(model) do
-      build_reqllm_model(reqllm_model, params)
-    else
+    case Jido.AI.Model.from(model) do
+      {:ok, reqllm_model} ->
+        build_reqllm_model(reqllm_model, params)
+
       {:error, reason} ->
         {:error, "Failed to build ReqLLM model: #{inspect(reason)}"}
     end
@@ -101,7 +102,6 @@ defmodule Jido.AI.Actions.TextCompletion do
     error ->
       {:error, "Failed to build ReqLLM model: #{inspect(error)}"}
   end
-
 
   @doc false
   @spec convert_messages(Prompt.t()) :: {:ok, list()} | {:error, term()}
