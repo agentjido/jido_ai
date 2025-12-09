@@ -486,6 +486,7 @@ defmodule Jido.AI.Runner.ProgramOfThoughtTest do
         })
 
       {:ok, result, _context} =
+        # credo:disable-for-next-line Credo.Check.Design.AliasUsage
         Jido.AI.Actions.CoT.ProgramOfThought.run(action.params, %{})
 
       assert is_number(result.answer)
@@ -505,6 +506,7 @@ defmodule Jido.AI.Runner.ProgramOfThoughtTest do
         })
 
       {:ok, result, _context} =
+        # credo:disable-for-next-line Credo.Check.Design.AliasUsage
         Jido.AI.Actions.CoT.ProgramOfThought.run(action.params, %{})
 
       assert is_number(result.answer)

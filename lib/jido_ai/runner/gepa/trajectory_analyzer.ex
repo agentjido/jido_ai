@@ -86,6 +86,7 @@ defmodule Jido.AI.Runner.GEPA.TrajectoryAnalyzer do
 
     field(:step_id, String.t() | nil)
     field(:step_index, non_neg_integer() | nil)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:category, Jido.AI.Runner.GEPA.TrajectoryAnalyzer.failure_category(), enforce: true)
     field(:description, String.t(), enforce: true)
     field(:context, map(), default: %{})
@@ -103,6 +104,7 @@ defmodule Jido.AI.Runner.GEPA.TrajectoryAnalyzer do
 
     field(
       :type,
+      # credo:disable-for-next-line Credo.Check.Design.AliasUsage
       Jido.AI.Runner.GEPA.TrajectoryAnalyzer.reasoning_issue_type(),
       enforce: true
     )
@@ -123,6 +125,7 @@ defmodule Jido.AI.Runner.GEPA.TrajectoryAnalyzer do
 
     field(
       :type,
+      # credo:disable-for-next-line Credo.Check.Design.AliasUsage
       Jido.AI.Runner.GEPA.TrajectoryAnalyzer.success_indicator_type(),
       enforce: true
     )

@@ -50,6 +50,7 @@ defmodule Jido.AI.Runner.GEPA.Diversity do
     field(:prompt_a_id, String.t(), enforce: true)
     field(:prompt_b_id, String.t(), enforce: true)
     field(:similarity_score, float(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:strategy_used, Jido.AI.Runner.GEPA.Diversity.similarity_strategy(), enforce: true)
     field(:components, map(), default: %{})
     field(:metadata, map(), default: %{})
@@ -72,6 +73,7 @@ defmodule Jido.AI.Runner.GEPA.Diversity do
 
     field(:prompt_ids, list(String.t()), default: [])
     field(:scores, map(), default: %{})
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:strategy_used, Jido.AI.Runner.GEPA.Diversity.similarity_strategy(), enforce: true)
     field(:computed_at, DateTime.t(), enforce: true)
     field(:metadata, map(), default: %{})
@@ -99,6 +101,7 @@ defmodule Jido.AI.Runner.GEPA.Diversity do
     field(:uniqueness_ratio, float(), default: 0.0)
     field(:clustering_coefficient, float(), default: 0.0)
     field(:convergence_risk, float(), default: 0.0)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:diversity_level, Jido.AI.Runner.GEPA.Diversity.diversity_level(), default: :moderate)
     field(:metadata, map(), default: %{})
   end
@@ -118,6 +121,7 @@ defmodule Jido.AI.Runner.GEPA.Diversity do
     - `:metadata` - Additional configuration
     """
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:similarity_strategy, Jido.AI.Runner.GEPA.Diversity.similarity_strategy(),
       default: :text
     )

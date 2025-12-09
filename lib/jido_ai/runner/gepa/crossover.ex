@@ -69,6 +69,7 @@ defmodule JidoAI.Runner.GEPA.Crossover do
     """
 
     field(:id, String.t(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:type, JidoAI.Runner.GEPA.Crossover.segment_type(), enforce: true)
     field(:content, String.t(), enforce: true)
     field(:start_pos, non_neg_integer(), enforce: true)
@@ -120,8 +121,10 @@ defmodule JidoAI.Runner.GEPA.Crossover do
     """
 
     field(:compatible, boolean(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:issues, list(JidoAI.Runner.GEPA.Crossover.compatibility_issue()), default: [])
     field(:compatibility_score, float(), default: 0.0)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:recommended_strategy, JidoAI.Runner.GEPA.Crossover.crossover_strategy() | nil)
     field(:metadata, map(), default: %{})
   end
@@ -141,8 +144,10 @@ defmodule JidoAI.Runner.GEPA.Crossover do
     - `:metadata` - Additional configuration options
     """
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:strategy, JidoAI.Runner.GEPA.Crossover.crossover_strategy(), default: :semantic)
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:preserve_sections, list(JidoAI.Runner.GEPA.Crossover.segment_type()),
       default: [:task_description]
     )
@@ -177,6 +182,7 @@ defmodule JidoAI.Runner.GEPA.Crossover do
     field(:id, String.t(), enforce: true)
     field(:parent_ids, list(String.t()), enforce: true)
     field(:offspring_prompts, list(String.t()), default: [])
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:strategy_used, JidoAI.Runner.GEPA.Crossover.crossover_strategy(), enforce: true)
     field(:segments_exchanged, list(PromptSegment.t()), default: [])
     field(:segments_blended, list(PromptSegment.t()), default: [])

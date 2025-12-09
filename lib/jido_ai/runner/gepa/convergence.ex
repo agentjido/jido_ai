@@ -64,7 +64,9 @@ defmodule Jido.AI.Runner.GEPA.Convergence do
     """
 
     field(:converged, boolean(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:status_level, Jido.AI.Runner.GEPA.Convergence.status_level(), default: :running)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:reason, Jido.AI.Runner.GEPA.Convergence.convergence_reason())
     field(:should_stop, boolean(), default: false)
     field(:warnings, list(String.t()), default: [])

@@ -67,11 +67,13 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
         }
     """
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:type, Jido.AI.Runner.GEPA.SuggestionGeneration.location_type(), enforce: true)
     field(:absolute_position, non_neg_integer() | nil)
     field(:relative_marker, String.t() | nil)
     field(:section_name, String.t() | nil)
     field(:pattern, String.t() | Regex.t() | nil)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:scope, Jido.AI.Runner.GEPA.SuggestionGeneration.edit_scope(), default: :phrase)
     field(:confidence, float(), default: 1.0)
   end
@@ -131,6 +133,7 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
     """
 
     field(:id, String.t(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:operation, Jido.AI.Runner.GEPA.SuggestionGeneration.edit_operation(), enforce: true)
     field(:location, PromptLocation.t(), enforce: true)
     field(:content, String.t() | nil)
@@ -190,6 +193,7 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
     field(:has_cot_trigger, boolean(), default: false)
     field(:length, non_neg_integer(), enforce: true)
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:complexity, Jido.AI.Runner.GEPA.SuggestionGeneration.complexity(), default: :moderate)
     field(:patterns, map(), default: %{})
     field(:metadata, map(), default: %{})
@@ -285,12 +289,14 @@ defmodule Jido.AI.Runner.GEPA.SuggestionGeneration do
 
     field(
       :conflict_type,
+      # credo:disable-for-next-line Credo.Check.Design.AliasUsage
       Jido.AI.Runner.GEPA.SuggestionGeneration.conflict_type(),
       enforce: true
     )
 
     field(
       :resolution_strategy,
+      # credo:disable-for-next-line Credo.Check.Design.AliasUsage
       Jido.AI.Runner.GEPA.SuggestionGeneration.resolution_strategy(),
       default: :highest_impact
     )

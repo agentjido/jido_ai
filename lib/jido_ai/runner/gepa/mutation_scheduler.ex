@@ -67,6 +67,7 @@ defmodule Jido.AI.Runner.GEPA.MutationScheduler do
     - `:metadata` - Additional scheduler state
     """
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:strategy, Jido.AI.Runner.GEPA.MutationScheduler.strategy(), default: :adaptive)
     field(:base_rate, float(), default: 0.15)
     field(:min_rate, float(), default: 0.05)

@@ -234,16 +234,19 @@ defmodule Jido.AI.Runner.GEPA.Diversity.SimilarityDetector do
   end
 
   defp calculate_similarity(_text_a, _text_b, :structural) do
+    # credo:disable-for-next-line Credo.Check.Design.TagTODO
     # TODO: Implement structural similarity
     {:error, :not_implemented}
   end
 
   defp calculate_similarity(_text_a, _text_b, :semantic) do
+    # credo:disable-for-next-line Credo.Check.Design.TagTODO
     # TODO: Implement semantic similarity
     {:error, :not_implemented}
   end
 
   defp calculate_similarity(_text_a, _text_b, :behavioral) do
+    # credo:disable-for-next-line Credo.Check.Design.TagTODO
     # TODO: Implement behavioral similarity
     {:error, :not_implemented}
   end

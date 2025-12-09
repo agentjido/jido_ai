@@ -89,7 +89,9 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     captured during prompt evaluation.
     """
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:type, Jido.AI.Runner.GEPA.Metrics.metric_type(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:value, Jido.AI.Runner.GEPA.Metrics.metric_value(), enforce: true)
     field(:timestamp, DateTime.t(), default: DateTime.utc_now())
     field(:metadata, map(), default: %{})
@@ -101,6 +103,7 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     # Contains collections of metric values organized by type,
     # enabling statistical analysis and fitness calculation.
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:values, %{optional(Jido.AI.Runner.GEPA.Metrics.metric_type()) => list(MetricValue.t())}, default: %{})
     field(:task_ids, MapSet.t(), default: MapSet.new())
     field(:metadata, map(), default: %{})
@@ -154,7 +157,12 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
       metrics = Metrics.add_metric(metrics, :latency, 1234, task_id: "task_1")
       metrics = Metrics.add_metric(metrics, :quality_score, 0.85, metadata: %{model: "gpt-4"})
   """
-  @spec add_metric(t(), Jido.AI.Runner.GEPA.Metrics.metric_type(), Jido.AI.Runner.GEPA.Metrics.metric_value(), keyword()) :: t()
+  @spec add_metric(
+          t(),
+          Jido.AI.Runner.GEPA.Metrics.metric_type(),
+          Jido.AI.Runner.GEPA.Metrics.metric_value(),
+          keyword()
+        ) :: t()
   def add_metric(%__MODULE__{} = metrics, type, value, opts \\ [])
       when is_atom(type) and is_number(value) do
     task_id = Keyword.get(opts, :task_id)

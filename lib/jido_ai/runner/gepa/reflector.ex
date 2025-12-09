@@ -76,10 +76,13 @@ defmodule Jido.AI.Runner.GEPA.Reflector do
     to address identified failures or weaknesses.
     """
 
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:type, Jido.AI.Runner.GEPA.Reflector.suggestion_type(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:category, Jido.AI.Runner.GEPA.Reflector.suggestion_category(), enforce: true)
     field(:description, String.t(), enforce: true)
     field(:rationale, String.t(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:priority, Jido.AI.Runner.GEPA.Reflector.priority(), default: :medium)
     field(:specific_text, String.t() | nil)
     field(:target_section, String.t() | nil)
@@ -127,6 +130,7 @@ defmodule Jido.AI.Runner.GEPA.Reflector do
     field(:root_causes, list(String.t()), default: [])
     field(:suggestions, list(Suggestion.t()), default: [])
     field(:expected_improvement, String.t())
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:confidence, Jido.AI.Runner.GEPA.Reflector.confidence(), default: :medium)
     field(:needs_clarification, boolean(), default: false)
     field(:metadata, map(), default: %{})

@@ -177,6 +177,7 @@ defmodule Jido.AI.Runner.GEPA.Pareto.FrontierManager do
       )
 
       # Update frontier
+      # credo:disable-for-next-line Credo.Check.Design.TagTODO
       # TODO: Calculate hypervolume once Phase 4 (HypervolumeCalculator) is implemented
       updated_frontier = %{
         frontier
@@ -222,6 +223,7 @@ defmodule Jido.AI.Runner.GEPA.Pareto.FrontierManager do
       _found ->
         new_solutions = Enum.reject(frontier.solutions, fn c -> c.id == candidate_id end)
 
+        # credo:disable-for-next-line Credo.Check.Design.TagTODO
         # TODO: Recalculate hypervolume once Phase 4 is implemented
         updated_frontier = %{
           frontier
@@ -285,6 +287,7 @@ defmodule Jido.AI.Runner.GEPA.Pareto.FrontierManager do
         "Trimmed frontier from #{length(frontier.solutions)} to #{length(trimmed_solutions)} solutions"
       )
 
+      # credo:disable-for-next-line Credo.Check.Design.TagTODO
       # TODO: Recalculate hypervolume once Phase 4 is implemented
       {:ok,
        %{frontier | solutions: trimmed_solutions, updated_at: System.monotonic_time(:millisecond)}}

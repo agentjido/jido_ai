@@ -362,6 +362,7 @@ defmodule Jido.AI.Runner.ChainOfThought.ExecutionHook do
     case Regex.run(~r/STEPS:\s*(.+?)(?=\n[A-Z_]+:|$)/s, text) do
       [_, _content] ->
         # Parse each step from the content
+        # credo:disable-for-next-line Credo.Check.Design.TagTODO
         # TODO: Parse expected_inputs, expected_outputs, depends_on from LLM response
         instructions
         |> Enum.with_index()

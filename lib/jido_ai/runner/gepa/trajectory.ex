@@ -103,12 +103,14 @@ defmodule Jido.AI.Runner.GEPA.Trajectory do
     """
 
     field(:id, String.t(), enforce: true)
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:type, Jido.AI.Runner.GEPA.Trajectory.step_type(), enforce: true)
     field(:content, term(), enforce: true)
     field(:timestamp, DateTime.t(), enforce: true)
     field(:duration_ms, non_neg_integer() | nil)
     field(:metadata, map(), default: %{})
     field(:context, map(), default: %{})
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:importance, Jido.AI.Runner.GEPA.Trajectory.importance(), default: :medium)
     field(:parent_step_id, String.t() | nil)
   end
@@ -141,6 +143,7 @@ defmodule Jido.AI.Runner.GEPA.Trajectory do
     field(:completed_at, DateTime.t() | nil)
     field(:duration_ms, non_neg_integer() | nil)
     field(:metadata, map(), default: %{})
+    # credo:disable-for-next-line Credo.Check.Design.AliasUsage
     field(:outcome, Jido.AI.Runner.GEPA.Trajectory.outcome() | nil)
     field(:error, term() | nil)
     field(:filtered, boolean(), default: false)
