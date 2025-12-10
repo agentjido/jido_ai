@@ -2,6 +2,7 @@ defmodule Jido.AI.Runner.ProgramOfThoughtTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Actions.CoT.ProgramOfThought, as: ProgramOfThoughtAction
+
   alias Jido.AI.Runner.ProgramOfThought.{
     ProblemClassifier,
     ProgramExecutor,
@@ -485,8 +486,8 @@ defmodule Jido.AI.Runner.ProgramOfThoughtTest do
           generate_explanation: false
         })
 
+      # credo:disable-for-next-line Credo.Check.Design.AliasUsage
       {:ok, result, _context} =
-        # credo:disable-for-next-line Credo.Check.Design.AliasUsage
         Jido.AI.Actions.CoT.ProgramOfThought.run(action.params, %{})
 
       assert is_number(result.answer)
@@ -505,8 +506,8 @@ defmodule Jido.AI.Runner.ProgramOfThoughtTest do
           timeout: 5000
         })
 
+      # credo:disable-for-next-line Credo.Check.Design.AliasUsage
       {:ok, result, _context} =
-        # credo:disable-for-next-line Credo.Check.Design.AliasUsage
         Jido.AI.Actions.CoT.ProgramOfThought.run(action.params, %{})
 
       assert is_number(result.answer)

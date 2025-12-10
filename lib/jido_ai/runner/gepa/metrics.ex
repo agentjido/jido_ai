@@ -104,7 +104,12 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     # enabling statistical analysis and fitness calculation.
 
     # credo:disable-for-next-line Credo.Check.Design.AliasUsage
-    field(:values, %{optional(Jido.AI.Runner.GEPA.Metrics.metric_type()) => list(MetricValue.t())}, default: %{})
+    field(
+      :values,
+      %{optional(Jido.AI.Runner.GEPA.Metrics.metric_type()) => list(MetricValue.t())},
+      default: %{}
+    )
+
     field(:task_ids, MapSet.t(), default: MapSet.new())
     field(:metadata, map(), default: %{})
     field(:created_at, DateTime.t(), enforce: true)
@@ -225,7 +230,9 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
 
   Map of metric_type => aggregation_stats
   """
-  @spec aggregate(t(), keyword()) :: %{optional(Jido.AI.Runner.GEPA.Metrics.metric_type()) => aggregation_stats()}
+  @spec aggregate(t(), keyword()) :: %{
+          optional(Jido.AI.Runner.GEPA.Metrics.metric_type()) => aggregation_stats()
+        }
   def aggregate(%__MODULE__{} = metrics, opts \\ []) do
     types = Keyword.get(opts, :types, Map.keys(metrics.values))
     task_id = Keyword.get(opts, :task_id)
@@ -272,7 +279,8 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
 
   Map with :lower, :upper, :mean, :confidence keys, or nil if insufficient data
   """
-  @spec confidence_interval(t(), Jido.AI.Runner.GEPA.Metrics.metric_type(), keyword()) :: map() | nil
+  @spec confidence_interval(t(), Jido.AI.Runner.GEPA.Metrics.metric_type(), keyword()) ::
+          map() | nil
   def confidence_interval(%__MODULE__{} = metrics, type, opts \\ []) do
     confidence_level = Keyword.get(opts, :confidence_level, 0.95)
     task_id = Keyword.get(opts, :task_id)
@@ -352,7 +360,8 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
       stats = Metrics.get_stats(metrics, :success_rate)
       # => %{mean: 0.95, median: 1.0, variance: 0.01, ...}
   """
-  @spec get_stats(t(), Jido.AI.Runner.GEPA.Metrics.metric_type(), keyword()) :: aggregation_stats() | nil
+  @spec get_stats(t(), Jido.AI.Runner.GEPA.Metrics.metric_type(), keyword()) ::
+          aggregation_stats() | nil
   def get_stats(%__MODULE__{} = metrics, type, opts \\ []) do
     task_id = Keyword.get(opts, :task_id)
 
@@ -552,9 +561,12 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     }
   end
 
-  @spec calculate_weighted_fitness(%{Jido.AI.Runner.GEPA.Metrics.metric_type() => aggregation_stats()}, %{
-          Jido.AI.Runner.GEPA.Metrics.metric_type() => float()
-        }) :: float()
+  @spec calculate_weighted_fitness(
+          %{Jido.AI.Runner.GEPA.Metrics.metric_type() => aggregation_stats()},
+          %{
+            Jido.AI.Runner.GEPA.Metrics.metric_type() => float()
+          }
+        ) :: float()
   defp calculate_weighted_fitness(aggregated, weights) do
     total_weight =
       aggregated
@@ -583,7 +595,9 @@ defmodule Jido.AI.Runner.GEPA.Metrics do
     end
   end
 
-  @spec calculate_geometric_fitness(%{Jido.AI.Runner.GEPA.Metrics.metric_type() => aggregation_stats()}) :: float()
+  @spec calculate_geometric_fitness(%{
+          Jido.AI.Runner.GEPA.Metrics.metric_type() => aggregation_stats()
+        }) :: float()
   defp calculate_geometric_fitness(aggregated) do
     if map_size(aggregated) == 0 do
       0.0

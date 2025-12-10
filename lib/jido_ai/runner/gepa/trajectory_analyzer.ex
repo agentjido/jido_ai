@@ -175,17 +175,11 @@ defmodule Jido.AI.Runner.GEPA.TrajectoryAnalyzer do
     field(:trajectory_id, String.t(), enforce: true)
     field(:outcome, Trajectory.outcome(), enforce: true)
 
-    field(:failure_points, list(FailurePoint.t()),
-      default: []
-    )
+    field(:failure_points, list(FailurePoint.t()), default: [])
 
-    field(:reasoning_issues, list(ReasoningIssue.t()),
-      default: []
-    )
+    field(:reasoning_issues, list(ReasoningIssue.t()), default: [])
 
-    field(:success_indicators, list(SuccessIndicator.t()),
-      default: []
-    )
+    field(:success_indicators, list(SuccessIndicator.t()), default: [])
 
     field(:overall_quality, :poor | :fair | :good | :excellent)
     field(:duration_ms, non_neg_integer())

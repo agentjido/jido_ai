@@ -28,8 +28,13 @@ defmodule Jido.Ai.MixProject do
       consolidate_protocols: Mix.env() != :test,
 
       # Coverage
-      test_coverage: [tool: ExCoveralls, export: "cov"],
-      preferred_cli_env: [
+      test_coverage: [tool: ExCoveralls, export: "cov"]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
         "test.unit": :test,
         "test.integration": :test,
         "test.providers": :test,
@@ -54,6 +59,7 @@ defmodule Jido.Ai.MixProject do
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "examples"]
   defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.
