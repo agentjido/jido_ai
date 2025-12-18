@@ -420,8 +420,8 @@ defmodule Jido.AI.Provider do
     - model_name: The name of the model to search for
 
   ## Returns
-    - {:ok, model_info} - Combined model information
-    - {:error, reason} - Error if model not found
+    - `{:ok, model_info}` - Combined model information
+    - `{:error, reason}` - Error if model not found
   """
   def get_combined_model_info(model_name) do
     models =
@@ -460,8 +460,8 @@ defmodule Jido.AI.Provider do
     - :refresh - Force refresh from sources (default: false)
 
   ## Returns
-    - {:ok, models} where models is an enhanced list with registry data
-    - {:error, reason} if discovery fails
+    - `{:ok, models}` - enhanced list with registry data
+    - `{:error, reason}` - discovery fails
 
   ## Examples
 
@@ -516,8 +516,8 @@ defmodule Jido.AI.Provider do
     - :include_pricing - Include pricing information (default: false)
 
   ## Returns
-    - {:ok, enhanced_model} with comprehensive metadata
-    - {:error, reason} if model not found or registry unavailable
+    - `{:ok, enhanced_model}` - comprehensive metadata
+    - `{:error, reason}` - model not found or registry unavailable
 
   ## Examples
 
@@ -573,8 +573,8 @@ defmodule Jido.AI.Provider do
     - :modality - Required modality (:text, :image, :audio)
 
   ## Returns
-    - {:ok, models} with filtered and enhanced model list
-    - {:error, reason} if discovery fails
+    - `{:ok, models}` - filtered and enhanced model list
+    - `{:error, reason}` - discovery fails
 
   ## Examples
 
@@ -622,8 +622,8 @@ defmodule Jido.AI.Provider do
   provider coverage, capability distribution, and performance metrics.
 
   ## Returns
-    - {:ok, stats} with comprehensive registry information
-    - {:error, reason} if statistics cannot be computed
+    - `{:ok, stats}` - comprehensive registry information
+    - `{:error, reason}` - statistics cannot be computed
 
   ## Example Output
 
