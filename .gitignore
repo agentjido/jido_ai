@@ -30,3 +30,8 @@ jido_ai-*.tar
 
 # AI Docs
 PLAN.md
+
+# Example project build artifacts
+examples/**/_build/
+examples/**/deps/
+examples/**/mix.lock
