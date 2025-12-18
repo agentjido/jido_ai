@@ -59,8 +59,8 @@ defmodule Jido.AI.Model.Registry do
     - provider_id: Optional atom specifying provider (:anthropic, :openai, etc.)
 
   ## Returns
-    - {:ok, models} where models is a list of Jido.AI.Model structs
-    - {:error, reason} if discovery fails
+    - `{:ok, models}` - list of Jido.AI.Model structs
+    - `{:error, reason}` - discovery fails
 
   ## Examples
 
@@ -204,8 +204,8 @@ defmodule Jido.AI.Model.Registry do
     - model_name: String model identifier ("claude-3-5-sonnet", etc.)
 
   ## Returns
-    - {:ok, model} with enhanced Jido.AI.Model struct
-    - {:error, reason} if model not found or unavailable
+    - `{:ok, model}` - enhanced Jido.AI.Model struct
+    - `{:error, reason}` - model not found or unavailable
 
   ## Examples
 
@@ -256,8 +256,8 @@ defmodule Jido.AI.Model.Registry do
     - :tier - Performance tier (:premium, :standard, :economy)
 
   ## Returns
-    - {:ok, models} with filtered list of enhanced models
-    - {:error, reason} if discovery fails
+    - `{:ok, models}` - filtered list of enhanced models
+    - `{:error, reason}` - discovery fails
 
   ## Examples
 
@@ -328,8 +328,8 @@ defmodule Jido.AI.Model.Registry do
   distribution, and other registry metrics.
 
   ## Returns
-    - {:ok, stats} with comprehensive registry statistics
-    - {:error, reason} if statistics cannot be computed
+    - `{:ok, stats}` - comprehensive registry statistics
+    - `{:error, reason}` - statistics cannot be computed
 
   ## Example Output
 

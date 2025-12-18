@@ -51,8 +51,8 @@ defmodule Jido.AI.Model.CapabilityIndex do
     - models: List of Jido.AI.Model structs
 
   ## Returns
-    - :ok on success
-    - {:error, reason} on failure
+    - `:ok` on success
+    - `{:error, reason}` on failure
   """
   @spec build([Jido.AI.Model.t()]) :: :ok | {:error, term()}
   def build(models) when is_list(models) do
@@ -81,8 +81,8 @@ defmodule Jido.AI.Model.CapabilityIndex do
     - value: Expected capability value (typically boolean)
 
   ## Returns
-    - {:ok, [model_ids]} with list of matching model IDs
-    - {:error, :index_not_found} if index not built
+    - `{:ok, [model_ids]}` - list of matching model IDs
+    - `{:error, :index_not_found}` - index not built
   """
   @spec lookup_by_capability(capability_key(), capability_value()) ::
           {:ok, [model_id()]} | {:error, :index_not_found}
@@ -104,9 +104,9 @@ defmodule Jido.AI.Model.CapabilityIndex do
     - model_id: Model identifier string
 
   ## Returns
-    - {:ok, capabilities_map} if model found
-    - {:error, :not_found} if model not in index
-    - {:error, :index_not_found} if index not built
+    - `{:ok, capabilities_map}` - model found
+    - `{:error, :not_found}` - model not in index
+    - `{:error, :index_not_found}` - index not built
   """
   @spec get_capabilities(model_id()) ::
           {:ok, map()} | {:error, :not_found | :index_not_found}
@@ -145,8 +145,8 @@ defmodule Jido.AI.Model.CapabilityIndex do
     - model: Jido.AI.Model struct
 
   ## Returns
-    - :ok on success
-    - {:error, :index_not_found} if index not built
+    - `:ok` on success
+    - `{:error, :index_not_found}` - index not built
   """
   @spec update_model(Jido.AI.Model.t()) :: :ok | {:error, :index_not_found}
   def update_model(model) do
@@ -169,8 +169,8 @@ defmodule Jido.AI.Model.CapabilityIndex do
     - model_id: Model identifier string
 
   ## Returns
-    - :ok on success
-    - {:error, :index_not_found} if index not built
+    - `:ok` on success
+    - `{:error, :index_not_found}` - index not built
   """
   @spec remove_model(model_id()) :: :ok | {:error, :index_not_found}
   def remove_model(model_id) do
@@ -201,8 +201,8 @@ defmodule Jido.AI.Model.CapabilityIndex do
   Gets statistics about the capability index.
 
   ## Returns
-    - {:ok, stats_map} with index statistics
-    - {:error, :index_not_found} if index not built
+    - `{:ok, stats_map}` - index statistics
+    - `{:error, :index_not_found}` - index not built
   """
   @spec stats() :: {:ok, map()} | {:error, :index_not_found}
   def stats do

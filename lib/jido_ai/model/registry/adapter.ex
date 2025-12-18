@@ -24,8 +24,8 @@ defmodule Jido.AI.Model.Registry.Adapter do
   Lists all available providers from ReqLLM registry.
 
   ## Returns
-    - {:ok, providers} where providers is a list of provider atoms
-    - {:error, reason} if registry is unavailable
+    - `{:ok, providers}` - list of provider atoms
+    - `{:error, reason}` - registry is unavailable
 
   ## Examples
 
@@ -60,8 +60,8 @@ defmodule Jido.AI.Model.Registry.Adapter do
     - provider_id: Provider atom (:anthropic, :openai, etc.)
 
   ## Returns
-    - {:ok, models} where models is a list of ReqLLM.Model structs
-    - {:error, reason} if provider not found or registry unavailable
+    - `{:ok, models}` - list of ReqLLM.Model structs
+    - `{:error, reason}` - provider not found or registry unavailable
 
   ## Examples
 
@@ -144,8 +144,8 @@ defmodule Jido.AI.Model.Registry.Adapter do
     - model_name: String model identifier ("claude-3-5-sonnet", etc.)
 
   ## Returns
-    - {:ok, model} with enhanced ReqLLM.Model struct
-    - {:error, reason} if model not found or registry unavailable
+    - `{:ok, model}` - enhanced ReqLLM.Model struct
+    - `{:error, reason}` - model not found or registry unavailable
 
   ## Examples
 
@@ -216,8 +216,8 @@ defmodule Jido.AI.Model.Registry.Adapter do
   provider coverage, and error rates for monitoring purposes.
 
   ## Returns
-    - {:ok, health_info} with detailed health metrics
-    - {:error, reason} if health check fails
+    - `{:ok, health_info}` - detailed health metrics
+    - `{:error, reason}` - health check fails
 
   ## Example Output
 
