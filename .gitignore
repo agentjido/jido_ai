@@ -3,6 +3,8 @@
 
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
+*.coverdata
+Elixir.*.coverdata
 
 # The directory Mix downloads your dependencies sources to.
 /deps/
@@ -28,3 +30,8 @@ jido_ai-*.tar
 
 # AI Docs
 PLAN.md
+
+# Example project build artifacts
+examples/**/_build/
+examples/**/deps/
+examples/**/mix.lock

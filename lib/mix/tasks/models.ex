@@ -101,26 +101,29 @@ defmodule Mix.Tasks.Jido.Ai.Models do
     # Start the required applications
     Application.ensure_all_started(:jido_ai)
 
-    {opts, args, _} =
-      OptionParser.parse(args,
-        switches: [
-          verbose: :boolean,
-          all: :boolean,
-          refresh: :boolean,
-          model: :string,
-          list_providers: :boolean,
-          list_all_models: :boolean,
-          list: :boolean,
-          fetch: :boolean,
-          show: :string
-        ]
-      )
+    # Parse arguments with enhanced registry support
+    {opts, args, _} = parse_args_enhanced(args)
+
+    # Convert opts list to map for easier access
+    opts_map = Enum.into(opts, %{})
 
     verbose = Keyword.get(opts, :verbose, false)
     refresh = Keyword.get(opts, :refresh, false)
     specific_model = Keyword.get(opts, :model)
 
     cond do
+      # Help command
+      opts_map[:help] ->
+        show_help_enhanced()
+
+      # Registry commands
+      handle_registry_stats(opts_map) ->
+        :ok
+
+      handle_enhanced_listing(opts_map) ->
+        :ok
+
+      # Legacy commands
       Keyword.get(opts, :list_providers, false) ->
         list_available_providers()
 
@@ -142,7 +145,7 @@ defmodule Mix.Tasks.Jido.Ai.Models do
         handle_provider_operation(provider_id, opts)
 
       true ->
-        show_usage()
+        show_help_enhanced()
     end
   end
 
@@ -188,7 +191,7 @@ defmodule Mix.Tasks.Jido.Ai.Models do
       models
       |> Enum.group_by(fn model ->
         model = Map.get(model, :id) || Map.get(model, "id")
-        Jido.AI.Provider.standardize_model_name(model)
+        Provider.standardize_model_name(model)
       end)
       |> Enum.each(fn {standard_name, models} ->
         providers = Enum.map(models, & &1.provider)
@@ -499,26 +502,442 @@ defmodule Mix.Tasks.Jido.Ai.Models do
   defp list_available_providers do
     IO.puts("\nAvailable providers:")
 
-    Provider.list()
-    |> Enum.sort_by(& &1.id)
-    |> Enum.each(fn provider ->
-      IO.puts("  #{provider.id}: #{provider.name} - #{provider.description}")
+    providers =
+      Provider.list()
+      |> Enum.sort_by(& &1.id)
+
+    # Group providers by implementation status
+    {legacy_providers, reqllm_providers} =
+      Enum.split_with(providers, fn provider ->
+        # Check if provider has a legacy adapter
+        provider.id in [:openai, :anthropic, :google, :cloudflare, :openrouter]
+      end)
+
+    # Show legacy providers first
+    if length(legacy_providers) > 0 do
+      IO.puts("\nFully Implemented (Legacy Adapters):")
+
+      Enum.each(legacy_providers, fn provider ->
+        IO.puts("  ✓ #{provider.id}: #{provider.name} - #{provider.description}")
+      end)
+    end
+
+    # Show ReqLLM-backed providers
+    if length(reqllm_providers) > 0 do
+      IO.puts("\nAvailable via ReqLLM Integration:")
+
+      reqllm_providers
+      # Show first 20 to avoid overwhelming output
+      |> Enum.take(20)
+      |> Enum.each(fn provider ->
+        status =
+          if ReqLLM.Provider.Registry.implemented?(provider.id),
+            do: "✓",
+            else: "○"
+
+        IO.puts("  #{status} #{provider.id}: #{provider.name}")
+      end)
+
+      remaining = length(reqllm_providers) - 20
+
+      if remaining > 0 do
+        IO.puts("  ... and #{remaining} more providers")
+      end
+    end
+
+    IO.puts("\n✓ = Fully implemented, ○ = Metadata only")
+    IO.puts("Total providers available: #{length(providers)}")
+  end
+
+  # Registry-enhanced functionality
+
+  defp handle_registry_stats(args) do
+    if args[:registry_stats] do
+      display_registry_statistics()
+      true
+    else
+      false
+    end
+  end
+
+  defp handle_enhanced_listing(args) do
+    cond do
+      args[:list_all_models_enhanced] ->
+        display_enhanced_all_models(args)
+        true
+
+      args[:list_models_enhanced] ->
+        provider = get_provider_from_args(args)
+        display_enhanced_provider_models(provider, args)
+        true
+
+      args[:discover_models] ->
+        filters = build_filters_from_args(args)
+        display_discovered_models(filters, args)
+        true
+
+      true ->
+        false
+    end
+  end
+
+  defp display_registry_statistics do
+    Mix.shell().info("Registry Statistics:\n")
+
+    case Provider.get_model_registry_stats() do
+      {:ok, stats} ->
+        Mix.shell().info("Total Models: #{stats.total_models}")
+        Mix.shell().info("Registry Models: #{Map.get(stats, :registry_models, 0)}")
+        Mix.shell().info("Cached Models: #{Map.get(stats, :cached_models, 0)}")
+        Mix.shell().info("Total Providers: #{stats.total_providers}")
+
+        if registry_health = Map.get(stats, :registry_health) do
+          status = Map.get(registry_health, :status, :unknown)
+          Mix.shell().info("Registry Status: #{status}")
+
+          if response_time = Map.get(registry_health, :response_time_ms) do
+            Mix.shell().info("Registry Response Time: #{response_time}ms")
+          end
+        end
+
+        Mix.shell().info("\nProvider Coverage:")
+
+        stats.provider_coverage
+        |> Enum.sort_by(fn {_provider, count} -> count end, :desc)
+        |> Enum.each(fn {provider, count} ->
+          Mix.shell().info("  #{provider}: #{count} models")
+        end)
+
+        if capabilities = Map.get(stats, :capabilities_distribution) do
+          Mix.shell().info("\nCapability Distribution:")
+
+          capabilities
+          |> Enum.sort_by(fn {_capability, count} -> count end, :desc)
+          |> Enum.each(fn {capability, count} ->
+            Mix.shell().info("  #{capability}: #{count} models")
+          end)
+        end
+
+      {:error, reason} ->
+        Mix.shell().error("Failed to get registry statistics: #{inspect(reason)}")
+    end
+  end
+
+  defp display_enhanced_all_models(args) do
+    verbose = args[:verbose] || false
+    source = get_source_option(args)
+
+    Mix.shell().info("Enhanced Model Listing (source: #{source}):\n")
+
+    case Provider.list_all_models_enhanced(nil, source: source) do
+      {:ok, models} ->
+        Mix.shell().info("Found #{length(models)} models")
+
+        if verbose do
+          display_models_verbose(models)
+        else
+          display_models_summary(models)
+        end
+
+      {:error, reason} ->
+        Mix.shell().error("Failed to list enhanced models: #{inspect(reason)}")
+    end
+  end
+
+  defp display_enhanced_provider_models(provider, args) do
+    verbose = args[:verbose] || false
+    source = get_source_option(args)
+
+    Mix.shell().info("Enhanced #{provider} Models (source: #{source}):\n")
+
+    case Provider.list_all_models_enhanced(provider, source: source) do
+      {:ok, models} ->
+        Mix.shell().info("Found #{length(models)} models for #{provider}")
+
+        if verbose do
+          display_models_verbose(models)
+        else
+          display_models_summary(models)
+        end
+
+      {:error, reason} ->
+        Mix.shell().error("Failed to list enhanced models for #{provider}: #{inspect(reason)}")
+    end
+  end
+
+  defp display_discovered_models(filters, args) do
+    verbose = args[:verbose] || false
+
+    Mix.shell().info("Model Discovery with filters: #{inspect(filters)}\n")
+
+    case Provider.discover_models_by_criteria(filters) do
+      {:ok, models} ->
+        Mix.shell().info("Found #{length(models)} models matching criteria")
+
+        if verbose do
+          display_models_verbose(models)
+        else
+          display_models_summary(models)
+        end
+
+      {:error, reason} ->
+        Mix.shell().error("Model discovery failed: #{inspect(reason)}")
+    end
+  end
+
+  defp display_models_verbose(models) do
+    models
+    |> Enum.each(fn model ->
+      provider = Map.get(model, :provider) || Map.get(model, "provider")
+      id = Map.get(model, :id) || Map.get(model, "id")
+      name = Map.get(model, :name) || Map.get(model, "name") || id
+
+      Mix.shell().info("#{provider}:#{id}")
+      Mix.shell().info("  Name: #{name}")
+
+      if description = Map.get(model, :description) || Map.get(model, "description") do
+        Mix.shell().info("  Description: #{description}")
+      end
+
+      if capabilities = Map.get(model, :capabilities) do
+        Mix.shell().info("  Capabilities: #{format_capabilities(capabilities)}")
+      end
+
+      if limit = Map.get(model, :limit) do
+        Mix.shell().info("  Context: #{Map.get(limit, :context, "unknown")}")
+        Mix.shell().info("  Max Output: #{Map.get(limit, :output, "unknown")}")
+      end
+
+      if cost = Map.get(model, :cost) do
+        Mix.shell().info(
+          "  Cost: input=$#{Map.get(cost, :input, "?")}/1M, output=$#{Map.get(cost, :output, "?")}/1M"
+        )
+      end
+
+      if reqllm_id = Map.get(model, :reqllm_id) do
+        Mix.shell().info("  ReqLLM ID: #{reqllm_id}")
+      end
+
+      Mix.shell().info("")
     end)
   end
 
-  defp show_usage do
-    IO.puts("""
-    Usage:
-      mix jido.ai.cache_models PROVIDER_ID [--verbose] [--refresh]
-      mix jido.ai.cache_models PROVIDER_ID --model=MODEL_ID [--verbose] [--refresh]
-      mix jido.ai.cache_models --all [--verbose] [--refresh]
-      mix jido.ai.cache_models --list-providers
+  defp display_models_summary(models) do
+    # Group by provider
+    provider_groups =
+      Enum.group_by(models, fn model ->
+        Map.get(model, :provider) || Map.get(model, "provider")
+      end)
 
-    Examples:
-      mix jido.ai.cache_models anthropic
-      mix jido.ai.cache_models openai --verbose
-      mix jido.ai.cache_models anthropic --model=claude-3-7-sonnet-20250219 --refresh
-      mix jido.ai.cache_models --all
+    provider_groups
+    |> Enum.sort_by(fn {provider, _models} -> provider end)
+    |> Enum.each(fn {provider, provider_models} ->
+      Mix.shell().info("#{provider}: #{length(provider_models)} models")
+
+      # Show first few models as examples
+      provider_models
+      |> Enum.take(5)
+      |> Enum.each(fn model ->
+        id = Map.get(model, :id) || Map.get(model, "id")
+        capabilities = format_capabilities_short(Map.get(model, :capabilities))
+        Mix.shell().info("  - #{id}#{capabilities}")
+      end)
+
+      if length(provider_models) > 5 do
+        Mix.shell().info("  ... and #{length(provider_models) - 5} more")
+      end
+
+      Mix.shell().info("")
+    end)
+  end
+
+  defp format_capabilities(nil), do: "none specified"
+
+  defp format_capabilities(caps) when is_map(caps) do
+    enabled_caps =
+      caps
+      |> Enum.filter(fn {_cap, enabled} -> enabled end)
+      |> Enum.map(fn {cap, _} -> cap end)
+
+    if length(enabled_caps) > 0 do
+      Enum.join(enabled_caps, ", ")
+    else
+      "none"
+    end
+  end
+
+  defp format_capabilities_short(nil), do: ""
+
+  defp format_capabilities_short(caps) when is_map(caps) do
+    flags = []
+    flags = if Map.get(caps, :tool_call), do: ["T" | flags], else: flags
+    flags = if Map.get(caps, :reasoning), do: ["R" | flags], else: flags
+    flags = if Map.get(caps, :attachment), do: ["A" | flags], else: flags
+
+    if length(flags) > 0 do
+      " [#{Enum.join(flags, "")}]"
+    else
+      ""
+    end
+  end
+
+  defp get_source_option(args) do
+    cond do
+      args[:registry_only] -> :registry
+      args[:cache_only] -> :cache
+      true -> :both
+    end
+  end
+
+  defp build_filters_from_args(args) do
+    filters = []
+
+    filters =
+      if capability = args[:capability] do
+        [{:capability, String.to_atom(capability)} | filters]
+      else
+        filters
+      end
+
+    filters =
+      if max_cost = args[:max_cost] do
+        [{:max_cost_per_token, String.to_float(max_cost)} | filters]
+      else
+        filters
+      end
+
+    filters =
+      if min_context = args[:min_context] do
+        [{:min_context_length, String.to_integer(min_context)} | filters]
+      else
+        filters
+      end
+
+    filters =
+      if provider = args[:provider_filter] do
+        [{:provider, String.to_atom(provider)} | filters]
+      else
+        filters
+      end
+
+    filters =
+      if modality = args[:modality] do
+        [{:modality, String.to_atom(modality)} | filters]
+      else
+        filters
+      end
+
+    filters
+  end
+
+  defp get_provider_from_args(args) do
+    # This would need to be enhanced to get provider from command line args
+    # For now, return nil to list all providers
+    args[:provider] || nil
+  end
+
+  # Enhanced argument parsing
+  defp parse_args_enhanced(args) do
+    args
+    |> OptionParser.parse(
+      switches: [
+        # Existing switches...
+        help: :boolean,
+        list_providers: :boolean,
+        list_all_models: :boolean,
+        verbose: :boolean,
+        fetch: :boolean,
+        model: :string,
+        refresh: :boolean,
+        show: :string,
+        compare: :string,
+
+        # New registry switches
+        registry_stats: :boolean,
+        list_all_models_enhanced: :boolean,
+        list_models_enhanced: :boolean,
+        discover_models: :boolean,
+        registry_only: :boolean,
+        cache_only: :boolean,
+        capability: :string,
+        max_cost: :string,
+        min_context: :string,
+        provider_filter: :string,
+        modality: :string
+      ],
+      aliases: [
+        h: :help,
+        v: :verbose,
+        f: :fetch,
+        m: :model,
+        r: :refresh,
+        s: :show,
+        c: :compare,
+        # New aliases
+        rs: :registry_stats,
+        lae: :list_all_models_enhanced,
+        lme: :list_models_enhanced,
+        dm: :discover_models
+      ]
+    )
+  end
+
+  # Update help text to include new registry commands
+  defp show_help_enhanced do
+    Mix.shell().info("""
+    Jido AI Models Management (Enhanced with Registry)
+
+    USAGE:
+        mix jido.ai.models [OPTIONS]
+        mix jido.ai.models PROVIDER [OPTIONS]
+
+    REGISTRY COMMANDS:
+        --registry-stats, -rs           Show comprehensive registry statistics
+        --list-all-models-enhanced      List all models using registry + cache
+        --list-models-enhanced          List provider models using registry + cache
+        --discover-models, -dm          Discover models with advanced filtering
+
+    REGISTRY OPTIONS:
+        --registry-only                 Use only registry data (no cache)
+        --cache-only                    Use only cached data (no registry)
+        --capability CAPABILITY         Filter by capability (tool_call, reasoning, etc.)
+        --max-cost COST                 Maximum cost per token (e.g., "0.001")
+        --min-context LENGTH            Minimum context length (e.g., "100000")
+        --provider-filter PROVIDER      Filter by specific provider
+        --modality MODALITY             Filter by modality (text, image, audio)
+
+    REGISTRY EXAMPLES:
+        # Show comprehensive registry statistics
+        mix jido.ai.models --registry-stats
+
+        # List all models from registry and cache
+        mix jido.ai.models --list-all-models-enhanced
+
+        # List only registry models for Anthropic
+        mix jido.ai.models anthropic --list-models-enhanced --registry-only
+
+        # Find models with tool calling capability
+        mix jido.ai.models --discover-models --capability tool_call
+
+        # Find cost-effective models with large context
+        mix jido.ai.models --discover-models --max-cost 0.0005 --min-context 100000
+
+        # Find Anthropic models with reasoning capability
+        mix jido.ai.models --discover-models --provider-filter anthropic --capability reasoning
+
+    LEGACY COMMANDS:
+        --list-providers                List all available providers
+        --list-all-models               List all cached models
+        --fetch, -f                     Fetch and cache models
+        --show MODEL, -s MODEL          Show detailed model information
+        --compare MODEL, -c MODEL       Compare model across providers
+        --verbose, -v                   Show detailed output
+        --help, -h                      Show this help
+
+    PROVIDERS:
+        anthropic, openai, google, cloudflare, openrouter
+
+    For more information, visit: https://docs.jido.ai
     """)
   end
 end

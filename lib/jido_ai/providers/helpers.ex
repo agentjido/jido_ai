@@ -12,6 +12,7 @@ defmodule Jido.AI.Provider.Helpers do
 
   require Logger
   alias Jido.AI.Keyring
+  alias Jido.AI.Provider
 
   defp model_patterns do
     [
@@ -72,7 +73,7 @@ defmodule Jido.AI.Provider.Helpers do
   Gets the path to the models file for a provider.
   """
   def get_models_file_path(provider_path) do
-    base_dir = Jido.AI.Provider.base_dir()
+    base_dir = Provider.base_dir()
     provider_dir = Path.join(base_dir, provider_path)
     Path.join(provider_dir, "models.json")
   end
@@ -81,7 +82,7 @@ defmodule Jido.AI.Provider.Helpers do
   Gets the path to a specific model file for a provider.
   """
   def get_model_file_path(provider_path, model) do
-    base_dir = Jido.AI.Provider.base_dir()
+    base_dir = Provider.base_dir()
     provider_dir = Path.join(base_dir, provider_path)
     model_dir = Path.join(provider_dir, "models")
     Path.join(model_dir, "#{model}.json")
@@ -114,11 +115,9 @@ defmodule Jido.AI.Provider.Helpers do
 
   # Helper function to parse JSON with proper error handling
   defp parse_json(json) do
-    try do
-      Jason.decode(json)
-    rescue
-      e -> {:error, "Invalid JSON: #{inspect(e)}"}
-    end
+    Jason.decode(json)
+  rescue
+    e -> {:error, "Invalid JSON: #{inspect(e)}"}
   end
 
   @doc """
@@ -167,20 +166,48 @@ defmodule Jido.AI.Provider.Helpers do
   Fetches models from the API and caches them.
   """
   def fetch_and_cache_models(_provider, url, headers, provider_path, process_fn) do
+    require Logger
+
     case Req.get(url, headers: headers) do
       {:ok, %{status: status, body: body}} when status in 200..299 ->
         # Extract models from the response
         models = extract_models_from_response(body)
 
-        # Ensure cache directory exists
+        # Ensure cache directory exists (with error handling)
         models_file = get_models_file_path(provider_path)
-        File.mkdir_p!(Path.dirname(models_file))
+        cache_dir = Path.dirname(models_file)
 
-        # Cache the response
-        json = Jason.encode!(%{"data" => models}, pretty: true)
-        File.write!(models_file, json)
+        case File.mkdir_p(cache_dir) do
+          :ok ->
+            :ok
 
-        # Return processed models
+          {:error, reason} ->
+            Logger.warning(
+              "Failed to create cache directory #{cache_dir}: #{inspect(reason)}. Continuing without caching."
+            )
+        end
+
+        # Try to cache the response (with error handling)
+        try do
+          json = Jason.encode!(%{"data" => models}, pretty: true)
+
+          case File.write(models_file, json) do
+            :ok ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning(
+                "Failed to write models cache file #{models_file}: #{inspect(reason)}. Continuing without caching."
+              )
+          end
+        rescue
+          e ->
+            Logger.warning(
+              "Failed to encode/write models cache: #{inspect(e)}. Continuing without caching."
+            )
+        end
+
+        # Return processed models (even if caching failed)
         {:ok, process_fn.(models)}
 
       {:ok, %{status: status, body: body}} ->
@@ -226,16 +253,29 @@ defmodule Jido.AI.Provider.Helpers do
 
   @doc """
   Caches a single model to a file.
+
+  Returns :ok on success, or logs a warning and returns :error on failure.
+  This function is best-effort - failures don't prevent the application from working.
   """
   def cache_single_model(provider_path, model, model_data) do
+    require Logger
+
     model_file = get_model_file_path(provider_path, model)
+    cache_dir = Path.dirname(model_file)
 
-    # Ensure model directory exists
-    File.mkdir_p!(Path.dirname(model_file))
+    # Ensure model directory exists (with error handling)
+    with :ok <- File.mkdir_p(cache_dir),
+         {:ok, json} <- Jason.encode(%{data: model_data}, pretty: true),
+         :ok <- File.write(model_file, json) do
+      :ok
+    else
+      {:error, reason} ->
+        Logger.warning(
+          "Failed to cache model #{inspect(model)} to #{model_file}: #{inspect(reason)}"
+        )
 
-    # Save model to file
-    json = Jason.encode!(model_data, pretty: true)
-    File.write!(model_file, json)
+        :error
+    end
   end
 
   @doc """
