@@ -9,6 +9,8 @@ defmodule Jido.AI.Agent do
     tags: ["AI", "Agent"],
     vsn: "0.1.0"
 
+  alias Jido.Agent.Server
+
   @default_opts [
     skills: [Jido.AI.Skill],
     agent: __MODULE__
@@ -23,7 +25,7 @@ defmodule Jido.AI.Agent do
   @impl true
   def start_link(opts) do
     opts = Keyword.merge(@default_opts, opts)
-    Jido.Agent.Server.start_link(opts)
+    Server.start_link(opts)
   end
 
   def chat_response(pid, message, kwargs \\ @default_kwargs) when is_binary(message) do

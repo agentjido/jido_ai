@@ -41,6 +41,12 @@ defmodule Jido.AI.Model do
     field(:temperature, float(), default: 0.7)
     field(:max_tokens, non_neg_integer(), default: 1024)
     field(:max_retries, non_neg_integer(), default: 0)
+    # ReqLLM integration field
+    field(:reqllm_id, String.t())
+    # Enhanced ReqLLM metadata fields
+    field(:capabilities, map())
+    field(:modalities, map())
+    field(:cost, map())
   end
 
   @doc """
@@ -50,6 +56,8 @@ defmodule Jido.AI.Model do
   - An existing %Jido.AI.Model{} struct (pass-through)
   - A tuple of {provider, opts} where provider is an atom and opts is a keyword list
   - A category tuple of {:category, category, class}
+
+  The function automatically computes and sets the `reqllm_id` field for ReqLLM integration.
 
   ## Parameters
     - input: The input to create a model from
@@ -61,48 +69,40 @@ defmodule Jido.AI.Model do
   ## Examples
 
       iex> Jido.AI.Model.from({:anthropic, [model: "claude-3-5-haiku"]})
-      {:ok, %Jido.AI.Model{provider: :anthropic, model: "claude-3-5-haiku", ...}}
+      {:ok, %Jido.AI.Model{provider: :anthropic, model: "claude-3-5-haiku", reqllm_id: "anthropic:claude-3-5-haiku", ...}}
 
       iex> Jido.AI.Model.from(%Jido.AI.Model{provider: :openai, model: "gpt-4"})
       {:ok, %Jido.AI.Model{provider: :openai, model: "gpt-4", ...}}
   """
-  @spec from(term()) :: {:ok, __MODULE__.t()} | {:error, String.t()}
+  @spec from(term()) :: {:ok, ReqLLM.Model.t()} | {:error, String.t()}
   def from(input) do
     case input do
-      # Already a Model struct
-      %__MODULE__{} = model ->
+      # Already a ReqLLM.Model struct
+      %ReqLLM.Model{} = model ->
         {:ok, model}
+
+      # Already a Jido.AI.Model struct - convert to ReqLLM.Model
+      %__MODULE__{provider: provider, model: model_name} ->
+        ReqLLM.Model.from("#{provider}:#{model_name}")
 
       # A provider tuple
       {provider, opts} when is_atom(provider) and is_list(opts) ->
-        case Jido.AI.Provider.get_adapter_by_id(provider) do
-          {:ok, adapter_module} ->
-            adapter_module.build(opts)
+        model_name = Keyword.get(opts, :model)
 
-          {:error, reason} ->
-            {:error, reason}
+        if model_name do
+          # Use ReqLLM.Model directly
+          ReqLLM.Model.from({provider, model_name, opts})
+        else
+          {:error, "model option is required for provider #{provider}"}
         end
 
-      # A category tuple
+      # A string specification like "openai:gpt-4"
+      model_spec when is_binary(model_spec) ->
+        ReqLLM.Model.from(model_spec)
+
+      # A category tuple - not supported directly by ReqLLM
       {:category, category, class} when is_atom(category) and is_atom(class) ->
-        # For now, create a basic model with category info
-        # This could be enhanced to map to specific providers based on category/class
-        {:ok,
-         %__MODULE__{
-           id: "#{category}_#{class}",
-           name: "#{category} #{class} Model",
-           provider: nil,
-           architecture: %Architecture{
-             modality: "text",
-             tokenizer: "unknown"
-           },
-           description: "Category-based model for #{category} #{class}",
-           created: System.system_time(:second),
-           endpoints: [],
-           base_url: "",
-           api_key: "",
-           model: "#{category}_#{class}"
-         }}
+        {:error, "Category-based models not supported. Use provider:model format instead."}
 
       other ->
         {:error, "Invalid model specification: #{inspect(other)}"}
