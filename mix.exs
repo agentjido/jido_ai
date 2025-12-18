@@ -85,7 +85,8 @@ defmodule Jido.Ai.MixProject do
       {:ex_doc, "~> 0.39.3", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
       {:expublish, "~> 2.5", only: [:dev], runtime: false},
-      {:git_ops, "~> 2.5", only: [:dev, :test]},
+      {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
+      {:git_ops, "~> 2.9", only: [:dev, :test]},
       {:igniter, "~> 0.5", only: [:dev, :test]},
       {:mimic, "~> 2.0", only: [:dev, :test]},
       {:mix_audit, ">= 0.0.0", only: [:dev, :test], runtime: false},
@@ -137,10 +138,16 @@ defmodule Jido.Ai.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE.md"],
+      files: ["lib", "mix.exs", "README.md", "LICENSE"],
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => @source_url}
+      links: %{
+        "Documentation" => "https://hexdocs.pm/jido_ai",
+        "GitHub" => @source_url,
+        "Website" => "https://agentjido.xyz",
+        "Discord" => "https://agentjido.xyz/discord",
+        "Changelog" => "https://github.com/agentjido/jido_ai/blob/main/CHANGELOG.md"
+      }
     ]
   end
 
