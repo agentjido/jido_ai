@@ -177,7 +177,8 @@ defmodule Jido.Ai.MixProject do
         {"guides/developer/data-flow.md", title: "Data Flow"}
       ],
       groups_for_extras: [
-        "Getting Started": ~r/guides\/user\/(getting-started|models|prompts|configuration|chat-completion|conversations)\.md/,
+        "Getting Started":
+          ~r/guides\/user\/(getting-started|models|prompts|configuration|chat-completion|conversations)\.md/,
         Runners: ~r/guides\/user\/runners\/.*/,
         "Developer Guides": ~r/guides\/developer\/.*/
       ]
