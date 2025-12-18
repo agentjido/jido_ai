@@ -1,0 +1,10 @@
+{application,chain_of_thought_example,
+             [{modules,['Elixir.Examples.ChainOfThoughtExample',
+                        'Elixir.Examples.ChainOfThoughtExample.DecisionAction',
+                        'Elixir.Examples.ChainOfThoughtExample.PlanningAction',
+                        'Elixir.Examples.ChainOfThoughtExample.ReasoningAction']},
+              {optional_applications,[]},
+              {applications,[kernel,stdlib,elixir,logger,jido_ai]},
+              {description,"chain_of_thought_example"},
+              {registered,[]},
+              {vsn,"0.1.0"}]}.

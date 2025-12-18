@@ -1,0 +1,11 @@
+{application,financial_calculator,
+             [{modules,['Elixir.Examples.ProgramOfThought.FinancialCalculator',
+                        'Elixir.Examples.ProgramOfThought.FinancialCalculator.ClassifyProblemAction',
+                        'Elixir.Examples.ProgramOfThought.FinancialCalculator.ExecuteCodeAction',
+                        'Elixir.Examples.ProgramOfThought.FinancialCalculator.GenerateCodeAction',
+                        'Elixir.Examples.ProgramOfThought.FinancialCalculator.IntegrateResultAction']},
+              {optional_applications,[]},
+              {applications,[kernel,stdlib,elixir,logger,jido_ai]},
+              {description,"financial_calculator"},
+              {registered,[]},
+              {vsn,"0.1.0"}]}.

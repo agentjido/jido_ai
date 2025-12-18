@@ -1,7 +1,7 @@
 defmodule JidoTest.AI.Provider.HelpersTest do
   use ExUnit.Case, async: false
-  alias Jido.AI.Provider.Helpers
   alias Jido.AI.Keyring
+  alias Jido.AI.Provider.Helpers
 
   import Mimic
 

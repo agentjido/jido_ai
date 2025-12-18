@@ -344,34 +344,30 @@ defmodule Jido.AI.Prompt.Template do
   end
 
   defp compile_with_eex(text) do
-    try do
-      compiled = EEx.compile_string(text)
-      {:ok, compiled}
-    rescue
-      e in [EEx.SyntaxError] ->
-        raise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
+    compiled = EEx.compile_string(text)
+    {:ok, compiled}
+  rescue
+    e in [EEx.SyntaxError] ->
+      raise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
 
-      e in CompileError ->
-        {:error, Exception.message(e)}
+    e in CompileError ->
+      {:error, Exception.message(e)}
 
-      e ->
-        {:error, "Unexpected error: #{Exception.message(e)}"}
-    end
+    e ->
+      {:error, "Unexpected error: #{Exception.message(e)}"}
   end
 
   defp format_with_eex(text, inputs) do
-    try do
-      EEx.eval_string(text, assigns: inputs)
-    rescue
-      e in [RuntimeError] ->
-        raise Jido.AI.Error, "Template formatting error: #{Exception.message(e)}"
+    EEx.eval_string(text, assigns: inputs)
+  rescue
+    e in [RuntimeError] ->
+      raise Jido.AI.Error, "Template formatting error: #{Exception.message(e)}"
 
-      e in CompileError ->
-        raise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
+    e in CompileError ->
+      raise Jido.AI.Error, "Template compilation error: #{Exception.message(e)}"
 
-      e ->
-        raise Jido.AI.Error, "Unexpected error: #{Exception.message(e)}"
-    end
+    e ->
+      raise Jido.AI.Error, "Unexpected error: #{Exception.message(e)}"
   end
 
   @doc """
@@ -415,12 +411,10 @@ defmodule Jido.AI.Prompt.Template do
   """
   @spec to_message(t(), inputs :: map()) :: {:ok, MessageItem.t()} | {:error, String.t()}
   def to_message(%Template{} = template, inputs \\ %{}) do
-    try do
-      content = format(template, inputs)
-      {:ok, MessageItem.new(%{role: template.role, content: content})}
-    rescue
-      e -> {:error, Exception.message(e)}
-    end
+    content = format(template, inputs)
+    {:ok, MessageItem.new(%{role: template.role, content: content})}
+  rescue
+    e -> {:error, Exception.message(e)}
   end
 
   @doc """
@@ -465,13 +459,11 @@ defmodule Jido.AI.Prompt.Template do
   """
   @spec estimate_tokens(t(), inputs :: map()) :: integer()
   def estimate_tokens(%Template{} = template, inputs \\ %{}) do
-    try do
-      formatted = format(template, inputs)
-      # Very rough estimate: ~4 characters per token for English text
-      (String.length(formatted) / 4) |> round()
-    rescue
-      _ -> 0
-    end
+    formatted = format(template, inputs)
+    # Very rough estimate: ~4 characters per token for English text
+    (String.length(formatted) / 4) |> round()
+  rescue
+    _ -> 0
   end
 
   @doc """
@@ -637,14 +629,12 @@ defmodule Jido.AI.Prompt.Template do
   Validates the syntax of a template without evaluating it.
   """
   def validate_template_syntax(%__MODULE__{text: text, engine: :eex}) do
-    try do
-      case compile_with_eex(text) do
-        {:ok, _} -> :ok
-        {:error, reason} -> {:error, reason}
-      end
-    rescue
-      e ->
-        {:error, "Template compilation error: #{Exception.message(e)}"}
+    case compile_with_eex(text) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
+  rescue
+    e ->
+      {:error, "Template compilation error: #{Exception.message(e)}"}
   end
 end

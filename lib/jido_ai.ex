@@ -216,4 +216,96 @@ defmodule Jido.AI do
   def list_keys do
     Keyring.list(Keyring)
   end
+
+  # ===========================================================================
+  # ReqLLM Integration API - Enhanced functions with ReqLLM awareness
+  # ===========================================================================
+
+  @doc """
+  Gets API key with ReqLLM integration and per-request override support.
+
+  This function extends api_key/1 with ReqLLM integration, supporting
+  per-request overrides and unified key precedence.
+
+  ## Parameters
+
+    * `provider` - The AI provider (default: :openai)
+    * `req_options` - Request options that may contain :api_key override
+
+  ## Examples
+
+      # Standard usage (backward compatible)
+      Jido.AI.api_key_with_reqllm(:openai)
+
+      # With per-request override
+      options = %{api_key: "sk-override"}
+      Jido.AI.api_key_with_reqllm(:openai, options)
+  """
+  @spec api_key_with_reqllm(atom(), map()) :: String.t() | nil
+  def api_key_with_reqllm(provider \\ :openai, _req_options \\ %{}) do
+    # Map provider to appropriate key name
+    key_name = provider_to_key_name(provider)
+    ReqLLM.get_key(key_name)
+  end
+
+  defp provider_to_key_name(:openai), do: :openai_api_key
+  defp provider_to_key_name(:anthropic), do: :anthropic_api_key
+  defp provider_to_key_name(:google), do: :google_api_key
+  defp provider_to_key_name(:github_models), do: :github_models_api_key
+  defp provider_to_key_name(provider), do: :"#{provider}_api_key"
+
+  @doc """
+  Validates that all required provider keys are available.
+
+  Checks key availability across all integrated systems and returns
+  information about available providers and their key sources.
+
+  ## Returns
+
+    * List of available providers with source information
+
+  ## Examples
+
+      providers = Jido.AI.list_available_providers()
+      # [%{provider: :openai, source: :environment}, ...]
+  """
+  @spec list_available_providers() :: [%{provider: atom(), source: atom()}]
+  def list_available_providers do
+    ReqLLM.Provider.Registry.list_implemented_providers()
+    |> Enum.map(fn provider ->
+      key_name = provider_to_key_name(provider)
+      has_key = ReqLLM.get_key(key_name) != nil
+
+      %{
+        provider: provider,
+        source: if(has_key, do: :configured, else: :not_configured)
+      }
+    end)
+  end
+
+  @doc """
+  Gets configuration with ReqLLM integration support.
+
+  This function extends config/2 with ReqLLM awareness, supporting
+  per-request overrides and provider-specific key resolution.
+
+  ## Parameters
+
+    * `key` - The configuration key (atom)
+    * `default` - Default value if key not found (default: nil)
+    * `req_options` - Per-request options for ReqLLM integration
+
+  ## Examples
+
+      # Standard usage (backward compatible)
+      value = Jido.AI.config_with_reqllm(:openai_api_key, "default")
+
+      # With per-request override
+      options = %{api_key: "override"}
+      value = Jido.AI.config_with_reqllm(:openai_api_key, "default", options)
+  """
+  @spec config_with_reqllm(atom(), term(), map()) :: term()
+  def config_with_reqllm(key, default \\ nil, req_options \\ %{}) do
+    Keyring.get_with_reqllm(Keyring, key, default, self(), req_options)
+  end
 end

@@ -1,5 +1,5 @@
 defmodule JidoTest.AI.Prompt.MessageItemTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   @moduletag :capture_log
 
   alias Jido.AI.Prompt.MessageItem

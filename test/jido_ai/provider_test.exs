@@ -1,5 +1,5 @@
 defmodule JidoTest.AI.ProviderTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   alias Jido.AI.Provider
 
   describe "base_dir/0" do
@@ -23,25 +23,24 @@ defmodule JidoTest.AI.ProviderTest do
         assert is_binary(provider.name)
       end)
 
-      # Check for expected providers
+      # Check for expected providers (from ReqLLM registry)
       provider_ids = Enum.map(providers, & &1.id)
       assert :openai in provider_ids
       assert :anthropic in provider_ids
       assert :openrouter in provider_ids
-      assert :cloudflare in provider_ids
     end
   end
 
   describe "get_adapter_module/1" do
-    test "returns the correct adapter module for a provider struct" do
+    test "returns reqllm_backed for known providers" do
       # Create a provider struct
       provider = %Provider{id: :openrouter, name: "OpenRouter"}
 
-      # Get the adapter module
+      # Get the adapter module - now all providers are ReqLLM-backed
       {:ok, adapter} = Provider.get_adapter_module(provider)
 
-      # Check that it's the expected module
-      assert adapter == Jido.AI.Provider.OpenRouter
+      # Check that it's ReqLLM-backed
+      assert adapter == :reqllm_backed
     end
 
     test "returns an error for an unknown provider" do
@@ -57,12 +56,12 @@ defmodule JidoTest.AI.ProviderTest do
   end
 
   describe "get_adapter_by_id/1" do
-    test "returns the correct adapter module for a provider ID" do
-      # Get the adapter module by ID
+    test "returns reqllm_backed for a known provider ID" do
+      # Get the adapter module by ID - now all providers are ReqLLM-backed
       {:ok, adapter} = Provider.get_adapter_by_id(:openrouter)
 
-      # Check that it's the expected module
-      assert adapter == Jido.AI.Provider.OpenRouter
+      # Check that it's ReqLLM-backed
+      assert adapter == :reqllm_backed
     end
 
     test "returns an error for an unknown provider ID" do
@@ -77,8 +76,8 @@ defmodule JidoTest.AI.ProviderTest do
       # Get the adapter module by string ID
       {:ok, adapter} = Provider.get_adapter_by_id("openrouter")
 
-      # Check that it's the expected module
-      assert adapter == Jido.AI.Provider.OpenRouter
+      # Check that it's ReqLLM-backed
+      assert adapter == :reqllm_backed
     end
   end
 

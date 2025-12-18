@@ -13,6 +13,8 @@ defmodule Jido.AI.Prompt.Splitter do
   bespoke data that will be added to the payload as the agent's "accumulator".
   """
 
+  alias Jido.AI.Tokenizer
+
   defstruct [
     :model,
     :input,
@@ -25,7 +27,7 @@ defmodule Jido.AI.Prompt.Splitter do
     %Jido.AI.Prompt.Splitter{
       model: model,
       input: input,
-      input_tokens: Jido.AI.Tokenizer.encode(input, model),
+      input_tokens: Tokenizer.encode(input, model),
       offset: 0,
       done: false
     }
@@ -36,7 +38,7 @@ defmodule Jido.AI.Prompt.Splitter do
   end
 
   def next_chunk(tok, bespoke_input) do
-    bespoke_tokens = Jido.AI.Tokenizer.encode(bespoke_input, tok.model) |> length()
+    bespoke_tokens = Tokenizer.encode(bespoke_input, tok.model) |> length()
     remaining_tokens = tok.model.context - bespoke_tokens
     {slice, %Jido.AI.Prompt.Splitter{} = tok} = get_slice(tok, remaining_tokens)
 
@@ -57,7 +59,7 @@ defmodule Jido.AI.Prompt.Splitter do
   defp get_slice(%Jido.AI.Prompt.Splitter{} = tok, num_tokens) do
     slice = Enum.slice(tok.input_tokens, tok.offset, num_tokens)
     tokens = length(slice)
-    output = Jido.AI.Tokenizer.decode(slice, tok.model)
+    output = Tokenizer.decode(slice, tok.model)
     {output, %Jido.AI.Prompt.Splitter{tok | offset: tok.offset + tokens}}
   end
 end
