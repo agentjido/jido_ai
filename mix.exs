@@ -166,11 +166,20 @@ defmodule Jido.Ai.MixProject do
         {"guides/user/runners/react.md", title: "ReAct"},
         {"guides/user/runners/self-consistency.md", title: "Self-Consistency"},
         {"guides/user/runners/tree-of-thoughts.md", title: "Tree of Thoughts"},
-        {"guides/user/runners/gepa.md", title: "GEPA"}
+        {"guides/user/runners/gepa.md", title: "GEPA"},
+
+        # Developer Guides
+        {"guides/developer/architecture.md", title: "Architecture Overview"},
+        {"guides/developer/model-system.md", title: "Model System"},
+        {"guides/developer/prompt-system.md", title: "Prompt System"},
+        {"guides/developer/actions-system.md", title: "Actions System"},
+        {"guides/developer/runners-system.md", title: "Runners System"},
+        {"guides/developer/data-flow.md", title: "Data Flow"}
       ],
       groups_for_extras: [
         "Getting Started": ~r/guides\/user\/(getting-started|models|prompts|configuration|chat-completion|conversations)\.md/,
-        Runners: ~r/guides\/user\/runners\/.*/
+        Runners: ~r/guides\/user\/runners\/.*/,
+        "Developer Guides": ~r/guides\/developer\/.*/
       ]
     ]
   end
