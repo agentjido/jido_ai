@@ -20,7 +20,6 @@ defmodule Jido.AI.Runner.GEPA.TestFixtures do
       trajectory = build_trajectory_for_scenario(:success)
   """
 
-  alias Jido.AI.Runner.GEPA.Metrics
   alias Jido.AI.Runner.GEPA.Trajectory
 
   @doc """
@@ -204,10 +203,10 @@ defmodule Jido.AI.Runner.GEPA.TestFixtures do
         %{base_metrics | success: true, duration_ms: 150}
 
       :high_fitness ->
-        %{base_metrics | success: true, duration_ms: 120, quality_score: 0.95}
+        Map.merge(base_metrics, %{success: true, duration_ms: 120, quality_score: 0.95})
 
       :low_fitness ->
-        %{base_metrics | success: true, duration_ms: 80, quality_score: 0.3}
+        Map.merge(base_metrics, %{success: true, duration_ms: 80, quality_score: 0.3})
 
       :timeout ->
         %{base_metrics | timeout: true, duration_ms: 30_000}
@@ -216,13 +215,13 @@ defmodule Jido.AI.Runner.GEPA.TestFixtures do
         %{base_metrics | error: true, duration_ms: 200}
 
       :partial ->
-        %{base_metrics | success: false, duration_ms: 500, partial: true}
+        Map.merge(base_metrics, %{success: false, duration_ms: 500, partial: true})
 
       :error ->
         %{base_metrics | error: true, duration_ms: 50}
 
       :agent_crash ->
-        %{base_metrics | error: true, duration_ms: 10, crash: true}
+        Map.merge(base_metrics, %{error: true, duration_ms: 10, crash: true})
 
       _ ->
         base_metrics

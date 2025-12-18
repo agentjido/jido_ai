@@ -28,7 +28,6 @@ defmodule Jido.AI.Runner.GEPA.TestHelper do
 
   alias Jido.AI.Runner.GEPA.Evaluator.EvaluationResult
   alias Jido.AI.Runner.GEPA.TestFixtures
-  alias Jido.AI.Runner.GEPA.Trajectory
   alias Jido.Signal.ID, as: SignalID
 
   @doc """
@@ -305,29 +304,6 @@ defmodule Jido.AI.Runner.GEPA.TestHelper do
   end
 
   # Private helpers
-
-  defp extract_prompt(params) when is_map(params) do
-    cond do
-      Map.has_key?(params, :prompt) ->
-        case params.prompt do
-          %{messages: [%{content: content} | _]} -> content
-          %{messages: messages} when is_list(messages) -> inspect(messages)
-          prompt when is_binary(prompt) -> prompt
-          _ -> "unknown prompt"
-        end
-
-      Map.has_key?(params, :messages) ->
-        case params.messages do
-          [%{content: content} | _] -> content
-          _ -> "unknown prompt"
-        end
-
-      true ->
-        "unknown prompt"
-    end
-  end
-
-  defp extract_prompt(_), do: "unknown prompt"
 
   # Check if a signal is a chat/AI response signal that should be mocked
   defp chat_signal?(%{type: type}) when is_binary(type) do

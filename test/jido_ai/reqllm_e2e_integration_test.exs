@@ -11,6 +11,7 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
   @moduletag :capture_log
   @moduletag :reqllm_integration
 
+  setup :set_mimic_global
   setup :verify_on_exit!
 
   # =============================================================================
