@@ -151,44 +151,26 @@ defmodule Jido.Ai.MixProject do
       source_url: @source_url,
       extras: [
         "README.md",
-        {"guides/getting-started.md", title: "Getting Started"},
-        {"guides/keyring.md", title: "Managing Keys"},
-        {"guides/prompt.md", title: "Prompting"},
-        {"guides/providers.md", title: "LLM Providers"},
-        {"guides/agent-skill.md", title: "Agent & Skill"},
-        {"guides/actions.md", title: "Actions"},
 
-        # Provider Guides
-        {"guides/providers/provider-matrix.md", title: "Provider Matrix"},
-        {"guides/providers/high-performance.md", title: "High-Performance Providers"},
-        {"guides/providers/specialized.md", title: "Specialized Providers"},
-        {"guides/providers/local-models.md", title: "Local & Self-Hosted"},
-        {"guides/providers/enterprise.md", title: "Enterprise Providers"},
-        {"guides/providers/regional.md", title: "Regional Providers"},
+        # User Guides
+        {"guides/user/getting-started.md", title: "Getting Started"},
+        {"guides/user/models.md", title: "Models"},
+        {"guides/user/prompts.md", title: "Prompts"},
+        {"guides/user/configuration.md", title: "Configuration"},
+        {"guides/user/chat-completion.md", title: "Chat Completion"},
+        {"guides/user/conversations.md", title: "Conversations"},
 
-        # Migration Guides
-        {"guides/migration/from-legacy-providers.md", title: "Migration from Legacy"},
-        {"guides/migration/breaking-changes.md", title: "Breaking Changes"},
-        {"guides/migration/reqllm-integration.md", title: "ReqLLM Architecture"},
-
-        # Feature Guides
-        {"guides/features/rag-integration.md", title: "RAG Integration"},
-        {"guides/features/code-execution.md", title: "Code Execution"},
-        {"guides/features/plugins.md", title: "Plugins & Extensions"},
-        {"guides/features/fine-tuning.md", title: "Fine-Tuning"},
-        {"guides/features/context-windows.md", title: "Context Windows"},
-        {"guides/features/advanced-parameters.md", title: "Advanced Parameters"},
-
-        # Troubleshooting
-        {"guides/troubleshooting.md", title: "Troubleshooting"}
+        # Runners
+        {"guides/user/runners/overview.md", title: "Runners Overview"},
+        {"guides/user/runners/chain-of-thought.md", title: "Chain of Thought"},
+        {"guides/user/runners/react.md", title: "ReAct"},
+        {"guides/user/runners/self-consistency.md", title: "Self-Consistency"},
+        {"guides/user/runners/tree-of-thoughts.md", title: "Tree of Thoughts"},
+        {"guides/user/runners/gepa.md", title: "GEPA"}
       ],
       groups_for_extras: [
-        "Getting Started":
-          ~r/guides\/(getting-started|keyring|prompt|providers|agent-skill|actions)\.md/,
-        Providers: ~r/guides\/providers\/.*/,
-        Migration: ~r/guides\/migration\/.*/,
-        Features: ~r/guides\/features\/.*/,
-        Troubleshooting: ~r/guides\/troubleshooting.*/
+        "Getting Started": ~r/guides\/user\/(getting-started|models|prompts|configuration|chat-completion|conversations)\.md/,
+        Runners: ~r/guides\/user\/runners\/.*/
       ]
     ]
   end
