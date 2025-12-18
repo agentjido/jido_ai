@@ -1,0 +1,11 @@
+{application,abnf_parsec,
+             [{modules,['Elixir.AbnfParsec','Elixir.AbnfParsec.Generator',
+                        'Elixir.AbnfParsec.LeftoverTokenError',
+                        'Elixir.AbnfParsec.Parser',
+                        'Elixir.AbnfParsec.UnexpectedTokenError']},
+              {compile_env,[{abnf_parsec,[extra_utf8_range],error}]},
+              {optional_applications,[]},
+              {applications,[kernel,stdlib,elixir,logger,nimble_parsec]},
+              {description,"ABNF in, parser out"},
+              {registered,[]},
+              {vsn,"2.1.0"}]}.

@@ -1,0 +1,10 @@
+{application,ex_aws_auth,
+             [{modules,['Elixir.AWSAuth','Elixir.AWSAuth.AuthorizationHeader',
+                        'Elixir.AWSAuth.Credentials',
+                        'Elixir.AWSAuth.QueryParameters','Elixir.AWSAuth.Req',
+                        'Elixir.AWSAuth.Utils']},
+              {optional_applications,[req,jason]},
+              {applications,[kernel,stdlib,elixir,logger,crypto,req,jason]},
+              {description,"AWS Signature Version 4 Signing Library - Community-maintained fork\n"},
+              {registered,[]},
+              {vsn,"1.3.1"}]}.

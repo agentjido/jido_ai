@@ -1,0 +1,8 @@
+{
+  "provider": {
+    "id": "cerebras"
+  },
+  "exclude": [
+    "qwen-3-235b-a22b-thinking-2507"
+  ]
+}

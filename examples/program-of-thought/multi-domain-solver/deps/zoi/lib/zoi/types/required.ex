@@ -1,0 +1,12 @@
+defmodule Zoi.Types.Required do
+  @moduledoc false
+
+  use Zoi.Type.Def, fields: [:inner]
+
+  alias Zoi.Types.Meta
+
+  def new(inner) do
+    meta = %Meta{} = inner.meta
+    %{inner | meta: %{meta | required: true}}
+  end
+end
