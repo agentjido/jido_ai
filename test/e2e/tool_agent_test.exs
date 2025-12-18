@@ -6,9 +6,9 @@ defmodule JidoTest.E2E.ToolAgentTest do
 
   require Logger
 
-  alias Jido.AI.Agent
-  alias Jido.Actions.Arithmetic.{Add, Subtract, Multiply, Divide}
   alias Instructor.Adapters.Anthropic
+  alias Jido.Actions.Arithmetic.{Add, Divide, Multiply, Subtract}
+  alias Jido.AI.Agent
 
   setup :set_mimic_global
 

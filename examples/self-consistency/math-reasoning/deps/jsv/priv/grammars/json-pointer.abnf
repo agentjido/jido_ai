@@ -1,0 +1,10 @@
+json-pointer    = *( "/" reference-token )
+reference-token = *( unescaped / escaped )
+unescaped       = %x00-2E / %x30-7D / %x7F-10FFFF
+    ; %x2F ('/') and %x7E ('~') are excluded from 'unescaped'
+escaped         = "~" ( "0" / "1" )
+  ; representing '~' and '/', respectively
+
+relative-json-pointer =   (non-negative-integer "#") / (non-negative-integer json-pointer)
+non-negative-integer  =  %x30 / %x31-39 *( %x30-39 )
+        ; "0", or digits without a leading "0"

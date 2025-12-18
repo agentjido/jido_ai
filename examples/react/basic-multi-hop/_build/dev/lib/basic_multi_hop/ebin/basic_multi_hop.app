@@ -1,0 +1,9 @@
+{application,basic_multi_hop,
+             [{modules,['Elixir.Examples.ReAct.BasicMultiHop',
+                        'Elixir.Examples.ReAct.BasicMultiHop.LookupTool',
+                        'Elixir.Examples.ReAct.BasicMultiHop.SearchTool']},
+              {optional_applications,[]},
+              {applications,[kernel,stdlib,elixir,logger,jido_ai]},
+              {description,"basic_multi_hop"},
+              {registered,[]},
+              {vsn,"0.1.0"}]}.

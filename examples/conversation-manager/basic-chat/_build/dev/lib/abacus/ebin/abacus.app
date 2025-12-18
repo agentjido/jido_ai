@@ -1,0 +1,11 @@
+{application,abacus,
+             [{modules,['Elixir.Abacus','Elixir.Abacus.Compile',
+                        'Elixir.Abacus.Format',
+                        'Elixir.Abacus.Runtime.Helpers',
+                        'Elixir.Abacus.Runtime.Scope',math_term,
+                        math_term_parser,new_parser]},
+              {optional_applications,[]},
+              {applications,[kernel,stdlib,elixir,logger]},
+              {description,"Mathematical expression parser and evaluator in Elixir.\n\n\n\n\n\n\nTags: math, parse, parser, eval\n"},
+              {registered,[]},
+              {vsn,"2.1.0"}]}.

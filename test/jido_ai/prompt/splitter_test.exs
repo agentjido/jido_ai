@@ -1,5 +1,5 @@
 defmodule JidoTest.AI.Prompt.SplitterTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   @moduletag :capture_log
 
   alias Jido.AI.Prompt.Splitter

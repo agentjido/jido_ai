@@ -1,5 +1,5 @@
 defmodule Jido.AI.Keyring.FilterTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   require Logger
 
   alias Jido.AI.Keyring.Filter
