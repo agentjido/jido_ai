@@ -129,7 +129,7 @@ defmodule Jido.Ai.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "dialyzer --format dialyxir",
-        "credo --min-priority high",
+        "credo --min-priority higher",
         "doctor --short --raise",
         "docs"
       ]
