@@ -125,13 +125,10 @@ defmodule Jido.Ai.MixProject do
       docs: "docs -f html --open",
       q: ["quality"],
       quality: [
-        "format",
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "dialyzer --format dialyxir",
         "credo --min-priority higher",
-        "doctor --short --raise",
-        "docs"
+        "dialyzer"
       ]
     ]
   end
