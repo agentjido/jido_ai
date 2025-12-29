@@ -74,7 +74,7 @@ defmodule Jido.Ai.MixProject do
 
       # Clients
       {:req, "~> 0.5.8"},
-      {:req_llm, "~> 1.0.0-rc.5"},
+      {:req_llm, "~> 1.2.0"},
       {:openai_ex, "~> 0.9.0"},
 
       # Testing
