@@ -24,6 +24,7 @@ Jido.AI is the **AI integration layer** for the Jido ecosystem, providing:
 
 - **jido_action** - Composable action framework
 - **jido_signal** - Event/signal handling
+- **jido** - Agent framework
 - **req_llm** - LLM provider abstraction (Anthropic, OpenAI, Google, etc.)
 - **zoi** - Schema validation with transformations
 - **splode** - Structured error handling
