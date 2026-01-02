@@ -1,8 +1,5 @@
-defmodule JidoAiTest do
-  use ExUnit.Case
-  doctest JidoAi
+defmodule Jido.AITest do
+  use ExUnit.Case, async: true
 
-  test "greets the world" do
-    assert JidoAi.hello() == :world
-  end
+  doctest Jido.AI
 end
