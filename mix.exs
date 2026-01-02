@@ -64,12 +64,14 @@ defmodule JidoAi.MixProject do
 
   defp jido_deps do
     [
+      jido_dep(:jido, "../jido", "~> 2.0"),
       jido_dep(:req_llm, "../req_llm", "~> 1.2")
     ]
   end
 
   defp runtime_deps do
     [
+      {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.2.4"},
