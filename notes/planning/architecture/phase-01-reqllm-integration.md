@@ -255,26 +255,26 @@ Comprehensive integration tests verifying all Phase 1 enhancements work together
 
 Verify enhanced directives work with ReqLLM.
 
-- [ ] 1.6.1.1 Create `test/jido_ai/integration/foundation_phase1_test.exs`
-- [ ] 1.6.1.2 Test: ReqLLMStream with model alias resolution
-- [ ] 1.6.1.3 Test: ReqLLMGenerate non-streaming flow
-- [ ] 1.6.1.4 Test: ReqLLMEmbed embedding generation
+- [x] 1.6.1.1 Create `test/jido_ai/integration/foundation_phase1_test.exs`
+- [x] 1.6.1.2 Test: ReqLLMStream with model alias resolution
+- [x] 1.6.1.3 Test: ReqLLMGenerate non-streaming flow
+- [x] 1.6.1.4 Test: ReqLLMEmbed embedding generation
 
 ### 1.6.2 Signal Flow Integration
 
 Test signal creation and metadata.
 
-- [ ] 1.6.2.1 Test: Full directive → signal flow with usage metadata
-- [ ] 1.6.2.2 Test: Error signal creation on failure
-- [ ] 1.6.2.3 Test: Tool result signal with action execution
+- [x] 1.6.2.1 Test: Full directive → signal flow with usage metadata
+- [x] 1.6.2.2 Test: Error signal creation on failure
+- [x] 1.6.2.3 Test: Tool result signal with action execution
 
 ### 1.6.3 Configuration Integration
 
 Test configuration across components.
 
-- [ ] 1.6.3.1 Test: Model alias resolution in directives
-- [ ] 1.6.3.2 Test: Default settings applied correctly
-- [ ] 1.6.3.3 Test: Provider config validation
+- [x] 1.6.3.1 Test: Model alias resolution in directives
+- [x] 1.6.3.2 Test: Default settings applied correctly
+- [x] 1.6.3.3 Test: Provider config validation
 
 ---
 
