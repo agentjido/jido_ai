@@ -1,282 +1,304 @@
-# Phase 1: ReqLLM Integration Layer
+# Phase 1: Foundation Enhancement
 
-This phase implements the foundational ReqLLM integration layer that provides a Jido-friendly interface to ReqLLM's capabilities including streaming, tool calling, and metadata handling.
+This phase enhances the existing ReqLLM integration foundation. ReqLLM is a direct dependency and should be used directly throughout Jido.AI - no wrapper layers.
 
-## Module Structure
+## Design Principle
+
+**Use ReqLLM directly, not through adapters.** The existing codebase already follows this pattern:
+- `Jido.AI.Directive.ReqLLMStream` calls `ReqLLM.stream_text()` directly
+- `Jido.AI.ToolAdapter` converts Jido.Actions to `ReqLLM.Tool` structs
+- Strategies and skills should call ReqLLM functions directly
+
+This phase enhances the existing integration points, adds configuration, and improves error handling.
+
+## Existing Modules (Reference)
 
 ```
 lib/jido_ai/
-├── req_llm/
-│   ├── adapter.ex     # ReqLLM adapter for Jido
-│   ├── client.ex      # ReqLLM client wrapper
-│   ├── streaming.ex   # Streaming response handling
-│   └── metadata.ex    # Metadata extraction and processing
+├── directive.ex      # ReqLLMStream, ToolExec directives (uses ReqLLM directly)
+├── signal.ex         # ReqLLMResult, ReqLLMPartial, ToolResult signals
+├── tool_adapter.ex   # Jido.Action → ReqLLM.Tool conversion
+└── error.ex          # Splode-based error handling
+```
+
+## New/Enhanced Modules
+
+```
+lib/jido_ai/
+├── config.ex         # NEW: Configuration helpers for ReqLLM providers
+├── directive.ex      # ENHANCE: Add new directives
+├── signal.ex         # ENHANCE: Add new signals
+├── tool_adapter.ex   # ENHANCE: Improve conversion
+└── helpers.ex        # NEW: Common patterns and utilities
 ```
 
 ---
 
-## 1.1 Adapter Module
+## 1.1 Configuration Module
 
-Implement the main adapter module that provides the public API for ReqLLM integration with Jido AI.
+Create a configuration module for managing ReqLLM provider settings.
 
 ### 1.1.1 Module Setup
 
-Create the adapter module with type specifications and documentation.
+Create the configuration module.
 
-- [ ] 1.1.1.1 Create `lib/jido_ai/req_llm/adapter.ex` with module documentation
-- [ ] 1.1.1.2 Define `@type model_spec :: String.t() | {:atom, String.t(), keyword()} | ReqLLM.Model.t()`
-- [ ] 1.1.1.3 Add module aliases for Client, Streaming, and Metadata
+- [ ] 1.1.1.1 Create `lib/jido_ai/config.ex` with module documentation
+- [ ] 1.1.1.2 Document that this configures ReqLLM (not wrapping it)
+- [ ] 1.1.1.3 Define configuration schema types
 
-### 1.1.2 Text Generation Functions
+### 1.1.2 Provider Configuration
 
-Implement text generation with both blocking and streaming modes.
+Implement provider configuration helpers.
 
-- [ ] 1.1.2.1 Implement `generate_text/3` function with model_spec, prompt, and opts
-- [ ] 1.1.2.2 Implement `stream_text/3` function that returns a stream response
-- [ ] 1.1.2.3 Add `@spec` for both functions with proper return types
+- [ ] 1.1.2.1 Implement `get_provider/1` to retrieve provider config
+- [ ] 1.1.2.2 Support OpenAI, Anthropic, Google, Ollama providers
+- [ ] 1.1.2.3 Validate provider configuration at startup
+- [ ] 1.1.2.4 Support environment variable overrides
 
-### 1.1.3 Structured Output Functions
+### 1.1.3 Model Aliases
 
-Implement schema-based structured output generation.
+Implement named model aliases.
 
-- [ ] 1.1.3.1 Implement `generate_object/4` with model_spec, prompt, schema, opts
-- [ ] 1.1.3.2 Add Zoi schema validation support
-- [ ] 1.1.3.3 Add `@spec` with schema parameter types
+- [ ] 1.1.3.1 Implement `resolve_model/1` for alias resolution
+- [ ] 1.1.3.2 Support aliases like `:fast`, `:capable`, `:reasoning`
+- [ ] 1.1.3.3 Map aliases to ReqLLM model specs (e.g., "anthropic:claude-haiku-4-5")
+- [ ] 1.1.3.4 Allow runtime configuration of aliases
 
-### 1.1.4 Tool Calling Functions
+### 1.1.4 Default Settings
 
-Implement tool calling integration.
+Implement default settings management.
 
-- [ ] 1.1.4.1 Implement `call_with_tools/4` with model_spec, prompt, tools, opts
-- [ ] 1.1.4.2 Define tool list type specification
-- [ ] 1.1.4.3 Add `@spec` for tool calling function
+- [ ] 1.1.4.1 Implement `defaults/0` for global defaults
+- [ ] 1.1.4.2 Support default temperature, max_tokens, etc.
+- [ ] 1.1.4.3 Allow per-agent default overrides
 
-### 1.1.5 Embedding Functions
+### 1.1.5 Unit Tests for Configuration
 
-Implement embedding generation.
-
-- [ ] 1.1.5.1 Implement `generate_embeddings/3` with model_spec, texts, opts
-- [ ] 1.1.5.2 Support batch embedding for multiple texts
-- [ ] 1.1.5.3 Add `@spec` with list return type
-
-### 1.1.6 Response Processing
-
-Implement unified response processing.
-
-- [ ] 1.1.6.1 Implement `process_response/1` function
-- [ ] 1.1.6.2 Delegate to Metadata module for extraction
-- [ ] 1.1.6.3 Return normalized response structure
-
-### 1.1.7 Unit Tests for Adapter
-
-- [ ] Test generate_text/3 delegates to Client correctly
-- [ ] Test stream_text/3 returns stream response
-- [ ] Test generate_object/4 validates schema
-- [ ] Test call_with_tools/4 converts tools properly
-- [ ] Test generate_embeddings/3 handles batch input
-- [ ] Test process_response/1 extracts metadata
+- [ ] Test get_provider/1 returns config
+- [ ] Test resolve_model/1 resolves aliases
+- [ ] Test resolve_model/1 passes through direct specs
+- [ ] Test defaults/0 returns merged config
+- [ ] Test environment variable overrides
+- [ ] Test validation catches invalid config
 
 ---
 
-## 1.2 Client Implementation
+## 1.2 Directive Enhancement
 
-Implement the client wrapper that handles actual ReqLLM requests.
+Enhance the existing directive module with additional capabilities.
 
-### 1.2.1 Text Generation
+### 1.2.1 ReqLLMStream Enhancement
 
-Implement text generation with context building.
+Enhance the existing ReqLLMStream directive.
 
-- [ ] 1.2.1.1 Create `lib/jido_ai/req_llm/client.ex` with module documentation
-- [ ] 1.2.1.2 Implement `generate_text/3` with context building
-- [ ] 1.2.1.3 Implement `build_context/2` helper for prompt conversion
-- [ ] 1.2.1.4 Implement `maybe_add_system_message/2` helper
-- [ ] 1.2.1.5 Handle conversation history from opts
+- [ ] 1.2.1.1 Add `system_prompt` field for convenience
+- [ ] 1.2.1.2 Add `model_alias` field that resolves via Config
+- [ ] 1.2.1.3 Add `timeout` field for request timeout
+- [ ] 1.2.1.4 Improve error classification in DirectiveExec
 
-### 1.2.2 Streaming Implementation
+### 1.2.2 ReqLLMGenerate Directive (Non-Streaming)
 
-Implement streaming text generation.
+Add a non-streaming generate directive.
 
-- [ ] 1.2.2.1 Implement `stream_text/3` with context building
-- [ ] 1.2.2.2 Delegate stream processing to Streaming module
-- [ ] 1.2.2.3 Return structured stream response
+- [ ] 1.2.2.1 Create `Jido.AI.Directive.ReqLLMGenerate` module
+- [ ] 1.2.2.2 Define schema: id, model, context, tools, max_tokens, temperature
+- [ ] 1.2.2.3 Implement DirectiveExec that calls `ReqLLM.generate_text/3` directly
+- [ ] 1.2.2.4 Send ReqLLMResult signal on completion
 
-### 1.2.3 Structured Output
+### 1.2.3 ReqLLMEmbed Directive
 
-Implement schema-based output generation.
+Add an embedding generation directive.
 
-- [ ] 1.2.3.1 Implement `generate_object/4` with schema parameter
-- [ ] 1.2.3.2 Pass schema to ReqLLM.generate_object
-- [ ] 1.2.3.3 Validate response against schema
+- [ ] 1.2.3.1 Create `Jido.AI.Directive.ReqLLMEmbed` module
+- [ ] 1.2.3.2 Define schema: id, model, texts, metadata
+- [ ] 1.2.3.3 Implement DirectiveExec that calls ReqLLM embedding directly
+- [ ] 1.2.3.4 Create corresponding EmbedResult signal
 
-### 1.2.4 Tool Calling
+### 1.2.4 Unit Tests for Directives
 
-Implement tool calling with conversion.
-
-- [ ] 1.2.4.1 Implement `call_with_tools/4` function
-- [ ] 1.2.4.2 Implement `convert_tool/1` for Jido to ReqLLM tool conversion
-- [ ] 1.2.4.3 Extract tool_module.name(), description(), schema()
-
-### 1.2.5 Embedding Generation
-
-Implement embedding generation.
-
-- [ ] 1.2.5.1 Implement `generate_embeddings/3` function
-- [ ] 1.2.5.2 Delegate to ReqLLM.Embedding.generate
-- [ ] 1.2.5.3 Process and normalize response
-
-### 1.2.6 Response Processing
-
-Implement response normalization.
-
-- [ ] 1.2.6.1 Implement `process_response/1` private function
-- [ ] 1.2.6.2 Extract content, usage, finish_reason, model, provider
-- [ ] 1.2.6.3 Implement `extract_metadata/1` for detailed metadata
-
-### 1.2.7 Unit Tests for Client
-
-- [ ] Test generate_text/3 builds context correctly
-- [ ] Test generate_text/3 includes system message when provided
-- [ ] Test generate_text/3 includes conversation history
-- [ ] Test stream_text/3 returns stream via Streaming module
-- [ ] Test generate_object/4 passes schema to ReqLLM
-- [ ] Test call_with_tools/4 converts tools correctly
-- [ ] Test generate_embeddings/3 handles single and batch texts
-- [ ] Test process_response/1 extracts all fields
-- [ ] Test error handling for API failures
+- [ ] Test ReqLLMStream with system_prompt field
+- [ ] Test ReqLLMStream with model_alias resolution
+- [ ] Test ReqLLMGenerate non-streaming call
+- [ ] Test ReqLLMEmbed batch embedding
+- [ ] Test timeout handling
+- [ ] Test error classification
 
 ---
 
-## 1.3 Streaming Handler
+## 1.3 Signal Enhancement
 
-Implement streaming response processing.
+Enhance the existing signal module with additional signal types.
 
-### 1.3.1 Stream Response Processing
+### 1.3.1 New Signal Types
 
-Create the streaming module for handling ReqLLM streams.
+Add new signals for enhanced functionality.
 
-- [ ] 1.3.1.1 Create `lib/jido_ai/req_llm/streaming.ex` with module documentation
-- [ ] 1.3.1.2 Implement `process_stream/1` that wraps StreamResponse
-- [ ] 1.3.1.3 Return structured map with id, tokens, usage fn, finish_reason fn
+- [ ] 1.3.1.1 Create `Jido.AI.Signal.EmbedResult` for embedding responses
+- [ ] 1.3.1.2 Create `Jido.AI.Signal.ReqLLMError` for structured errors
+- [ ] 1.3.1.3 Create `Jido.AI.Signal.UsageReport` for token/cost tracking
 
-### 1.3.2 Token Handling
+### 1.3.2 Enhanced Metadata
 
-Implement token extraction and processing.
+Improve metadata in existing signals.
 
-- [ ] 1.3.2.1 Extract tokens via StreamResponse.tokens/1
-- [ ] 1.3.2.2 Provide lazy evaluation for usage and finish_reason
-- [ ] 1.3.2.3 Support enumeration over token stream
+- [ ] 1.3.2.1 Add `usage` field to ReqLLMResult (input/output tokens)
+- [ ] 1.3.2.2 Add `model` field to ReqLLMResult (actual model used)
+- [ ] 1.3.2.3 Add `duration_ms` field to ReqLLMResult
+- [ ] 1.3.2.4 Add `thinking_content` field to ReqLLMResult (for extended thinking)
 
-### 1.3.3 Metadata Extraction
+### 1.3.3 Signal Helpers
 
-Implement stream metadata extraction.
+Add helper functions for signal creation.
 
-- [ ] 1.3.3.1 Implement `extract_stream_metadata/1` private function
-- [ ] 1.3.3.2 Extract model, provider, request_id, created_at
-- [ ] 1.3.3.3 Provide lazy metadata function in response
+- [ ] 1.3.3.1 Implement `from_reqllm_response/2` to create signals from ReqLLM responses
+- [ ] 1.3.3.2 Implement `extract_tool_calls/1` helper
+- [ ] 1.3.3.3 Implement `is_tool_call?/1` predicate
 
-### 1.3.4 Unit Tests for Streaming
+### 1.3.4 Unit Tests for Signals
 
-- [ ] Test process_stream/1 returns structured response
-- [ ] Test tokens are accessible via returned map
-- [ ] Test usage function returns token counts lazily
-- [ ] Test finish_reason function returns completion status
-- [ ] Test metadata function returns model info
-- [ ] Test stream can be enumerated
-
----
-
-## 1.4 Metadata Processing
-
-Implement metadata extraction and processing.
-
-### 1.4.1 Response Metadata
-
-Create the metadata module for response processing.
-
-- [ ] 1.4.1.1 Create `lib/jido_ai/req_llm/metadata.ex` with module documentation
-- [ ] 1.4.1.2 Implement `process/1` function for response metadata
-- [ ] 1.4.1.3 Define metadata struct type
-
-### 1.4.2 Usage Extraction
-
-Implement usage metrics extraction.
-
-- [ ] 1.4.2.1 Extract input_tokens from response.usage
-- [ ] 1.4.2.2 Extract output_tokens from response.usage
-- [ ] 1.4.2.3 Calculate total_tokens
-- [ ] 1.4.2.4 Extract cost if available
-
-### 1.4.3 Request Metadata
-
-Implement request-level metadata extraction.
-
-- [ ] 1.4.3.1 Extract request_id from response
-- [ ] 1.4.3.2 Extract created_at timestamp
-- [ ] 1.4.3.3 Extract model and provider info
-
-### 1.4.4 Unit Tests for Metadata
-
-- [ ] Test process/1 extracts all usage fields
-- [ ] Test process/1 handles missing optional fields
-- [ ] Test total_tokens calculation
-- [ ] Test cost extraction when available
-- [ ] Test request metadata extraction
-- [ ] Test provider/model info extraction
+- [ ] Test EmbedResult signal creation
+- [ ] Test ReqLLMError signal creation
+- [ ] Test UsageReport signal creation
+- [ ] Test enhanced metadata in ReqLLMResult
+- [ ] Test from_reqllm_response/2 conversion
+- [ ] Test signal helper functions
 
 ---
 
-## 1.5 Phase 1 Integration Tests
+## 1.4 Tool Adapter Enhancement
 
-Comprehensive integration tests verifying all Phase 1 components work together.
+Enhance the existing tool adapter with additional capabilities.
 
-### 1.5.1 Adapter Integration
+### 1.4.1 Batch Conversion
 
-Verify adapter functions integrate correctly.
+Improve batch action conversion.
 
-- [ ] 1.5.1.1 Create `test/jido_ai/integration/reqllm_phase1_test.exs`
-- [ ] 1.5.1.2 Test: generate_text → client → process_response chain
-- [ ] 1.5.1.3 Test: stream_text → streaming → metadata chain
-- [ ] 1.5.1.4 Test: generate_object with schema validation
+- [ ] 1.4.1.1 Add `from_actions/2` with options parameter
+- [ ] 1.4.1.2 Support filtering actions by category/tag
+- [ ] 1.4.1.3 Support action name prefixing
 
-### 1.5.2 Error Handling Integration
+### 1.4.2 Schema Improvements
 
-Test error handling across the stack.
+Improve JSON schema generation.
 
-- [ ] 1.5.2.1 Test: API errors propagate correctly
-- [ ] 1.5.2.2 Test: Rate limit errors include retry info
-- [ ] 1.5.2.3 Test: Authentication errors are clear
-- [ ] 1.5.2.4 Test: Timeout handling
+- [ ] 1.4.2.1 Handle nested Zoi schemas correctly
+- [ ] 1.4.2.2 Add support for enum constraints
+- [ ] 1.4.2.3 Add support for string format constraints
+- [ ] 1.4.2.4 Generate better descriptions from schema metadata
 
-### 1.5.3 Streaming Integration
+### 1.4.3 Action Registry
 
-Test end-to-end streaming behavior.
+Add optional action registry for tool management.
 
-- [ ] 1.5.3.1 Test: Full streaming flow from adapter to tokens
-- [ ] 1.5.3.2 Test: Streaming with tool calls
-- [ ] 1.5.3.3 Test: Stream cancellation handling
-- [ ] 1.5.3.4 Test: Partial response handling
+- [ ] 1.4.3.1 Implement `register_action/1` for runtime registration
+- [ ] 1.4.3.2 Implement `list_actions/0` to get registered actions
+- [ ] 1.4.3.3 Implement `get_action/1` to lookup by name
+- [ ] 1.4.3.4 Implement `to_tools/0` to convert all registered actions
+
+### 1.4.4 Unit Tests for Tool Adapter
+
+- [ ] Test from_actions/2 with options
+- [ ] Test nested schema conversion
+- [ ] Test enum constraint handling
+- [ ] Test action registry operations
+- [ ] Test to_tools/0 conversion
+
+---
+
+## 1.5 Helper Utilities
+
+Create helper utilities for common ReqLLM patterns.
+
+### 1.5.1 Message Building
+
+Implement message building helpers.
+
+- [ ] 1.5.1.1 Create `lib/jido_ai/helpers.ex` with module documentation
+- [ ] 1.5.1.2 Implement `build_messages/2` for context building
+- [ ] 1.5.1.3 Implement `add_system_message/2` helper
+- [ ] 1.5.1.4 Implement `add_tool_result/3` for tool result messages
+
+### 1.5.2 Response Processing
+
+Implement response processing helpers.
+
+- [ ] 1.5.2.1 Implement `extract_text/1` from ReqLLM response
+- [ ] 1.5.2.2 Implement `extract_tool_calls/1` from response
+- [ ] 1.5.2.3 Implement `has_tool_calls?/1` predicate
+- [ ] 1.5.2.4 Implement `classify_response/1` (tool_calls vs final_answer)
+
+### 1.5.3 Error Handling
+
+Implement error handling helpers.
+
+- [ ] 1.5.3.1 Implement `wrap_error/1` to convert ReqLLM errors to Jido.AI.Error
+- [ ] 1.5.3.2 Classify errors: rate_limit, auth, timeout, provider_error
+- [ ] 1.5.3.3 Extract retry-after from rate limit errors
+
+### 1.5.4 Unit Tests for Helpers
+
+- [ ] Test build_messages/2 creates valid context
+- [ ] Test add_system_message/2 prepends system
+- [ ] Test add_tool_result/3 formats correctly
+- [ ] Test extract_text/1 handles various response formats
+- [ ] Test classify_response/1 detection
+- [ ] Test wrap_error/1 error classification
+
+---
+
+## 1.6 Phase 1 Integration Tests
+
+Comprehensive integration tests verifying all Phase 1 enhancements work together.
+
+### 1.6.1 Directive Integration
+
+Verify enhanced directives work with ReqLLM.
+
+- [ ] 1.6.1.1 Create `test/jido_ai/integration/foundation_phase1_test.exs`
+- [ ] 1.6.1.2 Test: ReqLLMStream with model alias resolution
+- [ ] 1.6.1.3 Test: ReqLLMGenerate non-streaming flow
+- [ ] 1.6.1.4 Test: ReqLLMEmbed embedding generation
+
+### 1.6.2 Signal Flow Integration
+
+Test signal creation and metadata.
+
+- [ ] 1.6.2.1 Test: Full directive → signal flow with usage metadata
+- [ ] 1.6.2.2 Test: Error signal creation on failure
+- [ ] 1.6.2.3 Test: Tool result signal with action execution
+
+### 1.6.3 Configuration Integration
+
+Test configuration across components.
+
+- [ ] 1.6.3.1 Test: Model alias resolution in directives
+- [ ] 1.6.3.2 Test: Default settings applied correctly
+- [ ] 1.6.3.3 Test: Provider config validation
 
 ---
 
 ## Phase 1 Success Criteria
 
-1. **Adapter**: Unified API for all ReqLLM operations
-2. **Client**: Correct request building and response handling
-3. **Streaming**: Token-by-token streaming with lazy metadata
-4. **Metadata**: Complete usage and request metadata extraction
-5. **Test Coverage**: Minimum 80% for Phase 1 modules
+1. **No Wrappers**: All code uses ReqLLM directly (no adapter/client layers)
+2. **Configuration**: Model aliases and provider config working
+3. **Enhanced Directives**: New directives for generate/embed
+4. **Enhanced Signals**: Usage metadata and new signal types
+5. **Tool Adapter**: Registry and improved schema conversion
+6. **Helpers**: Common patterns extracted as utilities
+7. **Test Coverage**: Minimum 80% for Phase 1 modules
 
 ---
 
 ## Phase 1 Critical Files
 
 **New Files:**
-- `lib/jido_ai/req_llm/adapter.ex`
-- `lib/jido_ai/req_llm/client.ex`
-- `lib/jido_ai/req_llm/streaming.ex`
-- `lib/jido_ai/req_llm/metadata.ex`
-- `test/jido_ai/req_llm/adapter_test.exs`
-- `test/jido_ai/req_llm/client_test.exs`
-- `test/jido_ai/req_llm/streaming_test.exs`
-- `test/jido_ai/req_llm/metadata_test.exs`
-- `test/jido_ai/integration/reqllm_phase1_test.exs`
+- `lib/jido_ai/config.ex`
+- `lib/jido_ai/helpers.ex`
+- `test/jido_ai/config_test.exs`
+- `test/jido_ai/helpers_test.exs`
+- `test/jido_ai/integration/foundation_phase1_test.exs`
+
+**Modified Files:**
+- `lib/jido_ai/directive.ex` - Add ReqLLMGenerate, ReqLLMEmbed
+- `lib/jido_ai/signal.ex` - Add EmbedResult, ReqLLMError, UsageReport
+- `lib/jido_ai/tool_adapter.ex` - Add registry, improve schema
