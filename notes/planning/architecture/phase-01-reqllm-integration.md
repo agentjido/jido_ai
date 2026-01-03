@@ -213,36 +213,37 @@ Create helper utilities for common ReqLLM patterns.
 
 Implement message building helpers.
 
-- [ ] 1.5.1.1 Create `lib/jido_ai/helpers.ex` with module documentation
-- [ ] 1.5.1.2 Implement `build_messages/2` for context building
-- [ ] 1.5.1.3 Implement `add_system_message/2` helper
-- [ ] 1.5.1.4 Implement `add_tool_result/3` for tool result messages
+- [x] 1.5.1.1 Create `lib/jido_ai/helpers.ex` with module documentation
+- [x] 1.5.1.2 Implement `build_messages/2` for context building
+- [x] 1.5.1.3 Implement `add_system_message/2` helper
+- [x] 1.5.1.4 Implement `add_tool_result/4` for tool result messages
 
 ### 1.5.2 Response Processing
 
 Implement response processing helpers.
 
-- [ ] 1.5.2.1 Implement `extract_text/1` from ReqLLM response
-- [ ] 1.5.2.2 Implement `extract_tool_calls/1` from response
-- [ ] 1.5.2.3 Implement `has_tool_calls?/1` predicate
-- [ ] 1.5.2.4 Implement `classify_response/1` (tool_calls vs final_answer)
+- [x] 1.5.2.1 Implement `extract_text/1` from ReqLLM response
+- [x] 1.5.2.2 Implement `extract_tool_calls/1` from response
+- [x] 1.5.2.3 Implement `has_tool_calls?/1` predicate
+- [x] 1.5.2.4 Implement `classify_response/1` (tool_calls vs final_answer)
 
 ### 1.5.3 Error Handling
 
 Implement error handling helpers.
 
-- [ ] 1.5.3.1 Implement `wrap_error/1` to convert ReqLLM errors to Jido.AI.Error
-- [ ] 1.5.3.2 Classify errors: rate_limit, auth, timeout, provider_error
-- [ ] 1.5.3.3 Extract retry-after from rate limit errors
+- [x] 1.5.3.1 Implement `wrap_error/1` to convert ReqLLM errors to Jido.AI.Error
+- [x] 1.5.3.2 Implement `classify_error/1` for error classification
+- [x] 1.5.3.3 Implement `extract_retry_after/1` from rate limit errors
 
 ### 1.5.4 Unit Tests for Helpers
 
-- [ ] Test build_messages/2 creates valid context
-- [ ] Test add_system_message/2 prepends system
-- [ ] Test add_tool_result/3 formats correctly
-- [ ] Test extract_text/1 handles various response formats
-- [ ] Test classify_response/1 detection
-- [ ] Test wrap_error/1 error classification
+- [x] Test build_messages/2 creates valid context
+- [x] Test add_system_message/2 prepends system
+- [x] Test add_tool_result/4 formats correctly
+- [x] Test extract_text/1 handles various response formats
+- [x] Test classify_response/1 detection
+- [x] Test wrap_error/1 error classification
+- [x] Test extract_retry_after/1
 
 ---
 

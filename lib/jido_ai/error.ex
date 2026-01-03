@@ -50,3 +50,86 @@ defmodule Jido.AI.Error.Unknown do
     "Unknown error: #{inspect(error)}"
   end
 end
+
+# ============================================================================
+# API Error Types
+# ============================================================================
+
+defmodule Jido.AI.Error.API.RateLimit do
+  @moduledoc "Rate limit exceeded error"
+
+  use Splode.Error,
+    fields: [:message, :retry_after],
+    class: :api
+
+  @impl true
+  def message(%{message: message}) when is_binary(message), do: message
+  def message(%{retry_after: seconds}) when is_integer(seconds), do: "Rate limit exceeded, retry after #{seconds} seconds"
+  def message(_), do: "Rate limit exceeded"
+end
+
+defmodule Jido.AI.Error.API.Auth do
+  @moduledoc "Authentication/authorization error"
+
+  use Splode.Error,
+    fields: [:message],
+    class: :api
+
+  @impl true
+  def message(%{message: message}) when is_binary(message), do: message
+  def message(_), do: "Authentication failed"
+end
+
+defmodule Jido.AI.Error.API.Timeout do
+  @moduledoc "Request timeout error"
+
+  use Splode.Error,
+    fields: [:message],
+    class: :api
+
+  @impl true
+  def message(%{message: message}) when is_binary(message), do: message
+  def message(_), do: "Request timed out"
+end
+
+defmodule Jido.AI.Error.API.Provider do
+  @moduledoc "Provider-side error (5xx)"
+
+  use Splode.Error,
+    fields: [:message, :status],
+    class: :api
+
+  @impl true
+  def message(%{message: message}) when is_binary(message), do: message
+  def message(%{status: status}) when is_integer(status), do: "Provider error (#{status})"
+  def message(_), do: "Provider error"
+end
+
+defmodule Jido.AI.Error.API.Network do
+  @moduledoc "Network connectivity error"
+
+  use Splode.Error,
+    fields: [:message],
+    class: :api
+
+  @impl true
+  def message(%{message: message}) when is_binary(message), do: message
+  def message(_), do: "Network error"
+end
+
+# ============================================================================
+# Validation Error Types
+# ============================================================================
+
+defmodule Jido.AI.Error.Validation.Invalid do
+  @moduledoc "Input validation error"
+
+  use Splode.Error,
+    fields: [:message, :field],
+    class: :validation
+
+  @impl true
+  def message(%{message: message}) when is_binary(message), do: message
+  def message(%{field: field}) when is_binary(field), do: "Invalid field: #{field}"
+  def message(_), do: "Validation error"
+end
