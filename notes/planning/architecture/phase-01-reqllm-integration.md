@@ -133,35 +133,35 @@ Enhance the existing signal module with additional signal types.
 
 Add new signals for enhanced functionality.
 
-- [ ] 1.3.1.1 Create `Jido.AI.Signal.EmbedResult` for embedding responses
-- [ ] 1.3.1.2 Create `Jido.AI.Signal.ReqLLMError` for structured errors
-- [ ] 1.3.1.3 Create `Jido.AI.Signal.UsageReport` for token/cost tracking
+- [x] 1.3.1.1 Create `Jido.AI.Signal.EmbedResult` for embedding responses (done in 1.2)
+- [x] 1.3.1.2 Create `Jido.AI.Signal.ReqLLMError` for structured errors
+- [x] 1.3.1.3 Create `Jido.AI.Signal.UsageReport` for token/cost tracking
 
 ### 1.3.2 Enhanced Metadata
 
 Improve metadata in existing signals.
 
-- [ ] 1.3.2.1 Add `usage` field to ReqLLMResult (input/output tokens)
-- [ ] 1.3.2.2 Add `model` field to ReqLLMResult (actual model used)
-- [ ] 1.3.2.3 Add `duration_ms` field to ReqLLMResult
-- [ ] 1.3.2.4 Add `thinking_content` field to ReqLLMResult (for extended thinking)
+- [x] 1.3.2.1 Add `usage` field to ReqLLMResult (input/output tokens)
+- [x] 1.3.2.2 Add `model` field to ReqLLMResult (actual model used)
+- [x] 1.3.2.3 Add `duration_ms` field to ReqLLMResult
+- [x] 1.3.2.4 Add `thinking_content` field to ReqLLMResult (for extended thinking)
 
 ### 1.3.3 Signal Helpers
 
 Add helper functions for signal creation.
 
-- [ ] 1.3.3.1 Implement `from_reqllm_response/2` to create signals from ReqLLM responses
-- [ ] 1.3.3.2 Implement `extract_tool_calls/1` helper
-- [ ] 1.3.3.3 Implement `is_tool_call?/1` predicate
+- [x] 1.3.3.1 Implement `from_reqllm_response/2` to create signals from ReqLLM responses
+- [x] 1.3.3.2 Implement `extract_tool_calls/1` helper
+- [x] 1.3.3.3 Implement `is_tool_call?/1` predicate
 
 ### 1.3.4 Unit Tests for Signals
 
-- [ ] Test EmbedResult signal creation
-- [ ] Test ReqLLMError signal creation
-- [ ] Test UsageReport signal creation
-- [ ] Test enhanced metadata in ReqLLMResult
-- [ ] Test from_reqllm_response/2 conversion
-- [ ] Test signal helper functions
+- [x] Test EmbedResult signal creation (done in 1.2)
+- [x] Test ReqLLMError signal creation
+- [x] Test UsageReport signal creation
+- [x] Test enhanced metadata in ReqLLMResult
+- [x] Test from_reqllm_response/2 conversion
+- [x] Test signal helper functions
 
 ---
 
