@@ -36,8 +36,7 @@ The existing codebase already follows this pattern:
 | 3 | Algorithm Framework | Algorithm behaviors and implementations | Phase 1 |
 | 4 | Strategy Implementations | AI strategies (ReAct, CoT, ToT, etc.) | Phase 1, 2, 3 |
 | 5 | Skills System | Composable AI skills | Phase 1, 2 |
-| 6 | Agent Types | AI-capable agent implementations | Phase 1-5 |
-| 7 | Support Systems | Telemetry, performance, security | Phase 1-6 |
+| 6 | Support Systems | Telemetry, performance, security | Phase 1-5 |
 
 ## Phase Details
 
@@ -109,21 +108,7 @@ The existing codebase already follows this pattern:
 - `lib/jido_ai/skills/reasoning_skill.ex`
 - `lib/jido_ai/skills/planning_skill.ex`
 
-### Phase 6: Agent Types
-**Focus:** AI-capable agent implementations.
-
-- Base AI agent
-- Streaming AI agent
-- Multi-model agent
-- Tool-enabled agent
-- Coordinator agent
-
-**Key Files:**
-- `lib/jido_ai/agents/ai_agent.ex`
-- `lib/jido_ai/agents/streaming_ai_agent.ex`
-- `lib/jido_ai/agents/coordinator_agent.ex`
-
-### Phase 7: Support Systems
+### Phase 6: Support Systems
 **Focus:** Infrastructure for production deployment.
 
 - Telemetry integration
