@@ -91,37 +91,37 @@ Enhance the existing directive module with additional capabilities.
 
 Enhance the existing ReqLLMStream directive.
 
-- [ ] 1.2.1.1 Add `system_prompt` field for convenience
-- [ ] 1.2.1.2 Add `model_alias` field that resolves via Config
-- [ ] 1.2.1.3 Add `timeout` field for request timeout
-- [ ] 1.2.1.4 Improve error classification in DirectiveExec
+- [x] 1.2.1.1 Add `system_prompt` field for convenience
+- [x] 1.2.1.2 Add `model_alias` field that resolves via Config
+- [x] 1.2.1.3 Add `timeout` field for request timeout
+- [x] 1.2.1.4 Improve error classification in DirectiveExec
 
 ### 1.2.2 ReqLLMGenerate Directive (Non-Streaming)
 
 Add a non-streaming generate directive.
 
-- [ ] 1.2.2.1 Create `Jido.AI.Directive.ReqLLMGenerate` module
-- [ ] 1.2.2.2 Define schema: id, model, context, tools, max_tokens, temperature
-- [ ] 1.2.2.3 Implement DirectiveExec that calls `ReqLLM.generate_text/3` directly
-- [ ] 1.2.2.4 Send ReqLLMResult signal on completion
+- [x] 1.2.2.1 Create `Jido.AI.Directive.ReqLLMGenerate` module
+- [x] 1.2.2.2 Define schema: id, model, context, tools, max_tokens, temperature
+- [x] 1.2.2.3 Implement DirectiveExec that calls `ReqLLM.Generation.generate_text/3` directly
+- [x] 1.2.2.4 Send ReqLLMResult signal on completion
 
 ### 1.2.3 ReqLLMEmbed Directive
 
 Add an embedding generation directive.
 
-- [ ] 1.2.3.1 Create `Jido.AI.Directive.ReqLLMEmbed` module
-- [ ] 1.2.3.2 Define schema: id, model, texts, metadata
-- [ ] 1.2.3.3 Implement DirectiveExec that calls ReqLLM embedding directly
-- [ ] 1.2.3.4 Create corresponding EmbedResult signal
+- [x] 1.2.3.1 Create `Jido.AI.Directive.ReqLLMEmbed` module
+- [x] 1.2.3.2 Define schema: id, model, texts, metadata
+- [x] 1.2.3.3 Implement DirectiveExec that calls ReqLLM embedding directly
+- [x] 1.2.3.4 Create corresponding EmbedResult signal
 
 ### 1.2.4 Unit Tests for Directives
 
-- [ ] Test ReqLLMStream with system_prompt field
-- [ ] Test ReqLLMStream with model_alias resolution
-- [ ] Test ReqLLMGenerate non-streaming call
-- [ ] Test ReqLLMEmbed batch embedding
-- [ ] Test timeout handling
-- [ ] Test error classification
+- [x] Test ReqLLMStream with system_prompt field
+- [x] Test ReqLLMStream with model_alias resolution
+- [x] Test ReqLLMGenerate non-streaming call
+- [x] Test ReqLLMEmbed batch embedding
+- [x] Test timeout handling
+- [x] Test error classification
 
 ---
 
