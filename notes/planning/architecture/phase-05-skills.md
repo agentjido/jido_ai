@@ -2,6 +2,14 @@
 
 This phase implements the composable AI skills system. Skills are reusable capabilities that can be attached to agents, providing specific AI functionality like LLM interaction, reasoning, and planning.
 
+## Design Principle
+
+**Skills call ReqLLM directly.** Each skill implementation:
+- Calls ReqLLM functions directly (`ReqLLM.stream_text/3`, `ReqLLM.generate_text/3`)
+- Uses `Jido.AI.Config` for model resolution
+- Uses `Jido.AI.Helpers` for common patterns
+- No adapter/wrapper layer between skills and ReqLLM
+
 ## Module Structure
 
 ```
@@ -16,7 +24,7 @@ lib/jido_ai/
 
 ## Dependencies
 
-- Phase 1: ReqLLM Integration Layer
+- Phase 1: Foundation Enhancement
 - Phase 2: Tool System
 
 ---
@@ -49,7 +57,7 @@ Implement chat completion action.
 
 - [ ] 5.1.3.1 Create Chat action module
 - [ ] 5.1.3.2 Accept messages, model, temperature parameters
-- [ ] 5.1.3.3 Delegate to Adapter.generate_text
+- [ ] 5.1.3.3 Call `ReqLLM.generate_text/3` directly
 - [ ] 5.1.3.4 Return formatted response
 
 ### 5.1.4 Complete Action
@@ -58,7 +66,7 @@ Implement text completion action.
 
 - [ ] 5.1.4.1 Create Complete action module
 - [ ] 5.1.4.2 Accept prompt, model, max_tokens parameters
-- [ ] 5.1.4.3 Delegate to Adapter.generate_text
+- [ ] 5.1.4.3 Call `ReqLLM.generate_text/3` directly
 - [ ] 5.1.4.4 Return completion text
 
 ### 5.1.5 Embed Action
@@ -67,7 +75,7 @@ Implement embedding generation action.
 
 - [ ] 5.1.5.1 Create Embed action module
 - [ ] 5.1.5.2 Accept texts, model parameters
-- [ ] 5.1.5.3 Delegate to Adapter.generate_embeddings
+- [ ] 5.1.5.3 Call ReqLLM embedding function directly
 - [ ] 5.1.5.4 Return embedding vectors
 
 ### 5.1.6 Unit Tests for LLM Skill
@@ -226,7 +234,7 @@ Implement stream start action.
 
 - [ ] 5.4.3.1 Create StartStream action module
 - [ ] 5.4.3.2 Accept prompt, model parameters
-- [ ] 5.4.3.3 Initialize stream via Adapter.stream_text
+- [ ] 5.4.3.3 Call `ReqLLM.stream_text/3` directly
 - [ ] 5.4.3.4 Return stream handle
 
 ### 5.4.4 ProcessTokens Action
@@ -285,7 +293,7 @@ Implement tool-enabled LLM call action.
 
 - [ ] 5.5.3.1 Create CallWithTools action module
 - [ ] 5.5.3.2 Accept prompt, tools parameters
-- [ ] 5.5.3.3 Call Adapter.call_with_tools
+- [ ] 5.5.3.3 Call `ReqLLM.generate_text/3` with `tools:` option directly
 - [ ] 5.5.3.4 Return response with tool calls
 
 ### 5.5.4 ExecuteTool Action
