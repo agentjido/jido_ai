@@ -8,9 +8,10 @@ defmodule Jido.AI.Signal do
 
   ## Signal Types
 
-  - `Jido.AI.Signal.ReqLLMResult` - Result from a ReqLLM streaming call
+  - `Jido.AI.Signal.ReqLLMResult` - Result from a ReqLLM streaming/generation call
   - `Jido.AI.Signal.ReqLLMPartial` - Streaming token chunk from ReqLLM
   - `Jido.AI.Signal.ToolResult` - Result from a tool execution
+  - `Jido.AI.Signal.EmbedResult` - Result from an embedding generation call
 
   ## Usage
 
@@ -109,6 +110,31 @@ defmodule Jido.AI.Signal do
       schema: [
         call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
         tool_name: [type: :string, required: true, doc: "Name of the executed tool"],
+        result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"]
+      ]
+  end
+
+  defmodule EmbedResult do
+    @moduledoc """
+    Signal for embedding generation completion.
+
+    Emitted when an embedding request completes, containing the embedding vectors.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID matching the original ReqLLMEmbed directive
+    - `:result` (required) - `{:ok, result_map}` or `{:error, reason}` from the embedding call
+
+    The result map (when successful) contains:
+    - `:embeddings` - Single embedding vector or list of embedding vectors
+    - `:count` - Number of embeddings generated (1 for single, N for batch)
+    """
+
+    use Jido.Signal,
+      type: "ai.embed_result",
+      default_source: "/ai/embedding",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the embedding call"],
         result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"]
       ]
   end
