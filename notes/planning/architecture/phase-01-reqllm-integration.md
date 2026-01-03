@@ -42,44 +42,44 @@ Create a configuration module for managing ReqLLM provider settings.
 
 Create the configuration module.
 
-- [ ] 1.1.1.1 Create `lib/jido_ai/config.ex` with module documentation
-- [ ] 1.1.1.2 Document that this configures ReqLLM (not wrapping it)
-- [ ] 1.1.1.3 Define configuration schema types
+- [x] 1.1.1.1 Create `lib/jido_ai/config.ex` with module documentation
+- [x] 1.1.1.2 Document that this configures ReqLLM (not wrapping it)
+- [x] 1.1.1.3 Define configuration schema types
 
 ### 1.1.2 Provider Configuration
 
 Implement provider configuration helpers.
 
-- [ ] 1.1.2.1 Implement `get_provider/1` to retrieve provider config
-- [ ] 1.1.2.2 Support OpenAI, Anthropic, Google, Ollama providers
-- [ ] 1.1.2.3 Validate provider configuration at startup
-- [ ] 1.1.2.4 Support environment variable overrides
+- [x] 1.1.2.1 Implement `get_provider/1` to retrieve provider config
+- [x] 1.1.2.2 Support OpenAI, Anthropic, Google, Ollama providers
+- [x] 1.1.2.3 Validate provider configuration at startup
+- [x] 1.1.2.4 Support environment variable overrides
 
 ### 1.1.3 Model Aliases
 
 Implement named model aliases.
 
-- [ ] 1.1.3.1 Implement `resolve_model/1` for alias resolution
-- [ ] 1.1.3.2 Support aliases like `:fast`, `:capable`, `:reasoning`
-- [ ] 1.1.3.3 Map aliases to ReqLLM model specs (e.g., "anthropic:claude-haiku-4-5")
-- [ ] 1.1.3.4 Allow runtime configuration of aliases
+- [x] 1.1.3.1 Implement `resolve_model/1` for alias resolution
+- [x] 1.1.3.2 Support aliases like `:fast`, `:capable`, `:reasoning`
+- [x] 1.1.3.3 Map aliases to ReqLLM model specs (e.g., "anthropic:claude-haiku-4-5")
+- [x] 1.1.3.4 Allow runtime configuration of aliases
 
 ### 1.1.4 Default Settings
 
 Implement default settings management.
 
-- [ ] 1.1.4.1 Implement `defaults/0` for global defaults
-- [ ] 1.1.4.2 Support default temperature, max_tokens, etc.
-- [ ] 1.1.4.3 Allow per-agent default overrides
+- [x] 1.1.4.1 Implement `defaults/0` for global defaults
+- [x] 1.1.4.2 Support default temperature, max_tokens, etc.
+- [x] 1.1.4.3 Allow per-agent default overrides
 
 ### 1.1.5 Unit Tests for Configuration
 
-- [ ] Test get_provider/1 returns config
-- [ ] Test resolve_model/1 resolves aliases
-- [ ] Test resolve_model/1 passes through direct specs
-- [ ] Test defaults/0 returns merged config
-- [ ] Test environment variable overrides
-- [ ] Test validation catches invalid config
+- [x] Test get_provider/1 returns config
+- [x] Test resolve_model/1 resolves aliases
+- [x] Test resolve_model/1 passes through direct specs
+- [x] Test defaults/0 returns merged config
+- [x] Test environment variable overrides
+- [x] Test validation catches invalid config
 
 ---
 

@@ -65,7 +65,8 @@ defmodule JidoAi.MixProject do
   defp jido_deps do
     [
       jido_dep(:jido, "../jido", "~> 2.0"),
-      jido_dep(:req_llm, "../req_llm", "~> 1.2")
+      # Use github source to match jido's dependency; local path takes precedence if available
+      jido_dep_git(:req_llm, "../req_llm", "agentjido/req_llm", "main")
     ]
   end
 
@@ -106,6 +107,16 @@ defmodule JidoAi.MixProject do
     |> case do
       {app, opts} when is_list(opts) -> {app, opts}
       {app, req, opts} -> {app, req, opts}
+    end
+  end
+
+  defp jido_dep_git(app, rel_path, github_repo, branch) do
+    path = Path.expand(rel_path, __DIR__)
+
+    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
+      {app, path: rel_path, override: true}
+    else
+      {app, github: github_repo, branch: branch, override: true}
     end
   end
 
