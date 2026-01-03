@@ -306,63 +306,7 @@ end
 
 #### 7. Memory and Context Management
 
-```elixir
-defmodule Jido.AI.Memory.Memory do
-  @moduledoc """
-  Memory management for AI agents.
-  """
-
-  defstruct [
-    :short_term,
-    :long_term,
-    :episodic,
-    :semantic,
-    :working
-  ]
-
-  def new() do
-    %__MODULE__{
-      short_term: [],
-      long_term: [],
-      episodic: [],
-      semantic: %{},
-      working: %{}
-    }
-  end
-
-  def add_short_term(memory, item) do
-    %{memory | short_term: [item | memory.short_term]}
-  end
-
-  def consolidate(memory) do
-    # Consolidate short-term to long-term memory
-  end
-end
-
-defmodule Jido.AI.Memory.Context do
-  @moduledoc """
-  Context management for AI agents.
-  """
-
-  defstruct [
-    :conversation_history,
-    :current_task,
-    :relevant_memories,
-    :tool_results,
-    :subagent_states
-  ]
-
-  def new() do
-    %__MODULE__{
-      conversation_history: [],
-      current_task: nil,
-      relevant_memories: [],
-      tool_results: %{},
-      subagent_states: %{}
-    }
-  end
-end
-```
+*Deferred - Memory and context management will be designed in a future iteration.*
 
 ## Integration with Jido v2
 
@@ -1225,64 +1169,7 @@ end
 
 #### 5. Enhanced Memory and Context Management
 
-```elixir
-defmodule Jido.AI.Memory.Context do
-  @moduledoc """
-  Enhanced context management that integrates with ReqLLM's conversation tracking.
-  """
-
-  defstruct [
-    :conversation_history,
-    :current_task,
-    :relevant_memories,
-    :tool_results,
-    :subagent_states,
-    :reqllm_metadata
-  ]
-
-  def new() do
-    %__MODULE__{
-      conversation_history: [],
-      current_task: nil,
-      relevant_memories: [],
-      tool_results: %{},
-      subagent_states: %{},
-      reqllm_metadata: %{}
-    }
-  end
-
-  def add_message(context, role, content) do
-    message = %{
-      role: role,
-      content: content,
-      timestamp: DateTime.utc_now()
-    }
-
-    %{context | conversation_history: context.conversation_history ++ [message]}
-  end
-
-  def add_reqllm_metadata(context, metadata) do
-    %{context | reqllm_metadata: Map.merge(context.reqllm_metadata, metadata)}
-  end
-
-  def to_reqllm_context(context) do
-    messages =
-      context.conversation_history
-      |> Enum.map(&convert_message/1)
-
-    ReqLLM.Context.new(messages)
-  end
-
-  defp convert_message(%{role: role, content: content}) do
-    case role do
-      "system" -> ReqLLM.Message.system(content)
-      "user" -> ReqLLM.Message.user(content)
-      "assistant" -> ReqLLM.Message.assistant(content)
-      _ -> ReqLLM.Message.user(content)
-    end
-  end
-end
-```
+*Deferred - Memory and context management will be designed in a future iteration.*
 
 #### 6. Streaming AI Agent
 
