@@ -173,35 +173,35 @@ Enhance the existing tool adapter with additional capabilities.
 
 Improve batch action conversion.
 
-- [ ] 1.4.1.1 Add `from_actions/2` with options parameter
-- [ ] 1.4.1.2 Support filtering actions by category/tag
-- [ ] 1.4.1.3 Support action name prefixing
+- [x] 1.4.1.1 Add `from_actions/2` with options parameter
+- [x] 1.4.1.2 Support filtering actions by filter function
+- [x] 1.4.1.3 Support action name prefixing
 
 ### 1.4.2 Schema Improvements
 
 Improve JSON schema generation.
 
-- [ ] 1.4.2.1 Handle nested Zoi schemas correctly
-- [ ] 1.4.2.2 Add support for enum constraints
-- [ ] 1.4.2.3 Add support for string format constraints
-- [ ] 1.4.2.4 Generate better descriptions from schema metadata
+- [x] 1.4.2.1 Handle nested Zoi schemas correctly (via Zoi.to_json_schema)
+- [x] 1.4.2.2 Add support for enum constraints (via Zoi.to_json_schema)
+- [x] 1.4.2.3 Add support for string format constraints (via Zoi.to_json_schema)
+- [x] 1.4.2.4 Generate better descriptions from schema metadata (via Zoi.to_json_schema)
 
 ### 1.4.3 Action Registry
 
 Add optional action registry for tool management.
 
-- [ ] 1.4.3.1 Implement `register_action/1` for runtime registration
-- [ ] 1.4.3.2 Implement `list_actions/0` to get registered actions
-- [ ] 1.4.3.3 Implement `get_action/1` to lookup by name
-- [ ] 1.4.3.4 Implement `to_tools/0` to convert all registered actions
+- [x] 1.4.3.1 Implement `register_action/1` for runtime registration
+- [x] 1.4.3.2 Implement `list_actions/0` to get registered actions
+- [x] 1.4.3.3 Implement `get_action/1` to lookup by name
+- [x] 1.4.3.4 Implement `to_tools/0` to convert all registered actions
 
 ### 1.4.4 Unit Tests for Tool Adapter
 
-- [ ] Test from_actions/2 with options
-- [ ] Test nested schema conversion
-- [ ] Test enum constraint handling
-- [ ] Test action registry operations
-- [ ] Test to_tools/0 conversion
+- [x] Test from_actions/2 with options
+- [x] Test nested schema conversion (delegated to Jido.Action.Schema)
+- [x] Test enum constraint handling (delegated to Jido.Action.Schema)
+- [x] Test action registry operations
+- [x] Test to_tools/0 conversion
 
 ---
 
