@@ -10,6 +10,7 @@ defmodule Jido.AI.ToolAdapter do
   - **Schema-focused**: Tools use a noop callback; Jido owns execution via `Directive.ToolExec`
   - **Adapter pattern**: Converts `Jido.Action` behaviour → `ReqLLM.Tool` struct
   - **Single source of truth**: All action→tool conversion goes through this module
+  - **Optional Registry**: Actions can be registered for runtime management
 
   ## Usage
 
@@ -19,9 +20,188 @@ defmodule Jido.AI.ToolAdapter do
         MyApp.Actions.Search
       ])
 
+      # With options
+      tools = Jido.AI.ToolAdapter.from_actions(actions,
+        prefix: "myapp_",
+        filter: fn mod -> mod.category() == :search end
+      )
+
       # Use in LLM call
       ReqLLM.stream_text(model, messages, tools: tools)
+
+  ## Registry Usage
+
+      # Register actions at runtime
+      Jido.AI.ToolAdapter.register_action(MyApp.Actions.Calculator)
+      Jido.AI.ToolAdapter.register_actions([MyApp.Actions.Search, MyApp.Actions.Weather])
+
+      # Get tools from registry
+      tools = Jido.AI.ToolAdapter.to_tools()
+
+      # Look up action by tool name
+      {:ok, module} = Jido.AI.ToolAdapter.get_action("calculator")
   """
+
+  use Agent
+
+  @registry_name __MODULE__.Registry
+
+  # ============================================================================
+  # Registry Management
+  # ============================================================================
+
+  @doc """
+  Starts the action registry agent.
+
+  This is called automatically when needed. The registry stores action modules
+  for runtime tool management.
+  """
+  @spec start_link(keyword()) :: Agent.on_start()
+  def start_link(_opts \\ []) do
+    Agent.start_link(fn -> %{} end, name: @registry_name)
+  end
+
+  @doc """
+  Ensures the registry is started, starting it if necessary.
+
+  Returns `:ok` if the registry is available, `{:error, reason}` otherwise.
+  """
+  @spec ensure_started() :: :ok | {:error, term()}
+  def ensure_started do
+    case Process.whereis(@registry_name) do
+      nil ->
+        case start_link() do
+          {:ok, _pid} -> :ok
+          {:error, {:already_started, _pid}} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      _pid ->
+        :ok
+    end
+  end
+
+  @doc """
+  Registers a single action module in the registry.
+
+  The action is stored by its tool name (from `action_module.name()`).
+
+  ## Example
+
+      :ok = Jido.AI.ToolAdapter.register_action(MyApp.Actions.Calculator)
+  """
+  @spec register_action(module()) :: :ok
+  def register_action(action_module) when is_atom(action_module) do
+    ensure_started()
+    name = action_module.name()
+    Agent.update(@registry_name, fn state -> Map.put(state, name, action_module) end)
+  end
+
+  @doc """
+  Registers multiple action modules in the registry.
+
+  ## Example
+
+      :ok = Jido.AI.ToolAdapter.register_actions([
+        MyApp.Actions.Calculator,
+        MyApp.Actions.Search
+      ])
+  """
+  @spec register_actions([module()]) :: :ok
+  def register_actions(action_modules) when is_list(action_modules) do
+    Enum.each(action_modules, &register_action/1)
+  end
+
+  @doc """
+  Unregisters an action module from the registry.
+
+  ## Example
+
+      :ok = Jido.AI.ToolAdapter.unregister_action(MyApp.Actions.Calculator)
+  """
+  @spec unregister_action(module()) :: :ok
+  def unregister_action(action_module) when is_atom(action_module) do
+    ensure_started()
+    name = action_module.name()
+    Agent.update(@registry_name, fn state -> Map.delete(state, name) end)
+  end
+
+  @doc """
+  Lists all registered action modules.
+
+  Returns a list of `{name, module}` tuples.
+
+  ## Example
+
+      actions = Jido.AI.ToolAdapter.list_actions()
+      # => [{"calculator", MyApp.Actions.Calculator}, {"search", MyApp.Actions.Search}]
+  """
+  @spec list_actions() :: [{String.t(), module()}]
+  def list_actions do
+    ensure_started()
+    Agent.get(@registry_name, fn state -> Map.to_list(state) end)
+  end
+
+  @doc """
+  Gets an action module by its tool name.
+
+  Returns `{:ok, module}` if found, `{:error, :not_found}` otherwise.
+
+  ## Example
+
+      {:ok, module} = Jido.AI.ToolAdapter.get_action("calculator")
+      {:error, :not_found} = Jido.AI.ToolAdapter.get_action("unknown")
+  """
+  @spec get_action(String.t()) :: {:ok, module()} | {:error, :not_found}
+  def get_action(tool_name) when is_binary(tool_name) do
+    ensure_started()
+
+    case Agent.get(@registry_name, fn state -> Map.get(state, tool_name) end) do
+      nil -> {:error, :not_found}
+      module -> {:ok, module}
+    end
+  end
+
+  @doc """
+  Clears all registered actions from the registry.
+
+  ## Example
+
+      :ok = Jido.AI.ToolAdapter.clear_registry()
+  """
+  @spec clear_registry() :: :ok
+  def clear_registry do
+    ensure_started()
+    Agent.update(@registry_name, fn _state -> %{} end)
+  end
+
+  @doc """
+  Converts all registered actions to ReqLLM.Tool structs.
+
+  Accepts the same options as `from_actions/2`.
+
+  ## Options
+
+    * `:prefix` - String prefix to add to tool names
+    * `:filter` - Function `(module -> boolean)` to filter actions
+
+  ## Example
+
+      tools = Jido.AI.ToolAdapter.to_tools()
+      tools = Jido.AI.ToolAdapter.to_tools(prefix: "myapp_")
+  """
+  @spec to_tools(keyword()) :: [ReqLLM.Tool.t()]
+  def to_tools(opts \\ []) do
+    modules =
+      list_actions()
+      |> Enum.map(fn {_name, module} -> module end)
+
+    from_actions(modules, opts)
+  end
+
+  # ============================================================================
+  # Action Conversion
+  # ============================================================================
 
   @doc """
   Converts a list of Jido.Action modules into ReqLLM.Tool structs.
@@ -32,20 +212,41 @@ defmodule Jido.AI.ToolAdapter do
   ## Arguments
 
     * `action_modules` - List of modules implementing the `Jido.Action` behaviour
+    * `opts` - Optional keyword list of options
+
+  ## Options
+
+    * `:prefix` - String prefix to add to all tool names (e.g., `"myapp_"`)
+    * `:filter` - Function `(module -> boolean)` to filter which actions to include
 
   ## Returns
 
     A list of `ReqLLM.Tool` structs
 
-  ## Example
+  ## Examples
 
-      iex> tools = Jido.AI.ToolAdapter.from_actions([MyApp.Actions.Add, MyApp.Actions.Search])
-      [%ReqLLM.Tool{name: "add", ...}, ...]
+      # Basic usage
+      tools = Jido.AI.ToolAdapter.from_actions([MyApp.Actions.Add, MyApp.Actions.Search])
 
+      # With prefix
+      tools = Jido.AI.ToolAdapter.from_actions(actions, prefix: "calc_")
+      # Tool names become "calc_add", "calc_search", etc.
+
+      # With filter
+      tools = Jido.AI.ToolAdapter.from_actions(actions,
+        filter: fn mod -> mod.category() == :math end
+      )
   """
-  @spec from_actions([module()]) :: [ReqLLM.Tool.t()]
-  def from_actions(action_modules) when is_list(action_modules) do
-    Enum.map(action_modules, &from_action/1)
+  @spec from_actions([module()], keyword()) :: [ReqLLM.Tool.t()]
+  def from_actions(action_modules, opts \\ [])
+
+  def from_actions(action_modules, opts) when is_list(action_modules) do
+    prefix = Keyword.get(opts, :prefix)
+    filter_fn = Keyword.get(opts, :filter)
+
+    action_modules
+    |> maybe_filter(filter_fn)
+    |> Enum.map(fn module -> from_action(module, prefix: prefix) end)
   end
 
   @doc """
@@ -54,19 +255,71 @@ defmodule Jido.AI.ToolAdapter do
   ## Arguments
 
     * `action_module` - A module implementing the `Jido.Action` behaviour
+    * `opts` - Optional keyword list of options
+
+  ## Options
+
+    * `:prefix` - String prefix to add to the tool name
 
   ## Returns
 
     A `ReqLLM.Tool` struct
   """
-  @spec from_action(module()) :: ReqLLM.Tool.t()
-  def from_action(action_module) when is_atom(action_module) do
+  @spec from_action(module(), keyword()) :: ReqLLM.Tool.t()
+  def from_action(action_module, opts \\ [])
+
+  def from_action(action_module, opts) when is_atom(action_module) do
+    prefix = Keyword.get(opts, :prefix)
+    base_name = action_module.name()
+    name = if prefix, do: "#{prefix}#{base_name}", else: base_name
+
     ReqLLM.Tool.new!(
-      name: action_module.name(),
+      name: name,
       description: action_module.description(),
       parameter_schema: build_json_schema(action_module.schema()),
       callback: &noop_callback/1
     )
+  end
+
+  @doc """
+  Looks up an action module by tool name from a list of modules.
+
+  This is useful when you have a list of action modules and need to find
+  the one matching a tool call from the LLM.
+
+  ## Arguments
+
+    * `tool_name` - The name of the tool to look up
+    * `action_modules` - List of action modules to search
+
+  ## Returns
+
+    * `{:ok, module}` if found
+    * `{:error, :not_found}` if no module matches
+
+  ## Example
+
+      {:ok, module} = Jido.AI.ToolAdapter.lookup_action("calculator", [
+        MyApp.Actions.Calculator,
+        MyApp.Actions.Search
+      ])
+  """
+  @spec lookup_action(String.t(), [module()]) :: {:ok, module()} | {:error, :not_found}
+  def lookup_action(tool_name, action_modules) when is_binary(tool_name) and is_list(action_modules) do
+    case Enum.find(action_modules, fn mod -> mod.name() == tool_name end) do
+      nil -> {:error, :not_found}
+      module -> {:ok, module}
+    end
+  end
+
+  # ============================================================================
+  # Private Functions
+  # ============================================================================
+
+  defp maybe_filter(modules, nil), do: modules
+
+  defp maybe_filter(modules, filter_fn) when is_function(filter_fn, 1) do
+    Enum.filter(modules, filter_fn)
   end
 
   defp build_json_schema(schema) do
