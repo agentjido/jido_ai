@@ -220,13 +220,11 @@ defmodule Jido.AI.DirectiveTest do
       directive =
         ToolExec.new!(%{
           id: "call_123",
-          tool_name: "calculator",
-          action_module: MyApp.Actions.Calculator
+          tool_name: "calculator"
         })
 
       assert directive.id == "call_123"
       assert directive.tool_name == "calculator"
-      assert directive.action_module == MyApp.Actions.Calculator
       assert directive.arguments == %{}
       assert directive.context == %{}
       assert directive.metadata == %{}
@@ -237,7 +235,6 @@ defmodule Jido.AI.DirectiveTest do
         ToolExec.new!(%{
           id: "call_456",
           tool_name: "calculator",
-          action_module: MyApp.Actions.Calculator,
           arguments: %{"a" => 1, "b" => 2, "operation" => "add"}
         })
 
@@ -249,7 +246,6 @@ defmodule Jido.AI.DirectiveTest do
         ToolExec.new!(%{
           id: "call_789",
           tool_name: "weather",
-          action_module: MyApp.Actions.Weather,
           context: %{user_id: "user_123", session_id: "sess_456"}
         })
 
@@ -261,7 +257,6 @@ defmodule Jido.AI.DirectiveTest do
         ToolExec.new!(%{
           id: "call_abc",
           tool_name: "search",
-          action_module: MyApp.Actions.Search,
           metadata: %{request_id: "req_123", timestamp: ~U[2026-01-03 12:00:00Z]}
         })
 
@@ -273,7 +268,6 @@ defmodule Jido.AI.DirectiveTest do
         ToolExec.new!(%{
           id: "call_full",
           tool_name: "database",
-          action_module: MyApp.Actions.Database,
           arguments: %{query: "SELECT * FROM users"},
           context: %{db_pool: :primary},
           metadata: %{traced: true}
@@ -281,7 +275,6 @@ defmodule Jido.AI.DirectiveTest do
 
       assert directive.id == "call_full"
       assert directive.tool_name == "database"
-      assert directive.action_module == MyApp.Actions.Database
       assert directive.arguments == %{query: "SELECT * FROM users"}
       assert directive.context == %{db_pool: :primary}
       assert directive.metadata == %{traced: true}
@@ -290,8 +283,7 @@ defmodule Jido.AI.DirectiveTest do
     test "raises on missing required fields - id" do
       assert_raise RuntimeError, ~r/Invalid ToolExec/, fn ->
         ToolExec.new!(%{
-          tool_name: "calculator",
-          action_module: MyApp.Actions.Calculator
+          tool_name: "calculator"
         })
       end
     end
@@ -299,17 +291,7 @@ defmodule Jido.AI.DirectiveTest do
     test "raises on missing required fields - tool_name" do
       assert_raise RuntimeError, ~r/Invalid ToolExec/, fn ->
         ToolExec.new!(%{
-          id: "call_123",
-          action_module: MyApp.Actions.Calculator
-        })
-      end
-    end
-
-    test "raises on missing required fields - action_module" do
-      assert_raise RuntimeError, ~r/Invalid ToolExec/, fn ->
-        ToolExec.new!(%{
-          id: "call_123",
-          tool_name: "calculator"
+          id: "call_123"
         })
       end
     end
@@ -355,6 +337,87 @@ defmodule Jido.AI.DirectiveTest do
         })
 
       assert signal.data.result == result
+    end
+  end
+
+  describe "ToolExec DirectiveExec" do
+    alias Jido.AI.Tools.Registry
+
+    # Define test Action module
+    defmodule TestActions.Calculator do
+      use Jido.Action,
+        name: "calculator",
+        description: "Performs arithmetic calculations",
+        schema: [
+          a: [type: :integer, required: true, doc: "First operand"],
+          b: [type: :integer, required: true, doc: "Second operand"]
+        ]
+
+      @impl true
+      def run(params, _context) do
+        {:ok, %{result: params.a + params.b}}
+      end
+    end
+
+    # Define test Tool module
+    defmodule TestTools.Echo do
+      use Jido.AI.Tools.Tool,
+        name: "echo",
+        description: "Echoes back the input message"
+
+      @impl true
+      def schema do
+        [message: [type: :string, required: true, doc: "Message to echo"]]
+      end
+
+      @impl true
+      def run(params, _context) do
+        {:ok, %{echoed: params.message}}
+      end
+    end
+
+    setup do
+      # Ensure registry is started and clear before each test
+      Registry.ensure_started()
+      Registry.clear()
+      :ok
+    end
+
+    test "ToolExec creates valid directive for Registry lookup" do
+      directive =
+        ToolExec.new!(%{
+          id: "call_456",
+          tool_name: "calculator",
+          arguments: %{"a" => "10", "b" => "20"}
+        })
+
+      assert directive.id == "call_456"
+      assert directive.tool_name == "calculator"
+      assert directive.arguments == %{"a" => "10", "b" => "20"}
+    end
+
+    test "ToolExec with context passes context to execution" do
+      directive =
+        ToolExec.new!(%{
+          id: "call_789",
+          tool_name: "echo",
+          arguments: %{"message" => "hello"},
+          context: %{user_id: "user_123"}
+        })
+
+      assert directive.context == %{user_id: "user_123"}
+    end
+
+    test "ToolExec with metadata preserves metadata" do
+      directive =
+        ToolExec.new!(%{
+          id: "call_meta",
+          tool_name: "test_tool",
+          arguments: %{},
+          metadata: %{trace_id: "abc123", parent_span: "xyz"}
+        })
+
+      assert directive.metadata == %{trace_id: "abc123", parent_span: "xyz"}
     end
   end
 end

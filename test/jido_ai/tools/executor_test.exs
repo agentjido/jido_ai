@@ -327,36 +327,39 @@ defmodule Jido.AI.Tools.ExecutorTest do
   describe "execute_module/5" do
     test "executes action module directly" do
       # Use string keys like LLM would provide
-      result = Executor.execute_module(
-        TestActions.Calculator,
-        :action,
-        %{"operation" => "add", "a" => "5", "b" => "3"},
-        %{}
-      )
+      result =
+        Executor.execute_module(
+          TestActions.Calculator,
+          :action,
+          %{"operation" => "add", "a" => "5", "b" => "3"},
+          %{}
+        )
 
       assert {:ok, %{result: 8}} = result
     end
 
     test "executes tool module directly" do
       # Use string keys like LLM would provide
-      result = Executor.execute_module(
-        TestTools.Echo,
-        :tool,
-        %{"message" => "direct call"},
-        %{}
-      )
+      result =
+        Executor.execute_module(
+          TestTools.Echo,
+          :tool,
+          %{"message" => "direct call"},
+          %{}
+        )
 
       assert {:ok, %{echoed: "direct call"}} = result
     end
 
     test "respects timeout for direct execution" do
-      result = Executor.execute_module(
-        TestActions.SlowAction,
-        :action,
-        %{"delay_ms" => "500"},
-        %{},
-        timeout: 100
-      )
+      result =
+        Executor.execute_module(
+          TestActions.SlowAction,
+          :action,
+          %{"delay_ms" => "500"},
+          %{},
+          timeout: 100
+        )
 
       assert {:error, error} = result
       assert error.type == :timeout
@@ -402,7 +405,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
       Executor.execute("slow_action", %{"delay_ms" => "500"}, %{}, timeout: 50)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :exception], %{duration: _},
-                       %{tool_name: "slow_action", reason: :timeout}},
+                      %{tool_name: "slow_action", reason: :timeout}},
                      1000
 
       :telemetry.detach("test-exception-handler")

@@ -26,7 +26,6 @@ defmodule Jido.AI.Directive do
       directive = Directive.ToolExec.new!(%{
         id: "tool_456",
         tool_name: "calculator",
-        action_module: MyApp.Actions.Calculator,
         arguments: %{a: 1, b: 2, operation: "add"}
       })
   """
@@ -97,15 +96,18 @@ defmodule Jido.AI.Directive do
 
   defmodule ToolExec do
     @moduledoc """
-    Directive to execute a Jido.Action as a tool.
+    Directive to execute a Jido.Action or Jido.AI.Tools.Tool as a tool.
 
     The runtime will execute this asynchronously and send the result back
     as an `ai.tool_result` signal.
 
+    Tools are looked up in `Jido.AI.Tools.Registry` by name and executed via
+    `Jido.AI.Tools.Executor`. Both Actions and Tools are supported.
+
     ## Argument Normalization
 
     LLM tool calls return arguments with string keys (from JSON). The execution
-    normalizes arguments using the action's schema before execution:
+    normalizes arguments using the tool's schema before execution:
     - Converts string keys to atom keys
     - Parses string numbers to integers/floats based on schema type
 
@@ -117,8 +119,7 @@ defmodule Jido.AI.Directive do
               __MODULE__,
               %{
                 id: Zoi.string(description: "Tool call ID from LLM (ReqLLM.ToolCall.id)"),
-                tool_name: Zoi.string(description: "Name of the tool (matches Jido.Action.name/0)"),
-                action_module: Zoi.any(description: "Module implementing Jido.Action behaviour"),
+                tool_name: Zoi.string(description: "Name of the tool (used for Registry lookup)"),
                 arguments:
                   Zoi.map(description: "Arguments from LLM (string keys, normalized before exec)")
                   |> Zoi.default(%{}),
@@ -447,20 +448,21 @@ end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   @moduledoc """
-  Spawns an async task to execute a Jido.Action and sends the result back
-  to the agent as an `ai.tool_result` signal.
+  Spawns an async task to execute a Jido.Action or Jido.AI.Tools.Tool and sends
+  the result back to the agent as an `ai.tool_result` signal.
 
-  If the action raises an exception, the error is caught and sent back as an
-  error result to prevent the agent from getting stuck in an awaiting state.
+  Looks up the tool in `Jido.AI.Tools.Registry` by name and uses
+  `Jido.AI.Tools.Executor` for execution, which provides consistent error
+  handling, parameter normalization, and telemetry.
   """
 
   alias Jido.AI.Signal
+  alias Jido.AI.Tools.Executor
 
   def exec(directive, _input_signal, state) do
     %{
       id: call_id,
       tool_name: tool_name,
-      action_module: action_module,
       arguments: arguments,
       context: context
     } = directive
@@ -468,21 +470,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     agent_pid = self()
 
     Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
-      result =
-        try do
-          normalized_args = normalize_arguments(action_module, arguments)
-
-          case Jido.Exec.run(action_module, normalized_args, context) do
-            {:ok, output} -> {:ok, output}
-            {:error, reason} -> {:error, reason}
-          end
-        rescue
-          e ->
-            {:error, %{exception: Exception.message(e), type: e.__struct__}}
-        catch
-          kind, reason ->
-            {:error, %{caught: kind, reason: inspect(reason)}}
-        end
+      result = Executor.execute(tool_name, arguments, context)
 
       signal =
         Signal.ToolResult.new!(%{
@@ -495,11 +483,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     end)
 
     {:async, nil, state}
-  end
-
-  defp normalize_arguments(action_module, arguments) do
-    schema = action_module.schema()
-    Jido.Action.Tool.convert_params_using_schema(arguments, schema)
   end
 end
 

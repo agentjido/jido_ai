@@ -47,6 +47,7 @@ defmodule Jido.AI.ToolAdapter do
   alias Jido.Action.Schema, as: ActionSchema
 
   @registry_name __MODULE__.Registry
+  @max_retries 3
 
   # ============================================================================
   # Registry Management
@@ -94,9 +95,8 @@ defmodule Jido.AI.ToolAdapter do
   """
   @spec register_action(module()) :: :ok
   def register_action(action_module) when is_atom(action_module) do
-    ensure_started()
     name = action_module.name()
-    Agent.update(@registry_name, fn state -> Map.put(state, name, action_module) end)
+    safe_update(fn state -> Map.put(state, name, action_module) end)
   end
 
   @doc """
@@ -123,9 +123,8 @@ defmodule Jido.AI.ToolAdapter do
   """
   @spec unregister_action(module()) :: :ok
   def unregister_action(action_module) when is_atom(action_module) do
-    ensure_started()
     name = action_module.name()
-    Agent.update(@registry_name, fn state -> Map.delete(state, name) end)
+    safe_update(fn state -> Map.delete(state, name) end)
   end
 
   @doc """
@@ -140,8 +139,7 @@ defmodule Jido.AI.ToolAdapter do
   """
   @spec list_actions() :: [{String.t(), module()}]
   def list_actions do
-    ensure_started()
-    Agent.get(@registry_name, fn state -> Map.to_list(state) end)
+    safe_get(fn state -> Map.to_list(state) end)
   end
 
   @doc """
@@ -156,9 +154,7 @@ defmodule Jido.AI.ToolAdapter do
   """
   @spec get_action(String.t()) :: {:ok, module()} | {:error, :not_found}
   def get_action(tool_name) when is_binary(tool_name) do
-    ensure_started()
-
-    case Agent.get(@registry_name, fn state -> Map.get(state, tool_name) end) do
+    case safe_get(fn state -> Map.get(state, tool_name) end) do
       nil -> {:error, :not_found}
       module -> {:ok, module}
     end
@@ -173,8 +169,7 @@ defmodule Jido.AI.ToolAdapter do
   """
   @spec clear_registry() :: :ok
   def clear_registry do
-    ensure_started()
-    Agent.update(@registry_name, fn _state -> %{} end)
+    safe_update(fn _state -> %{} end)
   end
 
   @doc """
@@ -315,7 +310,49 @@ defmodule Jido.AI.ToolAdapter do
   end
 
   # ============================================================================
-  # Private Functions
+  # Private Functions - Agent Operations with Retry
+  # ============================================================================
+
+  # Wraps Agent.get with retry logic to handle race conditions
+  defp safe_get(fun, retries \\ @max_retries)
+
+  defp safe_get(fun, retries) when retries > 0 do
+    ensure_started()
+
+    try do
+      Agent.get(@registry_name, fun)
+    catch
+      :exit, {:noproc, _} ->
+        safe_get(fun, retries - 1)
+    end
+  end
+
+  defp safe_get(fun, 0) do
+    ensure_started()
+    Agent.get(@registry_name, fun)
+  end
+
+  # Wraps Agent.update with retry logic
+  defp safe_update(fun, retries \\ @max_retries)
+
+  defp safe_update(fun, retries) when retries > 0 do
+    ensure_started()
+
+    try do
+      Agent.update(@registry_name, fun)
+    catch
+      :exit, {:noproc, _} ->
+        safe_update(fun, retries - 1)
+    end
+  end
+
+  defp safe_update(fun, 0) do
+    ensure_started()
+    Agent.update(@registry_name, fun)
+  end
+
+  # ============================================================================
+  # Private Functions - Schema and Filtering
   # ============================================================================
 
   defp maybe_filter(modules, nil), do: modules

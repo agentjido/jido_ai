@@ -97,59 +97,61 @@ Implement a registry for managing available tools (both Jido.Actions and simple 
 
 ### 2.2.1 Registry Design
 
-Create the registry module (not a GenServer - compile-time registration preferred).
+Create the registry module (ETS-based for runtime registration).
 
-- [ ] 2.2.1.1 Create `lib/jido_ai/tools/registry.ex` with module documentation
-- [ ] 2.2.1.2 Document that this manages both Actions and Tools
-- [ ] 2.2.1.3 Support compile-time registration via `@tools` attribute pattern
-- [ ] 2.2.1.4 Support runtime registration for dynamic tools
+- [x] 2.2.1.1 Create `lib/jido_ai/tools/registry.ex` with module documentation
+- [x] 2.2.1.2 Document that this manages both Actions and Tools
+- [x] 2.2.1.3 Support compile-time registration via `@tools` attribute pattern
+- [x] 2.2.1.4 Support runtime registration for dynamic tools
 
 ### 2.2.2 Action Registration
 
 Implement action registration.
 
-- [ ] 2.2.2.1 Implement `register_action/1` to add a Jido.Action module
-- [ ] 2.2.2.2 Implement `register_actions/1` for batch registration
-- [ ] 2.2.2.3 Validate module implements Jido.Action behavior
-- [ ] 2.2.2.4 Store action metadata (name, description, schema)
+- [x] 2.2.2.1 Implement `register_action/1` to add a Jido.Action module
+- [x] 2.2.2.2 Implement `register_actions/1` for batch registration
+- [x] 2.2.2.3 Validate module implements Jido.Action behavior
+- [x] 2.2.2.4 Store action metadata (name, description, schema)
 
 ### 2.2.3 Tool Registration
 
 Implement simple tool registration.
 
-- [ ] 2.2.3.1 Implement `register_tool/1` to add a Tool module
-- [ ] 2.2.3.2 Validate module implements Jido.AI.Tools.Tool behavior
-- [ ] 2.2.3.3 Store tool metadata
+- [x] 2.2.3.1 Implement `register_tool/1` to add a Tool module
+- [x] 2.2.3.2 Validate module implements Jido.AI.Tools.Tool behavior
+- [x] 2.2.3.3 Store tool metadata
 
 ### 2.2.4 Listing and Lookup
 
 Implement listing and lookup functionality.
 
-- [ ] 2.2.4.1 Implement `list_all/0` to get all registered tools/actions
-- [ ] 2.2.4.2 Implement `list_actions/0` for actions only
-- [ ] 2.2.4.3 Implement `list_tools/0` for simple tools only
-- [ ] 2.2.4.4 Implement `get/1` for lookup by name
-- [ ] 2.2.4.5 Implement `get!/1` that raises on not found
+- [x] 2.2.4.1 Implement `list_all/0` to get all registered tools/actions
+- [x] 2.2.4.2 Implement `list_actions/0` for actions only
+- [x] 2.2.4.3 Implement `list_tools/0` for simple tools only
+- [x] 2.2.4.4 Implement `get/1` for lookup by name
+- [x] 2.2.4.5 Implement `get!/1` that raises on not found
 
 ### 2.2.5 ReqLLM Conversion
 
 Implement batch conversion to ReqLLM format.
 
-- [ ] 2.2.5.1 Implement `to_reqllm_tools/0` to convert all registered items
-- [ ] 2.2.5.2 Use `ToolAdapter.from_actions/1` for actions
-- [ ] 2.2.5.3 Use `Tool.to_reqllm_tool/1` for simple tools
-- [ ] 2.2.5.4 Return combined list of `ReqLLM.Tool` structs
+- [x] 2.2.5.1 Implement `to_reqllm_tools/0` to convert all registered items
+- [x] 2.2.5.2 Use `ToolAdapter.from_actions/1` for actions
+- [x] 2.2.5.3 Use `Tool.to_reqllm_tool/1` for simple tools
+- [x] 2.2.5.4 Return combined list of `ReqLLM.Tool` structs
 
 ### 2.2.6 Unit Tests for Registry
 
-- [ ] Test register_action/1 adds action
-- [ ] Test register_tool/1 adds tool
-- [ ] Test list_all/0 returns combined list
-- [ ] Test get/1 finds by name
-- [ ] Test get/1 returns nil for unknown
-- [ ] Test to_reqllm_tools/0 converts all
-- [ ] Test validation rejects non-Action modules
-- [ ] Test validation rejects non-Tool modules
+- [x] Test register_action/1 adds action
+- [x] Test register_tool/1 adds tool
+- [x] Test list_all/0 returns combined list
+- [x] Test get/1 finds by name
+- [x] Test get/1 returns nil for unknown
+- [x] Test to_reqllm_tools/0 converts all
+- [x] Test validation rejects non-Action modules
+- [x] Test validation rejects non-Tool modules
+
+**See**: `notes/summaries/phase2-section2.2-tool-registry.md` for implementation summary
 
 ---
 
@@ -223,26 +225,28 @@ Enhance the existing ToolExec directive to use the new executor.
 
 ### 2.4.1 Registry Integration
 
-Integrate ToolExec with the registry.
+Integrate ToolExec with the registry (Registry-only, no backwards compatibility).
 
-- [ ] 2.4.1.1 Update ToolExec to look up tools in registry when action_module not provided
-- [ ] 2.4.1.2 Support tool execution by name only
-- [ ] 2.4.1.3 Fall back to direct action_module if provided
+- [x] 2.4.1.1 Remove `action_module` from ToolExec schema
+- [x] 2.4.1.2 Use Registry lookup exclusively via Executor.execute/3
+- [x] 2.4.1.3 Support both Actions and Tools via Registry
 
 ### 2.4.2 Enhanced Error Reporting
 
 Improve error reporting in ToolExec.
 
-- [ ] 2.4.2.1 Use Executor for consistent error handling
-- [ ] 2.4.2.2 Include structured error in ToolResult signal
-- [ ] 2.4.2.3 Add telemetry for tool execution
+- [x] 2.4.2.1 Use Executor for consistent error handling
+- [x] 2.4.2.2 Include structured error in ToolResult signal
+- [x] 2.4.2.3 Add telemetry for tool execution (via Executor)
 
 ### 2.4.3 Unit Tests for ToolExec Enhancement
 
-- [ ] Test ToolExec with registry lookup
-- [ ] Test ToolExec with direct action_module
-- [ ] Test enhanced error reporting
-- [ ] Test telemetry emission
+- [x] Test ToolExec with Registry lookup
+- [x] Test ToolExec with context and metadata
+- [x] Test enhanced error reporting (via Executor tests)
+- [x] Test telemetry emission (via Executor tests)
+
+**See**: `notes/summaries/phase2-section2.4-toolexec-enhancement.md` for implementation summary
 
 ---
 
