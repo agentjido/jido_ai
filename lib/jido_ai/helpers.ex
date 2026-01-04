@@ -40,6 +40,10 @@ defmodule Jido.AI.Helpers do
       {:error, jido_error} = Helpers.wrap_error(reqllm_error)
   """
 
+  alias Jido.AI.Config
+  alias Jido.AI.Error
+  alias Jido.AI.Error.API, as: APIError
+  alias Jido.AI.Error.Validation, as: ValidationError
   alias ReqLLM.Context
   alias ReqLLM.Message.ContentPart
 
@@ -214,26 +218,29 @@ defmodule Jido.AI.Helpers do
   """
   @spec extract_tool_calls(map()) :: [map()]
   def extract_tool_calls(%{message: %{tool_calls: tool_calls}}) when is_list(tool_calls) do
-    Enum.map(tool_calls, fn tc ->
-      case tc do
-        %ReqLLM.ToolCall{} = tool_call ->
-          %{
-            id: tool_call.id || "call_#{:erlang.unique_integer([:positive])}",
-            name: ReqLLM.ToolCall.name(tool_call),
-            arguments: ReqLLM.ToolCall.args_map(tool_call) || %{}
-          }
-
-        %{} = map ->
-          %{
-            id: map[:id] || map["id"] || "call_#{:erlang.unique_integer([:positive])}",
-            name: map[:name] || map["name"],
-            arguments: map[:arguments] || map["arguments"] || %{}
-          }
-      end
-    end)
+    Enum.map(tool_calls, &normalize_tool_call_data/1)
   end
 
   def extract_tool_calls(_), do: []
+
+  # Normalize a single tool call from various formats to a standard map
+  defp normalize_tool_call_data(%ReqLLM.ToolCall{} = tool_call) do
+    %{
+      id: tool_call.id || generate_call_id(),
+      name: ReqLLM.ToolCall.name(tool_call),
+      arguments: ReqLLM.ToolCall.args_map(tool_call) || %{}
+    }
+  end
+
+  defp normalize_tool_call_data(%{} = map) do
+    %{
+      id: map[:id] || map["id"] || generate_call_id(),
+      name: map[:name] || map["name"],
+      arguments: map[:arguments] || map["arguments"] || %{}
+    }
+  end
+
+  defp generate_call_id, do: "call_#{:erlang.unique_integer([:positive])}"
 
   @doc """
   Checks if a ReqLLM response contains tool calls.
@@ -441,28 +448,25 @@ defmodule Jido.AI.Helpers do
     jido_error =
       case error_type do
         :rate_limit ->
-          Jido.AI.Error.API.RateLimit.exception(
-            message: message,
-            retry_after: retry_after
-          )
+          APIError.RateLimit.exception(message: message, retry_after: retry_after)
 
         :auth ->
-          Jido.AI.Error.API.Auth.exception(message: message)
+          APIError.Auth.exception(message: message)
 
         :timeout ->
-          Jido.AI.Error.API.Timeout.exception(message: message)
+          APIError.Timeout.exception(message: message)
 
         :provider_error ->
-          Jido.AI.Error.API.Provider.exception(message: message)
+          APIError.Provider.exception(message: message)
 
         :network ->
-          Jido.AI.Error.API.Network.exception(message: message)
+          APIError.Network.exception(message: message)
 
         :validation ->
-          Jido.AI.Error.Validation.Invalid.exception(message: message)
+          ValidationError.Invalid.exception(message: message)
 
         :unknown ->
-          Jido.AI.Error.Unknown.exception(error: error)
+          Error.Unknown.exception(error: error)
       end
 
     {:error, jido_error}
@@ -512,7 +516,7 @@ defmodule Jido.AI.Helpers do
   def resolve_directive_model(%{model: model}) when is_binary(model) and model != "", do: model
 
   def resolve_directive_model(%{model_alias: alias_atom}) when is_atom(alias_atom) and not is_nil(alias_atom) do
-    Jido.AI.Config.resolve_model(alias_atom)
+    Config.resolve_model(alias_atom)
   end
 
   def resolve_directive_model(%{model: nil, model_alias: nil}) do

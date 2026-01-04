@@ -282,21 +282,23 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
 
     agent_pid = self()
 
+    stream_opts = %{
+      call_id: call_id,
+      model: model,
+      context: context,
+      system_prompt: system_prompt,
+      tools: tools,
+      tool_choice: tool_choice,
+      max_tokens: max_tokens,
+      temperature: temperature,
+      timeout: timeout,
+      agent_pid: agent_pid
+    }
+
     Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
       result =
         try do
-          stream_with_callbacks(
-            call_id,
-            model,
-            context,
-            system_prompt,
-            tools,
-            tool_choice,
-            max_tokens,
-            temperature,
-            timeout,
-            agent_pid
-          )
+          stream_with_callbacks(stream_opts)
         rescue
           e ->
             {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
@@ -312,18 +314,18 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
     {:async, nil, state}
   end
 
-  defp stream_with_callbacks(
-         call_id,
-         model,
-         context,
-         system_prompt,
-         tools,
-         tool_choice,
-         max_tokens,
-         temperature,
-         timeout,
-         agent_pid
-       ) do
+  defp stream_with_callbacks(%{
+         call_id: call_id,
+         model: model,
+         context: context,
+         system_prompt: system_prompt,
+         tools: tools,
+         tool_choice: tool_choice,
+         max_tokens: max_tokens,
+         temperature: temperature,
+         timeout: timeout,
+         agent_pid: agent_pid
+       }) do
     opts =
       []
       |> Helpers.add_tools_opt(tools)

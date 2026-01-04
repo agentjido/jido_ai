@@ -55,46 +55,40 @@ defmodule Jido.AI.ReActAgent do
   @default_max_iterations 10
 
   defmacro __using__(opts) do
-    default_model = @default_model
-    default_max_iterations = @default_max_iterations
+    # Extract all values at compile time (in the calling module's context)
+    name = Keyword.fetch!(opts, :name)
+    tools = Keyword.fetch!(opts, :tools)
+    description = Keyword.get(opts, :description, "ReAct agent #{name}")
+    system_prompt = Keyword.get(opts, :system_prompt)
+    model = Keyword.get(opts, :model, @default_model)
+    max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
+    skills = Keyword.get(opts, :skills, [])
 
-    quote location: :keep,
-          bind_quoted: [
-            opts: opts,
-            default_model: default_model,
-            default_max_iterations: default_max_iterations
-          ] do
-      use Jido.Agent,
-        name: name,
-        description: description,
-        skills: skills,
-        strategy: {Jido.AI.Strategy.ReAct, strategy_opts},
-        schema: base_schema
+    strategy_opts =
+      [tools: tools, model: model, max_iterations: max_iterations]
+      |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
 
-      import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
-
-      name = Keyword.fetch!(opts, :name)
-      tools = Keyword.fetch!(opts, :tools)
-      description = Keyword.get(opts, :description, "ReAct agent #{name}")
-      system_prompt = Keyword.get(opts, :system_prompt)
-      model = Keyword.get(opts, :model, default_model)
-      max_iterations = Keyword.get(opts, :max_iterations, default_max_iterations)
-      skills = Keyword.get(opts, :skills, [])
-
-      strategy_opts =
-        [tools: tools, model: model, max_iterations: max_iterations]
-        |> then(fn opts ->
-          if system_prompt, do: Keyword.put(opts, :system_prompt, system_prompt), else: opts
-        end)
-
-      base_schema =
+    # Build base_schema AST at macro expansion time
+    base_schema_ast =
+      quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(model),
+          model: Zoi.string() |> Zoi.default(unquote(model)),
           last_query: Zoi.string() |> Zoi.default(""),
           last_answer: Zoi.string() |> Zoi.default(""),
           completed: Zoi.boolean() |> Zoi.default(false)
         })
+      end
+
+    quote location: :keep do
+      use Jido.Agent,
+        name: unquote(name),
+        description: unquote(description),
+        skills: unquote(skills),
+        strategy: {Jido.AI.Strategy.ReAct, unquote(Macro.escape(strategy_opts))},
+        schema: unquote(base_schema_ast)
+
+      import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
 
       @doc """
       Send a query to the agent.

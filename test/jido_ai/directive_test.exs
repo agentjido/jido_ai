@@ -1,7 +1,7 @@
 defmodule Jido.AI.DirectiveTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Directive.{ReqLLMStream, ReqLLMGenerate, ReqLLMEmbed, ToolExec}
+  alias Jido.AI.Directive.{ReqLLMEmbed, ReqLLMGenerate, ReqLLMStream, ToolExec}
   alias Jido.AI.Signal.EmbedResult
 
   describe "ReqLLMStream" do

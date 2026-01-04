@@ -44,6 +44,8 @@ defmodule Jido.AI.ToolAdapter do
 
   use Agent
 
+  alias Jido.Action.Schema, as: ActionSchema
+
   @registry_name __MODULE__.Registry
 
   # ============================================================================
@@ -323,7 +325,7 @@ defmodule Jido.AI.ToolAdapter do
   end
 
   defp build_json_schema(schema) do
-    Jido.Action.Schema.to_json_schema(schema)
+    ActionSchema.to_json_schema(schema)
   end
 
   defp noop_callback(_args) do

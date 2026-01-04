@@ -76,6 +76,8 @@ defmodule Jido.AI.Tools.Tool do
       # => {:ok, %{result: 8}}
   """
 
+  alias Jido.Action.Schema, as: ActionSchema
+
   @doc """
   Returns the tool's name as used in LLM tool calls.
 
@@ -160,7 +162,7 @@ defmodule Jido.AI.Tools.Tool do
 
   # Convert Zoi schema to JSON Schema
   defp build_json_schema(schema) do
-    Jido.Action.Schema.to_json_schema(schema)
+    ActionSchema.to_json_schema(schema)
   end
 
   @doc false
