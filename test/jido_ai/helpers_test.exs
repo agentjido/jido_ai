@@ -333,13 +333,6 @@ defmodule Jido.AI.HelpersTest do
     end
 
     test "preserves retry_after for rate limit" do
-      error = %{
-        status: 429,
-        reason: "Rate limited",
-        response_body: %{"retry_after" => 60}
-      }
-
-      # Need to use the struct
       error = %ReqLLM.Error.API.Request{
         status: 429,
         reason: "Rate limited",

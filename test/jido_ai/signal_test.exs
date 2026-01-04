@@ -2,7 +2,7 @@ defmodule Jido.AI.SignalTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.{ReqLLMResult, ReqLLMError, UsageReport}
+  alias Jido.AI.Signal.{ReqLLMResult, ReqLLMPartial, ReqLLMError, UsageReport}
 
   describe "ReqLLMResult" do
     test "creates signal with required fields" do
@@ -72,6 +72,68 @@ defmodule Jido.AI.SignalTest do
       assert signal.data.model == "openai:gpt-4o"
       assert signal.data.duration_ms == 2500
       assert signal.data.thinking_content == "I need to consider multiple options..."
+    end
+  end
+
+  describe "ReqLLMPartial" do
+    test "creates partial signal with required fields" do
+      signal = ReqLLMPartial.new!(%{
+        call_id: "call_partial_1",
+        delta: "Hello"
+      })
+
+      assert signal.type == "reqllm.partial"
+      assert signal.data.call_id == "call_partial_1"
+      assert signal.data.delta == "Hello"
+      assert signal.data.chunk_type == :content
+    end
+
+    test "creates partial signal with default chunk_type :content" do
+      signal = ReqLLMPartial.new!(%{
+        call_id: "call_partial_2",
+        delta: " world"
+      })
+
+      assert signal.data.chunk_type == :content
+    end
+
+    test "creates partial signal with chunk_type :thinking" do
+      signal = ReqLLMPartial.new!(%{
+        call_id: "call_partial_3",
+        delta: "Let me think about this...",
+        chunk_type: :thinking
+      })
+
+      assert signal.data.chunk_type == :thinking
+      assert signal.data.delta == "Let me think about this..."
+    end
+
+    test "creates partial signal with empty delta" do
+      signal = ReqLLMPartial.new!(%{
+        call_id: "call_partial_4",
+        delta: ""
+      })
+
+      assert signal.data.delta == ""
+    end
+
+    test "creates multiple partial signals for streaming" do
+      chunks = ["Hello", ", ", "world", "!"]
+
+      signals =
+        Enum.map(chunks, fn chunk ->
+          ReqLLMPartial.new!(%{
+            call_id: "call_stream_1",
+            delta: chunk
+          })
+        end)
+
+      assert length(signals) == 4
+      assert Enum.all?(signals, &(&1.type == "reqllm.partial"))
+      assert Enum.all?(signals, &(&1.data.call_id == "call_stream_1"))
+
+      accumulated = signals |> Enum.map(& &1.data.delta) |> Enum.join()
+      assert accumulated == "Hello, world!"
     end
   end
 
@@ -239,14 +301,14 @@ defmodule Jido.AI.SignalTest do
     end
   end
 
-  describe "is_tool_call?/1" do
+  describe "tool_call?/1" do
     test "returns true for result with tool_calls type" do
       signal = ReqLLMResult.new!(%{
         call_id: "call_is_tc_1",
         result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
       })
 
-      assert Signal.is_tool_call?(signal) == true
+      assert Signal.tool_call?(signal) == true
     end
 
     test "returns true when tool_calls list is non-empty" do
@@ -255,7 +317,7 @@ defmodule Jido.AI.SignalTest do
         result: {:ok, %{tool_calls: [%{id: "tc_1"}], text: "text"}}
       })
 
-      assert Signal.is_tool_call?(signal) == true
+      assert Signal.tool_call?(signal) == true
     end
 
     test "returns false for final_answer type" do
@@ -264,7 +326,7 @@ defmodule Jido.AI.SignalTest do
         result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
       })
 
-      assert Signal.is_tool_call?(signal) == false
+      assert Signal.tool_call?(signal) == false
     end
 
     test "returns false for error result" do
@@ -273,7 +335,7 @@ defmodule Jido.AI.SignalTest do
         result: {:error, %{reason: "failed"}}
       })
 
-      assert Signal.is_tool_call?(signal) == false
+      assert Signal.tool_call?(signal) == false
     end
 
     test "returns false for non-ReqLLMResult signals" do
@@ -283,7 +345,19 @@ defmodule Jido.AI.SignalTest do
         message: "Timeout"
       })
 
-      assert Signal.is_tool_call?(signal) == false
+      assert Signal.tool_call?(signal) == false
+    end
+  end
+
+  describe "is_tool_call?/1 (deprecated)" do
+    test "is_tool_call?/1 delegates to tool_call?/1" do
+      signal = ReqLLMResult.new!(%{
+        call_id: "call_deprecated",
+        result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
+      })
+
+      # Should still work but is deprecated
+      assert Signal.is_tool_call?(signal) == Signal.tool_call?(signal)
     end
   end
 

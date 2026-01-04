@@ -303,3 +303,32 @@ Test configuration across components.
 - `lib/jido_ai/directive.ex` - Add ReqLLMGenerate, ReqLLMEmbed
 - `lib/jido_ai/signal.ex` - Add EmbedResult, ReqLLMError, UsageReport
 - `lib/jido_ai/tool_adapter.ex` - Add registry, improve schema
+
+---
+
+## 1.7 Phase 1 Review and Fixes
+
+Comprehensive code review and quality fixes.
+
+### 1.7.1 Blockers
+
+- [x] 1.7.1.1 Add ToolExec.new!/1 tests (9 tests)
+- [x] 1.7.1.2 Add ReqLLMPartial.new!/1 tests (5 tests)
+- [x] 1.7.1.3 Replace primitive classify_error with Helpers.classify_error
+
+### 1.7.2 Concerns
+
+- [x] 1.7.2.1 Extract shared directive helpers to helpers.ex (~200 lines consolidated)
+- [x] 1.7.2.2 Rename is_tool_call?/1 to tool_call?/1 (Elixir naming convention)
+- [x] 1.7.2.3 Fix config.ex validate/0 unused variable
+- [x] 1.7.2.4 Refactor validate_defaults to functional pattern
+- [x] 1.7.2.5 Add @doc false to schema/0 functions (5 directives)
+- [x] 1.7.2.6 Fix unused variable in helpers_test.exs
+
+### 1.7.3 Test Verification
+
+- [x] 1.7.3.1 Run full test suite - 204 tests passing
+- [x] 1.7.3.2 Update integration tests to use tool_call?/1
+
+**See**: `notes/reviews/phase1-comprehensive-review.md` for full review details
+**See**: `notes/summaries/phase1-review-fixes.md` for fix summary
