@@ -19,7 +19,7 @@ Implement an Adaptive Strategy that:
 ### Design Decisions
 - Follow existing Strategy pattern - Adaptive wraps other strategies
 - Task analysis is heuristic-based (no LLM call required for selection)
-- Strategy is selected on first command and persisted for the session
+- Strategy is re-evaluated when previous reasoning completes and new prompt arrives
 - Support manual override via `:strategy` option
 - Configurable available strategies and selection thresholds
 
@@ -83,7 +83,7 @@ Implement an Adaptive Strategy that:
 3. [x] Strategy selection maps complexity to appropriate strategy
 4. [x] Delegation works correctly for all callbacks
 5. [x] Manual override works
-6. [x] All tests pass (40 Adaptive tests, 837 total)
+6. [x] All tests pass (45 Adaptive tests, 842 total)
 7. [x] Fallback handles errors gracefully
 
 ## Current Status
@@ -109,11 +109,17 @@ Implement an Adaptive Strategy that:
 4. Select strategy based on task type or complexity score
 5. Fall back to default strategy if needed
 
-**Task Type Detection:**
-- `:tool_use` - Keywords like "search", "find", "calculate", "execute"
-- `:exploration` - Keywords like "analyze", "explore", "compare", "evaluate"
-- `:simple_query` - Keywords like "what", "who", "when", "where", "define"
-- `:general` - No specific keyword match
+**Task Type Detection (in priority order):**
+- `:synthesis` - Keywords like "synthesize", "combine", "merge", "integrate", "relationships", "perspectives" → GoT
+- `:tool_use` - Keywords like "search", "find", "calculate", "execute" → ReAct
+- `:exploration` - Keywords like "analyze", "explore", "compare", "evaluate" → ToT
+- `:simple_query` - Keywords like "what", "who", "when", "where", "define" → CoT
+- `:general` - No specific keyword match → Based on complexity score
+
+**Re-evaluation Behavior:**
+- Strategy is re-evaluated when previous reasoning is complete (`done? == true`)
+- New prompt with start instruction triggers re-analysis
+- Allows different strategies for different tasks in the same session
 
 **Complexity Score Factors:**
 - Prompt length (normalized)
@@ -125,5 +131,5 @@ Implement an Adaptive Strategy that:
 - `:model` - LLM model identifier (default: "anthropic:claude-haiku-4-5")
 - `:default_strategy` - Default strategy if analysis is inconclusive (default: :react)
 - `:strategy` - Manual override to force a specific strategy
-- `:available_strategies` - List of available strategies (default: [:cot, :react, :tot])
+- `:available_strategies` - List of available strategies (default: [:cot, :react, :tot, :got])
 - `:complexity_thresholds` - Map of thresholds for strategy selection

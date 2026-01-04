@@ -3,8 +3,8 @@ defmodule Jido.AI.Strategies.Adaptive do
   Adaptive execution strategy that automatically selects the best reasoning approach.
 
   This strategy analyzes task characteristics and selects the most appropriate
-  strategy (CoT, ReAct, ToT, GoT) for the given task. Once selected, all
-  callbacks are delegated to the chosen strategy.
+  strategy (CoT, ReAct, ToT, GoT) for the given task. The strategy is re-evaluated
+  when the previous reasoning completes and a new prompt arrives.
 
   ## Overview
 
@@ -12,12 +12,22 @@ defmodule Jido.AI.Strategies.Adaptive do
   - Analyzes prompt complexity and task type
   - Selects the appropriate strategy based on heuristics
   - Delegates all operations to the selected strategy
+  - Re-evaluates strategy when previous task completes
   - Supports manual override via configuration
 
   ## Strategy Selection
 
-  By default, strategies are selected based on task complexity:
+  Strategies are selected based on task type keywords and complexity:
 
+  ### Task Type Detection (highest priority)
+  - **Synthesis** → Graph-of-Thoughts (GoT)
+    - Keywords: synthesize, combine, merge, integrate, relationships, perspectives
+  - **Tool use** → ReAct
+    - Keywords: search, find, calculate, execute, fetch
+  - **Exploration** → Tree-of-Thoughts (ToT)
+    - Keywords: analyze, explore, compare, evaluate, alternatives
+
+  ### Complexity-based Selection (fallback)
   - **Simple tasks** (score < 0.3) → Chain-of-Thought (CoT)
     - Direct questions, simple calculations, factual queries
   - **Moderate tasks** (0.3-0.7) → ReAct
@@ -87,6 +97,9 @@ defmodule Jido.AI.Strategies.Adaptive do
   @tool_keywords ~w(search find lookup fetch get calculate compute call execute run use tool)
   @complex_keywords ~w(analyze explore consider multiple options alternatives compare contrast evaluate)
   @simple_keywords ~w(what is who when where define explain tell me)
+  # Keywords that suggest graph-based reasoning (GoT)
+  @synthesis_keywords ~w(synthesize combine merge integrate aggregate unify consolidate)
+  @graph_keywords ~w(relationships connections network graph linked interdependent perspectives viewpoints)
 
   @type complexity :: :simple | :moderate | :complex
   @type strategy_type :: :cot | :react | :tot | :got
@@ -204,8 +217,32 @@ defmodule Jido.AI.Strategies.Adaptive do
         handle_initial_instruction(agent, instructions, ctx, state)
 
       strategy_module ->
-        # Delegate to selected strategy
-        delegate_cmd(agent, instructions, ctx, strategy_module, state)
+        # Check if we should re-evaluate strategy for a new task
+        if should_reevaluate?(agent, instructions, ctx, strategy_module) do
+          # Previous reasoning is complete, re-evaluate for new prompt
+          handle_initial_instruction(agent, instructions, ctx, state)
+        else
+          # Delegate to selected strategy
+          delegate_cmd(agent, instructions, ctx, strategy_module, state)
+        end
+    end
+  end
+
+  # Check if we should re-evaluate strategy selection
+  defp should_reevaluate?(agent, instructions, ctx, strategy_module) do
+    # Only re-evaluate if there's a new start instruction
+    has_start = Enum.any?(instructions, fn
+      %{action: @start} -> true
+      %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start] -> true
+      _ -> false
+    end)
+
+    if has_start do
+      # Check if previous reasoning is complete
+      snapshot = strategy_module.snapshot(agent, ctx)
+      snapshot.done? == true
+    else
+      false
     end
   end
 
@@ -217,7 +254,7 @@ defmodule Jido.AI.Strategies.Adaptive do
   @spec analyze_prompt(String.t(), config()) :: {strategy_type(), float(), atom()}
   def analyze_prompt(prompt, config \\ %{}) do
     thresholds = Map.get(config, :complexity_thresholds, @default_thresholds)
-    available = Map.get(config, :available_strategies, [:cot, :react, :tot])
+    available = Map.get(config, :available_strategies, [:cot, :react, :tot, :got])
 
     # Calculate complexity score
     complexity_score = calculate_complexity(prompt)
@@ -260,7 +297,7 @@ defmodule Jido.AI.Strategies.Adaptive do
     %{
       model: resolved_model,
       default_strategy: Keyword.get(opts, :default_strategy, @default_strategy),
-      available_strategies: Keyword.get(opts, :available_strategies, [:cot, :react, :tot]),
+      available_strategies: Keyword.get(opts, :available_strategies, [:cot, :react, :tot, :got]),
       complexity_thresholds: Keyword.get(opts, :complexity_thresholds, @default_thresholds),
       strategy_override: Keyword.get(opts, :strategy),
       strategy_opts: opts
@@ -441,6 +478,10 @@ defmodule Jido.AI.Strategies.Adaptive do
     prompt_lower = String.downcase(prompt)
 
     cond do
+      # Synthesis/graph tasks prefer GoT
+      has_synthesis_keywords?(prompt_lower) ->
+        :synthesis
+
       has_tool_keywords?(prompt_lower) ->
         :tool_use
 
@@ -467,6 +508,11 @@ defmodule Jido.AI.Strategies.Adaptive do
     Enum.any?(@simple_keywords, &String.contains?(prompt, &1))
   end
 
+  defp has_synthesis_keywords?(prompt) do
+    Enum.any?(@synthesis_keywords, &String.contains?(prompt, &1)) or
+      Enum.any?(@graph_keywords, &String.contains?(prompt, &1))
+  end
+
   defp select_strategy(complexity_score, task_type, thresholds, available) do
     # First, check task type overrides
     strategy = select_by_task_type(task_type, available)
@@ -482,7 +528,13 @@ defmodule Jido.AI.Strategies.Adaptive do
     if :react in available, do: :react, else: nil
   end
 
+  defp select_by_task_type(:synthesis, available) do
+    # Synthesis tasks prefer GoT for combining multiple perspectives
+    find_first_available([:got, :tot], available)
+  end
+
   defp select_by_task_type(:exploration, available) do
+    # Exploration tasks prefer ToT for branching exploration
     find_first_available([:tot, :got], available)
   end
 

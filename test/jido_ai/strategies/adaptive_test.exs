@@ -66,7 +66,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
       assert state[:config][:model] == "anthropic:claude-haiku-4-5"
       assert state[:config][:default_strategy] == :react
-      assert state[:config][:available_strategies] == [:cot, :react, :tot]
+      assert state[:config][:available_strategies] == [:cot, :react, :tot, :got]
       assert is_nil(state[:selected_strategy])
       assert is_nil(state[:strategy_type])
     end
@@ -124,10 +124,11 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       assert task_type == :tool_use
     end
 
-    test "classifies complex prompts" do
+    test "classifies complex exploration prompts" do
+      # Exploration keywords without synthesis keywords
       {strategy, score, task_type} =
         Adaptive.analyze_prompt("""
-        Analyze the following complex problem from multiple perspectives.
+        Analyze the following complex problem step by step.
         Consider the ethical implications, economic factors, and social consequences.
         Explore alternative solutions and compare their trade-offs.
         You must evaluate each option against the following criteria:
@@ -141,6 +142,19 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       assert strategy == :tot
       assert score > 0.7
       assert task_type == :exploration
+    end
+
+    test "classifies synthesis prompts for GoT" do
+      # Synthesis keywords should select GoT
+      {strategy, _score, task_type} =
+        Adaptive.analyze_prompt("""
+        Synthesize the following viewpoints into a unified recommendation.
+        Combine the insights from marketing, engineering, and finance teams.
+        Integrate their perspectives to create a comprehensive strategy.
+        """)
+
+      assert strategy == :got
+      assert task_type == :synthesis
     end
 
     test "classifies moderate complexity prompts" do
@@ -232,11 +246,12 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       assert state[:selected_strategy] == ReAct
     end
 
-    test "selects ToT for complex prompts" do
+    test "selects ToT for complex exploration prompts" do
       {agent, ctx} = create_agent()
 
+      # Exploration keywords without synthesis keywords (no "perspectives", etc.)
       complex_prompt = """
-      Analyze this complex problem from multiple perspectives.
+      Analyze this complex problem step by step.
       Consider various alternatives and compare them.
       Explore different options and evaluate their trade-offs.
       You must assess each approach carefully.
@@ -539,6 +554,68 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
       # Should fall through complexity scoring, not task type override
       assert state[:selected_strategy] != nil
+    end
+  end
+
+  describe "synthesis task detection" do
+    test "detects synthesis from keywords" do
+      prompts = [
+        "Synthesize these findings into a report",
+        "Combine the results from all teams",
+        "Merge these different approaches",
+        "Integrate the feedback from stakeholders",
+        "Aggregate the data from multiple sources"
+      ]
+
+      for prompt <- prompts do
+        {strategy, _score, task_type} = Adaptive.analyze_prompt(prompt)
+        assert task_type == :synthesis, "Expected synthesis for: #{prompt}"
+        assert strategy == :got, "Expected :got for synthesis prompt: #{prompt}"
+      end
+    end
+
+    test "detects graph-related tasks from keywords" do
+      prompts = [
+        "Map the relationships between these entities",
+        "Identify connections in the data",
+        "Analyze the network of dependencies",
+        "Explore how these are linked together"
+      ]
+
+      for prompt <- prompts do
+        {strategy, _score, task_type} = Adaptive.analyze_prompt(prompt)
+        assert task_type == :synthesis, "Expected synthesis for: #{prompt}"
+        assert strategy == :got, "Expected :got for graph-related prompt: #{prompt}"
+      end
+    end
+
+    test "selects GoT when available for synthesis" do
+      {agent, ctx} = create_agent(available_strategies: [:cot, :react, :tot, :got])
+
+      instructions = [
+        %{action: :adaptive_start, params: %{prompt: "Synthesize these viewpoints into one"}}
+      ]
+
+      {agent, _directives} = Adaptive.cmd(agent, instructions, ctx)
+      state = StratState.get(agent, %{})
+
+      assert state[:strategy_type] == :got
+      assert state[:task_type] == :synthesis
+    end
+
+    test "falls back to ToT when GoT not available for synthesis" do
+      {agent, ctx} = create_agent(available_strategies: [:cot, :react, :tot])
+
+      instructions = [
+        %{action: :adaptive_start, params: %{prompt: "Synthesize these viewpoints into one"}}
+      ]
+
+      {agent, _directives} = Adaptive.cmd(agent, instructions, ctx)
+      state = StratState.get(agent, %{})
+
+      # Falls back to ToT since GoT not available
+      assert state[:strategy_type] == :tot
+      assert state[:task_type] == :synthesis
     end
   end
 end
