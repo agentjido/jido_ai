@@ -161,57 +161,59 @@ Implement unified tool execution with validation and error handling.
 
 Create the executor module that handles both Actions and Tools.
 
-- [ ] 2.3.1.1 Create `lib/jido_ai/tools/executor.ex` with module documentation
-- [ ] 2.3.1.2 Implement `execute/3` with name, params, context
-- [ ] 2.3.1.3 Look up tool/action in registry
-- [ ] 2.3.1.4 Dispatch to appropriate executor (Jido.Exec for Actions, run/2 for Tools)
+- [x] 2.3.1.1 Create `lib/jido_ai/tools/executor.ex` with module documentation
+- [x] 2.3.1.2 Implement `execute/3` with name, params, context
+- [x] 2.3.1.3 Look up tool/action in registry
+- [x] 2.3.1.4 Dispatch to appropriate executor (Jido.Exec for Actions, run/2 for Tools)
 
 ### 2.3.2 Parameter Normalization
 
 Implement parameter normalization for LLM tool calls.
 
-- [ ] 2.3.2.1 Implement `normalize_params/2` with schema
-- [ ] 2.3.2.2 Convert string keys to atom keys
-- [ ] 2.3.2.3 Parse string numbers based on schema type
-- [ ] 2.3.2.4 Validate against schema after normalization
+- [x] 2.3.2.1 Implement `normalize_params/2` with schema
+- [x] 2.3.2.2 Convert string keys to atom keys
+- [x] 2.3.2.3 Parse string numbers based on schema type
+- [x] 2.3.2.4 Use existing `Jido.Action.Tool.convert_params_using_schema/2`
 
 ### 2.3.3 Result Formatting
 
 Implement result formatting for LLM consumption.
 
-- [ ] 2.3.3.1 Implement `format_result/1` for tool results
-- [ ] 2.3.3.2 Convert maps/structs to JSON strings
-- [ ] 2.3.3.3 Handle binary data (base64 encode or describe)
-- [ ] 2.3.3.4 Truncate large results with size indicator
+- [x] 2.3.3.1 Implement `format_result/1` for tool results
+- [x] 2.3.3.2 Convert maps/structs to JSON strings
+- [x] 2.3.3.3 Handle binary data (base64 encode or describe)
+- [x] 2.3.3.4 Truncate large results with size indicator
 
 ### 2.3.4 Error Handling
 
 Implement comprehensive error handling.
 
-- [ ] 2.3.4.1 Catch exceptions during execution
-- [ ] 2.3.4.2 Return structured error with tool name, reason, stacktrace
-- [ ] 2.3.4.3 Convert errors to LLM-friendly messages
-- [ ] 2.3.4.4 Emit telemetry for execution metrics
+- [x] 2.3.4.1 Catch exceptions during execution
+- [x] 2.3.4.2 Return structured error with tool name, reason, stacktrace
+- [x] 2.3.4.3 Convert errors to LLM-friendly messages
+- [x] 2.3.4.4 Emit telemetry for execution metrics
 
 ### 2.3.5 Timeout Handling
 
 Implement timeout handling for long-running tools.
 
-- [ ] 2.3.5.1 Implement `execute/4` with timeout option
-- [ ] 2.3.5.2 Use Task.await with timeout
-- [ ] 2.3.5.3 Return timeout error with context
-- [ ] 2.3.5.4 Support per-tool timeout configuration
+- [x] 2.3.5.1 Implement `execute/4` with timeout option
+- [x] 2.3.5.2 Use Task.await with timeout
+- [x] 2.3.5.3 Return timeout error with context
+- [x] 2.3.5.4 Support per-tool timeout configuration
 
 ### 2.3.6 Unit Tests for Executor
 
-- [ ] Test execute/3 runs action via Jido.Exec
-- [ ] Test execute/3 runs tool via run/2
-- [ ] Test normalize_params/2 handles string keys
-- [ ] Test normalize_params/2 parses string numbers
-- [ ] Test format_result/1 produces JSON
-- [ ] Test format_result/1 truncates large results
-- [ ] Test exception handling
-- [ ] Test timeout handling
+- [x] Test execute/3 runs action via Jido.Exec
+- [x] Test execute/3 runs tool via run/2
+- [x] Test normalize_params/2 handles string keys
+- [x] Test normalize_params/2 parses string numbers
+- [x] Test format_result/1 produces JSON
+- [x] Test format_result/1 truncates large results
+- [x] Test error handling
+- [x] Test timeout handling
+
+**See**: `notes/summaries/phase2-section2.3-tool-executor.md` for implementation summary
 
 ---
 
