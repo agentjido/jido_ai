@@ -162,56 +162,56 @@ Implement parallel execution algorithm that runs steps concurrently.
 
 Create the parallel algorithm module.
 
-- [ ] 3.4.1.1 Create `lib/jido_ai/algorithms/parallel.ex` with module documentation
-- [ ] 3.4.1.2 Use `Jido.AI.Algorithms.Base` with name and description
-- [ ] 3.4.1.3 Document parallel execution semantics and result merging
+- [x] 3.4.1.1 Create `lib/jido_ai/algorithms/parallel.ex` with module documentation
+- [x] 3.4.1.2 Use `Jido.AI.Algorithms.Base` with name and description
+- [x] 3.4.1.3 Document parallel execution semantics and result merging
 
 ### 3.4.2 Execute Implementation
 
 Implement parallel execution logic.
 
-- [ ] 3.4.2.1 Implement `execute/2` function
-- [ ] 3.4.2.2 Extract algorithms list from context
-- [ ] 3.4.2.3 Use `Task.async_stream/3` for parallel execution
-- [ ] 3.4.2.4 Collect results and merge
+- [x] 3.4.2.1 Implement `execute/2` function
+- [x] 3.4.2.2 Extract algorithms list from context
+- [x] 3.4.2.3 Use `Task.async_stream/3` for parallel execution
+- [x] 3.4.2.4 Collect results and merge
 
 ### 3.4.3 Result Merging
 
 Implement result merging strategies.
 
-- [ ] 3.4.3.1 Implement `merge_results/1` for combining parallel results
-- [ ] 3.4.3.2 Support `:merge_maps` strategy (deep merge)
-- [ ] 3.4.3.3 Support `:collect` strategy (list of results)
-- [ ] 3.4.3.4 Support custom merge function via context
+- [x] 3.4.3.1 Implement `merge_results/2` for combining parallel results
+- [x] 3.4.3.2 Support `:merge_maps` strategy (deep merge)
+- [x] 3.4.3.3 Support `:collect` strategy (list of results)
+- [x] 3.4.3.4 Support custom merge function via context
 
 ### 3.4.4 Error Handling
 
 Implement parallel error handling.
 
-- [ ] 3.4.4.1 Support `:fail_fast` mode (cancel on first error)
-- [ ] 3.4.4.2 Support `:collect_errors` mode (return all errors)
-- [ ] 3.4.4.3 Support `:ignore_errors` mode (return successful results)
-- [ ] 3.4.4.4 Configure via context option
+- [x] 3.4.4.1 Support `:fail_fast` mode (cancel on first error)
+- [x] 3.4.4.2 Support `:collect_errors` mode (return all errors)
+- [x] 3.4.4.3 Support `:ignore_errors` mode (return successful results)
+- [x] 3.4.4.4 Configure via context option
 
 ### 3.4.5 Concurrency Control
 
 Implement concurrency control.
 
-- [ ] 3.4.5.1 Support `max_concurrency` option
-- [ ] 3.4.5.2 Support `timeout` option per task
-- [ ] 3.4.5.3 Handle task timeout gracefully
+- [x] 3.4.5.1 Support `max_concurrency` option
+- [x] 3.4.5.2 Support `timeout` option per task
+- [x] 3.4.5.3 Handle task timeout gracefully
 
 ### 3.4.6 Unit Tests for Parallel Algorithm
 
-- [ ] Test execute/2 runs algorithms concurrently
-- [ ] Test merge_results/1 with merge_maps strategy
-- [ ] Test merge_results/1 with collect strategy
-- [ ] Test merge_results/1 with custom function
-- [ ] Test fail_fast mode cancels on error
-- [ ] Test collect_errors mode returns all errors
-- [ ] Test ignore_errors mode returns successes
-- [ ] Test max_concurrency limits parallel tasks
-- [ ] Test timeout handling per task
+- [x] Test execute/2 runs algorithms concurrently
+- [x] Test merge_results with merge_maps strategy
+- [x] Test merge_results with collect strategy
+- [x] Test merge_results with custom function
+- [x] Test fail_fast mode cancels on error
+- [x] Test collect_errors mode returns all errors
+- [x] Test ignore_errors mode returns successes
+- [x] Test max_concurrency limits parallel tasks
+- [x] Test timeout handling per task
 
 ---
 
