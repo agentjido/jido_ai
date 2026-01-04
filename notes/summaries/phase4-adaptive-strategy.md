@@ -11,10 +11,10 @@ Implemented Adaptive Strategy that automatically selects the most appropriate re
 
 | File | Purpose | Tests |
 |------|---------|-------|
-| `lib/jido_ai/strategies/adaptive.ex` | Adaptive Strategy implementation | 40 |
+| `lib/jido_ai/strategies/adaptive.ex` | Adaptive Strategy implementation | 45 |
 | `test/jido_ai/strategies/adaptive_test.exs` | Strategy tests | - |
 
-**Total**: 40 new tests, 837 tests passing overall
+**Total**: 45 new tests, 842 tests passing overall
 
 ## Architecture
 
@@ -45,21 +45,23 @@ Adaptive Strategy
 ## Key Features
 
 1. **Heuristic-Based Selection**: No LLM call required for strategy selection
-2. **Task Type Detection**: Analyzes keywords to categorize tasks
-   - `:tool_use` - Keywords like "search", "find", "calculate"
-   - `:exploration` - Keywords like "analyze", "explore", "compare"
-   - `:simple_query` - Keywords like "what", "who", "define"
+2. **Task Type Detection**: Analyzes keywords to categorize tasks (in priority order)
+   - `:synthesis` - Keywords like "synthesize", "combine", "merge", "perspectives" → GoT
+   - `:tool_use` - Keywords like "search", "find", "calculate" → ReAct
+   - `:exploration` - Keywords like "analyze", "explore", "compare" → ToT
+   - `:simple_query` - Keywords like "what", "who", "define" → CoT
 3. **Complexity Scoring**: Scores prompts 0.0-1.0 based on:
    - Prompt length
    - Sentence structure
    - Complex reasoning keywords
    - Questions and constraints
-4. **Threshold-Based Selection**:
+4. **Threshold-Based Selection** (when no task type match):
    - Simple (< 0.3) → CoT
    - Moderate (0.3-0.7) → ReAct
    - Complex (> 0.7) → ToT
-5. **Manual Override**: Force specific strategy via `:strategy` option
-6. **Configurable**: Available strategies, thresholds, default strategy
+5. **Re-evaluation When Done**: Strategy is re-evaluated when previous reasoning completes
+6. **Manual Override**: Force specific strategy via `:strategy` option
+7. **Configurable**: Available strategies, thresholds, default strategy
 
 ## Configuration
 
@@ -119,4 +121,13 @@ complex_instruction = %{
 
 {agent, directives} = Adaptive.cmd(agent, [complex_instruction], %{})
 # Strategy selected: :tot (exploration keywords + high complexity)
+
+# Synthesis prompt selects GoT
+synthesis_instruction = %{
+  action: :adaptive_start,
+  params: %{prompt: "Synthesize these viewpoints and combine the perspectives..."}
+}
+
+{agent, directives} = Adaptive.cmd(agent, [synthesis_instruction], %{})
+# Strategy selected: :got (synthesis keywords → graph-based reasoning)
 ```
