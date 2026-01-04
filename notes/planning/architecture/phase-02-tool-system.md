@@ -54,38 +54,40 @@ Define a behavior for simple tools that aren't full Jido.Actions. This provides 
 
 Create the tool behavior module with required callbacks.
 
-- [ ] 2.1.1.1 Create `lib/jido_ai/tools/tool.ex` with module documentation
-- [ ] 2.1.1.2 Document relationship to Jido.Action (Actions are preferred for complex tools)
-- [ ] 2.1.1.3 Define `@callback name() :: String.t()` for tool name
-- [ ] 2.1.1.4 Define `@callback description() :: String.t()` for tool description
-- [ ] 2.1.1.5 Define `@callback schema() :: map()` for Zoi parameter schema
-- [ ] 2.1.1.6 Define `@callback run(params :: map(), context :: map()) :: {:ok, term()} | {:error, term()}`
+- [x] 2.1.1.1 Create `lib/jido_ai/tools/tool.ex` with module documentation
+- [x] 2.1.1.2 Document relationship to Jido.Action (Actions are preferred for complex tools)
+- [x] 2.1.1.3 Define `@callback name() :: String.t()` for tool name
+- [x] 2.1.1.4 Define `@callback description() :: String.t()` for tool description
+- [x] 2.1.1.5 Define `@callback schema() :: keyword()` for NimbleOptions parameter schema
+- [x] 2.1.1.6 Define `@callback run(params :: map(), context :: map()) :: {:ok, term()} | {:error, term()}`
 
 ### 2.1.2 Using Macro
 
 Implement the `__using__` macro for tool modules.
 
-- [ ] 2.1.2.1 Implement `__using__/1` macro with opts (name, description)
-- [ ] 2.1.2.2 Inject `@behaviour Jido.AI.Tools.Tool`
-- [ ] 2.1.2.3 Provide default implementations for name/0 and description/0 from opts
-- [ ] 2.1.2.4 Generate `to_reqllm_tool/0` that creates `ReqLLM.Tool` struct directly
+- [x] 2.1.2.1 Implement `__using__/1` macro with opts (name, description)
+- [x] 2.1.2.2 Inject `@behaviour Jido.AI.Tools.Tool`
+- [x] 2.1.2.3 Provide default implementations for name/0 and description/0 from opts
+- [x] 2.1.2.4 Generate `to_reqllm_tool/0` that creates `ReqLLM.Tool` struct directly
 
 ### 2.1.3 Conversion to ReqLLM
 
 Implement conversion to ReqLLM.Tool format.
 
-- [ ] 2.1.3.1 Implement `to_reqllm_tool/1` that takes a tool module
-- [ ] 2.1.3.2 Convert Zoi schema to JSON Schema for ReqLLM
-- [ ] 2.1.3.3 Use noop callback (execution via Jido, not ReqLLM callbacks)
-- [ ] 2.1.3.4 Match the pattern used by ToolAdapter for consistency
+- [x] 2.1.3.1 Implement `to_reqllm_tool/1` that takes a tool module
+- [x] 2.1.3.2 Convert NimbleOptions schema to JSON Schema for ReqLLM
+- [x] 2.1.3.3 Use noop callback (execution via Jido, not ReqLLM callbacks)
+- [x] 2.1.3.4 Match the pattern used by ToolAdapter for consistency
 
 ### 2.1.4 Unit Tests for Tool Behavior
 
-- [ ] Test behavior callbacks are defined
-- [ ] Test `__using__` macro injects behavior and defaults
-- [ ] Test to_reqllm_tool/1 creates valid ReqLLM.Tool
-- [ ] Test schema validation works
-- [ ] Test run/2 execution
+- [x] Test behavior callbacks are defined
+- [x] Test `__using__` macro injects behavior and defaults
+- [x] Test to_reqllm_tool/1 creates valid ReqLLM.Tool
+- [x] Test schema validation works
+- [x] Test run/2 execution
+
+**See**: `notes/summaries/phase2-section2.1-tool-behavior.md` for implementation summary
 
 ---
 
