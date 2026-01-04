@@ -51,6 +51,7 @@ defmodule Jido.AI.Tools.Registry do
   alias Jido.AI.Tools.Tool
 
   @registry_name __MODULE__
+  @max_retries 3
 
   @type tool_type :: :action | :tool
   @type entry :: {String.t(), tool_type(), module()}
@@ -129,9 +130,8 @@ defmodule Jido.AI.Tools.Registry do
   @spec register_action(module()) :: :ok | {:error, :not_an_action}
   def register_action(module) when is_atom(module) do
     if action?(module) do
-      ensure_started()
       name = module.name()
-      Agent.update(@registry_name, fn state -> Map.put(state, name, {:action, module}) end)
+      safe_update(fn state -> Map.put(state, name, {:action, module}) end)
     else
       {:error, :not_an_action}
     end
@@ -168,9 +168,8 @@ defmodule Jido.AI.Tools.Registry do
   @spec register_tool(module()) :: :ok | {:error, :not_a_tool}
   def register_tool(module) when is_atom(module) do
     if tool?(module) do
-      ensure_started()
       name = module.name()
-      Agent.update(@registry_name, fn state -> Map.put(state, name, {:tool, module}) end)
+      safe_update(fn state -> Map.put(state, name, {:tool, module}) end)
     else
       {:error, :not_a_tool}
     end
@@ -211,9 +210,7 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec get(String.t()) :: {:ok, {tool_type(), module()}} | {:error, :not_found}
   def get(name) when is_binary(name) do
-    ensure_started()
-
-    case Agent.get(@registry_name, fn state -> Map.get(state, name) end) do
+    case safe_get(fn state -> Map.get(state, name) end) do
       nil -> {:error, :not_found}
       {type, module} -> {:ok, {type, module}}
     end
@@ -252,9 +249,7 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec list_all() :: [entry()]
   def list_all do
-    ensure_started()
-
-    Agent.get(@registry_name, fn state ->
+    safe_get(fn state ->
       state
       |> Enum.map(fn {name, {type, module}} -> {name, type, module} end)
       |> Enum.sort_by(&elem(&1, 0))
@@ -273,9 +268,7 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec list_actions() :: [{String.t(), module()}]
   def list_actions do
-    ensure_started()
-
-    Agent.get(@registry_name, fn state ->
+    safe_get(fn state ->
       state
       |> Enum.filter(fn {_name, {type, _module}} -> type == :action end)
       |> Enum.map(fn {name, {_type, module}} -> {name, module} end)
@@ -295,9 +288,7 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec list_tools() :: [{String.t(), module()}]
   def list_tools do
-    ensure_started()
-
-    Agent.get(@registry_name, fn state ->
+    safe_get(fn state ->
       state
       |> Enum.filter(fn {_name, {type, _module}} -> type == :tool end)
       |> Enum.map(fn {name, {_type, module}} -> {name, module} end)
@@ -322,9 +313,7 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec to_reqllm_tools() :: [ReqLLM.Tool.t()]
   def to_reqllm_tools do
-    ensure_started()
-
-    Agent.get(@registry_name, fn state ->
+    safe_get(fn state ->
       Enum.map(state, &convert_to_reqllm_tool/1)
     end)
   end
@@ -347,8 +336,7 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec clear() :: :ok
   def clear do
-    ensure_started()
-    Agent.update(@registry_name, fn _state -> %{} end)
+    safe_update(fn _state -> %{} end)
   end
 
   @doc """
@@ -362,12 +350,56 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec unregister(String.t()) :: :ok
   def unregister(name) when is_binary(name) do
-    ensure_started()
-    Agent.update(@registry_name, fn state -> Map.delete(state, name) end)
+    safe_update(fn state -> Map.delete(state, name) end)
   end
 
   # ============================================================================
-  # Private Helpers
+  # Private Helpers - Agent Operations with Retry
+  # ============================================================================
+
+  # Wraps Agent.get with retry logic to handle race conditions
+  # where the agent might not be available between ensure_started and the call
+  defp safe_get(fun, retries \\ @max_retries)
+
+  defp safe_get(fun, retries) when retries > 0 do
+    ensure_started()
+
+    try do
+      Agent.get(@registry_name, fun)
+    catch
+      :exit, {:noproc, _} ->
+        safe_get(fun, retries - 1)
+    end
+  end
+
+  defp safe_get(fun, 0) do
+    # Last attempt - let it fail if it fails
+    ensure_started()
+    Agent.get(@registry_name, fun)
+  end
+
+  # Wraps Agent.update with retry logic
+  defp safe_update(fun, retries \\ @max_retries)
+
+  defp safe_update(fun, retries) when retries > 0 do
+    ensure_started()
+
+    try do
+      Agent.update(@registry_name, fun)
+    catch
+      :exit, {:noproc, _} ->
+        safe_update(fun, retries - 1)
+    end
+  end
+
+  defp safe_update(fun, 0) do
+    # Last attempt - let it fail if it fails
+    ensure_started()
+    Agent.update(@registry_name, fun)
+  end
+
+  # ============================================================================
+  # Private Helpers - Module Introspection
   # ============================================================================
 
   # Check if a module implements the Jido.Action behavior

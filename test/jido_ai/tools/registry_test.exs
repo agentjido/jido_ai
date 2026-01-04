@@ -73,7 +73,8 @@ defmodule Jido.AI.Tools.RegistryTest do
   end
 
   setup do
-    # Clear registry before each test
+    # Ensure registry is started and clear before each test
+    Registry.ensure_started()
     Registry.clear()
     :ok
   end
