@@ -10,7 +10,6 @@ defmodule Jido.AI.ToolAdapter do
   - **Schema-focused**: Tools use a noop callback; Jido owns execution via `Directive.ToolExec`
   - **Adapter pattern**: Converts `Jido.Action` behaviour → `ReqLLM.Tool` struct
   - **Single source of truth**: All action→tool conversion goes through this module
-  - **Optional Registry**: Actions can be registered for runtime management
 
   ## Usage
 
@@ -29,18 +28,23 @@ defmodule Jido.AI.ToolAdapter do
       # Use in LLM call
       ReqLLM.stream_text(model, messages, tools: tools)
 
-  ## Registry Usage
+  ## Registry (DEPRECATED)
 
-      # Register actions at runtime
-      Jido.AI.ToolAdapter.register_action(MyApp.Actions.Calculator)
-      Jido.AI.ToolAdapter.register_actions([MyApp.Actions.Search, MyApp.Actions.Weather])
+  The registry functions in this module are deprecated. Use `Jido.AI.Tools.Registry` instead:
 
-      # Get tools from registry
-      tools = Jido.AI.ToolAdapter.to_tools()
+      # Instead of:
+      Jido.AI.ToolAdapter.register_action(MyAction)
+      Jido.AI.ToolAdapter.get_action("name")
 
-      # Look up action by tool name
-      {:ok, module} = Jido.AI.ToolAdapter.get_action("calculator")
+      # Use:
+      Jido.AI.Tools.Registry.register_action(MyAction)
+      Jido.AI.Tools.Registry.get("name")
+
+  The `Jido.AI.Tools.Registry` module provides a unified registry for both
+  Actions and simple Tools, with better integration with the Executor.
   """
+
+  require Logger
 
   use Agent
 
@@ -50,7 +54,7 @@ defmodule Jido.AI.ToolAdapter do
   @max_retries 3
 
   # ============================================================================
-  # Registry Management
+  # Registry Management (DEPRECATED - use Jido.AI.Tools.Registry instead)
   # ============================================================================
 
   @doc """
@@ -58,9 +62,16 @@ defmodule Jido.AI.ToolAdapter do
 
   This is called automatically when needed. The registry stores action modules
   for runtime tool management.
+
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry` instead, which
+  provides unified management for both Actions and Tools.
   """
+  @deprecated "Use Jido.AI.Tools.Registry instead"
   @spec start_link(keyword()) :: Agent.on_start()
   def start_link(_opts \\ []) do
+    Logger.warning("ToolAdapter.start_link/1 is deprecated. Use Jido.AI.Tools.Registry instead.")
     Agent.start_link(fn -> %{} end, name: @registry_name)
   end
 
@@ -68,12 +79,17 @@ defmodule Jido.AI.ToolAdapter do
   Ensures the registry is started, starting it if necessary.
 
   Returns `:ok` if the registry is available, `{:error, reason}` otherwise.
+
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry.ensure_started/0` instead.
   """
+  @deprecated "Use Jido.AI.Tools.Registry.ensure_started/0 instead"
   @spec ensure_started() :: :ok | {:error, term()}
   def ensure_started do
     case Process.whereis(@registry_name) do
       nil ->
-        case start_link() do
+        case Agent.start_link(fn -> %{} end, name: @registry_name) do
           {:ok, _pid} -> :ok
           {:error, {:already_started, _pid}} -> :ok
           {:error, reason} -> {:error, reason}
@@ -89,18 +105,31 @@ defmodule Jido.AI.ToolAdapter do
 
   The action is stored by its tool name (from `action_module.name()`).
 
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry.register_action/1` instead.
+
   ## Example
 
       :ok = Jido.AI.ToolAdapter.register_action(MyApp.Actions.Calculator)
   """
+  @deprecated "Use Jido.AI.Tools.Registry.register_action/1 instead"
   @spec register_action(module()) :: :ok
   def register_action(action_module) when is_atom(action_module) do
+    Logger.warning(
+      "ToolAdapter.register_action/1 is deprecated. Use Jido.AI.Tools.Registry.register_action/1 instead."
+    )
+
     name = action_module.name()
     safe_update(fn state -> Map.put(state, name, action_module) end)
   end
 
   @doc """
   Registers multiple action modules in the registry.
+
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry.register_actions/1` instead.
 
   ## Example
 
@@ -109,20 +138,37 @@ defmodule Jido.AI.ToolAdapter do
         MyApp.Actions.Search
       ])
   """
+  @deprecated "Use Jido.AI.Tools.Registry.register_actions/1 instead"
   @spec register_actions([module()]) :: :ok
   def register_actions(action_modules) when is_list(action_modules) do
-    Enum.each(action_modules, &register_action/1)
+    Logger.warning(
+      "ToolAdapter.register_actions/1 is deprecated. Use Jido.AI.Tools.Registry.register_actions/1 instead."
+    )
+
+    Enum.each(action_modules, fn mod ->
+      name = mod.name()
+      safe_update(fn state -> Map.put(state, name, mod) end)
+    end)
   end
 
   @doc """
   Unregisters an action module from the registry.
 
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry.unregister/1` instead.
+
   ## Example
 
       :ok = Jido.AI.ToolAdapter.unregister_action(MyApp.Actions.Calculator)
   """
+  @deprecated "Use Jido.AI.Tools.Registry.unregister/1 instead"
   @spec unregister_action(module()) :: :ok
   def unregister_action(action_module) when is_atom(action_module) do
+    Logger.warning(
+      "ToolAdapter.unregister_action/1 is deprecated. Use Jido.AI.Tools.Registry.unregister/1 instead."
+    )
+
     name = action_module.name()
     safe_update(fn state -> Map.delete(state, name) end)
   end
@@ -132,13 +178,22 @@ defmodule Jido.AI.ToolAdapter do
 
   Returns a list of `{name, module}` tuples.
 
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry.list_actions/0` instead.
+
   ## Example
 
       actions = Jido.AI.ToolAdapter.list_actions()
       # => [{"calculator", MyApp.Actions.Calculator}, {"search", MyApp.Actions.Search}]
   """
+  @deprecated "Use Jido.AI.Tools.Registry.list_actions/0 instead"
   @spec list_actions() :: [{String.t(), module()}]
   def list_actions do
+    Logger.warning(
+      "ToolAdapter.list_actions/0 is deprecated. Use Jido.AI.Tools.Registry.list_actions/0 instead."
+    )
+
     safe_get(fn state -> Map.to_list(state) end)
   end
 
@@ -147,13 +202,22 @@ defmodule Jido.AI.ToolAdapter do
 
   Returns `{:ok, module}` if found, `{:error, :not_found}` otherwise.
 
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry.get/1` instead.
+
   ## Example
 
       {:ok, module} = Jido.AI.ToolAdapter.get_action("calculator")
       {:error, :not_found} = Jido.AI.ToolAdapter.get_action("unknown")
   """
+  @deprecated "Use Jido.AI.Tools.Registry.get/1 instead"
   @spec get_action(String.t()) :: {:ok, module()} | {:error, :not_found}
   def get_action(tool_name) when is_binary(tool_name) do
+    Logger.warning(
+      "ToolAdapter.get_action/1 is deprecated. Use Jido.AI.Tools.Registry.get/1 instead."
+    )
+
     case safe_get(fn state -> Map.get(state, tool_name) end) do
       nil -> {:error, :not_found}
       module -> {:ok, module}
@@ -163,12 +227,21 @@ defmodule Jido.AI.ToolAdapter do
   @doc """
   Clears all registered actions from the registry.
 
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry.clear/0` instead.
+
   ## Example
 
       :ok = Jido.AI.ToolAdapter.clear_registry()
   """
+  @deprecated "Use Jido.AI.Tools.Registry.clear/0 instead"
   @spec clear_registry() :: :ok
   def clear_registry do
+    Logger.warning(
+      "ToolAdapter.clear_registry/0 is deprecated. Use Jido.AI.Tools.Registry.clear/0 instead."
+    )
+
     safe_update(fn _state -> %{} end)
   end
 
@@ -176,6 +249,10 @@ defmodule Jido.AI.ToolAdapter do
   Converts all registered actions to ReqLLM.Tool structs.
 
   Accepts the same options as `from_actions/2`.
+
+  ## Deprecation Notice
+
+  This function is deprecated. Use `Jido.AI.Tools.Registry.to_reqllm_tools/0` instead.
 
   ## Options
 
@@ -187,10 +264,15 @@ defmodule Jido.AI.ToolAdapter do
       tools = Jido.AI.ToolAdapter.to_tools()
       tools = Jido.AI.ToolAdapter.to_tools(prefix: "myapp_")
   """
+  @deprecated "Use Jido.AI.Tools.Registry.to_reqllm_tools/0 instead"
   @spec to_tools(keyword()) :: [ReqLLM.Tool.t()]
   def to_tools(opts \\ []) do
+    Logger.warning(
+      "ToolAdapter.to_tools/1 is deprecated. Use Jido.AI.Tools.Registry.to_reqllm_tools/0 instead."
+    )
+
     modules =
-      list_actions()
+      safe_get(fn state -> Map.to_list(state) end)
       |> Enum.map(fn {_name, module} -> module end)
 
     from_actions(modules, opts)

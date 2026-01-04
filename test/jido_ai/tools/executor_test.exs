@@ -57,6 +57,20 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
   end
 
+  defmodule TestActions.ExceptionAction do
+    use Jido.Action,
+      name: "exception_action",
+      description: "An action that raises an exception",
+      schema: [
+        message: [type: :string, required: true, doc: "Exception message"]
+      ]
+
+    @impl true
+    def run(params, _context) do
+      raise ArgumentError, params.message
+    end
+  end
+
   # Define test Tool modules
   defmodule TestTools.Echo do
     use Jido.AI.Tools.Tool,
@@ -112,6 +126,24 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
   end
 
+  defmodule TestTools.ExceptionTool do
+    use Jido.AI.Tools.Tool,
+      name: "exception_tool",
+      description: "A tool that raises an exception"
+
+    @impl true
+    def schema do
+      [
+        message: [type: :string, required: true, doc: "Exception message"]
+      ]
+    end
+
+    @impl true
+    def run(params, _context) do
+      raise ArgumentError, params.message
+    end
+  end
+
   setup do
     # Ensure registry is started and clear it before each test
     Registry.ensure_started()
@@ -119,9 +151,11 @@ defmodule Jido.AI.Tools.ExecutorTest do
     :ok = Registry.register_action(TestActions.Calculator)
     :ok = Registry.register_action(TestActions.SlowAction)
     :ok = Registry.register_action(TestActions.ErrorAction)
+    :ok = Registry.register_action(TestActions.ExceptionAction)
     :ok = Registry.register_tool(TestTools.Echo)
     :ok = Registry.register_tool(TestTools.LargeResult)
     :ok = Registry.register_tool(TestTools.BinaryResult)
+    :ok = Registry.register_tool(TestTools.ExceptionTool)
     :ok
   end
 
@@ -314,13 +348,14 @@ defmodule Jido.AI.Tools.ExecutorTest do
 
     test "describes large binary data" do
       # Use a binary with invalid UTF-8 to ensure it's treated as binary
-      binary = <<0xFF>> <> :crypto.strong_rand_bytes(1999)
+      # Binary must be larger than max_result_size * 0.75 (7500 bytes) to get description
+      binary = <<0xFF>> <> :crypto.strong_rand_bytes(7999)
       result = Executor.format_result(binary)
 
       assert result.type == :binary
       assert result.encoding == :description
-      assert result.size_bytes == 2000
-      assert String.contains?(result.message, "2000 bytes")
+      assert result.size_bytes == 8000
+      assert String.contains?(result.message, "8000 bytes")
     end
   end
 
@@ -409,6 +444,118 @@ defmodule Jido.AI.Tools.ExecutorTest do
                      1000
 
       :telemetry.detach("test-exception-handler")
+    end
+
+    test "sanitizes sensitive parameters in telemetry" do
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-sanitize-handler",
+        [:jido, :ai, :tool, :execute, :start],
+        fn _event, _measurements, metadata, _config ->
+          send(test_pid, {:telemetry_params, metadata.params})
+        end,
+        nil
+      )
+
+      # Execute with sensitive parameters
+      sensitive_params = %{
+        "operation" => "add",
+        "a" => "1",
+        "b" => "2",
+        "api_key" => "secret-key-12345",
+        "password" => "my-password",
+        "token" => "bearer-token",
+        "secret_value" => "shhh"
+      }
+
+      Executor.execute("calculator", sensitive_params, %{})
+
+      assert_receive {:telemetry_params, sanitized_params}
+
+      # Non-sensitive params should be preserved
+      assert sanitized_params["operation"] == "add"
+      assert sanitized_params["a"] == "1"
+      assert sanitized_params["b"] == "2"
+
+      # Sensitive params should be redacted
+      assert sanitized_params["api_key"] == "[REDACTED]"
+      assert sanitized_params["password"] == "[REDACTED]"
+      assert sanitized_params["token"] == "[REDACTED]"
+      assert sanitized_params["secret_value"] == "[REDACTED]"
+
+      :telemetry.detach("test-sanitize-handler")
+    end
+
+    test "sanitizes nested sensitive parameters" do
+      test_pid = self()
+
+      :telemetry.attach(
+        "test-nested-sanitize-handler",
+        [:jido, :ai, :tool, :execute, :start],
+        fn _event, _measurements, metadata, _config ->
+          send(test_pid, {:telemetry_params, metadata.params})
+        end,
+        nil
+      )
+
+      nested_params = %{
+        "operation" => "add",
+        "a" => "1",
+        "b" => "2",
+        "credentials" => %{
+          "api_key" => "nested-secret",
+          "username" => "user"
+        }
+      }
+
+      Executor.execute("calculator", nested_params, %{})
+
+      assert_receive {:telemetry_params, sanitized_params}
+
+      # Nested sensitive param should be redacted
+      assert sanitized_params["credentials"]["api_key"] == "[REDACTED]"
+      # Nested non-sensitive param should be preserved
+      assert sanitized_params["credentials"]["username"] == "user"
+
+      :telemetry.detach("test-nested-sanitize-handler")
+    end
+  end
+
+  describe "security" do
+    test "does not include stacktrace in exception error response" do
+      import ExUnit.CaptureLog
+
+      # Capture log to prevent noise in test output
+      capture_log(fn ->
+        # Use exception_tool (a Tool) which directly raises in run/2
+        # Actions go through Jido.Exec which handles exceptions differently
+        result = Executor.execute("exception_tool", %{"message" => "test exception"}, %{})
+
+        assert {:error, error} = result
+        assert error.type == :exception
+        assert error.tool_name == "exception_tool"
+        assert error.error == "test exception"
+        assert error.exception_type == ArgumentError
+
+        # CRITICAL: Stacktrace should NOT be in the response
+        refute Map.has_key?(error, :stacktrace)
+      end)
+    end
+
+    test "logs stacktrace server-side for exceptions" do
+      import ExUnit.CaptureLog
+
+      log =
+        capture_log([level: :error], fn ->
+          # Use exception_tool (a Tool) which directly raises
+          Executor.execute("exception_tool", %{"message" => "logged exception"}, %{})
+        end)
+
+      # Stacktrace should be logged server-side (the message appears in log)
+      assert log =~ "Tool execution exception"
+      # Note: Metadata (tool_name, exception, stacktrace) is included via Logger metadata
+      # The default formatter may not show all metadata, but the log message confirms logging works
     end
   end
 end

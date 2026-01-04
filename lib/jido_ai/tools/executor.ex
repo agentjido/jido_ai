@@ -50,6 +50,9 @@ defmodule Jido.AI.Tools.Executor do
         details: %{...}
       }}
 
+  Note: Stacktraces are logged server-side for debugging but are NOT included
+  in error responses to prevent information disclosure.
+
   ## Telemetry
 
   The executor emits telemetry events for monitoring:
@@ -57,7 +60,12 @@ defmodule Jido.AI.Tools.Executor do
   - `[:jido, :ai, :tool, :execute, :start]` - Execution started
   - `[:jido, :ai, :tool, :execute, :stop]` - Execution completed
   - `[:jido, :ai, :tool, :execute, :exception]` - Execution failed with exception
+
+  Note: Telemetry metadata sanitizes sensitive parameters (api_key, password,
+  token, secret, etc.) to prevent credential leakage in logs.
   """
+
+  require Logger
 
   alias Jido.Action.Tool, as: ActionTool
   alias Jido.AI.Tools.Registry
@@ -159,6 +167,8 @@ defmodule Jido.AI.Tools.Executor do
   # Execution
   # ============================================================================
 
+  @spec execute_with_timeout(:action | :tool, module(), String.t(), map(), map(), pos_integer()) ::
+          execute_result()
   defp execute_with_timeout(type, module, tool_name, params, context, timeout) do
     start_time = System.monotonic_time()
 
@@ -185,6 +195,7 @@ defmodule Jido.AI.Tools.Executor do
     end
   end
 
+  @spec execute_internal(:action | :tool, module(), String.t(), map(), map()) :: execute_result()
   defp execute_internal(type, module, tool_name, params, context) do
     schema = module.schema()
     normalized_params = normalize_params(params, schema)
@@ -207,10 +218,12 @@ defmodule Jido.AI.Tools.Executor do
       {:error, format_catch(tool_name, kind, reason)}
   end
 
+  @spec execute_action(module(), map(), map()) :: {:ok, term()} | {:error, term()}
   defp execute_action(module, params, context) do
     Jido.Exec.run(module, params, context)
   end
 
+  @spec execute_tool(module(), map(), map()) :: {:ok, term()} | {:error, term()}
   defp execute_tool(module, params, context) do
     module.run(params, context)
   end
@@ -338,19 +351,24 @@ defmodule Jido.AI.Tools.Executor do
 
   defp format_binary(binary) do
     size = byte_size(binary)
+    # Base64 encoding increases size by ~33%, so limit raw bytes to stay under max_result_size
+    # For a 10KB limit, we can encode up to ~7.5KB of raw binary data
+    max_raw_size = trunc(@max_result_size * 0.75)
 
-    if size <= 1000 do
+    if size <= max_raw_size do
+      encoded = Base.encode64(binary)
+
       %{
         type: :binary,
         encoding: :base64,
-        data: Base.encode64(binary),
+        data: encoded,
         size_bytes: size
       }
     else
       %{
         type: :binary,
         encoding: :description,
-        message: "Binary data (#{size} bytes)",
+        message: "Binary data (#{size} bytes) - too large to encode",
         size_bytes: size
       }
     end
@@ -386,12 +404,21 @@ defmodule Jido.AI.Tools.Executor do
   end
 
   defp format_exception(tool_name, exception, stacktrace) do
+    # Log stacktrace server-side for debugging - do NOT include in response
+    Logger.error(
+      "Tool execution exception",
+      tool_name: tool_name,
+      exception: Exception.message(exception),
+      exception_type: exception.__struct__,
+      stacktrace: format_stacktrace_for_logging(stacktrace)
+    )
+
+    # Return sanitized error without stacktrace to prevent information disclosure
     %{
       error: Exception.message(exception),
       tool_name: tool_name,
       type: :exception,
-      exception_type: exception.__struct__,
-      stacktrace: format_stacktrace(stacktrace)
+      exception_type: exception.__struct__
     }
   end
 
@@ -404,7 +431,9 @@ defmodule Jido.AI.Tools.Executor do
     }
   end
 
-  defp format_stacktrace(stacktrace) do
+  # Formats stacktrace for server-side logging only - never include in responses
+  @doc false
+  defp format_stacktrace_for_logging(stacktrace) do
     stacktrace
     |> Enum.take(5)
     |> Exception.format_stacktrace()
@@ -414,13 +443,60 @@ defmodule Jido.AI.Tools.Executor do
   # Telemetry
   # ============================================================================
 
+  # Patterns for sensitive keys that should be redacted in telemetry
+  # These match common credential field names but avoid partial matches (e.g. "credentials" container)
+  @sensitive_key_patterns [
+    ~r/^api_?key$/i,
+    ~r/^password$/i,
+    ~r/^secret$/i,
+    ~r/^token$/i,
+    ~r/^auth_?token$/i,
+    ~r/^private_?key$/i,
+    ~r/^access_?key$/i,
+    ~r/^bearer$/i,
+    ~r/^api_?secret$/i,
+    ~r/^client_?secret$/i,
+    ~r/secret_/i,
+    ~r/_secret$/i,
+    ~r/_key$/i,
+    ~r/_token$/i,
+    ~r/_password$/i
+  ]
+
   defp start_telemetry(tool_name, params) do
     :telemetry.execute(
       [:jido, :ai, :tool, :execute, :start],
       %{system_time: System.system_time()},
-      %{tool_name: tool_name, params: params}
+      %{tool_name: tool_name, params: sanitize_params(params)}
     )
   end
+
+  @doc false
+  defp sanitize_params(params) when is_map(params) do
+    Map.new(params, fn {key, value} ->
+      if sensitive_key?(key) do
+        {key, "[REDACTED]"}
+      else
+        {key, sanitize_value(value)}
+      end
+    end)
+  end
+
+  defp sanitize_params(params), do: params
+
+  defp sanitize_value(value) when is_map(value), do: sanitize_params(value)
+  defp sanitize_value(value) when is_list(value), do: Enum.map(value, &sanitize_value/1)
+  defp sanitize_value(value), do: value
+
+  defp sensitive_key?(key) when is_atom(key) do
+    key |> Atom.to_string() |> sensitive_key?()
+  end
+
+  defp sensitive_key?(key) when is_binary(key) do
+    Enum.any?(@sensitive_key_patterns, &Regex.match?(&1, key))
+  end
+
+  defp sensitive_key?(_key), do: false
 
   defp stop_telemetry(tool_name, result, start_time) do
     duration = System.monotonic_time() - start_time

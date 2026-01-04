@@ -42,8 +42,19 @@ defmodule Jido.AI.Tools.Registry do
   This Registry uses ToolAdapter internally for that conversion but provides
   a unified interface for managing both Actions and Tools.
 
+  ## Telemetry
+
+  The registry emits telemetry events for monitoring:
+
+  - `[:jido, :ai, :registry, :register]` - Module registered
+    - Metadata: `%{name: String.t(), type: :action | :tool, module: module()}`
+  - `[:jido, :ai, :registry, :unregister]` - Module unregistered
+    - Metadata: `%{name: String.t()}`
+
   See `notes/decisions/adr-001-tools-registry-design.md` for design rationale.
   """
+
+  require Logger
 
   use Agent
 
@@ -131,6 +142,7 @@ defmodule Jido.AI.Tools.Registry do
   def register_action(module) when is_atom(module) do
     if action?(module) do
       name = module.name()
+      emit_telemetry(:register, %{name: name, type: :action, module: module})
       safe_update(fn state -> Map.put(state, name, {:action, module}) end)
     else
       {:error, :not_an_action}
@@ -169,6 +181,7 @@ defmodule Jido.AI.Tools.Registry do
   def register_tool(module) when is_atom(module) do
     if tool?(module) do
       name = module.name()
+      emit_telemetry(:register, %{name: name, type: :tool, module: module})
       safe_update(fn state -> Map.put(state, name, {:tool, module}) end)
     else
       {:error, :not_a_tool}
@@ -350,7 +363,22 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec unregister(String.t()) :: :ok
   def unregister(name) when is_binary(name) do
+    emit_telemetry(:unregister, %{name: name})
     safe_update(fn state -> Map.delete(state, name) end)
+  end
+
+  # ============================================================================
+  # Private Helpers - Telemetry
+  # ============================================================================
+
+  @doc false
+  @spec emit_telemetry(:register | :unregister, map()) :: :ok
+  defp emit_telemetry(operation, metadata) do
+    :telemetry.execute(
+      [:jido, :ai, :registry, operation],
+      %{system_time: System.system_time()},
+      metadata
+    )
   end
 
   # ============================================================================
@@ -359,8 +387,10 @@ defmodule Jido.AI.Tools.Registry do
 
   # Wraps Agent.get with retry logic to handle race conditions
   # where the agent might not be available between ensure_started and the call
+  @doc false
   defp safe_get(fun, retries \\ @max_retries)
 
+  @doc false
   defp safe_get(fun, retries) when retries > 0 do
     ensure_started()
 
@@ -368,10 +398,20 @@ defmodule Jido.AI.Tools.Registry do
       Agent.get(@registry_name, fun)
     catch
       :exit, {:noproc, _} ->
+        attempt = @max_retries - retries + 1
+
+        Logger.warning(
+          "Registry agent not available, retrying",
+          attempt: attempt,
+          max_retries: @max_retries,
+          operation: :get
+        )
+
         safe_get(fun, retries - 1)
     end
   end
 
+  @doc false
   defp safe_get(fun, 0) do
     # Last attempt - let it fail if it fails
     ensure_started()
@@ -379,8 +419,10 @@ defmodule Jido.AI.Tools.Registry do
   end
 
   # Wraps Agent.update with retry logic
+  @doc false
   defp safe_update(fun, retries \\ @max_retries)
 
+  @doc false
   defp safe_update(fun, retries) when retries > 0 do
     ensure_started()
 
@@ -388,10 +430,20 @@ defmodule Jido.AI.Tools.Registry do
       Agent.update(@registry_name, fun)
     catch
       :exit, {:noproc, _} ->
+        attempt = @max_retries - retries + 1
+
+        Logger.warning(
+          "Registry agent not available, retrying",
+          attempt: attempt,
+          max_retries: @max_retries,
+          operation: :update
+        )
+
         safe_update(fun, retries - 1)
     end
   end
 
+  @doc false
   defp safe_update(fun, 0) do
     # Last attempt - let it fail if it fails
     ensure_started()
@@ -405,6 +457,7 @@ defmodule Jido.AI.Tools.Registry do
   # Check if a module implements the Jido.Action behavior
   # We check for Jido.Action in behaviours first, then fall back to function check
   # for Actions that may not explicitly declare the behavior
+  @doc false
   defp action?(module) do
     behaviours = module_behaviours(module)
 
@@ -412,6 +465,7 @@ defmodule Jido.AI.Tools.Registry do
       (has_action_functions?(module) and Jido.AI.Tools.Tool not in behaviours)
   end
 
+  @doc false
   defp has_action_functions?(module) do
     function_exported?(module, :name, 0) and
       function_exported?(module, :description, 0) and
@@ -420,11 +474,13 @@ defmodule Jido.AI.Tools.Registry do
   end
 
   # Check if a module implements the Jido.AI.Tools.Tool behavior
+  @doc false
   defp tool?(module) do
     behaviours = module_behaviours(module)
     Jido.AI.Tools.Tool in behaviours
   end
 
+  @doc false
   defp module_behaviours(module) do
     module.module_info(:attributes)
     |> Keyword.get_values(:behaviour)

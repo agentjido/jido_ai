@@ -74,6 +74,37 @@ defmodule Jido.AI.Tools.Tool do
       # The tool's run/2 callback is invoked by the executor
       {:ok, result} = MyApp.Tools.Calculator.run(%{a: 5, b: 3, operation: "add"}, %{})
       # => {:ok, %{result: 8}}
+
+  ## Context Parameter
+
+  The `run/2` callback receives a context map as its second parameter. This context
+  is passed through from the executor and may include:
+
+  - `:agent_id` - Identifier of the calling agent (if available)
+  - `:conversation_id` - Current conversation/session ID
+  - `:user_id` - User identifier (if authenticated)
+  - `:metadata` - Additional metadata from the caller
+
+  **Security Note**: If context is received from untrusted sources (e.g., external
+  LLM calls), treat it as potentially malicious. Validate and sanitize any context
+  values before using them in sensitive operations.
+
+  ## Rate Limiting
+
+  The tool system does not implement rate limiting internally. Rate limiting is
+  the caller's responsibility. If you need to limit tool execution rates, consider:
+
+  - Using `Hammer` (https://hex.pm/packages/hammer) for token bucket rate limiting
+  - Implementing rate limiting at the API layer before tool execution
+  - Using agent-level rate limiting in the calling context
+
+  Example with Hammer:
+
+      # In your application
+      case Hammer.check_rate("tool:\#{tool_name}:\#{user_id}", 60_000, 10) do
+        {:allow, _count} -> Executor.execute(tool_name, params, context)
+        {:deny, _limit} -> {:error, :rate_limited}
+      end
   """
 
   alias Jido.Action.Schema, as: ActionSchema
