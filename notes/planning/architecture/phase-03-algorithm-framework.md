@@ -29,35 +29,35 @@ Define the behavior interface that all algorithms must implement.
 
 Create the algorithm behavior module with required callbacks.
 
-- [ ] 3.1.1.1 Create `lib/jido_ai/algorithms/algorithm.ex` with module documentation
-- [ ] 3.1.1.2 Define `@callback execute(input :: map(), context :: map()) :: {:ok, result :: map()} | {:error, reason :: term()}`
-- [ ] 3.1.1.3 Define `@callback can_execute?(input :: map(), context :: map()) :: boolean()`
-- [ ] 3.1.1.4 Define `@callback metadata() :: map()` for algorithm metadata
-- [ ] 3.1.1.5 Define `@optional_callbacks` for optional hooks
+- [x] 3.1.1.1 Create `lib/jido_ai/algorithms/algorithm.ex` with module documentation
+- [x] 3.1.1.2 Define `@callback execute(input :: map(), context :: map()) :: {:ok, result :: map()} | {:error, reason :: term()}`
+- [x] 3.1.1.3 Define `@callback can_execute?(input :: map(), context :: map()) :: boolean()`
+- [x] 3.1.1.4 Define `@callback metadata() :: map()` for algorithm metadata
+- [x] 3.1.1.5 Define `@optional_callbacks` for optional hooks
 
 ### 3.1.2 Optional Hooks
 
 Define optional callback hooks for algorithm customization.
 
-- [ ] 3.1.2.1 Define `@callback before_execute(input :: map(), context :: map()) :: {:ok, input :: map()} | {:error, reason :: term()}`
-- [ ] 3.1.2.2 Define `@callback after_execute(result :: map(), context :: map()) :: {:ok, result :: map()} | {:error, reason :: term()}`
-- [ ] 3.1.2.3 Define `@callback on_error(error :: term(), context :: map()) :: {:retry, opts :: keyword()} | {:fail, reason :: term()}`
+- [x] 3.1.2.1 Define `@callback before_execute(input :: map(), context :: map()) :: {:ok, input :: map()} | {:error, reason :: term()}`
+- [x] 3.1.2.2 Define `@callback after_execute(result :: map(), context :: map()) :: {:ok, result :: map()} | {:error, reason :: term()}`
+- [x] 3.1.2.3 Define `@callback on_error(error :: term(), context :: map()) :: {:retry, opts :: keyword()} | {:fail, reason :: term()}`
 
 ### 3.1.3 Type Specifications
 
 Define type specifications for algorithm module.
 
-- [ ] 3.1.3.1 Define `@type t :: module()` for algorithm type
-- [ ] 3.1.3.2 Define `@type input :: map()` for algorithm input
-- [ ] 3.1.3.3 Define `@type result :: {:ok, map()} | {:error, term()}`
-- [ ] 3.1.3.4 Define `@type context :: map()` for execution context
+- [x] 3.1.3.1 Define `@type t :: module()` for algorithm type
+- [x] 3.1.3.2 Define `@type input :: map()` for algorithm input
+- [x] 3.1.3.3 Define `@type result :: {:ok, map()} | {:error, term()}`
+- [x] 3.1.3.4 Define `@type context :: map()` for execution context
 
 ### 3.1.4 Unit Tests for Algorithm Behavior
 
-- [ ] Test behavior callbacks are defined
-- [ ] Test optional callbacks are marked optional
-- [ ] Test type specifications compile correctly
-- [ ] Test example algorithm implements behavior
+- [x] Test behavior callbacks are defined
+- [x] Test optional callbacks are marked optional
+- [x] Test type specifications compile correctly
+- [x] Test example algorithm implements behavior
 
 ---
 
