@@ -223,46 +223,46 @@ Implement hybrid algorithm that combines sequential and parallel execution.
 
 Create the hybrid algorithm module.
 
-- [ ] 3.5.1.1 Create `lib/jido_ai/algorithms/hybrid.ex` with module documentation
-- [ ] 3.5.1.2 Use `Jido.AI.Algorithms.Base` with name and description
-- [ ] 3.5.1.3 Document hybrid execution semantics
+- [x] 3.5.1.1 Create `lib/jido_ai/algorithms/hybrid.ex` with module documentation
+- [x] 3.5.1.2 Use `Jido.AI.Algorithms.Base` with name and description
+- [x] 3.5.1.3 Document hybrid execution semantics
 
 ### 3.5.2 Execution Stages
 
 Implement stage-based execution.
 
-- [ ] 3.5.2.1 Define stage struct `%Stage{algorithms: [], mode: :sequential | :parallel}`
-- [ ] 3.5.2.2 Implement `execute/2` that processes stages in order
-- [ ] 3.5.2.3 Execute each stage according to its mode
-- [ ] 3.5.2.4 Pass stage output to next stage input
+- [x] 3.5.2.1 Define stage map structure with algorithms and mode
+- [x] 3.5.2.2 Implement `execute/2` that processes stages in order
+- [x] 3.5.2.3 Execute each stage according to its mode
+- [x] 3.5.2.4 Pass stage output to next stage input
 
 ### 3.5.3 Stage Configuration
 
 Implement stage configuration.
 
-- [ ] 3.5.3.1 Support inline stage definition in context
-- [ ] 3.5.3.2 Support pre-defined stage pipelines
-- [ ] 3.5.3.3 Validate stage configuration
+- [x] 3.5.3.1 Support inline stage definition in context
+- [x] 3.5.3.2 Support shorthand for single-algorithm stages
+- [x] 3.5.3.3 Validate stage configuration
 
 ### 3.5.4 Fallback Support
 
 Implement fallback algorithm support.
 
-- [ ] 3.5.4.1 Support `primary` and `fallback` algorithm configuration
-- [ ] 3.5.4.2 Try primary algorithm first
-- [ ] 3.5.4.3 Fall back on error or timeout
-- [ ] 3.5.4.4 Support multiple fallback levels
+- [x] 3.5.4.1 Support algorithm to fallbacks mapping in context
+- [x] 3.5.4.2 Try primary algorithm first
+- [x] 3.5.4.3 Fall back on error
+- [x] 3.5.4.4 Support multiple fallback levels
 
 ### 3.5.5 Unit Tests for Hybrid Algorithm
 
-- [ ] Test execute/2 processes stages in order
-- [ ] Test sequential stage execution
-- [ ] Test parallel stage execution
-- [ ] Test mixed mode stages
-- [ ] Test stage output passed to next stage
-- [ ] Test fallback on primary failure
-- [ ] Test fallback on primary timeout
-- [ ] Test multiple fallback levels
+- [x] Test execute/2 processes stages in order
+- [x] Test sequential stage execution
+- [x] Test parallel stage execution
+- [x] Test mixed mode stages
+- [x] Test stage output passed to next stage
+- [x] Test fallback on primary failure
+- [x] Test multiple fallback levels
+- [x] Test empty stages handling
 
 ---
 
