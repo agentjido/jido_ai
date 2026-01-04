@@ -34,6 +34,9 @@ defmodule Jido.AI.ReAct.Machine do
       "error" => []
     }
 
+  # Telemetry event names
+  @telemetry_prefix [:jido, :ai, :react]
+
   @type status :: :idle | :awaiting_llm | :awaiting_tool | :completed | :error
   @type termination_reason :: :final_answer | :max_iterations | :error | nil
 
@@ -42,6 +45,14 @@ defmodule Jido.AI.ReAct.Machine do
           name: String.t(),
           arguments: map(),
           result: term() | nil
+        }
+
+  @type usage :: %{
+          optional(:input_tokens) => non_neg_integer(),
+          optional(:output_tokens) => non_neg_integer(),
+          optional(:total_tokens) => non_neg_integer(),
+          optional(:cache_creation_input_tokens) => non_neg_integer(),
+          optional(:cache_read_input_tokens) => non_neg_integer()
         }
 
   @type t :: %__MODULE__{
@@ -53,7 +64,9 @@ defmodule Jido.AI.ReAct.Machine do
           current_llm_call_id: String.t() | nil,
           termination_reason: termination_reason(),
           streaming_text: String.t(),
-          streaming_thinking: String.t()
+          streaming_thinking: String.t(),
+          usage: usage(),
+          started_at: integer() | nil
         }
 
   defstruct status: "idle",
@@ -64,7 +77,9 @@ defmodule Jido.AI.ReAct.Machine do
             current_llm_call_id: nil,
             termination_reason: nil,
             streaming_text: "",
-            streaming_thinking: ""
+            streaming_thinking: "",
+            usage: %{},
+            started_at: nil
 
   @type msg ::
           {:start, query :: String.t(), call_id :: String.t()}
@@ -108,6 +123,13 @@ defmodule Jido.AI.ReAct.Machine do
   def update(%__MODULE__{status: "idle"} = machine, {:start, query, call_id}, env) do
     system_prompt = Map.fetch!(env, :system_prompt)
     conversation = [system_message(system_prompt), user_message(query)]
+    started_at = System.monotonic_time(:millisecond)
+
+    # Emit start telemetry
+    emit_telemetry(:start, %{system_time: System.system_time()}, %{
+      call_id: call_id,
+      query_length: String.length(query)
+    })
 
     with_transition(machine, "awaiting_llm", fn machine ->
       machine =
@@ -120,6 +142,8 @@ defmodule Jido.AI.ReAct.Machine do
         |> Map.put(:current_llm_call_id, call_id)
         |> Map.put(:streaming_text, "")
         |> Map.put(:streaming_thinking, "")
+        |> Map.put(:usage, %{})
+        |> Map.put(:started_at, started_at)
 
       {machine, [{:call_llm_stream, call_id, conversation}]}
     end)
@@ -172,6 +196,15 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp handle_iteration_check(machine, max_iterations) when machine.iteration > max_iterations do
+    duration_ms = calculate_duration(machine)
+
+    # Emit complete telemetry for max iterations
+    emit_telemetry(:complete, %{duration: duration_ms}, %{
+      iteration: machine.iteration,
+      termination_reason: :max_iterations,
+      usage: machine.usage
+    })
+
     with_transition(machine, "completed", fn m ->
       m =
         Map.merge(m, %{
@@ -185,6 +218,12 @@ defmodule Jido.AI.ReAct.Machine do
 
   defp handle_iteration_check(machine, _max_iterations) do
     new_call_id = generate_call_id()
+
+    # Emit iteration telemetry
+    emit_telemetry(:iteration, %{system_time: System.system_time()}, %{
+      iteration: machine.iteration,
+      call_id: new_call_id
+    })
 
     with_transition(machine, "awaiting_llm", fn m ->
       m = Map.merge(m, %{current_llm_call_id: new_call_id, streaming_text: "", streaming_thinking: ""})
@@ -230,7 +269,9 @@ defmodule Jido.AI.ReAct.Machine do
       current_llm_call_id: map[:current_llm_call_id],
       termination_reason: map[:termination_reason],
       streaming_text: map[:streaming_text] || "",
-      streaming_thinking: map[:streaming_thinking] || ""
+      streaming_thinking: map[:streaming_thinking] || "",
+      usage: map[:usage] || %{},
+      started_at: map[:started_at]
     }
   end
 
@@ -244,6 +285,16 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp handle_llm_response(machine, {:error, reason}, _env) do
+    duration_ms = calculate_duration(machine)
+
+    # Emit complete telemetry for error
+    emit_telemetry(:complete, %{duration: duration_ms}, %{
+      iteration: machine.iteration,
+      termination_reason: :error,
+      error: reason,
+      usage: machine.usage
+    })
+
     with_transition(machine, "error", fn machine ->
       machine =
         machine
@@ -255,9 +306,30 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp handle_llm_response(machine, {:ok, result}, env) do
+    # Extract and accumulate usage metadata
+    machine = accumulate_usage(machine, result)
+
     case result.type do
       :tool_calls -> handle_tool_calls(machine, result.tool_calls, env)
       :final_answer -> handle_final_answer(machine, result.text)
+    end
+  end
+
+  # Accumulates usage from LLM response into machine state
+  defp accumulate_usage(machine, result) do
+    case Map.get(result, :usage) do
+      nil ->
+        machine
+
+      new_usage when is_map(new_usage) ->
+        current = machine.usage
+
+        merged =
+          Map.merge(current, new_usage, fn _k, v1, v2 ->
+            (v1 || 0) + (v2 || 0)
+          end)
+
+        %{machine | usage: merged}
     end
   end
 
@@ -286,6 +358,14 @@ defmodule Jido.AI.ReAct.Machine do
 
   defp handle_final_answer(machine, answer) do
     assistant_msg = assistant_message(answer)
+    duration_ms = calculate_duration(machine)
+
+    # Emit complete telemetry for final answer
+    emit_telemetry(:complete, %{duration: duration_ms}, %{
+      iteration: machine.iteration,
+      termination_reason: :final_answer,
+      usage: machine.usage
+    })
 
     with_transition(machine, "completed", fn machine ->
       machine =
@@ -352,5 +432,17 @@ defmodule Jido.AI.ReAct.Machine do
       end
 
     %{role: :tool, tool_call_id: id, name: name, content: content}
+  end
+
+  # Telemetry helpers
+
+  defp emit_telemetry(event, measurements, metadata) do
+    :telemetry.execute(@telemetry_prefix ++ [event], measurements, metadata)
+  end
+
+  defp calculate_duration(%{started_at: nil}), do: 0
+
+  defp calculate_duration(%{started_at: started_at}) do
+    System.monotonic_time(:millisecond) - started_at
   end
 end
