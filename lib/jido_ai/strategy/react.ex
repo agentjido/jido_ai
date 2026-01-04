@@ -69,9 +69,11 @@ defmodule Jido.AI.Strategy.ReAct do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.ReAct.Machine
   alias Jido.AI.ToolAdapter
+  alias Jido.AI.Tools.Registry
   alias ReqLLM.Context
 
   @type config :: %{
@@ -80,7 +82,8 @@ defmodule Jido.AI.Strategy.ReAct do
           actions_by_name: %{String.t() => module()},
           system_prompt: String.t(),
           model: String.t(),
-          max_iterations: pos_integer()
+          max_iterations: pos_integer(),
+          use_registry: boolean()
         }
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -96,6 +99,8 @@ defmodule Jido.AI.Strategy.ReAct do
   @llm_result :react_llm_result
   @tool_result :react_tool_result
   @llm_partial :react_llm_partial
+  @register_tool :react_register_tool
+  @unregister_tool :react_unregister_tool
 
   @doc "Returns the action atom for starting a ReAct conversation."
   @spec start_action() :: :react_start
@@ -104,6 +109,14 @@ defmodule Jido.AI.Strategy.ReAct do
   @doc "Returns the action atom for handling LLM results."
   @spec llm_result_action() :: :react_llm_result
   def llm_result_action, do: @llm_result
+
+  @doc "Returns the action atom for registering a tool dynamically."
+  @spec register_tool_action() :: :react_register_tool
+  def register_tool_action, do: @register_tool
+
+  @doc "Returns the action atom for unregistering a tool."
+  @spec unregister_tool_action() :: :react_unregister_tool
+  def unregister_tool_action, do: @unregister_tool
 
   @doc "Returns the action atom for handling tool results."
   @spec tool_result_action() :: :react_tool_result
@@ -138,6 +151,16 @@ defmodule Jido.AI.Strategy.ReAct do
         }),
       doc: "Handle streaming LLM token chunk",
       name: "react.llm_partial"
+    },
+    @register_tool => %{
+      schema: Zoi.object(%{tool_module: Zoi.atom()}),
+      doc: "Register a new tool dynamically at runtime",
+      name: "react.register_tool"
+    },
+    @unregister_tool => %{
+      schema: Zoi.object(%{tool_name: Zoi.string()}),
+      doc: "Unregister a tool by name",
+      name: "react.unregister_tool"
     }
   }
 
@@ -168,6 +191,13 @@ defmodule Jido.AI.Strategy.ReAct do
 
     done? = status in [:success, :failure]
 
+    # Calculate duration if we have started_at
+    duration_ms =
+      case state[:started_at] do
+        nil -> nil
+        started_at -> System.monotonic_time(:millisecond) - started_at
+      end
+
     %Jido.Agent.Strategy.Snapshot{
       status: status,
       done?: done?,
@@ -178,9 +208,11 @@ defmodule Jido.AI.Strategy.ReAct do
           iteration: state[:iteration],
           termination_reason: state[:termination_reason],
           streaming_text: state[:streaming_text],
-          streaming_thinking: state[:streaming_thinking]
+          streaming_thinking: state[:streaming_thinking],
+          usage: state[:usage],
+          duration_ms: duration_ms
         }
-        |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" end)
+        |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} end)
         |> Map.new()
     }
   end
@@ -216,30 +248,82 @@ defmodule Jido.AI.Strategy.ReAct do
   end
 
   defp process_instruction(agent, %Jido.Instruction{action: action, params: params}) do
-    case to_machine_msg(normalize_action(action), params) do
-      msg when not is_nil(msg) ->
-        state = StratState.get(agent, %{})
-        config = state[:config]
-        machine = Machine.from_map(state)
+    normalized_action = normalize_action(action)
 
-        env = %{
-          system_prompt: config[:system_prompt],
-          max_iterations: config[:max_iterations]
-        }
+    # Handle tool registration/unregistration separately (not machine messages)
+    case normalized_action do
+      @register_tool ->
+        process_register_tool(agent, params)
 
-        {machine, directives} = Machine.update(machine, msg, env)
-
-        new_state =
-          machine
-          |> Machine.to_map()
-          |> Map.put(:config, config)
-
-        agent = StratState.put(agent, new_state)
-        {agent, lift_directives(directives, config)}
+      @unregister_tool ->
+        process_unregister_tool(agent, params)
 
       _ ->
-        :noop
+        case to_machine_msg(normalized_action, params) do
+          msg when not is_nil(msg) ->
+            state = StratState.get(agent, %{})
+            config = state[:config]
+            machine = Machine.from_map(state)
+
+            env = %{
+              system_prompt: config[:system_prompt],
+              max_iterations: config[:max_iterations]
+            }
+
+            {machine, directives} = Machine.update(machine, msg, env)
+
+            new_state =
+              machine
+              |> Machine.to_map()
+              |> Map.put(:config, config)
+
+            agent = StratState.put(agent, new_state)
+            {agent, lift_directives(directives, config)}
+
+          _ ->
+            :noop
+        end
     end
+  end
+
+  defp process_register_tool(agent, %{tool_module: module}) when is_atom(module) do
+    state = StratState.get(agent, %{})
+    config = state[:config]
+
+    # Add the tool to the config
+    new_tools = [module | config[:tools]] |> Enum.uniq()
+    new_actions_by_name = Map.put(config[:actions_by_name], module.name(), module)
+    new_reqllm_tools = ToolAdapter.from_actions(new_tools)
+
+    new_config =
+      config
+      |> Map.put(:tools, new_tools)
+      |> Map.put(:actions_by_name, new_actions_by_name)
+      |> Map.put(:reqllm_tools, new_reqllm_tools)
+
+    new_state = Map.put(state, :config, new_config)
+    agent = StratState.put(agent, new_state)
+    {agent, []}
+  end
+
+  defp process_unregister_tool(agent, %{tool_name: tool_name}) when is_binary(tool_name) do
+    state = StratState.get(agent, %{})
+    config = state[:config]
+
+    # Remove the tool from the config
+    new_tools = Enum.reject(config[:tools], fn m -> m.name() == tool_name end)
+    new_actions_by_name = Map.delete(config[:actions_by_name], tool_name)
+    new_reqllm_tools = ToolAdapter.from_actions(new_tools)
+
+    new_config =
+      config
+      |> Map.put(:tools, new_tools)
+      |> Map.put(:actions_by_name, new_actions_by_name)
+      |> Map.put(:reqllm_tools, new_reqllm_tools)
+
+    new_state = Map.put(state, :config, new_config)
+    agent = StratState.put(agent, new_state)
+    {agent, []}
   end
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
@@ -279,7 +363,7 @@ defmodule Jido.AI.Strategy.ReAct do
         ]
 
       {:exec_tool, id, tool_name, arguments} ->
-        case Map.fetch(actions_by_name, tool_name) do
+        case lookup_tool(tool_name, actions_by_name, config) do
           {:ok, action_module} ->
             [
               Directive.ToolExec.new!(%{
@@ -294,6 +378,25 @@ defmodule Jido.AI.Strategy.ReAct do
             []
         end
     end)
+  end
+
+  # Looks up a tool by name, first in actions_by_name, then optionally in Registry
+  defp lookup_tool(tool_name, actions_by_name, config) do
+    case Map.fetch(actions_by_name, tool_name) do
+      {:ok, _module} = result ->
+        result
+
+      :error ->
+        if config[:use_registry] do
+          case Registry.get(tool_name) do
+            {:ok, {:action, module}} -> {:ok, module}
+            {:ok, {:tool, module}} -> {:ok, module}
+            _ -> :error
+          end
+        else
+          :error
+        end
+    end
   end
 
   defp convert_to_reqllm_context(conversation) do
@@ -317,15 +420,42 @@ defmodule Jido.AI.Strategy.ReAct do
     actions_by_name = Map.new(tools_modules, &{&1.name(), &1})
     reqllm_tools = ToolAdapter.from_actions(tools_modules)
 
+    # Resolve model - can be an alias atom (:fast, :capable) or a full spec string
+    raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
+    resolved_model = resolve_model_spec(raw_model)
+
+    # Whether to also use Registry for tool lookup (for exec_tool fallback)
+    use_registry = Keyword.get(opts, :use_registry, false)
+
     %{
       tools: tools_modules,
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
       system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
-      model: Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model)),
-      max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations)
+      model: resolved_model,
+      max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
+      use_registry: use_registry
     }
   end
 
+  # Resolves model aliases to full specs, passes through strings unchanged
+  defp resolve_model_spec(model) when is_atom(model) do
+    Config.resolve_model(model)
+  end
+
+  defp resolve_model_spec(model) when is_binary(model) do
+    model
+  end
+
   defp generate_call_id, do: Machine.generate_call_id()
+
+  @doc """
+  Returns the list of currently registered tools for the given agent.
+  """
+  @spec list_tools(Agent.t()) :: [module()]
+  def list_tools(%Agent{} = agent) do
+    state = StratState.get(agent, %{})
+    config = state[:config] || %{}
+    config[:tools] || []
+  end
 end
