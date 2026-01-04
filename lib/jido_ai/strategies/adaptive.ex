@@ -20,6 +20,8 @@ defmodule Jido.AI.Strategies.Adaptive do
   Strategies are selected based on task type keywords and complexity:
 
   ### Task Type Detection (highest priority)
+  - **Iterative Reasoning** → TRM (Tiny-Recursive-Model)
+    - Keywords: puzzle, solve, step-by-step, iterate, improve, refine, recursive
   - **Synthesis** → Graph-of-Thoughts (GoT)
     - Keywords: synthesize, combine, merge, integrate, relationships, perspectives
   - **Tool use** → ReAct
@@ -45,7 +47,7 @@ defmodule Jido.AI.Strategies.Adaptive do
           Jido.AI.Strategies.Adaptive,
           model: "anthropic:claude-sonnet-4-20250514",
           default_strategy: :react,
-          available_strategies: [:cot, :react, :tot, :got]
+          available_strategies: [:cot, :react, :tot, :got, :trm]
         }
 
   ### Options
@@ -74,6 +76,7 @@ defmodule Jido.AI.Strategies.Adaptive do
   alias Jido.AI.Strategies.ChainOfThought
   alias Jido.AI.Strategies.GraphOfThoughts
   alias Jido.AI.Strategies.TreeOfThoughts
+  alias Jido.AI.Strategies.TRM
   alias Jido.AI.Strategy.ReAct
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -84,7 +87,8 @@ defmodule Jido.AI.Strategies.Adaptive do
     cot: ChainOfThought,
     react: ReAct,
     tot: TreeOfThoughts,
-    got: GraphOfThoughts
+    got: GraphOfThoughts,
+    trm: TRM
   }
 
   # Default complexity thresholds
@@ -100,9 +104,12 @@ defmodule Jido.AI.Strategies.Adaptive do
   # Keywords that suggest graph-based reasoning (GoT)
   @synthesis_keywords ~w(synthesize combine merge integrate aggregate unify consolidate)
   @graph_keywords ~w(relationships connections network graph linked interdependent perspectives viewpoints)
+  # Keywords that suggest iterative reasoning (TRM)
+  # Note: multi-word keywords use spaces, and we check for both with and without hyphens
+  @puzzle_keywords ~w(puzzle iterate improve refine recursive riddle)
 
   @type complexity :: :simple | :moderate | :complex
-  @type strategy_type :: :cot | :react | :tot | :got
+  @type strategy_type :: :cot | :react | :tot | :got | :trm
 
   @type config :: %{
           model: String.t(),
@@ -233,7 +240,7 @@ defmodule Jido.AI.Strategies.Adaptive do
     # Only re-evaluate if there's a new start instruction
     has_start = Enum.any?(instructions, fn
       %{action: @start} -> true
-      %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start] -> true
+      %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start, :trm_start] -> true
       _ -> false
     end)
 
@@ -254,7 +261,7 @@ defmodule Jido.AI.Strategies.Adaptive do
   @spec analyze_prompt(String.t(), config()) :: {strategy_type(), float(), atom()}
   def analyze_prompt(prompt, config \\ %{}) do
     thresholds = Map.get(config, :complexity_thresholds, @default_thresholds)
-    available = Map.get(config, :available_strategies, [:cot, :react, :tot, :got])
+    available = Map.get(config, :available_strategies, [:cot, :react, :tot, :got, :trm])
 
     # Calculate complexity score
     complexity_score = calculate_complexity(prompt)
@@ -297,7 +304,7 @@ defmodule Jido.AI.Strategies.Adaptive do
     %{
       model: resolved_model,
       default_strategy: Keyword.get(opts, :default_strategy, @default_strategy),
-      available_strategies: Keyword.get(opts, :available_strategies, [:cot, :react, :tot, :got]),
+      available_strategies: Keyword.get(opts, :available_strategies, [:cot, :react, :tot, :got, :trm]),
       complexity_thresholds: Keyword.get(opts, :complexity_thresholds, @default_thresholds),
       strategy_override: Keyword.get(opts, :strategy),
       strategy_opts: opts
@@ -316,7 +323,7 @@ defmodule Jido.AI.Strategies.Adaptive do
     # Find the start instruction
     start_instr = Enum.find(instructions, fn
       %{action: @start} -> true
-      %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start] -> true
+      %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start, :trm_start] -> true
       _ -> false
     end)
 
@@ -396,13 +403,24 @@ defmodule Jido.AI.Strategies.Adaptive do
           other -> other
         end
 
+      # Map params for strategy-specific requirements
+      mapped_params = map_params_for_strategy(instr_map.params || %{}, strategy_type, instr_map.action)
+
       # Convert to Jido.Instruction struct for delegated strategy
       %Jido.Instruction{
         action: mapped_action,
-        params: instr_map.params || %{}
+        params: mapped_params
       }
     end)
   end
+
+  # TRM uses :question instead of :prompt for start action
+  defp map_params_for_strategy(params, :trm, @start) do
+    prompt = Map.get(params, :prompt) || Map.get(params, "prompt")
+    Map.put(params, :question, prompt)
+  end
+
+  defp map_params_for_strategy(params, _strategy_type, _action), do: params
 
   defp normalize_instruction(%Jido.Instruction{} = instr) do
     %{action: instr.action, params: instr.params}
@@ -420,16 +438,19 @@ defmodule Jido.AI.Strategies.Adaptive do
   defp start_action_for(:react), do: :react_start
   defp start_action_for(:tot), do: :tot_start
   defp start_action_for(:got), do: :got_start
+  defp start_action_for(:trm), do: :trm_start
 
   defp llm_result_action_for(:cot), do: :cot_llm_result
   defp llm_result_action_for(:react), do: :react_llm_result
   defp llm_result_action_for(:tot), do: :tot_llm_result
   defp llm_result_action_for(:got), do: :got_llm_result
+  defp llm_result_action_for(:trm), do: :trm_llm_result
 
   defp llm_partial_action_for(:cot), do: :cot_llm_partial
   defp llm_partial_action_for(:react), do: :react_llm_partial
   defp llm_partial_action_for(:tot), do: :tot_llm_partial
   defp llm_partial_action_for(:got), do: :got_llm_partial
+  defp llm_partial_action_for(:trm), do: :trm_llm_partial
 
   defp select_strategy_for_task(prompt, config) do
     # Check for manual override
@@ -478,6 +499,10 @@ defmodule Jido.AI.Strategies.Adaptive do
     prompt_lower = String.downcase(prompt)
 
     cond do
+      # Iterative reasoning/puzzle tasks prefer TRM
+      has_puzzle_keywords?(prompt_lower) ->
+        :iterative_reasoning
+
       # Synthesis/graph tasks prefer GoT
       has_synthesis_keywords?(prompt_lower) ->
         :synthesis
@@ -513,6 +538,10 @@ defmodule Jido.AI.Strategies.Adaptive do
       Enum.any?(@graph_keywords, &String.contains?(prompt, &1))
   end
 
+  defp has_puzzle_keywords?(prompt) do
+    Enum.any?(@puzzle_keywords, &String.contains?(prompt, &1))
+  end
+
   defp select_strategy(complexity_score, task_type, thresholds, available) do
     # First, check task type overrides
     strategy = select_by_task_type(task_type, available)
@@ -536,6 +565,11 @@ defmodule Jido.AI.Strategies.Adaptive do
   defp select_by_task_type(:exploration, available) do
     # Exploration tasks prefer ToT for branching exploration
     find_first_available([:tot, :got], available)
+  end
+
+  defp select_by_task_type(:iterative_reasoning, available) do
+    # Iterative reasoning/puzzle tasks prefer TRM for recursive improvement
+    find_first_available([:trm, :tot], available)
   end
 
   defp select_by_task_type(_other, _available), do: nil
