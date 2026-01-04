@@ -113,28 +113,24 @@ defmodule Jido.AI.Algorithms.BaseTest do
     end
 
     test "requires name option" do
-      assert_raise KeyError, ~r/key :name not found/, fn ->
+      assert_raise ArgumentError, ~r/Missing required :name option/, fn ->
         defmodule MissingName do
           use Jido.AI.Algorithms.Base,
             description: "Missing name"
 
           def execute(_input, _context), do: {:ok, %{}}
         end
-
-        MissingName.metadata()
       end
     end
 
     test "requires description option" do
-      assert_raise KeyError, ~r/key :description not found/, fn ->
+      assert_raise ArgumentError, ~r/Missing required :description option/, fn ->
         defmodule MissingDescription do
           use Jido.AI.Algorithms.Base,
             name: "missing_desc"
 
           def execute(_input, _context), do: {:ok, %{}}
         end
-
-        MissingDescription.metadata()
       end
     end
   end

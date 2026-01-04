@@ -118,8 +118,6 @@ defmodule Jido.AI.Algorithms.Hybrid do
 
   alias Jido.AI.Algorithms.Parallel
 
-  require Logger
-
   # ============================================================================
   # Algorithm Implementation
   # ============================================================================

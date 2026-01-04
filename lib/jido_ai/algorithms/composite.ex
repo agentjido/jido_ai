@@ -134,16 +134,36 @@ defmodule Jido.AI.Algorithms.Composite do
       # Usage
       algo = MyWorkflow.build()
       {:ok, result} = Composite.execute_composite(algo, input, %{})
+
+  ## Security Considerations
+
+  Several composition operators accept user-provided functions:
+
+    * `choice/3` - predicate function
+    * `when_cond/2` - condition function
+    * `repeat/2` - while predicate function
+    * `parallel/2` - custom merge_strategy function
+
+  **WARNING**: These functions are executed without sandboxing. Never pass
+  functions from untrusted sources (e.g., deserialized data, user input).
+  Functions should only come from compile-time definitions or trusted
+  runtime sources.
+
+  ### Repeat Safety
+
+  The `repeat/2` operator has a built-in safety limit of 10,000 iterations
+  (configurable via `:max_iterations` option) to prevent infinite loops
+  from buggy predicates.
   """
 
   use Jido.AI.Algorithms.Base,
     name: "composite",
     description: "Composition operators for building complex algorithms"
 
-  # Sequential and Parallel are not used directly anymore as we implement
-  # our own execution that handles composite structs properly
+  alias Jido.AI.Algorithms.Helpers
 
-  require Logger
+  # Maximum iterations for repeat to prevent infinite loops
+  @max_iterations 10_000
 
   # ============================================================================
   # Composition Types (Structs for holding composition data)
@@ -151,31 +171,44 @@ defmodule Jido.AI.Algorithms.Composite do
 
   defmodule SequenceComposite do
     @moduledoc false
+    @type t :: %__MODULE__{algorithms: list(module() | struct())}
     defstruct [:algorithms]
   end
 
   defmodule ParallelComposite do
     @moduledoc false
+    @type t :: %__MODULE__{algorithms: list(module() | struct()), options: map()}
     defstruct [:algorithms, :options]
   end
 
   defmodule ChoiceComposite do
     @moduledoc false
+    @type t :: %__MODULE__{
+            predicate: (map() -> boolean()),
+            if_true: module() | struct(),
+            if_false: module() | struct()
+          }
     defstruct [:predicate, :if_true, :if_false]
   end
 
   defmodule RepeatComposite do
     @moduledoc false
+    @type t :: %__MODULE__{algorithm: module() | struct(), options: map()}
     defstruct [:algorithm, :options]
   end
 
   defmodule WhenComposite do
     @moduledoc false
+    @type t :: %__MODULE__{
+            condition: (map() -> boolean()) | map(),
+            algorithm: module() | struct()
+          }
     defstruct [:condition, :algorithm]
   end
 
   defmodule ComposeComposite do
     @moduledoc false
+    @type t :: %__MODULE__{first: module() | struct(), second: module() | struct()}
     defstruct [:first, :second]
   end
 
@@ -249,9 +282,14 @@ defmodule Jido.AI.Algorithms.Composite do
 
     * `:times` - Number of times to execute (default: 1)
     * `:while` - Predicate function that receives result, continues while true
+    * `:max_iterations` - Safety limit to prevent infinite loops (default: 10,000)
 
   If both `:times` and `:while` are specified, execution stops when either
   condition is met (times exhausted or while returns false).
+
+  The `:max_iterations` option provides a safety cap that cannot be exceeded
+  regardless of `:times` or `:while` settings. This prevents runaway loops
+  from buggy predicates.
 
   ## Examples
 
@@ -260,6 +298,9 @@ defmodule Jido.AI.Algorithms.Composite do
 
       # Conditional repetition
       algo = Composite.repeat(IncrementStep, while: fn result -> result.value < 100 end)
+
+      # With custom safety limit
+      algo = Composite.repeat(Step, times: 1_000_000, max_iterations: 1000)
   """
   @spec repeat(module() | struct(), keyword()) :: RepeatComposite.t()
   def repeat(algorithm, opts \\ []) do
@@ -484,68 +525,8 @@ defmodule Jido.AI.Algorithms.Composite do
         {:exit, reason} -> {:error, {:exit, reason}}
       end)
 
-    handle_parallel_results(results, merge_strategy, error_mode)
+    Helpers.handle_results(results, merge_strategy, error_mode)
   end
-
-  defp handle_parallel_results(results, merge_strategy, error_mode) do
-    {successes, errors} = Enum.split_with(results, fn
-      {:ok, _} -> true
-      {:error, _} -> false
-    end)
-
-    case error_mode do
-      :fail_fast ->
-        case errors do
-          [] -> merge_successes(successes, merge_strategy)
-          [{:error, reason} | _] -> {:error, reason}
-        end
-
-      :collect_errors ->
-        case {successes, errors} do
-          {_, []} ->
-            merge_successes(successes, merge_strategy)
-
-          {[], _} ->
-            error_reasons = Enum.map(errors, fn {:error, reason} -> reason end)
-            {:error, %{errors: error_reasons, successful: []}}
-
-          {_, _} ->
-            success_results = Enum.map(successes, fn {:ok, result} -> result end)
-            error_reasons = Enum.map(errors, fn {:error, reason} -> reason end)
-            {:error, %{errors: error_reasons, successful: success_results}}
-        end
-
-      :ignore_errors ->
-        case successes do
-          [] -> {:error, :all_failed}
-          _ -> merge_successes(successes, merge_strategy)
-        end
-    end
-  end
-
-  defp merge_successes(successes, merge_strategy) do
-    results = Enum.map(successes, fn {:ok, result} -> result end)
-
-    merged = case merge_strategy do
-      :merge_maps -> Enum.reduce(results, %{}, &deep_merge(&2, &1))
-      :collect -> results
-      merge_fn when is_function(merge_fn, 1) -> merge_fn.(results)
-    end
-
-    {:ok, merged}
-  end
-
-  defp deep_merge(left, right) when is_map(left) and is_map(right) do
-    Map.merge(left, right, fn
-      _key, left_val, right_val when is_map(left_val) and is_map(right_val) ->
-        deep_merge(left_val, right_val)
-
-      _key, _left_val, right_val ->
-        right_val
-    end)
-  end
-
-  defp deep_merge(_left, right), do: right
 
   defp execute_choice(predicate, if_true, if_false, input, context) do
     emit_start(:choice)
@@ -570,8 +551,12 @@ defmodule Jido.AI.Algorithms.Composite do
 
     times = Map.get(options, :times, 1)
     while_fn = Map.get(options, :while)
+    max_iter = Map.get(options, :max_iterations, @max_iterations)
 
-    result = do_repeat(algorithm, input, context, times, while_fn, 0)
+    # Enforce max iterations to prevent infinite loops
+    effective_times = min(times, max_iter)
+
+    result = do_repeat(algorithm, input, context, effective_times, while_fn, 0, max_iter)
 
     emit_stop(:repeat, start_time)
     result
@@ -608,71 +593,87 @@ defmodule Jido.AI.Algorithms.Composite do
   end
 
   # ============================================================================
-  # Private Functions
+  # Private Functions - Algorithm Dispatch
   # ============================================================================
 
-  defp execute_algorithm(algorithm, input, context) do
-    cond do
-      is_struct(algorithm, SequenceComposite) ->
-        execute_composite(algorithm, input, context)
+  # Pattern matching for composite structs
+  defp execute_algorithm(%SequenceComposite{} = c, input, context),
+    do: execute_composite(c, input, context)
 
-      is_struct(algorithm, ParallelComposite) ->
-        execute_composite(algorithm, input, context)
+  defp execute_algorithm(%ParallelComposite{} = c, input, context),
+    do: execute_composite(c, input, context)
 
-      is_struct(algorithm, ChoiceComposite) ->
-        execute_composite(algorithm, input, context)
+  defp execute_algorithm(%ChoiceComposite{} = c, input, context),
+    do: execute_composite(c, input, context)
 
-      is_struct(algorithm, RepeatComposite) ->
-        execute_composite(algorithm, input, context)
+  defp execute_algorithm(%RepeatComposite{} = c, input, context),
+    do: execute_composite(c, input, context)
 
-      is_struct(algorithm, WhenComposite) ->
-        execute_composite(algorithm, input, context)
+  defp execute_algorithm(%WhenComposite{} = c, input, context),
+    do: execute_composite(c, input, context)
 
-      is_struct(algorithm, ComposeComposite) ->
-        execute_composite(algorithm, input, context)
+  defp execute_algorithm(%ComposeComposite{} = c, input, context),
+    do: execute_composite(c, input, context)
 
-      is_atom(algorithm) and function_exported?(algorithm, :execute, 2) ->
-        algorithm.execute(input, context)
-
-      true ->
-        {:error, {:invalid_algorithm, algorithm}}
+  # Module-based algorithms
+  defp execute_algorithm(algorithm, input, context) when is_atom(algorithm) do
+    if Helpers.valid_algorithm?(algorithm) do
+      algorithm.execute(input, context)
+    else
+      {:error, {:invalid_algorithm, algorithm}}
     end
   end
 
-  defp check_can_execute(algorithm, input, context) do
-    cond do
-      is_struct(algorithm, SequenceComposite) ->
-        can_execute_composite?(algorithm, input, context)
+  defp execute_algorithm(algorithm, _input, _context) do
+    {:error, {:invalid_algorithm, algorithm}}
+  end
 
-      is_struct(algorithm, ParallelComposite) ->
-        can_execute_composite?(algorithm, input, context)
+  # Pattern matching for composite structs
+  defp check_can_execute(%SequenceComposite{} = c, input, context),
+    do: can_execute_composite?(c, input, context)
 
-      is_struct(algorithm, ChoiceComposite) ->
-        can_execute_composite?(algorithm, input, context)
+  defp check_can_execute(%ParallelComposite{} = c, input, context),
+    do: can_execute_composite?(c, input, context)
 
-      is_struct(algorithm, RepeatComposite) ->
-        can_execute_composite?(algorithm, input, context)
+  defp check_can_execute(%ChoiceComposite{} = c, input, context),
+    do: can_execute_composite?(c, input, context)
 
-      is_struct(algorithm, WhenComposite) ->
-        can_execute_composite?(algorithm, input, context)
+  defp check_can_execute(%RepeatComposite{} = c, input, context),
+    do: can_execute_composite?(c, input, context)
 
-      is_struct(algorithm, ComposeComposite) ->
-        can_execute_composite?(algorithm, input, context)
+  defp check_can_execute(%WhenComposite{} = c, input, context),
+    do: can_execute_composite?(c, input, context)
 
-      is_atom(algorithm) and function_exported?(algorithm, :can_execute?, 2) ->
-        algorithm.can_execute?(input, context)
+  defp check_can_execute(%ComposeComposite{} = c, input, context),
+    do: can_execute_composite?(c, input, context)
 
-      true ->
-        true
+  # Module-based algorithms
+  defp check_can_execute(algorithm, input, context) when is_atom(algorithm) do
+    if function_exported?(algorithm, :can_execute?, 2) do
+      algorithm.can_execute?(input, context)
+    else
+      true
     end
   end
 
-  defp do_repeat(_algorithm, result, _context, times, _while_fn, iteration)
+  defp check_can_execute(_algorithm, _input, _context), do: true
+
+  # ============================================================================
+  # Private Functions - Repeat Logic
+  # ============================================================================
+
+  defp do_repeat(_algorithm, result, _context, times, _while_fn, iteration, _max_iter)
        when iteration >= times do
     {:ok, result}
   end
 
-  defp do_repeat(algorithm, input, context, times, while_fn, iteration) do
+  defp do_repeat(_algorithm, result, _context, _times, _while_fn, iteration, max_iter)
+       when iteration >= max_iter do
+    # Max iterations reached - return current result to prevent infinite loop
+    {:ok, result}
+  end
+
+  defp do_repeat(algorithm, input, context, times, while_fn, iteration, max_iter) do
     case execute_algorithm(algorithm, input, context) do
       {:ok, result} ->
         should_continue =
@@ -682,7 +683,7 @@ defmodule Jido.AI.Algorithms.Composite do
           end
 
         if should_continue do
-          do_repeat(algorithm, result, context, times, while_fn, iteration + 1)
+          do_repeat(algorithm, result, context, times, while_fn, iteration + 1, max_iter)
         else
           {:ok, result}
         end
