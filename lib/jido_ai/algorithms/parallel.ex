@@ -122,15 +122,30 @@ defmodule Jido.AI.Algorithms.Parallel do
           Parallel.execute(input, context)
         end
       end
+
+  ## Security Considerations
+
+  The `:merge_strategy` option can accept a custom function. This function
+  is executed without sandboxing.
+
+  **WARNING**: Never pass functions from untrusted sources (e.g., deserialized
+  data, user input). Custom merge functions should only come from compile-time
+  definitions or trusted runtime sources.
   """
 
   use Jido.AI.Algorithms.Base,
     name: "parallel",
     description: "Executes algorithms concurrently and merges results"
 
-  require Logger
+  alias Jido.AI.Algorithms.Helpers
 
+  # Evaluated at compile time for performance. This means the value is fixed
+  # based on the build machine's scheduler count. For most deployments this
+  # is acceptable as it provides a sensible default.
   @default_max_concurrency System.schedulers_online() * 2
+
+  # Default timeout of 5 seconds per task. For LLM operations, you may need
+  # to increase this via the :timeout context option.
   @default_timeout 5_000
 
   # ============================================================================
@@ -156,7 +171,7 @@ defmodule Jido.AI.Algorithms.Parallel do
         results = execute_parallel(algorithms, input, context, max_concurrency, timeout)
 
         duration = System.monotonic_time() - start_time
-        handle_results(results, merge_strategy, error_mode, duration)
+        do_handle_results(results, merge_strategy, error_mode, duration)
     end
   end
 
@@ -221,102 +236,16 @@ defmodule Jido.AI.Algorithms.Parallel do
   # Private Functions - Result Handling
   # ============================================================================
 
-  defp handle_results(results, merge_strategy, error_mode, duration) do
-    {successes, errors} = partition_results(results)
+  defp do_handle_results(results, merge_strategy, error_mode, duration) do
+    {successes, errors} = Helpers.partition_results(results)
 
     success_count = length(successes)
     error_count = length(errors)
 
     emit_stop(duration, success_count, error_count)
 
-    case error_mode do
-      :fail_fast ->
-        handle_fail_fast(successes, errors, merge_strategy)
-
-      :collect_errors ->
-        handle_collect_errors(successes, errors, merge_strategy)
-
-      :ignore_errors ->
-        handle_ignore_errors(successes, merge_strategy)
-    end
+    Helpers.handle_results(results, merge_strategy, error_mode)
   end
-
-  defp partition_results(results) do
-    Enum.split_with(results, fn
-      {:ok, _} -> true
-      {:error, _} -> false
-    end)
-  end
-
-  defp handle_fail_fast(successes, errors, merge_strategy) do
-    case errors do
-      [] ->
-        merge_successes(successes, merge_strategy)
-
-      [{:error, reason} | _] ->
-        {:error, reason}
-    end
-  end
-
-  defp handle_collect_errors(successes, errors, merge_strategy) do
-    case {successes, errors} do
-      {_, []} ->
-        merge_successes(successes, merge_strategy)
-
-      {[], _} ->
-        error_reasons = Enum.map(errors, fn {:error, reason} -> reason end)
-        {:error, %{errors: error_reasons, successful: []}}
-
-      {_, _} ->
-        success_results = Enum.map(successes, fn {:ok, result} -> result end)
-        error_reasons = Enum.map(errors, fn {:error, reason} -> reason end)
-        {:error, %{errors: error_reasons, successful: success_results}}
-    end
-  end
-
-  defp handle_ignore_errors(successes, merge_strategy) do
-    case successes do
-      [] ->
-        {:error, :all_failed}
-
-      _ ->
-        merge_successes(successes, merge_strategy)
-    end
-  end
-
-  # ============================================================================
-  # Private Functions - Merging
-  # ============================================================================
-
-  defp merge_successes(successes, merge_strategy) do
-    results = Enum.map(successes, fn {:ok, result} -> result end)
-    merged = merge_results(results, merge_strategy)
-    {:ok, merged}
-  end
-
-  defp merge_results(results, :merge_maps) do
-    Enum.reduce(results, %{}, &deep_merge(&2, &1))
-  end
-
-  defp merge_results(results, :collect) do
-    results
-  end
-
-  defp merge_results(results, merge_fn) when is_function(merge_fn, 1) do
-    merge_fn.(results)
-  end
-
-  defp deep_merge(left, right) when is_map(left) and is_map(right) do
-    Map.merge(left, right, fn
-      _key, left_val, right_val when is_map(left_val) and is_map(right_val) ->
-        deep_merge(left_val, right_val)
-
-      _key, _left_val, right_val ->
-        right_val
-    end)
-  end
-
-  defp deep_merge(_left, right), do: right
 
   # ============================================================================
   # Telemetry

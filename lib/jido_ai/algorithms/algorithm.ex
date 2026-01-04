@@ -94,6 +94,13 @@ defmodule Jido.AI.Algorithms.Algorithm do
   @typedoc "Error handling response from on_error callback"
   @type error_response :: {:retry, keyword()} | {:fail, term()}
 
+  @typedoc "Algorithm metadata map with required name and description"
+  @type metadata :: %{
+          required(:name) => String.t(),
+          required(:description) => String.t(),
+          optional(atom()) => term()
+        }
+
   # ============================================================================
   # Required Callbacks
   # ============================================================================
@@ -169,7 +176,7 @@ defmodule Jido.AI.Algorithms.Algorithm do
       iex> MyAlgorithm.metadata()
       %{name: "my_algorithm", description: "Does something useful", version: "1.0"}
   """
-  @callback metadata() :: map()
+  @callback metadata() :: metadata()
 
   # ============================================================================
   # Optional Callbacks (Hooks)

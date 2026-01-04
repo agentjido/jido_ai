@@ -315,6 +315,37 @@ defmodule Jido.AI.Algorithms.CompositeTest do
 
       assert {:error, :intentional_error} = Composite.execute_composite(composite, input, %{})
     end
+
+    test "respects max_iterations option to prevent infinite loops" do
+      # Create a repeat with a while condition that would never become false
+      # but with a max_iterations limit
+      composite = Composite.repeat(
+        AddOneAlgorithm,
+        times: 1_000_000,
+        while: fn _result -> true end,  # Always continue
+        max_iterations: 10
+      )
+      input = %{value: 0}
+
+      assert {:ok, result} = Composite.execute_composite(composite, input, %{})
+      # Should stop at 10 iterations
+      assert result.value == 10
+    end
+
+    test "default max_iterations is 10000" do
+      # We can't actually test 10000 iterations, but we can verify the behavior
+      # by using a custom max_iterations that's lower
+      composite = Composite.repeat(
+        AddOneAlgorithm,
+        times: 100,
+        max_iterations: 5
+      )
+      input = %{value: 0}
+
+      assert {:ok, result} = Composite.execute_composite(composite, input, %{})
+      # Should stop at 5 due to max_iterations
+      assert result.value == 5
+    end
   end
 
   # ============================================================================

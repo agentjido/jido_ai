@@ -92,6 +92,29 @@ defmodule Jido.AI.Algorithms.Base do
         version: "1.0.0"
   """
   defmacro __using__(opts) do
+    # Compile-time validation of required options
+    unless Keyword.has_key?(opts, :name) do
+      raise ArgumentError, """
+      Missing required :name option for Jido.AI.Algorithms.Base.
+
+      Usage:
+          use Jido.AI.Algorithms.Base,
+            name: "my_algorithm",
+            description: "What this algorithm does"
+      """
+    end
+
+    unless Keyword.has_key?(opts, :description) do
+      raise ArgumentError, """
+      Missing required :description option for Jido.AI.Algorithms.Base.
+
+      Usage:
+          use Jido.AI.Algorithms.Base,
+            name: "my_algorithm",
+            description: "What this algorithm does"
+      """
+    end
+
     quote location: :keep do
       @behaviour Jido.AI.Algorithms.Algorithm
 

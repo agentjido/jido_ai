@@ -84,8 +84,6 @@ defmodule Jido.AI.Algorithms.Sequential do
     name: "sequential",
     description: "Executes algorithms in sequence, chaining outputs to inputs"
 
-  require Logger
-
   # ============================================================================
   # Algorithm Implementation
   # ============================================================================
