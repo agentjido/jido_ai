@@ -300,6 +300,7 @@ defmodule Jido.AI.Signal do
   """
   @deprecated "Use tool_call?/1 instead"
   @spec is_tool_call?(Jido.Signal.t()) :: boolean()
+  # credo:disable-for-next-line Credo.Check.Readability.PredicateFunctionNames
   def is_tool_call?(signal), do: tool_call?(signal)
 
   @doc """
@@ -368,26 +369,29 @@ defmodule Jido.AI.Signal do
   # Private helpers for from_reqllm_response
 
   defp extract_response_tool_calls(%{message: %{tool_calls: tool_calls}}) when is_list(tool_calls) do
-    Enum.map(tool_calls, fn tc ->
-      case tc do
-        %ReqLLM.ToolCall{} = tool_call ->
-          %{
-            id: tool_call.id || "call_#{:erlang.unique_integer([:positive])}",
-            name: ReqLLM.ToolCall.name(tool_call),
-            arguments: ReqLLM.ToolCall.args_map(tool_call) || %{}
-          }
-
-        %{} = map ->
-          %{
-            id: map[:id] || map["id"] || "call_#{:erlang.unique_integer([:positive])}",
-            name: map[:name] || map["name"],
-            arguments: map[:arguments] || map["arguments"] || %{}
-          }
-      end
-    end)
+    Enum.map(tool_calls, &normalize_tool_call_data/1)
   end
 
   defp extract_response_tool_calls(_), do: []
+
+  # Normalize a single tool call from various formats to a standard map
+  defp normalize_tool_call_data(%ReqLLM.ToolCall{} = tool_call) do
+    %{
+      id: tool_call.id || generate_call_id(),
+      name: ReqLLM.ToolCall.name(tool_call),
+      arguments: ReqLLM.ToolCall.args_map(tool_call) || %{}
+    }
+  end
+
+  defp normalize_tool_call_data(%{} = map) do
+    %{
+      id: map[:id] || map["id"] || generate_call_id(),
+      name: map[:name] || map["name"],
+      arguments: map[:arguments] || map["arguments"] || %{}
+    }
+  end
+
+  defp generate_call_id, do: "call_#{:erlang.unique_integer([:positive])}"
 
   defp extract_response_text(%{message: %{content: content}}) when is_binary(content), do: content
 

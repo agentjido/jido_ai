@@ -69,8 +69,8 @@ defmodule Jido.AI.Strategy.ReAct do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.ReAct.Machine
   alias Jido.AI.{Directive, ToolAdapter}
+  alias Jido.AI.ReAct.Machine
   alias ReqLLM.Context
 
   @type config :: %{

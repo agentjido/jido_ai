@@ -158,33 +158,10 @@ defmodule Jido.AI.ReAct.Machine do
     {machine, all_complete?} = record_tool_result(machine, call_id, result)
 
     if all_complete? do
-      machine =
-        machine
-        |> append_all_tool_results()
-        |> inc_iteration()
-
-      if machine.iteration > max_iterations do
-        with_transition(machine, "completed", fn machine ->
-          machine =
-            machine
-            |> Map.put(:termination_reason, :max_iterations)
-            |> Map.put(:result, "Maximum iterations reached without a final answer.")
-
-          {machine, []}
-        end)
-      else
-        new_call_id = generate_call_id()
-
-        with_transition(machine, "awaiting_llm", fn machine ->
-          machine =
-            machine
-            |> Map.put(:current_llm_call_id, new_call_id)
-            |> Map.put(:streaming_text, "")
-            |> Map.put(:streaming_thinking, "")
-
-          {machine, [{:call_llm_stream, new_call_id, machine.conversation}]}
-        end)
-      end
+      machine
+      |> append_all_tool_results()
+      |> inc_iteration()
+      |> handle_iteration_check(max_iterations)
     else
       {machine, []}
     end
@@ -192,6 +169,27 @@ defmodule Jido.AI.ReAct.Machine do
 
   def update(machine, _msg, _env) do
     {machine, []}
+  end
+
+  defp handle_iteration_check(machine, max_iterations) when machine.iteration > max_iterations do
+    with_transition(machine, "completed", fn m ->
+      m =
+        Map.merge(m, %{
+          termination_reason: :max_iterations,
+          result: "Maximum iterations reached without a final answer."
+        })
+
+      {m, []}
+    end)
+  end
+
+  defp handle_iteration_check(machine, _max_iterations) do
+    new_call_id = generate_call_id()
+
+    with_transition(machine, "awaiting_llm", fn m ->
+      m = Map.merge(m, %{current_llm_call_id: new_call_id, streaming_text: "", streaming_thinking: ""})
+      {m, [{:call_llm_stream, new_call_id, m.conversation}]}
+    end)
   end
 
   @doc """

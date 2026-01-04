@@ -2,7 +2,7 @@ defmodule Jido.AI.SignalTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.{ReqLLMResult, ReqLLMPartial, ReqLLMError, UsageReport}
+  alias Jido.AI.Signal.{ReqLLMError, ReqLLMPartial, ReqLLMResult, UsageReport}
 
   describe "ReqLLMResult" do
     test "creates signal with required fields" do

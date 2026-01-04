@@ -15,10 +15,10 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Config
-  alias Jido.AI.Directive.{ReqLLMStream, ReqLLMGenerate, ReqLLMEmbed}
+  alias Jido.AI.Directive.{ReqLLMEmbed, ReqLLMGenerate, ReqLLMStream}
   alias Jido.AI.Helpers
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.{ReqLLMError, UsageReport, ToolResult, EmbedResult}
+  alias Jido.AI.Signal.{EmbedResult, ReqLLMError, ToolResult, UsageReport}
   alias Jido.AI.ToolAdapter
 
   # ============================================================================
