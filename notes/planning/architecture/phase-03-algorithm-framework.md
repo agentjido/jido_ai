@@ -274,45 +274,45 @@ Implement composite algorithm for combining multiple algorithms.
 
 Create the composite algorithm module.
 
-- [ ] 3.6.1.1 Create `lib/jido_ai/algorithms/composite.ex` with module documentation
-- [ ] 3.6.1.2 Use `Jido.AI.Algorithms.Base` with name and description
-- [ ] 3.6.1.3 Document composition patterns
+- [x] 3.6.1.1 Create `lib/jido_ai/algorithms/composite.ex` with module documentation
+- [x] 3.6.1.2 Use `Jido.AI.Algorithms.Base` with name and description
+- [x] 3.6.1.3 Document composition patterns
 
 ### 3.6.2 Composition Operators
 
 Implement composition operators.
 
-- [ ] 3.6.2.1 Implement `sequence/1` for sequential composition
-- [ ] 3.6.2.2 Implement `parallel/1` for parallel composition
-- [ ] 3.6.2.3 Implement `choice/2` for conditional selection
-- [ ] 3.6.2.4 Implement `repeat/2` for repeated execution
+- [x] 3.6.2.1 Implement `sequence/1` for sequential composition
+- [x] 3.6.2.2 Implement `parallel/1` for parallel composition
+- [x] 3.6.2.3 Implement `choice/3` for conditional selection
+- [x] 3.6.2.4 Implement `repeat/2` for repeated execution
 
 ### 3.6.3 Dynamic Composition
 
 Implement dynamic algorithm composition.
 
-- [ ] 3.6.3.1 Implement `compose/2` for runtime composition
-- [ ] 3.6.3.2 Support nested compositions
-- [ ] 3.6.3.3 Validate composition graph
+- [x] 3.6.3.1 Implement `compose/2` for runtime composition
+- [x] 3.6.3.2 Support nested compositions
+- [x] 3.6.3.3 Validate composition graph
 
 ### 3.6.4 Conditional Execution
 
 Implement conditional algorithm selection.
 
-- [ ] 3.6.4.1 Implement `when/2` for conditional execution
-- [ ] 3.6.4.2 Support predicate functions
-- [ ] 3.6.4.3 Support pattern matching on input
+- [x] 3.6.4.1 Implement `when_cond/2` for conditional execution
+- [x] 3.6.4.2 Support predicate functions
+- [x] 3.6.4.3 Support pattern matching on input
 
 ### 3.6.5 Unit Tests for Composite Algorithm
 
-- [ ] Test sequence/1 creates sequential composite
-- [ ] Test parallel/1 creates parallel composite
-- [ ] Test choice/2 selects based on condition
-- [ ] Test repeat/2 executes multiple times
-- [ ] Test compose/2 combines algorithms dynamically
-- [ ] Test nested compositions
-- [ ] Test when/2 conditional execution
-- [ ] Test predicate function evaluation
+- [x] Test sequence/1 creates sequential composite
+- [x] Test parallel/1 creates parallel composite
+- [x] Test choice/3 selects based on condition
+- [x] Test repeat/2 executes multiple times
+- [x] Test compose/2 combines algorithms dynamically
+- [x] Test nested compositions
+- [x] Test when_cond/2 conditional execution
+- [x] Test predicate function evaluation
 
 ---
 
