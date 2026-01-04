@@ -330,7 +330,7 @@ defmodule Jido.AI.Signal do
     tool_calls = extract_response_tool_calls(response)
 
     # Determine response type
-    type = if tool_calls != [], do: :tool_calls, else: :final_answer
+    type = if tool_calls == [], do: :final_answer, else: :tool_calls
 
     # Extract text content
     text = extract_response_text(response)
@@ -405,7 +405,7 @@ defmodule Jido.AI.Signal do
       |> Enum.filter(&match?(%{type: :thinking}, &1))
       |> Enum.map_join("", & &1.thinking)
 
-    if thinking == "", do: nil, else: thinking
+    if thinking != "", do: thinking
   end
 
   defp extract_thinking_content(_), do: nil

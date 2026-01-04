@@ -6,10 +6,11 @@ defmodule Jido.AI.SignalTest do
 
   describe "ReqLLMResult" do
     test "creates signal with required fields" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_123",
-        result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_123",
+          result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
+        })
 
       assert signal.type == "reqllm.result"
       assert signal.data.call_id == "call_123"
@@ -18,54 +19,60 @@ defmodule Jido.AI.SignalTest do
 
     test "creates signal with usage metadata" do
       usage = %{input_tokens: 100, output_tokens: 50}
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_456",
-        result: {:ok, %{type: :final_answer, text: "Hi"}},
-        usage: usage
-      })
+
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_456",
+          result: {:ok, %{type: :final_answer, text: "Hi"}},
+          usage: usage
+        })
 
       assert signal.data.usage == usage
     end
 
     test "creates signal with model metadata" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_789",
-        result: {:ok, %{type: :final_answer, text: "Hi"}},
-        model: "anthropic:claude-haiku-4-5"
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_789",
+          result: {:ok, %{type: :final_answer, text: "Hi"}},
+          model: "anthropic:claude-haiku-4-5"
+        })
 
       assert signal.data.model == "anthropic:claude-haiku-4-5"
     end
 
     test "creates signal with duration_ms metadata" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_abc",
-        result: {:ok, %{type: :final_answer, text: "Hi"}},
-        duration_ms: 1500
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_abc",
+          result: {:ok, %{type: :final_answer, text: "Hi"}},
+          duration_ms: 1500
+        })
 
       assert signal.data.duration_ms == 1500
     end
 
     test "creates signal with thinking_content metadata" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_def",
-        result: {:ok, %{type: :final_answer, text: "Hi"}},
-        thinking_content: "Let me think about this..."
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_def",
+          result: {:ok, %{type: :final_answer, text: "Hi"}},
+          thinking_content: "Let me think about this..."
+        })
 
       assert signal.data.thinking_content == "Let me think about this..."
     end
 
     test "creates signal with all metadata fields" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_full",
-        result: {:ok, %{type: :final_answer, text: "Complete"}},
-        usage: %{input_tokens: 200, output_tokens: 100},
-        model: "openai:gpt-4o",
-        duration_ms: 2500,
-        thinking_content: "I need to consider multiple options..."
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_full",
+          result: {:ok, %{type: :final_answer, text: "Complete"}},
+          usage: %{input_tokens: 200, output_tokens: 100},
+          model: "openai:gpt-4o",
+          duration_ms: 2500,
+          thinking_content: "I need to consider multiple options..."
+        })
 
       assert signal.data.call_id == "call_full"
       assert signal.data.usage == %{input_tokens: 200, output_tokens: 100}
@@ -77,10 +84,11 @@ defmodule Jido.AI.SignalTest do
 
   describe "ReqLLMPartial" do
     test "creates partial signal with required fields" do
-      signal = ReqLLMPartial.new!(%{
-        call_id: "call_partial_1",
-        delta: "Hello"
-      })
+      signal =
+        ReqLLMPartial.new!(%{
+          call_id: "call_partial_1",
+          delta: "Hello"
+        })
 
       assert signal.type == "reqllm.partial"
       assert signal.data.call_id == "call_partial_1"
@@ -89,30 +97,33 @@ defmodule Jido.AI.SignalTest do
     end
 
     test "creates partial signal with default chunk_type :content" do
-      signal = ReqLLMPartial.new!(%{
-        call_id: "call_partial_2",
-        delta: " world"
-      })
+      signal =
+        ReqLLMPartial.new!(%{
+          call_id: "call_partial_2",
+          delta: " world"
+        })
 
       assert signal.data.chunk_type == :content
     end
 
     test "creates partial signal with chunk_type :thinking" do
-      signal = ReqLLMPartial.new!(%{
-        call_id: "call_partial_3",
-        delta: "Let me think about this...",
-        chunk_type: :thinking
-      })
+      signal =
+        ReqLLMPartial.new!(%{
+          call_id: "call_partial_3",
+          delta: "Let me think about this...",
+          chunk_type: :thinking
+        })
 
       assert signal.data.chunk_type == :thinking
       assert signal.data.delta == "Let me think about this..."
     end
 
     test "creates partial signal with empty delta" do
-      signal = ReqLLMPartial.new!(%{
-        call_id: "call_partial_4",
-        delta: ""
-      })
+      signal =
+        ReqLLMPartial.new!(%{
+          call_id: "call_partial_4",
+          delta: ""
+        })
 
       assert signal.data.delta == ""
     end
@@ -132,18 +143,19 @@ defmodule Jido.AI.SignalTest do
       assert Enum.all?(signals, &(&1.type == "reqllm.partial"))
       assert Enum.all?(signals, &(&1.data.call_id == "call_stream_1"))
 
-      accumulated = signals |> Enum.map(& &1.data.delta) |> Enum.join()
+      accumulated = signals |> Enum.map_join(& &1.data.delta)
       assert accumulated == "Hello, world!"
     end
   end
 
   describe "ReqLLMError" do
     test "creates error signal with required fields" do
-      signal = ReqLLMError.new!(%{
-        call_id: "call_err_1",
-        error_type: :rate_limit,
-        message: "Rate limit exceeded"
-      })
+      signal =
+        ReqLLMError.new!(%{
+          call_id: "call_err_1",
+          error_type: :rate_limit,
+          message: "Rate limit exceeded"
+        })
 
       assert signal.type == "reqllm.error"
       assert signal.data.call_id == "call_err_1"
@@ -153,24 +165,27 @@ defmodule Jido.AI.SignalTest do
     end
 
     test "creates error signal with retry_after" do
-      signal = ReqLLMError.new!(%{
-        call_id: "call_err_2",
-        error_type: :rate_limit,
-        message: "Too many requests",
-        retry_after: 60
-      })
+      signal =
+        ReqLLMError.new!(%{
+          call_id: "call_err_2",
+          error_type: :rate_limit,
+          message: "Too many requests",
+          retry_after: 60
+        })
 
       assert signal.data.retry_after == 60
     end
 
     test "creates error signal with details" do
       details = %{provider: "anthropic", error_code: "overloaded"}
-      signal = ReqLLMError.new!(%{
-        call_id: "call_err_3",
-        error_type: :provider_error,
-        message: "Provider is overloaded",
-        details: details
-      })
+
+      signal =
+        ReqLLMError.new!(%{
+          call_id: "call_err_3",
+          error_type: :provider_error,
+          message: "Provider is overloaded",
+          details: details
+        })
 
       assert signal.data.details == details
     end
@@ -179,11 +194,12 @@ defmodule Jido.AI.SignalTest do
       error_types = [:rate_limit, :auth, :timeout, :provider_error, :validation, :network, :unknown]
 
       for error_type <- error_types do
-        signal = ReqLLMError.new!(%{
-          call_id: "call_#{error_type}",
-          error_type: error_type,
-          message: "Error of type #{error_type}"
-        })
+        signal =
+          ReqLLMError.new!(%{
+            call_id: "call_#{error_type}",
+            error_type: error_type,
+            message: "Error of type #{error_type}"
+          })
 
         assert signal.data.error_type == error_type
       end
@@ -192,12 +208,13 @@ defmodule Jido.AI.SignalTest do
 
   describe "UsageReport" do
     test "creates usage report with required fields" do
-      signal = UsageReport.new!(%{
-        call_id: "call_usage_1",
-        model: "anthropic:claude-haiku-4-5",
-        input_tokens: 150,
-        output_tokens: 75
-      })
+      signal =
+        UsageReport.new!(%{
+          call_id: "call_usage_1",
+          model: "anthropic:claude-haiku-4-5",
+          input_tokens: 150,
+          output_tokens: 75
+        })
 
       assert signal.type == "ai.usage_report"
       assert signal.data.call_id == "call_usage_1"
@@ -208,38 +225,42 @@ defmodule Jido.AI.SignalTest do
     end
 
     test "creates usage report with total_tokens" do
-      signal = UsageReport.new!(%{
-        call_id: "call_usage_2",
-        model: "openai:gpt-4o",
-        input_tokens: 200,
-        output_tokens: 100,
-        total_tokens: 300
-      })
+      signal =
+        UsageReport.new!(%{
+          call_id: "call_usage_2",
+          model: "openai:gpt-4o",
+          input_tokens: 200,
+          output_tokens: 100,
+          total_tokens: 300
+        })
 
       assert signal.data.total_tokens == 300
     end
 
     test "creates usage report with duration_ms" do
-      signal = UsageReport.new!(%{
-        call_id: "call_usage_3",
-        model: "openai:gpt-4o",
-        input_tokens: 100,
-        output_tokens: 50,
-        duration_ms: 1200
-      })
+      signal =
+        UsageReport.new!(%{
+          call_id: "call_usage_3",
+          model: "openai:gpt-4o",
+          input_tokens: 100,
+          output_tokens: 50,
+          duration_ms: 1200
+        })
 
       assert signal.data.duration_ms == 1200
     end
 
     test "creates usage report with metadata" do
       metadata = %{request_id: "req_123", user_id: "user_456"}
-      signal = UsageReport.new!(%{
-        call_id: "call_usage_4",
-        model: "anthropic:claude-sonnet-4-20250514",
-        input_tokens: 500,
-        output_tokens: 250,
-        metadata: metadata
-      })
+
+      signal =
+        UsageReport.new!(%{
+          call_id: "call_usage_4",
+          model: "anthropic:claude-sonnet-4-20250514",
+          input_tokens: 500,
+          output_tokens: 250,
+          metadata: metadata
+        })
 
       assert signal.data.metadata == metadata
     end
@@ -252,10 +273,11 @@ defmodule Jido.AI.SignalTest do
         %{id: "tc_2", name: "weather", arguments: %{city: "NYC"}}
       ]
 
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_tc_1",
-        result: {:ok, %{type: :tool_calls, tool_calls: tool_calls, text: ""}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_tc_1",
+          result: {:ok, %{type: :tool_calls, tool_calls: tool_calls, text: ""}}
+        })
 
       assert Signal.extract_tool_calls(signal) == tool_calls
     end
@@ -263,39 +285,43 @@ defmodule Jido.AI.SignalTest do
     test "extracts tool calls when type is not explicitly :tool_calls but list is present" do
       tool_calls = [%{id: "tc_3", name: "search", arguments: %{query: "test"}}]
 
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_tc_2",
-        result: {:ok, %{tool_calls: tool_calls, text: "Some text"}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_tc_2",
+          result: {:ok, %{tool_calls: tool_calls, text: "Some text"}}
+        })
 
       assert Signal.extract_tool_calls(signal) == tool_calls
     end
 
     test "returns empty list for final_answer type" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_tc_3",
-        result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_tc_3",
+          result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
+        })
 
       assert Signal.extract_tool_calls(signal) == []
     end
 
     test "returns empty list for error result" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_tc_4",
-        result: {:error, %{reason: "timeout"}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_tc_4",
+          result: {:error, %{reason: "timeout"}}
+        })
 
       assert Signal.extract_tool_calls(signal) == []
     end
 
     test "returns empty list for non-ReqLLMResult signals" do
-      signal = UsageReport.new!(%{
-        call_id: "call_usage",
-        model: "test",
-        input_tokens: 10,
-        output_tokens: 5
-      })
+      signal =
+        UsageReport.new!(%{
+          call_id: "call_usage",
+          model: "test",
+          input_tokens: 10,
+          output_tokens: 5
+        })
 
       assert Signal.extract_tool_calls(signal) == []
     end
@@ -303,47 +329,52 @@ defmodule Jido.AI.SignalTest do
 
   describe "tool_call?/1" do
     test "returns true for result with tool_calls type" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_is_tc_1",
-        result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_is_tc_1",
+          result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
+        })
 
       assert Signal.tool_call?(signal) == true
     end
 
     test "returns true when tool_calls list is non-empty" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_is_tc_2",
-        result: {:ok, %{tool_calls: [%{id: "tc_1"}], text: "text"}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_is_tc_2",
+          result: {:ok, %{tool_calls: [%{id: "tc_1"}], text: "text"}}
+        })
 
       assert Signal.tool_call?(signal) == true
     end
 
     test "returns false for final_answer type" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_is_tc_3",
-        result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_is_tc_3",
+          result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
+        })
 
       assert Signal.tool_call?(signal) == false
     end
 
     test "returns false for error result" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_is_tc_4",
-        result: {:error, %{reason: "failed"}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_is_tc_4",
+          result: {:error, %{reason: "failed"}}
+        })
 
       assert Signal.tool_call?(signal) == false
     end
 
     test "returns false for non-ReqLLMResult signals" do
-      signal = ReqLLMError.new!(%{
-        call_id: "call_err",
-        error_type: :timeout,
-        message: "Timeout"
-      })
+      signal =
+        ReqLLMError.new!(%{
+          call_id: "call_err",
+          error_type: :timeout,
+          message: "Timeout"
+        })
 
       assert Signal.tool_call?(signal) == false
     end
@@ -351,10 +382,11 @@ defmodule Jido.AI.SignalTest do
 
   describe "is_tool_call?/1 (deprecated)" do
     test "is_tool_call?/1 delegates to tool_call?/1" do
-      signal = ReqLLMResult.new!(%{
-        call_id: "call_deprecated",
-        result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
-      })
+      signal =
+        ReqLLMResult.new!(%{
+          call_id: "call_deprecated",
+          result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
+        })
 
       # Should still work but is deprecated
       assert Signal.is_tool_call?(signal) == Signal.tool_call?(signal)
@@ -396,10 +428,11 @@ defmodule Jido.AI.SignalTest do
         model: "anthropic:claude-haiku-4-5"
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(response,
-        call_id: "call_from_3",
-        model: "openai:gpt-4o"
-      )
+      {:ok, signal} =
+        Signal.from_reqllm_response(response,
+          call_id: "call_from_3",
+          model: "openai:gpt-4o"
+        )
 
       assert signal.data.model == "openai:gpt-4o"
     end
@@ -407,10 +440,11 @@ defmodule Jido.AI.SignalTest do
     test "creates signal with duration_ms" do
       response = %{message: %{content: "Test"}}
 
-      {:ok, signal} = Signal.from_reqllm_response(response,
-        call_id: "call_from_4",
-        duration_ms: 1234
-      )
+      {:ok, signal} =
+        Signal.from_reqllm_response(response,
+          call_id: "call_from_4",
+          duration_ms: 1234
+        )
 
       assert signal.data.duration_ms == 1234
     end

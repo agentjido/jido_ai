@@ -69,8 +69,8 @@ defmodule Jido.AI.Strategy.ReAct do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.{Directive, ToolAdapter}
   alias Jido.AI.ReAct.Machine
+  alias Jido.AI.{Directive, ToolAdapter}
   alias ReqLLM.Context
 
   @type config :: %{
@@ -204,7 +204,7 @@ defmodule Jido.AI.Strategy.ReAct do
       Enum.reduce(instructions, {agent, []}, fn instr, {acc_agent, acc_dirs} ->
         case process_instruction(acc_agent, instr) do
           {new_agent, new_dirs} ->
-            {new_agent, Enum.reverse(new_dirs) ++ acc_dirs}
+            {new_agent, Enum.reverse(new_dirs, acc_dirs)}
 
           :noop ->
             {acc_agent, acc_dirs}
@@ -215,27 +215,29 @@ defmodule Jido.AI.Strategy.ReAct do
   end
 
   defp process_instruction(agent, %Jido.Instruction{action: action, params: params}) do
-    with msg when not is_nil(msg) <- to_machine_msg(normalize_action(action), params) do
-      state = StratState.get(agent, %{})
-      config = state[:config]
-      machine = Machine.from_map(state)
+    case to_machine_msg(normalize_action(action), params) do
+      msg when not is_nil(msg) ->
+        state = StratState.get(agent, %{})
+        config = state[:config]
+        machine = Machine.from_map(state)
 
-      env = %{
-        system_prompt: config[:system_prompt],
-        max_iterations: config[:max_iterations]
-      }
+        env = %{
+          system_prompt: config[:system_prompt],
+          max_iterations: config[:max_iterations]
+        }
 
-      {machine, directives} = Machine.update(machine, msg, env)
+        {machine, directives} = Machine.update(machine, msg, env)
 
-      new_state =
-        machine
-        |> Machine.to_map()
-        |> Map.put(:config, config)
+        new_state =
+          machine
+          |> Machine.to_map()
+          |> Map.put(:config, config)
 
-      agent = StratState.put(agent, new_state)
-      {agent, lift_directives(directives, config)}
-    else
-      _ -> :noop
+        agent = StratState.put(agent, new_state)
+        {agent, lift_directives(directives, config)}
+
+      _ ->
+        :noop
     end
   end
 

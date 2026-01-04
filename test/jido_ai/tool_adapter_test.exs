@@ -58,11 +58,12 @@ defmodule Jido.AI.ToolAdapterTest do
     end
 
     test "converts multiple actions to tools" do
-      tools = ToolAdapter.from_actions([
-        TestActions.Calculator,
-        TestActions.Search,
-        TestActions.Weather
-      ])
+      tools =
+        ToolAdapter.from_actions([
+          TestActions.Calculator,
+          TestActions.Search,
+          TestActions.Weather
+        ])
 
       assert length(tools) == 3
       names = Enum.map(tools, & &1.name)
@@ -78,9 +79,10 @@ defmodule Jido.AI.ToolAdapterTest do
 
   describe "from_actions/2 with :prefix option" do
     test "adds prefix to tool names" do
-      tools = ToolAdapter.from_actions([TestActions.Calculator, TestActions.Search],
-        prefix: "myapp_"
-      )
+      tools =
+        ToolAdapter.from_actions([TestActions.Calculator, TestActions.Search],
+          prefix: "myapp_"
+        )
 
       names = Enum.map(tools, & &1.name)
       assert "myapp_calculator" in names
@@ -100,10 +102,11 @@ defmodule Jido.AI.ToolAdapterTest do
 
   describe "from_actions/2 with :filter option" do
     test "filters actions by function" do
-      tools = ToolAdapter.from_actions(
-        [TestActions.Calculator, TestActions.Search, TestActions.Weather],
-        filter: fn mod -> mod.name() in ["search", "weather"] end
-      )
+      tools =
+        ToolAdapter.from_actions(
+          [TestActions.Calculator, TestActions.Search, TestActions.Weather],
+          filter: fn mod -> mod.name() in ["search", "weather"] end
+        )
 
       assert length(tools) == 2
       names = Enum.map(tools, & &1.name)
@@ -113,25 +116,28 @@ defmodule Jido.AI.ToolAdapterTest do
     end
 
     test "filter returning false for all returns empty list" do
-      tools = ToolAdapter.from_actions([TestActions.Calculator],
-        filter: fn _mod -> false end
-      )
+      tools =
+        ToolAdapter.from_actions([TestActions.Calculator],
+          filter: fn _mod -> false end
+        )
 
       assert tools == []
     end
 
     test "filter returning true for all returns all" do
-      tools = ToolAdapter.from_actions([TestActions.Calculator, TestActions.Search],
-        filter: fn _mod -> true end
-      )
+      tools =
+        ToolAdapter.from_actions([TestActions.Calculator, TestActions.Search],
+          filter: fn _mod -> true end
+        )
 
       assert length(tools) == 2
     end
 
     test "nil filter has no effect" do
-      tools = ToolAdapter.from_actions([TestActions.Calculator, TestActions.Search],
-        filter: nil
-      )
+      tools =
+        ToolAdapter.from_actions([TestActions.Calculator, TestActions.Search],
+          filter: nil
+        )
 
       assert length(tools) == 2
     end
@@ -139,11 +145,12 @@ defmodule Jido.AI.ToolAdapterTest do
 
   describe "from_actions/2 with combined options" do
     test "applies both filter and prefix" do
-      tools = ToolAdapter.from_actions(
-        [TestActions.Calculator, TestActions.Search, TestActions.Weather],
-        filter: fn mod -> mod.name() in ["search", "weather"] end,
-        prefix: "api_"
-      )
+      tools =
+        ToolAdapter.from_actions(
+          [TestActions.Calculator, TestActions.Search, TestActions.Weather],
+          filter: fn mod -> mod.name() in ["search", "weather"] end,
+          prefix: "api_"
+        )
 
       assert length(tools) == 2
       names = Enum.map(tools, & &1.name)
@@ -185,10 +192,11 @@ defmodule Jido.AI.ToolAdapterTest do
 
   describe "register_actions/1" do
     test "registers multiple actions" do
-      :ok = ToolAdapter.register_actions([
-        TestActions.Calculator,
-        TestActions.Search
-      ])
+      :ok =
+        ToolAdapter.register_actions([
+          TestActions.Calculator,
+          TestActions.Search
+        ])
 
       actions = ToolAdapter.list_actions()
       assert length(actions) == 2
@@ -241,11 +249,12 @@ defmodule Jido.AI.ToolAdapterTest do
 
   describe "clear_registry/0" do
     test "removes all registered actions" do
-      :ok = ToolAdapter.register_actions([
-        TestActions.Calculator,
-        TestActions.Search,
-        TestActions.Weather
-      ])
+      :ok =
+        ToolAdapter.register_actions([
+          TestActions.Calculator,
+          TestActions.Search,
+          TestActions.Weather
+        ])
 
       assert length(ToolAdapter.list_actions()) == 3
 

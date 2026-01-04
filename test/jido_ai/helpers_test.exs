@@ -53,10 +53,11 @@ defmodule Jido.AI.HelpersTest do
     end
 
     test "does not add system message if one exists" do
-      context = Context.new([
-        Context.system("Existing system"),
-        Context.user("Hello")
-      ])
+      context =
+        Context.new([
+          Context.system("Existing system"),
+          Context.user("Hello")
+        ])
 
       updated = Helpers.add_system_message(context, "New system")
 

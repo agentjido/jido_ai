@@ -51,10 +51,11 @@ defmodule Jido.AI.Tools.ToolTest do
 
     @impl true
     def run(params, context) do
-      {:ok, %{
-        message: params.message,
-        context_keys: Map.keys(context)
-      }}
+      {:ok,
+       %{
+         message: params.message,
+         context_keys: Map.keys(context)
+       }}
     end
   end
 
