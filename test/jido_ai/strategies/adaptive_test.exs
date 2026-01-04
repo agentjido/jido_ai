@@ -6,6 +6,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
   alias Jido.AI.Strategies.ChainOfThought
   alias Jido.AI.Strategies.GraphOfThoughts
   alias Jido.AI.Strategies.TreeOfThoughts
+  alias Jido.AI.Strategies.TRM
   alias Jido.AI.Strategy.ReAct
 
   @moduletag :unit
@@ -66,7 +67,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
       assert state[:config][:model] == "anthropic:claude-haiku-4-5"
       assert state[:config][:default_strategy] == :react
-      assert state[:config][:available_strategies] == [:cot, :react, :tot, :got]
+      assert state[:config][:available_strategies] == [:cot, :react, :tot, :got, :trm]
       assert is_nil(state[:selected_strategy])
       assert is_nil(state[:strategy_type])
     end
@@ -616,6 +617,96 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       # Falls back to ToT since GoT not available
       assert state[:strategy_type] == :tot
       assert state[:task_type] == :synthesis
+    end
+  end
+
+  describe "TRM integration" do
+    test "TRM is in strategy_modules" do
+      # Verify TRM is registered as an available strategy
+      {agent, _ctx} = create_agent()
+      state = StratState.get(agent, %{})
+
+      assert :trm in state[:config][:available_strategies]
+    end
+
+    test "detects iterative reasoning from puzzle keywords" do
+      # Each prompt should contain at least one puzzle keyword:
+      # puzzle, iterate, improve, refine, recursive, riddle
+      prompts = [
+        "This is a puzzle that needs careful reasoning",
+        "Iterate on this solution until perfect",
+        "Improve the answer through multiple refinements",
+        "Refine this draft recursively",
+        "This riddle needs careful reasoning"
+      ]
+
+      for prompt <- prompts do
+        {strategy, _score, task_type} = Adaptive.analyze_prompt(prompt)
+        assert task_type == :iterative_reasoning, "Expected iterative_reasoning for: #{prompt}"
+        assert strategy == :trm, "Expected :trm for puzzle prompt: #{prompt}"
+      end
+    end
+
+    test "selects TRM for iterative reasoning tasks" do
+      {agent, ctx} = create_agent(available_strategies: [:cot, :react, :tot, :got, :trm])
+
+      instructions = [
+        %{action: :adaptive_start, params: %{prompt: "Solve this puzzle step by step and iterate to improve the solution"}}
+      ]
+
+      {agent, _directives} = Adaptive.cmd(agent, instructions, ctx)
+      state = StratState.get(agent, %{})
+
+      assert state[:strategy_type] == :trm
+      assert state[:selected_strategy] == TRM
+      assert state[:task_type] == :iterative_reasoning
+    end
+
+    test "falls back to ToT when TRM not available for iterative reasoning" do
+      {agent, ctx} = create_agent(available_strategies: [:cot, :react, :tot, :got])
+
+      instructions = [
+        %{action: :adaptive_start, params: %{prompt: "This puzzle needs iterative reasoning"}}
+      ]
+
+      {agent, _directives} = Adaptive.cmd(agent, instructions, ctx)
+      state = StratState.get(agent, %{})
+
+      # Falls back to ToT since TRM not available
+      assert state[:strategy_type] == :tot
+      assert state[:task_type] == :iterative_reasoning
+    end
+
+    test "override to TRM works" do
+      {agent, ctx} = create_agent(strategy: :trm)
+
+      instructions = [
+        %{action: :adaptive_start, params: %{prompt: "Simple question"}}
+      ]
+
+      {agent, _directives} = Adaptive.cmd(agent, instructions, ctx)
+      state = StratState.get(agent, %{})
+
+      assert state[:strategy_type] == :trm
+      assert state[:selected_strategy] == TRM
+    end
+
+    test "TRM action mappings work correctly" do
+      {agent, ctx} = create_agent(strategy: :trm)
+
+      instructions = [
+        %{action: :adaptive_start, params: %{prompt: "Test prompt"}}
+      ]
+
+      {agent, directives} = Adaptive.cmd(agent, instructions, ctx)
+
+      # Should have a directive from TRM strategy
+      assert directives != []
+      assert Enum.any?(directives, fn d -> match?(%Jido.AI.Directive.ReqLLMStream{}, d) end)
+
+      # State should show TRM is selected
+      state = StratState.get(agent, %{})
+      assert state[:selected_strategy] == TRM
     end
   end
 end
