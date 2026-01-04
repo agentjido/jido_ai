@@ -274,18 +274,18 @@ defmodule Jido.AI.Signal do
       ...>   call_id: "call_1",
       ...>   result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}]}}
       ...> })
-      iex> Signal.is_tool_call?(signal)
+      iex> Signal.tool_call?(signal)
       true
 
       iex> signal = Signal.ReqLLMResult.new!(%{
       ...>   call_id: "call_2",
       ...>   result: {:ok, %{type: :final_answer, text: "Hello"}}
       ...> })
-      iex> Signal.is_tool_call?(signal)
+      iex> Signal.tool_call?(signal)
       false
   """
-  @spec is_tool_call?(Jido.Signal.t()) :: boolean()
-  def is_tool_call?(%{type: "reqllm.result", data: %{result: {:ok, result}}}) do
+  @spec tool_call?(Jido.Signal.t()) :: boolean()
+  def tool_call?(%{type: "reqllm.result", data: %{result: {:ok, result}}}) do
     case result do
       %{type: :tool_calls} -> true
       %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> true
@@ -293,7 +293,14 @@ defmodule Jido.AI.Signal do
     end
   end
 
-  def is_tool_call?(_signal), do: false
+  def tool_call?(_signal), do: false
+
+  @doc """
+  Deprecated: Use `tool_call?/1` instead.
+  """
+  @deprecated "Use tool_call?/1 instead"
+  @spec is_tool_call?(Jido.Signal.t()) :: boolean()
+  def is_tool_call?(signal), do: tool_call?(signal)
 
   @doc """
   Creates a ReqLLMResult signal from a ReqLLM response struct.

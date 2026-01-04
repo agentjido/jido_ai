@@ -1,7 +1,7 @@
 defmodule Jido.AI.DirectiveTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Directive.{ReqLLMStream, ReqLLMGenerate, ReqLLMEmbed}
+  alias Jido.AI.Directive.{ReqLLMStream, ReqLLMGenerate, ReqLLMEmbed, ToolExec}
   alias Jido.AI.Signal.EmbedResult
 
   describe "ReqLLMStream" do
@@ -197,6 +197,101 @@ defmodule Jido.AI.DirectiveTest do
     test "raises on missing required fields" do
       assert_raise RuntimeError, ~r/Invalid ReqLLMEmbed/, fn ->
         ReqLLMEmbed.new!(%{id: "embed_123"})
+      end
+    end
+  end
+
+  describe "ToolExec" do
+    test "creates directive with required fields" do
+      directive = ToolExec.new!(%{
+        id: "call_123",
+        tool_name: "calculator",
+        action_module: MyApp.Actions.Calculator
+      })
+
+      assert directive.id == "call_123"
+      assert directive.tool_name == "calculator"
+      assert directive.action_module == MyApp.Actions.Calculator
+      assert directive.arguments == %{}
+      assert directive.context == %{}
+      assert directive.metadata == %{}
+    end
+
+    test "creates directive with arguments" do
+      directive = ToolExec.new!(%{
+        id: "call_456",
+        tool_name: "calculator",
+        action_module: MyApp.Actions.Calculator,
+        arguments: %{"a" => 1, "b" => 2, "operation" => "add"}
+      })
+
+      assert directive.arguments == %{"a" => 1, "b" => 2, "operation" => "add"}
+    end
+
+    test "creates directive with context" do
+      directive = ToolExec.new!(%{
+        id: "call_789",
+        tool_name: "weather",
+        action_module: MyApp.Actions.Weather,
+        context: %{user_id: "user_123", session_id: "sess_456"}
+      })
+
+      assert directive.context == %{user_id: "user_123", session_id: "sess_456"}
+    end
+
+    test "creates directive with metadata" do
+      directive = ToolExec.new!(%{
+        id: "call_abc",
+        tool_name: "search",
+        action_module: MyApp.Actions.Search,
+        metadata: %{request_id: "req_123", timestamp: ~U[2026-01-03 12:00:00Z]}
+      })
+
+      assert directive.metadata == %{request_id: "req_123", timestamp: ~U[2026-01-03 12:00:00Z]}
+    end
+
+    test "creates directive with all optional fields" do
+      directive = ToolExec.new!(%{
+        id: "call_full",
+        tool_name: "database",
+        action_module: MyApp.Actions.Database,
+        arguments: %{query: "SELECT * FROM users"},
+        context: %{db_pool: :primary},
+        metadata: %{traced: true}
+      })
+
+      assert directive.id == "call_full"
+      assert directive.tool_name == "database"
+      assert directive.action_module == MyApp.Actions.Database
+      assert directive.arguments == %{query: "SELECT * FROM users"}
+      assert directive.context == %{db_pool: :primary}
+      assert directive.metadata == %{traced: true}
+    end
+
+    test "raises on missing required fields - id" do
+      assert_raise RuntimeError, ~r/Invalid ToolExec/, fn ->
+        ToolExec.new!(%{
+          tool_name: "calculator",
+          action_module: MyApp.Actions.Calculator
+        })
+      end
+    end
+
+    test "raises on missing required fields - tool_name" do
+      assert_raise RuntimeError, ~r/Invalid ToolExec/, fn ->
+        ToolExec.new!(%{
+          id: "call_123",
+          action_module: MyApp.Actions.Calculator
+        })
+      end
+    end
+
+    test "raises on missing required fields - action_module" do
+      assert_raise RuntimeError, ~r/Invalid ToolExec/, fn ->
+        ToolExec.new!(%{
+          id: "call_123",
+          tool_name: "calculator"
+        })
       end
     end
   end

@@ -223,8 +223,6 @@ defmodule Jido.AI.Config do
   """
   @spec validate() :: :ok | {:error, [String.t()]}
   def validate do
-    errors = []
-
     # Validate model aliases point to valid-looking specs
     aliases = get_model_aliases()
 
@@ -240,7 +238,7 @@ defmodule Jido.AI.Config do
     # Validate defaults have valid types
     default_errors = validate_defaults()
 
-    all_errors = errors ++ alias_errors ++ default_errors
+    all_errors = alias_errors ++ default_errors
 
     if all_errors == [] do
       :ok
@@ -277,22 +275,22 @@ defmodule Jido.AI.Config do
 
   defp validate_defaults do
     defaults = defaults()
-    errors = []
 
-    errors =
-      case Map.get(defaults, :temperature) do
-        nil -> errors
-        t when is_number(t) and t >= 0 and t <= 2 -> errors
-        t -> ["Invalid temperature: #{inspect(t)}. Must be a number between 0 and 2." | errors]
-      end
+    validators = [
+      {:temperature, &validate_temperature/1},
+      {:max_tokens, &validate_max_tokens/1}
+    ]
 
-    errors =
-      case Map.get(defaults, :max_tokens) do
-        nil -> errors
-        t when is_integer(t) and t > 0 -> errors
-        t -> ["Invalid max_tokens: #{inspect(t)}. Must be a positive integer." | errors]
-      end
-
-    errors
+    Enum.flat_map(validators, fn {key, validator} ->
+      defaults |> Map.get(key) |> validator.()
+    end)
   end
+
+  defp validate_temperature(nil), do: []
+  defp validate_temperature(t) when is_number(t) and t >= 0 and t <= 2, do: []
+  defp validate_temperature(t), do: ["Invalid temperature: #{inspect(t)}. Must be a number between 0 and 2."]
+
+  defp validate_max_tokens(nil), do: []
+  defp validate_max_tokens(t) when is_integer(t) and t > 0, do: []
+  defp validate_max_tokens(t), do: ["Invalid max_tokens: #{inspect(t)}. Must be a positive integer."]
 end

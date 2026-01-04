@@ -158,7 +158,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       {:ok, signal} = Signal.from_reqllm_response(mocked_response, call_id: "call_789")
 
       # Test helper functions
-      assert Signal.is_tool_call?(signal) == true
+      assert Signal.tool_call?(signal) == true
       tool_calls = Signal.extract_tool_calls(signal)
       assert length(tool_calls) == 1
       assert hd(tool_calls).name == "search"
@@ -171,7 +171,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
       {:ok, signal} = Signal.from_reqllm_response(mocked_response, call_id: "call_answer")
 
-      assert Signal.is_tool_call?(signal) == false
+      assert Signal.tool_call?(signal) == false
       assert Signal.extract_tool_calls(signal) == []
     end
   end
@@ -493,7 +493,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
       # 6. Use helpers to process
       assert Helpers.classify_response(mocked_response) == :final_answer
-      assert Signal.is_tool_call?(signal) == false
+      assert Signal.tool_call?(signal) == false
     end
 
     test "complete tool call flow" do
@@ -517,7 +517,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       {:ok, signal} = Signal.from_reqllm_response(mocked_response, call_id: directive.id)
 
       # 4. Verify tool call detection
-      assert Signal.is_tool_call?(signal) == true
+      assert Signal.tool_call?(signal) == true
       tool_calls = Signal.extract_tool_calls(signal)
       assert length(tool_calls) == 1
 
