@@ -334,38 +334,40 @@ Implement delegation to selected strategy.
 
 Comprehensive integration tests verifying all Phase 4 components work together.
 
+**Status**: COMPLETED (2026-01-04) - 27 tests passing
+
 ### 4.6.1 Strategy Execution Integration
 
 Verify strategies execute correctly with the agent runtime.
 
-- [ ] 4.6.1.1 Create `test/jido_ai/integration/strategies_phase4_test.exs`
-- [ ] 4.6.1.2 Test: ReAct strategy completes multi-turn conversation
-- [ ] 4.6.1.3 Test: CoT strategy produces step-by-step reasoning
-- [ ] 4.6.1.4 Test: ToT strategy explores multiple branches
+- [x] 4.6.1.1 Create `test/jido_ai/integration/strategies_phase4_test.exs`
+- [x] 4.6.1.2 Test: ReAct strategy completes multi-turn conversation
+- [x] 4.6.1.3 Test: CoT strategy produces step-by-step reasoning
+- [x] 4.6.1.4 Test: ToT strategy explores multiple branches
 
 ### 4.6.2 Signal Routing Integration
 
 Test signal routing for all strategies.
 
-- [ ] 4.6.2.1 Test: `reqllm.result` routes to correct strategy command
-- [ ] 4.6.2.2 Test: `ai.tool_result` routes correctly
-- [ ] 4.6.2.3 Test: `reqllm.partial` routes for streaming
+- [x] 4.6.2.1 Test: `reqllm.result` routes to correct strategy command
+- [x] 4.6.2.2 Test: `ai.tool_result` routes correctly
+- [x] 4.6.2.3 Test: `reqllm.partial` routes for streaming
 
 ### 4.6.3 Directive Execution Integration
 
 Test directive execution.
 
-- [ ] 4.6.3.1 Test: ReqLLMStream directive executes via runtime
-- [ ] 4.6.3.2 Test: ToolExec directive executes action
-- [ ] 4.6.3.3 Test: Result signals arrive back at strategy
+- [x] 4.6.3.1 Test: ReqLLMStream directive executes via runtime
+- [x] 4.6.3.2 Test: ToolExec directive executes action
+- [x] 4.6.3.3 Test: Result signals arrive back at strategy
 
 ### 4.6.4 Adaptive Selection Integration
 
 Test adaptive strategy selection.
 
-- [ ] 4.6.4.1 Test: Simple prompt selects CoT
-- [ ] 4.6.4.2 Test: Tool-requiring prompt selects ReAct
-- [ ] 4.6.4.3 Test: Complex prompt selects ToT/GoT
+- [x] 4.6.4.1 Test: Simple prompt selects CoT
+- [x] 4.6.4.2 Test: Tool-requiring prompt selects ReAct
+- [x] 4.6.4.3 Test: Complex prompt selects ToT/GoT
 
 ---
 
