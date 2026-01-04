@@ -169,10 +169,10 @@ defmodule Jido.AI.Tools.Tool do
       @behaviour Jido.AI.Tools.Tool
 
       @tool_name Keyword.get(unquote(opts), :name) ||
-                   raise ArgumentError, "Tool requires :name option"
+                   raise(ArgumentError, "Tool requires :name option")
 
       @tool_description Keyword.get(unquote(opts), :description) ||
-                          raise ArgumentError, "Tool requires :description option"
+                          raise(ArgumentError, "Tool requires :description option")
 
       @impl Jido.AI.Tools.Tool
       def name, do: @tool_name

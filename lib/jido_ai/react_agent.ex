@@ -64,6 +64,13 @@ defmodule Jido.AI.ReActAgent do
             default_model: default_model,
             default_max_iterations: default_max_iterations
           ] do
+      use Jido.Agent,
+        name: name,
+        description: description,
+        skills: skills,
+        strategy: {Jido.AI.Strategy.ReAct, strategy_opts},
+        schema: base_schema
+
       import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
 
       name = Keyword.fetch!(opts, :name)
@@ -89,13 +96,6 @@ defmodule Jido.AI.ReActAgent do
           completed: Zoi.boolean() |> Zoi.default(false)
         })
 
-      use Jido.Agent,
-        name: name,
-        description: description,
-        skills: skills,
-        strategy: {Jido.AI.Strategy.ReAct, strategy_opts},
-        schema: base_schema
-
       @doc """
       Send a query to the agent.
 
@@ -107,7 +107,6 @@ defmodule Jido.AI.ReActAgent do
         Jido.AgentServer.cast(pid, signal)
       end
 
-      @impl true
       def on_before_cmd(agent, {:react_start, %{query: query}} = action) do
         agent = %{agent | state: Map.put(agent.state, :last_query, query)}
         {:ok, agent, action}

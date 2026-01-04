@@ -64,7 +64,10 @@ defmodule Jido.AI.Error.API.RateLimit do
 
   @impl true
   def message(%{message: message}) when is_binary(message), do: message
-  def message(%{retry_after: seconds}) when is_integer(seconds), do: "Rate limit exceeded, retry after #{seconds} seconds"
+
+  def message(%{retry_after: seconds}) when is_integer(seconds),
+    do: "Rate limit exceeded, retry after #{seconds} seconds"
+
   def message(_), do: "Rate limit exceeded"
 end
 

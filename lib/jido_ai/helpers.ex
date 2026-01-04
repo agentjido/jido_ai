@@ -110,8 +110,7 @@ defmodule Jido.AI.Helpers do
       :system
   """
   @spec add_system_message(Context.t(), String.t()) :: Context.t()
-  def add_system_message(%Context{messages: messages} = context, system_prompt)
-      when is_binary(system_prompt) do
+  def add_system_message(%Context{messages: messages} = context, system_prompt) when is_binary(system_prompt) do
     has_system? = Enum.any?(messages, &(&1.role == :system))
 
     if has_system? do
@@ -256,9 +255,7 @@ defmodule Jido.AI.Helpers do
       false
   """
   @spec has_tool_calls?(map()) :: boolean()
-  def has_tool_calls?(%{message: %{tool_calls: tool_calls}})
-      when is_list(tool_calls) and tool_calls != [],
-      do: true
+  def has_tool_calls?(%{message: %{tool_calls: tool_calls}}) when is_list(tool_calls) and tool_calls != [], do: true
 
   def has_tool_calls?(_), do: false
 
@@ -289,9 +286,8 @@ defmodule Jido.AI.Helpers do
   @spec classify_response(map() | {:error, term()}) :: :tool_calls | :final_answer | :error
   def classify_response({:error, _}), do: :error
 
-  def classify_response(%{message: %{tool_calls: tool_calls}})
-      when is_list(tool_calls) and tool_calls != [],
-      do: :tool_calls
+  def classify_response(%{message: %{tool_calls: tool_calls}}) when is_list(tool_calls) and tool_calls != [],
+    do: :tool_calls
 
   def classify_response(%{message: _}), do: :final_answer
 
@@ -332,12 +328,10 @@ defmodule Jido.AI.Helpers do
   def classify_error(%ReqLLM.Error.API.Request{status: 401}), do: :auth
   def classify_error(%ReqLLM.Error.API.Request{status: 403}), do: :auth
 
-  def classify_error(%ReqLLM.Error.API.Request{status: status})
-      when is_integer(status) and status >= 500,
-      do: :provider_error
+  def classify_error(%ReqLLM.Error.API.Request{status: status}) when is_integer(status) and status >= 500,
+    do: :provider_error
 
-  def classify_error(%ReqLLM.Error.API.Request{reason: reason})
-      when is_binary(reason) do
+  def classify_error(%ReqLLM.Error.API.Request{reason: reason}) when is_binary(reason) do
     reason_lower = String.downcase(reason)
 
     cond do
@@ -382,24 +376,19 @@ defmodule Jido.AI.Helpers do
       nil
   """
   @spec extract_retry_after(term()) :: integer() | nil
-  def extract_retry_after(%{response_body: %{"error" => %{"retry_after" => seconds}}})
-      when is_integer(seconds),
-      do: seconds
+  def extract_retry_after(%{response_body: %{"error" => %{"retry_after" => seconds}}}) when is_integer(seconds),
+    do: seconds
 
-  def extract_retry_after(%{response_body: %{"error" => %{"retry_after" => seconds}}})
-      when is_binary(seconds) do
+  def extract_retry_after(%{response_body: %{"error" => %{"retry_after" => seconds}}}) when is_binary(seconds) do
     case Integer.parse(seconds) do
       {n, _} -> n
       :error -> nil
     end
   end
 
-  def extract_retry_after(%{response_body: %{"retry_after" => seconds}})
-      when is_integer(seconds),
-      do: seconds
+  def extract_retry_after(%{response_body: %{"retry_after" => seconds}}) when is_integer(seconds), do: seconds
 
-  def extract_retry_after(%{response_body: %{"retry_after" => seconds}})
-      when is_binary(seconds) do
+  def extract_retry_after(%{response_body: %{"retry_after" => seconds}}) when is_binary(seconds) do
     case Integer.parse(seconds) do
       {n, _} -> n
       :error -> nil
@@ -483,9 +472,8 @@ defmodule Jido.AI.Helpers do
   defp extract_error_message(%{reason: reason}) when is_binary(reason), do: reason
   defp extract_error_message(%{message: message}) when is_binary(message), do: message
 
-  defp extract_error_message(%{response_body: %{"error" => %{"message" => message}}})
-       when is_binary(message),
-       do: message
+  defp extract_error_message(%{response_body: %{"error" => %{"message" => message}}}) when is_binary(message),
+    do: message
 
   defp extract_error_message({:error, reason}) when is_binary(reason), do: reason
   defp extract_error_message({:error, reason}) when is_atom(reason), do: to_string(reason)
@@ -632,6 +620,7 @@ defmodule Jido.AI.Helpers do
 
       {:error, _reason} ->
         require Logger
+
         Logger.warning("Failed to parse tool call arguments as JSON: #{inspect(args)}")
         %{}
     end

@@ -126,21 +126,15 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   def update(%__MODULE__{status: "awaiting_llm"} = machine, {:llm_result, call_id, result}, env) do
-    if call_id != machine.current_llm_call_id do
-      {machine, []}
-    else
+    if call_id == machine.current_llm_call_id do
       handle_llm_response(machine, result, env)
+    else
+      {machine, []}
     end
   end
 
-  def update(
-        %__MODULE__{status: "awaiting_llm"} = machine,
-        {:llm_partial, call_id, delta, chunk_type},
-        _env
-      ) do
-    if call_id != machine.current_llm_call_id do
-      {machine, []}
-    else
+  def update(%__MODULE__{status: "awaiting_llm"} = machine, {:llm_partial, call_id, delta, chunk_type}, _env) do
+    if call_id == machine.current_llm_call_id do
       machine =
         case chunk_type do
           :content ->
@@ -153,6 +147,8 @@ defmodule Jido.AI.ReAct.Machine do
             machine
         end
 
+      {machine, []}
+    else
       {machine, []}
     end
   end
@@ -167,29 +163,27 @@ defmodule Jido.AI.ReAct.Machine do
         |> append_all_tool_results()
         |> inc_iteration()
 
-      cond do
-        machine.iteration > max_iterations ->
-          with_transition(machine, "completed", fn machine ->
-            machine =
-              machine
-              |> Map.put(:termination_reason, :max_iterations)
-              |> Map.put(:result, "Maximum iterations reached without a final answer.")
+      if machine.iteration > max_iterations do
+        with_transition(machine, "completed", fn machine ->
+          machine =
+            machine
+            |> Map.put(:termination_reason, :max_iterations)
+            |> Map.put(:result, "Maximum iterations reached without a final answer.")
 
-            {machine, []}
-          end)
+          {machine, []}
+        end)
+      else
+        new_call_id = generate_call_id()
 
-        true ->
-          new_call_id = generate_call_id()
+        with_transition(machine, "awaiting_llm", fn machine ->
+          machine =
+            machine
+            |> Map.put(:current_llm_call_id, new_call_id)
+            |> Map.put(:streaming_text, "")
+            |> Map.put(:streaming_thinking, "")
 
-          with_transition(machine, "awaiting_llm", fn machine ->
-            machine =
-              machine
-              |> Map.put(:current_llm_call_id, new_call_id)
-              |> Map.put(:streaming_text, "")
-              |> Map.put(:streaming_thinking, "")
-
-            {machine, [{:call_llm_stream, new_call_id, machine.conversation}]}
-          end)
+          {machine, [{:call_llm_stream, new_call_id, machine.conversation}]}
+        end)
       end
     else
       {machine, []}

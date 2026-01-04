@@ -232,7 +232,7 @@ defmodule Jido.AI.ConfigTest do
       on_exit(fn -> Application.delete_env(:jido_ai, :model_aliases) end)
 
       assert {:error, errors} = Config.validate()
-      assert length(errors) > 0
+      refute Enum.empty?(errors)
       assert Enum.any?(errors, &String.contains?(&1, "invalid"))
     end
 

@@ -62,11 +62,7 @@ defmodule Jido.AI.Directive do
                 system_prompt:
                   Zoi.string(description: "Optional system prompt prepended to context")
                   |> Zoi.optional(),
-                context:
-                  Zoi.any(
-                    description:
-                      "Conversation context: [ReqLLM.Message.t()] or ReqLLM.Context.t()"
-                  ),
+                context: Zoi.any(description: "Conversation context: [ReqLLM.Message.t()] or ReqLLM.Context.t()"),
                 tools:
                   Zoi.list(Zoi.any(),
                     description: "List of ReqLLM.Tool.t() structs (schema-only, callback ignored)"
@@ -75,14 +71,10 @@ defmodule Jido.AI.Directive do
                 tool_choice:
                   Zoi.any(description: "Tool choice: :auto | :none | {:required, tool_name}")
                   |> Zoi.default(:auto),
-                max_tokens:
-                  Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
-                temperature:
-                  Zoi.number(description: "Sampling temperature (0.0–2.0)") |> Zoi.default(0.2),
-                timeout:
-                  Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
-                metadata:
-                  Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
+                max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
+                temperature: Zoi.number(description: "Sampling temperature (0.0–2.0)") |> Zoi.default(0.2),
+                timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+                metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
               },
               coerce: true
             )
@@ -125,8 +117,7 @@ defmodule Jido.AI.Directive do
               __MODULE__,
               %{
                 id: Zoi.string(description: "Tool call ID from LLM (ReqLLM.ToolCall.id)"),
-                tool_name:
-                  Zoi.string(description: "Name of the tool (matches Jido.Action.name/0)"),
+                tool_name: Zoi.string(description: "Name of the tool (matches Jido.Action.name/0)"),
                 action_module: Zoi.any(description: "Module implementing Jido.Action behaviour"),
                 arguments:
                   Zoi.map(description: "Arguments from LLM (string keys, normalized before exec)")
@@ -134,8 +125,7 @@ defmodule Jido.AI.Directive do
                 context:
                   Zoi.map(description: "Execution context passed to Jido.Exec.run/3")
                   |> Zoi.default(%{}),
-                metadata:
-                  Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
+                metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
               },
               coerce: true
             )
@@ -180,11 +170,7 @@ defmodule Jido.AI.Directive do
                 system_prompt:
                   Zoi.string(description: "Optional system prompt prepended to context")
                   |> Zoi.optional(),
-                context:
-                  Zoi.any(
-                    description:
-                      "Conversation context: [ReqLLM.Message.t()] or ReqLLM.Context.t()"
-                  ),
+                context: Zoi.any(description: "Conversation context: [ReqLLM.Message.t()] or ReqLLM.Context.t()"),
                 tools:
                   Zoi.list(Zoi.any(),
                     description: "List of ReqLLM.Tool.t() structs (schema-only, callback ignored)"
@@ -193,14 +179,10 @@ defmodule Jido.AI.Directive do
                 tool_choice:
                   Zoi.any(description: "Tool choice: :auto | :none | {:required, tool_name}")
                   |> Zoi.default(:auto),
-                max_tokens:
-                  Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
-                temperature:
-                  Zoi.number(description: "Sampling temperature (0.0–2.0)") |> Zoi.default(0.2),
-                timeout:
-                  Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
-                metadata:
-                  Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
+                max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
+                temperature: Zoi.number(description: "Sampling temperature (0.0–2.0)") |> Zoi.default(0.2),
+                timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+                metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
               },
               coerce: true
             )
@@ -235,19 +217,13 @@ defmodule Jido.AI.Directive do
               __MODULE__,
               %{
                 id: Zoi.string(description: "Unique call ID for correlation"),
-                model:
-                  Zoi.string(
-                    description: "Embedding model spec, e.g. 'openai:text-embedding-3-small'"
-                  ),
-                texts:
-                  Zoi.any(description: "Text string or list of text strings to embed"),
+                model: Zoi.string(description: "Embedding model spec, e.g. 'openai:text-embedding-3-small'"),
+                texts: Zoi.any(description: "Text string or list of text strings to embed"),
                 dimensions:
                   Zoi.integer(description: "Number of dimensions for embedding vector")
                   |> Zoi.optional(),
-                timeout:
-                  Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
-                metadata:
-                  Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
+                timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+                metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
               },
               coerce: true
             )
@@ -305,9 +281,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
     timeout = Map.get(directive, :timeout)
 
     agent_pid = self()
-    task_sup = if state.jido, do: Jido.task_supervisor_name(state.jido), else: Jido.TaskSupervisor
 
-    Task.Supervisor.start_child(task_sup, fn ->
+    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
       result =
         try do
           stream_with_callbacks(
@@ -423,9 +398,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMEmbed do
     timeout = Map.get(directive, :timeout)
 
     agent_pid = self()
-    task_sup = if state.jido, do: Jido.task_supervisor_name(state.jido), else: Jido.TaskSupervisor
 
-    Task.Supervisor.start_child(task_sup, fn ->
+    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
       result =
         try do
           generate_embeddings(model, texts, dimensions, timeout)
@@ -463,6 +437,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMEmbed do
   defp count_embeddings(_), do: 1
 
   defp add_dimensions_opt(opts, nil), do: opts
+
   defp add_dimensions_opt(opts, dimensions) when is_integer(dimensions) do
     Keyword.put(opts, :dimensions, dimensions)
   end
@@ -489,9 +464,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     } = directive
 
     agent_pid = self()
-    task_sup = if state.jido, do: Jido.task_supervisor_name(state.jido), else: Jido.TaskSupervisor
 
-    Task.Supervisor.start_child(task_sup, fn ->
+    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
       result =
         try do
           normalized_args = normalize_arguments(action_module, arguments)
@@ -558,9 +532,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
     timeout = Map.get(directive, :timeout)
 
     agent_pid = self()
-    task_sup = if state.jido, do: Jido.task_supervisor_name(state.jido), else: Jido.TaskSupervisor
 
-    Task.Supervisor.start_child(task_sup, fn ->
+    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
       result =
         try do
           generate_text(

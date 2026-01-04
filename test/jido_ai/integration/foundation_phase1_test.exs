@@ -16,9 +16,9 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   alias Jido.AI.Config
   alias Jido.AI.Directive.{ReqLLMStream, ReqLLMGenerate, ReqLLMEmbed}
+  alias Jido.AI.Helpers
   alias Jido.AI.Signal
   alias Jido.AI.Signal.{ReqLLMError, UsageReport, ToolResult, EmbedResult}
-  alias Jido.AI.Helpers
   alias Jido.AI.ToolAdapter
 
   # ============================================================================
@@ -28,11 +28,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   describe "directive with config integration" do
     test "ReqLLMStream uses model_alias resolution" do
       # Create directive with model_alias
-      directive = ReqLLMStream.new!(%{
-        id: "stream_1",
-        model_alias: :fast,
-        context: [%{role: :user, content: "Hello"}]
-      })
+      directive =
+        ReqLLMStream.new!(%{
+          id: "stream_1",
+          model_alias: :fast,
+          context: [%{role: :user, content: "Hello"}]
+        })
 
       assert directive.model_alias == :fast
       assert is_nil(directive.model)
@@ -44,11 +45,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     end
 
     test "ReqLLMGenerate uses model_alias resolution" do
-      directive = ReqLLMGenerate.new!(%{
-        id: "gen_1",
-        model_alias: :capable,
-        context: [%{role: :user, content: "Explain this"}]
-      })
+      directive =
+        ReqLLMGenerate.new!(%{
+          id: "gen_1",
+          model_alias: :capable,
+          context: [%{role: :user, content: "Explain this"}]
+        })
 
       resolved_model = Config.resolve_model(directive.model_alias)
       assert is_binary(resolved_model)
@@ -57,11 +59,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     test "directive with direct model bypasses alias resolution" do
       model = "anthropic:claude-haiku-4-5"
 
-      directive = ReqLLMStream.new!(%{
-        id: "stream_2",
-        model: model,
-        context: [%{role: :user, content: "Hello"}]
-      })
+      directive =
+        ReqLLMStream.new!(%{
+          id: "stream_2",
+          model: model,
+          context: [%{role: :user, content: "Hello"}]
+        })
 
       # Direct model passes through Config.resolve_model unchanged
       assert Config.resolve_model(directive.model) == model
@@ -70,11 +73,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     test "directive defaults match Config.defaults" do
       defaults = Config.defaults()
 
-      directive = ReqLLMStream.new!(%{
-        id: "stream_3",
-        model: "test:model",
-        context: [%{role: :user, content: "Hello"}]
-      })
+      directive =
+        ReqLLMStream.new!(%{
+          id: "stream_3",
+          model: "test:model",
+          context: [%{role: :user, content: "Hello"}]
+        })
 
       # Directive has its own defaults, but Config.defaults provides guidance
       assert is_number(directive.temperature)
@@ -84,11 +88,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     end
 
     test "ReqLLMEmbed directive creation" do
-      directive = ReqLLMEmbed.new!(%{
-        id: "embed_1",
-        model: "openai:text-embedding-3-small",
-        texts: ["Hello", "World"]
-      })
+      directive =
+        ReqLLMEmbed.new!(%{
+          id: "embed_1",
+          model: "openai:text-embedding-3-small",
+          texts: ["Hello", "World"]
+        })
 
       assert directive.id == "embed_1"
       assert directive.texts == ["Hello", "World"]
@@ -107,10 +112,11 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
         model: "anthropic:claude-haiku-4-5"
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(mocked_response,
-        call_id: "call_123",
-        duration_ms: 500
-      )
+      {:ok, signal} =
+        Signal.from_reqllm_response(mocked_response,
+          call_id: "call_123",
+          duration_ms: 500
+        )
 
       assert signal.type == "reqllm.result"
       assert signal.data.call_id == "call_123"
@@ -178,12 +184,13 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   describe "error signal integration" do
     test "ReqLLMError signal creation" do
-      error_signal = ReqLLMError.new!(%{
-        call_id: "call_err_1",
-        error_type: :rate_limit,
-        message: "Rate limit exceeded",
-        retry_after: 60
-      })
+      error_signal =
+        ReqLLMError.new!(%{
+          call_id: "call_err_1",
+          error_type: :rate_limit,
+          message: "Rate limit exceeded",
+          retry_after: 60
+        })
 
       assert error_signal.type == "reqllm.error"
       assert error_signal.data.error_type == :rate_limit
@@ -219,15 +226,16 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   describe "usage report signal integration" do
     test "UsageReport signal with full metadata" do
-      usage_signal = UsageReport.new!(%{
-        call_id: "call_usage_1",
-        model: "anthropic:claude-haiku-4-5",
-        input_tokens: 100,
-        output_tokens: 50,
-        total_tokens: 150,
-        duration_ms: 1200,
-        metadata: %{request_id: "req_123"}
-      })
+      usage_signal =
+        UsageReport.new!(%{
+          call_id: "call_usage_1",
+          model: "anthropic:claude-haiku-4-5",
+          input_tokens: 100,
+          output_tokens: 50,
+          total_tokens: 150,
+          duration_ms: 1200,
+          metadata: %{request_id: "req_123"}
+        })
 
       assert usage_signal.type == "ai.usage_report"
       assert usage_signal.data.model == "anthropic:claude-haiku-4-5"
@@ -239,11 +247,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   describe "tool result signal integration" do
     test "ToolResult signal with successful result" do
-      tool_signal = ToolResult.new!(%{
-        call_id: "tc_calc_1",
-        tool_name: "calculator",
-        result: {:ok, %{answer: 42}}
-      })
+      tool_signal =
+        ToolResult.new!(%{
+          call_id: "tc_calc_1",
+          tool_name: "calculator",
+          result: {:ok, %{answer: 42}}
+        })
 
       assert tool_signal.type == "ai.tool_result"
       assert tool_signal.data.tool_name == "calculator"
@@ -251,11 +260,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     end
 
     test "ToolResult signal with error result" do
-      tool_signal = ToolResult.new!(%{
-        call_id: "tc_fail_1",
-        tool_name: "search",
-        result: {:error, %{reason: "Service unavailable"}}
-      })
+      tool_signal =
+        ToolResult.new!(%{
+          call_id: "tc_fail_1",
+          tool_name: "search",
+          result: {:error, %{reason: "Service unavailable"}}
+        })
 
       assert tool_signal.data.result == {:error, %{reason: "Service unavailable"}}
     end
@@ -265,10 +275,11 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     test "EmbedResult signal with embeddings" do
       embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
 
-      embed_signal = EmbedResult.new!(%{
-        call_id: "embed_1",
-        result: {:ok, %{embeddings: embeddings, count: 2}}
-      })
+      embed_signal =
+        EmbedResult.new!(%{
+          call_id: "embed_1",
+          result: {:ok, %{embeddings: embeddings, count: 2}}
+        })
 
       assert embed_signal.type == "ai.embed_result"
       {:ok, result} = embed_signal.data.result
@@ -462,12 +473,13 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   describe "end-to-end flow simulation" do
     test "complete request -> response -> signal flow" do
       # 1. Create directive with model alias
-      directive = ReqLLMStream.new!(%{
-        id: "e2e_1",
-        model_alias: :fast,
-        system_prompt: "You are helpful.",
-        context: [%{role: :user, content: "What is 2+2?"}]
-      })
+      directive =
+        ReqLLMStream.new!(%{
+          id: "e2e_1",
+          model_alias: :fast,
+          system_prompt: "You are helpful.",
+          context: [%{role: :user, content: "What is 2+2?"}]
+        })
 
       # 2. Resolve model for the request
       model = Config.resolve_model(directive.model_alias)
@@ -481,10 +493,11 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       }
 
       # 4. Create signal from response
-      {:ok, signal} = Signal.from_reqllm_response(mocked_response,
-        call_id: directive.id,
-        duration_ms: 250
-      )
+      {:ok, signal} =
+        Signal.from_reqllm_response(mocked_response,
+          call_id: directive.id,
+          duration_ms: 250
+        )
 
       # 5. Verify signal contains all expected data
       assert signal.data.call_id == "e2e_1"
@@ -498,11 +511,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
     test "complete tool call flow" do
       # 1. Create directive
-      directive = ReqLLMGenerate.new!(%{
-        id: "tool_e2e_1",
-        model: "test:model",
-        context: [%{role: :user, content: "Calculate 5 * 7"}]
-      })
+      directive =
+        ReqLLMGenerate.new!(%{
+          id: "tool_e2e_1",
+          model: "test:model",
+          context: [%{role: :user, content: "Calculate 5 * 7"}]
+        })
 
       # 2. Simulate tool call response
       mocked_response = %{
@@ -525,11 +539,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert tc.name == "calculator"
 
       # 5. Create tool result signal
-      tool_result = ToolResult.new!(%{
-        call_id: tc.id,
-        tool_name: tc.name,
-        result: {:ok, %{answer: 35}}
-      })
+      tool_result =
+        ToolResult.new!(%{
+          call_id: tc.id,
+          tool_name: tc.name,
+          result: {:ok, %{answer: 35}}
+        })
 
       assert tool_result.data.result == {:ok, %{answer: 35}}
 
@@ -560,12 +575,13 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert jido_error.retry_after == 60
 
       # 4. Create error signal
-      error_signal = ReqLLMError.new!(%{
-        call_id: "err_flow_1",
-        error_type: :rate_limit,
-        message: "Rate limit exceeded",
-        retry_after: 60
-      })
+      error_signal =
+        ReqLLMError.new!(%{
+          call_id: "err_flow_1",
+          error_type: :rate_limit,
+          message: "Rate limit exceeded",
+          retry_after: 60
+        })
 
       assert error_signal.data.error_type == :rate_limit
     end
