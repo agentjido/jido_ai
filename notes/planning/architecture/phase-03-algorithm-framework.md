@@ -69,38 +69,38 @@ Implement the base algorithm module with shared functionality.
 
 Create the base module with `__using__` macro.
 
-- [ ] 3.2.1.1 Create `lib/jido_ai/algorithms/base.ex` with module documentation
-- [ ] 3.2.1.2 Implement `__using__/1` macro with opts
-- [ ] 3.2.1.3 Inject `@behaviour Jido.AI.Algorithms.Algorithm`
-- [ ] 3.2.1.4 Provide default `metadata/0` from opts
+- [x] 3.2.1.1 Create `lib/jido_ai/algorithms/base.ex` with module documentation
+- [x] 3.2.1.2 Implement `__using__/1` macro with opts
+- [x] 3.2.1.3 Inject `@behaviour Jido.AI.Algorithms.Algorithm`
+- [x] 3.2.1.4 Provide default `metadata/0` from opts
 
 ### 3.2.2 Default Implementations
 
 Implement default implementations for optional callbacks.
 
-- [ ] 3.2.2.1 Implement default `can_execute?/2` returning `true`
-- [ ] 3.2.2.2 Implement default `before_execute/2` returning `{:ok, input}`
-- [ ] 3.2.2.3 Implement default `after_execute/2` returning `{:ok, result}`
-- [ ] 3.2.2.4 Allow override via `defoverridable`
+- [x] 3.2.2.1 Implement default `can_execute?/2` returning `true`
+- [x] 3.2.2.2 Implement default `before_execute/2` returning `{:ok, input}`
+- [x] 3.2.2.3 Implement default `after_execute/2` returning `{:ok, result}`
+- [x] 3.2.2.4 Allow override via `defoverridable`
 
 ### 3.2.3 Helper Functions
 
 Implement helper functions for algorithm implementations.
 
-- [ ] 3.2.3.1 Implement `run_with_hooks/3` that wraps execute with before/after hooks
-- [ ] 3.2.3.2 Implement `handle_error/3` for error handling with on_error callback
-- [ ] 3.2.3.3 Implement `merge_context/2` for context manipulation
+- [x] 3.2.3.1 Implement `run_with_hooks/2` that wraps execute with before/after hooks
+- [x] 3.2.3.2 Implement `handle_error/2` for error handling with on_error callback
+- [x] 3.2.3.3 Implement `merge_context/2` for context manipulation
 
 ### 3.2.4 Unit Tests for Base Algorithm
 
-- [ ] Test `__using__` macro injects behavior
-- [ ] Test default metadata/0 from opts
-- [ ] Test default can_execute?/2 returns true
-- [ ] Test default before_execute/2 passes through
-- [ ] Test default after_execute/2 passes through
-- [ ] Test run_with_hooks/3 calls hooks in order
-- [ ] Test handle_error/3 calls on_error callback
-- [ ] Test defoverridable allows customization
+- [x] Test `__using__` macro injects behavior
+- [x] Test default metadata/0 from opts
+- [x] Test default can_execute?/2 returns true
+- [x] Test default before_execute/2 passes through
+- [x] Test default after_execute/2 passes through
+- [x] Test run_with_hooks/2 calls hooks in order
+- [x] Test handle_error/2 calls on_error callback
+- [x] Test defoverridable allows customization
 
 ---
 
