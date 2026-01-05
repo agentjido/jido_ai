@@ -76,19 +76,23 @@ The existing implementation includes:
 
 ### 4.1.2 Enhancements
 
+**Status**: COMPLETED (2026-01-05)
+
 Enhance the existing ReAct strategy.
 
-- [ ] 4.1.2.1 Add model alias support via `Config.resolve_model/1`
-- [ ] 4.1.2.2 Add usage metadata extraction from LLM responses
-- [ ] 4.1.2.3 Add telemetry for iteration tracking
-- [ ] 4.1.2.4 Support dynamic tool registration via Phase 2 Registry
+- [x] 4.1.2.1 Add model alias support via `Config.resolve_model/1`
+- [x] 4.1.2.2 Add usage metadata extraction from LLM responses
+- [x] 4.1.2.3 Add telemetry for iteration tracking
+- [x] 4.1.2.4 Support dynamic tool registration via Phase 2 Registry
 
 ### 4.1.3 Unit Tests for ReAct Enhancements
 
-- [ ] Test model alias resolution
-- [ ] Test usage metadata in signals
-- [ ] Test telemetry emission
-- [ ] Test dynamic tool registration
+**Status**: COMPLETED (2026-01-05) - 47 tests passing
+
+- [x] Test model alias resolution
+- [x] Test usage metadata in signals
+- [x] Test telemetry emission
+- [x] Test dynamic tool registration
 
 ---
 
