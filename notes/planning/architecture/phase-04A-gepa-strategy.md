@@ -74,32 +74,42 @@ Represents a prompt template with its evaluation metrics.
 
 ## 4A.2 Evaluator Module
 
+**Status**: COMPLETED (2026-01-05) - 52 tests passing (30 Task + 22 Evaluator)
+
 Runs a prompt variant against a task set and collects metrics.
 
 ### 4A.2.1 Core Functions
 
-- [ ] Create `lib/jido_ai/gepa/evaluator.ex`
-- [ ] `evaluate_variant/3` - Evaluate variant on task set
-  - Takes: variant, tasks, options (strategy, model, etc.)
-  - Returns: `%{accuracy: float, token_cost: int, results: [...]}`
-- [ ] `run_single_task/3` - Run one task with a variant
-  - Uses the specified strategy (ReAct, CoT, etc.)
-  - Captures: success?, tokens, trace, output
-- [ ] Support configurable success criteria per task
+- [x] Create `lib/jido_ai/gepa/evaluator.ex`
+- [x] `evaluate_variant/3` - Evaluate variant on task set
+  - Takes: variant, tasks, options (runner, parallel, timeout, runner_opts)
+  - Returns: `%{accuracy: float, token_cost: int, latency_ms: int, results: [...]}`
+- [x] `run_single_task/3` - Run one task with a variant
+  - Pluggable runner function for LLM execution
+  - Template rendering with `{{input}}` substitution
+  - Captures: success?, output, tokens, latency_ms, error
+- [x] Support configurable success criteria per task (expected string or validator function)
 
 ### 4A.2.2 Task Format
 
-- [ ] Define task struct/type:
+- [x] Create `lib/jido_ai/gepa/task.ex`
+- [x] Define task struct:
+  - `id` - Unique identifier (auto-generated with `task_` prefix)
   - `input` - The task input/prompt
-  - `expected` - Expected output or validation function
-  - `success?/1` - Function to check if output is correct
+  - `expected` - Expected output string (optional)
+  - `validator` - Custom validation function (optional)
   - `metadata` - Task category, difficulty, etc.
+- [x] `success?/2` - Check if output passes criteria (flexible matching)
+- [x] `from_input/1`, `from_pairs/1` convenience functions
 
 ### 4A.2.3 Unit Tests
 
-- [ ] Test single task evaluation
-- [ ] Test batch evaluation
-- [ ] Test metric aggregation
+- [x] Test single task evaluation
+- [x] Test batch evaluation (sequential and parallel)
+- [x] Test metric aggregation
+- [x] Test template rendering
+- [x] Test error handling (timeouts, exceptions)
+- [x] Test Task struct creation and validation
 
 ---
 
