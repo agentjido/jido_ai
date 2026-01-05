@@ -115,41 +115,52 @@ Runs a prompt variant against a task set and collects metrics.
 
 ## 4A.3 Reflector Module
 
+**Status**: COMPLETED (2026-01-05) - 28 tests passing
+
 Analyzes failures and proposes prompt mutations using the LLM itself.
 
 ### 4A.3.1 Core Functions
 
-- [ ] Create `lib/jido_ai/gepa/reflector.ex`
-- [ ] `reflect_on_failures/2` - Analyze why tasks failed
-  - Takes: variant, failing_results
-  - Returns: Analysis text explaining failure patterns
-- [ ] `propose_mutations/2` - Generate new prompt variants
-  - Takes: variant, reflection_analysis
-  - Returns: List of new template strings
-- [ ] `mutate_prompt/2` - Combined reflect + propose
-  - Takes: variant, eval_results
-  - Returns: List of new PromptVariant structs
+- [x] Create `lib/jido_ai/gepa/reflector.ex`
+- [x] `reflect_on_failures/3` - Analyze why tasks failed
+  - Takes: variant, failing_results, opts (runner)
+  - Returns: `{:ok, analysis_text}` explaining failure patterns
+  - Samples up to 5 failures to prevent context overflow
+- [x] `propose_mutations/3` - Generate new prompt variants
+  - Takes: variant, reflection_analysis, opts (runner, mutation_count)
+  - Returns: `{:ok, [template_strings]}`
+  - Parses LLM response with `---MUTATION N---` markers
+- [x] `mutate_prompt/3` - Combined reflect + propose
+  - Takes: variant, eval_results, opts
+  - Returns: `{:ok, [PromptVariant]}` with lineage
+- [x] `crossover/3` - Combine elements from two parent prompts
+  - Takes: variant1, variant2, opts (runner, children_count)
+  - Returns: `{:ok, [PromptVariant]}` with both parents in lineage
 
 ### 4A.3.2 Reflection Prompt Design
 
-- [ ] Build reflection prompt that includes:
-  - Current prompt template
-  - Sample of failing cases (limited to ~5)
-  - Reasoning traces from failures
-  - Request for 2-3 concrete edits
-- [ ] Parse LLM response to extract mutations
+- [x] Build reflection prompt that includes:
+  - Current prompt template (string or map format)
+  - Sample of failing cases (limited to 5)
+  - Task inputs, expected outputs, actual outputs
+  - Request for actionable analysis (2-4 paragraphs)
+- [x] Parse LLM response to extract mutations
+  - Primary: `---MUTATION N---` marker parsing
+  - Fallback: Paragraph-based parsing for unformatted responses
 
 ### 4A.3.3 Mutation Strategies
 
-- [ ] **Textual mutations**: Reword, reorder, expand, condense
-- [ ] **Structural mutations**: Add/remove sections, change format
-- [ ] **Crossover**: Combine parts from two parent prompts
+- [x] **Textual mutations**: Clarification prompts request clearer instructions
+- [x] **Structural mutations**: Restructuring prompts reorganize format
+- [x] **Crossover**: `crossover/3` combines strengths from two parents
 
 ### 4A.3.4 Unit Tests
 
-- [ ] Test reflection prompt construction
-- [ ] Test mutation parsing
-- [ ] Test edge cases (no failures, all failures)
+- [x] Test reflection prompt construction
+- [x] Test mutation parsing (formatted and fallback)
+- [x] Test edge cases (no failures, all failures, errors)
+- [x] Test crossover with lineage tracking
+- [x] Test unicode and long content handling
 
 ---
 
