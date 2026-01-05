@@ -210,41 +210,48 @@ Implements Pareto-optimal selection for multi-objective optimization.
 
 ## 4A.5 Optimizer Module
 
+**Status**: COMPLETED (2026-01-05) - 20 tests passing
+
 Main optimization loop orchestrating the GEPA process.
 
 ### 4A.5.1 Core Functions
 
-- [ ] Create `lib/jido_ai/gepa/optimizer.ex`
-- [ ] `optimize/3` - Main entry point
+- [x] Create `lib/jido_ai/gepa/optimizer.ex`
+- [x] `optimize/3` - Main entry point
   - Takes: seed_template, tasks, options
-  - Options: generations, population_size, strategy, model
-  - Returns: Best variant(s) after optimization
-- [ ] `run_generation/4` - Execute one generation
-  - Evaluate all variants
-  - Compute Pareto front
-  - Generate mutations from survivors
+  - Options: generations, population_size, mutation_count, crossover_rate, objectives
+  - Returns: `{:ok, result}` with best_variants, best_accuracy, final_population
+- [x] `run_generation/4` - Execute one generation
+  - Evaluate all unevaluated variants
+  - Select survivors using Pareto selection
+  - Generate mutations and crossovers
+- [x] `best_variants/2` - Extract Pareto front from population
 
 ### 4A.5.2 Configuration Options
 
-- [ ] `generations` - Number of evolution cycles (default: 10)
-- [ ] `population_size` - Variants per generation (default: 8)
-- [ ] `mutation_count` - New variants per survivor (default: 3)
-- [ ] `strategy` - Which reasoning strategy to use (default: :react)
-- [ ] `model` - Which model to use for evaluation and reflection
+- [x] `generations` - Number of evolution cycles (default: 10)
+- [x] `population_size` - Variants per generation (default: 8)
+- [x] `mutation_count` - New variants per survivor (default: 3)
+- [x] `crossover_rate` - Probability of crossover vs mutation (default: 0.2)
+- [x] `objectives` - Selection objectives (default: accuracy↑, cost↓)
+- [x] `runner` - Function for LLM calls (required)
+- [x] `runner_opts` - Options passed to runner function
 
 ### 4A.5.3 Telemetry
 
-- [ ] Emit telemetry events:
-  - `[:jido, :ai, :gepa, :generation]` - Per-generation stats
-  - `[:jido, :ai, :gepa, :evaluation]` - Per-variant evaluation
-  - `[:jido, :ai, :gepa, :mutation]` - Mutation events
-  - `[:jido, :ai, :gepa, :complete]` - Optimization complete
+- [x] Emit telemetry events:
+  - `[:jido, :ai, :gepa, :generation]` - best_accuracy, avg_accuracy, token_cost, pareto_front_size
+  - `[:jido, :ai, :gepa, :evaluation]` - accuracy, token_cost, latency_ms per variant
+  - `[:jido, :ai, :gepa, :mutation]` - mutation_count per parent
+  - `[:jido, :ai, :gepa, :complete]` - total_generations, total_evaluations, best_accuracy
 
 ### 4A.5.4 Unit Tests
 
-- [ ] Test optimization loop
-- [ ] Test generation progression
-- [ ] Test convergence behavior
+- [x] Test optimization loop (6 tests)
+- [x] Test generation progression (3 tests)
+- [x] Test best_variants extraction (2 tests)
+- [x] Test telemetry emission (3 tests)
+- [x] Test edge cases (6 tests)
 
 ---
 
