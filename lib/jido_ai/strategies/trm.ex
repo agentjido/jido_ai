@@ -54,7 +54,7 @@ defmodule Jido.AI.Strategies.TRM do
   This strategy implements `signal_routes/1` which AgentServer uses to
   automatically route these signals to strategy commands:
 
-  - `"trm.reason"` → `:trm_start`
+  - `"trm.query"` → `:trm_start`
   - `"reqllm.result"` → `:trm_llm_result`
   - `"reqllm.partial"` → `:trm_llm_partial`
 
@@ -70,6 +70,8 @@ defmodule Jido.AI.Strategies.TRM do
   alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.TRM.Machine
+  alias Jido.AI.TRM.Reasoning
+  alias Jido.AI.TRM.Supervision
   alias ReqLLM.Context
 
   @type config :: %{
@@ -130,7 +132,7 @@ defmodule Jido.AI.Strategies.TRM do
   @impl true
   def signal_routes(_ctx) do
     [
-      {"trm.reason", {:strategy_cmd, @start}},
+      {"trm.query", {:strategy_cmd, @start}},
       {"reqllm.result", {:strategy_cmd, @llm_result}},
       {"reqllm.partial", {:strategy_cmd, @llm_partial}}
     ]
@@ -373,42 +375,15 @@ defmodule Jido.AI.Strategies.TRM do
     end)
   end
 
-  defp build_reasoning_directive(id, context, model, config) do
-    system = config.reasoning_prompt
+  defp build_reasoning_directive(id, context, model, _config) do
+    # Use Reasoning module for structured prompt building
+    reasoning_context = %{
+      question: context[:question],
+      current_answer: context[:current_answer],
+      latent_state: context[:latent_state]
+    }
 
-    user =
-      if context[:current_answer] do
-        """
-        Question: #{context[:question]}
-
-        Current answer:
-        #{context[:current_answer]}
-
-        Previous reasoning:
-        #{format_reasoning_trace(context[:latent_state])}
-
-        Analyze this answer and identify:
-        1. Key insights that are correct
-        2. Areas that need improvement
-        3. Missing considerations
-        4. Logical gaps or errors
-
-        Provide your detailed reasoning analysis.
-        """
-      else
-        """
-        Question: #{context[:question]}
-
-        This is the first reasoning step. Analyze the question and provide an initial answer
-        with your reasoning. Consider:
-        1. What is being asked
-        2. Key concepts involved
-        3. Step-by-step reasoning
-        4. Initial answer
-
-        Provide your initial answer with reasoning.
-        """
-      end
+    {system, user} = Reasoning.build_reasoning_prompt(reasoning_context)
 
     messages = [
       %{role: :system, content: system},
@@ -424,25 +399,16 @@ defmodule Jido.AI.Strategies.TRM do
     })
   end
 
-  defp build_supervision_directive(id, context, model, config) do
-    system = config.supervision_prompt
+  defp build_supervision_directive(id, context, model, _config) do
+    # Use Supervision module for structured prompt building
+    supervision_context = %{
+      question: context[:question],
+      answer: context[:current_answer],
+      step: context[:step],
+      previous_feedback: nil
+    }
 
-    user = """
-    Question: #{context[:question]}
-
-    Current answer to evaluate:
-    #{context[:current_answer]}
-
-    Step: #{context[:step]} of evaluation
-
-    Please evaluate this answer critically:
-    1. Accuracy: Is the answer factually correct?
-    2. Completeness: Does it fully address the question?
-    3. Clarity: Is the reasoning clear and logical?
-    4. Quality Score: Rate from 0.0 to 1.0 (format: "Score: X.X")
-
-    Provide specific feedback for improvement.
-    """
+    {system, user} = Supervision.build_supervision_prompt(supervision_context)
 
     messages = [
       %{role: :system, content: system},
@@ -458,28 +424,18 @@ defmodule Jido.AI.Strategies.TRM do
     })
   end
 
-  defp build_improvement_directive(id, context, model, config) do
-    system = config.improvement_prompt
+  defp build_improvement_directive(id, context, model, _config) do
+    # Use Supervision module for improvement prompt building
+    # Use parsed feedback if available, otherwise parse the raw feedback
+    parsed_feedback =
+      context[:parsed_feedback] ||
+        Supervision.parse_supervision_result(context[:feedback] || "")
 
-    user = """
-    Question: #{context[:question]}
-
-    Current answer:
-    #{context[:current_answer]}
-
-    Feedback from evaluation:
-    #{context[:feedback]}
-
-    Step: #{context[:step]}
-
-    Based on the feedback, provide an improved answer that:
-    1. Addresses all identified issues
-    2. Maintains correct parts
-    3. Adds missing considerations
-    4. Improves clarity and completeness
-
-    Provide your improved answer.
-    """
+    {system, user} = Supervision.build_improvement_prompt(
+      context[:question],
+      context[:current_answer],
+      parsed_feedback
+    )
 
     messages = [
       %{role: :system, content: system},
@@ -495,74 +451,37 @@ defmodule Jido.AI.Strategies.TRM do
     })
   end
 
-  defp format_reasoning_trace(nil), do: "(none)"
-
-  defp format_reasoning_trace(%{reasoning_trace: trace}) when is_list(trace) do
-    if Enum.empty?(trace) do
-      "(none)"
-    else
-      Enum.join(trace, "\n")
-    end
-  end
-
-  defp format_reasoning_trace(_), do: "(none)"
-
   defp convert_to_reqllm_context(conversation) do
     {:ok, context} = Context.normalize(conversation, validate: false)
     Context.to_list(context)
   end
 
-  # Default Prompts
+  # Default Prompts - delegate to TRM support modules for consistency
 
   @doc """
   Returns the default system prompt for reasoning phase.
+  Delegates to `Jido.AI.TRM.Reasoning.default_reasoning_system_prompt/0`.
   """
   @spec default_reasoning_prompt() :: String.t()
   def default_reasoning_prompt do
-    """
-    You are a reasoning assistant that analyzes problems through iterative thinking.
-    Your task is to examine the current answer and identify:
-    1. What is correct and should be preserved
-    2. What needs improvement or clarification
-    3. What is missing or incomplete
-    4. Any logical errors or gaps
-
-    Be thorough and constructive in your analysis.
-    """
+    Reasoning.default_reasoning_system_prompt()
   end
 
   @doc """
   Returns the default system prompt for supervision phase.
+  Delegates to `Jido.AI.TRM.Supervision.default_supervision_system_prompt/0`.
   """
   @spec default_supervision_prompt() :: String.t()
   def default_supervision_prompt do
-    """
-    You are a critical evaluator providing feedback on answers.
-    Your task is to:
-    1. Evaluate accuracy and correctness
-    2. Assess completeness and depth
-    3. Check logical consistency
-    4. Provide a quality score from 0.0 to 1.0 (format: "Score: X.X")
-    5. Give specific, actionable feedback for improvement
-
-    Be honest and constructive. Higher scores mean better quality.
-    """
+    Supervision.default_supervision_system_prompt()
   end
 
   @doc """
   Returns the default system prompt for improvement phase.
+  Delegates to `Jido.AI.TRM.Supervision.default_improvement_system_prompt/0`.
   """
   @spec default_improvement_prompt() :: String.t()
   def default_improvement_prompt do
-    """
-    You are an assistant that improves answers based on feedback.
-    Your task is to:
-    1. Address all issues identified in the feedback
-    2. Preserve parts that were correct
-    3. Add any missing considerations
-    4. Improve clarity and organization
-
-    Provide a complete, improved answer that addresses the feedback.
-    """
+    Supervision.default_improvement_system_prompt()
   end
 end
