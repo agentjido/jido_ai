@@ -23,10 +23,27 @@ See: `notes/planning/architecture/phase-04A-gepa-strategy.md`
 - `lib/jido_ai/gepa/prompt_variant.ex`
 - `test/jido_ai/gepa/prompt_variant_test.exs`
 
-### 4A.2 Evaluator Module
-- [ ] Create evaluator for running tasks
-- [ ] Define task format
-- [ ] Add unit tests
+### 4A.2 Evaluator Module ✅ COMPLETE
+- [x] Create Task struct (4A.2.2)
+  - Struct fields: id, input, expected, validator, metadata
+  - `new/1`, `new!/1` constructors with validation
+  - `success?/2` for checking output against criteria
+  - `from_input/1` and `from_pairs/1` convenience functions
+  - Flexible matching (case-insensitive, whitespace normalized)
+- [x] Create Evaluator module (4A.2.1)
+  - `evaluate_variant/3` - Evaluate variant on task set
+  - `run_single_task/3` - Run one task with a variant
+  - Template rendering with `{{input}}` substitution
+  - Parallel and sequential execution modes
+  - Timeout protection and exception handling
+  - Metric aggregation (accuracy, token_cost, latency_ms)
+- [x] Add unit tests (30 Task tests + 22 Evaluator tests = 52 total)
+
+**Files created:**
+- `lib/jido_ai/gepa/task.ex`
+- `lib/jido_ai/gepa/evaluator.ex`
+- `test/jido_ai/gepa/task_test.exs`
+- `test/jido_ai/gepa/evaluator_test.exs`
 
 ### 4A.3 Reflector Module
 - [ ] Create failure analysis
