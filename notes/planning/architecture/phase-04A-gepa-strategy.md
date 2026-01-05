@@ -166,32 +166,45 @@ Analyzes failures and proposes prompt mutations using the LLM itself.
 
 ## 4A.4 Selection Module
 
+**Status**: COMPLETED (2026-01-05) - 35 tests passing
+
 Implements Pareto-optimal selection for multi-objective optimization.
 
 ### 4A.4.1 Core Functions
 
-- [ ] Create `lib/jido_ai/gepa/selection.ex`
-- [ ] `pareto_front/2` - Find non-dominated solutions
-  - Takes: variants, objectives (e.g., [:accuracy, :token_cost])
+- [x] Create `lib/jido_ai/gepa/selection.ex`
+- [x] `pareto_front/2` - Find non-dominated solutions
+  - Takes: variants, objectives (list of `{metric, direction}` tuples)
   - Returns: List of Pareto-optimal variants
-- [ ] `dominates?/3` - Check if one variant dominates another
+  - Filters unevaluated variants automatically
+- [x] `dominates?/3` - Check if one variant dominates another
   - Handles maximization (accuracy) vs minimization (cost)
-- [ ] `select_survivors/3` - Select variants for next generation
-  - Uses Pareto front + optional diversity bonus
+  - A dominates B if: at least as good on all, strictly better on one
+- [x] `select_survivors/3` - Select variants for next generation
+  - Strategies: `:pareto_first`, `:nsga2`, `:weighted`
+  - Uses Pareto front + crowding distance for diversity
+- [x] `crowding_distance/2` - Measure diversity in objective space
+  - Boundary points get infinite distance
+  - Used in NSGA-II selection
 
 ### 4A.4.2 Objectives Configuration
 
-- [ ] Support configurable objectives:
+- [x] Support configurable objectives:
   - `{:accuracy, :maximize}`
   - `{:token_cost, :minimize}`
   - `{:latency_ms, :minimize}`
-- [ ] Allow weighted combination for final selection
+- [x] `default_objectives/0` returns `[{:accuracy, :maximize}, {:token_cost, :minimize}]`
+- [x] Allow weighted combination for final selection (`:weighted` strategy)
+- [x] Support custom weights via `:weights` option
 
 ### 4A.4.3 Unit Tests
 
-- [ ] Test Pareto front calculation
-- [ ] Test domination logic
-- [ ] Test with various objective combinations
+- [x] Test Pareto front calculation
+- [x] Test domination logic (9 tests)
+- [x] Test with various objective combinations
+- [x] Test selection strategies (pareto_first, nsga2, weighted)
+- [x] Test crowding distance calculation
+- [x] Test edge cases (empty, single, equal variants)
 
 ---
 
