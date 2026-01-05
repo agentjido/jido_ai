@@ -431,5 +431,57 @@ defmodule Jido.AI.GEPA.OptimizerTest do
 
       assert is_list(result.best_variants)
     end
+
+    test "validates maximum generations" do
+      tasks = create_tasks()
+
+      assert {:error, :generations_exceeds_max} = Optimizer.optimize(
+        "Answer: {{input}}",
+        tasks,
+        runner: &full_mock_runner/3,
+        generations: 10_000
+      )
+    end
+
+    test "validates maximum population_size" do
+      tasks = create_tasks()
+
+      assert {:error, :population_size_exceeds_max} = Optimizer.optimize(
+        "Answer: {{input}}",
+        tasks,
+        runner: &full_mock_runner/3,
+        population_size: 10_000
+      )
+    end
+
+    test "validates maximum mutation_count" do
+      tasks = create_tasks()
+
+      assert {:error, :mutation_count_exceeds_max} = Optimizer.optimize(
+        "Answer: {{input}}",
+        tasks,
+        runner: &full_mock_runner/3,
+        mutation_count: 10_000
+      )
+    end
+  end
+
+  # ============================================================================
+  # Invalid Args Tests
+  # ============================================================================
+
+  describe "invalid args" do
+    test "optimize returns error when tasks is not a list" do
+      assert {:error, :invalid_args} = Optimizer.optimize("template", "not a list", runner: &mock_runner/3)
+      assert {:error, :invalid_args} = Optimizer.optimize("template", nil, runner: &mock_runner/3)
+      assert {:error, :invalid_args} = Optimizer.optimize("template", %{}, runner: &mock_runner/3)
+    end
+
+    test "run_generation returns error when variants is not a list" do
+      tasks = create_tasks()
+
+      assert {:error, :invalid_args} = Optimizer.run_generation("not a list", tasks, 0, runner: &mock_runner/3)
+      assert {:error, :invalid_args} = Optimizer.run_generation(nil, tasks, 0, runner: &mock_runner/3)
+    end
   end
 end

@@ -177,6 +177,21 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
       assert opts[:model] == "gpt-4"
       assert opts[:temperature] == 0.5
     end
+
+    test "returns error when variant is not a PromptVariant" do
+      tasks = [Task.new!(%{input: "test"})]
+
+      assert {:error, :invalid_args} = Evaluator.evaluate_variant("not a variant", tasks, runner: &mock_runner/3)
+      assert {:error, :invalid_args} = Evaluator.evaluate_variant(nil, tasks, runner: &mock_runner/3)
+      assert {:error, :invalid_args} = Evaluator.evaluate_variant(%{}, tasks, runner: &mock_runner/3)
+    end
+
+    test "returns error when tasks is not a list" do
+      variant = PromptVariant.new!(%{template: "test"})
+
+      assert {:error, :invalid_args} = Evaluator.evaluate_variant(variant, "not a list", runner: &mock_runner/3)
+      assert {:error, :invalid_args} = Evaluator.evaluate_variant(variant, nil, runner: &mock_runner/3)
+    end
   end
 
   # ============================================================================

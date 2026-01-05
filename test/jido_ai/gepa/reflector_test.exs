@@ -473,4 +473,61 @@ defmodule Jido.AI.GEPA.ReflectorTest do
       assert is_binary(reflection)
     end
   end
+
+  # ============================================================================
+  # Invalid Args Tests
+  # ============================================================================
+
+  describe "invalid args" do
+    test "reflect_on_failures returns error for non-variant first arg" do
+      failure = create_failing_result(create_task("Q", "A"), "Wrong")
+
+      assert {:error, :invalid_args} = Reflector.reflect_on_failures("not a variant", [failure], runner: &mock_reflection_runner/3)
+      assert {:error, :invalid_args} = Reflector.reflect_on_failures(nil, [failure], runner: &mock_reflection_runner/3)
+      assert {:error, :invalid_args} = Reflector.reflect_on_failures(%{}, [failure], runner: &mock_reflection_runner/3)
+    end
+
+    test "reflect_on_failures returns error for non-list second arg" do
+      variant = create_variant()
+
+      assert {:error, :invalid_args} = Reflector.reflect_on_failures(variant, "not a list", runner: &mock_reflection_runner/3)
+      assert {:error, :invalid_args} = Reflector.reflect_on_failures(variant, nil, runner: &mock_reflection_runner/3)
+    end
+
+    test "propose_mutations returns error for non-variant first arg" do
+      assert {:error, :invalid_args} = Reflector.propose_mutations("not a variant", "reflection", runner: &mock_mutation_runner/3)
+      assert {:error, :invalid_args} = Reflector.propose_mutations(nil, "reflection", runner: &mock_mutation_runner/3)
+    end
+
+    test "propose_mutations returns error for non-string reflection" do
+      variant = create_variant()
+
+      assert {:error, :invalid_args} = Reflector.propose_mutations(variant, 123, runner: &mock_mutation_runner/3)
+      assert {:error, :invalid_args} = Reflector.propose_mutations(variant, nil, runner: &mock_mutation_runner/3)
+    end
+
+    test "mutate_prompt returns error for non-variant first arg" do
+      eval_result = %{results: []}
+
+      assert {:error, :invalid_args} = Reflector.mutate_prompt("not a variant", eval_result, runner: &mock_mutation_runner/3)
+      assert {:error, :invalid_args} = Reflector.mutate_prompt(nil, eval_result, runner: &mock_mutation_runner/3)
+    end
+
+    test "mutate_prompt returns error for invalid eval_result" do
+      variant = create_variant()
+
+      assert {:error, :invalid_args} = Reflector.mutate_prompt(variant, "not a map", runner: &mock_mutation_runner/3)
+      assert {:error, :invalid_args} = Reflector.mutate_prompt(variant, %{}, runner: &mock_mutation_runner/3)
+      assert {:error, :invalid_args} = Reflector.mutate_prompt(variant, nil, runner: &mock_mutation_runner/3)
+    end
+
+    test "crossover returns error for non-variant args" do
+      variant = create_variant()
+
+      assert {:error, :invalid_args} = Reflector.crossover("not a variant", variant, runner: &mock_crossover_runner/3)
+      assert {:error, :invalid_args} = Reflector.crossover(variant, "not a variant", runner: &mock_crossover_runner/3)
+      assert {:error, :invalid_args} = Reflector.crossover(nil, variant, runner: &mock_crossover_runner/3)
+      assert {:error, :invalid_args} = Reflector.crossover(variant, nil, runner: &mock_crossover_runner/3)
+    end
+  end
 end
