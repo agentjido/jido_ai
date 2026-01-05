@@ -1,3 +1,7 @@
+# NOTE: Module is in `Strategies` namespace (plural) to match other strategies
+# in this codebase (e.g., Jido.AI.Strategies.Adaptive). This differs from the
+# singular `Strategy` namespace used by Jido.AI.Strategy.ReAct for historical
+# reasons. Future refactoring may consolidate to a single namespace.
 defmodule Jido.AI.Strategies.TRM do
   @moduledoc """
   TRM (Tiny-Recursive-Model) execution strategy for Jido agents.
@@ -45,9 +49,6 @@ defmodule Jido.AI.Strategies.TRM do
   - `:model` (optional) - Model identifier, defaults to "anthropic:claude-haiku-4-5"
   - `:max_supervision_steps` (optional) - Maximum iterations before termination, defaults to 5
   - `:act_threshold` (optional) - Confidence threshold for early stopping, defaults to 0.9
-  - `:reasoning_prompt` (optional) - Custom prompt for reasoning phase
-  - `:supervision_prompt` (optional) - Custom prompt for supervision phase
-  - `:improvement_prompt` (optional) - Custom prompt for improvement phase
 
   ## Signal Routing
 
@@ -77,10 +78,7 @@ defmodule Jido.AI.Strategies.TRM do
   @type config :: %{
           model: String.t(),
           max_supervision_steps: pos_integer(),
-          act_threshold: float(),
-          reasoning_prompt: String.t(),
-          supervision_prompt: String.t(),
-          improvement_prompt: String.t()
+          act_threshold: float()
         }
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -103,10 +101,13 @@ defmodule Jido.AI.Strategies.TRM do
   @spec llm_partial_action() :: :trm_llm_partial
   def llm_partial_action, do: @llm_partial
 
+  # Maximum prompt length to prevent resource exhaustion (enforced in sanitization)
+  # Length validation is handled by Jido.AI.TRM.Helpers.sanitize_user_input/2
+
   @action_specs %{
     @start => %{
-      schema: Zoi.object(%{question: Zoi.string()}),
-      doc: "Start TRM recursive reasoning with a question",
+      schema: Zoi.object(%{prompt: Zoi.string()}),
+      doc: "Start TRM recursive reasoning with a prompt",
       name: "trm.start"
     },
     @llm_result => %{
@@ -288,10 +289,7 @@ defmodule Jido.AI.Strategies.TRM do
       model: resolved_model,
       max_supervision_steps:
         Keyword.get(opts, :max_supervision_steps, @default_max_supervision_steps),
-      act_threshold: Keyword.get(opts, :act_threshold, @default_act_threshold),
-      reasoning_prompt: Keyword.get(opts, :reasoning_prompt, default_reasoning_prompt()),
-      supervision_prompt: Keyword.get(opts, :supervision_prompt, default_supervision_prompt()),
-      improvement_prompt: Keyword.get(opts, :improvement_prompt, default_improvement_prompt())
+      act_threshold: Keyword.get(opts, :act_threshold, @default_act_threshold)
     }
   end
 
@@ -329,9 +327,9 @@ defmodule Jido.AI.Strategies.TRM do
   defp normalize_action(action), do: action
 
   defp to_machine_msg(@start, params) do
-    question = Map.get(params, :question) || Map.get(params, "question")
+    prompt = Map.get(params, :prompt) || Map.get(params, "prompt")
     call_id = Machine.generate_call_id()
-    {:start, question, call_id}
+    {:start, prompt, call_id}
   end
 
   defp to_machine_msg(@llm_result, params) do
@@ -356,6 +354,11 @@ defmodule Jido.AI.Strategies.TRM do
   end
 
   defp to_machine_msg(_, _), do: nil
+
+  # NOTE: The directive building functions below (build_*_directive and
+  # convert_to_reqllm_context) share patterns with other strategies like ReAct.
+  # A future refactoring could extract these into a shared Jido.AI.Strategy.Helpers
+  # module to reduce duplication across strategies.
 
   defp lift_directives(directives, config) do
     %{model: model} = config
@@ -401,11 +404,12 @@ defmodule Jido.AI.Strategies.TRM do
 
   defp build_supervision_directive(id, context, model, _config) do
     # Use Supervision module for structured prompt building
+    # Include previous_feedback from Machine for iterative improvement context
     supervision_context = %{
       question: context[:question],
       answer: context[:current_answer],
       step: context[:step],
-      previous_feedback: nil
+      previous_feedback: context[:previous_feedback]
     }
 
     {system, user} = Supervision.build_supervision_prompt(supervision_context)
@@ -460,7 +464,9 @@ defmodule Jido.AI.Strategies.TRM do
 
   @doc """
   Returns the default system prompt for reasoning phase.
-  Delegates to `Jido.AI.TRM.Reasoning.default_reasoning_system_prompt/0`.
+
+  This is provided for reference - prompts are managed internally by
+  the Reasoning module. See `Jido.AI.TRM.Reasoning` for details.
   """
   @spec default_reasoning_prompt() :: String.t()
   def default_reasoning_prompt do
@@ -469,7 +475,9 @@ defmodule Jido.AI.Strategies.TRM do
 
   @doc """
   Returns the default system prompt for supervision phase.
-  Delegates to `Jido.AI.TRM.Supervision.default_supervision_system_prompt/0`.
+
+  This is provided for reference - prompts are managed internally by
+  the Supervision module. See `Jido.AI.TRM.Supervision` for details.
   """
   @spec default_supervision_prompt() :: String.t()
   def default_supervision_prompt do
@@ -478,7 +486,9 @@ defmodule Jido.AI.Strategies.TRM do
 
   @doc """
   Returns the default system prompt for improvement phase.
-  Delegates to `Jido.AI.TRM.Supervision.default_improvement_system_prompt/0`.
+
+  This is provided for reference - prompts are managed internally by
+  the Supervision module. See `Jido.AI.TRM.Supervision` for details.
   """
   @spec default_improvement_prompt() :: String.t()
   def default_improvement_prompt do

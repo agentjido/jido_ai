@@ -55,6 +55,9 @@ defmodule Jido.AI.TRM.Reasoning do
           importance: :high | :medium | :low
         }
 
+  # Import shared helpers
+  import Jido.AI.TRM.Helpers, only: [clamp: 3, parse_float_safe: 1, sanitize_user_input: 1]
+
   # Confidence markers that indicate certainty
   @high_confidence_markers ~w(
     clearly definitely certainly absolutely obviously
@@ -159,11 +162,12 @@ defmodule Jido.AI.TRM.Reasoning do
   @spec build_latent_update_prompt(String.t(), String.t(), map()) :: String.t()
   def build_latent_update_prompt(question, reasoning_output, latent_state) do
     previous_trace = format_reasoning_trace(latent_state)
+    safe_question = sanitize_user_input(question)
 
     """
     Based on the following reasoning analysis, extract the key learnings to carry forward:
 
-    Question: #{question}
+    Question: #{safe_question}
 
     Previous Reasoning Trace:
     #{previous_trace}
@@ -337,8 +341,10 @@ defmodule Jido.AI.TRM.Reasoning do
   # ============================================================================
 
   defp build_user_prompt(%{current_answer: nil} = context) do
+    safe_question = sanitize_user_input(context[:question])
+
     """
-    Question: #{context[:question]}
+    Question: #{safe_question}
 
     This is the first reasoning step. Analyze the question and provide an initial answer
     with your reasoning. Use the structured format with INSIGHT, ISSUE, MISSING, SUGGESTION markers.
@@ -355,12 +361,14 @@ defmodule Jido.AI.TRM.Reasoning do
 
   defp build_user_prompt(context) do
     trace = format_reasoning_trace(context[:latent_state])
+    safe_question = sanitize_user_input(context[:question])
+    safe_answer = sanitize_user_input(context[:current_answer])
 
     """
-    Question: #{context[:question]}
+    Question: #{safe_question}
 
     Current answer:
-    #{context[:current_answer]}
+    #{safe_answer}
 
     Previous reasoning trace:
     #{trace}
@@ -502,18 +510,5 @@ defmodule Jido.AI.TRM.Reasoning do
       confidence: 0.5,
       raw_text: ""
     }
-  end
-
-  defp parse_float_safe(str) do
-    case Float.parse(str) do
-      {float, _} -> float
-      :error -> 0.5
-    end
-  end
-
-  defp clamp(value, min, max) do
-    value
-    |> max(min)
-    |> min(max)
   end
 end
