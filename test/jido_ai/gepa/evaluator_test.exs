@@ -83,7 +83,8 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
 
       {:ok, result} = Evaluator.evaluate_variant(variant, tasks, runner: &mock_runner/3)
 
-      assert result.token_cost == 300  # 100 * 3
+      # 100 * 3
+      assert result.token_cost == 300
     end
 
     test "returns error when runner is missing" do
@@ -123,10 +124,11 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
       # Use slow runner to verify parallelism
       start_time = System.monotonic_time(:millisecond)
 
-      {:ok, result} = Evaluator.evaluate_variant(variant, tasks,
-        runner: &slow_runner/3,
-        parallel: true
-      )
+      {:ok, result} =
+        Evaluator.evaluate_variant(variant, tasks,
+          runner: &slow_runner/3,
+          parallel: true
+        )
 
       elapsed = System.monotonic_time(:millisecond) - start_time
 
@@ -168,10 +170,11 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
         {:ok, %{output: "test", tokens: 1}}
       end
 
-      {:ok, _result} = Evaluator.evaluate_variant(variant, tasks,
-        runner: runner,
-        runner_opts: [model: "gpt-4", temperature: 0.5]
-      )
+      {:ok, _result} =
+        Evaluator.evaluate_variant(variant, tasks,
+          runner: runner,
+          runner_opts: [model: "gpt-4", temperature: 0.5]
+        )
 
       assert_receive {:opts, opts}
       assert opts[:model] == "gpt-4"
@@ -219,8 +222,10 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
       result = Evaluator.run_single_task(variant, task, runner: &mock_runner/3)
 
       assert result.success == false
-      assert result.output != nil  # Output exists but doesn't match
-      assert result.error == nil   # No error, just validation failure
+      # Output exists but doesn't match
+      assert result.output != nil
+      # No error, just validation failure
+      assert result.error == nil
     end
 
     test "returns failure result when runner fails" do
@@ -252,12 +257,15 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
 
     test "renders map template with input" do
       test_pid = self()
-      variant = PromptVariant.new!(%{
-        template: %{
-          system: "You are helpful",
-          user: "Answer this: {{input}}"
-        }
-      })
+
+      variant =
+        PromptVariant.new!(%{
+          template: %{
+            system: "You are helpful",
+            user: "Answer this: {{input}}"
+          }
+        })
+
       task = Task.new!(%{input: "What is 1+1?"})
 
       runner = fn template, _input, _opts ->
@@ -295,7 +303,8 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
       result = Evaluator.run_single_task(variant, task, runner: &slow_runner/3)
 
       # Should measure at least 500ms (the sleep time)
-      assert result.latency_ms >= 400  # Allow some margin
+      # Allow some margin
+      assert result.latency_ms >= 400
     end
 
     test "handles runner returning output without tokens" do
@@ -309,7 +318,8 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
       result = Evaluator.run_single_task(variant, task, runner: runner)
 
       assert result.success == true
-      assert result.tokens == 0  # Defaults to 0
+      # Defaults to 0
+      assert result.tokens == 0
     end
 
     test "handles runner exception" do

@@ -101,39 +101,43 @@ defmodule Jido.AI.GEPA.TaskTest do
 
   describe "success?/2 with validator" do
     test "returns true when validator passes" do
-      task = Task.new!(%{
-        input: "What is 2+2?",
-        validator: fn output -> String.contains?(output, "4") end
-      })
+      task =
+        Task.new!(%{
+          input: "What is 2+2?",
+          validator: fn output -> String.contains?(output, "4") end
+        })
 
       assert Task.success?(task, "The answer is 4")
       assert Task.success?(task, "4")
     end
 
     test "returns false when validator fails" do
-      task = Task.new!(%{
-        input: "What is 2+2?",
-        validator: fn output -> String.contains?(output, "4") end
-      })
+      task =
+        Task.new!(%{
+          input: "What is 2+2?",
+          validator: fn output -> String.contains?(output, "4") end
+        })
 
       refute Task.success?(task, "The answer is five")
       refute Task.success?(task, "I don't know")
     end
 
     test "returns false when validator raises" do
-      task = Task.new!(%{
-        input: "test",
-        validator: fn _output -> raise "oops" end
-      })
+      task =
+        Task.new!(%{
+          input: "test",
+          validator: fn _output -> raise "oops" end
+        })
 
       refute Task.success?(task, "any output")
     end
 
     test "returns false when validator returns non-boolean truthy value" do
-      task = Task.new!(%{
-        input: "test",
-        validator: fn _output -> "truthy" end
-      })
+      task =
+        Task.new!(%{
+          input: "test",
+          validator: fn _output -> "truthy" end
+        })
 
       refute Task.success?(task, "output")
     end
@@ -206,10 +210,11 @@ defmodule Jido.AI.GEPA.TaskTest do
     end
 
     test "handles nil output with validator" do
-      task = Task.new!(%{
-        input: "test",
-        validator: fn output -> output == nil end
-      })
+      task =
+        Task.new!(%{
+          input: "test",
+          validator: fn output -> output == nil end
+        })
 
       assert Task.success?(task, nil)
     end
@@ -265,21 +270,23 @@ defmodule Jido.AI.GEPA.TaskTest do
     end
 
     test "handles unicode in input and expected" do
-      {:ok, task} = Task.new(%{
-        input: "What is 2+2 in Japanese?",
-        expected: "四"
-      })
+      {:ok, task} =
+        Task.new(%{
+          input: "What is 2+2 in Japanese?",
+          expected: "四"
+        })
 
       assert Task.success?(task, "The answer is 四")
     end
 
     test "validator takes precedence over expected" do
       # When both validator and expected are set, validator is used
-      task = Task.new!(%{
-        input: "test",
-        expected: "4",
-        validator: fn output -> output == "five" end
-      })
+      task =
+        Task.new!(%{
+          input: "test",
+          expected: "4",
+          validator: fn output -> output == "five" end
+        })
 
       # Validator says "five" is correct, not "4"
       assert Task.success?(task, "five")

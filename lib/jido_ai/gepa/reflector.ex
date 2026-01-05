@@ -33,8 +33,8 @@ defmodule Jido.AI.GEPA.Reflector do
   - **Crossover**: Combine successful elements from two parent prompts
   """
 
-  alias Jido.AI.GEPA.PromptVariant
   alias Jido.AI.GEPA.Helpers
+  alias Jido.AI.GEPA.PromptVariant
 
   @type reflection :: String.t()
   @type run_result :: Jido.AI.GEPA.Evaluator.run_result()
@@ -68,8 +68,7 @@ defmodule Jido.AI.GEPA.Reflector do
   """
   @spec reflect_on_failures(PromptVariant.t(), [run_result()], keyword()) ::
           {:ok, reflection()} | {:error, atom()}
-  def reflect_on_failures(%PromptVariant{} = variant, failing_results, opts)
-      when is_list(failing_results) do
+  def reflect_on_failures(%PromptVariant{} = variant, failing_results, opts) when is_list(failing_results) do
     case validate_opts(opts) do
       :ok ->
         if Enum.empty?(failing_results) do
@@ -108,8 +107,7 @@ defmodule Jido.AI.GEPA.Reflector do
   """
   @spec propose_mutations(PromptVariant.t(), reflection(), keyword()) ::
           {:ok, [String.t()]} | {:error, atom()}
-  def propose_mutations(%PromptVariant{} = variant, reflection, opts)
-      when is_binary(reflection) do
+  def propose_mutations(%PromptVariant{} = variant, reflection, opts) when is_binary(reflection) do
     case validate_opts(opts) do
       :ok ->
         do_propose_mutations(variant, reflection, opts)
@@ -146,8 +144,7 @@ defmodule Jido.AI.GEPA.Reflector do
   """
   @spec mutate_prompt(PromptVariant.t(), map(), keyword()) ::
           {:ok, [PromptVariant.t()]} | {:error, atom()}
-  def mutate_prompt(%PromptVariant{} = variant, %{results: results} = _eval_result, opts)
-      when is_list(results) do
+  def mutate_prompt(%PromptVariant{} = variant, %{results: results} = _eval_result, opts) when is_list(results) do
     case validate_opts(opts) do
       :ok ->
         failing_results = Enum.filter(results, &(!&1.success))
