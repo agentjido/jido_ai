@@ -233,41 +233,47 @@ defmodule Jido.AI.GEPA.Selection do
   defp compare_metric(variant_a, variant_b, metric, direction) do
     val_a = Map.get(variant_a, metric)
     val_b = Map.get(variant_b, metric)
-
-    cond do
-      is_nil(val_a) or is_nil(val_b) -> :eq
-      val_a == val_b -> :eq
-      direction == :maximize and val_a > val_b -> :gt
-      direction == :maximize and val_a < val_b -> :lt
-      direction == :minimize and val_a < val_b -> :gt
-      direction == :minimize and val_a > val_b -> :lt
-      true -> :eq
-    end
+    compare_values(val_a, val_b, direction)
   end
+
+  # Helper functions to reduce cyclomatic complexity
+  defp compare_values(nil, _, _), do: :eq
+  defp compare_values(_, nil, _), do: :eq
+  defp compare_values(a, b, direction) when a == b, do: :eq
+  defp compare_values(a, b, :maximize) when a > b, do: :gt
+  defp compare_values(_, _, :maximize), do: :lt
+  defp compare_values(a, b, :minimize) when a < b, do: :gt
+  defp compare_values(_, _, :minimize), do: :lt
 
   # Pareto-first selection: take Pareto front, then best remaining
   defp pareto_first_select(variants, count, objectives) do
-    if Enum.empty?(variants) or count == 0 do
-      []
+    cond do
+      Enum.empty?(variants) or count == 0 ->
+        []
+
+      true ->
+        front = pareto_front(variants, objectives)
+        fill_from_front(front, variants, count, objectives)
+    end
+  end
+
+  defp fill_from_front(front, variants, count, objectives) do
+    if length(front) >= count do
+      pick_by_crowding(front, count, objectives)
     else
-      front = pareto_front(variants, objectives)
+      fill_remaining(front, variants, count, objectives)
+    end
+  end
 
-      if length(front) >= count do
-        # More in front than needed - use crowding distance to pick
-        pick_by_crowding(front, count, objectives)
-      else
-        # Take all from front, fill remaining from non-front
-        remaining_count = count - length(front)
-        non_front = variants -- front
+  defp fill_remaining(front, variants, count, objectives) do
+    remaining_count = count - length(front)
+    non_front = variants -- front
 
-        if Enum.empty?(non_front) do
-          front
-        else
-          # Recursively select from remaining
-          additional = pareto_first_select(non_front, remaining_count, objectives)
-          front ++ additional
-        end
-      end
+    if Enum.empty?(non_front) do
+      front
+    else
+      additional = pareto_first_select(non_front, remaining_count, objectives)
+      front ++ additional
     end
   end
 
@@ -352,51 +358,65 @@ defmodule Jido.AI.GEPA.Selection do
 
   # Add crowding distance contribution from one objective
   defp add_objective_distance(variants, metric, direction, distances) do
-    # Sort variants by this objective
-    sorted =
-      variants
-      |> Enum.sort_by(fn v ->
-        val = Map.get(v, metric) || 0
-        if direction == :maximize, do: -val, else: val
-      end)
-
-    # Get min and max values
-    values = Enum.map(sorted, fn v -> Map.get(v, metric) || 0 end)
-    {min_val, max_val} = {Enum.min(values), Enum.max(values)}
-    range = max_val - min_val
+    sorted = sort_by_metric(variants, metric, direction)
+    range = calculate_range(sorted, metric)
 
     if range == 0 do
-      # All same value - no contribution to distance
       distances
     else
-      # Boundary points get infinite distance
-      first_id = hd(sorted).id
-      last_id = List.last(sorted).id
-
-      distances =
-        distances
-        |> Map.put(first_id, :infinity)
-        |> Map.put(last_id, :infinity)
-
-      # Interior points get distance from neighbors
-      sorted
-      |> Enum.with_index()
-      |> Enum.reduce(distances, fn {variant, idx}, acc ->
-        if idx == 0 or idx == length(sorted) - 1 do
-          acc
-        else
-          prev_val = Map.get(Enum.at(sorted, idx - 1), metric) || 0
-          next_val = Map.get(Enum.at(sorted, idx + 1), metric) || 0
-          contribution = abs(next_val - prev_val) / range
-
-          current = Map.get(acc, variant.id)
-
-          case current do
-            :infinity -> acc
-            n when is_number(n) -> Map.put(acc, variant.id, n + contribution)
-          end
-        end
-      end)
+      distances_with_boundaries = add_boundary_distances(sorted, distances)
+      add_interior_distances(sorted, metric, range, distances_with_boundaries)
     end
+  end
+
+  defp sort_by_metric(variants, metric, direction) do
+    Enum.sort_by(variants, fn v ->
+      val = Map.get(v, metric) || 0
+      if direction == :maximize, do: -val, else: val
+    end)
+  end
+
+  defp calculate_range(sorted, metric) do
+    values = Enum.map(sorted, fn v -> Map.get(v, metric) || 0 end)
+    Enum.max(values) - Enum.min(values)
+  end
+
+  defp add_boundary_distances(sorted, distances) do
+    first_id = hd(sorted).id
+    last_id = List.last(sorted).id
+
+    distances
+    |> Map.put(first_id, :infinity)
+    |> Map.put(last_id, :infinity)
+  end
+
+  defp add_interior_distances(sorted, metric, range, distances) do
+    sorted
+    |> Enum.with_index()
+    |> Enum.reduce(distances, fn {variant, idx}, acc ->
+      add_interior_distance(variant, idx, sorted, metric, range, acc)
+    end)
+  end
+
+  defp add_interior_distance(variant, idx, sorted, metric, range, acc) do
+    is_boundary = idx == 0 or idx == length(sorted) - 1
+
+    if is_boundary do
+      acc
+    else
+      contribution = calculate_contribution(sorted, idx, metric, range)
+      current = Map.get(acc, variant.id)
+
+      case current do
+        :infinity -> acc
+        n when is_number(n) -> Map.put(acc, variant.id, n + contribution)
+      end
+    end
+  end
+
+  defp calculate_contribution(sorted, idx, metric, range) do
+    prev_val = Map.get(Enum.at(sorted, idx - 1), metric) || 0
+    next_val = Map.get(Enum.at(sorted, idx + 1), metric) || 0
+    abs(next_val - prev_val) / range
   end
 end

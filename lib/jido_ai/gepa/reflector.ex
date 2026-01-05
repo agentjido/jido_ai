@@ -34,6 +34,7 @@ defmodule Jido.AI.GEPA.Reflector do
   """
 
   alias Jido.AI.GEPA.PromptVariant
+  alias Jido.AI.GEPA.Helpers
 
   @type reflection :: String.t()
   @type run_result :: Jido.AI.GEPA.Evaluator.run_result()
@@ -201,11 +202,7 @@ defmodule Jido.AI.GEPA.Reflector do
   # ============================================================================
 
   defp validate_opts(opts) do
-    cond do
-      not Keyword.has_key?(opts, :runner) -> {:error, :runner_required}
-      not is_function(Keyword.get(opts, :runner), 3) -> {:error, :invalid_runner}
-      true -> :ok
-    end
+    Helpers.validate_runner_opts(opts)
   end
 
   defp do_reflect(variant, failing_results, opts) do
@@ -308,8 +305,7 @@ defmodule Jido.AI.GEPA.Reflector do
     failures_text =
       sampled_failures
       |> Enum.with_index(1)
-      |> Enum.map(&format_failure/1)
-      |> Enum.join("\n\n")
+      |> Enum.map_join("\n\n", &format_failure/1)
 
     template_text = format_template(variant.template)
 
@@ -424,8 +420,7 @@ defmodule Jido.AI.GEPA.Reflector do
   defp format_template(template) when is_map(template) do
     formatted =
       template
-      |> Enum.map(fn {k, v} -> "#{k}: #{inspect(v)}" end)
-      |> Enum.join("\n")
+      |> Enum.map_join("\n", fn {k, v} -> "#{k}: #{inspect(v)}" end)
 
     "```\n#{formatted}\n```"
   end

@@ -119,6 +119,13 @@ defmodule Jido.AI.GEPA.Task do
 
   `true` if the output passes, `false` otherwise.
 
+  ## Security Note
+
+  When using a custom `:validator` function, ensure it comes from trusted code only.
+  Validator functions are executed during `success?/2` calls and have access to the
+  output string. Do NOT construct Task structs with validators from untrusted sources
+  (e.g., user input, external APIs, or deserialized data from untrusted origins).
+
   ## Examples
 
       iex> task = Task.new!(%{input: "2+2?", expected: "4"})

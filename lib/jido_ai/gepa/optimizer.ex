@@ -52,7 +52,7 @@ defmodule Jido.AI.GEPA.Optimizer do
   - `[:jido, :ai, :gepa, :complete]` - When optimization finishes
   """
 
-  alias Jido.AI.GEPA.{PromptVariant, Evaluator, Reflector, Selection}
+  alias Jido.AI.GEPA.{Evaluator, Helpers, Optimizer, PromptVariant, Reflector, Selection}
 
   @type result :: %{
           best_variants: [PromptVariant.t()],
@@ -66,6 +66,11 @@ defmodule Jido.AI.GEPA.Optimizer do
   @default_population_size 8
   @default_mutation_count 3
   @default_crossover_rate 0.2
+
+  # Maximum bounds to prevent resource exhaustion
+  @max_generations 1000
+  @max_population_size 100
+  @max_mutation_count 20
 
   # ============================================================================
   # Public API
@@ -156,6 +161,8 @@ defmodule Jido.AI.GEPA.Optimizer do
     {:ok, next_population}
   end
 
+  def run_generation(_, _, _, _), do: {:error, :invalid_args}
+
   @doc """
   Extracts the best variants from a population based on objectives.
 
@@ -172,10 +179,20 @@ defmodule Jido.AI.GEPA.Optimizer do
   # ============================================================================
 
   defp validate_opts(opts) do
-    cond do
-      not Keyword.has_key?(opts, :runner) -> {:error, :runner_required}
-      not is_function(Keyword.get(opts, :runner), 3) -> {:error, :invalid_runner}
-      true -> :ok
+    with :ok <- Helpers.validate_runner_opts(opts) do
+      cond do
+        Keyword.get(opts, :generations, @default_generations) > @max_generations ->
+          {:error, :generations_exceeds_max}
+
+        Keyword.get(opts, :population_size, @default_population_size) > @max_population_size ->
+          {:error, :population_size_exceeds_max}
+
+        Keyword.get(opts, :mutation_count, @default_mutation_count) > @max_mutation_count ->
+          {:error, :mutation_count_exceeds_max}
+
+        true ->
+          :ok
+      end
     end
   end
 
@@ -227,7 +244,8 @@ defmodule Jido.AI.GEPA.Optimizer do
 
     if mutation_count > 0 do
       # Generate initial mutations from seed
-      case Reflector.propose_mutations(seed, "Initial population generation", runner: runner, mutation_count: mutation_count, runner_opts: runner_opts) do
+      mutation_opts = [runner: runner, mutation_count: mutation_count, runner_opts: runner_opts]
+      case Reflector.propose_mutations(seed, "Initial population generation", mutation_opts) do
         {:ok, templates} ->
           children = Enum.map(templates, &PromptVariant.create_child(seed, &1))
           [seed | children]
@@ -245,23 +263,31 @@ defmodule Jido.AI.GEPA.Optimizer do
       if PromptVariant.evaluated?(variant) do
         variant
       else
-        case Evaluator.evaluate_variant(variant, tasks, runner: runner, runner_opts: runner_opts) do
-          {:ok, result} ->
-            updated = PromptVariant.update_metrics(variant, %{
-              accuracy: result.accuracy,
-              token_cost: result.token_cost,
-              latency_ms: result.latency_ms
-            })
-
-            emit_evaluation_telemetry(updated, generation)
-            updated
-
-          {:error, _} ->
-            # Mark as evaluated with 0 accuracy on error
-            PromptVariant.update_metrics(variant, %{accuracy: 0.0, token_cost: 0})
-        end
+        evaluate_single_variant(variant, tasks, runner, runner_opts, generation)
       end
     end)
+  end
+
+  defp evaluate_single_variant(variant, tasks, runner, runner_opts, generation) do
+    case Evaluator.evaluate_variant(variant, tasks, runner: runner, runner_opts: runner_opts) do
+      {:ok, result} ->
+        updated = update_variant_metrics(variant, result, generation)
+        updated
+
+      {:error, _} ->
+        PromptVariant.update_metrics(variant, %{accuracy: 0.0, token_cost: 0})
+    end
+  end
+
+  defp update_variant_metrics(variant, result, generation) do
+    updated = PromptVariant.update_metrics(variant, %{
+      accuracy: result.accuracy,
+      token_cost: result.token_cost,
+      latency_ms: result.latency_ms
+    })
+
+    emit_evaluation_telemetry(updated, generation)
+    updated
   end
 
   defp generate_offspring(survivors, mutation_count, crossover_rate, runner, runner_opts) do

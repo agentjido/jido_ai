@@ -36,6 +36,7 @@ defmodule Jido.AI.GEPA.Evaluator do
 
   alias Jido.AI.GEPA.PromptVariant
   alias Jido.AI.GEPA.Task, as: GEPATask
+  alias Jido.AI.GEPA.Helpers
 
   @type run_result :: %{
           task: GEPATask.t(),
@@ -170,11 +171,7 @@ defmodule Jido.AI.GEPA.Evaluator do
   # ============================================================================
 
   defp validate_opts(opts) do
-    cond do
-      not Keyword.has_key?(opts, :runner) -> {:error, :runner_required}
-      not is_function(Keyword.get(opts, :runner), 3) -> {:error, :invalid_runner}
-      true -> :ok
-    end
+    Helpers.validate_runner_opts(opts)
   end
 
   defp run_all_tasks(variant, tasks, opts) do
@@ -194,11 +191,15 @@ defmodule Jido.AI.GEPA.Evaluator do
   end
 
   defp run_tasks_parallel(variant, tasks, opts) do
+    # Calculate bounded timeout: individual timeout * task count + buffer
+    per_task_timeout = Keyword.get(opts, :timeout, 30_000)
+    total_timeout = per_task_timeout * length(tasks) + 5_000
+
     tasks
     |> Enum.map(fn task ->
       Elixir.Task.async(fn -> run_single_task(variant, task, opts) end)
     end)
-    |> Enum.map(&Elixir.Task.await(&1, :infinity))
+    |> Enum.map(&Elixir.Task.await(&1, total_timeout))
   end
 
   defp render_template(template, input) when is_binary(template) do

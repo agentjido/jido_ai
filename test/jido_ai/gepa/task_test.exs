@@ -190,6 +190,31 @@ defmodule Jido.AI.GEPA.TaskTest do
     end
   end
 
+  describe "success?/2 with nil output" do
+    test "returns false when expected but output is nil" do
+      task = Task.new!(%{input: "test", expected: "something"})
+
+      # nil output should not match expected string
+      refute Task.success?(task, nil)
+    end
+
+    test "returns true when no criteria and output is nil" do
+      task = Task.new!(%{input: "test"})
+
+      # No criteria means always passes
+      assert Task.success?(task, nil)
+    end
+
+    test "handles nil output with validator" do
+      task = Task.new!(%{
+        input: "test",
+        validator: fn output -> output == nil end
+      })
+
+      assert Task.success?(task, nil)
+    end
+  end
+
   # ============================================================================
   # Convenience Functions
   # ============================================================================
