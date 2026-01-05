@@ -325,6 +325,88 @@ defmodule Jido.AI.ReAct.MachineTest do
   end
 
   # ============================================================================
+  # Telemetry Emission
+  # ============================================================================
+
+  describe "telemetry emission" do
+    test "emits iteration telemetry when continuing to next iteration" do
+      # Attach a telemetry handler to capture the event
+      ref = make_ref()
+      test_pid = self()
+
+      handler = fn event, measurements, metadata, _config ->
+        send(test_pid, {:telemetry_event, ref, event, measurements, metadata})
+      end
+
+      :telemetry.attach(
+        "test-iteration-handler-#{inspect(ref)}",
+        [:jido, :ai, :react, :iteration],
+        handler,
+        nil
+      )
+
+      # Set up a machine that will transition to next iteration (after tool result)
+      machine = %Machine{
+        status: "awaiting_tool",
+        iteration: 1,
+        conversation: [
+          %{role: :system, content: "Be helpful"},
+          %{role: :user, content: "Test"}
+        ],
+        pending_tool_calls: [%{id: "tc_1", name: "calc", arguments: %{}, result: nil}],
+        usage: %{},
+        started_at: System.monotonic_time(:millisecond)
+      }
+
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      # Process tool result - this should trigger next iteration and emit telemetry
+      {_machine, _directives} = Machine.update(machine, {:tool_result, "tc_1", {:ok, %{result: 42}}}, env)
+
+      # Verify telemetry was emitted
+      assert_receive {:telemetry_event, ^ref, [:jido, :ai, :react, :iteration], measurements, metadata}, 1000
+
+      assert is_map(measurements)
+      assert Map.has_key?(measurements, :system_time)
+      assert metadata.iteration == 2
+      assert String.starts_with?(metadata.call_id, "call_")
+
+      # Cleanup
+      :telemetry.detach("test-iteration-handler-#{inspect(ref)}")
+    end
+
+    test "emits start telemetry on start" do
+      ref = make_ref()
+      test_pid = self()
+
+      handler = fn event, measurements, metadata, _config ->
+        send(test_pid, {:telemetry_event, ref, event, measurements, metadata})
+      end
+
+      :telemetry.attach(
+        "test-start-handler-#{inspect(ref)}",
+        [:jido, :ai, :react, :start],
+        handler,
+        nil
+      )
+
+      machine = Machine.new()
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {_machine, _directives} = Machine.update(machine, {:start, "Hello world", "call_123"}, env)
+
+      # Should emit start telemetry
+      assert_receive {:telemetry_event, ^ref, [:jido, :ai, :react, :start], measurements, metadata}, 1000
+
+      assert Map.has_key?(measurements, :system_time)
+      assert metadata.call_id == "call_123"
+      assert metadata.query_length == 11  # "Hello world" length
+
+      :telemetry.detach("test-start-handler-#{inspect(ref)}")
+    end
+  end
+
+  # ============================================================================
   # Generate Call ID
   # ============================================================================
 
