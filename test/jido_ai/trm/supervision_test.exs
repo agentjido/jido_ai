@@ -316,11 +316,12 @@ defmodule Jido.AI.TRM.SupervisionTest do
         raw_text: ""
       }
 
-      {system, user} = Supervision.build_improvement_prompt(
-        "What is AI?",
-        "AI is artificial intelligence",
-        feedback
-      )
+      {system, user} =
+        Supervision.build_improvement_prompt(
+          "What is AI?",
+          "AI is artificial intelligence",
+          feedback
+        )
 
       assert is_binary(system)
       assert is_binary(user)
@@ -335,11 +336,12 @@ defmodule Jido.AI.TRM.SupervisionTest do
         raw_text: ""
       }
 
-      {_system, user} = Supervision.build_improvement_prompt(
-        "What is 2+2?",
-        "The answer is 4",
-        feedback
-      )
+      {_system, user} =
+        Supervision.build_improvement_prompt(
+          "What is 2+2?",
+          "The answer is 4",
+          feedback
+        )
 
       assert user =~ "What is 2+2?"
       assert user =~ "The answer is 4"
@@ -518,11 +520,12 @@ defmodule Jido.AI.TRM.SupervisionTest do
       assert feedback.quality_score == 0.55
 
       # Build improvement prompt
-      {imp_system, imp_user} = Supervision.build_improvement_prompt(
-        context.question,
-        context.answer,
-        feedback
-      )
+      {imp_system, imp_user} =
+        Supervision.build_improvement_prompt(
+          context.question,
+          context.answer,
+          feedback
+        )
 
       assert imp_system =~ "improve"
       assert imp_user =~ "chlorophyll"

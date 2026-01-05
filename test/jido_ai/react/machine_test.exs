@@ -96,11 +96,13 @@ defmodule Jido.AI.ReAct.MachineTest do
         started_at: System.monotonic_time(:millisecond)
       }
 
-      result = {:ok, %{
-        type: :final_answer,
-        text: "The answer is 4.",
-        usage: %{input_tokens: 100, output_tokens: 50}
-      }}
+      result =
+        {:ok,
+         %{
+           type: :final_answer,
+           text: "The answer is 4.",
+           usage: %{input_tokens: 100, output_tokens: 50}
+         }}
 
       env = %{system_prompt: "Be helpful", max_iterations: 10}
 
@@ -118,11 +120,13 @@ defmodule Jido.AI.ReAct.MachineTest do
         started_at: System.monotonic_time(:millisecond)
       }
 
-      result = {:ok, %{
-        type: :final_answer,
-        text: "Done.",
-        usage: %{input_tokens: 100, output_tokens: 50}
-      }}
+      result =
+        {:ok,
+         %{
+           type: :final_answer,
+           text: "Done.",
+           usage: %{input_tokens: 100, output_tokens: 50}
+         }}
 
       env = %{system_prompt: "Be helpful", max_iterations: 10}
 
@@ -141,11 +145,13 @@ defmodule Jido.AI.ReAct.MachineTest do
         started_at: System.monotonic_time(:millisecond)
       }
 
-      result = {:ok, %{
-        type: :final_answer,
-        text: "Done."
-        # no usage field
-      }}
+      result =
+        {:ok,
+         %{
+           type: :final_answer,
+           text: "Done."
+           # no usage field
+         }}
 
       env = %{system_prompt: "Be helpful", max_iterations: 10}
 
@@ -400,7 +406,8 @@ defmodule Jido.AI.ReAct.MachineTest do
 
       assert Map.has_key?(measurements, :system_time)
       assert metadata.call_id == "call_123"
-      assert metadata.query_length == 11  # "Hello world" length
+      # "Hello world" length
+      assert metadata.query_length == 11
 
       :telemetry.detach("test-start-handler-#{inspect(ref)}")
     end

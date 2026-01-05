@@ -395,12 +395,13 @@ defmodule Jido.AI.TRM.MachineTest do
       {machine, _} = Machine.update(machine, {:start, "What is AI?", "call_1"})
 
       # Simulate some progress
-      machine = %{machine |
-        supervision_step: 2,
-        current_answer: "AI is artificial intelligence",
-        answer_history: ["First answer"],
-        best_answer: "First answer",
-        best_score: 0.7
+      machine = %{
+        machine
+        | supervision_step: 2,
+          current_answer: "AI is artificial intelligence",
+          answer_history: ["First answer"],
+          best_answer: "First answer",
+          best_score: 0.7
       }
 
       map = Machine.to_map(machine)
@@ -509,6 +510,7 @@ defmodule Jido.AI.TRM.MachineTest do
         act_threshold: 0.8,
         latent_state: %{confidence_score: 0.85, reasoning_trace: []}
       }
+
       assert Machine.check_act_condition(machine)
     end
 
@@ -517,6 +519,7 @@ defmodule Jido.AI.TRM.MachineTest do
         act_threshold: 0.9,
         latent_state: %{confidence_score: 0.7, reasoning_trace: []}
       }
+
       refute Machine.check_act_condition(machine)
     end
   end

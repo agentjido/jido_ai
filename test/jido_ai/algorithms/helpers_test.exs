@@ -241,13 +241,13 @@ defmodule Jido.AI.Algorithms.HelpersTest do
     end
 
     test "returns false for module without execute/2" do
-      assert not Helpers.valid_algorithm?(InvalidAlgo)
+      refute Helpers.valid_algorithm?(InvalidAlgo)
     end
 
     test "returns false for non-atom" do
-      assert not Helpers.valid_algorithm?("not a module")
-      assert not Helpers.valid_algorithm?(123)
-      assert not Helpers.valid_algorithm?(%{})
+      refute Helpers.valid_algorithm?("not a module")
+      refute Helpers.valid_algorithm?(123)
+      refute Helpers.valid_algorithm?(%{})
     end
   end
 end

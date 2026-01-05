@@ -44,11 +44,11 @@ defmodule Jido.AI.ToolAdapter do
   Actions and simple Tools, with better integration with the Executor.
   """
 
-  require Logger
-
   use Agent
 
   alias Jido.Action.Schema, as: ActionSchema
+
+  require Logger
 
   @registry_name __MODULE__.Registry
   @max_retries 3
@@ -116,9 +116,7 @@ defmodule Jido.AI.ToolAdapter do
   @deprecated "Use Jido.AI.Tools.Registry.register_action/1 instead"
   @spec register_action(module()) :: :ok
   def register_action(action_module) when is_atom(action_module) do
-    Logger.warning(
-      "ToolAdapter.register_action/1 is deprecated. Use Jido.AI.Tools.Registry.register_action/1 instead."
-    )
+    Logger.warning("ToolAdapter.register_action/1 is deprecated. Use Jido.AI.Tools.Registry.register_action/1 instead.")
 
     name = action_module.name()
     safe_update(fn state -> Map.put(state, name, action_module) end)
@@ -165,9 +163,7 @@ defmodule Jido.AI.ToolAdapter do
   @deprecated "Use Jido.AI.Tools.Registry.unregister/1 instead"
   @spec unregister_action(module()) :: :ok
   def unregister_action(action_module) when is_atom(action_module) do
-    Logger.warning(
-      "ToolAdapter.unregister_action/1 is deprecated. Use Jido.AI.Tools.Registry.unregister/1 instead."
-    )
+    Logger.warning("ToolAdapter.unregister_action/1 is deprecated. Use Jido.AI.Tools.Registry.unregister/1 instead.")
 
     name = action_module.name()
     safe_update(fn state -> Map.delete(state, name) end)
@@ -190,9 +186,7 @@ defmodule Jido.AI.ToolAdapter do
   @deprecated "Use Jido.AI.Tools.Registry.list_actions/0 instead"
   @spec list_actions() :: [{String.t(), module()}]
   def list_actions do
-    Logger.warning(
-      "ToolAdapter.list_actions/0 is deprecated. Use Jido.AI.Tools.Registry.list_actions/0 instead."
-    )
+    Logger.warning("ToolAdapter.list_actions/0 is deprecated. Use Jido.AI.Tools.Registry.list_actions/0 instead.")
 
     safe_get(fn state -> Map.to_list(state) end)
   end
@@ -214,9 +208,7 @@ defmodule Jido.AI.ToolAdapter do
   @deprecated "Use Jido.AI.Tools.Registry.get/1 instead"
   @spec get_action(String.t()) :: {:ok, module()} | {:error, :not_found}
   def get_action(tool_name) when is_binary(tool_name) do
-    Logger.warning(
-      "ToolAdapter.get_action/1 is deprecated. Use Jido.AI.Tools.Registry.get/1 instead."
-    )
+    Logger.warning("ToolAdapter.get_action/1 is deprecated. Use Jido.AI.Tools.Registry.get/1 instead.")
 
     case safe_get(fn state -> Map.get(state, tool_name) end) do
       nil -> {:error, :not_found}
@@ -238,9 +230,7 @@ defmodule Jido.AI.ToolAdapter do
   @deprecated "Use Jido.AI.Tools.Registry.clear/0 instead"
   @spec clear_registry() :: :ok
   def clear_registry do
-    Logger.warning(
-      "ToolAdapter.clear_registry/0 is deprecated. Use Jido.AI.Tools.Registry.clear/0 instead."
-    )
+    Logger.warning("ToolAdapter.clear_registry/0 is deprecated. Use Jido.AI.Tools.Registry.clear/0 instead.")
 
     safe_update(fn _state -> %{} end)
   end
@@ -267,9 +257,7 @@ defmodule Jido.AI.ToolAdapter do
   @deprecated "Use Jido.AI.Tools.Registry.to_reqllm_tools/0 instead"
   @spec to_tools(keyword()) :: [ReqLLM.Tool.t()]
   def to_tools(opts \\ []) do
-    Logger.warning(
-      "ToolAdapter.to_tools/1 is deprecated. Use Jido.AI.Tools.Registry.to_reqllm_tools/0 instead."
-    )
+    Logger.warning("ToolAdapter.to_tools/1 is deprecated. Use Jido.AI.Tools.Registry.to_reqllm_tools/0 instead.")
 
     modules =
       safe_get(fn state -> Map.to_list(state) end)

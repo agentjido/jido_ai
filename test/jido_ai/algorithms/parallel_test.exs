@@ -483,8 +483,8 @@ defmodule Jido.AI.Algorithms.ParallelTest do
 
       {:ok, _} = Parallel.execute(input, context)
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :parallel, :start],
-                      %{system_time: _, algorithm_count: 1}, %{algorithms: [AlgorithmA]}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :parallel, :start], %{system_time: _, algorithm_count: 1},
+                      %{algorithms: [AlgorithmA]}}
 
       assert_receive {:telemetry, [:jido, :ai, :algorithm, :parallel, :stop], %{duration: _},
                       %{success_count: 1, error_count: 0}}

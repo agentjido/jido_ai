@@ -549,11 +549,9 @@ defmodule Jido.AI.Algorithms.HybridTest do
 
       {:ok, _} = Hybrid.execute(input, context)
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :hybrid, :start],
-                      %{system_time: _, stage_count: 1}, %{}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :hybrid, :start], %{system_time: _, stage_count: 1}, %{}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :hybrid, :stop], %{duration: _},
-                      %{stages_completed: 1}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :hybrid, :stop], %{duration: _}, %{stages_completed: 1}}
     end
 
     test "emits stage events" do

@@ -393,11 +393,12 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       }
 
       # 4. Execute the tool call
-      result = Executor.execute(
-        simulated_tool_call.name,
-        simulated_tool_call.arguments,
-        %{}
-      )
+      result =
+        Executor.execute(
+          simulated_tool_call.name,
+          simulated_tool_call.arguments,
+          %{}
+        )
 
       assert {:ok, %{result: 56}} = result
 
@@ -410,20 +411,22 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       :ok = Registry.register_action(TestActions.Calculator)
 
       # First tool call
-      {:ok, result1} = Executor.execute(
-        "calculator",
-        %{"operation" => "add", "a" => "10", "b" => "20"},
-        %{}
-      )
+      {:ok, result1} =
+        Executor.execute(
+          "calculator",
+          %{"operation" => "add", "a" => "10", "b" => "20"},
+          %{}
+        )
 
       assert result1.result == 30
 
       # Second tool call using previous result
-      {:ok, result2} = Executor.execute(
-        "calculator",
-        %{"operation" => "multiply", "a" => Integer.to_string(result1.result), "b" => "2"},
-        %{}
-      )
+      {:ok, result2} =
+        Executor.execute(
+          "calculator",
+          %{"operation" => "multiply", "a" => Integer.to_string(result1.result), "b" => "2"},
+          %{}
+        )
 
       assert result2.result == 60
     end
@@ -432,11 +435,12 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       :ok = Registry.register_action(TestActions.Calculator)
 
       # Division by zero
-      result = Executor.execute(
-        "calculator",
-        %{"operation" => "divide", "a" => "10", "b" => "0"},
-        %{}
-      )
+      result =
+        Executor.execute(
+          "calculator",
+          %{"operation" => "divide", "a" => "10", "b" => "0"},
+          %{}
+        )
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -525,11 +529,9 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "1"}, %{})
 
-      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _},
-                      %{tool_name: "calculator"}}
+      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _}, %{tool_name: "calculator"}}
 
-      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _},
-                      %{tool_name: "calculator"}}
+      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _}, %{tool_name: "calculator"}}
 
       :telemetry.detach("integration-test-handler")
     end

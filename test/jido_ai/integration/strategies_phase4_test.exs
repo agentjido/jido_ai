@@ -17,12 +17,12 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Directive
   alias Jido.AI.Strategies.Adaptive
   alias Jido.AI.Strategies.ChainOfThought
   alias Jido.AI.Strategies.GraphOfThoughts
   alias Jido.AI.Strategies.TreeOfThoughts
   alias Jido.AI.Strategy.ReAct
-  alias Jido.AI.Directive
   alias Jido.Instruction
 
   # ============================================================================
@@ -93,15 +93,16 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       [%Directive.ReqLLMStream{id: call_id}] = directives
 
       # Simulate LLM response with steps
-      llm_result = mock_llm_result(call_id, """
-      Step 1: Identify the numbers to add
-      We have 2 and 2.
+      llm_result =
+        mock_llm_result(call_id, """
+        Step 1: Identify the numbers to add
+        We have 2 and 2.
 
-      Step 2: Perform the addition
-      2 + 2 = 4
+        Step 2: Perform the addition
+        2 + 2 = 4
 
-      Therefore, the answer is 4.
-      """)
+        Therefore, the answer is 4.
+        """)
 
       result_instruction = %Instruction{
         action: ChainOfThought.llm_result_action(),
@@ -219,7 +220,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       [directive] = directives
       assert %Directive.ReqLLMStream{} = directive
       # Verify tools are included in directive
-      assert length(directive.tools) > 0
+      refute Enum.empty?(directive.tools)
     end
   end
 

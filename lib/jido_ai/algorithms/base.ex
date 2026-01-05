@@ -93,7 +93,7 @@ defmodule Jido.AI.Algorithms.Base do
   """
   defmacro __using__(opts) do
     # Compile-time validation of required options
-    unless Keyword.has_key?(opts, :name) do
+    if !Keyword.has_key?(opts, :name) do
       raise ArgumentError, """
       Missing required :name option for Jido.AI.Algorithms.Base.
 
@@ -104,7 +104,7 @@ defmodule Jido.AI.Algorithms.Base do
       """
     end
 
-    unless Keyword.has_key?(opts, :description) do
+    if !Keyword.has_key?(opts, :description) do
       raise ArgumentError, """
       Missing required :description option for Jido.AI.Algorithms.Base.
 
@@ -189,9 +189,8 @@ defmodule Jido.AI.Algorithms.Base do
       @spec run_with_hooks(map(), map()) :: {:ok, map()} | {:error, term()}
       def run_with_hooks(input, context) do
         with {:ok, processed_input} <- before_execute(input, context),
-             {:ok, result} <- execute(processed_input, context),
-             {:ok, final_result} <- after_execute(result, context) do
-          {:ok, final_result}
+             {:ok, result} <- execute(processed_input, context) do
+          after_execute(result, context)
         end
       end
 

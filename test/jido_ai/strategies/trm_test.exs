@@ -617,11 +617,10 @@ defmodule Jido.AI.Strategies.TRMTest do
 
           content when is_list(content) ->
             content
-            |> Enum.map(fn
+            |> Enum.map_join(" ", fn
               %{text: text} -> text
               part -> inspect(part)
             end)
-            |> Enum.join(" ")
         end
 
       assert content_text =~ "What is the meaning of life?"

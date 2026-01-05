@@ -65,10 +65,10 @@ defmodule Jido.AI.Tools.Executor do
   token, secret, etc.) to prevent credential leakage in logs.
   """
 
-  require Logger
-
   alias Jido.Action.Tool, as: ActionTool
   alias Jido.AI.Tools.Registry
+
+  require Logger
 
   @default_timeout 30_000
   @max_result_size 10_000

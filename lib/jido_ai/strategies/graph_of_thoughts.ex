@@ -279,12 +279,9 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
       max_nodes: Keyword.get(opts, :max_nodes, 20),
       max_depth: Keyword.get(opts, :max_depth, 5),
       aggregation_strategy: Keyword.get(opts, :aggregation_strategy, :synthesis),
-      generation_prompt:
-        Keyword.get(opts, :generation_prompt, Machine.default_generation_prompt()),
-      connection_prompt:
-        Keyword.get(opts, :connection_prompt, Machine.default_connection_prompt()),
-      aggregation_prompt:
-        Keyword.get(opts, :aggregation_prompt, Machine.default_aggregation_prompt())
+      generation_prompt: Keyword.get(opts, :generation_prompt, Machine.default_generation_prompt()),
+      connection_prompt: Keyword.get(opts, :connection_prompt, Machine.default_connection_prompt()),
+      aggregation_prompt: Keyword.get(opts, :aggregation_prompt, Machine.default_aggregation_prompt())
     }
   end
 

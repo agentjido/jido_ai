@@ -44,6 +44,8 @@ defmodule Jido.AI.TRM.Supervision do
       )
   """
 
+  import Jido.AI.TRM.Helpers, only: [clamp: 3, parse_float_safe: 1, sanitize_user_input: 1]
+
   @type feedback :: %{
           issues: [String.t()],
           suggestions: [String.t()],
@@ -66,7 +68,6 @@ defmodule Jido.AI.TRM.Supervision do
         }
 
   # Import shared helpers
-  import Jido.AI.TRM.Helpers, only: [clamp: 3, parse_float_safe: 1, sanitize_user_input: 1]
 
   # Issue markers in LLM responses
   @issue_markers ~w(
@@ -433,8 +434,7 @@ defmodule Jido.AI.TRM.Supervision do
         "(none specified)"
       else
         prioritized
-        |> Enum.map(fn s -> "- [#{s.impact}] #{s.content}" end)
-        |> Enum.join("\n")
+        |> Enum.map_join("\n", fn s -> "- [#{s.impact}] #{s.content}" end)
       end
 
     issues_text =
@@ -442,8 +442,7 @@ defmodule Jido.AI.TRM.Supervision do
         "(none identified)"
       else
         feedback.issues
-        |> Enum.map(&("- " <> &1))
-        |> Enum.join("\n")
+        |> Enum.map_join("\n", &("- " <> &1))
       end
 
     strengths_text =
@@ -451,8 +450,7 @@ defmodule Jido.AI.TRM.Supervision do
         "(none identified)"
       else
         feedback.strengths
-        |> Enum.map(&("- " <> &1))
-        |> Enum.join("\n")
+        |> Enum.map_join("\n", &("- " <> &1))
       end
 
     """
