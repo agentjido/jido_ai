@@ -64,7 +64,7 @@ defmodule Jido.AI.Strategies.TRMTest do
     test "returns correct signal routing" do
       routes = TRM.signal_routes(%{})
 
-      assert {"trm.reason", {:strategy_cmd, :trm_start}} in routes
+      assert {"trm.query", {:strategy_cmd, :trm_start}} in routes
       assert {"reqllm.result", {:strategy_cmd, :trm_llm_result}} in routes
       assert {"reqllm.partial", {:strategy_cmd, :trm_llm_partial}} in routes
     end

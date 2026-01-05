@@ -200,7 +200,7 @@ defmodule Jido.AI.TRM.MachineTest do
 
     test "extracts quality score from feedback", %{machine: machine} do
       call_id = machine.current_call_id
-      result = {:ok, %{text: "Quality: 85%. Well done."}}
+      result = {:ok, %{text: "SCORE: 0.85. Well done."}}
 
       {machine, _directives} = Machine.update(machine, {:supervision_result, call_id, result})
 
