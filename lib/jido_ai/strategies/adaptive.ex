@@ -414,12 +414,7 @@ defmodule Jido.AI.Strategies.Adaptive do
     end)
   end
 
-  # TRM uses :question instead of :prompt for start action
-  defp map_params_for_strategy(params, :trm, @start) do
-    prompt = Map.get(params, :prompt) || Map.get(params, "prompt")
-    Map.put(params, :question, prompt)
-  end
-
+  # All strategies now use :prompt consistently
   defp map_params_for_strategy(params, _strategy_type, _action), do: params
 
   defp normalize_instruction(%Jido.Instruction{} = instr) do

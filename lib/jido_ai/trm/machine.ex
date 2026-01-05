@@ -36,9 +36,39 @@ defmodule Jido.AI.TRM.Machine do
       {machine, directives} = Machine.update(machine, {:start, question, call_id}, env)
 
   All state transitions are pure - side effects are described in directives.
+
+  ## Telemetry Events
+
+  The machine emits the following telemetry events:
+
+  ### `[:jido, :ai, :trm, :start]`
+  Emitted when reasoning starts with a new question.
+  - **Measurements**: (none)
+  - **Metadata**: `%{call_id: String.t(), question_length: non_neg_integer()}`
+
+  ### `[:jido, :ai, :trm, :step]`
+  Emitted at each supervision step.
+  - **Measurements**: `%{step: pos_integer(), quality_score: float()}`
+  - **Metadata**: `%{call_id: String.t(), issues_count: non_neg_integer(), suggestions_count: non_neg_integer()}`
+
+  ### `[:jido, :ai, :trm, :act_triggered]`
+  Emitted when ACT early stopping triggers.
+  - **Measurements**: `%{confidence: float(), threshold: float()}`
+  - **Metadata**: `%{call_id: String.t(), step: pos_integer()}`
+
+  ### `[:jido, :ai, :trm, :error]`
+  Emitted when an error occurs.
+  - **Measurements**: (none)
+  - **Metadata**: `%{call_id: String.t(), error: term(), usage: map()}`
+
+  ### `[:jido, :ai, :trm, :complete]`
+  Emitted when reasoning completes successfully.
+  - **Measurements**: `%{steps: non_neg_integer(), best_score: float(), duration_ms: non_neg_integer()}`
+  - **Metadata**: `%{call_id: String.t(), termination_reason: atom(), usage: map()}`
   """
 
   alias Jido.AI.TRM.ACT
+  alias Jido.AI.TRM.Helpers
   alias Jido.AI.TRM.Supervision
 
   use Fsmx.Struct,
@@ -206,25 +236,26 @@ defmodule Jido.AI.TRM.Machine do
     with_transition(machine, "reasoning", fn machine ->
       latent_state = initialize_latent_state(question, nil)
 
-      machine =
+      machine = %{
         machine
-        |> Map.put(:question, question)
-        |> Map.put(:current_answer, nil)
-        |> Map.put(:answer_history, [])
-        |> Map.put(:latent_state, latent_state)
-        |> Map.put(:supervision_feedback, nil)
-        |> Map.put(:parsed_feedback, nil)
-        |> Map.put(:supervision_step, 1)
-        |> Map.put(:act_state, ACT.new(machine.act_threshold))
-        |> Map.put(:act_triggered, false)
-        |> Map.put(:best_answer, nil)
-        |> Map.put(:best_score, 0.0)
-        |> Map.put(:result, nil)
-        |> Map.put(:current_call_id, call_id)
-        |> Map.put(:termination_reason, nil)
-        |> Map.put(:streaming_text, "")
-        |> Map.put(:usage, %{})
-        |> Map.put(:started_at, started_at)
+        | question: question,
+          current_answer: nil,
+          answer_history: [],
+          latent_state: latent_state,
+          supervision_feedback: nil,
+          parsed_feedback: nil,
+          supervision_step: 1,
+          act_state: ACT.new(machine.act_threshold),
+          act_triggered: false,
+          best_answer: nil,
+          best_score: 0.0,
+          result: nil,
+          current_call_id: call_id,
+          termination_reason: nil,
+          streaming_text: "",
+          usage: %{},
+          started_at: started_at
+      }
 
       context = build_reasoning_context(machine)
       {machine, [{:reason, call_id, context}]}
@@ -492,7 +523,7 @@ defmodule Jido.AI.TRM.Machine do
       machine =
         machine
         |> Map.put(:termination_reason, :error)
-        |> Map.put(:result, "Error: #{inspect(reason)}")
+        |> Map.put(:result, Helpers.safe_error_message(reason))
 
       {machine, []}
     end)
@@ -605,7 +636,9 @@ defmodule Jido.AI.TRM.Machine do
       question: machine.question,
       current_answer: machine.current_answer,
       latent_state: machine.latent_state,
-      step: machine.supervision_step
+      step: machine.supervision_step,
+      # Include previous feedback for context in iterative supervision
+      previous_feedback: machine.parsed_feedback
     }
   end
 

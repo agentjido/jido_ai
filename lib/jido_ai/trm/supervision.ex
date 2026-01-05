@@ -65,6 +65,9 @@ defmodule Jido.AI.TRM.Supervision do
           category: atom()
         }
 
+  # Import shared helpers
+  import Jido.AI.TRM.Helpers, only: [clamp: 3, parse_float_safe: 1, sanitize_user_input: 1]
+
   # Issue markers in LLM responses
   @issue_markers ~w(
     ISSUE PROBLEM ERROR INCORRECT WRONG FLAW
@@ -403,11 +406,14 @@ defmodule Jido.AI.TRM.Supervision do
   # ============================================================================
 
   defp build_supervision_user_prompt(context) do
+    safe_question = sanitize_user_input(context.question)
+    safe_answer = sanitize_user_input(context.answer)
+
     base_prompt = """
-    **Question**: #{context.question}
+    **Question**: #{safe_question}
 
     **Answer to evaluate**:
-    #{context.answer}
+    #{safe_answer}
 
     **Evaluation step**: #{context.step}
 
@@ -418,6 +424,8 @@ defmodule Jido.AI.TRM.Supervision do
   end
 
   defp build_improvement_user_prompt(question, answer, feedback) do
+    safe_question = sanitize_user_input(question)
+    safe_answer = sanitize_user_input(answer)
     prioritized = prioritize_suggestions(feedback.suggestions)
 
     suggestions_text =
@@ -448,10 +456,10 @@ defmodule Jido.AI.TRM.Supervision do
       end
 
     """
-    **Original Question**: #{question}
+    **Original Question**: #{safe_question}
 
     **Current Answer**:
-    #{answer}
+    #{safe_answer}
 
     **Current Quality Score**: #{feedback.quality_score}
 
@@ -580,17 +588,4 @@ defmodule Jido.AI.TRM.Supervision do
 
   defp format_list([]), do: "(none)"
   defp format_list(items), do: Enum.join(items, "; ")
-
-  defp parse_float_safe(str) do
-    case Float.parse(str) do
-      {float, _} -> float
-      :error -> 0.5
-    end
-  end
-
-  defp clamp(value, min, max) do
-    value
-    |> max(min)
-    |> min(max)
-  end
 end

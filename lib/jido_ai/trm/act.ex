@@ -2,6 +2,8 @@ defmodule Jido.AI.TRM.ACT do
   @moduledoc """
   Adaptive Computational Time (ACT) module for TRM strategy.
 
+  Uses `Jido.AI.TRM.Helpers.clamp/3` for value clamping.
+
   This module implements early stopping logic based on confidence thresholds
   and convergence detection. It helps the TRM strategy decide when to stop
   iterating and return the best answer found.
@@ -43,6 +45,9 @@ defmodule Jido.AI.TRM.ACT do
   @type decision :: :continue | :halt
 
   @type halt_reason :: :threshold_exceeded | :convergence_detected | :max_improvement_reached
+
+  # Import shared helpers
+  import Jido.AI.TRM.Helpers, only: [clamp: 3]
 
   # Default convergence detection settings
   @convergence_window 3
@@ -486,11 +491,5 @@ defmodule Jido.AI.TRM.ACT do
     history
     |> Enum.chunk_every(2, 1, :discard)
     |> Enum.map(fn [a, b] -> b - a end)
-  end
-
-  defp clamp(value, min, max) do
-    value
-    |> max(min)
-    |> min(max)
   end
 end

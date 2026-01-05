@@ -127,9 +127,14 @@ defmodule Jido.AI.Strategies.TRMTest do
       assert config.model == "anthropic:claude-haiku-4-5"
       assert config.max_supervision_steps == 5
       assert config.act_threshold == 0.9
-      assert is_binary(config.reasoning_prompt)
-      assert is_binary(config.supervision_prompt)
-      assert is_binary(config.improvement_prompt)
+    end
+
+    test "default prompts are available via helper functions" do
+      # Prompts are managed internally by Reasoning/Supervision modules
+      # but accessible via helper functions for reference
+      assert is_binary(TRM.default_reasoning_prompt())
+      assert is_binary(TRM.default_supervision_prompt())
+      assert is_binary(TRM.default_improvement_prompt())
     end
   end
 
@@ -144,7 +149,7 @@ defmodule Jido.AI.Strategies.TRMTest do
     test "creates reasoning directive", %{agent: agent, ctx: ctx} do
       instruction = %Jido.Instruction{
         action: :trm_start,
-        params: %{question: "What is machine learning?"}
+        params: %{prompt: "What is machine learning?"}
       }
 
       {agent, directives} = TRM.cmd(agent, [instruction], ctx)
@@ -160,7 +165,7 @@ defmodule Jido.AI.Strategies.TRMTest do
     test "updates state to reasoning", %{agent: agent, ctx: ctx} do
       instruction = %Jido.Instruction{
         action: :trm_start,
-        params: %{question: "What is AI?"}
+        params: %{prompt: "What is AI?"}
       }
 
       {agent, _} = TRM.cmd(agent, [instruction], ctx)
@@ -174,14 +179,14 @@ defmodule Jido.AI.Strategies.TRMTest do
     test "handles string keys in params", %{agent: agent, ctx: ctx} do
       instruction = %Jido.Instruction{
         action: :trm_start,
-        params: %{"question" => "String key question"}
+        params: %{"prompt" => "String key prompt"}
       }
 
       {agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
       assert length(directives) == 1
       state = Agent.Strategy.State.get(agent, %{})
-      assert state[:question] == "String key question"
+      assert state[:question] == "String key prompt"
     end
   end
 
@@ -194,7 +199,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       # Start reasoning
       start_instr = %Jido.Instruction{
         action: :trm_start,
-        params: %{question: "What is 2+2?"}
+        params: %{prompt: "What is 2+2?"}
       }
 
       {agent, [directive]} = TRM.cmd(agent, [start_instr], ctx)
@@ -255,7 +260,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       # 1. Start
       start_instr = %Jido.Instruction{
         action: :trm_start,
-        params: %{question: "What is 2+2?"}
+        params: %{prompt: "What is 2+2?"}
       }
 
       {agent, [reason_dir]} = TRM.cmd(agent, [start_instr], ctx)
@@ -333,7 +338,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       # Start reasoning
       instruction = %Jido.Instruction{
         action: :trm_start,
-        params: %{question: "Test question"}
+        params: %{prompt: "Test question"}
       }
 
       {agent, _} = TRM.cmd(agent, [instruction], ctx)
@@ -535,7 +540,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       # Start reasoning
       start_instr = %Jido.Instruction{
         action: :trm_start,
-        params: %{question: "What is AI?"}
+        params: %{prompt: "What is AI?"}
       }
 
       {agent, [directive]} = TRM.cmd(agent, [start_instr], ctx)
@@ -591,7 +596,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       instruction = %Jido.Instruction{
         action: :trm_start,
-        params: %{question: "What is the meaning of life?"}
+        params: %{prompt: "What is the meaning of life?"}
       }
 
       {_agent, [directive]} = TRM.cmd(agent, [instruction], ctx)
