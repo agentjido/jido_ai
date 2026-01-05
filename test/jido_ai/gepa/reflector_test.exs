@@ -44,20 +44,21 @@ defmodule Jido.AI.GEPA.ReflectorTest do
   defp mock_mutation_runner(prompt, _input, _opts) do
     # Return different responses based on what the prompt is asking for
     if String.contains?(prompt, "Mutation Request") do
-      {:ok, %{
-        output: """
-        ---MUTATION 1---
-        Please answer clearly and concisely: {{input}}
+      {:ok,
+       %{
+         output: """
+         ---MUTATION 1---
+         Please answer clearly and concisely: {{input}}
 
-        ---MUTATION 2---
-        You are a helpful assistant. Answer: {{input}}
+         ---MUTATION 2---
+         You are a helpful assistant. Answer: {{input}}
 
-        ---MUTATION 3---
-        Task: {{input}}
-        Provide a direct answer.
-        """,
-        tokens: 100
-      }}
+         ---MUTATION 3---
+         Task: {{input}}
+         Provide a direct answer.
+         """,
+         tokens: 100
+       }}
     else
       # Reflection response
       {:ok, %{output: "The prompt needs clearer instructions.", tokens: 50}}
@@ -65,16 +66,17 @@ defmodule Jido.AI.GEPA.ReflectorTest do
   end
 
   defp mock_crossover_runner(_prompt, _input, _opts) do
-    {:ok, %{
-      output: """
-      ---MUTATION 1---
-      Combined prompt A and B: {{input}}
+    {:ok,
+     %{
+       output: """
+       ---MUTATION 1---
+       Combined prompt A and B: {{input}}
 
-      ---MUTATION 2---
-      Hybrid approach: {{input}}
-      """,
-      tokens: 80
-    }}
+       ---MUTATION 2---
+       Hybrid approach: {{input}}
+       """,
+       tokens: 80
+     }}
   end
 
   defp failing_runner(_prompt, _input, _opts) do
@@ -111,6 +113,7 @@ defmodule Jido.AI.GEPA.ReflectorTest do
 
     test "handles multiple failures" do
       variant = create_variant()
+
       failures = [
         create_failing_result(create_task("Q1", "A1"), "Wrong1"),
         create_failing_result(create_task("Q2", "A2"), "Wrong2"),
@@ -125,11 +128,13 @@ defmodule Jido.AI.GEPA.ReflectorTest do
     test "limits failure samples to prevent context overflow" do
       variant = create_variant()
       # Create many failures
-      failures = for i <- 1..20 do
-        create_failing_result(create_task("Q#{i}", "A#{i}"), "Wrong#{i}")
-      end
+      failures =
+        for i <- 1..20 do
+          create_failing_result(create_task("Q#{i}", "A#{i}"), "Wrong#{i}")
+        end
 
       test_pid = self()
+
       capturing_runner = fn prompt, _input, _opts ->
         send(test_pid, {:prompt, prompt})
         {:ok, %{output: "Analysis complete.", tokens: 50}}
@@ -176,7 +181,8 @@ defmodule Jido.AI.GEPA.ReflectorTest do
       variant = create_variant()
       failure = create_failing_result(create_task("Q", "A"), "Wrong")
 
-      assert {:error, :invalid_runner_response} = Reflector.reflect_on_failures(variant, [failure], runner: &invalid_response_runner/3)
+      assert {:error, :invalid_runner_response} =
+               Reflector.reflect_on_failures(variant, [failure], runner: &invalid_response_runner/3)
     end
   end
 
@@ -202,22 +208,24 @@ defmodule Jido.AI.GEPA.ReflectorTest do
       reflection = "Needs improvement."
 
       runner = fn _prompt, _input, _opts ->
-        {:ok, %{
-          output: """
-          ---MUTATION 1---
-          Template 1: {{input}}
+        {:ok,
+         %{
+           output: """
+           ---MUTATION 1---
+           Template 1: {{input}}
 
-          ---MUTATION 2---
-          Template 2: {{input}}
-          """,
-          tokens: 50
-        }}
+           ---MUTATION 2---
+           Template 2: {{input}}
+           """,
+           tokens: 50
+         }}
       end
 
-      {:ok, mutations} = Reflector.propose_mutations(variant, reflection,
-        runner: runner,
-        mutation_count: 2
-      )
+      {:ok, mutations} =
+        Reflector.propose_mutations(variant, reflection,
+          runner: runner,
+          mutation_count: 2
+        )
 
       assert length(mutations) == 2
     end
@@ -228,25 +236,26 @@ defmodule Jido.AI.GEPA.ReflectorTest do
 
       # Runner that returns unformatted text
       runner = fn _prompt, _input, _opts ->
-        {:ok, %{
-          output: """
-          Here are some improved prompts:
+        {:ok,
+         %{
+           output: """
+           Here are some improved prompts:
 
-          First, try this approach: Be specific when answering {{input}}
+           First, try this approach: Be specific when answering {{input}}
 
-          Second, consider this format: Question received, let me answer {{input}} clearly
+           Second, consider this format: Question received, let me answer {{input}} clearly
 
-          Third option: Direct response to {{input}}
-          """,
-          tokens: 50
-        }}
+           Third option: Direct response to {{input}}
+           """,
+           tokens: 50
+         }}
       end
 
       {:ok, mutations} = Reflector.propose_mutations(variant, reflection, runner: runner)
 
       # Should fall back to paragraph-based parsing
       assert is_list(mutations)
-      assert length(mutations) > 0
+      refute Enum.empty?(mutations)
     end
 
     test "returns error when runner fails" do
@@ -264,6 +273,7 @@ defmodule Jido.AI.GEPA.ReflectorTest do
   describe "mutate_prompt/3" do
     test "returns PromptVariant children from eval results" do
       variant = create_variant()
+
       eval_result = %{
         accuracy: 0.5,
         token_cost: 100,
@@ -288,6 +298,7 @@ defmodule Jido.AI.GEPA.ReflectorTest do
 
     test "returns empty list when all tasks pass" do
       variant = create_variant()
+
       eval_result = %{
         accuracy: 1.0,
         token_cost: 100,
@@ -304,6 +315,7 @@ defmodule Jido.AI.GEPA.ReflectorTest do
 
     test "children have unique IDs" do
       variant = create_variant()
+
       eval_result = %{
         accuracy: 0.0,
         token_cost: 100,
@@ -321,6 +333,7 @@ defmodule Jido.AI.GEPA.ReflectorTest do
 
     test "children are unevaluated" do
       variant = create_variant()
+
       eval_result = %{
         accuracy: 0.0,
         token_cost: 100,
@@ -377,7 +390,8 @@ defmodule Jido.AI.GEPA.ReflectorTest do
       {:ok, children} = Reflector.crossover(variant1, variant2, runner: &mock_crossover_runner/3)
 
       first_child = hd(children)
-      assert first_child.generation == 6  # max(3, 5) + 1
+      # max(3, 5) + 1
+      assert first_child.generation == 6
     end
 
     test "children have crossover metadata" do
@@ -395,19 +409,21 @@ defmodule Jido.AI.GEPA.ReflectorTest do
       variant2 = create_variant("B: {{input}}")
 
       runner = fn _prompt, _input, _opts ->
-        {:ok, %{
-          output: """
-          ---MUTATION 1---
-          Hybrid: {{input}}
-          """,
-          tokens: 50
-        }}
+        {:ok,
+         %{
+           output: """
+           ---MUTATION 1---
+           Hybrid: {{input}}
+           """,
+           tokens: 50
+         }}
       end
 
-      {:ok, children} = Reflector.crossover(variant1, variant2,
-        runner: runner,
-        children_count: 1
-      )
+      {:ok, children} =
+        Reflector.crossover(variant1, variant2,
+          runner: runner,
+          children_count: 1
+        )
 
       assert length(children) == 1
     end
@@ -426,9 +442,11 @@ defmodule Jido.AI.GEPA.ReflectorTest do
 
   describe "edge cases" do
     test "handles map templates in reflection" do
-      variant = PromptVariant.new!(%{
-        template: %{system: "You are helpful", user: "{{input}}"}
-      })
+      variant =
+        PromptVariant.new!(%{
+          template: %{system: "You are helpful", user: "{{input}}"}
+        })
+
       failure = create_failing_result(create_task("Q", "A"), "Wrong")
 
       {:ok, reflection} = Reflector.reflect_on_failures(variant, [failure], runner: &mock_reflection_runner/3)
@@ -442,6 +460,7 @@ defmodule Jido.AI.GEPA.ReflectorTest do
       failure = create_failing_result(create_task("Q", "A"), long_output)
 
       test_pid = self()
+
       capturing_runner = fn prompt, _input, _opts ->
         send(test_pid, {:prompt_length, String.length(prompt)})
         {:ok, %{output: "Analysis.", tokens: 50}}
@@ -482,7 +501,9 @@ defmodule Jido.AI.GEPA.ReflectorTest do
     test "reflect_on_failures returns error for non-variant first arg" do
       failure = create_failing_result(create_task("Q", "A"), "Wrong")
 
-      assert {:error, :invalid_args} = Reflector.reflect_on_failures("not a variant", [failure], runner: &mock_reflection_runner/3)
+      assert {:error, :invalid_args} =
+               Reflector.reflect_on_failures("not a variant", [failure], runner: &mock_reflection_runner/3)
+
       assert {:error, :invalid_args} = Reflector.reflect_on_failures(nil, [failure], runner: &mock_reflection_runner/3)
       assert {:error, :invalid_args} = Reflector.reflect_on_failures(%{}, [failure], runner: &mock_reflection_runner/3)
     end
@@ -490,12 +511,16 @@ defmodule Jido.AI.GEPA.ReflectorTest do
     test "reflect_on_failures returns error for non-list second arg" do
       variant = create_variant()
 
-      assert {:error, :invalid_args} = Reflector.reflect_on_failures(variant, "not a list", runner: &mock_reflection_runner/3)
+      assert {:error, :invalid_args} =
+               Reflector.reflect_on_failures(variant, "not a list", runner: &mock_reflection_runner/3)
+
       assert {:error, :invalid_args} = Reflector.reflect_on_failures(variant, nil, runner: &mock_reflection_runner/3)
     end
 
     test "propose_mutations returns error for non-variant first arg" do
-      assert {:error, :invalid_args} = Reflector.propose_mutations("not a variant", "reflection", runner: &mock_mutation_runner/3)
+      assert {:error, :invalid_args} =
+               Reflector.propose_mutations("not a variant", "reflection", runner: &mock_mutation_runner/3)
+
       assert {:error, :invalid_args} = Reflector.propose_mutations(nil, "reflection", runner: &mock_mutation_runner/3)
     end
 
@@ -509,7 +534,9 @@ defmodule Jido.AI.GEPA.ReflectorTest do
     test "mutate_prompt returns error for non-variant first arg" do
       eval_result = %{results: []}
 
-      assert {:error, :invalid_args} = Reflector.mutate_prompt("not a variant", eval_result, runner: &mock_mutation_runner/3)
+      assert {:error, :invalid_args} =
+               Reflector.mutate_prompt("not a variant", eval_result, runner: &mock_mutation_runner/3)
+
       assert {:error, :invalid_args} = Reflector.mutate_prompt(nil, eval_result, runner: &mock_mutation_runner/3)
     end
 

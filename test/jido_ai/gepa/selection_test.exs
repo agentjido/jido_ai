@@ -47,8 +47,10 @@ defmodule Jido.AI.GEPA.SelectionTest do
     end
 
     test "returns false when neither dominates (trade-off)" do
-      a = create_variant(0.9, 200)  # Better accuracy, worse cost
-      b = create_variant(0.8, 100)  # Worse accuracy, better cost
+      # Better accuracy, worse cost
+      a = create_variant(0.9, 200)
+      # Worse accuracy, better cost
+      b = create_variant(0.8, 100)
 
       refute Selection.dominates?(a, b, default_objectives())
       refute Selection.dominates?(b, a, default_objectives())
@@ -113,8 +115,10 @@ defmodule Jido.AI.GEPA.SelectionTest do
     end
 
     test "returns both when neither dominates" do
-      a = create_variant(0.9, 200, id: "a")  # High accuracy, high cost
-      b = create_variant(0.7, 100, id: "b")  # Low accuracy, low cost
+      # High accuracy, high cost
+      a = create_variant(0.9, 200, id: "a")
+      # Low accuracy, low cost
+      b = create_variant(0.7, 100, id: "b")
 
       front = Selection.pareto_front([a, b])
       assert length(front) == 2
@@ -123,9 +127,12 @@ defmodule Jido.AI.GEPA.SelectionTest do
     end
 
     test "excludes dominated variants" do
-      a = create_variant(0.9, 100, id: "a")   # Dominates c
-      b = create_variant(0.7, 80, id: "b")    # Different trade-off
-      c = create_variant(0.8, 150, id: "c")   # Dominated by a
+      # Dominates c
+      a = create_variant(0.9, 100, id: "a")
+      # Different trade-off
+      b = create_variant(0.7, 80, id: "b")
+      # Dominated by a
+      c = create_variant(0.8, 150, id: "c")
 
       front = Selection.pareto_front([a, b, c])
       assert length(front) == 2
@@ -147,12 +154,15 @@ defmodule Jido.AI.GEPA.SelectionTest do
     end
 
     test "handles many variants" do
-      variants = for i <- 1..20 do
-        # Create a range of trade-offs
-        acc = 0.5 + (i / 40)  # 0.525 to 1.0
-        cost = 50 + i * 10    # 60 to 250
-        create_variant(acc, cost, id: "v#{i}")
-      end
+      variants =
+        for i <- 1..20 do
+          # Create a range of trade-offs
+          # 0.525 to 1.0
+          acc = 0.5 + i / 40
+          # 60 to 250
+          cost = 50 + i * 10
+          create_variant(acc, cost, id: "v#{i}")
+        end
 
       front = Selection.pareto_front(variants)
       # Should have multiple variants in the front (the best trade-offs)
@@ -184,9 +194,10 @@ defmodule Jido.AI.GEPA.SelectionTest do
 
   describe "select_survivors/3" do
     test "returns requested count" do
-      variants = for i <- 1..10 do
-        create_variant(0.5 + i * 0.04, 100 + i * 10, id: "v#{i}")
-      end
+      variants =
+        for i <- 1..10 do
+          create_variant(0.5 + i * 0.04, 100 + i * 10, id: "v#{i}")
+        end
 
       survivors = Selection.select_survivors(variants, 5)
       assert length(survivors) == 5
@@ -243,9 +254,10 @@ defmodule Jido.AI.GEPA.SelectionTest do
     end
 
     test "works with :nsga2 strategy" do
-      variants = for i <- 1..10 do
-        create_variant(0.5 + i * 0.04, 100 + i * 10, id: "v#{i}")
-      end
+      variants =
+        for i <- 1..10 do
+          create_variant(0.5 + i * 0.04, 100 + i * 10, id: "v#{i}")
+        end
 
       survivors = Selection.select_survivors(variants, 5, strategy: :nsga2)
       assert length(survivors) == 5
@@ -257,11 +269,12 @@ defmodule Jido.AI.GEPA.SelectionTest do
       balanced = create_variant(0.85, 100, id: "balanced")
 
       # With equal weights, balanced might score well
-      survivors = Selection.select_survivors(
-        [high_acc, low_cost, balanced],
-        2,
-        strategy: :weighted
-      )
+      survivors =
+        Selection.select_survivors(
+          [high_acc, low_cost, balanced],
+          2,
+          strategy: :weighted
+        )
 
       assert length(survivors) == 2
     end
@@ -271,12 +284,13 @@ defmodule Jido.AI.GEPA.SelectionTest do
       low_cost = create_variant(0.5, 10, id: "low_cost")
 
       # Strongly weight accuracy
-      survivors = Selection.select_survivors(
-        [high_acc, low_cost],
-        1,
-        strategy: :weighted,
-        weights: %{accuracy: 0.99, token_cost: 0.01}
-      )
+      survivors =
+        Selection.select_survivors(
+          [high_acc, low_cost],
+          1,
+          strategy: :weighted,
+          weights: %{accuracy: 0.99, token_cost: 0.01}
+        )
 
       assert hd(survivors).id == "high_acc"
     end
@@ -304,9 +318,12 @@ defmodule Jido.AI.GEPA.SelectionTest do
 
     test "boundary variants get infinity" do
       # Create a line of variants
-      v1 = create_variant(0.9, 100, id: "v1")  # Best accuracy
-      v2 = create_variant(0.8, 80, id: "v2")   # Middle
-      v3 = create_variant(0.7, 60, id: "v3")   # Best cost
+      # Best accuracy
+      v1 = create_variant(0.9, 100, id: "v1")
+      # Middle
+      v2 = create_variant(0.8, 80, id: "v2")
+      # Best cost
+      v3 = create_variant(0.7, 60, id: "v3")
 
       distances = Selection.crowding_distance([v1, v2, v3])
 
@@ -318,9 +335,10 @@ defmodule Jido.AI.GEPA.SelectionTest do
     end
 
     test "middle variants have finite distance" do
-      variants = for i <- 1..5 do
-        create_variant(0.5 + i * 0.1, 100 + i * 20, id: "v#{i}")
-      end
+      variants =
+        for i <- 1..5 do
+          create_variant(0.5 + i * 0.1, 100 + i * 20, id: "v#{i}")
+        end
 
       distances = Selection.crowding_distance(variants)
 
@@ -330,7 +348,7 @@ defmodule Jido.AI.GEPA.SelectionTest do
         |> Map.values()
         |> Enum.filter(&is_number/1)
 
-      assert length(middle_distances) > 0
+      refute Enum.empty?(middle_distances)
     end
   end
 
@@ -390,9 +408,10 @@ defmodule Jido.AI.GEPA.SelectionTest do
 
     test "select_survivors maintains order stability" do
       # Create variants that should have deterministic selection
-      variants = for i <- 1..5 do
-        create_variant(1.0 - i * 0.1, 100 + i * 10, id: "v#{i}")
-      end
+      variants =
+        for i <- 1..5 do
+          create_variant(1.0 - i * 0.1, 100 + i * 10, id: "v#{i}")
+        end
 
       survivors1 = Selection.select_survivors(variants, 3)
       survivors2 = Selection.select_survivors(variants, 3)

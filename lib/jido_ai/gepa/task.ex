@@ -138,11 +138,9 @@ defmodule Jido.AI.GEPA.Task do
   """
   @spec success?(t(), String.t()) :: boolean()
   def success?(%__MODULE__{validator: validator}, output) when is_function(validator, 1) do
-    try do
-      validator.(output) == true
-    rescue
-      _ -> false
-    end
+    validator.(output) == true
+  rescue
+    _ -> false
   end
 
   def success?(%__MODULE__{expected: expected}, output) when is_binary(expected) do
@@ -215,15 +213,12 @@ defmodule Jido.AI.GEPA.Task do
     "task_#{Jido.Util.generate_id()}"
   end
 
-  # Flexible matching - checks if expected is contained in output
-  # or if normalized versions match
+  # Flexible matching - checks if expected is contained in output or if normalized versions match
   defp flexible_match?(expected, output) when is_binary(expected) and is_binary(output) do
     expected_normalized = normalize(expected)
     output_normalized = normalize(output)
 
-    # Check for substring match (expected appears in output)
     String.contains?(output_normalized, expected_normalized) or
-      # Check for exact match after normalization
       output_normalized == expected_normalized
   end
 

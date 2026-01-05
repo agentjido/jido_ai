@@ -34,9 +34,9 @@ defmodule Jido.AI.GEPA.Evaluator do
         {:ok, %{output: String.t(), tokens: integer()}} | {:error, term()}
   """
 
+  alias Jido.AI.GEPA.Helpers
   alias Jido.AI.GEPA.PromptVariant
   alias Jido.AI.GEPA.Task, as: GEPATask
-  alias Jido.AI.GEPA.Helpers
 
   @type run_result :: %{
           task: GEPATask.t(),
@@ -131,11 +131,8 @@ defmodule Jido.AI.GEPA.Evaluator do
 
     start_time = System.monotonic_time(:millisecond)
 
-    # Render the template with task input
     prompt = render_template(variant.template, task.input)
 
-    # Execute with timeout protection
-    # Wrap runner in try/rescue inside the task to catch exceptions
     safe_runner = fn ->
       try do
         runner.(prompt, task.input, runner_opts)
@@ -212,14 +209,13 @@ defmodule Jido.AI.GEPA.Evaluator do
   defp render_template(template, input) when is_map(template) do
     # For map templates, render each string value
     template
-    |> Enum.map(fn {k, v} ->
+    |> Map.new(fn {k, v} ->
       if is_binary(v) do
         {k, render_template(v, input)}
       else
         {k, v}
       end
     end)
-    |> Map.new()
   end
 
   defp render_template(template, _input), do: template

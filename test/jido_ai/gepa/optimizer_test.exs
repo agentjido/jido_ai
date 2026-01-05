@@ -1,7 +1,7 @@
 defmodule Jido.AI.GEPA.OptimizerTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.GEPA.{Optimizer, PromptVariant, Task, Selection}
+  alias Jido.AI.GEPA.{Optimizer, PromptVariant, Task}
 
   # ============================================================================
   # Test Helpers
@@ -37,32 +37,34 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     cond do
       # Mutation request
       String.contains?(template, "Mutation Request") or String.contains?(template, "improved prompt") ->
-        {:ok, %{
-          output: """
-          ---MUTATION 1---
-          Improved template with more detail: {{input}}
+        {:ok,
+         %{
+           output: """
+           ---MUTATION 1---
+           Improved template with more detail: {{input}}
 
-          ---MUTATION 2---
-          Please answer the following question carefully: {{input}}
+           ---MUTATION 2---
+           Please answer the following question carefully: {{input}}
 
-          ---MUTATION 3---
-          You are a math expert. Solve: {{input}}
-          """,
-          tokens: 100
-        }}
+           ---MUTATION 3---
+           You are a math expert. Solve: {{input}}
+           """,
+           tokens: 100
+         }}
 
       # Crossover request
       String.contains?(template, "Crossover Request") or String.contains?(template, "hybrid") ->
-        {:ok, %{
-          output: """
-          ---MUTATION 1---
-          Combined approach: {{input}}
+        {:ok,
+         %{
+           output: """
+           ---MUTATION 1---
+           Combined approach: {{input}}
 
-          ---MUTATION 2---
-          Hybrid solution: {{input}}
-          """,
-          tokens: 80
-        }}
+           ---MUTATION 2---
+           Hybrid solution: {{input}}
+           """,
+           tokens: 80
+         }}
 
       # Reflection request
       String.contains?(template, "analyzing") or String.contains?(template, "failures") ->
@@ -104,13 +106,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     test "runs optimization loop and returns results" do
       tasks = create_tasks()
 
-      {:ok, result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 2,
-        population_size: 3
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 2,
+          population_size: 3
+        )
 
       assert is_list(result.best_variants)
       assert result.best_accuracy >= 0.0
@@ -132,12 +135,13 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     end
 
     test "handles empty tasks list" do
-      {:ok, result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        [],
-        runner: &full_mock_runner/3,
-        generations: 1
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          [],
+          runner: &full_mock_runner/3,
+          generations: 1
+        )
 
       # With no tasks, accuracy should be 0 (or 1 if we define empty as success)
       assert is_list(result.best_variants)
@@ -146,13 +150,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     test "respects generations option" do
       tasks = create_tasks()
 
-      {:ok, result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 3,
-        population_size: 2
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 3,
+          population_size: 2
+        )
 
       assert result.generations_run == 3
     end
@@ -160,13 +165,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     test "respects population_size option" do
       tasks = create_tasks()
 
-      {:ok, result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 1,
-        population_size: 4
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 1,
+          population_size: 4
+        )
 
       # Final population should be at most population_size
       assert length(result.final_population) <= 4
@@ -179,14 +185,15 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       ]
 
       # Short initial template - should have lower accuracy
-      {:ok, result} = Optimizer.optimize(
-        "{{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 3,
-        population_size: 4,
-        mutation_count: 2
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "{{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 3,
+          population_size: 4,
+          mutation_count: 2
+        )
 
       # Should have found some variants (may or may not have improved)
       assert length(result.best_variants) >= 1
@@ -202,13 +209,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       tasks = create_tasks()
       variant = PromptVariant.new!(%{template: "Answer: {{input}}"})
 
-      {:ok, new_pop} = Optimizer.run_generation(
-        [variant],
-        tasks,
-        0,
-        runner: &full_mock_runner/3,
-        population_size: 3
-      )
+      {:ok, new_pop} =
+        Optimizer.run_generation(
+          [variant],
+          tasks,
+          0,
+          runner: &full_mock_runner/3,
+          population_size: 3
+        )
 
       # Should have evaluated the variant
       evaluated = Enum.filter(new_pop, &PromptVariant.evaluated?/1)
@@ -220,14 +228,15 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       variant = PromptVariant.new!(%{template: "Test: {{input}}"})
       variant = PromptVariant.update_metrics(variant, %{accuracy: 0.5, token_cost: 100})
 
-      {:ok, new_pop} = Optimizer.run_generation(
-        [variant],
-        tasks,
-        0,
-        runner: &full_mock_runner/3,
-        population_size: 4,
-        mutation_count: 2
-      )
+      {:ok, new_pop} =
+        Optimizer.run_generation(
+          [variant],
+          tasks,
+          0,
+          runner: &full_mock_runner/3,
+          population_size: 4,
+          mutation_count: 2
+        )
 
       # Should have generated new variants
       assert length(new_pop) >= 1
@@ -240,16 +249,18 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       variant = PromptVariant.new!(%{template: "Test: {{input}}", id: "pre-eval"})
       variant = PromptVariant.update_metrics(variant, %{accuracy: 0.8, token_cost: 100})
 
-      {:ok, new_pop} = Optimizer.run_generation(
-        [variant],
-        tasks,
-        0,
-        runner: &full_mock_runner/3,
-        population_size: 3
-      )
+      {:ok, new_pop} =
+        Optimizer.run_generation(
+          [variant],
+          tasks,
+          0,
+          runner: &full_mock_runner/3,
+          population_size: 3
+        )
 
       # Original should still be there with same accuracy
       original = Enum.find(new_pop, &(&1.id == "pre-eval"))
+
       if original do
         assert original.accuracy == 0.8
       end
@@ -262,9 +273,12 @@ defmodule Jido.AI.GEPA.OptimizerTest do
 
   describe "best_variants/2" do
     test "returns Pareto front" do
-      v1 = %PromptVariant{id: "1", template: "a", accuracy: 0.9, token_cost: 100}  # Best on both
-      v2 = %PromptVariant{id: "2", template: "b", accuracy: 0.7, token_cost: 80}   # Trade-off
-      v3 = %PromptVariant{id: "3", template: "c", accuracy: 0.8, token_cost: 150}  # Dominated by v1
+      # Best on both
+      v1 = %PromptVariant{id: "1", template: "a", accuracy: 0.9, token_cost: 100}
+      # Trade-off
+      v2 = %PromptVariant{id: "2", template: "b", accuracy: 0.7, token_cost: 80}
+      # Dominated by v1
+      v3 = %PromptVariant{id: "3", template: "c", accuracy: 0.8, token_cost: 150}
 
       best = Optimizer.best_variants([v1, v2, v3])
 
@@ -280,10 +294,13 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       v2 = %PromptVariant{id: "2", template: "b", accuracy: 0.8, token_cost: 100, latency_ms: 100}
 
       # With latency as objective, both might be on front
-      best = Optimizer.best_variants([v1, v2], objectives: [
-        {:accuracy, :maximize},
-        {:latency_ms, :minimize}
-      ])
+      best =
+        Optimizer.best_variants([v1, v2],
+          objectives: [
+            {:accuracy, :maximize},
+            {:latency_ms, :minimize}
+          ]
+        )
 
       assert length(best) >= 1
     end
@@ -298,13 +315,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       attach_telemetry()
       tasks = create_tasks()
 
-      {:ok, _result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 2,
-        population_size: 2
-      )
+      {:ok, _result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 2,
+          population_size: 2
+        )
 
       # Should receive generation telemetry
       assert_receive {:telemetry, [:jido, :ai, :gepa, :generation], measurements, metadata}, 1000
@@ -317,13 +335,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       attach_telemetry()
       tasks = create_tasks()
 
-      {:ok, _result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 1,
-        population_size: 2
-      )
+      {:ok, _result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 1,
+          population_size: 2
+        )
 
       # Should receive evaluation telemetry
       assert_receive {:telemetry, [:jido, :ai, :gepa, :evaluation], measurements, metadata}, 1000
@@ -335,13 +354,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       attach_telemetry()
       tasks = create_tasks()
 
-      {:ok, _result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 1,
-        population_size: 2
-      )
+      {:ok, _result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 1,
+          population_size: 2
+        )
 
       # Should receive complete telemetry
       assert_receive {:telemetry, [:jido, :ai, :gepa, :complete], measurements, _metadata}, 1000
@@ -358,13 +378,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     test "handles single generation" do
       tasks = create_tasks()
 
-      {:ok, result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 1,
-        population_size: 2
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 1,
+          population_size: 2
+        )
 
       assert result.generations_run == 1
     end
@@ -372,13 +393,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     test "handles map template" do
       tasks = create_tasks()
 
-      {:ok, result} = Optimizer.optimize(
-        %{system: "You are helpful", user: "{{input}}"},
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 1,
-        population_size: 2
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          %{system: "You are helpful", user: "{{input}}"},
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 1,
+          population_size: 2
+        )
 
       assert is_list(result.best_variants)
     end
@@ -391,13 +413,14 @@ defmodule Jido.AI.GEPA.OptimizerTest do
       end
 
       # Should not crash, but results might be poor
-      {:ok, result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: failing_runner,
-        generations: 1,
-        population_size: 2
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: failing_runner,
+          generations: 1,
+          population_size: 2
+        )
 
       assert result.generations_run == 1
     end
@@ -405,14 +428,15 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     test "handles zero crossover rate" do
       tasks = create_tasks()
 
-      {:ok, result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 2,
-        population_size: 3,
-        crossover_rate: 0.0
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 2,
+          population_size: 3,
+          crossover_rate: 0.0
+        )
 
       assert is_list(result.best_variants)
     end
@@ -420,14 +444,15 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     test "handles high crossover rate" do
       tasks = create_tasks()
 
-      {:ok, result} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 2,
-        population_size: 4,
-        crossover_rate: 0.8
-      )
+      {:ok, result} =
+        Optimizer.optimize(
+          "Answer: {{input}}",
+          tasks,
+          runner: &full_mock_runner/3,
+          generations: 2,
+          population_size: 4,
+          crossover_rate: 0.8
+        )
 
       assert is_list(result.best_variants)
     end
@@ -435,34 +460,37 @@ defmodule Jido.AI.GEPA.OptimizerTest do
     test "validates maximum generations" do
       tasks = create_tasks()
 
-      assert {:error, :generations_exceeds_max} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        generations: 10_000
-      )
+      assert {:error, :generations_exceeds_max} =
+               Optimizer.optimize(
+                 "Answer: {{input}}",
+                 tasks,
+                 runner: &full_mock_runner/3,
+                 generations: 10_000
+               )
     end
 
     test "validates maximum population_size" do
       tasks = create_tasks()
 
-      assert {:error, :population_size_exceeds_max} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        population_size: 10_000
-      )
+      assert {:error, :population_size_exceeds_max} =
+               Optimizer.optimize(
+                 "Answer: {{input}}",
+                 tasks,
+                 runner: &full_mock_runner/3,
+                 population_size: 10_000
+               )
     end
 
     test "validates maximum mutation_count" do
       tasks = create_tasks()
 
-      assert {:error, :mutation_count_exceeds_max} = Optimizer.optimize(
-        "Answer: {{input}}",
-        tasks,
-        runner: &full_mock_runner/3,
-        mutation_count: 10_000
-      )
+      assert {:error, :mutation_count_exceeds_max} =
+               Optimizer.optimize(
+                 "Answer: {{input}}",
+                 tasks,
+                 runner: &full_mock_runner/3,
+                 mutation_count: 10_000
+               )
     end
   end
 

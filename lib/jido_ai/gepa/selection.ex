@@ -81,8 +81,7 @@ defmodule Jido.AI.GEPA.Selection do
       false  # A is better on accuracy but worse on cost - neither dominates
   """
   @spec dominates?(PromptVariant.t(), PromptVariant.t(), objectives()) :: boolean()
-  def dominates?(%PromptVariant{} = variant_a, %PromptVariant{} = variant_b, objectives)
-      when is_list(objectives) do
+  def dominates?(%PromptVariant{} = variant_a, %PromptVariant{} = variant_b, objectives) when is_list(objectives) do
     # Must be at least as good on all objectives
     at_least_as_good_on_all =
       Enum.all?(objectives, fn {metric, direction} ->
@@ -239,7 +238,7 @@ defmodule Jido.AI.GEPA.Selection do
   # Helper functions to reduce cyclomatic complexity
   defp compare_values(nil, _, _), do: :eq
   defp compare_values(_, nil, _), do: :eq
-  defp compare_values(a, b, direction) when a == b, do: :eq
+  defp compare_values(a, b, _direction) when a == b, do: :eq
   defp compare_values(a, b, :maximize) when a > b, do: :gt
   defp compare_values(_, _, :maximize), do: :lt
   defp compare_values(a, b, :minimize) when a < b, do: :gt
@@ -247,13 +246,11 @@ defmodule Jido.AI.GEPA.Selection do
 
   # Pareto-first selection: take Pareto front, then best remaining
   defp pareto_first_select(variants, count, objectives) do
-    cond do
-      Enum.empty?(variants) or count == 0 ->
-        []
-
-      true ->
-        front = pareto_front(variants, objectives)
-        fill_from_front(front, variants, count, objectives)
+    if Enum.empty?(variants) or count == 0 do
+      []
+    else
+      front = pareto_front(variants, objectives)
+      fill_from_front(front, variants, count, objectives)
     end
   end
 
@@ -330,15 +327,15 @@ defmodule Jido.AI.GEPA.Selection do
       weight = Map.get(weights, metric, 0)
 
       # Normalize and adjust for direction
-      normalized =
-        case direction do
-          :maximize -> value
-          :minimize -> if value > 0, do: 1.0 / value, else: 1.0
-        end
+      normalized = normalize_for_direction(value, direction)
 
       acc + normalized * weight
     end)
   end
+
+  defp normalize_for_direction(value, :maximize), do: value
+  defp normalize_for_direction(value, :minimize) when value > 0, do: 1.0 / value
+  defp normalize_for_direction(_, :minimize), do: 1.0
 
   # Pick variants by crowding distance (higher distance = more diverse)
   defp pick_by_crowding(variants, count, objectives) do

@@ -98,10 +98,11 @@ defmodule Jido.AI.GEPA.PromptVariantTest do
     test "updates accuracy and token_cost" do
       variant = PromptVariant.new!(%{template: "test"})
 
-      updated = PromptVariant.update_metrics(variant, %{
-        accuracy: 0.85,
-        token_cost: 1500
-      })
+      updated =
+        PromptVariant.update_metrics(variant, %{
+          accuracy: 0.85,
+          token_cost: 1500
+        })
 
       assert updated.accuracy == 0.85
       assert updated.token_cost == 1500
@@ -111,11 +112,12 @@ defmodule Jido.AI.GEPA.PromptVariantTest do
     test "updates all metrics including latency" do
       variant = PromptVariant.new!(%{template: "test"})
 
-      updated = PromptVariant.update_metrics(variant, %{
-        accuracy: 0.9,
-        token_cost: 2000,
-        latency_ms: 250
-      })
+      updated =
+        PromptVariant.update_metrics(variant, %{
+          accuracy: 0.9,
+          token_cost: 2000,
+          latency_ms: 250
+        })
 
       assert updated.accuracy == 0.9
       assert updated.token_cost == 2000
@@ -147,12 +149,13 @@ defmodule Jido.AI.GEPA.PromptVariantTest do
     end
 
     test "preserves other fields when updating metrics" do
-      variant = PromptVariant.new!(%{
-        template: "test",
-        generation: 3,
-        parents: ["p1"],
-        metadata: %{tag: "v1"}
-      })
+      variant =
+        PromptVariant.new!(%{
+          template: "test",
+          generation: 3,
+          parents: ["p1"],
+          metadata: %{tag: "v1"}
+        })
 
       updated = PromptVariant.update_metrics(variant, %{accuracy: 0.9, token_cost: 100})
 

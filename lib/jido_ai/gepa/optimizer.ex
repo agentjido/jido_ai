@@ -52,7 +52,7 @@ defmodule Jido.AI.GEPA.Optimizer do
   - `[:jido, :ai, :gepa, :complete]` - When optimization finishes
   """
 
-  alias Jido.AI.GEPA.{Evaluator, Helpers, Optimizer, PromptVariant, Reflector, Selection}
+  alias Jido.AI.GEPA.{Evaluator, Helpers, PromptVariant, Reflector, Selection}
 
   @type result :: %{
           best_variants: [PromptVariant.t()],
@@ -245,6 +245,7 @@ defmodule Jido.AI.GEPA.Optimizer do
     if mutation_count > 0 do
       # Generate initial mutations from seed
       mutation_opts = [runner: runner, mutation_count: mutation_count, runner_opts: runner_opts]
+
       case Reflector.propose_mutations(seed, "Initial population generation", mutation_opts) do
         {:ok, templates} ->
           children = Enum.map(templates, &PromptVariant.create_child(seed, &1))
@@ -280,11 +281,12 @@ defmodule Jido.AI.GEPA.Optimizer do
   end
 
   defp update_variant_metrics(variant, result, generation) do
-    updated = PromptVariant.update_metrics(variant, %{
-      accuracy: result.accuracy,
-      token_cost: result.token_cost,
-      latency_ms: result.latency_ms
-    })
+    updated =
+      PromptVariant.update_metrics(variant, %{
+        accuracy: result.accuracy,
+        token_cost: result.token_cost,
+        latency_ms: result.latency_ms
+      })
 
     emit_evaluation_telemetry(updated, generation)
     updated
@@ -408,7 +410,7 @@ defmodule Jido.AI.GEPA.Optimizer do
   end
 
   defp emit_complete_telemetry(generations, total_evals, best_acc, best_variants) do
-    best_id = if Enum.empty?(best_variants), do: nil, else: hd(best_variants).id
+    best_id = if !Enum.empty?(best_variants), do: hd(best_variants).id
 
     :telemetry.execute(
       [:jido, :ai, :gepa, :complete],
