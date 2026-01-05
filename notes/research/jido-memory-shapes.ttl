@@ -1,0 +1,262 @@
+@prefix jmem:  <https://w3id.org/jido/memory/core#> .
+@prefix sh:    <http://www.w3.org/ns/shacl#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+
+#################################################################
+# Jido Memory – SHACL Shapes
+#################################################################
+
+#################################################################
+# Fact Shape – applies to all jmem:Fact
+#################################################################
+
+jmem:FactShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:Fact ;
+
+    sh:property [
+        sh:path jmem:statementText ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message "Every Fact must have a statementText (human-readable content)."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:aboutEntity ;
+        sh:minCount 1 ;
+        sh:message "Every Fact must be about at least one Entity (jmem:aboutEntity)."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:inContext ;
+        sh:minCount 1 ;
+        sh:message "Every Fact must belong to at least one MemoryContext (jmem:inContext)."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:hasSource ;
+        sh:maxCount 1 ;
+        sh:message "If present, hasSource should link to a single Source instance."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:confidence ;
+        sh:datatype xsd:decimal ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:maxCount 1 ;
+        sh:message "If present, confidence must be a decimal between 0.0 and 1.0."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:salience ;
+        sh:datatype xsd:decimal ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:maxCount 1 ;
+        sh:message "If present, salience must be a decimal between 0.0 and 1.0."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:createdAt ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Every Fact should have a createdAt timestamp."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:updatedAt ;
+        sh:datatype xsd:dateTime ;
+        sh:maxCount 1 ;
+        sh:message "If present, updatedAt must be a valid xsd:dateTime."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:validFrom ;
+        sh:datatype xsd:dateTime ;
+        sh:maxCount 1 ;
+        sh:message "If present, validFrom must be a valid xsd:dateTime."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:validUntil ;
+        sh:datatype xsd:dateTime ;
+        sh:maxCount 1 ;
+        sh:message "If present, validUntil must be a valid xsd:dateTime."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:status ;
+        sh:in ( "active" "superseded" "rejected" "candidate" ) ;
+        sh:maxCount 1 ;
+        sh:message "If present, status must be one of: active, superseded, rejected, candidate."@en ;
+    ] ;
+
+    sh:property [
+        sh:path jmem:language ;
+        sh:datatype xsd:language ;
+        sh:maxCount 1 ;
+        sh:message "If present, language must be a valid language code."@en ;
+    ] .
+
+#################################################################
+# Specialized Fact Shapes
+#################################################################
+
+jmem:ClaimShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:Claim ;
+    sh:property [
+        sh:path jmem:normalizedForm ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "For Claims, normalizedForm is recommended for canonical deduplication."@en ;
+    ] .
+
+jmem:DerivedFactShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:DerivedFact ;
+    sh:property [
+        sh:path jmem:derivedFrom ;
+        sh:minCount 1 ;
+        sh:message "DerivedFact should indicate at least one source Fact via derivedFrom."@en ;
+    ] .
+
+jmem:UserPreferenceShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:UserPreference ;
+    sh:property [
+        sh:path jmem:normalizedForm ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "UserPreference should have a normalizedForm for stable keying and deduplication."@en ;
+    ] ;
+    sh:property [
+        sh:path jmem:salience ;
+        sh:datatype xsd:decimal ;
+        sh:minInclusive 0.3 ;
+        sh:maxInclusive 1.0 ;
+        sh:maxCount 1 ;
+        sh:message "UserPreference salience should be at least 0.3 as they impact behavior strongly."@en ;
+    ] .
+
+jmem:ConstraintFactShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:ConstraintFact ;
+    sh:property [
+        sh:path jmem:normalizedForm ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "ConstraintFact should have a normalizedForm to compare and detect conflicts."@en ;
+    ] .
+
+jmem:ToolResultFactShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:ToolResultFact ;
+    sh:property [
+        sh:path jmem:hasSource ;
+        sh:minCount 1 ;
+        sh:message "ToolResultFact must have a source (typically a ToolInvocation)."@en ;
+    ] .
+
+#################################################################
+# Memory Context Shapes
+#################################################################
+
+jmem:MemoryContextShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:MemoryContext ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message "Every MemoryContext should have an rdfs:label."@en ;
+    ] ;
+    sh:property [
+        sh:path jmem:createdAt ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Every MemoryContext should have a createdAt timestamp."@en ;
+    ] .
+
+jmem:GlobalContextShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:GlobalContext .
+
+jmem:SessionContextShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:SessionContext .
+
+jmem:TaskContextShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:TaskContext .
+
+jmem:TurnContextShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:TurnContext .
+
+#################################################################
+# Source Shapes
+#################################################################
+
+jmem:SourceShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:Source ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message "Every Source should have an rdfs:label."@en ;
+    ] ;
+    sh:property [
+        sh:path jmem:createdAt ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Every Source should have a createdAt timestamp."@en ;
+    ] .
+
+jmem:UserUtteranceShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:UserUtterance ;
+    sh:property [
+        sh:path rdfs:comment ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "UserUtterance may store a brief snippet or summary in rdfs:comment."@en ;
+    ] .
+
+jmem:DocumentSourceShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:DocumentSource ;
+    sh:property [
+        sh:path rdfs:comment ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "DocumentSource may use rdfs:comment for a short description or URI."@en ;
+    ] .
+
+jmem:ToolInvocationShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:ToolInvocation ;
+    sh:property [
+        sh:path rdfs:comment ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "ToolInvocation may store a tool name or invocation details in rdfs:comment."@en ;
+    ] .
+
+jmem:AgentInferenceShape
+    a sh:NodeShape ;
+    sh:targetClass jmem:AgentInference ;
+    sh:property [
+        sh:path rdfs:comment ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "AgentInference may store a short description of the reasoning step in rdfs:comment."@en ;
+    ] .
+
