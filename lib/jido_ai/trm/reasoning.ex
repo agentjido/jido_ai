@@ -35,6 +35,8 @@ defmodule Jido.AI.TRM.Reasoning do
       # %{insights: [...], issues: [...], confidence: 0.85}
   """
 
+  import Jido.AI.TRM.Helpers, only: [clamp: 3, parse_float_safe: 1, sanitize_user_input: 1]
+
   @type reasoning_context :: %{
           question: String.t(),
           current_answer: String.t() | nil,
@@ -56,7 +58,6 @@ defmodule Jido.AI.TRM.Reasoning do
         }
 
   # Import shared helpers
-  import Jido.AI.TRM.Helpers, only: [clamp: 3, parse_float_safe: 1, sanitize_user_input: 1]
 
   # Confidence markers that indicate certainty
   @high_confidence_markers ~w(
@@ -195,8 +196,7 @@ defmodule Jido.AI.TRM.Reasoning do
     else
       trace
       |> Enum.with_index(1)
-      |> Enum.map(fn {entry, idx} -> "Step #{idx}: #{entry}" end)
-      |> Enum.join("\n")
+      |> Enum.map_join("\n", fn {entry, idx} -> "Step #{idx}: #{entry}" end)
     end
   end
 

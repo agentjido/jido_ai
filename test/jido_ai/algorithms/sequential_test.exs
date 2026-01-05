@@ -291,11 +291,11 @@ defmodule Jido.AI.Algorithms.SequentialTest do
 
       {:ok, _} = Sequential.execute(input, context)
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :start],
-                      %{system_time: _}, %{step_index: 0, step_name: "double", algorithm: DoubleAlgorithm}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :start], %{system_time: _},
+                      %{step_index: 0, step_name: "double", algorithm: DoubleAlgorithm}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :stop],
-                      %{duration: _}, %{step_index: 0, step_name: "double", algorithm: DoubleAlgorithm}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :stop], %{duration: _},
+                      %{step_index: 0, step_name: "double", algorithm: DoubleAlgorithm}}
     end
 
     test "emits events for each step" do
@@ -305,16 +305,12 @@ defmodule Jido.AI.Algorithms.SequentialTest do
       {:ok, _} = Sequential.execute(input, context)
 
       # First step
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :start],
-                      _, %{step_index: 0}}
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :stop],
-                      _, %{step_index: 0}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :start], _, %{step_index: 0}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :stop], _, %{step_index: 0}}
 
       # Second step
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :start],
-                      _, %{step_index: 1}}
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :stop],
-                      _, %{step_index: 1}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :start], _, %{step_index: 1}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :stop], _, %{step_index: 1}}
     end
 
     test "emits exception event on error" do
@@ -323,11 +319,10 @@ defmodule Jido.AI.Algorithms.SequentialTest do
 
       {:error, _} = Sequential.execute(input, context)
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :start],
-                      _, %{step_index: 0}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :start], _, %{step_index: 0}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :exception],
-                      %{duration: _}, %{step_index: 0, error: :intentional_error}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :exception], %{duration: _},
+                      %{step_index: 0, error: :intentional_error}}
     end
 
     test "emits exception event on raised exception" do
@@ -336,8 +331,8 @@ defmodule Jido.AI.Algorithms.SequentialTest do
 
       {:error, _} = Sequential.execute(input, context)
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :exception],
-                      %{duration: _}, %{error: %RuntimeError{}}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :sequential, :step, :exception], %{duration: _},
+                      %{error: %RuntimeError{}}}
     end
   end
 

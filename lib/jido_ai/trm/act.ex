@@ -36,6 +36,8 @@ defmodule Jido.AI.TRM.ACT do
       #=> {:continue, %{expected_improvement: 0.08}}
   """
 
+  import Jido.AI.TRM.Helpers, only: [clamp: 3]
+
   @type act_state :: %{
           threshold: float(),
           current_confidence: float(),
@@ -47,7 +49,6 @@ defmodule Jido.AI.TRM.ACT do
   @type halt_reason :: :threshold_exceeded | :convergence_detected | :max_improvement_reached
 
   # Import shared helpers
-  import Jido.AI.TRM.Helpers, only: [clamp: 3]
 
   # Default convergence detection settings
   @convergence_window 3
@@ -256,8 +257,7 @@ defmodule Jido.AI.TRM.ACT do
       true
   """
   @spec detect_convergence([float()], pos_integer(), float()) :: boolean()
-  def detect_convergence(history, window, epsilon)
-      when is_list(history) and is_integer(window) and window > 0 do
+  def detect_convergence(history, window, epsilon) when is_list(history) and is_integer(window) and window > 0 do
     if length(history) < window do
       false
     else

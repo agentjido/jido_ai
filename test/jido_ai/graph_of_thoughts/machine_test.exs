@@ -404,7 +404,8 @@ defmodule Jido.AI.GraphOfThoughts.MachineTest do
       edges: [
         %{from: "a", to: "b", type: :generates},
         %{from: "b", to: "c", type: :generates},
-        %{from: "c", to: "a", type: :connects}  # Creates cycle
+        # Creates cycle
+        %{from: "c", to: "a", type: :connects}
       ],
       root_id: "a"
     }

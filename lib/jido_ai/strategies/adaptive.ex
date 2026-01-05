@@ -238,11 +238,12 @@ defmodule Jido.AI.Strategies.Adaptive do
   # Check if we should re-evaluate strategy selection
   defp should_reevaluate?(agent, instructions, ctx, strategy_module) do
     # Only re-evaluate if there's a new start instruction
-    has_start = Enum.any?(instructions, fn
-      %{action: @start} -> true
-      %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start, :trm_start] -> true
-      _ -> false
-    end)
+    has_start =
+      Enum.any?(instructions, fn
+        %{action: @start} -> true
+        %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start, :trm_start] -> true
+        _ -> false
+      end)
 
     if has_start do
       # Check if previous reasoning is complete
@@ -321,11 +322,12 @@ defmodule Jido.AI.Strategies.Adaptive do
 
   defp handle_initial_instruction(agent, instructions, ctx, state) do
     # Find the start instruction
-    start_instr = Enum.find(instructions, fn
-      %{action: @start} -> true
-      %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start, :trm_start] -> true
-      _ -> false
-    end)
+    start_instr =
+      Enum.find(instructions, fn
+        %{action: @start} -> true
+        %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start, :trm_start] -> true
+        _ -> false
+      end)
 
     case start_instr do
       nil ->
@@ -549,7 +551,7 @@ defmodule Jido.AI.Strategies.Adaptive do
   end
 
   defp select_by_task_type(:tool_use, available) do
-    if :react in available, do: :react, else: nil
+    if :react in available, do: :react
   end
 
   defp select_by_task_type(:synthesis, available) do

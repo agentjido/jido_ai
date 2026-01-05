@@ -821,6 +821,7 @@ defmodule Jido.AI.GraphOfThoughts.Machine do
       else
         # Fall back to most recent node
         leaves = find_leaves(machine)
+
         case leaves do
           [leaf | _] -> leaf.content
           [] -> machine.prompt

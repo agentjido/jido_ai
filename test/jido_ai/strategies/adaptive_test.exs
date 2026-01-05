@@ -89,9 +89,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
     test "initializes with custom complexity thresholds" do
       {agent, _ctx} =
-        create_agent(
-          complexity_thresholds: %{simple: 0.2, complex: 0.8}
-        )
+        create_agent(complexity_thresholds: %{simple: 0.2, complex: 0.8})
 
       state = StratState.get(agent, %{})
       assert state[:config][:complexity_thresholds] == %{simple: 0.2, complex: 0.8}
@@ -119,7 +117,8 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
     end
 
     test "classifies tool-use prompts" do
-      {strategy, _score, task_type} = Adaptive.analyze_prompt("Search for the latest news about AI and fetch the top 5 results.")
+      {strategy, _score, task_type} =
+        Adaptive.analyze_prompt("Search for the latest news about AI and fetch the top 5 results.")
 
       assert strategy == :react
       assert task_type == :tool_use
@@ -165,6 +164,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       for large datasets. It must handle edge cases like empty arrays and single elements.
       The implementation should also track the number of comparisons made.
       """
+
       {strategy, score, _task_type} = Adaptive.analyze_prompt(prompt)
 
       # Moderate complexity score (between thresholds)
@@ -198,7 +198,9 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
     test "prompts with constraints have higher complexity" do
       simple = "Tell me about cats."
-      constrained = "You must explain cats. You need to include their history. You should also mention their behavior. You have to be thorough."
+
+      constrained =
+        "You must explain cats. You need to include their history. You should also mention their behavior. You have to be thorough."
 
       {_strat1, score1, _type1} = Adaptive.analyze_prompt(simple)
       {_strat2, score2, _type2} = Adaptive.analyze_prompt(constrained)
@@ -651,7 +653,10 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       {agent, ctx} = create_agent(available_strategies: [:cot, :react, :tot, :got, :trm])
 
       instructions = [
-        %{action: :adaptive_start, params: %{prompt: "Solve this puzzle step by step and iterate to improve the solution"}}
+        %{
+          action: :adaptive_start,
+          params: %{prompt: "Solve this puzzle step by step and iterate to improve the solution"}
+        }
       ]
 
       {agent, _directives} = Adaptive.cmd(agent, instructions, ctx)

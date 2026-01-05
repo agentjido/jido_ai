@@ -199,23 +199,24 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
       # 3. Parallel fetch
       # 4. Sequential processing
 
-      workflow = Composite.sequence([
-        # Step 1: Add one (validation placeholder)
-        AddAlgorithm,
+      workflow =
+        Composite.sequence([
+          # Step 1: Add one (validation placeholder)
+          AddAlgorithm,
 
-        # Step 2: Choice - if value > 5, multiply; else add again
-        Composite.choice(
-          fn input -> input.value > 5 end,
-          MultiplyAlgorithm,
-          AddAlgorithm
-        ),
+          # Step 2: Choice - if value > 5, multiply; else add again
+          Composite.choice(
+            fn input -> input.value > 5 end,
+            MultiplyAlgorithm,
+            AddAlgorithm
+          ),
 
-        # Step 3: Parallel fetch (using two fetch algorithms)
-        Composite.parallel([FetchDataAlgorithm, FetchDataAlgorithm]),
+          # Step 3: Parallel fetch (using two fetch algorithms)
+          Composite.parallel([FetchDataAlgorithm, FetchDataAlgorithm]),
 
-        # Step 4: Final multiply
-        MultiplyAlgorithm
-      ])
+          # Step 4: Final multiply
+          MultiplyAlgorithm
+        ])
 
       # Starting with 5: 5 + 1 = 6, 6 > 5 so multiply: 12, fetch (no value change), 12 * 2 = 24
       assert {:ok, result} = Composite.execute_composite(workflow, %{value: 5}, %{})
@@ -237,10 +238,11 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
       # Note: Hybrid expects modules, not composite structs, so we use Composite
       # for nested workflows instead
       # This test verifies the pattern - use Composite for nested workflows
-      composite_workflow = Composite.sequence([
-        double_and_add,
-        Composite.parallel([AddAlgorithm, MultiplyAlgorithm])
-      ])
+      composite_workflow =
+        Composite.sequence([
+          double_and_add,
+          Composite.parallel([AddAlgorithm, MultiplyAlgorithm])
+        ])
 
       # 2 * 2 = 4, 4 + 1 = 5, then parallel (both get 5): merge results
       assert {:ok, result} = Composite.execute_composite(composite_workflow, input, %{})
@@ -257,17 +259,19 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
       inner_choice = Composite.choice(fn _ -> true end, AddAlgorithm, MultiplyAlgorithm)
       inner_repeat = Composite.repeat(AddAlgorithm, times: 2)
 
-      middle = Composite.sequence([
-        inner_seq,
-        inner_parallel,
-        inner_choice,
-        inner_repeat
-      ])
+      middle =
+        Composite.sequence([
+          inner_seq,
+          inner_parallel,
+          inner_choice,
+          inner_repeat
+        ])
 
-      outer = Composite.compose(
-        Composite.when_cond(fn _ -> true end, middle),
-        MultiplyAlgorithm
-      )
+      outer =
+        Composite.compose(
+          Composite.when_cond(fn _ -> true end, middle),
+          MultiplyAlgorithm
+        )
 
       # 0 -> seq(+1,+1)=2 -> parallel(fetch) -> choice(+1)=3 -> repeat(+1,+1)=5 -> *2=10
       assert {:ok, result} = Composite.execute_composite(outer, %{value: 0}, %{})
@@ -362,22 +366,24 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
     end
 
     test "error propagation through nested composite" do
-      workflow = Composite.sequence([
-        AddAlgorithm,
-        Composite.choice(
-          fn input -> input.value > 5 end,
-          ErrorAlgorithm,
-          AddAlgorithm
-        ),
-        MultiplyAlgorithm
-      ])
+      workflow =
+        Composite.sequence([
+          AddAlgorithm,
+          Composite.choice(
+            fn input -> input.value > 5 end,
+            ErrorAlgorithm,
+            AddAlgorithm
+          ),
+          MultiplyAlgorithm
+        ])
 
       # Value 5 + 1 = 6 > 5, so ErrorAlgorithm is chosen
       assert {:error, :intentional_error} = Composite.execute_composite(workflow, %{value: 5}, %{})
 
       # Value 3 + 1 = 4 <= 5, so AddAlgorithm is chosen, continues to multiply
       assert {:ok, result} = Composite.execute_composite(workflow, %{value: 3}, %{})
-      assert result.value == 10  # (3 + 1 + 1) * 2
+      # (3 + 1 + 1) * 2
+      assert result.value == 10
     end
 
     test "error in repeat stops iteration" do
@@ -385,11 +391,12 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
 
       # First iteration fails
       assert {:error, :conditional_error} =
-        Composite.execute_composite(workflow, %{should_fail: true}, %{})
+               Composite.execute_composite(workflow, %{should_fail: true}, %{})
 
       # All iterations succeed when condition is false
       assert {:ok, result} =
-        Composite.execute_composite(workflow, %{should_fail: false}, %{})
+               Composite.execute_composite(workflow, %{should_fail: false}, %{})
+
       assert result.conditional_passed == true
     end
   end
@@ -420,7 +427,7 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
       # Parallel should be at least 2x faster (with 4 concurrent tasks)
       # Allow some margin for test environment variance
       assert par_duration < seq_duration,
-        "Parallel (#{par_duration}ms) should be faster than sequential (#{seq_duration}ms)"
+             "Parallel (#{par_duration}ms) should be faster than sequential (#{seq_duration}ms)"
     end
 
     test "concurrency limits respected" do
@@ -463,7 +470,7 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
       max_concurrent = calculate_max_concurrent(messages)
 
       assert max_concurrent <= 2,
-        "Max concurrent (#{max_concurrent}) should not exceed limit (2)"
+             "Max concurrent (#{max_concurrent}) should not exceed limit (2)"
     end
 
     test "timeout handling across compositions" do
@@ -517,7 +524,7 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
 
       # Should not have significant process leak (allow small variance)
       assert final_process_count <= initial_process_count + 5,
-        "Process count increased by #{final_process_count - initial_process_count}"
+             "Process count increased by #{final_process_count - initial_process_count}"
     end
 
     test "hybrid stage execution maintains order" do
@@ -589,20 +596,24 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
       # FetchDataAlgorithm: adds :data key, value unchanged (2)
       # With merge_maps, the order of results depends on task completion
       # FetchDataAlgorithm result gets merged last so value stays 2
-      {:ok, par_result} = Parallel.execute(seq_result, %{
-        algorithms: [MultiplyAlgorithm, FetchDataAlgorithm],
-        merge_strategy: :merge_maps
-      })
+      {:ok, par_result} =
+        Parallel.execute(seq_result, %{
+          algorithms: [MultiplyAlgorithm, FetchDataAlgorithm],
+          merge_strategy: :merge_maps
+        })
+
       # FetchDataAlgorithm doesn't modify value, so it's still 2 after merge
       # (the last result in the merge wins, and FetchDataAlgorithm's value is 2)
       assert Map.has_key?(par_result, :data)
 
       # Then Hybrid - apply multiply to get to a known state
-      {:ok, hybrid_result} = Hybrid.execute(par_result, %{
-        stages: [
-          %{algorithms: [MultiplyAlgorithm], mode: :sequential}
-        ]
-      })
+      {:ok, hybrid_result} =
+        Hybrid.execute(par_result, %{
+          stages: [
+            %{algorithms: [MultiplyAlgorithm], mode: :sequential}
+          ]
+        })
+
       # Whatever value was * 2
       multiplied_value = hybrid_result.value
 
@@ -697,6 +708,7 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
 
   defp collect_concurrency_messages(count, acc \\ [])
   defp collect_concurrency_messages(0, acc), do: Enum.reverse(acc)
+
   defp collect_concurrency_messages(count, acc) do
     receive do
       msg -> collect_concurrency_messages(count - 1, [msg | acc])

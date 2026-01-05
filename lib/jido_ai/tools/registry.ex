@@ -54,12 +54,12 @@ defmodule Jido.AI.Tools.Registry do
   See `notes/decisions/adr-001-tools-registry-design.md` for design rationale.
   """
 
-  require Logger
-
   use Agent
 
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Tools.Tool
+
+  require Logger
 
   @registry_name __MODULE__
   @max_retries 3

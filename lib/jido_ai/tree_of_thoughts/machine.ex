@@ -662,7 +662,7 @@ defmodule Jido.AI.TreeOfThoughts.Machine do
   defp start_generating_for_node(machine, node_id, remaining_frontier, env) do
     # Transition expanding -> generating atomically
     with {:ok, machine} <- Fsmx.transition(machine, "expanding", state_field: :status),
-         machine <- Map.put(machine, :frontier, remaining_frontier),
+         machine = Map.put(machine, :frontier, remaining_frontier),
          {:ok, machine} <- Fsmx.transition(machine, "generating", state_field: :status) do
       call_id = generate_call_id()
 

@@ -67,10 +67,6 @@ defmodule Jido.AI.TRM.Machine do
   - **Metadata**: `%{call_id: String.t(), termination_reason: atom(), usage: map()}`
   """
 
-  alias Jido.AI.TRM.ACT
-  alias Jido.AI.TRM.Helpers
-  alias Jido.AI.TRM.Supervision
-
   use Fsmx.Struct,
     state_field: :status,
     transitions: %{
@@ -81,6 +77,10 @@ defmodule Jido.AI.TRM.Machine do
       "completed" => [],
       "error" => []
     }
+
+  alias Jido.AI.TRM.ACT
+  alias Jido.AI.TRM.Helpers
+  alias Jido.AI.TRM.Supervision
 
   # Telemetry event names
   @telemetry_prefix [:jido, :ai, :trm]
@@ -263,11 +263,7 @@ defmodule Jido.AI.TRM.Machine do
   end
 
   # Reasoning result: reasoning → supervising
-  def update(
-        %__MODULE__{status: "reasoning"} = machine,
-        {:reasoning_result, call_id, result},
-        _env
-      ) do
+  def update(%__MODULE__{status: "reasoning"} = machine, {:reasoning_result, call_id, result}, _env) do
     if call_id == machine.current_call_id do
       handle_reasoning_result(machine, result)
     else
@@ -276,11 +272,7 @@ defmodule Jido.AI.TRM.Machine do
   end
 
   # Supervision result: supervising → improving
-  def update(
-        %__MODULE__{status: "supervising"} = machine,
-        {:supervision_result, call_id, result},
-        _env
-      ) do
+  def update(%__MODULE__{status: "supervising"} = machine, {:supervision_result, call_id, result}, _env) do
     if call_id == machine.current_call_id do
       handle_supervision_result(machine, result)
     else
@@ -289,11 +281,7 @@ defmodule Jido.AI.TRM.Machine do
   end
 
   # Improvement result: improving → reasoning or completed
-  def update(
-        %__MODULE__{status: "improving"} = machine,
-        {:improvement_result, call_id, result},
-        _env
-      ) do
+  def update(%__MODULE__{status: "improving"} = machine, {:improvement_result, call_id, result}, _env) do
     if call_id == machine.current_call_id do
       handle_improvement_result(machine, result)
     else
@@ -302,11 +290,7 @@ defmodule Jido.AI.TRM.Machine do
   end
 
   # Streaming partial for any awaiting state
-  def update(
-        %__MODULE__{status: status} = machine,
-        {:llm_partial, call_id, delta, chunk_type},
-        _env
-      )
+  def update(%__MODULE__{status: status} = machine, {:llm_partial, call_id, delta, chunk_type}, _env)
       when status in ["reasoning", "supervising", "improving"] do
     if call_id == machine.current_call_id do
       machine =

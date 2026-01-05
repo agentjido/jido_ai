@@ -597,23 +597,17 @@ defmodule Jido.AI.Algorithms.Composite do
   # ============================================================================
 
   # Pattern matching for composite structs
-  defp execute_algorithm(%SequenceComposite{} = c, input, context),
-    do: execute_composite(c, input, context)
+  defp execute_algorithm(%SequenceComposite{} = c, input, context), do: execute_composite(c, input, context)
 
-  defp execute_algorithm(%ParallelComposite{} = c, input, context),
-    do: execute_composite(c, input, context)
+  defp execute_algorithm(%ParallelComposite{} = c, input, context), do: execute_composite(c, input, context)
 
-  defp execute_algorithm(%ChoiceComposite{} = c, input, context),
-    do: execute_composite(c, input, context)
+  defp execute_algorithm(%ChoiceComposite{} = c, input, context), do: execute_composite(c, input, context)
 
-  defp execute_algorithm(%RepeatComposite{} = c, input, context),
-    do: execute_composite(c, input, context)
+  defp execute_algorithm(%RepeatComposite{} = c, input, context), do: execute_composite(c, input, context)
 
-  defp execute_algorithm(%WhenComposite{} = c, input, context),
-    do: execute_composite(c, input, context)
+  defp execute_algorithm(%WhenComposite{} = c, input, context), do: execute_composite(c, input, context)
 
-  defp execute_algorithm(%ComposeComposite{} = c, input, context),
-    do: execute_composite(c, input, context)
+  defp execute_algorithm(%ComposeComposite{} = c, input, context), do: execute_composite(c, input, context)
 
   # Module-based algorithms
   defp execute_algorithm(algorithm, input, context) when is_atom(algorithm) do
@@ -629,23 +623,17 @@ defmodule Jido.AI.Algorithms.Composite do
   end
 
   # Pattern matching for composite structs
-  defp check_can_execute(%SequenceComposite{} = c, input, context),
-    do: can_execute_composite?(c, input, context)
+  defp check_can_execute(%SequenceComposite{} = c, input, context), do: can_execute_composite?(c, input, context)
 
-  defp check_can_execute(%ParallelComposite{} = c, input, context),
-    do: can_execute_composite?(c, input, context)
+  defp check_can_execute(%ParallelComposite{} = c, input, context), do: can_execute_composite?(c, input, context)
 
-  defp check_can_execute(%ChoiceComposite{} = c, input, context),
-    do: can_execute_composite?(c, input, context)
+  defp check_can_execute(%ChoiceComposite{} = c, input, context), do: can_execute_composite?(c, input, context)
 
-  defp check_can_execute(%RepeatComposite{} = c, input, context),
-    do: can_execute_composite?(c, input, context)
+  defp check_can_execute(%RepeatComposite{} = c, input, context), do: can_execute_composite?(c, input, context)
 
-  defp check_can_execute(%WhenComposite{} = c, input, context),
-    do: can_execute_composite?(c, input, context)
+  defp check_can_execute(%WhenComposite{} = c, input, context), do: can_execute_composite?(c, input, context)
 
-  defp check_can_execute(%ComposeComposite{} = c, input, context),
-    do: can_execute_composite?(c, input, context)
+  defp check_can_execute(%ComposeComposite{} = c, input, context), do: can_execute_composite?(c, input, context)
 
   # Module-based algorithms
   defp check_can_execute(algorithm, input, context) when is_atom(algorithm) do
@@ -662,13 +650,11 @@ defmodule Jido.AI.Algorithms.Composite do
   # Private Functions - Repeat Logic
   # ============================================================================
 
-  defp do_repeat(_algorithm, result, _context, times, _while_fn, iteration, _max_iter)
-       when iteration >= times do
+  defp do_repeat(_algorithm, result, _context, times, _while_fn, iteration, _max_iter) when iteration >= times do
     {:ok, result}
   end
 
-  defp do_repeat(_algorithm, result, _context, _times, _while_fn, iteration, max_iter)
-       when iteration >= max_iter do
+  defp do_repeat(_algorithm, result, _context, _times, _while_fn, iteration, max_iter) when iteration >= max_iter do
     # Max iterations reached - return current result to prevent infinite loop
     {:ok, result}
   end
@@ -677,9 +663,10 @@ defmodule Jido.AI.Algorithms.Composite do
     case execute_algorithm(algorithm, input, context) do
       {:ok, result} ->
         should_continue =
-          cond do
-            while_fn != nil -> while_fn.(result)
-            true -> true
+          if while_fn == nil do
+            true
+          else
+            while_fn.(result)
           end
 
         if should_continue do

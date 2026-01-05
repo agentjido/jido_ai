@@ -130,7 +130,8 @@ defmodule Jido.AI.TRM.HelpersTest do
     test "truncates long string errors" do
       long_error = String.duplicate("a", 300)
       result = Helpers.safe_error_message(long_error)
-      assert String.length(result) <= 210  # "Error: " + 200 chars
+      # "Error: " + 200 chars
+      assert String.length(result) <= 210
     end
 
     test "sanitizes special characters in string errors" do
@@ -150,7 +151,7 @@ defmodule Jido.AI.TRM.HelpersTest do
 
     test "returns generic message for complex structures" do
       assert Helpers.safe_error_message(%{complex: %{nested: "data"}}) ==
-        "Error: An unexpected error occurred"
+               "Error: An unexpected error occurred"
     end
   end
 end

@@ -204,9 +204,12 @@ defmodule Jido.AI.TRM.Helpers do
     safe_msg =
       reason
       |> String.slice(0, 200)
-      |> String.replace(~r/<[^>]*>/, "")  # Remove HTML tags
-      |> String.replace(~r/[^\w\s\.\-:,]/, " ")  # Replace special chars with space
-      |> String.replace(~r/\s+/, " ")  # Collapse multiple spaces
+      # Remove HTML tags
+      |> String.replace(~r/<[^>]*>/, "")
+      # Replace special chars with space
+      |> String.replace(~r/[^\w\s\.\-:,]/, " ")
+      # Collapse multiple spaces
+      |> String.replace(~r/\s+/, " ")
       |> String.trim()
 
     "Error: #{safe_msg}"

@@ -2,6 +2,7 @@ defmodule Jido.AI.Algorithms.CompositeTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Algorithms.Composite
+
   alias Jido.AI.Algorithms.Composite.{
     SequenceComposite,
     ParallelComposite,
@@ -227,18 +228,20 @@ defmodule Jido.AI.Algorithms.CompositeTest do
       composite = Composite.choice(predicate, PremiumAlgorithm, StandardAlgorithm)
 
       assert %ChoiceComposite{
-        predicate: ^predicate,
-        if_true: PremiumAlgorithm,
-        if_false: StandardAlgorithm
-      } = composite
+               predicate: ^predicate,
+               if_true: PremiumAlgorithm,
+               if_false: StandardAlgorithm
+             } = composite
     end
 
     test "executes if_true when predicate is true" do
-      composite = Composite.choice(
-        fn input -> input.premium? end,
-        PremiumAlgorithm,
-        StandardAlgorithm
-      )
+      composite =
+        Composite.choice(
+          fn input -> input.premium? end,
+          PremiumAlgorithm,
+          StandardAlgorithm
+        )
+
       input = %{premium?: true}
 
       assert {:ok, result} = Composite.execute_composite(composite, input, %{})
@@ -246,11 +249,13 @@ defmodule Jido.AI.Algorithms.CompositeTest do
     end
 
     test "executes if_false when predicate is false" do
-      composite = Composite.choice(
-        fn input -> input.premium? end,
-        PremiumAlgorithm,
-        StandardAlgorithm
-      )
+      composite =
+        Composite.choice(
+          fn input -> input.premium? end,
+          PremiumAlgorithm,
+          StandardAlgorithm
+        )
+
       input = %{premium?: false}
 
       assert {:ok, result} = Composite.execute_composite(composite, input, %{})
@@ -258,11 +263,12 @@ defmodule Jido.AI.Algorithms.CompositeTest do
     end
 
     test "works with complex predicates" do
-      composite = Composite.choice(
-        fn input -> input.value > 10 and input.active? end,
-        PremiumAlgorithm,
-        StandardAlgorithm
-      )
+      composite =
+        Composite.choice(
+          fn input -> input.value > 10 and input.active? end,
+          PremiumAlgorithm,
+          StandardAlgorithm
+        )
 
       assert {:ok, result1} = Composite.execute_composite(composite, %{value: 20, active?: true}, %{})
       assert result1.tier == :premium
@@ -319,12 +325,15 @@ defmodule Jido.AI.Algorithms.CompositeTest do
     test "respects max_iterations option to prevent infinite loops" do
       # Create a repeat with a while condition that would never become false
       # but with a max_iterations limit
-      composite = Composite.repeat(
-        AddOneAlgorithm,
-        times: 1_000_000,
-        while: fn _result -> true end,  # Always continue
-        max_iterations: 10
-      )
+      composite =
+        Composite.repeat(
+          AddOneAlgorithm,
+          times: 1_000_000,
+          # Always continue
+          while: fn _result -> true end,
+          max_iterations: 10
+        )
+
       input = %{value: 0}
 
       assert {:ok, result} = Composite.execute_composite(composite, input, %{})
@@ -335,11 +344,13 @@ defmodule Jido.AI.Algorithms.CompositeTest do
     test "default max_iterations is 10000" do
       # We can't actually test 10000 iterations, but we can verify the behavior
       # by using a custom max_iterations that's lower
-      composite = Composite.repeat(
-        AddOneAlgorithm,
-        times: 100,
-        max_iterations: 5
-      )
+      composite =
+        Composite.repeat(
+          AddOneAlgorithm,
+          times: 100,
+          max_iterations: 5
+        )
+
       input = %{value: 0}
 
       assert {:ok, result} = Composite.execute_composite(composite, input, %{})
@@ -450,24 +461,32 @@ defmodule Jido.AI.Algorithms.CompositeTest do
 
   describe "nested compositions" do
     test "sequence containing parallel" do
-      composite = Composite.sequence([
-        AddOneAlgorithm,
-        Composite.parallel([FetchAAlgorithm, FetchBAlgorithm]),
-        DoubleAlgorithm
-      ])
+      composite =
+        Composite.sequence([
+          AddOneAlgorithm,
+          Composite.parallel([FetchAAlgorithm, FetchBAlgorithm]),
+          DoubleAlgorithm
+        ])
+
       input = %{value: 5}
 
       assert {:ok, result} = Composite.execute_composite(composite, input, %{})
-      assert result.value == 12  # (5 + 1) * 2
+      # (5 + 1) * 2
+      assert result.value == 12
       assert result.a == "data_a"
       assert result.b == "data_b"
     end
 
     test "parallel containing sequences" do
-      composite = Composite.parallel([
-        Composite.sequence([AddOneAlgorithm, FetchAAlgorithm]),
-        Composite.sequence([DoubleAlgorithm, FetchBAlgorithm])
-      ], merge_strategy: :merge_maps)
+      composite =
+        Composite.parallel(
+          [
+            Composite.sequence([AddOneAlgorithm, FetchAAlgorithm]),
+            Composite.sequence([DoubleAlgorithm, FetchBAlgorithm])
+          ],
+          merge_strategy: :merge_maps
+        )
+
       input = %{value: 5}
 
       assert {:ok, result} = Composite.execute_composite(composite, input, %{})
@@ -476,11 +495,12 @@ defmodule Jido.AI.Algorithms.CompositeTest do
     end
 
     test "choice containing composites" do
-      composite = Composite.choice(
-        fn input -> input.premium? end,
-        Composite.sequence([AddOneAlgorithm, DoubleAlgorithm]),
-        AddOneAlgorithm
-      )
+      composite =
+        Composite.choice(
+          fn input -> input.premium? end,
+          Composite.sequence([AddOneAlgorithm, DoubleAlgorithm]),
+          AddOneAlgorithm
+        )
 
       # Premium path: 5 + 1 = 6, 6 * 2 = 12
       assert {:ok, result1} = Composite.execute_composite(composite, %{value: 5, premium?: true}, %{})
@@ -492,15 +512,17 @@ defmodule Jido.AI.Algorithms.CompositeTest do
     end
 
     test "deeply nested composition" do
-      composite = Composite.sequence([
-        Composite.when_cond(fn _ -> true end, AddOneAlgorithm),
-        Composite.choice(
-          fn input -> input.value > 3 end,
-          Composite.parallel([FetchAAlgorithm, FetchBAlgorithm]),
-          AddOneAlgorithm
-        ),
-        Composite.repeat(DoubleAlgorithm, times: 2)
-      ])
+      composite =
+        Composite.sequence([
+          Composite.when_cond(fn _ -> true end, AddOneAlgorithm),
+          Composite.choice(
+            fn input -> input.value > 3 end,
+            Composite.parallel([FetchAAlgorithm, FetchBAlgorithm]),
+            AddOneAlgorithm
+          ),
+          Composite.repeat(DoubleAlgorithm, times: 2)
+        ])
+
       input = %{value: 5}
 
       # 5 + 1 = 6 (when_cond)
@@ -628,66 +650,54 @@ defmodule Jido.AI.Algorithms.CompositeTest do
       composite = Composite.sequence([AddOneAlgorithm])
       Composite.execute_composite(composite, %{value: 5}, %{})
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start],
-                      %{system_time: _}, %{type: :sequence}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start], %{system_time: _}, %{type: :sequence}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop],
-                      %{duration: _}, %{type: :sequence}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop], %{duration: _}, %{type: :sequence}}
     end
 
     test "emits start and stop events for parallel" do
       composite = Composite.parallel([FetchAAlgorithm])
       Composite.execute_composite(composite, %{}, %{})
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start],
-                      %{system_time: _}, %{type: :parallel}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start], %{system_time: _}, %{type: :parallel}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop],
-                      %{duration: _}, %{type: :parallel}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop], %{duration: _}, %{type: :parallel}}
     end
 
     test "emits start and stop events for choice" do
       composite = Composite.choice(fn _ -> true end, AddOneAlgorithm, DoubleAlgorithm)
       Composite.execute_composite(composite, %{value: 5}, %{})
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start],
-                      %{system_time: _}, %{type: :choice}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start], %{system_time: _}, %{type: :choice}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop],
-                      %{duration: _}, %{type: :choice}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop], %{duration: _}, %{type: :choice}}
     end
 
     test "emits start and stop events for repeat" do
       composite = Composite.repeat(AddOneAlgorithm, times: 1)
       Composite.execute_composite(composite, %{value: 5}, %{})
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start],
-                      %{system_time: _}, %{type: :repeat}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start], %{system_time: _}, %{type: :repeat}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop],
-                      %{duration: _}, %{type: :repeat}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop], %{duration: _}, %{type: :repeat}}
     end
 
     test "emits start and stop events for when" do
       composite = Composite.when_cond(fn _ -> true end, AddOneAlgorithm)
       Composite.execute_composite(composite, %{value: 5}, %{})
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start],
-                      %{system_time: _}, %{type: :when}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start], %{system_time: _}, %{type: :when}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop],
-                      %{duration: _}, %{type: :when}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop], %{duration: _}, %{type: :when}}
     end
 
     test "emits start and stop events for compose" do
       composite = Composite.compose(AddOneAlgorithm, DoubleAlgorithm)
       Composite.execute_composite(composite, %{value: 5}, %{})
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start],
-                      %{system_time: _}, %{type: :compose}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :start], %{system_time: _}, %{type: :compose}}
 
-      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop],
-                      %{duration: _}, %{type: :compose}}
+      assert_receive {:telemetry, [:jido, :ai, :algorithm, :composite, :stop], %{duration: _}, %{type: :compose}}
     end
   end
 
@@ -705,23 +715,24 @@ defmodule Jido.AI.Algorithms.CompositeTest do
     end
 
     test "complex workflow with all operators" do
-      workflow = Composite.sequence([
-        # Stage 1: Add one
-        AddOneAlgorithm,
+      workflow =
+        Composite.sequence([
+          # Stage 1: Add one
+          AddOneAlgorithm,
 
-        # Stage 2: Conditional - double if value > 5
-        Composite.when_cond(fn input -> input.value > 5 end, DoubleAlgorithm),
+          # Stage 2: Conditional - double if value > 5
+          Composite.when_cond(fn input -> input.value > 5 end, DoubleAlgorithm),
 
-        # Stage 3: Choice based on value
-        Composite.choice(
-          fn input -> input.value >= 10 end,
-          Composite.parallel([FetchAAlgorithm, FetchBAlgorithm]),
-          FetchAAlgorithm
-        ),
+          # Stage 3: Choice based on value
+          Composite.choice(
+            fn input -> input.value >= 10 end,
+            Composite.parallel([FetchAAlgorithm, FetchBAlgorithm]),
+            FetchAAlgorithm
+          ),
 
-        # Stage 4: Repeat add one twice
-        Composite.repeat(AddOneAlgorithm, times: 2)
-      ])
+          # Stage 4: Repeat add one twice
+          Composite.repeat(AddOneAlgorithm, times: 2)
+        ])
 
       # Starting with value: 5
       # Step 1: 5 + 1 = 6
