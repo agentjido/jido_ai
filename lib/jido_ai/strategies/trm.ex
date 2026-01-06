@@ -1,7 +1,5 @@
 # NOTE: Module is in `Strategies` namespace (plural) to match other strategies
-# in this codebase (e.g., Jido.AI.Strategies.Adaptive). This differs from the
-# singular `Strategy` namespace used by Jido.AI.Strategy.ReAct for historical
-# reasons. Future refactoring may consolidate to a single namespace.
+# in this codebase (e.g., Jido.AI.Strategies.Adaptive, Jido.AI.Strategies.ReAct).
 defmodule Jido.AI.Strategies.TRM do
   @moduledoc """
   TRM (Tiny-Recursive-Model) execution strategy for Jido agents.

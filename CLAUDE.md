@@ -49,7 +49,7 @@ Jido.AI is the **AI integration layer** for the Jido ecosystem, providing LLM or
 The ReAct (Reason-Act) pattern provides multi-step LLM reasoning with tool use:
 
 - **`Jido.AI.ReActAgent`** (`lib/jido_ai/react_agent.ex`) - Base macro for ReAct agents
-- **`Jido.AI.Strategy.ReAct`** (`lib/jido_ai/strategy/react.ex`) - Strategy implementation
+- **`Jido.AI.Strategies.ReAct`** (`lib/jido_ai/strategies/react.ex`) - Strategy implementation
 - **`Jido.AI.ReAct.Machine`** (`lib/jido_ai/react/machine.ex`) - Pure state machine (Fsmx-based)
 - **`Jido.AI.ToolAdapter`** (`lib/jido_ai/tool_adapter.ex`) - Converts Jido.Actions to ReqLLM tools
 

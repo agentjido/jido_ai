@@ -2,7 +2,7 @@ defmodule Jido.AI.ReActAgent do
   @moduledoc """
   Base macro for ReAct-powered agents.
 
-  Wraps `use Jido.Agent` with `Jido.AI.Strategy.ReAct` wired in,
+  Wraps `use Jido.Agent` with `Jido.AI.Strategies.ReAct` wired in,
   plus standard state fields and helper functions.
 
   ## Usage
@@ -85,7 +85,7 @@ defmodule Jido.AI.ReActAgent do
         name: unquote(name),
         description: unquote(description),
         skills: unquote(skills),
-        strategy: {Jido.AI.Strategy.ReAct, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
       import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
