@@ -274,63 +274,63 @@ Implement the tool calling skill for function execution.
 
 Create the tool calling skill module.
 
-- [ ] 5.5.1.1 Create `lib/jido_ai/skills/tool_calling_skill.ex` with module documentation
-- [ ] 5.5.1.2 Use `Jido.Skill` with name, state_key, and actions
-- [ ] 5.5.1.3 Define schema with available_tools, auto_execute fields
-- [ ] 5.5.1.4 List actions: CallWithTools, ExecuteTool, ListTools
+- [x] 5.5.1.1 Create `lib/jido_ai/skills/tool_calling.ex` with module documentation
+- [x] 5.5.1.2 Use `Jido.Skill` with name, state_key, and actions
+- [x] 5.5.1.3 Define schema with available_tools, auto_execute fields
+- [x] 5.5.1.4 List actions: CallWithTools, ExecuteTool, ListTools
 
 ### 5.5.2 Mount Callback
 
 Implement skill mounting.
 
-- [ ] 5.5.2.1 Implement `mount/2` callback
-- [ ] 5.5.2.2 Load available tools from Registry
-- [ ] 5.5.2.3 Configure auto-execution setting
+- [x] 5.5.2.1 Implement `mount/2` callback
+- [x] 5.5.2.2 Load available tools from Registry
+- [x] 5.5.2.3 Configure auto-execution setting
 
 ### 5.5.3 CallWithTools Action
 
 Implement tool-enabled LLM call action.
 
-- [ ] 5.5.3.1 Create CallWithTools action module
-- [ ] 5.5.3.2 Accept prompt, tools parameters
-- [ ] 5.5.3.3 Call `ReqLLM.generate_text/3` with `tools:` option directly
-- [ ] 5.5.3.4 Return response with tool calls
+- [x] 5.5.3.1 Create CallWithTools action module
+- [x] 5.5.3.2 Accept prompt, tools parameters
+- [x] 5.5.3.3 Call `ReqLLM.generate_text/3` with `tools:` option directly
+- [x] 5.5.3.4 Return response with tool calls
 
 ### 5.5.4 ExecuteTool Action
 
 Implement tool execution action.
 
-- [ ] 5.5.4.1 Create ExecuteTool action module
-- [ ] 5.5.4.2 Accept tool_name, params parameters
-- [ ] 5.5.4.3 Execute via Registry.execute_tool
-- [ ] 5.5.4.4 Return tool result
+- [x] 5.5.4.1 Create ExecuteTool action module
+- [x] 5.5.4.2 Accept tool_name, params parameters
+- [x] 5.5.4.3 Execute via Registry/Executor
+- [x] 5.5.4.4 Return tool result
 
 ### 5.5.5 ListTools Action
 
 Implement tool listing action.
 
-- [ ] 5.5.5.1 Create ListTools action module
-- [ ] 5.5.5.2 Get tools from Registry
-- [ ] 5.5.5.3 Return tool list with schemas
+- [x] 5.5.5.1 Create ListTools action module
+- [x] 5.5.5.2 Get tools from Registry
+- [x] 5.5.5.3 Return tool list with schemas
 
 ### 5.5.6 Auto-Execution
 
 Implement automatic tool execution.
 
-- [ ] 5.5.6.1 Implement `handle_tool_call/2` for auto-execution
-- [ ] 5.5.6.2 Parse tool call from LLM response
-- [ ] 5.5.6.3 Execute and return result to LLM
-- [ ] 5.5.6.4 Support multi-turn tool conversations
+- [x] 5.5.6.1 Implement `handle_tool_call/2` for auto-execution
+- [x] 5.5.6.2 Parse tool call from LLM response
+- [x] 5.5.6.3 Execute and return result to LLM
+- [x] 5.5.6.4 Support multi-turn tool conversations
 
 ### 5.5.7 Unit Tests for Tool Calling Skill
 
-- [ ] Test mount/2 loads available tools
-- [ ] Test CallWithTools action includes tools
-- [ ] Test ExecuteTool action runs tool
-- [ ] Test ListTools action returns tool list
-- [ ] Test auto-execution handles tool calls
-- [ ] Test multi-turn tool conversations
-- [ ] Test error handling during execution
+- [x] Test mount/2 loads available tools
+- [x] Test CallWithTools action includes tools
+- [x] Test ExecuteTool action runs tool
+- [x] Test ListTools action returns tool list
+- [x] Test auto-execution handles tool calls
+- [x] Test multi-turn tool conversations
+- [x] Test error handling during execution
 
 ---
 
