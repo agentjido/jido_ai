@@ -94,7 +94,7 @@ defmodule Jido.AI.Signal do
 
     Strategies can handle these signals via `signal_routes/1` to route them
     to strategy commands that accumulate partial responses. The ReAct strategy
-    automatically handles these signals when using `Jido.AI.Strategy.ReAct`.
+    automatically handles these signals when using `Jido.AI.Strategies.ReAct`.
     """
 
     use Jido.Signal,

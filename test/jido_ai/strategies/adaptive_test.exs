@@ -5,9 +5,9 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
   alias Jido.AI.Strategies.Adaptive
   alias Jido.AI.Strategies.ChainOfThought
   alias Jido.AI.Strategies.GraphOfThoughts
+  alias Jido.AI.Strategies.ReAct
   alias Jido.AI.Strategies.TreeOfThoughts
   alias Jido.AI.Strategies.TRM
-  alias Jido.AI.Strategy.ReAct
 
   @moduletag :unit
 

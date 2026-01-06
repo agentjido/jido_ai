@@ -75,9 +75,9 @@ defmodule Jido.AI.Strategies.Adaptive do
   alias Jido.AI.Config
   alias Jido.AI.Strategies.ChainOfThought
   alias Jido.AI.Strategies.GraphOfThoughts
+  alias Jido.AI.Strategies.ReAct
   alias Jido.AI.Strategies.TreeOfThoughts
   alias Jido.AI.Strategies.TRM
-  alias Jido.AI.Strategy.ReAct
 
   @default_model "anthropic:claude-haiku-4-5"
   @default_strategy :react

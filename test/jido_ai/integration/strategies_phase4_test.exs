@@ -21,8 +21,8 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   alias Jido.AI.Strategies.Adaptive
   alias Jido.AI.Strategies.ChainOfThought
   alias Jido.AI.Strategies.GraphOfThoughts
+  alias Jido.AI.Strategies.ReAct
   alias Jido.AI.Strategies.TreeOfThoughts
-  alias Jido.AI.Strategy.ReAct
   alias Jido.Instruction
 
   # ============================================================================
