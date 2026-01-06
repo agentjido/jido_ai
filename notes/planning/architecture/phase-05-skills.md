@@ -342,26 +342,26 @@ Comprehensive integration tests verifying all Phase 5 components work together.
 
 Verify skills compose correctly on agents.
 
-- [ ] 5.6.1.1 Create `test/jido_ai/integration/skills_phase5_test.exs`
-- [ ] 5.6.1.2 Test: Agent with multiple skills mounted
-- [ ] 5.6.1.3 Test: Skills access shared agent state
-- [ ] 5.6.1.4 Test: Skill actions invoked through agent
+- [x] 5.6.1.1 Create `test/jido_ai/integration/skills_phase5_test.exs`
+- [x] 5.6.1.2 Test: Agent with multiple skills mounted
+- [x] 5.6.1.3 Test: Skills access shared agent state
+- [x] 5.6.1.4 Test: Skill actions invoked through agent
 
 ### 5.6.2 LLM Skill Integration
 
 Test LLM skill with streaming and tools.
 
-- [ ] 5.6.2.1 Test: LLM skill → Streaming skill flow
-- [ ] 5.6.2.2 Test: LLM skill → Tool calling skill flow
-- [ ] 5.6.2.3 Test: Combined streaming + tool calling
+- [x] 5.6.2.1 Test: LLM skill → Streaming skill flow
+- [x] 5.6.2.2 Test: LLM skill → Tool calling skill flow
+- [x] 5.6.2.3 Test: Combined streaming + tool calling
 
 ### 5.6.3 Reasoning and Planning Integration
 
 Test reasoning and planning skill interaction.
 
-- [ ] 5.6.3.1 Test: Reasoning skill informs planning
-- [ ] 5.6.3.2 Test: Planning skill decomposes reasoning tasks
-- [ ] 5.6.3.3 Test: Full analysis → plan → execute flow
+- [x] 5.6.3.1 Test: Reasoning skill informs planning
+- [x] 5.6.3.2 Test: Planning skill decomposes reasoning tasks
+- [x] 5.6.3.3 Test: Full analysis → plan → execute flow
 
 ---
 
