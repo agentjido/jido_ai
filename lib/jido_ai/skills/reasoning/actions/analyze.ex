@@ -86,6 +86,7 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers
+  alias Jido.AI.Security
 
   @sentiment_prompt """
   You are an expert sentiment analyst. Analyze the provided text and determine:
@@ -150,10 +151,11 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
   @impl Jido.Action
   def run(params, _context) do
     with {:ok, model} <- resolve_model(params[:model]),
-         {:ok, messages} <- build_analysis_messages(params),
-         opts = build_opts(params),
+         {:ok, validated_params} <- validate_and_sanitize_params(params),
+         {:ok, messages} <- build_analysis_messages(validated_params),
+         opts = build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, opts) do
-      {:ok, format_result(response, model, params[:analysis_type])}
+      {:ok, format_result(response, model, validated_params[:analysis_type])}
     end
   end
 
@@ -178,8 +180,29 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
   end
 
   defp build_analysis_system_prompt(:custom, custom) when is_binary(custom) do
-    custom
+    # Validate and sanitize custom prompt to prevent prompt injection
+    case Security.validate_custom_prompt(custom, max_length: Security.max_prompt_length()) do
+      {:ok, sanitized} -> sanitized
+      {:error, _reason} -> "You are an expert analyst. Analyze the provided input."
+    end
   end
+
+  # Validates and sanitizes input parameters to prevent security issues
+  defp validate_and_sanitize_params(params) do
+    with {:ok, _input} <- Security.validate_string(params[:input], max_length: Security.max_input_length()),
+         {:ok, _validated} <- validate_custom_prompt_if_needed(params) do
+      {:ok, params}
+    else
+      {:error, :empty_string} -> {:error, :input_required}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_custom_prompt_if_needed(%{analysis_type: :custom, custom_prompt: custom}) do
+    Security.validate_custom_prompt(custom, max_length: Security.max_prompt_length())
+  end
+
+  defp validate_custom_prompt_if_needed(_params), do: {:ok, nil}
 
   defp build_opts(params) do
     opts = [

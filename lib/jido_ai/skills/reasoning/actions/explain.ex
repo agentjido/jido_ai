@@ -94,6 +94,7 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers
+  alias Jido.AI.Security
 
   @basic_prompt """
   You are an expert teacher explaining concepts to beginners.
@@ -158,10 +159,11 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
   @impl Jido.Action
   def run(params, _context) do
     with {:ok, model} <- resolve_model(params[:model]),
-         {:ok, messages} <- build_explanation_messages(params),
-         opts = build_opts(params),
+         {:ok, validated_params} <- validate_and_sanitize_params(params),
+         {:ok, messages} <- build_explanation_messages(validated_params),
+         opts = build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, opts) do
-      {:ok, format_result(response, model, params[:detail_level])}
+      {:ok, format_result(response, model, validated_params[:detail_level])}
     end
   end
 
@@ -212,9 +214,28 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
 
     case params[:audience] do
       nil -> base
+      # Audience is already validated in validate_and_sanitize_params
       audience when is_binary(audience) -> base <> "\n\nTarget Audience: " <> audience
     end
   end
+
+  # Validates and sanitizes input parameters to prevent security issues
+  defp validate_and_sanitize_params(params) do
+    with {:ok, _topic} <-
+           Security.validate_string(params[:topic], max_length: Security.max_input_length()),
+         {:ok, _validated} <- validate_audience_if_needed(params) do
+      {:ok, params}
+    else
+      {:error, :empty_string} -> {:error, :topic_required}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_audience_if_needed(%{audience: audience}) when is_binary(audience) do
+    Security.validate_string(audience, max_length: 1000)
+  end
+
+  defp validate_audience_if_needed(_params), do: {:ok, nil}
 
   defp build_opts(params) do
     opts = [

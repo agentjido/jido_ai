@@ -67,14 +67,52 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListToolsTest do
   end
 
   describe "tool structure" do
-    test "returns tools with name, type, and module" do
+    test "returns tools with name and type (module excluded for security)" do
       assert {:ok, result} = ListTools.run(%{}, %{})
 
       Enum.each(result.tools, fn tool ->
         assert Map.has_key?(tool, :name)
         assert Map.has_key?(tool, :type)
-        assert Map.has_key?(tool, :module)
+        # Module is excluded for security - don't expose internal structure
+        refute Map.has_key?(tool, :module)
         assert tool.type in [:action, :tool]
+      end)
+    end
+  end
+
+  describe "security features" do
+    test "excludes sensitive tools by default" do
+      assert {:ok, result} = ListTools.run(%{}, %{})
+
+      # Tools with sensitive keywords should be filtered out
+      tool_names = Enum.map(result.tools, fn tool -> String.downcase(tool.name) end)
+
+      # Check that no sensitive tool names are present
+      refute Enum.any?(tool_names, fn name ->
+        Enum.any?(
+          ["system", "admin", "config", "registry", "shell", "delete", "secret", "password", "token", "auth"],
+          fn keyword -> String.contains?(name, keyword) end
+        )
+      end)
+    end
+
+    test "includes sensitive_excluded flag in result" do
+      assert {:ok, result} = ListTools.run(%{}, %{})
+      # By default, sensitive tools should be excluded
+      assert result.sensitive_excluded == true
+    end
+
+    test "allows including sensitive tools when explicitly requested" do
+      assert {:ok, result} = ListTools.run(%{include_sensitive: true}, %{})
+      assert result.sensitive_excluded == false
+    end
+
+    test "respects allowed_tools allowlist" do
+      # When allowlist is provided, only those tools should be returned
+      assert {:ok, result} = ListTools.run(%{allowed_tools: ["test_tool"]}, %{})
+
+      Enum.each(result.tools, fn tool ->
+        assert tool.name == "test_tool"
       end)
     end
   end
