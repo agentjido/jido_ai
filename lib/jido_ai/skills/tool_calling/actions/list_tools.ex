@@ -49,33 +49,118 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
         required: false,
         default: true,
         doc: "Include tool schemas in result"
+      ],
+      include_sensitive: [
+        type: :boolean,
+        required: false,
+        default: false,
+        doc: "Include tools marked as sensitive (default: false)"
+      ],
+      allowed_tools: [
+        type: {:list, :string},
+        required: false,
+        doc: "Allowlist of tool names to include (all others excluded)"
       ]
     ]
 
   alias Jido.AI.Tools.Registry
+  alias Jido.AI.Security
 
   @doc """
   Executes the list tools action.
   """
   @impl Jido.Action
   def run(params, _context) do
-    Registry.ensure_started()
+    with {:ok, validated_params} <- validate_and_sanitize_params(params) do
+      Registry.ensure_started()
 
-    tools =
-      Registry.list_all()
-      |> filter_tools(params[:filter], params[:type])
-      |> format_tools(params[:include_schema] != false)
+      tools =
+        Registry.list_all()
+        |> filter_sensitive_tools(validated_params[:include_sensitive])
+        |> filter_by_allowlist(validated_params[:allowed_tools])
+        |> filter_tools(validated_params[:filter], validated_params[:type])
+        |> format_tools(validated_params[:include_schema] != false)
 
-    {:ok,
-     %{
-       tools: tools,
-       count: length(tools),
-       filter: params[:filter],
-       type: params[:type]
-     }}
+      {:ok,
+       %{
+         tools: tools,
+         count: length(tools),
+         filter: validated_params[:filter],
+         type: validated_params[:type],
+         sensitive_excluded: not (validated_params[:include_sensitive] == true)
+       }}
+    end
   end
 
   # Private Functions
+
+  defp validate_and_sanitize_params(params) do
+    with {:ok, _filter} <- validate_filter_if_present(params[:filter]),
+         {:ok, _allowed} <- validate_allowed_tools_if_present(params[:allowed_tools]) do
+      {:ok, params}
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_filter_if_present(nil), do: {:ok, nil}
+  defp validate_filter_if_present(filter) when is_binary(filter) do
+    Security.validate_string(filter, max_length: 1000, allow_empty: true)
+  end
+  defp validate_filter_if_present(_), do: {:error, :invalid_filter}
+
+  defp validate_allowed_tools_if_present(nil), do: {:ok, nil}
+  defp validate_allowed_tools_if_present(allowed) when is_list(allowed) do
+    if Enum.all?(allowed, &is_binary/1) do
+      {:ok, allowed}
+    else
+      {:error, :invalid_allowed_tools}
+    end
+  end
+  defp validate_allowed_tools_if_present(_), do: {:error, :invalid_allowed_tools}
+
+  # Filter out sensitive tools unless explicitly requested
+  defp filter_sensitive_tools(tools, true), do: tools
+  defp filter_sensitive_tools(tools, _include_sensitive) when is_list(tools) do
+    Enum.filter(tools, fn {name, _type, _module} ->
+      not sensitive_tool?(name)
+    end)
+  end
+  defp filter_sensitive_tools(tools, _include_sensitive), do: tools
+
+  # Tools that should be excluded by default
+  defp sensitive_tool?(name) when is_binary(name) do
+    lower_name = String.downcase(name)
+
+    # Exclude tools that could expose system information
+    Enum.any?(
+      [
+        "system",
+        "admin",
+        "config",
+        "registry",
+        "exec",
+        "shell",
+        "file",
+        "delete",
+        "destroy",
+        "secret",
+        "password",
+        "token",
+        "auth"
+      ],
+      fn keyword -> String.contains?(lower_name, keyword) end
+    )
+  end
+
+  defp filter_by_allowlist(tools, nil), do: tools
+  defp filter_by_allowlist(tools, allowed_tools) when is_list(allowed_tools) do
+    allowed_set = MapSet.new(allowed_tools)
+
+    Enum.filter(tools, fn {name, _type, _module} ->
+      MapSet.member?(allowed_set, name)
+    end)
+  end
 
   defp filter_tools(tools, nil, nil), do: tools
   defp filter_tools(tools, filter, type), do: filter_tools(tools, filter, type, [])
@@ -97,8 +182,8 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
     Enum.map(tools, fn {name, type, module} ->
       base = %{
         name: name,
-        type: type,
-        module: module
+        type: type
+        # Module name excluded for security
       }
 
       if include_schema do

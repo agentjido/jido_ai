@@ -79,6 +79,7 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers
+  alias Jido.AI.Security
 
   @inference_prompt """
   You are an expert logical reasoner. Your task is to draw valid inferences from given premises.
@@ -113,8 +114,9 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
   @impl Jido.Action
   def run(params, _context) do
     with {:ok, model} <- resolve_model(params[:model]),
-         {:ok, messages} <- build_inference_messages(params),
-         opts = build_opts(params),
+         {:ok, validated_params} <- validate_and_sanitize_params(params),
+         {:ok, messages} <- build_inference_messages(validated_params),
+         opts = build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, opts) do
       {:ok, format_result(response, model)}
     end
@@ -142,9 +144,30 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
 
     case params[:context] do
       nil -> base
+      # Context is already validated in validate_and_sanitize_params
       context when is_binary(context) -> base <> "\n\nAdditional Context:\n" <> context
     end
   end
+
+  # Validates and sanitizes input parameters to prevent security issues
+  defp validate_and_sanitize_params(params) do
+    with {:ok, _premises} <-
+           Security.validate_string(params[:premises], max_length: Security.max_input_length()),
+         {:ok, _question} <-
+           Security.validate_string(params[:question], max_length: Security.max_input_length()),
+         {:ok, _validated} <- validate_context_if_needed(params) do
+      {:ok, params}
+    else
+      {:error, :empty_string} -> {:error, :premises_and_question_required}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_context_if_needed(%{context: context}) when is_binary(context) do
+    Security.validate_string(context, max_length: Security.max_input_length())
+  end
+
+  defp validate_context_if_needed(_params), do: {:ok, nil}
 
   defp build_opts(params) do
     opts = [

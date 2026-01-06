@@ -66,8 +66,9 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
       ]
     ]
 
-  alias Jido.AI.Config
   alias Jido.AI.Helpers
+  alias Jido.AI.Skills.BaseActionHelpers
+  alias Jido.AI.Security
 
   @doc """
   Executes the completion action.
@@ -91,73 +92,38 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
   """
   @impl Jido.Action
   def run(params, _context) do
-    with {:ok, model} <- resolve_model(params[:model]),
-         {:ok, messages} <- build_messages(params[:prompt]),
-         opts = build_opts(params),
+    with {:ok, validated_params} <- BaseActionHelpers.validate_and_sanitize_input(params),
+         {:ok, model} <- BaseActionHelpers.resolve_model(validated_params[:model], :fast),
+         {:ok, messages} <- build_messages(validated_params[:prompt]),
+         opts = BaseActionHelpers.build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, opts) do
       {:ok, format_result(response, model)}
+    else
+      {:error, reason} -> {:error, sanitize_error_for_user(reason)}
     end
   end
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Config.resolve_model(:fast)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Config.resolve_model(model)}
-  defp resolve_model(model) when is_binary(model), do: {:ok, model}
-
   defp build_messages(prompt) do
     Helpers.build_messages(prompt, [])
   end
 
-  defp build_opts(params) do
-    opts = [
-      max_tokens: params[:max_tokens],
-      temperature: params[:temperature]
-    ]
-
-    opts =
-      if params[:timeout] do
-        Keyword.put(opts, :receive_timeout, params[:timeout])
-      else
-        opts
-      end
-
-    opts
+  defp sanitize_error_for_user(error) when is_struct(error) do
+    Security.sanitize_error_message(error)
   end
+
+  defp sanitize_error_for_user(error) when is_atom(error) do
+    Security.sanitize_error_message(error)
+  end
+
+  defp sanitize_error_for_user(_error), do: "An error occurred"
 
   defp format_result(response, model) do
     %{
-      text: extract_text(response),
+      text: BaseActionHelpers.extract_text(response),
       model: model,
-      usage: extract_usage(response)
+      usage: BaseActionHelpers.extract_usage(response)
     }
   end
-
-  defp extract_text(%{message: %{content: content}}) when is_binary(content), do: content
-
-  defp extract_text(%{message: %{content: content}}) when is_list(content) do
-    content
-    |> Enum.filter(fn part ->
-      case part do
-        %{type: :text} -> true
-        _ -> false
-      end
-    end)
-    |> Enum.map_join("", fn
-      %{text: text} -> text
-      _ -> ""
-    end)
-  end
-
-  defp extract_text(_), do: ""
-
-  defp extract_usage(%{usage: usage}) when is_map(usage) do
-    %{
-      input_tokens: Map.get(usage, :input_tokens, 0),
-      output_tokens: Map.get(usage, :output_tokens, 0),
-      total_tokens: Map.get(usage, :total_tokens, 0)
-    }
-  end
-
-  defp extract_usage(_), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
 end

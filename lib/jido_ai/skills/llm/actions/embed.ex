@@ -78,6 +78,9 @@ defmodule Jido.AI.Skills.LLM.Actions.Embed do
       ]
     ]
 
+  alias Jido.AI.Skills.BaseActionHelpers
+  alias Jido.AI.Security
+
   @doc """
   Executes the embedding action.
 
@@ -88,16 +91,50 @@ defmodule Jido.AI.Skills.LLM.Actions.Embed do
   """
   @impl Jido.Action
   def run(params, _context) do
-    model = params[:model]
-    texts = normalize_texts(params[:texts], params[:texts_list])
-    opts = build_opts(params)
-
-    with {:ok, response} <- ReqLLM.Embedding.embed(model, texts, opts) do
+    with {:ok, _validated} <- validate_and_sanitize_params(params),
+         model = params[:model],
+         texts = normalize_texts(params[:texts], params[:texts_list]),
+         opts = build_opts(params),
+         {:ok, response} <- ReqLLM.Embedding.embed(model, texts, opts) do
       {:ok, format_result(response, model)}
+    else
+      {:error, reason} -> {:error, sanitize_error_for_user(reason)}
     end
   end
 
   # Private Functions
+
+  defp validate_and_sanitize_params(params) do
+    with {:ok, _model} <- Security.validate_string(params[:model], max_length: 1000),
+         {:ok, _validated} <- validate_texts(params) do
+      {:ok, params}
+    else
+      {:error, :empty_string} -> {:error, :model_required}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_texts(%{texts: text}) when is_binary(text), do: Security.validate_string(text, max_length: Security.max_input_length())
+  defp validate_texts(%{texts_list: texts_list}) when is_list(texts_list) do
+    # Validate each text in the list
+    Enum.reduce_while(texts_list, {:ok, nil}, fn text, _acc ->
+      case Security.validate_string(text, max_length: Security.max_input_length()) do
+        {:ok, _} -> {:cont, {:ok, nil}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+  defp validate_texts(_params), do: {:error, :texts_required}
+
+  defp sanitize_error_for_user(error) when is_struct(error) do
+    Security.sanitize_error_message(error)
+  end
+
+  defp sanitize_error_for_user(error) when is_atom(error) do
+    Security.sanitize_error_message(error)
+  end
+
+  defp sanitize_error_for_user(_error), do: "An error occurred"
 
   defp normalize_texts(text, nil) when is_binary(text), do: [text]
   defp normalize_texts(nil, texts_list) when is_list(texts_list), do: texts_list

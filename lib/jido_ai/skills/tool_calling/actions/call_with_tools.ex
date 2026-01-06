@@ -91,22 +91,23 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
       ]
     ]
 
-  alias Jido.AI.{Config, Helpers, Tools}
+  alias Jido.AI.{Config, Helpers, Security, Tools}
 
   @doc """
   Executes the call with tools action.
   """
   @impl Jido.Action
   def run(params, _context) do
-    with {:ok, model} <- resolve_model(params[:model]),
-         {:ok, messages} <- build_messages(params[:prompt], params[:system_prompt]),
-         tools <- get_tools(params[:tools]),
-         opts <- build_opts(params),
+    with {:ok, validated_params} <- validate_and_sanitize_params(params),
+         {:ok, model} <- resolve_model(validated_params[:model]),
+         {:ok, messages} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         tools <- get_tools(validated_params[:tools]),
+         opts <- build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, Keyword.put(opts, :tools, tools)) do
       result = classify_and_format_response(response, model)
 
-      if params[:auto_execute] && result.type == :tool_calls do
-        execute_tool_turns(result, messages, model, params, 1)
+      if validated_params[:auto_execute] && result.type == :tool_calls do
+        execute_tool_turns(result, messages, model, validated_params, 1)
       else
         {:ok, result}
       end
@@ -187,7 +188,8 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
 
   # Multi-turn execution for auto_execute
   defp execute_tool_turns(result, messages, model, params, turn) do
-    max_turns = params[:max_turns] || 10
+    # Use validated max_turns from params (already sanitized with hard limit)
+    max_turns = params[:max_turns]
 
     if turn > max_turns do
       {:ok, Map.put(result, :reason, :max_turns_reached)}
@@ -204,6 +206,25 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
       end
     end
   end
+
+  # Validates and sanitizes input parameters to prevent security issues
+  defp validate_and_sanitize_params(params) do
+    with {:ok, _prompt} <-
+           Security.validate_string(params[:prompt], max_length: Security.max_input_length()),
+         {:ok, _validated} <- validate_system_prompt_if_needed(params),
+         {:ok, max_turns} <- Security.validate_max_turns(params[:max_turns] || 10) do
+      {:ok, Map.put(params, :max_turns, max_turns)}
+    else
+      {:error, :empty_string} -> {:error, :prompt_required}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_system_prompt_if_needed(%{system_prompt: system_prompt}) when is_binary(system_prompt) do
+    Security.validate_string(system_prompt, max_length: Security.max_prompt_length())
+  end
+
+  defp validate_system_prompt_if_needed(_params), do: {:ok, nil}
 
   defp execute_tools_and_continue(tool_calls, messages, model, params) do
     # Execute all tool calls

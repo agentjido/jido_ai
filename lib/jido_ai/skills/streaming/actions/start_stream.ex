@@ -100,6 +100,7 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers
+  alias Jido.AI.Security
 
   @doc """
   Executes the start stream action.
@@ -120,20 +121,21 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
   """
   @impl Jido.Action
   def run(params, _context) do
-    with {:ok, model} <- resolve_model(params[:model]),
-         {:ok, messages} <- build_messages(params[:prompt], params[:system_prompt]),
-         stream_id <- generate_stream_id(),
-         opts <- build_opts(params),
+    with {:ok, validated_params} <- validate_and_sanitize_params(params),
+         {:ok, model} <- resolve_model(validated_params[:model]),
+         {:ok, messages} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         {:ok, stream_id} <- Security.generate_stream_id() |> Security.validate_stream_id(),
+         opts <- build_opts(validated_params),
          {:ok, stream_response} <- ReqLLM.stream_text(model, messages, opts) do
       # Start background task to process the stream
-      start_stream_processor(stream_id, stream_response, params)
+      start_stream_processor(stream_id, stream_response, validated_params)
 
       {:ok,
        %{
          stream_id: stream_id,
          model: model,
          status: :streaming,
-         buffered: params[:buffer] || false
+         buffered: validated_params[:buffer] || false
        }}
     end
   end
@@ -169,11 +171,30 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
     opts
   end
 
-  defp generate_stream_id do
-    :crypto.strong_rand_bytes(16)
-    |> Base.encode64()
-    |> binary_part(0, 16)
+  # Validates and sanitizes input parameters to prevent security issues
+  defp validate_and_sanitize_params(params) do
+    with {:ok, _prompt} <-
+           Security.validate_string(params[:prompt], max_length: Security.max_input_length()),
+         {:ok, _validated} <- validate_system_prompt_if_needed(params),
+         {:ok, validated_callback} <- validate_callback_if_needed(params) do
+      {:ok, Map.put(params, :on_token, validated_callback)}
+    else
+      {:error, :empty_string} -> {:error, :prompt_required}
+      {:error, reason} -> {:error, reason}
+    end
   end
+
+  defp validate_system_prompt_if_needed(%{system_prompt: system_prompt}) when is_binary(system_prompt) do
+    Security.validate_string(system_prompt, max_length: Security.max_prompt_length())
+  end
+
+  defp validate_system_prompt_if_needed(_params), do: {:ok, nil}
+
+  defp validate_callback_if_needed(%{on_token: on_token}) when is_function(on_token) do
+    Security.validate_and_wrap_callback(on_token, timeout: Security.callback_timeout())
+  end
+
+  defp validate_callback_if_needed(_params), do: {:ok, nil}
 
   defp start_stream_processor(stream_id, stream_response, params) do
     on_token = params[:on_token]
@@ -217,6 +238,7 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
   defp handle_token(_stream_id, _chunk, nil, _buffer_ref), do: :ok
 
   defp handle_token(_stream_id, chunk, on_token, nil) when is_function(on_token, 1) do
+    # Callback is already wrapped with timeout protection by Security.validate_and_wrap_callback
     try do
       on_token.(chunk)
     catch
@@ -228,7 +250,7 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
     # Store in buffer
     :ets.insert(buffer_ref, {stream_id, chunk})
 
-    # Also call on_token if provided
+    # Also call on_token if provided (already validated and wrapped)
     if on_token && is_function(on_token, 1) do
       try do
         on_token.(chunk)
