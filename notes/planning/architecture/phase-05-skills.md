@@ -156,54 +156,54 @@ Implement the planning skill for goal decomposition and planning.
 
 Create the planning skill module.
 
-- [ ] 5.3.1.1 Create `lib/jido_ai/skills/planning_skill.ex` with module documentation
-- [ ] 5.3.1.2 Use `Jido.Skill` with name, state_key, and actions
-- [ ] 5.3.1.3 Define schema with planning_model, max_steps fields
-- [ ] 5.3.1.4 List actions: Plan, Decompose, Prioritize
+- [x] 5.3.1.1 Create `lib/jido_ai/skills/planning_skill.ex` with module documentation
+- [x] 5.3.1.2 Use `Jido.Skill` with name, state_key, and actions
+- [x] 5.3.1.3 Define schema with planning_model, max_steps fields
+- [x] 5.3.1.4 List actions: Plan, Decompose, Prioritize
 
 ### 5.3.2 Mount Callback
 
 Implement skill mounting.
 
-- [ ] 5.3.2.1 Implement `mount/2` callback
-- [ ] 5.3.2.2 Configure planning model
-- [ ] 5.3.2.3 Initialize plan state
+- [x] 5.3.2.1 Implement `mount/2` callback
+- [x] 5.3.2.2 Configure planning model
+- [x] 5.3.2.3 Initialize plan state
 
 ### 5.3.3 Plan Action
 
 Implement planning action.
 
-- [ ] 5.3.3.1 Create Plan action module
-- [ ] 5.3.3.2 Accept goal, constraints, resources parameters
-- [ ] 5.3.3.3 Generate structured plan with steps
-- [ ] 5.3.3.4 Return plan with dependencies
+- [x] 5.3.3.1 Create Plan action module
+- [x] 5.3.3.2 Accept goal, constraints, resources parameters
+- [x] 5.3.3.3 Generate structured plan with steps
+- [x] 5.3.3.4 Return plan with dependencies
 
 ### 5.3.4 Decompose Action
 
 Implement goal decomposition action.
 
-- [ ] 5.3.4.1 Create Decompose action module
-- [ ] 5.3.4.2 Accept goal, max_depth parameters
-- [ ] 5.3.4.3 Break goal into sub-goals
-- [ ] 5.3.4.4 Return hierarchical goal structure
+- [x] 5.3.4.1 Create Decompose action module
+- [x] 5.3.4.2 Accept goal, max_depth parameters
+- [x] 5.3.4.3 Break goal into sub-goals
+- [x] 5.3.4.4 Return hierarchical goal structure
 
 ### 5.3.5 Prioritize Action
 
 Implement task prioritization action.
 
-- [ ] 5.3.5.1 Create Prioritize action module
-- [ ] 5.3.5.2 Accept tasks, criteria parameters
-- [ ] 5.3.5.3 Order tasks by priority
-- [ ] 5.3.5.4 Return ordered task list with scores
+- [x] 5.3.5.1 Create Prioritize action module
+- [x] 5.3.5.2 Accept tasks, criteria parameters
+- [x] 5.3.5.3 Order tasks by priority
+- [x] 5.3.5.4 Return ordered task list with scores
 
 ### 5.3.6 Unit Tests for Planning Skill
 
-- [ ] Test mount/2 configures planning model
-- [ ] Test Plan action returns structured plan
-- [ ] Test Decompose action breaks down goals
-- [ ] Test Prioritize action orders tasks
-- [ ] Test max_steps limit respected
-- [ ] Test error handling
+- [x] Test mount/2 configures planning model
+- [x] Test Plan action returns structured plan
+- [x] Test Decompose action breaks down goals
+- [x] Test Prioritize action orders tasks
+- [x] Test max_steps limit respected
+- [x] Test error handling
 
 ---
 

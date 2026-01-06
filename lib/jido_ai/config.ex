@@ -24,7 +24,8 @@ defmodule Jido.AI.Config do
         model_aliases: %{
           fast: "anthropic:claude-haiku-4-5",
           capable: "anthropic:claude-sonnet-4-20250514",
-          reasoning: "anthropic:claude-sonnet-4-20250514"
+          reasoning: "anthropic:claude-sonnet-4-20250514",
+          planning: "anthropic:claude-sonnet-4-20250514"
         },
         defaults: %{
           temperature: 0.7,
@@ -51,7 +52,7 @@ defmodule Jido.AI.Config do
   """
 
   @type provider :: :openai | :anthropic | :google | :ollama | atom()
-  @type model_alias :: :fast | :capable | :reasoning | atom()
+  @type model_alias :: :fast | :capable | :reasoning | :planning | atom()
   @type model_spec :: String.t()
   @type provider_config :: keyword()
 
@@ -59,7 +60,8 @@ defmodule Jido.AI.Config do
   @default_aliases %{
     fast: "anthropic:claude-haiku-4-5",
     capable: "anthropic:claude-sonnet-4-20250514",
-    reasoning: "anthropic:claude-sonnet-4-20250514"
+    reasoning: "anthropic:claude-sonnet-4-20250514",
+    planning: "anthropic:claude-sonnet-4-20250514"
   }
 
   # Default settings
