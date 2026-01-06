@@ -215,54 +215,54 @@ Implement the streaming skill for real-time response handling.
 
 Create the streaming skill module.
 
-- [ ] 5.4.1.1 Create `lib/jido_ai/skills/streaming_skill.ex` with module documentation
-- [ ] 5.4.1.2 Use `Jido.Skill` with name, state_key, and actions
-- [ ] 5.4.1.3 Define schema with buffer_size, on_token fields
-- [ ] 5.4.1.4 List actions: StartStream, ProcessTokens, EndStream
+- [x] 5.4.1.1 Create `lib/jido_ai/skills/streaming.ex` with module documentation
+- [x] 5.4.1.2 Use `Jido.Skill` with name, state_key, and actions
+- [x] 5.4.1.3 Define schema with buffer_size, on_token fields
+- [x] 5.4.1.4 List actions: StartStream, ProcessTokens, EndStream
 
 ### 5.4.2 Mount Callback
 
 Implement skill mounting.
 
-- [ ] 5.4.2.1 Implement `mount/2` callback
-- [ ] 5.4.2.2 Configure token buffer
-- [ ] 5.4.2.3 Set up token callback
+- [x] 5.4.2.1 Implement `mount/2` callback
+- [x] 5.4.2.2 Configure token buffer
+- [x] 5.4.2.3 Set up token callback
 
 ### 5.4.3 StartStream Action
 
 Implement stream start action.
 
-- [ ] 5.4.3.1 Create StartStream action module
-- [ ] 5.4.3.2 Accept prompt, model parameters
-- [ ] 5.4.3.3 Call `ReqLLM.stream_text/3` directly
-- [ ] 5.4.3.4 Return stream handle
+- [x] 5.4.3.1 Create StartStream action module
+- [x] 5.4.3.2 Accept prompt, model parameters
+- [x] 5.4.3.3 Call `ReqLLM.stream_text/3` directly
+- [x] 5.4.3.4 Return stream handle
 
 ### 5.4.4 ProcessTokens Action
 
 Implement token processing action.
 
-- [ ] 5.4.4.1 Create ProcessTokens action module
-- [ ] 5.4.4.2 Accept stream_handle, callback parameters
-- [ ] 5.4.4.3 Iterate over token stream
-- [ ] 5.4.4.4 Invoke callback for each token
+- [x] 5.4.4.1 Create ProcessTokens action module
+- [x] 5.4.4.2 Accept stream_handle, callback parameters
+- [x] 5.4.4.3 Iterate over token stream
+- [x] 5.4.4.4 Invoke callback for each token
 
 ### 5.4.5 EndStream Action
 
 Implement stream end action.
 
-- [ ] 5.4.5.1 Create EndStream action module
-- [ ] 5.4.5.2 Accept stream_handle parameter
-- [ ] 5.4.5.3 Collect final usage/metadata
-- [ ] 5.4.5.4 Return complete response
+- [x] 5.4.5.1 Create EndStream action module
+- [x] 5.4.5.2 Accept stream_handle parameter
+- [x] 5.4.5.3 Collect final usage/metadata
+- [x] 5.4.5.4 Return complete response
 
 ### 5.4.6 Unit Tests for Streaming Skill
 
-- [ ] Test mount/2 configures buffer
-- [ ] Test StartStream action initializes stream
-- [ ] Test ProcessTokens action invokes callbacks
-- [ ] Test EndStream action collects metadata
-- [ ] Test token buffering works correctly
-- [ ] Test error handling during streaming
+- [x] Test mount/2 configures buffer
+- [x] Test StartStream action initializes stream
+- [x] Test ProcessTokens action invokes callbacks
+- [x] Test EndStream action collects metadata
+- [x] Test token buffering works correctly
+- [x] Test error handling during streaming
 
 ---
 
