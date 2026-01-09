@@ -130,7 +130,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     # Extract options from prompt if available
     prompt_opts =
       case params[:prompt] do
-        %Prompt{options: options} when is_list(options) and length(options) > 0 ->
+        %Prompt{options: options} when is_list(options) and options != [] ->
           Map.new(options)
 
         _ ->
@@ -215,14 +215,80 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
   end
 
   defp convert_messages(prompt) do
+    # Convert all messages to ReqLLM format first
     messages =
       Prompt.render(prompt)
       |> Enum.map(fn msg ->
-        %{role: msg.role, content: msg.content}
+        # Convert content to ReqLLM format
+        content = convert_message_content(msg.content)
+
+        case msg.role do
+          :system -> ReqLLM.Context.system(content)
+          :user -> ReqLLM.Context.user(content)
+          :assistant -> ReqLLM.Context.assistant(content)
+          # Fallback for other roles - treat as user
+          _ -> ReqLLM.Context.user(content)
+        end
       end)
 
-    {:ok, messages}
+    # Create context from messages
+    context = ReqLLM.Context.new(messages)
+    {:ok, context}
   end
+
+  # Convert message content to ReqLLM format
+  # For multimodal content (list), convert each part to ContentPart
+  defp convert_message_content(content) when is_list(content) do
+    Enum.map(content, &convert_content_part/1)
+  end
+
+  # For simple string content, return as-is
+  defp convert_message_content(content) when is_binary(content), do: content
+
+  # For other content types, try to convert
+  defp convert_message_content(content), do: content
+
+  # Convert individual content parts to ReqLLM ContentPart format
+  defp convert_content_part(%{type: :text, text: text}) do
+    ReqLLM.Message.ContentPart.text(text)
+  end
+
+  defp convert_content_part(%{type: :image_url, image_url: "data:" <> _ = data_url}) do
+    # Parse data URL: "data:image/png;base64,..."
+    case parse_data_url(data_url) do
+      {:ok, binary, mime_type} ->
+        ReqLLM.Message.ContentPart.image(binary, mime_type)
+
+      {:error, _reason} ->
+        # If parsing fails, log and return as-is (will likely fail later)
+        Logger.warning("Failed to parse image data URL, returning as-is")
+        %{"type" => "image_url", "image_url" => %{"url" => data_url}}
+    end
+  end
+
+  defp convert_content_part(%{type: :image_url, image_url: url}) do
+    # Handle network URL (http/https)
+    ReqLLM.Message.ContentPart.image_url(url)
+  end
+
+  # Fallback for other content types
+  defp convert_content_part(other), do: other
+
+  # Parse data URL format: "data:mime/type;base64,encoded_data"
+  defp parse_data_url("data:" <> rest) do
+    case String.split(rest, ";base64,", parts: 2) do
+      [mime_type, base64_data] ->
+        case Base.decode64(base64_data) do
+          {:ok, binary} -> {:ok, binary, mime_type}
+          :error -> {:error, :invalid_base64}
+        end
+
+      _ ->
+        {:error, :invalid_format}
+    end
+  end
+
+  defp parse_data_url(_), do: {:error, :not_data_url}
 
   defp build_req_llm_options(_model, params) do
     # Build base options
@@ -238,7 +304,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     # Add tools if provided
     opts_with_tools =
       case params[:tools] do
-        tools when is_list(tools) and length(tools) > 0 ->
+        tools when is_list(tools) and tools != [] ->
           # Convert tools directly to ReqLLM format
           tool_specs =
             Enum.map(tools, fn tool ->
@@ -295,6 +361,12 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
       {:error, error} ->
         {:error, error}
     end
+  end
+
+  defp format_response(%ReqLLM.Response{} = response) do
+    # Use ReqLLM.Response.text/1 to extract content
+    content = ReqLLM.Response.text(response) || ""
+    {:ok, %{content: content, tool_results: []}}
   end
 
   defp format_response(%{content: content, tool_calls: tool_calls}) when is_list(tool_calls) do

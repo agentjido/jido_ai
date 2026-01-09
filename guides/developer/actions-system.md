@@ -146,6 +146,45 @@ Enum.each(stream, fn chunk ->
 end)
 ```
 
+### Multimodal Support (Images)
+
+The ChatCompletion action supports multimodal inputs, allowing you to send images alongside text. You can provide images either as Base64-encoded Data URLs or as remote HTTP/HTTPS URLs.
+
+```elixir
+alias Jido.AI.Prompt.MessageItem
+
+# Method 1: Base64 Encoded Image (Recommended for local files)
+# Read image file
+image_binary = File.read!("path/to/image.png")
+base64_data = Base.encode64(image_binary)
+# Create Data URL (supports image/png, image/jpeg, image/webp, image/gif)
+image_data_url = "data:image/png;base64,#{base64_data}"
+
+# Create multimodal message
+message = MessageItem.new_multipart(:user, [
+  MessageItem.text_part("Describe this image"),
+  MessageItem.image_part(image_data_url)
+])
+
+# Create prompt with the message
+prompt = Jido.AI.Prompt.new(%{messages: [message]})
+
+# Run action
+{:ok, result} = ChatCompletion.run(%{
+  model: model, # Ensure model supports vision (e.g., gpt-4o, claude-3-5-sonnet)
+  prompt: prompt
+}, %{})
+
+# Method 2: Remote Image URL
+message = MessageItem.new_multipart(:user, [
+  MessageItem.text_part("Describe this image"),
+  MessageItem.image_part("https://example.com/image.png")
+])
+
+prompt = Jido.AI.Prompt.new(%{messages: [message]})
+{:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+```
+
 ### Implementation Flow
 
 ```mermaid

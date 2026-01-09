@@ -100,11 +100,20 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
       model = {:openai, [model: "gpt-4"]}
       prompt = Prompt.new(:user, "Hello world")
 
-      expect_generate_text(fn _model, messages, _opts ->
+      expect_generate_text(fn _model, context, _opts ->
+        # Context is a struct, we need to get messages from it
+        # Based on #Context<1 msgs...>, it likely has a messages field
+        messages = context.messages
         assert length(messages) == 1
         [message] = messages
         assert message.role == :user
-        assert message.content == "Hello world"
+        # assert message.content == "Hello world"
+        # Content is converted to a list of ContentPart structs
+        assert is_list(message.content)
+        [content_part] = message.content
+        assert content_part.type == :text
+        assert content_part.text == "Hello world"
+
         {:ok, mock_chat_response("Hi!")}
       end)
 
@@ -453,6 +462,119 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
       assert length(result.tool_results) == 1
       [tool] = result.tool_results
       assert tool.name == "test_tool"
+    end
+  end
+
+  describe "multimodal support" do
+    test "handles base64 image content" do
+      model = {:openai, [model: "gpt-4-vision-preview"]}
+
+      # Construct multimodal message
+      image_data =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+
+      messages = [
+        %{
+          role: :user,
+          content: [
+            %{type: :text, text: "Describe this image"},
+            %{type: :image_url, image_url: image_data}
+          ]
+        }
+      ]
+
+      prompt = Prompt.new(%{messages: messages})
+
+      expect_generate_text(fn _model, context, _opts ->
+        messages = context.messages
+        [message] = messages
+        # ReqLLM.Context.user returns struct, we need to inspect its content
+        assert is_list(message.content)
+        assert length(message.content) == 2
+
+        [text_part, image_part] = message.content
+
+        # Verify text part
+        assert match?(%ReqLLM.Message.ContentPart{type: :text}, text_part)
+
+        # Verify image part (base64 converted to binary)
+        assert match?(%ReqLLM.Message.ContentPart{type: :image}, image_part)
+
+        assert is_binary(image_part.data)
+        assert image_part.media_type == "image/png"
+
+        {:ok, mock_chat_response("It's a red dot")}
+      end)
+
+      {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+      assert result.content == "It's a red dot"
+    end
+
+    test "handles network image url" do
+      model = {:openai, [model: "gpt-4-vision-preview"]}
+
+      image_url = "https://picsum.photos/id/237/200/300"
+
+      messages = [
+        %{
+          role: :user,
+          content: [
+            %{type: :text, text: "Describe this image"},
+            %{type: :image_url, image_url: image_url}
+          ]
+        }
+      ]
+
+      prompt = Prompt.new(%{messages: messages})
+
+      expect_generate_text(fn _model, context, _opts ->
+        messages = context.messages
+        [message] = messages
+        [_, image_part] = message.content
+
+        # Verify image url part
+        assert match?(%ReqLLM.Message.ContentPart{type: :image_url}, image_part)
+        # IO.inspect(image_part, label: "IMAGE_URL_PART_DEBUG", structs: false)
+        assert image_part.url == image_url
+
+        {:ok, mock_chat_response("It's an example image")}
+      end)
+
+      {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+      assert result.content == "It's an example image"
+    end
+
+    test "handles invalid base64 gracefully" do
+      model = {:openai, [model: "gpt-4-vision-preview"]}
+
+      # Invalid data url
+      invalid_data = "data:image/png;base64,invalid-base64"
+
+      messages = [
+        %{
+          role: :user,
+          content: [
+            %{type: :image_url, image_url: invalid_data}
+          ]
+        }
+      ]
+
+      prompt = Prompt.new(%{messages: messages})
+
+      expect_generate_text(fn _model, context, _opts ->
+        messages = context.messages
+        [message] = messages
+        [part] = message.content
+
+        # Should return as map/original structure if parsing fails
+        assert is_map(part)
+        assert part["type"] == "image_url"
+        assert part["image_url"]["url"] == invalid_data
+
+        {:ok, mock_chat_response("Error processing image")}
+      end)
+
+      {:ok, _result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
     end
   end
 

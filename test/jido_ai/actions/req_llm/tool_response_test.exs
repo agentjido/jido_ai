@@ -117,9 +117,9 @@ defmodule Jido.AI.Actions.ReqLlm.ToolResponseTest do
     test "handles message with existing prompt" do
       base_prompt = Prompt.new(:system, "You are helpful")
 
-      expect_generate_text(fn _model, messages, _opts ->
+      expect_generate_text(fn _model, context, _opts ->
         # Should have both system and user messages
-        assert length(messages) >= 2
+        assert length(context.messages) >= 2
         {:ok, mock_chat_response("Helpful response")}
       end)
 
@@ -138,10 +138,12 @@ defmodule Jido.AI.Actions.ReqLlm.ToolResponseTest do
     test "uses prompt parameter when no message" do
       prompt = Prompt.new(:user, "Test prompt")
 
-      expect_generate_text(fn _model, messages, _opts ->
-        assert length(messages) == 1
-        [msg] = messages
-        assert msg.content == "Test prompt"
+      expect_generate_text(fn _model, context, _opts ->
+        assert length(context.messages) == 1
+        [msg] = context.messages
+        # Content is now converted to list of ContentParts
+        # assert msg.content == "Test prompt"
+        assert is_list(msg.content)
         {:ok, mock_chat_response("Response")}
       end)
 

@@ -98,6 +98,9 @@ This is a major version release featuring a complete architectural shift from pr
 
 - **Troubleshooting Guide**: Comprehensive guide with common issues and solutions
 
+### Fixed
+- **Image Support**: Fixed and enhanced support for Base64 data URLs and remote image URLs in `ReqLLM` chat completion action.
+
 ### Changed
 
 #### Provider System
