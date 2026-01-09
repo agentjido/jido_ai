@@ -1,0 +1,266 @@
+Here’s a concrete `jido-memory-core.ttl` you can drop into a repo as-is and tweak IRIs later as needed.
+
+```turtle
+@prefix jmem:  <https://w3id.org/jido/memory/core#> .
+@prefix prov:  <http://www.w3.org/ns/prov#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+
+#################################################################
+# Ontology header
+#################################################################
+
+<https://w3id.org/jido/memory/core>
+    a owl:Ontology ;
+    rdfs:label "Jido Memory Core Ontology"@en ;
+    rdfs:comment "Core schema for fact-store memory in Jido/JidoAi. Defines facts, contexts, entities, and sources for structured LLM memory."@en ;
+    owl:versionInfo "0.1.0" .
+
+#################################################################
+# Core Classes
+#################################################################
+
+### Facts & Claims ################################################
+
+jmem:Fact
+    a owl:Class ;
+    rdfs:label "Fact"@en ;
+    rdfs:comment "An atomic unit of rememberable information stored in memory."@en .
+
+jmem:Claim
+    a owl:Class ;
+    rdfs:subClassOf jmem:Fact ;
+    rdfs:label "Claim"@en ;
+    rdfs:comment "A fact expressed as a proposition, usually in natural language."@en .
+
+jmem:DerivedFact
+    a owl:Class ;
+    rdfs:subClassOf jmem:Fact ;
+    rdfs:label "Derived fact"@en ;
+    rdfs:comment "A fact inferred or derived from other facts or reasoning steps."@en .
+
+jmem:PlanStepFact
+    a owl:Class ;
+    rdfs:subClassOf jmem:Fact ;
+    rdfs:label "Plan step fact"@en ;
+    rdfs:comment "A fact representing a step, milestone, or decision in a plan."@en .
+
+jmem:UserPreference
+    a owl:Class ;
+    rdfs:subClassOf jmem:Fact ;
+    rdfs:label "User preference"@en ;
+    rdfs:comment "A fact describing a user's preference, habit, or stable choice."@en .
+
+jmem:ConstraintFact
+    a owl:Class ;
+    rdfs:subClassOf jmem:Fact ;
+    rdfs:label "Constraint fact"@en ;
+    rdfs:comment "A fact expressing a constraint, rule, or limitation relevant to a task or session."@en .
+
+jmem:ToolResultFact
+    a owl:Class ;
+    rdfs:subClassOf jmem:Fact ;
+    rdfs:label "Tool result fact"@en ;
+    rdfs:comment "A fact summarizing the result of a tool invocation (e.g., file read, HTTP call, DB query)."@en .
+
+
+### Entities & Contexts ###########################################
+
+jmem:Entity
+    a owl:Class ;
+    rdfs:label "Entity"@en ;
+    rdfs:comment "Any thing a fact can be about (user, project, file, module, concept, etc.). Typically aligned with domain ontologies."@en .
+
+jmem:MemoryContext
+    a owl:Class ;
+    rdfs:label "Memory context"@en ;
+    rdfs:comment "A scope or situation in which facts are considered valid or relevant (global, session, task, turn, etc.)."@en .
+
+jmem:GlobalContext
+    a owl:Class ;
+    rdfs:subClassOf jmem:MemoryContext ;
+    rdfs:label "Global context"@en ;
+    rdfs:comment "Context for long-term, cross-session facts (e.g., stable user preferences, identities)."@en .
+
+jmem:SessionContext
+    a owl:Class ;
+    rdfs:subClassOf jmem:MemoryContext ;
+    rdfs:label "Session context"@en ;
+    rdfs:comment "Context for a specific interactive session or work-session."@en .
+
+jmem:TaskContext
+    a owl:Class ;
+    rdfs:subClassOf jmem:MemoryContext ;
+    rdfs:label "Task context"@en ;
+    rdfs:comment "Context for a specific task, goal, or sub-problem within a session."@en .
+
+jmem:TurnContext
+    a owl:Class ;
+    rdfs:subClassOf jmem:MemoryContext ;
+    rdfs:label "Turn context"@en ;
+    rdfs:comment "Short-lived context for a single interaction turn, usually for intermediate/ephemeral facts."@en .
+
+
+### Sources & Provenance ##########################################
+
+jmem:Source
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "Source"@en ;
+    rdfs:comment "A source from which a fact was obtained (utterance, document, tool call, agent inference, etc.)."@en .
+
+jmem:UserUtterance
+    a owl:Class ;
+    rdfs:subClassOf jmem:Source ;
+    rdfs:label "User utterance"@en ;
+    rdfs:comment "A source representing a user message or group of user messages."@en .
+
+jmem:ToolInvocation
+    a owl:Class ;
+    rdfs:subClassOf jmem:Source , prov:Activity ;
+    rdfs:label "Tool invocation"@en ;
+    rdfs:comment "A source representing the execution of a tool or external system call."@en .
+
+jmem:DocumentSource
+    a owl:Class ;
+    rdfs:subClassOf jmem:Source ;
+    rdfs:label "Document source"@en ;
+    rdfs:comment "A source representing an external document, file, web page, or repository artifact."@en .
+
+jmem:AgentInference
+    a owl:Class ;
+    rdfs:subClassOf jmem:Source , prov:Activity ;
+    rdfs:label "Agent inference"@en ;
+    rdfs:comment "A source representing reasoning or summarization performed by an agent or model."@en .
+
+#################################################################
+# Object Properties
+#################################################################
+
+jmem:aboutEntity
+    a owl:ObjectProperty ;
+    rdfs:label "about entity"@en ;
+    rdfs:comment "Relates a fact to an entity it is about."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  jmem:Entity .
+
+jmem:inContext
+    a owl:ObjectProperty ;
+    rdfs:label "in context"@en ;
+    rdfs:comment "Relates a fact to the memory context (scope) in which it is valid or relevant."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  jmem:MemoryContext .
+
+jmem:hasSource
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:wasDerivedFrom ;
+    rdfs:label "has source"@en ;
+    rdfs:comment "Relates a fact to the source from which it was obtained."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  jmem:Source .
+
+jmem:supportedBy
+    a owl:ObjectProperty ;
+    rdfs:label "supported by"@en ;
+    rdfs:comment "Relates a fact to other facts that support or provide evidence for it."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  jmem:Fact .
+
+jmem:contradictedBy
+    a owl:ObjectProperty ;
+    rdfs:label "contradicted by"@en ;
+    rdfs:comment "Relates a fact to other facts that contradict it."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  jmem:Fact .
+
+jmem:derivedFrom
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:wasDerivedFrom ;
+    rdfs:label "derived from"@en ;
+    rdfs:comment "Relates a derived fact to the facts it was derived from."@en ;
+    rdfs:domain jmem:DerivedFact ;
+    rdfs:range  jmem:Fact .
+
+#################################################################
+# Data Properties
+#################################################################
+
+jmem:statementText
+    a owl:DatatypeProperty ;
+    rdfs:label "statement text"@en ;
+    rdfs:comment "Human-readable text expressing the content of a fact."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:string .
+
+jmem:normalizedForm
+    a owl:DatatypeProperty ;
+    rdfs:label "normalized form"@en ;
+    rdfs:comment "Canonical or normalized representation of a fact's content (e.g., for deduplication)."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:string .
+
+jmem:confidence
+    a owl:DatatypeProperty ;
+    rdfs:label "confidence"@en ;
+    rdfs:comment "Model or system confidence in the correctness of a fact, in [0.0, 1.0]."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:decimal .
+
+jmem:salience
+    a owl:DatatypeProperty ;
+    rdfs:label "salience"@en ;
+    rdfs:comment "Importance or relevance of a fact for context selection, in [0.0, 1.0]."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:decimal .
+
+jmem:createdAt
+    a owl:DatatypeProperty ;
+    rdfs:label "created at"@en ;
+    rdfs:comment "Timestamp when the fact or context was created."@en ;
+    rdfs:domain [ a owl:Class ;
+                  owl:unionOf ( jmem:Fact jmem:MemoryContext jmem:Source ) ] ;
+    rdfs:range  xsd:dateTime .
+
+jmem:updatedAt
+    a owl:DatatypeProperty ;
+    rdfs:label "updated at"@en ;
+    rdfs:comment "Timestamp when the fact or context was last updated."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:dateTime .
+
+jmem:validFrom
+    a owl:DatatypeProperty ;
+    rdfs:label "valid from"@en ;
+    rdfs:comment "Start of the time interval during which the fact is considered valid."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:dateTime .
+
+jmem:validUntil
+    a owl:DatatypeProperty ;
+    rdfs:label "valid until"@en ;
+    rdfs:comment "End of the time interval during which the fact is considered valid (if applicable)."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:dateTime .
+
+jmem:status
+    a owl:DatatypeProperty ;
+    rdfs:label "status"@en ;
+    rdfs:comment "Lifecycle status of a fact (e.g., active, superseded, rejected, candidate)."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:string .
+
+jmem:language
+    a owl:DatatypeProperty ;
+    rdfs:label "language"@en ;
+    rdfs:comment "Language code of the statement text, if applicable."@en ;
+    rdfs:domain jmem:Fact ;
+    rdfs:range  xsd:language .
+```
+
+If you want, next step I can:
+
+* add a tiny **example graph** using this ontology in the same file (as a separate section), or
+* generate a matching `jido-memory-shapes.ttl` with SHACL shapes that validate `Fact`, `UserPreference`, and the context classes.
+
