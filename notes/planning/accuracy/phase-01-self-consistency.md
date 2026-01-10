@@ -174,72 +174,76 @@ Implement voting and selection strategies to pick the best candidate.
 
 Define the behavior for candidate aggregation.
 
-- [ ] 1.3.1.1 Create `lib/jido_ai/accuracy/aggregator.ex`
-- [ ] 1.3.1.2 Define `@moduledoc` with behavior documentation
-- [ ] 1.3.1.3 Define `@callback aggregate/2`:
+- [x] 1.3.1.1 Create `lib/jido_ai/accuracy/aggregator.ex`
+- [x] 1.3.1.2 Define `@moduledoc` with behavior documentation
+- [x] 1.3.1.3 Define `@callback aggregate/2`:
   ```elixir
   @callback aggregate(
     candidates :: [Jido.AI.Accuracy.Candidate.t()],
     opts :: keyword()
-  ) :: {:ok, Jido.AI.Accuracy.Candidate.t()} | {:error, term()}
+  ) :: {:ok, Jido.AI.Accuracy.Candidate.t(), metadata()} | {:error, term()}
   ```
-- [ ] 1.3.1.4 Document aggregation strategies in module docs
+- [x] 1.3.1.4 Document aggregation strategies in module docs
 
 ### 1.3.2 Majority Vote Aggregator
 
 Implement self-consistency through majority voting on final answers.
 
-- [ ] 1.3.2.1 Create `lib/jido_ai/accuracy/aggregators/majority_vote.ex`
-- [ ] 1.3.2.2 Add `@moduledoc` explaining majority voting approach
-- [ ] 1.3.2.3 Implement `extract_answer/1` to parse final answer
-- [ ] 1.3.2.4 Support common answer formats:
+- [x] 1.3.2.1 Create `lib/jido_ai/accuracy/aggregators/majority_vote.ex`
+- [x] 1.3.2.2 Add `@moduledoc` explaining majority voting approach
+- [x] 1.3.2.3 Implement `extract_answer/1` to parse final answer
+- [x] 1.3.2.4 Support common answer formats:
   - Final answer in quotes
   - "Answer:" prefix
-  - "Therefore" prefix
+  - "Therefore:" prefix
+  - "Thus:" prefix
+  - "So:" prefix
+  - "The answer is:" prefix
+  - "Result:" prefix
   - Last line as answer
-- [ ] 1.3.2.5 Implement `count_votes/1` for vote tallying
-- [ ] 1.3.2.6 Implement `aggregate/2` with tie-breaking logic
-- [ ] 1.3.2.7 Add support for fuzzy matching of similar answers
-- [ ] 1.3.2.8 Return vote confidence percentage
-- [ ] 1.3.2.9 Implement `vote_distribution/1` for analysis
+- [x] 1.3.2.5 Implement `count_votes/1` for vote tallying
+- [x] 1.3.2.6 Implement `aggregate/2` with tie-breaking logic
+- [x] 1.3.2.7 Add support for fuzzy matching of similar answers
+- [x] 1.3.2.8 Return vote confidence percentage
+- [x] 1.3.2.9 Implement `vote_distribution/1` for analysis
 
 ### 1.3.3 Best-of-N Aggregator
 
 Implement selection based on pre-assigned scores.
 
-- [ ] 1.3.3.1 Create `lib/jido_ai/accuracy/aggregators/best_of_n.ex`
-- [ ] 1.3.3.2 Add `@moduledoc` explaining best-of-N selection
-- [ ] 1.3.3.3 Implement `aggregate/2` to select max score
-- [ ] 1.3.3.4 Add confidence based on score distribution
-- [ ] 1.3.3.5 Handle ties with secondary criteria (token efficiency)
-- [ ] 1.3.3.6 Return score metadata with selected candidate
+- [x] 1.3.3.1 Create `lib/jido_ai/accuracy/aggregators/best_of_n.ex`
+- [x] 1.3.3.2 Add `@moduledoc` explaining best-of-N selection
+- [x] 1.3.3.3 Implement `aggregate/2` to select max score
+- [x] 1.3.3.4 Add confidence based on score distribution
+- [x] 1.3.3.5 Handle ties with secondary criteria (token efficiency, timestamp)
+- [x] 1.3.3.6 Return score metadata with selected candidate
 
 ### 1.3.4 Weighted Aggregator
 
 Combine multiple selection strategies with weights.
 
-- [ ] 1.3.4.1 Create `lib/jido_ai/accuracy/aggregators/weighted.ex`
-- [ ] 1.3.4.2 Add `@moduledoc` explaining weighted combination
-- [ ] 1.3.4.3 Implement `aggregate/3` with strategy weights
-- [ ] 1.3.4.4 Support dynamic weight adjustment
-- [ ] 1.3.4.5 Combine scores from multiple aggregators
-- [ ] 1.3.4.6 Normalize weights to sum to 1.0
+- [x] 1.3.4.1 Create `lib/jido_ai/accuracy/aggregators/weighted.ex`
+- [x] 1.3.4.2 Add `@moduledoc` explaining weighted combination
+- [x] 1.3.4.3 Implement `aggregate/2` with strategy weights
+- [x] 1.3.4.4 Support dynamic weight adjustment via opts
+- [x] 1.3.4.5 Combine scores from multiple aggregators
+- [x] 1.3.4.6 Normalize weights to sum to 1.0
 
 ### 1.3.5 Unit Tests for Aggregators
 
-- [ ] Test `MajorityVote.aggregate/2` selects majority answer
-- [ ] Test `MajorityVote.aggregate/2` handles ties correctly
-- [ ] Test `MajorityVote.aggregate/2` returns vote confidence
-- [ ] Test `MajorityVote.extract_answer/1` parses various formats
-- [ ] Test `MajorityVote` fuzzy matching works for similar answers
-- [ ] Test `BestOfN.aggregate/2` selects highest scored
-- [ ] Test `BestOfN.aggregate/2` handles equal scores
-- [ ] Test `BestOfN` uses token efficiency for tie-breaking
-- [ ] Test `Weighted.aggregate/3` combines strategies correctly
-- [ ] Test `Weighted` normalizes weights properly
-- [ ] Test edge case: empty candidate list
-- [ ] Test edge case: single candidate
-- [ ] Test vote distribution analysis
+- [x] Test `MajorityVote.aggregate/2` selects majority answer
+- [x] Test `MajorityVote.aggregate/2` handles ties correctly
+- [x] Test `MajorityVote.aggregate/2` returns vote confidence
+- [x] Test `MajorityVote.extract_answer/1` parses various formats
+- [x] Test `MajorityVote` fuzzy matching works for similar answers
+- [x] Test `BestOfN.aggregate/2` selects highest scored
+- [x] Test `BestOfN.aggregate/2` handles equal scores
+- [x] Test `BestOfN` uses token efficiency for tie-breaking
+- [x] Test `Weighted.aggregate/2` combines strategies correctly
+- [x] Test `Weighted` normalizes weights properly
+- [x] Test edge case: empty candidate list
+- [x] Test edge case: single candidate
+- [x] Test vote distribution analysis
 
 ---
 
