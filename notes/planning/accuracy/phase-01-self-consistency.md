@@ -44,8 +44,8 @@ Define the foundational types and behaviors for the accuracy improvement system.
 
 Define the structure for representing generated candidate responses.
 
-- [ ] 1.1.1.1 Create `lib/jido_ai/accuracy/candidate.ex`
-- [ ] 1.1.1.2 Define `defstruct` with fields:
+- [x] 1.1.1.1 Create `lib/jido_ai/accuracy/candidate.ex`
+- [x] 1.1.1.2 Define `defstruct` with fields:
   - `:id` - Unique identifier for this candidate (UUID)
   - `:content` - The generated response text
   - `:reasoning` - The reasoning trace (if applicable)
@@ -54,49 +54,49 @@ Define the structure for representing generated candidate responses.
   - `:model` - The model that generated this candidate
   - `:timestamp` - When this candidate was generated
   - `:metadata` - Additional metadata (temperature, etc.)
-- [ ] 1.1.1.3 Add `@moduledoc` with documentation
-- [ ] 1.1.1.4 Add `@type t()` definition
-- [ ] 1.1.1.5 Implement `new/2` constructor function
-- [ ] 1.1.1.6 Implement `update_score/2` for score updates
-- [ ] 1.1.1.7 Implement `to_map/1` for serialization
-- [ ] 1.1.1.8 Implement `from_map/1` for deserialization
+- [x] 1.1.1.3 Add `@moduledoc` with documentation
+- [x] 1.1.1.4 Add `@type t()` definition
+- [x] 1.1.1.5 Implement `new/1` constructor function
+- [x] 1.1.1.6 Implement `update_score/2` for score updates
+- [x] 1.1.1.7 Implement `to_map/1` for serialization
+- [x] 1.1.1.8 Implement `from_map/1` for deserialization
 
 ### 1.1.2 Generation Result
 
 Define the result type for multi-candidate generation operations.
 
-- [ ] 1.1.2.1 Create `lib/jido_ai/accuracy/generation_result.ex`
-- [ ] 1.1.2.2 Define `defstruct` with fields:
+- [x] 1.1.2.1 Create `lib/jido_ai/accuracy/generation_result.ex`
+- [x] 1.1.2.2 Define `defstruct` with fields:
   - `:candidates` - List of Candidate structs
   - `:total_tokens` - Total tokens used across all candidates
   - `:best_candidate` - The highest-scoring candidate
   - `:aggregation_method` - How candidates were aggregated
   - `:metadata` - Generation metadata
-- [ ] 1.1.2.3 Add `@moduledoc` with documentation
-- [ ] 1.1.2.4 Add `@type t()` definition
-- [ ] 1.1.2.5 Implement `new/1` with candidate list
-- [ ] 1.1.2.6 Implement `best_candidate/1` to get top scored
-- [ ] 1.1.2.7 Implement `total_tokens/1` for cost tracking
-- [ ] 1.1.2.8 Implement `select_by_strategy/2` for different selection methods
-- [ ] 1.1.2.9 Implement `candidates/1` to get candidate list
-- [ ] 1.1.2.10 Implement `add_candidate/2` to append single candidate
+- [x] 1.1.2.3 Add `@moduledoc` with documentation
+- [x] 1.1.2.4 Add `@type t()` definition
+- [x] 1.1.2.5 Implement `new/1` with candidate list
+- [x] 1.1.2.6 Implement `best_candidate/1` to get top scored
+- [x] 1.1.2.7 Implement `total_tokens/1` for cost tracking
+- [x] 1.1.2.8 Implement `select_by_strategy/2` for different selection methods
+- [x] 1.1.2.9 Implement `candidates/1` to get candidate list
+- [x] 1.1.2.10 Implement `add_candidate/2` to append single candidate
 
 ### 1.1.3 Unit Tests for Core Types
 
 Comprehensive unit tests for candidate and generation result types.
 
-- [ ] Test `Candidate.new/2` creates valid candidate with required fields
-- [ ] Test `Candidate.update_score/2` updates score and returns updated struct
-- [ ] Test `Candidate.to_map/1` serializes to map
-- [ ] Test `Candidate.from_map/1` deserializes from map
-- [ ] Test `GenerationResult.new/1` creates result from candidate list
-- [ ] Test `GenerationResult.best_candidate/1` returns highest scored candidate
-- [ ] Test `GenerationResult.best_candidate/1` handles empty list
-- [ ] Test `GenerationResult.select_by_strategy/2` with `:best` strategy
-- [ ] Test `GenerationResult.select_by_strategy/2` with `:vote` strategy
-- [ ] Test `GenerationResult.total_tokens/1` sums tokens correctly
-- [ ] Test `GenerationResult.add_candidate/2` appends candidate to list
-- [ ] Test serialization and deserialization round-trip
+- [x] Test `Candidate.new/1` creates valid candidate with required fields
+- [x] Test `Candidate.update_score/2` updates score and returns updated struct
+- [x] Test `Candidate.to_map/1` serializes to map
+- [x] Test `Candidate.from_map/1` deserializes from map
+- [x] Test `GenerationResult.new/1` creates result from candidate list
+- [x] Test `GenerationResult.best_candidate/1` returns highest scored candidate
+- [x] Test `GenerationResult.best_candidate/1` handles empty list
+- [x] Test `GenerationResult.select_by_strategy/2` with `:best` strategy
+- [x] Test `GenerationResult.select_by_strategy/2` with `:vote` strategy
+- [x] Test `GenerationResult.total_tokens/1` sums tokens correctly
+- [x] Test `GenerationResult.add_candidate/2` appends candidate to list
+- [x] Test serialization and deserialization round-trip
 
 ---
 
