@@ -108,58 +108,61 @@ Generate multiple candidate responses from a single prompt using various samplin
 
 Define the behavior for candidate generators.
 
-- [ ] 1.2.1.1 Create `lib/jido_ai/accuracy/generator.ex`
-- [ ] 1.2.1.2 Define `@moduledoc` with behavior documentation
-- [ ] 1.2.1.3 Define `@callback generate_candidates/2`:
+- [x] 1.2.1.1 Create `lib/jido_ai/accuracy/generator.ex`
+- [x] 1.2.1.2 Define `@moduledoc` with behavior documentation
+- [x] 1.2.1.3 Define `@callback generate_candidates/3`:
   ```elixir
   @callback generate_candidates(
+    generator :: term(),
     prompt :: String.t(),
     opts :: keyword()
   ) :: {:ok, [Jido.AI.Accuracy.Candidate.t()]} | {:error, term()}
   ```
-- [ ] 1.2.1.4 Define `@callback generate_candidates_async/2`:
+- [x] 1.2.1.4 Define `@callback generate_candidates_async/3`:
   ```elixir
   @callback generate_candidates_async(
+    generator :: term(),
     prompt :: String.t(),
     opts :: keyword()
   ) :: Task.t()
   ```
-- [ ] 1.2.1.5 Define `@callback generate_with_reasoning/2` for CoT prompts
-- [ ] 1.2.1.6 Define `@type t/0` for generator configuration
-- [ ] 1.2.1.7 Define `@type opts/0` for generator options
+- [x] 1.2.1.5 Define `@callback generate_with_reasoning/3` for CoT prompts
+- [x] 1.2.1.6 Define `@type t/0` for generator configuration
+- [x] 1.2.1.7 Define `@type opts/0` for generator options
 
 ### 1.2.2 LLM Generator Implementation
 
 Implement the standard LLM-based candidate generator.
 
-- [ ] 1.2.2.1 Create `lib/jido_ai/accuracy/generators/llm_generator.ex`
-- [ ] 1.2.2.2 Add `@moduledoc` explaining LLM sampling approach
-- [ ] 1.2.2.3 Implement `init/1` for configuration
-- [ ] 1.2.2.4 Define configuration schema with Zoi:
+- [x] 1.2.2.1 Create `lib/jido_ai/accuracy/generators/llm_generator.ex`
+- [x] 1.2.2.2 Add `@moduledoc` explaining LLM sampling approach
+- [x] 1.2.2.3 Implement `new/1` for configuration (not init)
+- [x] 1.2.2.4 Define configuration with manual validation:
   - `:model` - Model to use (default: "anthropic:claude-haiku-4-5")
-  - `:num_candidates` - Number of candidates to generate
-  - `:temperature_range` - Range for temperature variation
-  - `:timeout` - Per-candidate timeout
-- [ ] 1.2.2.5 Implement `generate_candidates/2` with N samples
-- [ ] 1.2.2.6 Support `temperature_range` option for varied sampling
-- [ ] 1.2.2.7 Add parallel generation via `Task.async_stream`
-- [ ] 1.2.2.8 Handle rate limiting and retry logic
-- [ ] 1.2.2.9 Implement token counting for cost tracking
-- [ ] 1.2.2.10 Implement `generate_with_reasoning/2` for CoT prompts
-- [ ] 1.2.2.11 Implement `generate_candidates_async/2` returning Task
+  - `:num_candidates` - Number of candidates to generate (default: 5)
+  - `:temperature_range` - Range for temperature variation (default: {0.0, 1.0})
+  - `:timeout` - Per-candidate timeout (default: 30000)
+  - `:max_concurrency` - Max parallel generations (default: 3)
+- [x] 1.2.2.5 Implement `generate_candidates/3` with N samples
+- [x] 1.2.2.6 Support `temperature_range` option for varied sampling
+- [x] 1.2.2.7 Add parallel generation via `Task.async_stream`
+- [x] 1.2.2.8 Handle errors gracefully (filter failed candidates)
+- [x] 1.2.2.9 Implement token counting for cost tracking
+- [x] 1.2.2.10 Implement `generate_with_reasoning/3` for CoT prompts
+- [x] 1.2.2.11 Implement `generate_candidates_async/3` returning Task
 
 ### 1.2.3 Unit Tests for Generator
 
-- [ ] Test `generate_candidates/2` returns N candidates
-- [ ] Test candidates have different content with varied temperature
-- [ ] Test parallel generation completes successfully
-- [ ] Test token counting is accurate
-- [ ] Test rate limiting triggers retry
-- [ ] Test error handling for API failures
-- [ ] Test `generate_candidates_async/2` returns Task
-- [ ] Test `generate_with_reasoning/2` preserves reasoning traces
-- [ ] Test temperature_range produces diverse outputs
-- [ ] Test timeout is enforced per candidate
+- [x] Test `generate_candidates/3` returns N candidates
+- [x] Test candidates have different content with varied temperature
+- [x] Test parallel generation completes successfully
+- [x] Test token counting is accurate
+- [x] Test error handling for API failures
+- [x] Test `generate_candidates_async/3` returns Task
+- [x] Test `generate_with_reasoning/3` preserves reasoning traces
+- [x] Test temperature_range produces diverse outputs
+- [x] Test timeout is enforced per candidate
+- [x] Test configuration validation
 
 ---
 
