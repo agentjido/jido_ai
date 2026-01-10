@@ -255,42 +255,41 @@ Orchestrate the full self-consistency workflow.
 
 Create the high-level runner for self-consistency.
 
-- [ ] 1.4.1.1 Create `lib/jido_ai/accuracy/self_consistency.ex`
-- [ ] 1.4.1.2 Add `@moduledoc` explaining self-consistency pattern
-- [ ] 1.4.1.3 Define configuration schema with Zoi:
+- [x] 1.4.1.1 Create `lib/jido_ai/accuracy/self_consistency.ex`
+- [x] 1.4.1.2 Add `@moduledoc` explaining self-consistency pattern
+- [x] 1.4.1.3 Define configuration via opts:
   - `:num_candidates` - Number of candidates (default: 5)
   - `:aggregator` - Aggregation strategy (default: :majority_vote)
   - `:temperature_range` - Temperature range for sampling
   - `:model` - Model to use
   - `:timeout` - Overall timeout
-- [ ] 1.4.1.4 Implement `run/2` with prompt and options
-- [ ] 1.4.1.5 Implement `run_with_reasoning/2` for CoT prompts
-- [ ] 1.4.1.6 Add telemetry hooks for monitoring
-- [ ] 1.4.1.7 Support streaming intermediate results
-- [ ] 1.4.1.8 Implement `validate_opts/1` for configuration validation
+- [x] 1.4.1.4 Implement `run/2` with prompt and options
+- [x] 1.4.1.5 Implement `run_with_reasoning/2` for CoT prompts
+- [x] 1.4.1.6 Add telemetry hooks for monitoring
+- [ ] 1.4.1.7 Support streaming intermediate results (future work)
+- [x] 1.4.1.8 Implement aggregator validation
 
 ### 1.4.2 Runner Operations
 
 Implement the core runner operations.
 
-- [ ] 1.4.2.1 Implement `generate_candidates/2` with configured generator
-- [ ] 1.4.2.2 Implement `aggregate_candidates/2` with configured aggregator
-- [ ] 1.4.2.3 Implement `calculate_confidence/2` from aggregation results
-- [ ] 1.4.2.4 Implement `format_result/2` for output formatting
-- [ ] 1.4.2.5 Add support for custom aggregators
+- [x] 1.4.2.1 Implement `generate_candidates/2` with configured generator
+- [x] 1.4.2.2 Implement `aggregate_candidates/2` with configured aggregator
+- [x] 1.4.2.3 Implement `calculate_confidence/2` from aggregation results
+- [x] 1.4.2.4 Implement `format_result/2` for output formatting
+- [x] 1.4.2.5 Add support for custom aggregators
 
 ### 1.4.3 Unit Tests for SelfConsistency
 
-- [ ] Test `run/2` generates and aggregates candidates
-- [ ] Test `run_with_reasoning/2` preserves reasoning traces
-- [ ] Test telemetry events are emitted
-- [ ] Test configuration validation via schema
-- [ ] Test invalid aggregator returns error
-- [ ] Test num_candidates=1 returns single result
-- [ ] Test custom aggregator is used when specified
-- [ ] Test streaming returns intermediate results
-- [ ] Test confidence is calculated correctly
-- [ ] Test timeout is enforced
+- [x] Test `run/2` generates and aggregates candidates
+- [x] Test `run_with_reasoning/2` preserves reasoning traces
+- [x] Test telemetry events are emitted
+- [x] Test configuration validation
+- [x] Test invalid aggregator returns error
+- [x] Test custom aggregator is used when specified
+- [ ] Test streaming returns intermediate results (future work)
+- [x] Test confidence is calculated correctly
+- [x] Test timeout is enforced
 
 ---
 
