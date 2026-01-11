@@ -267,7 +267,7 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
 
   defp extract_with_patterns(_content, []), do: nil
 
-  defp extract_with_pattern(content, ~r/""([^"]+)""/ = _regex, :quote) do
+  defp extract_with_pattern(content, _regex, :quote) do
     # Extract quoted text (non-greedy)
     case Regex.run(~r/"([^"]+)"/, content) do
       [_, match] -> {:ok, match}
@@ -275,9 +275,9 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
     end
   end
 
-  defp extract_with_pattern(content, ~r/"([^"]+)"/, _type) do
-    # Generic quoted text extraction
-    case Regex.run(~r/"([^"]+)"/, content) do
+  defp extract_with_pattern(content, regex, _type) when is_struct(regex, Regex) do
+    # Generic regex pattern extraction
+    case Regex.run(regex, content) do
       [_, match] -> {:ok, match}
       _ -> :no_match
     end
