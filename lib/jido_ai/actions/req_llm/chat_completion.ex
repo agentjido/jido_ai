@@ -102,6 +102,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
   require Logger
   alias Jido.AI.Model
   alias Jido.AI.Prompt
+  alias ReqLLM.Response, as: ReqResponse
 
   @impl true
   def on_before_validate_params(params) do
@@ -297,13 +298,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     end
   end
 
-  defp format_response(%{content: content, tool_calls: tool_calls}) when is_list(tool_calls) do
+  defp format_response(%ReqResponse{} = response) do
+    content = ReqResponse.text(response) || ""
+    tool_calls = ReqResponse.tool_calls(response) || []
+
     formatted_tools =
       Enum.map(tool_calls, fn tool ->
         %{
           name: tool[:name] || tool["name"],
           arguments: tool[:arguments] || tool["arguments"],
-          # Will be populated after execution
           result: nil
         }
       end)
@@ -311,13 +314,23 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     {:ok, %{content: content, tool_results: formatted_tools}}
   end
 
-  defp format_response(%{content: content}) do
-    {:ok, %{content: content, tool_results: []}}
-  end
-
   defp format_response(response) when is_map(response) do
-    # Fallback for other response formats
     content = response[:content] || response["content"] || ""
-    {:ok, %{content: content, tool_results: []}}
+    tool_calls = response[:tool_calls] || response["tool_calls"] || []
+
+    formatted_tools =
+      if is_list(tool_calls) do
+        Enum.map(tool_calls, fn tool ->
+          %{
+            name: tool[:name] || tool["name"],
+            arguments: tool[:arguments] || tool["arguments"],
+            result: nil
+          }
+        end)
+      else
+        []
+      end
+
+    {:ok, %{content: content, tool_results: formatted_tools}}
   end
 end
