@@ -69,6 +69,89 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
     test "returns error for non-tuple temperature range" do
       assert {:error, :invalid_temperature_range} = LLMGenerator.new(temperature_range: :invalid)
     end
+
+    # Security bounds tests
+    test "returns error for num_candidates > max (100)" do
+      assert {:error, :invalid_num_candidates} = LLMGenerator.new(num_candidates: 101)
+    end
+
+    test "returns error for num_candidates = 0" do
+      assert {:error, :invalid_num_candidates} = LLMGenerator.new(num_candidates: 0)
+    end
+
+    test "returns error for negative num_candidates" do
+      assert {:error, :invalid_num_candidates} = LLMGenerator.new(num_candidates: -5)
+    end
+
+    test "accepts num_candidates at max bound (100)" do
+      assert {:ok, generator} = LLMGenerator.new(num_candidates: 100)
+      assert generator.num_candidates == 100
+    end
+
+    test "accepts num_candidates at min bound (1)" do
+      assert {:ok, generator} = LLMGenerator.new(num_candidates: 1)
+      assert generator.num_candidates == 1
+    end
+
+    test "returns error for max_concurrency > limit (50)" do
+      assert {:error, :invalid_max_concurrency} = LLMGenerator.new(max_concurrency: 51)
+    end
+
+    test "returns error for max_concurrency = 0" do
+      assert {:error, :invalid_max_concurrency} = LLMGenerator.new(max_concurrency: 0)
+    end
+
+    test "returns error for negative max_concurrency" do
+      assert {:error, :invalid_max_concurrency} = LLMGenerator.new(max_concurrency: -5)
+    end
+
+    test "accepts max_concurrency at limit (50)" do
+      assert {:ok, generator} = LLMGenerator.new(max_concurrency: 50)
+      assert generator.max_concurrency == 50
+    end
+
+    test "accepts max_concurrency at min bound (1)" do
+      assert {:ok, generator} = LLMGenerator.new(max_concurrency: 1)
+      assert generator.max_concurrency == 1
+    end
+
+    test "returns error for timeout < min (1000)" do
+      assert {:error, :invalid_timeout} = LLMGenerator.new(timeout: 999)
+    end
+
+    test "returns error for timeout = 0" do
+      assert {:error, :invalid_timeout} = LLMGenerator.new(timeout: 0)
+    end
+
+    test "returns error for negative timeout" do
+      assert {:error, :invalid_timeout} = LLMGenerator.new(timeout: -1000)
+    end
+
+    test "returns error for timeout > max (300000)" do
+      assert {:error, :invalid_timeout} = LLMGenerator.new(timeout: 300_001)
+    end
+
+    test "accepts timeout at max bound (300000)" do
+      assert {:ok, generator} = LLMGenerator.new(timeout: 300_000)
+      assert generator.timeout == 300_000
+    end
+
+    test "accepts timeout at min bound (1000)" do
+      assert {:ok, generator} = LLMGenerator.new(timeout: 1000)
+      assert generator.timeout == 1000
+    end
+
+    test "returns error for non-integer num_candidates" do
+      assert {:error, :invalid_num_candidates} = LLMGenerator.new(num_candidates: 5.5)
+    end
+
+    test "returns error for non-integer timeout" do
+      assert {:error, :invalid_timeout} = LLMGenerator.new(timeout: 30_000.5)
+    end
+
+    test "returns error for non-integer max_concurrency" do
+      assert {:error, :invalid_max_concurrency} = LLMGenerator.new(max_concurrency: 3.5)
+    end
   end
 
   describe "new!/1" do
