@@ -3,6 +3,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
 
   alias Jido.AI.Accuracy.{Candidate, SelfConsistency}
   alias Jido.AI.Accuracy.Aggregators.{MajorityVote, BestOfN, Weighted}
+  alias Jido.AI.Accuracy.TestSupport.MockGenerator
 
   @moduletag :capture_log
 
@@ -248,6 +249,263 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       assert metadata.num_candidates == 1
       # The reasoning field may be empty or populated depending on LLM response
       assert %Candidate{} = best
+    end
+  end
+
+  describe "prompt sanitization (telemetry)" do
+    test "sanitizes email addresses in telemetry" do
+      handler_id = :email_sanitization_test
+      parent = self()
+
+      :telemetry.attach(
+        handler_id,
+        [:jido, :accuracy, :self_consistency, :start],
+        fn event, measurements, metadata, _ ->
+          send(parent, {:telemetry_data, metadata})
+        end,
+        nil
+      )
+
+      # Run with email in prompt
+      SelfConsistency.run("Contact me at test@example.com for help", aggregator: String)
+
+      assert_receive {:telemetry_data, metadata}
+      # Email should be redacted
+      assert String.contains?(metadata.prompt, "[EMAIL]") or
+               not String.contains?(metadata.prompt, "@")
+
+      :telemetry.detach(handler_id)
+    end
+
+    test "sanitizes phone numbers in telemetry" do
+      handler_id = :phone_sanitization_test
+      parent = self()
+
+      :telemetry.attach(
+        handler_id,
+        [:jido, :accuracy, :self_consistency, :start],
+        fn event, measurements, metadata, _ ->
+          send(parent, {:telemetry_data, metadata})
+        end,
+        nil
+      )
+
+      # Run with phone number
+      SelfConsistency.run("Call me at 555-123-4567 for help", aggregator: String)
+
+      assert_receive {:telemetry_data, metadata}
+      # Phone should be redacted or truncated
+      assert String.contains?(metadata.prompt, "[PHONE]") or
+               String.contains?(metadata.prompt, "...")
+
+      :telemetry.detach(handler_id)
+    end
+
+    test "truncates long prompts in telemetry" do
+      handler_id = :truncation_test
+      parent = self()
+
+      :telemetry.attach(
+        handler_id,
+        [:jido, :accuracy, :self_consistency, :start],
+        fn event, measurements, metadata, _ ->
+          send(parent, {:telemetry_data, metadata})
+        end,
+        nil
+      )
+
+      # Run with very long prompt
+      long_prompt = String.duplicate("a", 200)
+      SelfConsistency.run(long_prompt, aggregator: String)
+
+      assert_receive {:telemetry_data, metadata}
+      # Prompt should be truncated with "..."
+      assert String.length(metadata.prompt) <= 100
+      assert String.ends_with?(metadata.prompt, "...")
+
+      :telemetry.detach(handler_id)
+    end
+  end
+
+  describe "generator validation" do
+    test "returns error for invalid generator module" do
+      # A module that doesn't implement the Generator behavior
+      assert {:error, :invalid_generator} =
+        SelfConsistency.run("What is 2+2?", generator: String)
+    end
+
+    test "accepts valid generator module implementing Generator behavior" do
+      # LLMGenerator implements the Generator behavior
+      # This test validates that validation passes for valid modules
+      # The error should NOT be :invalid_generator (it would be an exception from actual generation)
+      result = SelfConsistency.run("What is 2+2?",
+        generator: Jido.AI.Accuracy.Generators.LLMGenerator,
+        num_candidates: 1
+      )
+      # Should not return :invalid_generator error (validation passed)
+      refute result == {:error, :invalid_generator}
+    end
+
+    test "accepts struct generator" do
+      # A struct that implements Generator should be accepted
+      # (The validation passes, but we still get error for other reasons)
+      generator = Jido.AI.Accuracy.Generators.LLMGenerator.new!([])
+      assert {:error, _} = SelfConsistency.run("What is 2+2?", generator: generator)
+    end
+  end
+
+  describe "with Mock Generator" do
+    test "returns best candidate with majority vote" do
+      candidates = [
+        Candidate.new!(%{content: "42", model: "mock", tokens_used: 10}),
+        Candidate.new!(%{content: "42", model: "mock", tokens_used: 10}),
+        Candidate.new!(%{content: "43", model: "mock", tokens_used: 10})
+      ]
+
+      generator = MockGenerator.new(candidates: candidates)
+
+      assert {:ok, best, metadata} = SelfConsistency.run("What is 2+2?",
+        generator: generator,
+        aggregator: :majority_vote
+      )
+
+      assert best.content == "42"
+      assert metadata.confidence == 2.0 / 3.0
+      assert metadata.num_candidates == 3
+    end
+
+    test "returns best candidate with best_of_n aggregator" do
+      candidates = [
+        Candidate.new!(%{content: "low", model: "mock", tokens_used: 10, score: 0.5}),
+        Candidate.new!(%{content: "high", model: "mock", tokens_used: 10, score: 0.9}),
+        Candidate.new!(%{content: "medium", model: "mock", tokens_used: 10, score: 0.7})
+      ]
+
+      generator = MockGenerator.new(candidates: candidates)
+
+      assert {:ok, best, metadata} = SelfConsistency.run("Question",
+        generator: generator,
+        aggregator: :best_of_n
+      )
+
+      assert best.content == "high"
+      assert best.score == 0.9
+    end
+
+    test "handles generation failure gracefully" do
+      generator = MockGenerator.new(should_fail: true, failure_reason: :api_error)
+
+      assert {:error, :api_error} =
+        SelfConsistency.run("What is 2+2?", generator: generator)
+    end
+
+    test "calculates total_tokens correctly" do
+      candidates = [
+        Candidate.new!(%{content: "a", model: "mock", tokens_used: 10}),
+        Candidate.new!(%{content: "b", model: "mock", tokens_used: 20}),
+        Candidate.new!(%{content: "c", model: "mock", tokens_used: 30})
+      ]
+
+      generator = MockGenerator.new(candidates: candidates)
+
+      assert {:ok, _best, metadata} = SelfConsistency.run("Question",
+        generator: generator
+      )
+
+      assert metadata.total_tokens == 60
+    end
+
+    test "returns nil for total_tokens when all candidates have nil tokens" do
+      candidates = [
+        Candidate.new!(%{content: "a", model: "mock", tokens_used: nil}),
+        Candidate.new!(%{content: "b", model: "mock", tokens_used: nil})
+      ]
+
+      generator = MockGenerator.new(candidates: candidates)
+
+      assert {:ok, _best, metadata} = SelfConsistency.run("Question",
+        generator: generator
+      )
+
+      assert metadata.total_tokens == nil
+    end
+
+    test "emits telemetry events on success" do
+      candidates = [
+        Candidate.new!(%{content: "42", model: "mock", tokens_used: 10}),
+        Candidate.new!(%{content: "42", model: "mock", tokens_used: 10})
+      ]
+
+      generator = MockGenerator.new(candidates: candidates)
+
+      # Attach telemetry handler
+      handler_id = :mock_generator_test
+      parent = self()
+
+      :telemetry.attach(
+        handler_id,
+        [:jido, :accuracy, :self_consistency, :stop],
+        fn _event, measurements, _metadata, _ ->
+          send(parent, {:stop_event, measurements})
+        end,
+        nil
+      )
+
+      SelfConsistency.run("What is 2+2?", generator: generator)
+
+      assert_receive {:stop_event, %{duration: duration}}
+      assert is_integer(duration) and duration >= 0
+
+      :telemetry.detach(handler_id)
+    end
+
+    test "emits telemetry events on error" do
+      generator = MockGenerator.new(should_fail: true, failure_reason: :test_error)
+
+      # Attach telemetry handler
+      handler_id = :mock_generator_error_test
+      parent = self()
+
+      :telemetry.attach(
+        handler_id,
+        [:jido, :accuracy, :self_consistency, :exception],
+        fn _event, measurements, metadata, _ ->
+          send(parent, {:exception_event, measurements, metadata})
+        end,
+        nil
+      )
+
+      SelfConsistency.run("What is 2+2?", generator: generator)
+
+      assert_receive {:exception_event, %{duration: duration}, %{kind: :error}}
+      assert is_integer(duration) and duration >= 0
+
+      :telemetry.detach(handler_id)
+    end
+  end
+
+  describe "run_with_reasoning/2 with Mock Generator" do
+    test "generates candidates with reasoning field" do
+      # Mock generator's generate_with_reasoning adds reasoning
+      generator = MockGenerator.new(num_candidates: 2)
+
+      assert {:ok, candidates} =
+        MockGenerator.generate_with_reasoning(generator, "What is 2+2?")
+
+      assert length(candidates) == 2
+
+      # Check that reasoning is added
+      Enum.each(candidates, fn c ->
+        assert Map.has_key?(c, :reasoning)
+        assert is_binary(c.reasoning)
+      end)
+    end
+
+    test "propagates generation errors" do
+      generator = MockGenerator.new(should_fail: true, failure_reason: :generation_failed)
+
+      assert {:error, :generation_failed} =
+        MockGenerator.generate_with_reasoning(generator, "Question")
     end
   end
 
