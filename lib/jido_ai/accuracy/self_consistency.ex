@@ -90,7 +90,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
 
   """
 
-  alias Jido.AI.Accuracy.Candidate
+  alias Jido.AI.Accuracy.{Candidate, Config}
   alias Jido.AI.Accuracy.Generators.LLMGenerator
   alias Jido.AI.Accuracy.Aggregators.MajorityVote
   alias Jido.AI.Accuracy.Aggregators.BestOfN
@@ -107,14 +107,6 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   }
 
   @type opts :: keyword()
-
-  # Default configuration
-  @default_num_candidates 5
-  @default_aggregator :majority_vote
-  @default_temperature_range {0.0, 1.0}
-  @default_model "anthropic:claude-haiku-4-5"
-  @default_timeout 30_000
-  @default_max_concurrency 3
 
   # Aggregator name to module mapping
   @aggregators %{
@@ -155,12 +147,12 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
     start_metadata = build_start_metadata(prompt, opts)
     :telemetry.execute([:jido, :accuracy, :self_consistency, :start], %{system_time: start_time}, start_metadata)
 
-    aggregator = resolve_aggregator(Keyword.get(opts, :aggregator, @default_aggregator))
+    aggregator = resolve_aggregator(Keyword.get(opts, :aggregator, :majority_vote))
 
-    case validate_aggregator(aggregator) do
-      :ok ->
-        do_run(prompt, aggregator, opts, start_time)
-
+    with :ok <- validate_aggregator(aggregator),
+         :ok <- validate_generator(opts) do
+      do_run(prompt, aggregator, opts, start_time)
+    else
       {:error, _reason} = error ->
         emit_exception(start_time, error)
         error
@@ -198,12 +190,12 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
     start_metadata = build_start_metadata(prompt, opts)
     :telemetry.execute([:jido, :accuracy, :self_consistency, :start], %{system_time: start_time}, start_metadata)
 
-    aggregator = resolve_aggregator(Keyword.get(opts, :aggregator, @default_aggregator))
+    aggregator = resolve_aggregator(Keyword.get(opts, :aggregator, :majority_vote))
 
-    case validate_aggregator(aggregator) do
-      :ok ->
-        do_run_with_reasoning(prompt, aggregator, opts, start_time)
-
+    with :ok <- validate_aggregator(aggregator),
+         :ok <- validate_generator(opts) do
+      do_run_with_reasoning(prompt, aggregator, opts, start_time)
+    else
       {:error, _reason} = error ->
         emit_exception(start_time, error)
         error
@@ -229,7 +221,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
     end
   rescue
     e ->
-      error = {:exception, Exception.message(e), __struct__: e.__struct__}
+      error = {:exception, Exception.message(e), struct: e.__struct__}
       emit_exception(start_time, error)
       error
   end
@@ -251,7 +243,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
     end
   rescue
     e ->
-      error = {:exception, Exception.message(e), __struct__: e.__struct__}
+      error = {:exception, Exception.message(e), struct: e.__struct__}
       emit_exception(start_time, error)
       error
   end
@@ -277,7 +269,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
     end
   end
 
-  defp get_generator_module(%_struct{}), do: LLMGenerator
+  defp get_generator_module(%_{} = struct), do: struct.__struct__
   defp get_generator_module(module) when is_atom(module), do: module
 
   defp apply_generator_generate(LLMGenerator, func, args) do
@@ -290,11 +282,11 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
 
   defp build_generator_opts(opts) do
     []
-    |> Keyword.put(:num_candidates, Keyword.get(opts, :num_candidates, @default_num_candidates))
-    |> Keyword.put(:temperature_range, Keyword.get(opts, :temperature_range, @default_temperature_range))
-    |> Keyword.put(:timeout, Keyword.get(opts, :timeout, @default_timeout))
-    |> Keyword.put(:max_concurrency, Keyword.get(opts, :max_concurrency, @default_max_concurrency))
-    |> Keyword.put(:model, Keyword.get(opts, :model, @default_model))
+    |> Keyword.put(:num_candidates, Keyword.get(opts, :num_candidates, Config.default_num_candidates()))
+    |> Keyword.put(:temperature_range, Keyword.get(opts, :temperature_range, Config.default_temperature_range()))
+    |> Keyword.put(:timeout, Keyword.get(opts, :timeout, Config.default_timeout()))
+    |> Keyword.put(:max_concurrency, Keyword.get(opts, :max_concurrency, Config.default_max_concurrency()))
+    |> Keyword.put(:model, Keyword.get(opts, :model, Config.default_model()))
     |> maybe_put_system_prompt(opts)
   end
 
@@ -330,6 +322,34 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
 
   defp validate_aggregator(_), do: {:error, :invalid_aggregator}
 
+  # Validate generator module - ensures it implements the Generator behavior
+  defp validate_generator(opts) do
+    case Keyword.get(opts, :generator) do
+      nil ->
+        # Using default LLMGenerator
+        :ok
+
+      module when is_atom(module) ->
+        # Validate it's a module that implements Generator behavior
+        Code.ensure_loaded?(module)
+
+        cond do
+          function_exported?(module, :generate_candidates, 3) ->
+            :ok
+
+          true ->
+            {:error, :invalid_generator}
+        end
+
+      %_struct{} ->
+        # It's a struct, assume it's valid
+        :ok
+
+      _ ->
+        {:error, :invalid_generator}
+    end
+  end
+
   defp build_metadata(candidates, agg_metadata, aggregator, _opts) do
     %{
       confidence: Map.get(agg_metadata, :confidence, 0.0),
@@ -352,18 +372,46 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
 
   defp build_start_metadata(prompt, opts) do
     %{
-      prompt: truncate_prompt(prompt),
-      num_candidates: Keyword.get(opts, :num_candidates, @default_num_candidates),
-      aggregator: Keyword.get(opts, :aggregator, @default_aggregator),
-      temperature_range: Keyword.get(opts, :temperature_range, @default_temperature_range)
+      prompt: sanitize_prompt_for_telemetry(prompt),
+      num_candidates: Keyword.get(opts, :num_candidates, Config.default_num_candidates()),
+      aggregator: Keyword.get(opts, :aggregator, :majority_vote),
+      temperature_range: Keyword.get(opts, :temperature_range, Config.default_temperature_range())
     }
   end
+
+  # Prompt sanitization with PII redaction
+  # Removes common PII patterns before logging to telemetry
+  defp sanitize_prompt_for_telemetry(prompt) when is_binary(prompt) do
+    prompt
+    |> truncate_prompt()
+    |> remove_pii_patterns()
+  end
+
+  defp sanitize_prompt_for_telemetry(other), do: truncate_prompt_for_telemetry(other)
 
   defp truncate_prompt(prompt) when byte_size(prompt) > 100 do
     String.slice(prompt, 0, 97) <> "..."
   end
 
   defp truncate_prompt(prompt), do: prompt
+
+  defp truncate_prompt_for_telemetry(val) when is_binary(val) and byte_size(val) > 100 do
+    String.slice(val, 0, 97) <> "..."
+  end
+
+  defp truncate_prompt_for_telemetry(val) when is_binary(val), do: val
+  defp truncate_prompt_for_telemetry(val), do: inspect(val, limit: 100)
+
+  defp remove_pii_patterns(prompt) when is_binary(prompt) do
+    # Remove common PII patterns (email, phone, credit card, etc.)
+    prompt
+    |> (&Regex.replace(~r/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, &1, "[EMAIL]")).()
+    |> (&Regex.replace(~r/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/, &1, "[PHONE]")).()
+    |> (&Regex.replace(~r/\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/, &1, "[CARD]")).()
+    |> (&Regex.replace(~r/\b\d{3}-\d{2}-\d{4}\b/, &1, "[SSN]", [])).()
+  end
+
+  defp remove_pii_patterns(other), do: other
 
   defp emit_stop(start_time, candidates, metadata) do
     duration = System.monotonic_time(:millisecond) - start_time
