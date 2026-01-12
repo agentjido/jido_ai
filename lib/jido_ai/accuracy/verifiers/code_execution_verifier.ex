@@ -71,10 +71,26 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
 
   ## Security Considerations
 
-  - **Always use sandboxing in production** - Direct execution can run arbitrary code
+  - **Default sandbox is `:none`** for backward compatibility, but logs a warning
+  - **Production deployments should use sandboxing** - Set `JIDO_DEFAULT_SANDBOX=docker`
+    or `JIDO_DEFAULT_SANDBOX=podman` environment variable, or configure via
+    `config :jido_ai, :default_code_sandbox, :docker`
   - **Set appropriate timeouts** - Prevent infinite loops and resource exhaustion
   - **Validate working directories** - Prevent file system access outside designated areas
   - **Sanitize environment variables** - Don't pass secrets to executed code
+
+  ## Production Configuration
+
+  To enforce sandboxed execution in production, configure the default sandbox
+  via application config or environment variable:
+
+      # config/config.exs
+      config :jido_ai, :default_code_sandbox, :docker
+
+      # Or via environment variable
+      export JIDO_DEFAULT_SANDBOX=docker
+
+  This prevents accidental use of unsafe execution in production deployments.
 
   ## Language Support
 
@@ -109,7 +125,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
         }
 
   defstruct timeout: 5000,
-            sandbox: :none,
+            sandbox: nil,
             working_dir: nil,
             environment: %{},
             language: :auto
@@ -144,13 +160,54 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
   """
   @spec new(keyword()) :: {:ok, t()} | {:error, term()}
   def new(opts) when is_list(opts) or is_map(opts) do
+    # Determine default sandbox based on application config or environment
+    default_sandbox = get_default_sandbox()
+
+    # Merge opts with defaults, preferring explicit :sandbox from opts
+    opts = Enum.into(opts, %{})
+    sandbox = Map.get(opts, :sandbox, default_sandbox)
+    opts = Map.put(opts, :sandbox, sandbox)
+
     verifier = struct(__MODULE__, opts)
 
     with :ok <- validate_timeout(verifier.timeout),
-         :ok <- validate_sandbox(verifier.sandbox),
+         :ok <- validate_sandbox(verifier.sandbox, opts),
          :ok <- validate_language(verifier.language),
          :ok <- validate_working_dir(verifier.working_dir) do
+      # Log warning if using unsafe sandbox
+      if verifier.sandbox == :none do
+        require Logger
+        Logger.warning("""
+        [SECURITY] CodeExecutionVerifier using sandbox: :none
+        This allows arbitrary code execution on the host system!
+        Ensure this is intentional and only used in trusted environments.
+        Consider using sandbox: :docker or :podman instead.
+        """)
+      end
+
       {:ok, verifier}
+    end
+  end
+
+  # Get default sandbox from application config or environment variable
+  defp get_default_sandbox do
+    cond do
+      # Application config takes precedence
+      Application.get_env(:jido_ai, :default_code_sandbox) != nil ->
+        Application.get_env(:jido_ai, :default_code_sandbox)
+
+      # Environment variable for backwards compatibility and testing
+      System.get_env("JIDO_DEFAULT_SANDBOX") ->
+        case System.get_env("JIDO_DEFAULT_SANDBOX") do
+          "docker" -> :docker
+          "podman" -> :podman
+          "none" -> :none
+          _ -> :docker
+        end
+
+      # Default to :none for backward compatibility, but with warning
+      true ->
+        :none
     end
   end
 
@@ -433,8 +490,8 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
   defp validate_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
   defp validate_timeout(_), do: {:error, :invalid_timeout}
 
-  defp validate_sandbox(sandbox) when sandbox in [:none, :docker, :podman], do: :ok
-  defp validate_sandbox(_), do: {:error, :invalid_sandbox}
+  defp validate_sandbox(sandbox, _opts) when sandbox in [:none, :docker, :podman], do: :ok
+  defp validate_sandbox(_sandbox, _opts), do: {:error, :invalid_sandbox}
 
   defp validate_language(lang) when lang in [:python, :javascript, :elixir, :ruby, :bash, :auto], do: :ok
   defp validate_language(_), do: {:error, :invalid_language}

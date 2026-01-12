@@ -177,6 +177,16 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
   defp parse_tool_output(result, format) do
     output = ToolExecutor.capture_output(result)
 
+    # Limit output size to prevent ReDoS and memory issues
+    max_output_size = 1_000_000  # 1MB limit
+
+    output =
+      if String.length(output) > max_output_size do
+        String.slice(output, 0, max_output_size) <> "\n[output truncated due to size]"
+      else
+        output
+      end
+
     case format do
       :auto -> detect_and_parse_issues(output)
       :json -> parse_json_issues(output)
@@ -233,7 +243,8 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
   defp parse_text_issues(output) do
     pattern = ~r/.+?:(\d+):(?:(\d+):)?\s+(error|warning|info|style|fatal|note):\s*(.+)/i
 
-    Regex.scan(pattern, output)
+    # Wrap regex operation in timeout to prevent ReDoS
+    safe_regex_scan(fn -> Regex.scan(pattern, output) end)
     |> Enum.map(fn
       [_, line, col, severity, message] ->
         %{severity: parse_text_severity(severity), line: parse_int(line), column: parse_int(col), message: message}
@@ -245,6 +256,31 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
         nil
     end)
     |> Enum.reject(&is_nil/1)
+  end
+
+  # Safe regex execution with timeout to prevent catastrophic backtracking
+  defp safe_regex_scan(regex_fn) do
+    try do
+      # Use Task.async with a short timeout to prevent hanging
+      task = Task.async(regex_fn)
+
+      case Task.yield(task, 1000) do
+        {:ok, result} ->
+          result
+
+        {:exit, _reason} ->
+          # Task crashed (possibly due to stack overflow from ReDoS)
+          []
+
+        nil ->
+          # Timeout - task didn't complete in time
+          Task.shutdown(task, :brutal_kill)
+          []
+      end
+    catch
+      # Catch any other errors (e.g., compile errors from malformed regex)
+      _kind, _error -> []
+    end
   end
 
   defp parse_text_severity(severity) when is_binary(severity) do

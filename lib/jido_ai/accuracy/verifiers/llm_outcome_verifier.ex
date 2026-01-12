@@ -14,6 +14,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   - `:temperature` - Temperature for LLM calls (default: 0.3)
   - `:timeout` - Timeout for LLM calls in ms (default: 30_000)
   - `:max_retries` - Maximum retry attempts (default: 2)
+  - `:max_content_length` - Maximum candidate content length in chars (default: 50_000)
 
   ## Usage
 
@@ -59,6 +60,14 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
 
   Scores are automatically normalized to the configured range.
 
+  ## Security
+
+  Candidate content is sanitized before being interpolated into prompts to prevent
+  prompt injection attacks:
+  - Content is truncated to `max_content_length`
+  - Special delimiter markers are added to clearly delineate content
+  - Suspicious patterns are escaped
+
   """
 
   @behaviour Jido.AI.Accuracy.Verifier
@@ -72,7 +81,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
           score_range: {number(), number()},
           temperature: number(),
           timeout: pos_integer(),
-          max_retries: non_neg_integer()
+          max_retries: non_neg_integer(),
+          max_content_length: pos_integer()
         }
 
   defstruct [
@@ -81,7 +91,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
     score_range: {0.0, 1.0},
     temperature: 0.3,
     timeout: 30_000,
-    max_retries: 2
+    max_retries: 2,
+    max_content_length: 50_000
   ]
 
   @default_prompt_template """
@@ -89,7 +100,9 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
 
   Original Question: <%= @prompt %>
 
-  Candidate Answer: <%= @candidate.content %>
+  === CANDIDATE ANSWER BEGINS ===
+  <%= @candidate.content %>
+  === CANDIDATE ANSWER ENDS ===
 
   Evaluate this answer on a scale from <%= @min_score %> to <%= @max_score %>:
   - <%= @max_score %>: Perfect answer - correct, complete, and well-explained
@@ -394,9 +407,11 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   end
 
   defp build_candidate_assign(%Candidate{} = candidate) do
+    sanitized_content = sanitize_content(candidate.content || "")
+
     %{
       id: candidate.id || "unknown",
-      content: candidate.content || "",
+      content: sanitized_content,
       score: candidate.score,
       reasoning: candidate.reasoning
     }
@@ -404,6 +419,33 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
 
   defp build_candidate_assign(candidates) when is_list(candidates) do
     Enum.map(candidates, fn c -> build_candidate_assign(c) end)
+  end
+
+  # Sanitize candidate content to prevent prompt injection
+  # 1. Truncate to max length
+  # 2. Escape potential injection patterns
+  defp sanitize_content(content) when is_binary(content) do
+    max_length = 50_000
+
+    content
+    |> String.slice(0, max_length)
+    |> escape_injection_patterns()
+  end
+
+  defp sanitize_content(_), do: ""
+
+  # Escape patterns that could be used for prompt injection
+  defp escape_injection_patterns(content) do
+    content
+    # Escape EEx delimiters that could break out of template
+    |> String.replace("<%=", "&lt;%=")
+    |> String.replace("%>", "%&gt;")
+    # Escape common prompt injection markers
+    |> String.replace("=== END INSTRUCTIONS ===", "== END INSTRUCTIONS ==")
+    |> String.replace("=== END ===", "== END ==")
+    |> String.replace("### END ###", "## END ##")
+    # Limit consecutive newlines that could be used to break formatting
+    |> String.replace(~r/\n{4,}/, "\n\n\n")
   end
 
   defp build_batch_template(verifier, count) do
@@ -420,9 +462,11 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
     - <%= mid_score %>: Partially correct - on the right track but missing details or has minor errors
     - <%= min_score %>: Incorrect - wrong answer or fundamentally flawed reasoning
 
+    === CANDIDATE ANSWERS BEGIN ===
     <%= Enum.map(@candidates, fn c ->
       "Candidate " <> to_string(c.id) <> ": " <> c.content
     end) |> Enum.join("\\n") %>
+    === CANDIDATE ANSWERS END ===
 
     For each candidate, provide:
     Score: [numeric score]

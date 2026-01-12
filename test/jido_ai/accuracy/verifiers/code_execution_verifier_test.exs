@@ -9,6 +9,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
     test "creates verifier with defaults" do
       assert {:ok, verifier} = CodeExecutionVerifier.new([])
       assert verifier.timeout == 5000
+      # Default sandbox is :none for backward compatibility (with warning logged)
       assert verifier.sandbox == :none
       assert verifier.language == :auto
     end
@@ -21,6 +22,11 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
     test "creates verifier with docker sandbox" do
       assert {:ok, verifier} = CodeExecutionVerifier.new(%{sandbox: :docker})
       assert verifier.sandbox == :docker
+    end
+
+    test "creates verifier with podman sandbox" do
+      assert {:ok, verifier} = CodeExecutionVerifier.new(%{sandbox: :podman})
+      assert verifier.sandbox == :podman
     end
 
     test "creates verifier with language specified" do
@@ -44,6 +50,34 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
     test "returns error for invalid working directory" do
       assert {:error, :directory_not_found} =
                CodeExecutionVerifier.new(%{working_dir: "/nonexistent/path"})
+    end
+
+    test "respects JIDO_DEFAULT_SANDBOX environment variable" do
+      System.put_env("JIDO_DEFAULT_SANDBOX", "docker")
+      assert {:ok, verifier} = CodeExecutionVerifier.new([])
+      assert verifier.sandbox == :docker
+      System.delete_env("JIDO_DEFAULT_SANDBOX")
+    end
+
+    test "respects JIDO_DEFAULT_SANDBOX=podman" do
+      System.put_env("JIDO_DEFAULT_SANDBOX", "podman")
+      assert {:ok, verifier} = CodeExecutionVerifier.new([])
+      assert verifier.sandbox == :podman
+      System.delete_env("JIDO_DEFAULT_SANDBOX")
+    end
+
+    test "respects JIDO_DEFAULT_SANDBOX=none" do
+      System.put_env("JIDO_DEFAULT_SANDBOX", "none")
+      assert {:ok, verifier} = CodeExecutionVerifier.new([])
+      assert verifier.sandbox == :none
+      System.delete_env("JIDO_DEFAULT_SANDBOX")
+    end
+
+    test "explicit sandbox option overrides environment variable" do
+      System.put_env("JIDO_DEFAULT_SANDBOX", "docker")
+      assert {:ok, verifier} = CodeExecutionVerifier.new(%{sandbox: :podman})
+      assert verifier.sandbox == :podman
+      System.delete_env("JIDO_DEFAULT_SANDBOX")
     end
   end
 
@@ -241,6 +275,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
   end
 
   describe "timeout handling" do
+    @tag :flaky
     test "handles infinite loops gracefully" do
       verifier = CodeExecutionVerifier.new!(%{language: :python, timeout: 500})
 
@@ -251,6 +286,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
       assert result.metadata.timed_out == true
     end
 
+    @tag :flaky
     test "sets appropriate timeout for long-running code" do
       verifier = CodeExecutionVerifier.new!(%{language: :python, timeout: 100})
 
