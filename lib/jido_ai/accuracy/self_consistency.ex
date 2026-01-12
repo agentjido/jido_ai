@@ -220,7 +220,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
         error
     end
   rescue
-    e ->
+    e in [ArgumentError, FunctionClauseError, RuntimeError] ->
       error = {:exception, Exception.message(e), struct: e.__struct__}
       emit_exception(start_time, error)
       error
@@ -242,7 +242,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
         error
     end
   rescue
-    e ->
+    e in [ArgumentError, FunctionClauseError, RuntimeError] ->
       error = {:exception, Exception.message(e), struct: e.__struct__}
       emit_exception(start_time, error)
       error

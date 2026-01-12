@@ -280,7 +280,8 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
         {:error, reason}
     end
   rescue
-    e -> {:error, {:exception, Exception.message(e), struct: e.__struct__}}
+    e in [ArgumentError, KeyError, MatchError, RuntimeError] ->
+      {:error, {:exception, Exception.message(e), struct: e.__struct__}}
   end
 
   defp build_messages(nil, prompt) do

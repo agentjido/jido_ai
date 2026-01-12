@@ -78,10 +78,13 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   @spec new([Candidate.t()], keyword()) :: {:ok, t()} | {:error, term()}
   def new(candidates, opts \\ []) when is_list(candidates) do
     if valid_candidate_list?(candidates) do
+      # Reverse for O(1) prepend performance in add_candidate/2
+      reversed_candidates = Enum.reverse(candidates)
+
       result = %__MODULE__{
-        candidates: candidates,
-        total_tokens: compute_total_tokens(candidates),
-        best_candidate: find_best_candidate(candidates),
+        candidates: reversed_candidates,
+        total_tokens: compute_total_tokens(reversed_candidates),
+        best_candidate: find_best_candidate(reversed_candidates),
         aggregation_method: Keyword.get(opts, :aggregation_method, :none),
         metadata: Keyword.get(opts, :metadata, %{})
       }
@@ -160,28 +163,6 @@ defmodule Jido.AI.Accuracy.GenerationResult do
     total
   end
 
-  @doc """
-  Returns the list of candidates from the result.
-
-  ## Parameters
-
-  - `result` - The GenerationResult
-
-  ## Returns
-
-  List of Candidate structs.
-
-  ## Examples
-
-      iex> candidates = [Candidate.new!(%{content: "A"})]
-      iex> result = GenerationResult.new!(candidates)
-      iex> length(GenerationResult.candidates(result))
-      1
-  """
-  @spec candidates(t()) :: [Candidate.t()]
-  def candidates(%__MODULE__{candidates: candidates}) do
-    candidates
-  end
 
   @doc """
   Selects a candidate using the specified strategy.
@@ -219,17 +200,19 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   end
 
   def select_by_strategy(%__MODULE__{candidates: candidates}, :first) do
-    List.first(candidates)
-  end
-
-  def select_by_strategy(%__MODULE__{candidates: candidates}, :last) do
+    # Get first candidate (which is last in our internal reversed list)
     List.last(candidates)
   end
 
-  def select_by_strategy(%__MODULE__{candidates: candidates}, :vote) do
+  def select_by_strategy(%__MODULE__{candidates: candidates}, :last) do
+    # Get last candidate (which is first in our internal reversed list)
+    List.first(candidates)
+  end
+
+  def select_by_strategy(%__MODULE__{} = result, :vote) do
     # Simple majority vote implementation
     # Full implementation in Phase 1.3 with answer extraction
-    select_by_majority_content(candidates)
+    select_by_majority_content(candidates(result))
   end
 
   def select_by_strategy(%__MODULE__{candidates: candidates}, strategy) do
@@ -264,33 +247,67 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   """
   @spec add_candidate(t(), Candidate.t()) :: t() | {:error, term()}
   def add_candidate(%__MODULE__{} = result, %Candidate{} = candidate) do
-    new_candidates = result.candidates ++ [candidate]
+    # Prepend for O(1) performance instead of append (O(n))
+    # Order is preserved by reversing in candidates/1 when accessed
+    new_candidates = [candidate | result.candidates]
 
     %{result | candidates: new_candidates, total_tokens: compute_total_tokens(new_candidates)}
     |> recompute_best_candidate()
   end
 
   @doc """
-  Serializes a generation result to a map.
+  Returns the list of candidates from the result.
 
-  Converts the result struct to a plain map suitable for
-  JSON encoding or storage.
+  Candidates are returned in the order they were added (oldest first).
 
   ## Parameters
 
-  - `result` - The GenerationResult to serialize
+  - `result` - The GenerationResult
 
   ## Returns
 
-  A map with string keys for JSON compatibility.
+  List of Candidate structs.
+
+  ## Examples
+
+      iex> candidates = [Candidate.new!(%{content: "A"})]
+      iex> result = GenerationResult.new!(candidates)
+      iex> length(GenerationResult.candidates(result))
+      1
+  """
+  @spec candidates(t()) :: [Candidate.t()]
+  def candidates(%__MODULE__{candidates: candidates}) do
+    # Reverse to maintain original order since we prepend in add_candidate/2
+    Enum.reverse(candidates)
+  end
+
+  @doc """
+  Serializes a generation result to a map.
+
+  The map can be deserialized back using `from_map/1`.
+
+  ## Parameters
+
+  - `result` - The GenerationResult
+
+  ## Returns
+
+  A map with generation result data.
+
+  ## Examples
+
+      iex> candidates = [Candidate.new!(%{content: "A", score: 0.5})]
+      iex> result = GenerationResult.new!(candidates, aggregation_method: :best_of_n)
+      iex> map = GenerationResult.to_map(result)
+      iex> map["aggregation_method"]
+      "best_of_n"
   """
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = result) do
     %{
-      "candidates" => Enum.map(result.candidates, &Candidate.to_map/1),
+      "candidates" => Enum.map(candidates(result), &Candidate.to_map/1),
       "total_tokens" => result.total_tokens,
-      "best_candidate" =>
-        if(result.best_candidate, do: Candidate.to_map(result.best_candidate), else: nil),
+      "best_candidate" => if(result.best_candidate, do: Candidate.to_map(result.best_candidate), else: nil),
       "aggregation_method" => result.aggregation_method,
       "metadata" => result.metadata
     }
@@ -314,7 +331,7 @@ defmodule Jido.AI.Accuracy.GenerationResult do
     with {:ok, candidates} <- deserialize_candidates(Map.get(map, "candidates", [])),
          {:ok, best_candidate} <- deserialize_best_candidate(Map.get(map, "best_candidate")) do
       opts = [
-        aggregation_method: Map.get(map, "aggregation_method", :none) || Map.get(map, :aggregation_method, :none),
+        aggregation_method: parse_aggregation_method(Map.get(map, "aggregation_method") || Map.get(map, :aggregation_method)),
         metadata: Map.get(map, "metadata", %{}) || Map.get(map, :metadata, %{})
       ]
 
@@ -402,4 +419,9 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   defp deserialize_best_candidate(nil), do: {:ok, nil}
   defp deserialize_best_candidate(%{} = map), do: Candidate.from_map(map)
   defp deserialize_best_candidate(_), do: {:ok, nil}
+
+  defp parse_aggregation_method(nil), do: :none
+  defp parse_aggregation_method(method) when is_atom(method), do: method
+  defp parse_aggregation_method(method) when is_binary(method), do: String.to_existing_atom(method)
+  defp parse_aggregation_method(_), do: :none
 end

@@ -206,7 +206,8 @@ defmodule Jido.AI.Accuracy.Candidate do
       attrs = extract_attrs_from_map(map)
       new(attrs)
     rescue
-      _ -> {:error, :invalid_map}
+      e in [ArgumentError, KeyError, MatchError] ->
+        {:error, :invalid_map}
     end
   end
 
