@@ -317,8 +317,8 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
       end
     end
   rescue
-    error ->
-      {:error, error}
+    e in [ArgumentError, BadArityError, FunctionClauseError] ->
+      {:error, e}
   end
 
   defp build_port_options(nil, env, _timeout), do: env_option(env)
