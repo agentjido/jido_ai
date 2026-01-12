@@ -392,11 +392,14 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
 
   describe "message conversion end-to-end" do
     test "Prompt converts to messages correctly" do
-      expect_generate_text(fn _model, messages, _opts ->
-        assert length(messages) == 1
-        [msg] = messages
+      expect_generate_text(fn _model, context, _opts ->
+        assert length(context.messages) == 1
+        [msg] = context.messages
         assert msg.role == :user
-        assert msg.content == "User message"
+        # Content is now a list of ContentParts
+        assert is_list(msg.content)
+        [part] = msg.content
+        assert part.text == "User message"
         {:ok, mock_chat_response("Response")}
       end)
 
@@ -407,8 +410,8 @@ defmodule JidoTest.AI.ReqLLME2EIntegrationTest do
     end
 
     test "system and user messages flow correctly" do
-      expect_generate_text(fn _model, messages, _opts ->
-        assert length(messages) >= 1
+      expect_generate_text(fn _model, context, _opts ->
+        assert length(context.messages) >= 1
         {:ok, mock_chat_response("Response")}
       end)
 
