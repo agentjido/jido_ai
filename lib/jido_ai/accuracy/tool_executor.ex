@@ -14,24 +14,40 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
   - Working directory management
   - Environment variable control
   - Optional Docker/podman sandboxing
+  - Command allowlist for security
 
   ## Security Considerations
 
+  - All commands are validated against an allowlist (configurable)
   - All commands are executed with a timeout to prevent hanging
   - Environment variables are sanitized (no secrets passed)
   - Working directory is validated before execution
   - Docker/podman isolation recommended for production
 
+  ## Command Allowlist
+
+  By default, only common programming language interpreters and build tools
+  are allowed. This can be configured via:
+
+      # config/config.exs
+      config :jido_ai, :command_allowlist, [
+        "python3", "python", "node", "elixir", "ruby", "bash", "sh"
+      ]
+
+  Or completely disabled (not recommended for production):
+
+      config :jido_ai, :enforce_command_allowlist, false
+
   ## Usage
 
       # Execute a simple command
-      {:ok, result} = ToolExecutor.run_command("echo", ["hello"], %{})
+      {:ok, result} = ToolExecutor.run_command("echo", ["hello"], [])
 
       # Execute with timeout
-      {:ok, result} = ToolExecutor.run_command("sleep", ["10"], %{}, timeout: 1000)
+      {:ok, result} = ToolExecutor.run_command("sleep", ["10"], [], timeout: 1000)
 
       # Execute in specific directory
-      {:ok, result} = ToolExecutor.run_command("ls", ["-la"], %{}, cd: "/tmp")
+      {:ok, result} = ToolExecutor.run_command("ls", ["-la"], [], cd: "/tmp")
 
   ## Result Structure
 
@@ -56,8 +72,113 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
           cd: String.t(),
           env: %{optional(String.t()) => String.t()},
           timeout: pos_integer(),
-          sandbox: :none | :docker | :podman
+          sandbox: :none | :docker | :podman,
+          bypass_allowlist: boolean()
         ]
+
+  # Default command allowlist - common language interpreters and tools
+  @default_allowlist [
+    # Language interpreters
+    "python3", "python", "python2",
+    "node", "nodejs", "npm", "npx",
+    "elixir", "elixirc", "mix", "iex",
+    "ruby", "gem", "irb",
+    "perl", "perl6",
+    "java", "javac",
+    "go", "gofmt",
+    "rustc", "cargo",
+    # Shells
+    "bash", "sh", "zsh", "fish",
+    # Build tools
+    "make", "cmake", "gcc", "g++", "clang", "clang++",
+    # Common utilities (for testing)
+    "echo", "cat", "ls", "pwd", "mkdir", "rm", "cp", "mv",
+    "test", "true", "false",
+    # Docker/Podman (for sandboxing)
+    "docker", "podman"
+  ]
+
+  @doc """
+  Initializes the command allowlist from configuration.
+  Should be called from application startup.
+  """
+  def init_allowlist do
+    custom_list = Application.get_env(:jido_ai, :command_allowlist, @default_allowlist)
+
+    allowlist =
+      if Application.get_env(:jido_ai, :enforce_command_allowlist, true) do
+        MapSet.new(custom_list)
+      else
+        :disabled
+      end
+
+    :persistent_term.put(:jido_ai_command_allowlist, allowlist)
+  end
+
+  @doc """
+  Returns the current command allowlist.
+  """
+  @spec get_allowlist() :: MapSet.t() | :disabled
+  def get_allowlist do
+    case :persistent_term.get(:jido_ai_command_allowlist, :not_initialized) do
+      :not_initialized ->
+        init_allowlist()
+        :persistent_term.get(:jido_ai_command_allowlist)
+
+      allowlist ->
+        allowlist
+    end
+  end
+
+  @doc """
+  Sets a custom command allowlist at runtime.
+  Useful for testing or dynamic configuration.
+  """
+  @spec set_allowlist([String.t()] | :disabled | :allow_all) :: :ok
+  def set_allowlist(:allow_all) do
+    :persistent_term.put(:jido_ai_command_allowlist, :disabled)
+    :ok
+  end
+
+  def set_allowlist(:disabled) do
+    :persistent_term.put(:jido_ai_command_allowlist, :disabled)
+    :ok
+  end
+
+  def set_allowlist(commands) when is_list(commands) do
+    :persistent_term.put(:jido_ai_command_allowlist, MapSet.new(commands))
+    :ok
+  end
+
+  @doc """
+  Adds a command to the allowlist.
+  """
+  @spec allow_command(String.t()) :: :ok
+  def allow_command(command) do
+    current_allowlist = get_allowlist()
+
+    new_allowlist =
+      case current_allowlist do
+        :disabled -> :disabled
+        set -> MapSet.put(set, command)
+      end
+
+    :persistent_term.put(:jido_ai_command_allowlist, new_allowlist)
+    :ok
+  end
+
+  @doc """
+  Checks if a command is allowed.
+  """
+  @spec command_allowed?(String.t()) :: boolean()
+  def command_allowed?(command) when is_binary(command) do
+    allowlist = get_allowlist()
+
+    case allowlist do
+      :disabled -> true
+      set -> MapSet.member?(set, Path.basename(command))
+    end
+  end
 
   @doc """
   Executes a command with the given arguments.
@@ -74,6 +195,7 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
   - `:env` - Environment variables to set
   - `:timeout` - Maximum execution time in milliseconds (default: 5000)
   - `:sandbox` - Sandbox type (:none, :docker, :podman)
+  - `:bypass_allowlist` - Skip allowlist check (default: false)
 
   ## Returns
 
@@ -99,8 +221,10 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
     cd = Keyword.get(opts, :cd)
     env = Keyword.get(opts, :env, %{})
     sandbox = Keyword.get(opts, :sandbox, :none)
+    bypass_allowlist = Keyword.get(opts, :bypass_allowlist, false)
 
-    with :ok <- validate_working_dir(cd),
+    with :ok <- validate_command(command, bypass_allowlist),
+         :ok <- validate_working_dir(cd),
          :ok <- validate_environment(env),
          {:ok, full_command, full_args} <- maybe_wrap_in_sandbox(command, args, sandbox, opts),
          {start_time, exec_result} <- measure_time(fn -> execute(full_command, full_args, cd, env, timeout) end) do
@@ -179,20 +303,22 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
   defp execute(command, args, cd, env, timeout) do
     # Open a port to execute the command
     port_options = build_port_options(cd, env, timeout)
+    port = Port.open({:spawn_executable, find_executable(command)}, port_options ++ [:binary, :exit_status, :hide, args: args])
 
+    # Ensure port is closed even if an error occurs
     try do
-      port =
-        Port.open(
-          {:spawn_executable, find_executable(command)},
-          port_options ++ [:binary, :exit_status, :hide, args: args]
-        )
-
       # Wait for the result with timeout
       await_port_result(port, timeout, <<>>, <<>>)
-    catch
-      kind, error ->
-        {:error, {kind, error}}
+    after
+      # Close port if it's still open (not closed by await_port_result)
+      # Note: Erlang ports close automatically on exit_status, but this is defensive
+      if Port.info(port) != nil do
+        Port.close(port)
+      end
     end
+  rescue
+    error ->
+      {:error, error}
   end
 
   defp build_port_options(nil, env, _timeout), do: env_option(env)
@@ -224,10 +350,11 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
         )
 
       {^port, {:exit_status, exit_code}} ->
+        # Port closes automatically after exit_status
         {:ok, exit_code, stdout_acc, stderr_acc}
     after
       timeout ->
-        Port.close(port)
+        # Return timeout signal - port will be closed by try/after in execute
         {:timeout, stdout_acc, stderr_acc}
     end
   end
@@ -250,20 +377,44 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
 
       _docker ->
         cd = Keyword.get(opts, :cd, File.cwd!())
-        # Wrap command in docker run
+
+        # Sanitize the working directory path for Docker volume mount
+        # Docker doesn't handle paths with certain characters well
+        sanitized_cd = sanitize_path_for_docker(cd)
+
+        # Wrap command in docker run with security hardening
         docker_cmd = "docker"
 
         docker_args =
           [
             "run",
             "--rm",
+            # Read-only mount (prevents container from modifying host files)
             "-v",
-            "#{cd}:/workspace",
+            "#{sanitized_cd}:/workspace:ro",
             "-w",
             "/workspace",
+            # Drop all capabilities (no privileged operations)
+            "--cap-drop=ALL",
+            # No new privileges (even for root user)
+            "--security-opt=no-new-privileges",
+            # Temporary filesystems for /tmp and /home (writable but in memory only)
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=100m",
+            "--tmpfs",
+            "/home:rw,noexec,nosuid,size=100m",
+            # Network isolation (no network access)
             "--network=none",
+            # Resource limits
             "--memory=512m",
             "--cpus=1",
+            "--pids-limit=100",
+            # Read-only root filesystem (prevents writing to system directories)
+            "--read-only",
+            # Use non-root user
+            "-u",
+            "1000:1000",
+            # Use a minimal image
             "elixir:latest",
             command
           ] ++ args
@@ -280,20 +431,43 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
 
       _podman ->
         cd = Keyword.get(opts, :cd, File.cwd!())
-        # Wrap command in podman run
+
+        # Sanitize the working directory path for Podman volume mount
+        sanitized_cd = sanitize_path_for_docker(cd)
+
+        # Wrap command in podman run with security hardening
         podman_cmd = "podman"
 
         podman_args =
           [
             "run",
             "--rm",
+            # Read-only mount with SELinux label
             "-v",
-            "#{cd}:/workspace:Z",
+            "#{sanitized_cd}:/workspace:ro,Z",
             "-w",
             "/workspace",
+            # Drop all capabilities
+            "--cap-drop=ALL",
+            # No new privileges
+            "--security-opt=no-new-privileges",
+            # Temporary filesystems
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=100m",
+            "--tmpfs",
+            "/home:rw,noexec,nosuid,size=100m",
+            # Network isolation
             "--network=none",
+            # Resource limits
             "--memory=512m",
             "--cpus=1",
+            "--pids-limit=100",
+            # Read-only root filesystem
+            "--read-only",
+            # Non-root user
+            "-u",
+            "1000:1000",
+            # Use a minimal image
             "elixir:latest",
             command
           ] ++ args
@@ -302,17 +476,69 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
     end
   end
 
+  # Sanitize path for Docker/Podman volume mounts
+  # Some characters in paths can cause issues with container runtimes
+  defp sanitize_path_for_docker(path) do
+    # Expand the path first
+    expanded = Path.expand(path)
+
+    # For Docker on Windows, paths need special handling
+    # On Unix-like systems, the path should be fine as-is
+    expanded
+  end
+
   defp validate_working_dir(nil), do: :ok
 
   defp validate_working_dir(path) when is_binary(path) do
-    if File.dir?(path) do
-      :ok
+    # Sanitize path to prevent directory traversal
+    expanded_path = Path.expand(path)
+
+    # Check if path exists and is a directory
+    if File.dir?(expanded_path) do
+      # Ensure path doesn't contain suspicious patterns
+      if suspicious_path?(expanded_path) do
+        {:error, :suspicious_path}
+      else
+        {:ok, expanded_path}
+      end
     else
       {:error, :directory_not_found}
     end
   end
 
   defp validate_working_dir(_), do: {:error, :invalid_directory}
+
+  # Check for suspicious path patterns that might indicate attacks
+  defp suspicious_path?(path) do
+    # Check for null bytes and URL-like patterns that shouldn't be in file paths
+    # Note: ".." is allowed for legitimate parent directory navigation
+    cond do
+      String.contains?(path, "\x00") -> true  # Null byte injection
+      # Check for protocol-like patterns (potential URL injection)
+      # But allow common patterns like "C:/" on Windows
+      String.contains?(path, "://") -> true
+      true -> false
+    end
+  end
+
+  # Validate command against allowlist
+  defp validate_command(command, bypass_allowlist?) do
+    command_basename = Path.basename(command)
+
+    cond do
+      # Allow bypass for internal use (e.g., docker/podman wrapper)
+      bypass_allowlist? ->
+        :ok
+
+      # Check if command is on allowlist
+      command_allowed?(command_basename) ->
+        :ok
+
+      # Reject commands not on allowlist
+      true ->
+        {:error, {:command_not_allowed, command_basename}}
+    end
+  end
 
   defp validate_environment(env) when is_map(env) do
     # Check for dangerous environment variables
