@@ -552,7 +552,8 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
       rendered = EEx.eval_string(template, assigns: assigns)
       {:ok, rendered}
     rescue
-      e -> {:error, {:template_error, Exception.message(e)}}
+      e in [SyntaxError, TokenMissingError, ArgumentError] ->
+        {:error, {:template_error, Exception.message(e)}}
     end
   end
 

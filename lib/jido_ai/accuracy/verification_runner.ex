@@ -435,9 +435,9 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
 
     init_verifier_with_exports(verifier_mod, config, exports)
   rescue
-    error ->
+    e in [UndefinedFunctionError, ArgumentError] ->
       # Module doesn't exist or can't be loaded
-      {:error, {:module_not_found, {verifier_mod, error}}}
+      {:error, {:module_not_found, {verifier_mod, e}}}
   end
 
   defp init_verifier_with_exports(verifier_mod, config, exports) do
@@ -478,7 +478,8 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
   defp create_verifier_struct(verifier_mod, config) do
     {:ok, struct!(verifier_mod, config)}
   rescue
-    _ -> {:ok, verifier_mod}
+    e in [BadStructError, ArgumentError] ->
+      {:ok, verifier_mod}
   end
 
   defp verify_with_verifier(_verifier_mod, verifier, candidate, context) when is_struct(verifier) do

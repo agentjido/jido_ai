@@ -242,8 +242,9 @@ defmodule Jido.AI.Accuracy.GenerationResultTest do
 
       updated = GenerationResult.add_candidate(result, new_candidate)
 
-      assert length(updated.candidates) == 1
-      assert Enum.at(updated.candidates, 0).content == "New"
+      candidates = GenerationResult.candidates(updated)
+      assert length(candidates) == 1
+      assert Enum.at(candidates, 0).content == "New"
       assert updated.total_tokens == 50
     end
 
@@ -254,8 +255,9 @@ defmodule Jido.AI.Accuracy.GenerationResultTest do
       new_candidate = Candidate.new!(%{content: "B", tokens_used: 50})
       updated = GenerationResult.add_candidate(result, new_candidate)
 
-      assert length(updated.candidates) == 2
-      assert Enum.at(updated.candidates, 1).content == "B"
+      candidates = GenerationResult.candidates(updated)
+      assert length(candidates) == 2
+      assert Enum.at(candidates, 1).content == "B"
       assert updated.total_tokens == 150
     end
 

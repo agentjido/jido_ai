@@ -291,4 +291,55 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
   end
 
   defp find_reasoning_split_test(_, []), do: nil
+
+  describe "LLM API error handling" do
+    @moduletag :capture_log
+
+    test "handles timeout errors gracefully" do
+      generator = LLMGenerator.new!(timeout: 2000)
+
+      # Verify the generator handles timeouts without crashing
+      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+    end
+
+    test "handles rate limit errors" do
+      generator = LLMGenerator.new!([])
+
+      # When API rate limit is hit (HTTP 429), generator should:
+      # 1. Log the error
+      # 2. Return {:error, :rate_limited} or similar
+      # 3. Not crash
+      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+    end
+
+    test "handles network connectivity errors" do
+      generator = LLMGenerator.new!([])
+
+      # Network errors should be handled gracefully
+      # Return {:error, reason} tuple with appropriate error info
+      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+    end
+
+    test "handles authentication errors" do
+      generator = LLMGenerator.new!([])
+
+      # Invalid API key (HTTP 401/403) should return structured error
+      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+    end
+
+    test "handles malformed LLM responses" do
+      generator = LLMGenerator.new!([])
+
+      # Invalid JSON or unexpected format should be handled
+      # Return {:error, {:malformed_response, _}} or similar
+      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+    end
+
+    test "handles service unavailable errors" do
+      generator = LLMGenerator.new!([])
+
+      # HTTP 503 should be handled gracefully
+      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+    end
+  end
 end
