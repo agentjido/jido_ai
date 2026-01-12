@@ -346,8 +346,8 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
     {:cont, [result | acc]}
   end
 
-  defp handle_verifier_result({:error, reason}, verifier_mod, acc, :continue) do
-    Logger.warning("Verifier #{inspect(verifier_mod)} failed: #{inspect(reason)}")
+  defp handle_verifier_result({:error, _reason}, verifier_mod, acc, :continue) do
+    Logger.warning("Verifier failed for #{format_module_name(verifier_mod)}")
     {:cont, acc}
   end
 
@@ -401,9 +401,9 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
     {:ok, result}
   end
 
-  defp handle_task_result({:ok, {:error, reason}}, verifier_mod, :continue) do
-    Logger.warning("Verifier #{inspect(verifier_mod)} failed: #{inspect(reason)}")
-    {:error, reason}
+  defp handle_task_result({:ok, {:error, _reason}}, verifier_mod, :continue) do
+    Logger.warning("Verifier task failed for #{format_module_name(verifier_mod)}")
+    {:error, :task_failed}
   end
 
   defp handle_task_result({:ok, {:error, reason}}, verifier_mod, _halt) do
@@ -420,101 +420,88 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
   end
 
   defp run_verifier(verifier_mod, config, candidate, context, _timeout) do
-    # Initialize verifier if it has new/1
-    with {:ok, verifier} <- init_verifier(verifier_mod, config) do
-      # Call verify with appropriate arity
-      verify_with_verifier(verifier_mod, verifier, candidate, context)
+    with {:ok, verifier} <- init_verifier(verifier_mod, config),
+         {:ok, result} <- call_verify(verifier_mod, verifier, candidate, context) do
+      {:ok, result}
     end
   end
 
-  # Try to call new/1, handling the case where the module might not be fully loaded
+  # Initialize verifier: try new/1, fall back to module or struct
   defp init_verifier(verifier_mod, config) do
-    # Ensure module is loaded by accessing exports
-    _ = verifier_mod.module_info(:exports)
-    exports = verifier_mod.module_info(:exports)
+    # Force module loading by accessing exports
+    exports = try do
+      verifier_mod.module_info(:exports)
+    rescue
+      _ -> %{}
+    end
 
-    init_verifier_with_exports(verifier_mod, config, exports)
+    cond do
+      has_function?(exports, :new, 1) ->
+        call_new(verifier_mod, config)
+
+      has_function?(exports, :verify, 3) ->
+        # Needs struct, try to create one
+        create_verifier_struct(verifier_mod, config)
+
+      has_function?(exports, :verify, 2) ->
+        # Use module directly
+        {:ok, verifier_mod}
+
+      true ->
+        {:error, {:verifier_not_available, verifier_mod}}
+    end
   rescue
     e in [UndefinedFunctionError, ArgumentError] ->
-      # Module doesn't exist or can't be loaded
       {:error, {:module_not_found, {verifier_mod, e}}}
   end
 
-  defp init_verifier_with_exports(verifier_mod, config, exports) do
-    if Keyword.get(exports, :new) == 1 do
-      call_verifier_new(verifier_mod, config)
-    else
-      # No new/1, try to create struct directly
-      try_create_struct(verifier_mod, config)
-    end
+  defp has_function?(exports, func, arity) do
+    Enum.any?(exports, fn {f, a} -> f == func and a == arity end)
   end
 
-  defp call_verifier_new(verifier_mod, config) when is_map(config) do
+  defp call_new(verifier_mod, config) when is_map(config) do
     case verifier_mod.new(Map.to_list(config)) do
       {:ok, v} -> {:ok, v}
       {:error, reason} -> {:error, {:init_failed, reason}}
     end
   end
 
-  defp call_verifier_new(verifier_mod, config) do
+  defp call_new(verifier_mod, config) when is_list(config) do
     case verifier_mod.new(config) do
       {:ok, v} -> {:ok, v}
       {:error, reason} -> {:error, {:init_failed, reason}}
     end
   end
 
-  defp try_create_struct(verifier_mod, config) do
-    # Check if module has verify/3, which suggests it needs a struct
-    exports = verifier_mod.module_info(:exports)
-
-    if Keyword.get(exports, :verify) == 3 do
-      create_verifier_struct(verifier_mod, config)
-    else
-      # Use module directly for verify/2
-      {:ok, verifier_mod}
-    end
-  end
-
-  defp create_verifier_struct(verifier_mod, config) do
-    {:ok, struct!(verifier_mod, config)}
+  defp create_verifier_struct(verifier_mod, _config) do
+    {:ok, struct!(verifier_mod, [])}
   rescue
     e in [BadStructError, ArgumentError] ->
+      Logger.warning("Could not create struct for #{format_module_name(verifier_mod)}")
       {:ok, verifier_mod}
   end
 
-  defp verify_with_verifier(_verifier_mod, verifier, candidate, context) when is_struct(verifier) do
+  # Call verify with appropriate arity
+  defp call_verify(_verifier_mod, verifier, candidate, context) when is_struct(verifier) do
     struct_module = verifier.__struct__
 
     if function_exported?(struct_module, :verify, 3) do
       struct_module.verify(verifier, candidate, context)
     else
-      require Logger
-
-      Logger.warning("Verifier #{inspect(struct_module)} does not have verify/3")
-      {:error, :verify_not_implemented}
+      {:error, {:verifier_not_available, struct_module}}
     end
   end
 
-  defp verify_with_verifier(verifier_mod, verifier, candidate, context) when is_atom(verifier) do
-    if function_exported?(verifier, :verify, 2) do
-      verifier.verify(candidate, context)
+  defp call_verify(verifier_mod, _verifier, candidate, context) when is_atom(verifier_mod) do
+    if function_exported?(verifier_mod, :verify, 2) do
+      verifier_mod.verify(candidate, context)
     else
-      log_verify_error(verifier_mod, verifier)
+      {:error, {:verifier_not_available, verifier_mod}}
     end
   end
 
-  defp verify_with_verifier(verifier_mod, verifier, _candidate, _context) do
-    log_verify_error(verifier_mod, verifier)
-  end
-
-  defp log_verify_error(verifier_mod, verifier) do
-    require Logger
-
-    Logger.warning(
-      "verify_with_verifier failed: verifier_mod=#{inspect(verifier_mod)}, verifier=#{inspect(verifier)}, is_struct=#{is_struct(verifier)}"
-    )
-
-    {:error, :verify_not_implemented}
+  defp call_verify(verifier_mod, verifier, _candidate, _context) do
+    {:error, {:verifier_not_available, {verifier_mod, verifier}}}
   end
 
   defp aggregate_results(runner, results, candidate) do
@@ -685,4 +672,15 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
   defp validate_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
   defp validate_timeout(nil), do: :ok
   defp validate_timeout(_), do: {:error, :invalid_timeout}
+
+  # Format module name for logging (sanitizes internal state)
+  defp format_module_name(mod) when is_atom(mod) do
+    mod
+    |> Atom.to_string()
+    |> String.replace_prefix("Elixir.", "")
+    |> String.split(".")
+    |> List.last()
+  end
+
+  defp format_module_name(_), do: "Unknown"
 end
