@@ -131,56 +131,63 @@ Route responses based on confidence level.
 
 Create the gate that routes based on confidence.
 
-- [ ] 6.2.1.1 Create `lib/jido_ai/accuracy/calibration_gate.ex`
-- [ ] 6.2.1.2 Add `@moduledoc` explaining calibration gate pattern
-- [ ] 6.2.1.3 Define configuration schema:
+- [x] 6.2.1.1 Create `lib/jido_ai/accuracy/calibration_gate.ex`
+- [x] 6.2.1.2 Add `@moduledoc` explaining calibration gate pattern
+- [x] 6.2.1.3 Define configuration schema:
   - `:high_threshold` - Threshold for high confidence (default: 0.7)
   - `:low_threshold` - Threshold for low confidence (default: 0.4)
   - `:medium_action` - Action for medium confidence
   - `:low_action` - Action for low confidence
-- [ ] 6.2.1.4 Implement `route/3` with candidate and estimate
-- [ ] 6.2.1.5 Define routing logic:
+- [x] 6.2.1.4 Implement `route/3` with candidate and estimate
+- [x] 6.2.1.5 Define routing logic:
   - High confidence → direct answer
   - Medium confidence → answer with verification
   - Low confidence → abstain or escalate
-- [ ] 6.2.1.6 Support custom thresholds
-- [ ] 6.2.1.7 Add telemetry for routing decisions
-- [ ] 6.2.1.8 Implement `should_route?/2` for pre-check
+- [x] 6.2.1.6 Support custom thresholds
+- [x] 6.2.1.7 Add telemetry for routing decisions
+- [x] 6.2.1.8 Implement `should_route?/2` for pre-check
 
 ### 6.2.2 Routing Strategies
 
 Implement specific routing strategies.
 
-- [ ] 6.2.2.1 Implement `direct_answer/1`
+- [x] 6.2.2.1 Implement `direct_answer/1`
   - Return candidate as-is
   - Emit direct_answer telemetry event
-- [ ] 6.2.2.2 Implement `answer_with_citations/1`
+- [x] 6.2.2.2 Implement `answer_with_citations/1`
   - Add source citations if available
   - Include confidence disclaimer
   - Emit citation_added telemetry event
-- [ ] 6.2.2.3 Implement `answer_with_tests/1`
+- [x] 6.2.2.3 Implement `answer_with_tests/1` (as `with_verification`)
   - Suggest verification steps
   - Include test cases if code
   - Emit verification_suggested telemetry event
-- [ ] 6.2.2.4 Implement `escalate/1`
+- [x] 6.2.2.4 Implement `escalate/1`
   - Format escalation message
   - Include context for escalation
   - Emit escalated telemetry event
-- [ ] 6.2.2.5 Implement `abstain/1`
+- [x] 6.2.2.5 Implement `abstain/1`
   - Format abstention message
   - Explain uncertainty
   - Emit abstained telemetry event
 
 ### 6.2.3 Unit Tests for CalibrationGate
 
-- [ ] Test `route/3` routes high confidence correctly
-- [ ] Test `route/3` routes medium confidence with verification
-- [ ] Test `route/3` routes low confidence to abstain
-- [ ] Test custom thresholds work correctly
-- [ ] Test telemetry emitted for each route
-- [ ] Test `direct_answer/1` returns candidate unchanged
-- [ ] Test `answer_with_citations/1` adds citations
-- [ ] Test `abstain/1` returns abstention message
+- [x] Test `route/3` routes high confidence correctly
+- [x] Test `route/3` routes medium confidence with verification
+- [x] Test `route/3` routes low confidence to abstain
+- [x] Test custom thresholds work correctly
+- [x] Test telemetry emitted for each route
+- [x] Test `direct_answer/1` returns candidate unchanged
+- [x] Test `answer_with_citations/1` adds citations
+- [x] Test `abstain/1` returns abstention message
+
+**Section 6.2 Status: Complete (60 tests passing)**
+
+**Additional:**
+- [x] Created `lib/jido_ai/accuracy/routing_result.ex` - Result struct with action helpers
+- [x] Created `test/jido_ai/accuracy/routing_result_test.exs` - 28 tests
+- [x] Created `test/jido_ai/accuracy/calibration_gate_test.exs` - 32 tests
 
 ---
 
