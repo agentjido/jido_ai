@@ -10,8 +10,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Critique
 
+    defstruct []
+
     @impl true
-    def critique(%Candidate{}, context) do
+    def critique(_critiquer, %Candidate{}, context) do
       # Severity decreases with iterations to simulate improvement
       iteration = Map.get(context, :iteration, 0)
       severity = 0.8 - (iteration * 0.3)
@@ -31,8 +33,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Revision
 
+    defstruct []
+
     @impl true
-    def revise(%Candidate{} = candidate, %CritiqueResult{}, context) do
+    def revise(_reviser, %Candidate{} = candidate, %CritiqueResult{}, context) do
       iteration = Map.get(context, :iteration, 0)
 
       {:ok,
@@ -95,10 +99,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
                ReflectionLoop.new(%{
                  critiquer: MockCritiquer,
                  reviser: MockReviser,
-                 memory: {:ok, memory}
+                 memory: memory
                })
 
-      assert loop.memory == {:ok, memory}
+      assert loop.memory == memory
 
       ReflexionMemory.stop(memory)
     end
@@ -234,8 +238,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
       defmodule ScoringReviser do
         @behaviour Jido.AI.Accuracy.Revision
 
+        defstruct []
+
         @impl true
-        def revise(%Candidate{} = candidate, _critique, context) do
+        def revise(_reviser, %Candidate{} = candidate, _critique, context) do
           iteration = Map.get(context, :iteration, 0)
 
           {:ok,
@@ -284,8 +290,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
       defmodule ContextCheckingReviser do
         @behaviour Jido.AI.Accuracy.Revision
 
+        defstruct []
+
         @impl true
-        def revise(_candidate, _critique, context) do
+        def revise(_reviser, _candidate, _critique, context) do
           iter = Map.get(context, :iteration)
           {:ok, Candidate.new!(%{id: "ctx-#{iter}", content: "Context received"})}
         end
@@ -418,7 +426,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
         ReflectionLoop.new!(%{
           critiquer: MockCritiquer,
           reviser: MockReviser,
-          memory: {:ok, memory}
+          memory: memory
         })
 
       initial = Candidate.new!(%{id: "1", content: "Initial"})
@@ -434,8 +442,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
       defmodule HighSeverityCritiquer do
         @behaviour Jido.AI.Accuracy.Critique
 
+        defstruct []
+
         @impl true
-        def critique(_candidate, _context) do
+        def critique(_critiquer, _candidate, _context) do
           {:ok,
            CritiqueResult.new!(%{
              severity: 0.8,
@@ -451,7 +461,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
         ReflectionLoop.new!(%{
           critiquer: HighSeverityCritiquer,
           reviser: MockReviser,
-          memory: {:ok, memory}
+          memory: memory
         })
 
       initial = Candidate.new!(%{id: "1", content: "Wrong answer"})
@@ -489,8 +499,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
       defmodule ConvergingCritiquer do
         @behaviour Jido.AI.Accuracy.Critique
 
+        defstruct []
+
         @impl true
-        def critique(_candidate, _context) do
+        def critique(_critiquer, _candidate, _context) do
           {:ok, CritiqueResult.new!(%{severity: 0.1})}
         end
       end
@@ -513,8 +525,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
       defmodule NonConvergingCritiquer do
         @behaviour Jido.AI.Accuracy.Critique
 
+        defstruct []
+
         @impl true
-        def critique(_candidate, _context) do
+        def critique(_critiquer, _candidate, _context) do
           {:ok, CritiqueResult.new!(%{severity: 0.8})}
         end
       end

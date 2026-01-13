@@ -14,8 +14,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Critique
 
+    defstruct []
+
     @impl true
-    def critique(%Candidate{}, context) do
+    def critique(_critiquer, %Candidate{}, context) do
       iteration = Map.get(context, :iteration, 0)
       # Severity decreases with iterations
       severity = 0.9 - (iteration * 0.35)
@@ -42,8 +44,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Revision
 
+    defstruct []
+
     @impl true
-    def revise(%Candidate{} = candidate, %CritiqueResult{} = _critique, context) do
+    def revise(_reviser, %Candidate{} = candidate, %CritiqueResult{} = _critique, context) do
       iteration = Map.get(context, :iteration, 0)
 
       # Content improves with iterations
@@ -71,8 +75,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Critique
 
+    defstruct []
+
     @impl true
-    def critique(%Candidate{content: content}, _context) do
+    def critique(_critiquer, %Candidate{content: content}, _context) do
       issues = []
 
       issues =
@@ -110,8 +116,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Revision
 
+    defstruct []
+
     @impl true
-    def revise(%Candidate{content: content}, %CritiqueResult{} = _critique, _context) do
+    def revise(_reviser, %Candidate{content: content}, %CritiqueResult{} = _critique, _context) do
       # Fix common code issues
       fixed =
         (content || "")
@@ -135,8 +143,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Critique
 
+    defstruct []
+
     @impl true
-    def critique(%Candidate{content: content}, _context) do
+    def critique(_critiquer, %Candidate{content: content}, _context) do
       text = content || ""
 
       issues = []
@@ -176,8 +186,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Revision
 
+    defstruct []
+
     @impl true
-    def revise(%Candidate{content: content}, %CritiqueResult{}, _context) do
+    def revise(_reviser, %Candidate{content: content}, %CritiqueResult{}, _context) do
       # Improve writing quality
       base = (content || "")
         |> String.replace("very good", "excellent")
@@ -210,8 +222,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Critique
 
+    defstruct []
+
     @impl true
-    def critique(%Candidate{content: content}, _context) do
+    def critique(_critiquer, %Candidate{content: content}, _context) do
       text = content || ""
 
       issues = []
@@ -245,8 +259,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @moduledoc false
     @behaviour Jido.AI.Accuracy.Revision
 
+    defstruct []
+
     @impl true
-    def revise(%Candidate{content: _content}, %CritiqueResult{}, _context) do
+    def revise(_reviser, %Candidate{content: _content}, %CritiqueResult{}, _context) do
       # Provide correct math solution
       revised = """
       To calculate 15 * 23:
@@ -311,8 +327,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
         @moduledoc false
         @behaviour Jido.AI.Accuracy.Critique
 
+        defstruct []
+
         @impl true
-        def critique(%Candidate{}, context) do
+        def critique(_critiquer, %Candidate{}, context) do
           iteration = Map.get(context, :iteration, 0)
           # Converges after iteration 1
           severity = if iteration >= 1, do: 0.1, else: 0.7
@@ -353,7 +371,7 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
         ReflectionLoop.new!(%{
           critiquer: ImprovingCritiquer,
           reviser: ImprovingReviser,
-          memory: {:ok, memory},
+          memory: memory,
           max_iterations: 2
         })
 
@@ -370,7 +388,7 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
         ReflectionLoop.new!(%{
           critiquer: ImprovingCritiquer,
           reviser: ImprovingReviser,
-          memory: {:ok, memory},
+          memory: memory,
           max_iterations: 2
         })
 

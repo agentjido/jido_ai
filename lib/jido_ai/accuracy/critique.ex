@@ -65,10 +65,13 @@ defmodule Jido.AI.Accuracy.Critique do
   @type critique_result :: {:ok, CritiqueResult.t()} | {:error, term()}
 
   @doc """
-  Generate a critique for the given candidate.
+  Generate a critique for the given candidate (struct-based implementation).
+
+  For struct-based critiquers that need to access their own configuration.
 
   ## Parameters
 
+  - `critiquer` - The critiquer struct (self)
   - `candidate` - The candidate to critique
   - `context` - Additional context for the critique
 
@@ -78,7 +81,7 @@ defmodule Jido.AI.Accuracy.Critique do
   - `{:error, reason}` on failure
 
   """
-  @callback critique(Candidate.t(), context()) :: critique_result()
+  @callback critique(struct(), Candidate.t(), context()) :: critique_result()
 
   @doc """
   Generate critiques for multiple candidates.
@@ -104,7 +107,7 @@ defmodule Jido.AI.Accuracy.Critique do
   @doc """
   Default implementation for batch critique.
 
-  Calls `critique/2` for each candidate sequentially.
+  Calls `critique/3` for each candidate sequentially.
 
   """
   @spec critique_batch([Candidate.t()], context(), module()) :: critique_result()
@@ -134,15 +137,16 @@ defmodule Jido.AI.Accuracy.Critique do
   @doc """
   Checks if the given module is a critiquer.
 
-  A module is considered a critiquer if it exports:
-  - `critique/2` - for module-level implementations, or
-  - `critique/3` - for struct-based implementations (self, candidate, context)
+  A module is considered a critiquer if it exports `critique/3`
+  (self, candidate, context) for struct-based implementations.
+
+  Note: Module-level `critique/2` implementations are not supported
+  by the current behavior.
 
   """
   @spec critiquer?(term()) :: boolean()
   def critiquer?(module) when is_atom(module) do
-    Code.ensure_loaded?(module) and
-      (function_exported?(module, :critique, 2) or function_exported?(module, :critique, 3))
+    Code.ensure_loaded?(module) and function_exported?(module, :critique, 3)
   end
 
   def critiquer?(_), do: false
