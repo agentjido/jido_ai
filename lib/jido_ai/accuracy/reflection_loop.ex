@@ -64,7 +64,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, Critique, Revision, ReflexionMemory}
+  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, ReflexionMemory}
 
   @type t :: %__MODULE__{
           max_iterations: pos_integer(),
@@ -72,7 +72,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
           reviser: module(),
           generator: module() | nil,
           convergence_threshold: float(),
-          memory: {:ok, ReflexionMemory.t()} | nil
+          memory: ReflexionMemory.t() | nil
         }
 
   defstruct [
@@ -252,17 +252,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
     context_with_iter = Map.put(context, :iteration, iteration)
 
     # Critique the current candidate
-    critique_result =
-      cond do
-        function_exported?(critiquer, :critique, 3) ->
-          critiquer.critique(critiquer, candidate, context_with_iter)
-
-        function_exported?(critiquer, :critique, 2) ->
-          critiquer.critique(candidate, context_with_iter)
-
-        true ->
-          {:error, :invalid_critiquer}
-      end
+    critique_result = critiquer.critique(critiquer, candidate, context_with_iter)
 
     with {:ok, critique} <- critique_result,
          {:ok, revised} <- revise_candidate(reviser, candidate, critique, context_with_iter) do
@@ -344,8 +334,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
 
   defp validate_critiquer(nil), do: {:error, :critiquer_required}
   defp validate_critiquer(module) when is_atom(module) do
-    if Code.ensure_loaded?(module) and
-         (function_exported?(module, :critique, 2) or function_exported?(module, :critique, 3)) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :critique, 3) do
       :ok
     else
       {:error, :invalid_critiquer}
@@ -356,8 +345,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
 
   defp validate_reviser(nil), do: {:error, :reviser_required}
   defp validate_reviser(module) when is_atom(module) do
-    if Code.ensure_loaded?(module) and
-         (function_exported?(module, :revise, 3) or function_exported?(module, :revise, 4)) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :revise, 4) do
       :ok
     else
       {:error, :invalid_reviser}
@@ -398,16 +386,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
   end
 
   defp revise_candidate(reviser, candidate, critique, context) do
-    cond do
-      function_exported?(reviser, :revise, 4) ->
-        reviser.revise(reviser, candidate, critique, context)
-
-      function_exported?(reviser, :revise, 3) ->
-        reviser.revise(candidate, critique, context)
-
-      true ->
-        {:error, :invalid_reviser}
-    end
+    reviser.revise(reviser, candidate, critique, context)
   end
 
   defp minimal_content_change?(nil, nil), do: true
@@ -429,9 +408,9 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
 
   defp minimal_content_change?(_, _), do: false
 
-  defp select_best(%Candidate{score: score1}, %Candidate{score: score2} = c2)
+  defp select_best(%Candidate{score: score1} = c1, %Candidate{score: score2} = c2)
        when is_number(score1) and is_number(score2) do
-    if score2 >= score1, do: c2, else: c2
+    if score2 >= score1, do: c2, else: c1
   end
 
   defp select_best(%Candidate{}, %Candidate{} = c2), do: c2
@@ -448,7 +427,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
 
   defp maybe_add_memory_context(%__MODULE__{memory: nil}, _prompt, context), do: context
 
-  defp maybe_add_memory_context(%__MODULE__{memory: {:ok, memory}}, prompt, context) do
+  defp maybe_add_memory_context(%__MODULE__{memory: memory}, prompt, context) do
     case ReflexionMemory.retrieve_similar(memory, prompt, max_results: 3) do
       {:ok, []} -> context
       {:ok, memories} -> Map.put(context, :past_mistakes, memories)
@@ -458,7 +437,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
 
   defp maybe_store_in_memory(%__MODULE__{memory: nil}, _prompt, _result), do: :ok
 
-  defp maybe_store_in_memory(%__MODULE__{memory: {:ok, memory}}, prompt, result) do
+  defp maybe_store_in_memory(%__MODULE__{memory: memory}, prompt, result) do
     # Store if there were iterations with critiques
     critiques =
       result.iterations

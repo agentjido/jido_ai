@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquerTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, Critiquers.ToolCritiquer}
+  alias Jido.AI.Accuracy.{Candidate, Critiquers.ToolCritiquer}
 
   @moduletag :capture_log
 

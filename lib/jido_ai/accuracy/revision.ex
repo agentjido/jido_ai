@@ -70,10 +70,13 @@ defmodule Jido.AI.Accuracy.Revision do
   @type revision_result :: {:ok, Candidate.t()} | {:error, term()}
 
   @doc """
-  Revise a candidate based on critique feedback.
+  Revise a candidate based on critique feedback (struct-based implementation).
+
+  For struct-based revisers that need to access their own configuration.
 
   ## Parameters
 
+  - `reviser` - The reviser struct (self)
   - `candidate` - The candidate to revise
   - `critique` - The critique feedback to incorporate
   - `context` - Additional context for the revision
@@ -84,7 +87,7 @@ defmodule Jido.AI.Accuracy.Revision do
   - `{:error, reason}` on failure
 
   """
-  @callback revise(Candidate.t(), CritiqueResult.t(), context()) :: revision_result()
+  @callback revise(struct(), Candidate.t(), CritiqueResult.t(), context()) :: revision_result()
 
   @doc """
   Generate a diff showing changes between original and revised content.
@@ -133,15 +136,16 @@ defmodule Jido.AI.Accuracy.Revision do
   @doc """
   Checks if the given module is a reviser.
 
-  A module is considered a reviser if it exports:
-  - `revise/3` - for module-level implementations, or
-  - `revise/4` - for struct-based implementations (self, candidate, critique, context)
+  A module is considered a reviser if it exports `revise/4`
+  (self, candidate, critique, context) for struct-based implementations.
+
+  Note: Module-level `revise/3` implementations are not supported
+  by the current behavior.
 
   """
   @spec reviser?(term()) :: boolean()
   def reviser?(module) when is_atom(module) do
-    Code.ensure_loaded?(module) and
-      (function_exported?(module, :revise, 3) or function_exported?(module, :revise, 4))
+    Code.ensure_loaded?(module) and function_exported?(module, :revise, 4)
   end
 
   def reviser?(_), do: false

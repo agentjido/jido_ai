@@ -136,7 +136,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquer do
 
   """
   @spec critique(t(), Candidate.t(), map()) :: {:ok, CritiqueResult.t()} | {:error, term()}
-  def critique(%__MODULE__{tools: []} = _critiquer, %Candidate{} = candidate, _context) do
+  def critique(%__MODULE__{tools: []} = _critiquer, %Candidate{} = _candidate, _context) do
     {:ok,
      CritiqueResult.new!(%{
        severity: 0.0,
@@ -187,7 +187,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquer do
     Map.put(result, :tool, tool_spec.name)
   end
 
-  defp process_tool_result(tool_spec, tool_result, candidate) do
+  defp process_tool_result(tool_spec, tool_result, _candidate) do
     success = tool_result.exit_code == 0 and not tool_result.timed_out
 
     severity =
@@ -273,7 +273,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquer do
     Enum.take(suggestion_lines, 5)
   end
 
-  defp aggregate_results(tool_results, severity_map) do
+  defp aggregate_results(tool_results, _severity_map) do
     all_issues =
       tool_results
       |> Enum.flat_map(fn r -> r.issues end)
