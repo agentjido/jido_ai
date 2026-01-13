@@ -46,77 +46,80 @@ Estimate confidence in model responses.
 
 Define the behavior for confidence estimation.
 
-- [ ] 6.1.1.1 Create `lib/jido_ai/accuracy/confidence_estimator.ex`
-- [ ] 6.1.1.2 Add `@moduledoc` explaining confidence estimation
-- [ ] 6.1.1.3 Define `@callback estimate/2`:
+- [x] 6.1.1.1 Create `lib/jido_ai/accuracy/confidence_estimator.ex`
+- [x] 6.1.1.2 Add `@moduledoc` explaining confidence estimation
+- [x] 6.1.1.3 Define `@callback estimate/3`:
   ```elixir
   @callback estimate(
+    estimator :: struct(),
     candidate :: Jido.AI.Accuracy.Candidate.t(),
     context :: map()
   ) :: {:ok, Jido.AI.Accuracy.ConfidenceEstimate.t()} | {:error, term()}
   ```
-- [ ] 6.1.1.4 Document estimation methods
+- [x] 6.1.1.4 Document estimation methods
 
 ### 6.1.2 Confidence Estimate
 
 Define the confidence estimate struct.
 
-- [ ] 6.1.2.1 Create `lib/jido_ai/accuracy/confidence_estimate.ex`
-- [ ] 6.1.2.2 Define `defstruct` with fields:
+- [x] 6.1.2.1 Create `lib/jido_ai/accuracy/confidence_estimate.ex`
+- [x] 6.1.2.2 Define `defstruct` with fields:
   - `:score` - Confidence score [0-1]
   - `:calibration` - How well-calibrated the estimate is
   - `:method` - Method used for estimation
   - `:reasoning` - Explanation for confidence level
   - `:token_level_confidence` - Per-token confidence if available
   - `:metadata` - Additional metadata
-- [ ] 6.1.2.3 Add `@moduledoc` with documentation
-- [ ] 6.1.2.4 Implement `new/1` constructor
-- [ ] 6.1.2.5 Implement `high_confidence?/1` (threshold: 0.7)
-- [ ] 6.1.2.6 Implement `low_confidence?/1` (threshold: 0.4)
-- [ ] 6.1.2.7 Implement `medium_confidence?/1`
-- [ ] 6.1.2.8 Implement `confidence_level/1` returns :high, :medium, :low
+- [x] 6.1.2.3 Add `@moduledoc` with documentation
+- [x] 6.1.2.4 Implement `new/1` constructor
+- [x] 6.1.2.5 Implement `high_confidence?/1` (threshold: 0.7)
+- [x] 6.1.2.6 Implement `low_confidence?/1` (threshold: 0.4)
+- [x] 6.1.2.7 Implement `medium_confidence?/1`
+- [x] 6.1.2.8 Implement `confidence_level/1` returns :high, :medium, :low
 
 ### 6.1.3 Self-Attention Confidence
 
 Use model's own attention patterns/logprobs.
 
-- [ ] 6.1.3.1 Create `lib/jido_ai/accuracy/estimators/attention_confidence.ex`
-- [ ] 6.1.3.2 Add `@moduledoc` explaining logprob-based estimation
-- [ ] 6.1.3.3 Define configuration schema:
+- [x] 6.1.3.1 Create `lib/jido_ai/accuracy/estimators/attention_confidence.ex`
+- [x] 6.1.3.2 Add `@moduledoc` explaining logprob-based estimation
+- [x] 6.1.3.3 Define configuration schema:
   - `:aggregation` - :min, :mean, :product (default: :product)
   - `:token_threshold` - Minimum per-token confidence
-- [ ] 6.1.3.4 Implement `estimate/2` with logprob analysis
-- [ ] 6.1.3.5 Use token-level probabilities from response
-- [ ] 6.1.3.6 Aggregate to response-level confidence
-- [ ] 6.1.3.7 Handle responses without logprobs
-- [ ] 6.1.3.8 Implement `token_confidences/1` for analysis
+- [x] 6.1.3.4 Implement `estimate/3` with logprob analysis
+- [x] 6.1.3.5 Use token-level probabilities from response
+- [x] 6.1.3.6 Aggregate to response-level confidence
+- [x] 6.1.3.7 Handle responses without logprobs
+- [x] 6.1.3.8 Implement `token_confidences/1` for analysis
 
 ### 6.1.4 Ensemble Confidence
 
 Use multiple methods for confidence estimation.
 
-- [ ] 6.1.4.1 Create `lib/jido_ai/accuracy/estimators/ensemble_confidence.ex`
-- [ ] 6.1.4.2 Add `@moduledoc` explaining ensemble approach
-- [ ] 6.1.4.3 Define configuration schema:
+- [x] 6.1.4.1 Create `lib/jido_ai/accuracy/estimators/ensemble_confidence.ex`
+- [x] 6.1.4.2 Add `@moduledoc` explaining ensemble approach
+- [x] 6.1.4.3 Define configuration schema:
   - `:estimators` - List of estimator modules
   - `:weights` - Weights for combining estimates
   - `:combination_method` - :mean, :weighted_mean, :voting
-- [ ] 6.1.4.4 Implement `estimate/2` with multiple methods
-- [ ] 6.1.4.5 Run all estimators in parallel
-- [ ] 6.1.4.6 Combine using specified method
-- [ ] 6.1.4.7 Handle disagreements between estimators
-- [ ] 6.1.4.8 Implement `disagreement_score/2` for analysis
+- [x] 6.1.4.4 Implement `estimate/3` with multiple methods
+- [x] 6.1.4.5 Run all estimators in parallel
+- [x] 6.1.4.6 Combine using specified method
+- [x] 6.1.4.7 Handle disagreements between estimators
+- [x] 6.1.4.8 Implement `disagreement_score/2` for analysis
 
 ### 6.1.5 Unit Tests for Confidence Estimation
 
-- [ ] Test `ConfidenceEstimate.new/1` creates valid estimate
-- [ ] Test `AttentionConfidence.estimate/2` returns score
-- [ ] Test `EnsembleConfidence.estimate/2` combines methods
-- [ ] Test confidence thresholds work correctly
-- [ ] Test `confidence_level/1` returns correct level
-- [ ] Test aggregation methods produce different scores
-- [ ] Test disagreement score calculated correctly
-- [ ] Test handling of missing logprobs
+- [x] Test `ConfidenceEstimate.new/1` creates valid estimate (27 tests)
+- [x] Test `AttentionConfidence.estimate/3` returns score (23 tests)
+- [x] Test `EnsembleConfidence.estimate/3` combines methods (26 tests)
+- [x] Test confidence thresholds work correctly
+- [x] Test `confidence_level/1` returns correct level
+- [x] Test aggregation methods produce different scores
+- [x] Test disagreement score calculated correctly
+- [x] Test handling of missing logprobs
+
+**Section 6.1 Status: Complete (76 tests passing)**
 
 ---
 
