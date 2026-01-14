@@ -67,6 +67,66 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidenceTest do
                )
     end
 
+    test "returns error for negative weights" do
+      estimators = [
+        {MockEstimator, [score: 0.7]},
+        {MockEstimator, [score: 0.9]}
+      ]
+
+      assert {:error, :invalid_weight_value} =
+               EnsembleConfidence.new(
+                 estimators: estimators,
+                 weights: [0.5, -0.5]
+               )
+    end
+
+    test "returns error for weights greater than 1" do
+      estimators = [
+        {MockEstimator, [score: 0.7]},
+        {MockEstimator, [score: 0.9]}
+      ]
+
+      assert {:error, :invalid_weight_value} =
+               EnsembleConfidence.new(
+                 estimators: estimators,
+                 weights: [0.5, 1.5]
+               )
+    end
+
+    test "returns error for non-numeric weights" do
+      estimators = [
+        {MockEstimator, [score: 0.7]},
+        {MockEstimator, [score: 0.9]}
+      ]
+
+      assert {:error, :invalid_weight_value} =
+               EnsembleConfidence.new(
+                 estimators: estimators,
+                 weights: [0.5, "invalid"]
+               )
+    end
+
+    test "accepts valid weights including boundaries" do
+      estimators = [
+        {MockEstimator, [score: 0.7]},
+        {MockEstimator, [score: 0.9]}
+      ]
+
+      # Test 0.0 and 1.0 as valid boundaries
+      assert {:ok, _estimator} =
+               EnsembleConfidence.new(
+                 estimators: estimators,
+                 weights: [0.0, 1.0]
+               )
+
+      # Test weights that don't sum to 1.0 (still valid)
+      assert {:ok, _estimator} =
+               EnsembleConfidence.new(
+                 estimators: estimators,
+                 weights: [0.3, 0.3]
+               )
+    end
+
     test "returns error for invalid combination method" do
       assert {:error, :invalid_combination_method} =
                EnsembleConfidence.new(
@@ -300,7 +360,7 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidenceTest do
       assert Map.has_key?(estimate.metadata, :disagreement)
     end
 
-    test "returns error and nil on failure", context do
+    test "returns error and nil on failure", _context do
       # Missing logprobs will cause MockEstimator to not work
       # So let's use a real scenario
       estimators = [{NonExistent, []}]

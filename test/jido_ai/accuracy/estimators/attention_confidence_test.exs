@@ -123,6 +123,39 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidenceTest do
       assert {:error, :empty_logprobs} = AttentionConfidence.estimate(estimator, candidate, %{})
     end
 
+    test "returns error when logprobs contain positive values", %{estimator: estimator} do
+      # Log probabilities must be <= 0 (probabilities are 0-1, so log space is non-positive)
+      candidate =
+        Candidate.new!(%{
+          content: "Test",
+          metadata: %{logprobs: [0.1, -0.2, -0.3]}
+          # 0.1 is positive, which is invalid for log probabilities
+        })
+
+      assert {:error, :invalid_logprobs} = AttentionConfidence.estimate(estimator, candidate, %{})
+    end
+
+    test "returns error when logprobs contain non-numeric values", %{estimator: estimator} do
+      candidate =
+        Candidate.new!(%{
+          content: "Test",
+          metadata: %{logprobs: [-0.1, "invalid", -0.3]}
+        })
+
+      assert {:error, :invalid_logprobs} = AttentionConfidence.estimate(estimator, candidate, %{})
+    end
+
+    test "accepts zero logprobs (probability of 1.0)", %{estimator: estimator} do
+      # A logprob of 0.0 corresponds to probability of 1.0 (certainty)
+      candidate =
+        Candidate.new!(%{
+          content: "Test",
+          metadata: %{logprobs: [0.0, -0.1, -0.2]}
+        })
+
+      assert {:ok, _estimate} = AttentionConfidence.estimate(estimator, candidate, %{})
+    end
+
     test "applies token threshold to low probabilities" do
       estimator = AttentionConfidence.new!(token_threshold: 0.1)
 

@@ -76,6 +76,9 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
 
   @default_actions [:direct, :with_verification, :with_citations, :abstain, :escalate]
 
+  # Epsilon for float comparison to handle floating-point precision errors
+  @float_epsilon 0.0001
+
   defstruct [
     high_threshold: 0.7,
     low_threshold: 0.4,
@@ -370,7 +373,8 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
   # Validation helpers
 
   defp validate_thresholds(high, low) when is_number(high) and is_number(low) do
-    if high > low do
+    # Use epsilon for float comparison to handle floating-point precision errors
+    if high - low > @float_epsilon do
       :ok
     else
       {:error, :invalid_thresholds}

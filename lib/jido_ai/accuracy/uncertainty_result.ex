@@ -1,4 +1,8 @@
 defmodule Jido.AI.Accuracy.UncertaintyResult do
+  alias Jido.AI.Accuracy.Helpers
+
+  import Helpers, only: [get_attr: 2, get_attr: 3]
+
   @moduledoc """
   Represents the result of uncertainty classification.
 
@@ -215,26 +219,13 @@ defmodule Jido.AI.Accuracy.UncertaintyResult do
 
   # Private functions
 
-  defp get_attr(attrs, key) when is_list(attrs) do
-    Keyword.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key) when is_map(attrs) do
-    Map.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key, default) when is_list(attrs) do
-    Keyword.get(attrs, key, default)
-  end
-
-  defp get_attr(attrs, key, default) when is_map(attrs) do
-    Map.get(attrs, key, default)
-  end
-
   defp validate_uncertainty_type(type) when type in @uncertainty_types, do: :ok
   defp validate_uncertainty_type(_), do: {:error, :invalid_uncertainty_type}
 
   # Convert values from string representation back to atoms
+  # Note: When atom conversion fails (unknown atom), we keep the string value.
+  # This allows partial deserialization and prevents data loss. The caller
+  # should validate the result's uncertainty_type field after deserialization.
   defp convert_value("uncertainty_type", value) when is_binary(value) do
     String.to_existing_atom(value)
   rescue

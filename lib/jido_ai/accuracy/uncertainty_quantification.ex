@@ -68,7 +68,9 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, UncertaintyResult}
+  alias Jido.AI.Accuracy.{Candidate, UncertaintyResult, Helpers}
+
+  import Helpers, only: [get_attr: 2, get_attr: 3]
 
   @type t :: %__MODULE__{
           aleatoric_patterns: [Regex.t()],
@@ -104,6 +106,11 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
     # Prediction language
     ~r/\b(will win|will happen|predict the)\b/i
   ]
+
+  # Maximum pattern source length to prevent ReDoS attacks
+  @max_pattern_length 500
+  # Maximum number of patterns to prevent resource exhaustion
+  @max_patterns_count 50
 
   defstruct [
     aleatoric_patterns: nil,
@@ -339,10 +346,21 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
   end
 
   defp validate_patterns(patterns) when is_list(patterns) do
-    if Enum.all?(patterns, &is_valid_regex/1) do
-      :ok
-    else
-      {:error, :invalid_patterns}
+    cond do
+      length(patterns) > @max_patterns_count ->
+        {:error, :too_many_patterns}
+
+      not Enum.all?(patterns, &is_valid_regex/1) ->
+        {:error, :invalid_patterns}
+
+      Enum.any?(patterns, fn pattern ->
+        pattern_size = :erlang.term_to_binary(pattern) |> byte_size()
+        pattern_size > @max_pattern_length
+      end) ->
+        {:error, :pattern_too_long}
+
+      true ->
+        :ok
     end
   end
 
@@ -350,12 +368,4 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
 
   defp is_valid_regex(%Regex{}), do: true
   defp is_valid_regex(_), do: false
-
-  defp get_attr(attrs, key, default) when is_list(attrs) do
-    Keyword.get(attrs, key, default)
-  end
-
-  defp get_attr(attrs, key, default) when is_map(attrs) do
-    Map.get(attrs, key, default)
-  end
 end

@@ -41,7 +41,9 @@ defmodule Jido.AI.Accuracy.DecisionResult do
 
   """
 
-  alias Jido.AI.Accuracy.Candidate
+  alias Jido.AI.Accuracy.{Candidate, Helpers}
+
+  import Helpers, only: [get_attr: 2, get_attr: 3]
 
   @type t :: %__MODULE__{
           decision: decision(),
@@ -201,26 +203,13 @@ defmodule Jido.AI.Accuracy.DecisionResult do
 
   # Private functions
 
-  defp get_attr(attrs, key) when is_list(attrs) do
-    Keyword.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key) when is_map(attrs) do
-    Map.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key, default) when is_list(attrs) do
-    Keyword.get(attrs, key, default)
-  end
-
-  defp get_attr(attrs, key, default) when is_map(attrs) do
-    Map.get(attrs, key, default)
-  end
-
   defp validate_decision(decision) when decision in @decisions, do: :ok
   defp validate_decision(_), do: {:error, :invalid_decision}
 
   # Convert values from string representation back to atoms
+  # Note: When atom conversion fails (unknown atom), we keep the string value.
+  # This allows partial deserialization and prevents data loss. The caller
+  # should validate the result's decision field after deserialization.
   defp convert_value("decision", value) when is_binary(value) do
     String.to_existing_atom(value)
   rescue
