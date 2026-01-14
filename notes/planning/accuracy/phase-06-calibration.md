@@ -199,35 +199,43 @@ Skip answering when uncertain.
 
 Implement selective answering policy.
 
-- [ ] 6.3.1.1 Create `lib/jido_ai/accuracy/selective_generation.ex`
-- [ ] 6.3.1.2 Add `@moduledoc` explaining selective generation
-- [ ] 6.3.1.3 Define configuration schema:
-  - `:confidence_threshold` - Minimum confidence to answer
-  - `:penalty_threshold` - Cost of wrong answer vs abstention
-  - `:abstention_message` - Message when abstaining
-- [ ] 6.3.1.4 Implement `answer_or_abstain/3`
-- [ ] 6.3.1.5 Calculate expected value of answering
-- [ ] 6.3.1.6 Compare penalty of wrong answer
-- [ ] 6.3.1.7 Return answer or abstention
-- [ ] 6.3.1.8 Implement `expected_value/3` for EV calculation
+- [x] 6.3.1.1 Create `lib/jido_ai/accuracy/selective_generation.ex`
+- [x] 6.3.1.2 Add `@moduledoc` explaining selective generation
+- [x] 6.3.1.3 Define configuration schema:
+  - `:reward` - Reward for correct answer (default: 1.0)
+  - `:penalty` - Penalty for wrong answer (default: 1.0)
+  - `:confidence_threshold` - Minimum confidence to answer (optional)
+  - `:use_ev` - Use expected value calculation (default: true)
+- [x] 6.3.1.4 Implement `answer_or_abstain/3`
+- [x] 6.3.1.5 Calculate expected value of answering
+- [x] 6.3.1.6 Compare penalty of wrong answer
+- [x] 6.3.1.7 Return answer or abstention
+- [x] 6.3.1.8 Implement `calculate_ev/2` for EV calculation
 
 ### 6.3.2 Expected Value Calculation
 
 Calculate the expected value of answering vs abstaining.
 
-- [ ] 6.3.2.1 Implement `calculate_ev/3`
+- [x] 6.3.2.1 Implement `calculate_ev/2`
   - EV(answer) = confidence * reward - (1 - confidence) * penalty
   - EV(abstain) = 0 (neutral)
-- [ ] 6.3.2.2 Support custom reward/penalty values
-- [ ] 6.3.2.3 Handle domain-specific costs
+- [x] 6.3.2.2 Support custom reward/penalty values
+- [x] 6.3.2.3 Handle domain-specific costs
 
 ### 6.3.3 Unit Tests for SelectiveGeneration
 
-- [ ] Test answers when confidence is high
-- [ ] Test abstains when confidence is low
-- [ ] Test expected value calculation
-- [ ] Test custom penalty thresholds
-- [ ] Test abstention message formatting
+- [x] Test answers when confidence is high
+- [x] Test abstains when confidence is low
+- [x] Test expected value calculation
+- [x] Test custom penalty thresholds
+- [x] Test abstention message formatting
+
+**Section 6.3 Status: Complete (50 tests passing)**
+
+**Additional:**
+- [x] Created `lib/jido_ai/accuracy/decision_result.ex` - Decision result struct
+- [x] Created `test/jido_ai/accuracy/decision_result_test.exs` - 18 tests
+- [x] Created `test/jido_ai/accuracy/selective_generation_test.exs` - 32 tests
 
 ---
 
