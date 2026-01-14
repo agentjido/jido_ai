@@ -247,35 +247,42 @@ Quantify different types of uncertainty.
 
 Distinguish aleatoric vs epistemic uncertainty.
 
-- [ ] 6.4.1.1 Create `lib/jido_ai/accuracy/uncertainty_quantification.ex`
-- [ ] 6.4.1.2 Add `@moduledoc` explaining uncertainty types
-- [ ] 6.4.1.3 Define `@type uncertainty_type/0`:
+- [x] 6.4.1.1 Create `lib/jido_ai/accuracy/uncertainty_quantification.ex`
+- [x] 6.4.1.2 Add `@moduledoc` explaining uncertainty types
+- [x] 6.4.1.3 Define `@type uncertainty_type/0`:
   - `:aleatoric` - Inherent uncertainty in the data
   - `:epistemic` - Uncertainty due to lack of knowledge
-- [ ] 6.4.1.4 Implement `classify_uncertainty/2`
-- [ ] 6.4.1.5 Detect aleatoric uncertainty (inherent)
-- [ ] 6.4.1.6 Detect epistemic uncertainty (knowledge gap)
-- [ ] 6.4.1.7 Recommend actions based on type
+- [x] 6.4.1.4 Implement `classify_uncertainty/2`
+- [x] 6.4.1.5 Detect aleatoric uncertainty (inherent)
+- [x] 6.4.1.6 Detect epistemic uncertainty (knowledge gap)
+- [x] 6.4.1.7 Recommend actions based on type
 
 ### 6.4.2 Uncertainty Detection
 
 Implement detection methods for each uncertainty type.
 
-- [ ] 6.4.2.1 Implement `detect_aleatoric/2`
+- [x] 6.4.2.1 Implement `detect_aleatoric/2`
   - Check for ambiguity in query
   - Check for subjective content
   - Check for multiple valid answers
-- [ ] 6.4.2.2 Implement `detect_epistemic/2`
+- [x] 6.4.2.2 Implement `detect_epistemic/2`
   - Check for out-of-domain query
   - Check for missing information
-  - Check RAG retrieval quality
+  - Check RAG retrieval quality (pattern-based)
 
 ### 6.4.3 Unit Tests for Uncertainty
 
-- [ ] Test uncertainty classification
-- [ ] Test aleatoric detection for ambiguous queries
-- [ ] Test epistemic detection for out-of-domain queries
-- [ ] Test action recommendations differ by type
+- [x] Test uncertainty classification
+- [x] Test aleatoric detection for ambiguous queries
+- [x] Test epistemic detection for out-of-domain queries
+- [x] Test action recommendations differ by type
+
+**Section 6.4 Status: Complete (50 tests passing)**
+
+**Additional:**
+- [x] Created `lib/jido_ai/accuracy/uncertainty_result.ex` - Result struct
+- [x] Created `test/jido_ai/accuracy/uncertainty_result_test.exs` - 20 tests
+- [x] Created `test/jido_ai/accuracy/uncertainty_quantification_test.exs` - 30 tests
 
 ---
 
