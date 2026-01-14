@@ -43,6 +43,22 @@ defmodule Jido.AI.Accuracy.SelectiveGenerationTest do
       assert {:error, :invalid_penalty} = SelectiveGeneration.new(%{penalty: -1.0})
     end
 
+    test "returns error for excessive reward" do
+      assert {:error, :invalid_reward} = SelectiveGeneration.new(%{reward: 1001.0})
+      assert {:error, :invalid_reward} = SelectiveGeneration.new(%{reward: 10_000.0})
+    end
+
+    test "returns error for excessive penalty" do
+      assert {:error, :invalid_penalty} = SelectiveGeneration.new(%{penalty: 1001.0})
+      assert {:error, :invalid_penalty} = SelectiveGeneration.new(%{penalty: 10_000.0})
+    end
+
+    test "accepts maximum allowed values" do
+      assert {:ok, sg} = SelectiveGeneration.new(%{reward: 1000.0, penalty: 1000.0})
+      assert sg.reward == 1000.0
+      assert sg.penalty == 1000.0
+    end
+
     test "returns error for invalid threshold" do
       assert {:error, :invalid_threshold} = SelectiveGeneration.new(%{confidence_threshold: 1.5})
       assert {:error, :invalid_threshold} = SelectiveGeneration.new(%{confidence_threshold: -0.1})

@@ -72,7 +72,9 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, ConfidenceEstimator}
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, ConfidenceEstimator, Helpers}
+
+  import Helpers, only: [get_attr: 2, get_attr: 3]
 
   @type t :: %__MODULE__{
           estimators: [{module(), keyword()}],
@@ -422,10 +424,15 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
   defp validate_weights(nil, _estimator_count), do: :ok
 
   defp validate_weights(weights, estimator_count) when is_list(weights) do
-    if length(weights) == estimator_count do
-      :ok
-    else
-      {:error, :weights_length_mismatch}
+    cond do
+      length(weights) != estimator_count ->
+        {:error, :weights_length_mismatch}
+
+      not Enum.all?(weights, fn w -> is_number(w) and w >= 0 and w <= 1 end) ->
+        {:error, :invalid_weight_value}
+
+      true ->
+        :ok
     end
   end
 
@@ -433,24 +440,6 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
 
   defp validate_combination_method(method) when method in [:weighted_mean, :mean, :voting], do: :ok
   defp validate_combination_method(_), do: {:error, :invalid_combination_method}
-
-  # Attribute helpers
-
-  defp get_attr(attrs, key) when is_list(attrs) do
-    Keyword.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key) when is_map(attrs) do
-    Map.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key, default) when is_list(attrs) do
-    Keyword.get(attrs, key, default)
-  end
-
-  defp get_attr(attrs, key, default) when is_map(attrs) do
-    Map.get(attrs, key, default)
-  end
 
   defp config_to_map(config) when is_list(config), do: Map.new(config)
   defp config_to_map(config) when is_map(config), do: config

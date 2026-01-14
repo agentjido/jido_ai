@@ -54,7 +54,7 @@ defmodule Jido.AI.Accuracy.CalibrationTest do
       assert RoutingResult.direct?(result)
     end
 
-    test "medium confidence adds verification", context do
+    test "medium confidence adds verification", _context do
       # Create a medium confidence response
       {:ok, estimate} =
         ConfidenceEstimate.new(%{
@@ -83,7 +83,7 @@ defmodule Jido.AI.Accuracy.CalibrationTest do
       assert String.contains?(result.candidate.content, candidate.content)
     end
 
-    test "medium confidence with citations", context do
+    test "medium confidence with citations", _context do
       # Create a medium confidence response
       {:ok, estimate} =
         ConfidenceEstimate.new(%{
@@ -137,7 +137,7 @@ defmodule Jido.AI.Accuracy.CalibrationTest do
       assert String.contains?(result.candidate.content, "definitive")
     end
 
-    test "low confidence escalates", context do
+    test "low confidence escalates", _context do
       # Create a low confidence response
       {:ok, estimate} =
         ConfidenceEstimate.new(%{
@@ -436,7 +436,7 @@ defmodule Jido.AI.Accuracy.CalibrationTest do
       sg = SelectiveGeneration.new!(%{})
 
       # High confidence + aleatoric = should still acknowledge subjectivity
-      {:ok, high_conf_estimate} =
+      {:ok, _high_conf_estimate} =
         ConfidenceEstimate.new(%{
           score: 0.85,
           method: :test,
@@ -483,7 +483,7 @@ defmodule Jido.AI.Accuracy.CalibrationTest do
     end
 
     test "calibration gate respects uncertainty type" do
-      uq = UncertaintyQuantification.new!(%{})
+      _uq = UncertaintyQuantification.new!(%{})
       gate = CalibrationGate.new!(%{})
 
       # Aleatoric query with medium confidence

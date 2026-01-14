@@ -32,6 +32,38 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantificationTest do
                  aleatoric_patterns: ["not a regex"]
                })
     end
+
+    test "returns error for excessively long patterns" do
+      # Create a pattern that exceeds the 500 byte limit
+      # The regex struct overhead is about 200+ bytes, so a 300 char pattern should exceed 500
+      long_pattern_text = String.duplicate("a|", 300)
+      long_pattern = Regex.compile!(long_pattern_text)
+
+      assert {:error, :pattern_too_long} =
+               UncertaintyQuantification.new(%{
+                 aleatoric_patterns: [long_pattern]
+               })
+    end
+
+    test "returns error for too many patterns" do
+      # Create 51 patterns (exceeds limit of 50)
+      many_patterns = for _ <- 1..51, do: ~r/test/i
+
+      assert {:error, :too_many_patterns} =
+               UncertaintyQuantification.new(%{
+                 aleatoric_patterns: many_patterns
+               })
+    end
+
+    test "accepts patterns within size limit" do
+      # A simple small pattern should be accepted
+      pattern = Regex.compile!("test")
+
+      assert {:ok, _uq} =
+               UncertaintyQuantification.new(%{
+                 aleatoric_patterns: [pattern]
+               })
+    end
   end
 
   describe "classify_uncertainty/2" do

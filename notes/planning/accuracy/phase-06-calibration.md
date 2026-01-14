@@ -335,6 +335,31 @@ Comprehensive integration tests for calibration functionality.
 
 ---
 
+## 6.6 Phase 6 Review Fixes
+
+Address all blockers, concerns, and improvements from the comprehensive Phase 6 review.
+
+### 6.6.1 Security Fixes
+- [x] HIGH: Validate logprob bounds (must be <= 0.0)
+- [x] MEDIUM: Add upper bounds to reward/penalty values (max: 1000.0)
+- [x] MEDIUM: Validate ensemble weights are in [0, 1] range
+- [x] MEDIUM: Add regex complexity limits (max 500 chars, 50 patterns)
+
+### 6.6.2 Code Quality Improvements
+- [x] Extract ~180 lines of duplicated `get_attr` helpers to shared module
+- [x] Document atom conversion fallback behavior
+- [x] Add epsilon tolerance for float comparisons
+
+### 6.6.3 QA Fixes
+- [x] Eliminate all 5 compiler warnings
+- [x] Add 12 new validation/security tests
+
+**Branch:** `feature/accuracy-phase-6-review-fixes`
+**Status:** Completed (2026-01-14)
+**Tests:** 262 Phase 6 tests passing (+12 new tests added)
+
+---
+
 ## Phase 6 Success Criteria
 
 1. ✅ **Confidence estimation**: Produces calibrated confidence scores
@@ -342,7 +367,9 @@ Comprehensive integration tests for calibration functionality.
 3. ✅ **Selective generation**: Reduces wrong answers
 4. ✅ **Calibration quality**: Confidence matches accuracy
 5. ✅ **Uncertainty types**: Aleatoric vs epistemic distinguished
-6. **Test coverage**: Minimum 85% for Phase 6 modules
+6. ✅ **Test coverage**: 96% for Phase 6 modules
+7. ✅ **Security**: All HIGH and MEDIUM security issues addressed
+8. ✅ **Code quality**: Duplicated code eliminated, no compiler warnings
 
 ---
 

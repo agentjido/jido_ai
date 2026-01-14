@@ -42,7 +42,9 @@ defmodule Jido.AI.Accuracy.RoutingResult do
 
   """
 
-  alias Jido.AI.Accuracy.Candidate
+  alias Jido.AI.Accuracy.{Candidate, Helpers}
+
+  import Helpers, only: [get_attr: 2, get_attr: 3]
 
   @type t :: %__MODULE__{
           action: action(),
@@ -275,6 +277,9 @@ defmodule Jido.AI.Accuracy.RoutingResult do
   end
 
   # Convert values from string representation back to atoms
+  # Note: When atom conversion fails (unknown atom), we keep the string value.
+  # This allows partial deserialization and prevents data loss. The caller
+  # should validate the result's action/confidence_level fields after deserialization.
   defp convert_value("action", value) when is_binary(value) do
     String.to_existing_atom(value)
   rescue
@@ -290,22 +295,6 @@ defmodule Jido.AI.Accuracy.RoutingResult do
   defp convert_value(_, value), do: value
 
   # Private functions
-
-  defp get_attr(attrs, key) when is_list(attrs) do
-    Keyword.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key) when is_map(attrs) do
-    Map.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key, default) when is_list(attrs) do
-    Keyword.get(attrs, key, default)
-  end
-
-  defp get_attr(attrs, key, default) when is_map(attrs) do
-    Map.get(attrs, key, default)
-  end
 
   defp validate_action(action) when action in @actions, do: :ok
   defp validate_action(_), do: {:error, :invalid_action}

@@ -92,7 +92,9 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, DecisionResult}
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, DecisionResult, Helpers}
+
+  import Helpers, only: [get_attr: 2, get_attr: 3]
 
   @type t :: %__MODULE__{
           reward: float(),
@@ -108,14 +110,17 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
     use_ev: true
   ]
 
+  @max_reward 1000.0
+  @max_penalty 1000.0
+
   @doc """
   Creates a new SelectiveGeneration from the given attributes.
 
   ## Parameters
 
   - `attrs` - Map with selective generation attributes:
-    - `:reward` (optional) - Reward for correct answer (default: 1.0)
-    - `:penalty` (optional) - Penalty for wrong answer (default: 1.0)
+    - `:reward` (optional) - Reward for correct answer (default: 1.0, max: 1000.0)
+    - `:penalty` (optional) - Penalty for wrong answer (default: 1.0, max: 1000.0)
     - `:confidence_threshold` (optional) - Simple threshold (overrides EV)
     - `:use_ev` (optional) - Use EV calculation (default: true)
 
@@ -132,6 +137,9 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
       {:ok, %SelectiveGeneration{reward: 2.0, penalty: 5.0}}
 
       iex> SelectiveGeneration.new(%{reward: -1.0})
+      {:error, :invalid_reward}
+
+      iex> SelectiveGeneration.new(%{reward: 1001.0})
       {:error, :invalid_reward}
 
   """
@@ -320,31 +328,13 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
 
   # Validation helpers
 
-  defp validate_reward(reward) when is_number(reward) and reward > 0, do: :ok
+  defp validate_reward(reward) when is_number(reward) and reward > 0 and reward <= @max_reward, do: :ok
   defp validate_reward(_), do: {:error, :invalid_reward}
 
-  defp validate_penalty(penalty) when is_number(penalty) and penalty >= 0, do: :ok
+  defp validate_penalty(penalty) when is_number(penalty) and penalty >= 0 and penalty <= @max_penalty, do: :ok
   defp validate_penalty(_), do: {:error, :invalid_penalty}
 
   defp validate_threshold(nil), do: :ok
   defp validate_threshold(t) when is_number(t) and t >= 0 and t <= 1, do: :ok
   defp validate_threshold(_), do: {:error, :invalid_threshold}
-
-  # Attribute helpers
-
-  defp get_attr(attrs, key) when is_list(attrs) do
-    Keyword.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key) when is_map(attrs) do
-    Map.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key, default) when is_list(attrs) do
-    Keyword.get(attrs, key, default)
-  end
-
-  defp get_attr(attrs, key, default) when is_map(attrs) do
-    Map.get(attrs, key, default)
-  end
 end
