@@ -105,15 +105,6 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
     ~r/\b(will win|will happen|predict the)\b/i
   ]
 
-  def new(attrs \\ %{}) do
-    struct(__MODULE__, %{
-      aleatoric_patterns: Map.get(attrs, :aleatoric_patterns, @default_aleatoric_patterns),
-      epistemic_patterns: Map.get(attrs, :epistemic_patterns, @default_epistemic_patterns),
-      domain_keywords: Map.get(attrs, :domain_keywords, []),
-      min_matches: Map.get(attrs, :min_matches, 1)
-    })
-  end
-
   defstruct [
     aleatoric_patterns: nil,
     epistemic_patterns: nil,
@@ -359,14 +350,6 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
 
   defp is_valid_regex(%Regex{}), do: true
   defp is_valid_regex(_), do: false
-
-  defp get_attr(attrs, key) when is_list(attrs) do
-    Keyword.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key) when is_map(attrs) do
-    Map.get(attrs, key)
-  end
 
   defp get_attr(attrs, key, default) when is_list(attrs) do
     Keyword.get(attrs, key, default)

@@ -292,49 +292,56 @@ Comprehensive integration tests for calibration functionality.
 
 ### 6.5.1 Calibration Gate Tests
 
-- [ ] 6.5.1.1 Create `test/jido_ai/accuracy/calibration_test.exs`
-- [ ] 6.5.1.2 Test: High confidence routed directly
+- [x] 6.5.1.1 Create `test/jido_ai/accuracy/calibration_test.exs`
+- [x] 6.5.1.2 Test: High confidence routed directly
   - Generate high confidence response
   - Verify direct answer returned
-- [ ] 6.5.1.3 Test: Medium confidence adds verification
+- [x] 6.5.1.3 Test: Medium confidence adds verification
   - Generate medium confidence response
   - Verify citations/tests added
-- [ ] 6.5.1.4 Test: Low confidence abstains
+- [x] 6.5.1.4 Test: Low confidence abstains
   - Generate low confidence response
   - Verify abstention or escalation
 
 ### 6.5.2 Calibration Quality Tests
 
-- [ ] 6.5.2.1 Test: Confidence is well-calibrated
+- [x] 6.5.2.1 Test: Confidence is well-calibrated
   - Compare confidence vs accuracy
   - Measure calibration error
   - Verify error is acceptable
-- [ ] 6.5.2.2 Test: Selective generation improves reliability
+- [x] 6.5.2.2 Test: Selective generation improves reliability
   - Compare error rate with/without selective
   - Verify selective has fewer errors
-- [ ] 6.5.2.3 Test: Expected value calculation optimal
+- [x] 6.5.2.3 Test: Expected value calculation optimal
   - Compare EV-based vs threshold-based
   - Verify EV improves decisions
 
 ### 6.5.3 Uncertainty Tests
 
-- [ ] 6.5.3.1 Test: Aleatoric vs epistemic distinguished
+- [x] 6.5.3.1 Test: Aleatoric vs epistemic distinguished
   - Query with inherent ambiguity
   - Query with missing knowledge
   - Verify different classifications
-- [ ] 6.5.3.2 Test: Actions match uncertainty type
+- [x] 6.5.3.2 Test: Actions match uncertainty type
   - Aleatoric → provide options
   - Epistemic → abstain or gather info
+
+**Section 6.5 Status: Complete (16 tests passing)**
+
+**Additional:**
+- [x] Fixed bug in UncertaintyQuantification (duplicate new/1 function)
+- [x] Created integration test file with 16 comprehensive tests
+- [x] End-to-end pipeline tests for subjective, factual, and speculative queries
 
 ---
 
 ## Phase 6 Success Criteria
 
-1. **Confidence estimation**: Produces calibrated confidence scores
-2. **Calibration gate**: Routes based on confidence level
-3. **Selective generation**: Reduces wrong answers
-4. **Calibration quality**: Confidence matches accuracy
-5. **Uncertainty types**: Aleatoric vs epistemic distinguished
+1. ✅ **Confidence estimation**: Produces calibrated confidence scores
+2. ✅ **Calibration gate**: Routes based on confidence level
+3. ✅ **Selective generation**: Reduces wrong answers
+4. ✅ **Calibration quality**: Confidence matches accuracy
+5. ✅ **Uncertainty types**: Aleatoric vs epistemic distinguished
 6. **Test coverage**: Minimum 85% for Phase 6 modules
 
 ---
