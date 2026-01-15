@@ -64,7 +64,7 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, RoutingResult}
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, RoutingResult, Thresholds}
 
   @type t :: %__MODULE__{
           high_threshold: float(),
@@ -79,9 +79,14 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
   # Epsilon for float comparison to handle floating-point precision errors
   @float_epsilon 0.0001
 
+  # NOTE: Default thresholds now use centralized values from Thresholds module
+  @default_high_threshold Thresholds.calibration_high_confidence()
+  @default_low_threshold Thresholds.calibration_medium_confidence()
+
+  @enforce_keys [:high_threshold, :low_threshold]
   defstruct [
-    high_threshold: 0.7,
-    low_threshold: 0.4,
+    high_threshold: @default_high_threshold,
+    low_threshold: @default_low_threshold,
     medium_action: :with_verification,
     low_action: :abstain,
     emit_telemetry: true

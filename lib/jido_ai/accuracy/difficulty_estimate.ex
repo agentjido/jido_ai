@@ -61,7 +61,7 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
 
   """
 
-  alias Jido.AI.Accuracy.Helpers
+  alias Jido.AI.Accuracy.{Helpers, Thresholds}
 
   import Helpers, only: [get_attr: 2, get_attr: 3]
 
@@ -78,10 +78,10 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
 
   @levels [:easy, :medium, :hard]
 
-  # Score thresholds for level classification
-  @easy_threshold 0.35
-  @hard_threshold 0.65
+  # NOTE: Thresholds are now centralized in Jido.AI.Accuracy.Thresholds
+  # We keep module attributes for backwards compatibility but delegate to Thresholds
 
+  @enforce_keys [:level, :score]
   defstruct [
     :level,
     :score,
@@ -249,11 +249,7 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
   """
   @spec to_level(float()) :: level()
   def to_level(score) when is_number(score) do
-    cond do
-      score < @easy_threshold -> :easy
-      score <= @hard_threshold -> :medium
-      true -> :hard
-    end
+    Thresholds.score_to_level(score)
   end
 
   def to_level(_), do: :medium
@@ -261,16 +257,20 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
   @doc """
   Gets the easy threshold.
 
+  Delegates to `Thresholds.easy_threshold/0`.
+
   """
   @spec easy_threshold() :: float()
-  def easy_threshold, do: @easy_threshold
+  def easy_threshold, do: Thresholds.easy_threshold()
 
   @doc """
   Gets the hard threshold.
 
+  Delegates to `Thresholds.hard_threshold/0`.
+
   """
   @spec hard_threshold() :: float()
-  def hard_threshold, do: @hard_threshold
+  def hard_threshold, do: Thresholds.hard_threshold()
 
   @doc """
   Converts the estimate to a map for serialization.
