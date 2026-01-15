@@ -82,7 +82,8 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
           complexity_weight: float(),
           domain_weight: float(),
           question_weight: float(),
-          custom_indicators: map()
+          custom_indicators: map(),
+          timeout: pos_integer()
         }
 
   # Default feature weights
@@ -94,12 +95,18 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   # SECURITY: Maximum query length to prevent DoS
   @max_query_length 50_000
 
+  # SECURITY: Default timeout for regex operations (5 seconds)
+  @default_timeout 5000
+  # SECURITY: Maximum allowed timeout (30 seconds)
+  @max_timeout 30_000
+
   defstruct [
     length_weight: @default_length_weight,
     complexity_weight: @default_complexity_weight,
     domain_weight: @default_domain_weight,
     question_weight: @default_question_weight,
-    custom_indicators: %{}
+    custom_indicators: %{},
+    timeout: @default_timeout
   ]
 
   # Domain indicators
@@ -149,6 +156,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   - `:domain_weight` - Weight for domain feature (default: 0.25)
   - `:question_weight` - Weight for question type feature (default: 0.20)
   - `:custom_indicators` - Map of custom domain indicators
+  - `:timeout` - Timeout for regex operations in ms (default: 5000, max: 30000)
 
   ## Returns
 
@@ -162,14 +170,17 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
     domain_weight = get_attr(attrs, :domain_weight, @default_domain_weight)
     question_weight = get_attr(attrs, :question_weight, @default_question_weight)
     custom_indicators = get_attr(attrs, :custom_indicators, %{})
+    timeout = get_attr(attrs, :timeout, @default_timeout)
 
-    with :ok <- validate_weights(length_weight, complexity_weight, domain_weight, question_weight) do
+    with :ok <- validate_weights(length_weight, complexity_weight, domain_weight, question_weight),
+         :ok <- validate_timeout(timeout) do
       estimator = %__MODULE__{
         length_weight: length_weight,
         complexity_weight: complexity_weight,
         domain_weight: domain_weight,
         question_weight: question_weight,
-        custom_indicators: custom_indicators
+        custom_indicators: custom_indicators,
+        timeout: timeout
       }
 
       {:ok, estimator}
@@ -201,6 +212,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
 
   - `{:ok, DifficultyEstimate.t()}` on success
   - `{:error, reason}` on failure
+  - `{:error, :timeout}` if feature extraction exceeds timeout
 
   """
   @impl true
@@ -216,27 +228,39 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
         {:error, :query_too_long}
 
       true ->
-        features = extract_features(query, estimator)
+        # Wrap feature extraction in timeout-protected task
+        task = Task.async(fn -> extract_features(query, estimator) end)
 
-        score = calculate_score(features, estimator)
-        level = DifficultyEstimate.to_level(score)
-        confidence = calculate_confidence(features, score)
+        case Task.yield(task, estimator.timeout) do
+          {:ok, features} ->
+            score = calculate_score(features, estimator)
+            level = DifficultyEstimate.to_level(score)
+            confidence = calculate_confidence(features, score)
 
-        reasoning = generate_reasoning(features, score, level)
+            reasoning = generate_reasoning(features, score, level)
 
-        estimate = %DifficultyEstimate{
-          level: level,
-          score: score,
-          confidence: confidence,
-          reasoning: reasoning,
-          features: features,
-          metadata: %{
-            method: :heuristic,
-            estimator: __MODULE__
-          }
-        }
+            estimate = %DifficultyEstimate{
+              level: level,
+              score: score,
+              confidence: confidence,
+              reasoning: reasoning,
+              features: features,
+              metadata: %{
+                method: :heuristic,
+                estimator: __MODULE__
+              }
+            }
 
-        {:ok, estimate}
+            {:ok, estimate}
+
+          {:exit, _reason} ->
+            {:error, :feature_extraction_failed}
+
+          nil ->
+            # Timeout - kill the task
+            Task.shutdown(task, :brutal_kill)
+            {:error, :timeout}
+        end
     end
   end
 
@@ -495,6 +519,12 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
         :ok
     end
   end
+
+  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= @max_timeout,
+    do: :ok
+
+  defp validate_timeout(_), do: {:error, :invalid_timeout}
+
   defp format_error(atom) when is_atom(atom), do: atom
   defp format_error(_), do: :invalid_attributes
 end

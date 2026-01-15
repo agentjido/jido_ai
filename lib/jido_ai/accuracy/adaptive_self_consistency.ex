@@ -82,7 +82,8 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
           batch_size: pos_integer(),
           early_stop_threshold: float(),
           difficulty_estimator: module() | nil,
-          aggregator: module()
+          aggregator: module(),
+          timeout: pos_integer()
         }
 
   @type options :: [
@@ -92,6 +93,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
           | {:context, map()}
           | {:min_candidates, pos_integer()}
           | {:max_candidates, pos_integer()}
+          | {:timeout, pos_integer()}
         ]
 
   # Defaults
@@ -100,6 +102,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   @default_batch_size 3
   @default_early_stop_threshold 0.8
   @default_aggregator MajorityVote
+  @default_timeout 30_000
 
   defstruct [
     :min_candidates,
@@ -107,7 +110,8 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     batch_size: @default_batch_size,
     early_stop_threshold: @default_early_stop_threshold,
     difficulty_estimator: nil,
-    aggregator: @default_aggregator
+    aggregator: @default_aggregator,
+    timeout: @default_timeout
   ]
 
   @doc """
@@ -122,6 +126,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     - `:early_stop_threshold` - Consensus threshold (default: 0.8)
     - `:difficulty_estimator` - Difficulty estimator module
     - `:aggregator` - Aggregator module (default: MajorityVote)
+    - `:timeout` - Maximum runtime in milliseconds (default: 30000)
 
   ## Returns
 
@@ -132,7 +137,8 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
 
       {:ok, adapter} = AdaptiveSelfConsistency.new(%{
         min_candidates: 5,
-        early_stop_threshold: 0.9
+        early_stop_threshold: 0.9,
+        timeout: 60_000
       })
 
   """
@@ -144,20 +150,23 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     early_stop_threshold = Map.get(attrs, :early_stop_threshold, @default_early_stop_threshold)
     difficulty_estimator = Map.get(attrs, :difficulty_estimator)
     aggregator = Map.get(attrs, :aggregator, @default_aggregator)
+    timeout = Map.get(attrs, :timeout, @default_timeout)
 
     with {:ok, _} <- validate_positive(min_candidates, :min_candidates),
          {:ok, _} <- validate_positive(max_candidates, :max_candidates),
          {:ok, _} <- validate_positive(batch_size, :batch_size),
          {:ok, _} <- validate_threshold(early_stop_threshold),
          {:ok, _} <- validate_min_less_than_max(min_candidates, max_candidates),
-         {:ok, _} <- validate_aggregator(aggregator) do
+         {:ok, _} <- validate_aggregator(aggregator),
+         {:ok, _} <- validate_timeout(timeout) do
       adapter = %__MODULE__{
         min_candidates: min_candidates,
         max_candidates: max_candidates,
         batch_size: batch_size,
         early_stop_threshold: early_stop_threshold,
         difficulty_estimator: difficulty_estimator,
-        aggregator: aggregator
+        aggregator: aggregator,
+        timeout: timeout
       }
 
       {:ok, adapter}
@@ -184,7 +193,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   Runs adaptive self-consistency for the given query.
 
   Generates candidates incrementally, checking for consensus after each
-  batch. Stops early when consensus threshold is reached.
+  batch. Stops early when consensus threshold is reached or timeout is exceeded.
 
   ## Parameters
 
@@ -195,11 +204,13 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     - `:difficulty_level` - Difficulty level atom (optional, used if no estimate)
     - `:generator` - Function to generate candidates (required)
     - `:context` - Additional context (optional)
+    - `:timeout` - Override the adapter's timeout (optional, in milliseconds)
 
   ## Returns
 
   - `{:ok, result, metadata}` on success
   - `{:error, reason}` on failure
+  - `{:error, :timeout}` if the operation exceeds the timeout
 
   ## Examples
 
@@ -210,13 +221,14 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
         generator: fn query -> MyApp.generate(query) end
       )
 
-      # With difficulty estimate
+      # With difficulty estimate and custom timeout
       {:ok, estimate} = DifficultyEstimate.new(%{level: :easy, score: 0.2})
       {:ok, result, metadata} = AdaptiveSelfConsistency.run(
         adapter,
         query,
         difficulty_estimate: estimate,
-        generator: &MyApp.generate/1
+        generator: &MyApp.generate/1,
+        timeout: 60_000
       )
 
   """
@@ -228,6 +240,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
       {:error, :generator_required}
     else
       context = Keyword.get(opts, :context, %{})
+      timeout = Keyword.get(opts, :timeout, adapter.timeout)
 
       # Get or estimate difficulty
       result =
@@ -251,7 +264,24 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
 
       case result do
         {:ok, %DifficultyEstimate{} = estimate} ->
-          do_run(adapter, query, estimate, generator, context)
+          # Run with timeout protection
+          task = Task.async(fn -> do_run(adapter, query, estimate, generator, context) end)
+
+          case Task.yield(task, timeout) do
+            {:ok, {:ok, result, metadata}} ->
+              {:ok, result, metadata}
+
+            {:ok, {:error, reason}} ->
+              {:error, reason}
+
+            {:exit, _reason} ->
+              {:error, :generator_crashed}
+
+            nil ->
+              # Timeout - kill the task
+              Task.shutdown(task, :brutal_kill)
+              {:error, :timeout}
+          end
 
         {:error, _} = error ->
           error
@@ -609,6 +639,12 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
       {:error, :aggregator_must_implement_aggregate}
     end
   end
+
+  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000,
+    do: {:ok, :valid}
+
+  defp validate_timeout(_), do: {:error, :timeout_must_be_between_1000_and_300000_ms}
+
   defp format_error(atom) when is_atom(atom), do: atom
   defp format_error(_), do: :invalid_attributes
 end
