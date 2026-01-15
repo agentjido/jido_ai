@@ -372,11 +372,15 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
   @doc """
   Tracks usage for an allocation (internal function).
 
+  Returns `{:ok, updated_budgeter}` on success or `{:error, :invalid_cost}` if cost is invalid.
+
   """
-  @spec track_usage(t(), float()) :: t()
+  @spec track_usage(t(), float()) :: {:ok, t()} | {:error, term()}
   def track_usage(%__MODULE__{} = budgeter, cost) when is_number(cost) and cost >= 0 do
-    %{budgeter | used_budget: budgeter.used_budget + cost}
+    {:ok, %{budgeter | used_budget: budgeter.used_budget + cost}}
   end
+
+  def track_usage(%__MODULE__{}, _cost), do: {:error, :invalid_cost}
 
   @doc """
   Resets the budget tracking.
@@ -462,7 +466,7 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
     budgeter.used_budget + cost <= budgeter.global_limit
   end
 
-  defp track_allocation(%__MODULE__{} = budgeter, cost) do
+  defp track_allocation(%__MODULE__{} = budgeter, cost) when is_number(cost) and cost >= 0 do
     %{budgeter | used_budget: budgeter.used_budget + cost, allocation_count: budgeter.allocation_count + 1}
   end
 

@@ -343,10 +343,20 @@ defmodule Jido.AI.Accuracy.ComputeBudgeterTest do
   describe "track_usage/2" do
     test "tracks usage without allocation" do
       {:ok, budgeter} = ComputeBudgeter.new(%{})
-      updated = ComputeBudgeter.track_usage(budgeter, 5.0)
+      assert {:ok, updated} = ComputeBudgeter.track_usage(budgeter, 5.0)
 
       assert updated.used_budget == 5.0
       assert updated.allocation_count == 0
+    end
+
+    test "returns error for negative cost" do
+      {:ok, budgeter} = ComputeBudgeter.new(%{})
+      assert {:error, :invalid_cost} = ComputeBudgeter.track_usage(budgeter, -1.0)
+    end
+
+    test "returns error for non-numeric cost" do
+      {:ok, budgeter} = ComputeBudgeter.new(%{})
+      assert {:error, :invalid_cost} = ComputeBudgeter.track_usage(budgeter, "invalid")
     end
   end
 

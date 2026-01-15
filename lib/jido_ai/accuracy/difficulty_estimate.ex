@@ -305,12 +305,15 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
   """
   @spec from_map(map()) :: {:ok, t()} | {:error, term()}
   def from_map(map) when is_map(map) do
-    attrs =
-      map
-      |> Enum.map(fn {k, v} -> {String.to_atom(k), convert_value(k, v)} end)
-      |> Map.new()
-
-    new(attrs)
+    # SECURITY: Check for invalid level strings before converting
+    # to prevent atom exhaustion attacks
+    with {:ok, level} <- convert_level_from_map(Map.get(map, "level")),
+         attrs <- map
+           |> Enum.map(fn {k, v} -> {String.to_atom(k), convert_value(k, v)} end)
+           |> Map.new()
+           |> Map.put(:level, level) do
+      new(attrs)
+    end
   end
 
   # Private functions
@@ -328,12 +331,22 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
   defp compute_or_validate_level(level, _) when level in @levels, do: {:ok, level}
   defp compute_or_validate_level(_, _), do: {:error, :invalid_level}
 
-  # Convert values from string representation back to atoms
-  defp convert_value("level", value) when is_binary(value) do
-    String.to_existing_atom(value)
-  rescue
-    ArgumentError -> value
+  # SECURITY: Safe level conversion from map to prevent atom exhaustion
+  defp convert_level_from_map(nil), do: {:ok, nil}
+  defp convert_level_from_map(level) when is_atom(level) and level in @levels, do: {:ok, level}
+  defp convert_level_from_map(level) when is_binary(level) do
+    case level do
+      "easy" -> {:ok, :easy}
+      "medium" -> {:ok, :medium}
+      "hard" -> {:ok, :hard}
+      _ -> {:error, :invalid_level}
+    end
   end
+  defp convert_level_from_map(_), do: {:error, :invalid_level}
 
+  # Convert values from string representation back to atoms
+  # SECURITY: Use explicit case statement instead of to_existing_atom
+  # to prevent atom exhaustion attacks and invalid atom injection
+  defp convert_value("level", _value), do: nil  # Level handled separately in convert_level_from_map
   defp convert_value(_, value), do: value
 end
