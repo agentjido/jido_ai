@@ -224,7 +224,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
   def new!(opts) when is_list(opts) or is_map(opts) do
     case new(opts) do
       {:ok, verifier} -> verifier
-      {:error, reason} -> raise ArgumentError, "Invalid code execution verifier: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid code execution verifier: #{format_error(reason)}"
     end
   end
 
@@ -480,7 +480,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
       candidate_id: candidate.id,
       score: 0.0,
       confidence: 0.0,
-      reasoning: "Failed to execute #{language} code: #{inspect(reason)}",
+      reasoning: "Failed to execute #{language} code: #{format_error(reason)}",
       metadata: %{error: reason, language: language}
     }
   end
@@ -503,4 +503,6 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
   end
 
   defp validate_working_dir(_), do: {:error, :invalid_directory}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

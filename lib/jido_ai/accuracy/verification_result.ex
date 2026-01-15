@@ -134,7 +134,7 @@ defmodule Jido.AI.Accuracy.VerificationResult do
   def new!(attrs) when is_map(attrs) do
     case new(attrs) do
       {:ok, result} -> result
-      {:error, reason} -> raise ArgumentError, "Invalid verification result: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid verification result: #{format_error(reason)}"
     end
   end
 
@@ -273,7 +273,7 @@ defmodule Jido.AI.Accuracy.VerificationResult do
   def from_map!(map) when is_map(map) do
     case from_map(map) do
       {:ok, result} -> result
-      {:error, reason} -> raise ArgumentError, "Invalid verification result map: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid verification result map: #{format_error(reason)}"
     end
   end
 
@@ -296,4 +296,6 @@ defmodule Jido.AI.Accuracy.VerificationResult do
     end
   end
   defp validate_step_scores(_), do: {:error, :invalid_step_scores}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

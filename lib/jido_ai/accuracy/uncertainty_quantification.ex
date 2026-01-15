@@ -173,7 +173,7 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
   def new!(attrs) do
     case new(attrs) do
       {:ok, uq} -> uq
-      {:error, reason} -> raise ArgumentError, "Invalid UncertaintyQuantification: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid UncertaintyQuantification: #{format_error(reason)}"
     end
   end
 
@@ -368,4 +368,6 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
 
   defp is_valid_regex(%Regex{}), do: true
   defp is_valid_regex(_), do: false
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

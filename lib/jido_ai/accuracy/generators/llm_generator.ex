@@ -127,7 +127,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   def new!(opts) do
     case new(opts) do
       {:ok, generator} -> generator
-      {:error, reason} -> raise ArgumentError, "Invalid LLMGenerator: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid LLMGenerator: #{format_error(reason)}"
     end
   end
 
@@ -385,4 +385,6 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   end
 
   defp find_reasoning_split(_, []), do: nil
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

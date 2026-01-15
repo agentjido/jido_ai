@@ -151,7 +151,7 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
   def new!(attrs) do
     case new(attrs) do
       {:ok, gate} -> gate
-      {:error, reason} -> raise ArgumentError, "Invalid CalibrationGate: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid CalibrationGate: #{format_error(reason)}"
     end
   end
 
@@ -403,4 +403,6 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
   defp get_attr(attrs, key, default) when is_map(attrs) do
     Map.get(attrs, key, default)
   end
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

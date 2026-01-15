@@ -63,7 +63,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
   def new!(opts) when is_list(opts) do
     case new(opts) do
       {:ok, reviser} -> reviser
-      {:error, reason} -> raise ArgumentError, "Invalid TargetedReviser: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid TargetedReviser: #{format_error(reason)}"
     end
   end
 
@@ -433,4 +433,6 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
 
     if preserved == [], do: ["Original structure"], else: preserved
   end
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

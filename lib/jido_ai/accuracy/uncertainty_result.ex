@@ -117,7 +117,7 @@ defmodule Jido.AI.Accuracy.UncertaintyResult do
   def new!(attrs) do
     case new(attrs) do
       {:ok, result} -> result
-      {:error, reason} -> raise ArgumentError, "Invalid UncertaintyResult: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid UncertaintyResult: #{format_error(reason)}"
     end
   end
 
@@ -233,4 +233,6 @@ defmodule Jido.AI.Accuracy.UncertaintyResult do
   end
 
   defp convert_value(_, value), do: value
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

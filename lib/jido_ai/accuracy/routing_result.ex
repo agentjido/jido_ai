@@ -130,7 +130,7 @@ defmodule Jido.AI.Accuracy.RoutingResult do
   def new!(attrs) do
     case new(attrs) do
       {:ok, result} -> result
-      {:error, reason} -> raise ArgumentError, "Invalid RoutingResult: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid RoutingResult: #{format_error(reason)}"
     end
   end
 
@@ -306,4 +306,6 @@ defmodule Jido.AI.Accuracy.RoutingResult do
   defp validate_confidence_level(nil), do: :ok
   defp validate_confidence_level(level) when level in [:high, :medium, :low], do: :ok
   defp validate_confidence_level(_), do: {:error, :invalid_confidence_level}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

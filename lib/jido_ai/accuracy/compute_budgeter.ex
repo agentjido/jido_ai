@@ -151,7 +151,7 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
   def new!(attrs) do
     case new(attrs) do
       {:ok, budgeter} -> budgeter
-      {:error, reason} -> raise ArgumentError, "Invalid ComputeBudgeter: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid ComputeBudgeter: #{format_error(reason)}"
     end
   end
 
@@ -472,4 +472,6 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
 
   defp maybe_put_attr(attrs, _key, nil), do: attrs
   defp maybe_put_attr(attrs, key, value), do: Map.put(attrs, key, value)
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

@@ -189,7 +189,7 @@ defmodule Jido.AI.Accuracy.ComputeBudget do
   def new!(attrs) do
     case new(attrs) do
       {:ok, budget} -> budget
-      {:error, reason} -> raise ArgumentError, "Invalid ComputeBudget: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid ComputeBudget: #{format_error(reason)}"
     end
   end
 
@@ -417,4 +417,6 @@ defmodule Jido.AI.Accuracy.ComputeBudget do
   defp maybe_put_map(attrs, _key, nil), do: attrs
   defp maybe_put_map(attrs, key, value) when is_map(value), do: Map.put(attrs, key, value)
   defp maybe_put_map(attrs, _key, _value), do: attrs
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

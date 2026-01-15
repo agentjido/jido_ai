@@ -196,7 +196,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
   def new!(opts) when is_list(opts) do
     case new(opts) do
       {:ok, strategy} -> strategy
-      {:error, reason} -> raise ArgumentError, "Invalid SelfRefine: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid SelfRefine: #{format_error(reason)}"
     end
   end
 
@@ -502,4 +502,6 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     do: :ok
 
   defp validate_timeout(_), do: {:error, :invalid_timeout}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

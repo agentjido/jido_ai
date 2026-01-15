@@ -113,7 +113,7 @@ defmodule Jido.AI.Accuracy.Candidate do
   def new!(attrs) when is_map(attrs) do
     case new(attrs) do
       {:ok, candidate} -> candidate
-      {:error, reason} -> raise ArgumentError, "Invalid candidate: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid candidate: #{format_error(reason)}"
     end
   end
 
@@ -225,7 +225,7 @@ defmodule Jido.AI.Accuracy.Candidate do
   def from_map!(map) when is_map(map) do
     case from_map(map) do
       {:ok, candidate} -> candidate
-      {:error, reason} -> raise ArgumentError, "Invalid candidate map: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid candidate map: #{format_error(reason)}"
     end
   end
 
@@ -269,4 +269,6 @@ defmodule Jido.AI.Accuracy.Candidate do
 
   defp parse_timestamp(%DateTime{} = dt), do: dt
   defp parse_timestamp(_), do: nil
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

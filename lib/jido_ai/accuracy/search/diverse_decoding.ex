@@ -123,7 +123,7 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
   def new!(opts \\ []) when is_list(opts) do
     case new(opts) do
       {:ok, config} -> config
-      {:error, reason} -> raise ArgumentError, "Invalid DiverseDecoding config: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid DiverseDecoding config: #{format_error(reason)}"
     end
   end
 
@@ -366,4 +366,6 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
 
   defp validate_lambda(l) when is_number(l) and l >= 0.0 and l <= 1.0, do: :ok
   defp validate_lambda(_), do: {:error, :invalid_lambda}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end
