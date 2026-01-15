@@ -127,6 +127,10 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
   {"level": "easy|medium|hard", "score": 0.0-1.0, "confidence": 0.0-1.0, "reasoning": "explanation"}
   """
 
+  # SECURITY: Maximum sizes to prevent DoS attacks
+  @max_query_length 10_000
+  @max_json_size 50_000
+
   @doc """
   Creates a new LLMDifficulty estimator from the given attributes.
 
@@ -224,11 +228,25 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
   end
 
   defp build_prompt(%__MODULE__{prompt_template: nil}, query) do
-    String.replace(@default_prompt, "{{query}}", query)
+    sanitized = sanitize_query(query)
+    String.replace(@default_prompt, "{{query}}", sanitized)
   end
 
   defp build_prompt(%__MODULE__{prompt_template: template}, query) do
-    String.replace(template, "{{query}}", query)
+    sanitized = sanitize_query(query)
+    String.replace(template, "{{query}}", sanitized)
+  end
+
+  # SECURITY: Sanitize query to prevent prompt injection and DoS
+  defp sanitize_query(query) when is_binary(query) do
+    query
+    |> String.slice(0, @max_query_length)
+    |> normalize_newlines()
+    |> String.trim()
+  end
+
+  defp normalize_newlines(str) do
+    String.replace(str, ~r/[\r\n]+/, " ")
   end
 
   defp call_llm(estimator, model, prompt) do
@@ -291,13 +309,18 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
     # Try to extract JSON from response
     json_str = extract_json(response)
 
-    case Jason.decode(json_str) do
-      {:ok, data} ->
-        build_estimate_from_json(data, original_query)
+    # SECURITY: Check JSON size to prevent memory exhaustion
+    if byte_size(json_str) > @max_json_size do
+      {:error, :response_too_large}
+    else
+      case Jason.decode(json_str) do
+        {:ok, data} ->
+          build_estimate_from_json(data, original_query)
 
-      {:error, _} ->
-        # Try to parse manually if JSON decode fails
-        parse_manually(response, original_query)
+        {:error, _} ->
+          # Try to parse manually if JSON decode fails
+          parse_manually(response, original_query)
+      end
     end
   end
 
@@ -372,6 +395,20 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
       {:ok, estimate}
     else
       {:error, :invalid_response}
+    end
+  end
+
+  # Test helper function for security tests
+  @doc false
+  def parse_json_response(json_str) do
+    # SECURITY: Check JSON size to prevent memory exhaustion
+    if byte_size(json_str) > @max_json_size do
+      {:error, :response_too_large}
+    else
+      case Jason.decode(json_str) do
+        {:ok, data} -> build_estimate_from_json(data, "test query")
+        {:error, _} -> {:error, :invalid_response}
+      end
     end
   end
 

@@ -91,6 +91,9 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   @default_domain_weight 0.25
   @default_question_weight 0.20
 
+  # SECURITY: Maximum query length to prevent DoS
+  @max_query_length 50_000
+
   defstruct [
     length_weight: @default_length_weight,
     complexity_weight: @default_complexity_weight,
@@ -205,30 +208,35 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   def estimate(%__MODULE__{} = estimator, query, _context) when is_binary(query) do
     query = String.trim(query)
 
-    if query == "" do
-      {:error, :invalid_query}
-    else
-      features = extract_features(query, estimator)
+    cond do
+      query == "" ->
+        {:error, :invalid_query}
 
-      score = calculate_score(features, estimator)
-      level = DifficultyEstimate.to_level(score)
-      confidence = calculate_confidence(features, score)
+      byte_size(query) > @max_query_length ->
+        {:error, :query_too_long}
 
-      reasoning = generate_reasoning(features, score, level)
+      true ->
+        features = extract_features(query, estimator)
 
-      estimate = %DifficultyEstimate{
-        level: level,
-        score: score,
-        confidence: confidence,
-        reasoning: reasoning,
-        features: features,
-        metadata: %{
-          method: :heuristic,
-          estimator: __MODULE__
+        score = calculate_score(features, estimator)
+        level = DifficultyEstimate.to_level(score)
+        confidence = calculate_confidence(features, score)
+
+        reasoning = generate_reasoning(features, score, level)
+
+        estimate = %DifficultyEstimate{
+          level: level,
+          score: score,
+          confidence: confidence,
+          reasoning: reasoning,
+          features: features,
+          metadata: %{
+            method: :heuristic,
+            estimator: __MODULE__
+          }
         }
-      }
 
-      {:ok, estimate}
+        {:ok, estimate}
     end
   end
 

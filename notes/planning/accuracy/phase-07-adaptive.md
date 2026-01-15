@@ -311,3 +311,34 @@ Comprehensive integration tests for adaptive budgeting.
 - `test/jido_ai/accuracy/compute_budgeter_test.exs`
 - `test/jido_ai/accuracy/adaptive_self_consistency_test.exs`
 - `test/jido_ai/accuracy/adaptive_test.exs`
+
+---
+
+## Phase 7.5: Security Hardening ✅ COMPLETED
+
+**Date:** 2026-01-15
+**Branch:** `feature/accuracy-phase-7-5-security-hardening`
+
+Addressed all critical and high-severity security vulnerabilities identified in the Phase 7 comprehensive review.
+
+### Security Fixes
+
+- [x] Fix atom conversion vulnerability in `DifficultyEstimate.from_map/1`
+- [x] Add prompt sanitization in `LLMDifficulty.build_prompt/2`
+- [x] Add JSON size limits in `LLMDifficulty.parse_response/2`
+- [x] Add query length limits in `HeuristicDifficulty.estimate/3`
+- [x] Add cost validation in `ComputeBudgeter.track_usage/2`
+- [x] Add empty candidate handling in `AdaptiveSelfConsistency.run/3`
+
+### Security Tests
+
+- [x] `test/jido_ai/accuracy/difficulty_estimate_security_test.exs` (12 tests)
+- [x] `test/jido_ai/accuracy/llm_difficulty_security_test.exs` (10 tests)
+- [x] `test/jido_ai/accuracy/heuristic_difficulty_security_test.exs` (11 tests)
+- [x] `test/jido_ai/accuracy/compute_budgeter_security_test.exs` (15 tests)
+- [x] `test/jido_ai/accuracy/adaptive_self_consistency_security_test.exs` (17 tests)
+
+**Total: 65 security tests, all passing**
+
+See `notes/features/accuracy-phase-7-5-security-hardening.md` for details.
+

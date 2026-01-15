@@ -393,20 +393,23 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     max_n = min(max_n_for_level(level), adapter.max_candidates)
 
     # Generate candidates in batches, checking for consensus
-    {result, metadata} =
-      generate_with_early_stop(
-        adapter,
-        query,
-        generator,
-        context,
-        [],
-        0,
-        initial_n,
-        max_n,
-        level
-      )
+    case generate_with_early_stop(
+           adapter,
+           query,
+           generator,
+           context,
+           [],
+           0,
+           initial_n,
+           max_n,
+           level
+         ) do
+      {:ok, result, metadata} ->
+        {:ok, result, metadata}
 
-    {:ok, result, metadata}
+      {:error, _reason} = error ->
+        error
+    end
   end
 
   defp generate_with_early_stop(
@@ -439,29 +442,59 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
       all_candidates = candidates ++ new_candidates
       total_n = length(all_candidates)
 
-      # Check for consensus if we have at least min_candidates
-      should_check_consensus = total_n >= adapter.min_candidates
+      # Check for empty candidates - all generators failed
+      if total_n == 0 and batch_size > 0 do
+        {:error, :all_generators_failed}
+      else
+        # Check for consensus if we have at least min_candidates
+        should_check_consensus = total_n >= adapter.min_candidates
 
-      if should_check_consensus do
-        case check_consensus(all_candidates, aggregator: adapter.aggregator) do
-          {:ok, agreement, _metadata} ->
-            if agreement >= adapter.early_stop_threshold do
-              # Consensus reached - aggregate and return early
-              aggregate_and_return(all_candidates, adapter, %{
-                actual_n: total_n,
-                early_stopped: true,
-                consensus: agreement,
-                difficulty_level: level,
-                initial_n: target_n,
-                max_n: max_n
-              })
-            else
-              # No consensus, continue if not at max
+        if should_check_consensus do
+          case check_consensus(all_candidates, aggregator: adapter.aggregator) do
+            {:ok, agreement, _metadata} ->
+              if agreement >= adapter.early_stop_threshold do
+                # Consensus reached - aggregate and return early
+                aggregate_and_return(all_candidates, adapter, %{
+                  actual_n: total_n,
+                  early_stopped: true,
+                  consensus: agreement,
+                  difficulty_level: level,
+                  initial_n: target_n,
+                  max_n: max_n
+                })
+              else
+                # No consensus, continue if not at max
+                if total_n >= max_n do
+                  aggregate_and_return(all_candidates, adapter, %{
+                    actual_n: total_n,
+                    early_stopped: false,
+                    consensus: agreement,
+                    difficulty_level: level,
+                    initial_n: target_n,
+                    max_n: max_n
+                  })
+                else
+                  generate_with_early_stop(
+                    adapter,
+                    query,
+                    generator,
+                    context,
+                    all_candidates,
+                    total_n,
+                    target_n,
+                    max_n,
+                    level
+                  )
+                end
+              end
+
+            {:error, _reason} ->
+              # Consensus check failed, continue if not at max
               if total_n >= max_n do
                 aggregate_and_return(all_candidates, adapter, %{
                   actual_n: total_n,
                   early_stopped: false,
-                  consensus: agreement,
+                  consensus: nil,
                   difficulty_level: level,
                   initial_n: target_n,
                   max_n: max_n
@@ -479,46 +512,21 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
                   level
                 )
               end
-            end
-
-          {:error, _reason} ->
-            # Consensus check failed, continue if not at max
-            if total_n >= max_n do
-              aggregate_and_return(all_candidates, adapter, %{
-                actual_n: total_n,
-                early_stopped: false,
-                consensus: nil,
-                difficulty_level: level,
-                initial_n: target_n,
-                max_n: max_n
-              })
-            else
-              generate_with_early_stop(
-                adapter,
-                query,
-                generator,
-                context,
-                all_candidates,
-                total_n,
-                target_n,
-                max_n,
-                level
-              )
-            end
+          end
+        else
+          # Not enough candidates to check consensus, continue
+          generate_with_early_stop(
+            adapter,
+            query,
+            generator,
+            context,
+            all_candidates,
+            total_n,
+            target_n,
+            max_n,
+            level
+          )
         end
-      else
-        # Not enough candidates to check consensus, continue
-        generate_with_early_stop(
-          adapter,
-          query,
-          generator,
-          context,
-          all_candidates,
-          total_n,
-          target_n,
-          max_n,
-          level
-        )
       end
     end
   end
@@ -545,23 +553,28 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   end
 
   defp aggregate_and_return(candidates, adapter, base_metadata) do
-    case adapter.aggregator.aggregate(candidates, []) do
-      {:ok, best, agg_metadata} ->
-        consensus = Map.get(agg_metadata, :confidence, 0.0)
-        final_metadata = Map.merge(base_metadata, %{consensus: consensus})
-        final_metadata = Map.merge(final_metadata, %{aggregation_metadata: agg_metadata})
-        {best, final_metadata}
+    # Check if we have any candidates to aggregate
+    if Enum.empty?(candidates) do
+      {:error, :no_candidates_to_aggregate}
+    else
+      case adapter.aggregator.aggregate(candidates, []) do
+        {:ok, best, agg_metadata} ->
+          consensus = Map.get(agg_metadata, :confidence, 0.0)
+          final_metadata = Map.merge(base_metadata, %{consensus: consensus})
+          final_metadata = Map.merge(final_metadata, %{aggregation_metadata: agg_metadata})
+          {:ok, best, final_metadata}
 
-      {:error, _reason} ->
-        # If aggregation fails, return first candidate
-        candidate = List.first(candidates)
+        {:error, _reason} ->
+          # If aggregation fails, return first candidate
+          candidate = List.first(candidates)
 
-        if candidate do
-          final_metadata = Map.put(base_metadata, :aggregation_error, true)
-          {candidate, final_metadata}
-        else
-          {nil, base_metadata}
-        end
+          if candidate do
+            final_metadata = Map.put(base_metadata, :aggregation_error, true)
+            {:ok, candidate, final_metadata}
+          else
+            {:error, :no_candidates_to_aggregate}
+          end
+      end
     end
   end
 
@@ -570,7 +583,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
       adapter.difficulty_estimator.estimate(adapter.difficulty_estimator, query, context)
     else
       # Default to medium
-      {:ok, DifficultyEstimate.medium()}
+      {:ok, DifficultyEstimate.new!(%{level: :medium, score: 0.5})}
     end
   end
 
