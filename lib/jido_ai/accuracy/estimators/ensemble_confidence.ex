@@ -127,7 +127,7 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
   def new!(attrs) do
     case new(attrs) do
       {:ok, estimator} -> estimator
-      {:error, reason} -> raise ArgumentError, "Invalid EnsembleConfidence: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid EnsembleConfidence: #{format_error(reason)}"
     end
   end
 
@@ -443,4 +443,6 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
 
   defp config_to_map(config) when is_list(config), do: Map.new(config)
   defp config_to_map(config) when is_map(config), do: config
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

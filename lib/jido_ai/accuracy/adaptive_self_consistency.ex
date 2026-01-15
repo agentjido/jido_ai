@@ -176,7 +176,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   def new!(attrs) do
     case new(attrs) do
       {:ok, adapter} -> adapter
-      {:error, reason} -> raise ArgumentError, "Invalid AdaptiveSelfConsistency: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid AdaptiveSelfConsistency: #{format_error(reason)}"
     end
   end
 
@@ -609,4 +609,6 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
       {:error, :aggregator_must_implement_aggregate}
     end
   end
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

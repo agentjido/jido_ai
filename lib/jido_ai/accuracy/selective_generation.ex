@@ -177,7 +177,7 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
   def new!(attrs) do
     case new(attrs) do
       {:ok, sg} -> sg
-      {:error, reason} -> raise ArgumentError, "Invalid SelectiveGeneration: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid SelectiveGeneration: #{format_error(reason)}"
     end
   end
 
@@ -337,4 +337,6 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
   defp validate_threshold(nil), do: :ok
   defp validate_threshold(t) when is_number(t) and t >= 0 and t <= 1, do: :ok
   defp validate_threshold(_), do: {:error, :invalid_threshold}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

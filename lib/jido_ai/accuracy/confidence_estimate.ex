@@ -124,7 +124,7 @@ defmodule Jido.AI.Accuracy.ConfidenceEstimate do
   def new!(attrs) do
     case new(attrs) do
       {:ok, estimate} -> estimate
-      {:error, reason} -> raise ArgumentError, "Invalid ConfidenceEstimate: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid ConfidenceEstimate: #{format_error(reason)}"
     end
   end
 
@@ -290,4 +290,6 @@ defmodule Jido.AI.Accuracy.ConfidenceEstimate do
   defp validate_method(nil), do: {:error, :invalid_method}
   defp validate_method(method) when is_atom(method) or is_binary(method), do: :ok
   defp validate_method(_), do: {:error, :invalid_method}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

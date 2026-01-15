@@ -170,7 +170,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   def new!(opts) when is_list(opts) do
     case new(opts) do
       {:ok, verifier} -> verifier
-      {:error, reason} -> raise ArgumentError, "Invalid LLM outcome verifier: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid LLM outcome verifier: #{format_error(reason)}"
     end
   end
 
@@ -534,4 +534,6 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
 
   defp validate_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
   defp validate_timeout(_), do: {:error, :invalid_timeout}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

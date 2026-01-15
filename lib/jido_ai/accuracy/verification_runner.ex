@@ -160,7 +160,7 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
   def new!(opts) when is_list(opts) or is_map(opts) do
     case new(opts) do
       {:ok, runner} -> runner
-      {:error, reason} -> raise ArgumentError, "Invalid verification runner: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid verification runner: #{format_error(reason)}"
     end
   end
 
@@ -584,7 +584,7 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
       candidate_id: candidate.id,
       score: 0.0,
       confidence: 0.0,
-      reasoning: "Verification failed: #{inspect(reason)}",
+      reasoning: "Verification failed: #{format_error(reason)}",
       metadata: %{error: reason}
     }
   end
@@ -683,4 +683,6 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
   end
 
   defp format_module_name(_), do: "Unknown"
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

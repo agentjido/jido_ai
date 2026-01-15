@@ -117,7 +117,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquer do
   def new!(opts) when is_list(opts) or is_map(opts) do
     case new(opts) do
       {:ok, critiquer} -> critiquer
-      {:error, reason} -> raise ArgumentError, "Invalid ToolCritiquer: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid ToolCritiquer: #{format_error(reason)}"
     end
   end
 
@@ -178,7 +178,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquer do
             success: false,
             exit_code: nil,
             severity: Map.get(@default_severity_map, :exception, 1.0),
-            issues: ["Tool execution failed: #{inspect(reason)}"],
+            issues: ["Tool execution failed: #{format_error(reason)}"],
             suggestions: [],
             output: ""
           }
@@ -355,4 +355,6 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquer do
 
   defp validate_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
   defp validate_timeout(_), do: {:error, :invalid_timeout}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

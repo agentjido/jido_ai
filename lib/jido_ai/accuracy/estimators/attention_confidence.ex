@@ -113,7 +113,7 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
   def new!(attrs) do
     case new(attrs) do
       {:ok, estimator} -> estimator
-      {:error, reason} -> raise ArgumentError, "Invalid AttentionConfidence: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid AttentionConfidence: #{format_error(reason)}"
     end
   end
 
@@ -274,4 +274,6 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
 
   defp validate_token_threshold(t) when is_number(t) and t >= 0.0 and t <= 1.0, do: :ok
   defp validate_token_threshold(_), do: {:error, :invalid_token_threshold}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

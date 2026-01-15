@@ -184,7 +184,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   def new!(attrs) do
     case new(attrs) do
       {:ok, estimator} -> estimator
-      {:error, reason} -> raise ArgumentError, "Invalid HeuristicDifficulty: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid HeuristicDifficulty: #{format_error(reason)}"
     end
   end
 
@@ -495,4 +495,6 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
         :ok
     end
   end
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

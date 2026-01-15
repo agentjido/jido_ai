@@ -145,7 +145,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
   def new!(opts) when is_list(opts) or is_map(opts) do
     case new(opts) do
       {:ok, loop} -> loop
-      {:error, reason} -> raise ArgumentError, "Invalid ReflectionLoop: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid ReflectionLoop: #{format_error(reason)}"
     end
   end
 
@@ -461,4 +461,6 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
       :ok
     end
   end
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

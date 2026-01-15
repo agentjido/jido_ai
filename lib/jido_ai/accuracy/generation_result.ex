@@ -105,7 +105,7 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   def new!(candidates, opts \\ []) when is_list(candidates) do
     case new(candidates, opts) do
       {:ok, result} -> result
-      {:error, reason} -> raise ArgumentError, "Invalid generation result: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid generation result: #{format_error(reason)}"
     end
   end
 
@@ -353,7 +353,7 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   def from_map!(map) when is_map(map) do
     case from_map(map) do
       {:ok, result} -> result
-      {:error, reason} -> raise ArgumentError, "Invalid generation result map: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid generation result map: #{format_error(reason)}"
     end
   end
 
@@ -424,4 +424,6 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   defp parse_aggregation_method(method) when is_atom(method), do: method
   defp parse_aggregation_method(method) when is_binary(method), do: String.to_existing_atom(method)
   defp parse_aggregation_method(_), do: :none
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

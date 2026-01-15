@@ -74,7 +74,7 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
   def new!(opts) when is_list(opts) or is_map(opts) do
     case new(opts) do
       {:ok, verifier} -> verifier
-      {:error, reason} -> raise ArgumentError, "Invalid static analysis verifier: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid static analysis verifier: #{format_error(reason)}"
     end
   end
 
@@ -341,7 +341,7 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
       candidate_id: candidate.id,
       score: 0.0,
       confidence: 0.0,
-      reasoning: "Static analysis failed: #{inspect(reason)}",
+      reasoning: "Static analysis failed: #{format_error(reason)}",
       metadata: %{error: reason}
     }
   end
@@ -381,4 +381,6 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
   end
 
   defp validate_working_dir(_), do: {:error, :invalid_directory}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

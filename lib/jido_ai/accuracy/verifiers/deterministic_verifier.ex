@@ -135,7 +135,7 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifier do
   def new!(opts) when is_list(opts) do
     case new(opts) do
       {:ok, verifier} -> verifier
-      {:error, reason} -> raise ArgumentError, "Invalid deterministic verifier: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid deterministic verifier: #{format_error(reason)}"
     end
   end
 
@@ -348,4 +348,6 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifier do
   end
 
   defp validate_tolerance(_), do: :ok
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

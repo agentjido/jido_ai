@@ -129,7 +129,7 @@ defmodule Jido.AI.Accuracy.SearchState do
   def new!(opts) when is_list(opts) do
     case new(opts) do
       {:ok, state} -> state
-      {:error, reason} -> raise ArgumentError, "Invalid SearchState: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid SearchState: #{format_error(reason)}"
     end
   end
 
@@ -364,4 +364,6 @@ defmodule Jido.AI.Accuracy.SearchState do
 
   defp validate_iterations(iterations) when is_integer(iterations) and iterations >= 0, do: :ok
   defp validate_iterations(_), do: {:error, :invalid_iterations}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

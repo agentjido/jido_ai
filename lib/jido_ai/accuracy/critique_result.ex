@@ -127,7 +127,7 @@ defmodule Jido.AI.Accuracy.CritiqueResult do
   def new!(attrs) when is_list(attrs) or is_map(attrs) do
     case new(attrs) do
       {:ok, result} -> result
-      {:error, reason} -> raise ArgumentError, "Invalid CritiqueResult: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid CritiqueResult: #{format_error(reason)}"
     end
   end
 
@@ -329,4 +329,6 @@ defmodule Jido.AI.Accuracy.CritiqueResult do
   defp merge_feedback(feedback1, feedback2) when is_binary(feedback1) and is_binary(feedback2) do
     feedback1 <> "\n" <> feedback2
   end
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end

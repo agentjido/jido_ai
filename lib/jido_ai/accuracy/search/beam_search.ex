@@ -132,7 +132,7 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
   def new!(opts) when is_list(opts) do
     case new(opts) do
       {:ok, config} -> config
-      {:error, reason} -> raise ArgumentError, "Invalid BeamSearch config: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "Invalid BeamSearch config: #{format_error(reason)}"
     end
   end
 
@@ -362,4 +362,6 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
 
   defp validate_branching_factor(factor) when is_integer(factor) and factor >= 1 and factor <= 10, do: :ok
   defp validate_branching_factor(_), do: {:error, :invalid_branching_factor}
+  defp format_error(atom) when is_atom(atom), do: atom
+  defp format_error(_), do: :invalid_attributes
 end
