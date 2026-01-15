@@ -72,7 +72,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
 
   alias Jido.AI.Accuracy.{
     DifficultyEstimate,
-    DifficultyEstimator,
+    Thresholds,
     Aggregators.MajorityVote
   }
 
@@ -100,10 +100,11 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   @default_min_candidates 3
   @default_max_candidates 20
   @default_batch_size 3
-  @default_early_stop_threshold 0.8
+  @default_early_stop_threshold Thresholds.early_stop_threshold()
   @default_aggregator MajorityVote
   @default_timeout 30_000
 
+  @enforce_keys [:min_candidates, :max_candidates]
   defstruct [
     :min_candidates,
     :max_candidates,
@@ -617,9 +618,8 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     end
   end
 
-  defp level_to_score(:easy), do: 0.2
-  defp level_to_score(:medium), do: 0.5
-  defp level_to_score(:hard), do: 0.8
+  # NOTE: Now delegates to centralized Thresholds module
+  defp level_to_score(level), do: Thresholds.level_to_score(level)
 
   # Validation
 
