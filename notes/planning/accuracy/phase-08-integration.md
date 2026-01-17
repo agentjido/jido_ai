@@ -236,30 +236,32 @@ Add comprehensive telemetry.
 
 Create telemetry for accuracy operations.
 
-- [ ] 8.3.1.1 Create `lib/jido_ai/accuracy/telemetry.ex`
-- [ ] 8.3.1.2 Add `@moduledoc` explaining telemetry approach
-- [ ] 8.3.1.3 Define event names:
+- [x] 8.3.1.1 Create `lib/jido_ai/accuracy/telemetry.ex`
+- [x] 8.3.1.2 Add `@moduledoc` explaining telemetry approach
+- [x] 8.3.1.3 Define event names:
   - `[:jido, :accuracy, :pipeline, :start]`
   - `[:jido, :accuracy, :pipeline, :stop]`
   - `[:jido, :accuracy, :pipeline, :exception]`
   - `[:jido, :accuracy, :stage, :start]`
   - `[:jido, :accuracy, :stage, :stop]`
-- [ ] 8.3.1.4 Implement `emit_pipeline_start/2`
-- [ ] 8.3.1.5 Implement `emit_pipeline_stop/2`
-- [ ] 8.3.1.6 Implement `emit_stage_start/3`
-- [ ] 8.3.1.7 Implement `emit_stage_stop/3`
-- [ ] 8.3.1.8 Implement `emit_exception/3`
+  - `[:jido, :accuracy, :stage, :exception]`
+- [x] 8.3.1.4 Implement `emit_pipeline_start/2`
+- [x] 8.3.1.5 Implement `emit_pipeline_stop/3`
+- [x] 8.3.1.6 Implement `emit_pipeline_exception/5`
+- [x] 8.3.1.7 Implement `emit_stage_start/3`
+- [x] 8.3.1.8 Implement `emit_stage_stop/4`
+- [x] 8.3.1.9 Implement `emit_stage_exception/5`
 
 ### 8.3.2 Telemetry Measurements
 
 Define measurements to attach.
 
-- [ ] 8.3.2.1 Include timing information
+- [x] 8.3.2.1 Include timing information
   - Duration: pipeline total, each stage
-- [ ] 8.3.2.2 Include token usage
+- [x] 8.3.2.2 Include token usage
   - Total tokens per LLM call
   - Breakdown by stage
-- [ ] 8.3.2.3 Include quality metrics
+- [x] 8.3.2.3 Include quality metrics
   - Confidence scores
   - Verification scores
   - Candidate counts
@@ -268,17 +270,17 @@ Define measurements to attach.
 
 Create spans for distributed tracing.
 
-- [ ] 8.3.3.1 Create spans for pipeline execution
-- [ ] 8.3.3.2 Nest spans for sub-stages
-- [ ] 8.3.3.3 Include trace context in telemetry
+- [x] 8.3.3.1 Create spans for pipeline execution
+- [x] 8.3.3.2 Nest spans for sub-stages
+- [x] 8.3.3.3 Include trace context in telemetry
 
 ### 8.3.4 Unit Tests for Telemetry
 
-- [ ] Test events are emitted
-- [ ] Test spans are created
-- [ ] Test measurements are attached
-- [ ] Test timing is accurate
-- [ ] Test token counts are correct
+- [x] Test events are emitted
+- [x] Test spans are created
+- [x] Test measurements are attached
+- [x] Test timing is accurate
+- [x] Test token counts are correct
 
 ---
 
