@@ -346,21 +346,21 @@ Comprehensive integration tests for the complete pipeline.
 
 ### 8.5.1 End-to-End Pipeline Tests
 
-- [ ] 8.5.1.1 Create `test/jido_ai/accuracy/pipeline_test.exs`
-- [ ] 8.5.1.2 Test: Complete pipeline on math problem
+- [x] 8.5.1.1 Create `test/jido_ai/accuracy/pipeline_e2e_test.exs`
+- [x] 8.5.1.2 Test: Complete pipeline on math problem
   - Run full pipeline
   - Verify all stages execute
   - Verify correct answer
   - Check trace completeness
-- [ ] 8.5.1.3 Test: Complete pipeline on coding problem
+- [x] 8.5.1.3 Test: Complete pipeline on coding problem
   - Code generation task
   - Verify tool-based verification
   - Verify compilation check
-- [ ] 8.5.1.4 Test: Complete pipeline on research question
+- [x] 8.5.1.4 Test: Complete pipeline on research question
   - Factual QA task
   - Verify RAG with correction
   - Verify factuality improved
-- [ ] 8.5.1.5 Test: Presets behave as expected
+- [x] 8.5.1.5 Test: Presets behave as expected
   - Test :fast preset
   - Test :balanced preset
   - Test :accurate preset
@@ -368,48 +368,48 @@ Comprehensive integration tests for the complete pipeline.
 
 ### 8.5.2 Accuracy Validation Tests
 
-- [ ] 8.5.2.1 Test: Pipeline improves over baseline
+- [x] 8.5.2.1 Test: Pipeline improves over baseline
   - Compare pipeline vs simple LLM call
   - Measure accuracy improvement on benchmark
-- [ ] 8.5.2.2 Test: Each component contributes
+- [x] 8.5.2.2 Test: Each component contributes
   - Ablation study
   - Verify each stage adds value
-- [ ] 8.5.2.3 Test: Presets match their intent
+- [x] 8.5.2.3 Test: Presets match their intent
   - Fast is fastest
   - Accurate is most accurate
   - Balanced is best trade-off
 
 ### 8.5.3 Performance Tests
 
-- [ ] 8.5.3.1 Test: Pipeline latency is acceptable
+- [x] 8.5.3.1 Test: Pipeline latency is acceptable
   - Measure end-to-end latency
   - Verify < 30 seconds for typical query
-- [ ] 8.5.3.2 Test: Cost tracking is accurate
+- [x] 8.5.3.2 Test: Cost tracking is accurate
   - Verify total token count
   - Compare to expected
-- [ ] 8.5.3.3 Test: Telemetry overhead is minimal
+- [x] 8.5.3.3 Test: Telemetry overhead is minimal
   - Measure telemetry impact
   - Verify < 5% overhead
 
 ### 8.5.4 Reliability Tests
 
-- [ ] 8.5.4.1 Test: Pipeline handles errors gracefully
+- [x] 8.5.4.1 Test: Pipeline handles errors gracefully
   - Mock failure at each stage
   - Verify fallback behavior
-- [ ] 8.5.4.2 Test: Calibration prevents wrong answers
+- [x] 8.5.4.2 Test: Calibration prevents wrong answers
   - Questions LLM cannot answer
   - Verify abstention rate
-- [ ] 8.5.4.3 Test: Budget limits are enforced
+- [x] 8.5.4.3 Test: Budget limits are enforced
   - Set strict budget
   - Verify pipeline respects limit
 
 ### 8.5.5 Strategy Integration Tests
 
-- [ ] 8.5.5.1 Create `test/jido_ai/accuracy/strategy_integration_test.exs`
-- [ ] 8.5.5.2 Test: ReAct strategy with accuracy pipeline
+- [x] 8.5.5.1 Create `test/jido_ai/accuracy/strategy_integration_test.exs`
+- [x] 8.5.5.2 Test: ReAct strategy with accuracy pipeline
   - Run ReAct agent with pipeline
   - Verify correct integration
-- [ ] 8.5.5.3 Test: Directive execution
+- [x] 8.5.5.3 Test: Directive execution
   - Execute AccuracyDirective
   - Verify result signal
 
