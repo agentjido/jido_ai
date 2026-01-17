@@ -63,15 +63,25 @@ defmodule Jido.AI.Strategy.ReAct do
         termination_reason: :final_answer | :max_iterations | :error | nil,
         config: config()
       }
+
+  ## StateOps
+
+  This strategy uses `Jido.AI.Strategy.StateOpsHelpers` for clean state operation
+  patterns. The strategy's internal state is managed via `StratState`, while
+  StateOps are used when actions return effects that need to modify agent state.
+
+  See `StateOpsHelpers` for available state operation helpers.
   """
 
   use Jido.Agent.Strategy
 
   alias Jido.Agent
+  alias Jido.Agent.StateOp
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.ReAct.Machine
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Tools.Registry
   alias ReqLLM.Context
