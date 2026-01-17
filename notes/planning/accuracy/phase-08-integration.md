@@ -292,13 +292,13 @@ Integrate accuracy pipeline with existing strategies.
 
 Create adapter for using accuracy pipeline with strategies.
 
-- [ ] 8.4.1.1 Create `lib/jido_ai/accuracy/strategy_adapter.ex`
-- [ ] 8.4.1.2 Add `@moduledoc` explaining integration approach
-- [ ] 8.4.1.3 Implement `wrap_pipeline/2`
+- [x] 8.4.1.1 Create `lib/jido_ai/accuracy/strategy_adapter.ex`
+- [x] 8.4.1.2 Add `@moduledoc` explaining integration approach
+- [x] 8.4.1.3 Implement `run_pipeline/3`
   - Wraps accuracy pipeline for strategy use
-- [ ] 8.4.1.4 Implement `to_directive/2`
+- [x] 8.4.1.4 Implement `to_directive/2`
   - Converts pipeline config to directive
-- [ ] 8.4.1.5 Implement `from_signal/2`
+- [x] 8.4.1.5 Implement `from_signal/1`
   - Extracts query from signal
 
 ### 8.4.2 ReAct Strategy Integration
@@ -309,26 +309,34 @@ Integrate with ReAct strategy.
   - Adapts pipeline for ReAct pattern
 - [ ] 8.4.2.2 Support tool calls within pipeline
 - [ ] 8.4.2.3 Emit ReAct-compatible signals
+**Note**: Deferred - directive-based approach (8.4.3) works for all strategies including ReAct
 
 ### 8.4.3 Directive Integration
 
 Support directive-based execution.
 
-- [ ] 8.4.3.1 Implement `AccuracyDirective` module
-- [ ] 8.4.3.2 Define directive schema
+- [x] 8.4.3.1 Implement `Directive.Run` module
+- [x] 8.4.3.2 Define directive schema
+  - `:id` - Call ID for correlation
   - `:query` - Query to process
   - `:preset` - Preset to use
   - `:config` - Custom config overrides
-- [ ] 8.4.3.3 Implement directive execution
-- [ ] 8.4.3.4 Return result as signal
+  - `:generator` - Generator function or module
+  - `:timeout` - Execution timeout
+- [x] 8.4.3.3 Implement directive helpers
+  - `new!/1` for creating directives
+  - `to_execution_map/1` for execution
+- [x] 8.4.3.4 Create Signal.Result and Signal.Error modules
+  - `accuracy.result` signal for success
+  - `accuracy.error` signal for failures
 
 ### 8.4.4 Unit Tests for StrategyAdapter
 
-- [ ] Test ReAct integration
-- [ ] Test CoT integration
-- [ ] Test directive execution
-- [ ] Test signal emission
-- [ ] Test to_directive conversion
+- [x] Test directive creation
+- [x] Test signal creation (Result and Error)
+- [x] Test to_directive conversion
+- [x] Test from_signal extraction
+- [x] Test make_generator function
 
 ---
 
