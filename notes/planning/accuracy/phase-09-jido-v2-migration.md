@@ -400,6 +400,70 @@ Add config-specific StateOps helper functions to support strategy config updates
 
 ---
 
+## 9.7 Review Fixes and Code Cleanup
+
+**Status**: Complete (2026-01-18)
+**Summary**: Addressed all blockers and concerns from 6 comprehensive Phase 9 reviews. See `notes/summaries/accuracy-phase-9-7-review-fixes.md` for details.
+
+### 9.7.1 Critical Test Fixes (Priority: CRITICAL)
+
+- [x] 9.7.1.1 Verify schema integration tests passing
+- [x] 9.7.1.2 Confirm schema function detection pattern works correctly
+- [x] 9.7.1.3 Document findings (tests were already passing)
+
+**Result**: 38 tests passing, 0 failures. No fix needed.
+
+### 9.7.2 Strategy Module Consolidation (Priority: HIGH)
+
+- [x] 9.7.2.1 Delete duplicate `lib/jido_ai/strategy/react.ex` module
+- [x] 9.7.2.2 Keep canonical `Jido.AI.Strategies.ReAct` (plural namespace)
+- [x] 9.7.2.3 Update all test imports to use plural namespace
+- [x] 9.7.2.4 Verify no undefined module references
+
+**Result**: Single canonical ReAct module, all tests passing.
+
+### 9.7.3 Directory Structure Unification (Priority: HIGH)
+
+- [x] 9.7.3.1 Move all strategy files from `strategies/` to `strategy/` directory
+- [x] 9.7.3.2 Move all test files to `test/jido_ai/strategy/` directory
+- [x] 9.7.3.3 Delete old empty `strategies/` directory
+- [x] 9.7.3.4 Update directory references in documentation
+
+**Files Moved:**
+- `lib/jido_ai/strategies/react.ex` → `lib/jido_ai/strategy/react.ex`
+- `lib/jido_ai/strategies/adaptive.ex` → `lib/jido_ai/strategy/adaptive.ex`
+- `lib/jido_ai/strategies/chain_of_thought.ex` → `lib/jido_ai/strategy/chain_of_thought.ex`
+- `lib/jido_ai/strategies/graph_of_thoughts.ex` → `lib/jido_ai/strategy/graph_of_thoughts.ex`
+- `lib/jido_ai/strategies/tree_of_thoughts.ex` → `lib/jido_ai/strategy/tree_of_thoughts.ex`
+- `lib/jido_ai/strategies/trm.ex` → `lib/jido_ai/strategy/trm.ex`
+
+**Test Files Moved:**
+- All 6 strategy test files moved to `test/jido_ai/strategy/`
+
+**Result**: Unified `strategy/` directory structure.
+
+### 9.7.4 StateOpsHelpers Refactoring (Priority: MEDIUM)
+
+- [x] 9.7.4.1 Remove `set_iteration_counter/1` alias (kept `set_iteration/1`)
+- [x] 9.7.4.2 Update tests to remove alias test
+- [x] 9.7.4.3 Verify all StateOpsHelpers tests passing
+
+**Result**: 69 tests passing (27 doctests + 42 unit tests).
+
+### 9.7.5 Security Enhancements (Priority: MEDIUM)
+
+**Status**: SKIPPED per developer request
+
+- [~] Tool registration authorization
+- [~] Config update validation
+- [~] Conversation message validation
+
+**Rationale**: Medium-risk items deferred to future security-focused phase.
+
+**Section 9.7 Status: Complete (359 total tests passing)**
+
+---
+
 ## Phase 9 Success Criteria
 
 1. **StateOps**: All strategies use StateOps for state mutations

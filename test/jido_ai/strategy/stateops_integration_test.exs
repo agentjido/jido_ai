@@ -13,7 +13,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategy.ReAct
+  alias Jido.AI.Strategies.ReAct
   alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.Agent.StateOp
 

@@ -84,16 +84,6 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
     StateOp.set_path([:iteration], iteration)
   end
 
-  @doc """
-  Creates a StateOp to set the iteration counter (alias for set_iteration/1).
-
-  ## Examples
-
-      iex> StateOpsHelpers.set_iteration_counter(5)
-      %StateOp.SetPath{path: [:iteration], value: 5}
-  """
-  @spec set_iteration_counter(non_neg_integer()) :: StateOp.SetPath.t()
-  def set_iteration_counter(iteration), do: set_iteration(iteration)
 
   @doc """
   Creates a StateOp to append a message to the conversation.
