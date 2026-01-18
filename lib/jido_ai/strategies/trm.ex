@@ -66,6 +66,7 @@ defmodule Jido.AI.Strategies.TRM do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.TRM.Machine
@@ -195,7 +196,7 @@ defmodule Jido.AI.Strategies.TRM do
     state =
       machine
       |> Machine.to_map()
-      |> Map.put(:config, config)
+      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
     agent = StratState.put(agent, state)
     {agent, []}
@@ -310,7 +311,7 @@ defmodule Jido.AI.Strategies.TRM do
         new_state =
           machine
           |> Machine.to_map()
-          |> Map.put(:config, config)
+          |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
         agent = StratState.put(agent, new_state)
         {agent, lift_directives(directives, config)}
