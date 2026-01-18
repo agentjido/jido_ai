@@ -47,45 +47,23 @@ defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
     category: "ai",
     tags: ["planning", "prioritization", "tasks"],
     vsn: "1.0.0",
-    schema: [
-      model: [
-        type: :string,
-        required: false,
-        doc: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :planning)"
-      ],
-      tasks: [
-        type: {:list, :string},
-        required: true,
-        doc: "List of tasks to prioritize"
-      ],
-      criteria: [
-        type: :string,
-        required: false,
-        doc: "Prioritization criteria (e.g., 'impact, urgency, effort')"
-      ],
-      context: [
-        type: :string,
-        required: false,
-        doc: "Additional context about the project"
-      ],
-      max_tokens: [
-        type: :integer,
-        required: false,
-        default: 4096,
-        doc: "Maximum tokens to generate"
-      ],
-      temperature: [
-        type: :float,
-        required: false,
-        default: 0.5,
-        doc: "Sampling temperature"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        doc: "Request timeout in milliseconds"
-      ]
-    ]
+    schema: Zoi.object(%{
+      model:
+        Zoi.string(
+          description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :planning)"
+        )
+        |> Zoi.optional(),
+      tasks: Zoi.list(Zoi.string(), description: "List of tasks to prioritize"),
+      criteria:
+        Zoi.string(description: "Prioritization criteria (e.g., 'impact, urgency, effort')")
+        |> Zoi.optional(),
+      context:
+        Zoi.string(description: "Additional context about the project") |> Zoi.optional(),
+      max_tokens:
+        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
+      temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.5),
+      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+    })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers

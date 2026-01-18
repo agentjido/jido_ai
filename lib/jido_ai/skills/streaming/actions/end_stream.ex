@@ -32,25 +32,14 @@ defmodule Jido.AI.Skills.Streaming.Actions.EndStream do
     category: "ai",
     tags: ["streaming", "llm", "cleanup"],
     vsn: "1.0.0",
-    schema: [
-      stream_id: [
-        type: :string,
-        required: true,
-        doc: "The ID of the stream to finalize"
-      ],
-      wait_for_completion: [
-        type: :boolean,
-        required: false,
-        default: true,
-        doc: "Wait for stream to finish if still active"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        default: 30_000,
-        doc: "Max time to wait in milliseconds"
-      ]
-    ]
+    schema: Zoi.object(%{
+      stream_id: Zoi.string(description: "The ID of the stream to finalize"),
+      wait_for_completion:
+        Zoi.boolean(description: "Wait for stream to finish if still active")
+        |> Zoi.default(true),
+      timeout:
+        Zoi.integer(description: "Max time to wait in milliseconds") |> Zoi.default(30_000)
+    })
 
   @doc """
   Executes the end stream action.

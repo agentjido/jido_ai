@@ -43,46 +43,26 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
     category: "ai",
     tags: ["reasoning", "analysis"],
     vsn: "1.0.0",
-    schema: [
-      model: [
-        type: :string,
-        required: false,
-        doc: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)"
-      ],
-      input: [
-        type: :string,
-        required: true,
-        doc: "The text or data to analyze"
-      ],
-      analysis_type: [
-        type: {:in, [:sentiment, :topics, :entities, :summary, :custom]},
-        required: false,
-        default: :summary,
-        doc: "Type of analysis to perform"
-      ],
-      custom_prompt: [
-        type: :string,
-        required: false,
-        doc: "Custom analysis instructions (when analysis_type: :custom)"
-      ],
-      max_tokens: [
-        type: :integer,
-        required: false,
-        default: 2048,
-        doc: "Maximum tokens to generate"
-      ],
-      temperature: [
-        type: :float,
-        required: false,
-        default: 0.3,
-        doc: "Sampling temperature (lower for more deterministic analysis)"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        doc: "Request timeout in milliseconds"
-      ]
-    ]
+    schema: Zoi.object(%{
+      model:
+        Zoi.string(
+          description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)"
+        )
+        |> Zoi.optional(),
+      input: Zoi.string(description: "The text or data to analyze"),
+      analysis_type:
+        Zoi.atom(description: "Type of analysis to perform (:sentiment, :topics, :entities, :summary, :custom)")
+        |> Zoi.default(:summary),
+      custom_prompt:
+        Zoi.string(description: "Custom analysis instructions (when analysis_type: :custom)")
+        |> Zoi.optional(),
+      max_tokens:
+        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(2048),
+      temperature:
+        Zoi.float(description: "Sampling temperature (lower for more deterministic analysis)")
+        |> Zoi.default(0.3),
+      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+    })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers

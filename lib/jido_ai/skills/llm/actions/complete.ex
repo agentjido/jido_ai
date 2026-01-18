@@ -36,35 +36,19 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
     category: "ai",
     tags: ["llm", "completion", "generation"],
     vsn: "1.0.0",
-    schema: [
-      model: [
-        type: :string,
-        required: false,
-        doc: "Model spec (e.g., 'anthropic:claude-haiku-4-5') or alias (e.g., :fast)"
-      ],
-      prompt: [
-        type: :string,
-        required: true,
-        doc: "The text prompt to complete"
-      ],
-      max_tokens: [
-        type: :integer,
-        required: false,
-        default: 1024,
-        doc: "Maximum tokens to generate"
-      ],
-      temperature: [
-        type: :float,
-        required: false,
-        default: 0.7,
-        doc: "Sampling temperature (0.0-2.0)"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        doc: "Request timeout in milliseconds"
-      ]
-    ]
+    schema: Zoi.object(%{
+      model:
+        Zoi.string(
+          description: "Model spec (e.g., 'anthropic:claude-haiku-4-5') or alias (e.g., :fast)"
+        )
+        |> Zoi.optional(),
+      prompt: Zoi.string(description: "The text prompt to complete"),
+      max_tokens:
+        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
+      temperature:
+        Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
+      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+    })
 
   alias Jido.AI.Helpers
   alias Jido.AI.Skills.BaseActionHelpers
