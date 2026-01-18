@@ -1,11 +1,11 @@
-defmodule Jido.AI.Strategy.ReAct do
+defmodule Jido.AI.Strategies.ReAct do
   @moduledoc """
   Generic ReAct (Reason-Act) execution strategy for Jido agents.
 
   This strategy implements a multi-step reasoning loop:
-  1. User query arrives → Start LLM call with tools
-  2. LLM response → Either tool calls or final answer
-  3. Tool results → Continue with next LLM call
+  1. User query arrives -> Start LLM call with tools
+  2. LLM response -> Either tool calls or final answer
+  3. Tool results -> Continue with next LLM call
   4. Repeat until final answer or max iterations
 
   ## Architecture
@@ -23,7 +23,7 @@ defmodule Jido.AI.Strategy.ReAct do
       use Jido.Agent,
         name: "my_react_agent",
         strategy: {
-          Jido.AI.Strategy.ReAct,
+          Jido.AI.Strategies.ReAct,
           tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
           system_prompt: "You are a helpful assistant...",
           model: "anthropic:claude-haiku-4-5",
@@ -42,10 +42,10 @@ defmodule Jido.AI.Strategy.ReAct do
   This strategy implements `signal_routes/1` which AgentServer uses to
   automatically route these signals to strategy commands:
 
-  - `"react.user_query"` → `:react_start`
-  - `"reqllm.result"` → `:react_llm_result`
-  - `"ai.tool_result"` → `:react_tool_result`
-  - `"reqllm.partial"` → `:react_llm_partial`
+  - `"react.user_query"` -> `:react_start`
+  - `"reqllm.result"` -> `:react_llm_result`
+  - `"ai.tool_result"` -> `:react_tool_result`
+  - `"reqllm.partial"` -> `:react_llm_partial`
 
   No custom signal handling code is needed in your agent.
 
@@ -63,25 +63,16 @@ defmodule Jido.AI.Strategy.ReAct do
         termination_reason: :final_answer | :max_iterations | :error | nil,
         config: config()
       }
-
-  ## StateOps
-
-  This strategy uses `Jido.AI.Strategy.StateOpsHelpers` for clean state operation
-  patterns. The strategy's internal state is managed via `StratState`, while
-  StateOps are used when actions return effects that need to modify agent state.
-
-  See `StateOpsHelpers` for available state operation helpers.
   """
 
   use Jido.Agent.Strategy
 
   alias Jido.Agent
-  alias Jido.Agent.StateOp
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.ReAct.Machine
-  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Tools.Registry
   alias ReqLLM.Context
@@ -389,15 +380,19 @@ defmodule Jido.AI.Strategy.ReAct do
         result
 
       :error ->
-        if config[:use_registry] do
-          case Registry.get(tool_name) do
-            {:ok, {:action, module}} -> {:ok, module}
-            {:ok, {:tool, module}} -> {:ok, module}
-            _ -> :error
-          end
-        else
-          :error
-        end
+        lookup_in_registry(tool_name, config)
+    end
+  end
+
+  defp lookup_in_registry(tool_name, config) do
+    if config[:use_registry] do
+      case Registry.get(tool_name) do
+        {:ok, {:action, module}} -> {:ok, module}
+        {:ok, {:tool, module}} -> {:ok, module}
+        _ -> :error
+      end
+    else
+      :error
     end
   end
 
@@ -416,7 +411,7 @@ defmodule Jido.AI.Strategy.ReAct do
 
         :error ->
           raise ArgumentError,
-                "Jido.AI.Strategy.ReAct requires :tools option (list of Jido.Action modules)"
+                "Jido.AI.Strategies.ReAct requires :tools option (list of Jido.Action modules)"
       end
 
     actions_by_name = Map.new(tools_modules, &{&1.name(), &1})

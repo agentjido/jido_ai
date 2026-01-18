@@ -56,16 +56,6 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
     end
   end
 
-  describe "set_iteration_counter/1" do
-    test "aliases set_iteration/1" do
-      op1 = StateOpsHelpers.set_iteration_counter(3)
-      op2 = StateOpsHelpers.set_iteration(3)
-
-      assert op1.path == op2.path
-      assert op1.value == op2.value
-    end
-  end
-
   describe "append_conversation/1" do
     test "creates SetState operation for conversation list" do
       messages = [%{role: :user, content: "Hello"}]

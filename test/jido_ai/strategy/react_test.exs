@@ -1,9 +1,9 @@
-defmodule Jido.AI.Strategy.ReActTest do
+defmodule Jido.AI.Strategies.ReActTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Config
-  alias Jido.AI.Strategy.ReAct
+  alias Jido.AI.Strategies.ReAct
 
   # Test action module
   defmodule TestCalculator do
