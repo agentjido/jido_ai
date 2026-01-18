@@ -216,48 +216,30 @@ Add lifecycle callbacks to streaming skill.
 
 ## 9.4 Accuracy Pipeline StateOps Migration
 
-Migrate the accuracy pipeline to use StateOps for state mutations.
+**Status**: SKIPPED (2025-01-18)
 
-### 9.4.1 Pipeline StateOps Integration
+### Rationale for Skipping
 
-Update pipeline to use StateOps instead of direct state manipulation.
+Phase 9.4 was originally planned to migrate the accuracy pipeline to use StateOps for state mutations. However, after analysis, this migration is not applicable because:
 
-- [ ] 9.4.1.1 Update `lib/jido_ai/accuracy/pipeline.ex`
-- [ ] 9.4.1.2 Import `Jido.Agent.StateOp` for state operations
-- [ ] 9.4.1.3 Replace direct result struct updates with StateOp.SetState
-- [ ] 9.4.1.4 Use StateOp.SetPath for nested metadata updates
-- [ ] 9.4.1.5 Update `run/3` to apply state operations
-- [ ] 9.4.1.6 Ensure trace updates use state operations
+1. **The pipeline is a pure functional data flow** - The accuracy pipeline (`lib/jido_ai/accuracy/pipeline.ex`) transforms immutable state maps through stages using `Map.put`/`Map.update`. It does not manipulate agent state.
 
-### 9.4.2 Pipeline Stage StateOps
+2. **StateOps are for agent state management** - `Jido.Agent.StateOp` is specifically designed for explicit agent state mutations (like `StateOp.SetState`, `StateOp.SetPath`) when modifying agent state from strategies. The pipeline is not a strategy and does not operate on agent state.
 
-Update pipeline stages to use StateOps.
+3. **The pipeline is already correctly architected** - The pipeline uses immutable data structures (`GenerationResult`, `PipelineResult`, `Candidate`) which is the appropriate pattern for pure functional data transformation.
 
-- [ ] 9.4.2.1 Update `lib/jido_ai/accuracy/generation_result.ex`
-- [ ] 9.4.2.2 Add StateOps helpers for result updates
-- [ ] 9.4.2.3 Update `lib/jido_ai/accuracy/pipeline_result.ex`
-- [ ] 9.4.2.4 Add StateOps helpers for pipeline result updates
-- [ ] 9.4.2.5 Update stage execution to return state operations
-- [ ] 9.4.2.6 Compose state operations across stages
+4. **No breaking changes needed** - The pipeline's current design is consistent with functional programming principles and does not need to be changed to match agent state management patterns.
 
-### 9.4.3 Calibration Gate StateOps
+### Original Plan (Not Implemented)
 
-Update calibration gate to use StateOps.
+The following tasks were originally planned but are not applicable:
 
-- [ ] 9.4.3.1 Update `lib/jido_ai/accuracy/calibration_gate.ex`
-- [ ] 9.4.3.2 Replace direct state updates with state operations
-- [ ] 9.4.3.3 Use StateOp.SetPath for confidence updates
-- [ ] 9.4.3.4 Add StateOps for action decision storage
-- [ ] 9.4.3.5 Update calibration result handling
+- [~] 9.4.1 Pipeline StateOps Integration
+- [~] 9.4.2 Pipeline Stage StateOps
+- [~] 9.4.3 Calibration Gate StateOps
+- [~] 9.4.4 Unit Tests for Pipeline StateOps
 
-### 9.4.4 Unit Tests for Pipeline StateOps
-
-- [ ] Test pipeline applies state operations correctly
-- [ ] Test stage state operations compose
-- [ ] Test calibration gate uses state operations
-- [ ] Test state operations preserve pipeline integrity
-- [ ] Test metadata updates via StateOp.SetPath
-- [ ] Test trace updates via state operations
+**Note**: If the accuracy pipeline is later integrated as a strategy that modifies agent state, then StateOps would be applicable at that integration point. For now, the pipeline remains a pure functional component.
 
 ---
 
