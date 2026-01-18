@@ -120,4 +120,68 @@ defmodule Jido.AI.Skills.Planning do
 
     {:ok, initial_state}
   end
+
+  @doc """
+  Returns the schema for skill state.
+
+  Defines the structure and defaults for Planning skill state.
+  """
+  @impl Jido.Skill
+  def schema do
+    Zoi.object(%{
+      default_model:
+        Zoi.atom(description: "Default model alias (:fast, :capable, :planning)")
+        |> Zoi.default(:planning),
+      default_max_tokens:
+        Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(4096),
+      default_temperature:
+        Zoi.float(description: "Default sampling temperature (0.0-2.0)")
+        |> Zoi.default(0.7)
+    })
+  end
+
+  @doc """
+  Returns the signal router for this skill.
+
+  Maps signal patterns to action modules.
+  """
+  @impl Jido.Skill
+  def router(_config) do
+    [
+      {"planning.plan", Jido.AI.Skills.Planning.Actions.Plan},
+      {"planning.decompose", Jido.AI.Skills.Planning.Actions.Decompose},
+      {"planning.prioritize", Jido.AI.Skills.Planning.Actions.Prioritize}
+    ]
+  end
+
+  @doc """
+  Pre-routing hook for incoming signals.
+
+  Currently returns :continue to allow normal routing.
+  """
+  @impl Jido.Skill
+  def handle_signal(_signal, _context) do
+    {:ok, :continue}
+  end
+
+  @doc """
+  Transform the result returned from action execution.
+
+  Currently passes through results unchanged.
+  """
+  @impl Jido.Skill
+  def transform_result(_action, result, _context) do
+    result
+  end
+
+  @doc """
+  Returns signal patterns this skill responds to.
+  """
+  def signal_patterns do
+    [
+      "planning.plan",
+      "planning.decompose",
+      "planning.prioritize"
+    ]
+  end
 end

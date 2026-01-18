@@ -139,4 +139,74 @@ defmodule Jido.AI.Skills.Streaming do
 
     {:ok, initial_state}
   end
+
+  @doc """
+  Returns the schema for skill state.
+
+  Defines the structure and defaults for Streaming skill state.
+  """
+  @impl Jido.Skill
+  def schema do
+    Zoi.object(%{
+      default_model:
+        Zoi.atom(description: "Default model alias (:fast, :capable)")
+        |> Zoi.default(:fast),
+      default_max_tokens:
+        Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(1024),
+      default_temperature:
+        Zoi.float(description: "Default sampling temperature (0.0-2.0)")
+        |> Zoi.default(0.7),
+      default_buffer_size:
+        Zoi.integer(description: "Default buffer size for stream collection")
+        |> Zoi.default(8192),
+      active_streams:
+        Zoi.map(description: "Map of active stream IDs to their metadata")
+        |> Zoi.default(%{})
+    })
+  end
+
+  @doc """
+  Returns the signal router for this skill.
+
+  Maps signal patterns to action modules.
+  """
+  @impl Jido.Skill
+  def router(_config) do
+    [
+      {"stream.start", Jido.AI.Skills.Streaming.Actions.StartStream},
+      {"stream.process", Jido.AI.Skills.Streaming.Actions.ProcessTokens},
+      {"stream.end", Jido.AI.Skills.Streaming.Actions.EndStream}
+    ]
+  end
+
+  @doc """
+  Pre-routing hook for incoming signals.
+
+  Currently returns :continue to allow normal routing.
+  """
+  @impl Jido.Skill
+  def handle_signal(_signal, _context) do
+    {:ok, :continue}
+  end
+
+  @doc """
+  Transform the result returned from action execution.
+
+  Currently passes through results unchanged.
+  """
+  @impl Jido.Skill
+  def transform_result(_action, result, _context) do
+    result
+  end
+
+  @doc """
+  Returns signal patterns this skill responds to.
+  """
+  def signal_patterns do
+    [
+      "stream.start",
+      "stream.process",
+      "stream.end"
+    ]
+  end
 end

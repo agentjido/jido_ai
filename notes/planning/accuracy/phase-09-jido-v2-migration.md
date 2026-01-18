@@ -147,67 +147,70 @@ Update streaming skill actions to use Zoi schemas.
 
 Add new lifecycle callbacks to skills for better integration with Jido V2.
 
+**Status**: Complete (2025-01-18)
+**Summary**: All 5 skills now implement lifecycle callbacks. See `notes/summaries/accuracy-phase-9-3-skill-lifecycle.md` for details.
+
 ### 9.3.1 LLM Skill Lifecycle Enhancement
 
 Add lifecycle callbacks to LLM skill.
 
-- [ ] 9.3.1.1 Update `lib/jido_ai/skills/llm/llm.ex`
-- [ ] 9.3.1.2 Implement `router/1` callback for signal routing
+- [x] 9.3.1.1 Update `lib/jido_ai/skills/llm/llm.ex`
+- [x] 9.3.1.2 Implement `router/1` callback for signal routing
   - Map "llm.chat" → Chat action
   - Map "llm.complete" → Complete action
   - Map "llm.embed" → Embed action
-- [ ] 9.3.1.3 Add `transform_result/3` for response formatting
-- [ ] 9.3.1.4 Add schema for skill state defaults
-- [ ] 9.3.1.5 Add signal_patterns for LLM signals
+- [x] 9.3.1.3 Add `transform_result/3` for response formatting
+- [x] 9.3.1.4 Add schema for skill state defaults
+- [x] 9.3.1.5 Add signal_patterns for LLM signals
 
 ### 9.3.2 Planning Skill Lifecycle Enhancement
 
 Add lifecycle callbacks to planning skill.
 
-- [ ] 9.3.2.1 Update `lib/jido_ai/skills/planning/planning.ex`
-- [ ] 9.3.2.2 Implement `router/1` callback
-- [ ] 9.3.2.3 Add `handle_signal/2` for planning-specific signals
-- [ ] 9.3.2.4 Add schema for plan state tracking
-- [ ] 9.3.2.5 Add signal_patterns for planning signals
+- [x] 9.3.2.1 Update `lib/jido_ai/skills/planning/planning.ex`
+- [x] 9.3.2.2 Implement `router/1` callback
+- [x] 9.3.2.3 Add `handle_signal/2` for planning-specific signals
+- [x] 9.3.2.4 Add schema for plan state tracking
+- [x] 9.3.2.5 Add signal_patterns for planning signals
 
 ### 9.3.3 Reasoning Skill Lifecycle Enhancement
 
 Add lifecycle callbacks to reasoning skill.
 
-- [ ] 9.3.3.1 Update `lib/jido_ai/skills/reasoning/reasoning.ex`
-- [ ] 9.3.3.2 Implement `router/1` callback
-- [ ] 9.3.3.3 Add `transform_result/3` for reasoning results
-- [ ] 9.3.3.4 Add schema for reasoning state
-- [ ] 9.3.3.5 Add signal_patterns for reasoning signals
+- [x] 9.3.3.1 Update `lib/jido_ai/skills/reasoning/reasoning.ex`
+- [x] 9.3.3.2 Implement `router/1` callback
+- [x] 9.3.3.3 Add `transform_result/3` for reasoning results
+- [x] 9.3.3.4 Add schema for reasoning state
+- [x] 9.3.3.5 Add signal_patterns for reasoning signals
 
 ### 9.3.4 Tool Calling Skill Lifecycle Enhancement
 
 Add lifecycle callbacks to tool calling skill.
 
-- [ ] 9.3.4.1 Update `lib/jido_ai/skills/tool_calling/tool_calling.ex`
-- [ ] 9.3.4.2 Implement `router/1` callback
-- [ ] 9.3.4.3 Add `handle_signal/2` for tool execution signals
-- [ ] 9.3.4.4 Add schema for tool registry state
-- [ ] 9.3.4.5 Add signal_patterns for tool signals
+- [x] 9.3.4.1 Update `lib/jido_ai/skills/tool_calling/tool_calling.ex`
+- [x] 9.3.4.2 Implement `router/1` callback
+- [x] 9.3.4.3 Add `handle_signal/2` for tool execution signals
+- [x] 9.3.4.4 Add schema for tool registry state
+- [x] 9.3.4.5 Add signal_patterns for tool signals
 
 ### 9.3.5 Streaming Skill Lifecycle Enhancement
 
 Add lifecycle callbacks to streaming skill.
 
-- [ ] 9.3.5.1 Update `lib/jido_ai/skills/streaming/streaming.ex`
-- [ ] 9.3.5.2 Implement `router/1` callback
-- [ ] 9.3.5.3 Add `handle_signal/2` for stream signals
-- [ ] 9.3.5.4 Add schema for stream state tracking
-- [ ] 9.3.5.5 Add signal_patterns for streaming signals
+- [x] 9.3.5.1 Update `lib/jido_ai/skills/streaming/streaming.ex`
+- [x] 9.3.5.2 Implement `router/1` callback
+- [x] 9.3.5.3 Add `handle_signal/2` for stream signals
+- [x] 9.3.5.4 Add schema for stream state tracking
+- [x] 9.3.5.5 Add signal_patterns for streaming signals
 
 ### 9.3.6 Unit Tests for Skill Lifecycle
 
-- [ ] Test router/1 returns correct route mappings
-- [ ] Test handle_signal/2 processes signals correctly
-- [ ] Test transform_result/3 modifies results appropriately
-- [ ] Test skill schema provides correct defaults
-- [ ] Test signal_patterns match expected signals
-- [ ] Test mount/2 initializes skill state correctly
+- [x] Test router/1 returns correct route mappings
+- [x] Test handle_signal/2 processes signals correctly
+- [x] Test transform_result/3 modifies results appropriately
+- [x] Test skill schema provides correct defaults
+- [x] Test signal_patterns match expected signals
+- [x] Test mount/2 initializes skill state correctly
 
 ---
 

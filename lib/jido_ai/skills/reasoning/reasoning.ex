@@ -120,4 +120,68 @@ defmodule Jido.AI.Skills.Reasoning do
 
     {:ok, initial_state}
   end
+
+  @doc """
+  Returns the schema for skill state.
+
+  Defines the structure and defaults for Reasoning skill state.
+  """
+  @impl Jido.Skill
+  def schema do
+    Zoi.object(%{
+      default_model:
+        Zoi.atom(description: "Default model alias (:fast, :capable, :reasoning)")
+        |> Zoi.default(:reasoning),
+      default_max_tokens:
+        Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(2048),
+      default_temperature:
+        Zoi.float(description: "Default sampling temperature (0.0-2.0)")
+        |> Zoi.default(0.3)
+    })
+  end
+
+  @doc """
+  Returns the signal router for this skill.
+
+  Maps signal patterns to action modules.
+  """
+  @impl Jido.Skill
+  def router(_config) do
+    [
+      {"reasoning.analyze", Jido.AI.Skills.Reasoning.Actions.Analyze},
+      {"reasoning.explain", Jido.AI.Skills.Reasoning.Actions.Explain},
+      {"reasoning.infer", Jido.AI.Skills.Reasoning.Actions.Infer}
+    ]
+  end
+
+  @doc """
+  Pre-routing hook for incoming signals.
+
+  Currently returns :continue to allow normal routing.
+  """
+  @impl Jido.Skill
+  def handle_signal(_signal, _context) do
+    {:ok, :continue}
+  end
+
+  @doc """
+  Transform the result returned from action execution.
+
+  Currently passes through results unchanged.
+  """
+  @impl Jido.Skill
+  def transform_result(_action, result, _context) do
+    result
+  end
+
+  @doc """
+  Returns signal patterns this skill responds to.
+  """
+  def signal_patterns do
+    [
+      "reasoning.analyze",
+      "reasoning.explain",
+      "reasoning.infer"
+    ]
+  end
 end

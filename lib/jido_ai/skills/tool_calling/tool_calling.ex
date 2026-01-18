@@ -137,6 +137,82 @@ defmodule Jido.AI.Skills.ToolCalling do
     {:ok, initial_state}
   end
 
+  @doc """
+  Returns the schema for skill state.
+
+  Defines the structure and defaults for Tool Calling skill state.
+  """
+  @impl Jido.Skill
+  def schema do
+    Zoi.object(%{
+      default_model:
+        Zoi.atom(description: "Default model alias (:fast, :capable)")
+        |> Zoi.default(:capable),
+      default_max_tokens:
+        Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(4096),
+      default_temperature:
+        Zoi.float(description: "Default sampling temperature (0.0-2.0)")
+        |> Zoi.default(0.7),
+      auto_execute:
+        Zoi.boolean(description: "Automatically execute tool calls in multi-turn conversations")
+        |> Zoi.default(false),
+      max_turns:
+        Zoi.integer(description: "Maximum conversation turns when auto_execute is true")
+        |> Zoi.default(10),
+      available_tools:
+        Zoi.list(
+          Zoi.map(description: "Tool information with :name and :type keys"),
+          description: "List of available tools from registry"
+        )
+        |> Zoi.default([])
+    })
+  end
+
+  @doc """
+  Returns the signal router for this skill.
+
+  Maps signal patterns to action modules.
+  """
+  @impl Jido.Skill
+  def router(_config) do
+    [
+      {"tool.call", Jido.AI.Skills.ToolCalling.Actions.CallWithTools},
+      {"tool.execute", Jido.AI.Skills.ToolCalling.Actions.ExecuteTool},
+      {"tool.list", Jido.AI.Skills.ToolCalling.Actions.ListTools}
+    ]
+  end
+
+  @doc """
+  Pre-routing hook for incoming signals.
+
+  Currently returns :continue to allow normal routing.
+  """
+  @impl Jido.Skill
+  def handle_signal(_signal, _context) do
+    {:ok, :continue}
+  end
+
+  @doc """
+  Transform the result returned from action execution.
+
+  Currently passes through results unchanged.
+  """
+  @impl Jido.Skill
+  def transform_result(_action, result, _context) do
+    result
+  end
+
+  @doc """
+  Returns signal patterns this skill responds to.
+  """
+  def signal_patterns do
+    [
+      "tool.call",
+      "tool.execute",
+      "tool.list"
+    ]
+  end
+
   # Private Functions
 
   defp list_available_tools do
