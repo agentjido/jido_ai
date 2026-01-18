@@ -268,4 +268,195 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
       assert result == []
     end
   end
+
+  describe "update_config/1" do
+    test "creates SetState operation for config" do
+      config = %{tools: [], model: "test"}
+      op = StateOpsHelpers.update_config(config)
+
+      assert %StateOp.SetState{} = op
+      assert op.attrs == %{config: config}
+    end
+
+    test "creates SetState operation with nested config" do
+      config = %{
+        tools: [SomeAction],
+        actions_by_name: %{"action" => SomeAction},
+        reqllm_tools: [%{name: "action"}]
+      }
+
+      op = StateOpsHelpers.update_config(config)
+
+      assert %StateOp.SetState{} = op
+      assert op.attrs.config.tools == [SomeAction]
+      assert op.attrs.config.actions_by_name == %{"action" => SomeAction}
+    end
+  end
+
+  describe "set_config_field/2" do
+    test "creates SetPath operation for nested config field" do
+      op = StateOpsHelpers.set_config_field(:tools, [SomeAction])
+
+      assert %StateOp.SetPath{} = op
+      assert op.path == [:config, :tools]
+      assert op.value == [SomeAction]
+    end
+
+    test "creates SetPath operation for model field" do
+      op = StateOpsHelpers.set_config_field(:model, "openai:gpt-4")
+
+      assert %StateOp.SetPath{} = op
+      assert op.path == [:config, :model]
+      assert op.value == "openai:gpt-4"
+    end
+  end
+
+  describe "update_config_fields/1" do
+    test "creates multiple SetPath operations" do
+      fields = %{tools: [], model: "test"}
+      ops = StateOpsHelpers.update_config_fields(fields)
+
+      assert length(ops) == 2
+
+      assert Enum.all?(ops, fn op -> %StateOp.SetPath{} = op end)
+
+      tools_op = Enum.find(ops, fn op -> op.path == [:config, :tools] end)
+      assert tools_op.value == []
+
+      model_op = Enum.find(ops, fn op -> op.path == [:config, :model] end)
+      assert model_op.value == "test"
+    end
+
+    test "handles empty map" do
+      ops = StateOpsHelpers.update_config_fields(%{})
+      assert ops == []
+    end
+
+    test "creates SetPath operations in field order" do
+      fields = %{model: "gpt-4", tools: [], max_tokens: 4096}
+      ops = StateOpsHelpers.update_config_fields(fields)
+
+      assert length(ops) == 3
+
+      # Verify all paths are present
+      paths = Enum.map(ops, & &1.path)
+      assert [:config, :model] in paths
+      assert [:config, :tools] in paths
+      assert [:config, :max_tokens] in paths
+    end
+  end
+
+  describe "update_tools_config/3" do
+    test "creates three SetPath operations for tools config" do
+      tools = [SomeAction]
+      actions_by_name = %{"action" => SomeAction}
+      reqllm_tools = [%{name: "action"}]
+
+      ops = StateOpsHelpers.update_tools_config(tools, actions_by_name, reqllm_tools)
+
+      assert length(ops) == 3
+
+      assert Enum.all?(ops, fn op -> %StateOp.SetPath{} = op end)
+
+      tools_op = Enum.find(ops, fn op -> op.path == [:config, :tools] end)
+      assert tools_op.value == [SomeAction]
+
+      actions_op = Enum.find(ops, fn op -> op.path == [:config, :actions_by_name] end)
+      assert actions_op.value == %{"action" => SomeAction}
+
+      reqllm_op = Enum.find(ops, fn op -> op.path == [:config, :reqllm_tools] end)
+      assert reqllm_op.value == [%{name: "action"}]
+    end
+
+    test "handles empty tools list" do
+      ops = StateOpsHelpers.update_tools_config([], %{}, [])
+
+      assert length(ops) == 3
+
+      tools_op = Enum.find(ops, fn op -> op.path == [:config, :tools] end)
+      assert tools_op.value == []
+
+      actions_op = Enum.find(ops, fn op -> op.path == [:config, :actions_by_name] end)
+      assert actions_op.value == %{}
+
+      reqllm_op = Enum.find(ops, fn op -> op.path == [:config, :reqllm_tools] end)
+      assert reqllm_op.value == []
+    end
+
+    test "creates operations in consistent order" do
+      tools = [Action1, Action2]
+      actions_by_name = %{"action1" => Action1, "action2" => Action2}
+      reqllm_tools = [%{name: "action1"}, %{name: "action2"}]
+
+      ops = StateOpsHelpers.update_tools_config(tools, actions_by_name, reqllm_tools)
+
+      # Verify order: tools, actions_by_name, reqllm_tools
+      assert hd(ops).path == [:config, :tools]
+      assert Enum.at(ops, 1).path == [:config, :actions_by_name]
+      assert Enum.at(ops, 2).path == [:config, :reqllm_tools]
+    end
+  end
+
+  describe "apply_to_state/2" do
+    test "applies SetState operation" do
+      ops = [StateOpsHelpers.update_strategy_state(%{status: :running})]
+      result = StateOpsHelpers.apply_to_state(%{iteration: 1}, ops)
+
+      assert result.status == :running
+      assert result.iteration == 1
+    end
+
+    test "applies SetPath operation for nested key" do
+      ops = [StateOpsHelpers.set_config_field(:tools, [SomeAction])]
+      result = StateOpsHelpers.apply_to_state(%{}, ops)
+
+      assert result.config.tools == [SomeAction]
+    end
+
+    test "applies multiple SetPath operations" do
+      ops = StateOpsHelpers.update_tools_config([SomeAction], %{"action" => SomeAction}, [%{name: "action"}])
+      result = StateOpsHelpers.apply_to_state(%{other: "value"}, ops)
+
+      assert result.config.tools == [SomeAction]
+      assert result.config.actions_by_name == %{"action" => SomeAction}
+      assert result.config.reqllm_tools == [%{name: "action"}]
+      assert result.other == "value"
+    end
+
+    test "applies DeleteKeys operation" do
+      ops = [StateOpsHelpers.delete_keys([:temp, :cache])]
+      result = StateOpsHelpers.apply_to_state(%{temp: "data", cache: "data", keep: "this"}, ops)
+
+      assert result == %{keep: "this"}
+    end
+
+    test "applies ReplaceState operation" do
+      ops = [StateOpsHelpers.reset_strategy_state()]
+      result = StateOpsHelpers.apply_to_state(%{old: "data", more: "stuff"}, ops)
+
+      assert result.status == :idle
+      assert result.iteration == 0
+      refute Map.has_key?(result, :old)
+      refute Map.has_key?(result, :more)
+    end
+
+    test "applies operations in order" do
+      ops = [
+        StateOpsHelpers.set_strategy_field(:status, :running),
+        StateOpsHelpers.set_strategy_field(:count, 5)
+      ]
+      result = StateOpsHelpers.apply_to_state(%{}, ops)
+
+      assert result.status == :running
+      assert result.count == 5
+    end
+
+    test "deep merges nested maps with SetState" do
+      ops = [StateOpsHelpers.update_strategy_state(%{config: %{model: "gpt-4"}})]
+      result = StateOpsHelpers.apply_to_state(%{config: %{tools: []}}, ops)
+
+      assert result.config.tools == []
+      assert result.config.model == "gpt-4"
+    end
+  end
 end

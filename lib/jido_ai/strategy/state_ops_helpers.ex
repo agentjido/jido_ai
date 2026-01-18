@@ -337,6 +337,76 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   end
 
   @doc """
+  Creates a StateOp to update the config field in strategy state.
+
+  ## Examples
+
+      iex> config = %{tools: [], model: "test"}
+      iex> StateOpsHelpers.update_config(config)
+      %StateOp.SetState{attrs: %{config: config}}
+  """
+  @spec update_config(map()) :: StateOp.SetState.t()
+  def update_config(config) when is_map(config) do
+    StateOp.set_state(%{config: config})
+  end
+
+  @doc """
+  Creates a StateOp to set a specific config field.
+
+  ## Examples
+
+      iex> StateOpsHelpers.set_config_field(:tools, [MyAction])
+      %StateOp.SetPath{path: [:config, :tools], value: [MyAction]}
+  """
+  @spec set_config_field(atom(), term()) :: StateOp.SetPath.t()
+  def set_config_field(key, value) when is_atom(key) do
+    StateOp.set_path([:config, key], value)
+  end
+
+  @doc """
+  Creates StateOps to update multiple config fields at once.
+
+  ## Examples
+
+      iex> ops = StateOpsHelpers.update_config_fields(%{tools: [], model: "test"})
+      iex> length(ops)
+      2
+      iex> hd(ops).path
+      [:config, :tools]
+  """
+  @spec update_config_fields(map()) :: [StateOp.SetPath.t()]
+  def update_config_fields(fields) when is_map(fields) do
+    Enum.map(fields, fn {key, value} ->
+      StateOp.set_path([:config, key], value)
+    end)
+  end
+
+  @doc """
+  Creates StateOps to update tools, actions_by_name, and reqllm_tools together.
+
+  This is a common pattern when registering/unregistering tools.
+
+  ## Examples
+
+      iex> tools = [SomeAction]
+      iex> actions_by_name = %{"action" => SomeAction}
+      iex> reqllm_tools = [%{name: "action"}]
+      iex> ops = StateOpsHelpers.update_tools_config(tools, actions_by_name, reqllm_tools)
+      iex> length(ops)
+      3
+      iex> hd(ops).path
+      [:config, :tools]
+  """
+  @spec update_tools_config([module()], %{String.t() => module()}, [map()]) :: [StateOp.SetPath.t()]
+  def update_tools_config(tools, actions_by_name, reqllm_tools) do
+    [
+      StateOp.set_path([:config, :tools], tools),
+      StateOp.set_path([:config, :actions_by_name], actions_by_name),
+      StateOp.set_path([:config, :reqllm_tools], reqllm_tools)
+    ]
+  end
+
+  @doc """
   Composes multiple state operations into a single list.
 
   This is a convenience function for building state operation lists.
@@ -351,4 +421,58 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   """
   @spec compose([state_op()]) :: [state_op()]
   def compose(ops) when is_list(ops), do: ops
+
+  @doc """
+  Applies state operations to a state map.
+
+  This is useful for strategies to apply state operations internally
+  before setting the strategy state on the agent.
+
+  ## Examples
+
+      iex> ops = [StateOp.set_path([:status], :running)]
+      iex> StateOpsHelpers.apply_to_state(%{iteration: 1}, ops)
+      %{iteration: 1, status: :running}
+  """
+  @spec apply_to_state(map(), [state_op()]) :: map()
+  def apply_to_state(state, ops) when is_list(ops) do
+    Enum.reduce(ops, state, fn
+      %StateOp.SetState{attrs: attrs}, acc ->
+        deep_merge(acc, attrs)
+
+      %StateOp.ReplaceState{state: new_state}, _acc ->
+        new_state
+
+      %StateOp.DeleteKeys{keys: keys}, acc ->
+        Map.drop(acc, keys)
+
+      %StateOp.SetPath{path: path, value: value}, acc ->
+        deep_put_in(acc, path, value)
+
+      %StateOp.DeletePath{path: path}, acc ->
+        {_, result} = pop_in(acc, path)
+        result
+    end)
+  end
+
+  # Deep merge for nested maps
+  defp deep_merge(left, right) when is_map(left) and is_map(right) do
+    Map.merge(left, right, fn _k, lv, rv ->
+      if is_map(lv) and is_map(rv) do
+        deep_merge(lv, rv)
+      else
+        rv
+      end
+    end)
+  end
+
+  # Deep put_in for nested paths
+  defp deep_put_in(map, [key], value) do
+    Map.put(map, key, value)
+  end
+
+  defp deep_put_in(map, [key | rest], value) do
+    nested = Map.get(map, key, %{})
+    Map.put(map, key, deep_put_in(nested, rest, value))
+  end
 end

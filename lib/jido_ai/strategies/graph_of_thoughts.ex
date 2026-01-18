@@ -69,6 +69,7 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.GraphOfThoughts.Machine
@@ -185,7 +186,7 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
     state =
       machine
       |> Machine.to_map()
-      |> Map.put(:config, config)
+      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
     agent = StratState.put(agent, state)
     {agent, []}
@@ -306,7 +307,7 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
     updated_state =
       updated_machine
       |> Machine.to_map()
-      |> Map.put(:config, state[:config])
+      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(state[:config])])
 
     updated_agent = StratState.put(agent, updated_state)
     {updated_agent, lifted}
@@ -325,7 +326,7 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
     updated_state =
       updated_machine
       |> Machine.to_map()
-      |> Map.put(:config, state[:config])
+      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(state[:config])])
 
     updated_agent = StratState.put(agent, updated_state)
     {updated_agent, lifted}
@@ -347,7 +348,7 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
     updated_state =
       updated_machine
       |> Machine.to_map()
-      |> Map.put(:config, state[:config])
+      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(state[:config])])
 
     updated_agent = StratState.put(agent, updated_state)
     {updated_agent, lifted}

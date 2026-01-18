@@ -326,6 +326,80 @@ Comprehensive integration tests for Jido V2 migration.
 
 ---
 
+## 9.6 Complete Strategy StateOps Migration
+
+Complete the StateOps migration for all remaining strategy files that were still using direct Map.put for state mutations.
+
+### 9.6.1 Extend StateOpsHelpers with Config Helpers
+
+Add config-specific StateOps helper functions to support strategy config updates.
+
+- [x] 9.6.1.1 Add `update_config/1` helper for full config replacement
+- [x] 9.6.1.2 Add `set_config_field/2` helper for nested config field updates
+- [x] 9.6.1.3 Add `update_config_fields/1` helper for multiple config field updates
+- [x] 9.6.1.4 Add `update_tools_config/3` helper for tools, actions_by_name, reqllm_tools
+- [x] 9.6.1.5 Add `apply_to_state/2` helper for internal strategy state updates
+- [x] 9.6.1.6 Add tests for new helper functions (7 tests added)
+
+### 9.6.2 Migrate lib/jido_ai/strategy/react.ex
+
+- [x] 9.6.2.1 Replace `Map.put(:config, ...)` in init/2
+- [x] 9.6.2.2 Replace `Map.put(:config, ...)` in process_instruction
+- [x] 9.6.2.3 Replace tool registration Map.put patterns
+- [x] 9.6.2.4 Replace tool unregistration Map.put patterns
+- [x] 9.6.2.5 Add StateOpsHelpers import
+- [x] 9.6.2.6 Verify tests pass
+
+### 9.6.3 Migrate lib/jido_ai/strategies/react.ex
+
+- [x] 9.6.3.1 Replace `Map.put(:config, ...)` in init/2
+- [x] 9.6.3.2 Replace `Map.put(:config, ...)` in process_instruction
+- [x] 9.6.3.3 Replace tool registration Map.put patterns
+- [x] 9.6.3.4 Replace tool unregistration Map.put patterns
+- [x] 9.6.3.5 Add StateOpsHelpers import
+- [x] 9.6.3.6 Verify tests pass
+
+### 9.6.4 Migrate lib/jido_ai/strategies/tree_of_thoughts.ex
+
+- [x] 9.6.4.1 Replace `Map.put(:config, ...)` in init/2
+- [x] 9.6.4.2 Replace `Map.put(:config, ...)` in process_instruction
+- [x] 9.6.4.3 Add StateOpsHelpers import
+- [x] 9.6.4.4 Verify tests pass
+
+### 9.6.5 Migrate lib/jido_ai/strategies/chain_of_thought.ex
+
+- [x] 9.6.5.1 Replace `Map.put(:config, ...)` in init/2
+- [x] 9.6.5.2 Replace `Map.put(:config, ...)` in process_instruction
+- [x] 9.6.5.3 Add StateOpsHelpers import
+- [x] 9.6.5.4 Verify tests pass
+
+### 9.6.6 Migrate lib/jido_ai/strategies/graph_of_thoughts.ex
+
+- [x] 9.6.6.1 Replace `Map.put(:config, ...)` in init/2
+- [x] 9.6.6.2 Replace `Map.put(:config, ...)` in process_instruction (@start)
+- [x] 9.6.6.3 Replace `Map.put(:config, ...)` in process_instruction (@llm_result)
+- [x] 9.6.6.4 Replace `Map.put(:config, ...)` in process_instruction (@llm_partial)
+- [x] 9.6.6.5 Add StateOpsHelpers import
+- [x] 9.6.6.6 Verify tests pass
+
+### 9.6.7 Migrate lib/jido_ai/strategies/trm.ex
+
+- [x] 9.6.7.1 Replace `Map.put(:config, ...)` in init/2
+- [x] 9.6.7.2 Replace `Map.put(:config, ...)` in process_instruction
+- [x] 9.6.7.3 Add StateOpsHelpers import
+- [x] 9.6.7.4 Verify tests pass
+
+### 9.6.8 Verification
+
+- [x] 9.6.8.1 Run all strategy tests
+- [x] 9.6.8.2 Verify no direct state-mutating Map.put in strategy files
+- [x] 9.6.8.3 Update documentation
+- [x] 9.6.8.4 Write summary document
+
+**Section 9.6 Status: Complete (331 strategy tests passing)**
+
+---
+
 ## Phase 9 Success Criteria
 
 1. **StateOps**: All strategies use StateOps for state mutations

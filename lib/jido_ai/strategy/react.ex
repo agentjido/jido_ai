@@ -235,7 +235,7 @@ defmodule Jido.AI.Strategy.ReAct do
     state =
       machine
       |> Machine.to_map()
-      |> Map.put(:config, config)
+      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
     agent = StratState.put(agent, state)
     {agent, []}
@@ -285,7 +285,7 @@ defmodule Jido.AI.Strategy.ReAct do
             new_state =
               machine
               |> Machine.to_map()
-              |> Map.put(:config, config)
+              |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
             agent = StratState.put(agent, new_state)
             {agent, lift_directives(directives, config)}
@@ -305,13 +305,9 @@ defmodule Jido.AI.Strategy.ReAct do
     new_actions_by_name = Map.put(config[:actions_by_name], module.name(), module)
     new_reqllm_tools = ToolAdapter.from_actions(new_tools)
 
-    new_config =
-      config
-      |> Map.put(:tools, new_tools)
-      |> Map.put(:actions_by_name, new_actions_by_name)
-      |> Map.put(:reqllm_tools, new_reqllm_tools)
+    new_state =
+      StateOpsHelpers.apply_to_state(state, StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools))
 
-    new_state = Map.put(state, :config, new_config)
     agent = StratState.put(agent, new_state)
     {agent, []}
   end
@@ -325,13 +321,9 @@ defmodule Jido.AI.Strategy.ReAct do
     new_actions_by_name = Map.delete(config[:actions_by_name], tool_name)
     new_reqllm_tools = ToolAdapter.from_actions(new_tools)
 
-    new_config =
-      config
-      |> Map.put(:tools, new_tools)
-      |> Map.put(:actions_by_name, new_actions_by_name)
-      |> Map.put(:reqllm_tools, new_reqllm_tools)
+    new_state =
+      StateOpsHelpers.apply_to_state(state, StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools))
 
-    new_state = Map.put(state, :config, new_config)
     agent = StratState.put(agent, new_state)
     {agent, []}
   end
