@@ -50,33 +50,18 @@ defmodule Jido.AI.Skills.LLM.Actions.Embed do
     category: "ai",
     tags: ["llm", "embedding", "vectors"],
     vsn: "1.0.0",
-    schema: [
-      model: [
-        type: :string,
-        required: true,
-        doc: "Embedding model spec (e.g., 'openai:text-embedding-3-small')"
-      ],
-      texts: [
-        type: :string,
-        required: false,
-        doc: "Single text to embed"
-      ],
-      texts_list: [
-        type: {:list, :string},
-        required: false,
-        doc: "List of texts to embed (alternative to single text)"
-      ],
-      dimensions: [
-        type: :integer,
-        required: false,
-        doc: "Output dimensions for models that support it"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        doc: "Request timeout in milliseconds"
-      ]
-    ]
+    schema: Zoi.object(%{
+      model:
+        Zoi.string(description: "Embedding model spec (e.g., 'openai:text-embedding-3-small')"),
+      texts: Zoi.string(description: "Single text to embed") |> Zoi.optional(),
+      texts_list:
+        Zoi.list(Zoi.string(), description: "List of texts to embed (alternative to single text)")
+        |> Zoi.optional(),
+      dimensions:
+        Zoi.integer(description: "Output dimensions for models that support it")
+        |> Zoi.optional(),
+      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+    })
 
   alias Jido.AI.Skills.BaseActionHelpers
   alias Jido.AI.Security

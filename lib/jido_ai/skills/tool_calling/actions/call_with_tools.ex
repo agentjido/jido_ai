@@ -39,57 +39,28 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
     category: "ai",
     tags: ["tool-calling", "llm", "function-calling"],
     vsn: "1.0.0",
-    schema: [
-      model: [
-        type: :any,
-        required: false,
-        doc: "Model alias (e.g., :capable) or direct spec string"
-      ],
-      prompt: [
-        type: :string,
-        required: true,
-        doc: "The user prompt to send to the LLM"
-      ],
-      system_prompt: [
-        type: :string,
-        required: false,
-        doc: "Optional system prompt to guide the LLM's behavior"
-      ],
-      tools: [
-        type: {:list, :string},
-        required: false,
-        doc: "List of tool names to include (default: all registered)"
-      ],
-      max_tokens: [
-        type: :integer,
-        required: false,
-        default: 4096,
-        doc: "Maximum tokens to generate"
-      ],
-      temperature: [
-        type: :float,
-        required: false,
-        default: 0.7,
-        doc: "Sampling temperature (0.0-2.0)"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        doc: "Request timeout in milliseconds"
-      ],
-      auto_execute: [
-        type: :boolean,
-        required: false,
-        default: false,
-        doc: "Automatically execute tool calls in multi-turn conversation"
-      ],
-      max_turns: [
-        type: :integer,
-        required: false,
-        default: 10,
-        doc: "Maximum conversation turns when auto_execute is true"
-      ]
-    ]
+    schema: Zoi.object(%{
+      model:
+        Zoi.any(description: "Model alias (e.g., :capable) or direct spec string")
+        |> Zoi.optional(),
+      prompt: Zoi.string(description: "The user prompt to send to the LLM"),
+      system_prompt:
+        Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
+        |> Zoi.optional(),
+      tools:
+        Zoi.list(Zoi.string(), description: "List of tool names to include (default: all registered)")
+        |> Zoi.optional(),
+      max_tokens:
+        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
+      temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
+      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+      auto_execute:
+        Zoi.boolean(description: "Automatically execute tool calls in multi-turn conversation")
+        |> Zoi.default(false),
+      max_turns:
+        Zoi.integer(description: "Maximum conversation turns when auto_execute is true")
+        |> Zoi.default(10)
+    })
 
   alias Jido.AI.{Config, Helpers, Security, Tools}
 

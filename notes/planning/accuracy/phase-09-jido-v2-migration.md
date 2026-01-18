@@ -73,70 +73,73 @@ Define common state operation patterns for strategies.
 
 Convert skill actions from NimbleOptions-style schemas to Zoi schemas for consistency with Jido V2.
 
+**Status**: Complete (2025-01-17)
+**Summary**: All 15 skill actions migrated to Zoi schemas. See `notes/summaries/accuracy-phase-9-2-zoi-schemas.md` for details.
+
 ### 9.2.1 LLM Skill Schema Migration
 
 Update LLM skill actions to use Zoi schemas.
 
-- [ ] 9.2.1.1 Update `lib/jido_ai/skills/llm/actions/chat.ex`
-- [ ] 9.2.1.2 Replace NimbleOptions schema with `@schema Zoi.struct(...)`
-- [ ] 9.2.1.3 Add `@type t()` and `@enforce_keys` from Zoi schema
-- [ ] 9.2.1.4 Update `lib/jido_ai/skills/llm/actions/complete.ex`
-- [ ] 9.2.1.5 Replace NimbleOptions schema with Zoi schema
-- [ ] 9.2.1.6 Update `lib/jido_ai/skills/llm/actions/embed.ex`
-- [ ] 9.2.1.7 Replace NimbleOptions schema with Zoi schema
+- [x] 9.2.1.1 Update `lib/jido_ai/skills/llm/actions/chat.ex`
+- [x] 9.2.1.2 Replace NimbleOptions schema with `@schema Zoi.struct(...)`
+- [x] 9.2.1.3 Add `@type t()` and `@enforce_keys` from Zoi schema
+- [x] 9.2.1.4 Update `lib/jido_ai/skills/llm/actions/complete.ex`
+- [x] 9.2.1.5 Replace NimbleOptions schema with Zoi schema
+- [x] 9.2.1.6 Update `lib/jido_ai/skills/llm/actions/embed.ex`
+- [x] 9.2.1.7 Replace NimbleOptions schema with Zoi schema
 
 ### 9.2.2 Planning Skill Schema Migration
 
 Update planning skill actions to use Zoi schemas.
 
-- [ ] 9.2.2.1 Update `lib/jido_ai/skills/planning/actions/decompose.ex`
-- [ ] 9.2.2.2 Replace schema with Zoi struct
-- [ ] 9.2.2.3 Update `lib/jido_ai/skills/planning/actions/plan.ex`
-- [ ] 9.2.2.4 Replace schema with Zoi struct
-- [ ] 9.2.2.5 Update `lib/jido_ai/skills/planning/actions/prioritize.ex`
-- [ ] 9.2.2.6 Replace schema with Zoi struct
+- [x] 9.2.2.1 Update `lib/jido_ai/skills/planning/actions/decompose.ex`
+- [x] 9.2.2.2 Replace schema with Zoi struct
+- [x] 9.2.2.3 Update `lib/jido_ai/skills/planning/actions/plan.ex`
+- [x] 9.2.2.4 Replace schema with Zoi struct
+- [x] 9.2.2.5 Update `lib/jido_ai/skills/planning/actions/prioritize.ex`
+- [x] 9.2.2.6 Replace schema with Zoi struct
 
 ### 9.2.3 Reasoning Skill Schema Migration
 
 Update reasoning skill actions to use Zoi schemas.
 
-- [ ] 9.2.3.1 Update `lib/jido_ai/skills/reasoning/actions/analyze.ex`
-- [ ] 9.2.3.2 Replace schema with Zoi struct
-- [ ] 9.2.3.3 Update `lib/jido_ai/skills/reasoning/actions/explain.ex`
-- [ ] 9.2.3.4 Replace schema with Zoi struct
-- [ ] 9.2.3.5 Update `lib/jido_ai/skills/reasoning/actions/infer.ex`
-- [ ] 9.2.3.6 Replace schema with Zoi struct
+- [x] 9.2.3.1 Update `lib/jido_ai/skills/reasoning/actions/analyze.ex`
+- [x] 9.2.3.2 Replace schema with Zoi struct
+- [x] 9.2.3.3 Update `lib/jido_ai/skills/reasoning/actions/explain.ex`
+- [x] 9.2.3.4 Replace schema with Zoi struct
+- [x] 9.2.3.5 Update `lib/jido_ai/skills/reasoning/actions/infer.ex`
+- [x] 9.2.3.6 Replace schema with Zoi struct
 
 ### 9.2.4 Tool Calling Skill Schema Migration
 
 Update tool calling skill actions to use Zoi schemas.
 
-- [ ] 9.2.4.1 Update `lib/jido_ai/skills/tool_calling/actions/call_with_tools.ex`
-- [ ] 9.2.4.2 Replace schema with Zoi struct
-- [ ] 9.2.4.3 Update `lib/jido_ai/skills/tool_calling/actions/execute_tool.ex`
-- [ ] 9.2.4.4 Replace schema with Zoi struct
-- [ ] 9.2.4.5 Update `lib/jido_ai/skills/tool_calling/actions/list_tools.ex`
-- [ ] 9.2.4.6 Replace schema with Zoi struct
+- [x] 9.2.4.1 Update `lib/jido_ai/skills/tool_calling/actions/call_with_tools.ex`
+- [x] 9.2.4.2 Replace schema with Zoi struct
+- [x] 9.2.4.3 Update `lib/jido_ai/skills/tool_calling/actions/execute_tool.ex`
+- [x] 9.2.4.4 Replace schema with Zoi struct
+- [x] 9.2.4.5 Update `lib/jido_ai/skills/tool_calling/actions/list_tools.ex`
+- [x] 9.2.4.6 Replace schema with Zoi struct
 
 ### 9.2.5 Streaming Skill Schema Migration
 
 Update streaming skill actions to use Zoi schemas.
 
-- [ ] 9.2.5.1 Update `lib/jido_ai/skills/streaming/actions/start_stream.ex`
-- [ ] 9.2.5.2 Replace schema with Zoi struct
-- [ ] 9.2.5.3 Update `lib/jido_ai/skills/streaming/actions/process_tokens.ex`
-- [ ] 9.2.5.4 Replace schema with Zoi struct
-- [ ] 9.2.5.5 Update `lib/jido_ai/skills/streaming/actions/end_stream.ex`
-- [ ] 9.2.5.6 Replace schema with Zoi struct
+- [x] 9.2.5.1 Update `lib/jido_ai/skills/streaming/actions/start_stream.ex`
+- [x] 9.2.5.2 Replace schema with Zoi struct
+- [x] 9.2.5.3 Update `lib/jido_ai/skills/streaming/actions/process_tokens.ex`
+- [x] 9.2.5.4 Replace schema with Zoi struct
+- [x] 9.2.5.5 Update `lib/jido_ai/skills/streaming/actions/end_stream.ex`
+- [x] 9.2.5.6 Replace schema with Zoi struct
 
 ### 9.2.6 Unit Tests for Schema Migration
 
-- [ ] Test Zoi schema validation accepts valid inputs
-- [ ] Test Zoi schema validation rejects invalid inputs
-- [ ] Test schema coercion works correctly
-- [ ] Test default values are applied
-- [ ] Test required field validation
-- [ ] Test type validation for each field
+- [x] Test Zoi schema validation accepts valid inputs
+- [x] Test Zoi schema validation rejects invalid inputs
+- [x] Test schema coercion works correctly
+- [x] Test default values are applied
+- [x] Test required field validation
+- [x] Test type validation for each field
 
 ---
 

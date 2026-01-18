@@ -38,51 +38,26 @@ defmodule Jido.AI.Skills.Planning.Actions.Plan do
     category: "ai",
     tags: ["planning", "goals"],
     vsn: "1.0.0",
-    schema: [
-      model: [
-        type: :string,
-        required: false,
-        doc: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :planning)"
-      ],
-      goal: [
-        type: :string,
-        required: true,
-        doc: "The goal to achieve"
-      ],
-      constraints: [
-        type: {:list, :string},
-        required: false,
-        doc: "List of constraints/limitations"
-      ],
-      resources: [
-        type: {:list, :string},
-        required: false,
-        doc: "List of available resources"
-      ],
-      max_steps: [
-        type: :integer,
-        required: false,
-        default: 10,
-        doc: "Maximum number of steps in the plan"
-      ],
-      max_tokens: [
-        type: :integer,
-        required: false,
-        default: 4096,
-        doc: "Maximum tokens to generate"
-      ],
-      temperature: [
-        type: :float,
-        required: false,
-        default: 0.7,
-        doc: "Sampling temperature"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        doc: "Request timeout in milliseconds"
-      ]
-    ]
+    schema: Zoi.object(%{
+      model:
+        Zoi.string(
+          description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :planning)"
+        )
+        |> Zoi.optional(),
+      goal: Zoi.string(description: "The goal to achieve"),
+      constraints:
+        Zoi.list(Zoi.string(), description: "List of constraints/limitations")
+        |> Zoi.optional(),
+      resources:
+        Zoi.list(Zoi.string(), description: "List of available resources")
+        |> Zoi.optional(),
+      max_steps:
+        Zoi.integer(description: "Maximum number of steps in the plan") |> Zoi.default(10),
+      max_tokens:
+        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
+      temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.7),
+      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+    })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers

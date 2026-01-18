@@ -46,57 +46,27 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
     category: "ai",
     tags: ["streaming", "llm", "generation"],
     vsn: "1.0.0",
-    schema: [
-      model: [
-        type: :any,
-        required: false,
-        doc: "Model alias (e.g., :fast) or direct spec string"
-      ],
-      prompt: [
-        type: :string,
-        required: true,
-        doc: "The user prompt to send to the LLM"
-      ],
-      system_prompt: [
-        type: :string,
-        required: false,
-        doc: "Optional system prompt to guide the LLM's behavior"
-      ],
-      max_tokens: [
-        type: :integer,
-        required: false,
-        default: 1024,
-        doc: "Maximum tokens to generate"
-      ],
-      temperature: [
-        type: :float,
-        required: false,
-        default: 0.7,
-        doc: "Sampling temperature (0.0-2.0)"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        doc: "Request timeout in milliseconds"
-      ],
-      on_token: [
-        type: :any,
-        required: false,
-        doc: "Callback function invoked for each token"
-      ],
-      buffer: [
-        type: :boolean,
-        required: false,
-        default: false,
-        doc: "Whether to buffer tokens for full response collection"
-      ],
-      auto_process: [
-        type: :boolean,
-        required: false,
-        default: true,
-        doc: "Whether to automatically process the stream"
-      ]
-    ]
+    schema: Zoi.object(%{
+      model:
+        Zoi.any(description: "Model alias (e.g., :fast) or direct spec string")
+        |> Zoi.optional(),
+      prompt: Zoi.string(description: "The user prompt to send to the LLM"),
+      system_prompt:
+        Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
+        |> Zoi.optional(),
+      max_tokens:
+        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
+      temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
+      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+      on_token:
+        Zoi.any(description: "Callback function invoked for each token") |> Zoi.optional(),
+      buffer:
+        Zoi.boolean(description: "Whether to buffer tokens for full response collection")
+        |> Zoi.default(false),
+      auto_process:
+        Zoi.boolean(description: "Whether to automatically process the stream")
+        |> Zoi.default(true)
+    })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers

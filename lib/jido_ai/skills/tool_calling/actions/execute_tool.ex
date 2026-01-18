@@ -34,25 +34,15 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteTool do
     category: "ai",
     tags: ["tool-calling", "execution", "tools"],
     vsn: "1.0.0",
-    schema: [
-      tool_name: [
-        type: :string,
-        required: true,
-        doc: "The name of the tool to execute"
-      ],
-      params: [
-        type: :map,
-        required: false,
-        default: %{},
-        doc: "Parameters to pass to the tool"
-      ],
-      timeout: [
-        type: :integer,
-        required: false,
-        default: 30_000,
-        doc: "Execution timeout in milliseconds"
-      ]
-    ]
+    schema: Zoi.object(%{
+      tool_name: Zoi.string(description: "The name of the tool to execute"),
+      params:
+        Zoi.map(description: "Parameters to pass to the tool")
+        |> Zoi.default(%{}),
+      timeout:
+        Zoi.integer(description: "Execution timeout in milliseconds")
+        |> Zoi.default(30_000)
+    })
 
   alias Jido.AI.Tools.{Executor, Registry}
 

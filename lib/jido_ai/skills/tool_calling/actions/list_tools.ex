@@ -33,35 +33,22 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
     category: "ai",
     tags: ["tool-calling", "discovery", "tools"],
     vsn: "1.0.0",
-    schema: [
-      filter: [
-        type: :string,
-        required: false,
-        doc: "Filter tools by name pattern (substring match)"
-      ],
-      type: [
-        type: :atom,
-        required: false,
-        doc: "Filter by type (:action, :tool, or nil for all)"
-      ],
-      include_schema: [
-        type: :boolean,
-        required: false,
-        default: true,
-        doc: "Include tool schemas in result"
-      ],
-      include_sensitive: [
-        type: :boolean,
-        required: false,
-        default: false,
-        doc: "Include tools marked as sensitive (default: false)"
-      ],
-      allowed_tools: [
-        type: {:list, :string},
-        required: false,
-        doc: "Allowlist of tool names to include (all others excluded)"
-      ]
-    ]
+    schema: Zoi.object(%{
+      filter:
+        Zoi.string(description: "Filter tools by name pattern (substring match)")
+        |> Zoi.optional(),
+      type:
+        Zoi.atom(description: "Filter by type (:action, :tool, or nil for all)")
+        |> Zoi.optional(),
+      include_schema:
+        Zoi.boolean(description: "Include tool schemas in result") |> Zoi.default(true),
+      include_sensitive:
+        Zoi.boolean(description: "Include tools marked as sensitive (default: false)")
+        |> Zoi.default(false),
+      allowed_tools:
+        Zoi.list(Zoi.string(), description: "Allowlist of tool names to include (all others excluded)")
+        |> Zoi.optional()
+    })
 
   alias Jido.AI.Tools.Registry
   alias Jido.AI.Security
