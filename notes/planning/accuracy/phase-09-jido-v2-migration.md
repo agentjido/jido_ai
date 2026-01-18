@@ -245,78 +245,84 @@ The following tasks were originally planned but are not applicable:
 
 ## 9.5 Phase 9 Integration Tests
 
+**Status**: Complete (2025-01-18)
+
 Comprehensive integration tests for Jido V2 migration.
 
 ### 9.5.1 Strategy StateOps Integration Tests
 
-- [ ] 9.5.1.1 Create `test/jido_ai/strategy/stateops_integration_test.exs`
-- [ ] 9.5.1.2 Test: ReAct strategy uses StateOps correctly
+- [x] 9.5.1.1 Create `test/jido_ai/strategy/stateops_integration_test.exs`
+- [x] 9.5.1.2 Test: ReAct strategy uses StateOps correctly
   - Run ReAct conversation
   - Verify state ops are returned
   - Verify state is updated correctly
-- [ ] 9.5.1.3 Test: Multiple state ops compose correctly
+- [x] 9.5.1.3 Test: Multiple state ops compose correctly
   - Generate multiple state updates
   - Verify all updates applied
-- [ ] 9.5.1.4 Test: State ops isolation between strategies
+- [x] 9.5.1.4 Test: State ops isolation between strategies
   - Run multiple strategies concurrently
   - Verify state isolation
 
 ### 9.5.2 Skill Schema Integration Tests
 
-- [ ] 9.5.2.1 Create `test/jido_ai/skills/schema_integration_test.exs`
-- [ ] 9.5.2.2 Test: All skill actions use Zoi schemas
+- [x] 9.5.2.1 Create `test/jido_ai/skills/schema_integration_test.exs`
+- [x] 9.5.2.2 Test: All skill actions use Zoi schemas
   - Verify each action has @schema
   - Verify validation works
-- [ ] 9.5.2.3 Test: Schema validation rejects invalid inputs
+- [x] 9.5.2.3 Test: Schema validation rejects invalid inputs
   - Test each skill with invalid params
   - Verify proper errors
-- [ ] 9.5.2.4 Test: Schema coercion works correctly
+- [x] 9.5.2.4 Test: Schema coercion works correctly
   - Test type coercion
   - Test default value application
 
 ### 9.5.3 Skill Lifecycle Integration Tests
 
-- [ ] 9.5.3.1 Create `test/jido_ai/skills/lifecycle_integration_test.exs`
-- [ ] 9.5.3.2 Test: Router callbacks route signals correctly
+- [x] 9.5.3.1 Create `test/jido_ai/skills/lifecycle_integration_test.exs`
+- [x] 9.5.3.2 Test: Router callbacks route signals correctly
   - Send signal to each skill
   - Verify correct action invoked
-- [ ] 9.5.3.3 Test: Handle signal pre-processing works
+- [x] 9.5.3.3 Test: Handle signal pre-processing works
   - Send signal through handle_signal
   - Verify processing occurs
-- [ ] 9.5.3.4 Test: Transform result modifies output
+- [x] 9.5.3.4 Test: Transform result modifies output
   - Run action with transform_result
   - Verify result transformed
-- [ ] 9.5.3.5 Test: Skill state isolation works
+- [x] 9.5.3.5 Test: Skill state isolation works
   - Mount multiple skills
   - Verify state separation
 
 ### 9.5.4 Pipeline StateOps Integration Tests
 
-- [ ] 9.5.4.1 Create `test/jido_ai/accuracy/stateops_pipeline_test.exs`
-- [ ] 9.5.4.2 Test: Pipeline runs with StateOps
+**Status**: SKIPPED (same as Phase 9.4)
+
+- [~] 9.5.4.1 Create `test/jido_ai/accuracy/stateops_pipeline_test.exs`
+- [~] 9.5.4.2 Test: Pipeline runs with StateOps
   - Run full pipeline
   - Verify state ops applied
-- [ ] 9.5.4.3 Test: Stage state operations compose
+- [~] 9.5.4.3 Test: Stage state operations compose
   - Run multi-stage pipeline
   - Verify all stage updates applied
-- [ ] 9.5.4.4 Test: Calibration uses StateOps
+- [~] 9.5.4.4 Test: Calibration uses StateOps
   - Run pipeline with calibration
   - Verify state mutations via ops
-- [ ] 9.5.4.5 Test: Error handling with StateOps
+- [~] 9.5.4.5 Test: Error handling with StateOps
   - Cause stage error
   - Verify state consistency
 
 ### 9.5.5 Backward Compatibility Tests
 
-- [ ] 9.5.5.1 Test: Existing agents still work
+- [x] 9.5.5.1 Test: Existing agents still work
   - Run existing demo agents
   - Verify no breaking changes
-- [ ] 9.5.5.2 Test: Direct action execution works
+- [x] 9.5.5.2 Test: Direct action execution works
   - Execute actions directly
   - Verify results
-- [ ] 9.5.5.3 Test: Strategy configuration works
+- [x] 9.5.5.3 Test: Strategy configuration works
   - Create agent with strategies
   - Verify proper initialization
+
+**Section 9.5 Status: Complete (169 tests passing)**
 
 ---
 
