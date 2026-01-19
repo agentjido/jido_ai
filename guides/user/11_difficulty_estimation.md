@@ -19,7 +19,7 @@ flowchart TD
 
     Easy --> Direct[Direct Generation<br/>Low cost]
     Medium --> Standard[Self-Consistency<br/>Medium cost]
-    Hard -> Advanced[Full Pipeline<br/>High cost]
+    Hard --> Advanced["Full Pipeline<br/>High cost"]
 
     style Direct fill:#e1ffe1
     style Standard fill:#fff3e1
