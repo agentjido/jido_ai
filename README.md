@@ -1,118 +1,306 @@
-# Jido AI
+# Jido.AI
 
-Jido AI is an extension of the Jido framework for building AI Agents and Workflows in Elixir. At present, it provides a single action for interacting with Anthropic's Claude models via the Instructor library.
+**AI integration layer for the Jido ecosystem** - LLM orchestration, accuracy improvement techniques, and reasoning strategies for building intelligent agents in Elixir.
+
+## Overview
+
+Jido.AI provides a comprehensive toolkit for improving LLM output quality through proven accuracy enhancement techniques. It implements research-backed algorithms for self-consistency, search, verification, reflection, and more - all designed to get better results from language models.
+
+```elixir
+# Quick example: Self-consistency for better answers
+{:ok, best, metadata} = Jido.AI.Accuracy.SelfConsistency.run(
+  "What is 15 * 23?",
+  num_candidates: 5,
+  aggregator: :majority_vote
+)
+```
 
 ## Installation
 
 ```elixir
 def deps do
   [
-    {:jido, "~> 1.0.0"},
-    {:jido_ai, "~> 1.0.0"}
+    {:jido, "~> 2.0"},
+    {:jido_ai, "~> 2.0"}
   ]
 end
 ```
 
-## Configuration
-
-You will need to properly configure the `Instructor` library to use the Anthropic adapter:
+Configure your LLM provider (see [Configuration Guide](guides/developer/08_configuration.md)):
 
 ```elixir
 # config/config.exs
-config :instructor,
-  adapter: Instructor.Adapters.Anthropic,
+config :jido_ai, :models,
   anthropic: [
     api_key: System.get_env("ANTHROPIC_API_KEY")
+  ],
+  openai: [
+    api_key: System.get_env("OPENAI_API_KEY")
   ]
 ```
 
-## Example
+## Accuracy Improvement Techniques
 
-Here's how to use Jido AI with Jido.Workflow to get structured information about US politicians. See the [examples/politician.ex](examples/politician.ex) for more a full example.
+Jido.AI organizes accuracy techniques into categories based on how they improve LLM outputs:
+
+### Consensus-Based Methods
+
+Generate multiple candidates and aggregate results for more reliable answers.
+
+| Technique | Best For | Guide |
+|-----------|----------|-------|
+| **Self-Consistency** | Multi-step reasoning, math problems | [Guide](guides/user/03_self_consistency.md) |
+| **Adaptive Self-Consistency** | Dynamic resource allocation | [Guide](guides/user/04_adaptive_self_consistency.md) |
+
+**When to use consensus methods:**
+- Problems with definite answers (math, logic, factual)
+- When you can afford multiple LLM calls
+- When majority voting improves reliability
 
 ```elixir
-# Define a simple workflow
-defmodule JidoAi.Examples.Politician do
-  defmodule Schema do
-    use Ecto.Schema
-    use Instructor
-    @primary_key false
-    embedded_schema do
-      field(:first_name, :string)
-      field(:last_name, :string)
-
-      embeds_many :offices_held, Office, primary_key: false do
-        field(:office, Ecto.Enum,
-          values: [:president, :vice_president, :governor, :congress, :senate]
-        )
-
-        field(:from_date, :date)
-        field(:to_date, :date)
-      end
-    end
-  end
-
-  use Jido.Action,
-    name: "politician",
-    description: "A description of United States Politicians and the offices that they held",
-    schema: [
-      query: [type: :string, required: true, doc: "The query to search for"]
-    ]
-
-  def run(params, _context) do
-    # Run the Anthropic ChatCompletion action
-    JidoAi.Actions.Anthropic.ChatCompletion.run(
-      %{
-        model: "claude-3-5-haiku-latest",
-        messages: [
-          %{
-            role: "user",
-            content: params.query
-          }
-        ],
-        response_model: Schema,
-        temperature: 0.5,
-        max_tokens: 1000
-      },
-      %{}
-    )
-    |> case do
-      {:ok, %{result: politician}} -> {:ok, %{result: politician}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-end
-
-# Run the workflow
-iex> {:ok, result} = Jido.Workflow.run(JidoAi.Examples.Politician, %{query: "Tell me about Barack Obama's political career"})
-iex> result.result
-%JidoAi.Examples.Politician.Schema{
-  first_name: "Barack",
-  last_name: "Obama",
-  offices_held: [
-    %JidoAi.Examples.Politician.Schema.Office{
-      office: :senate,
-      from_date: ~D[2005-01-03],
-      to_date: ~D[2008-11-16]
-    },
-    %JidoAi.Examples.Politician.Schema.Office{
-      office: :president,
-      from_date: ~D[2009-01-20],
-      to_date: ~D[2017-01-20]
-    }
-  ]
-}
+# Generate 5 candidates, use majority vote
+{:ok, best, _meta} = Jido.AI.Accuracy.SelfConsistency.run(
+  "If 3 cats catch 3 mice in 3 minutes, how long for 100 cats?",
+  num_candidates: 5,
+  aggregator: :majority_vote
+)
 ```
 
-The example demonstrates how JidoAi can:
+---
 
-- Write Actions that can wrap other Actions
-- Use Jido.Workflow to orchestrate AI operations
-- Parse natural language queries about politicians
-- Return structured data using Ecto schemas
-- Handle complex nested data structures
-- Provide type validation through Ecto's type system
+### Search Algorithms
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/jido_ai>.
+Systematically explore the reasoning space to find optimal solutions.
+
+| Algorithm | Best For | Guide |
+|-----------|----------|-------|
+| **Beam Search** | Focused exploration, limited depth | [Guide](guides/user/05_search_algorithms.md#beam-search) |
+| **MCTS** | Complex reasoning, game-like scenarios | [Guide](guides/user/05_search_algorithms.md#monte-carlo-tree-search-mcts) |
+| **Diverse Decoding** | Creative brainstorming | [Guide](guides/user/05_search_algorithms.md#diverse-decoding) |
+
+**When to use search algorithms:**
+- Problems with clear branching structure
+- When systematic exploration beats single-shot
+- Game-like or planning scenarios
+
+```elixir
+# MCTS for complex reasoning
+{:ok, best} = Jido.AI.Accuracy.Search.MCTS.search(
+  "Solve: x^2 + 5x + 6 = 0 for x",
+  llm_generator,
+  llm_verifier,
+  simulations: 100
+)
+```
+
+---
+
+### Verification
+
+Validate outputs before accepting them, catching hallucinations and errors.
+
+| Verifier Type | Best For | Guide |
+|---------------|----------|-------|
+| **LLM Verifier** | General purpose checking | [Guide](guides/user/06_verification.md) |
+| **Code Execution** | Code generation, math | [Guide](guides/user/06_verification.md#code-execution-verifier) |
+| **Deterministic** | Known answers, test cases | [Guide](guides/user/06_verification.md#deterministic-verifier) |
+| **Static Analysis** | Code quality checks | [Guide](guides/user/06_verification.md#static-analysis-verifier) |
+| **Unit Test** | Test-driven validation | [Guide](guides/user/06_verification.md#unit-test-verifier) |
+
+**When to use verification:**
+- When hallucinations are costly
+- For code generation or mathematical outputs
+- When you have reference answers or tests
+
+```elixir
+# Create a code execution verifier
+verifier = Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier.new!(%{
+  language: :elixir,
+  timeout: 5000
+})
+
+# Verify code outputs
+{:ok, result} = Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier.verify(
+  verifier,
+  candidate,
+  %{}
+)
+```
+
+---
+
+### Reflection & Improvement
+
+Iteratively refine outputs through self-critique and revision.
+
+| Technique | Best For | Guide |
+|-----------|----------|-------|
+| **Self-Refine** | Improving draft outputs | [Guide](guides/user/07_reflection.md) |
+| **Reflection Stages** | Multi-stage refinement | [Guide](guides/user/07_reflection.md#reflection-stages) |
+| **Critique & Revision** | Structured improvement cycles | [Guide](guides/user/08_critique_revision.md) |
+
+**When to use reflection:**
+- When initial drafts need refinement
+- For writing, code, or complex explanations
+- When you have time for iteration
+
+```elixir
+# Self-refine for better outputs
+strategy = Jido.AI.Accuracy.SelfRefine.new!(%{})
+{:ok, result} = Jido.AI.Accuracy.SelfRefine.run(strategy, "Write a function to sort a list")
+
+result.refined_candidate  # The improved response
+```
+
+---
+
+### Quality Estimation
+
+Estimate confidence and difficulty to allocate resources appropriately.
+
+| Technique | Best For | Guide |
+|-----------|----------|-------|
+| **Confidence Calibration** | Reliability scoring | [Guide](guides/user/10_confidence_calibration.md) |
+| **Difficulty Estimation** | Resource allocation | [Guide](guides/user/11_difficulty_estimation.md) |
+| **Process Reward Models** | Step-by-step quality | [Guide](guides/user/09_prm.md) |
+
+**When to use quality estimation:**
+- Variable-difficulty workloads
+- Cost-sensitive applications
+- When you need confidence scores
+
+```elixir
+# Estimate difficulty to allocate resources
+estimator = Jido.AI.Accuracy.Estimators.HeuristicDifficulty.new!(%{})
+
+{:ok, estimate} = Jido.AI.Accuracy.Estimators.HeuristicDifficulty.estimate(
+  estimator,
+  "What is the square root of 144 multiplied by the sum of the first 10 primes?",
+  %{}
+)
+
+case estimate.level do
+  :easy -> use_fast_model()
+  :hard -> use_full_pipeline()
+end
+```
+
+---
+
+## Pipeline Orchestration
+
+Combine multiple techniques into powerful pipelines that adapt to your needs.
+
+[**Pipeline Guide &rarr;](guides/user/12_pipeline.md)**
+
+```elixir
+# Build a pipeline that adapts based on difficulty
+{:ok, pipeline} = Jido.AI.Accuracy.Pipeline.new(%{})
+
+generator = fn query, _context ->
+  # Your LLM generation logic here
+  {:ok, "Answer to: #{query}"}
+end
+
+{:ok, result} = Jido.AI.Accuracy.Pipeline.run(pipeline, "Solve this complex problem...", generator: generator)
+
+result.answer  # The final answer
+result.confidence  # Confidence score [0-1]
+```
+
+**When to use pipelines:**
+- Complex problems requiring multiple techniques
+- When you need adaptive processing
+- Production workflows with quality requirements
+
+---
+
+## Reasoning Strategies
+
+Strategies are agent patterns that determine how an LLM approaches a problem.
+
+| Strategy | Pattern | Best For | Guide |
+|----------|---------|----------|-------|
+| **ReAct** | Reason-Act loop | Tool-using agents | [Guide](guides/user/02_strategies.md#react-reason-act) |
+| **Chain-of-Thought** | Sequential reasoning | Multi-step problems | [Guide](guides/user/02_strategies.md#chain-of-thought) |
+| **Tree-of-Thoughts** | Explore multiple paths | Complex planning | [Guide](guides/user/02_strategies.md#tree-of-thoughts) |
+| **Graph-of-Thoughts** | Networked reasoning | Interconnected concepts | [Guide](guides/user/02_strategies.md#graph-of-thoughts) |
+| **Adaptive** | Strategy selection | Variable problem types | [Guide](guides/user/02_strategies.md#adaptive-strategy) |
+
+```elixir
+# ReAct agent with tools
+defmodule MyApp.Agent do
+  use Jido.AI.ReActAgent,
+    name: "my_agent",
+    tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
+    model: :fast
+end
+```
+
+---
+
+## Documentation
+
+### User Guides
+- [Overview](guides/user/01_overview.md) - Library introduction and concepts
+- [Strategies](guides/user/02_strategies.md) - Reasoning strategies
+- [Self-Consistency](guides/user/03_self_consistency.md) - Consensus-based improvement
+- [Adaptive Self-Consistency](guides/user/04_adaptive_self_consistency.md) - Dynamic resource allocation
+- [Search Algorithms](guides/user/05_search_algorithms.md) - Beam search, MCTS, diverse decoding
+- [Verification](guides/user/06_verification.md) - Output validation techniques
+- [Reflection](guides/user/07_reflection.md) - Self-refine and reflection stages
+- [Critique & Revision](guides/user/08_critique_revision.md) - Structured improvement cycles
+- [Process Reward Models](guides/user/09_prm.md) - Step-by-step quality scoring
+- [Confidence Calibration](guides/user/10_confidence_calibration.md) - Reliability estimation
+- [Difficulty Estimation](guides/user/11_difficulty_estimation.md) - Resource-aware processing
+- [Pipeline](guides/user/12_pipeline.md) - Combining techniques into workflows
+
+### Developer Guides
+- [Architecture Overview](guides/developer/01_architecture_overview.md) - System design
+- [Strategies](guides/developer/02_strategies.md) - Strategy implementation
+- [State Machines](guides/developer/03_state_machines.md) - Pure state machine pattern
+- [Directives](guides/developer/04_directives.md) - Declarative side effects
+- [Signals](guides/developer/05_signals.md) - Event-driven communication
+- [Tool System](guides/developer/06_tool_system.md) - Tool registry and execution
+- [Skills](guides/developer/07_skills.md) - Modular agent capabilities
+- [Configuration](guides/developer/08_configuration.md) - Model aliases and providers
+
+### Examples
+See the [`examples/`](examples/) directory for runnable code:
+- [`examples/accuracy/`](examples/accuracy/) - Accuracy improvement examples
+- [`examples/strategies/`](examples/strategies/) - Reasoning strategy examples
+
+## Quick Decision Guide
+
+Not sure which technique to use? Start here:
+
+```
+Need better answers?
+├─ Problem has definite answer?
+│  └─ Use Self-Consistency
+│
+├─ Requires exploration/planning?
+│  ├─ Shallow depth → Beam Search
+│  └─ Deep/complex → MCTS
+│
+├─ Output needs validation?
+│  └─ Add Verification
+│
+├─ Initial draft acceptable?
+│  └─ Use Self-Refine
+│
+└─ Variable difficulty?
+   └─ Use Pipeline with difficulty estimation
+```
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+Apache-2.0 - See [LICENSE](LICENSE) for details.
+
+---
+
+**[Jido.AI Homepage](https://agentjido.xyz)** | **[GitHub](https://github.com/agentjido/jido_ai)** | **[Discord](https://agentjido.xyz/discord)**
