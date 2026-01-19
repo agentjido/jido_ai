@@ -7,12 +7,16 @@
 Jido.AI provides a comprehensive toolkit for improving LLM output quality through proven accuracy enhancement techniques. It implements research-backed algorithms for self-consistency, search, verification, reflection, and more - all designed to get better results from language models.
 
 ```elixir
-# Quick example: Self-consistency for better answers
-{:ok, best, metadata} = Jido.AI.Accuracy.SelfConsistency.run(
-  "What is 15 * 23?",
-  num_candidates: 5,
-  aggregator: :majority_vote
-)
+# Quick example: ReAct agent with tool use
+defmodule MyApp.Agent do
+  use Jido.AI.ReActAgent,
+    name: "my_agent",
+    tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
+    model: :fast
+end
+
+{:ok, agent} = MyApp.Agent.start_link()
+{:ok, response} = MyApp.Agent.chat(agent, "What is 15 * 23?")
 ```
 
 ## Installation
@@ -39,9 +43,46 @@ config :jido_ai, :models,
   ]
 ```
 
+## Reasoning Strategies
+
+Strategies are agent patterns that determine how an LLM approaches a problem. They are the foundation of building intelligent agents with Jido.AI.
+
+| Strategy | Pattern | Best For | Guide |
+|----------|---------|----------|-------|
+| **ReAct** | Reason-Act loop | Tool-using agents | [Guide](guides/user/02_strategies.md#react-reason-act) |
+| **Chain-of-Thought** | Sequential reasoning | Multi-step problems | [Guide](guides/user/02_strategies.md#chain-of-thought) |
+| **Tree-of-Thoughts** | Explore multiple paths | Complex planning | [Guide](guides/user/02_strategies.md#tree-of-thoughts) |
+| **Graph-of-Thoughts** | Networked reasoning | Interconnected concepts | [Guide](guides/user/02_strategies.md#graph-of-thoughts) |
+| **Adaptive** | Strategy selection | Variable problem types | [Guide](guides/user/02_strategies.md#adaptive-strategy) |
+
+**When to use which strategy:**
+- **ReAct** - When your agent needs to use tools or APIs
+- **Chain-of-Thought** - For multi-step reasoning and math problems
+- **Tree-of-Thoughts** - When exploring multiple solution paths is beneficial
+- **Graph-of-Thoughts** - For problems with interconnected concepts
+- **Adaptive** - When you need dynamic strategy selection based on the problem
+
+```elixir
+# ReAct agent with tools
+defmodule MyApp.Agent do
+  use Jido.AI.ReActAgent,
+    name: "my_agent",
+    tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
+    model: :fast
+end
+
+# Chain-of-Thought for step-by-step reasoning
+{:ok, result} = Jido.AI.Strategies.ChainOfThought.run(
+  "If 3 cats catch 3 mice in 3 minutes, how many cats are needed to catch 100 mice in 100 minutes?",
+  model: :fast
+)
+```
+
+---
+
 ## Accuracy Improvement Techniques
 
-Jido.AI organizes accuracy techniques into categories based on how they improve LLM outputs:
+Beyond strategies, Jido.AI provides research-backed techniques to improve LLM output quality. These are organized by how they enhance results:
 
 ### Consensus-Based Methods
 
@@ -215,30 +256,6 @@ result.confidence  # Confidence score [0-1]
 
 ---
 
-## Reasoning Strategies
-
-Strategies are agent patterns that determine how an LLM approaches a problem.
-
-| Strategy | Pattern | Best For | Guide |
-|----------|---------|----------|-------|
-| **ReAct** | Reason-Act loop | Tool-using agents | [Guide](guides/user/02_strategies.md#react-reason-act) |
-| **Chain-of-Thought** | Sequential reasoning | Multi-step problems | [Guide](guides/user/02_strategies.md#chain-of-thought) |
-| **Tree-of-Thoughts** | Explore multiple paths | Complex planning | [Guide](guides/user/02_strategies.md#tree-of-thoughts) |
-| **Graph-of-Thoughts** | Networked reasoning | Interconnected concepts | [Guide](guides/user/02_strategies.md#graph-of-thoughts) |
-| **Adaptive** | Strategy selection | Variable problem types | [Guide](guides/user/02_strategies.md#adaptive-strategy) |
-
-```elixir
-# ReAct agent with tools
-defmodule MyApp.Agent do
-  use Jido.AI.ReActAgent,
-    name: "my_agent",
-    tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
-    model: :fast
-end
-```
-
----
-
 ## Documentation
 
 ### User Guides
@@ -275,7 +292,15 @@ See the [`examples/`](examples/) directory for runnable code:
 Not sure which technique to use? Start here:
 
 ```
-Need better answers?
+Building an agent?
+├─ Need to use tools/APIs?
+│  └─ Use ReAct Strategy
+├─ Multi-step reasoning?
+│  └─ Use Chain-of-Thought
+└─ Complex planning?
+   └─ Use Tree-of-Thoughts
+
+Improving accuracy?
 ├─ Problem has definite answer?
 │  └─ Use Self-Consistency
 │
