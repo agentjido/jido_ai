@@ -1,300 +1,453 @@
-# Jido.AI Directives Guide
+# Directives Guide
 
-This guide covers the directive system used in Jido.AI for describing external effects.
+This guide covers the directive system in Jido.AI, which provides declarative side effects for agent execution.
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Directive Types](#directive-types)
-3. [Using Directives](#using-directives)
-4. [Directive Lifecycle](#directive-lifecycle)
-5. [Creating Custom Directives](#creating-custom-directives)
-
----
+- [Overview](#overview)
+- [Available Directives](#available-directives)
+- [Directive Lifecycle](#directive-lifecycle)
+- [ReqLLMStream Directive](#reqllmstream-directive)
+- [ToolExec Directive](#toolexec-directive)
+- [ReqLLMGenerate Directive](#reqllmgenerate-directive)
+- [ReqLLMEmbed Directive](#reqllmembed-directive)
+- [Creating Custom Directives](#creating-custom-directives)
 
 ## Overview
 
-Directives describe **external effects** that should be performed. They are returned by state machines and executed by the AgentServer runtime.
+Directives are **declarative descriptions of side effects**. Strategies return directives, and the AgentServer runtime executes them.
 
-### Key Principles
+### Key Benefits
 
-1. **Declarative**: Directives describe *what* to do, not *how* to do it
-2. **Immutable**: Directives cannot be modified once created
-3. **Type-Safe**: All directives use Zoi schemas for validation
-4. **Observable**: Directive execution emits telemetry
+1. **Separation of Concerns**: Strategies don't execute side effects
+2. **Testability**: Can test strategies without mocking
+3. **Composability**: Directives can be batched and reordered
+4. **Observability**: All side effects are explicit
 
-### Pattern
+### Directive Pattern
 
-```elixir
-# State machine returns directives
-{machine, directives} = Machine.update(machine, message, env)
-
-# Strategy lifts to SDK directives
-sdk_directives = lift_directives(directives, config)
-
-# AgentServer executes directives
-# Results sent back as signals
+```mermaid
+graph LR
+    Strategy[Strategy] -->|Returns| Directive[Directive]
+    Directive -->|Executed by| Runtime[AgentServer Runtime]
+    Runtime -->|Sends| Signal[Signal]
+    Signal -->|Routes to| Strategy
 ```
 
----
+## Available Directives
 
-## Directive Types
-
-### ReqLLMStream
-
-**Module**: `Jido.AI.Directive.ReqLLMStream`
-
-Stream an LLM response with optional tool support.
-
-```elixir
-Directive.ReqLLMStream.new!(%{
-  id: "call_abc123",
-  model: "anthropic:claude-sonnet-4-20250514",
-  context: [
-    %{role: :system, content: "You are a helpful assistant..."},
-    %{role: :user, content: "Hello!"}
-  ],
-  tools: [
-    %{name: "calculator", description: "...", input_schema: %{...}}
-  ]
-})
-```
-
-**Fields**:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `:id` | `String.t()` | ✅ | Unique call identifier |
-| `:model` | `String.t()` | ✅ | LLM model identifier |
-| `:context` | `[ReqLLM.Message.t()]` | ✅ | Conversation context |
-| `:tools` | `[ReqLLM.Tool.t()]` | ❌ | Available tools |
-| `:max_tokens` | `pos_integer()` | ❌ | Max tokens to generate |
-| `:temperature` | `float()` | ❌ | Sampling temperature |
-| `:metadata` | `map()` | ❌ | Additional metadata |
-
-**Result Signal**: `ReqLLMResult` or `ReqLLMPartial`
-
----
-
-### ToolExec
-
-**Module**: `Jido.AI.Directive.ToolExec`
-
-Execute a Jido.Action as a tool.
-
-```elixir
-Directive.ToolExec.new!(%{
-  id: "tool_abc123",
-  tool_name: "calculator",
-  action_module: CalculatorAction,
-  arguments: %{expression: "2 + 2"}
-})
-```
-
-**Fields**:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `:id` | `String.t()` | ✅ | Unique call identifier |
-| `:tool_name` | `String.t()` | ✅ | Tool name |
-| `:action_module` | `module()` | ✅ | Jido.Action module |
-| `:arguments` | `map()` | ✅ | Tool parameters |
-| `:timeout` | `pos_integer()` | ❌ | Execution timeout |
-
-**Result Signal**: `ToolResult`
-
----
-
-### ReqLLMGenerate
-
-**Module**: `Jido.AI.Directive.ReqLLMGenerate`
-
-Generate a non-streaming LLM response.
-
-```elixir
-Directive.ReqLLMGenerate.new!(%{
-  id: "call_abc123",
-  model: "anthropic:claude-haiku-4-5",
-  context: [
-    %{role: :user, content: "What is 2 + 2?"}
-  ]
-})
-```
-
-**Fields**: Same as ReqLLMStream, but response is not streamed.
-
----
-
-### ReqLLMEmbed
-
-**Module**: `Jido.AI.Directive.ReqLLMEmbed`
-
-Generate embeddings for text.
-
-```elixir
-Directive.ReqLLMEmbed.new!(%{
-  id: "embed_abc123",
-  model: "openai:text-embedding-3-small",
-  texts: ["Hello world", "Goodbye world"]
-})
-```
-
-**Fields**:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `:id` | `String.t()` | ✅ | Unique call identifier |
-| `:model` | `String.t()` | ✅ | Embedding model |
-| `:texts` | `[String.t()]` | ✅ | Texts to embed |
-
-**Result Signal**: `EmbedResult`
-
----
-
-## Using Directives
-
-### In State Machines
-
-```elixir
-def update(machine, {:start, prompt, call_id}, env) do
-  with_transition(machine, "processing", fn machine ->
-    conversation = build_conversation(prompt, env)
-    {machine, [{:call_llm_stream, call_id, conversation}]}
-  end)
-end
-```
-
-### Lifting Directives (in Strategies)
-
-```elixir
-defp lift_directives(directives, config) do
-  %{model: model, reqllm_tools: tools} = config
-
-  Enum.flat_map(directives, fn
-    {:call_llm_stream, id, conversation} ->
-      [Directive.ReqLLMStream.new!(%{
-        id: id,
-        model: model,
-        context: convert_to_reqllm_context(conversation),
-        tools: tools
-      })]
-
-    {:exec_tool, id, tool_name, arguments} ->
-      case lookup_tool(tool_name, config) do
-        {:ok, action_module} ->
-          [Directive.ToolExec.new!(%{
-            id: id,
-            tool_name: tool_name,
-            action_module: action_module,
-            arguments: arguments
-          })]
-
-        :error ->
-          []
-      end
-  end)
-end
-```
-
----
+| Directive | Module | Purpose |
+|-----------|--------|---------|
+| `ReqLLMStream` | `Jido.AI.Directive.ReqLLMStream` | Stream LLM response |
+| `ReqLLMGenerate` | `Jido.AI.Directive.ReqLLMGenerate` | Generate non-streaming response |
+| `ReqLLMEmbed` | `Jido.AI.Directive.ReqLLMEmbed` | Generate embeddings |
+| `ToolExec` | `Jido.AI.Directive.ToolExec` | Execute a tool |
 
 ## Directive Lifecycle
 
-```
-┌────────────────┐     lift_directives      ┌────────────────┐
-│ State Machine  │ ──────────────────────▶ │   Strategy     │
-│                │   {:call_llm_stream,...} │                │
-└────────────────┘                          └────────┬───────┘
-                                                    │
-                                                    ▼
-┌────────────────┐     Directive.ReqLLMStream  ┌────────────────┐
-│ AgentServer    │ ◀────────────────────────── │   Strategy     │
-│                │                              │                │
-└────────┬───────┘                              └────────────────┘
-         │
-         │ Execute directive
-         ▼
-┌────────────────┐
-│ ReqLLM         │
-│ Stream text    │
-└────────┬───────┘
-         │
-         │ Emit signals
-         ▼
-┌────────────────┐
-│ reqllm.result │ ────────────────────────▶ AgentServer
-│ reqllm.partial│     ( routed back )
-└────────────────┘
+```mermaid
+sequenceDiagram
+    participant Machine as State Machine
+    participant Strategy as Strategy
+    participant Runtime as AgentServer
+    participant Impl as DirectiveExec Impl
+    participant External as External Service
+
+    Machine->>Strategy: Returns {:exec_tool, ...}
+    Strategy->>Strategy: lift_directives()
+    Strategy->>Runtime: Directive.ToolExec struct
+
+    Runtime->>Impl: exec(directive, signal, state)
+    Impl->>Impl: Spawn async task
+    Impl->>External: Execute tool
+    External-->>Impl: Result
+    Impl->>Runtime: Signal.ToolResult
+    Runtime->>Strategy: signal_routes()
+    Strategy->>Machine: update(machine, message)
 ```
 
----
+## ReqLLMStream Directive
 
-## Creating Custom Directives
+Streams an LLM response with optional tool support.
 
-### Step 1: Define Module
+### Schema
 
 ```elixir
-defmodule Jido.AI.Directive.CustomDirective do
-  @moduledoc """
-  Custom directive for doing X.
-  """
-
-  use Jido.AI.Directive
-
-  @impl true
-  def describe do
-    %{
-      name: "custom_directive",
-      description: "Does something custom...",
-      schema: @schema
-    }
-  end
-
-  @impl true
-  def validate(params) do
-    # Return {:ok, validated} or {:error, reason}
-    Zoi.validate(@schema, params)
-  end
-
-  @impl true
-  def execute(directive, context) do
-    # Execute the directive
-    # Return {:ok, result} or {:error, reason}
-  end
-end
+@schema Zoi.struct(__MODULE__, %{
+  id: Zoi.string(description: "Unique call ID for correlation"),
+  model: Zoi.string(description: "Model spec")
+    |> Zoi.optional(),
+  model_alias: Zoi.atom(description: "Model alias (e.g., :fast)")
+    |> Zoi.optional(),
+  system_prompt: Zoi.string(description: "Optional system prompt")
+    |> Zoi.optional(),
+  context: Zoi.any(description: "Conversation context"),
+  tools: Zoi.list(Zoi.any(), description: "ReqLLM tools")
+    |> Zoi.default([]),
+  tool_choice: Zoi.any(description: "Tool choice mode")
+    |> Zoi.default(:auto),
+  max_tokens: Zoi.integer(description: "Max tokens")
+    |> Zoi.default(1024),
+  temperature: Zoi.number(description: "Temperature (0.0–2.0)")
+    |> Zoi.default(0.2),
+  timeout: Zoi.integer(description: "Timeout in milliseconds")
+    |> Zoi.optional(),
+  metadata: Zoi.map(description: "Tracking metadata")
+    |> Zoi.default(%{})
+}, coerce: true)
 ```
 
-### Step 2: Define Schema
+### Creating the Directive
 
 ```elixir
-@schema Zoi.object(%{
-  id: Zoi.string(),
-  param1: Zoi.string(),
-  param2: Zoi.integer() |> Zoi.default(10)
+alias Jido.AI.Directive
+
+# Using model alias
+directive = Directive.ReqLLMStream.new!(%{
+  id: "call_123",
+  model_alias: :fast,
+  context: [
+    %{role: :system, content: "You are a helpful assistant."},
+    %{role: :user, content: "What is 2 + 2?"}
+  ],
+  tools: tools,
+  max_tokens: 2048
+})
+
+# Using direct model spec
+directive = Directive.ReqLLMStream.new!(%{
+  id: "call_123",
+  model: "anthropic:claude-haiku-4-5",
+  context: context,
+  tools: tools
 })
 ```
 
-### Step 3: Use in State Machine
+### Execution Behavior
+
+The directive implementation:
+
+1. Resolves model alias (if used)
+2. Prepends system prompt (if provided)
+3. Spawns an async task
+4. Streams tokens from LLM
+5. Sends `reqllm.partial` signals for each chunk
+6. Sends `reqllm.result` signal on completion
+
+### Signals Emitted
 
 ```elixir
-# Return directive tuple
-{machine, [{:custom_directive, id, %{param1: "value"}}]}
+# During streaming
+%Jido.Signal{
+  type: "reqllm.partial",
+  data: %{
+    call_id: "call_123",
+    delta: "Hello",
+    chunk_type: :content
+  }
+}
 
-# Lift in strategy
-defp lift_directives(directives, config) do
-  Enum.flat_map(directives, fn
-    {:custom_directive, id, params} ->
-      [Directive.CustomDirective.new!(Map.put(params, :id, id))]
+# On completion
+%Jido.Signal{
+  type: "reqllm.result",
+  data: %{
+    call_id: "call_123",
+    result: {:ok, %{type: :final_answer, text: "Hello!"}}
+  }
+}
+```
 
-    # ... other directives
-  end)
+## ToolExec Directive
+
+Executes a Jido.Action or Jido.AI.Tools.Tool as a tool.
+
+### Schema
+
+```elixir
+@schema Zoi.struct(__MODULE__, %{
+  id: Zoi.string(description: "Tool call ID from LLM"),
+  tool_name: Zoi.string(description: "Name of the tool"),
+  arguments: Zoi.map(description: "Arguments from LLM")
+    |> Zoi.default(%{}),
+  context: Zoi.map(description: "Execution context")
+    |> Zoi.default(%{}),
+  metadata: Zoi.map(description: "Tracking metadata")
+    |> Zoi.default(%{})
+}, coerce: true)
+```
+
+### Creating the Directive
+
+```elixir
+directive = Directive.ToolExec.new!(%{
+  id: "tc_123",
+  tool_name: "calculator",
+  arguments: %{
+    "a" => 1,
+    "b" => 2,
+    "operation" => "add"
+  },
+  context: %{
+    agent_id: "agent_456"
+  }
+})
+```
+
+### Argument Normalization
+
+LLM tool calls use string keys (JSON format). The executor normalizes them:
+
+```elixir
+# Before normalization (from LLM)
+%{"a" => "1", "b" => "2", "operation" => "add"}
+
+# After normalization (based on schema)
+%{a: 1, b: 2, operation: "add"}
+```
+
+### Execution Flow
+
+```elixir
+defimpl Jido.AgentServer.DirectiveExec, for: Directive.ToolExec do
+  def exec(directive, _input_signal, state) do
+    agent_pid = self()
+
+    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+      result = Executor.execute(
+        directive.tool_name,
+        directive.arguments,
+        directive.context
+      )
+
+      signal = Signal.ToolResult.new!(%{
+        call_id: directive.id,
+        tool_name: directive.tool_name,
+        result: result
+      })
+
+      Jido.AgentServer.cast(agent_pid, signal)
+    end)
+
+    {:async, nil, state}
+  end
 end
 ```
 
----
+## ReqLLMGenerate Directive
 
-## Related Guides
+Generates a non-streaming LLM response.
 
-- [Architecture Overview](./01_architecture_overview.md) - System architecture
-- [State Machines Guide](./03_state_machines.md) - State machine patterns
-- [Signals Guide](./05_signals.md) - Signal types
+### Schema
+
+```elixir
+@schema Zoi.struct(__MODULE__, %{
+  id: Zoi.string(description: "Unique call ID"),
+  model: Zoi.string(description: "Model spec") |> Zoi.optional(),
+  model_alias: Zoi.atom(description: "Model alias") |> Zoi.optional(),
+  system_prompt: Zoi.string(description: "System prompt") |> Zoi.optional(),
+  context: Zoi.any(description: "Conversation context"),
+  tools: Zoi.list(Zoi.any()) |> Zoi.default([]),
+  tool_choice: Zoi.any() |> Zoi.default(:auto),
+  max_tokens: Zoi.integer() |> Zoi.default(1024),
+  temperature: Zoi.number() |> Zoi.default(0.2),
+  timeout: Zoi.integer() |> Zoi.optional(),
+  metadata: Zoi.map() |> Zoi.default(%{})
+}, coerce: true)
+```
+
+### When to Use
+
+- When streaming is not needed
+- For simple one-shot responses
+- When you need the complete response before processing
+
+```elixir
+directive = Directive.ReqLLMGenerate.new!(%{
+  id: "call_123",
+  model_alias: :fast,
+  context: messages
+})
+```
+
+## ReqLLMEmbed Directive
+
+Generates embeddings for text.
+
+### Schema
+
+```elixir
+@schema Zoi.struct(__MODULE__, %{
+  id: Zoi.string(description: "Unique call ID"),
+  model: Zoi.string(description: "Embedding model"),
+  texts: Zoi.any(description: "Text or list of texts"),
+  dimensions: Zoi.integer(description: "Embedding dimensions")
+    |> Zoi.optional(),
+  timeout: Zoi.integer() |> Zoi.optional(),
+  metadata: Zoi.map() |> Zoi.default(%{})
+}, coerce: true)
+```
+
+### Usage
+
+```elixir
+# Single text
+directive = Directive.ReqLLMEmbed.new!(%{
+  id: "embed_123",
+  model: "openai:text-embedding-3-small",
+  texts: "Hello, world!"
+})
+
+# Batch embedding
+directive = Directive.ReqLLMEmbed.new!(%{
+  id: "embed_124",
+  model: "openai:text-embedding-3-small",
+  texts: ["Text 1", "Text 2", "Text 3"],
+  dimensions: 1536
+})
+```
+
+### Signal Emitted
+
+```elixir
+%Jido.Signal{
+  type: "ai.embed_result",
+  data: %{
+    call_id: "embed_123",
+    result: {:ok, %{
+      embeddings: [0.1, 0.2, ...],
+      count: 1
+    }}
+  }
+}
+```
+
+## Creating Custom Directives
+
+To create a custom directive:
+
+### Step 1: Define the Directive Struct
+
+```elixir
+defmodule MyApp.Directive.MyCustomDirective do
+  @moduledoc """
+  Custom directive for my specific use case.
+  """
+
+  @schema Zoi.struct(
+            __MODULE__,
+            %{
+              id: Zoi.string(description: "Unique ID"),
+              data: Zoi.any(description: "My data"),
+              options: Zoi.map(description: "Options")
+                |> Zoi.default(%{})
+            },
+            coerce: true
+          )
+
+  @type t :: unquote(Zoi.type_spec(@schema))
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
+
+  @doc false
+  def schema, do: @schema
+
+  @doc "Create a new directive."
+  def new!(attrs) when is_map(attrs) do
+    case Zoi.parse(@schema, attrs) do
+      {:ok, directive} -> directive
+      {:error, errors} -> raise "Invalid MyCustomDirective: #{inspect(errors)}"
+    end
+  end
+end
+```
+
+### Step 2: Implement DirectiveExec Protocol
+
+```elixir
+defimpl Jido.AgentServer.DirectiveExec, for: MyApp.Directive.MyCustomDirective do
+  @moduledoc """
+  Executes the custom directive.
+  """
+
+  require Logger
+
+  def exec(directive, _input_signal, state) do
+    Logger.info("Executing custom directive: #{directive.id}")
+
+    agent_pid = self()
+
+    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+      result = do_execute(directive)
+
+      # Send result back as a signal
+      signal = %Jido.Signal{
+        type: "my_app.custom_result",
+        data: %{
+          directive_id: directive.id,
+          result: result
+        }
+      }
+
+      Jido.AgentServer.cast(agent_pid, signal)
+    end)
+
+    {:async, nil, state}
+  end
+
+  defp do_execute(directive) do
+    # Your custom execution logic
+    {:ok, %{processed: directive.data}}
+  end
+end
+```
+
+### Step 3: Use in Strategy
+
+```elixir
+defmodule MyApp.Strategies.MyStrategy do
+  use Jido.Agent.Strategy
+
+  alias MyApp.Directive.MyCustomDirective
+
+  defp process_instruction(agent, %{action: :my_action, params: params}) do
+    # Return your custom directive
+    directive = MyCustomDirective.new!(%{
+      id: generate_id(),
+      data: params
+    })
+
+    {agent, [directive]}
+  end
+end
+```
+
+## Directive Helpers
+
+### Model Resolution
+
+The `Jido.AI.Helpers` module provides helper functions:
+
+```elixir
+alias Jido.AI.Helpers
+
+# Resolve model alias to full spec
+{:ok, model} = Helpers.resolve_model(:fast)
+# => {:ok, "anthropic:claude-haiku-4-5"}
+
+# Build messages from context with system prompt
+messages = Helpers.build_directive_messages(context, system_prompt)
+```
+
+### Error Classification
+
+```elixir
+# Classify errors for telemetry
+error_type = Helpers.classify_error(error)
+# => :rate_limit | :auth | :timeout | :provider_error | :unknown
+```
+
+## Next Steps
+
+- [Signals Guide](./05_signals.md) - Results from directive execution
+- [Tool System Guide](./06_tool_system.md) - Tool execution details
+- [Configuration Guide](./08_configuration.md) - Model aliases and providers

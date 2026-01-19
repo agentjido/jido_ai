@@ -1,669 +1,449 @@
-# Jido.AI Strategies Guide
+# Strategies Guide
 
-This guide covers all reasoning strategies available in Jido.AI, their use cases, and how to use them.
+This guide covers the strategy system in Jido.AI, which implements different reasoning patterns for AI agents.
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [ReAct (Reason-Act)](#react-reason-act)
-3. [Chain-of-Thought](#chain-of-thought)
-4. [Tree-of-Thoughts](#tree-of-thoughts)
-5. [Graph-of-Thoughts](#graph-of-thoughts)
-6. [TRM (Tiny-Recursive-Model)](#trm-tiny-recursive-model)
-7. [Adaptive Strategy](#adaptive-strategy)
-8. [Strategy Comparison](#strategy-comparison)
-9. [Creating Custom Strategies](#creating-custom-strategies)
-
----
+- [Overview](#overview)
+- [Available Strategies](#available-strategies)
+- [Strategy Interface](#strategy-interface)
+- [ReAct Strategy](#react-strategy)
+- [Chain-of-Thought Strategy](#chain-of-thought-strategy)
+- [Tree-of-Thoughts Strategy](#tree-of-thoughts-strategy)
+- [Graph-of-Thoughts Strategy](#graph-of-thoughts-strategy)
+- [TRM Strategy](#trm-strategy)
+- [Adaptive Strategy](#adaptive-strategy)
+- [Creating Custom Strategies](#creating-custom-strategies)
 
 ## Overview
 
-Jido.AI provides multiple reasoning strategies, each optimized for different types of tasks:
+Strategies in Jido.AI implement different reasoning patterns for agent execution. Each strategy:
 
-| Strategy | Best For | Tool Support | Complexity |
-|----------|----------|--------------|------------|
-| **ReAct** | Tool-based reasoning | ✅ | Medium |
-| **Chain-of-Thought** | Step-by-step reasoning | ❌ | Low |
-| **Tree-of-Thoughts** | Exploratory search | ❌ | High |
-| **Graph-of-Thoughts** | Multi-perspective analysis | ❌ | High |
-| **TRM** | Iterative improvement | ❌ | Medium |
-| **Adaptive** | Auto-selecting strategy | ✅ | High |
+- Implements the `Jido.Agent.Strategy` behavior
+- Uses a pure state machine for state transitions
+- Returns directives describing side effects
+- Routes signals to strategy commands
+- Stores state in `agent.state.__strategy__`
 
----
+### Strategy Location
 
-## ReAct (Reason-Act)
-
-**Module**: `Jido.AI.Strategies.ReAct`
-
-### Overview
-
-ReAct (Reason-Act) alternates between **reasoning** (LLM calls) and **acting** (tool execution) in a loop until a final answer is reached.
-
-### When to Use
-
-- Tasks requiring external information (file I/O, API calls, databases)
-- Multi-step problem solving with tool use
-- Agent workflows with action capabilities
-
-### Architecture
+All strategy modules are located in `lib/jido_ai/strategy/`:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     ReAct Flow                               │
-│                                                              │
-│   User Query → LLM → Tool Calls → Tool Results → LLM → ...  │
-│                                                              │
-│   Loop until:                                                │
-│   - Final answer received                                    │
-│   - Max iterations reached                                   │
-│   - Error occurs                                             │
-└─────────────────────────────────────────────────────────────┘
+lib/jido_ai/strategy/
+├── react.ex              # ReAct strategy
+├── chain_of_thought.ex   # Chain-of-Thought strategy
+├── tree_of_thoughts.ex   # Tree-of-Thoughts strategy
+├── graph_of_thoughts.ex  # Graph-of-Thoughts strategy
+├── trm.ex                # TRM strategy
+├── adaptive.ex           # Adaptive strategy
+└── state_ops_helpers.ex  # StateOps helper functions
 ```
 
-### State Machine
+## Available Strategies
 
-States: `idle` → `awaiting_llm` → `awaiting_tool` → `completed`/`error`
+| Strategy | Module | Description |
+|----------|--------|-------------|
+| **ReAct** | `Jido.AI.Strategies.ReAct` | Multi-step reasoning with tool use |
+| **Chain-of-Thought** | `Jido.AI.Strategies.ChainOfThought` | Step-by-step sequential reasoning |
+| **Tree-of-Thoughts** | `Jido.AI.Strategies.TreeOfThoughts` | Branching exploration with evaluation |
+| **Graph-of-Thoughts** | `Jido.AI.Strategies.GraphOfThoughts` | Graph-based reasoning with synthesis |
+| **TRM** | `Jido.AI.Strategies.TRM` | Thought-Refine-Merge with supervision |
+| **Adaptive** | `Jido.AI.Strategies.Adaptive` | Automatic strategy selection |
+
+## Strategy Interface
+
+All strategies implement the `Jido.Agent.Strategy` behavior:
 
 ```elixir
-defmodule Jido.AI.ReAct.Machine do
-  @type status :: :idle | :awaiting_llm | :awaiting_tool | :completed | :error
+@callback init(agent :: Agent.t(), ctx :: map()) :: {Agent.t(), [Directive.t()]}
 
-  # Messages
-  {:start, query, call_id}
-  {:llm_result, call_id, result}
-  {:llm_partial, call_id, delta, chunk_type}
-  {:tool_result, call_id, result}
+@callback cmd(agent :: Agent.t(), instructions :: [Instruction.t()], ctx :: map()) ::
+  {Agent.t(), [Directive.t()]}
 
-  # Directives
-  {:call_llm_stream, id, context}
-  {:exec_tool, id, tool_name, arguments}
-end
+@callback signal_routes(ctx :: map()) :: [{Signal.type(), route()}]
+
+@callback action_spec(action :: atom()) :: %{schema: Zoi.schema(), doc: String.t()} | nil
+
+@callback snapshot(agent :: Agent.t(), ctx :: map()) :: Strategy.Snapshot.t()
 ```
 
-### Usage
+### Required Actions
+
+Strategies define actions they handle via `@action_specs`:
+
+```elixir
+@action_specs %{
+  @start => %{
+    schema: Zoi.object(%{query: Zoi.string()}),
+    doc: "Start a new conversation",
+    name: "strategy.start"
+  }
+}
+```
+
+## ReAct Strategy
+
+The ReAct (Reason-Act) strategy implements a multi-step reasoning loop with tool use.
+
+### Configuration
 
 ```elixir
 use Jido.Agent,
   name: "my_react_agent",
   strategy: {
     Jido.AI.Strategies.ReAct,
-    tools: [
-      MyApp.Actions.Calculator,
-      MyApp.Actions.Search
-    ],
-    model: "anthropic:claude-sonnet-4-20250514",
-    max_iterations: 10,
-    system_prompt: "You are a helpful assistant..."
+    tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
+    system_prompt: "You are a helpful assistant...",
+    model: "anthropic:claude-haiku-4-5",
+    max_iterations: 10
   }
-
-# Start a conversation
-Agent.dispatch(agent, {:react_user_query, %{query: "What is 2 + 2?"}})
 ```
 
-### Configuration Options
+### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `:tools` | `[module()]` | **required** | List of Jido.Action modules |
-| `:model` | `String.t()` | `"anthropic:claude-haiku-4-5"` | LLM model |
-| `:max_iterations` | `pos_integer()` | `10` | Max reasoning loops |
-| `:system_prompt` | `String.t()` | See below | Custom system prompt |
-| `:use_registry` | `boolean()` | `false` | Also use Tools.Registry |
+| Option | Type | Required | Default | Description |
+|--------|------|----------|---------|-------------|
+| `:tools` | `[module()]` | Yes | - | List of Jido.Action modules |
+| `:system_prompt` | `String.t()` | No | Default prompt | Custom system prompt |
+| `:model` | `String.t()` | No | `claude-haiku-4-5` | Model identifier |
+| `:max_iterations` | `pos_integer()` | No | 10 | Maximum reasoning iterations |
+
+### State Structure
+
+```elixir
+%{
+  status: :idle | :awaiting_llm | :awaiting_tool | :completed | :error,
+  iteration: non_neg_integer(),
+  conversation: [ReqLLM.Message.t()],
+  pending_tool_calls: [%{id: String.t(), name: String.t(), arguments: map(), result: term()}],
+  final_answer: String.t() | nil,
+  current_llm_call_id: String.t() | nil,
+  termination_reason: :final_answer | :max_iterations | :error | nil,
+  config: config()
+}
+```
 
 ### Signal Routes
 
 ```elixir
-"react.user_query"  → :react_start
-"reqllm.result"     → :react_llm_result
-"ai.tool_result"    → :react_tool_result
-"reqllm.partial"    → :react_llm_partial
+def signal_routes(_ctx) do
+  [
+    {"react.user_query", {:strategy_cmd, :react_start}},
+    {"reqllm.result", {:strategy_cmd, :react_llm_result}},
+    {"ai.tool_result", {:strategy_cmd, :react_tool_result}},
+    {"reqllm.partial", {:strategy_cmd, :react_llm_partial}}
+  ]
+end
 ```
 
-### Example: Calculator Agent
+### Dynamic Tool Registration
 
 ```elixir
-defmodule CalculatorAction do
-  use Jido.Action
+# Register a tool at runtime
+Jido.AgentServer.cast(agent_pid, %Jido.Signal{
+  type: "react.register_tool",
+  data: %{tool_module: MyApp.Actions.NewTool}
+})
 
-  @impl true
-  def schema do
-    Zoi.object(%{
-      expression: Zoi.string()
-    })
-  end
-
-  @impl true
-  def run(params, _context) do
-    expr = params["expression"]
-    result = Code.eval_string(expr)
-    {:ok, %{result: elem(result, 0)}}
-  end
-end
-
-defmodule CalculatorAgent do
-  use Jido.Agent,
-    name: "calculator",
-    strategy: {
-      Jido.AI.Strategies.ReAct,
-      tools: [CalculatorAction],
-      max_iterations: 5
-    }
-end
+# Unregister a tool
+Jido.AgentServer.cast(agent_pid, %Jido.Signal{
+  type: "react.unregister_tool",
+  data: %{tool_name: "old_tool"}
+})
 ```
 
----
+## Chain-of-Thought Strategy
 
-## Chain-of-Thought
+The Chain-of-Thought strategy implements step-by-step reasoning.
 
-**Module**: `Jido.AI.Strategies.ChainOfThought`
-
-### Overview
-
-Chain-of-Thought (CoT) breaks down complex problems into explicit step-by-step reasoning. It's simpler than ReAct as it doesn't use tools.
-
-### When to Use
-
-- Mathematical reasoning
-- Logic puzzles
-- Multi-step questions without external tools
-- Tasks requiring explicit reasoning trace
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   Chain-of-Thought Flow                      │
-│                                                              │
-│   Query → LLM (step-by-step) → Extract Steps → Conclusion    │
-│                                                              │
-│   Response format:                                           │
-│   "Step 1: First I need to..."                               │
-│   "Step 2: Then I'll consider..."                            │
-│   "Conclusion: The answer is..."                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### State Machine
-
-States: `idle` → `reasoning` → `completed`/`error`
-
-```elixir
-defmodule Jido.AI.ChainOfThought.Machine do
-  # Messages
-  {:start, prompt, call_id}
-  {:llm_result, call_id, result}
-  {:llm_partial, call_id, delta, chunk_type}
-
-  # Directives
-  {:call_llm_stream, id, conversation}
-end
-```
-
-### Usage
+### Configuration
 
 ```elixir
 use Jido.Agent,
-  name: "math_solver",
+  name: "my_cot_agent",
   strategy: {
     Jido.AI.Strategies.ChainOfThought,
-    model: "anthropic:claude-sonnet-4-20250514",
-    system_prompt: "You are a mathematician. Think step by step."
+    system_prompt: "Think step by step...",
+    model: "anthropic:claude-haiku-4-5"
   }
-
-# Get reasoning steps
-steps = ChainOfThought.get_steps(agent)
-conclusion = ChainOfThought.get_conclusion(agent)
 ```
 
-### Helper Functions
+### State Structure
 
 ```elixir
-# Extract steps from response
-{:ok, result} = ChainOfThought.Machine.extract_steps(response_text)
-
-# Get formatted steps
-steps = ChainOfThought.get_steps(agent)
-# => [%{number: 1, content: "First, ..."}, ...]
-
-# Get conclusion
-conclusion = ChainOfThought.get_conclusion(agent)
-# => "The answer is 42"
+%{
+  status: :idle | :thinking | :completed | :error,
+  reasoning_steps: [String.t()],
+  final_answer: String.t() | nil
+}
 ```
 
----
+## Tree-of-Thoughts Strategy
 
-## Tree-of-Thoughts
+The Tree-of-Thoughts strategy implements branching exploration with thought evaluation.
 
-**Module**: `Jido.AI.Strategies.TreeOfThoughts`
-
-### Overview
-
-Tree-of-Thoughts (ToT) explores multiple reasoning paths simultaneously, evaluating each and expanding the most promising branches. Like search algorithms (BFS, DFS, best-first).
-
-### When to Use
-
-- Puzzles and games
-- Planning and scheduling
-- Creative writing with options
-- Complex reasoning requiring exploration
-
-### Architecture
-
-```
-                    Root (Query)
-                       │
-           ┌───────────┼───────────┐
-           ▼           ▼           ▼
-        Thought A   Thought B   Thought C
-           │           │           │
-       ┌───┴───┐       │       ┌───┴───┐
-       ▼       ▼       ▼       ▼       ▼
-    A1      A2      B1      C1      C2
-       │       │       │
-       ▼       ▼       ▼
-     A1a     A2a     B1a
-
-    Traverse: Best node selection → Solution path
-```
-
-### State Machine
-
-Features branching exploration with evaluation:
-
-```elixir
-# Configuration
-branching_factor: 3  # Thoughts per node
-max_depth: 4          # Max tree depth
-traversal_strategy: :best_first | :bfs | :dfs
-```
-
-### Usage
+### Configuration
 
 ```elixir
 use Jido.Agent,
-  name: "puzzle_solver",
+  name: "my_tot_agent",
   strategy: {
     Jido.AI.Strategies.TreeOfThoughts,
-    model: "anthropic:claude-sonnet-4-20250514",
     branching_factor: 3,
     max_depth: 4,
-    traversal_strategy: :best_first
+    traversal_strategy: :best_first,  # :bfs, :dfs, :best_first
+    model: "anthropic:claude-haiku-4-5"
   }
-
-# Get solution path
-solution_path = TreeOfThoughts.get_solution_path(agent)
-# => ["root", "thought_2", "thought_2_1", "thought_2_1_a"]
-
-# Get best node
-best_node = TreeOfThoughts.get_best_node(agent)
 ```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `:branching_factor` | `integer()` | 3 | Thoughts to generate per step |
+| `:max_depth` | `integer()` | 4 | Maximum reasoning depth |
+| `:traversal_strategy` | `atom()` | `:best_first` | How to traverse thoughts |
 
 ### Traversal Strategies
 
-| Strategy | Description | Use When |
-|----------|-------------|----------|
-| `:bfs` | Breadth-first search | All paths equally important |
-| `:dfs` | Depth-first search | Deep exploration needed |
-| `:best_first` | Best score first | Quality-based selection (default) |
+- `:bfs` - Breadth-first search: explores all thoughts at current depth before going deeper
+- `:dfs` - Depth-first search: explores each branch completely before backtracking
+- `:best_first` - Best-first search: always explores the highest-scoring thought first
 
----
+## Graph-of-Thoughts Strategy
 
-## Graph-of-Thoughts
+The Graph-of-Thoughts strategy implements graph-based reasoning with thought aggregation.
 
-**Module**: `Jido.AI.Strategies.GraphOfThoughts`
-
-### Overview
-
-Graph-of-Thoughts (GoT) extends Tree-of-Thoughts by allowing nodes to have multiple parents, enabling synthesis of competing ideas and multi-perspective analysis.
-
-### When to Use
-
-- Problems requiring synthesis of competing ideas
-- Multi-perspective analysis
-- Complex causal reasoning
-- Knowledge integration from multiple sources
-
-### Architecture
-
-```
-      ┌──────────────┐
-      │   Query     │
-      └──────┬───────┘
-             │
-    ┌────────┴────────┐
-    ▼                 ▼
-Thought A         Thought B
-    │                 │
-    └────────┬────────┘
-             ▼
-      Synthesis Node
-    (combines A + B)
-             │
-             ▼
-        Conclusion
-```
-
-### Key Differences from ToT
-
-| Feature | Tree-of-Thoughts | Graph-of-Thoughts |
-|---------|------------------|-------------------|
-| Structure | Tree (each node has 1 parent) | Graph (nodes can have multiple parents) |
-| Aggregation | Sequential | Synthesis of multiple thoughts |
-| Best For | Search problems | Synthesis and integration |
-
-### Usage
+### Configuration
 
 ```elixir
 use Jido.Agent,
-  name: "analyst",
+  name: "my_got_agent",
   strategy: {
     Jido.AI.Strategies.GraphOfThoughts,
-    model: "anthropic:claude-sonnet-4-20250514",
-    max_nodes: 20,
-    max_depth: 5,
-    aggregation_strategy: :synthesis
+    branching_factor: 3,
+    max_depth: 4,
+    aggregation_method: :weighted_vote,  # :majority_vote, :weighted_vote
+    model: "anthropic:claude-haiku-4-5"
   }
-
-# Get all nodes and edges
-nodes = GraphOfThoughts.get_nodes(agent)
-edges = GraphOfThoughts.get_edges(agent)
-
-# Get best solution
-best = GraphOfThoughts.get_best_node(agent)
-solution_path = GraphOfThoughts.get_solution_path(agent)
 ```
 
-### Aggregation Strategies
+### Key Differences from Tree-of-Thoughts
 
-| Strategy | Description |
-|----------|-------------|
-| `:voting` | Majority vote among thoughts |
-| `:weighted` | Weighted by quality scores |
-| `:synthesis` | LLM synthesizes combined answer (default) |
+- Thoughts can have multiple parents (graph vs tree)
+- Supports thought aggregation and synthesis
+- Better for multi-perspective analysis
 
----
+## TRM Strategy
 
-## TRM (Tiny-Recursive-Model)
+The TRM (Thought-Refine-Merge) strategy implements iterative reasoning with supervision.
 
-**Module**: `Jido.AI.Strategies.TRM`
-
-### Overview
-
-TRM (Tiny-Recursive-Model) iteratively improves answers through a **reason-supervise-improve** cycle. Each iteration generates insights, evaluates quality, and applies feedback.
-
-### When to Use
-
-- Tasks requiring iterative refinement
-- Quality-critical outputs
-- Complex reasoning needing self-correction
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                       TRM Loop                               │
-│                                                              │
-│   ┌─────────┐     ┌──────────┐     ┌──────────┐            │
-│   │ Reason  │ ──▶ │Supervise │ ──▶ │ Improve  │            │
-│   │         │     │          │     │          │            │
-│   │ Generate│     │Evaluate  │     │ Apply    │            │
-│   │ insights│     │ quality  │     │ feedback │            │
-│   └─────────┘     └──────────┘     └──────────┘            │
-│        │                                   │                │
-│        └───────────────────┬───────────────┘                │
-│                            ▼                                │
-│                     Check confidence                        │
-│                            │                                │
-│                ┌───────────┴───────────┐                    │
-│                ▼                       ▼                    │
-│            Above threshold        Below/Max steps           │
-│                │                       │                    │
-│                ▼                       ▼                    │
-│            Return result           Continue loop            │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### State Machine
-
-Three-phase cycle with ACT (Adaptive Computational Time):
-
-```elixir
-# Phases
-:reasoning   # Generate insights about current answer
-:supervising  # Evaluate quality and provide feedback
-:improving    # Apply feedback to improve answer
-
-# ACT (Adaptive Computational Time)
-act_threshold: 0.9  # Stop if confidence above this
-max_supervision_steps: 5  # Max iterations
-```
-
-### Usage
+### Configuration
 
 ```elixir
 use Jido.Agent,
-  name: "writer",
+  name: "my_trm_agent",
   strategy: {
     Jido.AI.Strategies.TRM,
-    model: "anthropic:claude-sonnet-4-20250514",
-    max_supervision_steps: 5,
-    act_threshold: 0.9
+    max_refinements: 3,
+    supervision_mode: :automatic,  # :automatic, :manual
+    model: "anthropic:claude-haiku-4-5"
   }
-
-# Get improvement history
-answer_history = TRM.get_answer_history(agent)
-best_answer = TRM.get_best_answer(agent)
-confidence = TRM.get_confidence(agent)
-step = TRM.get_supervision_step(agent)
 ```
 
-### TRM Prompts
+### TRM States
 
-Each phase has specialized prompts:
-
-```elixir
-# Default prompts (available for reference)
-TRM.default_reasoning_prompt()    # Initial reasoning
-TRM.default_supervision_prompt()  # Quality evaluation
-TRM.default_improvement_prompt()  # Feedback application
-```
-
----
+| State | Description |
+|-------|-------------|
+| `:act` | Generate initial thoughts |
+| `:reasoning` | Refine thoughts through reasoning |
+| `:supervision` | Evaluate and select best thoughts |
+| `:merge` | Merge selected thoughts |
 
 ## Adaptive Strategy
 
-**Module**: `Jido.AI.Strategies.Adaptive`
+The Adaptive strategy automatically selects the best strategy based on task characteristics.
 
-### Overview
-
-The Adaptive strategy automatically selects the best reasoning strategy based on task characteristics (complexity, tool requirements, etc.).
-
-### When to Use
-
-- Uncertain which strategy to use
-- Diverse task types
-- Production environments needing flexibility
-
-### Usage
+### Configuration
 
 ```elixir
 use Jido.Agent,
-  name: "adaptive_agent",
+  name: "my_adaptive_agent",
   strategy: {
     Jido.AI.Strategies.Adaptive,
-    available_strategies: [
-      {Jido.AI.Strategies.ChainOfThought, simple: true},
-      {Jido.AI.Strategies.ReAct, tools: true},
-      {Jido.AI.Strategies.TreeOfThoughts, complex: true}
-    ],
-    selection_criteria: :automatic
+    strategies: [:react, :cot, :tot, :got],
+    model: "anthropic:claude-haiku-4-5",
+    tools: [MyApp.Actions.Calculator]
   }
 ```
 
----
+### Strategy Selection Logic
 
-## Strategy Comparison
+```elixir
+defp select_strategy(prompt, config) do
+  cond do
+    has_tool_keywords?(prompt) and config[:tools] != [] ->
+      :react
 
-### Decision Tree
+    has_synthesis_keywords?(prompt) ->
+      :got
 
-```
-Need tools?
-├─ Yes → ReAct
-└─ No
-    ├─ Multi-path exploration?
-    │   ├─ Yes → Tree-of-Thoughts (search) or Graph-of-Thoughts (synthesis)
-    │   └─ No → Iterative improvement needed?
-    │       ├─ Yes → TRM
-    │       └─ No → Chain-of-Thought
-```
+    has_exploration_keywords?(prompt) ->
+      :tot
 
-### Complexity vs Capability
+    needs_iteration?(prompt) ->
+      :trm
 
-```
-High ┃    ┌──────────┐
-     ┃    │ GoT, ToT │  Complex reasoning
-Capability├──────────┤
-     ┃    │   TRM    │  Iterative improvement
-     ┃    ├──────────┤
-     ┃    │   ReAct  │  Tool-based reasoning
-     ┃    ├──────────┤
-Low  ┃    │   CoT    │  Step-by-step reasoning
-     └────────────────────────────────────────
-        Low    Medium    High
-               Complexity
+    true ->
+      :cot
+  end
+end
 ```
 
----
+### Keywords for Selection
+
+| Strategy | Keywords |
+|----------|----------|
+| ReAct | "use", "call", "execute", "tool", "function" |
+| GoT | "combine", "synthesize", "merge", "perspectives" |
+| ToT | "explore", "alternatives", "options", "branches" |
+| TRM | "refine", "improve", "iterate", "supervise" |
+| CoT | Default fallback |
+
+## StateOpsHelpers
+
+The `StateOpsHelpers` module provides helper functions for creating state operations.
+
+```elixir
+alias Jido.AI.Strategy.StateOpsHelpers
+
+# Update strategy state
+StateOpsHelpers.update_strategy_state(%{status: :awaiting_llm})
+
+# Set iteration
+StateOpsHelpers.set_iteration(3)
+
+# Set iteration status
+StateOpsHelpers.set_iteration_status(:completed)
+
+# Append to conversation
+StateOpsHelpers.append_conversation([%{role: :user, content: "Hello"}])
+
+# Set pending tools
+StateOpsHelpers.set_pending_tools([
+  %{id: "tc_1", name: "calculator", arguments: %{a: 1, b: 2}}
+])
+
+# Clear pending tools
+StateOpsHelpers.clear_pending_tools()
+
+# Update config
+StateOpsHelpers.update_config(%{model: "new:model"})
+
+# Set final answer
+StateOpsHelpers.set_final_answer("42")
+
+# Set termination reason
+StateOpsHelpers.set_termination_reason(:final_answer)
+```
 
 ## Creating Custom Strategies
 
-### Strategy Boilerplate
-
-All strategies follow the same pattern:
+To create a custom strategy:
 
 ```elixir
-defmodule Jido.AI.Strategies.MyCustom do
-  @moduledoc """
-  Custom strategy description...
-  """
-
+defmodule MyApp.Strategies.MyStrategy do
   use Jido.Agent.Strategy
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.MyCustom.Machine
 
-  @start :my_start
-  @llm_result :my_llm_result
+  # Define your state machine
+  defmodule Machine do
+    use Fsmx.Struct,
+      state_field: :status,
+      transitions: %{
+        "idle" => ["processing", "completed"],
+        "processing" => ["completed", "error"],
+        "completed" => [],
+        "error" => []
+      }
 
-  @action_specs %{
-    @start => %{
-      schema: Zoi.object(%{prompt: Zoi.string()}),
-      doc: "Start custom reasoning",
-      name: "my.start"
-    },
-    @llm_result => %{
-      schema: Zoi.object(%{call_id: Zoi.string(), result: Zoi.any()}),
-      doc: "Handle LLM response",
-      name: "my.llm_result"
-    }
-  }
+    defstruct status: "idle",
+              iteration: 0,
+              result: nil
 
-  @impl true
-  def action_spec(action), do: Map.get(@action_specs, action)
+    def new, do: %__MODULE__{}
 
-  @impl true
-  def signal_routes(_ctx) do
-    [
-      {"my.query", {:strategy_cmd, @start}},
-      {"reqllm.result", {:strategy_cmd, @llm_result}}
-    ]
+    def update(machine, {:start, input}, _env) do
+      # Process input and return {machine, directives}
+    end
+
+    def to_map(%__MODULE__{} = machine), do: Map.from_struct(machine)
+    def from_map(map), do: struct(__MODULE__, map)
   end
 
+  # Implement strategy callbacks
+
   @impl true
-  def init(%Agent{} = agent, ctx) do
-    config = build_config(agent, ctx)
+  def init(%Agent{} = agent, _ctx) do
     machine = Machine.new()
-
-    state =
-      machine
-      |> Machine.to_map()
-      |> Map.put(:config, config)
-
-    agent = StratState.put(agent, state)
-    {agent, []}
+    state = StratState.put(agent, Machine.to_map(machine))
+    {state, []}
   end
 
   @impl true
   def cmd(%Agent{} = agent, instructions, _ctx) do
-    # Process instructions
-    # Update machine state
-    # Return {agent, directives}
+    state_map = StratState.get(agent, %{})
+    machine = Machine.from_map(state_map)
+
+    {machine, directives} =
+      Enum.reduce(instructions, {machine, []}, fn instr, {m, dirs} ->
+        case process_instruction(m, instr) do
+          {new_machine, new_dirs} -> {new_machine, dirs ++ new_dirs}
+          :noop -> {m, dirs}
+        end
+      end)
+
+    agent = StratState.put(agent, Machine.to_map(machine))
+    {agent, directives}
   end
 
   @impl true
-  def snapshot(%Agent{} = agent, _ctx) do
-    # Return strategy snapshot
+  def signal_routes(_ctx) do
+    [
+      {"my.signal", {:strategy_cmd, :my_action}}
+    ]
   end
 
-  # Private helpers...
-end
-```
-
-### State Machine Pattern
-
-```elixir
-defmodule Jido.AI.MyCustom.Machine do
-  use Fsmx.Struct,
-    state_field: :status,
-    transitions: %{
-      "idle" => ["processing"],
-      "processing" => ["completed", "error"],
-      "completed" => [],
-      "error" => []
+  @impl true
+  def action_spec(:my_action) do
+    %{
+      schema: Zoi.object(%{input: Zoi.string()}),
+      doc: "Process an input",
+      name: "my_strategy.process"
     }
-
-  defstruct status: "idle",
-            result: nil,
-            started_at: nil
-
-  @type t :: %__MODULE__{
-          status: String.t(),
-          result: term(),
-          started_at: integer() | nil
-        }
-
-  def new, do: %__MODULE__{}
-
-  def update(machine, {:start, prompt, call_id}, env) do
-    # Handle start message
-    # Return {machine, directives}
   end
 
-  def update(machine, {:llm_result, call_id, result}, env) do
-    # Handle LLM result
-    # Return {machine, directives}
-  end
+  def action_spec(_), do: nil
 
-  def to_map(%__MODULE__{} = machine), do: Map.from_struct(machine)
-  def from_map(map) when is_map(map), do: struct(__MODULE__, map)
+  @impl true
+  def snapshot(%Agent{} = agent, _ctx) do
+    state_map = StratState.get(agent, %{})
+    status = state_map[:status] || :idle
+
+    %Jido.Agent.Strategy.Snapshot{
+      status: status,
+      done?: status in [:completed, :error],
+      result: state_map[:result]
+    }
+  end
 end
 ```
 
-### Key Implementation Points
+## Next Steps
 
-1. **Use Fsmx** for state machine transitions
-2. **Pure functions** in state machine (no side effects)
-3. **Directives** describe effects; don't execute them
-4. **Signal routes** define automatic message routing
-5. **Snapshot** provides state inspection
-
----
-
-## Related Guides
-
-- [Architecture Overview](./01_architecture_overview.md) - System architecture
-- [State Machines Guide](./03_state_machines.md) - State machine patterns
-- [Directives Guide](./04_directives.md) - Directive system
-- [Signals Guide](./05_signals.md) - Signal types and routing
-- [Tool System Guide](./06_tool_system.md) - Tool registry and execution
+- [State Machines Guide](./03_state_machines.md) - Pure state machine patterns
+- [Directives Guide](./04_directives.md) - Side effects and execution
+- [Tool System Guide](./06_tool_system.md) - Tool execution

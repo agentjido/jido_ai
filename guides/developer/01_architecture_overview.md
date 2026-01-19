@@ -1,354 +1,352 @@
 # Jido.AI Architecture Overview
 
-**Jido.AI** is the AI integration layer for the Jido ecosystem, providing LLM orchestration capabilities for building sophisticated AI agents.
+This guide provides a comprehensive overview of the Jido.AI architecture, its core components, and how they work together to build AI-powered agents.
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Core Principles](#core-principles)
-3. [Architecture](#architecture)
-4. [Component Relationships](#component-relationships)
-5. [Data Flows](#data-flows)
-6. [Directory Structure](#directory-structure)
-7. [Related Guides](#related-guides)
+- [Introduction](#introduction)
+- [Design Principles](#design-principles)
+- [Architecture Diagram](#architecture-diagram)
+- [Core Components](#core-components)
+- [Data Flow](#data-flow)
+- [Key Patterns](#key-patterns)
 
----
+## Introduction
 
-## Overview
+Jido.AI is the **AI integration layer** for the Jido ecosystem. It provides a unified interface for AI interactions built on [ReqLLM](https://hex.pm/packages/req_llm) and integrated with the Jido action framework.
 
-Jido.AI provides:
+### What Jido.AI Provides
 
-- **Multi-Strategy Reasoning**: ReAct, Chain-of-Thought, Graph-of-Thoughts, Tree-of-Thoughts, TRM, Adaptive
-- **Tool Execution**: Unified tool system with registry and executor
-- **Prompt Optimization**: GEPA (Genetic-Pareto Prompt Evolution) for automated prompt improvement
-- **Streaming Support**: Real-time streaming of LLM responses
-- **Extensibility**: Plugin architecture for custom strategies and tools
+- **Multi-LLM Support**: Anthropic, OpenAI, Google, and other providers through ReqLLM
+- **Reasoning Strategies**: ReAct, Chain-of-Thought, Tree-of-Thought, Graph-of-Thought, TRM, and Adaptive
+- **Tool System**: Execute Jido.Actions as tools for LLMs
+- **State Management**: Pure state machines for predictable agent behavior
+- **Signal-Driven Architecture**: Event-based communication between components
+- **Skill Framework**: Modular capabilities (LLM, Planning, Reasoning, ToolCalling, Streaming)
 
----
+## Design Principles
 
-## Core Principles
+1. **Pure State Machines**: All reasoning strategies use pure functional state machines
+2. **Directive Pattern**: Declarative side effects separate from business logic
+3. **Signal-Driven Communication**: Components communicate via typed signals
+4. **Composability**: Skills and strategies are composable building blocks
+5. **Type Safety**: Zoi schemas and TypeSpecs throughout
+6. **Observability**: Built-in telemetry and usage tracking
 
-### 1. Separation of Concerns
+## Architecture Diagram
 
+```mermaid
+graph TB
+    subgraph "Agent Layer"
+        Agent[Jido.Agent]
+        AgentServer[AgentServer Runtime]
+    end
+
+    subgraph "Strategy Layer"
+        ReAct[ReAct Strategy]
+        CoT[Chain-of-Thought]
+        ToT[Tree-of-Thought]
+        GoT[Graph-of-Thought]
+        Adaptive[Adaptive Strategy]
+    end
+
+    subgraph "State Machine Layer"
+        ReActMachine[ReAct.Machine]
+        CoTMachine[ChainOfThought.Machine]
+        ToTMachine[TreeOfThoughts.Machine]
+        GoTMachine[GraphOfThoughts.Machine]
+    end
+
+    subgraph "Directive Layer"
+        ReqLLMStream[ReqLLMStream]
+        ToolExec[ToolExec]
+        ReqLLMGenerate[ReqLLMGenerate]
+        ReqLLMEmbed[ReqLLMEmbed]
+    end
+
+    subgraph "Tool Layer"
+        Registry[Tools.Registry]
+        Executor[Tools.Executor]
+        ToolAdapter[ToolAdapter]
+    end
+
+    subgraph "Signal Layer"
+        ReqLLMResult[ReqLLMResult]
+        ReqLLMPartial[ReqLLMPartial]
+        ToolResult[ToolResult]
+    end
+
+    subgraph "Skill Layer"
+        LLM[LLM Skill]
+        Planning[Planning Skill]
+        Reasoning[Reasoning Skill]
+        ToolCalling[ToolCalling Skill]
+        Streaming[Streaming Skill]
+    end
+
+    Agent --> AgentServer
+    AgentServer --> ReAct
+    AgentServer --> CoT
+    AgentServer --> Adaptive
+
+    ReAct --> ReActMachine
+    CoT --> CoTMachine
+    ToT --> ToTMachine
+    GoT --> GoTMachine
+
+    ReActMachine --> ReqLLMStream
+    ReActMachine --> ToolExec
+
+    ToolExec --> Registry
+    ToolExec --> Executor
+    Registry --> ToolAdapter
+
+    ReqLLMStream --> ReqLLMResult
+    ReqLLMStream --> ReqLLMPartial
+    Executor --> ToolResult
+
+    ReqLLMResult --> ReActMachine
+    ToolResult --> ReActMachine
+    ReqLLMPartial --> ReActMachine
+
+    Agent --> LLM
+    Agent --> Planning
+    Agent --> ToolCalling
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Strategy      │────▶│  State Machine  │────▶│   Directives    │
-│   (Orchestration)│     │   (Pure Logic)  │     │  (Effects)       │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-```
 
-- **Strategies**: Orchestrate agent behavior, handle I/O
-- **State Machines**: Pure functional logic, no side effects
-- **Directives**: Describe external effects (LLM calls, tool execution)
+## Core Components
 
-### 2. Pure State Machines
+### 1. Facade Layer (`Jido.AI`)
 
-All strategies use Fsmx-based state machines:
+The main entry point for AI interactions. Provides simple functions for text generation and structured output.
 
 ```elixir
-# Pure state transitions
-{machine, directives} = Machine.update(machine, message, env)
+# Generate text
+{:ok, response} = Jido.AI.generate_text("anthropic:claude-haiku-4-5", "Hello!")
 
-# No side effects in machine
-# All effects described in directives
+# Generate structured output
+schema = Zoi.object(%{name: Zoi.string(), age: Zoi.integer()})
+{:ok, person} = Jido.AI.generate_object("openai:gpt-4", "Generate a person", schema)
 ```
 
-### 3. Type Safety
+### 2. Strategy Layer (`Jido.AI.Strategies.*`)
 
-- **Zoi schemas** for parameter validation
-- **TypeSpecs** for all public functions
-- **Structured errors** via Splode
+Strategies implement different reasoning patterns. Each strategy:
 
-### 4. Observability
+- Implements the `Jido.Agent.Strategy` behavior
+- Uses a pure state machine for state transitions
+- Returns directives describing side effects
+- Routes signals to appropriate commands
 
-Comprehensive telemetry throughout:
+| Strategy | Description | Use Case |
+|----------|-------------|----------|
+| `ReAct` | Reason-Act loop with tools | Multi-step reasoning with tool use |
+| `ChainOfThought` | Step-by-step reasoning | Math, logic, common sense |
+| `TreeOfThoughts` | Branching exploration | Puzzles, planning, creative writing |
+| `GraphOfThoughts` | Graph-based reasoning | Multi-perspective analysis |
+| `Adaptive` | Automatic strategy selection | Dynamic task routing |
+
+### 3. State Machine Layer (`Jido.AI.*.Machine`)
+
+Pure state machines using [Fsmx](https://hex.pm/packages/fsmx). Each machine:
+
+- Has defined states and transitions
+- Processes messages and returns directives
+- Emits telemetry events
+- Has no side effects (pure functional)
+
+**ReAct Machine States:**
+- `:idle` - Initial state, waiting for query
+- `:awaiting_llm` - Waiting for LLM response
+- `:awaiting_tool` - Waiting for tool execution
+- `:completed` - Conversation complete
+- `:error` - Error state
+
+### 4. Directive Layer (`Jido.AI.Directive.*`)
+
+Directives are declarative descriptions of side effects. The AgentServer runtime executes them.
+
+| Directive | Purpose |
+|-----------|---------|
+| `ReqLLMStream` | Stream LLM response with tools |
+| `ReqLLMGenerate` | Non-streaming text generation |
+| `ReqLLMEmbed` | Generate embeddings |
+| `ToolExec` | Execute a tool (Jido.Action) |
 
 ```elixir
-:telemetry.execute([:jido, :ai, :event], measurements, metadata)
+# Create an LLM streaming directive
+directive = Directive.ReqLLMStream.new!(%{
+  id: "call_123",
+  model: "anthropic:claude-haiku-4-5",
+  context: messages,
+  tools: tools
+})
 ```
 
----
+### 5. Tool System (`Jido.AI.Tools.*`)
 
-## Architecture
+The tool system bridges Jido.Actions and LLM tool calling.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Jido.AI Architecture                          │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         Strategy Layer                               │   │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │   │
-│  │  │  ReAct   │ │    CoT   │ │    GoT   │ │    ToT   │ │   TRM    │  │   │
-│  │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘  │   │
-│  └───────┼────────────┼────────────┼────────────┼────────────┼──────────┘   │
-│          │            │            │            │            │            │
-│          ▼            ▼            ▼            ▼            ▼            │
-│  ┌──────────────────────────────────────────────────────────────────────┐ │
-│  │                        State Machine Layer                           │ │
-│  │  Pure functional state machines (Fsmx)                               │ │
-│  └──────────────────────────────────────────────────────────────────────┘ │
-│                                  │                                        │
-│                                  ▼                                        │
-│  ┌──────────────────────────────────────────────────────────────────────┐ │
-│  │                          Directive Layer                             │ │
-│  │  ReqLLMStream │ ToolExec │ ReqLLMGenerate │ ReqLLMEmbed             │ │
-│  └──────────────────────────────────────────────────────────────────────┘ │
-│                                  │                                        │
-│                                  ▼                                        │
-│  ┌──────────────────────────────────────────────────────────────────────┐ │
-│  │                           Signal Layer                               │ │
-│  │  ReqLLMResult │ ReqLLMPartial │ ToolResult │ UsageReport            │ │
-│  └──────────────────────────────────────────────────────────────────────┘ │
-│                                  │                                        │
-│                                  ▼                                        │
-│  ┌──────────────────────────────────────────────────────────────────────┐ │
-│  │                           Tool System                                │ │
-│  │  Registry │ Executor │ ToolAdapter │ ToolBase                      │ │
-│  └──────────────────────────────────────────────────────────────────────┘ │
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐ │
-│  │                          GEPA System                                 │ │
-│  │  Optimizer │ Evaluator │ Reflector │ Selection │ PromptVariant       │ │
-│  └──────────────────────────────────────────────────────────────────────┘ │
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐ │
-│  │                          Skills System                               │ │
-│  │  LLM │ Planning │ Reasoning │ Streaming │ ToolCalling               │ │
-│  └──────────────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Component Relationships
-
-### Strategy → State Machine → Directive Flow
+| Module | Purpose |
+|--------|---------|
+| `Registry` | Unified registry for Actions and Tools |
+| `Executor` | Consistent tool execution with normalization |
+| `ToolAdapter` | Converts Actions to ReqLLM.Tool format |
+| `Tool` | Behavior for custom tool implementations |
 
 ```elixir
-# 1. Strategy receives instruction
-def cmd(agent, instructions, _ctx) do
-  # 2. Convert to machine message
-  msg = to_machine_msg(instruction)
+# Register tools
+Registry.register(MyApp.Actions.Calculator)
+Registry.register(MyApp.Tools.Search)
 
-  # 3. Update state machine
-  {machine, directives} = Machine.update(machine, msg, env)
+# Lookup and execute
+{:ok, {:action, module}} = Registry.get("calculator")
+{:ok, result} = Executor.execute("calculator", %{a: 1, b: 2, operation: "add"})
+```
 
-  # 4. Convert directives to SDK structs
-  sdk_directives = lift_directives(directives, config)
+### 6. Signal Layer (`Jido.AI.Signal.*`)
 
-  {agent, sdk_directives}
+Typed signals for event-driven communication.
+
+| Signal | Type | Purpose |
+|--------|------|---------|
+| `ReqLLMResult` | `reqllm.result` | LLM call completed |
+| `ReqLLMPartial` | `reqllm.partial` | Streaming token chunk |
+| `ReqLLMError` | `reqllm.error` | Structured error |
+| `ToolResult` | `ai.tool_result` | Tool execution completed |
+| `EmbedResult` | `ai.embed_result` | Embedding generated |
+| `UsageReport` | `ai.usage_report` | Token usage tracking |
+
+### 7. Skill Framework (`Jido.AI.Skills.*`)
+
+Skills provide modular capabilities. Each skill:
+
+- Contains related actions
+- Implements lifecycle callbacks
+- Has its own Zoi schema for configuration
+
+| Skill | Actions |
+|-------|---------|
+| `LLM` | Chat, Complete, Embed |
+| `Planning` | Plan, Decompose, Prioritize |
+| `Reasoning` | Analyze, Explain, Infer |
+| `ToolCalling` | CallWithTools, ExecuteTool, ListTools |
+| `Streaming` | StartStream, ProcessTokens, EndStream |
+
+## Data Flow
+
+### ReAct Agent Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Agent as Jido.Agent
+    participant Strategy as ReAct Strategy
+    participant Machine as ReAct.Machine
+    participant Runtime as AgentServer
+    participant LLM as ReqLLM
+    participant Tool as Tool.Exec
+
+    User->>Agent: Send query
+    Agent->>Strategy: cmd(:react_start, query)
+    Strategy->>Machine: update({:start, query})
+    Machine-->>Strategy: {:call_llm_stream, id, context}
+    Strategy->>Runtime: Directive.ReqLLMStream
+
+    Runtime->>LLM: stream_text(model, context)
+    LLM-->>Runtime: Streaming tokens
+    Runtime->>Agent: Signal.ReqLLMPartial (each token)
+    Agent->>Strategy: signal_routes(reqllm.partial)
+    Strategy->>Machine: update({:llm_partial, delta})
+    Machine-->>Strategy: :ok (state updated)
+
+    LLM-->>Runtime: Final response (tool calls)
+    Runtime->>Agent: Signal.ReqLLMResult (tool_calls)
+    Agent->>Strategy: signal_routes(reqllm.result)
+    Strategy->>Machine: update({:llm_result, tool_calls})
+    Machine-->>Strategy: {:exec_tool, id, name, args}
+    Strategy->>Runtime: Directive.ToolExec
+
+    Runtime->>Tool: execute(tool_name, arguments)
+    Tool-->>Runtime: Result
+    Runtime->>Agent: Signal.ToolResult
+    Agent->>Strategy: signal_routes(ai.tool_result)
+    Strategy->>Machine: update({:tool_result, result})
+    Machine-->>Strategy: {:call_llm_stream, id, context}
+
+    Note over Runtime: Loop continues until final_answer
+```
+
+## Key Patterns
+
+### 1. Strategy Pattern
+
+Different reasoning strategies can be swapped without changing agent code:
+
+```elixir
+use Jido.Agent,
+  name: "my_agent",
+  strategy: {Jido.AI.Strategies.ReAct, [tools: [Calculator], model: :fast]}
+
+# Or swap to Adaptive for automatic strategy selection
+use Jido.Agent,
+  name: "my_agent",
+  strategy: {Jido.AI.Strategies.Adaptive, [tools: [Calculator], model: :fast]}
+```
+
+### 2. Directive Pattern
+
+Strategies return directives describing what to do, not doing it themselves:
+
+```elixir
+# Strategy returns a directive
+{:exec_tool, id, "calculator", %{a: 1, b: 2, operation: "add"}}
+
+# Runtime executes it via DirectiveExec protocol
+defimpl Jido.AgentServer.DirectiveExec, for: Directive.ToolExec do
+  def exec(directive, _input_signal, state) do
+    # Execute tool asynchronously
+    # Send result back as Signal.ToolResult
+  end
 end
 ```
 
-### Signal Flow
+### 3. Signal Routing
+
+Strategies declare which signals they handle:
 
 ```elixir
-# 1. Strategy defines signal routes
 def signal_routes(_ctx) do
   [
-    {"reqllm.result", {:strategy_cmd, :react_llm_result}},
-    {"ai.tool_result", {:strategy_cmd, :react_tool_result}}
+    {"react.user_query", {:strategy_cmd, @start}},
+    {"reqllm.result", {:strategy_cmd, @llm_result}},
+    {"ai.tool_result", {:strategy_cmd, @tool_result}},
+    {"reqllm.partial", {:strategy_cmd, @llm_partial}}
   ]
 end
-
-# 2. AgentServer routes signals automatically
-# 3. Strategy receives as instruction
 ```
 
-### Tool Execution Flow
+### 4. Pure State Machines
 
-```
-┌──────────────┐
-│ Strategy     │ Issues ToolExec directive
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│ AgentServer  │ Executes directive
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│ Executor     │ Normalizes params, calls action
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│ Jido.Action  │ User-defined action
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐
-│ ToolResult   │ Signal sent back
-│ Signal       │
-└──────────────┘
+State transitions are pure functions returning directives:
+
+```elixir
+def update(%__MODULE__{status: "idle"} = machine, {:start, query, call_id}, env) do
+  conversation = [system_message(system_prompt), user_message(query)]
+
+  with_transition(machine, "awaiting_llm", fn machine ->
+    machine = %{machine | conversation: conversation, iteration: 1}
+    {machine, [{:call_llm_stream, call_id, conversation}]}
+  end)
+end
 ```
 
----
+## Next Steps
 
-## Data Flows
-
-### ReAct Reasoning Flow
-
-```
-User Query
-    │
-    ▼
-┌─────────────────┐
-│ ReAct Strategy  │ Start with query
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐     call_llm_stream
-│ ReAct Machine   │─────────────────────▶ LLM
-└────────┬────────┘
-         │
-         │ ◀─ tool_calls ────────────────┤
-         │
-         ▼
-┌─────────────────┐     exec_tool
-│ ToolExec        │─────────────────────▶ Tool
-└────────┬────────┘
-         │
-         │ ◀─ tool_result ───────────────┤
-         │
-         ▼
-    Loop until final_answer
-```
-
-### Chain-of-Thought Flow
-
-```
-User Query
-    │
-    ▼
-┌─────────────────────┐
-│ CoT Strategy        │ "Think step by step"
-└────────┬────────────┘
-         │
-         ▼
-┌─────────────────────┐     call_llm_stream
-│ CoT Machine         │─────────────────────▶ LLM
-└────────┬────────────┘
-         │
-         │ ◀─ reasoning with steps ───────┤
-         │
-         ▼
-┌─────────────────────┐
-│ Extract Steps       │ Parse "Step 1:", "Step 2:"
-└────────┬────────────┘
-         │
-         ▼
-┌─────────────────────┐
-│ Format Conclusion   │ "Conclusion: ..."
-└─────────────────────┘
-```
-
-### GEPA Optimization Flow
-
-```
-Initial Prompt
-    │
-    ▼
-┌─────────────────────┐
-│ GEPA Optimizer      │
-└────────┬────────────┘
-         │
-         ▼
-┌─────────────────────┐     Evaluate     ┌──────────────┐
-│ Reflector           │─────────────────▶│ Evaluator    │
-│ (Mutate/Crossover)  │                 │ (Test tasks) │
-└─────────────────────┘                 └──────┬───────┘
-         │                                         │
-         │                                         │
-         ▼                                         ▼
-┌─────────────────────┐     Select       ┌──────────────┐
-│ Selection           │◀────────────────│ Variants     │
-│ (Pareto-optimal)    │                 └──────────────┘
-└────────┬────────────┘
-         │
-         ▼
-    Next Generation
-```
-
----
-
-## Directory Structure
-
-```
-lib/jido_ai/
-├── jido_ai.ex                    # Main facade module
-├── config.ex                     # Configuration & model aliases
-├── directive.ex                  # Directive definitions
-├── signal.ex                     # Signal types
-├── tool_adapter.ex               # Action → Tool conversion
-│
-├── strategies/                   # Strategy implementations
-│   ├── react.ex                  # ReAct (Reason-Act)
-│   ├── chain_of_thought.ex       # Chain-of-Thought
-│   ├── graph_of_thoughts.ex      # Graph-of-Thoughts
-│   ├── tree_of_thoughts.ex       # Tree-of-Thoughts
-│   ├── trm.ex                    # Tree-Reasoning-Machine
-│   └── adaptive.ex               # Adaptive strategy selection
-│
-├── react/                        # ReAct components
-│   └── machine.ex                # Pure ReAct state machine
-│
-├── chain_of_thought/             # CoT components
-│   └── machine.ex                # Pure CoT state machine
-│
-├── tree_of_thoughts/             # ToT components
-│   └── machine.ex                # Pure ToT state machine
-│
-├── trm/                          # TRM components
-│   ├── machine.ex                # Pure TRM state machine
-│   ├── act.ex                    # TRM action execution
-│   ├── reasoning.ex              # TRM reasoning components
-│   └── supervision.ex            # TRM quality supervision
-│
-├── tools/                        # Tool system
-│   ├── registry.ex               # Tool registration
-│   ├── executor.ex               # Tool execution
-│   └── tool.ex                   # Base tool behavior
-│
-├── gepa/                         # GEPA system
-│   ├── optimizer.ex              # Main optimization loop
-│   ├── evaluator.ex              # Variant evaluation
-│   ├── reflector.ex              # Mutations & crossovers
-│   ├── selection.ex              # Pareto selection
-│   ├── prompt_variant.ex         # Variant representation
-│   ├── task.ex                   # Evaluation tasks
-│   └── helpers.ex                # Utility functions
-│
-├── skills/                       # Capability-based skills
-│   ├── llm/                      # LLM skills
-│   │   ├── chat.ex
-│   │   ├── complete.ex
-│   │   └── embed.ex
-│   ├── planning/                 # Planning skills
-│   ├── reasoning/                # Reasoning skills
-│   ├── streaming/                # Streaming skills
-│   └── tool_calling/             # Tool calling skills
-│
-├── algorithms/                   # Supporting algorithms
-│   ├── base.ex
-│   ├── composite.ex
-│   ├── hybrid.ex
-│   ├── parallel.ex
-│   ├── sequential.ex
-│   └── helpers.ex
-│
-└── error.ex                      # Structured error handling
-```
-
----
-
-## Related Guides
-
-- [Strategies Guide](./strategies.md) - Detailed strategy implementations
-- [State Machines Guide](./state_machines.md) - Pure state machine patterns
-- [Directives Guide](./directives.md) - Directive system
-- [Signals Guide](./signals.md) - Signal types and routing
-- [Tool System Guide](./tool_system.md) - Tool registry and execution
-- [GEPA Guide](./gepa.md) - Prompt optimization
-- [Skills Guide](./skills.md) - Capability-based skills
+- [Strategies Guide](./02_strategies.md) - Deep dive into reasoning strategies
+- [State Machines Guide](./03_state_machines.md) - Pure state machine patterns
+- [Directives Guide](./04_directives.md) - Declarative side effects
+- [Signals Guide](./05_signals.md) - Event-driven communication
+- [Tool System Guide](./06_tool_system.md) - Tool execution and registry
+- [Skills Guide](./07_skills.md) - Skill framework
+- [Configuration Guide](./08_configuration.md) - Model aliases and provider setup

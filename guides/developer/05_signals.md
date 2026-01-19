@@ -1,380 +1,398 @@
-# Jido.AI Signals Guide
+# Signals Guide
 
-This guide covers the signal system used for communication between components in Jido.AI.
+This guide covers the signal system in Jido.AI, which provides event-driven communication between components.
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Signal Types](#signal-types)
-3. [Signal Routing](#signal-routing)
-4. [Signal Lifecycle](#signal-lifecycle)
-5. [Creating Custom Signals](#creating-custom-signals)
-
----
+- [Overview](#overview)
+- [Signal Types](#signal-types)
+- [Signal Naming Convention](#signal-naming-convention)
+- [ReqLLMResult Signal](#reqllmresult-signal)
+- [ReqLLMPartial Signal](#reqllmpartial-signal)
+- [ToolResult Signal](#toolresult-signal)
+- [Signal Routing](#signal-routing)
+- [Helper Functions](#helper-functions)
 
 ## Overview
 
-Signals are the primary communication mechanism in Jido.AI. They carry results between the AgentServer, strategies, and external systems.
+Signals are the primary communication mechanism in Jido.AI. Components emit signals when events occur, and other components receive and process them.
 
-### Key Principles
+### Key Benefits
 
-1. **Typed**: All signals are structured types
-2. **Routed**: Signals are routed via `signal_routes/1`
-3. **Immutable**: Signals cannot be modified once created
-4. **Observable**: Signal emission can be tracked
+1. **Decoupling**: Components don't need direct references
+2. **Asynchronous**: Non-blocking communication
+3. **Type Safety**: Signal schemas define data contracts
+4. **Routing**: Automatic signal routing via `signal_routes/1`
 
 ### Signal Flow
 
+```mermaid
+graph LR
+    A[Directive Execution] -->|Emits| B[Signal]
+    B -->|AgentServer.broadcast| C[signal_routes]
+    C -->|Routes to| D[Strategy Command]
+    D -->|Updates| E[State Machine]
 ```
-┌──────────────┐     emit     ┌──────────────┐     route     ┌──────────────┐
-│ External     │ ──────────▶  │ AgentServer  │ ──────────▶  │   Strategy    │
-│ (ReqLLM, etc)│              │              │              │              │
-└──────────────┘              └──────┬───────┘              └──────┬───────┘
-                                     │                             │
-                                     │ emit                       │ process
-                                     ▼                             ▼
-                              ┌──────────────┐              ┌──────────────┐
-                              │   Signals    │              │ Instructions │
-                              │ (recorded)   │              │ (executed)   │
-                              └──────────────┘              └──────────────┘
-```
-
----
 
 ## Signal Types
 
-### ReqLLMResult
+| Signal | Type | Emitted By | Purpose |
+|--------|------|------------|---------|
+| `ReqLLMResult` | `reqllm.result` | ReqLLM directives | LLM call completed |
+| `ReqLLMPartial` | `reqllm.partial` | ReqLLMStream | Streaming token chunk |
+| `ReqLLMError` | `reqllm.error` | ReqLLM directives | Structured error |
+| `ToolResult` | `ai.tool_result` | ToolExec | Tool execution completed |
+| `EmbedResult` | `ai.embed_result` | ReqLLMEmbed | Embedding generated |
+| `UsageReport` | `ai.usage_report` | Telemetry | Token usage tracking |
 
-LLM call completion with tool calls or final answer.
+## Signal Naming Convention
+
+Jido.AI follows a consistent naming pattern:
+
+- **ReqLLM signals**: `reqllm.<event>` - LLM-related events
+- **Generic AI signals**: `ai.<event>` - General AI events
+
+This naming convention makes it easy to:
+- Identify signal sources
+- Route signals to handlers
+- Filter signal subscriptions
+
+## ReqLLMResult Signal
+
+Emitted when a ReqLLM call completes.
+
+### Schema
 
 ```elixir
-%Jido.AI.Signal.ReqLLMResult{
-  id: "call_abc123",
-  status: :ok,
-  result: %{
+use Jido.Signal,
+  type: "reqllm.result",
+  default_source: "/reqllm",
+  schema: [
+    call_id: [type: :string, required: true, doc: "Correlation ID"],
+    result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"],
+    usage: [type: :map, doc: "Token usage"],
+    model: [type: :string, doc: "Model used"],
+    duration_ms: [type: :integer, doc: "Request duration"],
+    thinking_content: [type: :string, doc: "Extended thinking (reasoning models)"]
+  ]
+```
+
+### Creating the Signal
+
+```elixir
+alias Jido.AI.Signal
+
+# Successful result with tool calls
+signal = Signal.ReqLLMResult.new!(%{
+  call_id: "call_123",
+  result: {:ok, %{
     type: :tool_calls,
+    text: "",
     tool_calls: [
-      %{id: "tool_1", name: "calculator", arguments: %{...}}
+      %{id: "tc_1", name: "calculator", arguments: %{a: 1, b: 2, operation: "add"}}
     ]
-  }
-}
+  }},
+  usage: %{input_tokens: 50, output_tokens: 20},
+  model: "anthropic:claude-haiku-4-5",
+  duration_ms: 1234
+})
 
-# Or final answer
-%Jido.AI.Signal.ReqLLMResult{
-  id: "call_abc123",
-  status: :ok,
-  result: %{
+# Successful result with final answer
+signal = Signal.ReqLLMResult.new!(%{
+  call_id: "call_124",
+  result: {:ok, %{
     type: :final_answer,
-    text: "The answer is 42"
-  }
-}
+    text: "The answer is 42."
+  }}
+})
 
-# Or error
-%Jido.AI.Signal.ReqLLMResult{
-  id: "call_abc123",
-  status: :error,
-  error: "API rate limit exceeded"
+# Error result
+signal = Signal.ReqLLMResult.new!(%{
+  call_id: "call_125",
+  result: {:error, %{type: :rate_limit, message: "Rate limit exceeded"}}
+})
+```
+
+### Result Structure
+
+When successful, the result contains:
+
+```elixir
+%{
+  type: :tool_calls | :final_answer,
+  text: String.t(),
+  tool_calls: [%{
+    id: String.t(),
+    name: String.t(),
+    arguments: map()
+  }]
 }
 ```
 
-**Fields**:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `:id` | `String.t()` | Call identifier |
-| `:status` | `:ok \| :error` | Result status |
-| `:result` | `map() \| nil` | Response data |
-| `:error` | `term() \| nil` | Error if failed |
-
----
-
-### ReqLLMPartial
-
-Streaming token chunk from LLM.
+### Helper Functions
 
 ```elixir
-%Jido.AI.Signal.ReqLLMPartial{
-  id: "call_abc123",
+# Extract tool calls from signal
+tool_calls = Signal.extract_tool_calls(signal)
+# => [%{id: "tc_1", name: "calculator", arguments: %{...}}]
+
+# Check if signal contains tool calls
+Signal.tool_call?(signal)
+# => true or false
+
+# Deprecated: use tool_call?/1 instead
+Signal.is_tool_call?(signal)
+```
+
+## ReqLLMPartial Signal
+
+Emitted incrementally during streaming LLM responses.
+
+### Schema
+
+```elixir
+use Jido.Signal,
+  type: "reqllm.partial",
+  default_source: "/reqllm",
+  schema: [
+    call_id: [type: :string, required: true, doc: "Correlation ID"],
+    delta: [type: :string, required: true, doc: "Text chunk"],
+    chunk_type: [type: :atom, default: :content, doc: ":content or :thinking"]
+  ]
+```
+
+### Creating the Signal
+
+```elixir
+# Content chunk
+signal = Signal.ReqLLMPartial.new!(%{
+  call_id: "call_123",
   delta: "Hello",
-  chunk_type: :content  # or :thinking
-}
+  chunk_type: :content
+})
 
-# Thinking token (for extended thinking models)
-%Jido.AI.Signal.ReqLLMPartial{
-  id: "call_abc123",
-  delta: "(thinking...)",
+# Thinking chunk (for reasoning models)
+signal = Signal.ReqLLMPartial.new!(%{
+  call_id: "call_123",
+  delta: "Let me think...",
   chunk_type: :thinking
-}
+})
 ```
 
-**Fields**:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `:id` | `String.t()` | Call identifier |
-| `:delta` | `String.t()` | Token text |
-| `:chunk_type` | `:content \| :thinking` | Token type |
-
----
-
-### ToolResult
-
-Tool execution result.
+### Handling in Strategy
 
 ```elixir
-%Jido.AI.Signal.ToolResult{
-  id: "tool_abc123",
-  tool_name: "calculator",
-  status: :ok,
-  result: %{
-    value: 4
-  }
-}
+def update(%__MODULE__{status: "awaiting_llm"} = machine,
+          {:llm_partial, call_id, delta, chunk_type}, _env) do
+  if call_id == machine.current_llm_call_id do
+    machine =
+      case chunk_type do
+        :content -> Map.update!(machine, :streaming_text, &(&1 <> delta))
+        :thinking -> Map.update!(machine, :streaming_thinking, &(&1 <> delta))
+        _ -> machine
+      end
 
-# Or error
-%Jido.AI.Signal.ToolResult{
-  id: "tool_abc123",
-  tool_name: "calculator",
-  status: :error,
-  error: "Division by zero"
-}
+    {machine, []}
+  else
+    {machine, []}
+  end
+end
 ```
 
-**Fields**:
+## ToolResult Signal
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `:id` | `String.t()` | Call identifier |
-| `:tool_name` | `String.t()` | Tool name |
-| `:status` | `:ok \| :error` | Result status |
-| `:result` | `term() \| nil` | Return value |
-| `:error` | `term() \| nil` | Error if failed |
+Emitted when a tool execution completes.
 
----
+### Schema
+
+```elixir
+use Jido.Signal,
+  type: "ai.tool_result",
+  default_source: "/ai/tool",
+  schema: [
+    call_id: [type: :string, required: true, doc: "Tool call ID from LLM"],
+    tool_name: [type: :string, required: true, doc: "Name of executed tool"],
+    result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"]
+  ]
+```
+
+### Creating the Signal
+
+```elixir
+# Successful tool result
+signal = Signal.ToolResult.new!(%{
+  call_id: "tc_123",
+  tool_name: "calculator",
+  result: {:ok, %{result: 3}}
+})
+
+# Error result
+signal = Signal.ToolResult.new!(%{
+  call_id: "tc_124",
+  tool_name: "calculator",
+  result: {:error, "Division by zero"}
+})
+```
+
+## Other Signal Types
+
+### ReqLLMError
+
+Structured error information:
+
+```elixir
+use Jido.Signal,
+  type: "reqllm.error",
+  schema: [
+    call_id: [type: :string, required: true],
+    error_type: [type: :atom, required: true],
+    message: [type: :string, required: true],
+    details: [type: :map, default: %{}],
+    retry_after: [type: :integer]
+  ]
+```
 
 ### UsageReport
 
-Token usage and cost tracking.
+Token usage and cost tracking:
 
 ```elixir
-%Jido.AI.Signal.UsageReport{
-  call_id: "call_abc123",
-  model: "anthropic:claude-sonnet-4-20250514",
-  input_tokens: 100,
-  output_tokens: 50,
-  total_tokens: 150,
-  cache_creation_input_tokens: 0,
-  cache_read_input_tokens: 0
-}
+use Jido.Signal,
+  type: "ai.usage_report",
+  schema: [
+    call_id: [type: :string, required: true],
+    model: [type: :string, required: true],
+    input_tokens: [type: :integer, required: true],
+    output_tokens: [type: :integer, required: true],
+    total_tokens: [type: :integer],
+    duration_ms: [type: :integer],
+    metadata: [type: :map, default: %{}]
+  ]
 ```
-
-**Fields**:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `:call_id` | `String.t()` | Associated call |
-| `:model` | `String.t()` | Model used |
-| `:input_tokens` | `non_neg_integer()` | Input tokens |
-| `:output_tokens` | `non_neg_integer()` | Output tokens |
-| `:total_tokens` | `non_neg_integer()` | Total tokens |
-| `:cache_creation_input_tokens` | `non_neg_integer()` | Cache write tokens |
-| `:cache_read_input_tokens` | `non_neg_integer()` | Cache read tokens |
-
----
 
 ### EmbedResult
 
-Embedding generation result.
+Embedding generation result:
 
 ```elixir
-%Jido.AI.Signal.EmbedResult{
-  id: "embed_abc123",
-  status: :ok,
-  embeddings: [
-    %{embedding: [0.1, 0.2, ...], index: 0},
-    %{embedding: [0.3, 0.4, ...], index: 1}
-  ],
-  model: "openai:text-embedding-3-small",
-  usage: %{total_tokens: 10}
-}
+use Jido.Signal,
+  type: "ai.embed_result",
+  schema: [
+    call_id: [type: :string, required: true],
+    result: [type: :any, required: true]
+  ]
 ```
 
----
+Result structure:
+```elixir
+{:ok, %{
+  embeddings: [0.1, 0.2, ...] | [[0.1, ...], [0.2, ...]],
+  count: 1 | N
+}}
+```
 
 ## Signal Routing
 
-Strategies define signal routes for automatic message delivery.
-
-### Defining Routes
+Strategies declare which signals they handle via `signal_routes/1`:
 
 ```elixir
 @impl true
 def signal_routes(_ctx) do
   [
-    {"react.user_query", {:strategy_cmd, @start}},
-    {"reqllm.result", {:strategy_cmd, @llm_result}},
-    {"reqllm.partial", {:strategy_cmd, @llm_partial}},
-    {"ai.tool_result", {:strategy_cmd, @tool_result}}
+    # Route specific signal types to strategy commands
+    {"react.user_query", {:strategy_cmd, :react_start}},
+    {"reqllm.result", {:strategy_cmd, :react_llm_result}},
+    {"ai.tool_result", {:strategy_cmd, :react_tool_result}},
+    {"reqllm.partial", {:strategy_cmd, :react_llm_partial}}
   ]
 end
 ```
 
-### Route Format
+### Route Types
+
+| Route Type | Description |
+|------------|-------------|
+| `{:strategy_cmd, action}` | Route to strategy command |
+| `{:skill_cmd, skill, action}` | Route to skill command |
+| `{:handler, module, function}` | Route to custom handler |
+
+### Signal Matching
+
+Signals are matched by their `type` field:
 
 ```elixir
-{signal_pattern, destination}
+# This signal matches the "reqllm.result" route
+%Jido.Signal{
+  type: "reqllm.result",
+  data: %{call_id: "call_123", result: {:ok, %{...}}}
+}
 ```
-
-**Signal Pattern**: String pattern matching signal type (e.g., `"reqllm.result"`)
-**Destination**: `{:strategy_cmd, action}` routes to strategy action
-
-### Available Signals
-
-| Signal | Source | Route Pattern |
-|--------|--------|---------------|
-| `ReqLLMResult` | ReqLLM | `"reqllm.result"` |
-| `ReqLLMPartial` | ReqLLM | `"reqllm.partial"` |
-| `ToolResult` | ToolExec | `"ai.tool_result"` |
-| `UsageReport` | ReqLLM | `"reqllm.usage"` |
-| `EmbedResult` | ReqLLM | `"reqllm.embed"` |
-
----
-
-## Signal Lifecycle
-
-```
-┌────────────────┐
-│ State Machine │ Returns {:call_llm_stream, id, context}
-└────────┬───────┘
-         │
-         ▼
-┌────────────────┐
-│   Strategy     │ lift_directives → ReqLLMStream directive
-└────────┬───────┘
-         │
-         ▼
-┌────────────────┐
-│  AgentServer   │ Executes directive
-└────────┬───────┘
-         │
-         ▼
-┌────────────────┐
-│    ReqLLM      │ Makes API call, streams response
-└────────┬───────┘
-         │
-         ▼
-┌────────────────┐
-│  Emit signals  │
-│  - Partial     │ ────▶ Strategy (as instruction)
-│  - Result      │ ────▶ Strategy (as instruction)
-└────────────────┘
-```
-
----
-
-## Creating Custom Signals
-
-### Step 1: Define Signal Struct
-
-```elixir
-defmodule Jido.AI.Signal.CustomSignal do
-  @moduledoc """
-  Custom signal for X.
-  """
-
-  @type t :: %__MODULE__{
-          id: String.t(),
-          status: :ok | :error,
-          result: term() | nil,
-          error: term() | nil
-        }
-
-  defstruct [:id, :status, :result, :error]
-
-  @doc """
-  Creates a new custom signal.
-  """
-  def new(id, status, result \\ nil, error \\ nil) do
-    %__MODULE__{
-      id: id,
-      status: status,
-      result: result,
-      error: error
-    }
-  end
-
-  @doc """
-  Creates a success signal.
-  """
-  def ok(id, result) do
-    new(id, :ok, result)
-  end
-
-  @doc """
-  Creates an error signal.
-  """
-  def error(id, error) do
-    new(id, :error, nil, error)
-  end
-end
-```
-
-### Step 2: Emit Signal
-
-```elixir
-# In directive execution
-AgentServer.emit_signal(agent, %Jido.AI.Signal.CustomSignal{
-  id: "custom_123",
-  status: :ok,
-  result: %{data: "..."}
-})
-```
-
-### Step 3: Route Signal
-
-```elixir
-# In strategy
-def signal_routes(_ctx) do
-  [
-    {"custom.signal", {:strategy_cmd, :custom_signal}}
-  ]
-end
-```
-
----
 
 ## Helper Functions
 
 ### Extract Tool Calls
 
 ```elixir
-alias Jido.AI.Signal
-
-# Get tool calls from result
-case result do
-  %{type: :tool_calls, tool_calls: calls} ->
-    # Process tool calls
-  _ ->
-    # No tool calls
+@spec extract_tool_calls(Jido.Signal.t()) :: [map()]
+def extract_tool_calls(%{type: "reqllm.result", data: %{result: {:ok, result}}}) do
+  case result do
+    %{type: :tool_calls, tool_calls: tool_calls} when is_list(tool_calls) -> tool_calls
+    %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> tool_calls
+    _ -> []
+  end
 end
+def extract_tool_calls(_signal), do: []
 ```
 
-### Classify Response
+### Tool Call Check
 
 ```elixir
-# Determine response type
-cond do
-  result.type == :tool_calls -> :has_tools
-  result.type == :final_answer -> :final
-  result.status == :error -> :error
-  true -> :unknown
+@spec tool_call?(Jido.Signal.t()) :: boolean()
+def tool_call?(%{type: "reqllm.result", data: %{result: {:ok, result}}}) do
+  case result do
+    %{type: :tool_calls} -> true
+    %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> true
+    _ -> false
+  end
+end
+def tool_call?(_signal), do: false
+```
+
+### From ReqLLM Response
+
+```elixir
+@spec from_reqllm_response(map(), keyword()) :: {:ok, Jido.Signal.t()} | {:error, term()}
+def from_reqllm_response(response, opts) do
+  call_id = Keyword.fetch!(opts, :call_id)
+
+  # Extract data from response
+  tool_calls = extract_response_tool_calls(response)
+  type = if tool_calls == [], do: :final_answer, else: :tool_calls
+  text = extract_response_text(response)
+
+  result = %{
+    type: type,
+    text: text,
+    tool_calls: tool_calls
+  }
+
+  ReqLLMResult.new(%{
+    call_id: call_id,
+    result: {:ok, result}
+  })
 end
 ```
 
----
+## Signal Best Practices
 
-## Related Guides
+1. **Use required fields**: Mark required fields in schemas
+2. **Provide context**: Include duration, usage, model info
+3. **Handle errors**: Always return `{:ok, ...}` or `{:error, ...}`
+4. **Match call IDs**: Correlate requests with responses using call IDs
+5. **Type results**: Use atoms for result types (`:tool_calls`, `:final_answer`)
 
-- [Architecture Overview](./01_architecture_overview.md) - System architecture
-- [Directives Guide](./04_directives.md) - Directive system
-- [Strategies Guide](./02_strategies.md) - Strategy implementations
+## Next Steps
+
+- [Directives Guide](./04_directives.md) - Directives that emit signals
+- [Strategies Guide](./02_strategies.md) - Signal routing in strategies
+- [State Machines Guide](./03_state_machines.md) - Handling signals in state machines

@@ -1,66 +1,82 @@
-# Jido.AI State Machines Guide
+# State Machines Guide
 
-This guide covers the pure functional state machines used in Jido.AI strategies, implemented with Fsmx.
+This guide covers the pure state machine pattern used in Jido.AI strategies.
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Fsmx Basics](#fsmx-basics)
-3. [State Machine Pattern](#state-machine-pattern)
-4. [ReAct Machine](#react-machine)
-5. [Chain-of-Thought Machine](#chain-of-thought-machine)
-6. [Tree-of-Thoughts Machine](#tree-of-thoughts-machine)
-7. [TRM Machine](#trm-machine)
-8. [Creating Custom Machines](#creating-custom-machines)
-
----
+- [Overview](#overview)
+- [Why Pure State Machines](#why-pure-state-machines)
+- [Fsmx Integration](#fsmx-integration)
+- [ReAct Machine](#react-machine)
+- [State Machine Lifecycle](#state-machine-lifecycle)
+- [Creating Custom Machines](#creating-custom-machines)
 
 ## Overview
 
-All Jido.AI strategies use **pure functional state machines** for core logic:
+All reasoning strategies in Jido.AI use **pure state machines** for state transitions. This means:
 
-- **Pure**: No side effects in state transitions
-- **Predictable**: Same input → same output
-- **Testable**: Easy to unit test
-- **Observable**: All state changes explicit
+1. State transitions are pure functions
+2. Side effects are described as directives
+3. The same input always produces the same output
+4. State machines can be serialized/deserialized
 
-The state machine returns **directives** that describe external effects:
-
-```elixir
-{machine, directives} = Machine.update(machine, message, env)
+```mermaid
+stateDiagram-v2
+    [*] --> idle
+    idle --> awaiting_llm: start(query)
+    awaiting_llm --> awaiting_tool: llm_result(tool_calls)
+    awaiting_llm --> completed: llm_result(final_answer)
+    awaiting_llm --> error: llm_result(error)
+    awaiting_tool --> awaiting_llm: all_tools_complete
+    awaiting_tool --> error: tool_failed
+    completed --> [*]
+    error --> [*]
 ```
 
----
+## Why Pure State Machines
 
-## Fsmx Basics
+### Benefits
+
+1. **Predictability**: Same state + same message = same result
+2. **Testability**: Easy to unit test without mocking side effects
+3. **Debuggability**: State transitions are explicit
+4. **Serialization**: Can save/restore state
+5. **Inspection**: Full history of state changes possible
+
+### Separation of Concerns
+
+```elixir
+# State Machine: Pure logic
+{machine, directives} = Machine.update(machine, message, env)
+
+# Strategy: Converts to SDK directives
+directives = lift_directives(machine_directives, config)
+
+# Runtime: Executes directives
+AgentServer.execute(directive)
+```
+
+## Fsmx Integration
 
 Jido.AI uses [Fsmx](https://hex.pm/packages/fsmx) for state machine management.
 
-### Defining Transitions
+### Basic Usage
 
 ```elixir
 use Fsmx.Struct,
   state_field: :status,
   transitions: %{
-    "idle" => ["processing", "error"],
+    "idle" => ["processing", "completed"],
     "processing" => ["completed", "error"],
     "completed" => [],
     "error" => []
   }
+
+defstruct status: "idle",
+          data: %{}
 ```
 
-### Transitioning States
-
-```elixir
-case Fsmx.transition(machine, "processing", state_field: :status) do
-  {:ok, updated_machine} ->
-    # Transition succeeded
-  {:error, _reason} ->
-    # Invalid transition
-end
-```
-
-### With Transition Helper
+### Transition Helper
 
 ```elixir
 defp with_transition(machine, new_status, fun) do
@@ -69,29 +85,198 @@ defp with_transition(machine, new_status, fun) do
     {:error, _} -> {machine, []}
   end
 end
-
-# Usage
-with_transition(machine, "processing", fn machine ->
-  {machine, [{:some_directive, ...}]}
-end)
 ```
 
----
+## ReAct Machine
 
-## State Machine Pattern
+The `Jido.AI.ReAct.Machine` module is a complete example of the pattern.
 
-All state machines follow this pattern:
+### Module Definition
 
 ```elixir
-defmodule Jido.AI.MyStrategy.Machine do
-  @moduledoc """
-  Pure state machine for MyStrategy.
-  """
-
+defmodule Jido.AI.ReAct.Machine do
   use Fsmx.Struct,
     state_field: :status,
     transitions: %{
-      "idle" => ["processing"],
+      "idle" => ["awaiting_llm"],
+      "awaiting_llm" => ["awaiting_tool", "completed", "error"],
+      "awaiting_tool" => ["awaiting_llm", "completed", "error"],
+      "completed" => [],
+      "error" => []
+    }
+
+  defstruct status: "idle",
+            iteration: 0,
+            conversation: [],
+            pending_tool_calls: [],
+            result: nil,
+            current_llm_call_id: nil,
+            termination_reason: nil,
+            streaming_text: "",
+            streaming_thinking: "",
+            usage: %{},
+            started_at: nil
+end
+```
+
+### State Types
+
+```elixir
+@type status :: :idle | :awaiting_llm | :awaiting_tool | :completed | :error
+
+@type pending_tool_call :: %{
+  id: String.t(),
+  name: String.t(),
+  arguments: map(),
+  result: term() | nil
+}
+
+@type usage :: %{
+  optional(:input_tokens) => non_neg_integer(),
+  optional(:output_tokens) => non_neg_integer(),
+  optional(:total_tokens) => non_neg_integer()
+}
+```
+
+### Message Types
+
+```elixir
+@type msg ::
+  {:start, query :: String.t(), call_id :: String.t()} |
+  {:llm_result, call_id :: String.t(), result :: term()} |
+  {:llm_partial, call_id :: String.t(), delta :: String.t(), chunk_type :: atom()} |
+  {:tool_result, call_id :: String.t(), result :: term()}
+```
+
+### Directive Types
+
+```elixir
+@type directive ::
+  {:call_llm_stream, id :: String.t(), context :: list()} |
+  {:exec_tool, id :: String.t(), tool_name :: String.t(), arguments :: map()}
+```
+
+### Update Function
+
+```elixir
+def update(%__MODULE__{status: "idle"} = machine, {:start, query, call_id}, env) do
+  system_prompt = Map.fetch!(env, :system_prompt)
+  conversation = [system_message(system_prompt), user_message(query)]
+  started_at = System.monotonic_time(:millisecond)
+
+  with_transition(machine, "awaiting_llm", fn machine ->
+    machine =
+      machine
+      |> Map.put(:iteration, 1)
+      |> Map.put(:conversation, conversation)
+      |> Map.put(:pending_tool_calls, [])
+      |> Map.put(:result, nil)
+      |> Map.put(:termination_reason, nil)
+      |> Map.put(:current_llm_call_id, call_id)
+      |> Map.put(:streaming_text, "")
+      |> Map.put(:streaming_thinking, "")
+      |> Map.put(:usage, %{})
+      |> Map.put(:started_at, started_at)
+
+    {machine, [{:call_llm_stream, call_id, conversation}]}
+  end)
+end
+```
+
+### Serialization
+
+```elixir
+@doc """
+Converts machine state to a map for storage in agent state.
+"""
+def to_map(%__MODULE__{} = machine) do
+  machine
+  |> Map.from_struct()
+  |> Map.update!(:status, &status_to_atom/1)
+end
+
+@doc """
+Creates a machine from a map (e.g., from agent state storage).
+"""
+def from_map(map) when is_map(map) do
+  status =
+    case map[:status] do
+      s when is_atom(s) -> Atom.to_string(s)
+      s when is_binary(s) -> s
+      nil -> "idle"
+    end
+
+  %__MODULE__{
+    status: status,
+    iteration: map[:iteration] || 0,
+    conversation: map[:conversation] || [],
+    pending_tool_calls: map[:pending_tool_calls] || [],
+    result: map[:result],
+    current_llm_call_id: map[:current_llm_call_id],
+    termination_reason: map[:termination_reason],
+    streaming_text: map[:streaming_text] || "",
+    streaming_thinking: map[:streaming_thinking] || "",
+    usage: map[:usage] || %{},
+    started_at: map[:started_at]
+  }
+end
+```
+
+## State Machine Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant Strategy as Strategy
+    participant Machine as State Machine
+    participant Runtime as AgentServer
+
+    Strategy->>Machine: new()
+    Machine-->>Strategy: machine (idle state)
+
+    Strategy->>Machine: update(machine, {:start, query}, env)
+    Machine-->>Strategy: {machine, [{:call_llm_stream, ...}]}
+    Strategy->>Runtime: Directive
+
+    Note over Runtime: Execute LLM call
+
+    Runtime->>Strategy: Signal.ReqLLMResult
+    Strategy->>Machine: update(machine, {:llm_result, result}, env)
+    Machine-->>Strategy: {machine, [{:exec_tool, ...}]}
+    Strategy->>Runtime: Directive
+
+    Note over Runtime: Execute tool
+
+    Runtime->>Strategy: Signal.ToolResult
+    Strategy->>Machine: update(machine, {:tool_result, result}, env)
+    Machine-->>Strategy: {machine, [{:call_llm_stream, ...}]}
+
+    Note over Strategy: Loop until completion
+
+    Runtime->>Strategy: Final LLM result
+    Strategy->>Machine: update(machine, {:llm_result, final}, env)
+    Machine-->>Strategy: {machine, []} (completed)
+```
+
+### State Transitions for ReAct
+
+| Current State | Message | Next State | Directives |
+|---------------|---------|------------|------------|
+| `:idle` | `{:start, query, call_id}` | `:awaiting_llm` | `{:call_llm_stream, call_id, context}` |
+| `:awaiting_llm` | `{:llm_result, call_id, tool_calls}` | `:awaiting_tool` | `{:exec_tool, ...}` for each tool |
+| `:awaiting_llm` | `{:llm_result, call_id, final_answer}` | `:completed` | `[]` |
+| `:awaiting_tool` | `{:tool_result, call_id, result}` | `:awaiting_llm` | `{:call_llm_stream, ...}` |
+| `:awaiting_tool` | All tools complete | `:awaiting_llm` | `{:call_llm_stream, ...}` |
+
+## Creating Custom Machines
+
+### Step 1: Define States and Transitions
+
+```elixir
+defmodule MyApp.MyMachine do
+  use Fsmx.Struct,
+    state_field: :status,
+    transitions: %{
+      "idle" => ["processing", "error"],
       "processing" => ["completed", "error"],
       "completed" => [],
       "error" => []
@@ -99,330 +284,45 @@ defmodule Jido.AI.MyStrategy.Machine do
 
   @type status :: :idle | :processing | :completed | :error
 
-  @type t :: %__MODULE__{
-          status: String.t(),
-          result: term(),
-          started_at: integer() | nil
-        }
-
   defstruct status: "idle",
-            result: nil,
-            started_at: nil
-
-  @type msg ::
-          {:start, prompt :: String.t(), call_id :: String.t()}
-          | {:llm_result, call_id :: String.t(), result :: term()}
-
-  @type directive :: {:some_directive, id :: String.t(), context :: term()}
-
-  @doc """
-  Creates a new machine in the idle state.
-  """
-  @spec new() :: t()
-  def new, do: %__MODULE__{}
-
-  @doc """
-  Updates the machine state based on a message.
-  """
-  @spec update(t(), msg(), map()) :: {t(), [directive()]}
-  def update(%__MODULE__{status: "idle"} = machine, {:start, prompt, call_id}, _env) do
-    with_transition(machine, "processing", fn machine ->
-      machine = %{machine | started_at: System.monotonic_time(:millisecond)}
-      {machine, [{:some_directive, call_id, %{prompt: prompt}}]}
-    end)
-  end
-
-  def update(%__MODULE__{status: "processing"} = machine, {:llm_result, _call_id, result}, _env) do
-    with_transition(machine, "completed", fn machine ->
-      machine = %{machine | result: result}
-      {machine, []}
-    end)
-  end
-
-  def update(machine, _msg, _env) do
-    {machine, []}
-  end
-
-  @doc """
-  Converts the machine state to a map for storage.
-  """
-  @spec to_map(t()) :: map()
-  def to_map(%__MODULE__{} = machine), do: Map.from_struct(machine)
-
-  @doc """
-  Creates a machine from a map.
-  """
-  @spec from_map(map()) :: t()
-  def from_map(map) when is_map(map), do: struct(__MODULE__, map)
-
-  @doc """
-  Generates a unique call ID.
-  """
-  @spec generate_call_id() :: String.t()
-  def generate_call_id, do: "call_#{Jido.Util.generate_id()}"
+            data: %{},
+            error: nil,
+            result: nil
 end
 ```
 
----
-
-## ReAct Machine
-
-**Module**: `Jido.AI.ReAct.Machine`
-
-### States
-
-```
-idle → awaiting_llm → awaiting_tool → awaiting_llm → ... → completed
-                    ↓                              ↓
-                  error                          error
-```
-
-### State Structure
+### Step 2: Define Types
 
 ```elixir
-@type t :: %__MODULE__{
-        status: String.t(),                          # Current state
-        iteration: non_neg_integer(),                # Current iteration
-        conversation: list(),                        # Message history
-        pending_tool_calls: [pending_tool_call()],    # Tools being executed
-        result: term(),                              # Final result
-        current_llm_call_id: String.t() | nil,       # Active LLM call
-        termination_reason: termination_reason(),     # How it ended
-        streaming_text: String.t(),                  # Accumulated stream
-        streaming_thinking: String.t(),              # Thinking tokens
-        usage: usage(),                              # Token usage
-        started_at: integer() | nil                 # Start time
-      }
+@type msg ::
+  {:start, input :: term()} |
+  {:process, data :: term()} |
+  {:complete, result :: term()}
+
+@type directive ::
+  {:do_something, id :: String.t(), data :: map()} |
+  {:do_another_thing, id :: String.t()}
 ```
 
-### Message Handling
+### Step 3: Implement Update
 
 ```elixir
-# Start reasoning
-{:start, query, call_id}
+def new, do: %__MODULE__{}
 
-# LLM responded
-{:llm_result, call_id, {:ok, %{type: :tool_calls, tool_calls: [...]}}}
-{:llm_result, call_id, {:ok, %{type: :final_answer, text: "..."}}}
-{:llm_result, call_id, {:error, reason}}
-
-# Streaming token
-{:llm_partial, call_id, delta, :content | :thinking}
-
-# Tool executed
-{:tool_result, call_id, {:ok, result}}
-{:tool_result, call_id, {:error, reason}}
-```
-
-### Directives
-
-```elixir
-{:call_llm_stream, id, conversation}
-{:exec_tool, id, tool_name, arguments}
-```
-
----
-
-## Chain-of-Thought Machine
-
-**Module**: `Jido.AI.ChainOfThought.Machine`
-
-### States
-
-```
-idle → reasoning → completed
-                   ↓
-                 error
-```
-
-### State Structure
-
-```elixir
-@type t :: %__MODULE__{
-        status: String.t(),
-        prompt: String.t() | nil,
-        reasoning: String.t(),
-        steps: [step()],              # Extracted steps
-        conclusion: String.t(),       # Final conclusion
-        result: term(),
-        current_llm_call_id: String.t() | nil,
-        termination_reason: termination_reason(),
-        streaming_text: String.t(),
-        usage: usage(),
-        started_at: integer() | nil
-      }
-
-@type step :: %{
-        number: pos_integer(),
-        content: String.t()
-      }
-```
-
-### Step Extraction
-
-```elixir
-# Extract steps from response
-%{steps: steps, conclusion: conclusion, remaining_text: rest} =
-  ChainOfThought.Machine.extract_steps(response_text)
-
-# Supported formats:
-# - "Step 1: First..."
-# - "1. First..."
-# - "- First..."
-```
-
----
-
-## Tree-of-Thoughts Machine
-
-**Module**: `Jido.AI.TreeOfThoughts.Machine`
-
-### State Structure
-
-```elixir
-@type t :: %__MODULE__{
-        status: String.t(),
-        nodes: %{String.t() => thought_node()},  # Tree nodes
-        edges: [edge()],                          # Tree edges
-        current_node_id: String.t() | nil,
-        solution_path: [String.t()],              # Root to solution
-        frontier: [String.t()],                   # Nodes to expand
-        branching_factor: pos_integer(),
-        max_depth: pos_integer(),
-        traversal_strategy: traversal_strategy(),
-        # ... other fields
-      }
-
-@type thought_node :: %{
-        id: String.t(),
-        content: String.t(),
-        depth: non_neg_integer(),
-        score: float(),
-        parent_id: String.t() | nil,
-        children: [String.t()]
-      }
-```
-
-### Tree Operations
-
-```elixir
-# Find best leaf node
-best_node = Machine.find_best_leaf(machine)
-
-# Trace path from root to node
-path = Machine.trace_path(machine, node_id)
-
-# Get all leaf nodes
-leaves = Machine.get_leaves(machine)
-```
-
----
-
-## TRM Machine
-
-**Module**: `Jido.AI.TRM.Machine`
-
-### States
-
-```
-idle → reasoning → supervising → improving → reasoning → ...
-       ↓            ↓            ↓           ↓
-     completed    error        error       error
-```
-
-### State Structure
-
-```elixir
-@type t :: %__MODULE__{
-        status: String.t(),
-        phase: :reasoning | :supervising | :improving,
-        question: String.t(),
-        current_answer: String.t(),
-        answer_history: [String.t()],
-        best_answer: String.t() | nil,
-        best_score: float(),
-        supervision_step: non_neg_integer(),
-        max_supervision_steps: pos_integer(),
-        act_threshold: float(),
-        act_triggered: boolean(),
-        latent_state: map(),
-        usage: usage(),
-        started_at: integer() | nil
-      }
-```
-
-### Phase Transitions
-
-```elixir
-# Reasoning phase
-{:start, question, call_id}
-
-# Supervision phase (evaluate quality)
-{:supervision_result, call_id, result}
-
-# Improvement phase (apply feedback)
-{:improvement_result, call_id, result}
-```
-
----
-
-## Creating Custom Machines
-
-### Step 1: Define States and Transitions
-
-```elixir
-use Fsmx.Struct,
-  state_field: :status,
-  transitions: %{
-    "idle" => ["in_progress"],
-    "in_progress" => ["succeeded", "failed"],
-    "succeeded" => [],
-    "failed" => []
-  }
-```
-
-### Step 2: Define Struct
-
-```elixir
-defstruct status: "idle",
-          input: nil,
-          result: nil,
-          error: nil,
-          started_at: nil,
-          completed_at: nil
-```
-
-### Step 3: Implement update/3
-
-```elixir
 def update(%__MODULE__{status: "idle"} = machine, {:start, input}, _env) do
-  with_transition(machine, "in_progress", fn machine ->
-    machine = %{machine
-      | input = input
-      | started_at = System.monotonic_time(:millisecond)
-    }
-    directives = [{:do_work, generate_id(), %{input: input}}]
-    {machine, directives}
+  with_transition(machine, "processing", fn machine ->
+    machine = %{machine | data: %{input: input}}
+    {machine, [{:do_something, generate_id(), %{data: input}}]}
   end)
 end
 
-def update(%__MODULE__{status: "in_progress"} = machine, {:work_complete, result}, _env) do
-  with_transition(machine, "succeeded", fn machine ->
-    machine = %{machine
-      | result = result
-      | completed_at = System.monotonic_time(:millisecond)
-    }
-    {machine, [{:notify_complete, result}]}
-  end)
-end
+def update(%__MODULE__{status: "processing"} = machine, {:process, data}, _env) do
+  # Process the data
+  result = process_data(data)
 
-def update(%__MODULE__{status: "in_progress"} = machine, {:work_failed, error}, _env) do
-  with_transition(machine, "failed", fn machine ->
-    machine = %{machine
-      | error = error
-      | completed_at = System.monotonic_time(:millisecond)
-    }
-    {machine, [{:notify_failed, error}]}
+  with_transition(machine, "completed", fn machine ->
+    machine = %{machine | result: result}
+    {machine, []}
   end)
 end
 
@@ -431,73 +331,59 @@ def update(machine, _msg, _env) do
 end
 ```
 
-### Step 4: Serialization
+### Step 4: Add Serialization
 
 ```elixir
-def to_map(%__MODULE__{} = machine), do: Map.from_struct(machine)
+def to_map(%__MODULE__{} = machine) do
+  machine
+  |> Map.from_struct()
+  |> Map.update!(:status, &String.to_atom/1)
+end
 
 def from_map(map) when is_map(map) do
-  struct(__MODULE__, map)
+  status =
+    case map[:status] do
+      s when is_atom(s) -> Atom.to_string(s)
+      s when is_binary(s) -> s
+      nil -> "idle"
+    end
+
+  %__MODULE__{
+    status: status,
+    data: Map.get(map, :data, %{}),
+    error: Map.get(map, :error),
+    result: Map.get(map, :result)
+  }
 end
 ```
 
----
-
-## Best Practices
-
-### 1. Keep State Pure
+### Step 5: Add Telemetry
 
 ```elixir
-# ❌ Bad - side effects
-def update(machine, msg, _env) do
-  File.write("/tmp/state", inspect(machine))  # Side effect!
-  {machine, []}
-end
-
-# ✅ Good - pure function
-def update(machine, msg, _env) do
-  new_machine = %{machine | result: process(msg)}
-  {new_machine, [{:log_state, new_machine}]}  # Directive describes effect
-end
-```
-
-### 2. Handle All Messages
-
-```elixir
-def update(machine, {:specific_msg, _}, _env), do: # handle specific
-def update(machine, _msg, _env), do: {machine, []}  # fallback
-```
-
-### 3. Emit Telemetry
-
-```elixir
-@telemetry_prefix [:jido, :ai, :my_strategy]
+@telemetry_prefix [:my_app, :my_machine]
 
 defp emit_telemetry(event, measurements, metadata) do
   :telemetry.execute(@telemetry_prefix ++ [event], measurements, metadata)
 end
 
-# Usage
-emit_telemetry(:start, %{system_time: System.system_time()}, %{call_id: call_id})
-emit_telemetry(:complete, %{duration: duration_ms}, %{status: status})
+# Use in transitions
+with_transition(machine, "processing", fn machine ->
+  emit_telemetry(:start, %{system_time: System.system_time()}, %{
+    input_type: typeof(machine.data.input)
+  })
+  # ...
+end)
 ```
 
-### 4. Track Token Usage
+## Best Practices
 
-```elixir
-defp accumulate_usage(machine, result) do
-  case Map.get(result, :usage) do
-    nil -> machine
-    new_usage when is_map(new_usage) ->
-      %{machine | usage: Map.merge(machine.usage || %{}, new_usage)}
-  end
-end
-```
+1. **Keep state machines pure**: No side effects in update functions
+2. **Use directives for side effects**: Describe what to do, don't do it
+3. **Emit telemetry**: Track state transitions for observability
+4. **Handle invalid transitions**: Return `{machine, []}` for unhandled messages
+5. **Serialize atom states**: Store as strings in maps for compatibility
 
----
+## Next Steps
 
-## Related Guides
-
-- [Architecture Overview](./01_architecture_overview.md) - System architecture
-- [Strategies Guide](./02_strategies.md) - Strategy implementations
-- [Directives Guide](./04_directives.md) - Directive system
+- [Strategies Guide](./02_strategies.md) - Using state machines in strategies
+- [Directives Guide](./04_directives.md) - Executing side effects
