@@ -319,15 +319,15 @@ flowchart TD
 ```mermaid
 graph LR
     subgraph "Beam Search"
-        B1[O(depth × beam_width)]
+        B1["O(depth * beam_width)"]
     end
 
     subgraph "MCTS"
-        M1[O(simulations × depth)]
+        M1["O(simulations * depth)"]
     end
 
     subgraph "Diverse Decoding"
-        D1[O(num_samples)]
+        D1["O(num_samples)"]
     end
 ```
 
