@@ -517,7 +517,7 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
   defp calculate_pass_rate(%{total: total, passed: passed}), do: passed / total
 
   defp calculate_confidence(%{total: 0}), do: 0.0
-  defp calculate_confidence(%{total: total, failed: 0}), do: 1.0
+  defp calculate_confidence(%{total: _total, failed: 0}), do: 1.0
   defp calculate_confidence(%{total: total, failed: failed}), do: (total - failed) / total
 
   defp build_reasoning(test_results, exec_result) do
