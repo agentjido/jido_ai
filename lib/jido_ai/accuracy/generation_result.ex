@@ -215,7 +215,7 @@ defmodule Jido.AI.Accuracy.GenerationResult do
     select_by_majority_content(candidates(result))
   end
 
-  def select_by_strategy(%__MODULE__{candidates: candidates}, strategy) do
+  def select_by_strategy(%__MODULE__{candidates: candidates}, _strategy) do
     # Unknown strategy - fall back to best
     select_by_strategy(
       %__MODULE__{candidates: candidates, best_candidate: find_best_candidate(candidates)},
@@ -329,7 +329,7 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   @spec from_map(map()) :: {:ok, t()} | {:error, term()}
   def from_map(map) when is_map(map) do
     with {:ok, candidates} <- deserialize_candidates(Map.get(map, "candidates", [])),
-         {:ok, best_candidate} <- deserialize_best_candidate(Map.get(map, "best_candidate")) do
+         {:ok, _best_candidate} <- deserialize_best_candidate(Map.get(map, "best_candidate")) do
       opts = [
         aggregation_method: parse_aggregation_method(Map.get(map, "aggregation_method") || Map.get(map, :aggregation_method)),
         metadata: Map.get(map, "metadata", %{}) || Map.get(map, :metadata, %{})

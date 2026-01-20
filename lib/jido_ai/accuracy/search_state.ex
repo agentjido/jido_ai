@@ -41,7 +41,7 @@ defmodule Jido.AI.Accuracy.SearchState do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, SearchState}
+  alias Jido.AI.Accuracy.Candidate
 
   @type search_node :: %{candidate: Candidate.t(), score: float(), metadata: map()}
 

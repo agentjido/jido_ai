@@ -18,7 +18,7 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVote do
 
   """
 
-  alias Jido.AI.Accuracy.{ConsensusChecker, Candidate}
+  alias Jido.AI.Accuracy.ConsensusChecker
   alias Jido.AI.Accuracy.Aggregators.MajorityVote, as: MVAggregator
 
   @behaviour ConsensusChecker

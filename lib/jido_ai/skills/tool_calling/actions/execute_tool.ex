@@ -44,7 +44,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteTool do
         |> Zoi.default(30_000)
     })
 
-  alias Jido.AI.Tools.{Executor, Registry}
+  alias Jido.AI.Tools.Executor
 
   @doc """
   Executes the tool by name.

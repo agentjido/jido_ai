@@ -145,20 +145,6 @@ defmodule Jido.AI.Accuracy.Stages.SearchStage do
     {:error, :search_not_available}
   end
 
-  # Try to get BeamSearch module if available
-  defp get_beam_search_module do
-    try do
-      module = Module.safe_concat([Jido, AI, Accuracy, Search, BeamSearch])
-      if Code.ensure_loaded?(module) do
-        {:ok, module}
-      else
-        {:error, :not_found}
-      end
-    rescue
-      _ -> {:error, :not_found}
-    end
-  end
-
   # Try to get MCTS module if available
   defp get_mcts_module do
     try do

@@ -134,7 +134,7 @@ defmodule Jido.AI.Accuracy.SearchController do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult}
+  alias Jido.AI.Accuracy.Candidate
 
   @type t :: module()
   @type generator :: module()

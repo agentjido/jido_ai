@@ -260,14 +260,6 @@ defmodule Jido.AI.Accuracy.StrategyAdapter do
     :ok
   end
 
-  defp emit_error_signal(call_id, query, preset, exception, agent) do
-    signal = Signal.Error.from_exception(call_id, query, preset, exception)
-
-    # Emit the error signal to the agent
-    _signal = signal
-    _agent = agent
-  end
-
   defp generate_call_id do
     "accuracy_#{System.unique_integer([:positive, :monotonic])}"
   end
