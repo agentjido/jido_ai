@@ -26,17 +26,17 @@ defmodule Jido.AI.Accuracy.Prm do
         @behaviour Jido.AI.Accuracy.Prm
 
         @impl true
-        def score_step(step, context, opts) do
+        def score_step(prm, step, context, opts) do
           # Score the individual step
           score = calculate_step_score(step, context, opts)
           {:ok, score}
         end
 
         @impl true
-        def score_trace(trace, context, opts) do
+        def score_trace(prm, trace, context, opts) do
           # Score each step in the trace
           Enum.map(trace, fn step ->
-            {:ok, score} = score_step(step, context, opts)
+            {:ok, score} = score_step(prm, step, context, opts)
             score
           end)
           |> then(&{:ok, &1})
@@ -49,22 +49,22 @@ defmodule Jido.AI.Accuracy.Prm do
 
   Scores the final answer without examining reasoning:
 
-      {:ok, result} = verifier.verify(candidate, %{})
+      {:ok, result} = VerifierModule.verify(verifier, candidate, %{})
       result.score  # => 0.85 (overall quality)
 
   ### Process Verification (PRM behavior)
 
   Scores each reasoning step for detailed feedback:
 
-      {:ok, scores} = prm.score_trace(["Step 1", "Step 2", "Step 3"], %{}, [])
+      {:ok, scores} = PrmModule.score_trace(prm, ["Step 1", "Step 2", "Step 3"], %{}, [])
       # => [0.9, 0.7, 0.95] (individual step scores)
 
-      {:ok, classification} = prm.classify_step("Step with error", %{}, [])
+      {:ok, classification} = PrmModule.classify_step(prm, "Step with error", %{}, [])
       # => :incorrect
 
   ## Step Classification
 
-  The `classify_step/3` callback returns one of:
+  The `classify_step/4` callback returns one of:
 
   - `:correct` - The step is logically sound and error-free
   - `:incorrect` - The step contains errors or flawed reasoning
@@ -91,14 +91,16 @@ defmodule Jido.AI.Accuracy.Prm do
   ## Examples
 
       # Score a single reasoning step
-      {:ok, score} = prm.score_step(
+      {:ok, score} = PrmModule.score_step(
+        prm,
         "First, I'll add 15 and 23 to get 38.",
         %{question: "What is 15 * 23?"},
         []
       )
 
       # Score a full reasoning trace
-      {:ok, scores} = prm.score_trace(
+      {:ok, scores} = PrmModule.score_trace(
+        prm,
         [
           "Let me calculate 15 * 23.",
           "15 * 23 = 15 * 20 + 15 * 3 = 300 + 45 = 345",
@@ -109,7 +111,8 @@ defmodule Jido.AI.Accuracy.Prm do
       )
 
       # Classify a step
-      {:ok, classification} = prm.classify_step(
+      {:ok, classification} = PrmModule.classify_step(
+        prm,
         "2 + 2 = 5",
         %{question: "What is 2 + 2?"},
         []
@@ -118,17 +121,17 @@ defmodule Jido.AI.Accuracy.Prm do
 
   ## Return Values
 
-  The `score_step/3` callback should return:
+  The `score_step/4` callback should return:
 
   - `{:ok, score}` - Successfully scored, where score is a number
   - `{:error, reason}` - Scoring failed
 
-  The `score_trace/3` callback should return:
+  The `score_trace/4` callback should return:
 
   - `{:ok, [number()]}` - List of step scores in order
   - `{:error, reason}` - Trace scoring failed
 
-  The `classify_step/3` callback should return:
+  The `classify_step/4` callback should return:
 
   - `{:ok, :correct | :incorrect | :neutral}` - Step classification
   - `{:error, reason}` - Classification failed
@@ -165,6 +168,7 @@ defmodule Jido.AI.Accuracy.Prm do
 
   ## Parameters
 
+  - `prm` - The PRM struct containing configuration
   - `step` - The reasoning step text to score
   - `context` - Context including the original question and previous steps
   - `opts` - PRM-specific options
@@ -176,12 +180,12 @@ defmodule Jido.AI.Accuracy.Prm do
 
   ## Examples
 
-      iex> {:ok, score} = prm.score_step("2 + 2 = 4", %{question: "What is 2+2?"}, [])
+      iex> {:ok, score} = prm.score_step(prm, "2 + 2 = 4", %{question: "What is 2+2?"}, [])
       iex> is_number(score)
       true
 
   """
-  @callback score_step(step :: String.t(), context :: context(), opts :: opts()) ::
+  @callback score_step(prm :: term(), step :: String.t(), context :: context(), opts :: opts()) ::
               step_score_result()
 
   @doc """
@@ -192,6 +196,7 @@ defmodule Jido.AI.Accuracy.Prm do
 
   ## Parameters
 
+  - `prm` - The PRM struct containing configuration
   - `trace` - List of reasoning step texts
   - `context` - Context including the original question
   - `opts` - PRM-specific options
@@ -203,17 +208,17 @@ defmodule Jido.AI.Accuracy.Prm do
 
   ## Examples
 
-      iex> {:ok, scores} = prm.score_trace(["Step 1", "Step 2"], %{}, [])
+      iex> {:ok, scores} = prm.score_trace(prm, ["Step 1", "Step 2"], %{}, [])
       iex> length(scores)
       2
 
   ## Default Implementation
 
-  If not implemented, the default behavior is to call `score_step/3`
+  If not implemented, the default behavior is to call `score_step/4`
   for each step in the trace sequentially.
 
   """
-  @callback score_trace(trace :: [String.t()], context :: context(), opts :: opts()) ::
+  @callback score_trace(prm :: term(), trace :: [String.t()], context :: context(), opts :: opts()) ::
               trace_score_result()
 
   @doc """
@@ -227,6 +232,7 @@ defmodule Jido.AI.Accuracy.Prm do
 
   ## Parameters
 
+  - `prm` - The PRM struct containing configuration
   - `step` - The reasoning step text to classify
   - `context` - Context including the original question
   - `opts` - PRM-specific options
@@ -240,12 +246,12 @@ defmodule Jido.AI.Accuracy.Prm do
 
   ## Examples
 
-      iex> {:ok, :correct} = prm.classify_step("2 + 2 = 4", %{question: "What is 2+2?"}, [])
+      iex> {:ok, :correct} = prm.classify_step(prm, "2 + 2 = 4", %{question: "What is 2+2?"}, [])
 
-      iex> {:ok, :incorrect} = prm.classify_step("2 + 2 = 5", %{question: "What is 2+2?"}, [])
+      iex> {:ok, :incorrect} = prm.classify_step(prm, "2 + 2 = 5", %{question: "What is 2+2?"}, [])
 
   """
-  @callback classify_step(step :: String.t(), context :: context(), opts :: opts()) ::
+  @callback classify_step(prm :: term(), step :: String.t(), context :: context(), opts :: opts()) ::
               classify_result()
 
   @doc """

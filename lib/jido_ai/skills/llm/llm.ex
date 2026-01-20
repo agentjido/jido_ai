@@ -123,7 +123,6 @@ defmodule Jido.AI.Skills.LLM do
 
   Defines the structure and defaults for LLM skill state.
   """
-  @impl Jido.Skill
   def schema do
     Zoi.object(%{
       default_model:

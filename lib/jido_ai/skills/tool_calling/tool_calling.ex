@@ -142,7 +142,6 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   Defines the structure and defaults for Tool Calling skill state.
   """
-  @impl Jido.Skill
   def schema do
     Zoi.object(%{
       default_model:
