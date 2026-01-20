@@ -194,16 +194,56 @@ defmodule Jido.AI.Accuracy.CalibrationTest do
       # Create a test dataset with known accuracy
       # Each entry: {predicted_confidence, actual_correct}
       test_data = [
-        {0.95, true}, {0.92, true}, {0.98, true}, {0.91, true}, {0.96, true},
-        {0.85, true}, {0.88, true}, {0.82, true}, {0.87, true}, {0.83, false},
-        {0.75, true}, {0.72, true}, {0.78, false}, {0.71, true}, {0.76, false},
-        {0.65, true}, {0.63, false}, {0.67, true}, {0.64, false}, {0.66, false},
-        {0.55, true}, {0.53, false}, {0.57, false}, {0.54, true}, {0.56, false},
-        {0.45, false}, {0.43, true}, {0.47, false}, {0.44, false}, {0.46, true},
-        {0.35, false}, {0.33, false}, {0.37, true}, {0.34, false}, {0.36, false},
-        {0.25, false}, {0.23, false}, {0.27, false}, {0.24, true}, {0.26, false},
-        {0.15, false}, {0.13, false}, {0.17, false}, {0.14, false}, {0.16, false},
-        {0.05, false}, {0.08, false}, {0.03, false}, {0.07, false}, {0.04, false}
+        {0.95, true},
+        {0.92, true},
+        {0.98, true},
+        {0.91, true},
+        {0.96, true},
+        {0.85, true},
+        {0.88, true},
+        {0.82, true},
+        {0.87, true},
+        {0.83, false},
+        {0.75, true},
+        {0.72, true},
+        {0.78, false},
+        {0.71, true},
+        {0.76, false},
+        {0.65, true},
+        {0.63, false},
+        {0.67, true},
+        {0.64, false},
+        {0.66, false},
+        {0.55, true},
+        {0.53, false},
+        {0.57, false},
+        {0.54, true},
+        {0.56, false},
+        {0.45, false},
+        {0.43, true},
+        {0.47, false},
+        {0.44, false},
+        {0.46, true},
+        {0.35, false},
+        {0.33, false},
+        {0.37, true},
+        {0.34, false},
+        {0.36, false},
+        {0.25, false},
+        {0.23, false},
+        {0.27, false},
+        {0.24, true},
+        {0.26, false},
+        {0.15, false},
+        {0.13, false},
+        {0.17, false},
+        {0.14, false},
+        {0.16, false},
+        {0.05, false},
+        {0.08, false},
+        {0.03, false},
+        {0.07, false},
+        {0.04, false}
       ]
 
       # Calculate Expected Calibration Error (ECE)
@@ -240,6 +280,7 @@ defmodule Jido.AI.Accuracy.CalibrationTest do
 
       # Calculate error rate WITHOUT selective generation (answer all)
       total_without_selective = length(test_cases)
+
       errors_without_selective =
         Enum.count(test_cases, fn case -> !case.correct end)
 

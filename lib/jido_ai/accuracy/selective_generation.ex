@@ -103,12 +103,10 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
           use_ev: boolean()
         }
 
-  defstruct [
-    reward: 1.0,
-    penalty: 1.0,
-    confidence_threshold: nil,
-    use_ev: true
-  ]
+  defstruct reward: 1.0,
+            penalty: 1.0,
+            confidence_threshold: nil,
+            use_ev: true
 
   @max_reward 1000.0
   @max_penalty 1000.0

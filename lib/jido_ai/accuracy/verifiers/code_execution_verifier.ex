@@ -164,7 +164,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
     default_sandbox = get_default_sandbox()
 
     # Merge opts with defaults, preferring explicit :sandbox from opts
-    opts = Enum.into(opts, %{})
+    opts = Map.new(opts)
     sandbox = Map.get(opts, :sandbox, default_sandbox)
     opts = Map.put(opts, :sandbox, sandbox)
 
@@ -177,6 +177,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
       # Log warning if using unsafe sandbox
       if verifier.sandbox == :none do
         require Logger
+
         Logger.warning("""
         [SECURITY] CodeExecutionVerifier using sandbox: :none
         This allows arbitrary code execution on the host system!
@@ -310,14 +311,12 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
       2
 
   """
-  @spec verify_batch(t(), [Candidate.t()], map()) :: {:ok, [VerificationResult.t()]} | {:error, term()}
+  @spec verify_batch(t(), [Candidate.t()], map()) :: {:ok, [VerificationResult.t()]}
   def verify_batch(%__MODULE__{} = verifier, candidates, context) when is_list(candidates) do
     results =
       Enum.map(candidates, fn candidate ->
-        case verify(verifier, candidate, context) do
-          {:ok, result} -> result
-          {:error, _reason} -> error_result(candidate, :verification_failed, :unknown)
-        end
+        {:ok, result} = verify(verifier, candidate, context)
+        result
       end)
 
     {:ok, results}
@@ -354,7 +353,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
     end
   end
 
-  defp detect_language(:auto, code, candidate) do
+  defp detect_language(:auto, code, _candidate) do
     # Try to detect from shebang
     case Regex.run(~r/^#!\s*(\S+)/, code) do
       [_, "/usr/bin/env python3" | _] ->

@@ -91,11 +91,11 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
 
   """
 
+  @behaviour DifficultyEstimator
+
   alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator, Helpers}
 
   import Helpers, only: [get_attr: 2, get_attr: 3]
-
-  @behaviour DifficultyEstimator
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -103,11 +103,9 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
           timeout: pos_integer()
         }
 
-  defstruct [
-    model: "anthropic:claude-haiku-4-5",
-    prompt_template: nil,
-    timeout: 5000
-  ]
+  defstruct model: "anthropic:claude-haiku-4-5",
+            prompt_template: nil,
+            timeout: 5000
 
   @default_prompt """
   Analyze the difficulty of this query: {{query}}
@@ -293,10 +291,12 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
     # Simple heuristic-based simulation
     cond do
       String.contains?(query, ["complex", "quantum", "algorithm", "explain"]) ->
-        {:ok, ~s({"level": "hard", "score": 0.8, "confidence": 0.9, "reasoning": "Complex query requiring deep analysis"})}
+        {:ok,
+         ~s({"level": "hard", "score": 0.8, "confidence": 0.9, "reasoning": "Complex query requiring deep analysis"})}
 
       String.contains?(query, ["calculate", "how", "why"]) ->
-        {:ok, ~s({"level": "medium", "score": 0.5, "confidence": 0.85, "reasoning": "Moderate difficulty with some reasoning required"})}
+        {:ok,
+         ~s({"level": "medium", "score": 0.5, "confidence": 0.85, "reasoning": "Moderate difficulty with some reasoning required"})}
 
       true ->
         {:ok, ~s({"level": "easy", "score": 0.2, "confidence": 0.95, "reasoning": "Simple factual query"})}

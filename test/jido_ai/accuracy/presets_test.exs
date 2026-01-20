@@ -76,7 +76,7 @@ defmodule Jido.AI.Accuracy.PresetsTest do
       assert :search in config.stages
       assert :reflection in config.stages
       assert :calibration in config.stages
-      assert :rag not in config.stages
+      refute :rag in config.stages
       assert config.generation_config.min_candidates == 5
       assert config.generation_config.max_candidates == 10
       assert config.search_config.enabled
@@ -93,7 +93,7 @@ defmodule Jido.AI.Accuracy.PresetsTest do
       assert :verification in config.stages
       assert :reflection in config.stages
       assert :calibration in config.stages
-      assert :search not in config.stages
+      refute :search in config.stages
       assert config.rag_config.enabled
       assert config.reflection_config.enabled
     end
@@ -107,8 +107,8 @@ defmodule Jido.AI.Accuracy.PresetsTest do
       assert :generation in config.stages
       assert :verification in config.stages
       assert :calibration in config.stages
-      assert :search not in config.stages
-      assert :reflection not in config.stages
+      refute :search in config.stages
+      refute :reflection in config.stages
       assert config.rag_config.enabled
       assert config.rag_config.correction
       assert config.calibration_config.medium_action == :with_citations
@@ -384,6 +384,7 @@ defmodule Jido.AI.Accuracy.PresetsTest do
     test "all presets pass PipelineConfig validation" do
       for preset <- Presets.list() do
         assert {:ok, config} = Presets.get(preset)
+
         assert :ok = PipelineConfig.validate(config),
                "Preset #{preset} failed validation"
       end
@@ -392,6 +393,7 @@ defmodule Jido.AI.Accuracy.PresetsTest do
     test "all presets include required stages" do
       for preset <- Presets.list() do
         assert {:ok, config} = Presets.get(preset)
+
         assert :generation in config.stages,
                "Preset #{preset} missing required generation stage"
       end

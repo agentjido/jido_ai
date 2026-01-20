@@ -69,10 +69,10 @@ defmodule Jido.AI.Strategies.ReAct do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.ReAct.Machine
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Tools.Registry
   alias ReqLLM.Context
@@ -297,7 +297,10 @@ defmodule Jido.AI.Strategies.ReAct do
     new_reqllm_tools = ToolAdapter.from_actions(new_tools)
 
     new_state =
-      StateOpsHelpers.apply_to_state(state, StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools))
+      StateOpsHelpers.apply_to_state(
+        state,
+        StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools)
+      )
 
     agent = StratState.put(agent, new_state)
     {agent, []}
@@ -313,7 +316,10 @@ defmodule Jido.AI.Strategies.ReAct do
     new_reqllm_tools = ToolAdapter.from_actions(new_tools)
 
     new_state =
-      StateOpsHelpers.apply_to_state(state, StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools))
+      StateOpsHelpers.apply_to_state(
+        state,
+        StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools)
+      )
 
     agent = StratState.put(agent, new_state)
     {agent, []}

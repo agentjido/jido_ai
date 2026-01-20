@@ -67,9 +67,10 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     end
 
     test "pipeline handles generator error gracefully" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       result = Pipeline.run(pipeline, "Test", generator: &error_generator/2)
 
@@ -81,9 +82,10 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     test "pipeline handles generator exception gracefully" do
       # Note: Currently generators that raise exceptions will crash
       # This is a known limitation - generators should handle their own exceptions
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       result = Pipeline.run(pipeline, "Test", generator: fn _q, _c -> raise "Intentional error" end)
 
@@ -94,15 +96,16 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
 
   describe "8.5.4.2 Calibration Tests" do
     test "calibration prevents low confidence answers" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            low_threshold: 0.5,
-            low_action: :abstain
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              low_threshold: 0.5,
+              low_action: :abstain
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Complex", generator: &low_confidence_generator/2)
 
@@ -112,14 +115,15 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     end
 
     test "calibration allows high confidence answers" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            high_threshold: 0.8
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              high_threshold: 0.8
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Simple", generator: &high_confidence_generator/2)
 
@@ -129,16 +133,17 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     end
 
     test "calibration can be configured to escalate" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            low_threshold: 0.6,
-            high_threshold: 0.9,
-            low_action: :escalate
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              low_threshold: 0.6,
+              high_threshold: 0.9,
+              low_action: :escalate
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Complex", generator: &normal_generator/2)
 
@@ -147,16 +152,17 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     end
 
     test "calibration respects medium action" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            high_threshold: 0.95,
-            low_threshold: 0.4,
-            medium_action: :with_verification
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              high_threshold: 0.95,
+              low_threshold: 0.4,
+              medium_action: :with_verification
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Medium", generator: &normal_generator/2)
 
@@ -165,15 +171,16 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     end
 
     test "abstained result contains helpful message" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            low_threshold: 0.5,
-            low_action: :abstain
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              low_threshold: 0.5,
+              low_action: :abstain
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Complex", generator: &low_confidence_generator/2)
 
@@ -181,22 +188,23 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
       assert result.action == :abstain
       # Answer should contain abstention text
       assert String.contains?(result.answer, "confident") or
-             String.contains?(result.answer, "abstain") or
-             String.contains?(result.answer, "uncertain")
+               String.contains?(result.answer, "abstain") or
+               String.contains?(result.answer, "uncertain")
     end
   end
 
   describe "8.5.4.3 Budget Tests" do
     test "pipeline respects max_candidates limit" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          generation_config: %{
-            min_candidates: 1,
-            max_candidates: 2
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            generation_config: %{
+              min_candidates: 1,
+              max_candidates: 2
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Test", generator: &normal_generator/2)
 
@@ -205,15 +213,16 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     end
 
     test "pipeline generation config is respected" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          generation_config: %{
-            min_candidates: 3,
-            max_candidates: 5
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            generation_config: %{
+              min_candidates: 3,
+              max_candidates: 5
+            }
           }
-        }
-      })
+        })
 
       # Config should be accessible
       assert pipeline.config.generation_config.max_candidates == 5
@@ -223,15 +232,16 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     test "pipeline accepts config with candidate limits" do
       # The config structure accepts the values
       # Validation may happen at pipeline execution time
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          generation_config: %{
-            min_candidates: 3,
-            max_candidates: 5
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            generation_config: %{
+              min_candidates: 3,
+              max_candidates: 5
+            }
           }
-        }
-      })
+        })
 
       # Config should be accessible
       assert pipeline.config.generation_config.max_candidates == 5
@@ -241,30 +251,34 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
 
   describe "8.5.4.4 Pipeline Resilience" do
     test "pipeline handles concurrent requests" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       # Run multiple pipelines concurrently
-      tasks = for i <- 1..5 do
-        Task.async(fn ->
-          Pipeline.run(pipeline, "Query #{i}", generator: &normal_generator/2)
-        end)
-      end
+      tasks =
+        for i <- 1..5 do
+          Task.async(fn ->
+            Pipeline.run(pipeline, "Query #{i}", generator: &normal_generator/2)
+          end)
+        end
 
       results = Task.await_many(tasks, 5000)
 
       # All should complete successfully
       assert length(results) == 5
+
       for {:ok, result} <- results do
         assert %PipelineResult{} = result
       end
     end
 
     test "pipeline state is isolated between runs" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       # Run pipeline multiple times
       {:ok, result1} = Pipeline.run(pipeline, "Query 1", generator: &normal_generator/2)
@@ -277,9 +291,10 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     end
 
     test "pipeline trace is complete" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Test", generator: &normal_generator/2)
 
@@ -298,9 +313,10 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
 
   describe "8.5.4.5 Error Recovery" do
     test "pipeline returns informative error for timeout" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       # Very short timeout with slow generator
       slow_gen = fn _q, _c ->
@@ -314,21 +330,23 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
     end
 
     test "pipeline metadata includes stages completed" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Test", generator: &normal_generator/2)
 
       # Should track which stages completed
       assert is_list(result.metadata.stages_completed)
-      assert length(result.metadata.stages_completed) > 0
+      refute Enum.empty?(result.metadata.stages_completed)
     end
 
     test "pipeline handles missing optional stages" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Test", generator: &normal_generator/2)
 

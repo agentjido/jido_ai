@@ -94,8 +94,7 @@ defmodule Jido.AI.Skills.Reasoning do
       default_model:
         Zoi.atom(description: "Default model alias (:fast, :capable, :reasoning)")
         |> Zoi.default(:reasoning),
-      default_max_tokens:
-        Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(2048),
+      default_max_tokens: Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(2048),
       default_temperature:
         Zoi.float(description: "Default sampling temperature (0.0-2.0)")
         |> Zoi.default(0.3)

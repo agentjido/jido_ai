@@ -237,8 +237,10 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrmTest do
 
       assert Enum.at(scores, 0) == 0.8
       assert Enum.at(scores, 1) == 0.9
-      assert Enum.at(scores, 2) == 0.5  # default
-      assert Enum.at(scores, 3) == 0.5  # default
+      # default
+      assert Enum.at(scores, 2) == 0.5
+      # default
+      assert Enum.at(scores, 3) == 0.5
     end
 
     test "truncates extra scores when more scores than steps" do
@@ -324,9 +326,12 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrmTest do
 
       assert String.contains?(prompt, "What is 2+2?")
       assert String.contains?(prompt, "2 + 2 = 4")
-      assert String.contains?(prompt, "0.0")  # min_score
-      assert String.contains?(prompt, "1.0")  # max_score
-      assert String.contains?(prompt, "0.5")  # mid_score
+      # min_score
+      assert String.contains?(prompt, "0.0")
+      # max_score
+      assert String.contains?(prompt, "1.0")
+      # mid_score
+      assert String.contains?(prompt, "0.5")
     end
 
     test "renders step prompt with previous steps" do
@@ -359,9 +364,12 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrmTest do
 
       prompt = render_step_prompt_test(prm, "Question", "Step", [])
 
-      assert String.contains?(prompt, "0")  # min
-      assert String.contains?(prompt, "100")  # max
-      assert String.contains?(prompt, "50")  # mid
+      # min
+      assert String.contains?(prompt, "0")
+      # max
+      assert String.contains?(prompt, "100")
+      # mid
+      assert String.contains?(prompt, "50")
     end
   end
 
@@ -456,7 +464,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrmTest do
     else
       # Build map of step index to score
       scores_map =
-        Enum.into(captures, %{}, fn [_, index_str, score_str] ->
+        Map.new(captures, fn [_, index_str, score_str] ->
           {String.to_integer(index_str) - 1, parse_score_value_test(score_str)}
         end)
 
@@ -493,8 +501,12 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrmTest do
 
   defp parse_score_value_test(str) do
     case Float.parse(str) do
-      {score, ""} -> score
-      {score, _rest} -> score
+      {score, ""} ->
+        score
+
+      {score, _rest} ->
+        score
+
       :error ->
         case Integer.parse(str) do
           {score, ""} -> score * 1.0
@@ -553,8 +565,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrmTest do
     formatted_steps =
       steps
       |> Enum.with_index(1)
-      |> Enum.map(fn {step, i} -> "#{i}. #{step}" end)
-      |> Enum.join("\n")
+      |> Enum.map_join("\n", fn {step, i} -> "#{i}. #{step}" end)
 
     assigns = [
       question: question || "",

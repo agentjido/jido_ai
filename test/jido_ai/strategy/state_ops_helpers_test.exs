@@ -5,8 +5,8 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.Agent.StateOp
+  alias Jido.AI.Strategy.StateOpsHelpers
 
   doctest StateOpsHelpers
 
@@ -435,6 +435,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
         StateOpsHelpers.set_strategy_field(:status, :running),
         StateOpsHelpers.set_strategy_field(:count, 5)
       ]
+
       result = StateOpsHelpers.apply_to_state(%{}, ops)
 
       assert result.status == :running

@@ -146,7 +146,9 @@ defmodule Jido.AI.Accuracy.RateLimiter do
     # Get or initialize window start time
     window_start =
       case :ets.lookup(@table_name, {key, :window_start}) do
-        [{_, start}] -> start
+        [{_, start}] ->
+          start
+
         [] ->
           :ets.insert(@table_name, {{key, :window_start}, now})
           now
@@ -241,10 +243,8 @@ defmodule Jido.AI.Accuracy.RateLimiter do
   end
 
   defp ets_delete(table, key) do
-    try do
-      :ets.delete(table, key)
-    rescue
-      ArgumentError -> :ok
-    end
+    :ets.delete(table, key)
+  rescue
+    ArgumentError -> :ok
   end
 end

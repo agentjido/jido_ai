@@ -90,21 +90,21 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, Config}
-  alias Jido.AI.Accuracy.Generators.LLMGenerator
-  alias Jido.AI.Accuracy.Aggregators.MajorityVote
   alias Jido.AI.Accuracy.Aggregators.BestOfN
+  alias Jido.AI.Accuracy.Aggregators.MajorityVote
   alias Jido.AI.Accuracy.Aggregators.Weighted
+  alias Jido.AI.Accuracy.Generators.LLMGenerator
+  alias Jido.AI.Accuracy.{Candidate, Config}
 
   @type result :: {:ok, Candidate.t(), metadata()} | {:error, term()}
 
   @type metadata :: %{
-    confidence: number(),
-    num_candidates: non_neg_integer(),
-    aggregator: atom() | module(),
-    total_tokens: non_neg_integer() | nil,
-    aggregation_metadata: map()
-  }
+          confidence: number(),
+          num_candidates: non_neg_integer(),
+          aggregator: atom() | module(),
+          total_tokens: non_neg_integer() | nil,
+          aggregation_metadata: map()
+        }
 
   @type opts :: keyword()
 
@@ -333,12 +333,10 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
         # Validate it's a module that implements Generator behavior
         Code.ensure_loaded?(module)
 
-        cond do
-          function_exported?(module, :generate_candidates, 3) ->
-            :ok
-
-          true ->
-            {:error, :invalid_generator}
+        if function_exported?(module, :generate_candidates, 3) do
+          :ok
+        else
+          {:error, :invalid_generator}
         end
 
       %_struct{} ->
@@ -405,10 +403,10 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   defp remove_pii_patterns(prompt) when is_binary(prompt) do
     # Remove common PII patterns (email, phone, credit card, etc.)
     prompt
-    |> (&Regex.replace(~r/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, &1, "[EMAIL]")).()
-    |> (&Regex.replace(~r/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/, &1, "[PHONE]")).()
-    |> (&Regex.replace(~r/\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/, &1, "[CARD]")).()
-    |> (&Regex.replace(~r/\b\d{3}-\d{2}-\d{4}\b/, &1, "[SSN]", [])).()
+    |> then(&Regex.replace(~r/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/, &1, "[EMAIL]"))
+    |> then(&Regex.replace(~r/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/, &1, "[PHONE]"))
+    |> then(&Regex.replace(~r/\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/, &1, "[CARD]"))
+    |> then(&Regex.replace(~r/\b\d{3}-\d{2}-\d{4}\b/, &1, "[SSN]", []))
   end
 
   defp remove_pii_patterns(other), do: other
@@ -429,16 +427,20 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   defp emit_exception(start_time, error) do
     duration = System.monotonic_time(:millisecond) - start_time
 
-    exception_metadata = case error do
-      {kind, reason, _} when is_atom(kind) ->
-        %{kind: kind, reason: reason}
-      {kind, reason} when is_atom(kind) ->
-        %{kind: kind, reason: reason}
-      reason when is_atom(reason) ->
-        %{kind: :error, reason: reason}
-      _ ->
-        %{kind: :error, reason: :unknown}
-    end
+    exception_metadata =
+      case error do
+        {kind, reason, _} when is_atom(kind) ->
+          %{kind: kind, reason: reason}
+
+        {kind, reason} when is_atom(kind) ->
+          %{kind: kind, reason: reason}
+
+        reason when is_atom(reason) ->
+          %{kind: :error, reason: reason}
+
+        _ ->
+          %{kind: :error, reason: :unknown}
+      end
 
     :telemetry.execute([:jido, :accuracy, :self_consistency, :exception], %{duration: duration}, exception_metadata)
   end

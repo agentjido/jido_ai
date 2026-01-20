@@ -67,7 +67,7 @@ defmodule Jido.AI.Accuracy.CritiqueTest do
       assert {:ok, result} = MockCritiquer.critique(candidate, %{})
 
       assert result.severity == 0.5
-      assert length(result.issues) > 0
+      refute Enum.empty?(result.issues)
     end
 
     test "critique includes content in issues" do
@@ -76,8 +76,8 @@ defmodule Jido.AI.Accuracy.CritiqueTest do
       assert {:ok, result} = MockCritiquer.critique(candidate, %{})
 
       assert Enum.any?(result.issues, fn issue ->
-        String.contains?(issue, "specific content")
-      end)
+               String.contains?(issue, "specific content")
+             end)
     end
   end
 

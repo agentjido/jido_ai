@@ -85,15 +85,13 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
           max_content_length: pos_integer()
         }
 
-  defstruct [
-    model: nil,
-    prompt_template: nil,
-    score_range: {0.0, 1.0},
-    temperature: 0.3,
-    timeout: 30_000,
-    max_retries: 2,
-    max_content_length: 50_000
-  ]
+  defstruct model: nil,
+            prompt_template: nil,
+            score_range: {0.0, 1.0},
+            temperature: 0.3,
+            timeout: 30_000,
+            max_retries: 2,
+            max_content_length: 50_000
 
   @default_prompt_template """
   You are an expert evaluator assessing the quality and correctness of answers.
@@ -323,14 +321,19 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
     %VerificationResult{
       score: score,
       reasoning: reasoning,
-      confidence: nil  # LLM provides its own confidence implicitly
+      # LLM provides its own confidence implicitly
+      confidence: nil
     }
   end
 
   defp extract_content(response) do
     case response.message.content do
-      nil -> ""
-      content when is_binary(content) -> content
+      nil ->
+        ""
+
+      content when is_binary(content) ->
+        content
+
       content when is_list(content) ->
         content
         |> Enum.filter(fn %{type: type} -> type == :text end)
@@ -387,24 +390,22 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   end
 
   defp render_prompt(template, prompt, candidate_or_candidates, score_range) do
-    try do
-      {min_score, max_score} = score_range
-      mid_score = (min_score + max_score) / 2
+    {min_score, max_score} = score_range
+    mid_score = (min_score + max_score) / 2
 
-      assigns = [
-        prompt: prompt,
-        candidate: build_candidate_assign(candidate_or_candidates),
-        min_score: min_score,
-        max_score: max_score,
-        mid_score: mid_score
-      ]
+    assigns = [
+      prompt: prompt,
+      candidate: build_candidate_assign(candidate_or_candidates),
+      min_score: min_score,
+      max_score: max_score,
+      mid_score: mid_score
+    ]
 
-      rendered = EEx.eval_string(template, assigns: assigns)
-      {:ok, rendered}
-    rescue
-      e in [SyntaxError, TokenMissingError, ArgumentError] ->
-        {:error, {:template_error, Exception.message(e)}}
-    end
+    rendered = EEx.eval_string(template, assigns: assigns)
+    {:ok, rendered}
+  rescue
+    e in [SyntaxError, TokenMissingError, ArgumentError] ->
+      {:error, {:template_error, Exception.message(e)}}
   end
 
   defp build_candidate_assign(%Candidate{} = candidate) do
@@ -449,9 +450,9 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
     |> String.replace(~r/\n{4,}/, "\n\n\n")
   end
 
-  defp build_batch_template(verifier, count) do
+  defp build_batch_template(verifier, _count) do
     {min_score, max_score} = verifier.score_range
-    mid_score = (min_score + max_score) / 2
+    _mid_score = (min_score + max_score) / 2
 
     """
     You are an expert evaluator assessing the quality and correctness of answers.
@@ -500,21 +501,25 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
 
   defp parse_batch_results({:error, reason}, _candidates), do: {:error, reason}
 
-  defp extract_batch_scores(content, count) do
+  defp extract_batch_scores(content, _count) do
     # Extract scores in format "Candidate X: Score: Y"
     pattern = ~r/Candidate (\d+):\s*(?:.*?\s*)?Score:\s*(-?\d+\.?\d*)/i
 
     captures = Regex.scan(pattern, content)
 
-    Enum.into(captures, %{}, fn [_, id, score_str] ->
+    Map.new(captures, fn [_, id, score_str] ->
       {String.to_integer(id), parse_score_value(score_str)}
     end)
   end
 
   defp parse_score_value(str) do
     case Float.parse(str) do
-      {score, ""} -> score
-      {score, _} -> score
+      {score, ""} ->
+        score
+
+      {score, _} ->
+        score
+
       :error ->
         case Integer.parse(str) do
           {score, ""} -> score * 1.0

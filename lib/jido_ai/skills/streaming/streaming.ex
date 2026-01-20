@@ -1,7 +1,7 @@
+require Jido.AI.Skills.Streaming.Actions.EndStream
+require Jido.AI.Skills.Streaming.Actions.ProcessTokens
 # Ensure actions are compiled before the skill
 require Jido.AI.Skills.Streaming.Actions.StartStream
-require Jido.AI.Skills.Streaming.Actions.ProcessTokens
-require Jido.AI.Skills.Streaming.Actions.EndStream
 
 defmodule Jido.AI.Skills.Streaming do
   @moduledoc """
@@ -130,8 +130,7 @@ defmodule Jido.AI.Skills.Streaming do
       default_model:
         Zoi.atom(description: "Default model alias (:fast, :capable)")
         |> Zoi.default(:fast),
-      default_max_tokens:
-        Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(1024),
+      default_max_tokens: Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(1024),
       default_temperature:
         Zoi.float(description: "Default sampling temperature (0.0-2.0)")
         |> Zoi.default(0.7),

@@ -200,13 +200,11 @@ defmodule Jido.AI.Accuracy.Candidate do
   """
   @spec from_map(map()) :: {:ok, t()} | {:error, term()}
   def from_map(map) when is_map(map) do
-    try do
-      attrs = extract_attrs_from_map(map)
-      new(attrs)
-    rescue
-      _e in [ArgumentError, KeyError, MatchError] ->
-        {:error, :invalid_map}
-    end
+    attrs = extract_attrs_from_map(map)
+    new(attrs)
+  rescue
+    _e in [ArgumentError, KeyError, MatchError] ->
+      {:error, :invalid_map}
   end
 
   def from_map(_invalid) do

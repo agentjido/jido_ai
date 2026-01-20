@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficultyTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
   alias Jido.AI.Accuracy.Estimators.HeuristicDifficulty
+  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
 
   @moduletag :capture_log
 
@@ -88,8 +88,10 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficultyTest do
 
       for query <- simple_queries do
         assert {:ok, estimate} = HeuristicDifficulty.estimate(context.estimator, query, %{})
+
         assert DifficultyEstimate.easy?(estimate) or DifficultyEstimate.medium?(estimate),
                "Expected easy or medium for: #{query}"
+
         assert estimate.score < 0.5, "Expected low score for: #{query}"
       end
     end

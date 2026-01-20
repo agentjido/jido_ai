@@ -167,7 +167,8 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifier do
     result = %VerificationResult{
       candidate_id: candidate.id,
       score: score,
-      confidence: 1.0,  # Deterministic = 100% confidence
+      # Deterministic = 100% confidence
+      confidence: 1.0,
       reasoning: reasoning
     }
 
@@ -273,8 +274,11 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifier do
         String.trim(List.last(match))
 
       # Fallback: last line if multiple lines
-      length(lines) > 1 -> List.last(lines)
-      true -> content
+      length(lines) > 1 ->
+        List.last(lines)
+
+      true ->
+        content
     end
   end
 
@@ -282,8 +286,12 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifier do
 
   defp extract_number(value) when is_binary(value) do
     case Float.parse(value) do
-      {num, ""} -> num
-      {num, _rest} -> num
+      {num, ""} ->
+        num
+
+      {num, _rest} ->
+        num
+
       :error ->
         case Integer.parse(value) do
           {num, ""} -> num * 1.0
@@ -315,6 +323,7 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifier do
   defp maybe_normalize_whitespace(str, _other) when is_binary(str) do
     String.replace(str, ~r/\s+/, " ") |> String.trim()
   end
+
   defp maybe_normalize_whitespace(val, _other), do: val
 
   defp build_reasoning(verifier, answer, ground_truth, score) do

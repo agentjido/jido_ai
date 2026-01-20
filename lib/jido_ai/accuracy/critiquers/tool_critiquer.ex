@@ -319,8 +319,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquer do
       failed_tools =
         tool_results
         |> Enum.reject(fn r -> r.success end)
-        |> Enum.map(fn r -> r.tool_name end)
-        |> Enum.join(", ")
+        |> Enum.map_join(", ", fn r -> r.tool_name end)
 
       "Some tools failed: #{failed_tools} (#{passed}/#{total} passed)"
     end

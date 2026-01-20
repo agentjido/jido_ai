@@ -8,9 +8,6 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
 
   use ExUnit.Case, async: false
 
-  @moduletag :integration
-  @moduletag :adaptive
-
   alias Jido.AI.Accuracy.{
     DifficultyEstimate,
     ComputeBudgeter,
@@ -19,6 +16,9 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
     Candidate,
     Estimators.HeuristicDifficulty
   }
+
+  @moduletag :integration
+  @moduletag :adaptive
 
   describe "7.4.1 Adaptive Budgeting Tests" do
     setup do
@@ -31,20 +31,20 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
       # Create consistent and varied generators for testing
       consistent_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "The answer is: 42",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "The answer is: 42",
+           model: "test"
+         })}
       end
 
       varied_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "Answer #{:rand.uniform(1000)}",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "Answer #{:rand.uniform(1000)}",
+           model: "test"
+         })}
       end
 
       %{
@@ -170,31 +170,32 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
 
   describe "7.4.2 Cost-Effectiveness Tests" do
     setup do
-      adapter = AdaptiveSelfConsistency.new!(%{
-        min_candidates: 3,
-        max_candidates: 20,
-        batch_size: 3,
-        early_stop_threshold: 0.8
-      })
+      adapter =
+        AdaptiveSelfConsistency.new!(%{
+          min_candidates: 3,
+          max_candidates: 20,
+          batch_size: 3,
+          early_stop_threshold: 0.8
+        })
 
       # Consistent generator triggers early stopping
       consistent_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "The answer is: 42",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "The answer is: 42",
+           model: "test"
+         })}
       end
 
       # Varied generator prevents early stopping
       varied_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "Answer #{:rand.uniform(1000)}",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "Answer #{:rand.uniform(1000)}",
+           model: "test"
+         })}
       end
 
       %{
@@ -209,17 +210,20 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
       {:ok, estimate} = DifficultyEstimate.new(%{level: :easy, score: 0.2})
 
       # Run adaptive self-consistency
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "What is 2+2?",
-        difficulty_estimate: estimate,
-        generator: context.consistent_generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "What is 2+2?",
+          difficulty_estimate: estimate,
+          generator: context.consistent_generator
+        )
 
       # With consistent answers, early stopping should kick in
       # Actual N should be much less than max
-      assert metadata.actual_n <= 5  # Easy max is 5
-      assert metadata.actual_n >= 3  # Min candidates
+      # Easy max is 5
+      assert metadata.actual_n <= 5
+      # Min candidates
+      assert metadata.actual_n >= 3
       assert metadata.early_stopped == true
     end
 
@@ -227,12 +231,13 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
       # With consistent generator, all answers are identical
       {:ok, estimate} = DifficultyEstimate.new(%{level: :medium, score: 0.5})
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Test query",
-        difficulty_estimate: estimate,
-        generator: context.consistent_generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Test query",
+          difficulty_estimate: estimate,
+          generator: context.consistent_generator
+        )
 
       # Early stopping should occur
       assert metadata.early_stopped == true
@@ -246,16 +251,18 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
       # With varied generator, answers differ
       {:ok, estimate} = DifficultyEstimate.new(%{level: :medium, score: 0.5})
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Test query",
-        difficulty_estimate: estimate,
-        generator: context.varied_generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Test query",
+          difficulty_estimate: estimate,
+          generator: context.varied_generator
+        )
 
       # Without consensus, generates up to max_n for medium (10)
       # because it keeps trying to find consensus
-      assert metadata.actual_n == 10  # max_n for medium
+      # max_n for medium
+      assert metadata.actual_n == 10
       # No early stopping
       assert metadata.early_stopped == false
       # Consensus should be low (no clear majority)
@@ -288,26 +295,30 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
       # Easy question
       {:ok, easy_estimate} = DifficultyEstimate.new(%{level: :easy, score: 0.2})
 
-      {:ok, _easy_result, easy_metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "What is 2+2?",
-        difficulty_estimate: easy_estimate,
-        generator: context.varied_generator
-      )
+      {:ok, _easy_result, easy_metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "What is 2+2?",
+          difficulty_estimate: easy_estimate,
+          generator: context.varied_generator
+        )
 
       # Hard question
       {:ok, hard_estimate} = DifficultyEstimate.new(%{level: :hard, score: 0.8})
 
-      {:ok, _hard_result, hard_metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Explain quantum entanglement",
-        difficulty_estimate: hard_estimate,
-        generator: context.varied_generator
-      )
+      {:ok, _hard_result, hard_metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Explain quantum entanglement",
+          difficulty_estimate: hard_estimate,
+          generator: context.varied_generator
+        )
 
       # Hard should use more candidates than easy
-      assert easy_metadata.actual_n <= 5  # Easy max
-      assert hard_metadata.actual_n >= 10  # Hard min
+      # Easy max
+      assert easy_metadata.actual_n <= 5
+      # Hard min
+      assert hard_metadata.actual_n >= 10
       assert hard_metadata.actual_n > easy_metadata.actual_n
     end
   end
@@ -370,7 +381,10 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
 
       # Long query
       long_query =
-        String.duplicate("Explain the history of the Roman Empire including its military conquests, political structure, economic systems, cultural achievements, and eventual decline. ", 10)
+        String.duplicate(
+          "Explain the history of the Roman Empire including its military conquests, political structure, economic systems, cultural achievements, and eventual decline. ",
+          10
+        )
 
       # Both should be fast
       {short_time, _} = :timer.tc(fn -> HeuristicDifficulty.estimate(heuristic, short_query, %{}) end)
@@ -418,7 +432,8 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
 
       # 6. Verify results
       assert result != nil
-      assert metadata.actual_n == 3  # Min candidates with early stop
+      # Min candidates with early stop
+      assert metadata.actual_n == 3
       assert metadata.early_stopped == true
       assert metadata.consensus >= 0.8
       assert metadata.difficulty_level == :easy

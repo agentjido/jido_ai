@@ -14,8 +14,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Skills.LLM
-  alias Jido.AI.Skills.Reasoning
   alias Jido.AI.Skills.Planning
+  alias Jido.AI.Skills.Reasoning
   alias Jido.AI.Skills.Streaming
   alias Jido.AI.Skills.ToolCalling
 
@@ -65,7 +65,10 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
       # No overlap in action modules
       all_actions =
-        llm_actions ++ reasoning_actions ++ planning_actions ++ streaming_actions ++
+        llm_actions ++
+          reasoning_actions ++
+          planning_actions ++
+          streaming_actions ++
           tool_calling_actions
 
       assert length(Enum.uniq(all_actions)) == length(all_actions)
@@ -278,8 +281,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       llm_actions = LLM.actions()
       reasoning_actions = Reasoning.actions()
 
-      assert length(llm_actions) > 0
-      assert length(reasoning_actions) > 0
+      refute Enum.empty?(llm_actions)
+      refute Enum.empty?(reasoning_actions)
     end
 
     test "Planning and Tool Calling skills can be used together" do

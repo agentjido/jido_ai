@@ -69,14 +69,14 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
 
   """
 
+  @behaviour SearchController
+
   alias Jido.AI.Accuracy.{
     Candidate,
     SearchController,
     Similarity,
     VerificationResult
   }
-
-  @behaviour SearchController
 
   @type t :: %__MODULE__{
           num_candidates: pos_integer(),
@@ -134,7 +134,11 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
     timeout = SearchController.get_timeout(opts, 30_000)
 
     with {:ok, config} <- new(opts),
-         :ok <- SearchController.validate_opts(Keyword.drop(opts, [:num_candidates, :diversity_threshold, :temperature_range, :lambda, :timeout]), []) do
+         :ok <-
+           SearchController.validate_opts(
+             Keyword.drop(opts, [:num_candidates, :diversity_threshold, :temperature_range, :lambda, :timeout]),
+             []
+           ) do
       do_search(prompt, generator, verifier, config, start_time, timeout)
     end
   end
@@ -178,10 +182,11 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
       end)
 
     # Filter out errors
-    successful = Enum.filter(candidates, fn
-      {:ok, _} -> true
-      _ -> false
-    end)
+    successful =
+      Enum.filter(candidates, fn
+        {:ok, _} -> true
+        _ -> false
+      end)
 
     if Enum.empty?(successful) do
       {:error, :no_candidates}
@@ -305,7 +310,7 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
       end)
 
     # Select candidate with highest MMR score
-    {best_score, best_candidate} = Enum.max_by(scored_remaining, fn {score, _} -> score end, fn -> {0.0, nil} end)
+    {_best_score, best_candidate} = Enum.max_by(scored_remaining, fn {score, _} -> score end, fn -> {0.0, nil} end)
 
     if best_candidate == nil do
       Enum.reverse(selected)
@@ -332,7 +337,8 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
       if max_sim > threshold do
         max_sim
       else
-        max_sim * 0.5  # Reduced penalty if below threshold
+        # Reduced penalty if below threshold
+        max_sim * 0.5
       end
 
     # MMR score: lambda * relevance - (1 - lambda) * diversity_penalty

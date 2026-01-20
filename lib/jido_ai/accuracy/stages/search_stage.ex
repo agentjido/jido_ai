@@ -28,9 +28,9 @@ defmodule Jido.AI.Accuracy.Stages.SearchStage do
 
   """
 
-  alias Jido.AI.Accuracy.PipelineStage
+  @behaviour Jido.AI.Accuracy.PipelineStage
 
-  @behaviour PipelineStage
+  alias Jido.AI.Accuracy.PipelineStage
 
   @type t :: %__MODULE__{
           enabled: boolean(),
@@ -40,13 +40,11 @@ defmodule Jido.AI.Accuracy.Stages.SearchStage do
           timeout: pos_integer()
         }
 
-  defstruct [
-    enabled: true,
-    algorithm: :beam_search,
-    beam_width: 5,
-    iterations: 50,
-    timeout: 10_000
-  ]
+  defstruct enabled: true,
+            algorithm: :beam_search,
+            beam_width: 5,
+            iterations: 50,
+            timeout: 10_000
 
   @impl PipelineStage
   def name, do: :search
@@ -147,15 +145,14 @@ defmodule Jido.AI.Accuracy.Stages.SearchStage do
 
   # Try to get MCTS module if available
   defp get_mcts_module do
-    try do
-      module = Module.safe_concat([Jido, AI, Accuracy, Search, MCTS])
-      if Code.ensure_loaded?(module) do
-        {:ok, module}
-      else
-        {:error, :not_found}
-      end
-    rescue
-      _ -> {:error, :not_found}
+    module = Module.safe_concat([Jido, AI, Accuracy, Search, MCTS])
+
+    if Code.ensure_loaded?(module) do
+      {:ok, module}
+    else
+      {:error, :not_found}
     end
+  rescue
+    _ -> {:error, :not_found}
   end
 end

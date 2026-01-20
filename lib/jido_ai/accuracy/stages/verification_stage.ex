@@ -29,14 +29,13 @@ defmodule Jido.AI.Accuracy.Stages.VerificationStage do
 
   """
 
+  @behaviour PipelineStage
+
   alias Jido.AI.Accuracy.{
     PipelineStage,
     VerificationRunner,
-    VerificationResult,
     Candidate
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           use_outcome: boolean(),
@@ -46,13 +45,11 @@ defmodule Jido.AI.Accuracy.Stages.VerificationStage do
           timeout: pos_integer()
         }
 
-  defstruct [
-    use_outcome: true,
-    use_process: true,
-    verifiers: [],
-    parallel: false,
-    timeout: 30_000
-  ]
+  defstruct use_outcome: true,
+            use_process: true,
+            verifiers: [],
+            parallel: false,
+            timeout: 30_000
 
   @impl PipelineStage
   def name, do: :verification
@@ -114,37 +111,33 @@ defmodule Jido.AI.Accuracy.Stages.VerificationStage do
         })
 
       # Verify all candidates
-      case VerificationRunner.verify_all_candidates(runner, candidates, context) do
-        {:ok, results} when is_list(results) ->
-          # Update candidates with scores
-          scored_candidates =
-            Enum.zip(candidates, results)
-            |> Enum.map(fn {candidate, result} ->
-              Candidate.update_score(candidate, result.score)
-            end)
+      {:ok, results} = VerificationRunner.verify_all_candidates(runner, candidates, context)
 
-          # Find best candidate
-          best_candidate =
-            scored_candidates
-            |> Enum.filter(fn c -> is_number(c.score) end)
-            |> Enum.sort_by(fn c -> c.score end, :desc)
-            |> List.first()
+      # Update candidates with scores
+      scored_candidates =
+        Enum.zip(candidates, results)
+        |> Enum.map(fn {candidate, result} ->
+          Candidate.update_score(candidate, result.score)
+        end)
 
-          updated_state =
-            input
-            |> Map.put(:candidates, scored_candidates)
-            |> Map.put(:best_candidate, best_candidate)
-            |> Map.put(:verification_results, results)
+      # Find best candidate
+      best_candidate =
+        scored_candidates
+        |> Enum.filter(fn c -> is_number(c.score) end)
+        |> Enum.sort_by(fn c -> c.score end, :desc)
+        |> List.first()
 
-          {:ok, updated_state,
-           %{
-             num_verified: length(results),
-             best_score: if(best_candidate, do: best_candidate.score, else: nil)
-           }}
+      updated_state =
+        input
+        |> Map.put(:candidates, scored_candidates)
+        |> Map.put(:best_candidate, best_candidate)
+        |> Map.put(:verification_results, results)
 
-        {:error, reason} ->
-          {:error, {:verification_failed, reason}}
-      end
+      {:ok, updated_state,
+       %{
+         num_verified: length(results),
+         best_score: if(best_candidate, do: best_candidate.score)
+       }}
     end
   end
 
@@ -190,29 +183,27 @@ defmodule Jido.AI.Accuracy.Stages.VerificationStage do
 
   # Try to get outcome verifier module if available
   defp get_outcome_verifier do
-    try do
-      module = Module.safe_concat([Jido, AI, Accuracy, Verifiers, LLMOutcomeVerifier])
-      if Code.ensure_loaded?(module) do
-        {:ok, module}
-      else
-        {:error, :not_found}
-      end
-    rescue
-      _ -> {:error, :not_found}
+    module = Module.safe_concat([Jido, AI, Accuracy, Verifiers, LLMOutcomeVerifier])
+
+    if Code.ensure_loaded?(module) do
+      {:ok, module}
+    else
+      {:error, :not_found}
     end
+  rescue
+    _ -> {:error, :not_found}
   end
 
   # Try to get process verifier module if available
   defp get_process_verifier do
-    try do
-      module = Module.safe_concat([Jido, AI, Accuracy, Verifiers, LLMProcessVerifier])
-      if Code.ensure_loaded?(module) do
-        {:ok, module}
-      else
-        {:error, :not_found}
-      end
-    rescue
-      _ -> {:error, :not_found}
+    module = Module.safe_concat([Jido, AI, Accuracy, Verifiers, LLMProcessVerifier])
+
+    if Code.ensure_loaded?(module) do
+      {:ok, module}
+    else
+      {:error, :not_found}
     end
+  rescue
+    _ -> {:error, :not_found}
   end
 end

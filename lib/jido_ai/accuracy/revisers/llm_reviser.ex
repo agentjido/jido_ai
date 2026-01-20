@@ -151,15 +151,16 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
     with :ok <- validate_model(resolved_model),
          :ok <- validate_temperature(Keyword.get(opts, :temperature, 0.5)),
          :ok <- validate_timeout(Keyword.get(opts, :timeout, 30_000)) do
-      reviser = struct(__MODULE__, [
-        model: resolved_model,
-        prompt_template: Keyword.get(opts, :prompt_template),
-        preserve_correct: Keyword.get(opts, :preserve_correct, true),
-        temperature: Keyword.get(opts, :temperature, 0.5),
-        timeout: Keyword.get(opts, :timeout, 30_000),
-        max_retries: Keyword.get(opts, :max_retries, 2),
-        domain: Keyword.get(opts, :domain)
-      ])
+      reviser =
+        struct(__MODULE__,
+          model: resolved_model,
+          prompt_template: Keyword.get(opts, :prompt_template),
+          preserve_correct: Keyword.get(opts, :preserve_correct, true),
+          temperature: Keyword.get(opts, :temperature, 0.5),
+          timeout: Keyword.get(opts, :timeout, 30_000),
+          max_retries: Keyword.get(opts, :max_retries, 2),
+          domain: Keyword.get(opts, :domain)
+        )
 
       {:ok, reviser}
     end
@@ -201,22 +202,24 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
       parts_preserved = Map.get(parsed, "parts_preserved", [])
 
       # Build revised candidate with metadata tracking changes
-      revised_candidate = Candidate.new!(%{
-        id: generate_revised_id(candidate.id, revision_count),
-        content: improved_content,
-        score: nil,  # Score would be re-evaluated
-        reasoning: candidate.reasoning,
-        metadata:
-          Map.merge(candidate.metadata || %{}, %{
-            revision_of: candidate.id,
-            revision_count: revision_count + 1,
-            changes_made: changes_made,
-            parts_preserved: parts_preserved,
-            reviser: :llm,
-            model: reviser.model,
-            original_severity: critique.severity
-          })
-      })
+      revised_candidate =
+        Candidate.new!(%{
+          id: generate_revised_id(candidate.id, revision_count),
+          content: improved_content,
+          # Score would be re-evaluated
+          score: nil,
+          reasoning: candidate.reasoning,
+          metadata:
+            Map.merge(candidate.metadata || %{}, %{
+              revision_of: candidate.id,
+              revision_count: revision_count + 1,
+              changes_made: changes_made,
+              parts_preserved: parts_preserved,
+              reviser: :llm,
+              model: reviser.model,
+              original_severity: critique.severity
+            })
+        })
 
       {:ok, revised_candidate}
     end
@@ -308,8 +311,12 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
 
   defp extract_content(response) do
     case response.message.content do
-      nil -> ""
-      content when is_binary(content) -> content
+      nil ->
+        ""
+
+      content when is_binary(content) ->
+        content
+
       content when is_list(content) ->
         content
         |> Enum.filter(fn %{type: type} -> type == :text end)
@@ -362,6 +369,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
 
   defp compute_content_diff("", ""), do: :unchanged
   defp compute_content_diff(original, original), do: :unchanged
+
   defp compute_content_diff(original, revised) do
     # Simple line-by-line diff
     original_lines = String.split(original, "\n")
@@ -401,8 +409,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
   defp validate_temperature(temp) when is_number(temp) and temp >= 0.0 and temp <= 2.0, do: :ok
   defp validate_temperature(_), do: {:error, :invalid_temperature}
 
-  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000,
-    do: :ok
+  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000, do: :ok
 
   defp validate_timeout(_), do: {:error, :invalid_timeout}
   defp format_error(atom) when is_atom(atom), do: atom

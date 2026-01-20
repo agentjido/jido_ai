@@ -198,13 +198,14 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
 
   defp validate_prompt_if_required(nil, true, _max_length), do: {:error, :empty_string}
   defp validate_prompt_if_required("", true, _max_length), do: {:error, :empty_string}
+
   defp validate_prompt_if_required(prompt, true, max_length) when is_binary(prompt) do
     Security.validate_string(prompt, max_length: max_length)
   end
+
   defp validate_prompt_if_required(_, false, _max_length), do: {:ok, nil}
 
-  defp validate_system_prompt_if_present(%{system_prompt: system_prompt}, max_length)
-       when is_binary(system_prompt) do
+  defp validate_system_prompt_if_present(%{system_prompt: system_prompt}, max_length) when is_binary(system_prompt) do
     Security.validate_string(system_prompt, max_length: max_length)
   end
 

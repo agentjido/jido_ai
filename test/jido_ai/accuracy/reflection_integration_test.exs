@@ -20,7 +20,7 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     def critique(_critiquer, %Candidate{}, context) do
       iteration = Map.get(context, :iteration, 0)
       # Severity decreases with iterations
-      severity = 0.9 - (iteration * 0.35)
+      severity = 0.9 - iteration * 0.35
       severity = max(severity, 0.1)
 
       issues =
@@ -64,7 +64,7 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
        Candidate.new!(%{
          id: "#{candidate.id}-rev#{iteration}",
          content: String.trim(new_content),
-         score: 0.3 + (iteration * 0.25),
+         score: 0.3 + iteration * 0.25,
          metadata: Map.put(candidate.metadata || %{}, :iteration, iteration)
        })}
     end
@@ -166,10 +166,10 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
         end
 
       issues =
-        if !String.contains?(text, ".") do
-          ["Missing punctuation" | issues]
-        else
+        if String.contains?(text, ".") do
           issues
+        else
+          ["Missing punctuation" | issues]
         end
 
       {:ok,
@@ -191,7 +191,8 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     @impl true
     def revise(_reviser, %Candidate{content: content}, %CritiqueResult{}, _context) do
       # Improve writing quality
-      base = (content || "")
+      base =
+        (content || "")
         |> String.replace("very good", "excellent")
         |> String.replace("very bad", "poor")
         |> String.replace("  ", " ")
@@ -408,7 +409,11 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
       # We can't test full LLM integration without mocking,
       # but we can verify the comparison function works correctly
       original = Candidate.new!(%{content: "Short answer"})
-      refined = Candidate.new!(%{content: "This is a much longer and more detailed answer that provides comprehensive information"})
+
+      refined =
+        Candidate.new!(%{
+          content: "This is a much longer and more detailed answer that provides comprehensive information"
+        })
 
       comparison = SelfRefine.compare_original_refined(original, refined)
 
@@ -687,7 +692,11 @@ defmodule Jido.AI.Accuracy.ReflectionIntegrationTest do
     end
 
     test "comparison shows negative change for shorter content" do
-      original = Candidate.new!(%{content: "This is a very long and detailed response that covers many aspects of the question thoroughly."})
+      original =
+        Candidate.new!(%{
+          content: "This is a very long and detailed response that covers many aspects of the question thoroughly."
+        })
+
       refined = Candidate.new!(%{content: "Short."})
 
       comparison = SelfRefine.compare_original_refined(original, refined)

@@ -12,10 +12,10 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
+  alias Jido.Agent.StateOp
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Strategies.ReAct
   alias Jido.AI.Strategy.StateOpsHelpers
-  alias Jido.Agent.StateOp
 
   # ============================================================================
   # Test Fixtures

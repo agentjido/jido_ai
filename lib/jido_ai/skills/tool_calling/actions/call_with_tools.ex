@@ -39,28 +39,28 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
     category: "ai",
     tags: ["tool-calling", "llm", "function-calling"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      model:
-        Zoi.any(description: "Model alias (e.g., :capable) or direct spec string")
-        |> Zoi.optional(),
-      prompt: Zoi.string(description: "The user prompt to send to the LLM"),
-      system_prompt:
-        Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
-        |> Zoi.optional(),
-      tools:
-        Zoi.list(Zoi.string(), description: "List of tool names to include (default: all registered)")
-        |> Zoi.optional(),
-      max_tokens:
-        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
-      temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
-      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
-      auto_execute:
-        Zoi.boolean(description: "Automatically execute tool calls in multi-turn conversation")
-        |> Zoi.default(false),
-      max_turns:
-        Zoi.integer(description: "Maximum conversation turns when auto_execute is true")
-        |> Zoi.default(10)
-    })
+    schema:
+      Zoi.object(%{
+        model:
+          Zoi.any(description: "Model alias (e.g., :capable) or direct spec string")
+          |> Zoi.optional(),
+        prompt: Zoi.string(description: "The user prompt to send to the LLM"),
+        system_prompt:
+          Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
+          |> Zoi.optional(),
+        tools:
+          Zoi.list(Zoi.string(), description: "List of tool names to include (default: all registered)")
+          |> Zoi.optional(),
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
+        temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+        auto_execute:
+          Zoi.boolean(description: "Automatically execute tool calls in multi-turn conversation")
+          |> Zoi.default(false),
+        max_turns:
+          Zoi.integer(description: "Maximum conversation turns when auto_execute is true")
+          |> Zoi.default(10)
+      })
 
   alias Jido.AI.{Config, Helpers, Security, Tools}
 
@@ -72,8 +72,8 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
     with {:ok, validated_params} <- validate_and_sanitize_params(params),
          {:ok, model} <- resolve_model(validated_params[:model]),
          {:ok, messages} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
-         tools <- get_tools(validated_params[:tools]),
-         opts <- build_opts(validated_params),
+         tools = get_tools(validated_params[:tools]),
+         opts = build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, Keyword.put(opts, :tools, tools)) do
       result = classify_and_format_response(response, model)
 
@@ -205,7 +205,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
     updated_messages = add_tool_results_to_messages(messages, tool_results)
 
     # Build opts for next call
-    opts = build_opts(params)
+    _opts = build_opts(params)
     tools = get_tools(params[:tools])
 
     # Call LLM again with tool results

@@ -5,8 +5,8 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStageTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.Stages.GenerationStage
   alias Jido.AI.Accuracy.Candidate
+  alias Jido.AI.Accuracy.Stages.GenerationStage
 
   describe "name/0" do
     test "returns stage name" do
@@ -32,11 +32,13 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStageTest do
 
     test "creates stage with custom values" do
       generator = fn _query -> {:ok, Candidate.new!(%{content: "test"})} end
-      stage = GenerationStage.new(%{
-        generator: generator,
-        min_candidates: 5,
-        max_candidates: 15
-      })
+
+      stage =
+        GenerationStage.new(%{
+          generator: generator,
+          min_candidates: 5,
+          max_candidates: 15
+        })
 
       assert stage.min_candidates == 5
       assert stage.max_candidates == 15
@@ -58,7 +60,7 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStageTest do
 
       assert {:ok, state, metadata} = GenerationStage.execute(input, config)
       assert is_list(state.candidates)
-      assert length(state.candidates) > 0
+      refute Enum.empty?(state.candidates)
       assert state.num_candidates > 0
       assert %Candidate{} = state.best_candidate
       assert is_map(state.generation_metadata)
@@ -98,7 +100,7 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStageTest do
       config = %{}
 
       assert {:ok, state, _metadata} = GenerationStage.execute(input, config)
-      assert length(state.candidates) > 0
+      refute Enum.empty?(state.candidates)
     end
 
     test "passes context to generator" do
@@ -122,17 +124,18 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStageTest do
     end
 
     test "adapts candidate count based on difficulty", %{generator: generator} do
-      difficulty = Jido.AI.Accuracy.DifficultyEstimate.new!(%{
-        level: :hard,
-        score: 0.8,
-        confidence: 0.9
-      })
+      difficulty =
+        Jido.AI.Accuracy.DifficultyEstimate.new!(%{
+          level: :hard,
+          score: 0.8,
+          confidence: 0.9
+        })
 
       input = %{query: "complex question", difficulty: difficulty}
       config = %{generator: generator}
 
       assert {:ok, state, metadata} = GenerationStage.execute(input, config)
-      assert length(state.candidates) > 0
+      refute Enum.empty?(state.candidates)
       assert metadata.actual_n > 0
     end
   end

@@ -33,25 +33,25 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
     category: "ai",
     tags: ["tool-calling", "discovery", "tools"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      filter:
-        Zoi.string(description: "Filter tools by name pattern (substring match)")
-        |> Zoi.optional(),
-      type:
-        Zoi.atom(description: "Filter by type (:action, :tool, or nil for all)")
-        |> Zoi.optional(),
-      include_schema:
-        Zoi.boolean(description: "Include tool schemas in result") |> Zoi.default(true),
-      include_sensitive:
-        Zoi.boolean(description: "Include tools marked as sensitive (default: false)")
-        |> Zoi.default(false),
-      allowed_tools:
-        Zoi.list(Zoi.string(), description: "Allowlist of tool names to include (all others excluded)")
-        |> Zoi.optional()
-    })
+    schema:
+      Zoi.object(%{
+        filter:
+          Zoi.string(description: "Filter tools by name pattern (substring match)")
+          |> Zoi.optional(),
+        type:
+          Zoi.atom(description: "Filter by type (:action, :tool, or nil for all)")
+          |> Zoi.optional(),
+        include_schema: Zoi.boolean(description: "Include tool schemas in result") |> Zoi.default(true),
+        include_sensitive:
+          Zoi.boolean(description: "Include tools marked as sensitive (default: false)")
+          |> Zoi.default(false),
+        allowed_tools:
+          Zoi.list(Zoi.string(), description: "Allowlist of tool names to include (all others excluded)")
+          |> Zoi.optional()
+      })
 
-  alias Jido.AI.Tools.Registry
   alias Jido.AI.Security
+  alias Jido.AI.Tools.Registry
 
   @doc """
   Executes the list tools action.
@@ -85,18 +85,19 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
     with {:ok, _filter} <- validate_filter_if_present(params[:filter]),
          {:ok, _allowed} <- validate_allowed_tools_if_present(params[:allowed_tools]) do
       {:ok, params}
-    else
-      {:error, reason} -> {:error, reason}
     end
   end
 
   defp validate_filter_if_present(nil), do: {:ok, nil}
+
   defp validate_filter_if_present(filter) when is_binary(filter) do
     Security.validate_string(filter, max_length: 1000, allow_empty: true)
   end
+
   defp validate_filter_if_present(_), do: {:error, :invalid_filter}
 
   defp validate_allowed_tools_if_present(nil), do: {:ok, nil}
+
   defp validate_allowed_tools_if_present(allowed) when is_list(allowed) do
     if Enum.all?(allowed, &is_binary/1) do
       {:ok, allowed}
@@ -104,15 +105,18 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
       {:error, :invalid_allowed_tools}
     end
   end
+
   defp validate_allowed_tools_if_present(_), do: {:error, :invalid_allowed_tools}
 
   # Filter out sensitive tools unless explicitly requested
   defp filter_sensitive_tools(tools, true), do: tools
+
   defp filter_sensitive_tools(tools, _include_sensitive) when is_list(tools) do
     Enum.filter(tools, fn {name, _type, _module} ->
       not sensitive_tool?(name)
     end)
   end
+
   defp filter_sensitive_tools(tools, _include_sensitive), do: tools
 
   # Tools that should be excluded by default
@@ -141,6 +145,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
   end
 
   defp filter_by_allowlist(tools, nil), do: tools
+
   defp filter_by_allowlist(tools, allowed_tools) when is_list(allowed_tools) do
     allowed_set = MapSet.new(allowed_tools)
 
@@ -182,20 +187,18 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
   end
 
   defp extract_schema(module) do
-    try do
-      case module.schema() do
-        schema when is_list(schema) ->
-          format_schema_list(schema)
+    case module.schema() do
+      schema when is_list(schema) ->
+        format_schema_list(schema)
 
-        schema when is_map(schema) ->
-          format_schema_map(schema)
+      schema when is_map(schema) ->
+        format_schema_map(schema)
 
-        _ ->
-          nil
-      end
-    rescue
-      _ -> nil
+      _ ->
+        nil
     end
+  rescue
+    _ -> nil
   end
 
   defp format_schema_list(schema) when is_list(schema) do

@@ -9,28 +9,28 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
 
   use ExUnit.Case, async: false
 
-  # Ensure all skill modules are loaded before tests
-  require Jido.AI.Skills.LLM
-  require Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
-  require Jido.AI.Skills.Reasoning
-  require Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
-  require Jido.AI.Skills.Planning
-  require Jido.AI.Skills.Planning.Actions.{Plan, Decompose, Prioritize}
-  require Jido.AI.Skills.Streaming
-  require Jido.AI.Skills.Streaming.Actions.{StartStream, ProcessTokens, EndStream}
-  require Jido.AI.Skills.ToolCalling
-  require Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
-
   alias Jido.AI.Skills.LLM
   alias Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
-  alias Jido.AI.Skills.Reasoning
-  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
   alias Jido.AI.Skills.Planning
   alias Jido.AI.Skills.Planning.Actions.{Plan, Decompose, Prioritize}
+  alias Jido.AI.Skills.Reasoning
+  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
   alias Jido.AI.Skills.Streaming
   alias Jido.AI.Skills.Streaming.Actions.{StartStream, ProcessTokens, EndStream}
   alias Jido.AI.Skills.ToolCalling
   alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
+
+  # Ensure all skill modules are loaded before tests
+  require Jido.AI.Skills.LLM
+  require Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
+  require Jido.AI.Skills.Planning
+  require Jido.AI.Skills.Planning.Actions.{Plan, Decompose, Prioritize}
+  require Jido.AI.Skills.Reasoning
+  require Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
+  require Jido.AI.Skills.Streaming
+  require Jido.AI.Skills.Streaming.Actions.{StartStream, ProcessTokens, EndStream}
+  require Jido.AI.Skills.ToolCalling
+  require Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
 
   # ============================================================================
   # LLM Skill Schema Tests

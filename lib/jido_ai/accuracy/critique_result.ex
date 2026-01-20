@@ -99,7 +99,7 @@ defmodule Jido.AI.Accuracy.CritiqueResult do
   @spec new(keyword() | map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_list(attrs) or is_map(attrs) do
     attrs_list = if is_map(attrs), do: Map.to_list(attrs), else: attrs
-    attrs_map = Enum.into(attrs_list, %{})
+    attrs_map = Map.new(attrs_list)
 
     # Check if severity is explicitly provided
     case Map.has_key?(attrs_map, :severity) do
@@ -147,7 +147,7 @@ defmodule Jido.AI.Accuracy.CritiqueResult do
   """
   @spec has_issues?(t()) :: boolean()
   def has_issues?(%__MODULE__{issues: issues}) do
-    is_list(issues) and length(issues) > 0
+    is_list(issues) and not Enum.empty?(issues)
   end
 
   @doc """
@@ -309,8 +309,7 @@ defmodule Jido.AI.Accuracy.CritiqueResult do
 
   # Private functions
 
-  defp validate_severity(severity) when is_number(severity) and severity >= 0.0 and severity <= 1.0,
-    do: :ok
+  defp validate_severity(severity) when is_number(severity) and severity >= 0.0 and severity <= 1.0, do: :ok
 
   defp validate_severity(_), do: {:error, :invalid_severity}
 
@@ -318,7 +317,7 @@ defmodule Jido.AI.Accuracy.CritiqueResult do
   defp validate_issues(_), do: {:error, :invalid_issues}
 
   defp compute_actionable(%__MODULE__{issues: issues, severity: severity}) do
-    has_issues = length(issues) > 0
+    has_issues = not Enum.empty?(issues)
     high_severity = severity > 0.3
     has_issues or high_severity
   end
@@ -329,6 +328,7 @@ defmodule Jido.AI.Accuracy.CritiqueResult do
   defp merge_feedback(feedback1, feedback2) when is_binary(feedback1) and is_binary(feedback2) do
     feedback1 <> "\n" <> feedback2
   end
+
   defp format_error(atom) when is_atom(atom), do: atom
   defp format_error(_), do: :invalid_attributes
 end

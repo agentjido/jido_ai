@@ -30,13 +30,13 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStage do
 
   """
 
+  @behaviour PipelineStage
+
   alias Jido.AI.Accuracy.{
     PipelineStage,
     DifficultyEstimate,
     Estimators.HeuristicDifficulty
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           estimator: module() | nil,
@@ -59,12 +59,10 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStage do
     query = Map.get(input, :query)
     estimator = Map.get(config, :estimator, HeuristicDifficulty)
 
-    cond do
-      is_binary(query) and query != "" ->
-        estimate_difficulty(estimator, query, input, config)
-
-      true ->
-        {:error, :invalid_query}
+    if is_binary(query) and query != "" do
+      estimate_difficulty(estimator, query, input, config)
+    else
+      {:error, :invalid_query}
     end
   end
 
@@ -98,9 +96,10 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStage do
         timeout = Map.get(config, :timeout, 5000)
 
         # Wrap in task for timeout protection
-        task = Task.async(fn ->
-          estimator.estimate(estimator, query, context)
-        end)
+        task =
+          Task.async(fn ->
+            estimator.estimate(estimator, query, context)
+          end)
 
         case Task.yield(task, timeout) do
           {:ok, {:ok, %DifficultyEstimate{} = estimate}} ->

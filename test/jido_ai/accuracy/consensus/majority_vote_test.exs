@@ -55,7 +55,8 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVoteTest do
       ]
 
       assert {:ok, true, agreement} = MajorityVote.check(checker, candidates)
-      assert agreement == 0.75  # 3 out of 4
+      # 3 out of 4
+      assert agreement == 0.75
     end
 
     test "returns false when consensus not reached" do
@@ -69,7 +70,8 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVoteTest do
       ]
 
       assert {:ok, false, agreement} = MajorityVote.check(checker, candidates)
-      assert agreement == 0.5  # 2 out of 4
+      # 2 out of 4
+      assert agreement == 0.5
     end
 
     test "returns 1.0 agreement for unanimous candidates" do

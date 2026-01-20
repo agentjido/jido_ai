@@ -29,14 +29,13 @@ defmodule Jido.AI.Accuracy.Stages.ReflectionStage do
 
   """
 
+  @behaviour PipelineStage
+
   alias Jido.AI.Accuracy.{
     PipelineStage,
     ReflectionLoop,
-    Candidate,
-    CritiqueResult
+    Candidate
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           enabled: boolean(),

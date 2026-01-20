@@ -11,8 +11,8 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantificationTest do
 
       assert is_list(uq.aleatoric_patterns)
       assert is_list(uq.epistemic_patterns)
-      assert length(uq.aleatoric_patterns) > 0
-      assert length(uq.epistemic_patterns) > 0
+      refute Enum.empty?(uq.aleatoric_patterns)
+      refute Enum.empty?(uq.epistemic_patterns)
     end
 
     test "creates with custom patterns" do
