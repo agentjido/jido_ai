@@ -79,22 +79,6 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVote do
     check(candidates, threshold: threshold)
   end
 
-  @doc """
-  Checks if consensus has been reached with options.
-
-  ## Parameters
-
-  - `candidates` - List of candidates
-  - `opts` - Options:
-    - `:threshold` - Agreement threshold (overrides struct value)
-
-  ## Returns
-
-  - `{:ok, true, agreement}` - Consensus reached
-  - `{:ok, false, agreement}` - Consensus not reached
-  - `{:error, reason}` - Error during check
-
-  """
   @impl ConsensusChecker
   def check(candidates, opts) when is_list(candidates) and is_list(opts) do
   threshold = Keyword.get(opts, :threshold)
