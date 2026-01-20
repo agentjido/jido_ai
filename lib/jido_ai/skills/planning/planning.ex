@@ -126,7 +126,6 @@ defmodule Jido.AI.Skills.Planning do
 
   Defines the structure and defaults for Planning skill state.
   """
-  @impl Jido.Skill
   def schema do
     Zoi.object(%{
       default_model:

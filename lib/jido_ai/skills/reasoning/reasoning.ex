@@ -126,7 +126,6 @@ defmodule Jido.AI.Skills.Reasoning do
 
   Defines the structure and defaults for Reasoning skill state.
   """
-  @impl Jido.Skill
   def schema do
     Zoi.object(%{
       default_model:
