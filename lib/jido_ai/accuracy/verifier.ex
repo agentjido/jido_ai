@@ -24,16 +24,16 @@ defmodule Jido.AI.Accuracy.Verifier do
         @behaviour Jido.AI.Accuracy.Verifier
 
         @impl true
-        def verify(candidate, context) do
+        def verify(verifier, candidate, context) do
           # Verify the candidate
           score = calculate_score(candidate, context)
           {:ok, VerificationResult.new!(%{score: score})}
         end
 
         @impl true
-        def verify_batch(candidates, context) do
+        def verify_batch(verifier, candidates, context) do
           # Verify multiple candidates efficiently
-          results = Enum.map(candidates, &verify(&1, context))
+          results = Enum.map(candidates, &verify(verifier, &1, context))
           {:ok, Enum.map(results, fn {:ok, r} -> r end)}
         end
       end
@@ -44,13 +44,13 @@ defmodule Jido.AI.Accuracy.Verifier do
 
   Scores the final answer without examining reasoning:
 
-      {:ok, result} = verifier.verify(candidate, %{})
+      {:ok, result} = VerifierModule.verify(verifier, candidate, %{})
 
   ### Process Verification (PRM)
 
   Scores each reasoning step for detailed feedback:
 
-      {:ok, result} = prm.verify(candidate_with_trace, %{})
+      {:ok, result} = PrmModule.verify(prm, candidate_with_trace, %{})
       result.step_scores
       # => %{"step_1" => 0.9, "step_2" => 0.7, ...}
 
@@ -58,18 +58,18 @@ defmodule Jido.AI.Accuracy.Verifier do
 
   Compares against known ground truth:
 
-      {:ok, result} = deterministic_verifier.verify(candidate, %{
+      {:ok, result} = DeterministicVerifier.verify(verifier, candidate, %{
         ground_truth: "42"
       })
 
   ## Return Values
 
-  The `verify/2` callback should return:
+  The `verify/3` callback should return:
 
   - `{:ok, VerificationResult.t()}` - Successfully verified
   - `{:error, reason}` - Verification failed
 
-  The `verify_batch/2` callback should return:
+  The `verify_batch/3` callback should return:
 
   - `{:ok, [VerificationResult.t()]}` - All candidates verified
   - `{:error, reason}` - Batch verification failed
@@ -87,7 +87,7 @@ defmodule Jido.AI.Accuracy.Verifier do
   ## Examples
 
       # Verify a candidate with LLM-based verifier
-      {:ok, result} = LLMOutcomeVerifier.verify(candidate, %{
+      {:ok, result} = LLMOutcomeVerifier.verify(verifier, candidate, %{
         prompt: "What is 15 * 23?",
         threshold: 0.7
       })
@@ -125,6 +125,7 @@ defmodule Jido.AI.Accuracy.Verifier do
 
   ## Parameters
 
+  - `verifier` - The verifier struct containing configuration
   - `candidate` - The candidate to verify
   - `context` - Verification context (ground truth, prompt, options)
 
@@ -135,12 +136,12 @@ defmodule Jido.AI.Accuracy.Verifier do
 
   ## Examples
 
-      iex> {:ok, result} = verifier.verify(candidate, %{})
+      iex> {:ok, result} = DeterministicVerifier.verify(verifier, candidate, %{})
       iex> result.score
       0.85
 
   """
-  @callback verify(candidate :: Candidate.t(), context :: context()) :: verify_result()
+  @callback verify(verifier :: term(), candidate :: Candidate.t(), context :: context()) :: verify_result()
 
   @doc """
   Verifies multiple candidates in batch.
@@ -150,6 +151,7 @@ defmodule Jido.AI.Accuracy.Verifier do
 
   ## Parameters
 
+  - `verifier` - The verifier struct containing configuration
   - `candidates` - List of candidates to verify
   - `context` - Verification context
 
@@ -160,17 +162,18 @@ defmodule Jido.AI.Accuracy.Verifier do
 
   ## Examples
 
-      iex> {:ok, results} = verifier.verify_batch(candidates, %{})
+      iex> {:ok, results} = DeterministicVerifier.verify_batch(verifier, candidates, %{})
       iex> length(results)
       3
 
   ## Default Implementation
 
-  If not implemented, the default behavior is to call `verify/2`
+  If not implemented, the default behavior is to call `verify/3`
   for each candidate sequentially.
 
   """
   @callback verify_batch(
+              verifier :: term(),
               candidates :: [Candidate.t()],
               context :: context()
             ) :: verify_batch_result()

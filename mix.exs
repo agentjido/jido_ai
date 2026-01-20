@@ -157,7 +157,33 @@ defmodule JidoAi.MixProject do
       extras: [
         "README.md",
         "CHANGELOG.md",
-        "CONTRIBUTING.md"
+        "CONTRIBUTING.md",
+        # Developer Guides
+        "guides/developer/01_architecture_overview.md",
+        "guides/developer/02_strategies.md",
+        "guides/developer/03_state_machines.md",
+        "guides/developer/04_directives.md",
+        "guides/developer/05_signals.md",
+        "guides/developer/06_tool_system.md",
+        "guides/developer/07_skills.md",
+        "guides/developer/08_configuration.md",
+        # User Guides
+        "guides/user/01_overview.md",
+        "guides/user/02_strategies.md",
+        "guides/user/03_self_consistency.md",
+        "guides/user/04_adaptive_self_consistency.md",
+        "guides/user/05_search_algorithms.md",
+        "guides/user/06_verification.md",
+        "guides/user/07_reflection.md",
+        "guides/user/08_critique_revision.md",
+        "guides/user/09_prm.md",
+        "guides/user/10_confidence_calibration.md",
+        "guides/user/11_difficulty_estimation.md",
+        "guides/user/12_pipeline.md"
+      ],
+      groups_for_extras: [
+        {"Developer Guides", ~r/guides\/developer/},
+        {"User Guides", ~r/guides\/user/}
       ],
       groups_for_modules: [
         Core: [
