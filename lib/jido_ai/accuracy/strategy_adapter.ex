@@ -42,8 +42,8 @@ defmodule Jido.AI.Accuracy.StrategyAdapter do
   """
 
   alias Jido.AI.Accuracy.Directive
-  alias Jido.AI.Accuracy.Presets
   alias Jido.AI.Accuracy.Pipeline
+  alias Jido.AI.Accuracy.Presets
   alias Jido.AI.Accuracy.Signal
 
   @type agent :: term()
@@ -98,14 +98,15 @@ defmodule Jido.AI.Accuracy.StrategyAdapter do
     call_id = Keyword.get(opts, :call_id, generate_call_id())
 
     # Build the directive
-    _directive = Directive.Run.new!(%{
-      id: call_id,
-      query: query,
-      preset: preset,
-      config: config,
-      generator: generator,
-      timeout: timeout
-    })
+    _directive =
+      Directive.Run.new!(%{
+        id: call_id,
+        query: query,
+        preset: preset,
+        config: config,
+        generator: generator,
+        timeout: timeout
+      })
 
     # Get or create pipeline
     pipeline_config = build_pipeline_config(preset, config, agent)
@@ -117,8 +118,7 @@ defmodule Jido.AI.Accuracy.StrategyAdapter do
 
     execution_result =
       try do
-        {:ok,
-         Pipeline.run(pipeline, query, generator: generator_fn, timeout: timeout)}
+        {:ok, Pipeline.run(pipeline, query, generator: generator_fn, timeout: timeout)}
       rescue
         e -> {:error, e}
       end

@@ -122,7 +122,11 @@ defmodule Jido.AI.Accuracy.SearchStateTest do
       assert updated.best_node.metadata.source == :beam_search
     end
 
-    test "resets stagnation_count when new best is found", %{state: state, candidate1: candidate1, candidate2: candidate2} do
+    test "resets stagnation_count when new best is found", %{
+      state: state,
+      candidate1: candidate1,
+      candidate2: candidate2
+    } do
       state = SearchState.update_best(state, candidate1, 0.7)
       assert state.stagnation_count == 0
 

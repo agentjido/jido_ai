@@ -237,9 +237,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   def run(%__MODULE__{} = adapter, query, opts) when is_binary(query) do
     generator = Keyword.get(opts, :generator)
 
-    unless is_function(generator, 1) do
-      {:error, :generator_required}
-    else
+    if is_function(generator, 1) do
       context = Keyword.get(opts, :context, %{})
       timeout = Keyword.get(opts, :timeout, adapter.timeout)
 
@@ -287,6 +285,8 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
         {:error, _} = error ->
           error
       end
+    else
+      {:error, :generator_required}
     end
   end
 
@@ -443,17 +443,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     end
   end
 
-  defp generate_with_early_stop(
-         adapter,
-         query,
-         generator,
-         context,
-         candidates,
-         current_n,
-         target_n,
-         max_n,
-         level
-       ) do
+  defp generate_with_early_stop(adapter, query, generator, context, candidates, current_n, target_n, max_n, level) do
     # Generate next batch
     batch_size = adjust_n_batch(adapter.batch_size, current_n, max_n)
 
@@ -591,8 +581,8 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
       case adapter.aggregator.aggregate(candidates, []) do
         {:ok, best, agg_metadata} ->
           consensus = Map.get(agg_metadata, :confidence, 0.0)
-          final_metadata = Map.merge(base_metadata, %{consensus: consensus})
-          final_metadata = Map.merge(final_metadata, %{aggregation_metadata: agg_metadata})
+          final_metadata = Map.put(base_metadata, :consensus, consensus)
+          final_metadata = Map.put(final_metadata, :aggregation_metadata, agg_metadata)
           {:ok, best, final_metadata}
 
         {:error, _reason} ->
@@ -640,8 +630,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     end
   end
 
-  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000,
-    do: {:ok, :valid}
+  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000, do: {:ok, :valid}
 
   defp validate_timeout(_), do: {:error, :timeout_must_be_between_1000_and_300000_ms}
 

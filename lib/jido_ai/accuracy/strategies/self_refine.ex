@@ -176,13 +176,14 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     with :ok <- validate_model(resolved_model),
          :ok <- validate_temperature(Keyword.get(opts, :temperature, 0.7)),
          :ok <- validate_timeout(Keyword.get(opts, :timeout, 30_000)) do
-      strategy = struct(__MODULE__, [
-        model: resolved_model,
-        feedback_prompt: Keyword.get(opts, :feedback_prompt),
-        refine_prompt: Keyword.get(opts, :refine_prompt),
-        temperature: Keyword.get(opts, :temperature, 0.7),
-        timeout: Keyword.get(opts, :timeout, 30_000)
-      ])
+      strategy =
+        struct(__MODULE__,
+          model: resolved_model,
+          feedback_prompt: Keyword.get(opts, :feedback_prompt),
+          refine_prompt: Keyword.get(opts, :refine_prompt),
+          temperature: Keyword.get(opts, :temperature, 0.7),
+          timeout: Keyword.get(opts, :timeout, 30_000)
+        )
 
       {:ok, strategy}
     end
@@ -369,7 +370,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     # Calculate percentage change
     length_change =
       if original_len > 0 do
-        (length_delta / original_len) * 100
+        length_delta / original_len * 100
       else
         0.0
       end
@@ -459,8 +460,12 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
   defp extract_content(response) do
     case response.message.content do
-      nil -> ""
-      content when is_binary(content) -> content
+      nil ->
+        ""
+
+      content when is_binary(content) ->
+        content
+
       content when is_list(content) ->
         content
         |> Enum.filter(fn %{type: type} -> type == :text end)
@@ -470,6 +475,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
   defp truncate_content(content) when is_binary(content) do
     max_length = 8_000
+
     if String.length(content) > max_length do
       String.slice(content, 0, max_length) <> "\n\n[Content truncated...]"
     else
@@ -498,8 +504,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
   defp validate_temperature(temp) when is_number(temp) and temp >= 0.0 and temp <= 2.0, do: :ok
   defp validate_temperature(_), do: {:error, :invalid_temperature}
 
-  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000,
-    do: :ok
+  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000, do: :ok
 
   defp validate_timeout(_), do: {:error, :invalid_timeout}
   defp format_error(atom) when is_atom(atom), do: atom

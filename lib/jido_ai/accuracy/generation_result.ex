@@ -163,7 +163,6 @@ defmodule Jido.AI.Accuracy.GenerationResult do
     total
   end
 
-
   @doc """
   Selects a candidate using the specified strategy.
 
@@ -307,7 +306,7 @@ defmodule Jido.AI.Accuracy.GenerationResult do
     %{
       "candidates" => Enum.map(candidates(result), &Candidate.to_map/1),
       "total_tokens" => result.total_tokens,
-      "best_candidate" => if(result.best_candidate, do: Candidate.to_map(result.best_candidate), else: nil),
+      "best_candidate" => if(result.best_candidate, do: Candidate.to_map(result.best_candidate)),
       "aggregation_method" => result.aggregation_method,
       "metadata" => result.metadata
     }
@@ -331,7 +330,8 @@ defmodule Jido.AI.Accuracy.GenerationResult do
     with {:ok, candidates} <- deserialize_candidates(Map.get(map, "candidates", [])),
          {:ok, _best_candidate} <- deserialize_best_candidate(Map.get(map, "best_candidate")) do
       opts = [
-        aggregation_method: parse_aggregation_method(Map.get(map, "aggregation_method") || Map.get(map, :aggregation_method)),
+        aggregation_method:
+          parse_aggregation_method(Map.get(map, "aggregation_method") || Map.get(map, :aggregation_method)),
         metadata: Map.get(map, "metadata", %{}) || Map.get(map, :metadata, %{})
       ]
 

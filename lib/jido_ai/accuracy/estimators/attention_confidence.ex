@@ -64,21 +64,19 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
 
   """
 
+  @behaviour ConfidenceEstimator
+
   alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, ConfidenceEstimator, Helpers}
 
-  import Helpers, only: [get_attr: 2, get_attr: 3]
+  import Helpers, only: [get_attr: 3]
 
   @type t :: %__MODULE__{
           aggregation: :product | :mean | :min,
           token_threshold: float()
         }
 
-  @behaviour ConfidenceEstimator
-
-  defstruct [
-    aggregation: :product,
-    token_threshold: 0.01
-  ]
+  defstruct aggregation: :product,
+            token_threshold: 0.01
 
   @doc """
   Creates a new AttentionConfidence estimator from the given attributes.
@@ -132,23 +130,24 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
     aggregation = Map.get(context, :aggregation, estimator.aggregation)
 
     with {:ok, logprobs} <- extract_logprobs(candidate),
-         {:ok, token_probs} <- calculate_token_probabilities(logprobs, estimator.token_threshold),
-         score <- aggregate_confidence(token_probs, aggregation) do
+         {:ok, token_probs} <- calculate_token_probabilities(logprobs, estimator.token_threshold) do
+      score = aggregate_confidence(token_probs, aggregation)
       reasoning = generate_reasoning(score, token_probs, aggregation)
 
-      estimate = ConfidenceEstimate.new!(%{
-        score: score,
-        calibration: nil,
-        method: :attention,
-        reasoning: reasoning,
-        token_level_confidence: token_probs,
-        metadata: %{
-          aggregation: aggregation,
-          token_count: length(token_probs),
-          min_token_prob: Enum.min(token_probs),
-          max_token_prob: Enum.max(token_probs)
-        }
-      })
+      estimate =
+        ConfidenceEstimate.new!(%{
+          score: score,
+          calibration: nil,
+          method: :attention,
+          reasoning: reasoning,
+          token_level_confidence: token_probs,
+          metadata: %{
+            aggregation: aggregation,
+            token_count: length(token_probs),
+            min_token_prob: Enum.min(token_probs),
+            max_token_prob: Enum.max(token_probs)
+          }
+        })
 
       {:ok, estimate}
     end
@@ -161,14 +160,16 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
   """
   @spec estimate_batch(t(), [Candidate.t()], map()) :: {:ok, [ConfidenceEstimate.t()]} | {:error, term()}
   def estimate_batch(%__MODULE__{} = estimator, candidates, context) when is_list(candidates) do
-    results = Enum.map(candidates, fn candidate ->
-      estimate(estimator, candidate, context)
-    end)
+    results =
+      Enum.map(candidates, fn candidate ->
+        estimate(estimator, candidate, context)
+      end)
 
-    errors = Enum.filter(results, fn
-      {:error, _} -> true
-      _ -> false
-    end)
+    errors =
+      Enum.filter(results, fn
+        {:error, _} -> true
+        _ -> false
+      end)
 
     if Enum.empty?(errors) do
       {:ok, Enum.map(results, fn {:ok, e} -> e end)}
@@ -212,8 +213,10 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
     cond do
       not Enum.all?(logprobs, &is_number/1) ->
         {:error, :invalid_logprobs}
+
       Enum.any?(logprobs, &(&1 > 0.0)) ->
         {:error, :invalid_logprobs}
+
       true ->
         {:ok, logprobs}
     end

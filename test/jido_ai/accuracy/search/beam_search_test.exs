@@ -112,48 +112,53 @@ defmodule Jido.AI.Accuracy.Search.BeamSearchTest do
 
   describe "search/4" do
     test "searches and returns best candidate" do
-      {:ok, best} = BeamSearch.search("test prompt", MockGenerator, MockVerifier,
-        beam_width: 3,
-        depth: 2
-      )
+      {:ok, best} =
+        BeamSearch.search("test prompt", MockGenerator, MockVerifier,
+          beam_width: 3,
+          depth: 2
+        )
 
       assert %Candidate{} = best
       assert is_binary(best.content)
     end
 
     test "respects beam_width option" do
-      {:ok, best} = BeamSearch.search("test", MockGenerator, MockVerifier,
-        beam_width: 2,
-        depth: 1
-      )
+      {:ok, best} =
+        BeamSearch.search("test", MockGenerator, MockVerifier,
+          beam_width: 2,
+          depth: 1
+        )
 
       assert %Candidate{} = best
     end
 
     test "respects depth option" do
-      {:ok, best} = BeamSearch.search("test", MockGenerator, MockVerifier,
-        beam_width: 2,
-        depth: 1
-      )
+      {:ok, best} =
+        BeamSearch.search("test", MockGenerator, MockVerifier,
+          beam_width: 2,
+          depth: 1
+        )
 
       assert %Candidate{} = best
     end
 
     test "respects branching_factor option" do
-      {:ok, best} = BeamSearch.search("test", MockGenerator, MockVerifier,
-        beam_width: 2,
-        depth: 1,
-        branching_factor: 3
-      )
+      {:ok, best} =
+        BeamSearch.search("test", MockGenerator, MockVerifier,
+          beam_width: 2,
+          depth: 1,
+          branching_factor: 3
+        )
 
       assert %Candidate{} = best
     end
 
     test "beam_width of 1 works (greedy search)" do
-      {:ok, best} = BeamSearch.search("test", MockGenerator, MockVerifier,
-        beam_width: 1,
-        depth: 2
-      )
+      {:ok, best} =
+        BeamSearch.search("test", MockGenerator, MockVerifier,
+          beam_width: 1,
+          depth: 2
+        )
 
       assert %Candidate{} = best
     end
@@ -267,11 +272,12 @@ defmodule Jido.AI.Accuracy.Search.BeamSearchTest do
         end
       end
 
-      {:ok, best} = BeamSearch.search("x", VariableLengthGenerator, LengthVerifier,
-        beam_width: 3,
-        depth: 2,
-        branching_factor: 2
-      )
+      {:ok, best} =
+        BeamSearch.search("x", VariableLengthGenerator, LengthVerifier,
+          beam_width: 3,
+          depth: 2,
+          branching_factor: 2
+        )
 
       # Best candidate should have high score (longer content)
       assert %Candidate{} = best

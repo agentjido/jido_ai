@@ -10,20 +10,24 @@ defmodule Jido.AI.Accuracy.VerifierTest do
     @impl true
     def verify(candidate, _context) do
       score = String.length(candidate.content || "") / 100.0
-      result = VerificationResult.new!(%{
-        candidate_id: candidate.id,
-        score: score,
-        confidence: 0.9
-      })
+
+      result =
+        VerificationResult.new!(%{
+          candidate_id: candidate.id,
+          score: score,
+          confidence: 0.9
+        })
+
       {:ok, result}
     end
 
     @impl true
     def verify_batch(candidates, context) do
-      results = Enum.map(candidates, fn candidate ->
-        {:ok, result} = verify(candidate, context)
-        result
-      end)
+      results =
+        Enum.map(candidates, fn candidate ->
+          {:ok, result} = verify(candidate, context)
+          result
+        end)
 
       {:ok, results}
     end
@@ -38,19 +42,22 @@ defmodule Jido.AI.Accuracy.VerifierTest do
 
     @impl true
     def verify(candidate, _context) do
-      result = VerificationResult.new!(%{
-        candidate_id: candidate.id,
-        score: 0.5
-      })
+      result =
+        VerificationResult.new!(%{
+          candidate_id: candidate.id,
+          score: 0.5
+        })
+
       {:ok, result}
     end
 
     @impl true
     def verify_batch(candidates, context) do
-      results = Enum.map(candidates, fn c ->
-        {:ok, r} = verify(c, context)
-        r
-      end)
+      results =
+        Enum.map(candidates, fn c ->
+          {:ok, r} = verify(c, context)
+          r
+        end)
 
       {:ok, results}
     end
@@ -162,6 +169,7 @@ defmodule Jido.AI.Accuracy.VerifierTest do
       assert {:ok, results} = MockVerifier.verify_batch(candidates, %{})
 
       assert length(results) == 3
+
       Enum.each(results, fn result ->
         assert %VerificationResult{} = result
       end)
@@ -204,9 +212,10 @@ defmodule Jido.AI.Accuracy.VerifierTest do
       candidates = [Candidate.new!(%{content: "Test"})]
 
       # Context should be available
-      assert {:ok, _results} = MockVerifier.verify_batch(candidates, %{
-        threshold: 0.5
-      })
+      assert {:ok, _results} =
+               MockVerifier.verify_batch(candidates, %{
+                 threshold: 0.5
+               })
     end
   end
 

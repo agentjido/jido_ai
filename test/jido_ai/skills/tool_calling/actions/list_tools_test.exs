@@ -89,11 +89,11 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListToolsTest do
 
       # Check that no sensitive tool names are present
       refute Enum.any?(tool_names, fn name ->
-        Enum.any?(
-          ["system", "admin", "config", "registry", "shell", "delete", "secret", "password", "token", "auth"],
-          fn keyword -> String.contains?(name, keyword) end
-        )
-      end)
+               Enum.any?(
+                 ["system", "admin", "config", "registry", "shell", "delete", "secret", "password", "token", "auth"],
+                 fn keyword -> String.contains?(name, keyword) end
+               )
+             end)
     end
 
     test "includes sensitive_excluded flag in result" do

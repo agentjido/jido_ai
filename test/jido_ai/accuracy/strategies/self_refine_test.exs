@@ -18,10 +18,10 @@ defmodule Jido.AI.Accuracy.SelfRefineTest do
 
     test "creates strategy with custom options" do
       assert {:ok, strategy} =
-               SelfRefine.new([
+               SelfRefine.new(
                  temperature: 0.5,
                  timeout: 60_000
-               ])
+               )
 
       assert strategy.temperature == 0.5
       assert strategy.timeout == 60_000
@@ -29,25 +29,25 @@ defmodule Jido.AI.Accuracy.SelfRefineTest do
 
     test "creates strategy with custom prompts" do
       assert {:ok, strategy} =
-               SelfRefine.new([
+               SelfRefine.new(
                  feedback_prompt: "Custom feedback: <%= @prompt %>",
                  refine_prompt: "Custom refine: <%= @prompt %>"
-               ])
+               )
 
       assert strategy.feedback_prompt == "Custom feedback: <%= @prompt %>"
       assert strategy.refine_prompt == "Custom refine: <%= @prompt %>"
     end
 
     test "returns error for invalid temperature" do
-      assert {:error, :invalid_temperature} = SelfRefine.new([temperature: 3.0])
+      assert {:error, :invalid_temperature} = SelfRefine.new(temperature: 3.0)
     end
 
     test "returns error for invalid timeout" do
-      assert {:error, :invalid_timeout} = SelfRefine.new([timeout: 100])
+      assert {:error, :invalid_timeout} = SelfRefine.new(timeout: 100)
     end
 
     test "returns error for invalid model" do
-      assert {:error, :invalid_model} = SelfRefine.new([model: ""])
+      assert {:error, :invalid_model} = SelfRefine.new(model: "")
     end
   end
 
@@ -60,7 +60,7 @@ defmodule Jido.AI.Accuracy.SelfRefineTest do
 
     test "raises when invalid" do
       assert_raise ArgumentError, ~r/Invalid SelfRefine/, fn ->
-        SelfRefine.new!([temperature: 5.0])
+        SelfRefine.new!(temperature: 5.0)
       end
     end
   end
@@ -240,7 +240,7 @@ defmodule Jido.AI.Accuracy.SelfRefineTest do
 
   describe "template rendering" do
     test "feedback template renders correctly" do
-      strategy = SelfRefine.new!([feedback_prompt: "Question: <%= @prompt %> Answer: <%= @response %>"])
+      strategy = SelfRefine.new!(feedback_prompt: "Question: <%= @prompt %> Answer: <%= @response %>")
 
       prompt = "What is 2+2?"
       response = "The answer is 4."
@@ -254,10 +254,7 @@ defmodule Jido.AI.Accuracy.SelfRefineTest do
 
     test "refine template renders correctly" do
       strategy =
-        SelfRefine.new!([
-          refine_prompt:
-            "Q: <%= @prompt %> A: <%= @response %> F: <%= @feedback %>"
-        ])
+        SelfRefine.new!(refine_prompt: "Q: <%= @prompt %> A: <%= @response %> F: <%= @feedback %>")
 
       prompt = "What is 2+2?"
       response = "4"

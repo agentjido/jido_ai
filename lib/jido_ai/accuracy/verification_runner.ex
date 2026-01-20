@@ -420,20 +420,20 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
   end
 
   defp run_verifier(verifier_mod, config, candidate, context, _timeout) do
-    with {:ok, verifier} <- init_verifier(verifier_mod, config),
-         {:ok, result} <- call_verify(verifier_mod, verifier, candidate, context) do
-      {:ok, result}
+    with {:ok, verifier} <- init_verifier(verifier_mod, config) do
+      call_verify(verifier_mod, verifier, candidate, context)
     end
   end
 
   # Initialize verifier: try new/1, fall back to module or struct
   defp init_verifier(verifier_mod, config) do
     # Force module loading by accessing exports
-    exports = try do
-      verifier_mod.module_info(:exports)
-    rescue
-      _ -> %{}
-    end
+    exports =
+      try do
+        verifier_mod.module_info(:exports)
+      rescue
+        _ -> %{}
+      end
 
     cond do
       has_function?(exports, :new, 1) ->
@@ -476,7 +476,7 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
   defp create_verifier_struct(verifier_mod, _config) do
     {:ok, struct!(verifier_mod, [])}
   rescue
-    e in [BadStructError, ArgumentError] ->
+    _e in [BadStructError, ArgumentError] ->
       Logger.warning("Could not create struct for #{format_module_name(verifier_mod)}")
       {:ok, verifier_mod}
   end
@@ -635,11 +635,6 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
     |> Enum.filter(&is_number/1)
     |> Enum.product()
   end
-
-  defp on_error?(:continue), do: true
-  defp on_error?(:halt), do: false
-  # default
-  defp on_error?(_), do: true
 
   # Validation
 

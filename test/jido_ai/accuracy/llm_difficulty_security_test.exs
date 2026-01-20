@@ -38,7 +38,7 @@ defmodule Jido.AI.Accuracy.LLMDifficultySecurityTest do
       # Simulate an oversized LLM response
       # Max JSON size is 50_000 bytes
       large_json =
-        "{\"level\": \"hard\", \"score\": 0.8, \"confidence\": 0.9, \"reasoning\": \"" <>
+        ~s({"level": "hard", "score": 0.8, "confidence": 0.9, "reasoning": ") <>
           String.duplicate("a", 60_000) <> "\"}"
 
       assert {:error, :response_too_large} =
@@ -56,11 +56,12 @@ defmodule Jido.AI.Accuracy.LLMDifficultySecurityTest do
     test "handles boundary at max JSON size" do
       # Exactly at the boundary (50KB)
       # Need to account for JSON wrapper characters
-      wrapper_size = byte_size("{\"level\": \"hard\", \"score\": 0.8, \"confidence\": 0.9, \"reasoning\": \"\"}")
-      content_size = 50_000 - wrapper_size - 1  # -1 for closing quote
+      wrapper_size = byte_size(~s({"level": "hard", "score": 0.8, "confidence": 0.9, "reasoning": ""}))
+      # -1 for closing quote
+      content_size = 50_000 - wrapper_size - 1
 
       boundary_json =
-        "{\"level\": \"hard\", \"score\": 0.8, \"confidence\": 0.9, \"reasoning\": \"" <>
+        ~s({"level": "hard", "score": 0.8, "confidence": 0.9, "reasoning": ") <>
           String.duplicate("a", content_size) <> "\"}"
 
       assert byte_size(boundary_json) <= 50_000

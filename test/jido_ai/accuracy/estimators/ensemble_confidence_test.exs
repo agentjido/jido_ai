@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidenceTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate}
   alias Jido.AI.Accuracy.Estimators.{EnsembleConfidence, AttentionConfidence}
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate}
 
   @moduletag :capture_log
 
@@ -50,6 +50,7 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidenceTest do
 
     test "returns error for invalid estimators" do
       assert {:error, :invalid_estimators} = EnsembleConfidence.new(estimators: "not a list")
+
       assert {:error, :invalid_estimator_format} =
                EnsembleConfidence.new(estimators: [:not_a_tuple])
     end
@@ -191,10 +192,11 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidenceTest do
         {MockEstimator, [score: 0.9]}
       ]
 
-      estimator = EnsembleConfidence.new!(
-        estimators: estimators,
-        combination_method: :mean
-      )
+      estimator =
+        EnsembleConfidence.new!(
+          estimators: estimators,
+          combination_method: :mean
+        )
 
       candidate = Candidate.new!(%{content: "Test"})
 
@@ -205,10 +207,14 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidenceTest do
 
     test "combines estimates using voting" do
       estimators = [
-        {MockEstimator, [score: 0.8]},  # high
-        {MockEstimator, [score: 0.75]},  # high
-        {MockEstimator, [score: 0.5]},  # medium
-        {MockEstimator, [score: 0.3]}  # low
+        # high
+        {MockEstimator, [score: 0.8]},
+        # high
+        {MockEstimator, [score: 0.75]},
+        # medium
+        {MockEstimator, [score: 0.5]},
+        # low
+        {MockEstimator, [score: 0.3]}
       ]
 
       estimator =

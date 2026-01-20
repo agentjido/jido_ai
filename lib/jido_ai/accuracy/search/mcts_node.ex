@@ -120,8 +120,7 @@ defmodule Jido.AI.Accuracy.Search.MCTSNode do
 
   """
   @spec ucb1_score(t(), float()) :: float() | :infinity
-  def ucb1_score(%__MODULE__{visits: visits}, _exploration_constant)
-      when is_integer(visits) and visits == 0 do
+  def ucb1_score(%__MODULE__{visits: visits}, _exploration_constant) when is_integer(visits) and visits == 0 do
     :infinity
   end
 
@@ -213,7 +212,7 @@ defmodule Jido.AI.Accuracy.Search.MCTSNode do
   """
   @spec is_fully_expanded?(t()) :: boolean()
   def is_fully_expanded?(%__MODULE__{children: []}), do: false
-  def is_fully_expanded?(%__MODULE__{children: children}), do: length(children) > 0
+  def is_fully_expanded?(%__MODULE__{children: children}), do: not Enum.empty?(children)
 
   @doc """
   Checks if this node is a terminal node (no further expansion possible).
@@ -299,7 +298,7 @@ defmodule Jido.AI.Accuracy.Search.MCTSNode do
   """
   @spec has_children?(t()) :: boolean()
   def has_children?(%__MODULE__{children: []}), do: false
-  def has_children?(%__MODULE__{children: children}) when is_list(children), do: length(children) > 0
+  def has_children?(%__MODULE__{children: children}) when is_list(children), do: not Enum.empty?(children)
 
   @doc """
   Gets the depth of this node from the root.

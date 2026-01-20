@@ -183,7 +183,9 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
   """
   @spec allocate(t(), DifficultyEstimate.t() | DifficultyEstimate.level(), keyword()) ::
           {:ok, ComputeBudget.t(), t()} | {:error, term()}
-  def allocate(%__MODULE__{} = budgeter, %DifficultyEstimate{} = difficulty, opts \\ []) do
+  def allocate(budgeter, difficulty_or_level, opts \\ [])
+
+  def allocate(%__MODULE__{} = budgeter, %DifficultyEstimate{} = difficulty, opts) do
     allocate(budgeter, difficulty.level, opts)
   end
 
@@ -283,11 +285,13 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
   """
   @spec custom_allocation(t(), pos_integer(), keyword()) ::
           {:ok, ComputeBudget.t(), t()} | {:error, term()}
-  def custom_allocation(%__MODULE__{} = _budgeter, num_candidates, _opts) when not is_integer(num_candidates) or num_candidates <= 0 do
+  def custom_allocation(%__MODULE__{} = _budgeter, num_candidates, _opts)
+      when not is_integer(num_candidates) or num_candidates <= 0 do
     {:error, :invalid_num_candidates}
   end
 
-  def custom_allocation(%__MODULE__{} = budgeter, num_candidates, opts) when is_integer(num_candidates) and num_candidates > 0 do
+  def custom_allocation(%__MODULE__{} = budgeter, num_candidates, opts)
+      when is_integer(num_candidates) and num_candidates > 0 do
     attrs =
       %{num_candidates: num_candidates}
       |> maybe_put_attr(:use_prm, Keyword.get(opts, :use_prm, false))
@@ -345,6 +349,7 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
   """
   @spec remaining_budget(t()) :: {:ok, float() | :infinity}
   def remaining_budget(%__MODULE__{global_limit: nil}), do: {:ok, :infinity}
+
   def remaining_budget(%__MODULE__{} = budgeter) do
     remaining = budgeter.global_limit - budgeter.used_budget
     {:ok, max(0.0, remaining)}
@@ -354,8 +359,8 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
   Checks if the budget is exhausted.
 
   Returns true if:
-- No global limit is set (always false - infinite budget)
-- Global limit exists and used >= limit
+  - No global limit is set (always false - infinite budget)
+  - Global limit exists and used >= limit
 
   ## Examples
 

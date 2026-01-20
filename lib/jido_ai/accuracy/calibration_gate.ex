@@ -84,13 +84,11 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
   @default_low_threshold Thresholds.calibration_medium_confidence()
 
   @enforce_keys [:high_threshold, :low_threshold]
-  defstruct [
-    high_threshold: @default_high_threshold,
-    low_threshold: @default_low_threshold,
-    medium_action: :with_verification,
-    low_action: :abstain,
-    emit_telemetry: true
-  ]
+  defstruct high_threshold: @default_high_threshold,
+            low_threshold: @default_low_threshold,
+            medium_action: :with_verification,
+            low_action: :abstain,
+            emit_telemetry: true
 
   @doc """
   Creates a new CalibrationGate from the given attributes.
@@ -185,12 +183,13 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
   """
   @spec route(t(), Candidate.t(), ConfidenceEstimate.t()) :: {:ok, RoutingResult.t()} | {:error, term()}
   def route(%__MODULE__{} = gate, %Candidate{} = candidate, %ConfidenceEstimate{score: score}) do
-    start_time = if gate.emit_telemetry, do: System.monotonic_time(), else: nil
+    start_time = if gate.emit_telemetry, do: System.monotonic_time()
 
     result = do_route(gate, candidate, score)
 
     if gate.emit_telemetry and start_time do
       duration = System.monotonic_time() - start_time
+
       :telemetry.execute(
         [:jido, :accuracy, :calibration, :route],
         %{duration: duration},
@@ -393,14 +392,6 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
 
   # Attribute helpers
 
-  defp get_attr(attrs, key) when is_list(attrs) do
-    Keyword.get(attrs, key)
-  end
-
-  defp get_attr(attrs, key) when is_map(attrs) do
-    Map.get(attrs, key)
-  end
-
   defp get_attr(attrs, key, default) when is_list(attrs) do
     Keyword.get(attrs, key, default)
   end
@@ -408,6 +399,7 @@ defmodule Jido.AI.Accuracy.CalibrationGate do
   defp get_attr(attrs, key, default) when is_map(attrs) do
     Map.get(attrs, key, default)
   end
+
   defp format_error(atom) when is_atom(atom), do: atom
   defp format_error(_), do: :invalid_attributes
 end

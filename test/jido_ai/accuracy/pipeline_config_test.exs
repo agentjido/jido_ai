@@ -15,17 +15,19 @@ defmodule Jido.AI.Accuracy.PipelineConfigTest do
     end
 
     test "creates config with custom stages" do
-      assert {:ok, config} = PipelineConfig.new(%{
-        stages: [:generation, :calibration]
-      })
+      assert {:ok, config} =
+               PipelineConfig.new(%{
+                 stages: [:generation, :calibration]
+               })
 
       assert config.stages == [:generation, :calibration]
     end
 
     test "creates config with all stages" do
-      assert {:ok, config} = PipelineConfig.new(%{
-        stages: PipelineConfig.all_stages()
-      })
+      assert {:ok, config} =
+               PipelineConfig.new(%{
+                 stages: PipelineConfig.all_stages()
+               })
 
       assert length(config.stages) == 7
       assert :rag in config.stages
@@ -39,56 +41,62 @@ defmodule Jido.AI.Accuracy.PipelineConfigTest do
 
     test "returns error for missing required stage" do
       assert {:error, {:missing_required_stages, [:generation]}} =
-        PipelineConfig.new(%{stages: [:difficulty_estimation, :calibration]})
+               PipelineConfig.new(%{stages: [:difficulty_estimation, :calibration]})
     end
 
     test "returns error for invalid stage name" do
       assert {:error, :invalid_stage} =
-        PipelineConfig.new(%{stages: [:generation, :invalid_stage]})
+               PipelineConfig.new(%{stages: [:generation, :invalid_stage]})
     end
 
     test "normalizes generation config" do
-      assert {:ok, config} = PipelineConfig.new(%{
-        stages: [:generation],
-        generation_config: %{
-          min_candidates: 5,
-          max_candidates: 15
-        }
-      })
+      assert {:ok, config} =
+               PipelineConfig.new(%{
+                 stages: [:generation],
+                 generation_config: %{
+                   min_candidates: 5,
+                   max_candidates: 15
+                 }
+               })
 
       assert config.generation_config.min_candidates == 5
       assert config.generation_config.max_candidates == 15
-      assert config.generation_config.batch_size == 3  # default
+      # default
+      assert config.generation_config.batch_size == 3
     end
 
     test "normalizes verification config" do
-      assert {:ok, config} = PipelineConfig.new(%{
-        stages: [:generation],
-        verifier_config: %{
-          use_outcome: false,
-          parallel: true
-        }
-      })
+      assert {:ok, config} =
+               PipelineConfig.new(%{
+                 stages: [:generation],
+                 verifier_config: %{
+                   use_outcome: false,
+                   parallel: true
+                 }
+               })
 
       assert config.verifier_config.use_outcome == false
-      assert config.verifier_config.use_process == true  # default
+      # default
+      assert config.verifier_config.use_process == true
       assert config.verifier_config.parallel == true
     end
 
     test "normalizes calibration config" do
-      assert {:ok, config} = PipelineConfig.new(%{
-        stages: [:generation],
-        calibration_config: %{
-          high_threshold: 0.8,
-          low_threshold: 0.5,
-          low_action: :escalate
-        }
-      })
+      assert {:ok, config} =
+               PipelineConfig.new(%{
+                 stages: [:generation],
+                 calibration_config: %{
+                   high_threshold: 0.8,
+                   low_threshold: 0.5,
+                   low_action: :escalate
+                 }
+               })
 
       assert config.calibration_config.high_threshold == 0.8
       assert config.calibration_config.low_threshold == 0.5
       assert config.calibration_config.low_action == :escalate
-      assert config.calibration_config.medium_action == :with_verification  # default
+      # default
+      assert config.calibration_config.medium_action == :with_verification
     end
 
     test "sets telemetry_enabled" do

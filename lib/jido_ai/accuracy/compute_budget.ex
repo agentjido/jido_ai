@@ -76,9 +76,7 @@ defmodule Jido.AI.Accuracy.ComputeBudget do
   - Hard: 10 × 1.0 + 10 × 0.5 + 50 × 0.01 + 2 × 1.0 = 17.5
   """
 
-  alias Jido.AI.Accuracy.Helpers
-
-  import Helpers, only: [get_attr: 2, get_attr: 3]
+  import Jido.AI.Accuracy.Helpers, only: [get_attr: 2, get_attr: 3]
 
   @type t :: %__MODULE__{
           num_candidates: pos_integer(),
@@ -98,7 +96,6 @@ defmodule Jido.AI.Accuracy.ComputeBudget do
   @cost_per_refinement 1.0
 
   # Default values
-  @default_num_candidates 5
   @default_prm_threshold 0.5
 
   defstruct [
@@ -147,13 +144,13 @@ defmodule Jido.AI.Accuracy.ComputeBudget do
   def new(attrs) when is_map(attrs) do
     num_candidates = get_attr(attrs, :num_candidates)
 
-    with {:ok, validated_num} <- validate_num_candidates(num_candidates),
-         use_prm <- get_attr(attrs, :use_prm, false),
-         use_search <- get_attr(attrs, :use_search, false),
-         max_refinements <- get_attr(attrs, :max_refinements, 0),
-         search_iterations <- get_attr(attrs, :search_iterations, nil),
-         prm_threshold <- get_attr(attrs, :prm_threshold, @default_prm_threshold),
-         metadata <- get_attr(attrs, :metadata, %{}) do
+    with {:ok, validated_num} <- validate_num_candidates(num_candidates) do
+      use_prm = get_attr(attrs, :use_prm, false)
+      use_search = get_attr(attrs, :use_search, false)
+      max_refinements = get_attr(attrs, :max_refinements, 0)
+      search_iterations = get_attr(attrs, :search_iterations, nil)
+      prm_threshold = get_attr(attrs, :prm_threshold, @default_prm_threshold)
+      metadata = get_attr(attrs, :metadata, %{})
       # Derive search_iterations if not provided but search is enabled
       search_iterations =
         if use_search and is_nil(search_iterations) do
@@ -394,6 +391,7 @@ defmodule Jido.AI.Accuracy.ComputeBudget do
   defp maybe_put_boolean(attrs, _key, _value), do: attrs
 
   defp maybe_put_non_neg_int(attrs, _key, nil), do: attrs
+
   defp maybe_put_non_neg_int(attrs, key, value) when is_integer(value) and value >= 0 do
     Map.put(attrs, key, value)
   end
@@ -401,6 +399,7 @@ defmodule Jido.AI.Accuracy.ComputeBudget do
   defp maybe_put_non_neg_int(attrs, _key, _value), do: attrs
 
   defp maybe_put_nullable_int(attrs, _key, nil), do: attrs
+
   defp maybe_put_nullable_int(attrs, key, value) when is_integer(value) and value > 0 do
     Map.put(attrs, key, value)
   end
@@ -408,6 +407,7 @@ defmodule Jido.AI.Accuracy.ComputeBudget do
   defp maybe_put_nullable_int(attrs, _key, _value), do: attrs
 
   defp maybe_put_nullable_float(attrs, _key, nil), do: attrs
+
   defp maybe_put_nullable_float(attrs, key, value) when is_number(value) do
     Map.put(attrs, key, value / 1)
   end

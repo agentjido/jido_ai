@@ -52,7 +52,8 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
 
       Telemetry.emit_pipeline_start(query, config)
 
-      Process.sleep(10)  # Allow event to be processed
+      # Allow event to be processed
+      Process.sleep(10)
       events = collect_events(collector_pid)
 
       assert length(events) == 1
@@ -114,6 +115,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
 
       start_time = System.monotonic_time()
       query = "What is 2+2?"
+
       result = %{
         answer: "4",
         metadata: %{
@@ -143,6 +145,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
 
       start_time = System.monotonic_time()
       query = "What is 2+2?"
+
       result = %{
         answer: "4",
         metadata: %{
@@ -226,7 +229,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
       assert [_event, _measurements, metadata] = List.first(events)
 
       assert is_list(metadata.stacktrace)
-      assert length(metadata.stacktrace) > 0
+      refute Enum.empty?(metadata.stacktrace)
 
       :telemetry.detach(handler_id)
     end
@@ -304,6 +307,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
       start_time = System.monotonic_time()
       stage_name = :generation
       query = "What is 2+2?"
+
       stage_result = %{
         candidates: ["Answer 1"],
         metadata: %{
@@ -418,7 +422,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
       # Should have start event
       assert length(start_events) == 1
       # Should NOT have stop event (function raised)
-      assert length(stop_events) == 0
+      assert Enum.empty?(stop_events)
 
       :telemetry.detach(start_handler_id)
       :telemetry.detach(stop_handler_id)
@@ -484,7 +488,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
       # Should have start event
       assert length(start_events) == 1
       # Should NOT have stop event (function raised)
-      assert length(stop_events) == 0
+      assert Enum.empty?(stop_events)
 
       :telemetry.detach(start_handler_id)
       :telemetry.detach(stop_handler_id)
@@ -511,6 +515,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
       start_time = System.monotonic_time()
       Telemetry.emit_stage_start(:generation, query, %{max_candidates: 3})
       Process.sleep(2)
+
       Telemetry.emit_stage_stop(:generation, start_time, query, %{
         candidates: ["4"],
         metadata: %{num_candidates: 3}
@@ -520,6 +525,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
       start_time = System.monotonic_time()
       Telemetry.emit_stage_start(:calibration, query, nil)
       Process.sleep(2)
+
       Telemetry.emit_stage_stop(:calibration, start_time, query, %{
         answer: "4",
         confidence: 0.95,
@@ -528,6 +534,7 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
 
       # Pipeline stop
       pipeline_start = System.monotonic_time() - 10
+
       Telemetry.emit_pipeline_stop(pipeline_start, query, %{
         answer: "4",
         confidence: 0.95,
@@ -574,7 +581,8 @@ defmodule Jido.AI.Accuracy.TelemetryTest do
             [[event, measurements, metadata] | events]
           end)
         rescue
-          _ -> :ok # Collector may be stopped, ignore error
+          # Collector may be stopped, ignore error
+          _ -> :ok
         end
       end,
       nil

@@ -221,8 +221,7 @@ defmodule Jido.AI.Accuracy.Telemetry do
 
   """
   @spec emit_stage_start(atom(), binary(), map() | nil) :: :ok
-  def emit_stage_start(stage_name, query, stage_config \\ nil)
-      when is_atom(stage_name) and is_binary(query) do
+  def emit_stage_start(stage_name, query, stage_config \\ nil) when is_atom(stage_name) and is_binary(query) do
     measurements = %{
       system_time: System.system_time()
     }
@@ -359,8 +358,7 @@ defmodule Jido.AI.Accuracy.Telemetry do
 
   """
   @spec stage_span(atom(), binary(), function()) :: term()
-  def stage_span(stage_name, query, fun) when is_atom(stage_name) and is_binary(query) and
-           is_function(fun, 0) do
+  def stage_span(stage_name, query, fun) when is_atom(stage_name) and is_binary(query) and is_function(fun, 0) do
     start_metadata = build_stage_start_metadata(stage_name, query, nil)
 
     :telemetry.span(
@@ -409,9 +407,8 @@ defmodule Jido.AI.Accuracy.Telemetry do
     }
 
     preset =
-      cond do
-        is_map(config) -> Map.get(config, :preset) || Map.get(config, "preset")
-        true -> nil
+      if is_map(config) do
+        Map.get(config, :preset) || Map.get(config, "preset")
       end
 
     base
@@ -474,8 +471,6 @@ defmodule Jido.AI.Accuracy.Telemetry do
 
     if input > 0 or output > 0 do
       input + output
-    else
-      nil
     end
   end
 
@@ -489,6 +484,7 @@ defmodule Jido.AI.Accuracy.Telemetry do
 
   defp format_stacktrace(nil), do: []
   defp format_stacktrace([]), do: []
+
   defp format_stacktrace(stacktrace) when is_list(stacktrace) do
     stacktrace
     |> Enum.take(10)
@@ -506,6 +502,7 @@ defmodule Jido.AI.Accuracy.Telemetry do
   defp format_location(_), do: "unknown"
 
   defp sanitize_config(nil), do: nil
+
   defp sanitize_config(config) when is_map(config) do
     # Remove sensitive or large config fields
     config

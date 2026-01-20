@@ -28,8 +28,9 @@ defmodule Jido.AI.Security do
       :ok = Security.validate_max_turns(25)
   """
 
-  require Bitwise
   alias Bitwise, as: BW
+
+  require Bitwise
 
   @type validation_result :: :ok | {:error, reason :: term()}
   @type prompt :: String.t()
@@ -83,7 +84,7 @@ defmodule Jido.AI.Security do
     ~r/(repeat|return|show)\s+your\s+(system\s+)?prompt/i,
 
     # Translation/encoding attempts
-    ~r/translate\s+(this|the\s+above)\s+to\s+(base64|binary|hex)/i,
+    ~r/translate\s+(this|the\s+above)\s+to\s+(base64|binary|hex)/i
   ]
 
   # Dangerous characters that should not appear in prompts (stored as byte integers)
@@ -91,10 +92,33 @@ defmodule Jido.AI.Security do
     # Null byte can cause string truncation issues
     0,
     # Control characters (except common whitespace like 9=tab, 10=LF, 13=CR)
-    1, 2, 3, 4, 5, 6, 7, 11, 12,
-    14, 15, 16, 17, 18, 19, 20, 21,
-    22, 23, 24, 25, 26, 27, 28, 29,
-    30, 31
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    11,
+    12,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
   ]
 
   # ============================================================================
@@ -150,9 +174,8 @@ defmodule Jido.AI.Security do
   @spec validate_prompt(prompt()) :: validation_result()
   def validate_prompt(prompt) when is_binary(prompt) do
     with :ok <- validate_prompt_length(prompt),
-         :ok <- validate_prompt_content(prompt),
-         :ok <- validate_prompt_injection_safe(prompt) do
-      :ok
+         :ok <- validate_prompt_content(prompt) do
+      validate_prompt_injection_safe(prompt)
     end
   end
 
@@ -346,6 +369,7 @@ defmodule Jido.AI.Security do
   @spec validate_and_wrap_callback(callback(), keyword()) ::
           {:ok, callback()} | {:error, atom()}
   def validate_and_wrap_callback(callback, opts \\ [])
+
   def validate_and_wrap_callback(callback, opts) when is_function(callback) do
     with :ok <- validate_callback(callback) do
       timeout = Keyword.get(opts, :timeout, @callback_timeout)
@@ -464,6 +488,7 @@ defmodule Jido.AI.Security do
 
     if include_code? do
       code = error_code(error)
+
       if verbose? do
         "#{base_message} (#{code})"
       else
@@ -550,11 +575,9 @@ defmodule Jido.AI.Security do
   end
 
   defp format_error_for_log(error) do
-    try do
-      inspect(error, limit: :infinity, printable_limit: :infinity)
-    rescue
-      _ -> "#{inspect(error.__struct__)}: [error data too large]"
-    end
+    inspect(error, limit: :infinity, printable_limit: :infinity)
+  rescue
+    _ -> "#{inspect(error.__struct__)}: [error data too large]"
   end
 
   # ============================================================================

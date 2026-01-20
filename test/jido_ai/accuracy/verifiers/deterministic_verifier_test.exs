@@ -120,8 +120,7 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifierTest do
   describe "verify/2 - exact comparison" do
     setup do
       {:ok,
-       verifier:
-         DeterministicVerifier.new!(ground_truth: "42", comparison_type: :exact, normalize_whitespace: true)}
+       verifier: DeterministicVerifier.new!(ground_truth: "42", comparison_type: :exact, normalize_whitespace: true)}
     end
 
     test "returns score 1.0 for exact match", %{verifier: verifier} do

@@ -9,10 +9,11 @@ defmodule Jido.AI.Accuracy.DirectiveTest do
 
   describe "Directive.Run" do
     test "creates a valid directive with required fields" do
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?"
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?"
+        })
 
       assert directive.id == "call_123"
       assert directive.query == "What is 2+2?"
@@ -22,11 +23,12 @@ defmodule Jido.AI.Accuracy.DirectiveTest do
     end
 
     test "creates a directive with preset" do
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        preset: :fast
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          preset: :fast
+        })
 
       assert directive.preset == :fast
     end
@@ -34,12 +36,13 @@ defmodule Jido.AI.Accuracy.DirectiveTest do
     test "creates a directive with config overrides" do
       config = %{generation_config: %{max_candidates: 15}}
 
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        preset: :accurate,
-        config: config
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          preset: :accurate,
+          config: config
+        })
 
       assert directive.config == config
     end
@@ -47,21 +50,23 @@ defmodule Jido.AI.Accuracy.DirectiveTest do
     test "creates a directive with generator" do
       generator = fn prompt -> {:ok, "Answer: #{prompt}"} end
 
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        generator: generator
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          generator: generator
+        })
 
       assert is_function(directive.generator, 1)
     end
 
     test "creates a directive with custom timeout" do
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        timeout: 60_000
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          timeout: 60_000
+        })
 
       assert directive.timeout == 60_000
     end
@@ -69,11 +74,12 @@ defmodule Jido.AI.Accuracy.DirectiveTest do
     test "accepts any atom as preset (validation happens at execution time)" do
       # Zoi doesn't constrain atom values, so this passes
       # Actual validation happens when the preset is used with Presets.get/1
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        preset: :custom_preset
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          preset: :custom_preset
+        })
 
       assert directive.preset == :custom_preset
     end
@@ -88,22 +94,24 @@ defmodule Jido.AI.Accuracy.DirectiveTest do
 
     test "accepts negative timeout (validation happens at execution time)" do
       # Zoi doesn't constrain integer values to be positive
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        timeout: -1000
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          timeout: -1000
+        })
 
       assert directive.timeout == -1000
     end
 
     test "converts directive to execution map" do
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        preset: :fast,
-        timeout: 45_000
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          preset: :fast,
+          timeout: 45_000
+        })
 
       exec_map = Directive.Run.to_execution_map(directive)
 
@@ -119,11 +127,12 @@ defmodule Jido.AI.Accuracy.DirectiveTest do
       presets = [:fast, :balanced, :accurate, :coding, :research]
 
       for preset <- presets do
-        directive = Directive.Run.new!(%{
-          id: "call_#{System.unique_integer()}",
-          query: "Test query",
-          preset: preset
-        })
+        directive =
+          Directive.Run.new!(%{
+            id: "call_#{System.unique_integer()}",
+            query: "Test query",
+            preset: preset
+          })
 
         assert directive.preset == preset
       end

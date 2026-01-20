@@ -206,6 +206,7 @@ defmodule Jido.AI.Accuracy.CalibrationGateTest do
       assert {:ok, result} = CalibrationGate.route(gate, candidate, estimate)
 
       assert result.action == :with_citations
+
       assert String.contains?(
                result.candidate.content,
                "[Confidence: Medium] Consider verifying"
@@ -398,8 +399,7 @@ defmodule Jido.AI.Accuracy.CalibrationGateTest do
 
       {:ok, _result} = CalibrationGate.route(gate, candidate, estimate)
 
-      assert_receive {:telemetry_event, [:jido, :accuracy, :calibration, :route], measurements,
-                      metadata}
+      assert_receive {:telemetry_event, [:jido, :accuracy, :calibration, :route], measurements, metadata}
 
       assert is_number(measurements.duration)
       assert metadata.action == :direct

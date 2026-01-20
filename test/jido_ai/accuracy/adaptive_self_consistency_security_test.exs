@@ -62,11 +62,12 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencySecurityTest do
       end
 
       # Should succeed after retries
-      result = AdaptiveSelfConsistency.run(
-        adapter,
-        "What is 2+2?",
-        generator: eventual_generator
-      )
+      result =
+        AdaptiveSelfConsistency.run(
+          adapter,
+          "What is 2+2?",
+          generator: eventual_generator
+        )
 
       Agent.stop(counter)
 

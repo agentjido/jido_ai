@@ -176,7 +176,8 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
     output = ToolExecutor.capture_output(result)
 
     # Limit output size to prevent ReDoS and memory issues
-    max_output_size = 1_000_000  # 1MB limit
+    # 1MB limit
+    max_output_size = 1_000_000
 
     output =
       if String.length(output) > max_output_size do
@@ -258,27 +259,25 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
 
   # Safe regex execution with timeout to prevent catastrophic backtracking
   defp safe_regex_scan(regex_fn) do
-    try do
-      # Use Task.async with a short timeout to prevent hanging
-      task = Task.async(regex_fn)
+    # Use Task.async with a short timeout to prevent hanging
+    task = Task.async(regex_fn)
 
-      case Task.yield(task, 1000) do
-        {:ok, result} ->
-          result
+    case Task.yield(task, 1000) do
+      {:ok, result} ->
+        result
 
-        {:exit, _reason} ->
-          # Task crashed (possibly due to stack overflow from ReDoS)
-          []
+      {:exit, _reason} ->
+        # Task crashed (possibly due to stack overflow from ReDoS)
+        []
 
-        nil ->
-          # Timeout - task didn't complete in time
-          Task.shutdown(task, :brutal_kill)
-          []
-      end
-    catch
-      # Catch any other errors (e.g., compile errors from malformed regex)
-      _kind, _error -> []
+      nil ->
+        # Timeout - task didn't complete in time
+        Task.shutdown(task, :brutal_kill)
+        []
     end
+  catch
+    # Catch any other errors (e.g., compile errors from malformed regex)
+    _kind, _error -> []
   end
 
   defp parse_text_severity(severity) when is_binary(severity) do
@@ -332,16 +331,6 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
 
       "Found #{Enum.join(parts, ", ")} across #{tools_count} tool(s)"
     end
-  end
-
-  defp error_result(candidate, reason) do
-    %VerificationResult{
-      candidate_id: candidate.id,
-      score: 0.0,
-      confidence: 0.0,
-      reasoning: "Static analysis failed: #{format_error(reason)}",
-      metadata: %{error: reason}
-    }
   end
 
   # Validation

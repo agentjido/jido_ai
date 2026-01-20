@@ -43,26 +43,24 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
     category: "ai",
     tags: ["reasoning", "analysis"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      model:
-        Zoi.string(
-          description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)"
-        )
-        |> Zoi.optional(),
-      input: Zoi.string(description: "The text or data to analyze"),
-      analysis_type:
-        Zoi.atom(description: "Type of analysis to perform (:sentiment, :topics, :entities, :summary, :custom)")
-        |> Zoi.default(:summary),
-      custom_prompt:
-        Zoi.string(description: "Custom analysis instructions (when analysis_type: :custom)")
-        |> Zoi.optional(),
-      max_tokens:
-        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(2048),
-      temperature:
-        Zoi.float(description: "Sampling temperature (lower for more deterministic analysis)")
-        |> Zoi.default(0.3),
-      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
-    })
+    schema:
+      Zoi.object(%{
+        model:
+          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)")
+          |> Zoi.optional(),
+        input: Zoi.string(description: "The text or data to analyze"),
+        analysis_type:
+          Zoi.atom(description: "Type of analysis to perform (:sentiment, :topics, :entities, :summary, :custom)")
+          |> Zoi.default(:summary),
+        custom_prompt:
+          Zoi.string(description: "Custom analysis instructions (when analysis_type: :custom)")
+          |> Zoi.optional(),
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(2048),
+        temperature:
+          Zoi.float(description: "Sampling temperature (lower for more deterministic analysis)")
+          |> Zoi.default(0.3),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+      })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers
