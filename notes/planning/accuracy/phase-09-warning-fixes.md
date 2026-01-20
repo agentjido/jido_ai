@@ -7,7 +7,7 @@ This phase addresses all compiler and documentation warnings to ensure clean bui
 | Category | Count | Priority | Status |
 |----------|-------|----------|--------|
 | Behaviour Callback Mismatches | 16 | High | ✅ Complete |
-| Unused Variables/Imports/Aliases | 45+ | Medium | Pending |
+| Unused Variables/Imports/Aliases | 45+ | Medium | ✅ Complete |
 | Code Style Issues | 6 | Low | Pending |
 | Type/Undefined Issues | 6 | High | Pending |
 | Unreachable Clauses | 3 | Medium | Pending |
@@ -53,61 +53,61 @@ Fixed skill modules that incorrectly implemented `schema/0` as a behaviour callb
 
 ---
 
-## 9.2 Unused Variables, Imports, Aliases, and Functions
+## 9.2 Unused Variables, Imports, Aliases, and Functions ✅
 
 Remove or prefix unused variables, imports, aliases, and functions throughout the codebase.
 
-### 9.2.1 Security Module Unused Variables
+### 9.2.1 Security Module Unused Variables ✅
 
 Fix unused pattern match variables in `lib/jido_ai/security.ex`.
 
-- [ ] 9.2.1.1 Fix `find_dangerous_character/1`:
-  - [ ] Prefix `rest` with underscore: `_rest`
-- [ ] 9.2.1.2 Fix `generate_stream_id/0`:
-  - [ ] Prefix all unused nibble variables: `_c1`, `_c2`, `_c3`, `_c4`, `_d1`, `_d2`, `_d3`, `_d4`, `_e1` through `_e12`
-- [ ] 9.2.1.3 Remove unused module attribute `@max_callback_arity`
+- [x] 9.2.1.1 Fix `find_dangerous_character/1`:
+  - [x] Prefix `rest` with underscore: `_rest`
+- [x] 9.2.1.2 Fix `generate_stream_id/0`:
+  - [x] Prefix all unused nibble variables: `_c1`, `_c2`, `_c3`, `_c4`, `_d1`, `_d2`, `_d3`, `_d4`, `_e1` through `_e12`
+- [x] 9.2.1.3 Remove unused module attribute `@max_callback_arity`
 
-### 9.2.2 Accuracy Module Unused Variables
+### 9.2.2 Accuracy Module Unused Variables ✅
 
-- [ ] 9.2.2.1 Fix `lib/jido_ai/accuracy/generation_result.ex`:
-  - [ ] Prefix unused `strategy` in `select_by_strategy/2`
-  - [ ] Prefix unused `best_candidate` in `from_map/1`
-- [ ] 9.2.2.2 Fix `lib/jido_ai/accuracy/aggregators/majority_vote.ex`:
-  - [ ] Prefix unused `candidate` in `aggregate/2`
-- [ ] 9.2.2.3 Fix `lib/jido_ai/accuracy/search_state.ex`:
-  - [ ] Remove unused alias `SearchState`
-- [ ] 9.2.2.4 Fix `lib/jido_ai/accuracy/verifiers/static_analysis_verifier.ex`:
-  - [ ] Prefix unused `verifier` in `verify/3`
-  - [ ] Prefix unused `tools` in `calculate_confidence/2`
-- [ ] 9.2.2.5 Fix `lib/jido_ai/accuracy/verifiers/unit_test_verifier.ex`:
-  - [ ] Prefix unused `total` in `calculate_confidence/1`
-- [ ] 9.2.2.6 Fix `lib/jido_ai/accuracy/prms/llm_prm.ex`:
-  - [ ] Prefix unused `opts` in `score_step/4`
-- [ ] 9.2.2.7 Fix `lib/jido_ai/accuracy/search/mcts.ex`:
-  - [ ] Prefix unused `sim_count` in `run_simulations/7`
+- [x] 9.2.2.1 Fix `lib/jido_ai/accuracy/generation_result.ex`:
+  - [x] Prefix unused `strategy` in `select_by_strategy/2`
+  - [x] Prefix unused `best_candidate` in `from_map/1`
+- [x] 9.2.2.2 Fix `lib/jido_ai/accuracy/aggregators/majority_vote.ex`:
+  - [x] Prefix unused `candidate` in `aggregate/2`
+- [x] 9.2.2.3 Fix `lib/jido_ai/accuracy/search_state.ex`:
+  - [x] Remove unused alias `SearchState`
+- [x] 9.2.2.4 Fix `lib/jido_ai/accuracy/verifiers/static_analysis_verifier.ex`:
+  - [x] Prefix unused `verifier` in `verify/3`
+  - [x] Prefix unused `tools` in `calculate_confidence/2`
+- [x] 9.2.2.5 Fix `lib/jido_ai/accuracy/verifiers/unit_test_verifier.ex`:
+  - [x] Prefix unused `total` in `calculate_confidence/1`
+- [x] 9.2.2.6 Fix `lib/jido_ai/accuracy/prms/llm_prm.ex`:
+  - [x] Prefix unused `opts` in `score_step/4`
+- [x] 9.2.2.7 Fix `lib/jido_ai/accuracy/search/mcts.ex`:
+  - [x] Prefix unused `sim_count` in `run_simulations/7`
 
-### 9.2.3 Unused Imports
+### 9.2.3 Unused Imports ✅
 
-- [ ] 9.2.3.1 Fix `lib/jido_ai/accuracy/estimators/heuristic_difficulty.ex`:
-  - [ ] Remove `get_attr: 2` from the `import Helpers` directive (only `get_attr: 3` is used)
-- [ ] 9.2.3.2 Fix `lib/jido_ai/accuracy/uncertainty_quantification.ex`:
-  - [ ] Remove `get_attr: 2` from the `import Helpers` directive
+- [x] 9.2.3.1 Fix `lib/jido_ai/accuracy/estimators/heuristic_difficulty.ex`:
+  - [x] Remove `get_attr: 2` from the `import Helpers` directive (only `get_attr: 3` is used)
+- [x] 9.2.3.2 Fix `lib/jido_ai/accuracy/uncertainty_quantification.ex`:
+  - [x] Remove `get_attr: 2` from the `import Helpers` directive
 
-### 9.2.4 Unused Aliases
+### 9.2.4 Unused Aliases ✅
 
-- [ ] 9.2.4.1 Fix `lib/jido_ai/accuracy/consensus/majority_vote.ex`:
-  - [ ] Remove unused `Candidate` alias
-- [ ] 9.2.4.2 Fix `lib/jido_ai/accuracy/search_controller.ex`:
-  - [ ] Remove unused `VerificationResult` alias
-- [ ] 9.2.4.3 Fix `lib/jido_ai/skills/tool_calling/actions/execute_tool.ex`:
-  - [ ] Remove unused `Registry` alias
+- [x] 9.2.4.1 Fix `lib/jido_ai/accuracy/consensus/majority_vote.ex`:
+  - [x] Remove unused `Candidate` alias
+- [x] 9.2.4.2 Fix `lib/jido_ai/accuracy/search_controller.ex`:
+  - [x] Remove unused `VerificationResult` alias
+- [x] 9.2.4.3 Fix `lib/jido_ai/skills/tool_calling/actions/execute_tool.ex`:
+  - [x] Remove unused `Registry` alias
 
-### 9.2.5 Unused Functions
+### 9.2.5 Unused Functions ✅
 
-- [ ] 9.2.5.1 Fix `lib/jido_ai/accuracy/stages/search_stage.ex`:
-  - [ ] Remove or document `get_beam_search_module/0` as `@doc false`
-- [ ] 9.2.5.2 Fix `lib/jido_ai/accuracy/strategy_adapter.ex`:
-  - [ ] Remove or document `emit_error_signal/5` as `@doc false`
+- [x] 9.2.5.1 Fix `lib/jido_ai/accuracy/stages/search_stage.ex`:
+  - [x] Remove unused `get_beam_search_module/0` function
+- [x] 9.2.5.2 Fix `lib/jido_ai/accuracy/strategy_adapter.ex`:
+  - [x] Remove unused `emit_error_signal/5` function
 
 ---
 

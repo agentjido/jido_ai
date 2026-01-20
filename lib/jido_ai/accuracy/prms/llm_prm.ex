@@ -227,7 +227,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
 
   """
   @spec score_step(t(), String.t(), map(), keyword()) :: {:ok, number()} | {:error, term()}
-  def score_step(%__MODULE__{} = prm, step, context, opts) when is_binary(step) do
+  def score_step(%__MODULE__{} = prm, step, context, _opts) when is_binary(step) do
     question = Map.get(context, :question) || Map.get(context, :prompt) || ""
     previous_steps = Map.get(context, :previous_steps, [])
 

@@ -73,7 +73,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
 
   alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator, Helpers}
 
-  import Helpers, only: [get_attr: 2, get_attr: 3]
+  import Helpers, only: [get_attr: 3]
 
   @behaviour DifficultyEstimator
 

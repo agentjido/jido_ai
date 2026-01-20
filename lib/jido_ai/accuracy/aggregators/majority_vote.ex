@@ -167,7 +167,7 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
 
     # Find the first candidate in original order with a tied answer
     winner_answer =
-      Enum.find_value(normalized_answers, fn {candidate, normalized_answer} ->
+      Enum.find_value(normalized_answers, fn {_candidate, normalized_answer} ->
         if normalized_answer in tied_answers do
           normalized_answer
         end
