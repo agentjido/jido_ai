@@ -83,7 +83,7 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
   Verifies a candidate by running static analysis tools.
   """
   @spec verify(t(), Candidate.t(), map()) :: {:ok, VerificationResult.t()} | {:error, term()}
-  def verify(%__MODULE__{tools: []} = verifier, %Candidate{} = candidate, _context) do
+  def verify(%__MODULE__{tools: []} = _verifier, %Candidate{} = candidate, _context) do
     {:ok,
      %VerificationResult{
        candidate_id: candidate.id,
@@ -312,7 +312,7 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
 
   defp calculate_confidence([], _tools), do: 0.0
 
-  defp calculate_confidence(issues, tools) do
+  defp calculate_confidence(issues, _tools) do
     issue_count = length(issues)
 
     cond do

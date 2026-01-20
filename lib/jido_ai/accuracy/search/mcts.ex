@@ -177,7 +177,7 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
   end
 
   defp run_simulations(root, prompt, generator, verifier, config, start_time, timeout) do
-    sim_count = 0
+    _sim_count = 0
 
     Enum.reduce_while(1..config.simulations, root, fn _i, current_root ->
       if SearchController.timeout_exceeded?(start_time, timeout) do

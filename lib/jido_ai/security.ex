@@ -43,7 +43,6 @@ defmodule Jido.AI.Security do
   @max_prompt_length 5_000
   @max_input_length 100_000
   @max_hard_turns 50
-  @max_callback_arity 3
   @callback_timeout 5_000
 
   # Known prompt injection patterns
@@ -181,7 +180,7 @@ defmodule Jido.AI.Security do
 
   defp find_dangerous_character(<<>>), do: nil
 
-  defp find_dangerous_character(<<char, rest::binary>>) when char in @dangerous_bytes do
+  defp find_dangerous_character(<<char, _rest::binary>>) when char in @dangerous_bytes do
     <<char>>
   end
 
@@ -585,9 +584,9 @@ defmodule Jido.AI.Security do
     d = BW.band(d, 0x3FFF) |> BW.bor(0x8000)
 
     # Format manually using pattern matching
-    <<c1::4, c2::4, c3::4, c4::4>> = <<c::16>>
-    <<d1::4, d2::4, d3::4, d4::4>> = <<d::16>>
-    <<e1::4, e2::4, e3::4, e4::4, e5::4, e6::4, e7::4, e8::4, e9::4, e10::4, e11::4, e12::4>> = <<e::48>>
+    <<_c1::4, _c2::4, _c3::4, _c4::4>> = <<c::16>>
+    <<_d1::4, _d2::4, _d3::4, _d4::4>> = <<d::16>>
+    <<_e1::4, _e2::4, _e3::4, _e4::4, _e5::4, _e6::4, _e7::4, _e8::4, _e9::4, _e10::4, _e11::4, _e12::4>> = <<e::48>>
 
     [
       to_hex(<<a::32>>, 8),
