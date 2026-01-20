@@ -112,12 +112,10 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
   # Maximum number of patterns to prevent resource exhaustion
   @max_patterns_count 50
 
-  defstruct [
-    aleatoric_patterns: nil,
-    epistemic_patterns: nil,
-    domain_keywords: [],
-    min_matches: 1
-  ]
+  defstruct aleatoric_patterns: nil,
+            epistemic_patterns: nil,
+            domain_keywords: [],
+            min_matches: 1
 
   @doc """
   Creates a new UncertaintyQuantification from the given attributes.

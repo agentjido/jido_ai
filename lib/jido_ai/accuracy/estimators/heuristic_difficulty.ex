@@ -71,11 +71,11 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
 
   """
 
+  @behaviour DifficultyEstimator
+
   alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator, Helpers}
 
   import Helpers, only: [get_attr: 3]
-
-  @behaviour DifficultyEstimator
 
   @type t :: %__MODULE__{
           length_weight: float(),
@@ -100,50 +100,126 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   # SECURITY: Maximum allowed timeout (30 seconds)
   @max_timeout 30_000
 
-  defstruct [
-    length_weight: @default_length_weight,
-    complexity_weight: @default_complexity_weight,
-    domain_weight: @default_domain_weight,
-    question_weight: @default_question_weight,
-    custom_indicators: %{},
-    timeout: @default_timeout
-  ]
+  defstruct length_weight: @default_length_weight,
+            complexity_weight: @default_complexity_weight,
+            domain_weight: @default_domain_weight,
+            question_weight: @default_question_weight,
+            custom_indicators: %{},
+            timeout: @default_timeout
 
   # Domain indicators
   @math_indicators [
     # Math symbols and operations
-    "~", "sum", "integral", "derivative", "equation", "formula",
-    "+", "-", "*", "/", "^", "=", "<", ">", "≤", "≥",
+    "~",
+    "sum",
+    "integral",
+    "derivative",
+    "equation",
+    "formula",
+    "+",
+    "-",
+    "*",
+    "/",
+    "^",
+    "=",
+    "<",
+    ">",
+    "≤",
+    "≥",
     # Math terms
-    "calculate", "compute", "solve", "probability", "statistic",
-    "algebra", "geometry", "trigonometry", "calculus"
+    "calculate",
+    "compute",
+    "solve",
+    "probability",
+    "statistic",
+    "algebra",
+    "geometry",
+    "trigonometry",
+    "calculus"
   ]
 
   @code_indicators [
     # Programming keywords
-    "function", "class", "def ", "import", "return", "if ", "else",
-    "for ", "while", "const", "let", "var", "print", "array",
+    "function",
+    "class",
+    "def ",
+    "import",
+    "return",
+    "if ",
+    "else",
+    "for ",
+    "while",
+    "const",
+    "let",
+    "var",
+    "print",
+    "array",
     # Code-like patterns
-    "()", "{}", "[]", "=>", "==", "!=", "&&", "||",
+    "()",
+    "{}",
+    "[]",
+    "=>",
+    "==",
+    "!=",
+    "&&",
+    "||",
     # Programming terms
-    "algorithm", "data structure", "recursion", "iteration",
-    "compile", "execute", "debug"
+    "algorithm",
+    "data structure",
+    "recursion",
+    "iteration",
+    "compile",
+    "execute",
+    "debug"
   ]
 
   @reasoning_indicators [
-    "explain", "why", "how", "analyze", "compare", "contrast",
-    "evaluate", "assess", "justify", "reasoning", "logic",
-    "relationship", "difference", "similarity", "cause"
+    "explain",
+    "why",
+    "how",
+    "analyze",
+    "compare",
+    "contrast",
+    "evaluate",
+    "assess",
+    "justify",
+    "reasoning",
+    "logic",
+    "relationship",
+    "difference",
+    "similarity",
+    "cause"
   ]
 
   @creative_indicators [
-    "write", "create", "generate", "story", "poem", "creative",
-    "imagine", "invent", "design", "compose", "narrative"
+    "write",
+    "create",
+    "generate",
+    "story",
+    "poem",
+    "creative",
+    "imagine",
+    "invent",
+    "design",
+    "compose",
+    "narrative"
   ]
 
   @simple_question_words [
-    "what", "when", "where", "who", "which", "is", "are", "do", "does",
-    "list", "name", "identify", "define", "state"
+    "what",
+    "when",
+    "where",
+    "who",
+    "which",
+    "is",
+    "are",
+    "do",
+    "does",
+    "list",
+    "name",
+    "identify",
+    "define",
+    "state"
   ]
 
   @doc """
@@ -379,7 +455,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
     %{
       score: domain_score,
       domains: Enum.reverse(detected_domains),
-      custom: Enum.into(custom_scores, %{})
+      custom: Map.new(custom_scores)
     }
   end
 
@@ -450,9 +526,10 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
     avg_score = Enum.sum(scores) / length(scores)
 
     # Variance from mean indicates disagreement
-    variance = Enum.reduce(scores, 0.0, fn s, acc ->
-      acc + :math.pow(s - avg_score, 2)
-    end) / length(scores)
+    variance =
+      Enum.reduce(scores, 0.0, fn s, acc ->
+        acc + :math.pow(s - avg_score, 2)
+      end) / length(scores)
 
     # Low variance = high confidence
     confidence =
@@ -469,7 +546,6 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   # Generate reasoning explanation
 
   defp generate_reasoning(features, _score, level) do
-
     # Length reasoning
     length_part =
       case features.length.score do
@@ -511,17 +587,19 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
     cond do
       not Enum.all?(weights, &is_number/1) ->
         {:error, :invalid_weights}
+
       not Enum.all?(weights, &(&1 >= 0.0 and &1 <= 1.0)) ->
         {:error, :invalid_weights}
+
       abs(Enum.sum(weights) - 1.0) > 0.01 ->
         {:error, :weights_dont_sum_to_1}
+
       true ->
         :ok
     end
   end
 
-  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= @max_timeout,
-    do: :ok
+  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= @max_timeout, do: :ok
 
   defp validate_timeout(_), do: {:error, :invalid_timeout}
 

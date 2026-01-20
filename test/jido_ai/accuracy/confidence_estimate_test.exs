@@ -145,12 +145,13 @@ defmodule Jido.AI.Accuracy.ConfidenceEstimateTest do
 
   describe "to_map/1" do
     test "converts estimate to map" do
-      estimate = ConfidenceEstimate.new!(%{
-        score: 0.75,
-        method: :attention,
-        reasoning: "Test",
-        token_level_confidence: [0.8, 0.7]
-      })
+      estimate =
+        ConfidenceEstimate.new!(%{
+          score: 0.75,
+          method: :attention,
+          reasoning: "Test",
+          token_level_confidence: [0.8, 0.7]
+        })
 
       map = ConfidenceEstimate.to_map(estimate)
 
@@ -210,12 +211,13 @@ defmodule Jido.AI.Accuracy.ConfidenceEstimateTest do
 
   describe "round-trip serialization" do
     test "to_map and from_map preserve data" do
-      original = ConfidenceEstimate.new!(%{
-        score: 0.85,
-        method: :attention,
-        reasoning: "High confidence",
-        token_level_confidence: [0.9, 0.8, 0.85]
-      })
+      original =
+        ConfidenceEstimate.new!(%{
+          score: 0.85,
+          method: :attention,
+          reasoning: "High confidence",
+          token_level_confidence: [0.9, 0.8, 0.85]
+        })
 
       map = ConfidenceEstimate.to_map(original)
       assert {:ok, restored} = ConfidenceEstimate.from_map(map)

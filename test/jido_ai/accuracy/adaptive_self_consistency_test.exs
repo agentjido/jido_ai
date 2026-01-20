@@ -15,12 +15,13 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
     end
 
     test "creates adapter with custom values" do
-      assert {:ok, adapter} = AdaptiveSelfConsistency.new(%{
-        min_candidates: 5,
-        max_candidates: 15,
-        batch_size: 5,
-        early_stop_threshold: 0.9
-      })
+      assert {:ok, adapter} =
+               AdaptiveSelfConsistency.new(%{
+                 min_candidates: 5,
+                 max_candidates: 15,
+                 batch_size: 5,
+                 early_stop_threshold: 0.9
+               })
 
       assert adapter.min_candidates == 5
       assert adapter.max_candidates == 15
@@ -39,15 +40,15 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
 
     test "returns error for min > max" do
       assert {:error, :min_candidates_must_be_less_than_max} =
-        AdaptiveSelfConsistency.new(%{min_candidates: 10, max_candidates: 5})
+               AdaptiveSelfConsistency.new(%{min_candidates: 10, max_candidates: 5})
     end
 
     test "returns error for invalid threshold" do
       assert {:error, :early_stop_threshold_must_be_between_0_and_1} =
-        AdaptiveSelfConsistency.new(%{early_stop_threshold: -0.1})
+               AdaptiveSelfConsistency.new(%{early_stop_threshold: -0.1})
 
       assert {:error, :early_stop_threshold_must_be_between_0_and_1} =
-        AdaptiveSelfConsistency.new(%{early_stop_threshold: 1.1})
+               AdaptiveSelfConsistency.new(%{early_stop_threshold: 1.1})
     end
 
     test "returns error for invalid batch_size" do
@@ -140,14 +141,14 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
 
     test "returns high consensus for consistent candidates", context do
       assert {:ok, agreement, _metadata} =
-        AdaptiveSelfConsistency.check_consensus(context.consistent)
+               AdaptiveSelfConsistency.check_consensus(context.consistent)
 
       assert agreement >= 0.8
     end
 
     test "returns low consensus for split candidates", context do
       assert {:ok, agreement, _metadata} =
-        AdaptiveSelfConsistency.check_consensus(context.split)
+               AdaptiveSelfConsistency.check_consensus(context.split)
 
       assert agreement < 1.0
     end
@@ -193,21 +194,22 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
 
   describe "run/3" do
     setup do
-      adapter = AdaptiveSelfConsistency.new!(%{
-        min_candidates: 3,
-        max_candidates: 10,
-        batch_size: 3,
-        early_stop_threshold: 0.8
-      })
+      adapter =
+        AdaptiveSelfConsistency.new!(%{
+          min_candidates: 3,
+          max_candidates: 10,
+          batch_size: 3,
+          early_stop_threshold: 0.8
+        })
 
       # Create a simple generator that returns mock candidates
       simple_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "The answer is: 42",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "The answer is: 42",
+           model: "test"
+         })}
       end
 
       {:ok, adapter: adapter, generator: simple_generator}
@@ -216,12 +218,13 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
     test "generates candidates with easy difficulty", context do
       {:ok, estimate} = DifficultyEstimate.new(%{level: :easy, score: 0.2})
 
-      {:ok, result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "What is 2+2?",
-        difficulty_estimate: estimate,
-        generator: context.generator
-      )
+      {:ok, result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "What is 2+2?",
+          difficulty_estimate: estimate,
+          generator: context.generator
+        )
 
       assert result != nil
       assert is_map(metadata)
@@ -237,19 +240,21 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
       # Use varied generator to prevent early stopping for this test
       varied_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "Answer #{:rand.uniform()}",  # Varied content
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           # Varied content
+           content: "Answer #{:rand.uniform()}",
+           model: "test"
+         })}
       end
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Explain photosynthesis",
-        difficulty_estimate: estimate,
-        generator: varied_generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Explain photosynthesis",
+          difficulty_estimate: estimate,
+          generator: varied_generator
+        )
 
       # With varied content and no early stopping, should generate initial_n for medium
       assert metadata.actual_n >= 5
@@ -262,19 +267,21 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
       # Use varied generator to prevent early stopping for this test
       varied_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "Answer #{:rand.uniform()}",  # Varied content
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           # Varied content
+           content: "Answer #{:rand.uniform()}",
+           model: "test"
+         })}
       end
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Prove the Riemann hypothesis",
-        difficulty_estimate: estimate,
-        generator: varied_generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Prove the Riemann hypothesis",
+          difficulty_estimate: estimate,
+          generator: varied_generator
+        )
 
       # With varied content and no early stopping, should generate initial_n for hard
       assert metadata.actual_n >= 10
@@ -282,12 +289,13 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
     end
 
     test "uses difficulty_level atom when no estimate provided", context do
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Test query",
-        difficulty_level: :easy,
-        generator: context.generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Test query",
+          difficulty_level: :easy,
+          generator: context.generator
+        )
 
       assert metadata.actual_n >= 3
       assert metadata.actual_n <= 5
@@ -297,18 +305,20 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
       # Use varied generator to prevent early stopping for this test
       varied_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "Answer #{:rand.uniform()}",  # Varied content
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           # Varied content
+           content: "Answer #{:rand.uniform()}",
+           model: "test"
+         })}
       end
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Test query",
-        generator: varied_generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Test query",
+          generator: varied_generator
+        )
 
       # Default is medium, should generate initial_n for medium
       assert metadata.actual_n >= 5
@@ -317,18 +327,19 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
 
     test "returns error without generator", context do
       assert {:error, :generator_required} =
-        AdaptiveSelfConsistency.run(context.adapter, "Test query", [])
+               AdaptiveSelfConsistency.run(context.adapter, "Test query", [])
     end
 
     test "includes early_stopped in metadata", context do
       {:ok, estimate} = DifficultyEstimate.new(%{level: :easy, score: 0.2})
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Test",
-        difficulty_estimate: estimate,
-        generator: context.generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Test",
+          difficulty_estimate: estimate,
+          generator: context.generator
+        )
 
       assert is_boolean(metadata.early_stopped)
     end
@@ -336,12 +347,13 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
     test "includes consensus in metadata", context do
       {:ok, estimate} = DifficultyEstimate.new(%{level: :easy, score: 0.2})
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        context.adapter,
-        "Test",
-        difficulty_estimate: estimate,
-        generator: context.generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          context.adapter,
+          "Test",
+          difficulty_estimate: estimate,
+          generator: context.generator
+        )
 
       assert is_number(metadata.consensus) or is_nil(metadata.consensus)
     end
@@ -349,31 +361,33 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
 
   describe "early stopping behavior" do
     test "stops early when consensus threshold is reached" do
-      adapter = AdaptiveSelfConsistency.new!(%{
-        min_candidates: 3,
-        max_candidates: 10,
-        batch_size: 3,
-        early_stop_threshold: 0.8
-      })
+      adapter =
+        AdaptiveSelfConsistency.new!(%{
+          min_candidates: 3,
+          max_candidates: 10,
+          batch_size: 3,
+          early_stop_threshold: 0.8
+        })
 
       # Generator that produces consistent answers
       consistent_generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "The answer is: 42",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "The answer is: 42",
+           model: "test"
+         })}
       end
 
       {:ok, estimate} = DifficultyEstimate.new(%{level: :medium, score: 0.5})
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        adapter,
-        "Test",
-        difficulty_estimate: estimate,
-        generator: consistent_generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          adapter,
+          "Test",
+          difficulty_estimate: estimate,
+          generator: consistent_generator
+        )
 
       # Should stop early due to consensus
       assert metadata.early_stopped == true
@@ -384,27 +398,29 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
 
   describe "consistency with difficulty-based N" do
     test "easy difficulty generates fewer candidates" do
-      adapter = AdaptiveSelfConsistency.new!(%{
-        min_candidates: 3,
-        max_candidates: 5,
-        batch_size: 3
-      })
+      adapter =
+        AdaptiveSelfConsistency.new!(%{
+          min_candidates: 3,
+          max_candidates: 5,
+          batch_size: 3
+        })
 
       generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "Answer",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "Answer",
+           model: "test"
+         })}
       end
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        adapter,
-        "Test",
-        difficulty_level: :easy,
-        generator: generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          adapter,
+          "Test",
+          difficulty_level: :easy,
+          generator: generator
+        )
 
       assert metadata.actual_n <= 5
       assert metadata.initial_n == 3
@@ -412,27 +428,29 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
     end
 
     test "hard difficulty generates more candidates" do
-      adapter = AdaptiveSelfConsistency.new!(%{
-        min_candidates: 10,
-        max_candidates: 20,
-        batch_size: 5
-      })
+      adapter =
+        AdaptiveSelfConsistency.new!(%{
+          min_candidates: 10,
+          max_candidates: 20,
+          batch_size: 5
+        })
 
       generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "Answer",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "Answer",
+           model: "test"
+         })}
       end
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        adapter,
-        "Test",
-        difficulty_level: :hard,
-        generator: generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          adapter,
+          "Test",
+          difficulty_level: :hard,
+          generator: generator
+        )
 
       assert metadata.actual_n >= 10
       assert metadata.initial_n == 10
@@ -442,27 +460,29 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
 
   describe "metadata accuracy" do
     test "metadata includes all required fields" do
-      adapter = AdaptiveSelfConsistency.new!(%{
-        min_candidates: 3,
-        max_candidates: 10,
-        early_stop_threshold: 0.8
-      })
+      adapter =
+        AdaptiveSelfConsistency.new!(%{
+          min_candidates: 3,
+          max_candidates: 10,
+          early_stop_threshold: 0.8
+        })
 
       generator = fn _query ->
         {:ok,
-          Candidate.new!(%{
-            id: Uniq.UUID.uuid4(),
-            content: "Answer",
-            model: "test"
-          })}
+         Candidate.new!(%{
+           id: Uniq.UUID.uuid4(),
+           content: "Answer",
+           model: "test"
+         })}
       end
 
-      {:ok, _result, metadata} = AdaptiveSelfConsistency.run(
-        adapter,
-        "Test",
-        difficulty_level: :medium,
-        generator: generator
-      )
+      {:ok, _result, metadata} =
+        AdaptiveSelfConsistency.run(
+          adapter,
+          "Test",
+          difficulty_level: :medium,
+          generator: generator
+        )
 
       # Check all required metadata fields
       assert Map.has_key?(metadata, :actual_n)

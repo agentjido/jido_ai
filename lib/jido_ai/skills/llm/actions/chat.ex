@@ -43,23 +43,23 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
     category: "ai",
     tags: ["llm", "chat", "generation"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      model: Zoi.string(description: "Model spec (e.g., 'anthropic:claude-haiku-4-5') or alias (e.g., :fast)")
-        |> Zoi.optional(),
-      prompt: Zoi.string(description: "The user prompt to send to the LLM"),
-      system_prompt:
-        Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
-        |> Zoi.optional(),
-      max_tokens:
-        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
-      temperature:
-        Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
-      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
-    })
+    schema:
+      Zoi.object(%{
+        model:
+          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-haiku-4-5') or alias (e.g., :fast)")
+          |> Zoi.optional(),
+        prompt: Zoi.string(description: "The user prompt to send to the LLM"),
+        system_prompt:
+          Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
+          |> Zoi.optional(),
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
+        temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+      })
 
   alias Jido.AI.Helpers
-  alias Jido.AI.Skills.BaseActionHelpers
   alias Jido.AI.Security
+  alias Jido.AI.Skills.BaseActionHelpers
 
   @doc """
   Executes the chat action.

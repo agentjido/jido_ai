@@ -288,8 +288,7 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
     estimate
     |> Map.from_struct()
     |> Enum.reject(fn {k, v} -> k == :__struct__ or is_nil(v) or v == %{} end)
-    |> Enum.map(fn {k, v} -> {Atom.to_string(k), v} end)
-    |> Map.new()
+    |> Map.new(fn {k, v} -> {Atom.to_string(k), v} end)
   end
 
   @doc """
@@ -307,11 +306,12 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
   def from_map(map) when is_map(map) do
     # SECURITY: Check for invalid level strings before converting
     # to prevent atom exhaustion attacks
-    with {:ok, level} <- convert_level_from_map(Map.get(map, "level")),
-         attrs <- map
-           |> Enum.map(fn {k, v} -> {String.to_atom(k), convert_value(k, v)} end)
-           |> Map.new()
-           |> Map.put(:level, level) do
+    with {:ok, level} <- convert_level_from_map(Map.get(map, "level")) do
+      attrs =
+        map
+        |> Map.new(fn {k, v} -> {String.to_atom(k), convert_value(k, v)} end)
+        |> Map.put(:level, level)
+
       new(attrs)
     end
   end
@@ -334,6 +334,7 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
   # SECURITY: Safe level conversion from map to prevent atom exhaustion
   defp convert_level_from_map(nil), do: {:ok, nil}
   defp convert_level_from_map(level) when is_atom(level) and level in @levels, do: {:ok, level}
+
   defp convert_level_from_map(level) when is_binary(level) do
     case level do
       "easy" -> {:ok, :easy}
@@ -342,12 +343,14 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
       _ -> {:error, :invalid_level}
     end
   end
+
   defp convert_level_from_map(_), do: {:error, :invalid_level}
 
   # Convert values from string representation back to atoms
   # SECURITY: Use explicit case statement instead of to_existing_atom
   # to prevent atom exhaustion attacks and invalid atom injection
-  defp convert_value("level", _value), do: nil  # Level handled separately in convert_level_from_map
+  # Level handled separately in convert_level_from_map
+  defp convert_value("level", _value), do: nil
   defp convert_value(_, value), do: value
   defp format_error(atom) when is_atom(atom), do: atom
   defp format_error(_), do: :invalid_attributes

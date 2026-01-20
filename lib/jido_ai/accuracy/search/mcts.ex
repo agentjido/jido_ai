@@ -83,9 +83,9 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, SearchController, Search.MCTSNode, VerificationResult}
-
   @behaviour SearchController
+
+  alias Jido.AI.Accuracy.{Candidate, SearchController, Search.MCTSNode, VerificationResult}
 
   @type t :: %__MODULE__{
           simulations: pos_integer(),
@@ -143,7 +143,11 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
     timeout = SearchController.get_timeout(opts, 30_000)
 
     with {:ok, config} <- new(opts),
-         :ok <- SearchController.validate_opts(Keyword.drop(opts, [:simulations, :exploration_constant, :max_depth, :timeout]), []) do
+         :ok <-
+           SearchController.validate_opts(
+             Keyword.drop(opts, [:simulations, :exploration_constant, :max_depth, :timeout]),
+             []
+           ) do
       do_search(prompt, generator, verifier, config, start_time, timeout)
     end
   end
@@ -237,11 +241,14 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
   defp select_ucb1_child(node, exploration_constant) do
     node.children
     |> Enum.reject(fn child -> MCTSNode.is_terminal?(child) end)
-    |> Enum.max_by(fn child ->
-      MCTSNode.ucb1_score_for_child(child, exploration_constant)
-    end, fn ->
-      node
-    end)
+    |> Enum.max_by(
+      fn child ->
+        MCTSNode.ucb1_score_for_child(child, exploration_constant)
+      end,
+      fn ->
+        node
+      end
+    )
   end
 
   # Expansion phase - add new child to leaf
@@ -289,28 +296,27 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
   end
 
   defp generate_candidate(prompt, generator, timeout) do
-    try do
-      case Code.ensure_loaded?(generator) and function_exported?(generator, :generate_candidates, 3) do
-        true ->
-          case generator.generate_candidates(prompt, num_candidates: 1, timeout: timeout) do
-            {:ok, [candidate | _]} -> {:ok, candidate}
-            {:ok, []} -> {:error, :no_candidates}
-            {:error, _} = error -> error
-          end
+    case Code.ensure_loaded?(generator) and function_exported?(generator, :generate_candidates, 3) do
+      true ->
+        case generator.generate_candidates(prompt, num_candidates: 1, timeout: timeout) do
+          {:ok, [candidate | _]} -> {:ok, candidate}
+          {:ok, []} -> {:error, :no_candidates}
+          {:error, _} = error -> error
+        end
 
-        false ->
-          # Fallback: create simple candidate
-          candidate = Candidate.new!(%{
+      false ->
+        # Fallback: create simple candidate
+        candidate =
+          Candidate.new!(%{
             id: "#{System.unique_integer([:positive, :monotonic])}",
             content: "#{prompt} (generated)",
             metadata: %{fallback: true}
           })
 
-          {:ok, candidate}
-      end
-    rescue
-      _ -> {:error, :generator_failed}
+        {:ok, candidate}
     end
+  rescue
+    _ -> {:error, :generator_failed}
   end
 
   defp verify_candidate(candidate, verifier, prompt, start_time, timeout) do

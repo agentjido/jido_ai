@@ -28,9 +28,9 @@ defmodule Jido.AI.Accuracy.Stages.RAGStage do
 
   """
 
-  alias Jido.AI.Accuracy.PipelineStage
+  @behaviour Jido.AI.Accuracy.PipelineStage
 
-  @behaviour PipelineStage
+  alias Jido.AI.Accuracy.PipelineStage
 
   @type t :: %__MODULE__{
           enabled: boolean(),
@@ -56,21 +56,19 @@ defmodule Jido.AI.Accuracy.Stages.RAGStage do
   def execute(input, config) do
     enabled = Map.get(config, :enabled, true)
 
-    unless enabled do
-      # Stage disabled, skip
-      {:ok, input, %{skipped: true}}
-    else
+    if enabled do
       query = Map.get(input, :query)
       retriever = Map.get(config, :retriever)
 
-      cond do
-        is_binary(query) and query != "" and not is_nil(retriever) ->
-          retrieve_and_correct(query, input, config)
-
-        true ->
-          # No retriever configured, skip
-          {:ok, Map.put(input, :rag_applied, false), %{no_retriever: true}}
+      if is_binary(query) and query != "" and not is_nil(retriever) do
+        retrieve_and_correct(query, input, config)
+      else
+        # No retriever configured, skip
+        # Stage disabled, skip
+        {:ok, Map.put(input, :rag_applied, false), %{no_retriever: true}}
       end
+    else
+      {:ok, input, %{skipped: true}}
     end
   end
 

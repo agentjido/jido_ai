@@ -234,8 +234,7 @@ defmodule Jido.AI.Accuracy.ConfidenceEstimate do
     estimate
     |> Map.from_struct()
     |> Enum.reject(fn {k, v} -> k == :__struct__ or is_nil(v) or v == %{} end)
-    |> Enum.map(fn {k, v} -> {Atom.to_string(k), v} end)
-    |> Map.new()
+    |> Map.new(fn {k, v} -> {Atom.to_string(k), v} end)
   end
 
   @doc """
@@ -253,8 +252,7 @@ defmodule Jido.AI.Accuracy.ConfidenceEstimate do
   def from_map(map) when is_map(map) do
     attrs =
       map
-      |> Enum.map(fn {k, v} -> {String.to_atom(k), v} end)
-      |> Map.new()
+      |> Map.new(fn {k, v} -> {String.to_atom(k), v} end)
 
     new(attrs)
   end

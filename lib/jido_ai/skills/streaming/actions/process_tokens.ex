@@ -42,18 +42,18 @@ defmodule Jido.AI.Skills.Streaming.Actions.ProcessTokens do
     category: "ai",
     tags: ["streaming", "llm", "tokens"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      stream_id: Zoi.string(description: "The ID of the stream to process"),
-      on_token:
-        Zoi.any(description: "Callback function invoked for each token") |> Zoi.optional(),
-      on_complete:
-        Zoi.any(description: "Callback function invoked when stream completes")
-        |> Zoi.optional(),
-      filter:
-        Zoi.any(description: "Function to filter tokens (return true to include)")
-        |> Zoi.optional(),
-      transform: Zoi.any(description: "Function to transform each token") |> Zoi.optional()
-    })
+    schema:
+      Zoi.object(%{
+        stream_id: Zoi.string(description: "The ID of the stream to process"),
+        on_token: Zoi.any(description: "Callback function invoked for each token") |> Zoi.optional(),
+        on_complete:
+          Zoi.any(description: "Callback function invoked when stream completes")
+          |> Zoi.optional(),
+        filter:
+          Zoi.any(description: "Function to filter tokens (return true to include)")
+          |> Zoi.optional(),
+        transform: Zoi.any(description: "Function to transform each token") |> Zoi.optional()
+      })
 
   @doc """
   Executes the process tokens action.

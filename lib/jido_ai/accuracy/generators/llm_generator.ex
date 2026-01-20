@@ -163,9 +163,10 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
     tasks =
       Enum.map(1..num_candidates, fn _i ->
         temp =
-          cond do
-            fixed_temperature != nil -> fixed_temperature
-            true -> random_temperature(temperature_range)
+          if fixed_temperature == nil do
+            random_temperature(temperature_range)
+          else
+            fixed_temperature
           end
 
         {prompt, temp}
@@ -186,7 +187,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
       end)
       |> Enum.reject(&is_nil/1)
 
-    if length(results) > 0 do
+    if not Enum.empty?(results) do
       {:ok, results}
     else
       {:error, :all_generations_failed}
@@ -232,7 +233,9 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   @spec generate_with_reasoning(t(), String.t(), keyword()) :: Generator.generate_result()
   def generate_with_reasoning(%__MODULE__{} = generator, prompt, opts \\ []) do
     # Add CoT prefix to prompt
-    cot_prompt = "Think step by step to solve this problem. Show your reasoning clearly, then provide the final answer.\n\n" <> prompt
+    cot_prompt =
+      "Think step by step to solve this problem. Show your reasoning clearly, then provide the final answer.\n\n" <>
+        prompt
 
     # Generate candidates
     case generate_candidates(generator, cot_prompt, opts) do
@@ -297,8 +300,12 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
 
   defp extract_content(response) do
     case response.message.content do
-      nil -> ""
-      content when is_binary(content) -> content
+      nil ->
+        ""
+
+      content when is_binary(content) ->
+        content
+
       content when is_list(content) ->
         content
         |> Enum.filter(fn
@@ -311,7 +318,9 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
 
   defp count_tokens(response) do
     case response.usage do
-      nil -> 0
+      nil ->
+        0
+
       usage ->
         input_tokens = Map.get(usage, :input_tokens, 0)
         output_tokens = Map.get(usage, :output_tokens, 0)
@@ -325,31 +334,25 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
 
   # Validation functions with security bounds (module attributes for guard compatibility)
 
-  defp validate_temperature_range({min, max}) when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max,
-    do: :ok
+  defp validate_temperature_range({min, max})
+       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max,
+       do: :ok
 
-  defp validate_temperature_range(_),
-    do: {:error, :invalid_temperature_range}
+  defp validate_temperature_range(_), do: {:error, :invalid_temperature_range}
 
-  defp validate_num_candidates(n) when is_integer(n) and n >= @min_num_candidates and n <= @max_num_candidates,
-    do: :ok
+  defp validate_num_candidates(n) when is_integer(n) and n >= @min_num_candidates and n <= @max_num_candidates, do: :ok
 
-  defp validate_num_candidates(_),
-    do: {:error, :invalid_num_candidates}
+  defp validate_num_candidates(_), do: {:error, :invalid_num_candidates}
 
-  defp validate_timeout(t) when is_integer(t) and t >= @min_timeout and t <= @max_timeout,
-    do: :ok
+  defp validate_timeout(t) when is_integer(t) and t >= @min_timeout and t <= @max_timeout, do: :ok
 
-  defp validate_timeout(_),
-    do: {:error, :invalid_timeout}
+  defp validate_timeout(_), do: {:error, :invalid_timeout}
 
-  defp validate_max_concurrency(n) when is_integer(n) and n >= @min_concurrency and n <= @max_concurrency_limit,
-    do: :ok
+  defp validate_max_concurrency(n) when is_integer(n) and n >= @min_concurrency and n <= @max_concurrency_limit, do: :ok
 
-  defp validate_max_concurrency(_),
-    do: {:error, :invalid_max_concurrency}
+  defp validate_max_concurrency(_), do: {:error, :invalid_max_concurrency}
 
-  defp add_model_opt(opts, model) do
+  defp add_model_opt(opts, _model) do
     # ReqLLM handles model in the first argument, so no need to add to opts
     opts
   end

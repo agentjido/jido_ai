@@ -77,10 +77,9 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, SearchController, SearchState, VerificationResult}
-  alias Jido.AI.Accuracy.Search.BeamSearch
-
   @behaviour SearchController
+
+  alias Jido.AI.Accuracy.{Candidate, SearchController, SearchState, VerificationResult}
 
   @type t :: %__MODULE__{
           beam_width: pos_integer(),
@@ -143,9 +142,11 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
     timeout = SearchController.get_timeout(opts, 30_000)
 
     with {:ok, config} <- new(opts),
-         :ok <- SearchController.validate_opts(Keyword.drop(opts, [:beam_width, :depth, :branching_factor, :timeout]), []),
+         :ok <-
+           SearchController.validate_opts(Keyword.drop(opts, [:beam_width, :depth, :branching_factor, :timeout]), []),
          {:ok, state} <- do_search(prompt, generator, verifier, config, start_time, timeout) do
       best = SearchState.get_best_candidate(state)
+
       if best do
         {:ok, best}
       else
@@ -203,9 +204,6 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
             |> update_best_from_nodes(top_k)
 
           run_iterations(prompt, generator, verifier, config, state, start_time, timeout)
-
-        {:error, _reason} = error ->
-          error
       end
     end
   end
@@ -227,10 +225,10 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
     # Expand each node in the beam
     all_expansions =
       Enum.flat_map(nodes, fn node ->
-        case expand_node(node, prompt, generator, verifier, config.branching_factor, start_time, timeout) do
-          {:ok, expansion_nodes} -> expansion_nodes
-          {:error, _} -> []
-        end
+        {:ok, expansion_nodes} =
+          expand_node(node, prompt, generator, verifier, config.branching_factor, start_time, timeout)
+
+        expansion_nodes
       end)
 
     {:ok, all_expansions}
@@ -308,20 +306,18 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
   end
 
   defp score_candidate(candidate, verifier, context) do
-    try do
-      case verifier.verify(candidate, context) do
-        {:ok, %VerificationResult{score: score}} when is_number(score) ->
-          score
+    case verifier.verify(candidate, context) do
+      {:ok, %VerificationResult{score: score}} when is_number(score) ->
+        score
 
-        {:ok, %VerificationResult{}} ->
-          0.5
+      {:ok, %VerificationResult{}} ->
+        0.5
 
-        _ ->
-          0.5
-      end
-    rescue
-      _ -> 0.5
+      _ ->
+        0.5
     end
+  rescue
+    _ -> 0.5
   end
 
   @doc """

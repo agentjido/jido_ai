@@ -1,9 +1,9 @@
 defmodule Jido.AI.Accuracy.SelfConsistencyTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.{Candidate, SelfConsistency}
   alias Jido.AI.Accuracy.Aggregators.{MajorityVote, BestOfN, Weighted}
   alias Jido.AI.Accuracy.TestSupport.MockGenerator
+  alias Jido.AI.Accuracy.{Candidate, SelfConsistency}
 
   @moduletag :capture_log
 
@@ -18,15 +18,16 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     test "validates aggregator module before running" do
       # Pass an invalid module (doesn't implement aggregate/2)
       assert {:error, :invalid_aggregator} =
-        SelfConsistency.run("What is 2+2?", aggregator: String)
+               SelfConsistency.run("What is 2+2?", aggregator: String)
     end
 
     @tag :integration
     @tag :requires_api
     test "generates and aggregates candidates (requires API)" do
-      assert {:ok, best, metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1
-      )
+      assert {:ok, best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1
+               )
 
       assert %Candidate{} = best
       assert is_number(metadata.confidence)
@@ -38,9 +39,10 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "uses majority_vote by default (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1
+               )
 
       assert metadata.aggregator == MajorityVote
     end
@@ -48,10 +50,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "resolves :majority_vote to MajorityVote module (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        aggregator: :majority_vote,
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 aggregator: :majority_vote,
+                 num_candidates: 1
+               )
 
       assert metadata.aggregator == MajorityVote
     end
@@ -59,10 +62,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "resolves :best_of_n to BestOfN module (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        aggregator: :best_of_n,
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 aggregator: :best_of_n,
+                 num_candidates: 1
+               )
 
       assert metadata.aggregator == BestOfN
     end
@@ -70,10 +74,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "resolves :weighted to Weighted module (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        aggregator: :weighted,
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 aggregator: :weighted,
+                 num_candidates: 1
+               )
 
       assert metadata.aggregator == Weighted
     end
@@ -81,10 +86,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "accepts custom aggregator module (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        aggregator: BestOfN,
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 aggregator: BestOfN,
+                 num_candidates: 1
+               )
 
       assert metadata.aggregator == BestOfN
     end
@@ -94,9 +100,10 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "passes num_candidates to generator (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1
+               )
 
       assert metadata.num_candidates <= 1
     end
@@ -104,37 +111,41 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "accepts temperature_range option (requires API)" do
-      assert {:ok, _best, _metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1,
-        temperature_range: {0.5, 0.8}
-      )
+      assert {:ok, _best, _metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1,
+                 temperature_range: {0.5, 0.8}
+               )
     end
 
     @tag :integration
     @tag :requires_api
     test "accepts timeout option (requires API)" do
-      assert {:ok, _best, _metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1,
-        timeout: 5000
-      )
+      assert {:ok, _best, _metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1,
+                 timeout: 5000
+               )
     end
 
     @tag :integration
     @tag :requires_api
     test "accepts max_concurrency option (requires API)" do
-      assert {:ok, _best, _metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1,
-        max_concurrency: 2
-      )
+      assert {:ok, _best, _metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1,
+                 max_concurrency: 2
+               )
     end
 
     @tag :integration
     @tag :requires_api
     test "accepts model option (requires API)" do
-      assert {:ok, _best, _metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1,
-        model: "anthropic:claude-haiku-4-5"
-      )
+      assert {:ok, _best, _metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1,
+                 model: "anthropic:claude-haiku-4-5"
+               )
     end
   end
 
@@ -179,9 +190,10 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "returns correct metadata structure (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1
+               )
 
       # Required fields
       assert Map.has_key?(metadata, :confidence)
@@ -199,9 +211,10 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "calculates total_tokens correctly (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 num_candidates: 1
+               )
 
       # total_tokens should be nil or a positive integer
       assert metadata.total_tokens == nil or metadata.total_tokens >= 0
@@ -210,10 +223,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "includes aggregation_metadata from aggregator (requires API)" do
-      assert {:ok, _best, metadata} = SelfConsistency.run("What is 2+2?",
-        aggregator: :majority_vote,
-        num_candidates: 1
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 aggregator: :majority_vote,
+                 num_candidates: 1
+               )
 
       assert is_map(metadata.aggregation_metadata)
     end
@@ -222,10 +236,12 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
   describe "error handling" do
     test "handles generation failure gracefully" do
       # Use an invalid timeout to trigger a generation failure
-      result = SelfConsistency.run("What is 2+2?",
-        num_candidates: 1,
-        timeout: 1  # 1ms timeout should cause failure
-      )
+      result =
+        SelfConsistency.run("What is 2+2?",
+          num_candidates: 1,
+          # 1ms timeout should cause failure
+          timeout: 1
+        )
 
       # Should either succeed or return an error, not crash
       case result do
@@ -239,10 +255,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     @tag :integration
     @tag :requires_api
     test "generates candidates with CoT prompt (requires API)" do
-      assert {:ok, best, metadata} = SelfConsistency.run_with_reasoning(
-        "Solve step by step: 2+2",
-        num_candidates: 1
-      )
+      assert {:ok, best, metadata} =
+               SelfConsistency.run_with_reasoning(
+                 "Solve step by step: 2+2",
+                 num_candidates: 1
+               )
 
       # Verify metadata structure
       assert is_number(metadata.confidence)
@@ -331,17 +348,19 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     test "returns error for invalid generator module" do
       # A module that doesn't implement the Generator behavior
       assert {:error, :invalid_generator} =
-        SelfConsistency.run("What is 2+2?", generator: String)
+               SelfConsistency.run("What is 2+2?", generator: String)
     end
 
     test "accepts valid generator module implementing Generator behavior" do
       # LLMGenerator implements the Generator behavior
       # This test validates that validation passes for valid modules
       # The error should NOT be :invalid_generator (it would be an exception from actual generation)
-      result = SelfConsistency.run("What is 2+2?",
-        generator: Jido.AI.Accuracy.Generators.LLMGenerator,
-        num_candidates: 1
-      )
+      result =
+        SelfConsistency.run("What is 2+2?",
+          generator: Jido.AI.Accuracy.Generators.LLMGenerator,
+          num_candidates: 1
+        )
+
       # Should not return :invalid_generator error (validation passed)
       refute result == {:error, :invalid_generator}
     end
@@ -364,10 +383,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
 
       generator = MockGenerator.new(candidates: candidates)
 
-      assert {:ok, best, metadata} = SelfConsistency.run("What is 2+2?",
-        generator: generator,
-        aggregator: :majority_vote
-      )
+      assert {:ok, best, metadata} =
+               SelfConsistency.run("What is 2+2?",
+                 generator: generator,
+                 aggregator: :majority_vote
+               )
 
       assert best.content == "42"
       assert metadata.confidence == 2.0 / 3.0
@@ -383,10 +403,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
 
       generator = MockGenerator.new(candidates: candidates)
 
-      assert {:ok, best, metadata} = SelfConsistency.run("Question",
-        generator: generator,
-        aggregator: :best_of_n
-      )
+      assert {:ok, best, metadata} =
+               SelfConsistency.run("Question",
+                 generator: generator,
+                 aggregator: :best_of_n
+               )
 
       assert best.content == "high"
       assert best.score == 0.9
@@ -396,7 +417,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       generator = MockGenerator.new(should_fail: true, failure_reason: :api_error)
 
       assert {:error, :api_error} =
-        SelfConsistency.run("What is 2+2?", generator: generator)
+               SelfConsistency.run("What is 2+2?", generator: generator)
     end
 
     test "calculates total_tokens correctly" do
@@ -408,9 +429,10 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
 
       generator = MockGenerator.new(candidates: candidates)
 
-      assert {:ok, _best, metadata} = SelfConsistency.run("Question",
-        generator: generator
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("Question",
+                 generator: generator
+               )
 
       assert metadata.total_tokens == 60
     end
@@ -423,9 +445,10 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
 
       generator = MockGenerator.new(candidates: candidates)
 
-      assert {:ok, _best, metadata} = SelfConsistency.run("Question",
-        generator: generator
-      )
+      assert {:ok, _best, metadata} =
+               SelfConsistency.run("Question",
+                 generator: generator
+               )
 
       assert metadata.total_tokens == nil
     end
@@ -490,7 +513,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       generator = MockGenerator.new(num_candidates: 2)
 
       assert {:ok, candidates} =
-        MockGenerator.generate_with_reasoning(generator, "What is 2+2?")
+               MockGenerator.generate_with_reasoning(generator, "What is 2+2?")
 
       assert length(candidates) == 2
 
@@ -505,7 +528,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       generator = MockGenerator.new(should_fail: true, failure_reason: :generation_failed)
 
       assert {:error, :generation_failed} =
-        MockGenerator.generate_with_reasoning(generator, "Question")
+               MockGenerator.generate_with_reasoning(generator, "Question")
     end
   end
 

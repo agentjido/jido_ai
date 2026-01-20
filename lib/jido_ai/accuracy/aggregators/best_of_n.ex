@@ -150,12 +150,20 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
   defp compare_candidates(c1, c2, prefer_early) do
     cond do
       # c1 has no score, c2 wins
-      is_nil(c1.score) -> false
+      is_nil(c1.score) ->
+        false
+
       # c2 has no score, c1 wins
-      is_nil(c2.score) -> true
+      is_nil(c2.score) ->
+        true
+
       # Higher score wins
-      c1.score < c2.score -> false
-      c1.score > c2.score -> true
+      c1.score < c2.score ->
+        false
+
+      c1.score > c2.score ->
+        true
+
       # Scores are equal, use token efficiency
       # Fewer tokens is better, so :lt means c1 comes before c2
       true ->
@@ -198,8 +206,8 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
         # Earlier is better if prefer_early is true
         if prefer_early do
           cond do
-            DateTime.compare(c1.timestamp, c2.timestamp) == :lt -> :lt
-            DateTime.compare(c1.timestamp, c2.timestamp) == :gt -> :gt
+            DateTime.before?(c1.timestamp, c2.timestamp) -> :lt
+            DateTime.after?(c1.timestamp, c2.timestamp) -> :gt
             true -> :eq
           end
         else

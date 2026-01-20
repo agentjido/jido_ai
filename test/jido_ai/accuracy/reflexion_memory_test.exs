@@ -63,7 +63,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
   describe "new!/1" do
     test "returns memory when valid" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       assert %ReflexionMemory{} = memory
 
@@ -72,14 +72,14 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
     test "raises when invalid" do
       assert_raise ArgumentError, ~r/Invalid ReflexionMemory/, fn ->
-        ReflexionMemory.new!([storage: :invalid])
+        ReflexionMemory.new!(storage: :invalid)
       end
     end
   end
 
   describe "store/2" do
     test "stores entry with all fields" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -95,7 +95,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "auto-generates timestamp if not provided" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -113,7 +113,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "returns error for entry without prompt" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       assert {:error, :prompt_required} =
                ReflexionMemory.store(memory, %{
@@ -125,7 +125,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "respects max_entries limit" do
-      memory = ReflexionMemory.new!([storage: :ets, max_entries: 3])
+      memory = ReflexionMemory.new!(storage: :ets, max_entries: 3)
 
       # Store 5 entries
       Enum.each(1..5, fn i ->
@@ -145,7 +145,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "extracts keywords from prompt" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -165,7 +165,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
   describe "retrieve_similar/3" do
     test "retrieves entries with similar keywords" do
-      memory = ReflexionMemory.new!([storage: :ets, similarity_threshold: 0.5])
+      memory = ReflexionMemory.new!(storage: :ets, similarity_threshold: 0.5)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -178,7 +178,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
       {:ok, results} =
         ReflexionMemory.retrieve_similar(memory, "How do I calculate 15 times 23?")
 
-      assert length(results) > 0
+      refute Enum.empty?(results)
       # retrieve_similar returns entry values directly
       assert hd(results).prompt == "Calculate 15 multiplication 23"
 
@@ -186,7 +186,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "returns empty list when no similar entries" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -205,7 +205,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "respects max_results option" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       # Store multiple similar entries
       Enum.each(1..5, fn i ->
@@ -226,7 +226,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "filters by similarity_threshold" do
-      memory = ReflexionMemory.new!([storage: :ets, similarity_threshold: 0.8])
+      memory = ReflexionMemory.new!(storage: :ets, similarity_threshold: 0.8)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -245,7 +245,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "returns most similar results first" do
-      memory = ReflexionMemory.new!([storage: :ets, similarity_threshold: 0.5])
+      memory = ReflexionMemory.new!(storage: :ets, similarity_threshold: 0.5)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -258,7 +258,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
         ReflexionMemory.retrieve_similar(memory, "Calculate 15 times 23")
 
       # Should find the similar entry
-      assert length(results) > 0
+      refute Enum.empty?(results)
 
       ReflexionMemory.stop(memory)
     end
@@ -303,7 +303,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
   describe "clear/1" do
     test "clears all entries from ETS memory" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       # Store some entries
       Enum.each(1..3, fn i ->
@@ -328,7 +328,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
   describe "count/1" do
     test "returns zero for empty memory" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       assert ReflexionMemory.count(memory) == 0
 
@@ -336,7 +336,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "returns entry count" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -360,7 +360,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
   describe "list_entries/1" do
     test "returns all stored entries" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -380,7 +380,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "returns empty list for empty memory" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       {:ok, entries} = ReflexionMemory.list_entries(memory)
 
@@ -392,7 +392,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
   describe "stop/1" do
     test "deletes ETS table" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       table_name = memory.table_name
 
@@ -406,7 +406,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "is safe to call multiple times" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok = ReflexionMemory.stop(memory)
       :ok = ReflexionMemory.stop(memory)
@@ -415,7 +415,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
   describe "keyword extraction" do
     test "removes stop words from prompts" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -441,7 +441,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
     end
 
     test "handles numbers and symbols" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -465,7 +465,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
 
   describe "Jaccard similarity" do
     test "calculates similarity for overlapping keywords" do
-      memory = ReflexionMemory.new!([storage: :ets, similarity_threshold: 0.3])
+      memory = ReflexionMemory.new!(storage: :ets, similarity_threshold: 0.3)
 
       :ok =
         ReflexionMemory.store(memory, %{
@@ -479,13 +479,13 @@ defmodule Jido.AI.Accuracy.ReflexionMemoryTest do
         ReflexionMemory.retrieve_similar(memory, "multiplication math problem")
 
       # Should find the similar entry
-      assert length(results) > 0
+      refute Enum.empty?(results)
 
       ReflexionMemory.stop(memory)
     end
 
     test "returns empty for no keyword overlap" do
-      memory = ReflexionMemory.new!([storage: :ets])
+      memory = ReflexionMemory.new!(storage: :ets)
 
       :ok =
         ReflexionMemory.store(memory, %{

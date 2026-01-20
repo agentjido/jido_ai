@@ -45,24 +45,21 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
     category: "ai",
     tags: ["reasoning", "explanation", "teaching"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      model:
-        Zoi.string(
-          description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)"
-        )
-        |> Zoi.optional(),
-      topic: Zoi.string(description: "The topic to explain"),
-      detail_level:
-        Zoi.atom(description: "Detail level: :basic, :intermediate, or :advanced")
-        |> Zoi.default(:intermediate),
-      audience: Zoi.string(description: "Target audience description") |> Zoi.optional(),
-      include_examples:
-        Zoi.boolean(description: "Whether to include examples") |> Zoi.default(true),
-      max_tokens:
-        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(2048),
-      temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.5),
-      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
-    })
+    schema:
+      Zoi.object(%{
+        model:
+          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)")
+          |> Zoi.optional(),
+        topic: Zoi.string(description: "The topic to explain"),
+        detail_level:
+          Zoi.atom(description: "Detail level: :basic, :intermediate, or :advanced")
+          |> Zoi.default(:intermediate),
+        audience: Zoi.string(description: "Target audience description") |> Zoi.optional(),
+        include_examples: Zoi.boolean(description: "Whether to include examples") |> Zoi.default(true),
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(2048),
+        temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.5),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+      })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers

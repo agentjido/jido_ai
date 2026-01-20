@@ -13,9 +13,9 @@ defmodule Jido.AI.Accuracy.SecurityTest do
 
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.{Candidate, ToolExecutor, Verifiers.CodeExecutionVerifier}
   alias Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier
   alias Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier
+  alias Jido.AI.Accuracy.{Candidate, ToolExecutor, Verifiers.CodeExecutionVerifier}
 
   @moduletag :security
 
@@ -47,7 +47,8 @@ defmodule Jido.AI.Accuracy.SecurityTest do
     test "blocks commands not on allowlist" do
       refute ToolExecutor.command_allowed?("rm")
       refute ToolExecutor.command_allowed?("malicious_command")
-      refute ToolExecutor.command_allowed?("nc")  # netcat
+      # netcat
+      refute ToolExecutor.command_allowed?("nc")
     end
 
     test "returns error for blocked command execution" do
@@ -61,13 +62,13 @@ defmodule Jido.AI.Accuracy.SecurityTest do
     end
 
     test "bypass_allowlist option allows any command" do
-      result = ToolExecutor.run_command("cat", ["/etc/hostname"], [bypass_allowlist: true])
+      result = ToolExecutor.run_command("cat", ["/etc/hostname"], bypass_allowlist: true)
       # cat is on the allowlist, so this should work
       assert {:ok, _} = result
     end
 
     test "bypass_allowlist works even for blocked commands" do
-      result = ToolExecutor.run_command("ls", ["-la"], [bypass_allowlist: true])
+      result = ToolExecutor.run_command("ls", ["-la"], bypass_allowlist: true)
       # ls is on the allowlist, but bypass should still be respected
       assert {:ok, _} = result
     end
@@ -187,8 +188,7 @@ defmodule Jido.AI.Accuracy.SecurityTest do
       # Create a large output that might cause issues
       large_output =
         1..10_000
-        |> Enum.map(fn i -> "file#{i}.ex:#{i}: warning: issue #{i}\n" end)
-        |> Enum.join()
+        |> Enum.map_join(fn i -> "file#{i}.ex:#{i}: warning: issue #{i}\n" end)
 
       # The output should be truncated to 1MB
       assert String.length(large_output) > 100_000
@@ -271,12 +271,14 @@ defmodule Jido.AI.Accuracy.SecurityTest do
   describe "Command allowlist management" do
     setup do
       original = ToolExecutor.get_allowlist()
+
       on_exit(fn ->
         case original do
           :disabled -> ToolExecutor.set_allowlist(:disabled)
           set when is_map(set) -> ToolExecutor.set_allowlist(Enum.to_list(set))
         end
       end)
+
       :ok
     end
 
@@ -387,4 +389,3 @@ defmodule Jido.AI.Accuracy.SecurityTest do
     end
   end
 end
-

@@ -161,8 +161,7 @@ defmodule Jido.AI.Accuracy.Similarity do
   """
   @spec combined_similarity(String.t(), String.t(), float(), float()) :: similarity_value()
   def combined_similarity(text1, text2, jaccard_weight, edit_weight)
-      when is_binary(text1) and is_binary(text2) and
-           is_number(jaccard_weight) and is_number(edit_weight) do
+      when is_binary(text1) and is_binary(text2) and is_number(jaccard_weight) and is_number(edit_weight) do
     jaccard = jaccard_similarity(text1, text2)
     edit = edit_distance_similarity(text1, text2)
 

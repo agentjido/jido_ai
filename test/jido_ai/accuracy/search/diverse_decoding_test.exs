@@ -155,9 +155,7 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecodingTest do
 
   describe "search/4" do
     test "searches and returns best candidate" do
-      {:ok, best} = DiverseDecoding.search("test", MockGenerator, MockVerifier,
-        num_candidates: 5
-      )
+      {:ok, best} = DiverseDecoding.search("test", MockGenerator, MockVerifier, num_candidates: 5)
 
       assert %Candidate{} = best
       assert is_binary(best.content)
@@ -165,9 +163,7 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecodingTest do
 
     test "respects num_candidates option" do
       {:ok, best} =
-        DiverseDecoding.search("test", MockGenerator, MockVerifier,
-          num_candidates: 3
-        )
+        DiverseDecoding.search("test", MockGenerator, MockVerifier, num_candidates: 3)
 
       assert %Candidate{} = best
     end
@@ -308,18 +304,17 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecodingTest do
     end
 
     test "returns {:ok, candidate} on success" do
-      result = DiverseDecoding.search("test", MockGenerator, MockVerifier,
-        num_candidates: 3
-      )
+      result = DiverseDecoding.search("test", MockGenerator, MockVerifier, num_candidates: 3)
 
       assert match?({:ok, %Candidate{}}, result)
     end
 
     test "returns {:error, reason} on failure" do
-      result = DiverseDecoding.search("test", MockGenerator, MockVerifier,
-        timeout: 0,
-        num_candidates: 5
-      )
+      result =
+        DiverseDecoding.search("test", MockGenerator, MockVerifier,
+          timeout: 0,
+          num_candidates: 5
+        )
 
       assert match?({:error, _}, result)
     end

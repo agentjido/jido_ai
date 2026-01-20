@@ -72,6 +72,8 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
 
   """
 
+  @behaviour ConfidenceEstimator
+
   alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, ConfidenceEstimator, Helpers}
 
   import Helpers, only: [get_attr: 2, get_attr: 3]
@@ -82,13 +84,9 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
           combination_method: :weighted_mean | :mean | :voting
         }
 
-  @behaviour ConfidenceEstimator
-
-  defstruct [
-    estimators: [],
-    weights: nil,
-    combination_method: :weighted_mean
-  ]
+  defstruct estimators: [],
+            weights: nil,
+            combination_method: :weighted_mean
 
   @doc """
   Creates a new EnsembleConfidence estimator from the given attributes.
@@ -150,20 +148,21 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
          {:ok, combined} <- combine_estimates(estimates, combination_method, weights) do
       reasoning = generate_ensemble_reasoning(estimates, combined, combination_method)
 
-      estimate = ConfidenceEstimate.new!(%{
-        score: combined.score,
-        calibration: nil,
-        method: :ensemble,
-        reasoning: reasoning,
-        token_level_confidence: nil,
-        metadata: %{
-          combination_method: combination_method,
-          estimator_count: length(estimates),
-          individual_scores: Enum.map(estimates, & &1.score),
-          individual_methods: Enum.map(estimates, & &1.method),
-          disagreement: calculate_disagreement(estimates)
-        }
-      })
+      estimate =
+        ConfidenceEstimate.new!(%{
+          score: combined.score,
+          calibration: nil,
+          method: :ensemble,
+          reasoning: reasoning,
+          token_level_confidence: nil,
+          metadata: %{
+            combination_method: combination_method,
+            estimator_count: length(estimates),
+            individual_scores: Enum.map(estimates, & &1.score),
+            individual_methods: Enum.map(estimates, & &1.method),
+            disagreement: calculate_disagreement(estimates)
+          }
+        })
 
       {:ok, estimate}
     end
@@ -176,14 +175,16 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
   """
   @spec estimate_batch(t(), [Candidate.t()], map()) :: {:ok, [ConfidenceEstimate.t()]} | {:error, term()}
   def estimate_batch(%__MODULE__{} = estimator, candidates, context) when is_list(candidates) do
-    results = Enum.map(candidates, fn candidate ->
-      estimate(estimator, candidate, context)
-    end)
+    results =
+      Enum.map(candidates, fn candidate ->
+        estimate(estimator, candidate, context)
+      end)
 
-    errors = Enum.filter(results, fn
-      {:error, _} -> true
-      _ -> false
-    end)
+    errors =
+      Enum.filter(results, fn
+        {:error, _} -> true
+        _ -> false
+      end)
 
     if Enum.empty?(errors) do
       {:ok, Enum.map(results, fn {:ok, e} -> e end)}
@@ -257,20 +258,21 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
 
       reasoning = generate_ensemble_reasoning(estimates, combined, combination_method)
 
-      estimate = ConfidenceEstimate.new!(%{
-        score: combined.score,
-        calibration: nil,
-        method: :ensemble,
-        reasoning: reasoning,
-        token_level_confidence: nil,
-        metadata: %{
-          combination_method: combination_method,
-          estimator_count: length(estimates),
-          individual_scores: Enum.map(estimates, & &1.score),
-          individual_methods: Enum.map(estimates, & &1.method),
-          disagreement: disagreement
-        }
-      })
+      estimate =
+        ConfidenceEstimate.new!(%{
+          score: combined.score,
+          calibration: nil,
+          method: :ensemble,
+          reasoning: reasoning,
+          token_level_confidence: nil,
+          metadata: %{
+            combination_method: combination_method,
+            estimator_count: length(estimates),
+            individual_scores: Enum.map(estimates, & &1.score),
+            individual_methods: Enum.map(estimates, & &1.method),
+            disagreement: disagreement
+          }
+        })
 
       {{:ok, estimate}, disagreement}
     else
@@ -310,9 +312,7 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
   end
 
   defp combine_estimates(estimates, :weighted_mean, weights) when is_list(weights) do
-    if length(weights) != length(estimates) do
-      {:error, :weights_length_mismatch}
-    else
+    if length(weights) == length(estimates) do
       zipped = Enum.zip(estimates, weights)
 
       weighted_sum =
@@ -327,6 +327,8 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
       else
         {:error, :zero_total_weight}
       end
+    else
+      {:error, :weights_length_mismatch}
     end
   end
 
@@ -365,9 +367,12 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
     # Use midpoint of winning level
     score =
       case winning_level do
-        :high -> 0.85  # Midpoint of [0.7, 1.0]
-        :medium -> 0.55  # Midpoint of [0.4, 0.7]
-        :low -> 0.2  # Midpoint of [0.0, 0.4]
+        # Midpoint of [0.7, 1.0]
+        :high -> 0.85
+        # Midpoint of [0.4, 0.7]
+        :medium -> 0.55
+        # Midpoint of [0.0, 0.4]
+        :low -> 0.2
       end
 
     {:ok, %ConfidenceEstimate{score: score}}
@@ -383,8 +388,7 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
 
     score_str =
       scores
-      |> Enum.map(&:erlang.float_to_binary(&1, decimals: 3))
-      |> Enum.join(", ")
+      |> Enum.map_join(", ", &:erlang.float_to_binary(&1, decimals: 3))
 
     method_str =
       case method do

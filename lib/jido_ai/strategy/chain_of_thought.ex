@@ -69,10 +69,10 @@ defmodule Jido.AI.Strategies.ChainOfThought do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.ChainOfThought.Machine
   alias Jido.AI.Config
   alias Jido.AI.Directive
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias ReqLLM.Context
 
   @type config :: %{

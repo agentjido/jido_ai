@@ -39,11 +39,9 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
           preserve_reasoning: boolean()
         }
 
-  defstruct [
-    fix_syntax: true,
-    fix_formatting: true,
-    preserve_reasoning: true
-  ]
+  defstruct fix_syntax: true,
+            fix_formatting: true,
+            preserve_reasoning: true
 
   @doc """
   Creates a new targeted reviser.
@@ -61,10 +59,8 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
   """
   @spec new!(keyword()) :: t()
   def new!(opts) when is_list(opts) do
-    case new(opts) do
-      {:ok, reviser} -> reviser
-      {:error, reason} -> raise ArgumentError, "Invalid TargetedReviser: #{format_error(reason)}"
-    end
+    {:ok, reviser} = new(opts)
+    reviser
   end
 
   @impl true
@@ -139,7 +135,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
 
   """
   @spec revise_reasoning(t(), Candidate.t(), CritiqueResult.t(), map()) :: {:ok, Candidate.t()}
-  def revise_reasoning(%__MODULE__{} = _reviser, %Candidate{} = candidate, %CritiqueResult{} = critique, context) do
+  def revise_reasoning(%__MODULE__{} = _reviser, %Candidate{} = candidate, %CritiqueResult{} = critique, _context) do
     content = candidate.content || ""
 
     # Apply reasoning-specific fixes
@@ -179,7 +175,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
 
   """
   @spec revise_format(t(), Candidate.t(), CritiqueResult.t(), map()) :: {:ok, Candidate.t()}
-  def revise_format(%__MODULE__{} = _reviser, %Candidate{} = candidate, %CritiqueResult{} = critique, context) do
+  def revise_format(%__MODULE__{} = _reviser, %Candidate{} = candidate, %CritiqueResult{} = critique, _context) do
     content = candidate.content || ""
 
     # Apply format-specific fixes
@@ -228,13 +224,20 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
 
   defp is_code?(content) when is_binary(content) do
     code_indicators = [
-      ~r/def\s+\w+\(/,  # Python/JS function definition
-      ~r/function\s+\w+\(/,  # JavaScript function
-      ~r/class\s+\w+\s+/,  # Class definition
-      ~r/\b(if|else|for|while)\b/,  # Control structures
-      ~r/^\s*import\s/,  # Imports
-      ~r/^\s*#include\s/,  # C includes
-      ~r/^\s*fn\s+/  # Elixir function
+      # Python/JS function definition
+      ~r/def\s+\w+\(/,
+      # JavaScript function
+      ~r/function\s+\w+\(/,
+      # Class definition
+      ~r/class\s+\w+\s+/,
+      # Control structures
+      ~r/\b(if|else|for|while)\b/,
+      # Imports
+      ~r/^\s*import\s/,
+      # C includes
+      ~r/^\s*#include\s/,
+      # Elixir function
+      ~r/^\s*fn\s+/
     ]
 
     Enum.any?(code_indicators, fn pattern -> Regex.match?(pattern, content) end)
@@ -266,12 +269,12 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
     |> fix_statement_terminators(language)
   end
 
-  defp fix_unclosed_brackets(_content, :python) do
+  defp fix_unclosed_brackets(content, :python) do
     # Simple bracket balancing for Python
     # For now, just return content as is - proper bracket balancing
     # would require a full parser which is beyond scope
     # In practice, LLM-based revision is better for this
-    _content
+    content
   end
 
   defp fix_unclosed_brackets(content, _language), do: content
@@ -282,8 +285,8 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
     double_count = content |> String.graphemes() |> Enum.count(&(&1 == "\""))
 
     base = content
-    base = if rem(single_count, 2) != 0, do: base <> "'", else: base
-    base = if rem(double_count, 2) != 0, do: base <> "\"", else: base
+    base = if rem(single_count, 2) == 0, do: base, else: base <> "'"
+    base = if rem(double_count, 2) == 0, do: base, else: base <> "\""
     base
   end
 
@@ -358,14 +361,15 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
         line
       else
         # Ensure reasoning statements have proper connectors
-        if not Regex.match?(~r/^[A-Z]/, trimmed) do
+        if Regex.match?(~r/^[A-Z]/, trimmed) do
+          line
+        else
           if Regex.match?(~r/^\d+\./, String.trim_leading(line)) do
-            line  # It's a numbered list, keep as is
+            # It's a numbered list, keep as is
+            line
           else
             line
           end
-        else
-          line
         end
       end
     end)
@@ -394,8 +398,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
     # Remove trailing whitespace
     content
     |> String.split("\n")
-    |> Enum.map(&String.trim_trailing/1)
-    |> Enum.join("\n")
+    |> Enum.map_join("\n", &String.trim_trailing/1)
   end
 
   defp normalize_line_endings(content) do
@@ -433,6 +436,4 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
 
     if preserved == [], do: ["Original structure"], else: preserved
   end
-  defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

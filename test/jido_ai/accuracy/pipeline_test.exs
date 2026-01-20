@@ -17,9 +17,10 @@ defmodule Jido.AI.Accuracy.PipelineTest do
     end
 
     test "creates pipeline with custom config" do
-      assert {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      assert {:ok, pipeline} =
+               Pipeline.new(%{
+                 config: %{stages: [:generation, :calibration]}
+               })
 
       assert pipeline.config.stages == [:generation, :calibration]
     end
@@ -37,9 +38,10 @@ defmodule Jido.AI.Accuracy.PipelineTest do
     end
 
     test "returns error for invalid config" do
-      assert {:error, _reason} = Pipeline.new(%{
-        config: %{stages: []}
-      })
+      assert {:error, _reason} =
+               Pipeline.new(%{
+                 config: %{stages: []}
+               })
     end
   end
 
@@ -65,9 +67,10 @@ defmodule Jido.AI.Accuracy.PipelineTest do
     end
 
     test "runs pipeline with minimal stages", %{generator: generator} do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: generator)
 
@@ -78,14 +81,15 @@ defmodule Jido.AI.Accuracy.PipelineTest do
     end
 
     test "runs pipeline with all stages enabled", %{generator: generator} do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: PipelineConfig.all_stages()}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: PipelineConfig.all_stages()}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: generator)
 
       assert %PipelineResult{} = result
-      assert length(result.trace) > 0
+      refute Enum.empty?(result.trace)
     end
 
     test "returns error for empty query", %{generator: generator} do
@@ -107,9 +111,10 @@ defmodule Jido.AI.Accuracy.PipelineTest do
     end
 
     test "accepts 2-arity generator", %{generator: generator} do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "test", generator: generator)
       assert %PipelineResult{} = result
@@ -120,18 +125,20 @@ defmodule Jido.AI.Accuracy.PipelineTest do
         {:ok, Candidate.new!(%{content: "Answer: #{query}"})}
       end
 
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "test", generator: generator)
       assert %PipelineResult{} = result
     end
 
     test "includes context in pipeline execution", %{generator: generator} do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       context = %{model: "test-model", temperature: 0.7}
 
@@ -146,9 +153,10 @@ defmodule Jido.AI.Accuracy.PipelineTest do
         {:ok, Candidate.new!(%{content: "Slow answer"})}
       end
 
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       # Set timeout lower than generation time
       assert {:error, :timeout} = Pipeline.run(pipeline, "test", generator: slow_generator, timeout: 50)
@@ -200,7 +208,7 @@ defmodule Jido.AI.Accuracy.PipelineTest do
       assert result.action in [:direct, :with_verification, :with_citations, :abstain, :escalate]
 
       # Verify trace
-      assert length(result.trace) > 0
+      refute Enum.empty?(result.trace)
       assert is_list(result.metadata.stages_completed)
     end
 
@@ -210,15 +218,16 @@ defmodule Jido.AI.Accuracy.PipelineTest do
         {:ok, Candidate.new!(%{content: "Uncertain: #{query}", score: 0.2})}
       end
 
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            low_threshold: 0.4,
-            low_action: :abstain
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              low_threshold: 0.4,
+              low_action: :abstain
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "complex question", generator: generator)
 
@@ -232,14 +241,15 @@ defmodule Jido.AI.Accuracy.PipelineTest do
         {:ok, Candidate.new!(%{content: "Certain: #{query}", score: 0.95})}
       end
 
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            high_threshold: 0.8
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              high_threshold: 0.8
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "simple question", generator: generator)
 

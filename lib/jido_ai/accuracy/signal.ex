@@ -122,19 +122,16 @@ defmodule Jido.AI.Accuracy.Signal do
         ]
       ]
 
-
     @doc """
     Creates a Result signal from a PipelineResult.
     """
     def from_pipeline_result(call_id, query, preset, result, start_time \\ nil)
 
     def from_pipeline_result(call_id, query, preset, {:ok, result}, start_time)
-         when is_binary(call_id) and is_binary(query) do
+        when is_binary(call_id) and is_binary(query) do
       duration_ms =
         if start_time do
           System.monotonic_time(:millisecond) - start_time
-        else
-          nil
         end
 
       # Build base signal data with required fields
@@ -162,12 +159,13 @@ defmodule Jido.AI.Accuracy.Signal do
     def from_pipeline_result(call_id, query, preset, {:error, reason}, _start_time) do
       # Reference the Error module from the parent module
       # Result is nested inside Jido.AI.Accuracy.Signal, so Error is a sibling
-      {:ok, signal} = Jido.AI.Accuracy.Signal.Error.new(%{
-        call_id: call_id,
-        query: query,
-        preset: preset,
-        error: reason
-      })
+      {:ok, signal} =
+        Jido.AI.Accuracy.Signal.Error.new(%{
+          call_id: call_id,
+          query: query,
+          preset: preset,
+          error: reason
+        })
 
       signal
     end
@@ -180,7 +178,10 @@ defmodule Jido.AI.Accuracy.Signal do
       |> maybe_put(:num_candidates, get_in(result, [:metadata, :num_candidates]))
       |> maybe_put(:input_tokens, input_tokens)
       |> maybe_put(:output_tokens, output_tokens)
-      |> maybe_put(:total_tokens, get_in(result, [:metadata, :total_tokens]) || compute_total_tokens(input_tokens, output_tokens))
+      |> maybe_put(
+        :total_tokens,
+        get_in(result, [:metadata, :total_tokens]) || compute_total_tokens(input_tokens, output_tokens)
+      )
       |> maybe_put(:verification_score, get_in(result, [:metadata, :verification_score]))
       |> maybe_put(:calibration_action, get_in(result, [:metadata, :calibration_action]))
       |> maybe_put(:calibration_level, get_in(result, [:metadata, :calibration_level]))
@@ -245,24 +246,6 @@ defmodule Jido.AI.Accuracy.Signal do
           doc: "Human-readable error message"
         ]
       ]
-
-    @doc """
-    Creates a new Error signal.
-
-    ## Options
-
-    - `:call_id` - Correlation ID (required)
-    - `:query` - The query that failed (required)
-    - `:preset` - The preset being used
-    - `:error` - Error reason (required)
-    - `:stage` - Stage where error occurred
-    - `:message` - Human-readable error message
-
-    ## Examples
-
-        iex> Error.new!(%{call_id: "call_123", query: "What is 2+2?", error: :timeout})
-        %Jido.AI.Accuracy.Signal.Error{...}
-    """
 
     @doc """
     Creates an Error signal from an exception or error reason.

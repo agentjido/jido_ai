@@ -12,19 +12,19 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
 
   use ExUnit.Case, async: false
 
-  # Ensure all skill modules are loaded before tests
-  require Jido.AI.Skills.LLM
-  require Jido.AI.Skills.Reasoning
-  require Jido.AI.Skills.Planning
-  require Jido.AI.Skills.Streaming
-  require Jido.AI.Skills.ToolCalling
-
   alias Jido.Agent
   alias Jido.AI.Skills.LLM
-  alias Jido.AI.Skills.Reasoning
   alias Jido.AI.Skills.Planning
+  alias Jido.AI.Skills.Reasoning
   alias Jido.AI.Skills.Streaming
   alias Jido.AI.Skills.ToolCalling
+
+  # Ensure all skill modules are loaded before tests
+  require Jido.AI.Skills.LLM
+  require Jido.AI.Skills.Planning
+  require Jido.AI.Skills.Reasoning
+  require Jido.AI.Skills.Streaming
+  require Jido.AI.Skills.ToolCalling
 
   # ============================================================================
   # Skill Mount/2 Tests
@@ -278,7 +278,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
     test "LLM skill signal patterns match router" do
       patterns = LLM.signal_patterns()
       routes = LLM.router(%{})
-      route_keys = routes |> Enum.map(fn {k, _v} -> k end) |> MapSet.new()
+      route_keys = routes |> MapSet.new(fn {k, _v} -> k end)
       pattern_set = MapSet.new(patterns)
 
       assert MapSet.equal?(route_keys, pattern_set)

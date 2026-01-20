@@ -17,17 +17,19 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic = HeuristicDifficulty.new!(%{})
       llm = LLMDifficulty.new!(%{})
 
-      assert {:ok, ensemble} = EnsembleDifficulty.new(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic},
-          {LLMDifficulty, llm}
-        ]
-      })
+      assert {:ok, ensemble} =
+               EnsembleDifficulty.new(%{
+                 estimators: [
+                   {HeuristicDifficulty, heuristic},
+                   {LLMDifficulty, llm}
+                 ]
+               })
 
       assert ensemble.estimators == [
-        {HeuristicDifficulty, heuristic},
-        {LLMDifficulty, llm}
-      ]
+               {HeuristicDifficulty, heuristic},
+               {LLMDifficulty, llm}
+             ]
+
       assert ensemble.combination == :weighted_average
       assert ensemble.timeout == 10_000
     end
@@ -35,10 +37,11 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "creates ensemble with custom combination" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      assert {:ok, ensemble} = EnsembleDifficulty.new(%{
-        estimators: [{HeuristicDifficulty, heuristic}],
-        combination: :majority_vote
-      })
+      assert {:ok, ensemble} =
+               EnsembleDifficulty.new(%{
+                 estimators: [{HeuristicDifficulty, heuristic}],
+                 combination: :majority_vote
+               })
 
       assert ensemble.combination == :majority_vote
     end
@@ -47,13 +50,14 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic = HeuristicDifficulty.new!(%{})
       llm = LLMDifficulty.new!(%{})
 
-      assert {:ok, ensemble} = EnsembleDifficulty.new(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic},
-          {LLMDifficulty, llm}
-        ],
-        weights: [0.3, 0.7]
-      })
+      assert {:ok, ensemble} =
+               EnsembleDifficulty.new(%{
+                 estimators: [
+                   {HeuristicDifficulty, heuristic},
+                   {LLMDifficulty, llm}
+                 ],
+                 weights: [0.3, 0.7]
+               })
 
       assert ensemble.weights == [0.3, 0.7]
     end
@@ -61,10 +65,11 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "creates ensemble with fallback" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      assert {:ok, ensemble} = EnsembleDifficulty.new(%{
-        estimators: [{HeuristicDifficulty, heuristic}],
-        fallback: HeuristicDifficulty
-      })
+      assert {:ok, ensemble} =
+               EnsembleDifficulty.new(%{
+                 estimators: [{HeuristicDifficulty, heuristic}],
+                 fallback: HeuristicDifficulty
+               })
 
       assert ensemble.fallback == HeuristicDifficulty
     end
@@ -72,61 +77,68 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "creates ensemble with custom timeout" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      assert {:ok, ensemble} = EnsembleDifficulty.new(%{
-        estimators: [{HeuristicDifficulty, heuristic}],
-        timeout: 5000
-      })
+      assert {:ok, ensemble} =
+               EnsembleDifficulty.new(%{
+                 estimators: [{HeuristicDifficulty, heuristic}],
+                 timeout: 5000
+               })
 
       assert ensemble.timeout == 5000
     end
 
     test "returns error for empty estimators" do
-      assert {:error, :estimators_required} = EnsembleDifficulty.new(%{
-        estimators: []
-      })
+      assert {:error, :estimators_required} =
+               EnsembleDifficulty.new(%{
+                 estimators: []
+               })
     end
 
     test "returns error for nil estimators" do
-      assert {:error, :estimators_required} = EnsembleDifficulty.new(%{
-        estimators: nil
-      })
+      assert {:error, :estimators_required} =
+               EnsembleDifficulty.new(%{
+                 estimators: nil
+               })
     end
 
     test "returns error for invalid estimators" do
-      assert {:error, :invalid_estimators} = EnsembleDifficulty.new(%{
-        estimators: [:not_a_tuple]
-      })
+      assert {:error, :invalid_estimators} =
+               EnsembleDifficulty.new(%{
+                 estimators: [:not_a_tuple]
+               })
     end
 
     test "returns error for mismatched weights length" do
       heuristic = HeuristicDifficulty.new!(%{})
       llm = LLMDifficulty.new!(%{})
 
-      assert {:error, :weights_length_mismatch} = EnsembleDifficulty.new(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic},
-          {LLMDifficulty, llm}
-        ],
-        weights: [0.5]
-      })
+      assert {:error, :weights_length_mismatch} =
+               EnsembleDifficulty.new(%{
+                 estimators: [
+                   {HeuristicDifficulty, heuristic},
+                   {LLMDifficulty, llm}
+                 ],
+                 weights: [0.5]
+               })
     end
 
     test "returns error for invalid combination" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      assert {:error, :invalid_combination} = EnsembleDifficulty.new(%{
-        estimators: [{HeuristicDifficulty, heuristic}],
-        combination: :invalid
-      })
+      assert {:error, :invalid_combination} =
+               EnsembleDifficulty.new(%{
+                 estimators: [{HeuristicDifficulty, heuristic}],
+                 combination: :invalid
+               })
     end
 
     test "returns error for invalid timeout" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      assert {:error, :invalid_timeout} = EnsembleDifficulty.new(%{
-        estimators: [{HeuristicDifficulty, heuristic}],
-        timeout: -1
-      })
+      assert {:error, :invalid_timeout} =
+               EnsembleDifficulty.new(%{
+                 estimators: [{HeuristicDifficulty, heuristic}],
+                 timeout: -1
+               })
     end
   end
 
@@ -134,9 +146,10 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "creates ensemble or raises" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [{HeuristicDifficulty, heuristic}]
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [{HeuristicDifficulty, heuristic}]
+        })
 
       assert %EnsembleDifficulty{} = ensemble
     end
@@ -153,14 +166,15 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic = HeuristicDifficulty.new!(%{})
       llm = LLMDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic},
-          {LLMDifficulty, llm}
-        ],
-        weights: [0.4, 0.6],
-        combination: :weighted_average
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [
+            {HeuristicDifficulty, heuristic},
+            {LLMDifficulty, llm}
+          ],
+          weights: [0.4, 0.6],
+          combination: :weighted_average
+        })
 
       # Use a simple query that heuristic can handle
       query = "What is 2+2?"
@@ -181,14 +195,16 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic = HeuristicDifficulty.new!(%{})
       llm = LLMDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic},
-          {LLMDifficulty, llm}
-        ],
-        weights: [1.0, 2.0],  # Sums to 3.0, should be normalized
-        combination: :weighted_average
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [
+            {HeuristicDifficulty, heuristic},
+            {LLMDifficulty, llm}
+          ],
+          # Sums to 3.0, should be normalized
+          weights: [1.0, 2.0],
+          combination: :weighted_average
+        })
 
       query = "What is 2+2?"
 
@@ -201,13 +217,14 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic = HeuristicDifficulty.new!(%{})
       llm = LLMDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic},
-          {LLMDifficulty, llm}
-        ],
-        combination: :weighted_average
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [
+            {HeuristicDifficulty, heuristic},
+            {LLMDifficulty, llm}
+          ],
+          combination: :weighted_average
+        })
 
       query = "What is 2+2?"
 
@@ -225,14 +242,15 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic2 = HeuristicDifficulty.new!(%{})
       heuristic3 = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic1},
-          {HeuristicDifficulty, heuristic2},
-          {HeuristicDifficulty, heuristic3}
-        ],
-        combination: :majority_vote
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [
+            {HeuristicDifficulty, heuristic1},
+            {HeuristicDifficulty, heuristic2},
+            {HeuristicDifficulty, heuristic3}
+          ],
+          combination: :majority_vote
+        })
 
       query = "What is 2+2?"
 
@@ -254,14 +272,15 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic2 = HeuristicDifficulty.new!(%{custom_indicators: %{test: ["a"]}})
       heuristic3 = HeuristicDifficulty.new!(%{custom_indicators: %{test: ["b"]}})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic1},
-          {HeuristicDifficulty, heuristic2},
-          {HeuristicDifficulty, heuristic3}
-        ],
-        combination: :majority_vote
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [
+            {HeuristicDifficulty, heuristic1},
+            {HeuristicDifficulty, heuristic2},
+            {HeuristicDifficulty, heuristic3}
+          ],
+          combination: :majority_vote
+        })
 
       query = "What is 2+2?"
 
@@ -276,13 +295,14 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic1 = HeuristicDifficulty.new!(%{})
       heuristic2 = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic1},
-          {HeuristicDifficulty, heuristic2}
-        ],
-        combination: :max_confidence
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [
+            {HeuristicDifficulty, heuristic1},
+            {HeuristicDifficulty, heuristic2}
+          ],
+          combination: :max_confidence
+        })
 
       query = "What is 2+2?"
 
@@ -301,13 +321,14 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic1 = HeuristicDifficulty.new!(%{})
       heuristic2 = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic1},
-          {HeuristicDifficulty, heuristic2}
-        ],
-        combination: :average
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [
+            {HeuristicDifficulty, heuristic1},
+            {HeuristicDifficulty, heuristic2}
+          ],
+          combination: :average
+        })
 
       query = "What is 2+2?"
 
@@ -330,10 +351,11 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       # but won't actually trigger it in tests.
       llm = LLMDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [{LLMDifficulty, llm}],
-        fallback: HeuristicDifficulty
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [{LLMDifficulty, llm}],
+          fallback: HeuristicDifficulty
+        })
 
       query = "What is 2+2?"
 
@@ -345,9 +367,10 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "returns error for empty query" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [{HeuristicDifficulty, heuristic}]
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [{HeuristicDifficulty, heuristic}]
+        })
 
       assert {:error, :invalid_query} = EnsembleDifficulty.estimate(ensemble, "", %{})
     end
@@ -355,9 +378,10 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "returns error for nil query" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [{HeuristicDifficulty, heuristic}]
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [{HeuristicDifficulty, heuristic}]
+        })
 
       assert {:error, :invalid_query} = EnsembleDifficulty.estimate(ensemble, nil, %{})
     end
@@ -367,9 +391,10 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "estimates multiple queries" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [{HeuristicDifficulty, heuristic}]
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [{HeuristicDifficulty, heuristic}]
+        })
 
       queries = [
         "What is 2+2?",
@@ -389,13 +414,15 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "returns error if any query fails" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [{HeuristicDifficulty, heuristic}]
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [{HeuristicDifficulty, heuristic}]
+        })
 
       queries = [
         "What is 2+2?",
-        "",  # Invalid query
+        # Invalid query
+        "",
         "Valid query"
       ]
 
@@ -405,9 +432,10 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
     test "handles empty query list" do
       heuristic = HeuristicDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [{HeuristicDifficulty, heuristic}]
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [{HeuristicDifficulty, heuristic}]
+        })
 
       assert {:ok, []} = EnsembleDifficulty.estimate_batch(ensemble, [], %{})
     end
@@ -423,10 +451,11 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
           {HeuristicDifficulty, HeuristicDifficulty.new!(%{})}
         ]
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: estimators,
-        combination: :majority_vote
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: estimators,
+          combination: :majority_vote
+        })
 
       query = "Calculate the integral of x^2 from 0 to 1."
 
@@ -439,13 +468,14 @@ defmodule Jido.AI.Accuracy.EnsembleDifficultyTest do
       heuristic = HeuristicDifficulty.new!(%{})
       llm = LLMDifficulty.new!(%{})
 
-      ensemble = EnsembleDifficulty.new!(%{
-        estimators: [
-          {HeuristicDifficulty, heuristic},
-          {LLMDifficulty, llm}
-        ],
-        weights: [0.7, 0.3]
-      })
+      ensemble =
+        EnsembleDifficulty.new!(%{
+          estimators: [
+            {HeuristicDifficulty, heuristic},
+            {LLMDifficulty, llm}
+          ],
+          weights: [0.7, 0.3]
+        })
 
       # Simple question - heuristic should say easy
       query = "What is 2+2?"

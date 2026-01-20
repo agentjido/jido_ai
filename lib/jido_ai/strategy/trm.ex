@@ -66,9 +66,9 @@ defmodule Jido.AI.Strategies.TRM do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.Config
   alias Jido.AI.Directive
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.TRM.Machine
   alias Jido.AI.TRM.Reasoning
   alias Jido.AI.TRM.Supervision

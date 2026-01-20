@@ -37,23 +37,20 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
     category: "ai",
     tags: ["reasoning", "inference", "logic"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      model:
-        Zoi.string(
-          description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)"
-        )
-        |> Zoi.optional(),
-      premises: Zoi.string(description: "The given facts/information as premises"),
-      question: Zoi.string(description: "What to infer from the premises"),
-      context:
-        Zoi.string(description: "Additional background information") |> Zoi.optional(),
-      max_tokens:
-        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(2048),
-      temperature:
-        Zoi.float(description: "Sampling temperature (lower for more deterministic reasoning)")
-        |> Zoi.default(0.3),
-      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
-    })
+    schema:
+      Zoi.object(%{
+        model:
+          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)")
+          |> Zoi.optional(),
+        premises: Zoi.string(description: "The given facts/information as premises"),
+        question: Zoi.string(description: "What to infer from the premises"),
+        context: Zoi.string(description: "Additional background information") |> Zoi.optional(),
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(2048),
+        temperature:
+          Zoi.float(description: "Sampling temperature (lower for more deterministic reasoning)")
+          |> Zoi.default(0.3),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+      })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers

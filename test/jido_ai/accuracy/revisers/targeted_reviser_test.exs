@@ -100,6 +100,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviserTest do
   describe "revise_reasoning/4" do
     test "improves logical flow" do
       reviser = TargetedReviser.new!([])
+
       candidate =
         Candidate.new!(%{
           id: "1",
