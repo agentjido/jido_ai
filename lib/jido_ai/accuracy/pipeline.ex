@@ -52,13 +52,6 @@ defmodule Jido.AI.Accuracy.Pipeline do
 
   """
 
-  alias Jido.AI.Accuracy.{
-    PipelineConfig,
-    PipelineResult,
-    PipelineStage
-  }
-
-  # Import stage modules
   alias Jido.AI.Accuracy.Stages.{
     DifficultyEstimationStage,
     RAGStage,
@@ -69,6 +62,13 @@ defmodule Jido.AI.Accuracy.Pipeline do
     CalibrationStage
   }
 
+  alias Jido.AI.Accuracy.{
+    PipelineConfig,
+    PipelineResult,
+    PipelineStage
+  }
+
+  # Import stage modules
   @type t :: %__MODULE__{
           config: PipelineConfig.t(),
           telemetry_enabled: boolean()
@@ -446,11 +446,9 @@ defmodule Jido.AI.Accuracy.Pipeline do
   end
 
   defp is_stage_required?(stage_module) do
-    try do
-      stage_module.required?()
-    rescue
-      _ -> true
-    end
+    stage_module.required?()
+  rescue
+    _ -> true
   end
 
   defp build_result(state, trace_entries, total_duration, _config) do

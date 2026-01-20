@@ -100,36 +100,34 @@ defmodule Jido.AI.Accuracy.Search.MCTSTest do
 
   describe "search/4" do
     test "searches and returns best candidate" do
-      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier,
-        simulations: 10
-      )
+      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier, simulations: 10)
 
       assert %Candidate{} = best
       assert is_binary(best.content)
     end
 
     test "respects simulations option" do
-      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier,
-        simulations: 5
-      )
+      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier, simulations: 5)
 
       assert %Candidate{} = best
     end
 
     test "respects exploration_constant option" do
-      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier,
-        simulations: 10,
-        exploration_constant: 1.0
-      )
+      {:ok, best} =
+        MCTS.search("test", MockGenerator, MockVerifier,
+          simulations: 10,
+          exploration_constant: 1.0
+        )
 
       assert %Candidate{} = best
     end
 
     test "respects max_depth option" do
-      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier,
-        simulations: 10,
-        max_depth: 3
-      )
+      {:ok, best} =
+        MCTS.search("test", MockGenerator, MockVerifier,
+          simulations: 10,
+          max_depth: 3
+        )
 
       assert %Candidate{} = best
     end
@@ -152,31 +150,32 @@ defmodule Jido.AI.Accuracy.Search.MCTSTest do
 
   describe "algorithm behavior" do
     test "completes search with single simulation" do
-      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier,
-        simulations: 1
-      )
+      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier, simulations: 1)
 
       assert %Candidate{} = best
     end
 
     test "explorer constant affects search (smoke test)" do
       # Just verify it doesn't crash with different constants
-      {:ok, _best} = MCTS.search("test", MockGenerator, MockVerifier,
-        simulations: 5,
-        exploration_constant: 0.5
-      )
+      {:ok, _best} =
+        MCTS.search("test", MockGenerator, MockVerifier,
+          simulations: 5,
+          exploration_constant: 0.5
+        )
 
-      {:ok, _best} = MCTS.search("test", MockGenerator, MockVerifier,
-        simulations: 5,
-        exploration_constant: 2.0
-      )
+      {:ok, _best} =
+        MCTS.search("test", MockGenerator, MockVerifier,
+          simulations: 5,
+          exploration_constant: 2.0
+        )
     end
 
     test "max_depth limits tree depth (smoke test)" do
-      {:ok, best} = MCTS.search("test", MockGenerator, MockVerifier,
-        simulations: 10,
-        max_depth: 2
-      )
+      {:ok, best} =
+        MCTS.search("test", MockGenerator, MockVerifier,
+          simulations: 10,
+          max_depth: 2
+        )
 
       assert %Candidate{} = best
     end

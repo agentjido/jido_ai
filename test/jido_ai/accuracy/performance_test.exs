@@ -22,11 +22,12 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
 
   # Generator that tracks tokens
   defp token_tracking_generator(query, _context) do
-    {:ok, Candidate.new!(%{
-      content: "Answer: #{query}",
-      score: 0.9,
-      tokens_used: 100
-    })}
+    {:ok,
+     Candidate.new!(%{
+       content: "Answer: #{query}",
+       score: 0.9,
+       tokens_used: 100
+     })}
   end
 
   # Slightly slower generator
@@ -38,9 +39,10 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
   describe "8.5.3 Performance Tests" do
     test "pipeline completes in reasonable time" do
       # Test that a simple pipeline completes quickly
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       start_time = System.monotonic_time(:millisecond)
 
@@ -67,9 +69,10 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
     end
 
     test "pipeline timeout is enforced" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       # Very short timeout with slow generator
       result = Pipeline.run(pipeline, "Test", generator: &slow_generator/2, timeout: 5)
@@ -79,25 +82,28 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
     end
 
     test "metadata includes timing information" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: &fast_generator/2)
 
       # Metadata should include timing
       assert is_map(result.metadata)
+
       assert is_integer(result.metadata.total_duration_ms) or
-             is_float(result.metadata.total_duration_ms)
+               is_float(result.metadata.total_duration_ms)
 
       # Total duration should be non-negative
       assert result.metadata.total_duration_ms >= 0
     end
 
     test "trace entries include timing per stage" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: &fast_generator/2)
 
@@ -111,9 +117,10 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
 
   describe "8.5.3.2 Cost Tracking Tests" do
     test "metadata includes candidate count" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: &fast_generator/2)
 
@@ -123,9 +130,10 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
     end
 
     test "token tracking is present in metadata" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: &token_tracking_generator/2)
 
@@ -140,16 +148,17 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
 
       # Max candidates should differ
       assert fast_config.generation_config.max_candidates <
-             accurate_config.generation_config.max_candidates
+               accurate_config.generation_config.max_candidates
     end
   end
 
   describe "8.5.3.3 Telemetry Overhead Tests" do
     test "pipeline with telemetry enabled" do
-      {:ok, pipeline_with_telemetry} = Pipeline.new(%{
-        telemetry_enabled: true,
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline_with_telemetry} =
+        Pipeline.new(%{
+          telemetry_enabled: true,
+          config: %{stages: [:generation, :calibration]}
+        })
 
       start_time = System.monotonic_time(:millisecond)
 
@@ -165,10 +174,11 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
     end
 
     test "pipeline without telemetry" do
-      {:ok, pipeline_without_telemetry} = Pipeline.new(%{
-        telemetry_enabled: false,
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline_without_telemetry} =
+        Pipeline.new(%{
+          telemetry_enabled: false,
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline_without_telemetry, "Test", generator: &fast_generator/2)
 
@@ -177,15 +187,17 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
     end
 
     test "telemetry setting is respected" do
-      {:ok, pipeline_with} = Pipeline.new(%{
-        telemetry_enabled: true,
-        config: %{stages: [:generation]}
-      })
+      {:ok, pipeline_with} =
+        Pipeline.new(%{
+          telemetry_enabled: true,
+          config: %{stages: [:generation]}
+        })
 
-      {:ok, pipeline_without} = Pipeline.new(%{
-        telemetry_enabled: false,
-        config: %{stages: [:generation]}
-      })
+      {:ok, pipeline_without} =
+        Pipeline.new(%{
+          telemetry_enabled: false,
+          config: %{stages: [:generation]}
+        })
 
       # Both should have the setting
       assert pipeline_with.telemetry_enabled == true
@@ -220,13 +232,15 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
     end
 
     test "minimal stages complete faster than all stages" do
-      {:ok, minimal_pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation]}
-      })
+      {:ok, minimal_pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation]}
+        })
 
-      {:ok, full_pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :verification, :calibration]}
-      })
+      {:ok, full_pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :verification, :calibration]}
+        })
 
       # Measure minimal
       start_minimal = System.monotonic_time(:millisecond)

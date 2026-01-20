@@ -160,7 +160,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquerTest do
 
       assert result.severity >= 0.5
       # Should have extracted issues from output
-      assert length(result.issues) > 0
+      refute Enum.empty?(result.issues)
       assert result.actionable == true
     end
   end

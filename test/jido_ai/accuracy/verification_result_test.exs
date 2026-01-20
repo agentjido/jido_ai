@@ -5,14 +5,15 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
 
   describe "new/1" do
     test "creates valid result with all fields" do
-      assert {:ok, result} = VerificationResult.new(%{
-        candidate_id: "candidate_1",
-        score: 0.95,
-        confidence: 0.9,
-        reasoning: "Correct answer",
-        step_scores: %{"step_1" => 0.8},
-        metadata: %{verifier: :test}
-      })
+      assert {:ok, result} =
+               VerificationResult.new(%{
+                 candidate_id: "candidate_1",
+                 score: 0.95,
+                 confidence: 0.9,
+                 reasoning: "Correct answer",
+                 step_scores: %{"step_1" => 0.8},
+                 metadata: %{verifier: :test}
+               })
 
       assert result.candidate_id == "candidate_1"
       assert result.score == 0.95
@@ -42,27 +43,27 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
 
     test "returns error for invalid confidence > 1" do
       assert {:error, :invalid_confidence} =
-        VerificationResult.new(%{confidence: 1.5})
+               VerificationResult.new(%{confidence: 1.5})
     end
 
     test "returns error for invalid confidence < 0" do
       assert {:error, :invalid_confidence} =
-        VerificationResult.new(%{confidence: -0.1})
+               VerificationResult.new(%{confidence: -0.1})
     end
 
     test "returns error for invalid score type" do
       assert {:error, :invalid_score} =
-        VerificationResult.new(%{score: "not_a_number"})
+               VerificationResult.new(%{score: "not_a_number"})
     end
 
     test "returns error for invalid step_scores (non-string keys)" do
       assert {:error, :invalid_step_scores} =
-        VerificationResult.new(%{step_scores: %{1 => 0.8}})
+               VerificationResult.new(%{step_scores: %{1 => 0.8}})
     end
 
     test "returns error for invalid step_scores (non-numeric values)" do
       assert {:error, :invalid_step_scores} =
-        VerificationResult.new(%{step_scores: %{"step_1" => "not_a_number"}})
+               VerificationResult.new(%{step_scores: %{"step_1" => "not_a_number"}})
     end
 
     test "accepts confidence of exactly 0.0" do
@@ -176,9 +177,10 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
 
   describe "merge_step_scores/2" do
     test "merges step scores into existing result with step_scores" do
-      result = VerificationResult.new!(%{
-        step_scores: %{"step_1" => 0.8}
-      })
+      result =
+        VerificationResult.new!(%{
+          step_scores: %{"step_1" => 0.8}
+        })
 
       updated = VerificationResult.merge_step_scores(result, %{"step_2" => 0.9})
 
@@ -194,9 +196,10 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
     end
 
     test "overwrites duplicate keys" do
-      result = VerificationResult.new!(%{
-        step_scores: %{"step_1" => 0.5}
-      })
+      result =
+        VerificationResult.new!(%{
+          step_scores: %{"step_1" => 0.5}
+        })
 
       updated = VerificationResult.merge_step_scores(result, %{"step_1" => 0.9})
 
@@ -204,9 +207,10 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
     end
 
     test "handles empty new_scores map" do
-      result = VerificationResult.new!(%{
-        step_scores: %{"step_1" => 0.8}
-      })
+      result =
+        VerificationResult.new!(%{
+          step_scores: %{"step_1" => 0.8}
+        })
 
       updated = VerificationResult.merge_step_scores(result, %{})
 
@@ -214,11 +218,12 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
     end
 
     test "preserves other fields" do
-      result = VerificationResult.new!(%{
-        score: 0.7,
-        confidence: 0.8,
-        reasoning: "Test"
-      })
+      result =
+        VerificationResult.new!(%{
+          score: 0.7,
+          confidence: 0.8,
+          reasoning: "Test"
+        })
 
       updated = VerificationResult.merge_step_scores(result, %{"step_1" => 0.9})
 
@@ -230,14 +235,15 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
 
   describe "to_map/1" do
     test "serializes all fields to string keys" do
-      result = VerificationResult.new!(%{
-        candidate_id: "candidate_1",
-        score: 0.95,
-        confidence: 0.9,
-        reasoning: "Good",
-        step_scores: %{"step_1" => 0.8},
-        metadata: %{key: :value}
-      })
+      result =
+        VerificationResult.new!(%{
+          candidate_id: "candidate_1",
+          score: 0.95,
+          confidence: 0.9,
+          reasoning: "Good",
+          step_scores: %{"step_1" => 0.8},
+          metadata: %{key: :value}
+        })
 
       map = VerificationResult.to_map(result)
 
@@ -390,14 +396,15 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
 
   describe "serialization round-trip" do
     test "to_map then from_map returns equivalent result" do
-      original = VerificationResult.new!(%{
-        candidate_id: "candidate_1",
-        score: 0.95,
-        confidence: 0.9,
-        reasoning: "Good answer",
-        step_scores: %{"step_1" => 0.8, "step_2" => 0.9},
-        metadata: %{verifier: :test, domain: :math}
-      })
+      original =
+        VerificationResult.new!(%{
+          candidate_id: "candidate_1",
+          score: 0.95,
+          confidence: 0.9,
+          reasoning: "Good answer",
+          step_scores: %{"step_1" => 0.8, "step_2" => 0.9},
+          metadata: %{verifier: :test, domain: :math}
+        })
 
       map = VerificationResult.to_map(original)
       assert {:ok, restored} = VerificationResult.from_map(map)
@@ -411,12 +418,13 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
     end
 
     test "round-trip with nil fields" do
-      original = VerificationResult.new!(%{
-        score: nil,
-        confidence: nil,
-        reasoning: nil,
-        step_scores: nil
-      })
+      original =
+        VerificationResult.new!(%{
+          score: nil,
+          confidence: nil,
+          reasoning: nil,
+          step_scores: nil
+        })
 
       map = VerificationResult.to_map(original)
       assert {:ok, restored} = VerificationResult.from_map(map)
@@ -428,10 +436,11 @@ defmodule Jido.AI.Accuracy.VerificationResultTest do
     end
 
     test "round-trip with empty metadata" do
-      original = VerificationResult.new!(%{
-        score: 0.8,
-        metadata: %{}
-      })
+      original =
+        VerificationResult.new!(%{
+          score: 0.8,
+          metadata: %{}
+        })
 
       map = VerificationResult.to_map(original)
       assert {:ok, restored} = VerificationResult.from_map(map)

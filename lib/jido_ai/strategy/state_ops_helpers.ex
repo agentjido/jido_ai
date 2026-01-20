@@ -84,7 +84,6 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
     StateOp.set_path([:iteration], iteration)
   end
 
-
   @doc """
   Creates a StateOp to append a message to the conversation.
 

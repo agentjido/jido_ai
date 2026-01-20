@@ -29,13 +29,13 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStage do
 
   """
 
+  @behaviour PipelineStage
+
   alias Jido.AI.Accuracy.{
     PipelineStage,
     AdaptiveSelfConsistency,
     Candidate
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           min_candidates: pos_integer(),
@@ -64,18 +64,16 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStage do
     query = Map.get(input, :query)
     generator = Map.get(config, :generator) || Map.get(input, :generator)
 
-    cond do
-      is_binary(query) and query != "" ->
-        if is_function(generator) do
-          # Ensure generator is in config for generate_candidates
-          config_with_generator = Map.put(config, :generator, generator)
-          generate_candidates(query, input, config_with_generator)
-        else
-          {:error, :generator_required}
-        end
-
-      true ->
-        {:error, :invalid_query}
+    if is_binary(query) and query != "" do
+      if is_function(generator) do
+        # Ensure generator is in config for generate_candidates
+        config_with_generator = Map.put(config, :generator, generator)
+        generate_candidates(query, input, config_with_generator)
+      else
+        {:error, :generator_required}
+      end
+    else
+      {:error, :invalid_query}
     end
   end
 

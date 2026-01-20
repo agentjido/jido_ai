@@ -42,11 +42,12 @@ defmodule Jido.AI.Accuracy.RevisionTest do
     test "MockReviser implements revise correctly" do
       candidate = Candidate.new!(%{id: "1", content: "original response"})
 
-      critique = CritiqueResult.new!(%{
-        severity: 0.5,
-        issues: ["Issue 1"],
-        suggestions: ["Fix it"]
-      })
+      critique =
+        CritiqueResult.new!(%{
+          severity: 0.5,
+          issues: ["Issue 1"],
+          suggestions: ["Fix it"]
+        })
 
       assert {:ok, revised} = MockReviser.revise(candidate, critique, %{})
 
@@ -66,8 +67,7 @@ defmodule Jido.AI.Accuracy.RevisionTest do
           {:ok,
            Candidate.new!(%{
              id: "context-revised",
-             content:
-               "Preserve: #{preserve}, Severity: #{severity}, Original: #{candidate.content}",
+             content: "Preserve: #{preserve}, Severity: #{severity}, Original: #{candidate.content}",
              metadata: %{context_used: true}
            })}
         end

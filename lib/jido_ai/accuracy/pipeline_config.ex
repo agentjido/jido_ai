@@ -208,14 +208,11 @@ defmodule Jido.AI.Accuracy.PipelineConfig do
         stages: stages,
         difficulty_estimator: Map.get(attrs, :difficulty_estimator, Estimators.HeuristicDifficulty),
         rag_config: normalize_rag_config(Map.get(attrs, :rag_config)),
-        generation_config:
-          normalize_generation_config(Map.get(attrs, :generation_config, %{})),
+        generation_config: normalize_generation_config(Map.get(attrs, :generation_config, %{})),
         verifier_config: normalize_verifier_config(Map.get(attrs, :verifier_config, %{})),
         search_config: normalize_search_config(Map.get(attrs, :search_config)),
-        reflection_config:
-          normalize_reflection_config(Map.get(attrs, :reflection_config)),
-        calibration_config:
-          normalize_calibration_config(Map.get(attrs, :calibration_config, %{})),
+        reflection_config: normalize_reflection_config(Map.get(attrs, :reflection_config)),
+        calibration_config: normalize_calibration_config(Map.get(attrs, :calibration_config, %{})),
         budget_limit: Map.get(attrs, :budget_limit),
         telemetry_enabled: Map.get(attrs, :telemetry_enabled, true)
       }
@@ -301,9 +298,8 @@ defmodule Jido.AI.Accuracy.PipelineConfig do
     with :ok <- validate_stages(config.stages),
          :ok <- validate_required_stages(config.stages),
          :ok <- validate_generation_config(config.generation_config),
-         :ok <- validate_verifier_config(config.verifier_config),
-         :ok <- validate_calibration_config(config.calibration_config) do
-      :ok
+         :ok <- validate_verifier_config(config.verifier_config) do
+      validate_calibration_config(config.calibration_config)
     end
   end
 
@@ -367,10 +363,8 @@ defmodule Jido.AI.Accuracy.PipelineConfig do
 
   defp normalize_calibration_config(config) when is_map(config) do
     %{
-      high_threshold:
-        Map.get(config, :high_threshold, Thresholds.calibration_high_confidence()),
-      low_threshold:
-        Map.get(config, :low_threshold, Thresholds.calibration_medium_confidence()),
+      high_threshold: Map.get(config, :high_threshold, Thresholds.calibration_high_confidence()),
+      low_threshold: Map.get(config, :low_threshold, Thresholds.calibration_medium_confidence()),
       medium_action: Map.get(config, :medium_action, :with_verification),
       low_action: Map.get(config, :low_action, :abstain)
     }
@@ -379,6 +373,7 @@ defmodule Jido.AI.Accuracy.PipelineConfig do
   # Validation functions
 
   defp validate_stages([]), do: {:error, :no_stages}
+
   defp validate_stages(stages) when is_list(stages) do
     if Enum.all?(stages, &(&1 in @all_stages)) do
       :ok
@@ -431,8 +426,10 @@ defmodule Jido.AI.Accuracy.PipelineConfig do
   end
 
   defp format_error(atom) when is_atom(atom), do: atom
+
   defp format_error({:missing_required_stages, stages}) do
     "missing_required_stages: #{inspect(stages)}"
   end
+
   defp format_error(_), do: :invalid_attributes
 end

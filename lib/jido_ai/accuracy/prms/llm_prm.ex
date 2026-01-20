@@ -91,15 +91,13 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
           parallel: boolean()
         }
 
-  defstruct [
-    model: nil,
-    prompt_template: nil,
-    score_range: {0.0, 1.0},
-    temperature: 0.2,
-    timeout: 30_000,
-    max_retries: 2,
-    parallel: false
-  ]
+  defstruct model: nil,
+            prompt_template: nil,
+            score_range: {0.0, 1.0},
+            temperature: 0.2,
+            timeout: 30_000,
+            max_retries: 2,
+            parallel: false
 
   @default_step_prompt """
   You are an expert evaluator assessing reasoning steps.
@@ -375,7 +373,8 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
 
         case score_step(prm, step, context_with_prev, opts) do
           {:ok, score} -> score
-          {:error, _} -> midpoint(prm.score_range)  # Default to middle score on error
+          # Default to middle score on error
+          {:error, _} -> midpoint(prm.score_range)
         end
       end,
       max_concurrency: 10,
@@ -436,8 +435,12 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
 
   defp extract_content(response) do
     case response.message.content do
-      nil -> ""
-      content when is_binary(content) -> content
+      nil ->
+        ""
+
+      content when is_binary(content) ->
+        content
+
       content when is_list(content) ->
         content
         |> Enum.filter(fn %{type: type} -> type == :text end)
@@ -488,7 +491,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
     else
       # Build map of step index to score
       scores_map =
-        Enum.into(captures, %{}, fn [_, index_str, score_str] ->
+        Map.new(captures, fn [_, index_str, score_str] ->
           {String.to_integer(index_str) - 1, parse_score_value(score_str)}
         end)
 
@@ -523,8 +526,12 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
 
   defp parse_score_value(str) do
     case Float.parse(str) do
-      {score, ""} -> score
-      {score, _rest} -> score
+      {score, ""} ->
+        score
+
+      {score, _rest} ->
+        score
+
       :error ->
         case Integer.parse(str) do
           {score, ""} -> score * 1.0
@@ -548,19 +555,16 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
   defp midpoint({min, max}), do: (min + max) / 2
 
   defp render_template(template, assigns) do
-    try do
-      rendered = EEx.eval_string(template, assigns: assigns)
-      {:ok, rendered}
-    rescue
-      e in [SyntaxError, TokenMissingError, ArgumentError] ->
-        {:error, {:template_error, Exception.message(e)}}
-    end
+    rendered = EEx.eval_string(template, assigns: assigns)
+    {:ok, rendered}
+  rescue
+    e in [SyntaxError, TokenMissingError, ArgumentError] ->
+      {:error, {:template_error, Exception.message(e)}}
   end
 
   # Validation
 
-  defp validate_score_range({min, max}) when is_number(min) and is_number(max) and min < max,
-    do: :ok
+  defp validate_score_range({min, max}) when is_number(min) and is_number(max) and min < max, do: :ok
 
   defp validate_score_range(_), do: {:error, :invalid_score_range}
 

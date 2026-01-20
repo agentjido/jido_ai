@@ -46,27 +46,26 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
     category: "ai",
     tags: ["streaming", "llm", "generation"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      model:
-        Zoi.any(description: "Model alias (e.g., :fast) or direct spec string")
-        |> Zoi.optional(),
-      prompt: Zoi.string(description: "The user prompt to send to the LLM"),
-      system_prompt:
-        Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
-        |> Zoi.optional(),
-      max_tokens:
-        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
-      temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
-      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
-      on_token:
-        Zoi.any(description: "Callback function invoked for each token") |> Zoi.optional(),
-      buffer:
-        Zoi.boolean(description: "Whether to buffer tokens for full response collection")
-        |> Zoi.default(false),
-      auto_process:
-        Zoi.boolean(description: "Whether to automatically process the stream")
-        |> Zoi.default(true)
-    })
+    schema:
+      Zoi.object(%{
+        model:
+          Zoi.any(description: "Model alias (e.g., :fast) or direct spec string")
+          |> Zoi.optional(),
+        prompt: Zoi.string(description: "The user prompt to send to the LLM"),
+        system_prompt:
+          Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
+          |> Zoi.optional(),
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
+        temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+        on_token: Zoi.any(description: "Callback function invoked for each token") |> Zoi.optional(),
+        buffer:
+          Zoi.boolean(description: "Whether to buffer tokens for full response collection")
+          |> Zoi.default(false),
+        auto_process:
+          Zoi.boolean(description: "Whether to automatically process the stream")
+          |> Zoi.default(true)
+      })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers
@@ -95,7 +94,7 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
          {:ok, model} <- resolve_model(validated_params[:model]),
          {:ok, messages} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          {:ok, stream_id} <- Security.generate_stream_id() |> Security.validate_stream_id(),
-         opts <- build_opts(validated_params),
+         opts = build_opts(validated_params),
          {:ok, stream_response} <- ReqLLM.stream_text(model, messages, opts) do
       # Start background task to process the stream
       start_stream_processor(stream_id, stream_response, validated_params)
@@ -178,7 +177,7 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
 
   defp process_stream(stream_id, stream_response, on_token, buffer?, _auto_process) do
     # Initialize state
-    buffer_ref = if buffer?, do: :ets.new(:stream_buffer, [:private, :multiset]), else: nil
+    buffer_ref = if buffer?, do: :ets.new(:stream_buffer, [:private, :multiset])
 
     try do
       case ReqLLM.StreamResponse.process_stream(stream_response,
@@ -207,13 +206,11 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
 
   defp handle_token(_stream_id, _chunk, nil, _buffer_ref), do: :ok
 
+  # Callback is already wrapped with timeout protection by Security.validate_and_wrap_callback
   defp handle_token(_stream_id, chunk, on_token, nil) when is_function(on_token, 1) do
-    # Callback is already wrapped with timeout protection by Security.validate_and_wrap_callback
-    try do
-      on_token.(chunk)
-    catch
-      _, _ -> :ok
-    end
+    on_token.(chunk)
+  catch
+    _, _ -> :ok
   end
 
   defp handle_token(stream_id, chunk, on_token, buffer_ref) when is_reference(buffer_ref) do
@@ -240,11 +237,11 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
     status
   end
 
-  defp finalize_stream(_stream_id, :completed, buffer_ref, response) do
-    _text = extract_buffered_text(buffer_ref, _stream_id)
+  defp finalize_stream(stream_id, :completed, buffer_ref, _response) do
+    # Extract buffered text for potential future use
+    _ = extract_buffered_text(buffer_ref, stream_id)
 
     # Could store completion status in Registry here
-    _ = {_stream_id, _text, response}
 
     :completed
   end

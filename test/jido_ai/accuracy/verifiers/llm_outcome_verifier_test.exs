@@ -618,23 +618,21 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
   end
 
   defp render_prompt_test(_verifier, template, prompt, candidate, score_range) do
-    try do
-      {min_score, max_score} = score_range
-      mid_score = (min_score + max_score) / 2
+    {min_score, max_score} = score_range
+    mid_score = (min_score + max_score) / 2
 
-      assigns = [
-        prompt: prompt,
-        candidate: build_candidate_assign_test(candidate),
-        min_score: min_score,
-        max_score: max_score,
-        mid_score: mid_score
-      ]
+    assigns = [
+      prompt: prompt,
+      candidate: build_candidate_assign_test(candidate),
+      min_score: min_score,
+      max_score: max_score,
+      mid_score: mid_score
+    ]
 
-      rendered = EEx.eval_string(template, assigns: assigns)
-      {:ok, rendered}
-    rescue
-      e -> {:error, {:template_error, Exception.message(e)}}
-    end
+    rendered = EEx.eval_string(template, assigns: assigns)
+    {:ok, rendered}
+  rescue
+    e -> {:error, {:template_error, Exception.message(e)}}
   end
 
   defp build_candidate_assign_test(candidate) do
@@ -648,8 +646,12 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
 
   defp extract_content_test(response) do
     case response.message.content do
-      nil -> ""
-      content when is_binary(content) -> content
+      nil ->
+        ""
+
+      content when is_binary(content) ->
+        content
+
       content when is_list(content) ->
         content
         |> Enum.filter(fn %{type: type} -> type == :text end)
@@ -661,15 +663,19 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
     pattern = ~r/Candidate (\d+):\s*(?:.*?)Score:\s*(-?\d+\.?\d*)/i
     captures = Regex.scan(pattern, content)
 
-    Enum.into(captures, %{}, fn [_, id, score_str] ->
+    Map.new(captures, fn [_, id, score_str] ->
       {String.to_integer(id), parse_score_value_test(score_str)}
     end)
   end
 
   defp parse_score_value_test(str) do
     case Float.parse(str) do
-      {score, ""} -> score
-      {score, _} -> score
+      {score, ""} ->
+        score
+
+      {score, _} ->
+        score
+
       :error ->
         case Integer.parse(str) do
           {score, ""} -> score * 1.0

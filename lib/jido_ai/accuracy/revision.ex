@@ -161,6 +161,7 @@ defmodule Jido.AI.Accuracy.Revision do
 
   defp compute_content_diff("", ""), do: :unchanged
   defp compute_content_diff(original, original), do: :unchanged
+
   defp compute_content_diff(original, revised) do
     # Simple word-level diff
     original_words = String.split(original, ~r/\s+/, trim: true)
@@ -196,6 +197,7 @@ defmodule Jido.AI.Accuracy.Revision do
   end
 
   defp compute_metadata_diff(original, original), do: :unchanged
+
   defp compute_metadata_diff(original, revised) do
     changed_keys =
       original
@@ -213,8 +215,10 @@ defmodule Jido.AI.Accuracy.Revision do
         changed_keys: changed_keys,
         original_keys: Map.keys(original) |> MapSet.new(),
         revised_keys: Map.keys(revised) |> MapSet.new(),
-        added_keys: MapSet.difference(MapSet.new(Map.keys(revised)), MapSet.new(Map.keys(original))) |> MapSet.to_list(),
-        removed_keys: MapSet.difference(MapSet.new(Map.keys(original)), MapSet.new(Map.keys(revised))) |> MapSet.to_list()
+        added_keys:
+          MapSet.difference(MapSet.new(Map.keys(revised)), MapSet.new(Map.keys(original))) |> MapSet.to_list(),
+        removed_keys:
+          MapSet.difference(MapSet.new(Map.keys(original)), MapSet.new(Map.keys(revised))) |> MapSet.to_list()
       }
     end
   end

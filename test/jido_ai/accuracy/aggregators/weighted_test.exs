@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Aggregator, Candidate, Aggregators.Weighted}
   alias Jido.AI.Accuracy.Aggregators.{MajorityVote, BestOfN}
+  alias Jido.AI.Accuracy.{Aggregator, Candidate, Aggregators.Weighted}
 
   @moduletag :capture_log
 
@@ -31,12 +31,13 @@ defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
       ]
 
       # Unequal weights that should be normalized
-      assert {:ok, _best, metadata} = Weighted.aggregate(candidates,
-        strategies: [
-          {MajorityVote, 2},
-          {BestOfN, 1}
-        ]
-      )
+      assert {:ok, _best, metadata} =
+               Weighted.aggregate(candidates,
+                 strategies: [
+                   {MajorityVote, 2},
+                   {BestOfN, 1}
+                 ]
+               )
 
       # Check weights were normalized (2/3 and 1/3)
       assert_in_delta metadata.strategy_weights[MajorityVote], 0.666, 0.01
@@ -49,12 +50,13 @@ defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
         Candidate.new!(%{content: "41", score: 0.7})
       ]
 
-      assert {:ok, _best, metadata} = Weighted.aggregate(candidates,
-        strategies: [
-          {MajorityVote, 0},
-          {BestOfN, 0}
-        ]
-      )
+      assert {:ok, _best, metadata} =
+               Weighted.aggregate(candidates,
+                 strategies: [
+                   {MajorityVote, 0},
+                   {BestOfN, 0}
+                 ]
+               )
 
       # Should normalize to equal weights (0.5 each)
       assert metadata.strategy_weights[MajorityVote] == 0.5
@@ -69,12 +71,13 @@ defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
       ]
 
       # Majority vote gets 80%, BestOfN gets 20%
-      assert {:ok, best, _metadata} = Weighted.aggregate(candidates,
-        strategies: [
-          {MajorityVote, 0.8},
-          {BestOfN, 0.2}
-        ]
-      )
+      assert {:ok, best, _metadata} =
+               Weighted.aggregate(candidates,
+                 strategies: [
+                   {MajorityVote, 0.8},
+                   {BestOfN, 0.2}
+                 ]
+               )
 
       # 42 should win since it has strong majority vote support
       assert String.contains?(best.content, "42")
@@ -115,12 +118,13 @@ defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
       ]
 
       # FailingStrategy + MajorityVote should still work
-      assert {:ok, best, _metadata} = Weighted.aggregate(candidates,
-        strategies: [
-          {FailingStrategy, 0.5},
-          {MajorityVote, 0.5}
-        ]
-      )
+      assert {:ok, best, _metadata} =
+               Weighted.aggregate(candidates,
+                 strategies: [
+                   {FailingStrategy, 0.5},
+                   {MajorityVote, 0.5}
+                 ]
+               )
 
       assert String.contains?(best.content, "42")
     end
@@ -131,12 +135,13 @@ defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
         Candidate.new!(%{content: "The answer is: 41", score: 0.7})
       ]
 
-      assert {:ok, _best, metadata} = Weighted.aggregate(candidates,
-        strategies: [
-          {MajorityVote, 0.6},
-          {BestOfN, 0.4}
-        ]
-      )
+      assert {:ok, _best, metadata} =
+               Weighted.aggregate(candidates,
+                 strategies: [
+                   {MajorityVote, 0.6},
+                   {BestOfN, 0.4}
+                 ]
+               )
 
       # Check that weighted scores are present
       assert is_list(metadata.weighted_scores)
@@ -198,11 +203,12 @@ defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
         Candidate.new!(%{content: "The answer is: 41", score: 0.7})
       ]
 
-      assert {:ok, best, metadata} = Weighted.aggregate(candidates,
-        strategies: [
-          {BestOfN, 1.0}
-        ]
-      )
+      assert {:ok, best, metadata} =
+               Weighted.aggregate(candidates,
+                 strategies: [
+                   {BestOfN, 1.0}
+                 ]
+               )
 
       assert String.contains?(best.content, "42")
       # With single strategy, confidence equals the weight (1.0)

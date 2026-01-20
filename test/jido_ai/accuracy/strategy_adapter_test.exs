@@ -5,8 +5,8 @@ defmodule Jido.AI.Accuracy.StrategyAdapterTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.StrategyAdapter
   alias Jido.AI.Accuracy.Directive
+  alias Jido.AI.Accuracy.StrategyAdapter
 
   describe "to_directive/2" do
     test "creates directive from query with defaults" do
@@ -118,11 +118,12 @@ defmodule Jido.AI.Accuracy.StrategyAdapterTest do
     end
 
     test "to_directive with all options" do
-      directive = StrategyAdapter.to_directive("What is 2+2?",
-        preset: :accurate,
-        config: %{generation_config: %{max_candidates: 15}},
-        timeout: 45_000
-      )
+      directive =
+        StrategyAdapter.to_directive("What is 2+2?",
+          preset: :accurate,
+          config: %{generation_config: %{max_candidates: 15}},
+          timeout: 45_000
+        )
 
       assert directive.config.generation_config.max_candidates == 15
       assert directive.timeout == 45_000

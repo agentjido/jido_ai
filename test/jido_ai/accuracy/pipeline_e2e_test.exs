@@ -44,13 +44,24 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
   # Simple math solver for testing
   defp solve_math(query) do
     cond do
-      String.contains?(query, "2+2") -> "4"
-      String.contains?(query, "15 * 23") -> "345"
-      String.contains?(query, "10 * 10") -> "100"
-      String.contains?(query, "7 * 8") -> "56"
-      String.contains?(query, "12 * 12") -> "144"
+      String.contains?(query, "2+2") ->
+        "4"
+
+      String.contains?(query, "15 * 23") ->
+        "345"
+
+      String.contains?(query, "10 * 10") ->
+        "100"
+
+      String.contains?(query, "7 * 8") ->
+        "56"
+
+      String.contains?(query, "12 * 12") ->
+        "144"
+
       String.contains?(query, "+") ->
         parts = String.split(query, "+")
+
         if length(parts) == 2 do
           a = parts |> List.first() |> String.trim() |> Integer.parse() |> elem(0)
           b = parts |> List.last() |> String.trim() |> Integer.parse() |> elem(0)
@@ -58,7 +69,9 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
         else
           "42"
         end
-      true -> "42"
+
+      true ->
+        "42"
     end
   end
 
@@ -69,10 +82,12 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
         def factorial(n) when n <= 1, do: 1
         def factorial(n), do: n * factorial(n - 1)
         """
+
       String.contains?(query, "sum") ->
         """
         def sum_list(list), do: Enum.sum(list)
         """
+
       true ->
         """
         def solve(), do: :ok
@@ -84,10 +99,13 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
     cond do
       String.contains?(query, "capital of France") ->
         "The capital of France is Paris."
+
       String.contains?(query, "Eiffel Tower") ->
         "The Eiffel Tower is located in Paris, France."
+
       String.contains?(query, "Python") ->
         "Python is a high-level programming language created by Guido van Rossum."
+
       true ->
         "Based on available information, this is a factual response."
     end
@@ -108,20 +126,21 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
 
       # Verify trace completeness
       assert is_list(result.trace)
-      assert length(result.trace) > 0
+      refute Enum.empty?(result.trace)
 
       # Verify metadata
       assert is_map(result.metadata)
       assert is_list(result.metadata.stages_completed)
-      assert length(result.metadata.stages_completed) > 0
+      refute Enum.empty?(result.metadata.stages_completed)
     end
 
     test "complete pipeline on coding problem" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :verification, :calibration]
-        }
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :verification, :calibration]
+          }
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Write a factorial function", generator: &coding_generator/2)
 
@@ -132,17 +151,19 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
     end
 
     test "complete pipeline on research question" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration]
-        }
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration]
+          }
+        })
 
-      {:ok, result} = Pipeline.run(
-        pipeline,
-        "What is the capital of France?",
-        generator: &research_generator/2
-      )
+      {:ok, result} =
+        Pipeline.run(
+          pipeline,
+          "What is the capital of France?",
+          generator: &research_generator/2
+        )
 
       # Verify factual response
       assert %PipelineResult{} = result
@@ -150,15 +171,16 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
     end
 
     test "pipeline with abstention on low confidence" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            low_threshold: 0.5,
-            low_action: :abstain
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              low_threshold: 0.5,
+              low_action: :abstain
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Complex question", generator: &uncertain_generator/2)
 
@@ -262,11 +284,12 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
       assert config.calibration_config.medium_action == :with_citations
 
       # Run pipeline
-      {:ok, result} = Pipeline.run(
-        pipeline,
-        "What is the capital of France?",
-        generator: &research_generator/2
-      )
+      {:ok, result} =
+        Pipeline.run(
+          pipeline,
+          "What is the capital of France?",
+          generator: &research_generator/2
+        )
 
       assert %PipelineResult{} = result
     end
@@ -287,23 +310,24 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
 
       # Max candidates should increase: fast < balanced < accurate
       assert fast_config.generation_config.max_candidates <
-             balanced_config.generation_config.max_candidates
+               balanced_config.generation_config.max_candidates
 
       assert balanced_config.generation_config.max_candidates <=
-             accurate_config.generation_config.max_candidates
+               accurate_config.generation_config.max_candidates
     end
   end
 
   describe "trace completeness" do
     test "pipeline includes trace entries for each executed stage" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: &math_generator/2)
 
       # Trace should have entries for each stage
-      assert length(result.trace) > 0
+      refute Enum.empty?(result.trace)
 
       # Each trace entry should have required fields
       for entry <- result.trace do
@@ -320,7 +344,7 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
 
       # Total duration should be recorded
       assert is_integer(result.metadata.total_duration_ms) or
-             is_float(result.metadata.total_duration_ms)
+               is_float(result.metadata.total_duration_ms)
 
       # Each stage trace should have timing
       for entry <- result.trace do
@@ -331,16 +355,17 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
 
   describe "8.5.1.4 Self-consistency with varied responses" do
     test "pipeline aggregates multiple candidates" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          generation_config: %{
-            min_candidates: 3,
-            max_candidates: 3,
-            batch_size: 3
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            generation_config: %{
+              min_candidates: 3,
+              max_candidates: 3,
+              batch_size: 3
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is the ultimate answer?", generator: &varied_generator/2)
 

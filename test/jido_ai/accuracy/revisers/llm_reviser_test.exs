@@ -70,11 +70,12 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviserTest do
       reviser = LLMReviser.new!([])
       candidate = Candidate.new!(%{id: "1", content: "The answer is 42."})
 
-      critique = CritiqueResult.new!(%{
-        severity: 0.5,
-        issues: ["Needs more explanation"],
-        suggestions: ["Add context"]
-      })
+      critique =
+        CritiqueResult.new!(%{
+          severity: 0.5,
+          issues: ["Needs more explanation"],
+          suggestions: ["Add context"]
+        })
 
       # This test will use ReqLLM if available, otherwise mock
       # For testing purposes, we'll create a mock version
@@ -168,15 +169,13 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviserTest do
 
     defmodule MockLLMReviser do
       @moduledoc false
-      defstruct [
-        model: nil,
-        prompt_template: nil,
-        preserve_correct: true,
-        temperature: 0.5,
-        timeout: 30_000,
-        max_retries: 2,
-        domain: nil
-      ]
+      defstruct model: nil,
+                prompt_template: nil,
+                preserve_correct: true,
+                temperature: 0.5,
+                timeout: 30_000,
+                max_retries: 2,
+                domain: nil
 
       def new(opts) do
         {:ok, struct(__MODULE__, opts)}
@@ -222,12 +221,13 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviserTest do
       reviser = MockLLMReviser.new!([])
       candidate = Candidate.new!(%{id: "1", content: "original"})
 
-      critique = CritiqueResult.new!(%{
-        severity: 0.6,
-        issues: ["Issue 1"],
-        suggestions: ["Fix it"],
-        feedback: "Needs improvement"
-      })
+      critique =
+        CritiqueResult.new!(%{
+          severity: 0.6,
+          issues: ["Issue 1"],
+          suggestions: ["Fix it"],
+          feedback: "Needs improvement"
+        })
 
       assert {:ok, revised} = MockLLMReviser.revise(reviser, candidate, critique, %{})
 

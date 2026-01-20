@@ -60,8 +60,6 @@ defmodule Jido.AI.Accuracy.VerificationResult do
 
   """
 
-  alias Jido.AI.Accuracy.Candidate
-
   @type t :: %__MODULE__{
           candidate_id: String.t() | nil,
           score: number() | nil,
@@ -166,8 +164,10 @@ defmodule Jido.AI.Accuracy.VerificationResult do
 
   """
   @spec pass?(t(), number()) :: boolean()
+  def pass?(result, threshold \\ 0.5)
   def pass?(%__MODULE__{score: nil}, _threshold), do: false
-  def pass?(%__MODULE__{score: score}, threshold \\ 0.5) when is_number(score) do
+
+  def pass?(%__MODULE__{score: score}, threshold) when is_number(score) do
     score >= threshold
   end
 
@@ -224,8 +224,7 @@ defmodule Jido.AI.Accuracy.VerificationResult do
   def to_map(%__MODULE__{} = result) do
     result
     |> Map.from_struct()
-    |> Enum.map(fn {k, v} -> {Atom.to_string(k), v} end)
-    |> Map.new()
+    |> Map.new(fn {k, v} -> {Atom.to_string(k), v} end)
   end
 
   @doc """
@@ -288,6 +287,7 @@ defmodule Jido.AI.Accuracy.VerificationResult do
   defp validate_confidence(_), do: {:error, :invalid_confidence}
 
   defp validate_step_scores(nil), do: :ok
+
   defp validate_step_scores(scores) when is_map(scores) do
     if Enum.all?(scores, fn {k, v} -> is_binary(k) and is_number(v) end) do
       :ok
@@ -295,6 +295,7 @@ defmodule Jido.AI.Accuracy.VerificationResult do
       {:error, :invalid_step_scores}
     end
   end
+
   defp validate_step_scores(_), do: {:error, :invalid_step_scores}
   defp format_error(atom) when is_atom(atom), do: atom
   defp format_error(_), do: :invalid_attributes

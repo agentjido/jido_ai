@@ -212,9 +212,9 @@ defmodule Jido.AI.Accuracy.DifficultyEstimateTest do
       map = DifficultyEstimate.to_map(estimate)
 
       assert Enum.all?(Map.keys(map), fn
-             key when is_binary(key) -> true
-             _ -> false
-           end)
+               key when is_binary(key) -> true
+               _ -> false
+             end)
     end
   end
 
@@ -241,12 +241,13 @@ defmodule Jido.AI.Accuracy.DifficultyEstimateTest do
 
   describe "round-trip serialization" do
     test "to_map and from_map are inverses" do
-      original = DifficultyEstimate.new!(%{
-        level: :hard,
-        score: 0.8,
-        confidence: 0.9,
-        reasoning: "Test"
-      })
+      original =
+        DifficultyEstimate.new!(%{
+          level: :hard,
+          score: 0.8,
+          confidence: 0.9,
+          reasoning: "Test"
+        })
 
       map = DifficultyEstimate.to_map(original)
       assert {:ok, restored} = DifficultyEstimate.from_map(map)

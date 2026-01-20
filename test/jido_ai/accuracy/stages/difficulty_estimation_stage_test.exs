@@ -5,8 +5,8 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStageTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.Stages.DifficultyEstimationStage
   alias Jido.AI.Accuracy.Estimators.HeuristicDifficulty
+  alias Jido.AI.Accuracy.Stages.DifficultyEstimationStage
 
   describe "name/0" do
     test "returns stage name" do
@@ -69,11 +69,12 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStageTest do
     end
 
     test "reuses existing difficulty if present" do
-      difficulty = Jido.AI.Accuracy.DifficultyEstimate.new!(%{
-        level: :hard,
-        score: 0.8,
-        confidence: 0.9
-      })
+      difficulty =
+        Jido.AI.Accuracy.DifficultyEstimate.new!(%{
+          level: :hard,
+          score: 0.8,
+          confidence: 0.9
+        })
 
       input = %{query: "test", difficulty: difficulty}
       config = %{}

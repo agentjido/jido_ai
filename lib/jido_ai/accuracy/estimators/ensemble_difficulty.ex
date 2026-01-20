@@ -72,9 +72,9 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
 
   """
 
-  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
-
   @behaviour DifficultyEstimator
+
+  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
 
   @type combination :: :weighted_average | :majority_vote | :max_confidence | :average
   @type estimator_pair :: {module(), struct()}
@@ -190,14 +190,12 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
   @spec estimate(t(), String.t(), map()) :: {:ok, DifficultyEstimate.t()} | {:error, term()}
   def estimate(%__MODULE__{} = ensemble, query, context) do
     # Validate query first
-    unless is_binary(query) do
-      {:error, :invalid_query}
-    else
+    if is_binary(query) do
       # Run all estimators in parallel
       results = run_estimators(ensemble, query, context)
 
       case results do
-        {:ok, estimates} when is_list(estimates) and length(estimates) > 0 ->
+        {:ok, estimates} when is_list(estimates) and (is_list(estimates) and estimates != []) ->
           combine_results(ensemble, estimates)
 
         {:ok, []} ->
@@ -210,6 +208,8 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
         {:error, _reason} ->
           try_fallback(ensemble, query, context)
       end
+    else
+      {:error, :invalid_query}
     end
   end
 
@@ -273,10 +273,11 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
       end)
 
     # Filter out errors and return successful estimates
-    successful = Enum.filter(results, fn
-      {:ok, _estimate} -> true
-      _ -> false
-    end)
+    successful =
+      Enum.filter(results, fn
+        {:ok, _estimate} -> true
+        _ -> false
+      end)
 
     if successful == [] do
       # Check if all failed with invalid_query
@@ -310,17 +311,18 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
 
     # Normalize weights if needed
     weights =
-      if Enum.sum(weights) != 1.0 do
+      if Enum.sum(weights) == 1.0 do
+        weights
+      else
         total = Enum.sum(weights)
         Enum.map(weights, &(&1 / total))
-      else
-        weights
       end
 
     # Calculate weighted score and confidence
     {weighted_score, weighted_confidence} =
       Enum.zip(estimates, weights)
-      |> Enum.reduce({0.0, 0.0}, fn {%DifficultyEstimate{score: score, confidence: conf}, weight}, {acc_score, acc_conf} ->
+      |> Enum.reduce({0.0, 0.0}, fn {%DifficultyEstimate{score: score, confidence: conf}, weight},
+                                    {acc_score, acc_conf} ->
         {acc_score + score * weight, acc_conf + conf * weight}
       end)
 
@@ -400,14 +402,17 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
     # Find estimate with highest confidence
     best_estimate = Enum.max_by(estimates, & &1.confidence)
 
-    reasoning = """
-    Selected estimate with highest confidence (#{Float.round(best_estimate.confidence * 100, 1)}%).
-    #{best_estimate.reasoning || ""}
-    """ |> String.trim()
+    reasoning =
+      """
+      Selected estimate with highest confidence (#{Float.round(best_estimate.confidence * 100, 1)}%).
+      #{best_estimate.reasoning || ""}
+      """
+      |> String.trim()
 
-    estimate = %{best_estimate |
-      reasoning: reasoning,
-      metadata: Map.put(best_estimate.metadata || %{}, :ensemble, true)
+    estimate = %{
+      best_estimate
+      | reasoning: reasoning,
+        metadata: Map.put(best_estimate.metadata || %{}, :ensemble, true)
     }
 
     {:ok, estimate}
@@ -448,9 +453,7 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
     case fallback.estimate(fallback, query, context) do
       {:ok, estimate} ->
         # Add note that fallback was used
-        estimate = %{estimate |
-          metadata: Map.put(estimate.metadata || %{}, :ensemble_fallback, true)
-        }
+        estimate = %{estimate | metadata: Map.put(estimate.metadata || %{}, :ensemble_fallback, true)}
         {:ok, estimate}
 
       {:error, _reason} ->
@@ -462,10 +465,9 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
   defp build_ensemble_reasoning(estimates, weights) do
     contributions =
       Enum.zip(estimates, weights)
-      |> Enum.map(fn {%DifficultyEstimate{level: level, confidence: conf}, weight} ->
+      |> Enum.map_join(", ", fn {%DifficultyEstimate{level: level, confidence: conf}, weight} ->
         "#{level} (#{Float.round(conf * 100, 1)}%, weight: #{Float.round(weight, 2)})"
       end)
-      |> Enum.join(", ")
 
     "Ensemble of #{length(estimates)} estimators: #{contributions}"
   end
@@ -498,6 +500,7 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
 
   defp validate_estimators(nil), do: {:error, :estimators_required}
   defp validate_estimators([]), do: {:error, :estimators_required}
+
   defp validate_estimators(estimators) when is_list(estimators) do
     if Enum.all?(estimators, fn
          {module, struct} when is_atom(module) and is_struct(struct) -> true
@@ -508,9 +511,11 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
       {:error, :invalid_estimators}
     end
   end
+
   defp validate_estimators(_), do: {:error, :invalid_estimators}
 
   defp validate_weights(nil, _num_estimators), do: :ok
+
   defp validate_weights(weights, num_estimators) when is_list(weights) do
     cond do
       length(weights) != num_estimators ->
@@ -523,9 +528,13 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
         :ok
     end
   end
-  defp validate_weights(_,_), do: {:error, :invalid_weights}
 
-  defp validate_combination(combination) when combination in [:weighted_average, :majority_vote, :max_confidence, :average], do: :ok
+  defp validate_weights(_, _), do: {:error, :invalid_weights}
+
+  defp validate_combination(combination)
+       when combination in [:weighted_average, :majority_vote, :max_confidence, :average],
+       do: :ok
+
   defp validate_combination(_), do: {:error, :invalid_combination}
 
   defp validate_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok

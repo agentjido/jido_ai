@@ -148,14 +148,15 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
     with :ok <- validate_model(resolved_model),
          :ok <- validate_temperature(Keyword.get(opts, :temperature, 0.3)),
          :ok <- validate_timeout(Keyword.get(opts, :timeout, 30_000)) do
-      critiquer = struct(__MODULE__, [
-        model: resolved_model,
-        prompt_template: Keyword.get(opts, :prompt_template),
-        temperature: Keyword.get(opts, :temperature, 0.3),
-        timeout: Keyword.get(opts, :timeout, 30_000),
-        max_retries: Keyword.get(opts, :max_retries, 2),
-        domain: Keyword.get(opts, :domain)
-      ])
+      critiquer =
+        struct(__MODULE__,
+          model: resolved_model,
+          prompt_template: Keyword.get(opts, :prompt_template),
+          temperature: Keyword.get(opts, :temperature, 0.3),
+          timeout: Keyword.get(opts, :timeout, 30_000),
+          max_retries: Keyword.get(opts, :max_retries, 2),
+          domain: Keyword.get(opts, :domain)
+        )
 
       {:ok, critiquer}
     end
@@ -181,14 +182,15 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
     with {:ok, rendered_prompt} <- render_prompt(critiquer, candidate, prompt),
          {:ok, response} <- call_llm(critiquer, rendered_prompt),
          {:ok, parsed} <- parse_critique(response) do
-      result = CritiqueResult.new!(%{
-        issues: Map.get(parsed, "issues", []),
-        suggestions: Map.get(parsed, "suggestions", []),
-        severity: Map.get(parsed, "severity", 0.5),
-        feedback: Map.get(parsed, "feedback", ""),
-        actionable: true,
-        metadata: %{critiquer: :llm, model: critiquer.model}
-      })
+      result =
+        CritiqueResult.new!(%{
+          issues: Map.get(parsed, "issues", []),
+          suggestions: Map.get(parsed, "suggestions", []),
+          severity: Map.get(parsed, "severity", 0.5),
+          feedback: Map.get(parsed, "feedback", ""),
+          actionable: true,
+          metadata: %{critiquer: :llm, model: critiquer.model}
+        })
 
       {:ok, result}
     end
@@ -261,8 +263,12 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
 
   defp extract_content(response) do
     case response.message.content do
-      nil -> ""
-      content when is_binary(content) -> content
+      nil ->
+        ""
+
+      content when is_binary(content) ->
+        content
+
       content when is_list(content) ->
         content
         |> Enum.filter(fn %{type: type} -> type == :text end)
@@ -351,8 +357,7 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
   defp validate_temperature(temp) when is_number(temp) and temp >= 0.0 and temp <= 2.0, do: :ok
   defp validate_temperature(_), do: {:error, :invalid_temperature}
 
-  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000,
-    do: :ok
+  defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000, do: :ok
 
   defp validate_timeout(_), do: {:error, :invalid_timeout}
   defp format_error(atom) when is_atom(atom), do: atom

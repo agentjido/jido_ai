@@ -9,12 +9,13 @@ defmodule Jido.AI.Accuracy.SignalTest do
 
   describe "Signal.Result" do
     test "creates a new result signal" do
-      signal = Signal.Result.new!(%{
-        call_id: "call_123",
-        query: "What is 2+2?",
-        answer: "4",
-        confidence: 0.95
-      })
+      signal =
+        Signal.Result.new!(%{
+          call_id: "call_123",
+          query: "What is 2+2?",
+          answer: "4",
+          confidence: 0.95
+        })
 
       assert signal.data.call_id == "call_123"
       assert signal.data.query == "What is 2+2?"
@@ -99,11 +100,12 @@ defmodule Jido.AI.Accuracy.SignalTest do
 
   describe "Signal.Error" do
     test "creates a new error signal" do
-      signal = Signal.Error.new!(%{
-        call_id: "call_123",
-        query: "What is 2+2?",
-        error: :timeout
-      })
+      signal =
+        Signal.Error.new!(%{
+          call_id: "call_123",
+          query: "What is 2+2?",
+          error: :timeout
+        })
 
       assert signal.data.call_id == "call_123"
       assert signal.data.query == "What is 2+2?"
@@ -111,23 +113,25 @@ defmodule Jido.AI.Accuracy.SignalTest do
     end
 
     test "creates error signal with stage" do
-      signal = Signal.Error.new!(%{
-        call_id: "call_123",
-        query: "What is 2+2?",
-        error: :generation_failed,
-        stage: :generation
-      })
+      signal =
+        Signal.Error.new!(%{
+          call_id: "call_123",
+          query: "What is 2+2?",
+          error: :generation_failed,
+          stage: :generation
+        })
 
       assert signal.data.stage == :generation
     end
 
     test "creates error signal with message" do
-      signal = Signal.Error.new!(%{
-        call_id: "call_123",
-        query: "What is 2+2?",
-        error: :timeout,
-        message: "Pipeline timed out after 30s"
-      })
+      signal =
+        Signal.Error.new!(%{
+          call_id: "call_123",
+          query: "What is 2+2?",
+          error: :timeout,
+          message: "Pipeline timed out after 30s"
+        })
 
       assert signal.data.message == "Pipeline timed out after 30s"
     end
@@ -171,20 +175,22 @@ defmodule Jido.AI.Accuracy.SignalTest do
 
   describe "Signal Types" do
     test "result signal has correct type" do
-      signal = Signal.Result.new!(%{
-        call_id: "call_123",
-        query: "What is 2+2?"
-      })
+      signal =
+        Signal.Result.new!(%{
+          call_id: "call_123",
+          query: "What is 2+2?"
+        })
 
       assert signal.type == "accuracy.result"
     end
 
     test "error signal has correct type" do
-      signal = Signal.Error.new!(%{
-        call_id: "call_123",
-        query: "What is 2+2?",
-        error: :timeout
-      })
+      signal =
+        Signal.Error.new!(%{
+          call_id: "call_123",
+          query: "What is 2+2?",
+          error: :timeout
+        })
 
       assert signal.type == "accuracy.error"
     end

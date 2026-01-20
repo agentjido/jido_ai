@@ -68,9 +68,9 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.Config
   alias Jido.AI.Directive
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.TreeOfThoughts.Machine
   alias ReqLLM.Context
 

@@ -30,6 +30,8 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
 
   """
 
+  @behaviour PipelineStage
+
   alias Jido.AI.Accuracy.{
     PipelineStage,
     CalibrationGate,
@@ -37,8 +39,6 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
     Candidate,
     RoutingResult
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           high_threshold: float(),
@@ -48,13 +48,11 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
           emit_telemetry: boolean()
         }
 
-  defstruct [
-    high_threshold: 0.7,
-    low_threshold: 0.4,
-    medium_action: :with_verification,
-    low_action: :abstain,
-    emit_telemetry: true
-  ]
+  defstruct high_threshold: 0.7,
+            low_threshold: 0.4,
+            medium_action: :with_verification,
+            low_action: :abstain,
+            emit_telemetry: true
 
   @impl PipelineStage
   def name, do: :calibration
@@ -66,12 +64,10 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
   def execute(input, config) do
     best_candidate = Map.get(input, :best_candidate)
 
-    cond do
-      is_nil(best_candidate) ->
-        {:error, :no_candidate}
-
-      true ->
-        apply_calibration(best_candidate, input, config)
+    if is_nil(best_candidate) do
+      {:error, :no_candidate}
+    else
+      apply_calibration(best_candidate, input, config)
     end
   end
 
@@ -99,41 +95,36 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
     gate = build_gate(config)
 
     # Route based on confidence
-    case CalibrationGate.route(gate, candidate, confidence_estimate) do
-      {:ok, %RoutingResult{} = routing_result} ->
-        # Extract final answer from routing result, falling back to original candidate
-        candidate_to_use = routing_result.candidate || candidate
-        final_answer = extract_answer(candidate_to_use)
+    {:ok, %RoutingResult{} = routing_result} =
+      CalibrationGate.route(gate, candidate, confidence_estimate)
 
-        updated_state =
-          input
-          |> Map.put(:answer, final_answer)
-          |> Map.put(:confidence, confidence_estimate.score)
-          |> Map.put(:action, routing_result.action)
-          |> Map.put(:routing_result, routing_result)
+    # Extract final answer from routing result, falling back to original candidate
+    candidate_to_use = routing_result.candidate || candidate
+    final_answer = extract_answer(candidate_to_use)
 
-        {:ok, updated_state,
-         %{
-           confidence: confidence_estimate.score,
-           confidence_level: routing_result.confidence_level,
-           action: routing_result.action
-         }}
+    updated_state =
+      input
+      |> Map.put(:answer, final_answer)
+      |> Map.put(:confidence, confidence_estimate.score)
+      |> Map.put(:action, routing_result.action)
+      |> Map.put(:routing_result, routing_result)
 
-      {:error, reason} ->
-        {:error, {:calibration_failed, reason}}
-    end
+    {:ok, updated_state,
+     %{
+       confidence: confidence_estimate.score,
+       confidence_level: routing_result.confidence_level,
+       action: routing_result.action
+     }}
   end
 
   defp estimate_confidence(candidate, _input) do
     # Try to use candidate score as confidence
     score =
-      cond do
-        is_number(candidate.score) ->
-          candidate.score
-
-        true ->
-          # Default confidence if no score
-          0.5
+      if is_number(candidate.score) do
+        candidate.score
+      else
+        # Default confidence if no score
+        0.5
       end
 
     ConfidenceEstimate.new!(%{

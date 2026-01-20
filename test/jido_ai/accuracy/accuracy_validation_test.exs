@@ -37,11 +37,13 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
 
   # Baseline generator (single response, no verification)
   defp baseline_generator(query, _context) do
-    answer = cond do
-      String.contains?(query, "2+2") -> "4"
-      String.contains?(query, "trick") -> "The trick answer is 42" # Wrong
-      true -> "42"
-    end
+    answer =
+      cond do
+        String.contains?(query, "2+2") -> "4"
+        # Wrong
+        String.contains?(query, "trick") -> "The trick answer is 42"
+        true -> "42"
+      end
 
     {:ok, Candidate.new!(%{content: answer, score: 0.8})}
   end
@@ -55,18 +57,20 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
       "The result equals 42"
     ]
 
-    {:ok, Candidate.new!(%{
-      content: Enum.random(answers),
-      score: 0.9
-    })}
+    {:ok,
+     Candidate.new!(%{
+       content: Enum.random(answers),
+       score: 0.9
+     })}
   end
 
   # Low-confidence generator
   defp low_confidence_generator(query, _context) do
-    {:ok, Candidate.new!(%{
-      content: "I'm uncertain about #{query}",
-      score: 0.4
-    })}
+    {:ok,
+     Candidate.new!(%{
+       content: "I'm uncertain about #{query}",
+       score: 0.4
+     })}
   end
 
   describe "8.5.2 Accuracy Validation Tests" do
@@ -75,9 +79,10 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
       {:ok, candidate} = baseline_generator("What is 2+2?", %{})
 
       # Pipeline: full accuracy processing
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: &baseline_generator/2)
 
@@ -93,27 +98,29 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
       assert result.action in [:direct, :with_verification, :abstain, :escalate]
 
       # Pipeline provides trace
-      assert length(result.trace) > 0
+      refute Enum.empty?(result.trace)
     end
 
     test "pipeline with verification catches more errors than baseline" do
       # This test verifies that verification stage adds value by checking consistency
 
       # Baseline: no verification
-      {:ok, baseline_pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, baseline_pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       # With verification: checks for consistency
-      {:ok, verified_pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :verification, :calibration],
-          verifier_config: %{
-            use_outcome: true,
-            use_process: true
+      {:ok, verified_pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :verification, :calibration],
+            verifier_config: %{
+              use_outcome: true,
+              use_process: true
+            }
           }
-        }
-      })
+        })
 
       # Run both on same query
       query = "What is 2+2?"
@@ -127,20 +134,21 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
 
       # Verified pipeline should have verification metadata
       assert :verification in baseline_result.metadata.stages_completed or
-            :verification in verified_result.metadata.stages_completed
+               :verification in verified_result.metadata.stages_completed
     end
 
     test "pipeline calibration prevents uncertain answers" do
       # Generator that produces low confidence
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          calibration_config: %{
-            low_threshold: 0.6,
-            low_action: :abstain
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            calibration_config: %{
+              low_threshold: 0.6,
+              low_action: :abstain
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "Tricky question", generator: &low_confidence_generator/2)
 
@@ -152,13 +160,15 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
 
   describe "8.5.2.2 Ablation Studies" do
     test "removing verification stage reduces metadata" do
-      {:ok, full_pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :verification, :calibration]}
-      })
+      {:ok, full_pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :verification, :calibration]}
+        })
 
-      {:ok, no_verify_pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, no_verify_pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       query = "What is 2+2?"
 
@@ -176,13 +186,15 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
     end
 
     test "removing calibration still produces answer" do
-      {:ok, with_calibration} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, with_calibration} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
-      {:ok, without_calibration} = Pipeline.new(%{
-        config: %{stages: [:generation]}
-      })
+      {:ok, without_calibration} =
+        Pipeline.new(%{
+          config: %{stages: [:generation]}
+        })
 
       query = "What is 2+2?"
 
@@ -203,14 +215,16 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
 
     test "each stage adds to trace" do
       # Minimal pipeline
-      {:ok, minimal_pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation]}
-      })
+      {:ok, minimal_pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation]}
+        })
 
       # Full pipeline
-      {:ok, full_pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :verification, :calibration]}
-      })
+      {:ok, full_pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :verification, :calibration]}
+        })
 
       query = "What is 2+2?"
 
@@ -247,10 +261,10 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
 
       # Max candidates should increase: fast < balanced < accurate
       assert fast_config.generation_config.max_candidates <=
-             balanced_config.generation_config.max_candidates
+               balanced_config.generation_config.max_candidates
 
       assert balanced_config.generation_config.max_candidates <=
-             accurate_config.generation_config.max_candidates
+               accurate_config.generation_config.max_candidates
     end
 
     test "preset thresholds are appropriately configured" do
@@ -296,15 +310,16 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
         {:ok, Candidate.new!(%{content: "42", score: 0.9})}
       end
 
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          generation_config: %{
-            min_candidates: 3,
-            max_candidates: 3
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            generation_config: %{
+              min_candidates: 3,
+              max_candidates: 3
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is the answer?", generator: consistent_gen)
 
@@ -316,21 +331,24 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
       # Generator that produces varied answers
       varied_gen = fn _query, _context ->
         answers = ["42", "Maybe 42", "Could be 42"]
-        {:ok, Candidate.new!(%{
-          content: Enum.random(answers),
-          score: Enum.random(60..80) / 100
-        })}
+
+        {:ok,
+         Candidate.new!(%{
+           content: Enum.random(answers),
+           score: Enum.random(60..80) / 100
+         })}
       end
 
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{
-          stages: [:generation, :calibration],
-          generation_config: %{
-            min_candidates: 3,
-            max_candidates: 3
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{
+            stages: [:generation, :calibration],
+            generation_config: %{
+              min_candidates: 3,
+              max_candidates: 3
+            }
           }
-        }
-      })
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is the answer?", generator: varied_gen)
 
@@ -342,11 +360,12 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
 
   # Helper function for math generation
   defp math_generator(query, _context) do
-    answer = cond do
-      String.contains?(query, "2+2") -> "4"
-      String.contains?(query, "10*10") -> "100"
-      true -> "42"
-    end
+    answer =
+      cond do
+        String.contains?(query, "2+2") -> "4"
+        String.contains?(query, "10*10") -> "100"
+        true -> "42"
+      end
 
     {:ok, Candidate.new!(%{content: answer, score: 0.9})}
   end

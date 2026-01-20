@@ -12,26 +12,26 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   use ExUnit.Case, async: false
 
+  alias Jido.Agent
+  alias Jido.AI.Skills.{LLM, Reasoning, Planning, Streaming, ToolCalling}
+  alias Jido.AI.Strategies.ReAct
+
   # Ensure all skill actions are compiled before tests run
   require Jido.AI.Skills.LLM.Actions.Chat
   require Jido.AI.Skills.LLM.Actions.Complete
   require Jido.AI.Skills.LLM.Actions.Embed
+  require Jido.AI.Skills.Planning.Actions.Decompose
+  require Jido.AI.Skills.Planning.Actions.Plan
+  require Jido.AI.Skills.Planning.Actions.Prioritize
   require Jido.AI.Skills.Reasoning.Actions.Analyze
   require Jido.AI.Skills.Reasoning.Actions.Explain
   require Jido.AI.Skills.Reasoning.Actions.Infer
-  require Jido.AI.Skills.Planning.Actions.Plan
-  require Jido.AI.Skills.Planning.Actions.Decompose
-  require Jido.AI.Skills.Planning.Actions.Prioritize
-  require Jido.AI.Skills.Streaming.Actions.StartStream
-  require Jido.AI.Skills.Streaming.Actions.ProcessTokens
   require Jido.AI.Skills.Streaming.Actions.EndStream
+  require Jido.AI.Skills.Streaming.Actions.ProcessTokens
+  require Jido.AI.Skills.Streaming.Actions.StartStream
   require Jido.AI.Skills.ToolCalling.Actions.CallWithTools
   require Jido.AI.Skills.ToolCalling.Actions.ExecuteTool
   require Jido.AI.Skills.ToolCalling.Actions.ListTools
-
-  alias Jido.Agent
-  alias Jido.AI.Strategies.ReAct
-  alias Jido.AI.Skills.{LLM, Reasoning, Planning, Streaming, ToolCalling}
 
   # ============================================================================
   # Test Fixtures

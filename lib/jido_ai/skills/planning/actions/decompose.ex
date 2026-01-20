@@ -41,21 +41,18 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
     category: "ai",
     tags: ["planning", "decomposition", "goals"],
     vsn: "1.0.0",
-    schema: Zoi.object(%{
-      model:
-        Zoi.string(
-          description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :planning)"
-        )
-        |> Zoi.optional(),
-      goal: Zoi.string(description: "The goal to decompose"),
-      max_depth:
-        Zoi.integer(description: "Maximum depth of decomposition (1-5)") |> Zoi.default(3),
-      context: Zoi.string(description: "Additional context about the goal") |> Zoi.optional(),
-      max_tokens:
-        Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
-      temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.6),
-      timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
-    })
+    schema:
+      Zoi.object(%{
+        model:
+          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :planning)")
+          |> Zoi.optional(),
+        goal: Zoi.string(description: "The goal to decompose"),
+        max_depth: Zoi.integer(description: "Maximum depth of decomposition (1-5)") |> Zoi.default(3),
+        context: Zoi.string(description: "Additional context about the goal") |> Zoi.optional(),
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
+        temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.6),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+      })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers

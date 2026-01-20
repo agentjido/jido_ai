@@ -282,12 +282,10 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
 
     # Check 3: Score plateau (if scores available)
     score_plateau =
-      cond do
-        is_number(original.score) and is_number(revised.score) ->
-          abs(original.score - revised.score) < loop.convergence_threshold
-
-        true ->
-          false
+      if is_number(original.score) and is_number(revised.score) do
+        abs(original.score - revised.score) < loop.convergence_threshold
+      else
+        false
       end
 
     # Converged if any condition is met
@@ -333,6 +331,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
   end
 
   defp validate_critiquer(nil), do: {:error, :critiquer_required}
+
   defp validate_critiquer(module) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :critique, 3) do
       :ok
@@ -344,6 +343,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
   defp validate_critiquer(_), do: {:error, :invalid_critiquer}
 
   defp validate_reviser(nil), do: {:error, :reviser_required}
+
   defp validate_reviser(module) when is_atom(module) do
     if Code.ensure_loaded?(module) and function_exported?(module, :revise, 4) do
       :ok
@@ -390,6 +390,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
   end
 
   defp minimal_content_change?(nil, nil), do: true
+
   defp minimal_content_change?(original, revised) when is_binary(original) and is_binary(revised) do
     # Calculate edit distance ratio
     original_len = String.length(original)
@@ -448,19 +449,21 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
       # Store high-severity critiques
       Enum.each(critiques, fn critique ->
         if critique.severity > 0.3 do
-          :ok = ReflexionMemory.store(memory, %{
-            prompt: prompt,
-            mistake: Enum.join(critique.issues || [], "; "),
-            correction: Enum.join(critique.suggestions || [], "; "),
-            severity: critique.severity,
-            timestamp: DateTime.utc_now()
-          })
+          :ok =
+            ReflexionMemory.store(memory, %{
+              prompt: prompt,
+              mistake: Enum.join(critique.issues || [], "; "),
+              correction: Enum.join(critique.suggestions || [], "; "),
+              severity: critique.severity,
+              timestamp: DateTime.utc_now()
+            })
         end
       end)
     else
       :ok
     end
   end
+
   defp format_error(atom) when is_atom(atom), do: atom
   defp format_error(_), do: :invalid_attributes
 end

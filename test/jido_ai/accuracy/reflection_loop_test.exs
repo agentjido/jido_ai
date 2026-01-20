@@ -16,7 +16,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
     def critique(_critiquer, %Candidate{}, context) do
       # Severity decreases with iterations to simulate improvement
       iteration = Map.get(context, :iteration, 0)
-      severity = 0.8 - (iteration * 0.3)
+      severity = 0.8 - iteration * 0.3
 
       {:ok,
        CritiqueResult.new!(%{
@@ -43,7 +43,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
        Candidate.new!(%{
          id: "#{candidate.id}-rev#{iteration}",
          content: String.trim(candidate.content || "") <> " [Improved #{iteration}]",
-         score: 0.5 + (iteration * 0.2),
+         score: 0.5 + iteration * 0.2,
          metadata: Map.put(candidate.metadata || %{}, :iteration, iteration)
        })}
     end
@@ -223,7 +223,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
       assert {:ok, result} = ReflectionLoop.run(loop, "Test prompt", %{initial_candidate: initial})
 
       # Check that iterations are tracked
-      assert length(result.iterations) > 0
+      refute Enum.empty?(result.iterations)
 
       # Check first iteration structure
       first_iter = List.first(result.iterations)
@@ -248,7 +248,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoopTest do
            Candidate.new!(%{
              id: "#{candidate.id}-rev#{iteration}",
              content: "Revised #{iteration}",
-             score: 0.3 + (iteration * 0.25)
+             score: 0.3 + iteration * 0.25
            })}
         end
       end

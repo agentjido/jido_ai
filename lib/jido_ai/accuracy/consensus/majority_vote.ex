@@ -18,10 +18,10 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVote do
 
   """
 
-  alias Jido.AI.Accuracy.ConsensusChecker
-  alias Jido.AI.Accuracy.Aggregators.MajorityVote, as: MVAggregator
+  @behaviour Jido.AI.Accuracy.ConsensusChecker
 
-  @behaviour ConsensusChecker
+  alias Jido.AI.Accuracy.Aggregators.MajorityVote, as: MVAggregator
+  alias Jido.AI.Accuracy.ConsensusChecker
 
   @default_threshold 0.8
 
@@ -81,21 +81,21 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVote do
 
   @impl ConsensusChecker
   def check(candidates, opts) when is_list(candidates) and is_list(opts) do
-  threshold = Keyword.get(opts, :threshold)
+    threshold = Keyword.get(opts, :threshold)
 
-  cond do
-    candidates == [] ->
-      {:error, :no_candidates}
+    cond do
+      candidates == [] ->
+        {:error, :no_candidates}
 
-    threshold == nil ->
-      {:error, :no_threshold}
+      threshold == nil ->
+        {:error, :no_threshold}
 
-    not is_number(threshold) or threshold < 0.0 or threshold > 1.0 ->
-      {:error, :invalid_threshold}
+      not is_number(threshold) or threshold < 0.0 or threshold > 1.0 ->
+        {:error, :invalid_threshold}
 
-    true ->
-      do_check(candidates, threshold)
-  end
+      true ->
+        do_check(candidates, threshold)
+    end
   end
 
   def check(_candidates, _opts) do
@@ -113,7 +113,8 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVote do
 
         if total_candidates > 0 do
           # Calculate agreement as max vote count / total
-          max_votes = vote_distribution
+          max_votes =
+            vote_distribution
             |> Map.values()
             |> Enum.max(fn -> 0 end)
 

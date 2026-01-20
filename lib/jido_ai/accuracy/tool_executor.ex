@@ -79,23 +79,55 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
   # Default command allowlist - common language interpreters and tools
   @default_allowlist [
     # Language interpreters
-    "python3", "python", "python2",
-    "node", "nodejs", "npm", "npx",
-    "elixir", "elixirc", "mix", "iex",
-    "ruby", "gem", "irb",
-    "perl", "perl6",
-    "java", "javac",
-    "go", "gofmt",
-    "rustc", "cargo",
+    "python3",
+    "python",
+    "python2",
+    "node",
+    "nodejs",
+    "npm",
+    "npx",
+    "elixir",
+    "elixirc",
+    "mix",
+    "iex",
+    "ruby",
+    "gem",
+    "irb",
+    "perl",
+    "perl6",
+    "java",
+    "javac",
+    "go",
+    "gofmt",
+    "rustc",
+    "cargo",
     # Shells
-    "bash", "sh", "zsh", "fish",
+    "bash",
+    "sh",
+    "zsh",
+    "fish",
     # Build tools
-    "make", "cmake", "gcc", "g++", "clang", "clang++",
+    "make",
+    "cmake",
+    "gcc",
+    "g++",
+    "clang",
+    "clang++",
     # Common utilities (for testing)
-    "echo", "cat", "ls", "pwd", "mkdir", "rm", "cp", "mv",
-    "test", "true", "false",
+    "echo",
+    "cat",
+    "ls",
+    "pwd",
+    "mkdir",
+    "rm",
+    "cp",
+    "mv",
+    "test",
+    "true",
+    "false",
     # Docker/Podman (for sandboxing)
-    "docker", "podman"
+    "docker",
+    "podman"
   ]
 
   @doc """
@@ -303,7 +335,12 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
   defp execute(command, args, cd, env, timeout) do
     # Open a port to execute the command
     port_options = build_port_options(cd, env, timeout)
-    port = Port.open({:spawn_executable, find_executable(command)}, port_options ++ [:binary, :exit_status, :hide, args: args])
+
+    port =
+      Port.open(
+        {:spawn_executable, find_executable(command)},
+        port_options ++ [:binary, :exit_status, :hide, args: args]
+      )
 
     # Ensure port is closed even if an error occurs
     try do
@@ -513,7 +550,8 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
     # Check for null bytes and URL-like patterns that shouldn't be in file paths
     # Note: ".." is allowed for legitimate parent directory navigation
     cond do
-      String.contains?(path, "\x00") -> true  # Null byte injection
+      # Null byte injection
+      String.contains?(path, "\x00") -> true
       # Check for protocol-like patterns (potential URL injection)
       # But allow common patterns like "C:/" on Windows
       String.contains?(path, "://") -> true

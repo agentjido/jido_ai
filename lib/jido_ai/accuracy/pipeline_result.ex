@@ -270,9 +270,8 @@ defmodule Jido.AI.Accuracy.PipelineResult do
   defp validate_confidence(conf) when is_number(conf) and conf >= 0.0 and conf <= 1.0, do: :ok
   defp validate_confidence(_), do: {:error, :invalid_confidence}
 
-  defp validate_action(action)
-       when action in [:direct, :with_verification, :with_citations, :abstain, :escalate],
-       do: :ok
+  defp validate_action(action) when action in [:direct, :with_verification, :with_citations, :abstain, :escalate],
+    do: :ok
 
   defp validate_action(_), do: {:error, :invalid_action}
 

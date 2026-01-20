@@ -77,8 +77,7 @@ defmodule Jido.AI.Accuracy.TestSupport.ReqLLMMock do
     {:error, :timeout}
   end
 
-  def generate_text_mock(%__MODULE__{simulate_error: reason}, _prompt, _opts)
-      when not is_nil(reason) do
+  def generate_text_mock(%__MODULE__{simulate_error: reason}, _prompt, _opts) when not is_nil(reason) do
     {:error, reason}
   end
 

@@ -91,8 +91,7 @@ defmodule Jido.AI.Skills.LLM do
       default_model:
         Zoi.atom(description: "Default model alias (:fast, :capable, :reasoning)")
         |> Zoi.default(:fast),
-      default_max_tokens:
-        Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(1024),
+      default_max_tokens: Zoi.integer(description: "Default max tokens for generation") |> Zoi.default(1024),
       default_temperature:
         Zoi.float(description: "Default sampling temperature (0.0-2.0)")
         |> Zoi.default(0.7)

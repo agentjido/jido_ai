@@ -69,10 +69,10 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.GraphOfThoughts.Machine
+  alias Jido.AI.Strategy.StateOpsHelpers
   alias ReqLLM.Context
 
   @default_model "anthropic:claude-haiku-4-5"

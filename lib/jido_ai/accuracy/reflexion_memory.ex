@@ -235,14 +235,13 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
 
       entries_str =
         entries
-        |> Enum.map(fn entry ->
+        |> Enum.map_join("\n", fn entry ->
           """
           Question: #{entry.prompt}
           Mistake: #{entry.mistake}
           Correction: #{entry.correction}
           """
         end)
-        |> Enum.join("\n")
 
       header <> entries_str <> "\n"
     end
@@ -262,7 +261,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
       :ets ->
         try do
           :ets.delete_all_objects(memory.table_name)
-          {:ok, %__MODULE__{memory | entry_count: 0}}
+          {:ok, %{memory | entry_count: 0}}
         rescue
           _ -> {:error, :ets_delete_failed}
         end
@@ -270,7 +269,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
       :memory ->
         # For memory storage, we need to handle it differently
         # This is a no-op for :memory storage since it's process state
-        {:ok, %__MODULE__{memory | entry_count: 0}}
+        {:ok, %{memory | entry_count: 0}}
     end
   end
 
@@ -323,12 +322,10 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
   """
   @spec stop(t()) :: :ok
   def stop(%__MODULE__{storage: :ets, table_name: table_name}) do
-    try do
-      :ets.delete(table_name)
-      :ok
-    rescue
-      _ -> :ok
-    end
+    :ets.delete(table_name)
+    :ok
+  rescue
+    _ -> :ok
   end
 
   def stop(%__MODULE__{}), do: :ok
@@ -355,12 +352,10 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
   defp validate_similarity_threshold(_), do: {:error, :invalid_similarity_threshold}
 
   defp initialize_storage(%__MODULE__{storage: :ets, table_name: table_name}) do
-    try do
-      :ets.new(table_name, [:named_table, :set, :public, read_concurrency: true])
-      :ok
-    rescue
-      _ -> {:error, :ets_init_failed}
-    end
+    :ets.new(table_name, [:named_table, :set, :public, read_concurrency: true])
+    :ok
+  rescue
+    _ -> {:error, :ets_init_failed}
   end
 
   defp initialize_storage(%__MODULE__{storage: :memory}), do: :ok
@@ -368,24 +363,22 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
   # ETS storage operations
 
   defp store_ets(%__MODULE__{} = memory, entry) do
-    try do
-      # Check if we're at max capacity
-      current_size = :ets.info(memory.table_name, :size)
+    # Check if we're at max capacity
+    current_size = :ets.info(memory.table_name, :size)
 
-      if current_size >= memory.max_entries do
-        # Remove oldest entry (first inserted)
-        oldest_key = :ets.first(memory.table_name)
-        :ets.delete(memory.table_name, oldest_key)
-      end
-
-      # Insert with timestamp as key for ordering
-      key = {DateTime.to_unix(entry.timestamp, :microsecond), :erlang.unique_integer()}
-      :ets.insert(memory.table_name, {key, entry})
-
-      :ok
-    rescue
-      _ -> {:error, :ets_insert_failed}
+    if current_size >= memory.max_entries do
+      # Remove oldest entry (first inserted)
+      oldest_key = :ets.first(memory.table_name)
+      :ets.delete(memory.table_name, oldest_key)
     end
+
+    # Insert with timestamp as key for ordering
+    key = {DateTime.to_unix(entry.timestamp, :microsecond), :erlang.unique_integer()}
+    :ets.insert(memory.table_name, {key, entry})
+
+    :ok
+  rescue
+    _ -> {:error, :ets_insert_failed}
   end
 
   defp store_memory(%__MODULE__{}, _entry) do
@@ -395,28 +388,26 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
   end
 
   defp retrieve_ets(%__MODULE__{} = memory, query_keywords, max_results) do
-    try do
-      # Get all entries and score by similarity
-      entries = :ets.tab2list(memory.table_name)
+    # Get all entries and score by similarity
+    entries = :ets.tab2list(memory.table_name)
 
-      scored =
-        Enum.map(entries, fn {_key, entry} ->
-          score = similarity_score(query_keywords, entry.keywords)
-          {score, entry}
-        end)
+    scored =
+      Enum.map(entries, fn {_key, entry} ->
+        score = similarity_score(query_keywords, entry.keywords)
+        {score, entry}
+      end)
 
-      # Filter by threshold and sort by score descending
-      similar =
-        scored
-        |> Enum.filter(fn {score, _entry} -> score >= memory.similarity_threshold end)
-        |> Enum.sort_by(fn {score, _entry} -> score end, :desc)
-        |> Enum.take(max_results)
-        |> Enum.map(fn {_score, entry} -> entry end)
+    # Filter by threshold and sort by score descending
+    similar =
+      scored
+      |> Enum.filter(fn {score, _entry} -> score >= memory.similarity_threshold end)
+      |> Enum.sort_by(fn {score, _entry} -> score end, :desc)
+      |> Enum.take(max_results)
+      |> Enum.map(fn {_score, entry} -> entry end)
 
-      {:ok, similar}
-    rescue
-      _ -> {:error, :ets_read_failed}
-    end
+    {:ok, similar}
+  rescue
+    _ -> {:error, :ets_read_failed}
   end
 
   defp retrieve_from_memory(%__MODULE__{}, _query_keywords, _max_results) do
@@ -455,20 +446,105 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
     |> String.split(~r/\s+/, trim: true)
     # Filter out common stop words
     |> Enum.reject(fn word ->
-      word in ["a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-               "have", "has", "had", "do", "does", "did", "will", "would", "could",
-               "should", "may", "might", "must", "shall", "can", "need", "what",
-               "how", "when", "where", "why", "who", "which", "that", "this", "these",
-               "those", "and", "or", "but", "if", "then", "else", "so", "because",
-               "although", "though", "while", "since", "until", "for", "of", "with",
-               "by", "from", "to", "in", "on", "at", "as", "into", "through", "during",
-               "before", "after", "above", "below", "between", "under", "again", "further",
-               "once", "here", "there", "all", "both", "each", "few", "more", "most",
-               "other", "some", "such", "no", "nor", "not", "only", "own", "same",
-               "than", "too", "very", "just"]
+      word in [
+        "a",
+        "an",
+        "the",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "what",
+        "how",
+        "when",
+        "where",
+        "why",
+        "who",
+        "which",
+        "that",
+        "this",
+        "these",
+        "those",
+        "and",
+        "or",
+        "but",
+        "if",
+        "then",
+        "else",
+        "so",
+        "because",
+        "although",
+        "though",
+        "while",
+        "since",
+        "until",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "to",
+        "in",
+        "on",
+        "at",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "again",
+        "further",
+        "once",
+        "here",
+        "there",
+        "all",
+        "both",
+        "each",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "than",
+        "too",
+        "very",
+        "just"
+      ]
     end)
     |> Enum.uniq()
   end
+
   defp format_error(atom) when is_atom(atom), do: atom
   defp format_error(_), do: :invalid_attributes
 end
