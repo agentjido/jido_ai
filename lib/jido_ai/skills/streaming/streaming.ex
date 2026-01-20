@@ -145,7 +145,6 @@ defmodule Jido.AI.Skills.Streaming do
 
   Defines the structure and defaults for Streaming skill state.
   """
-  @impl Jido.Skill
   def schema do
     Zoi.object(%{
       default_model:
