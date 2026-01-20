@@ -69,43 +69,6 @@ defmodule Jido.AI.Skills.Planning do
     vsn: "1.0.0"
 
   @doc """
-  Returns the skill specification with optional configuration.
-
-  ## Configuration Options
-
-  * `:default_model` - Default model alias to use (default: `:planning`)
-  * `:default_max_tokens` - Default max tokens (default: `4096`)
-  * `:default_temperature` - Default sampling temperature (default: `0.7`)
-
-  ## Examples
-
-      # Use all defaults
-      spec = Jido.AI.Skills.Planning.skill_spec(%{})
-
-      # Set custom defaults
-      spec = Jido.AI.Skills.Planning.skill_spec(%{
-        default_model: :capable,
-        default_max_tokens: 8192
-      })
-  """
-  def skill_spec(config) do
-    %Jido.Skill.Spec{
-      module: __MODULE__,
-      name: name(),
-      state_key: state_key(),
-      description: description(),
-      category: category(),
-      vsn: vsn(),
-      schema: schema(),
-      config_schema: config_schema(),
-      config: config,
-      signal_patterns: signal_patterns(),
-      tags: tags(),
-      actions: actions()
-    }
-  end
-
-  @doc """
   Initialize skill state when mounted to an agent.
 
   Returns initial state with any configured defaults.

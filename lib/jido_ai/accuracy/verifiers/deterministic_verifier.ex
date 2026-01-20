@@ -322,7 +322,7 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifier do
       1.0 ->
         "Match found using #{verifier.comparison_type} comparison"
 
-      0.0 ->
+      +0.0 ->
         "No match: expected '#{inspect(ground_truth)}', got '#{inspect(answer)}'"
 
       _ ->
