@@ -260,12 +260,10 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
   end
 
   defp call_req_llm(%__MODULE__{timeout: timeout}, model, prompt) do
+    messages = [%{role: "user", content: prompt}]
+
     try do
-      case ReqLLM.chat([
-        model: model,
-        messages: [%{role: "user", content: prompt}],
-        timeout: timeout
-      ]) do
+      case ReqLLM.Generation.generate_text(model, messages, timeout: timeout) do
         {:ok, response} ->
           content = extract_content(response)
           {:ok, content}
@@ -274,7 +272,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
           {:error, {:llm_failed, reason}}
       end
     rescue
-      _e in [TimeoutError, RuntimeError] ->
+      _e in [Jido.Error.TimeoutError, RuntimeError] ->
         {:error, :llm_timeout}
     end
   end

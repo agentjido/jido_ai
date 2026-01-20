@@ -111,10 +111,8 @@ defmodule Jido.AI.Accuracy.Candidate do
   """
   @spec new!(map()) :: t()
   def new!(attrs) when is_map(attrs) do
-    case new(attrs) do
-      {:ok, candidate} -> candidate
-      {:error, reason} -> raise ArgumentError, "Invalid candidate: #{format_error(reason)}"
-    end
+    {:ok, candidate} = new(attrs)
+    candidate
   end
 
   def new!(attrs) do

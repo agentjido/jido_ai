@@ -23,13 +23,13 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVote do
 
   @behaviour ConsensusChecker
 
+  @default_threshold 0.8
+
   defstruct threshold: @default_threshold
 
   @type t :: %__MODULE__{
           threshold: float()
         }
-
-  @default_threshold 0.8
 
   @doc """
   Creates a new MajorityVote consensus checker.

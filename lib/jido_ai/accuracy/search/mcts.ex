@@ -183,13 +183,10 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
       if SearchController.timeout_exceeded?(start_time, timeout) do
         {:halt, current_root}
       else
-        case run_single_simulation(current_root, prompt, generator, verifier, config, start_time, timeout) do
-          {:ok, updated_root} ->
-            {:cont, updated_root}
+        {:ok, updated_root} =
+          run_single_simulation(current_root, prompt, generator, verifier, config, start_time, timeout)
 
-          {:error, _} ->
-            {:cont, current_root}
-        end
+        {:cont, updated_root}
       end
     end)
   end

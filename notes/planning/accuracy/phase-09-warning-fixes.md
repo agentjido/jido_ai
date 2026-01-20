@@ -9,7 +9,7 @@ This phase addresses all compiler and documentation warnings to ensure clean bui
 | Behaviour Callback Mismatches | 16 | High | ✅ Complete |
 | Unused Variables/Imports/Aliases | 45+ | Medium | ✅ Complete |
 | Code Style Issues | 6 | Low | ✅ Complete |
-| Type/Undefined Issues | 6 | High | Pending |
+| Type/Undefined Issues | 6 | High | ✅ Complete |
 | Unreachable Clauses | 3 | Medium | Pending |
 
 **Total: ~76 warnings**
@@ -146,44 +146,46 @@ Fix `skill_spec/1` functions that have default values in multiple clauses.
 
 ---
 
-## 9.4 Type and Undefined Issues
+## 9.4 Type and Undefined Issues ✅
 
 Fix undefined types, structs, and module attributes.
 
-### 9.4.1 TimeoutError Struct
+### 9.4.1 TimeoutError Struct ✅
 
-- [ ] 9.4.1.1 Read `lib/jido_ai/accuracy/estimators/llm_difficulty.ex`
-- [ ] 9.4.1.2 Replace `TimeoutError` with fully qualified module:
-  - [ ] Use `Jido.Error.TimeoutError` or define a local timeout error
-  - [ ] Update rescue clause at line 277
+- [x] 9.4.1.1 Read `lib/jido_ai/accuracy/estimators/llm_difficulty.ex`
+- [x] 9.4.1.2 Replace `TimeoutError` with fully qualified module:
+  - [x] Use `Jido.Error.TimeoutError` from the jido dependency
+  - [x] Update rescue clause at line 275 (now line 275 after refactoring)
 
-### 9.4.2 Undefined Module Attribute
+### 9.4.2 Undefined Module Attribute ✅
 
-- [ ] 9.4.2.1 Fix `lib/jido_ai/accuracy/consensus/majority_vote.ex`:
-  - [ ] Define `@default_threshold` before using in struct
-  - [ ] Or provide a default value directly in the struct: `threshold: 0.5`
+- [x] 9.4.2.1 Fix `lib/jido_ai/accuracy/consensus/majority_vote.ex`:
+  - [x] Moved `@default_threshold 0.8` definition before defstruct
+  - [x] Module attribute now defined before use
 
-### 9.4.3 ReqLLM.chat/1 Undefined or Private
+### 9.4.3 ReqLLM.chat/1 Undefined or Private ✅
 
-- [ ] 9.4.3.1 Read `lib/jido_ai/accuracy/estimators/llm_difficulty.ex`
-- [ ] 9.4.3.2 Verify correct ReqLLM API for making chat requests
-- [ ] 9.4.3.3 Update call at line 264 to use correct ReqLLM API
+- [x] 9.4.3.1 Read `lib/jido_ai/accuracy/estimators/llm_difficulty.ex`
+- [x] 9.4.3.2 Verified correct ReqLLM API for making chat requests
+- [x] 9.4.3.3 Updated call to use `ReqLLM.Generation.generate_text/3` instead of `ReqLLM.chat/1`
 
-### 9.4.4 Unreachable Error Clauses
+### 9.4.4 Unreachable Error Clauses ✅
 
-- [ ] 9.4.4.1 Fix `lib/jido_ai/accuracy/verifiers/static_analysis_verifier.ex`:
-  - [ ] Remove unreachable `{:error, _reason}` clause in `verify_batch/3`
-  - [ ] The `verify/3` function only returns `{:ok, VerificationResult}`
-- [ ] 9.4.4.2 Fix `lib/jido_ai/accuracy/verifiers/unit_test_verifier.ex`:
-  - [ ] Remove unreachable `{:error, _reason}` clause in `verify_batch/3`
-- [ ] 9.4.4.3 Fix `lib/jido_ai/accuracy/search/mcts.ex`:
-  - [ ] Remove unreachable `{:error, _}` clause in `run_simulations/7`
+- [x] 9.4.4.1 Fix `lib/jido_ai/accuracy/verifiers/static_analysis_verifier.ex`:
+  - [x] Removed unreachable `{:error, _reason}` clause in `verify_batch/3`
+  - [x] Updated to use pattern matching: `{:ok, result} = verify(...)`
+- [x] 9.4.4.2 Fix `lib/jido_ai/accuracy/verifiers/unit_test_verifier.ex`:
+  - [x] Removed unreachable `{:error, _reason}` clause in `verify_batch/3`
+  - [x] Updated to use pattern matching: `{:ok, result} = verify(...)`
+- [x] 9.4.4.3 Fix `lib/jido_ai/accuracy/search/mcts.ex`:
+  - [x] Removed unreachable `{:error, _}` clause in `run_simulations/7`
+  - [x] Updated to use pattern matching: `{:ok, updated_root} = run_single_simulation(...)`
 
-### 9.4.5 Candidate.new/1 Error Clause
+### 9.4.5 Candidate.new/1 Error Clause ✅
 
-- [ ] 9.4.5.1 Read `lib/jido_ai/accuracy/candidate.ex`
-- [ ] 9.4.5.2 Remove unreachable `{:error, reason}` clause
-- [ ] 9.4.5.3 Verify that `new/1` only returns `{:ok, candidate}` or raises
+- [x] 9.4.5.1 Read `lib/jido_ai/accuracy/candidate.ex`
+- [x] 9.4.5.2 Removed unreachable `{:error, reason}` clause in `new!/1`
+- [x] 9.4.5.3 Verified that `new/1` only returns `{:ok, candidate}`
 
 ---
 
