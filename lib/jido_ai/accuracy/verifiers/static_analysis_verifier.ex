@@ -128,14 +128,12 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
   @doc """
   Verifies multiple candidates in batch.
   """
-  @spec verify_batch(t(), [Candidate.t()], map()) :: {:ok, [VerificationResult.t()]} | {:error, term()}
+  @spec verify_batch(t(), [Candidate.t()], map()) :: {:ok, [VerificationResult.t()]}
   def verify_batch(%__MODULE__{} = verifier, candidates, context) when is_list(candidates) do
     results =
       Enum.map(candidates, fn candidate ->
-        case verify(verifier, candidate, context) do
-          {:ok, result} -> result
-          {:error, _reason} -> error_result(candidate, :analysis_failed)
-        end
+        {:ok, result} = verify(verifier, candidate, context)
+        result
       end)
 
     {:ok, results}

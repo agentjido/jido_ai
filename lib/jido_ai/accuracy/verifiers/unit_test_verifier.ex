@@ -298,14 +298,12 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
       1
 
   """
-  @spec verify_batch(t(), [Candidate.t()], map()) :: {:ok, [VerificationResult.t()]} | {:error, term()}
+  @spec verify_batch(t(), [Candidate.t()], map()) :: {:ok, [VerificationResult.t()]}
   def verify_batch(%__MODULE__{} = verifier, candidates, context) when is_list(candidates) do
     results =
       Enum.map(candidates, fn candidate ->
-        case verify(verifier, candidate, context) do
-          {:ok, result} -> result
-          {:error, _reason} -> error_result(candidate, :test_execution_failed)
-        end
+        {:ok, result} = verify(verifier, candidate, context)
+        result
       end)
 
     {:ok, results}
