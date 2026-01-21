@@ -2,6 +2,253 @@
 
 Search algorithms systematically explore the reasoning space to find optimal solutions. Jido.AI provides several search strategies for different problem types.
 
+## Search Algorithms Overview
+
+Search algorithms explore multiple reasoning paths and select the best one based on verification scores. Unlike single-shot generation or self-consistency's independent sampling, search algorithms explicitly model the reasoning process as a tree or graph structure and explore it strategically.
+
+### The Role of Search in LLM Reasoning
+
+Search algorithms address a fundamental limitation of LLMs: they generate responses in a single left-to-right pass without backtracking. Search introduces:
+
+- **Explicit Exploration**: Multiple reasoning paths are considered
+- **Backtracking**: Dead ends can be abandoned
+- **Lookahead**: Future verification scores guide exploration
+- **Pruning**: Low-potential paths are discarded early
+
+### Algorithm Comparison
+
+| Algorithm | Origin | Best For | Exploration | Memory | Speed |
+|-----------|--------|----------|-------------|--------|-------|
+| **Beam Search** | NLP/ASR (1977) | Focused exploration | Systematic | Low | Fast |
+| **MCTS** | Game AI (2006) | Complex reasoning | Intelligent | Medium | Medium |
+| **Diverse Decoding** | ML sampling | Creative tasks | Randomized | Low | Fast |
+
+---
+
+## Beam Search Algorithm
+
+### Theoretical Foundation
+
+Beam Search is a heuristic search algorithm developed in the context of speech recognition and natural language processing. It maintains a fixed-size "beam" of the most promising partial solutions at each step, pruning less promising branches to control computational cost.
+
+Unlike breadth-first search (which expands all nodes) or depth-first search (which follows one path), beam search balances exploration and exploitation by keeping only the top-k candidates at each level.
+
+### Algorithm Mechanics
+
+```
+Input: Initial state S, beam_width k, depth d, branch_factor b
+Output: Best final state
+
+1. beam = [S]  # Initial beam with starting state
+
+2. For level = 1 to d:
+   a. candidates = []
+   b. For each state in beam:
+      i. Generate b successors by applying expansion
+      ii. Score each successor with verifier
+      iii. Add to candidates
+   c. Sort candidates by score (descending)
+   d. beam = top k candidates  # Keep only beam_width
+   e. If beam is empty: return error
+
+3. Return highest-scoring state in beam
+```
+
+### Time and Space Complexity
+
+| Aspect | Complexity |
+|--------|------------|
+| **Time** | O(d × k × b × E) |
+| **Space** | O(k × L) |
+| **Parallelizability** | O(k × b) |
+
+Where d = depth, k = beam_width, b = branch_factor, E = evaluation cost, L = path length
+
+### Key Properties
+
+| Property | Value |
+|----------|-------|
+| **Completeness** | No (can miss optimal solution) |
+| **Optimality** | No (heuristic) |
+| **Beam Width Trade-off** | k=1 → greedy, k=∞ → BFS |
+| **Best Depth** | 3-5 for most LLM tasks |
+| **Memory Efficient** | Yes, compared to full BFS |
+
+### When to Use Beam Search
+
+- Problems with clear branching structure
+- When you need systematic exploration
+- Memory-constrained environments
+- When depth is limited
+- Multi-step math problems
+- Planning with limited steps
+
+---
+
+## Monte Carlo Tree Search (MCTS) Algorithm
+
+### Theoretical Foundation
+
+Monte Carlo Tree Search was introduced by Coulom (2006) and famously powered AlphaGo's victory in 2016. MCTS combines random sampling (Monte Carlo) with tree search to intelligently explore decision spaces without requiring domain-specific heuristics.
+
+The algorithm builds a search tree incrementally through four phases:
+1. **Selection**: Traverse tree using UCB1 (Upper Confidence Bound) to select promising node
+2. **Expansion**: Add new child node to tree
+3. **Simulation**: Run random/rollout from new node to estimate value
+4. **Backpropagation**: Update statistics up the path to root
+
+### Algorithm Mechanics
+
+```
+Input: Initial state S, simulations N, exploration_constant C
+Output: Best action
+
+1. root = create_node(S)
+
+2. For i = 1 to N:
+   a. node = select(root, C)  # UCB1 selection
+   b. node = expand(node)      # Add child if not terminal
+   c. reward = simulate(node)  # Rollout to terminal
+   d. backpropagate(node, reward)  # Update statistics
+
+3. Return child of root with highest visit count
+
+# UCB1 Formula:
+UCB1(node) = (value / visits) + C × sqrt(ln(parent_visits) / visits)
+```
+
+### Time and Space Complexity
+
+| Aspect | Complexity |
+|--------|------------|
+| **Time** | O(N × d × S) |
+| **Space** | O(N × d) |
+| **Parallelizability** | O(N) with root parallelization |
+
+Where N = simulations, d = average depth, S = simulation cost
+
+### Key Properties
+
+| Property | Value |
+|----------|-------|
+| **Asymptotic Optimality** | Yes (with enough simulations) |
+| **Anytime** | Yes (can stop early) |
+| **Exploration Constant C** | 1.414 (√2) is theoretically optimal |
+| **Convergence** | O(log N) regret bound |
+| **Best For** | Game-like scenarios, complex reasoning |
+
+### UCB1 Exploration Formula
+
+The UCB1 (Upper Confidence Bound 1) formula balances exploitation and exploitation:
+
+```
+UCB1 = (wins / visits) + C × sqrt(ln(parent_visits) / visits)
+
+├─ Exploitation term: wins / visits
+│  └─ Average reward from this node
+│
+└─ Exploration term: C × sqrt(ln(parent_visits) / visits)
+   └─ Encourages trying less-visited nodes
+```
+
+| C Value | Effect |
+|---------|--------|
+| 0.5 | Exploit-focused (greedy) |
+| 1.414 | Balanced (theoretically optimal) |
+| 2.0+ | Explore-focused |
+
+### When to Use MCTS
+
+- Complex reasoning with many branches
+- When evaluation is expensive
+- Problems requiring deep exploration
+- Game-like scenarios
+- When you need intelligent path selection
+
+---
+
+## Diverse Decoding Algorithm
+
+### Theoretical Foundation
+
+Diverse Decoding uses Maximal Marginal Relevance (MMR) to balance relevance and diversity when sampling from the LLM. Unlike beam search's focused exploration or MCTS's intelligent search, diverse decoding explicitly samples from different regions of the output distribution.
+
+The algorithm is based on the observation that LLMs can produce diverse outputs with temperature > 0, and that exploring diverse alternatives can reveal better solutions than greedy decoding.
+
+### Algorithm Mechanics
+
+```
+Input: Query Q, num_candidates N, lambda λ, similarity_threshold T
+Output: Best candidate
+
+1. Generate N candidates using temperature sampling
+2. Score all candidates with verifier
+3. Apply MMR to select diverse top-K:
+
+   For each candidate i:
+     MMR(i) = λ × relevance(i) - (1-λ) × max_similarity(i, selected)
+
+4. Select candidate with highest MMR
+5. Return selected candidate
+
+# Where:
+# relevance(i) = verifier score of candidate i
+# max_similarity(i, selected) = highest similarity to any selected candidate
+# lambda = relevance/diversity tradeoff (0.5 = balanced)
+```
+
+### MMR (Maximal Marginal Relevance) Formula
+
+```
+MMR(candidate, selected_set) = λ × relevance - (1-λ) × max_sim
+
+Where:
+- relevance: How good the candidate is (verifier score)
+- max_sim: Maximum similarity to any already-selected candidate
+- lambda: Tradeoff parameter
+  - λ = 1.0 → Pure relevance (ignore diversity)
+  - λ = 0.5 → Balanced (default)
+  - λ = 0.0 → Pure diversity (maximize difference)
+```
+
+### Time and Space Complexity
+
+| Aspect | Complexity |
+|--------|------------|
+| **Time** | O(N × G + N² × S) |
+| **Space** | O(N × L) |
+| **Parallelizability** | O(N) |
+
+Where N = num_candidates, G = generation cost, S = similarity cost
+
+### Key Properties
+
+| Property | Value |
+|----------|-------|
+| **Completeness** | N/A (sampling-based) |
+| **Diversity Guarantee** | Yes, via MMR |
+| **Lambda Sensitivity** | High - determines behavior |
+| **Best For** | Creative tasks, brainstorming |
+
+### Similarity Metrics
+
+| Metric | Description | Use Case |
+|--------|-------------|----------|
+| **Cosine** | Embedding cosine similarity | Semantic diversity |
+| **Jaccard** | Token overlap Jaccard | Lexical diversity |
+| **Levenshtein** | Edit distance | Structural diversity |
+| **BERTScore** | Contextual similarity | Semantic nuance |
+
+### When to Use Diverse Decoding
+
+- Creative brainstorming
+- Exploring alternative solutions
+- When diversity matters more than optimality
+- Open-ended problems
+- Content generation (ideas, options)
+
+---
+
 ## Overview
 
 Search algorithms explore multiple reasoning paths and select the best one based on verification scores.

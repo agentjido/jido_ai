@@ -2,6 +2,60 @@
 
 Critique and revision components provide detailed analysis and improvement of candidate responses.
 
+## The Critique-Revision Framework
+
+The critique-revision pattern decomposes response improvement into two distinct phases:
+1. **Critique**: Analyze the response to identify issues, errors, and areas for improvement
+2. **Revision**: Generate an improved response addressing the identified issues
+
+This decomposition mirrors human editorial processes and allows for targeted, explainable improvements.
+
+### Theoretical Foundation
+
+The framework is based on research in **self-correction and revision** showing that:
+- Separating analysis from generation leads to better outcomes
+- Explicit critique identifies specific issues missed in end-to-end generation
+- Targeted revision is more efficient than complete regeneration
+
+Critique-Revision is particularly effective because:
+- **Modularity**: Different critics/revisers can be plugged in
+- **Explainability**: Critiques provide human-readable feedback
+- **Iterativity**: Can be applied multiple times for gradual improvement
+- **Composability**: Works with other techniques (verification, reflection)
+
+### Algorithm Mechanics
+
+```
+Input: Candidate C, Question Q, Critic K, Reviser R
+Output: Improved Candidate C', Critique critique
+
+# Critique Phase
+critique = K(C, Q)
+# critique.issues: [issue1, issue2, ...]
+# critique.score: 0.0-1.0
+# critique.feedback: Detailed explanation
+
+# Revision Phase
+C' = R(C, Q, critique)
+# Incorporates critique feedback
+
+# Optional: Validate improvement
+score' = S(C')
+If score' > S(C):
+  RETURN C', critique
+Else:
+  RETURN C, critique  # Original was better
+```
+
+### Key Properties
+
+| Property | Value |
+|----------|-------|
+| **Accuracy Gain** | +5-15% when applied to low-quality outputs |
+| **Compute Cost** | 2× (critique + revision) |
+| **Best For** | Fact correction, reasoning improvement |
+| **Composability** | Works with verification, reflection |
+
 ## Overview
 
 The critique-revision pattern analyzes responses for quality issues and generates targeted improvements.

@@ -2,6 +2,71 @@
 
 **Self-Consistency** is a powerful technique that improves LLM accuracy by generating multiple candidate answers and selecting the most consistent one.
 
+## The Self-Consistency Algorithm
+
+Self-Consistency is an ensemble technique introduced by Wang et al. (2022) in "Self-Consistency Improves Chain of Thought Reasoning in Large Language Models." The core insight is that while LLMs can make mistakes in single-shot generation, they are more likely to arrive at correct answers when the same reasoning path is sampled multiple times and the most consistent answer is selected.
+
+### Theoretical Foundation
+
+The algorithm rests on two key observations about LLM behavior:
+
+1. **Path Diversity**: LLMs with temperature > 0 can generate different reasoning paths for the same question due to the probabilistic nature of sampling
+2. **Convergence on Truth**: When multiple reasoning paths are sampled, correct reasoning tends to converge on the same final answer, while incorrect reasoning diverges
+
+Mathematically, if we sample N reasoning paths from the LLM's output distribution P(answer|question), the probability that the majority vote selects the correct answer increases with N as long as P(correct) > 0.5.
+
+### Algorithm Mechanics
+
+```
+Input: Question Q, integer N (num candidates)
+Output: Answer A
+
+1. For i = 1 to N:
+   a. Generate reasoning path Ri and answer Ai by sampling from LLM
+      with temperature T > 0
+   b. Store (Ri, Ai)
+
+2. Aggregate answers by counting frequencies:
+   Count[A] = number of times answer A appears
+
+3. Select A* = argmax Count[A]  # Most frequent answer
+
+4. Return A*
+```
+
+### Time and Space Complexity
+
+| Aspect | Complexity | Notes |
+|--------|------------|-------|
+| Time | O(N × C) | N = candidates, C = LLM generation time |
+| Space | O(N × L) | L = average response length |
+| Parallelizability | O(N) speedup | All N generations can run in parallel |
+
+### Key Properties
+
+| Property | Value |
+|----------|-------|
+| **Accuracy Gain** | +15-30% over single-shot for math/reasoning |
+| **Compute Cost** | N× single-shot cost |
+| **Optimal N** | 5-10 for most tasks |
+| **Temperature** | 0.5-0.8 for diversity |
+| **Best For** | Math, logic, factual questions with discrete answers |
+
+### Relationship to Other Techniques
+
+Self-consistency is closely related to several other ensemble methods:
+
+- **Majority Voting**: Self-consistency is essentially majority voting over LLM samples
+- **Ensemble Methods**: Like bagging in ML, but applied to generations from the same model
+- **Tree of Thoughts**: Can be viewed as a special case where each path is independent
+
+### Limitations
+
+1. **Cost**: Requires N LLM calls per question
+2. **Discrete Answers**: Works best for questions with clear, discrete answers
+3. **No Reuse**: Each question requires new generations
+4. **Temperature Sensitivity**: Too low = no diversity, too high = too much noise
+
 ## What is Self-Consistency?
 
 Self-consistency leverages the fact that while LLMs can make mistakes, they're more likely to be correct when they consistently produce the same answer across multiple generations.

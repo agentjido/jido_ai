@@ -72,9 +72,9 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
 
   """
 
-  @behaviour DifficultyEstimator
-
   alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
+
+  @behaviour DifficultyEstimator
 
   @type combination :: :weighted_average | :majority_vote | :max_confidence | :average
   @type estimator_pair :: {module(), struct()}

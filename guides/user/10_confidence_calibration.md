@@ -2,6 +2,51 @@
 
 Confidence estimation and calibration ensure that AI systems express appropriate uncertainty levels.
 
+## The Confidence Calibration Problem
+
+LLMs often express **misaligned confidence**—they can be highly confident in incorrect answers and underconfident in correct ones. Calibration is the process of adjusting predicted confidence to match actual accuracy rates.
+
+### Theoretical Foundation
+
+A well-calibrated model satisfies:
+```
+P(correct | predicted_confidence = p) = p
+```
+
+For example, if a model predicts 80% confidence on 100 answers, approximately 80 should be correct.
+
+**Key Insight**: Raw LLM confidence (from logprobs or verbal expressions) is systematically misaligned and requires calibration.
+
+### Calibration Curve
+
+```mermaid
+graph LR
+    x[Predicted] --> Graph[Calibration Curve]
+    y[Actual] --> Graph
+    Graph --> Adjusted[Calibrated Confidence]
+```
+
+- **Perfect calibration**: Points fall on diagonal
+- **Overconfidence**: Points fall below diagonal (common in LLMs)
+- **Underconfidence**: Points fall above diagonal
+
+### Calibration Methods
+
+| Method | Description | Best For |
+|--------|-------------|----------|
+| **Temperature Scaling** | Single parameter scaling | Probabilistic outputs |
+| **Platt Scaling** | Logistic regression | Small datasets |
+| **Isotonic Regression** | Monotonic piecewise function | Large datasets |
+| **Bin-based** | Map confidence bins to accuracy | Simple cases |
+
+### Time and Space Complexity
+
+| Aspect | Complexity |
+|--------|------------|
+| **Estimation** | O(E) | E = estimator cost |
+| **Calibration** | O(N × log N) | N = calibration samples |
+| **Inference** | O(1) | Lookup |
+
 ## Overview
 
 Confidence estimation predicts how likely a response is correct, while calibration ensures predicted confidence matches actual accuracy.
