@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "vicuna",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1713225600,
+    "description": "WizardLM-2 7B is the smaller variant of Microsoft AI's latest Wizard model. It is the fastest and achieves comparable performance with existing 10x larger opensource leading models\n\nIt is a finetune of [Mistral 7B Instruct](/models/mistralai/mistral-7b-instruct), using the same technique as [WizardLM-2 8x22B](/models/microsoft/wizardlm-2-8x22b).\n\nTo read more about the model release, [click here](https://wizardlm.github.io/WizardLM2/).\n\n#moe",
+    "endpoints": [
+      {
+        "context_length": 32000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Lepton | microsoft/wizardlm-2-7b",
+        "pricing": {
+          "completion": "0.00000007",
+          "image": "0",
+          "prompt": "0.00000007",
+          "request": "0"
+        },
+        "provider_name": "Lepton",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      }
+    ],
+    "id": "microsoft/wizardlm-2-7b",
+    "name": "WizardLM-2 7B"
+  }
+}

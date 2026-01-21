@@ -1,5 +1,4 @@
+# Used by "mix format"
 [
-  plugins: [Quokka],
-  line_length: 120,
-  inputs: ["{mix,.formatter,.credo}.exs", "{config,lib,test}/**/*.{ex,exs}"]
+  inputs: ["{mix,.credo,.formatter}.exs", "{config,lib,test}/**/*.{ex,exs}"]
 ]

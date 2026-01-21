@@ -1,0 +1,71 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1725926400,
+    "description": "The first multi-modal, text+image-to-text model from Mistral AI. Its weights were launched via torrent: https://x.com/mistralai/status/1833758285167722836.",
+    "endpoints": [
+      {
+        "context_length": 4096,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Hyperbolic | mistralai/pixtral-12b",
+        "pricing": {
+          "completion": "0.0000001",
+          "image": "0.0001445",
+          "prompt": "0.0000001",
+          "request": "0"
+        },
+        "provider_name": "Hyperbolic",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "logprobs",
+          "top_logprobs",
+          "seed",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "repetition_penalty"
+        ]
+      },
+      {
+        "context_length": 4096,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Mistral | mistralai/pixtral-12b",
+        "pricing": {
+          "completion": "0.00000015",
+          "image": "0.0002168",
+          "prompt": "0.00000015",
+          "request": "0"
+        },
+        "provider_name": "Mistral",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "response_format",
+          "structured_outputs",
+          "seed"
+        ]
+      }
+    ],
+    "id": "mistralai/pixtral-12b",
+    "name": "Mistral: Pixtral 12B"
+  }
+}

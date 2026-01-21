@@ -1,0 +1,21 @@
+{
+  "id": "claude-2.1",
+  "name": "Claude 2.1",
+  "description": "",
+  "capabilities": {
+    "code": true,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "max_tokens": null,
+  "created": "2023-11-21T00:00:00Z",
+  "context_length": null
+}

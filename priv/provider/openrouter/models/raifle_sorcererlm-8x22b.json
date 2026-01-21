@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "vicuna",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1731105083,
+    "description": "SorcererLM is an advanced RP and storytelling model, built as a Low-rank 16-bit LoRA fine-tuned on [WizardLM-2 8x22B](/microsoft/wizardlm-2-8x22b).\n\n- Advanced reasoning and emotional intelligence for engaging and immersive interactions\n- Vivid writing capabilities enriched with spatial and contextual awareness\n- Enhanced narrative depth, promoting creative and dynamic storytelling",
+    "endpoints": [
+      {
+        "context_length": 16000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Infermatic | raifle/sorcererlm-8x22b",
+        "pricing": {
+          "completion": "0.0000045",
+          "image": "0",
+          "prompt": "0.0000045",
+          "request": "0"
+        },
+        "provider_name": "Infermatic",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      }
+    ],
+    "id": "raifle/sorcererlm-8x22b",
+    "name": "SorcererLM 8x22B"
+  }
+}

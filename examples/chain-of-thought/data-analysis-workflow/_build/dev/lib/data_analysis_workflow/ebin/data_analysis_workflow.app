@@ -1,0 +1,11 @@
+{application,data_analysis_workflow,
+             [{modules,['Elixir.Examples.ChainOfThought.DataAnalysisWorkflow',
+                        'Elixir.Examples.ChainOfThought.DataAnalysisWorkflow.AggregateDataAction',
+                        'Elixir.Examples.ChainOfThought.DataAnalysisWorkflow.FilterDataAction',
+                        'Elixir.Examples.ChainOfThought.DataAnalysisWorkflow.GenerateReportAction',
+                        'Elixir.Examples.ChainOfThought.DataAnalysisWorkflow.LoadDataAction']},
+              {optional_applications,[]},
+              {applications,[kernel,stdlib,elixir,logger,jido_ai]},
+              {description,"data_analysis_workflow"},
+              {registered,[]},
+              {vsn,"0.1.0"}]}.

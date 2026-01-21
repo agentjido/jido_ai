@@ -1,0 +1,69 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Other"
+    },
+    "created": 1736489872,
+    "description": "[Microsoft Research](/microsoft) Phi-4 is designed to perform well in complex reasoning tasks and can operate efficiently in situations with limited memory or where quick responses are needed. \n\nAt 14 billion parameters, it was trained on a mix of high-quality synthetic datasets, data from curated websites, and academic materials. It has undergone careful improvement to follow instructions accurately and maintain strong safety standards. It works best with English language inputs.\n\nFor more information, please see [Phi-4 Technical Report](https://arxiv.org/pdf/2412.08905)\n",
+    "endpoints": [
+      {
+        "context_length": 16384,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": 4096,
+        "name": "DeepInfra | microsoft/phi-4",
+        "pricing": {
+          "completion": "0.00000014",
+          "image": "0",
+          "prompt": "0.00000007",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 16000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Nebius | microsoft/phi-4",
+        "pricing": {
+          "completion": "0.0000003",
+          "image": "0",
+          "prompt": "0.0000001",
+          "request": "0"
+        },
+        "provider_name": "Nebius",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "top_k",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs"
+        ]
+      }
+    ],
+    "id": "microsoft/phi-4",
+    "name": "Microsoft: Phi 4"
+  }
+}

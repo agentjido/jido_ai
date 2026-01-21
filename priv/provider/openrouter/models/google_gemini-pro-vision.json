@@ -1,0 +1,36 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Gemini"
+    },
+    "created": 1702425600,
+    "description": "Google's flagship multimodal model, supporting image and video in text or chat prompts for a text or code response.\n\nSee the benchmarks and prompting guidelines from [Deepmind](https://deepmind.google/technologies/gemini/).\n\nUsage of Gemini is subject to Google's [Gemini Terms of Use](https://ai.google.dev/terms).\n\n#multimodal",
+    "endpoints": [
+      {
+        "context_length": 16384,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Google | google/gemini-pro-vision",
+        "pricing": {
+          "completion": "0.0000015",
+          "image": "0.0025",
+          "prompt": "0.0000005",
+          "request": "0"
+        },
+        "provider_name": "Google",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "stop"
+        ]
+      }
+    ],
+    "id": "google/gemini-pro-vision",
+    "name": "Google: Gemini Pro Vision 1.0"
+  }
+}

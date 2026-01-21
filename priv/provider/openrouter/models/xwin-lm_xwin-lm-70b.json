@@ -1,0 +1,71 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "airoboros",
+      "modality": "text->text",
+      "tokenizer": "Llama2"
+    },
+    "created": 1697328000,
+    "description": "Xwin-LM aims to develop and open-source alignment tech for LLMs. Our first release, built-upon on the [Llama2](/models/${Model.Llama_2_13B_Chat}) base models, ranked TOP-1 on AlpacaEval. Notably, it's the first to surpass [GPT-4](/models/${Model.GPT_4}) on this benchmark. The project will be continuously updated.",
+    "endpoints": [
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 512,
+        "max_prompt_tokens": null,
+        "name": "Mancer | xwin-lm/xwin-lm-70b",
+        "pricing": {
+          "completion": "0.00000375",
+          "image": "0",
+          "prompt": "0.00000375",
+          "request": "0"
+        },
+        "provider_name": "Mancer",
+        "quantization": "int4",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed",
+          "top_a"
+        ]
+      },
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 512,
+        "max_prompt_tokens": null,
+        "name": "Mancer 2 | xwin-lm/xwin-lm-70b",
+        "pricing": {
+          "completion": "0.000005",
+          "image": "0",
+          "prompt": "0.000005",
+          "request": "0"
+        },
+        "provider_name": "Mancer 2",
+        "quantization": "int4",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed",
+          "top_a"
+        ]
+      }
+    ],
+    "id": "xwin-lm/xwin-lm-70b",
+    "name": "Xwin 70B"
+  }
+}

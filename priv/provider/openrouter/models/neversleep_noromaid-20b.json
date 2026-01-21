@@ -1,0 +1,71 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "alpaca",
+      "modality": "text->text",
+      "tokenizer": "Llama2"
+    },
+    "created": 1700956800,
+    "description": "A collab between IkariDev and Undi. This merge is suitable for RP, ERP, and general knowledge.\n\n#merge #uncensored",
+    "endpoints": [
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Mancer | neversleep/noromaid-20b",
+        "pricing": {
+          "completion": "0.00000225",
+          "image": "0",
+          "prompt": "0.0000015",
+          "request": "0"
+        },
+        "provider_name": "Mancer",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed",
+          "top_a"
+        ]
+      },
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Mancer 2 | neversleep/noromaid-20b",
+        "pricing": {
+          "completion": "0.000003",
+          "image": "0",
+          "prompt": "0.000002",
+          "request": "0"
+        },
+        "provider_name": "Mancer 2",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed",
+          "top_a"
+        ]
+      }
+    ],
+    "id": "neversleep/noromaid-20b",
+    "name": "Noromaid 20B"
+  }
+}

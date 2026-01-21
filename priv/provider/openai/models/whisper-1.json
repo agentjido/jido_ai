@@ -1,0 +1,20 @@
+{
+  "id": "whisper-1",
+  "name": "whisper-1",
+  "description": "",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": false,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": true
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "created": 1677532384,
+  "owned_by": "openai-internal"
+}

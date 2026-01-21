@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "chatml",
+      "modality": "text->text",
+      "tokenizer": "GPT"
+    },
+    "created": 1695859200,
+    "description": "This model is a variant of GPT-3.5 Turbo tuned for instructional prompts and omitting chat-related optimizations. Training data: up to Sep 2021.",
+    "endpoints": [
+      {
+        "context_length": 4095,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "OpenAI | openai/gpt-3.5-turbo-instruct",
+        "pricing": {
+          "completion": "0.000002",
+          "image": "0",
+          "prompt": "0.0000015",
+          "request": "0"
+        },
+        "provider_name": "OpenAI",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "openai/gpt-3.5-turbo-instruct",
+    "name": "OpenAI: GPT-3.5 Turbo Instruct"
+  }
+}

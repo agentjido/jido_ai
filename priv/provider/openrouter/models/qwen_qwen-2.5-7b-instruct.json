@@ -1,0 +1,69 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "chatml",
+      "modality": "text->text",
+      "tokenizer": "Qwen"
+    },
+    "created": 1729036800,
+    "description": "Qwen2.5 7B is the latest series of Qwen large language models. Qwen2.5 brings the following improvements upon Qwen2:\n\n- Significantly more knowledge and has greatly improved capabilities in coding and mathematics, thanks to our specialized expert models in these domains.\n\n- Significant improvements in instruction following, generating long texts (over 8K tokens), understanding structured data (e.g, tables), and generating structured outputs especially JSON. More resilient to the diversity of system prompts, enhancing role-play implementation and condition-setting for chatbots.\n\n- Long-context Support up to 128K tokens and can generate up to 8K tokens.\n\n- Multilingual support for over 29 languages, including Chinese, English, French, Spanish, Portuguese, German, Italian, Russian, Japanese, Korean, Vietnamese, Thai, Arabic, and more.\n\nUsage of this model is subject to [Tongyi Qianwen LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen1.5-110B-Chat/blob/main/LICENSE).",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "DeepInfra | qwen/qwen-2.5-7b-instruct",
+        "pricing": {
+          "completion": "0.00000005",
+          "image": "0",
+          "prompt": "0.000000025",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Together | qwen/qwen-2.5-7b-instruct",
+        "pricing": {
+          "completion": "0.0000003",
+          "image": "0",
+          "prompt": "0.0000003",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "qwen/qwen-2.5-7b-instruct",
+    "name": "Qwen2.5 7B Instruct"
+  }
+}

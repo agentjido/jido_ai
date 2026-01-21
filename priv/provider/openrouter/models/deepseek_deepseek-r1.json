@@ -1,0 +1,254 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "deepseek-r1",
+      "modality": "text->text",
+      "tokenizer": "DeepSeek"
+    },
+    "created": 1737381095,
+    "description": "DeepSeek R1 is here: Performance on par with [OpenAI o1](/openai/o1), but open-sourced and with fully open reasoning tokens. It's 671B parameters in size, with 37B active in an inference pass.\n\nFully open-source model & [technical report](https://api-docs.deepseek.com/news/news250120).\n\nMIT licensed: Distill & commercialize freely!",
+    "endpoints": [
+      {
+        "context_length": 128000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Nebius | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.0000024",
+          "image": "0",
+          "prompt": "0.0000008",
+          "request": "0"
+        },
+        "provider_name": "Nebius",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "reasoning",
+          "include_reasoning",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "top_k",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs"
+        ]
+      },
+      {
+        "context_length": 163840,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "Together | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.000007",
+          "image": "0",
+          "prompt": "0.000003",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "reasoning",
+          "include_reasoning",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      },
+      {
+        "context_length": 163840,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Friendli | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.000007",
+          "image": "0",
+          "prompt": "0.000003",
+          "request": "0"
+        },
+        "provider_name": "Friendli",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "reasoning",
+          "include_reasoning",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "logprobs",
+          "top_logprobs",
+          "top_k",
+          "min_p",
+          "repetition_penalty",
+          "response_format",
+          "structured_outputs"
+        ]
+      },
+      {
+        "context_length": 163840,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Fireworks | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.000008",
+          "image": "0",
+          "prompt": "0.000003",
+          "request": "0"
+        },
+        "provider_name": "Fireworks",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "reasoning",
+          "include_reasoning",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "response_format",
+          "structured_outputs",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs"
+        ]
+      },
+      {
+        "context_length": 128000,
+        "max_completion_tokens": 128000,
+        "max_prompt_tokens": null,
+        "name": "Kluster | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.000007",
+          "image": "0",
+          "prompt": "0.000007",
+          "request": "0"
+        },
+        "provider_name": "Kluster",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "reasoning",
+          "include_reasoning",
+          "temperature"
+        ]
+      },
+      {
+        "context_length": 64000,
+        "max_completion_tokens": 8000,
+        "max_prompt_tokens": null,
+        "name": "DeepSeek | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.00000219",
+          "image": "0",
+          "prompt": "0.00000055",
+          "request": "0"
+        },
+        "provider_name": "DeepSeek",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "reasoning",
+          "include_reasoning"
+        ]
+      },
+      {
+        "context_length": 65536,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "DeepInfra | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.0000024",
+          "image": "0",
+          "prompt": "0.00000075",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "reasoning",
+          "include_reasoning",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "Featherless | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.000008",
+          "image": "0",
+          "prompt": "0.0000065",
+          "request": "0"
+        },
+        "provider_name": "Featherless",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "reasoning",
+          "include_reasoning",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      },
+      {
+        "context_length": 164000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Avian | deepseek/deepseek-r1",
+        "pricing": {
+          "completion": "0.0000069",
+          "image": "0",
+          "prompt": "0.0000069",
+          "request": "0"
+        },
+        "provider_name": "Avian",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "reasoning",
+          "include_reasoning",
+          "seed"
+        ]
+      }
+    ],
+    "id": "deepseek/deepseek-r1",
+    "name": "DeepSeek: R1"
+  }
+}

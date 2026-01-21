@@ -1,0 +1,153 @@
+;; Code from https://github.com/rbkmoney/email_validator licensed under the
+;; Apache License Version 2.0.
+;; https://github.com/rbkmoney/email_validator/blob/master/LICENSE
+;;
+;; Modifications:
+;; Changed the root defintion from 'mailbox' to 'email-address'.
+
+
+;; Based on RFC5321 (Simple Mail Transfer Protocol)
+;; https://tools.ietf.org/rfc/rfc5321.txt
+;; + Added support for RFC6532 via RFC6531 (SMTP Extension for Internationalized Email)
+;;   https://tools.ietf.org/rfc/rfc6532.txt
+;;   https://tools.ietf.org/rfc/rfc6531.txt
+;; + Added stricter IP address grammar
+;;   https://tools.ietf.org/html/rfc3986#appendix-A
+;; + No longer accept General-address-literal
+
+;; Address specification
+
+email-address         =   local-part "@" domain
+
+;; Domain specification
+
+domain          =   domain-name / address-literal
+
+domain-name     =   sub-domain *("." sub-domain)
+
+sub-domain      =   let-dig [ldh-str] / U-Label
+
+U-Label         =   1*UTF8-non-ascii
+
+;; Original RFC5321 definition of
+;; ```
+;; Let-dig        = ALPHA / DIGIT
+;; Ldh-str        = *( ALPHA / DIGIT / "-" ) Let-dig
+;; address-literal =   "[" ( IPv4-address-literal / IPv6-address-literal / General-address-literal ) "]"
+;; ```
+;; changed for better compatability with ABNFC parser generator.
+;; Following definitions are supposed to be equal to them
+
+let-dig         =   ALPHA / DIGIT
+
+hyphen-let-dig  =   *("-") let-dig
+
+ldh-str         =   1*(hyphen-let-dig / let-dig)
+
+address-literal =   "[" IPv4-address-literal "]" / "[" IPv6-address-literal "]"
+
+;; Local part specification
+
+local-part      =   dot-string / quoted-string
+
+dot-string      =   atom *("."  atom)
+
+quoted-string   =   DQUOTE *qcontentSMTP DQUOTE
+
+qcontentSMTP    =   qtextSMTP / quoted-pairSMTP
+
+quoted-pairSMTP =   %d92 %d32-126   ; i.e., backslash followed by any ASCII
+                                    ; graphic (including itself) or SPace
+
+qtextSMTP       =   %d32-33 /       ; i.e., within a quoted string, any
+                    %d35-91 /       ; ASCII graphic or space is permitted
+                    %d93-126 /      ; without blackslash-quoting except
+                    UTF8-non-ascii  ; double-quote and the backslash itself.
+
+;; Atom
+
+atext           =   ALPHA / DIGIT / ; Printable US-ASCII
+                    "!" / "#" /     ; characters not including
+                    "$" / "%" /     ; specials. Used for atoms.
+                    "&" / "'" /
+                    "*" / "+" /
+                    "-" / "/" /
+                    "=" / "?" /
+                    "^" / "_" /
+                    "`" / "{" /
+                    "|" / "}" /
+                    "~" / UTF8-non-ascii
+
+atom            =   1*atext
+
+;; Internationalized Email Headers
+
+UTF8-non-ascii  =   UTF8-2 / UTF8-3 / UTF8-4
+
+;; UTF-8 Byte Sequences (https://tools.ietf.org/rfc/rfc3629.txt)
+
+UTF8-2          =   %xC2-DF UTF8-tail
+
+UTF8-3          =   %xE0 %xA0-BF UTF8-tail / %xE1-EC 2( UTF8-tail ) /
+                    %xED %x80-9F UTF8-tail / %xEE-EF 2( UTF8-tail )
+
+UTF8-4          =   %xF0 %x90-BF 2( UTF8-tail ) / %xF1-F3 3( UTF8-tail ) /
+                    %xF4 %x80-8F 2( UTF8-tail )
+
+UTF8-tail       =   %x80-BF
+
+;; SMTP Address Literals
+
+;; Original RFC5321 definitions of
+;; ```
+;;   IPv4-address-literal     =   Snum 3("." Snum)
+;;   IPv6-addr                =   IPv6-full /
+;;                                IPv6-comp /
+;;                                IPv6v4-full /
+;;                                IPv6v4-comp
+;;   IPv6-hex                 =   1*4HEXDIG
+;;   IPv6-full                =   IPv6-hex 7(":" IPv6-hex)
+;;   IPv6-comp                =   [IPv6-hex *5(":" IPv6-hex)] "::"
+;;                                [IPv6-hex *5(":" IPv6-hex)]
+;;   IPv6v4-full              =   IPv6-hex 5(":" IPv6-hex) ":" IPv4-address-literal
+;;   IPv6v4-comp              =   [IPv6-hex *3(":" IPv6-hex)] "::"
+;;                                [IPv6-hex *3(":" IPv6-hex) ":"]
+;;                                IPv4-address-literal
+;; ```
+;; Discarded in favor of those defined in [RFC3986 Appendix A]
+;; (https://tools.ietf.org/html/rfc3986#appendix-A).
+;; They are much stricter and friendlier for ABNFC parser generator.
+
+IPv4-address-literal     =   dec-octet 3("." dec-octet)
+
+dec-octet                =   "25" %x30-35          ; 250-255
+                           / "2" %x30-34 DIGIT     ; 200-249
+                           / "1" 2DIGIT            ; 100-199
+                           / %x31-39 DIGIT         ; 10-99
+                           / DIGIT                 ; 0-9
+
+IPv6-address-literal     =   "IPv6:" IPv6-addr
+
+IPv6-addr                =                               6( H16 ":" ) LS32
+                           /                        "::" 5( H16 ":" ) LS32
+                           / [ H16                ] "::" 4( H16 ":" ) LS32
+                           / [ H16 0*1( ":" H16 ) ] "::" 3( H16 ":" ) LS32
+                           / [ H16 0*2( ":" H16 ) ] "::" 2( H16 ":" ) LS32
+                           / [ H16 0*3( ":" H16 ) ] "::"    H16 ":"   LS32
+                           / [ H16 0*4( ":" H16 ) ] "::"              LS32
+                           / [ H16 0*5( ":" H16 ) ] "::"              H16
+                           / [ H16 0*6( ":" H16 ) ] "::"
+
+H16                      =   1*4HEXDIG
+
+LS32                     =   ( H16 ":" H16 ) / IPv4-address-literal
+
+;; RFC4234 CORE (For abnfc binary compatability)
+
+ALPHA           =   %x41-5A / %x61-7A   ; A-Z / a-z
+
+DIGIT           =   %x30-39             ; 0-9
+
+DQUOTE          =   %x22                ; " (Double Quote)
+
+HEXDIG          =   DIGIT / "A" / "B" / "C" / "D" / "E" / "F" ; 0-9 A-F

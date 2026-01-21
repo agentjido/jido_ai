@@ -1,0 +1,11 @@
+{application,uniq,
+             [{modules,['Elixir.Inspect.Uniq.UUID',
+                        'Elixir.String.Chars.Uniq.UUID','Elixir.Uniq.App',
+                        'Elixir.Uniq.Generator','Elixir.Uniq.Macros',
+                        'Elixir.Uniq.UUID']},
+              {optional_applications,[ecto]},
+              {applications,[kernel,stdlib,elixir,crypto,ecto]},
+              {description,"Provides UUID generation, parsing, and formatting. Supports RFC 4122, and the v6 draft extension"},
+              {registered,[]},
+              {vsn,"0.6.2"},
+              {mod,{'Elixir.Uniq.App',[]}}]}.

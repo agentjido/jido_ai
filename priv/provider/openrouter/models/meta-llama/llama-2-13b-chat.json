@@ -1,0 +1,25 @@
+{
+  "id": "meta-llama/llama-2-13b-chat",
+  "name": "Meta: Llama 2 13B Chat",
+  "description": "A 13 billion parameter language model from Meta, fine tuned for chat completions",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Llama2",
+    "instruct_type": "llama2"
+  },
+  "created": 1687219200,
+  "endpoints": []
+}

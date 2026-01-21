@@ -1,0 +1,98 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "mistral",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1716768000,
+    "description": "A high-performing, industry-standard 7.3B parameter model, with optimizations for speed and context length.\n\nAn improved version of [Mistral 7B Instruct v0.2](/models/mistralai/mistral-7b-instruct-v0.2), with the following changes:\n\n- Extended vocabulary to 32768\n- Supports v3 Tokenizer\n- Supports function calling\n\nNOTE: Support for function calling depends on the provider.",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "DeepInfra | mistralai/mistral-7b-instruct-v0.3",
+        "pricing": {
+          "completion": "0.000000055",
+          "image": "0",
+          "prompt": "0.00000003",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 32768,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Lepton | mistralai/mistral-7b-instruct-v0.3",
+        "pricing": {
+          "completion": "0.00000007",
+          "image": "0",
+          "prompt": "0.00000007",
+          "request": "0"
+        },
+        "provider_name": "Lepton",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      },
+      {
+        "context_length": 32768,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "Together | mistralai/mistral-7b-instruct-v0.3",
+        "pricing": {
+          "completion": "0.0000002",
+          "image": "0",
+          "prompt": "0.0000002",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      }
+    ],
+    "id": "mistralai/mistral-7b-instruct-v0.3",
+    "name": "Mistral: Mistral 7B Instruct v0.3"
+  }
+}

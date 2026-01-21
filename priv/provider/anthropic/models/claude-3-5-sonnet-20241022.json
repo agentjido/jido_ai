@@ -1,0 +1,21 @@
+{
+  "id": "claude-3-5-sonnet-20241022",
+  "name": "Claude 3.5 Sonnet (New)",
+  "description": "",
+  "capabilities": {
+    "code": true,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "standard",
+    "description": "Balanced performance and cost"
+  },
+  "max_tokens": null,
+  "created": "2024-10-22T00:00:00Z",
+  "context_length": null
+}

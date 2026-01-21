@@ -1,0 +1,25 @@
+{
+  "id": "mistralai/mistral-7b-instruct-v0.1",
+  "name": "Mistral: Mistral 7B Instruct v0.1",
+  "description": "A 7.3B parameter model that outperforms Llama 2 13B on all benchmarks, with optimizations for speed and context length.",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Mistral",
+    "instruct_type": "mistral"
+  },
+  "created": 1695859200,
+  "endpoints": []
+}

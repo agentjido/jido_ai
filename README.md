@@ -1,118 +1,143 @@
 # Jido AI
 
-Jido AI is an extension of the Jido framework for building AI Agents and Workflows in Elixir. At present, it provides a single action for interacting with Anthropic's Claude models via the Instructor library.
+**Intelligent Agent Framework for Elixir**
+
+Jido AI is a comprehensive framework for building sophisticated AI agents and workflows in Elixir. It extends the [Jido](https://github.com/agentjido/jido) framework with powerful LLM capabilities, advanced reasoning techniques, and stateful conversation management.
+
+## Features
+
+- **Multi-Provider Support**: Access 57+ LLM providers through ReqLLM (OpenAI, Anthropic, Google, Mistral, and more)
+- **Advanced Reasoning**: Chain-of-Thought, ReAct, Tree-of-Thoughts, Self-Consistency, GEPA
+- **Structured Prompts**: Template-based prompts with EEx and Liquid support
+- **Tool Integration**: Function calling with automatic schema conversion
+- **Conversation Management**: Stateful multi-turn conversations with ETS storage
+- **Context Window Management**: Automatic token counting and truncation strategies
 
 ## Installation
+
+Add `jido_ai` to your `mix.exs` dependencies:
 
 ```elixir
 def deps do
   [
-    {:jido, "~> 1.0.0"},
-    {:jido_ai, "~> 1.0.0"}
+    {:jido_ai, "~> 0.5.3"}
   ]
 end
 ```
+
+## Quick Start
+
+```elixir
+alias Jido.AI.{Model, Prompt}
+alias Jido.AI.Actions.ReqLlm.ChatCompletion
+
+# Create a model
+{:ok, model} = Model.from({:anthropic, [model: "claude-3-5-sonnet"]})
+
+# Create a prompt
+prompt = Prompt.new(:user, "What is the capital of France?")
+
+# Get a response
+{:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+IO.puts(result.content)
+```
+
+## Documentation
+
+### User Guides
+
+Learn how to use Jido AI in your applications:
+
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](guides/user/getting-started.md) | Installation, configuration, and first steps |
+| [Models](guides/user/models.md) | Working with LLM models and providers |
+| [Prompts](guides/user/prompts.md) | Creating and templating prompts |
+| [Configuration](guides/user/configuration.md) | API keys and settings management |
+| [Chat Completion](guides/user/chat-completion.md) | Basic and advanced chat completions |
+| [Conversations](guides/user/conversations.md) | Multi-turn stateful conversations |
+
+### Runners (Advanced Reasoning)
+
+Implement sophisticated reasoning strategies:
+
+| Runner | Description | Accuracy Gain |
+|--------|-------------|---------------|
+| [Overview](guides/user/runners/overview.md) | Introduction to runners | - |
+| [Chain of Thought](guides/user/runners/chain-of-thought.md) | Step-by-step reasoning | +8-15% |
+| [ReAct](guides/user/runners/react.md) | Reasoning with tool use | +27% |
+| [Self-Consistency](guides/user/runners/self-consistency.md) | Multiple paths with voting | +17.9% |
+| [Tree of Thoughts](guides/user/runners/tree-of-thoughts.md) | Tree search exploration | +74% |
+| [GEPA](guides/user/runners/gepa.md) | Evolutionary prompt optimization | +10-19% |
+
+### Developer Guides
+
+Understand the internals for extending Jido AI:
+
+| Guide | Description |
+|-------|-------------|
+| [Architecture](guides/developer/architecture.md) | System architecture and components |
+| [Model System](guides/developer/model-system.md) | Model creation, registry, and discovery |
+| [Prompt System](guides/developer/prompt-system.md) | Prompt structs, templating, versioning |
+| [Actions System](guides/developer/actions-system.md) | Jido Actions and tool integration |
+| [Runners System](guides/developer/runners-system.md) | Runner implementations and patterns |
+| [Data Flow](guides/developer/data-flow.md) | Request lifecycle and data transformations |
+
+## Supported Providers
+
+Jido AI supports 57+ providers through ReqLLM:
+
+| Provider | Example Models |
+|----------|----------------|
+| **Anthropic** | Claude 3.5 Sonnet, Claude 3 Opus |
+| **OpenAI** | GPT-4o, GPT-4 Turbo |
+| **Google** | Gemini 1.5 Pro, Gemini 1.5 Flash |
+| **Mistral** | Mistral Large, Mixtral 8x7B |
+| **Groq** | Llama 3.1 70B |
+| **Cohere** | Command R+ |
+| **Local** | Ollama, LM Studio |
+
+See the [Models Guide](guides/user/models.md) for complete provider documentation.
 
 ## Configuration
 
-You will need to properly configure the `Instructor` library to use the Anthropic adapter:
+Set API keys via environment variables:
 
-```elixir
-# config/config.exs
-config :instructor,
-  adapter: Instructor.Adapters.Anthropic,
-  anthropic: [
-    api_key: System.get_env("ANTHROPIC_API_KEY")
-  ]
+```bash
+export ANTHROPIC_API_KEY="sk-..."
+export OPENAI_API_KEY="sk-..."
+export GOOGLE_API_KEY="..."
 ```
 
-## Example
-
-Here's how to use Jido AI with Jido.Workflow to get structured information about US politicians. See the [examples/politician.ex](examples/politician.ex) for more a full example.
+Or configure in your application:
 
 ```elixir
-# Define a simple workflow
-defmodule JidoAi.Examples.Politician do
-  defmodule Schema do
-    use Ecto.Schema
-    use Instructor
-    @primary_key false
-    embedded_schema do
-      field(:first_name, :string)
-      field(:last_name, :string)
-
-      embeds_many :offices_held, Office, primary_key: false do
-        field(:office, Ecto.Enum,
-          values: [:president, :vice_president, :governor, :congress, :senate]
-        )
-
-        field(:from_date, :date)
-        field(:to_date, :date)
-      end
-    end
-  end
-
-  use Jido.Action,
-    name: "politician",
-    description: "A description of United States Politicians and the offices that they held",
-    schema: [
-      query: [type: :string, required: true, doc: "The query to search for"]
-    ]
-
-  def run(params, _context) do
-    # Run the Anthropic ChatCompletion action
-    JidoAi.Actions.Anthropic.ChatCompletion.run(
-      %{
-        model: "claude-3-5-haiku-latest",
-        messages: [
-          %{
-            role: "user",
-            content: params.query
-          }
-        ],
-        response_model: Schema,
-        temperature: 0.5,
-        max_tokens: 1000
-      },
-      %{}
-    )
-    |> case do
-      {:ok, %{result: politician}} -> {:ok, %{result: politician}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-end
-
-# Run the workflow
-iex> {:ok, result} = Jido.Workflow.run(JidoAi.Examples.Politician, %{query: "Tell me about Barack Obama's political career"})
-iex> result.result
-%JidoAi.Examples.Politician.Schema{
-  first_name: "Barack",
-  last_name: "Obama",
-  offices_held: [
-    %JidoAi.Examples.Politician.Schema.Office{
-      office: :senate,
-      from_date: ~D[2005-01-03],
-      to_date: ~D[2008-11-16]
-    },
-    %JidoAi.Examples.Politician.Schema.Office{
-      office: :president,
-      from_date: ~D[2009-01-20],
-      to_date: ~D[2017-01-20]
-    }
-  ]
+config :jido_ai, :keyring, %{
+  anthropic_api_key: "sk-...",
+  openai_api_key: "sk-..."
 }
 ```
 
-The example demonstrates how JidoAi can:
+See the [Configuration Guide](guides/user/configuration.md) for details.
 
-- Write Actions that can wrap other Actions
-- Use Jido.Workflow to orchestrate AI operations
-- Parse natural language queries about politicians
-- Return structured data using Ecto schemas
-- Handle complex nested data structures
-- Provide type validation through Ecto's type system
+## API Documentation
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/jido_ai>.
+Full API documentation is available at [HexDocs](https://hexdocs.pm/jido_ai).
+
+Generate documentation locally:
+
+```bash
+mix docs
+open doc/index.html
+```
+
+## Resources
+
+- [GitHub Repository](https://github.com/agentjido/jido_ai)
+- [HexDocs](https://hexdocs.pm/jido_ai)
+- [Jido Framework](https://github.com/agentjido/jido)
+- [ReqLLM](https://hexdocs.pm/req_llm)
+
+## License
+
+MIT License - see LICENSE for details.

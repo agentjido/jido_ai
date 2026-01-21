@@ -1,0 +1,20 @@
+{
+  "id": "gpt-4o-2024-05-13",
+  "name": "gpt-4o-2024-05-13",
+  "description": "",
+  "capabilities": {
+    "code": true,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "advanced",
+    "description": "High-performance model"
+  },
+  "created": 1715368132,
+  "owned_by": "system"
+}

@@ -1,0 +1,41 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "chatml",
+      "modality": "text->text",
+      "tokenizer": "Qwen"
+    },
+    "created": 1732210606,
+    "description": "EVA Qwen2.5 72B is a roleplay and storywriting specialist model. It's a full-parameter finetune of Qwen2.5-72B on mixture of synthetic and natural data.\n\nIt uses Celeste 70B 0.1 data mixture, greatly expanding it to improve versatility, creativity and \"flavor\" of the resulting model.",
+    "endpoints": [
+      {
+        "context_length": 16384,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "Featherless | eva-unit-01/eva-qwen-2.5-72b",
+        "pricing": {
+          "completion": "0.000006",
+          "image": "0",
+          "prompt": "0.000004",
+          "request": "0"
+        },
+        "provider_name": "Featherless",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      }
+    ],
+    "id": "eva-unit-01/eva-qwen-2.5-72b",
+    "name": "EVA Qwen2.5 72B"
+  }
+}
