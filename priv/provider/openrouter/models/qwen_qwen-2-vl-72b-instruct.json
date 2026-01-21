@@ -1,0 +1,44 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Qwen"
+    },
+    "created": 1726617600,
+    "description": "Qwen2 VL 72B is a multimodal LLM from the Qwen Team with the following key enhancements:\n\n- SoTA understanding of images of various resolution & ratio: Qwen2-VL achieves state-of-the-art performance on visual understanding benchmarks, including MathVista, DocVQA, RealWorldQA, MTVQA, etc.\n\n- Understanding videos of 20min+: Qwen2-VL can understand videos over 20 minutes for high-quality video-based question answering, dialog, content creation, etc.\n\n- Agent that can operate your mobiles, robots, etc.: with the abilities of complex reasoning and decision making, Qwen2-VL can be integrated with devices like mobile phones, robots, etc., for automatic operation based on visual environment and text instructions.\n\n- Multilingual Support: to serve global users, besides English and Chinese, Qwen2-VL now supports the understanding of texts in different languages inside images, including most European languages, Japanese, Korean, Arabic, Vietnamese, etc.\n\nFor more details, see this [blog post](https://qwenlm.github.io/blog/qwen2-vl/) and [GitHub repo](https://github.com/QwenLM/Qwen2-VL).\n\nUsage of this model is subject to [Tongyi Qianwen LICENSE AGREEMENT](https://huggingface.co/Qwen/Qwen1.5-110B-Chat/blob/main/LICENSE).",
+    "endpoints": [
+      {
+        "context_length": 4096,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Hyperbolic | qwen/qwen-2-vl-72b-instruct",
+        "pricing": {
+          "completion": "0.0000004",
+          "image": "0.000578",
+          "prompt": "0.0000004",
+          "request": "0"
+        },
+        "provider_name": "Hyperbolic",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "logprobs",
+          "top_logprobs",
+          "seed",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "repetition_penalty"
+        ]
+      }
+    ],
+    "id": "qwen/qwen-2-vl-72b-instruct",
+    "name": "Qwen2-VL 72B Instruct"
+  }
+}

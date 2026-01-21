@@ -1,0 +1,153 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "llama3",
+      "modality": "text->text",
+      "tokenizer": "Llama3"
+    },
+    "created": 1713398400,
+    "description": "Meta's latest class of model (Llama 3) launched with a variety of sizes & flavors. This 8B instruct-tuned version was optimized for high quality dialogue usecases.\n\nIt has demonstrated strong performance compared to leading closed-source models in human evaluations.\n\nTo read more about the model release, [click here](https://ai.meta.com/blog/meta-llama-3/). Usage of this model is subject to [Meta's Acceptable Use Policy](https://llama.meta.com/llama3/use-policy/).",
+    "endpoints": [
+      {
+        "context_length": 8192,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": null,
+        "name": "DeepInfra | meta-llama/llama-3-8b-instruct",
+        "pricing": {
+          "completion": "0.00000006",
+          "image": "0",
+          "prompt": "0.00000003",
+          "request": "0"
+        },
+        "provider_name": "DeepInfra",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "response_format",
+          "top_k",
+          "seed",
+          "min_p"
+        ]
+      },
+      {
+        "context_length": 8192,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": 131072,
+        "name": "Cloudflare | meta-llama/llama-3-8b-instruct",
+        "pricing": {
+          "completion": "0.00000015",
+          "image": "0",
+          "prompt": "0.00000015",
+          "request": "0"
+        },
+        "provider_name": "Cloudflare",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "seed",
+          "repetition_penalty",
+          "frequency_penalty",
+          "presence_penalty"
+        ]
+      },
+      {
+        "context_length": 16384,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Mancer | meta-llama/llama-3-8b-instruct",
+        "pricing": {
+          "completion": "0.000001125",
+          "image": "0",
+          "prompt": "0.0000001875",
+          "request": "0"
+        },
+        "provider_name": "Mancer",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed",
+          "top_a"
+        ]
+      },
+      {
+        "context_length": 8192,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Fireworks | meta-llama/llama-3-8b-instruct",
+        "pricing": {
+          "completion": "0.0000002",
+          "image": "0",
+          "prompt": "0.0000002",
+          "request": "0"
+        },
+        "provider_name": "Fireworks",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "response_format",
+          "structured_outputs",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs"
+        ]
+      },
+      {
+        "context_length": 16384,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Mancer 2 | meta-llama/llama-3-8b-instruct",
+        "pricing": {
+          "completion": "0.0000015",
+          "image": "0",
+          "prompt": "0.00000025",
+          "request": "0"
+        },
+        "provider_name": "Mancer 2",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed",
+          "top_a"
+        ]
+      }
+    ],
+    "id": "meta-llama/llama-3-8b-instruct",
+    "name": "Meta: Llama 3 8B Instruct"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Gemini"
+    },
+    "created": 1732216551,
+    "description": "An experimental version of [Gemini 1.5 Pro](/google/gemini-pro-1.5) from Google.",
+    "endpoints": [
+      {
+        "context_length": 40960,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": 32767,
+        "name": "Google AI Studio | google/learnlm-1.5-pro-experimental:free",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "Google AI Studio",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "google/learnlm-1.5-pro-experimental:free",
+    "name": "Google: LearnLM 1.5 Pro Experimental (free)"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "gpt-4o-audio-preview",
+  "name": "gpt-4o-audio-preview",
+  "description": "",
+  "capabilities": {
+    "code": true,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "advanced",
+    "description": "High-performance model"
+  },
+  "created": 1727460443,
+  "owned_by": "system"
+}

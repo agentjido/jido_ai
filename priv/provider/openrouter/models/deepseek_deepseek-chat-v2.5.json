@@ -1,0 +1,44 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Other"
+    },
+    "created": 1715644800,
+    "description": "DeepSeek-V2.5 is an upgraded version that combines DeepSeek-V2-Chat and DeepSeek-Coder-V2-Instruct. The new model integrates the general and coding abilities of the two previous versions. For model details, please visit [DeepSeek-V2 page](https://github.com/deepseek-ai/DeepSeek-V2) for more information.",
+    "endpoints": [
+      {
+        "context_length": 8192,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Hyperbolic | deepseek/deepseek-chat",
+        "pricing": {
+          "completion": "0.000002",
+          "image": "0",
+          "prompt": "0.000002",
+          "request": "0"
+        },
+        "provider_name": "Hyperbolic",
+        "quantization": "bf16",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "logprobs",
+          "top_logprobs",
+          "seed",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "repetition_penalty"
+        ]
+      }
+    ],
+    "id": "deepseek/deepseek-chat-v2.5",
+    "name": "DeepSeek V2.5"
+  }
+}

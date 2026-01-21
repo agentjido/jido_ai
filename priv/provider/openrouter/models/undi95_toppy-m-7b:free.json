@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "alpaca",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1699574400,
+    "description": "A wild 7B parameter model that merges several models using the new task_arithmetic merge method from mergekit.\nList of merged models:\n- NousResearch/Nous-Capybara-7B-V1.9\n- [HuggingFaceH4/zephyr-7b-beta](/models/huggingfaceh4/zephyr-7b-beta)\n- lemonilia/AshhLimaRP-Mistral-7B\n- Vulkane/120-Days-of-Sodom-LoRA-Mistral-7b\n- Undi95/Mistral-pippa-sharegpt-7b-qlora\n\n#merge #uncensored",
+    "endpoints": [
+      {
+        "context_length": 4096,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": 2048,
+        "name": "Lepton | undi95/toppy-m-7b:free",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "Lepton",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      }
+    ],
+    "id": "undi95/toppy-m-7b:free",
+    "name": "Toppy M 7B (free)"
+  }
+}

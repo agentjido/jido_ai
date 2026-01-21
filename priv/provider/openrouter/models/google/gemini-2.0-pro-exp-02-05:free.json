@@ -1,0 +1,25 @@
+{
+  "id": "google/gemini-2.0-pro-exp-02-05:free",
+  "name": "Google: Gemini Pro 2.0 Experimental (free)",
+  "description": "Gemini 2.0 Pro Experimental is a bleeding-edge version of the Gemini 2.0 Pro model. Because it's currently experimental, it will be **heavily rate-limited** by Google.\n\nUsage of Gemini is subject to Google's [Gemini Terms of Use](https://ai.google.dev/terms).\n\n#multimodal",
+  "capabilities": {
+    "code": false,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text+image->text",
+    "tokenizer": "Gemini",
+    "instruct_type": null
+  },
+  "created": 1738768044,
+  "endpoints": []
+}

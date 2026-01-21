@@ -1,0 +1,25 @@
+{
+  "id": "gryphe/mythomax-l2-13b:free",
+  "name": "MythoMax 13B (free)",
+  "description": "One of the highest performing and most popular fine-tunes of Llama 2 13B, with rich descriptions and roleplay. #merge",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "Llama2",
+    "instruct_type": "alpaca"
+  },
+  "created": 1688256000,
+  "endpoints": []
+}

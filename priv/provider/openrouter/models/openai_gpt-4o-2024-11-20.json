@@ -1,0 +1,45 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "GPT"
+    },
+    "created": 1732127594,
+    "description": "The 2024-11-20 version of GPT-4o offers a leveled-up creative writing ability with more natural, engaging, and tailored writing to improve relevance & readability. It’s also better at working with uploaded files, providing deeper insights & more thorough responses.\n\nGPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs. It maintains the intelligence level of [GPT-4 Turbo](/models/openai/gpt-4-turbo) while being twice as fast and 50% more cost-effective. GPT-4o also offers improved performance in processing non-English languages and enhanced visual capabilities.",
+    "endpoints": [
+      {
+        "context_length": 128000,
+        "max_completion_tokens": 16384,
+        "max_prompt_tokens": null,
+        "name": "OpenAI | openai/gpt-4o-2024-11-20",
+        "pricing": {
+          "completion": "0.00001",
+          "image": "0.003613",
+          "prompt": "0.0000025",
+          "request": "0"
+        },
+        "provider_name": "OpenAI",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "openai/gpt-4o-2024-11-20",
+    "name": "OpenAI: GPT-4o (2024-11-20)"
+  }
+}

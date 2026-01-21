@@ -1,0 +1,41 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Cohere"
+    },
+    "created": 1734158152,
+    "description": "Command R7B (12-2024) is a small, fast update of the Command R+ model, delivered in December 2024. It excels at RAG, tool use, agents, and similar tasks requiring complex reasoning and multiple steps.\n\nUse of this model is subject to Cohere's [Usage Policy](https://docs.cohere.com/docs/usage-policy) and [SaaS Agreement](https://cohere.com/saas-agreement).",
+    "endpoints": [
+      {
+        "context_length": 128000,
+        "max_completion_tokens": 4000,
+        "max_prompt_tokens": null,
+        "name": "Cohere | cohere/command-r7b-12-2024",
+        "pricing": {
+          "completion": "0.00000015",
+          "image": "0",
+          "prompt": "0.0000000375",
+          "request": "0"
+        },
+        "provider_name": "Cohere",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "seed",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "cohere/command-r7b-12-2024",
+    "name": "Cohere: Command R7B (12-2024)"
+  }
+}

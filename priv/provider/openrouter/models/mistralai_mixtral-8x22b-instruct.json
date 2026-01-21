@@ -1,0 +1,98 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "mistral",
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1713312000,
+    "description": "Mistral's official instruct fine-tuned version of [Mixtral 8x22B](/models/mistralai/mixtral-8x22b). It uses 39B active parameters out of 141B, offering unparalleled cost efficiency for its size. Its strengths include:\n- strong math, coding, and reasoning\n- large context length (64k)\n- fluency in English, French, Italian, German, and Spanish\n\nSee benchmarks on the launch announcement [here](https://mistral.ai/news/mixtral-8x22b/).\n#moe",
+    "endpoints": [
+      {
+        "context_length": 65536,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Fireworks | mistralai/mixtral-8x22b-instruct",
+        "pricing": {
+          "completion": "0.0000009",
+          "image": "0",
+          "prompt": "0.0000009",
+          "request": "0"
+        },
+        "provider_name": "Fireworks",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "response_format",
+          "structured_outputs",
+          "logit_bias",
+          "logprobs",
+          "top_logprobs"
+        ]
+      },
+      {
+        "context_length": 65536,
+        "max_completion_tokens": 2048,
+        "max_prompt_tokens": null,
+        "name": "Together | mistralai/mixtral-8x22b-instruct",
+        "pricing": {
+          "completion": "0.0000012",
+          "image": "0",
+          "prompt": "0.0000012",
+          "request": "0"
+        },
+        "provider_name": "Together",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "top_k",
+          "repetition_penalty",
+          "logit_bias",
+          "min_p",
+          "response_format"
+        ]
+      },
+      {
+        "context_length": 65536,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Mistral | mistralai/mixtral-8x22b-instruct",
+        "pricing": {
+          "completion": "0.000006",
+          "image": "0",
+          "prompt": "0.000002",
+          "request": "0"
+        },
+        "provider_name": "Mistral",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "response_format",
+          "structured_outputs",
+          "seed"
+        ]
+      }
+    ],
+    "id": "mistralai/mixtral-8x22b-instruct",
+    "name": "Mistral: Mixtral 8x22B Instruct"
+  }
+}

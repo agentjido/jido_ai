@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1729123200,
+    "description": "Ministral 3B is a 3B parameter model optimized for on-device and edge computing. It excels in knowledge, commonsense reasoning, and function-calling, outperforming larger models like Mistral 7B on most benchmarks. Supporting up to 128k context length, it’s ideal for orchestrating agentic workflows and specialist tasks with efficient inference.",
+    "endpoints": [
+      {
+        "context_length": 128000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Mistral | mistralai/ministral-3b",
+        "pricing": {
+          "completion": "0.00000004",
+          "image": "0",
+          "prompt": "0.00000004",
+          "request": "0"
+        },
+        "provider_name": "Mistral",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "response_format",
+          "structured_outputs",
+          "seed"
+        ]
+      }
+    ],
+    "id": "mistralai/ministral-3b",
+    "name": "Mistral: Ministral 3B"
+  }
+}

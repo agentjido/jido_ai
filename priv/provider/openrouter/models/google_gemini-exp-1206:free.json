@@ -1,0 +1,40 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Gemini"
+    },
+    "created": 1733507713,
+    "description": "Experimental release (December 6, 2024) of Gemini.",
+    "endpoints": [
+      {
+        "context_length": 2097152,
+        "max_completion_tokens": 8192,
+        "max_prompt_tokens": 32768,
+        "name": "Google AI Studio | google/gemini-exp-1206:free",
+        "pricing": {
+          "completion": "0",
+          "image": "0",
+          "prompt": "0",
+          "request": "0"
+        },
+        "provider_name": "Google AI Studio",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "response_format",
+          "structured_outputs"
+        ]
+      }
+    ],
+    "id": "google/gemini-exp-1206:free",
+    "name": "Google: Gemini Experimental 1206 (free)"
+  }
+}

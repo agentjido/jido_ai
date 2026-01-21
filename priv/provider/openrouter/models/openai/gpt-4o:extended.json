@@ -1,0 +1,25 @@
+{
+  "id": "openai/gpt-4o:extended",
+  "name": "OpenAI: GPT-4o (extended)",
+  "description": "GPT-4o (\"o\" for \"omni\") is OpenAI's latest AI model, supporting both text and image inputs with text outputs. It maintains the intelligence level of [GPT-4 Turbo](/models/openai/gpt-4-turbo) while being twice as fast and 50% more cost-effective. GPT-4o also offers improved performance in processing non-English languages and enhanced visual capabilities.\n\nFor benchmarking against other models, it was briefly called [\"im-also-a-good-gpt2-chatbot\"](https://twitter.com/LiamFedus/status/1790064963966370209)\n\n#multimodal",
+  "capabilities": {
+    "code": true,
+    "image": true,
+    "chat": true,
+    "embedding": false,
+    "vision": true,
+    "multimodal": true,
+    "audio": false
+  },
+  "tier": {
+    "value": "advanced",
+    "description": "High-performance model"
+  },
+  "architecture": {
+    "modality": "text+image->text",
+    "tokenizer": "GPT",
+    "instruct_type": null
+  },
+  "created": 1715558400,
+  "endpoints": []
+}

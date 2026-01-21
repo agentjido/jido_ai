@@ -1,0 +1,41 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "chatml",
+      "modality": "text->text",
+      "tokenizer": "Other"
+    },
+    "created": 1737806501,
+    "description": "Liquid's LFM 3B delivers incredible performance for its size. It positions itself as first place among 3B parameter transformers, hybrids, and RNN models It is also on par with Phi-3.5-mini on multiple benchmarks, while being 18.4% smaller.\n\nLFM-3B is the ideal choice for mobile and other edge text-based applications.\n\nSee the [launch announcement](https://www.liquid.ai/liquid-foundation-models) for benchmarks and more info.",
+    "endpoints": [
+      {
+        "context_length": 32768,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Liquid | liquid/lfm-3b",
+        "pricing": {
+          "completion": "0.00000002",
+          "image": "0",
+          "prompt": "0.00000002",
+          "request": "0"
+        },
+        "provider_name": "Liquid",
+        "quantization": null,
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "seed",
+          "top_k",
+          "min_p",
+          "repetition_penalty"
+        ]
+      }
+    ],
+    "id": "liquid/lfm-3b",
+    "name": "Liquid: LFM 3B"
+  }
+}

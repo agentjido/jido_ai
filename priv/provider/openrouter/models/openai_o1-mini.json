@@ -1,0 +1,33 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "GPT"
+    },
+    "created": 1726099200,
+    "description": "The latest and strongest model family from OpenAI, o1 is designed to spend more time thinking before responding.\n\nThe o1 models are optimized for math, science, programming, and other STEM-related tasks. They consistently exhibit PhD-level accuracy on benchmarks in physics, chemistry, and biology. Learn more in the [launch announcement](https://openai.com/o1).\n\nNote: This model is currently experimental and not suitable for production use-cases, and may be heavily rate-limited.",
+    "endpoints": [
+      {
+        "context_length": 128000,
+        "max_completion_tokens": 65536,
+        "max_prompt_tokens": null,
+        "name": "OpenAI | openai/o1-mini",
+        "pricing": {
+          "completion": "0.0000044",
+          "image": "0",
+          "prompt": "0.0000011",
+          "request": "0"
+        },
+        "provider_name": "OpenAI",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "seed",
+          "max_tokens"
+        ]
+      }
+    ],
+    "id": "openai/o1-mini",
+    "name": "OpenAI: o1-mini"
+  }
+}

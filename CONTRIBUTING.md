@@ -1,24 +1,24 @@
-# Contributing to Jido.AI
+# Contributing
 
-Thank you for your interest in contributing to Jido.AI!
+Thank you for your interest in contributing!
 
-## Development Setup
+## Getting Started
 
-1. Clone the repository
-2. Install dependencies: `mix deps.get`
-3. Run tests: `mix test`
-4. Run quality checks: `mix quality`
+```bash
+git clone git@github.com:agentjido/jido_ai.git
+cd jido_ai
+mix deps.get
+mix test
+mix quality
+```
 
-## Pull Request Process
+## Development
 
-1. Ensure all tests pass: `mix test`
-2. Run quality checks: `mix quality` (format, compile, credo, dialyzer)
-3. Update documentation as needed
-4. Use conventional commit messages
+- Run `mix quality` (or `mix q`) before committing
+- Follow [conventional commits](https://www.conventionalcommits.org/)
+- Install git hooks: `mix git_hooks.install`
 
 ## Commit Message Format
-
-We use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
 <type>[optional scope]: <description>
@@ -28,30 +28,31 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 [optional footer(s)]
 ```
 
-**Types:**
-- `feat` - New feature
-- `fix` - Bug fix
-- `docs` - Documentation only
-- `style` - Formatting, no code change
-- `refactor` - Code change, no fix or feature
-- `test` - Adding or updating tests
-- `chore` - Maintenance tasks
+**Types:** feat, fix, docs, style, refactor, perf, test, chore, ci
 
-## Code Style
-
-- Run `mix format` before committing
-- Follow Elixir community conventions
-- Add `@moduledoc` and `@doc` for public modules and functions
-- Use Zoi schemas for validation in new actions
-- Return `{:ok, result}` or `{:error, reason}` tuples
+**Examples:**
+```
+feat: add retry logic to API client
+fix(auth): handle expired tokens gracefully
+feat!: rename User to Account (breaking change)
+```
 
 ## Testing
 
-- Write tests for new functionality
-- Ensure existing tests pass
-- Use `test/support/` for shared test helpers
-- Tag flaky tests with `@tag :flaky`
+```bash
+mix test                   # Run all tests
+mix test --only tag_name   # Run specific tests
+mix test --cover           # With coverage
+```
+
+## Pull Request Process
+
+1. Create a feature branch from `main`
+2. Make changes following our code style
+3. Run `mix quality` - all checks must pass
+4. Write a descriptive PR with conventional commit format
+5. Reference related issues
 
 ## Questions?
 
-Join our [Discord](https://agentjido.xyz/discord) for discussion.
+Open a GitHub issue or join our [Discord](https://agentjido.xyz/discord).

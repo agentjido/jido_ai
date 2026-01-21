@@ -1,0 +1,20 @@
+{
+  "id": "omni-moderation-latest",
+  "name": "omni-moderation-latest",
+  "description": "",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": false,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "created": 1731689265,
+  "owned_by": "system"
+}

@@ -1,9 +1,8 @@
-defmodule JidoAi.MixProject do
+defmodule Jido.Ai.MixProject do
   use Mix.Project
 
-  @version "2.0.0"
+  @version "0.5.3"
   @source_url "https://github.com/agentjido/jido_ai"
-  @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
 
   def project do
     [
@@ -14,138 +13,137 @@ defmodule JidoAi.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
-
-      # Documentation
+      dialyzer: [
+        plt_add_apps: [:mix, :ex_unit],
+        flags: [
+          :error_handling,
+          :underspecs
+        ]
+      ],
       name: "Jido AI",
-      description: @description,
-      source_url: @source_url,
-      homepage_url: @source_url,
+      description: "Jido Actions and Workflows for interacting with LLMs",
       package: package(),
       docs: docs(),
+      source_url: @source_url,
+      consolidate_protocols: Mix.env() != :test,
 
-      # Test Coverage
-      test_coverage: [
-        tool: ExCoveralls,
-        summary: [threshold: 90]
-      ],
-
-      # Dialyzer
-      dialyzer: [
-        plt_local_path: "priv/plts/project.plt",
-        plt_core_path: "priv/plts/core.plt"
-      ]
+      # Coverage
+      test_coverage: [tool: ExCoveralls, export: "cov"]
     ]
   end
 
   def cli do
     [
       preferred_envs: [
+        "test.unit": :test,
+        "test.integration": :test,
+        "test.providers": :test,
+        "test.all": :test,
         coveralls: :test,
+        "coveralls.github": :test,
+        "coveralls.lcov": :test,
         "coveralls.detail": :test,
         "coveralls.post": :test,
         "coveralls.html": :test,
-        "coveralls.github": :test
+        "coveralls.cobertura": :test
       ]
     ]
   end
 
+  # Run "mix help compile.app" to learn about applications.
   def application do
     [
+      mod: {Jido.AI.Application, []},
       extra_applications: [:logger]
     ]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib"]
   defp elixirc_paths(_), do: ["lib"]
 
+  # Run "mix help deps" to learn about dependencies.
   defp deps do
-    jido_deps() ++ runtime_deps() ++ dev_test_deps()
-  end
+    require Logger
+    use_local_deps = System.get_env("LOCAL_JIDO_DEPS") == "true" || false
 
-  defp jido_deps do
-    [
-      jido_dep(:jido, "../jido", "~> 2.0"),
-      # Use github source to match jido's dependency; local path takes precedence if available
-      jido_dep_git(:req_llm, "../req_llm", "agentjido/req_llm", "main")
-    ]
-  end
+    deps = [
+      {:dotenvy, "~> 1.1.0"},
+      {:solid, "~> 1.2.0"},
+      {:typed_struct, "~> 0.3.0"},
 
-  defp runtime_deps do
-    [
-      {:fsmx, "~> 0.5"},
-      {:jason, "~> 1.4"},
-      {:nimble_options, "~> 1.1"},
-      {:splode, "~> 0.2.4"},
-      {:typedstruct, "~> 0.5"},
-      {:uniq, "~> 0.6"},
-      {:zoi, "~> 0.14"}
-    ]
-  end
+      # Clients
+      {:req, "~> 0.5.8"},
+      {:req_llm, "~> 1.0.0-rc.5"},
+      {:openai_ex, "~> 0.9.0"},
 
-  defp dev_test_deps do
-    [
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      # Testing
+      {:credo, "~> 1.7", only: [:dev, :test]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.18", only: [:dev, :test]},
+      {:doctor, "~> 0.22.0", only: [:dev, :test]},
+      {:ex_check, "~> 0.12", only: [:dev, :test]},
+      {:ex_doc, "~> 0.39.3", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
+      {:expublish, "~> 2.5", only: [:dev], runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
-      {:git_ops, "~> 2.9", only: :dev, runtime: false},
-      {:mimic, "~> 2.0", only: :test},
-      {:quokka, "~> 2.10", only: [:dev, :test], runtime: false},
-      {:stream_data, "~> 1.0", only: [:dev, :test]}
+      {:git_ops, "~> 2.9", only: [:dev, :test]},
+      {:igniter, "~> 0.5", only: [:dev, :test]},
+      {:mimic, "~> 2.0", only: [:dev, :test]},
+      {:mix_audit, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
+      {:sobelow, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:stream_data, "~> 1.1", only: [:dev, :test]}
     ]
-  end
 
-  defp jido_dep(app, rel_path, hex_req, extra_opts \\ []) do
-    path = Path.expand(rel_path, __DIR__)
+    if use_local_deps do
+      require Logger
+      Logger.warning("Using local Jido dependencies")
 
-    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
-      {app, Keyword.merge([path: rel_path, override: true], extra_opts)}
+      deps ++
+        [
+          {:jido, path: "../jido"}
+          # {:jido_memory, path: "../jido_memory"}
+        ]
     else
-      {app, hex_req, extra_opts}
-    end
-    |> case do
-      {app, opts} when is_list(opts) -> {app, opts}
-      {app, req, opts} -> {app, req, opts}
-    end
-  end
-
-  defp jido_dep_git(app, rel_path, github_repo, branch) do
-    path = Path.expand(rel_path, __DIR__)
-
-    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
-      {app, path: rel_path, override: true}
-    else
-      {app, github: github_repo, branch: branch, override: true}
+      deps ++
+        [
+          {:jido, "~> 1.2.0"}
+          # {:jido_memory, github: "agentjido/jido_memory"}
+        ]
     end
   end
 
   defp aliases do
     [
-      setup: ["deps.get", "git_hooks.install"],
-      test: "test --exclude flaky",
+      # Memory-friendly test aliases
+      "test.unit": "test --exclude integration_testing --exclude provider_validation",
+      "test.integration": "test --only integration_testing --max-cases 1",
+      "test.providers": "test --only provider_validation --max-cases 1",
+      "test.all": ["test.unit", "test.integration", "test.providers"],
+
+      # Other aliases
+      docs: "docs -f html --open",
       q: ["quality"],
       quality: [
         "format --check-formatted",
         "compile --warnings-as-errors",
         "credo --min-priority higher",
         "dialyzer"
-      ],
-      docs: "docs -f html"
+      ]
     ]
   end
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "CHANGELOG.md", "usage-rules.md"],
+      files: ["lib", "mix.exs", "README.md", "LICENSE"],
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{
-        "Changelog" => "https://hexdocs.pm/jido_ai/changelog.html",
-        "Discord" => "https://agentjido.xyz/discord",
         "Documentation" => "https://hexdocs.pm/jido_ai",
         "GitHub" => @source_url,
-        "Website" => "https://agentjido.xyz"
+        "Website" => "https://agentjido.xyz",
+        "Discord" => "https://agentjido.xyz/discord",
+        "Changelog" => "https://github.com/agentjido/jido_ai/blob/main/CHANGELOG.md"
       }
     ]
   end
@@ -154,16 +152,39 @@ defmodule JidoAi.MixProject do
     [
       main: "readme",
       source_ref: "v#{@version}",
+      source_url: @source_url,
       extras: [
         "README.md",
-        "CHANGELOG.md",
-        "CONTRIBUTING.md"
+
+        # User Guides
+        {"guides/user/getting-started.md", title: "Getting Started"},
+        {"guides/user/models.md", title: "Models"},
+        {"guides/user/prompts.md", title: "Prompts"},
+        {"guides/user/configuration.md", title: "Configuration"},
+        {"guides/user/chat-completion.md", title: "Chat Completion"},
+        {"guides/user/conversations.md", title: "Conversations"},
+
+        # Runners
+        {"guides/user/runners/overview.md", title: "Runners Overview"},
+        {"guides/user/runners/chain-of-thought.md", title: "Chain of Thought"},
+        {"guides/user/runners/react.md", title: "ReAct"},
+        {"guides/user/runners/self-consistency.md", title: "Self-Consistency"},
+        {"guides/user/runners/tree-of-thoughts.md", title: "Tree of Thoughts"},
+        {"guides/user/runners/gepa.md", title: "GEPA"},
+
+        # Developer Guides
+        {"guides/developer/architecture.md", title: "Architecture Overview"},
+        {"guides/developer/model-system.md", title: "Model System"},
+        {"guides/developer/prompt-system.md", title: "Prompt System"},
+        {"guides/developer/actions-system.md", title: "Actions System"},
+        {"guides/developer/runners-system.md", title: "Runners System"},
+        {"guides/developer/data-flow.md", title: "Data Flow"}
       ],
-      groups_for_modules: [
-        Core: [
-          Jido.AI,
-          Jido.AI.Error
-        ]
+      groups_for_extras: [
+        "Getting Started":
+          ~r/guides\/user\/(getting-started|models|prompts|configuration|chat-completion|conversations)\.md/,
+        Runners: ~r/guides\/user\/runners\/.*/,
+        "Developer Guides": ~r/guides\/developer\/.*/
       ]
     ]
   end

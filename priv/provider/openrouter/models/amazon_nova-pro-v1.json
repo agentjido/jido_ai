@@ -1,0 +1,37 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Nova"
+    },
+    "created": 1733436303,
+    "description": "Amazon Nova Pro 1.0 is a capable multimodal model from Amazon focused on providing a combination of accuracy, speed, and cost for a wide range of tasks. As of December 2024, it achieves state-of-the-art performance on key benchmarks including visual question answering (TextVQA) and video understanding (VATEX).\n\nAmazon Nova Pro demonstrates strong capabilities in processing both visual and textual information and at analyzing financial documents.\n\n**NOTE**: Video input is not supported at this time.",
+    "endpoints": [
+      {
+        "context_length": 300000,
+        "max_completion_tokens": 5120,
+        "max_prompt_tokens": null,
+        "name": "Amazon Bedrock | amazon/nova-pro-v1",
+        "pricing": {
+          "completion": "0.0000032",
+          "image": "0.0012",
+          "prompt": "0.0000008",
+          "request": "0"
+        },
+        "provider_name": "Amazon Bedrock",
+        "quantization": null,
+        "supported_parameters": [
+          "tools",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "stop"
+        ]
+      }
+    ],
+    "id": "amazon/nova-pro-v1",
+    "name": "Amazon: Nova Pro 1.0"
+  }
+}

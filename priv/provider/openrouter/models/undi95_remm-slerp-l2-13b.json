@@ -1,0 +1,97 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": "alpaca",
+      "modality": "text->text",
+      "tokenizer": "Llama2"
+    },
+    "created": 1689984000,
+    "description": "A recreation trial of the original MythoMax-L2-B13 but with updated models. #merge",
+    "endpoints": [
+      {
+        "context_length": 4096,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "Featherless | undi95/remm-slerp-l2-13b",
+        "pricing": {
+          "completion": "0.0000012",
+          "image": "0",
+          "prompt": "0.0000008",
+          "request": "0"
+        },
+        "provider_name": "Featherless",
+        "quantization": "fp8",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "top_k",
+          "min_p",
+          "seed"
+        ]
+      },
+      {
+        "context_length": 6144,
+        "max_completion_tokens": 512,
+        "max_prompt_tokens": null,
+        "name": "Mancer | undi95/remm-slerp-l2-13b",
+        "pricing": {
+          "completion": "0.000001125",
+          "image": "0",
+          "prompt": "0.000001125",
+          "request": "0"
+        },
+        "provider_name": "Mancer",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed",
+          "top_a"
+        ]
+      },
+      {
+        "context_length": 6144,
+        "max_completion_tokens": 512,
+        "max_prompt_tokens": null,
+        "name": "Mancer 2 | undi95/remm-slerp-l2-13b",
+        "pricing": {
+          "completion": "0.0000015",
+          "image": "0",
+          "prompt": "0.0000015",
+          "request": "0"
+        },
+        "provider_name": "Mancer 2",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "repetition_penalty",
+          "logit_bias",
+          "top_k",
+          "min_p",
+          "seed",
+          "top_a"
+        ]
+      }
+    ],
+    "id": "undi95/remm-slerp-l2-13b",
+    "name": "ReMM SLERP 13B"
+  }
+}

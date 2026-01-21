@@ -1,0 +1,316 @@
+{
+  "data": [
+    {
+      "created": 1734115920,
+      "id": "gpt-4o-mini-audio-preview-2024-12-17",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1732734466,
+      "id": "omni-moderation-2024-09-26",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1739331543,
+      "id": "gpt-4o-2024-11-20",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1698785189,
+      "id": "dall-e-3",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1698798177,
+      "id": "dall-e-2",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1727389042,
+      "id": "gpt-4o-audio-preview-2024-10-01",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1727460443,
+      "id": "gpt-4o-audio-preview",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1725648979,
+      "id": "o1-mini-2024-09-12",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1734112601,
+      "id": "gpt-4o-mini-realtime-preview-2024-12-17",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1725648865,
+      "id": "o1-preview-2024-09-12",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1725649008,
+      "id": "o1-mini",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1725648897,
+      "id": "o1-preview",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1734387380,
+      "id": "gpt-4o-mini-realtime-preview",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1734326976,
+      "id": "o1-2024-12-17",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1677532384,
+      "id": "whisper-1",
+      "object": "model",
+      "owned_by": "openai-internal"
+    },
+    {
+      "created": 1712361441,
+      "id": "gpt-4-turbo",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1734387424,
+      "id": "gpt-4o-mini-audio-preview",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1722814719,
+      "id": "gpt-4o-2024-08-06",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1715367049,
+      "id": "gpt-4o",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1727131766,
+      "id": "gpt-4o-realtime-preview-2024-10-01",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1687882411,
+      "id": "gpt-4",
+      "object": "model",
+      "owned_by": "openai"
+    },
+    {
+      "created": 1692634615,
+      "id": "babbage-002",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1699053533,
+      "id": "tts-1-hd-1106",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1734034239,
+      "id": "gpt-4o-audio-preview-2024-12-17",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1715368132,
+      "id": "gpt-4o-2024-05-13",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1734375816,
+      "id": "o1",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1699046015,
+      "id": "tts-1-hd",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1706037777,
+      "id": "gpt-4-turbo-preview",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1706037612,
+      "id": "gpt-4-0125-preview",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1681940951,
+      "id": "tts-1",
+      "object": "model",
+      "owned_by": "openai-internal"
+    },
+    {
+      "created": 1699053241,
+      "id": "tts-1-1106",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1712601677,
+      "id": "gpt-4-turbo-2024-04-09",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1692634301,
+      "id": "davinci-002",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1698959748,
+      "id": "gpt-3.5-turbo-1106",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1692901427,
+      "id": "gpt-3.5-turbo-instruct",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1723515131,
+      "id": "chatgpt-4o-latest",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1694122472,
+      "id": "gpt-3.5-turbo-instruct-0914",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1706048358,
+      "id": "gpt-3.5-turbo-0125",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1733945430,
+      "id": "gpt-4o-realtime-preview-2024-12-17",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1677610602,
+      "id": "gpt-3.5-turbo",
+      "object": "model",
+      "owned_by": "openai"
+    },
+    {
+      "created": 1727659998,
+      "id": "gpt-4o-realtime-preview",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1683758102,
+      "id": "gpt-3.5-turbo-16k",
+      "object": "model",
+      "owned_by": "openai-internal"
+    },
+    {
+      "created": 1721172717,
+      "id": "gpt-4o-mini-2024-07-18",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1705948997,
+      "id": "text-embedding-3-small",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1721172741,
+      "id": "gpt-4o-mini",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1698957206,
+      "id": "gpt-4-1106-preview",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1671217299,
+      "id": "text-embedding-ada-002",
+      "object": "model",
+      "owned_by": "openai-internal"
+    },
+    {
+      "created": 1705953180,
+      "id": "text-embedding-3-large",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1686588896,
+      "id": "gpt-4-0613",
+      "object": "model",
+      "owned_by": "openai"
+    },
+    {
+      "created": 1738010200,
+      "id": "o3-mini-2025-01-31",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1731689265,
+      "id": "omni-moderation-latest",
+      "object": "model",
+      "owned_by": "system"
+    },
+    {
+      "created": 1737146383,
+      "id": "o3-mini",
+      "object": "model",
+      "owned_by": "system"
+    }
+  ]
+}

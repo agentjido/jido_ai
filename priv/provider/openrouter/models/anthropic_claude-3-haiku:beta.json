@@ -1,0 +1,38 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text+image->text",
+      "tokenizer": "Claude"
+    },
+    "created": 1710288000,
+    "description": "Claude 3 Haiku is Anthropic's fastest and most compact model for\nnear-instant responsiveness. Quick and accurate targeted performance.\n\nSee the launch announcement and benchmark results [here](https://www.anthropic.com/news/claude-3-haiku)\n\n#multimodal",
+    "endpoints": [
+      {
+        "context_length": 200000,
+        "max_completion_tokens": 4096,
+        "max_prompt_tokens": null,
+        "name": "Anthropic | anthropic/claude-3-haiku:beta",
+        "pricing": {
+          "completion": "0.00000125",
+          "image": "0.0004",
+          "prompt": "0.00000025",
+          "request": "0"
+        },
+        "provider_name": "Anthropic",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "top_k",
+          "stop"
+        ]
+      }
+    ],
+    "id": "anthropic/claude-3-haiku:beta",
+    "name": "Anthropic: Claude 3 Haiku (self-moderated)"
+  }
+}

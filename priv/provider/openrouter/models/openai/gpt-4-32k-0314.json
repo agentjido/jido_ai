@@ -1,0 +1,25 @@
+{
+  "id": "openai/gpt-4-32k-0314",
+  "name": "OpenAI: GPT-4 32k (older v0314)",
+  "description": "GPT-4-32k is an extended version of GPT-4, with the same capabilities but quadrupled context length, allowing for processing up to 40 pages of text in a single pass. This is particularly beneficial for handling longer content like interacting with PDFs without an external vector database. Training data: up to Sep 2021.",
+  "capabilities": {
+    "code": true,
+    "image": false,
+    "chat": true,
+    "embedding": false,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "advanced",
+    "description": "High-performance model"
+  },
+  "architecture": {
+    "modality": "text->text",
+    "tokenizer": "GPT",
+    "instruct_type": null
+  },
+  "created": 1693180800,
+  "endpoints": []
+}

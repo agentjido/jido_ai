@@ -1,0 +1,20 @@
+{
+  "id": "text-embedding-3-small",
+  "name": "text-embedding-3-small",
+  "description": "",
+  "capabilities": {
+    "code": false,
+    "image": false,
+    "chat": false,
+    "embedding": true,
+    "vision": false,
+    "multimodal": false,
+    "audio": false
+  },
+  "tier": {
+    "value": "basic",
+    "description": "Entry-level model"
+  },
+  "created": 1705948997,
+  "owned_by": "system"
+}

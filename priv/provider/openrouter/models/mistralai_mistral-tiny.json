@@ -1,0 +1,42 @@
+{
+  "data": {
+    "architecture": {
+      "instruct_type": null,
+      "modality": "text->text",
+      "tokenizer": "Mistral"
+    },
+    "created": 1704844800,
+    "description": "This model is currently powered by Mistral-7B-v0.2, and incorporates a \"better\" fine-tuning than [Mistral 7B](/models/mistralai/mistral-7b-instruct-v0.1), inspired by community work. It's best used for large batch processing tasks where cost is a significant factor but reasoning capabilities are not crucial.",
+    "endpoints": [
+      {
+        "context_length": 32000,
+        "max_completion_tokens": null,
+        "max_prompt_tokens": null,
+        "name": "Mistral | mistralai/mistral-tiny",
+        "pricing": {
+          "completion": "0.00000025",
+          "image": "0",
+          "prompt": "0.00000025",
+          "request": "0"
+        },
+        "provider_name": "Mistral",
+        "quantization": "unknown",
+        "supported_parameters": [
+          "tools",
+          "tool_choice",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "stop",
+          "frequency_penalty",
+          "presence_penalty",
+          "response_format",
+          "structured_outputs",
+          "seed"
+        ]
+      }
+    ],
+    "id": "mistralai/mistral-tiny",
+    "name": "Mistral Tiny"
+  }
+}
