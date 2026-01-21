@@ -9,7 +9,7 @@ defmodule JidoAi.MixProject do
     [
       app: :jido_ai,
       version: @version,
-      elixir: "~> 1.17",
+      elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -59,33 +59,22 @@ defmodule JidoAi.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
-    jido_deps() ++ runtime_deps() ++ dev_test_deps()
-  end
-
-  defp jido_deps do
     [
-      jido_dep(:jido, "../jido", "~> 2.0"),
-      # Use github source to match jido's dependency; local path takes precedence if available
-      jido_dep_git(:req_llm, "../req_llm", "agentjido/req_llm", "main")
-    ]
-  end
+      # Jido ecosystem
+      {:jido, "~> 2.0.0-rc.1"},
+      {:req_llm, "~> 1.3"},
 
-  defp runtime_deps do
-    [
+      # Runtime dependencies
       {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
-      {:nimble_options, "~> 1.1"},
-      {:splode, "~> 0.2.4"},
-      {:typedstruct, "~> 0.5"},
+      {:splode, "~> 0.3"},
       {:uniq, "~> 0.6"},
-      {:zoi, "~> 0.14"}
-    ]
-  end
+      {:zoi, "~> 0.16"},
 
-  defp dev_test_deps do
-    [
+      # Dev/test dependencies
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:doctor, "~> 0.21", only: :dev, runtime: false},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18", only: [:dev, :test]},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
@@ -96,30 +85,6 @@ defmodule JidoAi.MixProject do
     ]
   end
 
-  defp jido_dep(app, rel_path, hex_req, extra_opts \\ []) do
-    path = Path.expand(rel_path, __DIR__)
-
-    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
-      {app, Keyword.merge([path: rel_path, override: true], extra_opts)}
-    else
-      {app, hex_req, extra_opts}
-    end
-    |> case do
-      {app, opts} when is_list(opts) -> {app, opts}
-      {app, req, opts} -> {app, req, opts}
-    end
-  end
-
-  defp jido_dep_git(app, rel_path, github_repo, branch) do
-    path = Path.expand(rel_path, __DIR__)
-
-    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
-      {app, path: rel_path, override: true}
-    else
-      {app, github: github_repo, branch: branch, override: true}
-    end
-  end
-
   defp aliases do
     [
       setup: ["deps.get", "git_hooks.install"],
@@ -128,6 +93,7 @@ defmodule JidoAi.MixProject do
       quality: [
         "format --check-formatted",
         "compile --warnings-as-errors",
+        "doctor --raise",
         "credo --min-priority higher",
         "dialyzer"
       ],
