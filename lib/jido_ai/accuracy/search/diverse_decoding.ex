@@ -69,14 +69,14 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
 
   """
 
-  @behaviour SearchController
-
   alias Jido.AI.Accuracy.{
     Candidate,
     SearchController,
     Similarity,
     VerificationResult
   }
+
+  @behaviour SearchController
 
   @type t :: %__MODULE__{
           num_candidates: pos_integer(),

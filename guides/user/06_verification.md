@@ -2,6 +2,56 @@
 
 Verification is the process of validating and scoring candidate responses to ensure accuracy and quality.
 
+## The Verification Problem
+
+Verification addresses a fundamental challenge in LLM systems: **how do we know if a generated response is correct?** Without verification, systems must blindly trust LLM outputs, which can contain hallucinations, factual errors, or flawed reasoning.
+
+### The Verification Spectrum
+
+Verification methods exist on a spectrum from fast/deterministic to slow/probabilistic:
+
+```mermaid
+graph LR
+    subgraph Fast
+        D1[Deterministic]
+        D2[Pattern Match]
+    end
+
+    subgraph Medium
+        C1[Code Execution]
+        C2[Static Analysis]
+    end
+
+    subgraph Slow
+        L1[LLM Evaluation]
+        L2[Human Review]
+    end
+
+    D1 --> C1
+    C1 --> L1
+```
+
+### Theoretical Foundation
+
+Verification is essentially a **quality estimation problem**. Given a candidate response C and question Q, we want to estimate P(C is correct | Q, C).
+
+Different verification approaches use different signals:
+- **Deterministic**: Exact match against known answer → P = 1 or 0
+- **Execution**: Run code/test → P based on pass/fail
+- **LLM**: Use another LLM to evaluate → P ∈ [0, 1]
+- **Ensemble**: Multiple verifiers → Aggregated P
+
+### Verification in LLM Accuracy Systems
+
+Verification enables several key capabilities:
+
+| Capability | Description | Example |
+|------------|-------------|---------|
+| **Candidate Selection** | Choose best from N candidates | Self-consistency aggregation |
+| **Quality Filtering** | Reject low-quality responses | Filter candidates below threshold |
+| **Confidence Estimation** | Predict correctness probability | Route to appropriate processing |
+| **Error Detection** | Identify specific issues | Provide feedback for revision |
+
 ## Overview
 
 Verification provides automated assessment of LLM responses, enabling:

@@ -63,7 +63,7 @@ defmodule Jido.AI.Accuracy.ComputeBudgeter do
 
   alias Jido.AI.Accuracy.{ComputeBudget, DifficultyEstimate, Helpers}
 
-  import Helpers, only: [get_attr: 2, get_attr: 3]
+  import Helpers, only: [get_attr: 3]
 
   @type t :: %__MODULE__{
           easy_budget: ComputeBudget.t(),

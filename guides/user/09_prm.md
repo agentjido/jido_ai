@@ -2,6 +2,100 @@
 
 Process Reward Models evaluate intermediate reasoning steps, not just final answers.
 
+## The Process Reward Model Algorithm
+
+Process Reward Models (PRMs) represent a paradigm shift from outcome-based reward modeling. Instead of providing feedback only on the final answer, PRMs evaluate each intermediate reasoning step, enabling fine-grained guidance for multi-step reasoning tasks.
+
+### Theoretical Foundation
+
+PRMs address a key limitation of outcome reward models: **credit assignment problem**. When a multi-step reasoning process fails, outcome models can only say "wrong" but cannot identify *where* the reasoning went wrong.
+
+PRMs were introduced in research showing that:
+- Step-level supervision enables better error localization
+- Early errors cascade into later failures
+- Guiding search with per-step rewards improves final accuracy
+
+### Key Difference: Process vs Outcome
+
+```mermaid
+graph TB
+    subgraph Outcome Model
+        O1[Step 1] --> O2[Step 2]
+        O2 --> O3[Step 3]
+        O3 --> O4[Final Answer]
+        O4 -.Score.-> OS{Single Score}
+    end
+
+    subgraph Process Model
+        P1[Step 1] --> PS1{Score}
+        PS1 --> P2[Step 2]
+        P2 --> PS2{Score}
+        PS2 --> P3[Step 3]
+        P3 --> PS3{Score}
+        PS3 --> P4[Final Answer]
+        P4 --> PS4{Score}
+    end
+
+    style PS1 fill:#90EE90
+    style PS2 fill:#90EE90
+    style PS3 fill:#90EE90
+    style PS4 fill:#90EE90
+```
+
+| Aspect | Outcome Model | Process Model |
+|--------|---------------|---------------|
+| **Granularity** | Final answer only | Each reasoning step |
+| **Feedback** | Binary (correct/wrong) | Continuous scores |
+| **Error Localization** | No | Yes |
+| **Guidance During** | No | Yes |
+| **Training Cost** | Lower | Higher |
+
+### Algorithm Mechanics
+
+```
+Input: Reasoning path P = [s1, s2, ..., sn], PRM model M
+Output: Path score, step classifications
+
+# Step-by-step evaluation
+scores = []
+For i = 1 to n:
+   step_score = M.classify_step(P[i], P[1..i-1], Question)
+   scores.append(step_score)
+
+# Aggregate to path score
+path_score = aggregate(scores, method=:average)
+
+Return path_score, scores
+```
+
+### Step Classification
+
+Steps are typically classified into quality buckets:
+
+| Label | Score Range | Meaning |
+|-------|-------------|---------|
+| `:good` | 0.8-1.0 | Correct reasoning |
+| `:partial` | 0.5-0.8 | Partially correct |
+| `:neutral` | 0.4-0.6 | Uncertain |
+| `:bad` | 0.0-0.4 | Incorrect reasoning |
+
+### Time and Space Complexity
+
+| Aspect | Complexity |
+|--------|------------|
+| **Time** | O(n × E) | n = steps, E = LLM evaluation cost |
+| **Space** | O(n × L) | L = average step length |
+| **Parallelizability** | O(n) | All steps can be scored in parallel |
+
+### Key Properties
+
+| Property | Value |
+|----------|-------|
+| **Accuracy Gain** | +10-20% for multi-step reasoning |
+| **Compute Cost** | n × single LLM call (n = steps) |
+| **Best For** | Multi-step math, logic, planning |
+| **Training Data** | Requires annotated reasoning steps |
+
 ## Overview
 
 Unlike outcome reward models that score only the final answer, PRMs evaluate each step of reasoning, providing granular feedback.

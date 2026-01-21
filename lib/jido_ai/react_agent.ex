@@ -101,11 +101,13 @@ defmodule Jido.AI.ReActAgent do
         Jido.AgentServer.cast(pid, signal)
       end
 
+      @impl true
       def on_before_cmd(agent, {:react_start, %{query: query}} = action) do
         agent = %{agent | state: Map.put(agent.state, :last_query, query)}
         {:ok, agent, action}
       end
 
+      @impl true
       def on_before_cmd(agent, action), do: {:ok, agent, action}
 
       @impl true

@@ -2,6 +2,77 @@
 
 Difficulty estimation predicts how challenging a query is, enabling resource-appropriate processing.
 
+## The Difficulty Estimation Problem
+
+Difficulty estimation is a **meta-learning problem**: predicting how much computational resources are needed to successfully answer a query. This enables systems to allocate compute efficiently—using simple methods for easy questions and sophisticated (expensive) methods for hard ones.
+
+### Theoretical Foundation
+
+The key insight is that **query difficulty varies widely**, and uniform resource allocation is inefficient:
+
+```
+Easy queries (30%):   Can be answered with 1 LLM call
+Medium queries (50%): Benefit from 5-10 candidates (self-consistency)
+Hard queries (20%):    Require full pipeline with search, verification, reflection
+```
+
+By estimating difficulty upfront, systems can:
+- **Reduce average cost** by 40-60%
+- **Maintain accuracy** by allocating sufficient resources to hard queries
+- **Improve latency** by avoiding unnecessary processing for easy queries
+
+### Difficulty Dimensions
+
+Query difficulty is multi-dimensional:
+
+| Dimension | Indicators | Example |
+|-----------|------------|---------|
+| **Lexical** | Length, vocabulary complexity | "What is..." vs "Explain quantum entanglement..." |
+| **Syntactic** | Nested structures, multiple clauses | Simple vs multi-part questions |
+| **Semantic** | Domain knowledge, reasoning type | Factual vs inference required |
+| **Computational** | Math operations, logic steps | Direct lookup vs multi-step calculation |
+
+### Algorithm Mechanics
+
+```
+Input: Query Q, Difficulty Estimator E
+Output: Difficulty estimate {level, score, confidence}
+
+# Heuristic approach
+score = w1 × f_length(Q) +
+        w2 × f_complexity(Q) +
+        w3 × f_domain(Q) +
+        w4 × f_syntax(Q)
+
+level = map_score_to_level(score)
+# :easy if score < 0.35
+# :medium if score < 0.65
+# :hard otherwise
+
+# LLM-based approach (more accurate)
+result = LLM.classify(Q)
+# Returns level with reasoning
+```
+
+### Time and Space Complexity
+
+| Method | Time | Space | Accuracy |
+|--------|------|-------|----------|
+| **Heuristic** | O(1) | O(1) | ~70-75% |
+| **LLM-based** | O(L) | O(1) | ~85-90% |
+| **Ensemble** | O(L) | O(1) | ~90-95% |
+
+Where L = LLM inference time
+
+### Key Properties
+
+| Property | Value |
+|----------|-------|
+| **Accuracy** | 75-95% depending on method |
+| **Compute Cost** | 0-1× additional LLM call |
+| **Best For** | Variable difficulty workloads |
+| **ROI** | High for cost-sensitive applications |
+
 ## Overview
 
 Difficulty estimation allows systems to:

@@ -116,7 +116,6 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
   end
 
   defp get_tool_name(%{name: name}), do: name
-  defp get_tool_name(%ReqLLM.Tool{} = tool), do: ReqLLM.Tool.name(tool)
   defp get_tool_name(_), do: nil
 
   defp build_opts(params) do

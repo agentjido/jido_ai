@@ -30,8 +30,6 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
 
   """
 
-  @behaviour PipelineStage
-
   alias Jido.AI.Accuracy.{
     PipelineStage,
     CalibrationGate,
@@ -39,6 +37,8 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
     Candidate,
     RoutingResult
   }
+
+  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           high_threshold: float(),

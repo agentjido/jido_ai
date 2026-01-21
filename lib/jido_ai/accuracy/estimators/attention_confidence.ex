@@ -64,11 +64,11 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
 
   """
 
-  @behaviour ConfidenceEstimator
-
   alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, ConfidenceEstimator, Helpers}
 
   import Helpers, only: [get_attr: 3]
+
+  @behaviour ConfidenceEstimator
 
   @type t :: %__MODULE__{
           aggregation: :product | :mean | :min,

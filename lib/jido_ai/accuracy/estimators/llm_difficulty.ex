@@ -91,11 +91,11 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
 
   """
 
-  @behaviour DifficultyEstimator
-
   alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator, Helpers}
 
   import Helpers, only: [get_attr: 2, get_attr: 3]
+
+  @behaviour DifficultyEstimator
 
   @type t :: %__MODULE__{
           model: String.t(),
