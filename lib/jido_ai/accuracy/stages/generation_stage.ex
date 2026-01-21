@@ -29,13 +29,13 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStage do
 
   """
 
+  @behaviour Jido.AI.Accuracy.PipelineStage
+
   alias Jido.AI.Accuracy.{
     PipelineStage,
     AdaptiveSelfConsistency,
     Candidate
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           min_candidates: pos_integer(),

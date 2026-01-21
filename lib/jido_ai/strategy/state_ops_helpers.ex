@@ -25,7 +25,8 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
   alias Jido.Agent.StateOp
 
-  @type state_op :: StateOp.SetState.t() | StateOp.SetPath.t() | StateOp.DeleteKeys.t()
+  @type state_op ::
+          StateOp.SetState.t() | StateOp.SetPath.t() | StateOp.DeleteKeys.t() | StateOp.DeletePath.t()
 
   @doc """
   Creates a StateOp to update the strategy state.
@@ -177,6 +178,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
       iex> StateOpsHelpers.remove_pending_tool("call_1")
       %StateOp.DeletePath{path: [:pending_tool_calls, "call_1"]}
   """
+  @dialyzer {:nowarn_function, remove_pending_tool: 1}
   @spec remove_pending_tool(String.t()) :: StateOp.DeletePath.t()
   def remove_pending_tool(tool_id) when is_binary(tool_id) do
     # Note: DeletePath removes a specific key, but pending_tool_calls is a list
@@ -206,6 +208,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
       iex> StateOpsHelpers.clear_call_id()
       %StateOp.DeletePath{path: [:current_llm_call_id]}
   """
+  @dialyzer {:nowarn_function, clear_call_id: 0}
   @spec clear_call_id() :: StateOp.DeletePath.t()
   def clear_call_id do
     StateOp.delete_path([:current_llm_call_id])

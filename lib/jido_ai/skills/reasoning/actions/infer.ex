@@ -30,8 +30,8 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
         context: "Consider that sprinklers can also make the ground wet."
       })
   """
-
   use Jido.Action,
+    # Dialyzer has incomplete PLT information about req_llm dependencies
     name: "reasoning_infer",
     description: "Draw logical inferences from given premises",
     category: "ai",
@@ -55,6 +55,12 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
   alias Jido.AI.Config
   alias Jido.AI.Helpers
   alias Jido.AI.Security
+
+  @dialyzer [
+    {:nowarn_function, run: 2},
+    {:nowarn_function, extract_text: 1},
+    {:nowarn_function, extract_usage: 1}
+  ]
 
   @inference_prompt """
   You are an expert logical reasoner. Your task is to draw valid inferences from given premises.

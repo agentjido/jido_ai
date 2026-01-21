@@ -187,10 +187,10 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
       end)
       |> Enum.reject(&is_nil/1)
 
-    if not Enum.empty?(results) do
-      {:ok, results}
-    else
+    if Enum.empty?(results) do
       {:error, :all_generations_failed}
+    else
+      {:ok, results}
     end
   end
 
@@ -335,8 +335,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   # Validation functions with security bounds (module attributes for guard compatibility)
 
   defp validate_temperature_range({min, max})
-       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max,
-       do: :ok
+       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max, do: :ok
 
   defp validate_temperature_range(_), do: {:error, :invalid_temperature_range}
 

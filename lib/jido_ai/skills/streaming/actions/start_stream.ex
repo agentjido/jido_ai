@@ -39,7 +39,6 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
       })
       # Use result.stream_id with ProcessTokens action
   """
-
   use Jido.Action,
     name: "streaming_start",
     description: "Start a streaming LLM request",
@@ -70,6 +69,17 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
   alias Jido.AI.Config
   alias Jido.AI.Helpers
   alias Jido.AI.Security
+
+  # Dialyzer has incomplete PLT information about req_llm dependencies
+  @dialyzer [
+    {:nowarn_function, run: 2},
+    {:nowarn_function, build_opts: 1},
+    {:nowarn_function, start_stream_processor: 3},
+    {:nowarn_function, process_stream: 5},
+    {:nowarn_function, handle_token: 4},
+    {:nowarn_function, finalize_stream: 4},
+    {:nowarn_function, extract_buffered_text: 2}
+  ]
 
   @doc """
   Executes the start stream action.

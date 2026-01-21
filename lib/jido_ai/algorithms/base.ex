@@ -124,6 +124,7 @@ defmodule Jido.AI.Algorithms.Base do
       # Default Metadata Implementation
       # ========================================================================
 
+      @doc false
       @impl true
       def metadata do
         opts = @_algorithm_opts
@@ -143,15 +144,19 @@ defmodule Jido.AI.Algorithms.Base do
       # Default Optional Callback Implementations
       # ========================================================================
 
+      @doc false
       @impl true
       def can_execute?(_input, _context), do: true
 
+      @doc false
       @impl true
       def before_execute(input, _context), do: {:ok, input}
 
+      @doc false
       @impl true
       def after_execute(result, _context), do: {:ok, result}
 
+      @doc false
       @impl true
       def on_error(error, _context), do: {:fail, error}
 

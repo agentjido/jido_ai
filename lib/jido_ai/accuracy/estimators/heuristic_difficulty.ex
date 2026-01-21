@@ -71,11 +71,11 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
 
   """
 
-  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator, Helpers}
+  @behaviour Jido.AI.Accuracy.DifficultyEstimator
 
-  import Helpers, only: [get_attr: 3]
+  import Jido.AI.Accuracy.Helpers, only: [get_attr: 3]
 
-  @behaviour DifficultyEstimator
+  alias Jido.AI.Accuracy.DifficultyEstimate
 
   @type t :: %__MODULE__{
           length_weight: float(),
