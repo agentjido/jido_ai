@@ -143,37 +143,65 @@ defmodule JidoTest.ReqLLMTestHelper do
   end
 
   @doc """
-  Creates a mock chat response.
+  Creates a mock chat response as a ReqLLM.Response struct.
 
   ## Parameters
   - `content` - The response content
   - `opts` - Optional configuration
 
   ## Options
-  - `:finish_reason` - Finish reason (default: "stop")
-  - `:prompt_tokens` - Prompt token count (default: 10)
-  - `:completion_tokens` - Completion token count (default: 20)
+  - `:finish_reason` - Finish reason (default: :stop)
+  - `:input_tokens` - Input token count (default: 10)
+  - `:output_tokens` - Output token count (default: 20)
   - `:total_tokens` - Total token count (default: 30)
+  - `:reasoning_tokens` - Reasoning token count (default: 0)
+  - `:cached_tokens` - Cached token count (default: 0)
+  - `:cache_creation_tokens` - Cache creation token count (default: 0)
+  - `:input_cost` - Input cost in USD (default: nil)
+  - `:output_cost` - Output cost in USD (default: nil)
+  - `:total_cost` - Total cost in USD (default: nil)
   - `:tool_calls` - List of tool calls (default: [])
 
   ## Examples
 
       mock_chat_response("Hello!")
       mock_chat_response("Result", tool_calls: [%{name: "search", arguments: %{}}])
+      mock_chat_response("Result", input_tokens: 100, output_tokens: 50)
   """
   def mock_chat_response(content, opts \\ []) do
-    %{
-      content: content,
+    tool_calls = Keyword.get(opts, :tool_calls, [])
+
+    usage =
+      %{
+        input_tokens: Keyword.get(opts, :input_tokens, 10),
+        output_tokens: Keyword.get(opts, :output_tokens, 20),
+        total_tokens: Keyword.get(opts, :total_tokens, 30),
+        reasoning_tokens: Keyword.get(opts, :reasoning_tokens, 0),
+        cached_tokens: Keyword.get(opts, :cached_tokens, 0),
+        cache_creation_tokens: Keyword.get(opts, :cache_creation_tokens, 0)
+      }
+      |> maybe_add_cost(:input_cost, Keyword.get(opts, :input_cost))
+      |> maybe_add_cost(:output_cost, Keyword.get(opts, :output_cost))
+      |> maybe_add_cost(:total_cost, Keyword.get(opts, :total_cost))
+
+    message = %ReqLLM.Message{
       role: :assistant,
-      finish_reason: Keyword.get(opts, :finish_reason, "stop"),
-      usage: %{
-        prompt_tokens: Keyword.get(opts, :prompt_tokens, 10),
-        completion_tokens: Keyword.get(opts, :completion_tokens, 20),
-        total_tokens: Keyword.get(opts, :total_tokens, 30)
-      },
-      tool_calls: Keyword.get(opts, :tool_calls, [])
+      content: [ReqLLM.Message.ContentPart.text(content)],
+      tool_calls: if(tool_calls == [], do: nil, else: tool_calls)
+    }
+
+    %ReqLLM.Response{
+      id: "test-response-#{System.unique_integer([:positive])}",
+      model: "test-model",
+      context: ReqLLM.Context.new([message]),
+      message: message,
+      usage: usage,
+      finish_reason: Keyword.get(opts, :finish_reason, :stop)
     }
   end
+
+  defp maybe_add_cost(usage, _key, nil), do: usage
+  defp maybe_add_cost(usage, key, cost), do: Map.put(usage, key, cost)
 
   @doc """
   Creates a mock chat response with tool calls.
@@ -224,7 +252,7 @@ defmodule JidoTest.ReqLLMTestHelper do
 
   ## Examples
 
-      mock_stream_chunks_with_usage(["Hello", "!"], %{prompt_tokens: 5, completion_tokens: 2})
+      mock_stream_chunks_with_usage(["Hello", "!"], %{input_tokens: 5, output_tokens: 2})
   """
   def mock_stream_chunks_with_usage(content_parts, usage) do
     chunks = mock_stream_chunks(content_parts)
