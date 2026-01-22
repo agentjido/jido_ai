@@ -8,16 +8,16 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithToolsTest do
 
   describe "schema" do
     test "has required fields" do
-      assert CallWithTools.schema()[:prompt][:required] == true
-      refute CallWithTools.schema()[:model][:required]
-      refute CallWithTools.schema()[:tools][:required]
+      assert CallWithTools.schema().fields[:prompt].meta.required == true
+      refute CallWithTools.schema().fields[:model].meta.required
+      refute CallWithTools.schema().fields[:tools].meta.required
     end
 
     test "has default values" do
-      assert CallWithTools.schema()[:max_tokens][:default] == 4096
-      assert CallWithTools.schema()[:temperature][:default] == 0.7
-      assert CallWithTools.schema()[:auto_execute][:default] == false
-      assert CallWithTools.schema()[:max_turns][:default] == 10
+      assert CallWithTools.schema().fields[:max_tokens].value == 4096
+      assert CallWithTools.schema().fields[:temperature].value == 0.7
+      assert CallWithTools.schema().fields[:auto_execute].value == false
+      assert CallWithTools.schema().fields[:max_turns].value == 10
     end
   end
 

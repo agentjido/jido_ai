@@ -8,17 +8,17 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStreamTest do
 
   describe "schema" do
     test "has required fields" do
-      assert StartStream.schema()[:prompt][:required] == true
-      refute StartStream.schema()[:model][:required]
-      refute StartStream.schema()[:on_token][:required]
-      refute StartStream.schema()[:buffer][:required]
+      assert StartStream.schema().fields[:prompt].meta.required == true
+      refute StartStream.schema().fields[:model].meta.required
+      refute StartStream.schema().fields[:on_token].meta.required
+      refute StartStream.schema().fields[:buffer].meta.required
     end
 
     test "has default values" do
-      assert StartStream.schema()[:max_tokens][:default] == 1024
-      assert StartStream.schema()[:temperature][:default] == 0.7
-      assert StartStream.schema()[:buffer][:default] == false
-      assert StartStream.schema()[:auto_process][:default] == true
+      assert StartStream.schema().fields[:max_tokens].value == 1024
+      assert StartStream.schema().fields[:temperature].value == 0.7
+      assert StartStream.schema().fields[:buffer].value == false
+      assert StartStream.schema().fields[:auto_process].value == true
     end
   end
 

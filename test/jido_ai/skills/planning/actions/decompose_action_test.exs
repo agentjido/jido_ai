@@ -8,15 +8,15 @@ defmodule Jido.AI.Skills.Planning.Actions.DecomposeTest do
 
   describe "schema" do
     test "has required fields" do
-      assert Decompose.schema()[:goal][:required] == true
-      refute Decompose.schema()[:model][:required]
-      refute Decompose.schema()[:context][:required]
+      assert Decompose.schema().fields[:goal].meta.required == true
+      refute Decompose.schema().fields[:model].meta.required
+      refute Decompose.schema().fields[:context].meta.required
     end
 
     test "has default values" do
-      assert Decompose.schema()[:max_depth][:default] == 3
-      assert Decompose.schema()[:max_tokens][:default] == 4096
-      assert Decompose.schema()[:temperature][:default] == 0.6
+      assert Decompose.schema().fields[:max_depth].value == 3
+      assert Decompose.schema().fields[:max_tokens].value == 4096
+      assert Decompose.schema().fields[:temperature].value == 0.6
     end
   end
 

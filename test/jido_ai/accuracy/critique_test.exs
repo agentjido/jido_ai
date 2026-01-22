@@ -10,7 +10,7 @@ defmodule Jido.AI.Accuracy.CritiqueTest do
     @behaviour Critique
 
     @impl true
-    def critique(%Candidate{content: content}, _context) do
+    def critique(_struct, %Candidate{content: content}, _context) do
       {:ok,
        CritiqueResult.new!(%{
          severity: 0.5,
@@ -25,7 +25,7 @@ defmodule Jido.AI.Accuracy.CritiqueTest do
     @behaviour Critique
 
     @impl true
-    def critique(%Candidate{} = candidate, _context) do
+    def critique(_struct, %Candidate{} = _candidate, _context) do
       {:ok,
        CritiqueResult.new!(%{
          severity: 0.3,
@@ -55,16 +55,16 @@ defmodule Jido.AI.Accuracy.CritiqueTest do
     @behaviour Critique
 
     @impl true
-    def critique(_candidate, _context) do
+    def critique(_struct, _candidate, _context) do
       {:error, :critique_failed}
     end
   end
 
-  describe "critique/2 callback" do
+  describe "critique/3 callback" do
     test "MockCritiquer implements critique correctly" do
       candidate = Candidate.new!(%{id: "1", content: "test response"})
 
-      assert {:ok, result} = MockCritiquer.critique(candidate, %{})
+      assert {:ok, result} = MockCritiquer.critique(nil, candidate, %{})
 
       assert result.severity == 0.5
       refute Enum.empty?(result.issues)
@@ -73,7 +73,7 @@ defmodule Jido.AI.Accuracy.CritiqueTest do
     test "critique includes content in issues" do
       candidate = Candidate.new!(%{id: "1", content: "specific content"})
 
-      assert {:ok, result} = MockCritiquer.critique(candidate, %{})
+      assert {:ok, result} = MockCritiquer.critique(nil, candidate, %{})
 
       assert Enum.any?(result.issues, fn issue ->
                String.contains?(issue, "specific content")
@@ -156,7 +156,7 @@ defmodule Jido.AI.Accuracy.CritiqueTest do
         @behaviour Critique
 
         @impl true
-        def critique(_candidate, context) do
+        def critique(_struct, _candidate, context) do
           domain = Map.get(context, :domain, :general)
           {:ok, CritiqueResult.new!(%{severity: 0.2, issues: ["#{domain} issue"]})}
         end
@@ -164,14 +164,14 @@ defmodule Jido.AI.Accuracy.CritiqueTest do
 
       candidate = Candidate.new!(%{id: "1", content: "test"})
 
-      assert {:ok, result} = ContextCritiquer.critique(candidate, %{domain: :math})
+      assert {:ok, result} = ContextCritiquer.critique(nil, candidate, %{domain: :math})
       assert Enum.any?(result.issues, &String.contains?(&1, "math"))
     end
 
     test "works with empty context" do
       candidate = Candidate.new!(%{id: "1", content: "test"})
 
-      assert {:ok, _result} = MockCritiquer.critique(candidate, %{})
+      assert {:ok, _result} = MockCritiquer.critique(nil, candidate, %{})
     end
   end
 end

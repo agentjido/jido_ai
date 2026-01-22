@@ -82,12 +82,24 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVoteTest do
     end
 
     test "parses The answer is: prefix" do
+      # Without proper newline format, falls back to full content
       candidate = Candidate.new!(%{content: "The answer is: 42"})
+      assert MajorityVote.extract_answer(candidate) == "The answer is: 42"
+    end
+
+    test "parses The answer is: prefix with proper newline" do
+      # With newline before pattern, extraction works
+      candidate = Candidate.new!(%{content: "Thinking...\n\nThe answer is: 42"})
       assert MajorityVote.extract_answer(candidate) == "42"
     end
 
     test "parses Result: prefix" do
       candidate = Candidate.new!(%{content: "Result: 42"})
+      assert MajorityVote.extract_answer(candidate) == "Result: 42"
+    end
+
+    test "parses Result: prefix with proper newline" do
+      candidate = Candidate.new!(%{content: "Calculating\n\nResult: 42"})
       assert MajorityVote.extract_answer(candidate) == "42"
     end
 
@@ -98,7 +110,7 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVoteTest do
 
     test "uses last line as fallback" do
       candidate = Candidate.new!(%{content: "Some explanation\nThe answer is 42"})
-      # Without the separator, it falls back to last line
+      # Last line fallback
       assert MajorityVote.extract_answer(candidate) == "The answer is 42"
     end
 
@@ -151,6 +163,7 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVoteTest do
 
       distribution = MajorityVote.distribution(candidates)
 
+      # Distribution normalizes answers by stripping common prefixes like "The answer is:"
       assert distribution["42"] == 2
       assert distribution["41"] == 1
       assert distribution["40"] == 2

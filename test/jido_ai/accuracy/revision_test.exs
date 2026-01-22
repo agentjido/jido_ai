@@ -10,7 +10,7 @@ defmodule Jido.AI.Accuracy.RevisionTest do
     @behaviour Revision
 
     @impl true
-    def revise(%Candidate{content: content}, %CritiqueResult{} = _critique, _context) do
+    def revise(_struct, %Candidate{content: content}, %CritiqueResult{} = _critique, _context) do
       # Simple mock: append " (improved)" to content
       {:ok,
        Candidate.new!(%{
@@ -38,7 +38,7 @@ defmodule Jido.AI.Accuracy.RevisionTest do
     end
   end
 
-  describe "revise/3 callback" do
+  describe "revise/4 callback" do
     test "MockReviser implements revise correctly" do
       candidate = Candidate.new!(%{id: "1", content: "original response"})
 
@@ -49,7 +49,7 @@ defmodule Jido.AI.Accuracy.RevisionTest do
           suggestions: ["Fix it"]
         })
 
-      assert {:ok, revised} = MockReviser.revise(candidate, critique, %{})
+      assert {:ok, revised} = MockReviser.revise(nil, candidate, critique, %{})
 
       assert revised.content =~ "improved"
       assert revised.metadata.revised == true
@@ -60,7 +60,7 @@ defmodule Jido.AI.Accuracy.RevisionTest do
         @behaviour Revision
 
         @impl true
-        def revise(%Candidate{} = candidate, %CritiqueResult{} = critique, context) do
+        def revise(_struct, %Candidate{} = candidate, %CritiqueResult{} = critique, context) do
           preserve = Map.get(context, :preserve_correct, false)
           severity = critique.severity
 
@@ -77,7 +77,7 @@ defmodule Jido.AI.Accuracy.RevisionTest do
 
       critique = CritiqueResult.new!(%{severity: 0.7})
 
-      assert {:ok, revised} = ContextReviser.revise(candidate, critique, %{preserve_correct: true})
+      assert {:ok, revised} = ContextReviser.revise(nil, candidate, critique, %{preserve_correct: true})
 
       assert revised.content =~ "Preserve: true"
       assert revised.content =~ "Severity: 0.7"
@@ -191,7 +191,7 @@ defmodule Jido.AI.Accuracy.RevisionTest do
         @behaviour Revision
 
         @impl true
-        def revise(_candidate, _critique, _context) do
+        def revise(_struct, _candidate, _critique, _context) do
           {:ok, Candidate.new!(%{id: "1", content: "revised"})}
         end
 
@@ -218,7 +218,7 @@ defmodule Jido.AI.Accuracy.RevisionTest do
         @behaviour Revision
 
         @impl true
-        def revise(%Candidate{content: content}, _critique, context) do
+        def revise(_struct, %Candidate{content: content}, _critique, context) do
           preserve = Map.get(context, :preserve_correct, false)
 
           if preserve do
@@ -233,11 +233,11 @@ defmodule Jido.AI.Accuracy.RevisionTest do
       critique = CritiqueResult.new!(%{severity: 0.5})
 
       # Without preserve
-      {:ok, revised1} = PreserveReviser.revise(candidate, critique, %{})
+      {:ok, revised1} = PreserveReviser.revise(nil, candidate, critique, %{})
       assert revised1.content =~ "MODIFIED"
 
       # With preserve
-      {:ok, revised2} = PreserveReviser.revise(candidate, critique, %{preserve_correct: true})
+      {:ok, revised2} = PreserveReviser.revise(nil, candidate, critique, %{preserve_correct: true})
       assert revised2.metadata.preserved == true
     end
   end

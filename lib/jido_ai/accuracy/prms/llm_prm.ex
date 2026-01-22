@@ -125,9 +125,6 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
   Provide your response in the following format:
   Score: [numeric score]
   Classification: [correct|incorrect|neutral]
-
-  Score: <%= @score %>
-  Classification: <%= @classification %>
   """
 
   @default_trace_prompt """
