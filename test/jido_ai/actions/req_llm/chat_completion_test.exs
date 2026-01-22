@@ -110,6 +110,40 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
 
       {:ok, _result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
     end
+
+    # Test that ReqLLM.Response structs are handled properly without errors
+    # This test ensures our format_response function correctly handles the new struct type
+    test "handles ReqLLM.Response struct without error" do
+      model = {:openai, [model: "gpt-4"]}
+      prompt = Prompt.new(:user, "Test")
+
+      # Create a simple mock that returns a struct that looks like ReqLLM.Response
+      # but with all required fields to avoid compilation errors
+      mock_response = %{
+        __struct__: ReqLLM.Response,
+        id: "test-id",
+        model: "gpt-4",
+        context: %ReqLLM.Context{messages: []},
+        message: %ReqLLM.Message{
+          role: :assistant,
+          content: [%{type: "text", text: "Test response"}]
+        },
+        object: nil,
+        finish_reason: :stop,
+        usage: %{prompt_tokens: 10, completion_tokens: 20, total_tokens: 30}
+      }
+
+      expect(ReqLLM, :generate_text, fn _model, _messages, _opts ->
+        {:ok, mock_response}
+      end)
+
+      # This should not crash with UndefinedFunctionError on ReqLLM.Response.fetch/2
+      assert {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+
+      # We mainly care that it doesn't crash, but also verify basic output
+      assert is_binary(result.content) || is_nil(result.content)
+      assert is_list(result.tool_results)
+    end
   end
 
   describe "parameters passing to ReqLLM" do

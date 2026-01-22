@@ -297,6 +297,24 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     end
   end
 
+  # Handle ReqLLM.Response struct
+  defp format_response(%ReqLLM.Response{} = response) do
+    content = ReqLLM.Response.text(response) || ""
+    tool_calls = ReqLLM.Response.tool_calls(response) || []
+
+    formatted_tools =
+      Enum.map(tool_calls, fn tool ->
+        %{
+          name: tool[:name] || tool["name"],
+          arguments: tool[:arguments] || tool["arguments"],
+          # Will be populated after execution
+          result: nil
+        }
+      end)
+
+    {:ok, %{content: content, tool_results: formatted_tools}}
+  end
+
   defp format_response(%{content: content, tool_calls: tool_calls}) when is_list(tool_calls) do
     formatted_tools =
       Enum.map(tool_calls, fn tool ->
