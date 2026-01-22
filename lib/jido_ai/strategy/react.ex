@@ -84,7 +84,8 @@ defmodule Jido.AI.Strategies.ReAct do
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
-          use_registry: boolean()
+          use_registry: boolean(),
+          tool_context: map()
         }
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -374,7 +375,12 @@ defmodule Jido.AI.Strategies.ReAct do
   defp to_machine_msg(_, _), do: nil
 
   defp lift_directives(directives, config) do
-    %{model: model, reqllm_tools: reqllm_tools, actions_by_name: actions_by_name} = config
+    %{
+      model: model,
+      reqllm_tools: reqllm_tools,
+      actions_by_name: actions_by_name,
+      tool_context: tool_context
+    } = config
 
     Enum.flat_map(directives, fn
       {:call_llm_stream, id, conversation} ->
@@ -395,7 +401,8 @@ defmodule Jido.AI.Strategies.ReAct do
                 id: id,
                 tool_name: tool_name,
                 action_module: action_module,
-                arguments: arguments
+                arguments: arguments,
+                context: tool_context
               })
             ]
 
@@ -463,7 +470,8 @@ defmodule Jido.AI.Strategies.ReAct do
       system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
-      use_registry: use_registry
+      use_registry: use_registry,
+      tool_context: Keyword.get(opts, :tool_context, %{})
     }
   end
 
