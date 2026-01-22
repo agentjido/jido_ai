@@ -8,14 +8,14 @@ defmodule Jido.AI.Skills.Streaming.Actions.EndStreamTest do
 
   describe "schema" do
     test "has required fields" do
-      assert EndStream.schema()[:stream_id][:required] == true
-      refute EndStream.schema()[:wait_for_completion][:required]
-      refute EndStream.schema()[:timeout][:required]
+      assert EndStream.schema().fields[:stream_id].meta.required == true
+      refute EndStream.schema().fields[:wait_for_completion].meta.required
+      refute EndStream.schema().fields[:timeout].meta.required
     end
 
     test "has default values" do
-      assert EndStream.schema()[:wait_for_completion][:default] == true
-      assert EndStream.schema()[:timeout][:default] == 30000
+      assert EndStream.schema().fields[:wait_for_completion].value == true
+      assert EndStream.schema().fields[:timeout].value == 30000
     end
   end
 

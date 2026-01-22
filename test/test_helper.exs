@@ -1,1 +1,1 @@
-ExUnit.start(exclude: [:flaky])
+ExUnit.start(exclude: [:flaky, :requires_api])

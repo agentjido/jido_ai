@@ -37,8 +37,12 @@ defmodule Jido.AI.Skills.Streaming.Actions.EndStream do
         stream_id: Zoi.string(description: "The ID of the stream to finalize"),
         wait_for_completion:
           Zoi.boolean(description: "Wait for stream to finish if still active")
-          |> Zoi.default(true),
-        timeout: Zoi.integer(description: "Max time to wait in milliseconds") |> Zoi.default(30_000)
+          |> Zoi.default(true)
+          |> Zoi.optional(),
+        timeout:
+          Zoi.integer(description: "Max time to wait in milliseconds")
+          |> Zoi.default(30_000)
+          |> Zoi.optional()
       })
 
   @doc """

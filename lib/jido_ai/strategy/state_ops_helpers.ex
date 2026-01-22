@@ -36,7 +36,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.update_strategy_state(%{status: :running, iteration: 1})
-      %StateOp.SetState{attrs: %{status: :running, iteration: 1}}
+      %Jido.Agent.StateOp.SetState{attrs: %{status: :running, iteration: 1}}
   """
   @spec update_strategy_state(map()) :: StateOp.SetState.t()
   def update_strategy_state(attrs) when is_map(attrs) do
@@ -49,7 +49,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.set_strategy_field(:status, :running)
-      %StateOp.SetPath{path: [:status], value: :running}
+      %Jido.Agent.StateOp.SetPath{path: [:status], value: :running}
   """
   @spec set_strategy_field(atom(), term()) :: StateOp.SetPath.t()
   def set_strategy_field(key, value) when is_atom(key) do
@@ -62,7 +62,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.set_iteration_status(:awaiting_llm)
-      %StateOp.SetPath{path: [:status], value: :awaiting_llm}
+      %Jido.Agent.StateOp.SetPath{path: [:status], value: :awaiting_llm}
   """
   @spec set_iteration_status(atom()) :: StateOp.SetPath.t()
   def set_iteration_status(status) when is_atom(status) do
@@ -78,7 +78,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.set_iteration(5)
-      %StateOp.SetPath{path: [:iteration], value: 5}
+      %Jido.Agent.StateOp.SetPath{path: [:iteration], value: 5}
   """
   @spec set_iteration(non_neg_integer()) :: StateOp.SetPath.t()
   def set_iteration(iteration) when is_integer(iteration) and iteration >= 0 do
@@ -92,7 +92,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
       iex> message = %{role: :user, content: "Hello"}
       iex> StateOpsHelpers.append_conversation([message])
-      %StateOp.SetState{attrs: %{conversation: [%{role: :user, content: "Hello"}]}}
+      %Jido.Agent.StateOp.SetState{attrs: %{conversation: [%{role: :user, content: "Hello"}]}}
   """
   @spec append_conversation([map()]) :: StateOp.SetState.t()
   def append_conversation(messages) when is_list(messages) do
@@ -107,7 +107,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
       iex> message = %{role: :user, content: "Hello"}
       iex> current_conversation = [%{role: :assistant, content: "Hi"}]
       iex> StateOpsHelpers.prepend_conversation(message, current_conversation)
-      %StateOp.SetState{attrs: %{conversation: [%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi"}]}}
+      %Jido.Agent.StateOp.SetState{attrs: %{conversation: [%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi"}]}}
   """
   @spec prepend_conversation(map(), [map()]) :: StateOp.SetState.t()
   def prepend_conversation(message, existing_conversation \\ [])
@@ -122,7 +122,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
       iex> messages = [%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi"}]
       iex> StateOpsHelpers.set_conversation(messages)
-      %StateOp.SetState{attrs: %{conversation: messages}}
+      %Jido.Agent.StateOp.SetState{attrs: %{conversation: messages}}
   """
   @spec set_conversation([map()]) :: StateOp.SetState.t()
   def set_conversation(messages) when is_list(messages) do
@@ -136,7 +136,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
       iex> tools = [%{id: "call_1", name: "search", arguments: %{query: "test"}}]
       iex> StateOpsHelpers.set_pending_tools(tools)
-      %StateOp.SetState{attrs: %{pending_tool_calls: tools}}
+      %Jido.Agent.StateOp.SetState{attrs: %{pending_tool_calls: tools}}
   """
   @spec set_pending_tools([map()]) :: StateOp.SetState.t()
   def set_pending_tools(tools) when is_list(tools) do
@@ -150,7 +150,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
       iex> tool = %{id: "call_1", name: "search", arguments: %{query: "test"}}
       iex> StateOpsHelpers.add_pending_tool(tool)
-      %StateOp.SetState{attrs: %{pending_tool_calls: [%{id: "call_1", name: "search", arguments: %{query: "test"}}]}}
+      %Jido.Agent.StateOp.SetState{attrs: %{pending_tool_calls: [%{id: "call_1", name: "search", arguments: %{query: "test"}}]}}
   """
   @spec add_pending_tool(map()) :: StateOp.SetState.t()
   def add_pending_tool(tool) when is_map(tool) do
@@ -163,7 +163,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.clear_pending_tools()
-      %StateOp.SetState{attrs: %{pending_tool_calls: []}}
+      %Jido.Agent.StateOp.SetState{attrs: %{pending_tool_calls: []}}
   """
   @spec clear_pending_tools() :: StateOp.SetState.t()
   def clear_pending_tools do
@@ -176,7 +176,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.remove_pending_tool("call_1")
-      %StateOp.DeletePath{path: [:pending_tool_calls, "call_1"]}
+      %Jido.Agent.StateOp.DeletePath{path: [:pending_tool_calls, "call_1"]}
   """
   @dialyzer {:nowarn_function, remove_pending_tool: 1}
   @spec remove_pending_tool(String.t()) :: StateOp.DeletePath.t()
@@ -193,7 +193,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.set_call_id("call_123")
-      %StateOp.SetPath{path: [:current_llm_call_id], value: "call_123"}
+      %Jido.Agent.StateOp.SetPath{path: [:current_llm_call_id], value: "call_123"}
   """
   @spec set_call_id(String.t()) :: StateOp.SetPath.t()
   def set_call_id(call_id) when is_binary(call_id) do
@@ -206,7 +206,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.clear_call_id()
-      %StateOp.DeletePath{path: [:current_llm_call_id]}
+      %Jido.Agent.StateOp.DeletePath{path: [:current_llm_call_id]}
   """
   @dialyzer {:nowarn_function, clear_call_id: 0}
   @spec clear_call_id() :: StateOp.DeletePath.t()
@@ -220,7 +220,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.set_final_answer("42")
-      %StateOp.SetPath{path: [:final_answer], value: "42"}
+      %Jido.Agent.StateOp.SetPath{path: [:final_answer], value: "42"}
   """
   @spec set_final_answer(String.t()) :: StateOp.SetPath.t()
   def set_final_answer(answer) when is_binary(answer) do
@@ -233,7 +233,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.set_termination_reason(:final_answer)
-      %StateOp.SetPath{path: [:termination_reason], value: :final_answer}
+      %Jido.Agent.StateOp.SetPath{path: [:termination_reason], value: :final_answer}
   """
   @spec set_termination_reason(atom()) :: StateOp.SetPath.t()
   def set_termination_reason(reason) when is_atom(reason) do
@@ -246,7 +246,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.set_streaming_text("Hello")
-      %StateOp.SetPath{path: [:streaming_text], value: "Hello"}
+      %Jido.Agent.StateOp.SetPath{path: [:streaming_text], value: "Hello"}
   """
   @spec set_streaming_text(String.t()) :: StateOp.SetPath.t()
   def set_streaming_text(text) when is_binary(text) do
@@ -259,7 +259,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.append_streaming_text(" world")
-      %StateOp.SetPath{path: [:streaming_text], value: " world"}
+      %Jido.Agent.StateOp.SetPath{path: [:streaming_text], value: " world"}
   """
   @spec append_streaming_text(String.t()) :: StateOp.SetPath.t()
   def append_streaming_text(text) when is_binary(text) do
@@ -273,7 +273,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
       iex> usage = %{input_tokens: 10, output_tokens: 20}
       iex> StateOpsHelpers.set_usage(usage)
-      %StateOp.SetState{attrs: %{usage: usage}}
+      %Jido.Agent.StateOp.SetState{attrs: %{usage: usage}}
   """
   @spec set_usage(map()) :: StateOp.SetState.t()
   def set_usage(usage) when is_map(usage) do
@@ -286,7 +286,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.delete_temp_keys()
-      %StateOp.DeleteKeys{keys: [:temp, :cache, :ephemeral]}
+      %Jido.Agent.StateOp.DeleteKeys{keys: [:temp, :cache, :ephemeral]}
   """
   @spec delete_temp_keys() :: StateOp.DeleteKeys.t()
   def delete_temp_keys do
@@ -299,7 +299,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.delete_keys([:temp1, :temp2])
-      %StateOp.DeleteKeys{keys: [:temp1, :temp2]}
+      %Jido.Agent.StateOp.DeleteKeys{keys: [:temp1, :temp2]}
   """
   @spec delete_keys([atom()]) :: StateOp.DeleteKeys.t()
   def delete_keys(keys) when is_list(keys) do
@@ -335,7 +335,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
       iex> config = %{tools: [], model: "test"}
       iex> StateOpsHelpers.update_config(config)
-      %StateOp.SetState{attrs: %{config: config}}
+      %Jido.Agent.StateOp.SetState{attrs: %{config: config}}
   """
   @spec update_config(map()) :: StateOp.SetState.t()
   def update_config(config) when is_map(config) do
@@ -348,7 +348,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   ## Examples
 
       iex> StateOpsHelpers.set_config_field(:tools, [MyAction])
-      %StateOp.SetPath{path: [:config, :tools], value: [MyAction]}
+      %Jido.Agent.StateOp.SetPath{path: [:config, :tools], value: [MyAction]}
   """
   @spec set_config_field(atom(), term()) :: StateOp.SetPath.t()
   def set_config_field(key, value) when is_atom(key) do
@@ -409,7 +409,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
       ...>   StateOpsHelpers.set_iteration_status(:running),
       ...>   StateOpsHelpers.set_iteration(1)
       ...> ])
-      [%StateOp.SetPath{path: [:status], value: :running}, %StateOp.SetPath{path: [:iteration], value: 1}]
+      [%Jido.Agent.StateOp.SetPath{path: [:status], value: :running}, %Jido.Agent.StateOp.SetPath{path: [:iteration], value: 1}]
   """
   @spec compose([state_op()]) :: [state_op()]
   def compose(ops) when is_list(ops), do: ops
@@ -422,26 +422,26 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
   ## Examples
 
-      iex> ops = [StateOp.set_path([:status], :running)]
+      iex> ops = [Jido.Agent.StateOp.set_path([:status], :running)]
       iex> StateOpsHelpers.apply_to_state(%{iteration: 1}, ops)
       %{iteration: 1, status: :running}
   """
   @spec apply_to_state(map(), [state_op()]) :: map()
   def apply_to_state(state, ops) when is_list(ops) do
     Enum.reduce(ops, state, fn
-      %StateOp.SetState{attrs: attrs}, acc ->
+      %Jido.Agent.StateOp.SetState{attrs: attrs}, acc ->
         deep_merge(acc, attrs)
 
-      %StateOp.ReplaceState{state: new_state}, _acc ->
+      %Jido.Agent.StateOp.ReplaceState{state: new_state}, _acc ->
         new_state
 
-      %StateOp.DeleteKeys{keys: keys}, acc ->
+      %Jido.Agent.StateOp.DeleteKeys{keys: keys}, acc ->
         Map.drop(acc, keys)
 
-      %StateOp.SetPath{path: path, value: value}, acc ->
+      %Jido.Agent.StateOp.SetPath{path: path, value: value}, acc ->
         deep_put_in(acc, path, value)
 
-      %StateOp.DeletePath{path: path}, acc ->
+      %Jido.Agent.StateOp.DeletePath{path: path}, acc ->
         {_, result} = pop_in(acc, path)
         result
     end)

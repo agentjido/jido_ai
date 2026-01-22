@@ -189,10 +189,12 @@ defmodule Jido.AI.Accuracy.Aggregators.Weighted do
   end
 
   defp apply_strategy(strategy_module, candidates, opts) do
-    if function_exported?(strategy_module, :aggregate, 2) do
+    try do
       apply(strategy_module, :aggregate, [candidates, opts])
-    else
-      {:error, :not_implemented}
+    rescue
+      # Handle cases where function doesn't exist or module not loaded
+      e in [UndefinedFunctionError, ArgumentError] ->
+        {:error, {:not_implemented, e}}
     end
   end
 
