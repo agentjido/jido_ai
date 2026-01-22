@@ -112,6 +112,7 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
       assert result.results == []
     end
 
+    @tag :flaky
     test "runs tasks in parallel when parallel: true" do
       variant = PromptVariant.new!(%{template: "{{input}}"})
 

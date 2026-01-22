@@ -114,7 +114,7 @@ defmodule Jido.AI.Accuracy.Critique do
   def critique_batch(candidates, context, critiquer) when is_list(candidates) do
     results =
       Enum.map(candidates, fn candidate ->
-        critiquer.critique(candidate, context)
+        critiquer.critique(nil, candidate, context)
       end)
 
     errors =

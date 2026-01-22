@@ -82,13 +82,6 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
     {~r/\nSo:\s*/i, :so_prefix_regex_single},
     {~r/\nThe answer is:\s*/i, :the_answer_is_prefix_regex_single},
     {~r/\nResult:\s*/i, :result_prefix_regex_single},
-    # Start of content patterns (no preceding newline)
-    {~r/^Answer:\s*/i, :answer_prefix_start},
-    {~r/^Therefore:\s*/i, :therefore_prefix_start},
-    {~r/^Thus:\s*/i, :thus_prefix_start},
-    {~r/^So:\s*/i, :so_prefix_start},
-    {~r/^The answer is:\s*/i, :the_answer_is_prefix_start},
-    {~r/^Result:\s*/i, :result_prefix_start},
     # Case-insensitive regex patterns as fallback with double newline
     {~r/\n\nAnswer:\s*/i, :answer_prefix_regex},
     {~r/\n\nTherefore:\s*/i, :therefore_prefix_regex},
@@ -275,14 +268,6 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
     end
   end
 
-  defp extract_with_pattern(content, regex, _type) when is_struct(regex, Regex) do
-    # Generic regex pattern extraction
-    case Regex.run(regex, content) do
-      [_, match] -> {:ok, match}
-      _ -> :no_match
-    end
-  end
-
   defp extract_with_pattern(content, pattern, _type) when is_binary(pattern) do
     case String.split(content, pattern, parts: 2) do
       [_before, after_part] ->
@@ -335,11 +320,12 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
     end
   end
 
-  defp normalize_answer(answer, _strict) when is_binary(answer) do
+  defp normalize_answer(answer, strict) when is_binary(answer) do
     answer
     |> String.downcase()
     |> String.trim()
     |> remove_punctuation()
+    |> strip_answer_prefixes(strict)
   end
 
   defp normalize_answer(_answer, _strict), do: ""
@@ -347,6 +333,26 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
   defp remove_punctuation(str) do
     str
     |> String.replace(~r/[.,!?;:()\[\]{}"']+$/, "")
+    |> String.trim()
+  end
+
+  # Strip common answer prefixes in non-strict mode to group similar answers
+  defp strip_answer_prefixes(str, true), do: str
+
+  defp strip_answer_prefixes(str, false) do
+    # Remove common prefixes if present
+    prefixes = [
+      ~r/^answer:\s*/i,
+      ~r/^therefore:\s*/i,
+      ~r/^thus:\s*/i,
+      ~r/^so:\s*/i,
+      ~r/^the answer is:\s*/i,
+      ~r/^result:\s*/i
+    ]
+
+    Enum.reduce(prefixes, str, fn prefix, acc ->
+      Regex.replace(prefix, acc, "")
+    end)
     |> String.trim()
   end
 

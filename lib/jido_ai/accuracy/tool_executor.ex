@@ -115,6 +115,7 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
     "clang++",
     # Common utilities (for testing)
     "echo",
+    "printf",
     "cat",
     "ls",
     "pwd",
@@ -260,6 +261,8 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
          :ok <- validate_environment(env),
          {:ok, full_command, full_args} <- maybe_wrap_in_sandbox(command, args, sandbox, opts),
          {start_time, exec_result} <- measure_time(fn -> execute(full_command, full_args, cd, env, timeout) end) do
+      end_time = System.monotonic_time(:native)
+
       case exec_result do
         {:ok, exit_code, stdout, stderr} ->
           {:ok,
@@ -268,7 +271,7 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
              stdout: stdout,
              stderr: stderr,
              timed_out: false,
-             duration_ms: System.convert_time_unit(start_time, :native, :millisecond)
+             duration_ms: System.convert_time_unit(end_time - start_time, :native, :millisecond)
            }}
 
         {:timeout, stdout, stderr} ->
@@ -359,15 +362,16 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
   end
 
   defp build_port_options(nil, env, _timeout), do: env_option(env)
-  defp build_port_options(cd, env, _timeout), do: [:cd, cd | env_option(env)]
+  defp build_port_options(cd, env, _timeout), do: [{:cd, cd} | env_option(env)]
 
   defp env_option(%{} = env) when map_size(env) > 0 do
+    # Port.open expects env values as charlists, not binaries
     env_list =
       Enum.map(env, fn {k, v} ->
-        {"#{k}", "#{v}"}
+        {String.to_charlist(k), String.to_charlist(v)}
       end)
 
-    [:env, env_list]
+    [{:env, env_list}]
   end
 
   defp env_option(_), do: []
@@ -536,7 +540,7 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
       if suspicious_path?(expanded_path) do
         {:error, :suspicious_path}
       else
-        {:ok, expanded_path}
+        :ok
       end
     else
       {:error, :directory_not_found}

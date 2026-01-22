@@ -55,16 +55,24 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
         system_prompt:
           Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
           |> Zoi.optional(),
-        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
-        temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
+        max_tokens:
+          Zoi.integer(description: "Maximum tokens to generate")
+          |> Zoi.default(1024)
+          |> Zoi.optional(),
+        temperature:
+          Zoi.float(description: "Sampling temperature (0.0-2.0)")
+          |> Zoi.default(0.7)
+          |> Zoi.optional(),
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
         on_token: Zoi.any(description: "Callback function invoked for each token") |> Zoi.optional(),
         buffer:
           Zoi.boolean(description: "Whether to buffer tokens for full response collection")
-          |> Zoi.default(false),
+          |> Zoi.default(false)
+          |> Zoi.optional(),
         auto_process:
           Zoi.boolean(description: "Whether to automatically process the stream")
           |> Zoi.default(true)
+          |> Zoi.optional()
       })
 
   alias Jido.AI.Config

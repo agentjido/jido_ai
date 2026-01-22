@@ -8,13 +8,13 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteToolTest do
 
   describe "schema" do
     test "has required fields" do
-      assert ExecuteTool.schema()[:tool_name][:required] == true
-      refute ExecuteTool.schema()[:params][:required]
+      assert ExecuteTool.schema().fields[:tool_name].meta.required == true
+      refute ExecuteTool.schema().fields[:params].meta.required
     end
 
     test "has default values" do
-      assert ExecuteTool.schema()[:params][:default] == %{}
-      assert ExecuteTool.schema()[:timeout][:default] == 30_000
+      assert ExecuteTool.schema().fields[:params].value == %{}
+      assert ExecuteTool.schema().fields[:timeout].value == 30_000
     end
   end
 

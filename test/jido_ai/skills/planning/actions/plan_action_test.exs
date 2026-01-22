@@ -8,16 +8,16 @@ defmodule Jido.AI.Skills.Planning.Actions.PlanTest do
 
   describe "schema" do
     test "has required fields" do
-      assert Plan.schema()[:goal][:required] == true
-      refute Plan.schema()[:model][:required]
-      refute Plan.schema()[:constraints][:required]
-      refute Plan.schema()[:resources][:required]
+      assert Plan.schema().fields[:goal].meta.required == true
+      refute Plan.schema().fields[:model].meta.required
+      refute Plan.schema().fields[:constraints].meta.required
+      refute Plan.schema().fields[:resources].meta.required
     end
 
     test "has default values" do
-      assert Plan.schema()[:max_steps][:default] == 10
-      assert Plan.schema()[:max_tokens][:default] == 4096
-      assert Plan.schema()[:temperature][:default] == 0.7
+      assert Plan.schema().fields[:max_steps].value == 10
+      assert Plan.schema().fields[:max_tokens].value == 4096
+      assert Plan.schema().fields[:temperature].value == 0.7
     end
   end
 

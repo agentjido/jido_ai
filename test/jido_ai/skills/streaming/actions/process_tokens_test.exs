@@ -8,9 +8,9 @@ defmodule Jido.AI.Skills.Streaming.Actions.ProcessTokensTest do
 
   describe "schema" do
     test "has required fields" do
-      assert ProcessTokens.schema()[:stream_id][:required] == true
-      refute ProcessTokens.schema()[:on_token][:required]
-      refute ProcessTokens.schema()[:filter][:required]
+      assert ProcessTokens.schema().fields[:stream_id].meta.required == true
+      refute ProcessTokens.schema().fields[:on_token].meta.required
+      refute ProcessTokens.schema().fields[:filter].meta.required
     end
   end
 

@@ -106,22 +106,22 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     test "Chat action has expected schema" do
       schema = Chat.schema()
 
-      assert schema[:prompt][:required] == true
-      refute schema[:model][:required]
-      assert schema[:max_tokens][:default] == 1024
+      assert schema.fields[:prompt].meta.required == true
+      refute schema.fields[:model].meta.required
+      assert schema.fields[:max_tokens].value == 1024
     end
 
     test "Complete action has expected schema" do
       schema = Complete.schema()
 
-      assert schema[:prompt][:required] == true
-      assert schema[:max_tokens][:default] == 1024
+      assert schema.fields[:prompt].meta.required == true
+      assert schema.fields[:max_tokens].value == 1024
     end
 
     test "Embed action has expected schema" do
       schema = Embed.schema()
 
-      refute schema[:texts][:required]
+      refute schema.fields[:texts].meta.required
     end
   end
 
@@ -141,22 +141,22 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     test "Analyze action has expected schema" do
       schema = Analyze.schema()
 
-      assert schema[:input][:required] == true
-      assert schema[:analysis_type][:default] == :summary
+      assert schema.fields[:input].meta.required == true
+      assert schema.fields[:analysis_type].value == :summary
     end
 
     test "Explain action has expected schema" do
       schema = Explain.schema()
 
-      assert schema[:topic][:required] == true
-      assert schema[:detail_level][:default] == :intermediate
+      assert schema.fields[:topic].meta.required == true
+      assert schema.fields[:detail_level].value == :intermediate
     end
 
     test "Infer action has expected schema" do
       schema = Infer.schema()
 
-      assert schema[:premises][:required] == true
-      assert schema[:question][:required] == true
+      assert schema.fields[:premises].meta.required == true
+      assert schema.fields[:question].meta.required == true
     end
   end
 
@@ -176,21 +176,21 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     test "Plan action has expected schema" do
       schema = Plan.schema()
 
-      assert schema[:goal][:required] == true
-      assert schema[:max_steps][:default] == 10
+      assert schema.fields[:goal].meta.required == true
+      assert schema.fields[:max_steps].value == 10
     end
 
     test "Decompose action has expected schema" do
       schema = Decompose.schema()
 
-      assert schema[:goal][:required] == true
-      assert schema[:max_depth][:default] == 3
+      assert schema.fields[:goal].meta.required == true
+      assert schema.fields[:max_depth].value == 3
     end
 
     test "Prioritize action has expected schema" do
       schema = Prioritize.schema()
 
-      assert schema[:tasks][:required] == true
+      assert schema.fields[:tasks].meta.required == true
     end
   end
 
@@ -210,21 +210,21 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     test "StartStream action has expected schema" do
       schema = StartStream.schema()
 
-      assert schema[:prompt][:required] == true
-      assert schema[:auto_process][:default] == true
+      assert schema.fields[:prompt].meta.required == true
+      assert schema.fields[:auto_process].value == true
     end
 
     test "ProcessTokens action has expected schema" do
       schema = ProcessTokens.schema()
 
-      assert schema[:stream_id][:required] == true
+      assert schema.fields[:stream_id].meta.required == true
     end
 
     test "EndStream action has expected schema" do
       schema = EndStream.schema()
 
-      assert schema[:stream_id][:required] == true
-      assert schema[:timeout][:default] == 30_000
+      assert schema.fields[:stream_id].meta.required == true
+      assert schema.fields[:timeout].value == 30_000
     end
   end
 
@@ -244,22 +244,22 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     test "CallWithTools action has expected schema" do
       schema = CallWithTools.schema()
 
-      assert schema[:prompt][:required] == true
-      assert schema[:auto_execute][:default] == false
-      assert schema[:max_turns][:default] == 10
+      assert schema.fields[:prompt].meta.required == true
+      assert schema.fields[:auto_execute].value == false
+      assert schema.fields[:max_turns].value == 10
     end
 
     test "ExecuteTool action has expected schema" do
       schema = ExecuteTool.schema()
 
-      assert schema[:tool_name][:required] == true
-      assert schema[:timeout][:default] == 30_000
+      assert schema.fields[:tool_name].meta.required == true
+      assert schema.fields[:timeout].value == 30_000
     end
 
     test "ListTools action has expected schema" do
       schema = ListTools.schema()
 
-      assert schema[:include_schema][:default] == true
+      assert schema.fields[:include_schema].value == true
     end
   end
 
@@ -315,10 +315,10 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       # Test that actions have the expected schema
       params = %{prompt: "Test"}
 
-      # Chat action should have schema accessible
+      # Chat action should have schema accessible (Zoi schema struct)
       schema = Jido.AI.Skills.LLM.Actions.Chat.schema()
-      assert is_list(schema)
-      assert schema[:prompt][:required] == true
+      assert is_map(schema)
+      assert schema.fields[:prompt].meta.required == true
     end
 
     test "all skills have proper skill_spec/1" do

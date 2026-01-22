@@ -171,6 +171,20 @@ defmodule Jido.AI.SecurityTest do
   end
 
   describe "validate_and_wrap_callback/2" do
+    # These tests need the TaskSupervisor to be running
+    setup do
+      # Start the TaskSupervisor if not already started
+      case Process.whereis(Jido.TaskSupervisor) do
+        nil ->
+          {:ok, _pid} = Task.Supervisor.start_link(name: Jido.TaskSupervisor)
+
+        _pid ->
+          :already_started
+      end
+
+      :ok
+    end
+
     test "wraps valid callback with timeout" do
       callback = fn x -> x end
       assert {:ok, wrapped} = Security.validate_and_wrap_callback(callback)

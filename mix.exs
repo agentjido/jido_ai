@@ -137,7 +137,7 @@ defmodule JidoAi.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "CHANGELOG.md", "usage-rules.md"],
+      files: ["lib", "mix.exs", "README.md", "LICENSE", "CHANGELOG.md", "usage-rules.md", "guides", "examples"],
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -179,11 +179,24 @@ defmodule JidoAi.MixProject do
         "guides/user/09_prm.md",
         "guides/user/10_confidence_calibration.md",
         "guides/user/11_difficulty_estimation.md",
-        "guides/user/12_pipeline.md"
+        "guides/user/12_pipeline.md",
+        # Examples
+        "examples/accuracy/adaptive_self_consistency/example.md",
+        "examples/accuracy/pipeline/example.md",
+        "examples/accuracy/reflection/example.md",
+        "examples/accuracy/search/example.md",
+        "examples/accuracy/self_consistency/example.md",
+        "examples/accuracy/verification/example.md",
+        "examples/strategies/adaptive_strategy.md",
+        "examples/strategies/chain_of_thought.md",
+        "examples/strategies/react_agent.md",
+        "examples/strategies/tree_of_thoughts.md"
       ],
       groups_for_extras: [
         {"Developer Guides", ~r/guides\/developer/},
-        {"User Guides", ~r/guides\/user/}
+        {"User Guides", ~r/guides\/user/},
+        {"Examples - Accuracy", ~r/examples\/accuracy/},
+        {"Examples - Strategies", ~r/examples\/strategies/}
       ],
       groups_for_modules: [
         Core: [

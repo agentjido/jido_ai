@@ -8,12 +8,12 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListToolsTest do
 
   describe "schema" do
     test "has no required fields" do
-      refute ListTools.schema()[:filter][:required]
-      refute ListTools.schema()[:type][:required]
+      refute ListTools.schema().fields[:filter].meta.required
+      refute ListTools.schema().fields[:type].meta.required
     end
 
     test "has default values" do
-      assert ListTools.schema()[:include_schema][:default] == true
+      assert ListTools.schema().fields[:include_schema].value == true
     end
   end
 

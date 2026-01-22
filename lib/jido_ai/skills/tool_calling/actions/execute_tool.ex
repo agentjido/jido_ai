@@ -39,10 +39,12 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteTool do
         tool_name: Zoi.string(description: "The name of the tool to execute"),
         params:
           Zoi.map(description: "Parameters to pass to the tool")
-          |> Zoi.default(%{}),
+          |> Zoi.default(%{})
+          |> Zoi.optional(),
         timeout:
           Zoi.integer(description: "Execution timeout in milliseconds")
           |> Zoi.default(30_000)
+          |> Zoi.optional()
       })
 
   alias Jido.AI.Tools.Executor
