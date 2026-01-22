@@ -64,10 +64,6 @@ defmodule Jido.AI.ReActAgent do
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
     skills = Keyword.get(opts, :skills, [])
 
-    strategy_opts =
-      [tools: tools, model: model, max_iterations: max_iterations]
-      |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
-
     # Build base_schema AST at macro expansion time
     base_schema_ast =
       quote do
@@ -80,12 +76,23 @@ defmodule Jido.AI.ReActAgent do
         })
       end
 
+    # Build strategy_opts inside quote to properly evaluate module references
     quote location: :keep do
+      # Build strategy opts at compile time in the calling module's context
+      strategy_opts =
+        [tools: unquote(tools), model: unquote(model), max_iterations: unquote(max_iterations)]
+        |> then(fn o ->
+          case unquote(system_prompt) do
+            nil -> o
+            prompt -> Keyword.put(o, :system_prompt, prompt)
+          end
+        end)
+
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
         skills: unquote(skills),
-        strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Strategies.ReAct, strategy_opts},
         schema: unquote(base_schema_ast)
 
       import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
@@ -103,7 +110,15 @@ defmodule Jido.AI.ReActAgent do
 
       @impl true
       def on_before_cmd(agent, {:react_start, %{query: query}} = action) do
-        agent = %{agent | state: Map.put(agent.state, :last_query, query)}
+        agent = %{
+          agent
+          | state:
+              agent.state
+              |> Map.put(:last_query, query)
+              |> Map.put(:completed, false)
+              |> Map.put(:last_answer, "")
+        }
+
         {:ok, agent, action}
       end
 

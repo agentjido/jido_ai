@@ -199,6 +199,12 @@ defmodule Jido.AI.Strategies.ReAct do
         started_at -> System.monotonic_time(:millisecond) - started_at
       end
 
+    # Format pending tool calls for UI consumption
+    tool_calls = format_tool_calls(state[:pending_tool_calls] || [])
+
+    # Get config info
+    config = state[:config] || %{}
+
     %Jido.Agent.Strategy.Snapshot{
       status: status,
       done?: done?,
@@ -211,11 +217,31 @@ defmodule Jido.AI.Strategies.ReAct do
           streaming_text: state[:streaming_text],
           streaming_thinking: state[:streaming_thinking],
           usage: state[:usage],
-          duration_ms: duration_ms
+          duration_ms: duration_ms,
+          tool_calls: tool_calls,
+          conversation: state[:conversation] || [],
+          current_llm_call_id: state[:current_llm_call_id],
+          model: config[:model],
+          max_iterations: config[:max_iterations],
+          available_tools: Enum.map(config[:tools] || [], & &1.name())
         }
-        |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} end)
+        |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} or v == [] end)
         |> Map.new()
     }
+  end
+
+  defp format_tool_calls([]), do: []
+
+  defp format_tool_calls(pending_tool_calls) do
+    Enum.map(pending_tool_calls, fn tc ->
+      %{
+        id: tc.id,
+        name: tc.name,
+        arguments: tc.arguments,
+        status: if(tc.result != nil, do: :completed, else: :running),
+        result: tc.result
+      }
+    end)
   end
 
   @impl true

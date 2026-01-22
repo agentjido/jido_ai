@@ -30,8 +30,8 @@ defmodule Jido.AI.ReAct.Machine do
       "idle" => ["awaiting_llm"],
       "awaiting_llm" => ["awaiting_tool", "completed", "error"],
       "awaiting_tool" => ["awaiting_llm", "completed", "error"],
-      "completed" => [],
-      "error" => []
+      "completed" => ["awaiting_llm"],
+      "error" => ["awaiting_llm"]
     }
 
   # Telemetry event names
@@ -121,14 +121,35 @@ defmodule Jido.AI.ReAct.Machine do
   def update(machine, msg, env \\ %{})
 
   def update(%__MODULE__{status: "idle"} = machine, {:start, query, call_id}, env) do
+    do_start_fresh(machine, query, call_id, env)
+  end
+
+  def update(%__MODULE__{status: status} = machine, {:start, query, call_id}, env)
+      when status in ["completed", "error"] do
+    # Continue conversation - append new user message to existing history
+    do_start_continue(machine, query, call_id, env)
+  end
+
+  # Fresh start - no prior conversation
+  defp do_start_fresh(machine, query, call_id, env) do
     system_prompt = Map.fetch!(env, :system_prompt)
     conversation = [system_message(system_prompt), user_message(query)]
+    do_start_with_conversation(machine, conversation, call_id)
+  end
+
+  # Continue existing conversation - append user message
+  defp do_start_continue(machine, query, call_id, _env) do
+    conversation = machine.conversation ++ [user_message(query)]
+    do_start_with_conversation(machine, conversation, call_id)
+  end
+
+  defp do_start_with_conversation(machine, conversation, call_id) do
     started_at = System.monotonic_time(:millisecond)
 
     # Emit start telemetry
     emit_telemetry(:start, %{system_time: System.system_time()}, %{
       call_id: call_id,
-      query_length: String.length(query)
+      query_length: String.length(List.last(conversation)[:content] || "")
     })
 
     with_transition(machine, "awaiting_llm", fn machine ->
