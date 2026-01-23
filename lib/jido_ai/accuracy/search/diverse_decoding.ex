@@ -69,14 +69,14 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
 
   """
 
+  @behaviour Jido.AI.Accuracy.SearchController
+
   alias Jido.AI.Accuracy.{
     Candidate,
     SearchController,
     Similarity,
     VerificationResult
   }
-
-  @behaviour SearchController
 
   @type t :: %__MODULE__{
           num_candidates: pos_integer(),
@@ -365,8 +365,7 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
   defp validate_diversity_threshold(_), do: {:error, :invalid_diversity_threshold}
 
   defp validate_temperature_range({min, max})
-       when is_number(min) and is_number(max) and min >= 0.0 and max <= 2.0 and min <= max,
-       do: :ok
+       when is_number(min) and is_number(max) and min >= 0.0 and max <= 2.0 and min <= max, do: :ok
 
   defp validate_temperature_range(_), do: {:error, :invalid_temperature_range}
 

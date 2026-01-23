@@ -39,7 +39,6 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
       })
       # Use result.stream_id with ProcessTokens action
   """
-
   use Jido.Action,
     name: "streaming_start",
     description: "Start a streaming LLM request",
@@ -72,12 +71,26 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
         auto_process:
           Zoi.boolean(description: "Whether to automatically process the stream")
           |> Zoi.default(true)
+          |> Zoi.optional(),
+        task_supervisor:
+          Zoi.atom(description: "Task supervisor to use for background processing")
           |> Zoi.optional()
       })
 
   alias Jido.AI.Config
   alias Jido.AI.Helpers
   alias Jido.AI.Security
+
+  # Dialyzer has incomplete PLT information about req_llm dependencies
+  @dialyzer [
+    {:nowarn_function, run: 2},
+    {:nowarn_function, build_opts: 1},
+    {:nowarn_function, start_stream_processor: 3},
+    {:nowarn_function, process_stream: 5},
+    {:nowarn_function, handle_token: 4},
+    {:nowarn_function, finalize_stream: 4},
+    {:nowarn_function, extract_buffered_text: 2}
+  ]
 
   @doc """
   Executes the start stream action.
@@ -177,8 +190,9 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
     on_token = params[:on_token]
     buffer? = params[:buffer] || false
     auto_process = params[:auto_process] != false
+    task_supervisor = params[:task_supervisor] || Jido.TaskSupervisor
 
-    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+    Task.Supervisor.start_child(task_supervisor, fn ->
       process_stream(stream_id, stream_response, on_token, buffer?, auto_process)
     end)
   end

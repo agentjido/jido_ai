@@ -68,9 +68,9 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, UncertaintyResult, Helpers}
+  import Jido.AI.Accuracy.Helpers, only: [get_attr: 3]
 
-  import Helpers, only: [get_attr: 3]
+  alias Jido.AI.Accuracy.{Candidate, UncertaintyResult}
 
   @type t :: %__MODULE__{
           aleatoric_patterns: [Regex.t()],

@@ -32,8 +32,8 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
         auto_execute: true
       })
   """
-
   use Jido.Action,
+    # Dialyzer has incomplete PLT information about req_llm dependencies
     name: "tool_calling_call_with_tools",
     description: "Send an LLM request with tool calling support",
     category: "ai",
@@ -63,6 +63,20 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
       })
 
   alias Jido.AI.{Config, Helpers, Security, Tools}
+
+  @dialyzer [
+    {:nowarn_function, run: 2},
+    {:nowarn_function, classify_and_format_response: 2},
+    {:nowarn_function, extract_usage: 1},
+    {:nowarn_function, execute_tool_turns: 5},
+    {:nowarn_function, execute_tools_and_continue: 4},
+    {:nowarn_function, execute_all_tools: 1},
+    {:nowarn_function, execute_single_tool: 1},
+    {:nowarn_function, format_tool_result: 1},
+    {:nowarn_function, add_tool_results_to_messages: 2}
+  ]
+
+  @dialyzer {:nowarn_function, run: 2}
 
   @doc """
   Executes the call with tools action.

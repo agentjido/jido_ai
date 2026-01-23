@@ -30,8 +30,8 @@ defmodule Jido.AI.ReAct.Machine do
       "idle" => ["awaiting_llm"],
       "awaiting_llm" => ["awaiting_tool", "completed", "error"],
       "awaiting_tool" => ["awaiting_llm", "completed", "error"],
-      "completed" => [],
-      "error" => []
+      "completed" => ["awaiting_llm"],
+      "error" => ["awaiting_llm"]
     }
 
   # Telemetry event names
@@ -121,32 +121,13 @@ defmodule Jido.AI.ReAct.Machine do
   def update(machine, msg, env \\ %{})
 
   def update(%__MODULE__{status: "idle"} = machine, {:start, query, call_id}, env) do
-    system_prompt = Map.fetch!(env, :system_prompt)
-    conversation = [system_message(system_prompt), user_message(query)]
-    started_at = System.monotonic_time(:millisecond)
+    do_start_fresh(machine, query, call_id, env)
+  end
 
-    # Emit start telemetry
-    emit_telemetry(:start, %{system_time: System.system_time()}, %{
-      call_id: call_id,
-      query_length: String.length(query)
-    })
-
-    with_transition(machine, "awaiting_llm", fn machine ->
-      machine =
-        machine
-        |> Map.put(:iteration, 1)
-        |> Map.put(:conversation, conversation)
-        |> Map.put(:pending_tool_calls, [])
-        |> Map.put(:result, nil)
-        |> Map.put(:termination_reason, nil)
-        |> Map.put(:current_llm_call_id, call_id)
-        |> Map.put(:streaming_text, "")
-        |> Map.put(:streaming_thinking, "")
-        |> Map.put(:usage, %{})
-        |> Map.put(:started_at, started_at)
-
-      {machine, [{:call_llm_stream, call_id, conversation}]}
-    end)
+  def update(%__MODULE__{status: status} = machine, {:start, query, call_id}, env)
+      when status in ["completed", "error"] do
+    # Continue conversation - append new user message to existing history
+    do_start_continue(machine, query, call_id, env)
   end
 
   def update(%__MODULE__{status: "awaiting_llm"} = machine, {:llm_result, call_id, result}, env) do
@@ -193,6 +174,46 @@ defmodule Jido.AI.ReAct.Machine do
 
   def update(machine, _msg, _env) do
     {machine, []}
+  end
+
+  # Fresh start - no prior conversation
+  defp do_start_fresh(machine, query, call_id, env) do
+    system_prompt = Map.fetch!(env, :system_prompt)
+    conversation = [system_message(system_prompt), user_message(query)]
+    do_start_with_conversation(machine, conversation, call_id)
+  end
+
+  # Continue existing conversation - append user message
+  defp do_start_continue(machine, query, call_id, _env) do
+    conversation = machine.conversation ++ [user_message(query)]
+    do_start_with_conversation(machine, conversation, call_id)
+  end
+
+  defp do_start_with_conversation(machine, conversation, call_id) do
+    started_at = System.monotonic_time(:millisecond)
+
+    # Emit start telemetry
+    emit_telemetry(:start, %{system_time: System.system_time()}, %{
+      call_id: call_id,
+      query_length: String.length(List.last(conversation)[:content] || "")
+    })
+
+    with_transition(machine, "awaiting_llm", fn machine ->
+      machine =
+        machine
+        |> Map.put(:iteration, 1)
+        |> Map.put(:conversation, conversation)
+        |> Map.put(:pending_tool_calls, [])
+        |> Map.put(:result, nil)
+        |> Map.put(:termination_reason, nil)
+        |> Map.put(:current_llm_call_id, call_id)
+        |> Map.put(:streaming_text, "")
+        |> Map.put(:streaming_thinking, "")
+        |> Map.put(:usage, %{})
+        |> Map.put(:started_at, started_at)
+
+      {machine, [{:call_llm_stream, call_id, conversation}]}
+    end)
   end
 
   defp handle_iteration_check(machine, max_iterations) when machine.iteration > max_iterations do
