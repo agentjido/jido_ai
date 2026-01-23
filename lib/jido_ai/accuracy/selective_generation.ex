@@ -322,8 +322,6 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
     :erlang.float_to_binary(n, decimals: 3)
   end
 
-  defp format_float(n), do: to_string(n)
-
   # Validation helpers
 
   defp validate_reward(reward) when is_number(reward) and reward > 0 and reward <= @max_reward, do: :ok
@@ -336,5 +334,4 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
   defp validate_threshold(t) when is_number(t) and t >= 0 and t <= 1, do: :ok
   defp validate_threshold(_), do: {:error, :invalid_threshold}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

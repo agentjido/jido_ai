@@ -23,7 +23,7 @@ defmodule Jido.AI.ReActAgent do
   - `:system_prompt` - Custom system prompt for the LLM
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
-  - `:skills` - Additional skills to attach to the agent
+  - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
 
@@ -39,6 +39,18 @@ defmodule Jido.AI.ReActAgent do
   - `:last_query` - The most recent query sent to the agent
   - `:last_answer` - The final answer from the last completed query
   - `:completed` - Boolean indicating if the last query is complete
+
+  ## Task Supervisor
+
+  Each agent instance gets its own Task.Supervisor automatically started via the
+  `Jido.AI.Skills.TaskSupervisorSkill`. This supervisor is used for:
+  - LLM streaming operations
+  - Tool execution
+  - Other async operations within the agent's lifecycle
+
+  The supervisor is stored in the skill's internal state (`agent.state.__task_supervisor_skill__`)
+  and is accessible via `Jido.AI.Directive.Helper.get_task_supervisor/1`. It is automatically
+  cleaned up when the agent terminates.
 
   ## Example
 
@@ -64,6 +76,9 @@ defmodule Jido.AI.ReActAgent do
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
     skills = Keyword.get(opts, :skills, [])
 
+    # TaskSupervisorSkill is always included for per-instance task supervision
+    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+
     strategy_opts =
       [tools: tools, model: model, max_iterations: max_iterations]
       |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
@@ -84,7 +99,7 @@ defmodule Jido.AI.ReActAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(skills),
+        skills: unquote(ai_skills) ++ unquote(skills),
         strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

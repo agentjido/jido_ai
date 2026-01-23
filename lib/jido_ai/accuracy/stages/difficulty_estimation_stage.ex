@@ -30,13 +30,12 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStage do
 
   """
 
+  @behaviour Jido.AI.Accuracy.PipelineStage
+
   alias Jido.AI.Accuracy.{
-    PipelineStage,
     DifficultyEstimate,
     Estimators.HeuristicDifficulty
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           estimator: module() | nil,
@@ -48,13 +47,13 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStage do
     timeout: 5000
   ]
 
-  @impl PipelineStage
+  @impl true
   def name, do: :difficulty_estimation
 
-  @impl PipelineStage
+  @impl true
   def required?, do: false
 
-  @impl PipelineStage
+  @impl true
   def execute(input, config) do
     query = Map.get(input, :query)
     estimator = Map.get(config, :estimator, HeuristicDifficulty)

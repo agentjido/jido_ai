@@ -214,10 +214,14 @@ defmodule Jido.AI.Accuracy.GenerationResult do
     select_by_majority_content(candidates(result))
   end
 
-  def select_by_strategy(%__MODULE__{candidates: candidates}, _strategy) do
+  def select_by_strategy(%__MODULE__{candidates: candidates} = result, _strategy) do
     # Unknown strategy - fall back to best
+    best = find_best_candidate(candidates)
     select_by_strategy(
-      %__MODULE__{candidates: candidates, best_candidate: find_best_candidate(candidates)},
+      %{result |
+        best_candidate: best,
+        aggregation_method: :best
+      },
       :best
     )
   end
@@ -425,5 +429,4 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   defp parse_aggregation_method(method) when is_binary(method), do: String.to_existing_atom(method)
   defp parse_aggregation_method(_), do: :none
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

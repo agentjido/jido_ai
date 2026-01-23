@@ -30,15 +30,14 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
 
   """
 
+  @behaviour Jido.AI.Accuracy.PipelineStage
+
   alias Jido.AI.Accuracy.{
-    PipelineStage,
     CalibrationGate,
     ConfidenceEstimate,
     Candidate,
     RoutingResult
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           high_threshold: float(),
@@ -54,13 +53,13 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
             low_action: :abstain,
             emit_telemetry: true
 
-  @impl PipelineStage
+  @impl true
   def name, do: :calibration
 
-  @impl PipelineStage
+  @impl true
   def required?, do: false
 
-  @impl PipelineStage
+  @impl true
   def execute(input, config) do
     best_candidate = Map.get(input, :best_candidate)
 
@@ -98,9 +97,8 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
     {:ok, %RoutingResult{} = routing_result} =
       CalibrationGate.route(gate, candidate, confidence_estimate)
 
-    # Extract final answer from routing result, falling back to original candidate
-    candidate_to_use = routing_result.candidate || candidate
-    final_answer = extract_answer(candidate_to_use)
+    # Extract final answer from routing result
+    final_answer = extract_answer(routing_result.candidate)
 
     updated_state =
       input
@@ -144,8 +142,5 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
     })
   end
 
-  defp extract_answer(nil), do: nil
   defp extract_answer(%Candidate{content: content}), do: content
-  defp extract_answer(%{content: content}) when is_binary(content), do: content
-  defp extract_answer(_), do: nil
 end

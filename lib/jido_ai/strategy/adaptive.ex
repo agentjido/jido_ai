@@ -259,7 +259,6 @@ defmodule Jido.AI.Strategies.Adaptive do
   @doc """
   Analyzes a prompt and returns the recommended strategy.
   """
-  @spec analyze_prompt(String.t(), config()) :: {strategy_type(), float(), atom()}
   def analyze_prompt(prompt, config \\ %{}) do
     thresholds = Map.get(config, :complexity_thresholds, @default_thresholds)
     available = Map.get(config, :available_strategies, [:cot, :react, :tot, :got, :trm])

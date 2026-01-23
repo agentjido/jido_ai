@@ -235,5 +235,4 @@ defmodule Jido.AI.GEPA.Task do
   defp error_message(:invalid_input), do: "input must be a string"
   defp error_message(:empty_input), do: "input cannot be empty"
   defp error_message(:invalid_attrs), do: "attrs must be a map"
-  defp error_message(reason), do: "#{inspect(reason)}"
 end

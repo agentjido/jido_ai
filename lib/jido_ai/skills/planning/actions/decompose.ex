@@ -116,9 +116,9 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
   @impl Jido.Action
   def run(params, _context) do
     with {:ok, model} <- resolve_model(params[:model]),
-         {:ok, messages} <- build_decompose_messages(params),
+         context = build_decompose_messages(params),
          opts = build_opts(params),
-         {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, opts) do
+         {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
       {:ok, format_result(response, model, params[:goal], params[:max_depth])}
     end
   end
@@ -189,19 +189,24 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
     |> Enum.filter(fn s -> String.length(s) > 0 end)
   end
 
-  defp extract_text(%{message: %{content: content}}) when is_binary(content), do: content
-
-  defp extract_text(%{message: %{content: content}}) when is_list(content) do
-    content
-    |> Enum.filter(fn
-      %{type: :text} -> true
-      _ -> false
-    end)
-    |> Enum.map_join("", fn
-      %{text: text} -> text
+  defp extract_text(%{message: %{content: content}}) do
+    case content do
+      c when is_binary(c) -> c
+      c when is_list(c) ->
+        c
+        |> Enum.filter(fn
+          %{type: :text} -> true
+          _ -> false
+        end)
+        |> Enum.map_join("", fn
+          %{text: text} -> text
+          _ -> ""
+        end)
       _ -> ""
-    end)
+    end
   end
+
+  @dialyzer {:nowarn_function, extract_text: 1}
 
   defp extract_text(_), do: ""
 

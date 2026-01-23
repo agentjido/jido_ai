@@ -546,5 +546,4 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
   end
 
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

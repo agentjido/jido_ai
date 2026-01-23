@@ -423,8 +423,8 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
 
   defp extract_preserved_parts(original, revised) do
     # Find parts that remained unchanged
-    original_lines = String.split(original || "", "\n")
-    revised_lines = String.split(revised || "", "\n")
+    original_lines = String.split(original, "\n")
+    revised_lines = String.split(revised, "\n")
 
     preserved =
       original_lines

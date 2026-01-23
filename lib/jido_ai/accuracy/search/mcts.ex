@@ -83,9 +83,9 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, SearchController, Search.MCTSNode, VerificationResult}
+  @behaviour Jido.AI.Accuracy.SearchController
 
-  @behaviour SearchController
+  alias Jido.AI.Accuracy.{Candidate, SearchController, Search.MCTSNode, VerificationResult}
 
   @type t :: %__MODULE__{
           simulations: pos_integer(),
@@ -385,5 +385,4 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
   defp validate_max_depth(depth) when is_integer(depth) and depth >= 1 and depth <= 100, do: :ok
   defp validate_max_depth(_), do: {:error, :invalid_max_depth}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

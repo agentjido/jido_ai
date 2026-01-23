@@ -635,5 +635,4 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   defp validate_timeout(_), do: {:error, :timeout_must_be_between_1000_and_300000_ms}
 
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

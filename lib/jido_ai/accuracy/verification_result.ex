@@ -298,5 +298,4 @@ defmodule Jido.AI.Accuracy.VerificationResult do
 
   defp validate_step_scores(_), do: {:error, :invalid_step_scores}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

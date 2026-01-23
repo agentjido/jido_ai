@@ -164,7 +164,7 @@ defmodule Jido.AI.Accuracy.Thresholds do
       # => :hard
 
   """
-  @spec score_to_level(float()) :: DifficultyEstimate.level()
+  @spec score_to_level(float()) :: :easy | :medium | :hard
   def score_to_level(score) when is_number(score) do
     cond do
       score < @easy_threshold -> :easy
@@ -188,7 +188,7 @@ defmodule Jido.AI.Accuracy.Thresholds do
       # => 0.175
 
   """
-  @spec level_to_score(DifficultyEstimate.level()) :: float()
+  @spec level_to_score(:easy | :medium | :hard) :: float()
   def level_to_score(:easy), do: @easy_threshold / 2
   def level_to_score(:medium), do: (@easy_threshold + @hard_threshold) / 2
   def level_to_score(:hard), do: (@hard_threshold + 1.0) / 2

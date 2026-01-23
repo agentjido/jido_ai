@@ -71,14 +71,14 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
   def run(params, _context) do
     with {:ok, validated_params} <- validate_and_sanitize_params(params),
          {:ok, model} <- resolve_model(validated_params[:model]),
-         {:ok, messages} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          tools = get_tools(validated_params[:tools]),
          opts = build_opts(validated_params),
-         {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, Keyword.put(opts, :tools, tools)) do
+         {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, Keyword.put(opts, :tools, tools)) do
       result = classify_and_format_response(response, model)
 
       if validated_params[:auto_execute] && result.type == :tool_calls do
-        execute_tool_turns(result, messages, model, validated_params, 1)
+        execute_tool_turns(result, context.messages, model, validated_params, 1)
       else
         {:ok, result}
       end
@@ -246,7 +246,6 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
   defp format_tool_result({:ok, result}) when is_map(result) or is_list(result), do: Jason.encode!(result)
   defp format_tool_result({:ok, result}), do: inspect(result)
   defp format_tool_result({:error, error}) when is_map(error), do: Map.get(error, :error, "Execution failed")
-  defp format_tool_result({:error, _reason}), do: "Execution failed"
 
   defp add_tool_results_to_messages(messages, tool_results) do
     tool_messages =

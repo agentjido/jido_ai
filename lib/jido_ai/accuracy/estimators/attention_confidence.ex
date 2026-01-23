@@ -64,11 +64,11 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, ConfidenceEstimator, Helpers}
+  @behaviour Jido.AI.Accuracy.ConfidenceEstimator
+
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, Helpers}
 
   import Helpers, only: [get_attr: 3]
-
-  @behaviour ConfidenceEstimator
 
   @type t :: %__MODULE__{
           aggregation: :product | :mean | :min,
@@ -278,5 +278,4 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
   defp validate_token_threshold(t) when is_number(t) and t >= 0.0 and t <= 1.0, do: :ok
   defp validate_token_threshold(_), do: {:error, :invalid_token_threshold}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end
