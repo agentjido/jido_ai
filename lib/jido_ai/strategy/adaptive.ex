@@ -112,11 +112,11 @@ defmodule Jido.AI.Strategies.Adaptive do
   @type strategy_type :: :cot | :react | :tot | :got | :trm
 
   @type config :: %{
-          model: String.t(),
-          default_strategy: strategy_type(),
-          available_strategies: [strategy_type()],
-          complexity_thresholds: map(),
-          strategy_opts: keyword()
+          optional(:model) => String.t(),
+          optional(:default_strategy) => strategy_type(),
+          optional(:available_strategies) => [strategy_type()],
+          optional(:complexity_thresholds) => map(),
+          optional(:strategy_opts) => keyword()
         }
 
   # Action atoms - we use generic ones that work across strategies

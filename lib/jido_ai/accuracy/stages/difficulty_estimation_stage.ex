@@ -30,13 +30,13 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStage do
 
   """
 
+  @behaviour Jido.AI.Accuracy.PipelineStage
+
   alias Jido.AI.Accuracy.{
     PipelineStage,
     DifficultyEstimate,
     Estimators.HeuristicDifficulty
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           estimator: module() | nil,

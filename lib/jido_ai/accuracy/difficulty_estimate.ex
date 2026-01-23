@@ -61,9 +61,9 @@ defmodule Jido.AI.Accuracy.DifficultyEstimate do
 
   """
 
-  alias Jido.AI.Accuracy.{Helpers, Thresholds}
+  import Jido.AI.Accuracy.Helpers, only: [get_attr: 2, get_attr: 3]
 
-  import Helpers, only: [get_attr: 2, get_attr: 3]
+  alias Jido.AI.Accuracy.Thresholds
 
   @type t :: %__MODULE__{
           level: level(),

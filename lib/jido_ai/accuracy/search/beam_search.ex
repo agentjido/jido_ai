@@ -77,9 +77,9 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, SearchController, SearchState, VerificationResult}
+  @behaviour Jido.AI.Accuracy.SearchController
 
-  @behaviour SearchController
+  alias Jido.AI.Accuracy.{Candidate, SearchController, SearchState, VerificationResult}
 
   @type t :: %__MODULE__{
           beam_width: pos_integer(),

@@ -712,4 +712,30 @@ defmodule Jido.AI.Helpers do
     |> Enum.filter(&match?(%{type: :text}, &1))
     |> Enum.map_join("", & &1.text)
   end
+
+  # ============================================================================
+  # Task Supervisor Helpers
+  # ============================================================================
+
+  @doc """
+  Returns the task supervisor name for the given Jido instance.
+
+  Uses instance-specific task supervisor from state.jido if available,
+  otherwise falls back to global Jido.TaskSupervisor for backwards compatibility.
+
+  ## Examples
+
+      # With instance state
+      task_sup = Helpers.task_supervisor(state)
+      Task.Supervisor.start_child(task_sup, fn -> ... end)
+
+      # With explicit jido name
+      task_sup = Helpers.task_supervisor(%{jido: MyApp.Jido})
+  """
+  @spec task_supervisor(map()) :: atom()
+  def task_supervisor(%{jido: jido}) when not is_nil(jido) do
+    Jido.task_supervisor_name(jido)
+  end
+
+  def task_supervisor(_state), do: Jido.TaskSupervisor
 end

@@ -475,7 +475,6 @@ defmodule Jido.AI.TRM.Machine do
   defp map_act_halt_reason(:threshold_exceeded), do: :act_threshold
   defp map_act_halt_reason(:convergence_detected), do: :convergence_detected
   defp map_act_halt_reason(:max_improvement_reached), do: :act_threshold
-  defp map_act_halt_reason(_), do: :act_threshold
 
   # Continue to next reasoning iteration
   defp continue_reasoning(machine) do

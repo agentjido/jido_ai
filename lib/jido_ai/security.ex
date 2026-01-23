@@ -360,6 +360,7 @@ defmodule Jido.AI.Security do
   * `callback` - The function to wrap
   * `opts` - Options:
     * `:timeout` - Timeout in milliseconds (default: #{@callback_timeout})
+    * `:task_supervisor` - Task supervisor to use (default: Jido.TaskSupervisor)
 
   ## Returns
 
@@ -373,17 +374,18 @@ defmodule Jido.AI.Security do
   def validate_and_wrap_callback(callback, opts) when is_function(callback) do
     with :ok <- validate_callback(callback) do
       timeout = Keyword.get(opts, :timeout, @callback_timeout)
-      wrapped = wrap_with_timeout(callback, timeout)
+      task_supervisor = Keyword.get(opts, :task_supervisor, Jido.TaskSupervisor)
+      wrapped = wrap_with_timeout(callback, timeout, task_supervisor)
       {:ok, wrapped}
     end
   end
 
   def validate_and_wrap_callback(_callback, _opts), do: {:error, :invalid_callback_type}
 
-  defp wrap_with_timeout(callback, timeout) do
+  defp wrap_with_timeout(callback, timeout, task_supervisor) do
     fn arg ->
       # Use Task.Supervisor.async_nolink which returns a Task struct
-      task = Task.Supervisor.async_nolink(Jido.TaskSupervisor, fn -> callback.(arg) end)
+      task = Task.Supervisor.async_nolink(task_supervisor, fn -> callback.(arg) end)
 
       try do
         case Task.yield(task, timeout) || Task.shutdown(task) do

@@ -72,9 +72,9 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
 
   """
 
-  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
+  @behaviour Jido.AI.Accuracy.DifficultyEstimator
 
-  @behaviour DifficultyEstimator
+  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
 
   @type combination :: :weighted_average | :majority_vote | :max_confidence | :average
   @type estimator_pair :: {module(), struct()}
@@ -532,8 +532,7 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
   defp validate_weights(_, _), do: {:error, :invalid_weights}
 
   defp validate_combination(combination)
-       when combination in [:weighted_average, :majority_vote, :max_confidence, :average],
-       do: :ok
+       when combination in [:weighted_average, :majority_vote, :max_confidence, :average], do: :ok
 
   defp validate_combination(_), do: {:error, :invalid_combination}
 

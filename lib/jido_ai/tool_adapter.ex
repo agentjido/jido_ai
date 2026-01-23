@@ -432,7 +432,13 @@ defmodule Jido.AI.ToolAdapter do
   end
 
   defp build_json_schema(schema) do
-    ActionSchema.to_json_schema(schema)
+    case ActionSchema.to_json_schema(schema) do
+      empty when empty == %{} ->
+        %{"type" => "object", "properties" => %{}}
+
+      json_schema ->
+        json_schema
+    end
   end
 
   defp noop_callback(_args) do

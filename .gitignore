@@ -32,5 +32,16 @@ jido_ai-*.tar
 # Environment
 .env
 
-# Dialyzer PLT files
+# Dialyzer PLT files - do NOT commit these
 /priv/plts/
+*.plt
+*.plt.hash
+
+# Editor/IDE
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
