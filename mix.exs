@@ -75,10 +75,10 @@ defmodule JidoAi.MixProject do
       {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
-      {:splode, "~> 0.3.0"},
+      {:splode, "~> 0.3.0", override: true},
       {:typedstruct, "~> 0.5"},
       {:uniq, "~> 0.6"},
-      {:zoi, "~> 0.14"}
+      {:zoi, "~> 0.16", override: true}
     ]
   end
 

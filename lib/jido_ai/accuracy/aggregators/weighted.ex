@@ -189,13 +189,11 @@ defmodule Jido.AI.Accuracy.Aggregators.Weighted do
   end
 
   defp apply_strategy(strategy_module, candidates, opts) do
-    try do
-      apply(strategy_module, :aggregate, [candidates, opts])
-    rescue
-      # Handle cases where function doesn't exist or module not loaded
-      e in [UndefinedFunctionError, ArgumentError] ->
-        {:error, {:not_implemented, e}}
-    end
+    apply(strategy_module, :aggregate, [candidates, opts])
+  rescue
+    # Handle cases where function doesn't exist or module not loaded
+    e in [UndefinedFunctionError, ArgumentError] ->
+      {:error, {:not_implemented, e}}
   end
 
   defp calculate_weighted_scores(candidates, strategy_results) do

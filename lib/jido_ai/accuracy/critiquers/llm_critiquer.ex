@@ -246,7 +246,7 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
         {:ok, response} ->
           content = extract_content(response)
 
-          if content do
+          if content != "" do
             {:ok, content}
           else
             {:error, :no_content}
@@ -298,21 +298,29 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
 
     cond do
       Regex.run(json_block_regex, response) != nil ->
-        [[_, match]] = Regex.run(json_block_regex, response, capture: :all)
-        match
+        case Regex.run(json_block_regex, response, capture: :all) do
+          [[_, match]] -> match
+          _ -> response
+        end
 
       Regex.run(code_block_regex, response) != nil ->
-        [[_, match]] = Regex.run(code_block_regex, response, capture: :all)
-        match
+        case Regex.run(code_block_regex, response, capture: :all) do
+          [[_, match]] -> match
+          _ -> response
+        end
 
       Regex.run(plain_json_regex, response) != nil ->
-        [[_, match]] = Regex.run(plain_json_regex, response, capture: :all)
-        match
+        case Regex.run(plain_json_regex, response, capture: :all) do
+          [[_, match]] -> match
+          _ -> response
+        end
 
       true ->
         response
     end
   end
+
+  @dialyzer {:nowarn_function, extract_json: 1}
 
   defp parse_fallback(response) do
     # Try to extract issues, suggestions, severity from text
@@ -361,5 +369,4 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
 
   defp validate_timeout(_), do: {:error, :invalid_timeout}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

@@ -72,11 +72,11 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, ConfidenceEstimator, Helpers}
+  @behaviour Jido.AI.Accuracy.ConfidenceEstimator
+
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, Helpers}
 
   import Helpers, only: [get_attr: 2, get_attr: 3]
-
-  @behaviour ConfidenceEstimator
 
   @type t :: %__MODULE__{
           estimators: [{module(), keyword()}],
@@ -448,5 +448,4 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
   defp config_to_map(config) when is_list(config), do: Map.new(config)
   defp config_to_map(config) when is_map(config), do: config
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

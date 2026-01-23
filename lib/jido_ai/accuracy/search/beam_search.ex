@@ -77,9 +77,9 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, SearchController, SearchState, VerificationResult}
+  @behaviour Jido.AI.Accuracy.SearchController
 
-  @behaviour SearchController
+  alias Jido.AI.Accuracy.{Candidate, SearchController, SearchState, VerificationResult}
 
   @type t :: %__MODULE__{
           beam_width: pos_integer(),
@@ -359,5 +359,4 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
   defp validate_branching_factor(factor) when is_integer(factor) and factor >= 1 and factor <= 10, do: :ok
   defp validate_branching_factor(_), do: {:error, :invalid_branching_factor}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

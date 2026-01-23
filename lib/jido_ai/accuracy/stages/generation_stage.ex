@@ -29,13 +29,12 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStage do
 
   """
 
+  @behaviour Jido.AI.Accuracy.PipelineStage
+
   alias Jido.AI.Accuracy.{
-    PipelineStage,
     AdaptiveSelfConsistency,
     Candidate
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           min_candidates: pos_integer(),
@@ -53,13 +52,13 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStage do
     early_stop_threshold: 0.8
   ]
 
-  @impl PipelineStage
+  @impl true
   def name, do: :generation
 
-  @impl PipelineStage
+  @impl true
   def required?, do: true
 
-  @impl PipelineStage
+  @impl true
   def execute(input, config) do
     query = Map.get(input, :query)
     generator = Map.get(config, :generator) || Map.get(input, :generator)

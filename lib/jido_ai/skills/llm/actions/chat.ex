@@ -85,9 +85,9 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
   def run(params, _context) do
     with {:ok, validated_params} <- BaseActionHelpers.validate_and_sanitize_input(params),
          {:ok, model} <- BaseActionHelpers.resolve_model(validated_params[:model], :fast),
-         {:ok, messages} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          opts = BaseActionHelpers.build_opts(validated_params),
-         {:ok, response} <- ReqLLM.Generation.generate_text(model, messages, opts) do
+         {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
       {:ok, format_result(response, model)}
     else
       {:error, reason} -> {:error, sanitize_error_for_user(reason)}

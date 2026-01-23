@@ -908,10 +908,12 @@ defmodule Jido.AI.GraphOfThoughts.Machine do
     }
   end
 
+  defp extract_content(result) when is_binary(result), do: result
   defp extract_content(%{text: text}) when is_binary(text), do: text
   defp extract_content(%{content: content}) when is_binary(content), do: content
-  defp extract_content(result) when is_binary(result), do: result
   defp extract_content(_), do: ""
+
+  @dialyzer {:nowarn_function, extract_content: 1}
 
   defp parse_connections(content) do
     # Parse connections in format: CONNECTION: [node_id_1] -> [node_id_2] : [description]

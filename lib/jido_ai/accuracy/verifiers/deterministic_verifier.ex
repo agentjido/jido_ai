@@ -358,5 +358,4 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifier do
 
   defp validate_tolerance(_), do: :ok
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

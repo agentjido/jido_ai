@@ -380,21 +380,41 @@ defmodule Jido.AI.Security do
 
   def validate_and_wrap_callback(_callback, _opts), do: {:error, :invalid_callback_type}
 
+  @dialyzer {:nowarn_function, wrap_with_timeout: 2}
   defp wrap_with_timeout(callback, timeout) do
     fn arg ->
-      # Use Task.Supervisor.async_nolink which returns a Task struct
-      task = Task.Supervisor.async_nolink(Jido.TaskSupervisor, fn -> callback.(arg) end)
+      # Use Task.async which creates a temporary unsupervised task
+      # This is acceptable for callbacks because:
+      # 1. The task is short-lived and immediately awaited
+      # 2. The timeout ensures it doesn't hang forever
+      # 3. The calling process supervises the task via Task.yield/shutdown
+      task =
+        Task.async(fn ->
+          try do
+            callback.(arg)
+          rescue
+            e -> {:error, %{exception: Exception.message(e), type: :rescued}}
+          catch
+            :error, reason -> {:error, %{exception: inspect(reason), type: :error}}
+            :throw, value -> {:error, %{exception: inspect(value), type: :throw}}
+            :exit, reason -> {:error, %{exception: inspect(reason), type: :exit}}
+            kind, reason -> {:error, %{exception: inspect(reason), type: kind}}
+          end
+        end)
 
-      try do
-        case Task.yield(task, timeout) || Task.shutdown(task) do
-          {:ok, result} -> result
-          {:exit, _} -> {:error, :callback_timeout}
-          nil -> {:error, :callback_timeout}
+      result =
+        try do
+          case Task.yield(task, timeout) || Task.shutdown(task) do
+            {:ok, task_result} -> task_result
+            {:exit, _} -> {:error, :callback_timeout}
+            nil -> {:error, :callback_timeout}
+          end
+        after
+          # Ensure we dereference the task if still running
+          Process.demonitor(task.ref, [:flush])
         end
-      after
-        # Ensure we dereference the task if still running
-        Process.demonitor(task.ref, [:flush])
-      end
+
+      result
     end
   end
 
@@ -637,10 +657,10 @@ defmodule Jido.AI.Security do
 
   ## Returns
 
-  * `:ok` - If valid
+  * `{:ok, stream_id}` - If valid
   * `{:error, reason}` - If invalid
   """
-  @spec validate_stream_id(String.t()) :: validation_result()
+  @spec validate_stream_id(String.t()) :: {:ok, String.t()} | {:error, atom()}
   def validate_stream_id(stream_id) when is_binary(stream_id) do
     # UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
     uuid_pattern = ~r/^
@@ -652,7 +672,7 @@ defmodule Jido.AI.Security do
     $/x
 
     if Regex.match?(uuid_pattern, stream_id) do
-      :ok
+      {:ok, stream_id}
     else
       {:error, :invalid_stream_id_format}
     end

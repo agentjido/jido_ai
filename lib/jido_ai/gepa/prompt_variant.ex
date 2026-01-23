@@ -290,5 +290,4 @@ defmodule Jido.AI.GEPA.PromptVariant do
   defp error_message(:template_required), do: "template is required"
   defp error_message(:invalid_template), do: "template must be a non-empty string or map"
   defp error_message(:invalid_attrs), do: "attrs must be a map"
-  defp error_message(reason), do: "#{inspect(reason)}"
 end

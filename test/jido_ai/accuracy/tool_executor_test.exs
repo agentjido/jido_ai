@@ -72,7 +72,10 @@ defmodule Jido.AI.Accuracy.ToolExecutorTest do
 
     test "allows safe environment variables" do
       {:ok, result} =
-        ToolExecutor.run_command("sh", ["-c", "echo $TEST_VAR"], env: %{"TEST_VAR" => "test_value"}, bypass_allowlist: true)
+        ToolExecutor.run_command("sh", ["-c", "echo $TEST_VAR"],
+          env: %{"TEST_VAR" => "test_value"},
+          bypass_allowlist: true
+        )
 
       assert String.contains?(result.stdout, "test_value")
     end
