@@ -69,14 +69,14 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
 
   """
 
+  @behaviour Jido.AI.Accuracy.SearchController
+
   alias Jido.AI.Accuracy.{
     Candidate,
     SearchController,
     Similarity,
     VerificationResult
   }
-
-  @behaviour SearchController
 
   @type t :: %__MODULE__{
           num_candidates: pos_integer(),
@@ -373,5 +373,4 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecoding do
   defp validate_lambda(l) when is_number(l) and l >= 0.0 and l <= 1.0, do: :ok
   defp validate_lambda(_), do: {:error, :invalid_lambda}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

@@ -443,7 +443,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
         {:ok, response} ->
           content = extract_content(response)
 
-          if content do
+          if content != "" do
             {:ok, String.trim(content)}
           else
             {:error, :no_content}
@@ -508,5 +508,4 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
   defp validate_timeout(_), do: {:error, :invalid_timeout}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

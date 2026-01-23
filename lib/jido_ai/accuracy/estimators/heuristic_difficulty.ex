@@ -71,11 +71,11 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
 
   """
 
-  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator, Helpers}
+  @behaviour Jido.AI.Accuracy.DifficultyEstimator
+
+  alias Jido.AI.Accuracy.{DifficultyEstimate, Helpers}
 
   import Helpers, only: [get_attr: 3]
-
-  @behaviour DifficultyEstimator
 
   @type t :: %__MODULE__{
           length_weight: float(),
@@ -604,5 +604,4 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   defp validate_timeout(_), do: {:error, :invalid_timeout}
 
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

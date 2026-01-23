@@ -305,5 +305,4 @@ defmodule Jido.AI.Accuracy.RoutingResult do
   defp validate_confidence_level(level) when level in [:high, :medium, :low], do: :ok
   defp validate_confidence_level(_), do: {:error, :invalid_confidence_level}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

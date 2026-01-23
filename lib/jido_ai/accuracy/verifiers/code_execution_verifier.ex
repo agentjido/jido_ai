@@ -503,5 +503,4 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
 
   defp validate_working_dir(_), do: {:error, :invalid_directory}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

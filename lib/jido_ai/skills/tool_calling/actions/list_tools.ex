@@ -117,8 +117,6 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
     end)
   end
 
-  defp filter_sensitive_tools(tools, _include_sensitive), do: tools
-
   # Tools that should be excluded by default
   defp sensitive_tool?(name) when is_binary(name) do
     lower_name = String.downcase(name)

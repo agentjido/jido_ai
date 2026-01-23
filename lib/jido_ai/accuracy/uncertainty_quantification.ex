@@ -367,5 +367,4 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
   defp is_valid_regex(%Regex{}), do: true
   defp is_valid_regex(_), do: false
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

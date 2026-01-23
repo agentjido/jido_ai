@@ -266,5 +266,4 @@ defmodule Jido.AI.Accuracy.Candidate do
   defp parse_timestamp(%DateTime{} = dt), do: dt
   defp parse_timestamp(_), do: nil
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

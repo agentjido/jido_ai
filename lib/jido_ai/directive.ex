@@ -262,6 +262,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
 
   Error handling: If the LLM call raises an exception, the error is caught
   and sent back as an error result to prevent the agent from getting stuck.
+
+  ## Task Supervisor
+
+  This implementation uses the agent's per-instance task supervisor stored in
+  `state[:task_supervisor]`. The supervisor is started automatically by Jido.AI
+  when an agent is created.
   """
 
   alias Jido.AI.{Helpers, Signal}
@@ -282,6 +288,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
     timeout = Map.get(directive, :timeout)
 
     agent_pid = self()
+    task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
     stream_opts = %{
       call_id: call_id,
@@ -296,7 +303,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
       agent_pid: agent_pid
     }
 
-    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+    Task.Supervisor.start_child(task_supervisor, fn ->
       result =
         try do
           stream_with_callbacks(stream_opts)
@@ -401,8 +408,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMEmbed do
     timeout = Map.get(directive, :timeout)
 
     agent_pid = self()
+    task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
-    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+    Task.Supervisor.start_child(task_supervisor, fn ->
       result =
         try do
           generate_embeddings(model, texts, dimensions, timeout)
@@ -437,7 +445,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMEmbed do
   end
 
   defp count_embeddings(embeddings) when is_list(embeddings), do: length(embeddings)
-  defp count_embeddings(_), do: 1
 
   defp add_dimensions_opt(opts, nil), do: opts
 
@@ -468,8 +475,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     } = directive
 
     agent_pid = self()
+    task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
-    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+    Task.Supervisor.start_child(task_supervisor, fn ->
       result = Executor.execute(tool_name, arguments, context)
 
       signal =
@@ -498,6 +506,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
   - `model_alias` resolution via `Jido.AI.Config.resolve_model/1`
   - `system_prompt` prepended to context messages
   - `timeout` passed to HTTP options
+
+  ## Task Supervisor
+
+  This implementation uses the agent's per-instance task supervisor stored in
+  `state[:task_supervisor]`. The supervisor is started automatically by Jido.AI
+  when an agent is created.
   """
 
   alias Jido.AI.{Helpers, Signal}
@@ -517,8 +531,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
     timeout = Map.get(directive, :timeout)
 
     agent_pid = self()
+    task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
-    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+    Task.Supervisor.start_child(task_supervisor, fn ->
       result =
         try do
           generate_text(
@@ -563,6 +578,59 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+end
+
+# Helper functions for DirectiveExec implementations
+defmodule Jido.AI.Directive.Helper do
+  @moduledoc """
+  Helper functions for DirectiveExec implementations.
+  """
+
+  @doc """
+  Gets the task supervisor from agent state.
+
+  First checks the TaskSupervisorSkill's internal state (`__task_supervisor_skill__`),
+  then falls back to the top-level `:task_supervisor` field for standalone usage.
+
+  ## Examples
+
+      iex> state = %{__task_supervisor_skill__: %{supervisor: supervisor_pid}}
+      iex> Jido.AI.Directive.Helper.get_task_supervisor(state)
+      supervisor_pid
+
+      iex> state = %{task_supervisor: supervisor_pid}
+      iex> Jido.AI.Directive.Helper.get_task_supervisor(state)
+      supervisor_pid
+
+  """
+  def get_task_supervisor(state) when is_map(state) do
+    # First check TaskSupervisorSkill's internal state
+    case Map.get(state, :__task_supervisor_skill__) do
+      %{supervisor: supervisor} when is_pid(supervisor) ->
+        supervisor
+
+      _ ->
+        # Fall back to top-level state field (for standalone usage)
+        case Map.get(state, :task_supervisor) do
+          nil ->
+            raise """
+            Task supervisor not found in agent state.
+
+            In Jido 2.0, each agent instance requires its own task supervisor.
+            Ensure your agent is started with Jido.AI which will automatically
+            create and store a per-instance supervisor in the agent state.
+
+            Example:
+                use Jido.AI.ReActAgent,
+                  name: "my_agent",
+                  tools: [MyApp.Tool1, MyApp.Tool2]
+            """
+
+          supervisor when is_pid(supervisor) ->
+            supervisor
+        end
     end
   end
 end

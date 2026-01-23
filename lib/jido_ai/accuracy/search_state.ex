@@ -365,5 +365,4 @@ defmodule Jido.AI.Accuracy.SearchState do
   defp validate_iterations(iterations) when is_integer(iterations) and iterations >= 0, do: :ok
   defp validate_iterations(_), do: {:error, :invalid_iterations}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

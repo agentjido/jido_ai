@@ -72,6 +72,9 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
         auto_process:
           Zoi.boolean(description: "Whether to automatically process the stream")
           |> Zoi.default(true)
+          |> Zoi.optional(),
+        task_supervisor:
+          Zoi.any(description: "Task supervisor pid for background stream processing")
           |> Zoi.optional()
       })
 
@@ -100,10 +103,10 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
   def run(params, _context) do
     with {:ok, validated_params} <- validate_and_sanitize_params(params),
          {:ok, model} <- resolve_model(validated_params[:model]),
-         {:ok, messages} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          {:ok, stream_id} <- Security.generate_stream_id() |> Security.validate_stream_id(),
          opts = build_opts(validated_params),
-         {:ok, stream_response} <- ReqLLM.stream_text(model, messages, opts) do
+         {:ok, stream_response} <- ReqLLM.stream_text(model, context.messages, opts) do
       # Start background task to process the stream
       start_stream_processor(stream_id, stream_response, validated_params)
 
@@ -177,10 +180,33 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
     on_token = params[:on_token]
     buffer? = params[:buffer] || false
     auto_process = params[:auto_process] != false
+    task_supervisor = resolve_task_supervisor(params[:task_supervisor])
 
-    Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+    Task.Supervisor.start_child(task_supervisor, fn ->
       process_stream(stream_id, stream_response, on_token, buffer?, auto_process)
     end)
+  end
+
+  defp resolve_task_supervisor(supervisor) when is_pid(supervisor), do: supervisor
+
+  defp resolve_task_supervisor(nil) do
+    case Application.get_env(:jido_ai, :task_supervisor) do
+      nil ->
+        raise """
+        Task supervisor not configured.
+
+        For streaming actions, you must either:
+        1. Pass task_supervisor as a parameter
+        2. Configure it in application environment:
+           Application.put_env(:jido_ai, :task_supervisor, supervisor_pid)
+
+        When using Jido.AI with agents, the supervisor is automatically
+        configured. For standalone action execution, you must provide it.
+        """
+
+      supervisor when is_pid(supervisor) ->
+        supervisor
+    end
   end
 
   defp process_stream(stream_id, stream_response, on_token, buffer?, _auto_process) do
@@ -212,28 +238,35 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
     end
   end
 
-  defp handle_token(_stream_id, _chunk, nil, _buffer_ref), do: :ok
+  defp handle_token(stream_id, chunk, on_token, buffer_ref) do
+    cond do
+      # Buffer exists (ETS tid is always truthy)
+      buffer_ref != nil ->
+        # Store in buffer
+        :ets.insert(buffer_ref, {stream_id, chunk})
 
-  # Callback is already wrapped with timeout protection by Security.validate_and_wrap_callback
-  defp handle_token(_stream_id, chunk, on_token, nil) when is_function(on_token, 1) do
-    on_token.(chunk)
-  catch
-    _, _ -> :ok
-  end
+        # Also call on_token if provided (already validated and wrapped)
+        if on_token && is_function(on_token, 1) do
+          try do
+            on_token.(chunk)
+          catch
+            _, _ -> :ok
+          end
+        else
+          :ok
+        end
 
-  defp handle_token(stream_id, chunk, on_token, buffer_ref) when is_reference(buffer_ref) do
-    # Store in buffer
-    :ets.insert(buffer_ref, {stream_id, chunk})
+      # No buffer, has callback
+      on_token != nil and is_function(on_token, 1) ->
+        try do
+          on_token.(chunk)
+        catch
+          _, _ -> :ok
+        end
 
-    # Also call on_token if provided (already validated and wrapped)
-    if on_token && is_function(on_token, 1) do
-      try do
-        on_token.(chunk)
-      catch
-        _, _ -> :ok
-      end
-    else
-      :ok
+      # No buffer, no callback
+      true ->
+        :ok
     end
   end
 
