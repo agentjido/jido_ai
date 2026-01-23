@@ -23,12 +23,8 @@ defmodule Jido.AI.ReActAgent do
   - `:system_prompt` - Custom system prompt for the LLM
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
-<<<<<<< HEAD
-  - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
-=======
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`)
-  - `:skills` - Additional skills to attach to the agent
->>>>>>> 98e69e0d8033c3fcba2db64262c09a9f6061f1cc
+  - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
 
