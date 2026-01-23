@@ -180,8 +180,25 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
 
   defp validate_system_prompt_if_needed(_params), do: {:ok, nil}
 
+  defp validate_callback_if_needed(%{on_token: on_token, task_supervisor: task_supervisor})
+       when is_function(on_token) do
+    supervisor = resolve_task_supervisor(task_supervisor)
+
+    Security.validate_and_wrap_callback(
+      on_token,
+      timeout: Security.callback_timeout(),
+      task_supervisor: supervisor
+    )
+  end
+
   defp validate_callback_if_needed(%{on_token: on_token}) when is_function(on_token) do
-    Security.validate_and_wrap_callback(on_token, timeout: Security.callback_timeout())
+    task_supervisor = resolve_task_supervisor(nil)
+
+    Security.validate_and_wrap_callback(
+      on_token,
+      timeout: Security.callback_timeout(),
+      task_supervisor: task_supervisor
+    )
   end
 
   defp validate_callback_if_needed(_params), do: {:ok, nil}
