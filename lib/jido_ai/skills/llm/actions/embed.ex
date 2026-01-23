@@ -158,10 +158,16 @@ defmodule Jido.AI.Skills.LLM.Actions.Embed do
     }
   end
 
-  defp extract_embeddings(%{embeddings: embeddings}) when is_list(embeddings), do: embeddings
-  defp extract_embeddings(%{data: data}) when is_list(data), do: data
-  defp extract_embeddings(response) when is_list(response), do: response
-  defp extract_embeddings(_), do: []
+  defp extract_embeddings(response) do
+    case response do
+      %{embeddings: embeddings} when is_list(embeddings) -> embeddings
+      %{data: data} when is_list(data) -> data
+      r when is_list(r) -> r
+      _ -> []
+    end
+  end
+
+  @dialyzer {:nowarn_function, extract_embeddings: 1}
 
   defp extract_dimensions([]), do: 0
   defp extract_dimensions([embedding | _]), do: length(embedding)

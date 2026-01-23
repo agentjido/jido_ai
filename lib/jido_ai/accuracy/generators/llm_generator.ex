@@ -187,10 +187,10 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
       end)
       |> Enum.reject(&is_nil/1)
 
-    if not Enum.empty?(results) do
-      {:ok, results}
-    else
+    if Enum.empty?(results) do
       {:error, :all_generations_failed}
+    else
+      {:ok, results}
     end
   end
 
@@ -271,11 +271,12 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
         tokens = count_tokens(response)
 
         candidate_opts =
-          []
-          |> Keyword.put(:content, content)
-          |> Keyword.put(:tokens_used, tokens)
-          |> Keyword.put(:model, generator.model)
-          |> Keyword.put(:metadata, %{temperature: temperature})
+          %{
+            content: content,
+            tokens_used: tokens,
+            model: generator.model,
+            metadata: %{temperature: temperature}
+          }
 
         Candidate.new(candidate_opts)
 
@@ -389,5 +390,4 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
 
   defp find_reasoning_split(_, []), do: nil
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

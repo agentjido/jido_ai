@@ -289,5 +289,4 @@ defmodule Jido.AI.Accuracy.ConfidenceEstimate do
   defp validate_method(method) when is_atom(method) or is_binary(method), do: :ok
   defp validate_method(_), do: {:error, :invalid_method}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

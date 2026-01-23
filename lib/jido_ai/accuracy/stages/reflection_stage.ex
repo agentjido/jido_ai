@@ -29,13 +29,12 @@ defmodule Jido.AI.Accuracy.Stages.ReflectionStage do
 
   """
 
+  @behaviour Jido.AI.Accuracy.PipelineStage
+
   alias Jido.AI.Accuracy.{
-    PipelineStage,
     ReflectionLoop,
     Candidate
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           enabled: boolean(),
@@ -55,13 +54,13 @@ defmodule Jido.AI.Accuracy.Stages.ReflectionStage do
     convergence_threshold: 0.1
   ]
 
-  @impl PipelineStage
+  @impl true
   def name, do: :reflection
 
-  @impl PipelineStage
+  @impl true
   def required?, do: false
 
-  @impl PipelineStage
+  @impl true
   def execute(input, config) do
     enabled = Map.get(config, :enabled, true)
     best_candidate = Map.get(input, :best_candidate)

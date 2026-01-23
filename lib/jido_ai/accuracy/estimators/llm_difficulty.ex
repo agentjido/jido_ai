@@ -91,11 +91,11 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
 
   """
 
-  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator, Helpers}
+  @behaviour Jido.AI.Accuracy.DifficultyEstimator
+
+  alias Jido.AI.Accuracy.{DifficultyEstimate, Helpers}
 
   import Helpers, only: [get_attr: 2, get_attr: 3]
-
-  @behaviour DifficultyEstimator
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -194,6 +194,8 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
       {:ok, %DifficultyEstimate{level: :easy, score: 0.1, ...}}
 
   """
+  alias Jido.AI.Accuracy.Thresholds
+
   @impl true
   @spec estimate(t(), String.t(), map()) :: {:ok, DifficultyEstimate.t()} | {:error, term()}
   def estimate(%__MODULE__{} = estimator, query, context) when is_binary(query) do
@@ -282,8 +284,6 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
     end
   end
 
-  defp extract_content(_), do: ""
-
   # Fallback simulation for testing without ReqLLM
   defp simulate_llm_response(prompt) do
     query = String.slice(prompt, 0, 100)
@@ -332,7 +332,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
 
   defp build_estimate_from_json(data, _query) do
     level = parse_level(get_in(data, ["level"]) || get_in(data, [:level]))
-    score = get_in(data, ["score"]) || get_in(data, [:score]) || DifficultyEstimate.to_level(level)
+    score = get_in(data, ["score"]) || get_in(data, [:score]) || Thresholds.level_to_score(level)
     confidence = get_in(data, ["confidence"]) || get_in(data, [:confidence]) || 0.8
     reasoning = get_in(data, ["reasoning"]) || get_in(data, [:reasoning])
 
@@ -377,7 +377,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
     if level do
       estimate = %DifficultyEstimate{
         level: level,
-        score: DifficultyEstimate.to_level(level),
+        score: Thresholds.level_to_score(level),
         confidence: 0.7,
         reasoning: "LLM classification (parsed from response)",
         features: %{
@@ -418,5 +418,4 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
   defp validate_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
   defp validate_timeout(_), do: {:error, :invalid_timeout}
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

@@ -216,5 +216,4 @@ defmodule Jido.AI.Accuracy.DecisionResult do
 
   defp convert_value(_, value), do: value
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

@@ -134,5 +134,4 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVote do
   defp validate_threshold(_), do: {:error, :invalid_threshold}
 
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

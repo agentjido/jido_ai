@@ -176,13 +176,14 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
 
       iex> StateOpsHelpers.remove_pending_tool("call_1")
       %Jido.Agent.StateOp.DeletePath{path: [:pending_tool_calls, "call_1"]}
+
+  Note: This operation is meant for map-based pending_tool_calls.
+  For list-based pending_tool_calls, use filter_pending_tools/1 instead.
   """
-  @spec remove_pending_tool(String.t()) :: StateOp.DeletePath.t()
   def remove_pending_tool(tool_id) when is_binary(tool_id) do
-    # Note: DeletePath removes a specific key, but pending_tool_calls is a list
-    # This would need custom handling or we use a different approach
-    # For now, we'll return a DeletePath that could be used with a map-based index
-    StateOp.delete_path([:pending_tool_calls, tool_id])
+    # Construct DeletePath struct directly to avoid dialyzer warning about
+    # mixing atoms and strings in the path (which DeletePath schema expects to be all atoms)
+    %StateOp.DeletePath{path: [:pending_tool_calls, tool_id]}
   end
 
   @doc """

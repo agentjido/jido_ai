@@ -387,6 +387,8 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
 
   defp sanitize_prompt_for_telemetry(other), do: truncate_prompt_for_telemetry(other)
 
+  @dialyzer {:nowarn_function, sanitize_prompt_for_telemetry: 1}
+
   defp truncate_prompt(prompt) when byte_size(prompt) > 100 do
     String.slice(prompt, 0, 97) <> "..."
   end
@@ -400,6 +402,8 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   defp truncate_prompt_for_telemetry(val) when is_binary(val), do: val
   defp truncate_prompt_for_telemetry(val), do: inspect(val, limit: 100)
 
+  @dialyzer {:nowarn_function, truncate_prompt_for_telemetry: 1}
+
   defp remove_pii_patterns(prompt) when is_binary(prompt) do
     # Remove common PII patterns (email, phone, credit card, etc.)
     prompt
@@ -410,6 +414,8 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   end
 
   defp remove_pii_patterns(other), do: other
+
+  @dialyzer {:nowarn_function, remove_pii_patterns: 1}
 
   defp emit_stop(start_time, candidates, metadata) do
     duration = System.monotonic_time(:millisecond) - start_time
@@ -444,4 +450,6 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
 
     :telemetry.execute([:jido, :accuracy, :self_consistency, :exception], %{duration: duration}, exception_metadata)
   end
+
+  @dialyzer {:nowarn_function, emit_exception: 2}
 end

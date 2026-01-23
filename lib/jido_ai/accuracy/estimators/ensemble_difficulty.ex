@@ -72,9 +72,9 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
 
   """
 
-  alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
+  @behaviour Jido.AI.Accuracy.DifficultyEstimator
 
-  @behaviour DifficultyEstimator
+  alias Jido.AI.Accuracy.DifficultyEstimate
 
   @type combination :: :weighted_average | :majority_vote | :max_confidence | :average
   @type estimator_pair :: {module(), struct()}
@@ -186,7 +186,7 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
       {:ok, estimate} = EnsembleDifficulty.estimate(ensemble, "What is 2+2?", %{})
 
   """
-  @impl DifficultyEstimator
+  @impl true
   @spec estimate(t(), String.t(), map()) :: {:ok, DifficultyEstimate.t()} | {:error, term()}
   def estimate(%__MODULE__{} = ensemble, query, context) do
     # Validate query first
@@ -204,9 +204,6 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
 
         {:error, :invalid_query} ->
           {:error, :invalid_query}
-
-        {:error, _reason} ->
-          try_fallback(ensemble, query, context)
       end
     else
       {:error, :invalid_query}
@@ -229,7 +226,7 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
   `{:ok, estimates}` on success, `{:error, reason}` on failure.
 
   """
-  @impl DifficultyEstimator
+  @impl true
   @spec estimate_batch(t(), [String.t()], map()) :: {:ok, [DifficultyEstimate.t()]} | {:error, term()}
   def estimate_batch(%__MODULE__{} = ensemble, queries, context) when is_list(queries) do
     # Process queries and stop on first error
@@ -541,5 +538,4 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
   defp validate_timeout(_), do: {:error, :invalid_timeout}
 
   defp format_error(atom) when is_atom(atom), do: atom
-  defp format_error(_), do: :invalid_attributes
 end

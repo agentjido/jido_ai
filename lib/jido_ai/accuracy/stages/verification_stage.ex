@@ -29,13 +29,12 @@ defmodule Jido.AI.Accuracy.Stages.VerificationStage do
 
   """
 
+  @behaviour Jido.AI.Accuracy.PipelineStage
+
   alias Jido.AI.Accuracy.{
-    PipelineStage,
     VerificationRunner,
     Candidate
   }
-
-  @behaviour PipelineStage
 
   @type t :: %__MODULE__{
           use_outcome: boolean(),
@@ -51,13 +50,13 @@ defmodule Jido.AI.Accuracy.Stages.VerificationStage do
             parallel: false,
             timeout: 30_000
 
-  @impl PipelineStage
+  @impl true
   def name, do: :verification
 
-  @impl PipelineStage
+  @impl true
   def required?, do: false
 
-  @impl PipelineStage
+  @impl true
   def execute(input, config) do
     candidates = Map.get(input, :candidates)
 
@@ -104,11 +103,11 @@ defmodule Jido.AI.Accuracy.Stages.VerificationStage do
     else
       # Create verification runner
       runner =
-        VerificationRunner.new!(%{
+        VerificationRunner.new!(
           verifiers: verifiers,
           parallel: Map.get(config, :parallel, false),
           timeout: Map.get(config, :timeout, 30_000)
-        })
+        )
 
       # Verify all candidates
       {:ok, results} = VerificationRunner.verify_all_candidates(runner, candidates, context)
