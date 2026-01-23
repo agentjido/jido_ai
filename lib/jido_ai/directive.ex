@@ -419,11 +419,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMEmbed do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
-<<<<<<< HEAD
     Task.Supervisor.start_child(task_supervisor, fn ->
-=======
-    Task.Supervisor.start_child(Helpers.task_supervisor(state), fn ->
->>>>>>> 98e69e0d8033c3fcba2db64262c09a9f6061f1cc
       result =
         try do
           generate_embeddings(model, texts, dimensions, timeout)
@@ -494,11 +490,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
-<<<<<<< HEAD
     Task.Supervisor.start_child(task_supervisor, fn ->
-      result = Executor.execute(tool_name, arguments, context)
-=======
-    Task.Supervisor.start_child(Helpers.task_supervisor(state), fn ->
       result =
         case action_module do
           nil ->
@@ -507,7 +499,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           module when is_atom(module) ->
             Executor.execute_module(module, :action, arguments, context)
         end
->>>>>>> 98e69e0d8033c3fcba2db64262c09a9f6061f1cc
 
       signal =
         Signal.ToolResult.new!(%{
@@ -562,11 +553,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
-<<<<<<< HEAD
     Task.Supervisor.start_child(task_supervisor, fn ->
-=======
-    Task.Supervisor.start_child(Helpers.task_supervisor(state), fn ->
->>>>>>> 98e69e0d8033c3fcba2db64262c09a9f6061f1cc
       result =
         try do
           generate_text(
