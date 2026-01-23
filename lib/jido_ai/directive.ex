@@ -101,8 +101,14 @@ defmodule Jido.AI.Directive do
     The runtime will execute this asynchronously and send the result back
     as an `ai.tool_result` signal.
 
-    Tools are looked up in `Jido.AI.Tools.Registry` by name and executed via
-    `Jido.AI.Tools.Executor`. Both Actions and Tools are supported.
+    ## Execution Modes
+
+    1. **Direct module execution** (preferred): When `action_module` is provided,
+       the module is executed directly via `Executor.execute_module/5`, bypassing
+       Registry lookup. This is used by strategies that maintain their own tool lists.
+
+    2. **Registry lookup**: When `action_module` is nil, looks up the tool in
+       `Jido.AI.Tools.Registry` by name and executes via `Jido.AI.Tools.Executor`.
 
     ## Argument Normalization
 
@@ -119,7 +125,10 @@ defmodule Jido.AI.Directive do
               __MODULE__,
               %{
                 id: Zoi.string(description: "Tool call ID from LLM (ReqLLM.ToolCall.id)"),
-                tool_name: Zoi.string(description: "Name of the tool (used for Registry lookup)"),
+                tool_name: Zoi.string(description: "Name of the tool (used for Registry lookup if action_module not provided)"),
+                action_module:
+                  Zoi.atom(description: "Module to execute directly (bypasses Registry lookup)")
+                  |> Zoi.optional(),
                 arguments:
                   Zoi.map(description: "Arguments from LLM (string keys, normalized before exec)")
                   |> Zoi.default(%{}),
@@ -410,7 +419,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMEmbed do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
+<<<<<<< HEAD
     Task.Supervisor.start_child(task_supervisor, fn ->
+=======
+    Task.Supervisor.start_child(Helpers.task_supervisor(state), fn ->
+>>>>>>> 98e69e0d8033c3fcba2db64262c09a9f6061f1cc
       result =
         try do
           generate_embeddings(model, texts, dimensions, timeout)
@@ -458,12 +471,15 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   Spawns an async task to execute a Jido.Action or Jido.AI.Tools.Tool and sends
   the result back to the agent as an `ai.tool_result` signal.
 
-  Looks up the tool in `Jido.AI.Tools.Registry` by name and uses
-  `Jido.AI.Tools.Executor` for execution, which provides consistent error
+  Supports two execution modes:
+  1. Direct module execution when `action_module` is provided (bypasses Registry)
+  2. Registry lookup by `tool_name` when `action_module` is nil
+
+  Uses `Jido.AI.Tools.Executor` for execution, which provides consistent error
   handling, parameter normalization, and telemetry.
   """
 
-  alias Jido.AI.Signal
+  alias Jido.AI.{Helpers, Signal}
   alias Jido.AI.Tools.Executor
 
   def exec(directive, _input_signal, state) do
@@ -474,11 +490,24 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
       context: context
     } = directive
 
+    action_module = Map.get(directive, :action_module)
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
+<<<<<<< HEAD
     Task.Supervisor.start_child(task_supervisor, fn ->
       result = Executor.execute(tool_name, arguments, context)
+=======
+    Task.Supervisor.start_child(Helpers.task_supervisor(state), fn ->
+      result =
+        case action_module do
+          nil ->
+            Executor.execute(tool_name, arguments, context)
+
+          module when is_atom(module) ->
+            Executor.execute_module(module, :action, arguments, context)
+        end
+>>>>>>> 98e69e0d8033c3fcba2db64262c09a9f6061f1cc
 
       signal =
         Signal.ToolResult.new!(%{
@@ -533,7 +562,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
+<<<<<<< HEAD
     Task.Supervisor.start_child(task_supervisor, fn ->
+=======
+    Task.Supervisor.start_child(Helpers.task_supervisor(state), fn ->
+>>>>>>> 98e69e0d8033c3fcba2db64262c09a9f6061f1cc
       result =
         try do
           generate_text(

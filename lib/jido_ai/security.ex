@@ -360,6 +360,7 @@ defmodule Jido.AI.Security do
   * `callback` - The function to wrap
   * `opts` - Options:
     * `:timeout` - Timeout in milliseconds (default: #{@callback_timeout})
+    * `:task_supervisor` - Task supervisor to use (default: Jido.TaskSupervisor)
 
   ## Returns
 
@@ -373,34 +374,19 @@ defmodule Jido.AI.Security do
   def validate_and_wrap_callback(callback, opts) when is_function(callback) do
     with :ok <- validate_callback(callback) do
       timeout = Keyword.get(opts, :timeout, @callback_timeout)
-      wrapped = wrap_with_timeout(callback, timeout)
+      task_supervisor = Keyword.get(opts, :task_supervisor, Jido.TaskSupervisor)
+      wrapped = wrap_with_timeout(callback, timeout, task_supervisor)
       {:ok, wrapped}
     end
   end
 
   def validate_and_wrap_callback(_callback, _opts), do: {:error, :invalid_callback_type}
 
-  @dialyzer {:nowarn_function, wrap_with_timeout: 2}
-  defp wrap_with_timeout(callback, timeout) do
+  @dialyzer {:nowarn_function, wrap_with_timeout: 3}
+  defp wrap_with_timeout(callback, timeout, task_supervisor) do
     fn arg ->
-      # Use Task.async which creates a temporary unsupervised task
-      # This is acceptable for callbacks because:
-      # 1. The task is short-lived and immediately awaited
-      # 2. The timeout ensures it doesn't hang forever
-      # 3. The calling process supervises the task via Task.yield/shutdown
-      task =
-        Task.async(fn ->
-          try do
-            callback.(arg)
-          rescue
-            e -> {:error, %{exception: Exception.message(e), type: :rescued}}
-          catch
-            :error, reason -> {:error, %{exception: inspect(reason), type: :error}}
-            :throw, value -> {:error, %{exception: inspect(value), type: :throw}}
-            :exit, reason -> {:error, %{exception: inspect(reason), type: :exit}}
-            kind, reason -> {:error, %{exception: inspect(reason), type: kind}}
-          end
-        end)
+      # Use Task.Supervisor.async_nolink which returns a Task struct
+      task = Task.Supervisor.async_nolink(task_supervisor, fn -> callback.(arg) end)
 
       result =
         try do

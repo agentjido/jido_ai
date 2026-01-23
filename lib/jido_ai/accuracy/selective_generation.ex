@@ -92,9 +92,9 @@ defmodule Jido.AI.Accuracy.SelectiveGeneration do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, DecisionResult, Helpers}
+  import Jido.AI.Accuracy.Helpers, only: [get_attr: 2, get_attr: 3]
 
-  import Helpers, only: [get_attr: 2, get_attr: 3]
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, DecisionResult}
 
   @type t :: %__MODULE__{
           reward: float(),

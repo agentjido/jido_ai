@@ -1,3 +1,8 @@
+# Dummy module for testing
+defmodule SomeModule do
+  @moduledoc false
+end
+
 defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
   @moduledoc """
   Strategy integration tests for the accuracy pipeline.
@@ -30,10 +35,11 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
     end
 
     test "StrategyAdapter.to_directive accepts options" do
-      directive = StrategyAdapter.to_directive("Test query",
-        preset: :accurate,
-        timeout: 60_000
-      )
+      directive =
+        StrategyAdapter.to_directive("Test query",
+          preset: :accurate,
+          timeout: 60_000
+        )
 
       assert directive.preset == :accurate
       assert directive.timeout == 60_000
@@ -91,10 +97,11 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
 
   describe "8.5.5.2 Directive Execution" do
     test "Directive.Run creates valid directive with required fields" do
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?"
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?"
+        })
 
       assert directive.id == "call_123"
       assert directive.query == "What is 2+2?"
@@ -103,31 +110,34 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
     end
 
     test "Directive.Run accepts preset option" do
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        preset: :fast
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          preset: :fast
+        })
 
       assert directive.preset == :fast
     end
 
     test "Directive.Run accepts timeout option" do
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        timeout: 60_000
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          timeout: 60_000
+        })
 
       assert directive.timeout == 60_000
     end
 
     test "Directive.Run.to_execution_map extracts fields" do
-      directive = Directive.Run.new!(%{
-        id: "call_123",
-        query: "What is 2+2?",
-        preset: :accurate
-      })
+      directive =
+        Directive.Run.new!(%{
+          id: "call_123",
+          query: "What is 2+2?",
+          preset: :accurate
+        })
 
       exec_map = Directive.Run.to_execution_map(directive)
 
@@ -145,12 +155,13 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
 
   describe "8.5.5.3 Signal Emission" do
     test "Signal.Result creates result signal" do
-      signal = Signal.Result.new!(%{
-        call_id: "call_123",
-        query: "What is 2+2?",
-        answer: "4",
-        confidence: 0.95
-      })
+      signal =
+        Signal.Result.new!(%{
+          call_id: "call_123",
+          query: "What is 2+2?",
+          answer: "4",
+          confidence: 0.95
+        })
 
       assert signal.type == "accuracy.result"
       assert signal.data.call_id == "call_123"
@@ -160,22 +171,25 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
     end
 
     test "Signal.Result.from_pipeline_result creates signal from pipeline result" do
-      pipeline_result = {:ok, %{
-        answer: "4",
-        confidence: 0.9,
-        metadata: %{
-          num_candidates: 3,
-          input_tokens: 100,
-          output_tokens: 50
-        }
-      }}
+      pipeline_result =
+        {:ok,
+         %{
+           answer: "4",
+           confidence: 0.9,
+           metadata: %{
+             num_candidates: 3,
+             input_tokens: 100,
+             output_tokens: 50
+           }
+         }}
 
-      signal = Signal.Result.from_pipeline_result(
-        "call_123",
-        "What is 2+2?",
-        :fast,
-        pipeline_result
-      )
+      signal =
+        Signal.Result.from_pipeline_result(
+          "call_123",
+          "What is 2+2?",
+          :fast,
+          pipeline_result
+        )
 
       assert signal.type == "accuracy.result"
       assert signal.data.answer == "4"
@@ -185,23 +199,25 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
     test "Signal.Result.from_pipeline_result creates error signal on error" do
       error_result = {:error, :timeout}
 
-      signal = Signal.Result.from_pipeline_result(
-        "call_123",
-        "What is 2+2?",
-        :fast,
-        error_result
-      )
+      signal =
+        Signal.Result.from_pipeline_result(
+          "call_123",
+          "What is 2+2?",
+          :fast,
+          error_result
+        )
 
       assert signal.type == "accuracy.error"
       assert signal.data.error == :timeout
     end
 
     test "Signal.Error creates error signal" do
-      signal = Signal.Error.new!(%{
-        call_id: "call_123",
-        query: "What is 2+2?",
-        error: :timeout
-      })
+      signal =
+        Signal.Error.new!(%{
+          call_id: "call_123",
+          query: "What is 2+2?",
+          error: :timeout
+        })
 
       assert signal.type == "accuracy.error"
       assert signal.data.call_id == "call_123"
@@ -210,12 +226,13 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
     end
 
     test "Signal.Error.from_exception creates signal from error" do
-      signal = Signal.Error.from_exception(
-        "call_123",
-        "What is 2+2?",
-        :balanced,
-        :generator_failed
-      )
+      signal =
+        Signal.Error.from_exception(
+          "call_123",
+          "What is 2+2?",
+          :balanced,
+          :generator_failed
+        )
 
       assert signal.type == "accuracy.error"
       assert signal.data.call_id == "call_123"
@@ -231,12 +248,13 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
       # The adapter needs to properly handle the PipelineResult structure
       agent = %{state: %{}}
 
-      result = StrategyAdapter.run_pipeline(
-        agent,
-        "What is 2+2?",
-        preset: :fast,
-        generator: &mock_generator/2
-      )
+      result =
+        StrategyAdapter.run_pipeline(
+          agent,
+          "What is 2+2?",
+          preset: :fast,
+          generator: &mock_generator/2
+        )
 
       # Should return success with agent
       assert {:ok, ^agent} = result
@@ -244,9 +262,10 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
 
     test "pipeline executes with basic config" do
       # Direct pipeline test instead of through adapter
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: &mock_generator/2)
 
@@ -276,9 +295,10 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
     end
 
     test "pipeline respects timeout option" do
-      {:ok, pipeline} = Pipeline.new(%{
-        config: %{stages: [:generation, :calibration]}
-      })
+      {:ok, pipeline} =
+        Pipeline.new(%{
+          config: %{stages: [:generation, :calibration]}
+        })
 
       # Very short timeout with a slow operation
       slow_gen = fn _q, _c ->
@@ -292,8 +312,4 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
       assert {:error, :timeout} = result
     end
   end
-end
-
-# Dummy module for testing
-defmodule SomeModule do
 end

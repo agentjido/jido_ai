@@ -66,10 +66,8 @@ defmodule Jido.AI.Accuracy.Estimators.AttentionConfidence do
 
   @behaviour Jido.AI.Accuracy.ConfidenceEstimator
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate, Helpers}
-
-  import Helpers, only: [get_attr: 3]
-
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate}
+  import Jido.AI.Accuracy.Helpers, only: [get_attr: 3]
   @type t :: %__MODULE__{
           aggregation: :product | :mean | :min,
           token_threshold: float()
