@@ -255,7 +255,23 @@ defmodule Jido.AI.Tools.Executor do
   """
   @spec normalize_params(map(), keyword()) :: map()
   def normalize_params(params, schema) when is_map(params) and is_list(schema) do
-    ActionTool.convert_params_using_schema(params, schema)
+    # First convert string keys and parse string values
+    converted = ActionTool.convert_params_using_schema(params, schema)
+
+    # Then coerce integer values to floats where schema expects float
+    # (LLMs often return integers like 20 instead of 20.0)
+    Enum.reduce(converted, %{}, fn {key, value}, acc ->
+      schema_entry = Keyword.get(schema, key, [])
+      expected_type = Keyword.get(schema_entry, :type)
+
+      coerced_value =
+        case {expected_type, value} do
+          {:float, val} when is_integer(val) -> val * 1.0
+          _ -> value
+        end
+
+      Map.put(acc, key, coerced_value)
+    end)
   end
 
   def normalize_params(params, _schema) when is_map(params), do: params

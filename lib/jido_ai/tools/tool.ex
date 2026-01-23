@@ -193,7 +193,13 @@ defmodule Jido.AI.Tools.Tool do
 
   # Convert Zoi schema to JSON Schema
   defp build_json_schema(schema) do
-    ActionSchema.to_json_schema(schema)
+    case ActionSchema.to_json_schema(schema) do
+      empty when empty == %{} ->
+        %{"type" => "object", "properties" => %{}}
+
+      json_schema ->
+        json_schema
+    end
   end
 
   @doc false

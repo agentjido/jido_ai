@@ -84,7 +84,8 @@ defmodule Jido.AI.Strategies.ReAct do
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
-          use_registry: boolean()
+          use_registry: boolean(),
+          tool_context: map()
         }
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -199,6 +200,12 @@ defmodule Jido.AI.Strategies.ReAct do
         started_at -> System.monotonic_time(:millisecond) - started_at
       end
 
+    # Format pending tool calls for UI consumption
+    tool_calls = format_tool_calls(state[:pending_tool_calls] || [])
+
+    # Get config info
+    config = state[:config] || %{}
+
     %Jido.Agent.Strategy.Snapshot{
       status: status,
       done?: done?,
@@ -211,11 +218,31 @@ defmodule Jido.AI.Strategies.ReAct do
           streaming_text: state[:streaming_text],
           streaming_thinking: state[:streaming_thinking],
           usage: state[:usage],
-          duration_ms: duration_ms
+          duration_ms: duration_ms,
+          tool_calls: tool_calls,
+          conversation: state[:conversation] || [],
+          current_llm_call_id: state[:current_llm_call_id],
+          model: config[:model],
+          max_iterations: config[:max_iterations],
+          available_tools: Enum.map(config[:tools] || [], & &1.name())
         }
-        |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} end)
+        |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} or v == [] end)
         |> Map.new()
     }
+  end
+
+  defp format_tool_calls([]), do: []
+
+  defp format_tool_calls(pending_tool_calls) do
+    Enum.map(pending_tool_calls, fn tc ->
+      %{
+        id: tc.id,
+        name: tc.name,
+        arguments: tc.arguments,
+        status: if(tc.result != nil, do: :completed, else: :running),
+        result: tc.result
+      }
+    end)
   end
 
   @impl true
@@ -348,7 +375,12 @@ defmodule Jido.AI.Strategies.ReAct do
   defp to_machine_msg(_, _), do: nil
 
   defp lift_directives(directives, config) do
-    %{model: model, reqllm_tools: reqllm_tools, actions_by_name: actions_by_name} = config
+    %{
+      model: model,
+      reqllm_tools: reqllm_tools,
+      actions_by_name: actions_by_name,
+      tool_context: tool_context
+    } = config
 
     Enum.flat_map(directives, fn
       {:call_llm_stream, id, conversation} ->
@@ -369,7 +401,8 @@ defmodule Jido.AI.Strategies.ReAct do
                 id: id,
                 tool_name: tool_name,
                 action_module: action_module,
-                arguments: arguments
+                arguments: arguments,
+                context: tool_context
               })
             ]
 
@@ -437,7 +470,8 @@ defmodule Jido.AI.Strategies.ReAct do
       system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
-      use_registry: use_registry
+      use_registry: use_registry,
+      tool_context: Keyword.get(opts, :tool_context, %{})
     }
   end
 

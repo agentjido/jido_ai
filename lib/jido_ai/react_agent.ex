@@ -23,7 +23,12 @@ defmodule Jido.AI.ReActAgent do
   - `:system_prompt` - Custom system prompt for the LLM
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
+<<<<<<< HEAD
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
+=======
+  - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`)
+  - `:skills` - Additional skills to attach to the agent
+>>>>>>> 98e69e0d8033c3fcba2db64262c09a9f6061f1cc
 
   ## Generated Functions
 
@@ -74,6 +79,8 @@ defmodule Jido.AI.ReActAgent do
     system_prompt = Keyword.get(opts, :system_prompt)
     model = Keyword.get(opts, :model, @default_model)
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
+    # Don't extract tool_context here - it contains AST with module aliases
+    # that need to be evaluated in the calling module's context
     skills = Keyword.get(opts, :skills, [])
 
     # TaskSupervisorSkill is always included for per-instance task supervision
@@ -95,7 +102,27 @@ defmodule Jido.AI.ReActAgent do
         })
       end
 
+    # Build strategy_opts inside quote to properly evaluate module references
     quote location: :keep do
+      # Build strategy opts at compile time in the calling module's context
+      # Access tool_context from opts directly so module aliases are resolved
+      # in the calling module's context
+      tool_context_value = Keyword.get(unquote(opts), :tool_context, %{})
+
+      strategy_opts =
+        [
+          tools: unquote(tools),
+          model: unquote(model),
+          max_iterations: unquote(max_iterations),
+          tool_context: tool_context_value
+        ]
+        |> then(fn o ->
+          case unquote(system_prompt) do
+            nil -> o
+            prompt -> Keyword.put(o, :system_prompt, prompt)
+          end
+        end)
+
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
@@ -118,7 +145,15 @@ defmodule Jido.AI.ReActAgent do
 
       @impl true
       def on_before_cmd(agent, {:react_start, %{query: query}} = action) do
-        agent = %{agent | state: Map.put(agent.state, :last_query, query)}
+        agent = %{
+          agent
+          | state:
+              agent.state
+              |> Map.put(:last_query, query)
+              |> Map.put(:completed, false)
+              |> Map.put(:last_answer, "")
+        }
+
         {:ok, agent, action}
       end
 
