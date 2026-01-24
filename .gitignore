@@ -3,8 +3,6 @@
 
 # If you run "mix test --cover", coverage assets end up here.
 /cover/
-*.coverdata
-Elixir.*.coverdata
 
 # The directory Mix downloads your dependencies sources to.
 /deps/
@@ -26,12 +24,24 @@ jido_ai-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
-.elixir_ls
 
-# AI Docs
-PLAN.md
+# Language Servers
+.elixir_ls/
+.expert/
 
-# Example project build artifacts
-examples/**/_build/
-examples/**/deps/
-examples/**/mix.lock
+# Environment
+.env
+
+# Dialyzer PLT files - do NOT commit these
+/priv/plts/
+*.plt
+*.plt.hash
+
+# Editor/IDE
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

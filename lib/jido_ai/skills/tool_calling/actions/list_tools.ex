@@ -1,0 +1,217 @@
+defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
+  @moduledoc """
+  A Jido.Action for listing all available tools with their schemas.
+
+  This action queries the `Jido.AI.Tools.Registry` and returns information
+  about all registered tools, including their names, types, and schemas.
+
+  ## Parameters
+
+  * `filter` (optional) - Filter tools by name pattern (string)
+  * `type` (optional) - Filter by type (`:action`, `:tool`, or `nil` for all)
+  * `include_schema` (optional) - Include tool schemas (default: `true`)
+
+  ## Examples
+
+      # List all tools
+      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ListTools, %{})
+
+      # Filter by name pattern
+      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ListTools, %{
+        filter: "calc"
+      })
+
+      # List only actions
+      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ListTools, %{
+        type: :action
+      })
+  """
+
+  use Jido.Action,
+    name: "tool_calling_list_tools",
+    description: "List all available tools with their schemas",
+    category: "ai",
+    tags: ["tool-calling", "discovery", "tools"],
+    vsn: "1.0.0",
+    schema:
+      Zoi.object(%{
+        filter:
+          Zoi.string(description: "Filter tools by name pattern (substring match)")
+          |> Zoi.optional(),
+        type:
+          Zoi.atom(description: "Filter by type (:action, :tool, or nil for all)")
+          |> Zoi.optional(),
+        include_schema: Zoi.boolean(description: "Include tool schemas in result") |> Zoi.default(true),
+        include_sensitive:
+          Zoi.boolean(description: "Include tools marked as sensitive (default: false)")
+          |> Zoi.default(false),
+        allowed_tools:
+          Zoi.list(Zoi.string(), description: "Allowlist of tool names to include (all others excluded)")
+          |> Zoi.optional()
+      })
+
+  alias Jido.AI.Security
+  alias Jido.AI.Tools.Registry
+
+  @doc """
+  Executes the list tools action.
+  """
+  @impl Jido.Action
+  def run(params, _context) do
+    with {:ok, validated_params} <- validate_and_sanitize_params(params) do
+      Registry.ensure_started()
+
+      tools =
+        Registry.list_all()
+        |> filter_sensitive_tools(validated_params[:include_sensitive])
+        |> filter_by_allowlist(validated_params[:allowed_tools])
+        |> filter_tools(validated_params[:filter], validated_params[:type])
+        |> format_tools(validated_params[:include_schema] != false)
+
+      {:ok,
+       %{
+         tools: tools,
+         count: length(tools),
+         filter: validated_params[:filter],
+         type: validated_params[:type],
+         sensitive_excluded: not (validated_params[:include_sensitive] == true)
+       }}
+    end
+  end
+
+  # Private Functions
+
+  defp validate_and_sanitize_params(params) do
+    with {:ok, _filter} <- validate_filter_if_present(params[:filter]),
+         {:ok, _allowed} <- validate_allowed_tools_if_present(params[:allowed_tools]) do
+      {:ok, params}
+    end
+  end
+
+  defp validate_filter_if_present(nil), do: {:ok, nil}
+
+  defp validate_filter_if_present(filter) when is_binary(filter) do
+    Security.validate_string(filter, max_length: 1000, allow_empty: true)
+  end
+
+  defp validate_filter_if_present(_), do: {:error, :invalid_filter}
+
+  defp validate_allowed_tools_if_present(nil), do: {:ok, nil}
+
+  defp validate_allowed_tools_if_present(allowed) when is_list(allowed) do
+    if Enum.all?(allowed, &is_binary/1) do
+      {:ok, allowed}
+    else
+      {:error, :invalid_allowed_tools}
+    end
+  end
+
+  defp validate_allowed_tools_if_present(_), do: {:error, :invalid_allowed_tools}
+
+  # Filter out sensitive tools unless explicitly requested
+  defp filter_sensitive_tools(tools, true), do: tools
+
+  defp filter_sensitive_tools(tools, _include_sensitive) when is_list(tools) do
+    Enum.filter(tools, fn {name, _type, _module} ->
+      not sensitive_tool?(name)
+    end)
+  end
+
+  # Tools that should be excluded by default
+  defp sensitive_tool?(name) when is_binary(name) do
+    lower_name = String.downcase(name)
+
+    # Exclude tools that could expose system information
+    Enum.any?(
+      [
+        "system",
+        "admin",
+        "config",
+        "registry",
+        "exec",
+        "shell",
+        "file",
+        "delete",
+        "destroy",
+        "secret",
+        "password",
+        "token",
+        "auth"
+      ],
+      fn keyword -> String.contains?(lower_name, keyword) end
+    )
+  end
+
+  defp filter_by_allowlist(tools, nil), do: tools
+
+  defp filter_by_allowlist(tools, allowed_tools) when is_list(allowed_tools) do
+    allowed_set = MapSet.new(allowed_tools)
+
+    Enum.filter(tools, fn {name, _type, _module} ->
+      MapSet.member?(allowed_set, name)
+    end)
+  end
+
+  defp filter_tools(tools, nil, nil), do: tools
+  defp filter_tools(tools, filter, type), do: filter_tools(tools, filter, type, [])
+
+  defp filter_tools([], _filter, _type, acc), do: Enum.reverse(acc)
+
+  defp filter_tools([{name, tool_type, module} | rest], filter, type, acc) do
+    matches_filter = filter == nil or String.contains?(name, filter)
+    matches_type = type == nil or tool_type == type
+
+    if matches_filter and matches_type do
+      filter_tools(rest, filter, type, [{name, tool_type, module} | acc])
+    else
+      filter_tools(rest, filter, type, acc)
+    end
+  end
+
+  defp format_tools(tools, include_schema) do
+    Enum.map(tools, fn {name, type, module} ->
+      base = %{
+        name: name,
+        type: type
+        # Module name excluded for security
+      }
+
+      if include_schema do
+        Map.put(base, :schema, extract_schema(module))
+      else
+        base
+      end
+    end)
+  end
+
+  defp extract_schema(module) do
+    case module.schema() do
+      schema when is_list(schema) ->
+        format_schema_list(schema)
+
+      schema when is_map(schema) ->
+        format_schema_map(schema)
+
+      _ ->
+        nil
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp format_schema_list(schema) when is_list(schema) do
+    Enum.map(schema, fn {key, opts} ->
+      %{
+        name: key,
+        type: Keyword.get(opts, :type),
+        required: Keyword.get(opts, :required, false),
+        default: Keyword.get(opts, :default),
+        doc: Keyword.get(opts, :doc)
+      }
+    end)
+  end
+
+  defp format_schema_list(_), do: nil
+
+  defp format_schema_map(_schema), do: nil
+end
