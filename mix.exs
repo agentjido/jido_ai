@@ -138,7 +138,7 @@ defmodule JidoAi.MixProject do
   defp package do
     [
       files: ["lib", "mix.exs", "README.md", "LICENSE", "CHANGELOG.md", "usage-rules.md", "guides", "examples"],
-      maintainers: ["Mike Hostetler"],
+      maintainers: ["Mike Hostetler <mike.hostetler@gmail.com>", "Pascal Charbon <pcharbon70@gmail.com>"],
       licenses: ["Apache-2.0"],
       links: %{
         "Changelog" => "https://hexdocs.pm/jido_ai/changelog.html",
