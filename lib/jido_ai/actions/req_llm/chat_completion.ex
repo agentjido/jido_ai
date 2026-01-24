@@ -61,8 +61,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
       model: [
         type: {:custom, Jido.AI.Model, :validate_model_opts, []},
         required: true,
-        doc:
-          "The AI model to use (e.g., {:anthropic, [model: \"claude-3-sonnet-20240229\"]} or %Jido.AI.Model{})"
+        doc: "The AI model to use (e.g., {:anthropic, [model: \"claude-3-sonnet-20240229\"]} or %Jido.AI.Model{})"
       ],
       prompt: [
         type: {:custom, Jido.AI.Prompt, :validate_prompt_opts, []},
@@ -96,12 +95,19 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
         type: :boolean,
         default: false,
         doc: "Enable verbose logging"
+      ],
+      provider_options: [
+        type: :keyword_list,
+        required: false,
+        default: [],
+        doc: "Provider-specific options passed directly to ReqLLM"
       ]
     ]
 
   require Logger
   alias Jido.AI.Model
   alias Jido.AI.Prompt
+  alias ReqLLM.Response, as: ReqResponse
 
   @impl true
   def on_before_validate_params(params) do
@@ -154,7 +160,8 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
         frequency_penalty: nil,
         presence_penalty: nil,
         json_mode: false,
-        verbose: false
+        verbose: false,
+        provider_options: []
       }
       # Apply prompt options over defaults
       |> Map.merge(prompt_opts)
@@ -171,16 +178,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
           :frequency_penalty,
           :presence_penalty,
           :json_mode,
-          :verbose
+          :verbose,
+          :provider_options
         ])
       )
       # Always keep required params
       |> Map.merge(required_params)
 
     if params_with_defaults.verbose do
-      Logger.info(
-        "Running ReqLLM chat completion with params: #{inspect(params_with_defaults, pretty: true)}"
-      )
+      Logger.info("Running ReqLLM chat completion with params: #{inspect(params_with_defaults, pretty: true)}")
     end
 
     with {:ok, model} <- validate_model(params_with_defaults.model),
@@ -255,8 +261,13 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
           base_opts
       end
 
+    # Add explicit provider_options if present
+    # The caller is responsible for passing the correct options for the provider (e.g. response_format for OpenAI)
+    final_opts =
+      Keyword.merge(opts_with_tools, provider_options: Map.get(params, :provider_options, []))
+
     # ReqLLM handles authentication internally via environment variables
-    {:ok, opts_with_tools}
+    {:ok, final_opts}
   end
 
   defp add_opt_if_present(opts, _key, nil), do: opts
@@ -297,13 +308,15 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     end
   end
 
-  defp format_response(%{content: content, tool_calls: tool_calls}) when is_list(tool_calls) do
+  defp format_response(%ReqResponse{} = response) do
+    content = ReqResponse.text(response) || ""
+    tool_calls = ReqResponse.tool_calls(response) || []
+
     formatted_tools =
       Enum.map(tool_calls, fn tool ->
         %{
           name: tool[:name] || tool["name"],
           arguments: tool[:arguments] || tool["arguments"],
-          # Will be populated after execution
           result: nil
         }
       end)
@@ -311,13 +324,23 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     {:ok, %{content: content, tool_results: formatted_tools}}
   end
 
-  defp format_response(%{content: content}) do
-    {:ok, %{content: content, tool_results: []}}
-  end
-
   defp format_response(response) when is_map(response) do
-    # Fallback for other response formats
     content = response[:content] || response["content"] || ""
-    {:ok, %{content: content, tool_results: []}}
+    tool_calls = response[:tool_calls] || response["tool_calls"] || []
+
+    formatted_tools =
+      if is_list(tool_calls) do
+        Enum.map(tool_calls, fn tool ->
+          %{
+            name: tool[:name] || tool["name"],
+            arguments: tool[:arguments] || tool["arguments"],
+            result: nil
+          }
+        end)
+      else
+        []
+      end
+
+    {:ok, %{content: content, tool_results: formatted_tools}}
   end
 end
