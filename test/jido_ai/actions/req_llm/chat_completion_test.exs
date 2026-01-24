@@ -454,6 +454,118 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletionTest do
       [tool] = result.tool_results
       assert tool.name == "test_tool"
     end
+
+    test "includes usage data from response" do
+      model = {:openai, [model: "gpt-4"]}
+      prompt = Prompt.new(:user, "Test")
+
+      response =
+        mock_chat_response("Response with usage",
+          input_tokens: 15,
+          output_tokens: 25,
+          total_tokens: 40
+        )
+
+      mock_generate_text(response)
+
+      {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+
+      assert result.content == "Response with usage"
+      assert result.usage.input_tokens == 15
+      assert result.usage.output_tokens == 25
+      assert result.usage.total_tokens == 40
+    end
+
+    test "includes usage with tool calls" do
+      model = {:openai, [model: "gpt-4"]}
+      prompt = Prompt.new(:user, "Search for something")
+
+      response =
+        mock_chat_response("Searching",
+          input_tokens: 20,
+          output_tokens: 30,
+          total_tokens: 50,
+          tool_calls: [%{name: "search", arguments: %{"query" => "test"}}]
+        )
+
+      mock_generate_text(response)
+
+      {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+
+      assert result.content == "Searching"
+      assert length(result.tool_results) == 1
+      assert result.usage.input_tokens == 20
+      assert result.usage.output_tokens == 30
+    end
+
+    test "handles response without usage gracefully" do
+      model = {:openai, [model: "gpt-4"]}
+      prompt = Prompt.new(:user, "Test")
+
+      mock_generate_text(%{content: "No usage data"})
+
+      {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+
+      assert result.content == "No usage data"
+      refute Map.has_key?(result, :usage)
+    end
+
+    test "handles response with empty usage map" do
+      model = {:openai, [model: "gpt-4"]}
+      prompt = Prompt.new(:user, "Test")
+
+      mock_generate_text(%{content: "Empty usage", usage: %{}})
+
+      {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+
+      assert result.content == "Empty usage"
+      refute Map.has_key?(result, :usage)
+    end
+
+    test "handles usage with string keys" do
+      model = {:openai, [model: "gpt-4"]}
+      prompt = Prompt.new(:user, "Test")
+
+      mock_generate_text(%{
+        "content" => "String keys",
+        "usage" => %{
+          "prompt_tokens" => 10,
+          "completion_tokens" => 20,
+          "total_tokens" => 30
+        }
+      })
+
+      {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+
+      assert result.content == "String keys"
+      assert result.usage["prompt_tokens"] == 10
+      assert result.usage["completion_tokens"] == 20
+    end
+
+    test "includes extended usage fields when present" do
+      model = {:anthropic, [model: "claude-3-5-sonnet"]}
+      prompt = Prompt.new(:user, "Test")
+
+      response = %{
+        content: "Extended usage",
+        usage: %{
+          input_tokens: 100,
+          output_tokens: 200,
+          total_tokens: 300,
+          input_cost: 0.001,
+          output_cost: 0.006,
+          total_cost: 0.007
+        }
+      }
+
+      mock_generate_text(response)
+
+      {:ok, result} = ChatCompletion.run(%{model: model, prompt: prompt}, %{})
+
+      assert result.usage.input_tokens == 100
+      assert result.usage.output_tokens == 200
+      assert result.usage.total_cost == 0.007
+    end
   end
 
   describe "different providers" do

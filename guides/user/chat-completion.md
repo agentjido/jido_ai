@@ -174,7 +174,8 @@ The result map contains:
 ```elixir
 %{
   content: "The response text from the LLM",
-  tool_results: []  # List of tool calls if any
+  tool_results: [],  # List of tool calls if any
+  usage: %{...}      # Optional - token usage and cost data
 }
 ```
 
@@ -189,9 +190,30 @@ With tool calls:
       arguments: %{"location" => "Tokyo"},
       result: nil  # Populated after you execute the tool
     }
-  ]
+  ],
+  usage: %{input_tokens: 25, output_tokens: 15, total_tokens: 40, ...}
 }
 ```
+
+### Usage Data
+
+When the provider returns token usage, it is normalized into a consistent structure:
+
+```elixir
+%{
+  input_tokens: 15,
+  output_tokens: 25,
+  total_tokens: 40,
+  reasoning_tokens: 0,       # For reasoning models (o1, o3, Gemini thinking)
+  cached_tokens: 0,          # Tokens read from cache
+  cache_creation_tokens: 0,  # Tokens written to cache
+  input_cost: 0.00015,       # Cost in USD (when model has pricing data)
+  output_cost: 0.00075,
+  total_cost: 0.0009
+}
+```
+
+Cost fields are included when the model has pricing metadata available.
 
 ## Controlling Response Quality
 

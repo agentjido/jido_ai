@@ -102,6 +102,7 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
   require Logger
   alias Jido.AI.Model
   alias Jido.AI.Prompt
+  alias ReqLLM.Response, as: ReqResponse
 
   @impl true
   def on_before_validate_params(params) do
@@ -297,27 +298,44 @@ defmodule Jido.AI.Actions.ReqLlm.ChatCompletion do
     end
   end
 
-  defp format_response(%{content: content, tool_calls: tool_calls}) when is_list(tool_calls) do
-    formatted_tools =
-      Enum.map(tool_calls, fn tool ->
-        %{
-          name: tool[:name] || tool["name"],
-          arguments: tool[:arguments] || tool["arguments"],
-          # Will be populated after execution
-          result: nil
-        }
-      end)
+  # Suppress dialyzer warning: the map fallback clause is kept for 
+  # test compatability
+  @dialyzer {:nowarn_function, format_response: 1}
+  defp format_response(%ReqResponse{} = response) do
+    content = ReqResponse.text(response) || ""
+    tool_calls = ReqResponse.tool_calls(response)
+    usage = ReqResponse.usage(response)
 
-    {:ok, %{content: content, tool_results: formatted_tools}}
-  end
+    formatted_tools = format_tool_calls(tool_calls)
 
-  defp format_response(%{content: content}) do
-    {:ok, %{content: content, tool_results: []}}
+    %{content: content, tool_results: formatted_tools}
+    |> maybe_add_usage(usage)
+    |> then(&{:ok, &1})
   end
 
   defp format_response(response) when is_map(response) do
-    # Fallback for other response formats
     content = response[:content] || response["content"] || ""
-    {:ok, %{content: content, tool_results: []}}
+    tool_calls = response[:tool_calls] || response["tool_calls"] || []
+    usage = response[:usage] || response["usage"]
+
+    formatted_tools = format_tool_calls(tool_calls)
+
+    %{content: content, tool_results: formatted_tools}
+    |> maybe_add_usage(usage)
+    |> then(&{:ok, &1})
   end
+
+  defp format_tool_calls(tool_calls) when is_list(tool_calls) do
+    Enum.map(tool_calls, fn tool ->
+      %{
+        name: tool[:name] || tool["name"],
+        arguments: tool[:arguments] || tool["arguments"],
+        result: nil
+      }
+    end)
+  end
+
+  defp maybe_add_usage(result, nil), do: result
+  defp maybe_add_usage(result, usage) when map_size(usage) == 0, do: result
+  defp maybe_add_usage(result, usage), do: Map.put(result, :usage, usage)
 end
