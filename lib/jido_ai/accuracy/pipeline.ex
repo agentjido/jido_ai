@@ -375,19 +375,7 @@ defmodule Jido.AI.Accuracy.Pipeline do
 
           {:error, reason} ->
             duration = System.monotonic_time(:millisecond) - start_time
-
-            # Check if stage is required
-            stage_required = stage_required?(stage_module)
-
-            if stage_required do
-              # Required stage failed, halt pipeline by propagating error
-              trace_entry = PipelineResult.trace_entry(stage_name, :error, duration, reason)
-              {Map.put(state, :__halt__, true), trace_entry}
-            else
-              # Optional stage failed, continue
-              trace_entry = PipelineResult.trace_entry(stage_name, :error, duration, reason)
-              {state, trace_entry}
-            end
+            handle_stage_error(state, stage_name, stage_module, duration, reason)
         end
       else
         # Stage module not found
@@ -396,6 +384,17 @@ defmodule Jido.AI.Accuracy.Pipeline do
       end
 
     result
+  end
+
+  defp handle_stage_error(state, stage_name, stage_module, duration, reason) do
+    stage_required = stage_required?(stage_module)
+    trace_entry = PipelineResult.trace_entry(stage_name, :error, duration, reason)
+
+    if stage_required do
+      {Map.put(state, :__halt__, true), trace_entry}
+    else
+      {state, trace_entry}
+    end
   end
 
   defp build_stage_config(config, stage_name, state, opts) do

@@ -358,16 +358,18 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
 
       # Replace the ancestor's child reference
       updated_ancestors =
-        Enum.map(updated_ancestor.children, fn child ->
-          if child.state == node.state or child.action == node.action do
-            acc
-          else
-            child
-          end
-        end)
+        Enum.map(updated_ancestor.children, &replace_child_if_matches(&1, acc, node))
 
       %{updated_ancestor | children: updated_ancestors}
     end)
+  end
+
+  defp replace_child_if_matches(child, replacement, original_node) do
+    if child.state == original_node.state or child.action == original_node.action do
+      replacement
+    else
+      child
+    end
   end
 
   defp select_best_child(root) do
