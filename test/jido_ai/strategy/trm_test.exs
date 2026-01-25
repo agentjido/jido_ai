@@ -153,7 +153,7 @@ defmodule Jido.AI.Strategies.TRMTest do
         params: %{prompt: "What is machine learning?"}
       }
 
-      {agent, directives} = TRM.cmd(agent, [instruction], ctx)
+      {_agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
       assert length(directives) == 1
       directive = hd(directives)
@@ -223,7 +223,7 @@ defmodule Jido.AI.Strategies.TRMTest do
         }
       }
 
-      {agent, directives} = TRM.cmd(agent, [instruction], ctx)
+      {_agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
       assert length(directives) == 1
       directive = hd(directives)

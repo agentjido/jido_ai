@@ -493,8 +493,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
     @moduletag :capture_log
 
     test "handles timeout errors gracefully" do
-      verifier = LLMOutcomeVerifier.new!(timeout: 5000)
-      candidate = Candidate.new!(%{content: "test content"})
+      _verifier = LLMOutcomeVerifier.new!(timeout: 5000)
+      _candidate = Candidate.new!(%{content: "test content"})
 
       # Note: This test verifies the error handling path exists.
       # In actual API calls, timeout would return {:error, :timeout} or similar.
@@ -503,8 +503,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
     end
 
     test "handles rate limit errors" do
-      verifier = LLMOutcomeVerifier.new!(max_retries: 0)
-      candidate = Candidate.new!(%{content: "test content"})
+      _verifier = LLMOutcomeVerifier.new!(max_retries: 0)
+      _candidate = Candidate.new!(%{content: "test content"})
 
       # When rate limit occurs (HTTP 429), the verifier should:
       # 1. Log the error
@@ -514,8 +514,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
     end
 
     test "handles network connectivity errors" do
-      verifier = LLMOutcomeVerifier.new!([])
-      candidate = Candidate.new!(%{content: "test content"})
+      _verifier = LLMOutcomeVerifier.new!([])
+      _candidate = Candidate.new!(%{content: "test content"})
 
       # Network errors (e.g., :econnrefused, :nxdomain) should be handled
       # Result: {:ok, VerificationResult} with mid score and error in metadata
@@ -523,8 +523,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
     end
 
     test "handles authentication errors" do
-      verifier = LLMOutcomeVerifier.new!([])
-      candidate = Candidate.new!(%{content: "test content"})
+      _verifier = LLMOutcomeVerifier.new!([])
+      _candidate = Candidate.new!(%{content: "test content"})
 
       # Invalid API key (HTTP 401/403) should be handled gracefully
       # The verifier should not crash and should return a structured error
@@ -533,8 +533,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
 
     test "handles malformed LLM responses" do
       # When the LLM returns invalid JSON or unexpected format
-      verifier = LLMOutcomeVerifier.new!([])
-      candidate = Candidate.new!(%{content: "test content"})
+      _verifier = LLMOutcomeVerifier.new!([])
+      _candidate = Candidate.new!(%{content: "test content"})
 
       # Should extract best-effort score and reasoning
       # Return mid score if parsing completely fails
@@ -542,8 +542,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
     end
 
     test "handles empty LLM responses" do
-      verifier = LLMOutcomeVerifier.new!([])
-      candidate = Candidate.new!(%{content: "test content"})
+      _verifier = LLMOutcomeVerifier.new!([])
+      _candidate = Candidate.new!(%{content: "test content"})
 
       # Empty response should result in mid-range score
       # with reasoning indicating no response received
@@ -551,8 +551,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
     end
 
     test "handles service unavailable errors" do
-      verifier = LLMOutcomeVerifier.new!([])
-      candidate = Candidate.new!(%{content: "test content"})
+      _verifier = LLMOutcomeVerifier.new!([])
+      _candidate = Candidate.new!(%{content: "test content"})
 
       # HTTP 503 should be handled gracefully
       # Return mid score with appropriate metadata
@@ -560,8 +560,8 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
     end
 
     test "handles content filtered by safety policies" do
-      verifier = LLMOutcomeVerifier.new!([])
-      candidate = Candidate.new!(%{content: "test content"})
+      _verifier = LLMOutcomeVerifier.new!([])
+      _candidate = Candidate.new!(%{content: "test content"})
 
       # When LLM refuses to answer due to content policies
       # Should return a neutral score and note the content filter
