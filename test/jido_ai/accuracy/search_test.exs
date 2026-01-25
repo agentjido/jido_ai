@@ -4,8 +4,8 @@ defmodule Jido.AI.Accuracy.SearchTest do
   alias Jido.AI.Accuracy.{
     Candidate,
     Search.BeamSearch,
-    Search.MCTS,
-    Search.DiverseDecoding
+    Search.DiverseDecoding,
+    Search.MCTS
   }
 
   @moduletag :capture_log

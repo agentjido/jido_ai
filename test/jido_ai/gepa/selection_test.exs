@@ -1,7 +1,7 @@
 defmodule Jido.AI.GEPA.SelectionTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.GEPA.{Selection, PromptVariant}
+  alias Jido.AI.GEPA.{PromptVariant, Selection}
 
   # ============================================================================
   # Test Helpers

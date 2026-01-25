@@ -53,13 +53,13 @@ defmodule Jido.AI.Accuracy.Pipeline do
   """
 
   alias Jido.AI.Accuracy.Stages.{
+    CalibrationStage,
     DifficultyEstimationStage,
-    RAGStage,
     GenerationStage,
-    VerificationStage,
-    SearchStage,
+    RAGStage,
     ReflectionStage,
-    CalibrationStage
+    SearchStage,
+    VerificationStage
   }
 
   alias Jido.AI.Accuracy.{

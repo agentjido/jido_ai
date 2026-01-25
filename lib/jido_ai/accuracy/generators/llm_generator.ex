@@ -36,7 +36,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
 
   @behaviour Jido.AI.Accuracy.Generator
 
-  alias Jido.AI.Accuracy.{Candidate, Generator, Config}
+  alias Jido.AI.Accuracy.{Candidate, Config, Generator}
   alias Jido.AI.Config, as: MainConfig
 
   @type t :: %__MODULE__{

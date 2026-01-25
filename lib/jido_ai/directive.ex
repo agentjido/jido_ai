@@ -476,8 +476,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   handling, parameter normalization, and telemetry.
   """
 
-  alias Jido.AI.Tools.Executor
   alias Jido.AI.{Helpers, Signal}
+  alias Jido.AI.Tools.Executor
 
   def exec(directive, _input_signal, state) do
     %{

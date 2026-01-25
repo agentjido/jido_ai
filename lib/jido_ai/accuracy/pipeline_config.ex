@@ -54,7 +54,7 @@ defmodule Jido.AI.Accuracy.PipelineConfig do
 
   """
 
-  alias Jido.AI.Accuracy.{Thresholds, Estimators}
+  alias Jido.AI.Accuracy.{Estimators, Thresholds}
 
   @type t :: %__MODULE__{
           stages: [atom()],

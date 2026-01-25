@@ -8,7 +8,7 @@ defmodule Jido.AI.Accuracy.PipelineE2ETest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, Presets, Candidate, PipelineResult}
+  alias Jido.AI.Accuracy.{Candidate, Pipeline, PipelineResult, Presets}
 
   @moduletag :e2e
   @moduletag :pipeline

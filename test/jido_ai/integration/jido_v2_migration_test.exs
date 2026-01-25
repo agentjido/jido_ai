@@ -13,7 +13,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
-  alias Jido.AI.Skills.{LLM, Reasoning, Planning, Streaming, ToolCalling}
+  alias Jido.AI.Skills.{LLM, Planning, Reasoning, Streaming, ToolCalling}
   alias Jido.AI.Strategies.ReAct
 
   # Ensure all skill actions are compiled before tests run

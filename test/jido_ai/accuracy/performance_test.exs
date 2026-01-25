@@ -10,7 +10,7 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, PipelineResult, Candidate, Presets}
+  alias Jido.AI.Accuracy.{Candidate, Pipeline, PipelineResult, Presets}
 
   @moduletag :performance
   @moduletag :pipeline

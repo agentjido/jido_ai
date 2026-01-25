@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Aggregators.MajorityVoteTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Aggregator, Candidate, Aggregators.MajorityVote}
+  alias Jido.AI.Accuracy.{Aggregator, Aggregators.MajorityVote, Candidate}
 
   @moduletag :capture_log
 

@@ -149,7 +149,7 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
 
   @behaviour Jido.AI.Accuracy.Verifier
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult, ToolExecutor}
+  alias Jido.AI.Accuracy.{Candidate, ToolExecutor, VerificationResult}
 
   @type output_format :: :junit | :tap | :dot | :auto
   @type t :: %__MODULE__{

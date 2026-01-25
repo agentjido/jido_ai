@@ -71,9 +71,9 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   """
 
   alias Jido.AI.Accuracy.{
+    Aggregators.MajorityVote,
     DifficultyEstimate,
-    Thresholds,
-    Aggregators.MajorityVote
+    Thresholds
   }
 
   @type t :: %__MODULE__{

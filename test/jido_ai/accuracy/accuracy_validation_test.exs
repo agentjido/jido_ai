@@ -8,7 +8,7 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, PipelineConfig, PipelineResult, Candidate, Presets}
+  alias Jido.AI.Accuracy.{Candidate, Pipeline, PipelineConfig, PipelineResult, Presets}
 
   @moduletag :accuracy_validation
   @moduletag :pipeline

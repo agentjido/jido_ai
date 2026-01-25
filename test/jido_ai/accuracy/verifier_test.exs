@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.VerifierTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, Verifier, VerificationResult}
+  alias Jido.AI.Accuracy.{Candidate, VerificationResult, Verifier}
 
   # Mock verifier implementation for testing
   defmodule MockVerifier do

@@ -85,7 +85,7 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
 
   @behaviour Jido.AI.Accuracy.SearchController
 
-  alias Jido.AI.Accuracy.{Candidate, SearchController, Search.MCTSNode, VerificationResult}
+  alias Jido.AI.Accuracy.{Candidate, Search.MCTSNode, SearchController, VerificationResult}
 
   @type t :: %__MODULE__{
           simulations: pos_integer(),

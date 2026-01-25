@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencyTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{AdaptiveSelfConsistency, DifficultyEstimate, Candidate}
+  alias Jido.AI.Accuracy.{AdaptiveSelfConsistency, Candidate, DifficultyEstimate}
 
   doctest AdaptiveSelfConsistency
 

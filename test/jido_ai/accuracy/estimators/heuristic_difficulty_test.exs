@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficultyTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.Estimators.HeuristicDifficulty
   alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
+  alias Jido.AI.Accuracy.Estimators.HeuristicDifficulty
 
   @moduletag :capture_log
 

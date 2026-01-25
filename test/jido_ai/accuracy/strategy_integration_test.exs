@@ -15,7 +15,7 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, PipelineResult, StrategyAdapter, Directive, Signal, Candidate, Presets}
+  alias Jido.AI.Accuracy.{Candidate, Directive, Pipeline, PipelineResult, Presets, Signal, StrategyAdapter}
 
   @moduletag :strategy_integration
   @moduletag :pipeline

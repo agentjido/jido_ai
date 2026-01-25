@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.AdaptiveSelfConsistencySecurityTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.{AdaptiveSelfConsistency, DifficultyEstimate, Candidate}
+  alias Jido.AI.Accuracy.{AdaptiveSelfConsistency, Candidate, DifficultyEstimate}
   alias Uniq.UUID
 
   @moduletag :security

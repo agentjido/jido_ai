@@ -12,11 +12,11 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
   alias Jido.AI.Skills.LLM
   alias Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
   alias Jido.AI.Skills.Planning
-  alias Jido.AI.Skills.Planning.Actions.{Plan, Decompose, Prioritize}
+  alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
   alias Jido.AI.Skills.Reasoning
   alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
   alias Jido.AI.Skills.Streaming
-  alias Jido.AI.Skills.Streaming.Actions.{StartStream, ProcessTokens, EndStream}
+  alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
   alias Jido.AI.Skills.ToolCalling
   alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
 

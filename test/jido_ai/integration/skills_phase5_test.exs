@@ -165,7 +165,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Planning Skill Integration" do
-    alias Jido.AI.Skills.Planning.Actions.{Plan, Decompose, Prioritize}
+    alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
 
     test "all Planning actions are accessible" do
       assert Plan in Planning.actions()
@@ -199,7 +199,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Streaming Skill Integration" do
-    alias Jido.AI.Skills.Streaming.Actions.{StartStream, ProcessTokens, EndStream}
+    alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
 
     test "all Streaming actions are accessible" do
       assert StartStream in Streaming.actions()

@@ -13,9 +13,9 @@ defmodule Jido.AI.Accuracy.SecurityTest do
 
   use ExUnit.Case, async: false
 
+  alias Jido.AI.Accuracy.{Candidate, ToolExecutor, Verifiers.CodeExecutionVerifier}
   alias Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier
   alias Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier
-  alias Jido.AI.Accuracy.{Candidate, ToolExecutor, Verifiers.CodeExecutionVerifier}
 
   @moduletag :security
 
