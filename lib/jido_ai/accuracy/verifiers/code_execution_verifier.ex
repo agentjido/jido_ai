@@ -355,6 +355,8 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
     end
   end
 
+  defp detect_language(language, _code, _candidate), do: language
+
   defp language_from_shebang("/usr/bin/env python3", _code), do: :python
   defp language_from_shebang("/usr/bin/python3", _code), do: :python
   defp language_from_shebang("/usr/bin/env node", _code), do: :javascript
@@ -381,8 +383,6 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
   defp javascript_pattern?(code), do: String.contains?(code, "function ") or String.contains?(code, "const ")
   defp elixir_pattern?(code), do: String.contains?(code, "defmodule ") or String.contains?(code, "defp ")
   defp ruby_pattern?(code), do: String.contains?(code, "def ") and String.contains?(code, "end")
-
-  defp detect_language(language, _code, _candidate), do: language
 
   defp execute_code(verifier, code, language) do
     {command, args} = build_command(language, code)

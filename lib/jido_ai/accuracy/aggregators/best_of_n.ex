@@ -187,14 +187,20 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
   defp token_compare(%{tokens_used: t1}, %{tokens_used: t2}) when is_nil(t1) and is_number(t2), do: :lt
   defp token_compare(_, _), do: :eq
 
-  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, prefer_early) when ts1 and ts2 do
+  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, prefer_early)
+       when is_struct(ts1, DateTime) and is_struct(ts2, DateTime) do
     compare_timestamps(ts1, ts2, prefer_early)
   end
 
-  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, _prefer_early) when ts1 and is_nil(ts2), do: :lt
-  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, _prefer_early) when is_nil(ts1) and ts2, do: :gt
+  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, _prefer_early)
+       when is_struct(ts1, DateTime) and is_nil(ts2), do: :lt
+
+  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, _prefer_early)
+       when is_nil(ts1) and is_struct(ts2, DateTime), do: :gt
+
   defp timestamp_compare(_, _, _), do: :eq
 
+  @spec compare_timestamps(DateTime.t(), DateTime.t(), boolean()) :: :lt | :gt | :eq
   defp compare_timestamps(ts1, ts2, true) do
     cond do
       DateTime.before?(ts1, ts2) -> :lt

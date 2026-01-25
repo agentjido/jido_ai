@@ -302,7 +302,7 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
 
   defp try_extract_json(response, [{regex, _type} | rest]) do
     case Regex.run(regex, response, capture: :all) do
-      [[_, match]] -> match
+      [_full, match | _] -> match
       _ -> try_extract_json(response, rest)
     end
   end

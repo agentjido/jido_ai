@@ -382,7 +382,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   # Complexity feature: average word length, special chars, punctuation density
   defp extract_complexity_feature(query) do
     words = String.split(query)
-    word_count = length(words)
+    _word_count = length(words)
     avg_word_len = calculate_avg_word_length(words)
 
     special_count = count_pattern(query, ~r/[^\w\s]/)
