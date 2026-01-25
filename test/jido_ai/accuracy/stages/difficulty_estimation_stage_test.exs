@@ -5,6 +5,7 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStageTest do
 
   use ExUnit.Case, async: true
 
+  alias Jido.AI.Accuracy.DifficultyEstimate
   alias Jido.AI.Accuracy.Estimators.HeuristicDifficulty
   alias Jido.AI.Accuracy.Stages.DifficultyEstimationStage
 
@@ -70,7 +71,7 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStageTest do
 
     test "reuses existing difficulty if present" do
       difficulty =
-        Jido.AI.Accuracy.DifficultyEstimate.new!(%{
+        DifficultyEstimate.new!(%{
           level: :hard,
           score: 0.8,
           confidence: 0.9

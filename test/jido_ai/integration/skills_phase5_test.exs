@@ -14,6 +14,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Skills.LLM
+  alias Jido.AI.Skills.LLM.Actions.Chat
   alias Jido.AI.Skills.Planning
   alias Jido.AI.Skills.Reasoning
   alias Jido.AI.Skills.Streaming
@@ -316,7 +317,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       params = %{prompt: "Test"}
 
       # Chat action should have schema accessible (Zoi schema struct)
-      schema = Jido.AI.Skills.LLM.Actions.Chat.schema()
+      schema = Chat.schema()
       assert is_map(schema)
       assert schema.fields[:prompt].meta.required == true
     end

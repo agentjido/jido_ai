@@ -514,14 +514,14 @@ defmodule Jido.AI.Accuracy.VerificationRunnerTest do
       :telemetry.attach(
         "test-telemetry-start",
         [:verification, :start],
-        &Jido.AI.Accuracy.VerificationRunnerTest.handle_telemetry_start/4,
+        &handle_telemetry_start/4,
         nil
       )
 
       :telemetry.attach(
         "test-telemetry-stop",
         [:verification, :stop],
-        &Jido.AI.Accuracy.VerificationRunnerTest.handle_telemetry_stop/4,
+        &handle_telemetry_stop/4,
         nil
       )
 

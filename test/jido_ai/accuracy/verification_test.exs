@@ -725,7 +725,7 @@ defmodule Jido.AI.Accuracy.VerificationTest do
       :telemetry.attach(
         "test-verification-telemetry",
         [:verification, :start],
-        &Jido.AI.Accuracy.VerificationTest.handle_telemetry/4,
+        &handle_telemetry/4,
         nil
       )
 

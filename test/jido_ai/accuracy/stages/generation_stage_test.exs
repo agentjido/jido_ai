@@ -6,6 +6,7 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStageTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Accuracy.Candidate
+  alias Jido.AI.Accuracy.DifficultyEstimate
   alias Jido.AI.Accuracy.Stages.GenerationStage
 
   describe "name/0" do
@@ -125,7 +126,7 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStageTest do
 
     test "adapts candidate count based on difficulty", %{generator: generator} do
       difficulty =
-        Jido.AI.Accuracy.DifficultyEstimate.new!(%{
+        DifficultyEstimate.new!(%{
           level: :hard,
           score: 0.8,
           confidence: 0.9

@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Revisers.TargetedReviserTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, Revisers.TargetedReviser}
+  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, Revision, Revisers.TargetedReviser}
 
   @moduletag :capture_log
 
@@ -32,7 +32,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviserTest do
   describe "revise/4" do
     test "implements Revision behavior" do
       Code.ensure_loaded?(TargetedReviser)
-      assert Jido.AI.Accuracy.Revision.reviser?(TargetedReviser) == true
+      assert Revision.reviser?(TargetedReviser) == true
     end
 
     test "routes code content to revise_code" do

@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquerTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, Critiquers.ToolCritiquer}
+  alias Jido.AI.Accuracy.{Candidate, Critique, Critiquers.ToolCritiquer}
 
   @moduletag :capture_log
 
@@ -84,7 +84,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquerTest do
 
     test "implements Critique behavior" do
       Code.ensure_loaded?(ToolCritiquer)
-      assert Jido.AI.Accuracy.Critique.critiquer?(ToolCritiquer) == true
+      assert Critique.critiquer?(ToolCritiquer) == true
     end
 
     test "runs successful tool and returns low severity" do

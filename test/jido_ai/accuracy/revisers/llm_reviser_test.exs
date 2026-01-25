@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Revisers.LLMReviserTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, Revisers.LLMReviser}
+  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, Revision, Revisers.LLMReviser}
 
   @moduletag :capture_log
 
@@ -63,7 +63,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviserTest do
   describe "revise/4" do
     test "implements Revision behavior" do
       Code.ensure_loaded?(LLMReviser)
-      assert Jido.AI.Accuracy.Revision.reviser?(LLMReviser) == true
+      assert Revision.reviser?(LLMReviser) == true
     end
 
     test "returns revised candidate for valid input" do
