@@ -146,7 +146,7 @@ defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifierTest do
     test "normalizes whitespace by default", %{verifier: verifier} do
       candidate = Candidate.new!(%{content: "4  2"})
 
-      assert {:ok, result} = DeterministicVerifier.verify(verifier, candidate, %{})
+      assert {:ok, _result} = DeterministicVerifier.verify(verifier, candidate, %{})
       # "4  2" -> "4 2" after whitespace normalization, but "42" != "4 2"
       # Let's test with proper whitespace matching
       verifier2 = DeterministicVerifier.new!(ground_truth: "the answer is 42")

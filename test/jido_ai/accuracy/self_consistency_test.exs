@@ -279,7 +279,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       :telemetry.attach(
         handler_id,
         [:jido, :accuracy, :self_consistency, :start],
-        fn event, measurements, metadata, _ ->
+        fn _event, _measurements, metadata, _ ->
           send(parent, {:telemetry_data, metadata})
         end,
         nil
@@ -303,7 +303,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       :telemetry.attach(
         handler_id,
         [:jido, :accuracy, :self_consistency, :start],
-        fn event, measurements, metadata, _ ->
+        fn _event, _measurements, metadata, _ ->
           send(parent, {:telemetry_data, metadata})
         end,
         nil
@@ -327,7 +327,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       :telemetry.attach(
         handler_id,
         [:jido, :accuracy, :self_consistency, :start],
-        fn event, measurements, metadata, _ ->
+        fn _event, _measurements, metadata, _ ->
           send(parent, {:telemetry_data, metadata})
         end,
         nil
@@ -405,7 +405,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
 
       generator = MockGenerator.new(candidates: candidates)
 
-      assert {:ok, best, metadata} =
+      assert {:ok, best, _metadata} =
                SelfConsistency.run("Question",
                  generator: generator,
                  aggregator: :best_of_n
