@@ -336,7 +336,8 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   # Validation functions with security bounds (module attributes for guard compatibility)
 
   defp validate_temperature_range({min, max})
-       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max, do: :ok
+       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max,
+       do: :ok
 
   defp validate_temperature_range(_), do: {:error, :invalid_temperature_range}
 

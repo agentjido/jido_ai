@@ -233,7 +233,9 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
 
   defp extract_text(%{message: %{content: content}}) do
     case content do
-      c when is_binary(c) -> c
+      c when is_binary(c) ->
+        c
+
       c when is_list(c) ->
         c
         |> Enum.filter(fn part ->
@@ -246,7 +248,9 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
           %{text: text} -> text
           _ -> ""
         end)
-      _ -> ""
+
+      _ ->
+        ""
     end
   end
 

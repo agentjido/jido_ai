@@ -239,7 +239,7 @@ defmodule Jido.AI.Strategies.ReAct do
         id: tc.id,
         name: tc.name,
         arguments: tc.arguments,
-        status: if(tc.result != nil, do: :completed, else: :running),
+        status: if(tc.result == nil, do: :running, else: :completed),
         result: tc.result
       }
     end)

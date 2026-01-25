@@ -93,8 +93,11 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
 
   @behaviour Jido.AI.Accuracy.DifficultyEstimator
 
-  alias Jido.AI.Accuracy.DifficultyEstimate
   import Jido.AI.Accuracy.Helpers, only: [get_attr: 2, get_attr: 3]
+
+  alias Jido.AI.Accuracy.DifficultyEstimate
+  alias Jido.AI.Accuracy.Thresholds
+
   @type t :: %__MODULE__{
           model: String.t(),
           prompt_template: String.t() | nil,
@@ -192,8 +195,6 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
       {:ok, %DifficultyEstimate{level: :easy, score: 0.1, ...}}
 
   """
-  alias Jido.AI.Accuracy.Thresholds
-
   @impl true
   @spec estimate(t(), String.t(), map()) :: {:ok, DifficultyEstimate.t()} | {:error, term()}
   def estimate(%__MODULE__{} = estimator, query, context) when is_binary(query) do

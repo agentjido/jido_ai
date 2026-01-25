@@ -246,10 +246,10 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
         {:ok, response} ->
           content = extract_content(response)
 
-          if content != "" do
-            {:ok, content}
-          else
+          if content == "" do
             {:error, :no_content}
+          else
+            {:ok, content}
           end
 
         {:error, reason} ->

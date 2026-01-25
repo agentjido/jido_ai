@@ -430,5 +430,4 @@ defmodule Jido.AI.Accuracy.PipelineConfig do
   defp format_error({:missing_required_stages, stages}) do
     "missing_required_stages: #{inspect(stages)}"
   end
-
 end

@@ -103,6 +103,15 @@ defmodule Jido.AI.ReActAgent do
       # Build strategy opts at compile time in the calling module's context
       # Access tool_context from opts directly so module aliases are resolved
       # in the calling module's context
+      use Jido.Agent,
+        name: unquote(name),
+        description: unquote(description),
+        skills: unquote(ai_skills) ++ unquote(skills),
+        strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
+        schema: unquote(base_schema_ast)
+
+      import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
+
       tool_context_value = Keyword.get(unquote(opts), :tool_context, %{})
 
       strategy_opts =
@@ -118,15 +127,6 @@ defmodule Jido.AI.ReActAgent do
             prompt -> Keyword.put(o, :system_prompt, prompt)
           end
         end)
-
-      use Jido.Agent,
-        name: unquote(name),
-        description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
-        strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
-        schema: unquote(base_schema_ast)
-
-      import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
 
       @doc """
       Send a query to the agent.

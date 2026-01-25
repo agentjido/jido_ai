@@ -443,10 +443,10 @@ defmodule Jido.AI.Accuracy.SelfRefine do
         {:ok, response} ->
           content = extract_content(response)
 
-          if content != "" do
-            {:ok, String.trim(content)}
-          else
+          if content == "" do
             {:error, :no_content}
+          else
+            {:ok, String.trim(content)}
           end
 
         {:error, reason} ->

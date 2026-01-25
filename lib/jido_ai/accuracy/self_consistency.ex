@@ -249,7 +249,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   end
 
   defp aggregate_and_build_result(candidates, aggregator, start_time, opts) do
-    case apply(aggregator, :aggregate, [candidates, opts]) do
+    case aggregator.aggregate(candidates, opts) do
       {:ok, best, agg_metadata} ->
         metadata = build_metadata(candidates, agg_metadata, aggregator, opts)
         emit_stop(start_time, candidates, metadata)

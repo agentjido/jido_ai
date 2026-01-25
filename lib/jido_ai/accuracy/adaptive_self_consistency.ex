@@ -634,5 +634,9 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
 
   defp validate_timeout(_), do: {:error, :timeout_must_be_between_1000_and_300000_ms}
 
+  defp format_error({field, reason}) when is_atom(field) and is_atom(reason) do
+    "#{field}: #{reason}"
+  end
+
   defp format_error(atom) when is_atom(atom), do: atom
 end
