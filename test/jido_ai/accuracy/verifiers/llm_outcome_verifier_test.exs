@@ -587,19 +587,21 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
       ~r/\[score:\s*(-?\d+\.?\d*)\]/i
     ]
 
-    Enum.find_value(patterns, fn pattern ->
-      case Regex.run(pattern, content) do
-        [_, score_str] ->
-          case Float.parse(score_str) do
-            {score, ""} -> score
-            {score, _rest} -> score
-            :error -> nil
-          end
+    Enum.find_value(patterns, &parse_score_from_pattern(&1, content)) || 0.5
+  end
 
-        _ ->
-          nil
-      end
-    end) || 0.5
+  defp parse_score_from_pattern(pattern, content) do
+    case Regex.run(pattern, content) do
+      [_, score_str] -> parse_float(score_str)
+      _ -> nil
+    end
+  end
+
+  defp parse_float(str) do
+    case Float.parse(str) do
+      {score, _rest} -> score
+      :error -> nil
+    end
   end
 
   defp extract_reasoning_test(content) do

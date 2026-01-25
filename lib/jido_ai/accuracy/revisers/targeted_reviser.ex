@@ -354,7 +354,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
     # Add transition words between disconnected statements
     lines = String.split(content, "\n")
 
-    Enum.map(lines, fn line ->
+    Enum.map_join(lines, "\n", fn line ->
       trimmed = String.trim(line)
 
       if trimmed == "" do
@@ -373,7 +373,6 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
         end
       end
     end)
-    |> Enum.join("\n")
   end
 
   defp add_conclusion_markers(content) do
