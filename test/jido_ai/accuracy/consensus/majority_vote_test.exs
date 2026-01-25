@@ -107,7 +107,7 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVoteTest do
 
   describe "check/2 with options" do
     test "uses threshold from options" do
-      checker = MajorityVote.new!(%{})
+      _checker = MajorityVote.new!(%{})
 
       candidates = [
         Candidate.new!(%{content: "The answer is: A"}),
@@ -124,7 +124,7 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVoteTest do
     end
 
     test "returns error for invalid threshold in options" do
-      checker = MajorityVote.new!(%{})
+      _checker = MajorityVote.new!(%{})
 
       candidates = [
         Candidate.new!(%{content: "The answer is: A"})

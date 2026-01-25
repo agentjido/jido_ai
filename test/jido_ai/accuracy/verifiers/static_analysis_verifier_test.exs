@@ -262,7 +262,7 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifierTest do
     test "returns 1.0 for no issues" do
       issues = []
 
-      weights =
+      _weights =
         StaticAnalysisVerifier.__info__(:attributes)
         |> Keyword.get(:default_severity_weights)
         |> Macro.escape()

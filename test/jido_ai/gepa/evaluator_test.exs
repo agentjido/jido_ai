@@ -8,7 +8,7 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
   # ============================================================================
 
   # Simple mock runner that returns deterministic results
-  defp mock_runner(template, input, _opts) do
+  defp mock_runner(_template, input, _opts) do
     # Return the input as output for testing
     {:ok, %{output: "Answer: #{input}", tokens: 100}}
   end
