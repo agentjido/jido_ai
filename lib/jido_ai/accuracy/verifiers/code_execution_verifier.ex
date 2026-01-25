@@ -278,12 +278,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
           }
 
           # Check for expected output if provided
-          verification_result =
-            if expected_output = Map.get(context, :expected_output) do
-              check_expected_output(verification_result, expected_output)
-            else
-              verification_result
-            end
+          verification_result = apply_expected_output_check(verification_result, context)
 
           {:ok, verification_result}
 
@@ -485,6 +480,14 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
   end
 
   # Validation
+
+  defp apply_expected_output_check(result, context) do
+    if expected_output = Map.get(context, :expected_output) do
+      check_expected_output(result, expected_output)
+    else
+      result
+    end
+  end
 
   defp validate_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
   defp validate_timeout(_), do: {:error, :invalid_timeout}

@@ -438,13 +438,8 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
       chars = String.to_charlist(dots)
 
       {passed, failed, skipped} =
-        Enum.reduce(chars, {0, 0, 0}, fn char, {pass, fail, skip} ->
-          case char do
-            ?. -> {pass + 1, fail, skip}
-            ?F -> {pass, fail + 1, skip}
-            ?* -> {pass, fail, skip + 1}
-            _ -> {pass, fail, skip}
-          end
+        Enum.reduce(chars, {0, 0, 0}, fn char, acc ->
+          update_test_counts(char, acc)
         end)
 
       total = passed + failed + skipped
@@ -458,6 +453,15 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
       }
     else
       fallback_parse(output)
+    end
+  end
+
+  defp update_test_counts(char, {pass, fail, skip}) do
+    case char do
+      ?. -> {pass + 1, fail, skip}
+      ?F -> {pass, fail + 1, skip}
+      ?* -> {pass, fail, skip + 1}
+      _ -> {pass, fail, skip}
     end
   end
 

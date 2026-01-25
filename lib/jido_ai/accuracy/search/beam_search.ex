@@ -270,19 +270,20 @@ defmodule Jido.AI.Accuracy.Search.BeamSearch do
 
         false ->
           # Fallback: create simple candidates
-          candidates =
-            Enum.map(1..num_candidates, fn i ->
-              Candidate.new!(%{
-                id: "#{System.unique_integer([:positive, :monotonic])}",
-                content: "#{prompt} (candidate #{i})",
-                score: 0.5,
-                metadata: %{generated: true}
-              })
-            end)
+          candidates = Enum.map(1..num_candidates, &create_fallback_candidate(&1, prompt))
 
           {:ok, candidates}
       end
     end
+  end
+
+  defp create_fallback_candidate(i, prompt) do
+    Candidate.new!(%{
+      id: "#{System.unique_integer([:positive, :monotonic])}",
+      content: "#{prompt} (candidate #{i})",
+      score: 0.5,
+      metadata: %{generated: true}
+    })
   end
 
   defp verify_and_score_nodes(candidates, prompt, verifier, start_time, timeout) do
