@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.AggregatorTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.{Aggregator, Candidate}
+  alias Jido.AI.Accuracy.Candidate
 
   describe "behavior contract" do
     test "defines aggregate callback" do
