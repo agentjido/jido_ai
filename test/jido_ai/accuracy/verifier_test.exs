@@ -7,8 +7,10 @@ defmodule Jido.AI.Accuracy.VerifierTest do
   defmodule MockVerifier do
     @behaviour Verifier
 
+    defstruct []
+
     @impl true
-    def verify(candidate, _context) do
+    def verify(_verifier, candidate, _context) do
       score = String.length(candidate.content || "") / 100.0
 
       result =
@@ -22,10 +24,10 @@ defmodule Jido.AI.Accuracy.VerifierTest do
     end
 
     @impl true
-    def verify_batch(candidates, context) do
+    def verify_batch(verifier, candidates, context) do
       results =
         Enum.map(candidates, fn candidate ->
-          {:ok, result} = verify(candidate, context)
+          {:ok, result} = verify(verifier, candidate, context)
           result
         end)
 
@@ -40,8 +42,10 @@ defmodule Jido.AI.Accuracy.VerifierTest do
   defmodule MinimalVerifier do
     @behaviour Verifier
 
+    defstruct []
+
     @impl true
-    def verify(candidate, _context) do
+    def verify(_verifier, candidate, _context) do
       result =
         VerificationResult.new!(%{
           candidate_id: candidate.id,
@@ -52,10 +56,10 @@ defmodule Jido.AI.Accuracy.VerifierTest do
     end
 
     @impl true
-    def verify_batch(candidates, context) do
+    def verify_batch(verifier, candidates, context) do
       results =
         Enum.map(candidates, fn c ->
-          {:ok, r} = verify(c, context)
+          {:ok, r} = verify(verifier, c, context)
           r
         end)
 
@@ -67,13 +71,15 @@ defmodule Jido.AI.Accuracy.VerifierTest do
   defmodule ErrorVerifier do
     @behaviour Verifier
 
+    defstruct []
+
     @impl true
-    def verify(_candidate, _context) do
+    def verify(_verifier, _candidate, _context) do
       {:error, :verification_failed}
     end
 
     @impl true
-    def verify_batch(_candidates, _context) do
+    def verify_batch(_verifier, _candidates, _context) do
       {:error, :batch_failed}
     end
   end
@@ -81,8 +87,8 @@ defmodule Jido.AI.Accuracy.VerifierTest do
   describe "behavior compliance" do
     test "MockVerifier implements all required callbacks" do
       # Verify module exports required functions
-      assert function_exported?(MockVerifier, :verify, 2)
-      assert function_exported?(MockVerifier, :verify_batch, 2)
+      assert function_exported?(MockVerifier, :verify, 3)
+      assert function_exported?(MockVerifier, :verify_batch, 3)
     end
 
     test "MockVerifier implements optional callback" do
@@ -90,19 +96,20 @@ defmodule Jido.AI.Accuracy.VerifierTest do
     end
 
     test "MinimalVerifier implements only required callbacks" do
-      assert function_exported?(MinimalVerifier, :verify, 2)
-      assert function_exported?(MinimalVerifier, :verify_batch, 2)
+      assert function_exported?(MinimalVerifier, :verify, 3)
+      assert function_exported?(MinimalVerifier, :verify_batch, 3)
 
       # Optional callback not implemented
       refute function_exported?(MinimalVerifier, :supports_streaming?, 0)
     end
   end
 
-  describe "verify/2" do
+  describe "verify/3" do
     test "returns VerificationResult for valid candidate" do
+      verifier = %MockVerifier{}
       candidate = Candidate.new!(%{content: "Hello world"})
 
-      assert {:ok, result} = MockVerifier.verify(candidate, %{})
+      assert {:ok, result} = MockVerifier.verify(verifier, candidate, %{})
 
       assert %VerificationResult{} = result
       assert is_number(result.score)
@@ -110,63 +117,71 @@ defmodule Jido.AI.Accuracy.VerifierTest do
     end
 
     test "returns VerificationResult with score based on content length" do
+      verifier = %MockVerifier{}
       candidate = Candidate.new!(%{content: "Test"})
 
-      assert {:ok, result} = MockVerifier.verify(candidate, %{})
+      assert {:ok, result} = MockVerifier.verify(verifier, candidate, %{})
 
       # "Test" has 4 characters, score should be 0.04
       assert_in_delta result.score, 0.04, 0.01
     end
 
     test "handles candidate with nil content" do
+      verifier = %MockVerifier{}
       candidate = Candidate.new!(%{content: nil})
 
-      assert {:ok, result} = MockVerifier.verify(candidate, %{})
+      assert {:ok, result} = MockVerifier.verify(verifier, candidate, %{})
 
       assert result.score == 0.0
     end
 
     test "handles candidate with empty content" do
+      verifier = %MockVerifier{}
       candidate = Candidate.new!(%{content: ""})
 
-      assert {:ok, result} = MockVerifier.verify(candidate, %{})
+      assert {:ok, result} = MockVerifier.verify(verifier, candidate, %{})
 
       assert result.score == 0.0
     end
 
     test "passes context to verify function" do
+      verifier = %MockVerifier{}
       candidate = Candidate.new!(%{content: "Test"})
 
       # Context should be available in verify function
       # (Our mock doesn't use it, but we verify it's accepted)
-      assert {:ok, _result} = MockVerifier.verify(candidate, %{threshold: 0.5})
+      assert {:ok, _result} = MockVerifier.verify(verifier, candidate, %{threshold: 0.5})
     end
 
     test "returns error when verification fails" do
+      verifier = %ErrorVerifier{}
       candidate = Candidate.new!(%{content: "Test"})
 
-      assert {:error, :verification_failed} = ErrorVerifier.verify(candidate, %{})
+      assert {:error, :verification_failed} = ErrorVerifier.verify(verifier, candidate, %{})
     end
 
     test "MinimalVerifier returns valid result" do
+      verifier = %MinimalVerifier{}
       candidate = Candidate.new!(%{content: "Test"})
 
-      assert {:ok, result} = MinimalVerifier.verify(candidate, %{})
+      assert {:ok, result} = MinimalVerifier.verify(verifier, candidate, %{})
 
       assert result.score == 0.5
       assert result.candidate_id == candidate.id
     end
   end
 
-  describe "verify_batch/2" do
+  describe "verify_batch/3" do
     test "returns list of results for multiple candidates" do
+      verifier = %MockVerifier{}
+
       candidates = [
         Candidate.new!(%{id: "1", content: "A"}),
         Candidate.new!(%{id: "2", content: "BB"}),
         Candidate.new!(%{id: "3", content: "CCC"})
       ]
 
-      assert {:ok, results} = MockVerifier.verify_batch(candidates, %{})
+      assert {:ok, results} = MockVerifier.verify_batch(verifier, candidates, %{})
 
       assert length(results) == 3
 
@@ -176,44 +191,51 @@ defmodule Jido.AI.Accuracy.VerifierTest do
     end
 
     test "returns results in same order as candidates" do
+      verifier = %MockVerifier{}
+
       candidates = [
         Candidate.new!(%{id: "1", content: "AA"}),
         Candidate.new!(%{id: "2", content: "BBB"})
       ]
 
-      assert {:ok, results} = MockVerifier.verify_batch(candidates, %{})
+      assert {:ok, results} = MockVerifier.verify_batch(verifier, candidates, %{})
 
       assert Enum.at(results, 0).candidate_id == "1"
       assert Enum.at(results, 1).candidate_id == "2"
     end
 
     test "handles empty candidate list" do
-      assert {:ok, results} = MockVerifier.verify_batch([], %{})
+      verifier = %MockVerifier{}
+
+      assert {:ok, results} = MockVerifier.verify_batch(verifier, [], %{})
 
       assert results == []
     end
 
     test "handles single candidate in batch" do
+      verifier = %MockVerifier{}
       candidates = [Candidate.new!(%{id: "1", content: "Test"})]
 
-      assert {:ok, results} = MockVerifier.verify_batch(candidates, %{})
+      assert {:ok, results} = MockVerifier.verify_batch(verifier, candidates, %{})
 
       assert length(results) == 1
       assert hd(results).candidate_id == "1"
     end
 
     test "returns error when batch verification fails" do
+      verifier = %ErrorVerifier{}
       candidates = [Candidate.new!(%{content: "Test"})]
 
-      assert {:error, :batch_failed} = ErrorVerifier.verify_batch(candidates, %{})
+      assert {:error, :batch_failed} = ErrorVerifier.verify_batch(verifier, candidates, %{})
     end
 
     test "passes context to verify_batch function" do
+      verifier = %MockVerifier{}
       candidates = [Candidate.new!(%{content: "Test"})]
 
       # Context should be available
       assert {:ok, _results} =
-               MockVerifier.verify_batch(candidates, %{
+               MockVerifier.verify_batch(verifier, candidates, %{
                  threshold: 0.5
                })
     end
@@ -233,18 +255,20 @@ defmodule Jido.AI.Accuracy.VerifierTest do
 
   describe "integration with VerificationResult" do
     test "verify result can be checked with pass?" do
+      verifier = %MockVerifier{}
       candidate = Candidate.new!(%{content: "Long content for higher score"})
 
-      assert {:ok, result} = MockVerifier.verify(candidate, %{})
+      assert {:ok, result} = MockVerifier.verify(verifier, candidate, %{})
 
       # Should pass with low threshold due to longer content
       assert VerificationResult.pass?(result, 0.1) == true
     end
 
     test "verify result can be serialized" do
+      verifier = %MockVerifier{}
       candidate = Candidate.new!(%{content: "Test content"})
 
-      assert {:ok, result} = MockVerifier.verify(candidate, %{})
+      assert {:ok, result} = MockVerifier.verify(verifier, candidate, %{})
 
       map = VerificationResult.to_map(result)
       assert Map.has_key?(map, "score")
