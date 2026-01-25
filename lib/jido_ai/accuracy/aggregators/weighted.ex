@@ -120,16 +120,7 @@ defmodule Jido.AI.Accuracy.Aggregators.Weighted do
 
       # Run each strategy and collect selections
       strategy_results =
-        Enum.map(normalized, fn {strategy_module, weight} ->
-          case apply_strategy(strategy_module, candidates, opts) do
-            {:ok, selected, _metadata} ->
-              {strategy_module, weight, selected}
-
-            {:error, _reason} ->
-              # Skip failed strategies but continue
-              {strategy_module, weight, nil}
-          end
-        end)
+        Enum.map(normalized, &apply_strategy_with_weight(&1, candidates, opts))
 
       # Calculate weighted scores for each candidate
       candidate_scores = calculate_weighted_scores(candidates, strategy_results)
@@ -173,6 +164,17 @@ defmodule Jido.AI.Accuracy.Aggregators.Weighted do
 
   defp find_candidate_score(candidate, candidate_scores, max_score) do
     Enum.find(candidate_scores, fn {c, s} -> c.id == candidate.id and s == max_score end)
+  end
+
+  defp apply_strategy_with_weight({strategy_module, weight}, candidates, opts) do
+    case apply_strategy(strategy_module, candidates, opts) do
+      {:ok, selected, _metadata} ->
+        {strategy_module, weight, selected}
+
+      {:error, _reason} ->
+        # Skip failed strategies but continue
+        {strategy_module, weight, nil}
+    end
   end
 
   defp normalize_weights(strategies) do

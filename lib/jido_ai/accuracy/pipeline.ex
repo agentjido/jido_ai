@@ -362,16 +362,12 @@ defmodule Jido.AI.Accuracy.Pipeline do
         case PipelineStage.execute_with_timeout(stage_module, state, stage_config, stage_timeout) do
           {:ok, new_state, metadata} ->
             duration = System.monotonic_time(:millisecond) - start_time
-
-            new_state =
-              new_state
-              |> Map.put(:last_stage, stage_name)
-              |> Map.update(:stages_completed, [], fn stages -> stages ++ [stage_name] end)
+            updated_state = update_stage_state(new_state, stage_name)
 
             trace_entry =
-              PipelineResult.trace_entry(stage_name, :ok, duration, Map.put(metadata, :state, new_state))
+              PipelineResult.trace_entry(stage_name, :ok, duration, Map.put(metadata, :state, updated_state))
 
-            {new_state, trace_entry}
+            {updated_state, trace_entry}
 
           {:error, reason} ->
             duration = System.monotonic_time(:millisecond) - start_time
@@ -395,6 +391,12 @@ defmodule Jido.AI.Accuracy.Pipeline do
     else
       {state, trace_entry}
     end
+  end
+
+  defp update_stage_state(state, stage_name) do
+    state
+    |> Map.put(:last_stage, stage_name)
+    |> Map.update(:stages_completed, [], &[&1 ++ [stage_name]])
   end
 
   defp build_stage_config(config, stage_name, state, opts) do
