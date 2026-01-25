@@ -247,15 +247,12 @@ defmodule Jido.AI.Accuracy.Search.MCTSNode do
       child_with_temperature_sampling(children, temperature)
     else
       # Select child with highest value/visits ratio
-      Enum.max_by(children, fn child ->
-        if child.visits > 0 do
-          child.value / child.visits
-        else
-          0.0
-        end
-      end)
+      Enum.max_by(children, &child_value_ratio/1)
     end
   end
+
+  defp child_value_ratio(%__MODULE__{visits: 0}), do: 0.0
+  defp child_value_ratio(%__MODULE__{value: value, visits: visits}), do: value / visits
 
   @doc """
   Gets the most visited child.
