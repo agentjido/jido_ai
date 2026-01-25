@@ -15,7 +15,6 @@ defmodule Jido.AI.Accuracy.SecurityTest do
 
   alias Jido.AI.Accuracy.{Candidate, ToolExecutor, Verifiers.CodeExecutionVerifier}
   alias Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier
-  alias Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier
 
   @moduletag :security
 

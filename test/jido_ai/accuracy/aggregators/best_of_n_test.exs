@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Aggregators.BestOfNTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Aggregator, Aggregators.BestOfN, Candidate}
+  alias Jido.AI.Accuracy.{Aggregators.BestOfN, Candidate}
 
   @moduletag :capture_log
 

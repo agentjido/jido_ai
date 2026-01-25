@@ -1,7 +1,6 @@
 defmodule Jido.AI.Accuracy.GeneratorTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.Generator
   alias LLMGenerator
 
   describe "behavior contract" do

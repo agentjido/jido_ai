@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.IntegrationTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.Aggregators.{BestOfN, MajorityVote, Weighted}
+  alias Jido.AI.Accuracy.Aggregators.MajorityVote
   alias Jido.AI.Accuracy.SelfConsistency
 
   @moduletag :integration
