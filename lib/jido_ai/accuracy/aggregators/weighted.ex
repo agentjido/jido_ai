@@ -139,9 +139,7 @@ defmodule Jido.AI.Accuracy.Aggregators.Weighted do
       max_score = candidate_scores |> Enum.map(fn {_c, s} -> s end) |> Enum.max(fn -> 0 end)
 
       {winner, score} =
-        Enum.find_value(candidates, fn candidate ->
-          Enum.find(candidate_scores, fn {c, s} -> c.id == candidate.id and s == max_score end)
-        end)
+        Enum.find_value(candidates, &find_candidate_score(&1, candidate_scores, max_score))
 
       # Build metadata
       weight_map = Map.new(normalized)
@@ -172,6 +170,10 @@ defmodule Jido.AI.Accuracy.Aggregators.Weighted do
   end
 
   # Private functions
+
+  defp find_candidate_score(candidate, candidate_scores, max_score) do
+    Enum.find(candidate_scores, fn {c, s} -> c.id == candidate.id and s == max_score end)
+  end
 
   defp normalize_weights(strategies) do
     total_weight =

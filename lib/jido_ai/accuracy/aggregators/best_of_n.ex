@@ -203,16 +203,7 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
     cond do
       # Both have timestamps
       c1.timestamp && c2.timestamp ->
-        # Earlier is better if prefer_early is true
-        if prefer_early do
-          cond do
-            DateTime.before?(c1.timestamp, c2.timestamp) -> :lt
-            DateTime.after?(c1.timestamp, c2.timestamp) -> :gt
-            true -> :eq
-          end
-        else
-          DateTime.compare(c1.timestamp, c2.timestamp)
-        end
+        compare_timestamps(c1.timestamp, c2.timestamp, prefer_early)
 
       # c1 has timestamp, c2 doesn't, c1 wins
       c1.timestamp && !c2.timestamp ->
@@ -227,6 +218,16 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
         :eq
     end
   end
+
+  defp compare_timestamps(ts1, ts2, true) do
+    cond do
+      DateTime.before?(ts1, ts2) -> :lt
+      DateTime.after?(ts1, ts2) -> :gt
+      true -> :eq
+    end
+  end
+
+  defp compare_timestamps(ts1, ts2, false), do: DateTime.compare(ts1, ts2)
 
   defp calculate_score_distribution(candidates) do
     candidates

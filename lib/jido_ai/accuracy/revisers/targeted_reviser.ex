@@ -360,19 +360,13 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
       if trimmed == "" do
         line
       else
-        # Ensure reasoning statements have proper connectors
-        if Regex.match?(~r/^[A-Z]/, trimmed) do
-          line
-        else
-          if Regex.match?(~r/^\d+\./, String.trim_leading(line)) do
-            # It's a numbered list, keep as is
-            line
-          else
-            line
-          end
-        end
+        keep_line_as_is?(line, trimmed) && line || line
       end
     end)
+  end
+
+  defp keep_line_as_is?(line, trimmed) do
+    Regex.match?(~r/^[A-Z]/, trimmed) || Regex.match?(~r/^\d+\./, String.trim_leading(line))
   end
 
   defp add_conclusion_markers(content) do
