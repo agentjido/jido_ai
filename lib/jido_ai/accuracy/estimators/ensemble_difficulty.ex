@@ -276,19 +276,30 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
         _ -> false
       end)
 
+    handle_estimator_results(results, successful)
+  end
+
+  defp handle_estimator_results(results, successful) do
     if successful == [] do
-      # Check if all failed with invalid_query
-      if Enum.all?(results, fn
-           {:error, :invalid_query} -> true
-           _ -> false
-         end) do
-        {:error, :invalid_query}
-      else
-        {:ok, []}
-      end
+      handle_all_failed_results(results)
     else
       {:ok, Enum.map(successful, fn {:ok, estimate} -> estimate end)}
     end
+  end
+
+  defp handle_all_failed_results(results) do
+    if all_invalid_query?(results) do
+      {:error, :invalid_query}
+    else
+      {:ok, []}
+    end
+  end
+
+  defp all_invalid_query?(results) do
+    Enum.all?(results, fn
+      {:error, :invalid_query} -> true
+      _ -> false
+    end)
   end
 
   # Combine estimates based on combination strategy
@@ -479,15 +490,21 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
   defp combine_features(estimates, weights) do
     # Merge all feature maps with weights
     Enum.reduce(Enum.zip(estimates, weights), %{}, fn {%DifficultyEstimate{features: features}, weight}, acc ->
-      Map.merge(acc, features, fn _k, v1, v2 ->
-        # Weight feature values
-        case {v1, v2} do
-          {n1, n2} when is_number(n1) and is_number(n2) -> n1 * weight + n2 * weight
-          {v1, _} -> v1
-        end
-      end)
+      merge_weighted_features(acc, features, weight)
     end)
   end
+
+  defp merge_weighted_features(acc, features, weight) do
+    Map.merge(acc, features, fn _k, v1, v2 ->
+      weight_feature_value(v1, v2, weight)
+    end)
+  end
+
+  defp weight_feature_value(v1, v2, weight) when is_number(v1) and is_number(v2) do
+    v1 * weight + v2 * weight
+  end
+
+  defp weight_feature_value(v1, _, _weight), do: v1
 
   # Calculate average of a list
   defp avg([]), do: 0.0
