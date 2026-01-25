@@ -400,51 +400,50 @@ defmodule Jido.AI.Accuracy.Pipeline do
   end
 
   defp build_stage_config(config, stage_name, state, opts) do
-    base_config = %{
-      timeout: Keyword.get(opts, :timeout, 30_000)
-    }
+    base_config = build_base_config(state, opts)
 
-    # Add state-derived config first (has priority)
-    base_with_state =
-      base_config
-      |> Map.put(:query, Map.get(state, :query))
-      |> Map.put(:context, Map.get(state, :context))
-      |> Map.put(:difficulty, Map.get(state, :difficulty))
-      |> Map.put(:difficulty_level, Map.get(state, :difficulty_level))
-      |> Map.put(:generator, Map.get(state, :generator))
-      |> Map.put(:candidates, Map.get(state, :candidates))
-      |> Map.put(:best_candidate, Map.get(state, :best_candidate))
-
-    # Add stage-specific config (state-derived values take priority)
-    stage_config =
-      case stage_name do
-        :difficulty_estimation ->
-          Map.put(base_with_state, :estimator, config.difficulty_estimator)
-
-        :rag ->
-          Map.merge(base_with_state, config.rag_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :generation ->
-          Map.merge(base_with_state, config.generation_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :verification ->
-          Map.merge(base_with_state, config.verifier_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :search ->
-          Map.merge(base_with_state, config.search_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :reflection ->
-          Map.merge(base_with_state, config.reflection_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :calibration ->
-          Map.merge(base_with_state, config.calibration_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        _ ->
-          base_with_state
-      end
-
-    stage_config
+    add_stage_config(base_config, config, stage_name)
   end
+
+  defp build_base_config(state, opts) do
+    %{
+      timeout: Keyword.get(opts, :timeout, 30_000),
+      query: Map.get(state, :query),
+      context: Map.get(state, :context),
+      difficulty: Map.get(state, :difficulty),
+      difficulty_level: Map.get(state, :difficulty_level),
+      generator: Map.get(state, :generator),
+      candidates: Map.get(state, :candidates),
+      best_candidate: Map.get(state, :best_candidate)
+    }
+  end
+
+  defp add_stage_config(base_config, config, stage_name) do
+    stage_config_field = stage_config_field(stage_name)
+
+    case Map.get(config, stage_config_field) do
+      nil when stage_name == :difficulty_estimation ->
+        Map.put(base_config, :estimator, config.difficulty_estimator)
+
+      nil when stage_name in [:rag, :generation, :verification, :search, :reflection, :calibration] ->
+        base_config
+
+      stage_config when is_map(stage_config) ->
+        Map.merge(stage_config, base_config, fn _k, _v1, v2 -> v2 end)
+
+      _ ->
+        base_config
+    end
+  end
+
+  defp stage_config_field(:rag), do: :rag_config
+  defp stage_config_field(:generation), do: :generation_config
+  defp stage_config_field(:verification), do: :verifier_config
+  defp stage_config_field(:search), do: :search_config
+  defp stage_config_field(:reflection), do: :reflection_config
+  defp stage_config_field(:calibration), do: :calibration_config
+  defp stage_config_field(:difficulty_estimation), do: :difficulty_estimator
+  defp stage_config_field(_), do: nil
 
   defp stage_required?(stage_module) do
     stage_module.required?()

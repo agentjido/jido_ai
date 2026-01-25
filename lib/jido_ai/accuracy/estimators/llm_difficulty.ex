@@ -330,32 +330,53 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
   end
 
   defp build_estimate_from_json(data, _query) do
-    level = parse_level(get_in(data, ["level"]) || get_in(data, [:level]))
-    score = get_in(data, ["score"]) || get_in(data, [:score]) || Thresholds.level_to_score(level)
-    confidence = get_in(data, ["confidence"]) || get_in(data, [:confidence]) || 0.8
+    level = extract_level(data)
+    score = extract_score(data, level)
+    confidence = extract_confidence(data)
     reasoning = get_in(data, ["reasoning"]) || get_in(data, [:reasoning])
 
-    with true <- level in [:easy, :medium, :hard],
-         true <- is_number(score) and score >= 0.0 and score <= 1.0,
-         true <- is_number(confidence) and confidence >= 0.0 and confidence <= 1.0 do
-      estimate = %DifficultyEstimate{
-        level: level,
-        score: score,
-        confidence: confidence,
-        reasoning: reasoning,
-        features: %{
-          method: :llm
-        },
-        metadata: %{
-          method: :llm,
-          estimator: __MODULE__
-        }
-      }
-
-      {:ok, estimate}
-    else
-      _ -> {:error, :invalid_response}
+    case validate_estimate_params(level, score, confidence) do
+      :ok -> build_valid_estimate(level, score, confidence, reasoning)
+      :error -> {:error, :invalid_response}
     end
+  end
+
+  defp extract_level(data) do
+    parse_level(get_in(data, ["level"]) || get_in(data, [:level]))
+  end
+
+  defp extract_score(data, level) do
+    get_in(data, ["score"]) || get_in(data, [:score]) || Thresholds.level_to_score(level)
+  end
+
+  defp extract_confidence(data) do
+    get_in(data, ["confidence"]) || get_in(data, [:confidence]) || 0.8
+  end
+
+  defp validate_estimate_params(level, score, confidence) do
+    cond do
+      level not in [:easy, :medium, :hard] -> :error
+      not is_number(score) or score < 0.0 or score > 1.0 -> :error
+      not is_number(confidence) or confidence < 0.0 or confidence > 1.0 -> :error
+      true -> :ok
+    end
+  end
+
+  defp build_valid_estimate(level, score, confidence, reasoning) do
+    {:ok,
+     %DifficultyEstimate{
+       level: level,
+       score: score,
+       confidence: confidence,
+       reasoning: reasoning,
+       features: %{
+         method: :llm
+       },
+       metadata: %{
+         method: :llm,
+         estimator: __MODULE__
+       }
+     }}
   end
 
   defp parse_level("easy"), do: :easy

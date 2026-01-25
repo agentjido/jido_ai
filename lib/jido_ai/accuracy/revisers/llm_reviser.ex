@@ -344,34 +344,23 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
   end
 
   defp extract_json(response) do
-    # Look for JSON code blocks
-    json_block_regex = ~r/```json\s*(\{.*?\})\s*```/s
-    code_block_regex = ~r/```\s*(\{.*?\})\s*```/s
-    plain_json_regex = ~r/(\{[^{}]*"improved_response"[^{}]*\})/s
+    extractors = [
+      {~r/```json\s*(\{.*?\})\s*```/s, :json_block},
+      {~r/```\s*(\{.*?\})\s*```/s, :code_block},
+      {~r/(\{[^{}]*"improved_response"[^{}]*\})/s, :plain_json}
+    ]
 
-    cond do
-      Regex.run(json_block_regex, response) != nil ->
-        case Regex.run(json_block_regex, response, capture: :all) do
-          [[_, match]] -> match
-          _ -> response
-        end
+    try_extract_json(response, extractors) || response
+  end
 
-      Regex.run(code_block_regex, response) != nil ->
-        case Regex.run(code_block_regex, response, capture: :all) do
-          [[_, match]] -> match
-          _ -> response
-        end
-
-      Regex.run(plain_json_regex, response) != nil ->
-        case Regex.run(plain_json_regex, response, capture: :all) do
-          [[_, match]] -> match
-          _ -> response
-        end
-
-      true ->
-        response
+  defp try_extract_json(response, [{regex, _type} | rest]) do
+    case Regex.run(regex, response, capture: :all) do
+      [[_, match]] -> match
+      _ -> try_extract_json(response, rest)
     end
   end
+
+  defp try_extract_json(_response, []), do: nil
 
   @dialyzer {:nowarn_function, extract_json: 1}
 

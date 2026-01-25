@@ -383,31 +383,12 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   defp extract_complexity_feature(query) do
     words = String.split(query)
     word_count = length(words)
+    avg_word_len = calculate_avg_word_length(words)
 
-    avg_word_len =
-      if word_count > 0 do
-        total_chars = words |> Enum.map(&String.length/1) |> Enum.sum()
-        total_chars / word_count
-      else
-        0
-      end
+    special_count = count_pattern(query, ~r/[^\w\s]/)
+    number_count = count_pattern(query, ~r/\b\d+\b/)
 
-    # Count special characters
-    special_chars = ~r/[^\w\s]/
-    special_count = Regex.scan(special_chars, query) |> length()
-
-    # Count numbers
-    numbers = ~r/\b\d+\b/
-    number_count = Regex.scan(numbers, query) |> length()
-
-    complexity_score =
-      cond do
-        avg_word_len < 4 and special_count < 2 -> 0.0
-        avg_word_len < 5 and special_count < 5 -> 0.3
-        avg_word_len < 6 and special_count < 10 -> 0.5
-        avg_word_len < 7 or special_count < 15 -> 0.7
-        true -> 1.0
-      end
+    complexity_score = calculate_complexity_score(avg_word_len, special_count)
 
     %{
       score: complexity_score,
@@ -416,6 +397,31 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
       number_count: number_count
     }
   end
+
+  defp calculate_avg_word_length([]), do: 0
+  defp calculate_avg_word_length(words) do
+    total_chars = words |> Enum.map(&String.length/1) |> Enum.sum()
+    total_chars / length(words)
+  end
+
+  defp count_pattern(text, pattern), do: Regex.scan(pattern, text) |> length()
+
+  defp calculate_complexity_score(avg_word_len, special_count) do
+    complexity_category(avg_word_len, special_count)
+    |> score_for_category()
+  end
+
+  defp complexity_category(w, s) when w < 4 and s < 2, do: :very_low
+  defp complexity_category(w, s) when w < 5 and s < 5, do: :low
+  defp complexity_category(w, s) when w < 6 and s < 10, do: :medium
+  defp complexity_category(w, s) when w < 7 or s < 15, do: :high
+  defp complexity_category(_, _), do: :very_high
+
+  defp score_for_category(:very_low), do: 0.0
+  defp score_for_category(:low), do: 0.3
+  defp score_for_category(:medium), do: 0.5
+  defp score_for_category(:high), do: 0.7
+  defp score_for_category(:very_high), do: 1.0
 
   # Domain feature: detect math, code, reasoning, creative domains
   defp extract_domain_feature(query, custom_indicators) do
@@ -546,38 +552,32 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   # Generate reasoning explanation
 
   defp generate_reasoning(features, _score, level) do
-    # Length reasoning
-    length_part =
-      case features.length.score do
-        s when s < 0.3 -> "short query"
-        s when s < 0.7 -> "medium-length query"
-        _ -> "long query"
-      end
-
-    # Domain reasoning
-    domain_part =
-      case features.domain.domains do
-        [] -> "general domain"
-        domains -> "#{Enum.join(domains, "/")} domain"
-      end
-
-    # Question type reasoning
-    question_part =
-      case features.question_type.score do
-        s when s < 0.3 -> "simple question"
-        s when s < 0.7 -> "moderate question"
-        _ -> "complex question"
-      end
-
-    # Build reasoning string
-    base = "#{domain_part}, #{length_part}, #{question_part}"
-
-    case level do
-      :easy -> "Simple: #{base}"
-      :medium -> "Moderate difficulty: #{base}"
-      :hard -> "Complex: #{base} with multiple factors"
-    end
+    base = build_reasoning_base(features)
+    format_reasoning_by_level(base, level)
   end
+
+  defp build_reasoning_base(features) do
+    domain_part = describe_domain(features.domain.domains)
+    length_part = describe_length(features.length.score)
+    question_part = describe_question_type(features.question_type.score)
+
+    "#{domain_part}, #{length_part}, #{question_part}"
+  end
+
+  defp describe_domain([]), do: "general domain"
+  defp describe_domain(domains), do: "#{Enum.join(domains, "/")} domain"
+
+  defp describe_length(score) when score < 0.3, do: "short query"
+  defp describe_length(score) when score < 0.7, do: "medium-length query"
+  defp describe_length(_score), do: "long query"
+
+  defp describe_question_type(score) when score < 0.3, do: "simple question"
+  defp describe_question_type(score) when score < 0.7, do: "moderate question"
+  defp describe_question_type(_score), do: "complex question"
+
+  defp format_reasoning_by_level(base, :easy), do: "Simple: #{base}"
+  defp format_reasoning_by_level(base, :medium), do: "Moderate difficulty: #{base}"
+  defp format_reasoning_by_level(base, :hard), do: "Complex: #{base} with multiple factors"
 
   # Validation
 

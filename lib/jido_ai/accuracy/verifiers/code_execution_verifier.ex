@@ -349,50 +349,38 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
   end
 
   defp detect_language(:auto, code, _candidate) do
-    # Try to detect from shebang
     case Regex.run(~r/^#!\s*(\S+)/, code) do
-      [_, "/usr/bin/env python3" | _] ->
-        :python
-
-      [_, "/usr/bin/python3" | _] ->
-        :python
-
-      [_, "/usr/bin/env node" | _] ->
-        :javascript
-
-      [_, "/usr/bin/node" | _] ->
-        :javascript
-
-      [_, "/usr/bin/env elixir" | _] ->
-        :elixir
-
-      [_, "/usr/bin/elixir" | _] ->
-        :elixir
-
-      [_, "/usr/bin/env ruby" | _] ->
-        :ruby
-
-      [_, "/usr/bin/ruby" | _] ->
-        :ruby
-
-      [_, "/bin/bash" | _] ->
-        :bash
-
-      [_, "/usr/bin/env bash" | _] ->
-        :bash
-
-      _ ->
-        # Try to detect from patterns
-        cond do
-          String.contains?(code, "def ") and String.contains?(code, "return ") -> :python
-          String.contains?(code, "function ") or String.contains?(code, "const ") -> :javascript
-          String.contains?(code, "defmodule ") or String.contains?(code, "def ") -> :elixir
-          String.contains?(code, "def ") and String.contains?(code, "end") -> :ruby
-          # Default to Python
-          true -> :python
-        end
+      [_, shebang] -> language_from_shebang(shebang, code)
+      _ -> detect_from_code_patterns(code)
     end
   end
+
+  defp language_from_shebang("/usr/bin/env python3", _code), do: :python
+  defp language_from_shebang("/usr/bin/python3", _code), do: :python
+  defp language_from_shebang("/usr/bin/env node", _code), do: :javascript
+  defp language_from_shebang("/usr/bin/node", _code), do: :javascript
+  defp language_from_shebang("/usr/bin/env elixir", _code), do: :elixir
+  defp language_from_shebang("/usr/bin/elixir", _code), do: :elixir
+  defp language_from_shebang("/usr/bin/env ruby", _code), do: :ruby
+  defp language_from_shebang("/usr/bin/ruby", _code), do: :ruby
+  defp language_from_shebang("/bin/bash", _code), do: :bash
+  defp language_from_shebang("/usr/bin/env bash", _code), do: :bash
+  defp language_from_shebang(_shebang, code), do: detect_from_code_patterns(code)
+
+  defp detect_from_code_patterns(code) do
+    cond do
+      python_pattern?(code) -> :python
+      javascript_pattern?(code) -> :javascript
+      elixir_pattern?(code) -> :elixir
+      ruby_pattern?(code) -> :ruby
+      true -> :python
+    end
+  end
+
+  defp python_pattern?(code), do: String.contains?(code, "def ") and String.contains?(code, "return ")
+  defp javascript_pattern?(code), do: String.contains?(code, "function ") or String.contains?(code, "const ")
+  defp elixir_pattern?(code), do: String.contains?(code, "defmodule ") or String.contains?(code, "defp ")
+  defp ruby_pattern?(code), do: String.contains?(code, "def ") and String.contains?(code, "end")
 
   defp detect_language(language, _code, _candidate), do: language
 
