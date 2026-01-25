@@ -2,10 +2,10 @@ defmodule Jido.AI.Strategies.TRMTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
+  alias Jido.Agent.Strategy.State
   alias Jido.AI.Directive
   alias Jido.AI.Strategies.TRM
   alias Jido.AI.TRM.Machine
-  alias Jido.Agent.Strategy.State
 
   def build_test_agent do
     %Agent{

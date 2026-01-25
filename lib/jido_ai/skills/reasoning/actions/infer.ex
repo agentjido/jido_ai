@@ -182,7 +182,7 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
 
       c when is_list(c) ->
         c
-        |> Enum.filter(&is_text_part?/1)
+        |> Enum.filter(&text_part?/1)
         |> Enum.map_join("", fn
           %{text: text} -> text
           _ -> ""
@@ -197,8 +197,8 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
 
   defp extract_text(_), do: ""
 
-  defp is_text_part?(%{type: :text}), do: true
-  defp is_text_part?(_), do: false
+  defp text_part?(%{type: :text}), do: true
+  defp text_part?(_), do: false
 
   defp extract_usage(%{usage: usage}) when is_map(usage) do
     %{

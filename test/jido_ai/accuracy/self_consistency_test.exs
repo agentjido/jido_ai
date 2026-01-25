@@ -3,9 +3,9 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
 
   alias Jido.AI.Accuracy.Aggregators.{BestOfN, MajorityVote, Weighted}
   alias Jido.AI.Accuracy.{Candidate, SelfConsistency}
-  alias LLMGenerator
-  alias Jido.AI.Accuracy.TestSupport.MockGenerator
   alias Jido.AI.Accuracy.SelfConsistencyTestTestHelper
+  alias Jido.AI.Accuracy.TestSupport.MockGenerator
+  alias LLMGenerator
 
   @moduletag :capture_log
 

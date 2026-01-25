@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Revisers.LLMReviserTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, Revision, Revisers.LLMReviser}
+  alias Jido.AI.Accuracy.{Candidate, CritiqueResult, Revisers.LLMReviser, Revision}
 
   @moduletag :capture_log
 
