@@ -10,7 +10,7 @@ defmodule Jido.AI.Accuracy.GeneratorTest do
       # The behavior defines @callback for generate_candidates/3
       # Check that LLMGenerator implements it by calling the function
       # Note: Implementation has opts \\ [] default, so both arity 2 and 3 are exported
-      generator = LLMGenerator.new!([])
+      _generator = LLMGenerator.new!([])
       # Should have the function because of @impl
       assert function_exported?(LLMGenerator, :generate_candidates, 3)
     end

@@ -27,7 +27,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = Machine.new()
       env = %{system_prompt: "You are helpful.", max_iterations: 10}
 
-      {machine, directives} = Machine.update(machine, {:start, "Hello", "call_123"}, env)
+      {machine, _directives} = Machine.update(machine, {:start, "Hello", "call_123"}, env)
 
       assert machine.status == "awaiting_llm"
       assert machine.iteration == 1

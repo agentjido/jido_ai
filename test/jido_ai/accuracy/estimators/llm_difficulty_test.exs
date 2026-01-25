@@ -125,7 +125,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficultyTest do
 
   describe "parse_response/2" do
     test "parses valid JSON response" do
-      json = ~s({"level": "easy", "score": 0.2, "confidence": 0.9, "reasoning": "Simple query"})
+      _json = ~s({"level": "easy", "score": 0.2, "confidence": 0.9, "reasoning": "Simple query"})
 
       # The parsing happens internally, so we test via the public interface
       # by verifying the simulation produces correct output
