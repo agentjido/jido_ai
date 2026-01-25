@@ -210,16 +210,16 @@ defmodule Jido.AI.Accuracy.Search.MCTSNode do
   overridden based on the problem domain.
 
   """
-  @spec is_fully_expanded?(t()) :: boolean()
-  def is_fully_expanded?(%__MODULE__{children: []}), do: false
-  def is_fully_expanded?(%__MODULE__{children: children}), do: not Enum.empty?(children)
+  @spec fully_expanded?(t()) :: boolean()
+  def fully_expanded?(%__MODULE__{children: []}), do: false
+  def fully_expanded?(%__MODULE__{children: children}), do: not Enum.empty?(children)
 
   @doc """
   Checks if this node is a terminal node (no further expansion possible).
 
   """
-  @spec is_terminal?(t()) :: boolean()
-  def is_terminal?(%__MODULE__{is_terminal: terminal}), do: terminal
+  @spec terminal?(t()) :: boolean()
+  def terminal?(%__MODULE__{is_terminal: terminal}), do: terminal
 
   @doc """
   Marks this node as terminal.

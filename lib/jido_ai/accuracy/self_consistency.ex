@@ -49,7 +49,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   - `:aggregator` - Aggregation strategy (default: `:majority_vote`)
   - `:temperature_range` - Temperature range for sampling (default: `{0.0, 1.0}`)
   - `:model` - Model to use (default: `"anthropic:claude-haiku-4-5"`)
-  - `:timeout` - Per-candidate timeout in ms (default: 30000)
+  - `:timeout` - Per-candidate timeout in ms (default: 30_000)
   - `:max_concurrency` - Max parallel generations (default: 3)
   - `:generator` - Custom generator module or struct (default: `LLMGenerator`)
   - `:system_prompt` - Optional system prompt

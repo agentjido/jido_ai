@@ -127,7 +127,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     - `:early_stop_threshold` - Consensus threshold (default: 0.8)
     - `:difficulty_estimator` - Difficulty estimator module
     - `:aggregator` - Aggregator module (default: MajorityVote)
-    - `:timeout` - Maximum runtime in milliseconds (default: 30000)
+    - `:timeout` - Maximum runtime in milliseconds (default: 30_000)
 
   ## Returns
 
@@ -632,7 +632,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
 
   defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000, do: {:ok, :valid}
 
-  defp validate_timeout(_), do: {:error, :timeout_must_be_between_1000_and_300000_ms}
+  defp validate_timeout(_), do: {:error, :timeout_must_be_between_1000_and_300_000_ms}
 
   defp format_error({field, reason}) when is_atom(field) and is_atom(reason) do
     "#{field}: #{reason}"

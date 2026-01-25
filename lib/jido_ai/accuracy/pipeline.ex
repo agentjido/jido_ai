@@ -165,7 +165,7 @@ defmodule Jido.AI.Accuracy.Pipeline do
   - `opts` - Options:
     - `:generator` - Function to generate candidates (required)
     - `:context` - Additional context (optional)
-    - `:timeout` - Overall timeout in ms (optional, default: 60000)
+    - `:timeout` - Overall timeout in ms (optional, default: 60_000)
     - `:debug` - Whether to emit debug info (optional)
 
   ## Returns
@@ -377,7 +377,7 @@ defmodule Jido.AI.Accuracy.Pipeline do
             duration = System.monotonic_time(:millisecond) - start_time
 
             # Check if stage is required
-            stage_required = is_stage_required?(stage_module)
+            stage_required = stage_required?(stage_module)
 
             if stage_required do
               # Required stage failed, halt pipeline by propagating error
@@ -445,7 +445,7 @@ defmodule Jido.AI.Accuracy.Pipeline do
     stage_config
   end
 
-  defp is_stage_required?(stage_module) do
+  defp stage_required?(stage_module) do
     stage_module.required?()
   rescue
     _ -> true

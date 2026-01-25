@@ -390,6 +390,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
   # Private functions
 
+  # credo:disable-for-next-line Credo.Check.Readability.VariableNames
   defp get_or_generate_original(%__MODULE{} = strategy, prompt, opts) do
     case Keyword.get(opts, :initial_candidate) do
       %Candidate{} = candidate ->

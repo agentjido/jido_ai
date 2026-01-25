@@ -181,7 +181,7 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
   - `:output_format` - Output format (:junit, :tap, :dot, :auto, default: :auto)
   - `:working_dir` - Working directory for tests
   - `:environment` - Environment variables for tests
-  - `:timeout` - Test execution timeout in ms (default: 30000)
+  - `:timeout` - Test execution timeout in ms (default: 30_000)
 
   ## Returns
 

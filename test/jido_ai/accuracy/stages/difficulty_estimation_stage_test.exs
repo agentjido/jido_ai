@@ -29,8 +29,8 @@ defmodule Jido.AI.Accuracy.Stages.DifficultyEstimationStageTest do
     end
 
     test "creates stage with custom timeout" do
-      stage = DifficultyEstimationStage.new(%{timeout: 10000})
-      assert stage.timeout == 10000
+      stage = DifficultyEstimationStage.new(%{timeout: 10_000})
+      assert stage.timeout == 10_000
     end
   end
 

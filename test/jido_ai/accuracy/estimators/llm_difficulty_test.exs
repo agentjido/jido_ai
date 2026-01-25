@@ -18,11 +18,11 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficultyTest do
       assert {:ok, estimator} =
                LLMDifficulty.new(%{
                  model: "anthropic:claude-4-5",
-                 timeout: 10000
+                 timeout: 10_000
                })
 
       assert estimator.model == "anthropic:claude-4-5"
-      assert estimator.timeout == 10000
+      assert estimator.timeout == 10_000
     end
 
     test "creates estimator with custom prompt template" do

@@ -300,7 +300,7 @@ defmodule Jido.AI.Signal do
   """
   @deprecated "Use tool_call?/1 instead"
   @spec is_tool_call?(Jido.Signal.t()) :: boolean()
-  # credo:disable-for-next-line Credo.Check.Readability.PredicateFunctionNames
+  # credo:disable-for-lines:1 Credo.Check.Readability.PredicateFunctionNames
   def is_tool_call?(signal), do: tool_call?(signal)
 
   @doc """

@@ -108,7 +108,7 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
     - `:weights` - Optional weights for each estimator (sum to 1.0)
     - `:combination` - Combination strategy (default: :weighted_average)
     - `:fallback` - Fallback estimator module if all fail (optional)
-    - `:timeout` - Per-estimator timeout in ms (default: 10000)
+    - `:timeout` - Per-estimator timeout in ms (default: 10_000)
 
   ## Returns
 
