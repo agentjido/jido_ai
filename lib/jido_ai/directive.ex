@@ -625,6 +625,11 @@ defmodule Jido.AI.Directive.Helper do
       supervisor_pid
 
   """
+  def get_task_supervisor(%Jido.AgentServer.State{agent: agent}) do
+    # Handle AgentServer.State struct - extract the agent's state
+    get_task_supervisor(agent.state)
+  end
+
   def get_task_supervisor(state) when is_map(state) do
     # First check TaskSupervisorSkill's internal state
     case Map.get(state, :__task_supervisor_skill__) do

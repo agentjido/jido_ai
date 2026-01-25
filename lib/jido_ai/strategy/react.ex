@@ -471,7 +471,7 @@ defmodule Jido.AI.Strategies.ReAct do
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       use_registry: use_registry,
-      tool_context: Keyword.get(opts, :tool_context, %{})
+      tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
     }
   end
 
