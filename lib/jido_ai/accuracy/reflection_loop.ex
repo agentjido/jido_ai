@@ -190,14 +190,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
               final_result = finalize_result(state, loop, :max_iterations)
               {:halt, {final_result, candidate}}
             else
-              case run_iteration(loop, prompt, candidate, iteration_num, context_with_memory) do
-                {:ok, %{candidate: revised_candidate, critique: critique, converged: converged}} ->
-                  handle_iteration_result(state, loop, revised_candidate, critique, iteration_num, converged)
-
-                {:error, _reason} ->
-                  final_result = finalize_result(state, loop, :error)
-                  {:halt, {final_result, candidate}}
-              end
+              run_single_iteration(loop, prompt, candidate, iteration_num, state, context_with_memory)
             end
         end)
 
@@ -427,6 +420,17 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
       {:halt, {final_result, revised_candidate}}
     else
       {:cont, {updated_state, revised_candidate}}
+    end
+  end
+
+  defp run_single_iteration(loop, prompt, candidate, iteration_num, state, context) do
+    case run_iteration(loop, prompt, candidate, iteration_num, context) do
+      {:ok, %{candidate: revised_candidate, critique: critique, converged: converged}} ->
+        handle_iteration_result(state, loop, revised_candidate, critique, iteration_num, converged)
+
+      {:error, _reason} ->
+        final_result = finalize_result(state, loop, :error)
+        {:halt, {final_result, candidate}}
     end
   end
 
