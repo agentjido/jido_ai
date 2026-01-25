@@ -110,9 +110,6 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   Provide your response in the following format:
   Score: [numeric score]
   Reasoning: [brief explanation]
-
-  Score: <%= @score %>
-  Reasoning: <%= @reasoning %>
   """
 
   @doc """
