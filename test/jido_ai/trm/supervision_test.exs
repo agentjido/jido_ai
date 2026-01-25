@@ -12,10 +12,10 @@ defmodule Jido.AI.TRM.SupervisionTest do
         previous_feedback: nil
       }
 
-      {system, user} = Supervision.build_supervision_prompt(context)
+      {_system, _user} = Supervision.build_supervision_prompt(context)
 
-      assert is_binary(system)
-      assert is_binary(user)
+      assert is_binary(_system)
+      assert is_binary(_user)
     end
 
     test "includes question and answer in user prompt" do
@@ -316,15 +316,15 @@ defmodule Jido.AI.TRM.SupervisionTest do
         raw_text: ""
       }
 
-      {system, user} =
+      {_system, _user} =
         Supervision.build_improvement_prompt(
           "What is AI?",
           "AI is artificial intelligence",
           feedback
         )
 
-      assert is_binary(system)
-      assert is_binary(user)
+      assert is_binary(_system)
+      assert is_binary(_user)
     end
 
     test "includes question and answer" do

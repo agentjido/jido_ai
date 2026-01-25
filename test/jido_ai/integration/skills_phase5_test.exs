@@ -314,7 +314,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   describe "End-to-End Flows" do
     test "skill action can be invoked directly" do
       # Test that actions have the expected schema
-      params = %{prompt: "Test"}
+      _params = %{prompt: "Test"}
 
       # Chat action should have schema accessible (Zoi schema struct)
       schema = Chat.schema()

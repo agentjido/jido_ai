@@ -108,7 +108,7 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStageTest do
       context_passed = :counters.new(1, [])
       call_count_ref = :counters.new(1, [])
 
-      generator = fn _query, context ->
+      generator = fn _query, _context ->
         :counters.add(context_passed, 1, 1)
         :counters.add(call_count_ref, 1, 1)
         {:ok, Candidate.new!(%{content: "test"})}

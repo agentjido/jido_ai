@@ -22,14 +22,6 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
     end
   end
 
-  # Runner that tracks calls
-  defp tracking_runner(agent_pid) do
-    fn template, input, opts ->
-      send(agent_pid, {:runner_called, template, input, opts})
-      {:ok, %{output: input, tokens: 10}}
-    end
-  end
-
   # Slow runner for timeout testing
   defp slow_runner(_template, _input, _opts) do
     Process.sleep(500)

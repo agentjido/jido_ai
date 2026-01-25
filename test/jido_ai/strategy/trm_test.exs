@@ -5,7 +5,6 @@ defmodule Jido.AI.Strategies.TRMTest do
   alias Jido.Agent.Strategy.State
   alias Jido.AI.Directive
   alias Jido.AI.Strategies.TRM
-  alias Jido.AI.TRM.Machine
 
   def build_test_agent do
     %Agent{

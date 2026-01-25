@@ -100,7 +100,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   describe "Direct Action Execution" do
     test "LLM Chat action can be executed directly" do
-      params = %{
+      _params = %{
         prompt: "What is 2+2?",
         model: :fast,
         max_tokens: 100

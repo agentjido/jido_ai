@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, Generators.LLMGenerator}
+  alias Jido.AI.Accuracy.Generators.LLMGenerator
 
   @moduletag :capture_log
 

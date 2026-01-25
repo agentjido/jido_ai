@@ -72,7 +72,7 @@ defmodule Jido.AI.Accuracy.SearchTest do
     @moduledoc """
     Generator that produces diverse content for testing diversity algorithms.
     """
-    def generate_candidates(prompt, opts) do
+    def generate_candidates(_prompt, opts) do
       num = Keyword.get(opts, :num_candidates, 1)
 
       answers = [

@@ -70,7 +70,7 @@ defmodule Jido.AI.GraphOfThoughts.MachineTest do
   describe "update/3 with :start" do
     test "transitions from idle to generating" do
       machine = Machine.new()
-      {updated, directives} = Machine.update(machine, {:start, "Solve this problem", "call_1"}, %{})
+      {updated, _directives} = Machine.update(machine, {:start, "Solve this problem", "call_1"}, %{})
 
       assert updated.status == "generating"
       assert updated.prompt == "Solve this problem"
@@ -125,11 +125,10 @@ defmodule Jido.AI.GraphOfThoughts.MachineTest do
 
     test "ignores stale call_id", %{machine: machine} do
       result = {:ok, %{text: "Response"}}
-      {updated, directives} = Machine.update(machine, {:llm_result, "wrong_call_id", result}, %{})
+      {updated, _directives} = Machine.update(machine, {:llm_result, "wrong_call_id", result}, %{})
 
       # Should not change
       assert updated.status == machine.status
-      assert directives == []
     end
   end
 

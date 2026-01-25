@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifierTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult, Verifiers.StaticAnalysisVerifier}
+  alias Jido.AI.Accuracy.{Candidate, Verifiers.StaticAnalysisVerifier}
 
   @moduletag :capture_log
 
