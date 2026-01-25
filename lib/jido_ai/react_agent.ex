@@ -70,7 +70,16 @@ defmodule Jido.AI.ReActAgent do
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
-    tools = Keyword.fetch!(opts, :tools)
+    tools_ast = Keyword.fetch!(opts, :tools)
+
+    # Expand module aliases in the tools list to actual module atoms
+    # This handles {:__aliases__, _, [...]} tuples from macro expansion
+    tools =
+      Enum.map(tools_ast, fn
+        {:__aliases__, _, _} = alias_ast -> Macro.expand(alias_ast, __CALLER__)
+        mod when is_atom(mod) -> mod
+      end)
+
     description = Keyword.get(opts, :description, "ReAct agent #{name}")
     system_prompt = Keyword.get(opts, :system_prompt)
     model = Keyword.get(opts, :model, @default_model)
@@ -82,8 +91,24 @@ defmodule Jido.AI.ReActAgent do
     # TaskSupervisorSkill is always included for per-instance task supervision
     ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
 
+    # Extract tool_context at macro expansion time
+    # If it contains module aliases, evaluate them in the caller's context
+    tool_context =
+      case Keyword.get(opts, :tool_context) do
+        nil ->
+          %{}
+
+        {:%, _, _} = map_ast ->
+          # It's a map AST - evaluate it in the caller's context to resolve aliases
+          {evaluated, _} = Code.eval_quoted(map_ast, [], __CALLER__)
+          evaluated
+
+        other when is_map(other) ->
+          other
+      end
+
     strategy_opts =
-      [tools: tools, model: model, max_iterations: max_iterations]
+      [tools: tools, model: model, max_iterations: max_iterations, tool_context: tool_context]
       |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
 
     # Build base_schema AST at macro expansion time
@@ -98,27 +123,7 @@ defmodule Jido.AI.ReActAgent do
         })
       end
 
-    # Build strategy_opts inside quote to properly evaluate module references
     quote location: :keep do
-      # Build strategy opts at compile time in the calling module's context
-      # Access tool_context from opts directly so module aliases are resolved
-      # in the calling module's context
-      tool_context_value = Keyword.get(unquote(opts), :tool_context, %{})
-
-      strategy_opts =
-        [
-          tools: unquote(tools),
-          model: unquote(model),
-          max_iterations: unquote(max_iterations),
-          tool_context: tool_context_value
-        ]
-        |> then(fn o ->
-          case unquote(system_prompt) do
-            nil -> o
-            prompt -> Keyword.put(o, :system_prompt, prompt)
-          end
-        end)
-
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
