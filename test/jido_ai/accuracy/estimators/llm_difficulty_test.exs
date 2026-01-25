@@ -154,7 +154,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficultyTest do
       {:ok, estimator: estimator}
     end
 
-    test "estimates multiple queries using default batch implementation", context do
+    test "estimates multiple queries using default batch implementation", _context do
       queries = ["What is 2+2?", "complex quantum mechanics question", "Who wrote Hamlet?"]
 
       assert {:ok, estimates} =

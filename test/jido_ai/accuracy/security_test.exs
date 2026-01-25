@@ -124,7 +124,7 @@ defmodule Jido.AI.Accuracy.SecurityTest do
       # Create content longer than 50KB
       long_content = String.duplicate("a", 60_000)
 
-      candidate = Candidate.new!(%{content: long_content})
+      _candidate = Candidate.new!(%{content: long_content})
 
       # The content should be truncated when building the candidate assign
       # We can verify this indirectly by checking the length after sanitization

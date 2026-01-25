@@ -134,7 +134,7 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVoteTest do
     end
 
     test "returns error when no threshold provided" do
-      checker = MajorityVote.new!(%{})
+      _checker = MajorityVote.new!(%{})
 
       candidates = [
         Candidate.new!(%{content: "The answer is: A"})
