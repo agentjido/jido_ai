@@ -19,7 +19,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   alias Jido.AI.Helpers
   alias Jido.AI.Signal
   alias Jido.AI.Signal.{EmbedResult, ReqLLMError, ToolResult, UsageReport}
-  alias Jido.AI.ToolAdapter
+  alias Jido.AI.Tools.Registry
 
   # ============================================================================
   # Directive + Configuration Integration
@@ -374,21 +374,21 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     end
 
     setup do
-      ToolAdapter.clear_registry()
+      Registry.clear()
       :ok
     end
 
     test "register and retrieve action" do
-      :ok = ToolAdapter.register_action(TestAction)
+      :ok = Registry.register_action(TestAction)
 
-      {:ok, module} = ToolAdapter.get_action("test_action")
+      {:ok, module} = Registry.get("test_action")
       assert module == TestAction
     end
 
     test "convert registered actions to tools" do
-      :ok = ToolAdapter.register_action(TestAction)
+      :ok = Registry.register_action(TestAction)
 
-      tools = ToolAdapter.to_tools()
+      tools = Registry.to_reqllm_tools()
       assert length(tools) == 1
 
       [tool] = tools
