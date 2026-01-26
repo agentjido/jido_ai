@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Aggregators.Weighted, Candidate}
-  alias Jido.AI.Accuracy.Aggregators.{BestOfN, MajorityVote}
+  alias Jido.AI.Accuracy.Aggregators.{BestOfN, MajorityVote, Weighted}
+  alias Jido.AI.Accuracy.Candidate
 
   @moduletag :capture_log
 

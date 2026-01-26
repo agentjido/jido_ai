@@ -290,26 +290,21 @@ defmodule Jido.AI.Strategies.ReAct do
         process_set_tool_context(agent, params)
 
       @start ->
-        # Handle per-request tool_context before processing start
-        agent =
-          case Map.get(params, :tool_context) do
-            nil ->
-              agent
-
-            ctx when is_map(ctx) and map_size(ctx) > 0 ->
-              {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
-              updated_agent
-
-            _ ->
-              agent
-          end
-
+        agent = maybe_apply_per_request_tool_context(agent, params)
         process_machine_message(agent, normalized_action, params)
 
       _ ->
         process_machine_message(agent, normalized_action, params)
     end
   end
+
+  defp maybe_apply_per_request_tool_context(agent, %{tool_context: ctx})
+       when is_map(ctx) and map_size(ctx) > 0 do
+    {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
+    updated_agent
+  end
+
+  defp maybe_apply_per_request_tool_context(agent, _params), do: agent
 
   defp process_machine_message(agent, action, params) do
     case to_machine_msg(action, params) do

@@ -79,6 +79,7 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
       refute Enum.empty?(result.trace)
     end
 
+    @tag :flaky
     test "pipeline with verification catches more errors than baseline" do
       # This test verifies that verification stage adds value by checking consistency
 

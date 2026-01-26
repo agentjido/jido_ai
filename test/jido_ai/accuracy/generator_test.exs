@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.GeneratorTest do
   use ExUnit.Case, async: false
 
-  alias LLMGenerator
+  alias Jido.AI.Accuracy.Generators.LLMGenerator
 
   describe "behavior contract" do
     test "defines generate_candidates callback" do
