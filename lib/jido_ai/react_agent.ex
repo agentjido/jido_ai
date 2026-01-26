@@ -28,7 +28,7 @@ defmodule Jido.AI.ReActAgent do
 
   ## Generated Functions
 
-  - `ask/2` - Convenience function to send a query to the agent
+  - `ask/2` or `ask/3` - Convenience function to send a query to the agent (with optional per-request tool_context)
   - `on_before_cmd/2` - Captures last_query before processing
   - `on_after_cmd/3` - Updates last_answer and completed when done
 
@@ -62,10 +62,61 @@ defmodule Jido.AI.ReActAgent do
       agent = Jido.AgentServer.get(pid)
       agent.state.completed   # => true
       agent.state.last_answer # => "The weather in Tokyo is..."
+
+  ## Per-Request Tool Context
+
+  You can pass per-request context that will be merged with the agent's base tool_context:
+
+      # Pass actor/tenant for this specific request
+      :ok = MyApp.WeatherAgent.ask(pid, "Get my preferences", 
+        tool_context: %{actor: current_user, tenant_id: "acme"})
   """
 
   @default_model "anthropic:claude-haiku-4-5"
   @default_max_iterations 10
+
+  @doc false
+  def expand_aliases_in_ast(ast, caller_env) do
+    Macro.prewalk(ast, fn
+      {:__aliases__, _, _} = alias_node ->
+        Macro.expand(alias_node, caller_env)
+
+      # Allow literals
+      literal when is_atom(literal) or is_binary(literal) or is_number(literal) ->
+        literal
+
+      # Allow list syntax
+      list when is_list(list) ->
+        list
+
+      # Allow map struct syntax: %{...}
+      {:%{}, meta, pairs} ->
+        {:%{}, meta, pairs}
+
+      # Allow struct syntax: %Module{...}
+      {:%, meta, args} ->
+        {:%, meta, args}
+
+      # Allow 2-tuples (key-value pairs in maps)
+      {key, value} when not is_atom(key) or key not in [:__aliases__, :%, :%{}] ->
+        {key, value}
+
+      # Reject function calls and other unsafe constructs
+      {func, meta, args} = node when is_atom(func) and is_list(args) ->
+        if func in [:__aliases__, :%, :%{}] do
+          node
+        else
+          raise CompileError,
+            description:
+              "Unsafe construct in tool_context or tools: function call #{inspect(func)} is not allowed. " <>
+                "Only module aliases, atoms, strings, numbers, lists, and maps are permitted.",
+            line: Keyword.get(meta, :line, 0)
+        end
+
+      other ->
+        other
+    end)
+  end
 
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
@@ -92,15 +143,22 @@ defmodule Jido.AI.ReActAgent do
     ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
 
     # Extract tool_context at macro expansion time
-    # If it contains module aliases, evaluate them in the caller's context
+    # Use safe alias-only expansion instead of Code.eval_quoted
     tool_context =
       case Keyword.get(opts, :tool_context) do
         nil ->
           %{}
 
         {:%, _, _} = map_ast ->
-          # It's a map AST - evaluate it in the caller's context to resolve aliases
-          {evaluated, _} = Code.eval_quoted(map_ast, [], __CALLER__)
+          # It's a struct/map AST - expand aliases safely and evaluate
+          expanded_ast = Jido.AI.ReActAgent.expand_aliases_in_ast(map_ast, __CALLER__)
+          {evaluated, _} = Code.eval_quoted(expanded_ast, [], __CALLER__)
+          evaluated
+
+        {:%{}, _, _} = map_ast ->
+          # Plain map AST - expand aliases safely and evaluate
+          expanded_ast = Jido.AI.ReActAgent.expand_aliases_in_ast(map_ast, __CALLER__)
+          {evaluated, _} = Code.eval_quoted(expanded_ast, [], __CALLER__)
           evaluated
 
         other when is_map(other) ->
@@ -138,9 +196,22 @@ defmodule Jido.AI.ReActAgent do
 
       Returns `:ok` immediately; the result arrives asynchronously via the ReAct loop.
       Check `agent.state.completed` and `agent.state.last_answer` for the result.
+
+      ## Options
+
+      - `:tool_context` - Additional context map merged with agent's tool_context for this request
       """
-      def ask(pid, query) when is_binary(query) do
-        signal = Jido.Signal.new!("react.user_query", %{query: query}, source: "/react/agent")
+      def ask(pid, query, opts \\ []) when is_binary(query) do
+        tool_context = Keyword.get(opts, :tool_context, %{})
+
+        payload =
+          if map_size(tool_context) > 0 do
+            %{query: query, tool_context: tool_context}
+          else
+            %{query: query}
+          end
+
+        signal = Jido.Signal.new!("react.user_query", payload, source: "/react/agent")
         Jido.AgentServer.cast(pid, signal)
       end
 
