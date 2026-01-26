@@ -476,8 +476,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   handling, parameter normalization, and telemetry.
   """
 
-  alias Jido.AI.{Helpers, Signal}
   alias Jido.AI.Tools.Executor
+  alias Jido.AI.{Helpers, Signal}
 
   def exec(directive, _input_signal, state) do
     %{
@@ -626,6 +626,11 @@ defmodule Jido.AI.Directive.Helper do
       supervisor_pid
 
   """
+  def get_task_supervisor(%Jido.AgentServer.State{agent: agent}) do
+    # Handle AgentServer.State struct - extract the agent's state
+    get_task_supervisor(agent.state)
+  end
+
   def get_task_supervisor(state) when is_map(state) do
     # First check TaskSupervisorSkill's internal state
     case Map.get(state, :__task_supervisor_skill__) do

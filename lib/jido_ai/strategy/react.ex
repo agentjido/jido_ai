@@ -103,6 +103,7 @@ defmodule Jido.AI.Strategies.ReAct do
   @llm_partial :react_llm_partial
   @register_tool :react_register_tool
   @unregister_tool :react_unregister_tool
+  @set_tool_context :react_set_tool_context
 
   @doc "Returns the action atom for starting a ReAct conversation."
   @spec start_action() :: :react_start
@@ -127,6 +128,10 @@ defmodule Jido.AI.Strategies.ReAct do
   @doc "Returns the action atom for handling streaming LLM partial tokens."
   @spec llm_partial_action() :: :react_llm_partial
   def llm_partial_action, do: @llm_partial
+
+  @doc "Returns the action atom for updating tool context."
+  @spec set_tool_context_action() :: :react_set_tool_context
+  def set_tool_context_action, do: @set_tool_context
 
   @action_specs %{
     @start => %{
@@ -163,6 +168,11 @@ defmodule Jido.AI.Strategies.ReAct do
       schema: Zoi.object(%{tool_name: Zoi.string()}),
       doc: "Unregister a tool by name",
       name: "react.unregister_tool"
+    },
+    @set_tool_context => %{
+      schema: Zoi.object(%{tool_context: Zoi.map()}),
+      doc: "Update the tool context for subsequent tool executions",
+      name: "react.set_tool_context"
     }
   }
 
@@ -268,7 +278,7 @@ defmodule Jido.AI.Strategies.ReAct do
   defp process_instruction(agent, %Jido.Instruction{action: action, params: params}) do
     normalized_action = normalize_action(action)
 
-    # Handle tool registration/unregistration separately (not machine messages)
+    # Handle tool registration/unregistration/context separately (not machine messages)
     case normalized_action do
       @register_tool ->
         process_register_tool(agent, params)
@@ -276,31 +286,55 @@ defmodule Jido.AI.Strategies.ReAct do
       @unregister_tool ->
         process_unregister_tool(agent, params)
 
+      @set_tool_context ->
+        process_set_tool_context(agent, params)
+
+      @start ->
+        # Handle per-request tool_context before processing start
+        agent =
+          case Map.get(params, :tool_context) do
+            nil ->
+              agent
+
+            ctx when is_map(ctx) and map_size(ctx) > 0 ->
+              {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
+              updated_agent
+
+            _ ->
+              agent
+          end
+
+        process_machine_message(agent, normalized_action, params)
+
       _ ->
-        case to_machine_msg(normalized_action, params) do
-          msg when not is_nil(msg) ->
-            state = StratState.get(agent, %{})
-            config = state[:config]
-            machine = Machine.from_map(state)
+        process_machine_message(agent, normalized_action, params)
+    end
+  end
 
-            env = %{
-              system_prompt: config[:system_prompt],
-              max_iterations: config[:max_iterations]
-            }
+  defp process_machine_message(agent, action, params) do
+    case to_machine_msg(action, params) do
+      msg when not is_nil(msg) ->
+        state = StratState.get(agent, %{})
+        config = state[:config]
+        machine = Machine.from_map(state)
 
-            {machine, directives} = Machine.update(machine, msg, env)
+        env = %{
+          system_prompt: config[:system_prompt],
+          max_iterations: config[:max_iterations]
+        }
 
-            new_state =
-              machine
-              |> Machine.to_map()
-              |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+        {machine, directives} = Machine.update(machine, msg, env)
 
-            agent = StratState.put(agent, new_state)
-            {agent, lift_directives(directives, config)}
+        new_state =
+          machine
+          |> Machine.to_map()
+          |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
-          _ ->
-            :noop
-        end
+        agent = StratState.put(agent, new_state)
+        {agent, lift_directives(directives, config)}
+
+      _ ->
+        :noop
     end
   end
 
@@ -338,6 +372,19 @@ defmodule Jido.AI.Strategies.ReAct do
         StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools)
       )
 
+    agent = StratState.put(agent, new_state)
+    {agent, []}
+  end
+
+  defp process_set_tool_context(agent, %{tool_context: new_context}) when is_map(new_context) do
+    state = StratState.get(agent, %{})
+    config = state[:config]
+
+    # Merge new context with existing (new values override)
+    updated_context = Map.merge(config[:tool_context] || %{}, new_context)
+    updated_config = Map.put(config, :tool_context, updated_context)
+
+    new_state = StateOpsHelpers.apply_to_state(state, [StateOpsHelpers.update_config(updated_config)])
     agent = StratState.put(agent, new_state)
     {agent, []}
   end
@@ -461,7 +508,7 @@ defmodule Jido.AI.Strategies.ReAct do
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       use_registry: use_registry,
-      tool_context: Keyword.get(opts, :tool_context, %{})
+      tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
     }
   end
 
