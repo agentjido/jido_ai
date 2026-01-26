@@ -1,6 +1,8 @@
 defmodule Jido.AI.Accuracy.AggregatorTest do
   use ExUnit.Case, async: false
 
+  alias Jido.AI.Accuracy.Aggregator
+
   describe "behavior contract" do
     test "defines aggregate callback" do
       assert function_exported?(Jido.AI.Accuracy.Aggregators.MajorityVote, :aggregate, 2)
@@ -19,7 +21,7 @@ defmodule Jido.AI.Accuracy.AggregatorTest do
     test "aggregate_result type is defined" do
       # This is a compile-time type check
       # Just verify the types exist in the module
-      assert is_list(Jido.AI.Accuracy.Aggregator.module_info(:exports))
+      assert is_list(Aggregator.module_info(:exports))
     end
   end
 end
