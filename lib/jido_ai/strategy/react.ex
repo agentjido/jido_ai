@@ -192,54 +192,44 @@ defmodule Jido.AI.Strategies.ReAct do
   @impl true
   def snapshot(%Agent{} = agent, _ctx) do
     state = StratState.get(agent, %{})
-
-    status =
-      case state[:status] do
-        :completed -> :success
-        :error -> :failure
-        :idle -> :idle
-        _ -> :running
-      end
-
-    done? = status in [:success, :failure]
-
-    # Calculate duration if we have started_at
-    duration_ms =
-      case state[:started_at] do
-        nil -> nil
-        started_at -> System.monotonic_time(:millisecond) - started_at
-      end
-
-    # Format pending tool calls for UI consumption
-    tool_calls = format_tool_calls(state[:pending_tool_calls] || [])
-
-    # Get config info
+    status = snapshot_status(state[:status])
     config = state[:config] || %{}
 
     %Jido.Agent.Strategy.Snapshot{
       status: status,
-      done?: done?,
+      done?: status in [:success, :failure],
       result: state[:result],
-      details:
-        %{
-          phase: state[:status],
-          iteration: state[:iteration],
-          termination_reason: state[:termination_reason],
-          streaming_text: state[:streaming_text],
-          streaming_thinking: state[:streaming_thinking],
-          usage: state[:usage],
-          duration_ms: duration_ms,
-          tool_calls: tool_calls,
-          conversation: state[:conversation] || [],
-          current_llm_call_id: state[:current_llm_call_id],
-          model: config[:model],
-          max_iterations: config[:max_iterations],
-          available_tools: Enum.map(config[:tools] || [], & &1.name())
-        }
-        |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} or v == [] end)
-        |> Map.new()
+      details: build_snapshot_details(state, config)
     }
   end
+
+  defp snapshot_status(:completed), do: :success
+  defp snapshot_status(:error), do: :failure
+  defp snapshot_status(:idle), do: :idle
+  defp snapshot_status(_), do: :running
+
+  defp build_snapshot_details(state, config) do
+    %{
+      phase: state[:status],
+      iteration: state[:iteration],
+      termination_reason: state[:termination_reason],
+      streaming_text: state[:streaming_text],
+      streaming_thinking: state[:streaming_thinking],
+      usage: state[:usage],
+      duration_ms: calculate_duration(state[:started_at]),
+      tool_calls: format_tool_calls(state[:pending_tool_calls] || []),
+      conversation: Map.get(state, :conversation, []),
+      current_llm_call_id: state[:current_llm_call_id],
+      model: config[:model],
+      max_iterations: config[:max_iterations],
+      available_tools: Enum.map(Map.get(config, :tools, []), & &1.name())
+    }
+    |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} or v == [] end)
+    |> Map.new()
+  end
+
+  defp calculate_duration(nil), do: nil
+  defp calculate_duration(started_at), do: System.monotonic_time(:millisecond) - started_at
 
   defp format_tool_calls([]), do: []
 
@@ -300,26 +290,21 @@ defmodule Jido.AI.Strategies.ReAct do
         process_set_tool_context(agent, params)
 
       @start ->
-        # Handle per-request tool_context before processing start
-        agent =
-          case Map.get(params, :tool_context) do
-            nil ->
-              agent
-
-            ctx when is_map(ctx) and map_size(ctx) > 0 ->
-              {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
-              updated_agent
-
-            _ ->
-              agent
-          end
-
+        agent = maybe_apply_per_request_tool_context(agent, params)
         process_machine_message(agent, normalized_action, params)
 
       _ ->
         process_machine_message(agent, normalized_action, params)
     end
   end
+
+  defp maybe_apply_per_request_tool_context(agent, %{tool_context: ctx})
+       when is_map(ctx) and map_size(ctx) > 0 do
+    {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
+    updated_agent
+  end
+
+  defp maybe_apply_per_request_tool_context(agent, _params), do: agent
 
   defp process_machine_message(agent, action, params) do
     case to_machine_msg(action, params) do

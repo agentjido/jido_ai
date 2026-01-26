@@ -532,18 +532,19 @@ defmodule Jido.AI.Security do
     end
   end
 
-  defp generic_reason_message(reason) do
-    case reason do
-      :enomem -> "Resource limit exceeded"
-      :econnrefused -> "Connection failed"
-      :timeout -> "Request timed out"
-      :not_found -> "Resource not found"
-      :unauthorized -> "Authentication required"
-      :forbidden -> "Access denied"
-      :invalid_input -> "Invalid input provided"
-      :validation_error -> "Validation failed"
-      _ -> "An error occurred"
-    end
+  @reason_messages %{
+    enomem: "Resource limit exceeded",
+    econnrefused: "Connection failed",
+    timeout: "Request timed out",
+    not_found: "Resource not found",
+    unauthorized: "Authentication required",
+    forbidden: "Access denied",
+    invalid_input: "Invalid input provided",
+    validation_error: "Validation failed"
+  }
+
+  defp generic_reason_message(reason) when is_atom(reason) do
+    Map.get(@reason_messages, reason, "An error occurred")
   end
 
   defp error_code(error) do

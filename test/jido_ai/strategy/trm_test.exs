@@ -2,9 +2,9 @@ defmodule Jido.AI.Strategies.TRMTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
+  alias Jido.Agent.Strategy.State
   alias Jido.AI.Directive
   alias Jido.AI.Strategies.TRM
-  alias Jido.AI.TRM.Machine
 
   def build_test_agent do
     %Agent{
@@ -79,7 +79,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       assert directives == []
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:status] == :idle
       assert state[:max_supervision_steps] == 5
       assert state[:act_threshold] == 0.9
@@ -91,7 +91,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       {agent, _} = TRM.init(agent, ctx)
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:max_supervision_steps] == 10
     end
 
@@ -101,7 +101,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       {agent, _} = TRM.init(agent, ctx)
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:act_threshold] == 0.85
     end
 
@@ -111,7 +111,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       {agent, _} = TRM.init(agent, ctx)
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:config].model == "anthropic:claude-sonnet-4-20250514"
     end
 
@@ -121,7 +121,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       {agent, _} = TRM.init(agent, ctx)
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       config = state[:config]
 
       assert config.model == "anthropic:claude-haiku-4-5"
@@ -152,7 +152,7 @@ defmodule Jido.AI.Strategies.TRMTest do
         params: %{prompt: "What is machine learning?"}
       }
 
-      {agent, directives} = TRM.cmd(agent, [instruction], ctx)
+      {_agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
       assert length(directives) == 1
       directive = hd(directives)
@@ -170,7 +170,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       {agent, _} = TRM.cmd(agent, [instruction], ctx)
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:status] == :reasoning
       assert state[:question] == "What is AI?"
       assert state[:supervision_step] == 1
@@ -185,7 +185,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       {agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
       assert length(directives) == 1
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:question] == "String key prompt"
     end
   end
@@ -222,7 +222,7 @@ defmodule Jido.AI.Strategies.TRMTest do
         }
       }
 
-      {agent, directives} = TRM.cmd(agent, [instruction], ctx)
+      {_agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
       assert length(directives) == 1
       directive = hd(directives)
@@ -242,7 +242,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       {agent, _} = TRM.cmd(agent, [instruction], ctx)
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:status] == :supervising
       assert state[:current_answer] == "The answer is 4"
     end
@@ -304,7 +304,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       {agent, directives} = TRM.cmd(agent, [improvement_instr], ctx)
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
 
       # Should either continue or complete based on step count
       if state[:status] == :reasoning do
@@ -357,11 +357,11 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       # Manually set completed state
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:status, :completed)
         |> Map.put(:result, "Final answer")
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       snapshot = TRM.snapshot(agent, ctx)
 
@@ -377,10 +377,10 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       # Manually set error state
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:status, :error)
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       snapshot = TRM.snapshot(agent, ctx)
 
@@ -395,7 +395,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       # Set up some state
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:status, :supervising)
         |> Map.put(:supervision_step, 2)
         |> Map.put(:max_supervision_steps, 5)
@@ -403,7 +403,7 @@ defmodule Jido.AI.Strategies.TRMTest do
         |> Map.put(:best_score, 0.7)
         |> Map.put(:answer_history, ["answer1", "answer2"])
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       snapshot = TRM.snapshot(agent, ctx)
 
@@ -429,10 +429,10 @@ defmodule Jido.AI.Strategies.TRMTest do
 
     test "get_answer_history/1 returns history after updates", %{agent: agent} do
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:answer_history, ["first", "second", "third"])
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       assert TRM.get_answer_history(agent) == ["first", "second", "third"]
     end
@@ -443,10 +443,10 @@ defmodule Jido.AI.Strategies.TRMTest do
 
     test "get_current_answer/1 returns current answer", %{agent: agent} do
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:current_answer, "The answer is 42")
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       assert TRM.get_current_answer(agent) == "The answer is 42"
     end
@@ -457,10 +457,10 @@ defmodule Jido.AI.Strategies.TRMTest do
 
     test "get_confidence/1 returns confidence from latent state", %{agent: agent} do
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:latent_state, %{confidence_score: 0.85, reasoning_trace: []})
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       assert TRM.get_confidence(agent) == 0.85
     end
@@ -471,10 +471,10 @@ defmodule Jido.AI.Strategies.TRMTest do
 
     test "get_supervision_step/1 returns current step", %{agent: agent} do
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:supervision_step, 3)
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       assert TRM.get_supervision_step(agent) == 3
     end
@@ -485,10 +485,10 @@ defmodule Jido.AI.Strategies.TRMTest do
 
     test "get_best_answer/1 returns best answer", %{agent: agent} do
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:best_answer, "Best answer so far")
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       assert TRM.get_best_answer(agent) == "Best answer so far"
     end
@@ -499,10 +499,10 @@ defmodule Jido.AI.Strategies.TRMTest do
 
     test "get_best_score/1 returns best score", %{agent: agent} do
       state =
-        Agent.Strategy.State.get(agent, %{})
+        State.get(agent, %{})
         |> Map.put(:best_score, 0.92)
 
-      agent = Agent.Strategy.State.put(agent, state)
+      agent = State.put(agent, state)
 
       assert TRM.get_best_score(agent) == 0.92
     end
@@ -565,7 +565,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       assert directives == []
 
       # Check streaming text was updated
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:streaming_text] == "Hello "
     end
 
@@ -583,7 +583,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       {agent, _} = TRM.cmd(agent, [instr1], ctx)
       {agent, _} = TRM.cmd(agent, [instr2], ctx)
 
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:streaming_text] == "Hello world!"
     end
   end
@@ -641,7 +641,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       {agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
       assert directives == []
-      state = Agent.Strategy.State.get(agent, %{})
+      state = State.get(agent, %{})
       assert state[:status] == :idle
     end
   end

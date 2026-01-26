@@ -1,9 +1,6 @@
 defmodule Jido.AI.Accuracy.PrmTest do
   use ExUnit.Case
 
-  alias Jido.AI.Accuracy.Prm
-  alias Jido.AI.Accuracy.Prms.LLMPrm
-
   @moduletag :capture_log
 
   describe "behavior implementation" do

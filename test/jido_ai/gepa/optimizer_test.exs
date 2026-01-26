@@ -196,7 +196,7 @@ defmodule Jido.AI.GEPA.OptimizerTest do
         )
 
       # Should have found some variants (may or may not have improved)
-      assert length(result.best_variants) >= 1
+      assert result.best_variants != []
     end
   end
 
@@ -220,7 +220,7 @@ defmodule Jido.AI.GEPA.OptimizerTest do
 
       # Should have evaluated the variant
       evaluated = Enum.filter(new_pop, &PromptVariant.evaluated?/1)
-      assert length(evaluated) >= 1
+      assert evaluated != []
     end
 
     test "generates mutations from survivors" do
@@ -239,7 +239,7 @@ defmodule Jido.AI.GEPA.OptimizerTest do
         )
 
       # Should have generated new variants
-      assert length(new_pop) >= 1
+      assert new_pop != []
     end
 
     test "preserves evaluated variants" do
@@ -302,7 +302,7 @@ defmodule Jido.AI.GEPA.OptimizerTest do
           ]
         )
 
-      assert length(best) >= 1
+      assert best != []
     end
   end
 

@@ -49,7 +49,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   - `:aggregator` - Aggregation strategy (default: `:majority_vote`)
   - `:temperature_range` - Temperature range for sampling (default: `{0.0, 1.0}`)
   - `:model` - Model to use (default: `"anthropic:claude-haiku-4-5"`)
-  - `:timeout` - Per-candidate timeout in ms (default: 30000)
+  - `:timeout` - Per-candidate timeout in ms (default: 30_000)
   - `:max_concurrency` - Max parallel generations (default: 3)
   - `:generator` - Custom generator module or struct (default: `LLMGenerator`)
   - `:system_prompt` - Optional system prompt
@@ -93,8 +93,8 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   alias Jido.AI.Accuracy.Aggregators.BestOfN
   alias Jido.AI.Accuracy.Aggregators.MajorityVote
   alias Jido.AI.Accuracy.Aggregators.Weighted
-  alias Jido.AI.Accuracy.Generators.LLMGenerator
   alias Jido.AI.Accuracy.{Candidate, Config}
+  alias Jido.AI.Accuracy.Generators.LLMGenerator
 
   @type result :: {:ok, Candidate.t(), metadata()} | {:error, term()}
 
@@ -249,7 +249,7 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   end
 
   defp aggregate_and_build_result(candidates, aggregator, start_time, opts) do
-    case apply(aggregator, :aggregate, [candidates, opts]) do
+    case aggregator.aggregate(candidates, opts) do
       {:ok, best, agg_metadata} ->
         metadata = build_metadata(candidates, agg_metadata, aggregator, opts)
         emit_stop(start_time, candidates, metadata)

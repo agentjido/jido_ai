@@ -8,7 +8,7 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
   # ============================================================================
 
   # Simple mock runner that returns deterministic results
-  defp mock_runner(template, input, _opts) do
+  defp mock_runner(_template, input, _opts) do
     # Return the input as output for testing
     {:ok, %{output: "Answer: #{input}", tokens: 100}}
   end
@@ -19,14 +19,6 @@ defmodule Jido.AI.GEPA.EvaluatorTest do
       {:error, :simulated_failure}
     else
       {:ok, %{output: "Success: #{input}", tokens: 50}}
-    end
-  end
-
-  # Runner that tracks calls
-  defp tracking_runner(agent_pid) do
-    fn template, input, opts ->
-      send(agent_pid, {:runner_called, template, input, opts})
-      {:ok, %{output: input, tokens: 10}}
     end
   end
 

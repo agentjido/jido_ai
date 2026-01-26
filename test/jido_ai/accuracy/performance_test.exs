@@ -10,7 +10,7 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, PipelineResult, Candidate, Presets}
+  alias Jido.AI.Accuracy.{Candidate, Pipeline, PipelineResult, Presets}
 
   @moduletag :performance
   @moduletag :pipeline
@@ -54,6 +54,7 @@ defmodule Jido.AI.Accuracy.PerformanceTest do
       assert duration < 1000
     end
 
+    @tag :flaky
     test "fast preset completes quickly" do
       {:ok, config} = Presets.get(:fast)
       {:ok, pipeline} = Pipeline.new(%{config: config})

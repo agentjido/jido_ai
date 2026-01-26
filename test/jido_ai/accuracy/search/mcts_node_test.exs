@@ -199,32 +199,32 @@ defmodule Jido.AI.Accuracy.Search.MCTSNodeTest do
     end
   end
 
-  describe "is_fully_expanded?/1" do
+  describe "fully_expanded?/1" do
     test "returns false for nodes without children" do
       node = MCTSNode.new()
 
-      refute MCTSNode.is_fully_expanded?(node)
+      refute MCTSNode.fully_expanded?(node)
     end
 
     test "returns true for nodes with children" do
       child = MCTSNode.new(state: "child")
       node = MCTSNode.new(children: [child])
 
-      assert MCTSNode.is_fully_expanded?(node)
+      assert MCTSNode.fully_expanded?(node)
     end
   end
 
-  describe "is_terminal?/1" do
+  describe "terminal?/1" do
     test "returns is_terminal flag value" do
       node = MCTSNode.new(is_terminal: true)
 
-      assert MCTSNode.is_terminal?(node)
+      assert MCTSNode.terminal?(node)
     end
 
     test "returns false for non-terminal nodes" do
       node = MCTSNode.new(is_terminal: false)
 
-      refute MCTSNode.is_terminal?(node)
+      refute MCTSNode.terminal?(node)
     end
   end
 

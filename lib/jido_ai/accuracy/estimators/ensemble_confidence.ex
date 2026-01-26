@@ -74,8 +74,10 @@ defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidence do
 
   @behaviour Jido.AI.Accuracy.ConfidenceEstimator
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate}
   import Jido.AI.Accuracy.Helpers, only: [get_attr: 2, get_attr: 3]
+
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate}
+
   @type t :: %__MODULE__{
           estimators: [{module(), keyword()}],
           weights: [float()] | nil,

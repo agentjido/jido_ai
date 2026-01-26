@@ -15,7 +15,7 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, PipelineResult, StrategyAdapter, Directive, Signal, Candidate, Presets}
+  alias Jido.AI.Accuracy.{Candidate, Directive, Pipeline, PipelineResult, Presets, Signal, StrategyAdapter}
 
   @moduletag :strategy_integration
   @moduletag :pipeline
@@ -285,7 +285,7 @@ defmodule Jido.AI.Accuracy.StrategyIntegrationTest do
   describe "8.5.5.5 Preset Integration" do
     test "all presets work with Pipeline" do
       for preset <- [:fast, :balanced, :accurate, :coding, :research] do
-        {:ok, config} = Jido.AI.Accuracy.Presets.get(preset)
+        {:ok, config} = Presets.get(preset)
         {:ok, pipeline} = Pipeline.new(%{config: config})
 
         {:ok, result} = Pipeline.run(pipeline, "What is 2+2?", generator: &mock_generator/2)

@@ -1,7 +1,7 @@
 defmodule Jido.AI.GEPA.ReflectorTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.GEPA.{Reflector, PromptVariant, Task}
+  alias Jido.AI.GEPA.{PromptVariant, Reflector, Task}
 
   # ============================================================================
   # Test Helpers

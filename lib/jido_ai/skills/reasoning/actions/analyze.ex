@@ -209,26 +209,28 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
 
   defp extract_text(%{message: %{content: content}}) do
     case content do
-      c when is_binary(c) -> c
+      c when is_binary(c) ->
+        c
+
       c when is_list(c) ->
         c
-        |> Enum.filter(fn part ->
-          case part do
-            %{type: :text} -> true
-            _ -> false
-          end
-        end)
+        |> Enum.filter(&text_part?/1)
         |> Enum.map_join("", fn
           %{text: text} -> text
           _ -> ""
         end)
-      _ -> ""
+
+      _ ->
+        ""
     end
   end
 
   @dialyzer {:nowarn_function, extract_text: 1}
 
   defp extract_text(_), do: ""
+
+  defp text_part?(%{type: :text}), do: true
+  defp text_part?(_), do: false
 
   defp extract_usage(%{usage: usage}) when is_map(usage) do
     %{

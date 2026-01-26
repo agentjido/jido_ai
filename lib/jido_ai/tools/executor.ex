@@ -95,7 +95,7 @@ defmodule Jido.AI.Tools.Executor do
 
   ## Options
 
-    * `:timeout` - Timeout in milliseconds (default: 30000)
+    * `:timeout` - Timeout in milliseconds (default: 30_000)
 
   ## Returns
 
@@ -147,7 +147,7 @@ defmodule Jido.AI.Tools.Executor do
 
   ## Options
 
-    * `:timeout` - Timeout in milliseconds (default: 30000)
+    * `:timeout` - Timeout in milliseconds (default: 30_000)
 
   ## Returns
 

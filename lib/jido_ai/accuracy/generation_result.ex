@@ -217,11 +217,9 @@ defmodule Jido.AI.Accuracy.GenerationResult do
   def select_by_strategy(%__MODULE__{candidates: candidates} = result, _strategy) do
     # Unknown strategy - fall back to best
     best = find_best_candidate(candidates)
+
     select_by_strategy(
-      %{result |
-        best_candidate: best,
-        aggregation_method: :best
-      },
+      %{result | best_candidate: best, aggregation_method: :best},
       :best
     )
   end

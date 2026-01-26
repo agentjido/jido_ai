@@ -15,7 +15,7 @@ defmodule Jido.AI.Skills.Streaming.Actions.EndStreamTest do
 
     test "has default values" do
       assert EndStream.schema().fields[:wait_for_completion].value == true
-      assert EndStream.schema().fields[:timeout].value == 30000
+      assert EndStream.schema().fields[:timeout].value == 30_000
     end
   end
 
