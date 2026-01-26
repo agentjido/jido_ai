@@ -192,54 +192,44 @@ defmodule Jido.AI.Strategies.ReAct do
   @impl true
   def snapshot(%Agent{} = agent, _ctx) do
     state = StratState.get(agent, %{})
-
-    status =
-      case state[:status] do
-        :completed -> :success
-        :error -> :failure
-        :idle -> :idle
-        _ -> :running
-      end
-
-    done? = status in [:success, :failure]
-
-    # Calculate duration if we have started_at
-    duration_ms =
-      case state[:started_at] do
-        nil -> nil
-        started_at -> System.monotonic_time(:millisecond) - started_at
-      end
-
-    # Format pending tool calls for UI consumption
-    tool_calls = format_tool_calls(state[:pending_tool_calls] || [])
-
-    # Get config info
+    status = snapshot_status(state[:status])
     config = state[:config] || %{}
 
     %Jido.Agent.Strategy.Snapshot{
       status: status,
-      done?: done?,
+      done?: status in [:success, :failure],
       result: state[:result],
-      details:
-        %{
-          phase: state[:status],
-          iteration: state[:iteration],
-          termination_reason: state[:termination_reason],
-          streaming_text: state[:streaming_text],
-          streaming_thinking: state[:streaming_thinking],
-          usage: state[:usage],
-          duration_ms: duration_ms,
-          tool_calls: tool_calls,
-          conversation: state[:conversation] || [],
-          current_llm_call_id: state[:current_llm_call_id],
-          model: config[:model],
-          max_iterations: config[:max_iterations],
-          available_tools: Enum.map(config[:tools] || [], & &1.name())
-        }
-        |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} or v == [] end)
-        |> Map.new()
+      details: build_snapshot_details(state, config)
     }
   end
+
+  defp snapshot_status(:completed), do: :success
+  defp snapshot_status(:error), do: :failure
+  defp snapshot_status(:idle), do: :idle
+  defp snapshot_status(_), do: :running
+
+  defp build_snapshot_details(state, config) do
+    %{
+      phase: state[:status],
+      iteration: state[:iteration],
+      termination_reason: state[:termination_reason],
+      streaming_text: state[:streaming_text],
+      streaming_thinking: state[:streaming_thinking],
+      usage: state[:usage],
+      duration_ms: calculate_duration(state[:started_at]),
+      tool_calls: format_tool_calls(state[:pending_tool_calls] || []),
+      conversation: Map.get(state, :conversation, []),
+      current_llm_call_id: state[:current_llm_call_id],
+      model: config[:model],
+      max_iterations: config[:max_iterations],
+      available_tools: Enum.map(Map.get(config, :tools, []), & &1.name())
+    }
+    |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} or v == [] end)
+    |> Map.new()
+  end
+
+  defp calculate_duration(nil), do: nil
+  defp calculate_duration(started_at), do: System.monotonic_time(:millisecond) - started_at
 
   defp format_tool_calls([]), do: []
 
@@ -300,6 +290,7 @@ defmodule Jido.AI.Strategies.ReAct do
         process_set_tool_context(agent, params)
 
       @start ->
+<<<<<<< HEAD
         # Handle per-request tool_context before processing start
         agent =
           case Map.get(params, :tool_context) do
@@ -321,32 +312,40 @@ defmodule Jido.AI.Strategies.ReAct do
     end
   end
 
-  defp process_machine_message(agent, action, params) do
-    case to_machine_msg(action, params) do
-      msg when not is_nil(msg) ->
-        state = StratState.get(agent, %{})
-        config = state[:config]
-        machine = Machine.from_map(state)
+defp maybe_apply_per_request_tool_context(agent, %{tool_context: ctx})
+     when is_map(ctx) and map_size(ctx) > 0 do
+  {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
+  updated_agent
+end
 
-        env = %{
-          system_prompt: config[:system_prompt],
-          max_iterations: config[:max_iterations]
-        }
+defp maybe_apply_per_request_tool_context(agent, _params), do: agent
 
-        {machine, directives} = Machine.update(machine, msg, env)
+defp process_machine_message(agent, action, params) do
+  case to_machine_msg(action, params) do
+    msg when not is_nil(msg) ->
+      state = StratState.get(agent, %{})
+      config = state[:config]
+      machine = Machine.from_map(state)
 
-        new_state =
-          machine
-          |> Machine.to_map()
-          |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+      env = %{
+        system_prompt: config[:system_prompt],
+        max_iterations: config[:max_iterations]
+      }
 
-        agent = StratState.put(agent, new_state)
-        {agent, lift_directives(directives, config)}
+      {machine, directives} = Machine.update(machine, msg, env)
 
-      _ ->
-        :noop
-    end
+      new_state =
+        machine
+        |> Machine.to_map()
+        |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+
+      agent = StratState.put(agent, new_state)
+      {agent, lift_directives(directives, config)}
+
+    _ ->
+      :noop
   end
+end
 
   defp process_register_tool(agent, %{tool_module: module}) when is_atom(module) do
     state = StratState.get(agent, %{})

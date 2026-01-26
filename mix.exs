@@ -64,7 +64,7 @@ defmodule JidoAi.MixProject do
 
   defp jido_deps do
     [
-      jido_dep(:jido, "../jido", "~> 2.0"),
+      jido_dep(:jido, "../jido", "~> 2.0.0-rc"),
       # Use github source to match jido's dependency; local path takes precedence if available
       jido_dep_git(:req_llm, "../req_llm", "agentjido/req_llm", "main")
     ]

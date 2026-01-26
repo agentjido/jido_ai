@@ -53,13 +53,13 @@ defmodule Jido.AI.Accuracy.Pipeline do
   """
 
   alias Jido.AI.Accuracy.Stages.{
+    CalibrationStage,
     DifficultyEstimationStage,
-    RAGStage,
     GenerationStage,
-    VerificationStage,
-    SearchStage,
+    RAGStage,
     ReflectionStage,
-    CalibrationStage
+    SearchStage,
+    VerificationStage
   }
 
   alias Jido.AI.Accuracy.{
@@ -165,7 +165,7 @@ defmodule Jido.AI.Accuracy.Pipeline do
   - `opts` - Options:
     - `:generator` - Function to generate candidates (required)
     - `:context` - Additional context (optional)
-    - `:timeout` - Overall timeout in ms (optional, default: 60000)
+    - `:timeout` - Overall timeout in ms (optional, default: 60_000)
     - `:debug` - Whether to emit debug info (optional)
 
   ## Returns
@@ -362,32 +362,16 @@ defmodule Jido.AI.Accuracy.Pipeline do
         case PipelineStage.execute_with_timeout(stage_module, state, stage_config, stage_timeout) do
           {:ok, new_state, metadata} ->
             duration = System.monotonic_time(:millisecond) - start_time
-
-            new_state =
-              new_state
-              |> Map.put(:last_stage, stage_name)
-              |> Map.update(:stages_completed, [], fn stages -> stages ++ [stage_name] end)
+            updated_state = update_stage_state(new_state, stage_name)
 
             trace_entry =
-              PipelineResult.trace_entry(stage_name, :ok, duration, Map.put(metadata, :state, new_state))
+              PipelineResult.trace_entry(stage_name, :ok, duration, Map.put(metadata, :state, updated_state))
 
-            {new_state, trace_entry}
+            {updated_state, trace_entry}
 
           {:error, reason} ->
             duration = System.monotonic_time(:millisecond) - start_time
-
-            # Check if stage is required
-            stage_required = is_stage_required?(stage_module)
-
-            if stage_required do
-              # Required stage failed, halt pipeline by propagating error
-              trace_entry = PipelineResult.trace_entry(stage_name, :error, duration, reason)
-              {Map.put(state, :__halt__, true), trace_entry}
-            else
-              # Optional stage failed, continue
-              trace_entry = PipelineResult.trace_entry(stage_name, :error, duration, reason)
-              {state, trace_entry}
-            end
+            handle_stage_error(state, stage_name, stage_module, duration, reason)
         end
       else
         # Stage module not found
@@ -398,54 +382,70 @@ defmodule Jido.AI.Accuracy.Pipeline do
     result
   end
 
-  defp build_stage_config(config, stage_name, state, opts) do
-    base_config = %{
-      timeout: Keyword.get(opts, :timeout, 30_000)
-    }
+  defp handle_stage_error(state, stage_name, stage_module, duration, reason) do
+    stage_required = stage_required?(stage_module)
+    trace_entry = PipelineResult.trace_entry(stage_name, :error, duration, reason)
 
-    # Add state-derived config first (has priority)
-    base_with_state =
-      base_config
-      |> Map.put(:query, Map.get(state, :query))
-      |> Map.put(:context, Map.get(state, :context))
-      |> Map.put(:difficulty, Map.get(state, :difficulty))
-      |> Map.put(:difficulty_level, Map.get(state, :difficulty_level))
-      |> Map.put(:generator, Map.get(state, :generator))
-      |> Map.put(:candidates, Map.get(state, :candidates))
-      |> Map.put(:best_candidate, Map.get(state, :best_candidate))
-
-    # Add stage-specific config (state-derived values take priority)
-    stage_config =
-      case stage_name do
-        :difficulty_estimation ->
-          Map.put(base_with_state, :estimator, config.difficulty_estimator)
-
-        :rag ->
-          Map.merge(base_with_state, config.rag_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :generation ->
-          Map.merge(base_with_state, config.generation_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :verification ->
-          Map.merge(base_with_state, config.verifier_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :search ->
-          Map.merge(base_with_state, config.search_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :reflection ->
-          Map.merge(base_with_state, config.reflection_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        :calibration ->
-          Map.merge(base_with_state, config.calibration_config || %{}, fn _k, v1, _v2 -> v1 end)
-
-        _ ->
-          base_with_state
-      end
-
-    stage_config
+    if stage_required do
+      {Map.put(state, :__halt__, true), trace_entry}
+    else
+      {state, trace_entry}
+    end
   end
 
-  defp is_stage_required?(stage_module) do
+  defp update_stage_state(state, stage_name) do
+    state
+    |> Map.put(:last_stage, stage_name)
+    |> Map.update(:stages_completed, [], &[&1 ++ [stage_name]])
+  end
+
+  defp build_stage_config(config, stage_name, state, opts) do
+    base_config = build_base_config(state, opts)
+
+    add_stage_config(base_config, config, stage_name)
+  end
+
+  defp build_base_config(state, opts) do
+    %{
+      timeout: Keyword.get(opts, :timeout, 30_000),
+      query: Map.get(state, :query),
+      context: Map.get(state, :context),
+      difficulty: Map.get(state, :difficulty),
+      difficulty_level: Map.get(state, :difficulty_level),
+      generator: Map.get(state, :generator),
+      candidates: Map.get(state, :candidates),
+      best_candidate: Map.get(state, :best_candidate)
+    }
+  end
+
+  defp add_stage_config(base_config, config, stage_name) do
+    stage_config_field = stage_config_field(stage_name)
+
+    case Map.get(config, stage_config_field) do
+      nil when stage_name == :difficulty_estimation ->
+        Map.put(base_config, :estimator, config.difficulty_estimator)
+
+      nil when stage_name in [:rag, :generation, :verification, :search, :reflection, :calibration] ->
+        base_config
+
+      stage_config when is_map(stage_config) ->
+        Map.merge(stage_config, base_config, fn _k, _v1, v2 -> v2 end)
+
+      _ ->
+        base_config
+    end
+  end
+
+  defp stage_config_field(:rag), do: :rag_config
+  defp stage_config_field(:generation), do: :generation_config
+  defp stage_config_field(:verification), do: :verifier_config
+  defp stage_config_field(:search), do: :search_config
+  defp stage_config_field(:reflection), do: :reflection_config
+  defp stage_config_field(:calibration), do: :calibration_config
+  defp stage_config_field(:difficulty_estimation), do: :difficulty_estimator
+  defp stage_config_field(_), do: nil
+
+  defp stage_required?(stage_module) do
     stage_module.required?()
   rescue
     _ -> true

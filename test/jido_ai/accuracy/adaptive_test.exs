@@ -9,11 +9,11 @@ defmodule Jido.AI.Accuracy.AdaptiveTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Accuracy.{
-    DifficultyEstimate,
-    ComputeBudgeter,
-    ComputeBudget,
     AdaptiveSelfConsistency,
     Candidate,
+    ComputeBudget,
+    ComputeBudgeter,
+    DifficultyEstimate,
     Estimators.HeuristicDifficulty
   }
 

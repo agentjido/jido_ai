@@ -116,7 +116,7 @@ defmodule Jido.AI.Accuracy.VerificationRunner do
   - `:parallel` - Whether to run verifiers in parallel (default: false)
   - `:aggregation` - Score aggregation strategy (default: :weighted_avg)
   - `:on_error` - Error handling strategy (:continue or :halt, default: :continue)
-  - `:timeout` - Timeout for verification in ms (default: 30000)
+  - `:timeout` - Timeout for verification in ms (default: 30_000)
 
   ## Returns
 

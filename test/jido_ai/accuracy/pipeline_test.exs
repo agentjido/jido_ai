@@ -5,7 +5,7 @@ defmodule Jido.AI.Accuracy.PipelineTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, PipelineConfig, PipelineResult, Candidate}
+  alias Jido.AI.Accuracy.{Candidate, Pipeline, PipelineConfig, PipelineResult}
 
   @moduletag :pipeline
 
@@ -146,7 +146,7 @@ defmodule Jido.AI.Accuracy.PipelineTest do
       assert %PipelineResult{} = result
     end
 
-    test "applies timeout to pipeline execution", %{generator: generator} do
+    test "applies timeout to pipeline execution", %{generator: _generator} do
       # Create a slow generator
       slow_generator = fn _query, _context ->
         Process.sleep(200)

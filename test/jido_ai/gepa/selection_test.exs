@@ -1,7 +1,7 @@
 defmodule Jido.AI.GEPA.SelectionTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.GEPA.{Selection, PromptVariant}
+  alias Jido.AI.GEPA.{PromptVariant, Selection}
 
   # ============================================================================
   # Test Helpers
@@ -166,7 +166,7 @@ defmodule Jido.AI.GEPA.SelectionTest do
 
       front = Selection.pareto_front(variants)
       # Should have multiple variants in the front (the best trade-offs)
-      assert length(front) >= 1
+      assert front != []
       assert length(front) <= length(variants)
     end
 
@@ -403,7 +403,7 @@ defmodule Jido.AI.GEPA.SelectionTest do
 
       front = Selection.pareto_front([a, b, c], objectives)
       # All have different trade-offs
-      assert length(front) >= 1
+      assert front != []
     end
 
     test "select_survivors maintains order stability" do

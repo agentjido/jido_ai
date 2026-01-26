@@ -32,8 +32,8 @@ defmodule Jido.AI.Accuracy.Stages.ReflectionStage do
   @behaviour Jido.AI.Accuracy.PipelineStage
 
   alias Jido.AI.Accuracy.{
-    ReflectionLoop,
-    Candidate
+    Candidate,
+    ReflectionLoop
   }
 
   @type t :: %__MODULE__{

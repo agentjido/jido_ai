@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.IntegrationTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.Aggregators.{MajorityVote, BestOfN, Weighted}
+  alias Jido.AI.Accuracy.Aggregators.MajorityVote
   alias Jido.AI.Accuracy.SelfConsistency
 
   @moduletag :integration
@@ -34,7 +34,7 @@ defmodule Jido.AI.Accuracy.IntegrationTest do
 
     @tag :math
     test "math problem with CoT: 15 * 23 + 7 = 352" do
-      assert {:ok, best, metadata} =
+      assert {:ok, best, _metadata} =
                SelfConsistency.run_with_reasoning(
                  "Solve step by step: 15 * 23 + 7. Answer with just the final number.",
                  num_candidates: 3
@@ -236,7 +236,7 @@ defmodule Jido.AI.Accuracy.IntegrationTest do
   describe "chain-of-thought reasoning" do
     @tag :cot
     test "run_with_reasoning preserves reasoning" do
-      assert {:ok, best, metadata} =
+      assert {:ok, best, _metadata} =
                SelfConsistency.run_with_reasoning(
                  "Think step by step: What is 12 * 12? Answer with just the final number.",
                  num_candidates: 2

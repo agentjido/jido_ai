@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficultyTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.Estimators.HeuristicDifficulty
   alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
+  alias Jido.AI.Accuracy.Estimators.HeuristicDifficulty
 
   @moduletag :capture_log
 
@@ -243,7 +243,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficultyTest do
       {:ok, estimator: estimator}
     end
 
-    test "estimates multiple queries", context do
+    test "estimates multiple queries", _context do
       queries = ["What is 2+2?", "Explain quantum entanglement", "Who wrote Hamlet?"]
 
       assert {:ok, estimates} =
@@ -253,7 +253,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficultyTest do
       assert Enum.all?(estimates, fn e -> %DifficultyEstimate{} = e end)
     end
 
-    test "returns error for empty list", context do
+    test "returns error for empty list", _context do
       assert {:ok, []} =
                DifficultyEstimator.estimate_batch([], %{}, HeuristicDifficulty)
     end

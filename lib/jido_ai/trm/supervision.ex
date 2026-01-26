@@ -532,42 +532,36 @@ defmodule Jido.AI.TRM.Supervision do
   defp analyze_suggestion(suggestion) do
     content_lower = String.downcase(suggestion)
 
-    # Determine impact level
-    has_high_impact =
-      @high_impact_keywords
-      |> Enum.any?(&String.contains?(content_lower, &1))
-
-    impact =
-      cond do
-        has_high_impact -> :high
-        String.length(suggestion) > 100 -> :medium
-        true -> :low
-      end
-
-    # Determine category
-    category =
-      cond do
-        String.contains?(content_lower, "accura") or String.contains?(content_lower, "correct") ->
-          :accuracy
-
-        String.contains?(content_lower, "complet") or String.contains?(content_lower, "missing") ->
-          :completeness
-
-        String.contains?(content_lower, "clear") or String.contains?(content_lower, "explain") ->
-          :clarity
-
-        String.contains?(content_lower, "relevan") or String.contains?(content_lower, "focus") ->
-          :relevance
-
-        true ->
-          :general
-      end
-
     %{
       content: suggestion,
-      impact: impact,
-      category: category
+      impact: determine_impact(content_lower, suggestion),
+      category: categorize_suggestion(content_lower)
     }
+  end
+
+  defp determine_impact(content_lower, suggestion) do
+    has_high_impact =
+      Enum.any?(@high_impact_keywords, &String.contains?(content_lower, &1))
+
+    cond do
+      has_high_impact -> :high
+      String.length(suggestion) > 100 -> :medium
+      true -> :low
+    end
+  end
+
+  defp categorize_suggestion(content_lower) do
+    cond do
+      contains_any?(content_lower, ["accura", "correct"]) -> :accuracy
+      contains_any?(content_lower, ["complet", "missing"]) -> :completeness
+      contains_any?(content_lower, ["clear", "explain"]) -> :clarity
+      contains_any?(content_lower, ["relevan", "focus"]) -> :relevance
+      true -> :general
+    end
+  end
+
+  defp contains_any?(content, patterns) do
+    Enum.any?(patterns, &String.contains?(content, &1))
   end
 
   defp impact_rank(%{impact: :high}), do: 3

@@ -19,7 +19,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   alias Jido.AI.Helpers
   alias Jido.AI.Signal
   alias Jido.AI.Signal.{EmbedResult, ReqLLMError, ToolResult, UsageReport}
-  alias Jido.AI.ToolAdapter
+  alias Jido.AI.Tools.Registry
 
   # ============================================================================
   # Directive + Configuration Integration
@@ -374,48 +374,26 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     end
 
     setup do
-      ToolAdapter.clear_registry()
+      Registry.clear()
       :ok
     end
 
     test "register and retrieve action" do
-      :ok = ToolAdapter.register_action(TestAction)
+      :ok = Registry.register_action(TestAction)
 
-      {:ok, module} = ToolAdapter.get_action("test_action")
+      {:ok, {:action, module}} = Registry.get("test_action")
       assert module == TestAction
     end
 
     test "convert registered actions to tools" do
-      :ok = ToolAdapter.register_action(TestAction)
+      :ok = Registry.register_action(TestAction)
 
-      tools = ToolAdapter.to_tools()
+      tools = Registry.to_reqllm_tools()
       assert length(tools) == 1
 
       [tool] = tools
       assert tool.name == "test_action"
       assert tool.description == "A test action for integration testing"
-    end
-
-    test "from_actions with prefix option" do
-      tools = ToolAdapter.from_actions([TestAction], prefix: "myapp_")
-
-      [tool] = tools
-      assert tool.name == "myapp_test_action"
-    end
-
-    test "from_actions with filter option" do
-      tools = ToolAdapter.from_actions([TestAction], filter: fn _mod -> true end)
-      assert length(tools) == 1
-
-      tools = ToolAdapter.from_actions([TestAction], filter: fn _mod -> false end)
-      assert tools == []
-    end
-
-    test "lookup_action finds action by name" do
-      {:ok, module} = ToolAdapter.lookup_action("test_action", [TestAction])
-      assert module == TestAction
-
-      {:error, :not_found} = ToolAdapter.lookup_action("unknown", [TestAction])
     end
   end
 

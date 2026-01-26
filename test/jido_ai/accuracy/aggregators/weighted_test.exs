@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.Aggregators.{MajorityVote, BestOfN}
-  alias Jido.AI.Accuracy.{Aggregator, Candidate, Aggregators.Weighted}
+  alias Jido.AI.Accuracy.Aggregators.{BestOfN, MajorityVote, Weighted}
+  alias Jido.AI.Accuracy.Candidate
 
   @moduletag :capture_log
 
@@ -19,7 +19,7 @@ defmodule Jido.AI.Accuracy.Aggregators.WeightedTest do
       # - 42 gets 0.5 from majority vote
       # - 41 gets 0.5 from best-of-N
       # Result depends on which wins - could be either with equal weights
-      assert {:ok, best, metadata} = Weighted.aggregate(candidates)
+      assert {:ok, _best, metadata} = Weighted.aggregate(candidates)
       assert is_map(metadata.strategy_weights)
       assert metadata.total_strategies == 2
     end

@@ -85,7 +85,7 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
 
   @behaviour Jido.AI.Accuracy.SearchController
 
-  alias Jido.AI.Accuracy.{Candidate, SearchController, Search.MCTSNode, VerificationResult}
+  alias Jido.AI.Accuracy.{Candidate, Search.MCTSNode, SearchController, VerificationResult}
 
   @type t :: %__MODULE__{
           simulations: pos_integer(),
@@ -224,7 +224,7 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
         {Enum.reverse([node | path]), node}
 
       # Node is terminal
-      MCTSNode.is_terminal?(node) ->
+      MCTSNode.terminal?(node) ->
         {Enum.reverse([node | path]), node}
 
       # Node has no children - this is a leaf
@@ -240,7 +240,7 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
 
   defp select_ucb1_child(node, exploration_constant) do
     node.children
-    |> Enum.reject(fn child -> MCTSNode.is_terminal?(child) end)
+    |> Enum.reject(fn child -> MCTSNode.terminal?(child) end)
     |> Enum.max_by(
       fn child ->
         MCTSNode.ucb1_score_for_child(child, exploration_constant)
@@ -358,16 +358,18 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
 
       # Replace the ancestor's child reference
       updated_ancestors =
-        Enum.map(updated_ancestor.children, fn child ->
-          if child.state == node.state or child.action == node.action do
-            acc
-          else
-            child
-          end
-        end)
+        Enum.map(updated_ancestor.children, &replace_child_if_matches(&1, acc, node))
 
       %{updated_ancestor | children: updated_ancestors}
     end)
+  end
+
+  defp replace_child_if_matches(child, replacement, original_node) do
+    if child.state == original_node.state or child.action == original_node.action do
+      replacement
+    else
+      child
+    end
   end
 
   defp select_best_child(root) do
@@ -376,7 +378,7 @@ defmodule Jido.AI.Accuracy.Search.MCTS do
 
   # Validation
 
-  defp validate_simulations(sim) when is_integer(sim) and sim >= 1 and sim <= 10000, do: :ok
+  defp validate_simulations(sim) when is_integer(sim) and sim >= 1 and sim <= 10_000, do: :ok
   defp validate_simulations(_), do: {:error, :invalid_simulations}
 
   defp validate_exploration_constant(c) when is_number(c) and c >= 0.0 and c <= 10.0, do: :ok

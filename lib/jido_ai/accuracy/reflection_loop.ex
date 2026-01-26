@@ -190,31 +190,7 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
               final_result = finalize_result(state, loop, :max_iterations)
               {:halt, {final_result, candidate}}
             else
-              case run_iteration(loop, prompt, candidate, iteration_num, context_with_memory) do
-                {:ok, %{candidate: revised_candidate, critique: critique, converged: converged}} ->
-                  new_step = %{
-                    iteration: iteration_num,
-                    candidate: revised_candidate,
-                    critique: critique,
-                    score: critique.severity
-                  }
-
-                  updated_state = %{
-                    iterations: state.iterations ++ [new_step],
-                    best_candidate: select_best(state.best_candidate, revised_candidate)
-                  }
-
-                  if converged do
-                    final_result = finalize_result(updated_state, loop, :converged)
-                    {:halt, {final_result, revised_candidate}}
-                  else
-                    {:cont, {updated_state, revised_candidate}}
-                  end
-
-                {:error, _reason} ->
-                  final_result = finalize_result(state, loop, :error)
-                  {:halt, {final_result, candidate}}
-              end
+              run_single_iteration(loop, prompt, candidate, iteration_num, state, context_with_memory)
             end
         end)
 
@@ -426,6 +402,38 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
     }
   end
 
+  defp handle_iteration_result(state, loop, revised_candidate, critique, iteration_num, converged) do
+    new_step = %{
+      iteration: iteration_num,
+      candidate: revised_candidate,
+      critique: critique,
+      score: critique.severity
+    }
+
+    updated_state = %{
+      iterations: state.iterations ++ [new_step],
+      best_candidate: select_best(state.best_candidate, revised_candidate)
+    }
+
+    if converged do
+      final_result = finalize_result(updated_state, loop, :converged)
+      {:halt, {final_result, revised_candidate}}
+    else
+      {:cont, {updated_state, revised_candidate}}
+    end
+  end
+
+  defp run_single_iteration(loop, prompt, candidate, iteration_num, state, context) do
+    case run_iteration(loop, prompt, candidate, iteration_num, context) do
+      {:ok, %{candidate: revised_candidate, critique: critique, converged: converged}} ->
+        handle_iteration_result(state, loop, revised_candidate, critique, iteration_num, converged)
+
+      {:error, _reason} ->
+        final_result = finalize_result(state, loop, :error)
+        {:halt, {final_result, candidate}}
+    end
+  end
+
   defp maybe_add_memory_context(%__MODULE__{memory: nil}, _prompt, context), do: context
 
   defp maybe_add_memory_context(%__MODULE__{memory: memory}, prompt, context) do
@@ -439,29 +447,25 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
   defp maybe_store_in_memory(%__MODULE__{memory: nil}, _prompt, _result), do: :ok
 
   defp maybe_store_in_memory(%__MODULE__{memory: memory}, prompt, result) do
-    # Store if there were iterations with critiques
+    # Store high-severity critiques
     critiques =
       result.iterations
-      |> Enum.filter(fn i -> i.critique != nil end)
+      |> Enum.filter(fn i -> i.critique != nil and i.critique.severity > 0.3 end)
       |> Enum.map(fn i -> i.critique end)
 
-    if Enum.any?(critiques, fn c -> c.severity > 0.3 end) do
-      # Store high-severity critiques
-      Enum.each(critiques, fn critique ->
-        if critique.severity > 0.3 do
-          :ok =
-            ReflexionMemory.store(memory, %{
-              prompt: prompt,
-              mistake: Enum.join(critique.issues || [], "; "),
-              correction: Enum.join(critique.suggestions || [], "; "),
-              severity: critique.severity,
-              timestamp: DateTime.utc_now()
-            })
-        end
-      end)
-    else
-      :ok
-    end
+    Enum.each(critiques, &store_critique(memory, prompt, &1))
+
+    :ok
+  end
+
+  defp store_critique(memory, prompt, critique) do
+    ReflexionMemory.store(memory, %{
+      prompt: prompt,
+      mistake: Enum.join(critique.issues || [], "; "),
+      correction: Enum.join(critique.suggestions || [], "; "),
+      severity: critique.severity,
+      timestamp: DateTime.utc_now()
+    })
   end
 
   defp format_error(atom) when is_atom(atom), do: atom

@@ -5,6 +5,7 @@ defmodule Jido.AI.ReActAgentTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.ReActAgent
   alias Jido.AI.Strategies.ReAct
 
   # ============================================================================
@@ -80,7 +81,7 @@ defmodule Jido.AI.ReActAgentTest do
       env = __ENV__
 
       # The function should walk the AST and expand aliases
-      result = Jido.AI.ReActAgent.expand_aliases_in_ast(ast, env)
+      result = ReActAgent.expand_aliases_in_ast(ast, env)
 
       # The __aliases__ node should be expanded (in this case to SomeModule atom)
       assert is_tuple(result)
@@ -90,7 +91,7 @@ defmodule Jido.AI.ReActAgentTest do
       ast = {:%{}, [], [key: "string", num: 42, flag: true, atom_val: :test]}
       env = __ENV__
 
-      result = Jido.AI.ReActAgent.expand_aliases_in_ast(ast, env)
+      result = ReActAgent.expand_aliases_in_ast(ast, env)
 
       # Should preserve the structure
       assert is_tuple(result)
@@ -100,7 +101,7 @@ defmodule Jido.AI.ReActAgentTest do
       ast = {:%{}, [], [outer: {:%{}, [], [inner: "value"]}]}
       env = __ENV__
 
-      result = Jido.AI.ReActAgent.expand_aliases_in_ast(ast, env)
+      result = ReActAgent.expand_aliases_in_ast(ast, env)
 
       assert is_tuple(result)
     end
@@ -109,7 +110,7 @@ defmodule Jido.AI.ReActAgentTest do
       ast = {:%{}, [], [items: [1, 2, 3]]}
       env = __ENV__
 
-      result = Jido.AI.ReActAgent.expand_aliases_in_ast(ast, env)
+      result = ReActAgent.expand_aliases_in_ast(ast, env)
 
       assert is_tuple(result)
     end
@@ -120,7 +121,7 @@ defmodule Jido.AI.ReActAgentTest do
       env = __ENV__
 
       assert_raise CompileError, ~r/Unsafe construct.*function call/, fn ->
-        Jido.AI.ReActAgent.expand_aliases_in_ast(ast, env)
+        ReActAgent.expand_aliases_in_ast(ast, env)
       end
     end
   end
@@ -212,21 +213,21 @@ defmodule Jido.AI.ReActAgentTest do
     end
 
     test "extracts actions from skill modules" do
-      tools = Jido.AI.ReActAgent.tools_from_skills([MockSkill])
+      tools = ReActAgent.tools_from_skills([MockSkill])
 
       assert TestCalculator in tools
       assert TestSearch in tools
     end
 
     test "deduplicates actions from multiple skills" do
-      tools = Jido.AI.ReActAgent.tools_from_skills([MockSkill, MockSkill2])
+      tools = ReActAgent.tools_from_skills([MockSkill, MockSkill2])
 
       # Should have unique entries only
       assert length(Enum.filter(tools, &(&1 == TestSearch))) == 1
     end
 
     test "returns empty list for empty input" do
-      assert Jido.AI.ReActAgent.tools_from_skills([]) == []
+      assert ReActAgent.tools_from_skills([]) == []
     end
   end
 end

@@ -426,20 +426,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrmTest do
       ~r/Rating:\s*(-?\d+\.?\d*)/i
     ]
 
-    score =
-      Enum.find_value(patterns, fn pattern ->
-        case Regex.run(pattern, content) do
-          [_, score_str] ->
-            case Float.parse(score_str) do
-              {score, ""} -> score
-              {score, _rest} -> score
-              :error -> nil
-            end
-
-          _ ->
-            nil
-        end
-      end)
+    score = Enum.find_value(patterns, &parse_prm_score_pattern(&1, content))
 
     {min_score, max_score} = score_range
     default_score = (min_score + max_score) / 2
@@ -449,6 +436,20 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrmTest do
       score < min_score -> min_score
       score > max_score -> max_score
       true -> score
+    end
+  end
+
+  defp parse_prm_score_pattern(pattern, content) do
+    case Regex.run(pattern, content) do
+      [_, score_str] -> parse_float(score_str)
+      _ -> nil
+    end
+  end
+
+  defp parse_float(str) do
+    case Float.parse(str) do
+      {score, _rest} -> score
+      :error -> nil
     end
   end
 
