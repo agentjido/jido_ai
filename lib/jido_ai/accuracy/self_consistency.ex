@@ -93,8 +93,8 @@ defmodule Jido.AI.Accuracy.SelfConsistency do
   alias Jido.AI.Accuracy.Aggregators.BestOfN
   alias Jido.AI.Accuracy.Aggregators.MajorityVote
   alias Jido.AI.Accuracy.Aggregators.Weighted
-  alias Jido.AI.Accuracy.{Candidate, Config}
   alias Jido.AI.Accuracy.Generators.LLMGenerator
+  alias Jido.AI.Accuracy.{Candidate, Config}
 
   @type result :: {:ok, Candidate.t(), metadata()} | {:error, term()}
 

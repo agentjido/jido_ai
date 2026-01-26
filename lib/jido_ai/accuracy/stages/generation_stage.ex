@@ -162,7 +162,10 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStage do
   defp call_generator(_, _, _), do: {:error, :invalid_generator_arity}
 
   defp normalize_generator_result({:ok, %Candidate{} = candidate}), do: {:ok, candidate}
-  defp normalize_generator_result({:ok, content}) when is_binary(content), do: {:ok, Candidate.new!(%{content: content})}
+
+  defp normalize_generator_result({:ok, content}) when is_binary(content),
+    do: {:ok, Candidate.new!(%{content: content})}
+
   defp normalize_generator_result(%Candidate{} = candidate), do: {:ok, candidate}
   defp normalize_generator_result(content) when is_binary(content), do: {:ok, Candidate.new!(%{content: content})}
   defp normalize_generator_result({:error, _} = error), do: error

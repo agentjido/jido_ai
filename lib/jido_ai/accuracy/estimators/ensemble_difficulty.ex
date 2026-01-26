@@ -546,8 +546,7 @@ defmodule Jido.AI.Accuracy.EnsembleDifficulty do
   defp validate_weights(_, _), do: {:error, :invalid_weights}
 
   defp validate_combination(combination)
-       when combination in [:weighted_average, :majority_vote, :max_confidence, :average],
-       do: :ok
+       when combination in [:weighted_average, :majority_vote, :max_confidence, :average], do: :ok
 
   defp validate_combination(_), do: {:error, :invalid_combination}
 

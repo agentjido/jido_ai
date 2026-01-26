@@ -360,7 +360,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
       if trimmed == "" do
         line
       else
-        keep_line_as_is?(line, trimmed) && line || line
+        (keep_line_as_is?(line, trimmed) && line) || line
       end
     end)
   end

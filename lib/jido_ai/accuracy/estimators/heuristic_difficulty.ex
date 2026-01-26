@@ -399,6 +399,7 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficulty do
   end
 
   defp calculate_avg_word_length([]), do: 0
+
   defp calculate_avg_word_length(words) do
     total_chars = words |> Enum.map(&String.length/1) |> Enum.sum()
     total_chars / length(words)
