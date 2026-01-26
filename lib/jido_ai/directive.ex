@@ -125,7 +125,8 @@ defmodule Jido.AI.Directive do
               __MODULE__,
               %{
                 id: Zoi.string(description: "Tool call ID from LLM (ReqLLM.ToolCall.id)"),
-                tool_name: Zoi.string(description: "Name of the tool (used for Registry lookup if action_module not provided)"),
+                tool_name:
+                  Zoi.string(description: "Name of the tool (used for Registry lookup if action_module not provided)"),
                 action_module:
                   Zoi.atom(description: "Module to execute directly (bypasses Registry lookup)")
                   |> Zoi.optional(),
@@ -475,8 +476,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   handling, parameter normalization, and telemetry.
   """
 
-  alias Jido.AI.{Helpers, Signal}
   alias Jido.AI.Tools.Executor
+  alias Jido.AI.{Helpers, Signal}
 
   def exec(directive, _input_signal, state) do
     %{

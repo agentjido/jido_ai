@@ -312,4 +312,163 @@ defmodule Jido.AI.Strategies.ReActTest do
       assert tools == []
     end
   end
+
+  # ============================================================================
+  # Tool Context Management
+  # ============================================================================
+
+  describe "tool_context configuration" do
+    test "tool_context defaults to empty map" do
+      agent = create_agent(tools: [TestCalculator])
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.tool_context == %{}
+    end
+
+    test "tool_context can be set via options" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{tenant: "acme", actor: :admin})
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.tool_context == %{tenant: "acme", actor: :admin}
+    end
+
+    test "tool_context from agent.state takes precedence over opts" do
+      # Create agent with tool_context in state
+      agent = %Jido.Agent{
+        id: "test-agent",
+        name: "test",
+        state: %{tool_context: %{from_state: true}}
+      }
+
+      ctx = %{strategy_opts: [tools: [TestCalculator], tool_context: %{from_opts: true}]}
+      {agent, []} = ReAct.init(agent, ctx)
+
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      # State should take precedence
+      assert config.tool_context == %{from_state: true}
+    end
+  end
+
+  describe "set_tool_context action" do
+    test "set_tool_context_action/0 returns correct atom" do
+      assert ReAct.set_tool_context_action() == :react_set_tool_context
+    end
+
+    test "action_spec returns spec for set_tool_context" do
+      spec = ReAct.action_spec(ReAct.set_tool_context_action())
+      assert spec.name == "react.set_tool_context"
+      assert spec.doc =~ "Update the tool context"
+    end
+
+    test "set_tool_context updates config" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{initial: "value"})
+
+      instruction = %Jido.Instruction{
+        action: ReAct.set_tool_context_action(),
+        params: %{tool_context: %{new_key: "new_value"}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction], %{})
+
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      # Should merge with existing context
+      assert config.tool_context[:initial] == "value"
+      assert config.tool_context[:new_key] == "new_value"
+    end
+
+    test "set_tool_context merges and overrides existing values" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{key1: "old", key2: "keep"})
+
+      instruction = %Jido.Instruction{
+        action: ReAct.set_tool_context_action(),
+        params: %{tool_context: %{key1: "new", key3: "added"}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction], %{})
+
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      # Overridden
+      assert config.tool_context[:key1] == "new"
+      # Preserved
+      assert config.tool_context[:key2] == "keep"
+      # Added
+      assert config.tool_context[:key3] == "added"
+    end
+
+    test "set_tool_context with empty map preserves existing context" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{existing: "value"})
+
+      instruction = %Jido.Instruction{
+        action: ReAct.set_tool_context_action(),
+        params: %{tool_context: %{}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction], %{})
+
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.tool_context[:existing] == "value"
+    end
+  end
+
+  describe "per-request tool_context in start instruction" do
+    test "start with tool_context merges context before processing" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{base: "context"})
+
+      instruction = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "test query", tool_context: %{request_id: "req-123"}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction], %{})
+
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      # Both base and per-request context should be present
+      assert config.tool_context[:base] == "context"
+      assert config.tool_context[:request_id] == "req-123"
+    end
+
+    test "start without tool_context preserves existing context" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{existing: "value"})
+
+      instruction = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "test query"}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction], %{})
+
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.tool_context[:existing] == "value"
+    end
+
+    test "per-request tool_context can override base context" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{actor: :default_actor})
+
+      instruction = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "test query", tool_context: %{actor: :specific_actor}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction], %{})
+
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.tool_context[:actor] == :specific_actor
+    end
+  end
 end
