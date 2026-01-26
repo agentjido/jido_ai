@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Estimators.EnsembleConfidenceTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate}
   alias Jido.AI.Accuracy.Estimators.{AttentionConfidence, EnsembleConfidence}
+  alias Jido.AI.Accuracy.{Candidate, ConfidenceEstimate}
 
   @moduletag :capture_log
 

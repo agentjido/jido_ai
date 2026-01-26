@@ -287,56 +287,56 @@ defmodule Jido.AI.Strategies.ReAct do
         process_unregister_tool(agent, params)
 
       @set_tool_context ->
-       process_set_tool_context(agent, params)
+        process_set_tool_context(agent, params)
 
       @start ->
-       # Handle per-request tool_context before processing start
-       agent =
-         case Map.get(params, :tool_context) do
-           nil ->
-             agent
+        # Handle per-request tool_context before processing start
+        agent =
+          case Map.get(params, :tool_context) do
+            nil ->
+              agent
 
-           ctx when is_map(ctx) and map_size(ctx) > 0 ->
-             {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
-             updated_agent
+            ctx when is_map(ctx) and map_size(ctx) > 0 ->
+              {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
+              updated_agent
 
-           _ ->
-             agent
-         end
+            _ ->
+              agent
+          end
 
-       process_machine_message(agent, normalized_action, params)
+        process_machine_message(agent, normalized_action, params)
 
       _ ->
-       process_machine_message(agent, normalized_action, params)
-      end
-      end
-
-      defp process_machine_message(agent, action, params) do
-  case to_machine_msg(action, params) do
-    msg when not is_nil(msg) ->
-      state = StratState.get(agent, %{})
-      config = state[:config]
-      machine = Machine.from_map(state)
-
-      env = %{
-        system_prompt: config[:system_prompt],
-        max_iterations: config[:max_iterations]
-      }
-
-      {machine, directives} = Machine.update(machine, msg, env)
-
-      new_state =
-        machine
-        |> Machine.to_map()
-        |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
-
-      agent = StratState.put(agent, new_state)
-      {agent, lift_directives(directives, config)}
-
-    _ ->
-      :noop
+        process_machine_message(agent, normalized_action, params)
+    end
   end
-end
+
+  defp process_machine_message(agent, action, params) do
+    case to_machine_msg(action, params) do
+      msg when not is_nil(msg) ->
+        state = StratState.get(agent, %{})
+        config = state[:config]
+        machine = Machine.from_map(state)
+
+        env = %{
+          system_prompt: config[:system_prompt],
+          max_iterations: config[:max_iterations]
+        }
+
+        {machine, directives} = Machine.update(machine, msg, env)
+
+        new_state =
+          machine
+          |> Machine.to_map()
+          |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+
+        agent = StratState.put(agent, new_state)
+        {agent, lift_directives(directives, config)}
+
+      _ ->
+        :noop
+    end
+  end
 
   defp process_register_tool(agent, %{tool_module: module}) when is_atom(module) do
     state = StratState.get(agent, %{})

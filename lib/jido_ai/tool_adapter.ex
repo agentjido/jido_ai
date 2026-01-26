@@ -141,8 +141,7 @@ defmodule Jido.AI.ToolAdapter do
       # => {:error, :not_found}
   """
   @spec lookup_action(String.t(), [module()]) :: {:ok, module()} | {:error, :not_found}
-  def lookup_action(tool_name, action_modules)
-      when is_binary(tool_name) and is_list(action_modules) do
+  def lookup_action(tool_name, action_modules) when is_binary(tool_name) and is_list(action_modules) do
     case Enum.find(action_modules, fn mod -> mod.name() == tool_name end) do
       nil -> {:error, :not_found}
       module -> {:ok, module}

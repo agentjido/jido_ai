@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Verifiers.DeterministicVerifierTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult}
   alias Jido.AI.Accuracy.Verifiers.DeterministicVerifier
+  alias Jido.AI.Accuracy.{Candidate, VerificationResult}
 
   @moduletag :capture_log
 
