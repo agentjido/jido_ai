@@ -10,7 +10,7 @@ defmodule Jido.AI.Accuracy.ReliabilityTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, PipelineConfig, PipelineResult, Candidate}
+  alias Jido.AI.Accuracy.{Candidate, Pipeline, PipelineResult}
 
   @moduletag :reliability
   @moduletag :pipeline

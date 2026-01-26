@@ -151,13 +151,13 @@ defmodule Jido.AI.ReActAgent do
 
         {:%, _, _} = map_ast ->
           # It's a struct/map AST - expand aliases safely and evaluate
-          expanded_ast = Jido.AI.ReActAgent.expand_aliases_in_ast(map_ast, __CALLER__)
+          expanded_ast = __MODULE__.expand_aliases_in_ast(map_ast, __CALLER__)
           {evaluated, _} = Code.eval_quoted(expanded_ast, [], __CALLER__)
           evaluated
 
         {:%{}, _, _} = map_ast ->
           # Plain map AST - expand aliases safely and evaluate
-          expanded_ast = Jido.AI.ReActAgent.expand_aliases_in_ast(map_ast, __CALLER__)
+          expanded_ast = __MODULE__.expand_aliases_in_ast(map_ast, __CALLER__)
           {evaluated, _} = Code.eval_quoted(expanded_ast, [], __CALLER__)
           evaluated
 

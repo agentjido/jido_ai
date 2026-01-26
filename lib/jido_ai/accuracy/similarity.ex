@@ -197,15 +197,23 @@ defmodule Jido.AI.Accuracy.Similarity do
 
     # Fill the matrix
     Enum.reduce(1..len1, matrix, fn i, acc ->
-      Enum.reduce(1..len2, acc, fn j, inner_acc ->
-        cost = if Enum.at(chars1, i - 1) == Enum.at(chars2, j - 1), do: 0, else: 1
-        del = get_matrix(inner_acc, i - 1, j) + 1
-        ins = get_matrix(inner_acc, i, j - 1) + 1
-        sub = get_matrix(inner_acc, i - 1, j - 1) + cost
-        put_matrix(inner_acc, i, j, min(del, min(ins, sub)))
-      end)
+      fill_matrix_row(acc, i, chars1, chars2, len2)
     end)
     |> get_matrix(len1, len2)
+  end
+
+  defp fill_matrix_row(matrix, i, chars1, chars2, len2) do
+    Enum.reduce(1..len2, matrix, fn j, inner_acc ->
+      update_matrix_cell(inner_acc, i, j, chars1, chars2)
+    end)
+  end
+
+  defp update_matrix_cell(matrix, i, j, chars1, chars2) do
+    cost = if Enum.at(chars1, i - 1) == Enum.at(chars2, j - 1), do: 0, else: 1
+    del = get_matrix(matrix, i - 1, j) + 1
+    ins = get_matrix(matrix, i, j - 1) + 1
+    sub = get_matrix(matrix, i - 1, j - 1) + cost
+    put_matrix(matrix, i, j, min(del, min(ins, sub)))
   end
 
   defp init_matrix(rows, cols) do

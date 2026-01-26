@@ -122,6 +122,8 @@ defmodule Jido.AI.Accuracy.Signal do
         ]
       ]
 
+    alias Jido.AI.Accuracy.Signal.Error
+
     @doc """
     Creates a Result signal from a PipelineResult.
     """
@@ -160,7 +162,7 @@ defmodule Jido.AI.Accuracy.Signal do
       # Reference the Error module from the parent module
       # Result is nested inside Jido.AI.Accuracy.Signal, so Error is a sibling
       {:ok, signal} =
-        Jido.AI.Accuracy.Signal.Error.new(%{
+        Error.new(%{
           call_id: call_id,
           query: query,
           preset: preset,

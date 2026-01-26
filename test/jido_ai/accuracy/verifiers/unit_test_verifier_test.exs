@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifierTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult, Verifiers.UnitTestVerifier}
+  alias Jido.AI.Accuracy.{Candidate, Verifiers.UnitTestVerifier}
 
   @moduletag :capture_log
 
@@ -103,9 +103,9 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifierTest do
       assert is_binary(result.reasoning)
     end
 
-    test "parses tap format output", %{verifier: verifier} do
+    test "parses tap format output", %{verifier: _verifier} do
       # Simulate TAP output using printf to get newlines correctly
-      verifier =
+      tap_verifier =
         UnitTestVerifier.new!(%{
           test_command: "printf",
           test_args: [
@@ -116,7 +116,7 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifierTest do
         })
 
       candidate = Candidate.new!(%{content: "code"})
-      {:ok, result} = UnitTestVerifier.verify(verifier, candidate, %{})
+      {:ok, result} = UnitTestVerifier.verify(tap_verifier, candidate, %{})
 
       # 4/5 passed
       assert result.score == 0.8
@@ -367,7 +367,7 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifierTest do
 
   describe "build_reasoning/2" do
     test "includes test counts" do
-      test_results = %{total: 10, passed: 8, failed: 2, skipped: 0}
+      _test_results = %{total: 10, passed: 8, failed: 2, skipped: 0}
 
       reasoning =
         "8/10 tests passed"

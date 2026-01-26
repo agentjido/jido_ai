@@ -32,8 +32,8 @@ defmodule Jido.AI.Accuracy.Stages.VerificationStage do
   @behaviour Jido.AI.Accuracy.PipelineStage
 
   alias Jido.AI.Accuracy.{
-    VerificationRunner,
-    Candidate
+    Candidate,
+    VerificationRunner
   }
 
   @type t :: %__MODULE__{

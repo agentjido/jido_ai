@@ -321,7 +321,7 @@ defmodule Jido.AI.SecurityTest do
       stream_id = Security.generate_stream_id()
 
       # Should match UUID v4 format
-      assert :ok = Security.validate_stream_id(stream_id)
+      assert {:ok, ^stream_id} = Security.validate_stream_id(stream_id)
     end
 
     test "generates unique IDs" do
@@ -330,24 +330,24 @@ defmodule Jido.AI.SecurityTest do
     end
 
     test "generates IDs with correct format" do
-      _stream_id = Security.generate_stream_id()
+      stream_id = Security.generate_stream_id()
 
       # UUID format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
       # The format is tested by validate_stream_id/1 in another test
       # We just verify it generates successfully here
-      assert :ok = Security.validate_stream_id(Security.generate_stream_id())
+      assert {:ok, ^stream_id} = Security.validate_stream_id(stream_id)
     end
   end
 
   describe "validate_stream_id/1" do
     test "accepts valid UUID v4 format" do
       valid_uuid = "550e8400-e29b-41d4-a716-446655440000"
-      assert :ok = Security.validate_stream_id(valid_uuid)
+      assert {:ok, ^valid_uuid} = Security.validate_stream_id(valid_uuid)
     end
 
     test "accepts generated stream IDs" do
       stream_id = Security.generate_stream_id()
-      assert :ok = Security.validate_stream_id(stream_id)
+      assert {:ok, ^stream_id} = Security.validate_stream_id(stream_id)
     end
 
     test "rejects invalid formats" do

@@ -116,7 +116,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
   @impl Jido.Action
   def run(params, _context) do
     with {:ok, model} <- resolve_model(params[:model]),
-         context = build_decompose_messages(params),
+         {:ok, context} <- build_decompose_messages(params),
          opts = build_opts(params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
       {:ok, format_result(response, model, params[:goal], params[:max_depth])}
@@ -191,7 +191,9 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
 
   defp extract_text(%{message: %{content: content}}) do
     case content do
-      c when is_binary(c) -> c
+      c when is_binary(c) ->
+        c
+
       c when is_list(c) ->
         c
         |> Enum.filter(fn
@@ -202,7 +204,9 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
           %{text: text} -> text
           _ -> ""
         end)
-      _ -> ""
+
+      _ ->
+        ""
     end
   end
 

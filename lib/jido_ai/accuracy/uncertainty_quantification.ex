@@ -348,7 +348,7 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
       length(patterns) > @max_patterns_count ->
         {:error, :too_many_patterns}
 
-      not Enum.all?(patterns, &is_valid_regex/1) ->
+      not Enum.all?(patterns, &valid_regex?/1) ->
         {:error, :invalid_patterns}
 
       Enum.any?(patterns, fn pattern ->
@@ -364,7 +364,7 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
 
   defp validate_patterns(_), do: {:error, :invalid_patterns}
 
-  defp is_valid_regex(%Regex{}), do: true
-  defp is_valid_regex(_), do: false
+  defp valid_regex?(%Regex{}), do: true
+  defp valid_regex?(_), do: false
   defp format_error(atom) when is_atom(atom), do: atom
 end

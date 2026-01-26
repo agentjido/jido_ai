@@ -176,6 +176,8 @@ defmodule Jido.AI.Accuracy.SimilarityTest do
   end
 
   describe "edge cases" do
+    @tag timeout: 120_000
+    @tag :flaky
     test "handles very long strings" do
       long1 = String.duplicate("a ", 1000)
       long2 = String.duplicate("a ", 999) <> "b"

@@ -151,37 +151,20 @@ defmodule Jido.AI.Accuracy.Stages.GenerationStage do
     user_generator = Map.get(config, :generator)
 
     fn query ->
-      result =
-        cond do
-          is_function(user_generator, 2) ->
-            user_generator.(query, rag_context)
-
-          is_function(user_generator, 1) ->
-            user_generator.(query)
-
-          true ->
-            {:error, :invalid_generator_arity}
-        end
-
-      case result do
-        {:ok, %Candidate{} = candidate} ->
-          {:ok, candidate}
-
-        {:ok, content} when is_binary(content) ->
-          {:ok, Candidate.new!(%{content: content})}
-
-        %Candidate{} = candidate ->
-          {:ok, candidate}
-
-        content when is_binary(content) ->
-          {:ok, Candidate.new!(%{content: content})}
-
-        {:error, _reason} = error ->
-          error
-
-        _ ->
-          {:error, :invalid_generator_response}
-      end
+      user_generator
+      |> call_generator(query, rag_context)
+      |> normalize_generator_result()
     end
   end
+
+  defp call_generator(gen, query, context) when is_function(gen, 2), do: gen.(query, context)
+  defp call_generator(gen, query, _context) when is_function(gen, 1), do: gen.(query)
+  defp call_generator(_, _, _), do: {:error, :invalid_generator_arity}
+
+  defp normalize_generator_result({:ok, %Candidate{} = candidate}), do: {:ok, candidate}
+  defp normalize_generator_result({:ok, content}) when is_binary(content), do: {:ok, Candidate.new!(%{content: content})}
+  defp normalize_generator_result(%Candidate{} = candidate), do: {:ok, candidate}
+  defp normalize_generator_result(content) when is_binary(content), do: {:ok, Candidate.new!(%{content: content})}
+  defp normalize_generator_result({:error, _} = error), do: error
+  defp normalize_generator_result(_), do: {:error, :invalid_generator_response}
 end

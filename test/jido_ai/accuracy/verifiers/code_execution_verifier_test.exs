@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult, Verifiers.CodeExecutionVerifier}
+  alias Jido.AI.Accuracy.{Candidate, Verifiers.CodeExecutionVerifier}
 
   @moduletag :capture_log
 

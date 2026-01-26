@@ -96,7 +96,7 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
   def run(params, _context) do
     with {:ok, model} <- resolve_model(params[:model]),
          {:ok, validated_params} <- validate_and_sanitize_params(params),
-         context = build_inference_messages(validated_params),
+         {:ok, context} <- build_inference_messages(validated_params),
          opts = build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
       {:ok, format_result(response, model)}
@@ -177,26 +177,28 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
 
   defp extract_text(%{message: %{content: content}}) do
     case content do
-      c when is_binary(c) -> c
+      c when is_binary(c) ->
+        c
+
       c when is_list(c) ->
         c
-        |> Enum.filter(fn part ->
-          case part do
-            %{type: :text} -> true
-            _ -> false
-          end
-        end)
+        |> Enum.filter(&text_part?/1)
         |> Enum.map_join("", fn
           %{text: text} -> text
           _ -> ""
         end)
-      _ -> ""
+
+      _ ->
+        ""
     end
   end
 
   @dialyzer {:nowarn_function, extract_text: 1}
 
   defp extract_text(_), do: ""
+
+  defp text_part?(%{type: :text}), do: true
+  defp text_part?(_), do: false
 
   defp extract_usage(%{usage: usage}) when is_map(usage) do
     %{

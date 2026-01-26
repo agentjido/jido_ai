@@ -109,25 +109,31 @@ defmodule Jido.AI.Accuracy.Consensus.MajorityVote do
     case MVAggregator.aggregate(candidates) do
       {:ok, _best, metadata} ->
         vote_distribution = Map.get(metadata, :vote_distribution, %{})
-        total_candidates = length(candidates)
-
-        if total_candidates > 0 do
-          # Calculate agreement as max vote count / total
-          max_votes =
-            vote_distribution
-            |> Map.values()
-            |> Enum.max(fn -> 0 end)
-
-          agreement = max_votes / total_candidates
-
-          {:ok, agreement >= threshold, agreement}
-        else
-          {:ok, false, 0.0}
-        end
+        calculate_agreement(candidates, vote_distribution, threshold)
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp calculate_agreement(candidates, vote_distribution, threshold) do
+    total_candidates = length(candidates)
+
+    if total_candidates > 0 do
+      agreement = compute_agreement(vote_distribution, total_candidates)
+      {:ok, agreement >= threshold, agreement}
+    else
+      {:ok, false, 0.0}
+    end
+  end
+
+  defp compute_agreement(vote_distribution, total_candidates) do
+    max_votes =
+      vote_distribution
+      |> Map.values()
+      |> Enum.max(fn -> 0 end)
+
+    max_votes / total_candidates
   end
 
   defp validate_threshold(threshold) when is_number(threshold) and threshold >= 0.0 and threshold <= 1.0, do: :ok

@@ -274,27 +274,24 @@ defmodule Jido.AI.ReAct.Machine do
   """
   @spec from_map(map()) :: t()
   def from_map(map) when is_map(map) do
-    status =
-      case map[:status] do
-        s when is_atom(s) -> Atom.to_string(s)
-        s when is_binary(s) -> s
-        nil -> "idle"
-      end
-
     %__MODULE__{
-      status: status,
-      iteration: map[:iteration] || 0,
-      conversation: map[:conversation] || [],
-      pending_tool_calls: map[:pending_tool_calls] || [],
-      result: map[:result],
-      current_llm_call_id: map[:current_llm_call_id],
-      termination_reason: map[:termination_reason],
-      streaming_text: map[:streaming_text] || "",
-      streaming_thinking: map[:streaming_thinking] || "",
-      usage: map[:usage] || %{},
-      started_at: map[:started_at]
+      status: parse_status(map[:status]),
+      iteration: Map.get(map, :iteration, 0),
+      conversation: Map.get(map, :conversation, []),
+      pending_tool_calls: Map.get(map, :pending_tool_calls, []),
+      result: Map.get(map, :result),
+      current_llm_call_id: Map.get(map, :current_llm_call_id),
+      termination_reason: Map.get(map, :termination_reason),
+      streaming_text: Map.get(map, :streaming_text, ""),
+      streaming_thinking: Map.get(map, :streaming_thinking, ""),
+      usage: Map.get(map, :usage, %{}),
+      started_at: Map.get(map, :started_at)
     }
   end
+
+  defp parse_status(s) when is_atom(s), do: Atom.to_string(s)
+  defp parse_status(s) when is_binary(s), do: s
+  defp parse_status(_), do: "idle"
 
   # Private helpers
 

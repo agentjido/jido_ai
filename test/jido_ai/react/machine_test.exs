@@ -27,7 +27,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = Machine.new()
       env = %{system_prompt: "You are helpful.", max_iterations: 10}
 
-      {machine, directives} = Machine.update(machine, {:start, "Hello", "call_123"}, env)
+      {machine, _directives} = Machine.update(machine, {:start, "Hello", "call_123"}, env)
 
       assert machine.status == "awaiting_llm"
       assert machine.iteration == 1
@@ -172,14 +172,14 @@ defmodule Jido.AI.ReAct.MachineTest do
         status: "awaiting_llm",
         iteration: 3,
         usage: %{input_tokens: 100, output_tokens: 50},
-        started_at: 12345
+        started_at: 12_345
       }
 
       map = Machine.to_map(machine)
       restored = Machine.from_map(map)
 
       assert restored.usage == %{input_tokens: 100, output_tokens: 50}
-      assert restored.started_at == 12345
+      assert restored.started_at == 12_345
     end
 
     test "converts status to atom in to_map" do

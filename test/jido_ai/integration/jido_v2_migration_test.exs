@@ -13,7 +13,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
-  alias Jido.AI.Skills.{LLM, Reasoning, Planning, Streaming, ToolCalling}
+  alias Jido.AI.Skills.{LLM, Planning, Reasoning, Streaming, ToolCalling}
   alias Jido.AI.Strategies.ReAct
 
   # Ensure all skill actions are compiled before tests run
@@ -100,7 +100,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   describe "Direct Action Execution" do
     test "LLM Chat action can be executed directly" do
-      params = %{
+      _params = %{
         prompt: "What is 2+2?",
         model: :fast,
         max_tokens: 100

@@ -149,7 +149,7 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
 
   @behaviour Jido.AI.Accuracy.Verifier
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult, ToolExecutor}
+  alias Jido.AI.Accuracy.{Candidate, ToolExecutor, VerificationResult}
 
   @type output_format :: :junit | :tap | :dot | :auto
   @type t :: %__MODULE__{
@@ -181,7 +181,7 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
   - `:output_format` - Output format (:junit, :tap, :dot, :auto, default: :auto)
   - `:working_dir` - Working directory for tests
   - `:environment` - Environment variables for tests
-  - `:timeout` - Test execution timeout in ms (default: 30000)
+  - `:timeout` - Test execution timeout in ms (default: 30_000)
 
   ## Returns
 
@@ -438,13 +438,8 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
       chars = String.to_charlist(dots)
 
       {passed, failed, skipped} =
-        Enum.reduce(chars, {0, 0, 0}, fn char, {pass, fail, skip} ->
-          case char do
-            ?. -> {pass + 1, fail, skip}
-            ?F -> {pass, fail + 1, skip}
-            ?* -> {pass, fail, skip + 1}
-            _ -> {pass, fail, skip}
-          end
+        Enum.reduce(chars, {0, 0, 0}, fn char, acc ->
+          update_test_counts(char, acc)
         end)
 
       total = passed + failed + skipped
@@ -458,6 +453,15 @@ defmodule Jido.AI.Accuracy.Verifiers.UnitTestVerifier do
       }
     else
       fallback_parse(output)
+    end
+  end
+
+  defp update_test_counts(char, {pass, fail, skip}) do
+    case char do
+      ?. -> {pass + 1, fail, skip}
+      ?F -> {pass, fail + 1, skip}
+      ?* -> {pass, fail, skip + 1}
+      _ -> {pass, fail, skip}
     end
   end
 

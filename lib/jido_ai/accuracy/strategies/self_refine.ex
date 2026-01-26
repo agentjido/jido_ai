@@ -390,6 +390,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
   # Private functions
 
+  # credo:disable-for-next-line Credo.Check.Readability.VariableNames
   defp get_or_generate_original(%__MODULE{} = strategy, prompt, opts) do
     case Keyword.get(opts, :initial_candidate) do
       %Candidate{} = candidate ->
@@ -443,10 +444,10 @@ defmodule Jido.AI.Accuracy.SelfRefine do
         {:ok, response} ->
           content = extract_content(response)
 
-          if content != "" do
-            {:ok, String.trim(content)}
-          else
+          if content == "" do
             {:error, :no_content}
+          else
+            {:ok, String.trim(content)}
           end
 
         {:error, reason} ->

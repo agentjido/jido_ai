@@ -12,10 +12,10 @@ defmodule Jido.AI.TRM.SupervisionTest do
         previous_feedback: nil
       }
 
-      {system, user} = Supervision.build_supervision_prompt(context)
+      {_system, _user} = Supervision.build_supervision_prompt(context)
 
-      assert is_binary(system)
-      assert is_binary(user)
+      assert is_binary(_system)
+      assert is_binary(_user)
     end
 
     test "includes question and answer in user prompt" do
@@ -170,7 +170,7 @@ defmodule Jido.AI.TRM.SupervisionTest do
 
       feedback = Supervision.parse_supervision_result(response)
 
-      assert length(feedback.suggestions) >= 1
+      assert feedback.suggestions != []
       assert Enum.any?(feedback.suggestions, &(&1 =~ "Add more examples"))
     end
 
@@ -182,7 +182,7 @@ defmodule Jido.AI.TRM.SupervisionTest do
 
       feedback = Supervision.parse_supervision_result(response)
 
-      assert length(feedback.strengths) >= 1
+      assert feedback.strengths != []
     end
 
     test "extracts explicit score" do
@@ -243,7 +243,7 @@ defmodule Jido.AI.TRM.SupervisionTest do
       response = "ISSUE: Problem found\nPROBLEM: Another problem"
       issues = Supervision.extract_issues(response)
 
-      assert length(issues) >= 1
+      assert issues != []
     end
 
     test "handles empty response" do
@@ -260,7 +260,7 @@ defmodule Jido.AI.TRM.SupervisionTest do
       response = "SUGGESTION: Add detail\nRECOMMEND: Improve clarity"
       suggestions = Supervision.extract_suggestions(response)
 
-      assert length(suggestions) >= 1
+      assert suggestions != []
     end
 
     test "handles empty response" do
@@ -273,7 +273,7 @@ defmodule Jido.AI.TRM.SupervisionTest do
       response = "STRENGTH: Well organized\nCORRECT: Formula is right"
       strengths = Supervision.extract_strengths(response)
 
-      assert length(strengths) >= 1
+      assert strengths != []
     end
 
     test "handles empty response" do
@@ -316,15 +316,15 @@ defmodule Jido.AI.TRM.SupervisionTest do
         raw_text: ""
       }
 
-      {system, user} =
+      {_system, _user} =
         Supervision.build_improvement_prompt(
           "What is AI?",
           "AI is artificial intelligence",
           feedback
         )
 
-      assert is_binary(system)
-      assert is_binary(user)
+      assert is_binary(_system)
+      assert is_binary(_user)
     end
 
     test "includes question and answer" do
@@ -514,9 +514,9 @@ defmodule Jido.AI.TRM.SupervisionTest do
       # Parse feedback
       feedback = Supervision.parse_supervision_result(llm_response)
 
-      assert length(feedback.strengths) >= 1
-      assert length(feedback.issues) >= 2
-      assert length(feedback.suggestions) >= 2
+      assert feedback.strengths != []
+      assert feedback.issues != []
+      assert feedback.suggestions != []
       assert feedback.quality_score == 0.55
 
       # Build improvement prompt

@@ -46,7 +46,7 @@ defmodule Jido.AI.Accuracy.Generator do
   - `:model` - Model to use (default: from config)
   - `:temperature` - Sampling temperature (default: 0.7)
   - `:temperature_range` - Range for temperature variation `{min, max}`
-  - `:timeout` - Per-candidate timeout in ms (default: 30000)
+  - `:timeout` - Per-candidate timeout in ms (default: 30_000)
   - `:max_concurrency` - Max parallel generations (default: 3)
   - `:system_prompt` - Optional system prompt
 

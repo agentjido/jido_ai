@@ -5,7 +5,7 @@ defmodule Jido.AI.Accuracy.PresetsTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Presets, PipelineConfig, Pipeline, Candidate}
+  alias Jido.AI.Accuracy.{Candidate, Pipeline, PipelineConfig, Presets}
 
   @moduletag :presets
 

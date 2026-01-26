@@ -237,15 +237,19 @@ defmodule Jido.AI.Accuracy.Candidate do
 
   defp extract_attrs_from_map(map) do
     %{
-      id: Map.get(map, "id") || Map.get(map, :id),
-      content: Map.get(map, "content") || Map.get(map, :content),
-      reasoning: Map.get(map, "reasoning") || Map.get(map, :reasoning),
-      score: Map.get(map, "score") || Map.get(map, :score),
-      tokens_used: Map.get(map, "tokens_used") || Map.get(map, :tokens_used),
-      model: Map.get(map, "model") || Map.get(map, :model),
-      timestamp: parse_timestamp(Map.get(map, "timestamp") || Map.get(map, :timestamp)),
-      metadata: Map.get(map, "metadata") || Map.get(map, :metadata) || %{}
+      id: get_map_value(map, "id", :id),
+      content: get_map_value(map, "content", :content),
+      reasoning: get_map_value(map, "reasoning", :reasoning),
+      score: get_map_value(map, "score", :score),
+      tokens_used: get_map_value(map, "tokens_used", :tokens_used),
+      model: get_map_value(map, "model", :model),
+      timestamp: parse_timestamp(get_map_value(map, "timestamp", :timestamp)),
+      metadata: get_map_value(map, "metadata", :metadata) || %{}
     }
+  end
+
+  defp get_map_value(map, str_key, atom_key) do
+    Map.get(map, str_key) || Map.get(map, atom_key)
   end
 
   defp format_timestamp(nil), do: nil

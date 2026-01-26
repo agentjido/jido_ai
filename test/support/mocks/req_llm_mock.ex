@@ -81,7 +81,7 @@ defmodule Jido.AI.Accuracy.TestSupport.ReqLLMMock do
     {:error, reason}
   end
 
-  def generate_text_mock(%__MODULE__{} = mock, prompt, _opts) do
+  def generate_text_mock(%__MODULE__{}, prompt, _opts) do
     response = build_mock_response(prompt)
     {:ok, response}
   end
