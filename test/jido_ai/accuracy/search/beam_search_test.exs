@@ -315,6 +315,8 @@ defmodule Jido.AI.Accuracy.Search.BeamSearchTest do
 
   describe "integration with SearchController behavior" do
     test "implements search/4 callback" do
+      # Ensure module is fully loaded before checking function_exported?
+      Code.ensure_loaded!(BeamSearch)
       assert function_exported?(BeamSearch, :search, 4)
     end
 

@@ -183,6 +183,8 @@ defmodule Jido.AI.Accuracy.Search.MCTSTest do
 
   describe "integration with SearchController behavior" do
     test "implements search/4 callback" do
+      # Ensure module is fully loaded before checking function_exported?
+      Code.ensure_loaded!(MCTS)
       assert function_exported?(MCTS, :search, 4)
     end
 

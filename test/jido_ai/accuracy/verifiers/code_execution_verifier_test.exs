@@ -95,6 +95,8 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
   end
 
   describe "verify/3" do
+    @describetag :requires_python
+
     setup do
       verifier = CodeExecutionVerifier.new!(%{language: :python, timeout: 5000})
       %{verifier: verifier}
@@ -275,6 +277,8 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
   end
 
   describe "timeout handling" do
+    @describetag :requires_python
+
     @tag :flaky
     test "handles infinite loops gracefully" do
       verifier = CodeExecutionVerifier.new!(%{language: :python, timeout: 500})
@@ -298,6 +302,8 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
   end
 
   describe "score calculation" do
+    @describetag :requires_python
+
     test "returns 1.0 for successful execution" do
       verifier = CodeExecutionVerifier.new!(%{language: :python})
       candidate = Candidate.new!(%{content: "print('success')"})
@@ -326,6 +332,8 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
   end
 
   describe "metadata" do
+    @describetag :requires_python
+
     test "includes execution details in metadata" do
       verifier = CodeExecutionVerifier.new!(%{language: :python})
       candidate = Candidate.new!(%{content: "print('test')"})
