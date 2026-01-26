@@ -63,8 +63,8 @@ defmodule Jido.AI.Accuracy.Search.MCTSTest do
       assert {:error, :invalid_simulations} = MCTS.new(simulations: 0)
     end
 
-    test "returns error for simulations > 10000" do
-      assert {:error, :invalid_simulations} = MCTS.new(simulations: 10001)
+    test "returns error for simulations > 10_000" do
+      assert {:error, :invalid_simulations} = MCTS.new(simulations: 10_001)
     end
 
     test "returns error for negative exploration_constant" do

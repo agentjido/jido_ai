@@ -34,8 +34,8 @@ defmodule Jido.AI.Accuracy.Stages.CalibrationStage do
 
   alias Jido.AI.Accuracy.{
     CalibrationGate,
-    ConfidenceEstimate,
     Candidate,
+    ConfidenceEstimate,
     RoutingResult
   }
 

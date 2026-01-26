@@ -11,7 +11,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   - `:model` - Model to use (default: `"anthropic:claude-haiku-4-5"`)
   - `:num_candidates` - Number of candidates to generate (default: 5)
   - `:temperature_range` - Range for temperature variation (default: `{0.0, 1.0}`)
-  - `:timeout` - Per-candidate timeout in ms (default: 30000)
+  - `:timeout` - Per-candidate timeout in ms (default: 30_000)
   - `:max_concurrency` - Max parallel generations (default: 3)
   - `:system_prompt` - Optional system prompt
 
@@ -36,7 +36,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
 
   @behaviour Jido.AI.Accuracy.Generator
 
-  alias Jido.AI.Accuracy.{Candidate, Generator, Config}
+  alias Jido.AI.Accuracy.{Candidate, Config, Generator}
   alias Jido.AI.Config, as: MainConfig
 
   @type t :: %__MODULE__{
@@ -75,7 +75,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   - `:model` - Model spec or alias (default: from Config)
   - `:num_candidates` - Number of candidates (default: from Config, max: 100)
   - `:temperature_range` - Temperature range `{min, max}` (default: `{0.0, 1.0}`)
-  - `:timeout` - Timeout in ms (default: from Config, range: 1000-300000)
+  - `:timeout` - Timeout in ms (default: from Config, range: 1000-300_000)
   - `:max_concurrency` - Max parallel requests (default: from Config, max: 50)
   - `:system_prompt` - Optional system prompt
 
@@ -336,7 +336,8 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   # Validation functions with security bounds (module attributes for guard compatibility)
 
   defp validate_temperature_range({min, max})
-       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max, do: :ok
+       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max,
+       do: :ok
 
   defp validate_temperature_range(_), do: {:error, :invalid_temperature_range}
 

@@ -14,6 +14,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Skills.LLM
+  alias Jido.AI.Skills.LLM.Actions.Chat
   alias Jido.AI.Skills.Planning
   alias Jido.AI.Skills.Reasoning
   alias Jido.AI.Skills.Streaming
@@ -165,7 +166,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Planning Skill Integration" do
-    alias Jido.AI.Skills.Planning.Actions.{Plan, Decompose, Prioritize}
+    alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
 
     test "all Planning actions are accessible" do
       assert Plan in Planning.actions()
@@ -199,7 +200,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Streaming Skill Integration" do
-    alias Jido.AI.Skills.Streaming.Actions.{StartStream, ProcessTokens, EndStream}
+    alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
 
     test "all Streaming actions are accessible" do
       assert StartStream in Streaming.actions()
@@ -313,10 +314,10 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   describe "End-to-End Flows" do
     test "skill action can be invoked directly" do
       # Test that actions have the expected schema
-      params = %{prompt: "Test"}
+      _params = %{prompt: "Test"}
 
       # Chat action should have schema accessible (Zoi schema struct)
-      schema = Jido.AI.Skills.LLM.Actions.Chat.schema()
+      schema = Chat.schema()
       assert is_map(schema)
       assert schema.fields[:prompt].meta.required == true
     end

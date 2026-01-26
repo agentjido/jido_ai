@@ -71,9 +71,9 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
   """
 
   alias Jido.AI.Accuracy.{
+    Aggregators.MajorityVote,
     DifficultyEstimate,
-    Thresholds,
-    Aggregators.MajorityVote
+    Thresholds
   }
 
   @type t :: %__MODULE__{
@@ -127,7 +127,7 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     - `:early_stop_threshold` - Consensus threshold (default: 0.8)
     - `:difficulty_estimator` - Difficulty estimator module
     - `:aggregator` - Aggregator module (default: MajorityVote)
-    - `:timeout` - Maximum runtime in milliseconds (default: 30000)
+    - `:timeout` - Maximum runtime in milliseconds (default: 30_000)
 
   ## Returns
 
@@ -241,52 +241,42 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
       context = Keyword.get(opts, :context, %{})
       timeout = Keyword.get(opts, :timeout, adapter.timeout)
 
-      # Get or estimate difficulty
-      result =
-        case Keyword.get(opts, :difficulty_estimate) do
-          %DifficultyEstimate{} = estimate ->
-            {:ok, estimate}
-
-          nil ->
-            case Keyword.get(opts, :difficulty_level) do
-              nil when not is_nil(adapter.difficulty_estimator) ->
-                estimate_difficulty(adapter, query, context)
-
-              nil ->
-                # No difficulty info and no estimator, default to medium
-                {:ok, DifficultyEstimate.new!(%{level: :medium, score: 0.5})}
-
-              level when is_atom(level) ->
-                {:ok, DifficultyEstimate.new!(%{level: level, score: level_to_score(level)})}
-            end
-        end
-
-      case result do
-        {:ok, %DifficultyEstimate{} = estimate} ->
-          # Run with timeout protection
-          task = Task.async(fn -> do_run(adapter, query, estimate, generator, context) end)
-
-          case Task.yield(task, timeout) do
-            {:ok, {:ok, result, metadata}} ->
-              {:ok, result, metadata}
-
-            {:ok, {:error, reason}} ->
-              {:error, reason}
-
-            {:exit, _reason} ->
-              {:error, :generator_crashed}
-
-            nil ->
-              # Timeout - kill the task
-              Task.shutdown(task, :brutal_kill)
-              {:error, :timeout}
-          end
-
-        {:error, _} = error ->
-          error
-      end
+      run_with_estimate(adapter, query, opts, generator, context, timeout)
     else
       {:error, :generator_required}
+    end
+  end
+
+  defp run_with_estimate(adapter, query, opts, generator, context, timeout) do
+    case get_or_estimate_difficulty(adapter, opts, query, context) do
+      {:ok, %DifficultyEstimate{} = estimate} ->
+        execute_with_timeout(adapter, query, estimate, generator, context, timeout)
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp execute_with_timeout(adapter, query, estimate, generator, context, timeout) do
+    task = Task.async(fn -> do_run(adapter, query, estimate, generator, context) end)
+    await_task_result(task, timeout)
+  end
+
+  defp await_task_result(task, timeout) do
+    case Task.yield(task, timeout) do
+      {:ok, {:ok, result, metadata}} ->
+        {:ok, result, metadata}
+
+      {:ok, {:error, reason}} ->
+        {:error, reason}
+
+      {:exit, _reason} ->
+        {:error, :generator_crashed}
+
+      nil ->
+        # Timeout - kill the task
+        Task.shutdown(task, :brutal_kill)
+        {:error, :timeout}
     end
   end
 
@@ -345,20 +335,22 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
         {:ok, _best, metadata} ->
           vote_distribution = Map.get(metadata, :vote_distribution, %{})
           total_votes = Map.values(vote_distribution) |> Enum.sum()
-
-          agreement =
-            if total_votes > 0 do
-              max_vote = vote_distribution |> Map.values() |> Enum.max(fn -> 0 end)
-              max_vote / total_votes
-            else
-              0.0
-            end
+          agreement = calculate_agreement(vote_distribution, total_votes)
 
           {:ok, agreement, metadata}
 
         {:error, _} = error ->
           error
       end
+    end
+  end
+
+  defp calculate_agreement(vote_distribution, total_votes) do
+    if total_votes > 0 do
+      max_vote = vote_distribution |> Map.values() |> Enum.max(fn -> 0 end)
+      max_vote / total_votes
+    else
+      0.0
     end
   end
 
@@ -423,18 +415,11 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     initial_n = max(initial_n_for_level(level), adapter.min_candidates)
     max_n = min(max_n_for_level(level), adapter.max_candidates)
 
+    run_ctx = %{query: query, generator: generator, context: context}
+    search_state = %{candidates: [], current_n: 0, target_n: initial_n, max_n: max_n, level: level}
+
     # Generate candidates in batches, checking for consensus
-    case generate_with_early_stop(
-           adapter,
-           query,
-           generator,
-           context,
-           [],
-           0,
-           initial_n,
-           max_n,
-           level
-         ) do
+    case generate_with_early_stop(adapter, run_ctx, search_state) do
       {:ok, result, metadata} ->
         {:ok, result, metadata}
 
@@ -443,112 +428,69 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     end
   end
 
-  defp generate_with_early_stop(adapter, query, generator, context, candidates, current_n, target_n, max_n, level) do
-    # Generate next batch
-    batch_size = adjust_n_batch(adapter.batch_size, current_n, max_n)
+  defp generate_with_early_stop(adapter, run_ctx, search_state) do
+    batch_size = adjust_n_batch(adapter.batch_size, search_state.current_n, search_state.max_n)
 
     if batch_size == 0 do
-      # At max, aggregate and return
-      aggregate_and_return(candidates, adapter, %{
-        actual_n: length(candidates),
-        early_stopped: false,
-        consensus: nil,
+      aggregate_at_max(search_state.candidates, adapter, search_state.target_n, search_state.max_n, search_state.level)
+    else
+      process_new_batch(adapter, run_ctx, search_state, batch_size)
+    end
+  end
+
+  defp aggregate_at_max(candidates, adapter, target_n, max_n, level) do
+    aggregate_and_return(candidates, adapter, %{
+      actual_n: length(candidates),
+      early_stopped: false,
+      consensus: nil,
+      difficulty_level: level,
+      initial_n: target_n,
+      max_n: max_n
+    })
+  end
+
+  defp process_new_batch(adapter, run_ctx, search_state, batch_size) do
+    new_candidates = generate_batch(run_ctx.generator, run_ctx.query, batch_size, run_ctx.context)
+    all_candidates = search_state.candidates ++ new_candidates
+    total_n = length(all_candidates)
+
+    if total_n == 0 and batch_size > 0 do
+      {:error, :all_generators_failed}
+    else
+      check_and_continue_or_stop(all_candidates, adapter, run_ctx, total_n, search_state.target_n, search_state.max_n, search_state.level)
+    end
+  end
+
+  defp check_and_continue_or_stop(all_candidates, adapter, run_ctx, total_n, target_n, max_n, level) do
+    if total_n >= adapter.min_candidates do
+      evaluate_consensus(all_candidates, adapter, run_ctx, total_n, target_n, max_n, level)
+    else
+      continue_or_aggregate(all_candidates, adapter, total_n, target_n, max_n, level, nil, run_ctx)
+    end
+  end
+
+  defp evaluate_consensus(all_candidates, adapter, run_ctx, total_n, target_n, max_n, level) do
+    case check_consensus(all_candidates, aggregator: adapter.aggregator) do
+      {:ok, agreement, _metadata} ->
+        handle_consensus_result(all_candidates, adapter, run_ctx, total_n, target_n, max_n, level, agreement)
+
+      {:error, _reason} ->
+        continue_or_aggregate(all_candidates, adapter, total_n, target_n, max_n, level, nil, run_ctx)
+    end
+  end
+
+  defp handle_consensus_result(all_candidates, adapter, run_ctx, total_n, target_n, max_n, level, agreement) do
+    if agreement >= adapter.early_stop_threshold do
+      aggregate_and_return(all_candidates, adapter, %{
+        actual_n: total_n,
+        early_stopped: true,
+        consensus: agreement,
         difficulty_level: level,
         initial_n: target_n,
         max_n: max_n
       })
     else
-      # Generate batch
-      new_candidates = generate_batch(generator, query, batch_size, context)
-      all_candidates = candidates ++ new_candidates
-      total_n = length(all_candidates)
-
-      # Check for empty candidates - all generators failed
-      if total_n == 0 and batch_size > 0 do
-        {:error, :all_generators_failed}
-      else
-        # Check for consensus if we have at least min_candidates
-        should_check_consensus = total_n >= adapter.min_candidates
-
-        if should_check_consensus do
-          case check_consensus(all_candidates, aggregator: adapter.aggregator) do
-            {:ok, agreement, _metadata} ->
-              if agreement >= adapter.early_stop_threshold do
-                # Consensus reached - aggregate and return early
-                aggregate_and_return(all_candidates, adapter, %{
-                  actual_n: total_n,
-                  early_stopped: true,
-                  consensus: agreement,
-                  difficulty_level: level,
-                  initial_n: target_n,
-                  max_n: max_n
-                })
-              else
-                # No consensus, continue if not at max
-                if total_n >= max_n do
-                  aggregate_and_return(all_candidates, adapter, %{
-                    actual_n: total_n,
-                    early_stopped: false,
-                    consensus: agreement,
-                    difficulty_level: level,
-                    initial_n: target_n,
-                    max_n: max_n
-                  })
-                else
-                  generate_with_early_stop(
-                    adapter,
-                    query,
-                    generator,
-                    context,
-                    all_candidates,
-                    total_n,
-                    target_n,
-                    max_n,
-                    level
-                  )
-                end
-              end
-
-            {:error, _reason} ->
-              # Consensus check failed, continue if not at max
-              if total_n >= max_n do
-                aggregate_and_return(all_candidates, adapter, %{
-                  actual_n: total_n,
-                  early_stopped: false,
-                  consensus: nil,
-                  difficulty_level: level,
-                  initial_n: target_n,
-                  max_n: max_n
-                })
-              else
-                generate_with_early_stop(
-                  adapter,
-                  query,
-                  generator,
-                  context,
-                  all_candidates,
-                  total_n,
-                  target_n,
-                  max_n,
-                  level
-                )
-              end
-          end
-        else
-          # Not enough candidates to check consensus, continue
-          generate_with_early_stop(
-            adapter,
-            query,
-            generator,
-            context,
-            all_candidates,
-            total_n,
-            target_n,
-            max_n,
-            level
-          )
-        end
-      end
+      continue_or_aggregate(all_candidates, adapter, total_n, target_n, max_n, level, agreement, run_ctx)
     end
   end
 
@@ -587,15 +529,19 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
 
         {:error, _reason} ->
           # If aggregation fails, return first candidate
-          candidate = List.first(candidates)
-
-          if candidate do
-            final_metadata = Map.put(base_metadata, :aggregation_error, true)
-            {:ok, candidate, final_metadata}
-          else
-            {:error, :no_candidates_to_aggregate}
-          end
+          handle_aggregation_error(candidates, base_metadata)
       end
+    end
+  end
+
+  defp handle_aggregation_error(candidates, base_metadata) do
+    candidate = List.first(candidates)
+
+    if candidate do
+      final_metadata = Map.put(base_metadata, :aggregation_error, true)
+      {:ok, candidate, final_metadata}
+    else
+      {:error, :no_candidates_to_aggregate}
     end
   end
 
@@ -610,6 +556,46 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
 
   # NOTE: Now delegates to centralized Thresholds module
   defp level_to_score(level), do: Thresholds.level_to_score(level)
+
+  defp get_or_estimate_difficulty(adapter, opts, query, context) do
+    case Keyword.get(opts, :difficulty_estimate) do
+      %DifficultyEstimate{} = estimate ->
+        {:ok, estimate}
+
+      nil ->
+        resolve_difficulty_from_opts(adapter, opts, query, context)
+    end
+  end
+
+  defp resolve_difficulty_from_opts(adapter, opts, query, context) do
+    case Keyword.get(opts, :difficulty_level) do
+      nil when not is_nil(adapter.difficulty_estimator) ->
+        estimate_difficulty(adapter, query, context)
+
+      nil ->
+        # No difficulty info and no estimator, default to medium
+        {:ok, DifficultyEstimate.new!(%{level: :medium, score: 0.5})}
+
+      level when is_atom(level) ->
+        {:ok, DifficultyEstimate.new!(%{level: level, score: level_to_score(level)})}
+    end
+  end
+
+  defp continue_or_aggregate(candidates, adapter, total_n, target_n, max_n, level, consensus, run_ctx) do
+    if total_n >= max_n do
+      aggregate_and_return(candidates, adapter, %{
+        actual_n: total_n,
+        early_stopped: false,
+        consensus: consensus,
+        difficulty_level: level,
+        initial_n: target_n,
+        max_n: max_n
+      })
+    else
+      search_state = %{candidates: candidates, current_n: total_n, target_n: target_n, max_n: max_n, level: level}
+      generate_with_early_stop(adapter, run_ctx, search_state)
+    end
+  end
 
   # Validation
 
@@ -632,7 +618,11 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
 
   defp validate_timeout(timeout) when is_integer(timeout) and timeout >= 1000 and timeout <= 300_000, do: {:ok, :valid}
 
-  defp validate_timeout(_), do: {:error, :timeout_must_be_between_1000_and_300000_ms}
+  defp validate_timeout(_), do: {:error, :timeout_must_be_between_1000_and_300_000_ms}
+
+  defp format_error({field, reason}) when is_atom(field) and is_atom(reason) do
+    "#{field}: #{reason}"
+  end
 
   defp format_error(atom) when is_atom(atom), do: atom
 end

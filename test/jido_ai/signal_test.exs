@@ -380,19 +380,6 @@ defmodule Jido.AI.SignalTest do
     end
   end
 
-  describe "is_tool_call?/1 (deprecated)" do
-    test "is_tool_call?/1 delegates to tool_call?/1" do
-      signal =
-        ReqLLMResult.new!(%{
-          call_id: "call_deprecated",
-          result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
-        })
-
-      # Should still work but is deprecated
-      assert Signal.is_tool_call?(signal) == Signal.tool_call?(signal)
-    end
-  end
-
   describe "from_reqllm_response/2" do
     test "creates signal from simple text response" do
       response = %{

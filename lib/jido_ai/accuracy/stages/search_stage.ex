@@ -11,7 +11,7 @@ defmodule Jido.AI.Accuracy.Stages.SearchStage do
   - `:algorithm` - Search algorithm (:beam_search or :mcts)
   - `:beam_width` - Beam width for beam search (default: 5)
   - `:iterations` - Number of search iterations (default: 50)
-  - `:timeout` - Maximum search time in ms (default: 10000)
+  - `:timeout` - Maximum search time in ms (default: 10_000)
 
   ## Output State
 

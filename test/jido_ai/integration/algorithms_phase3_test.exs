@@ -8,7 +8,7 @@ defmodule Jido.AI.Integration.AlgorithmsPhase3Test do
   """
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Algorithms.{Sequential, Parallel, Hybrid, Composite}
+  alias Jido.AI.Algorithms.{Composite, Hybrid, Parallel, Sequential}
 
   # ============================================================================
   # Test Algorithm Implementations

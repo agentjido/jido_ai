@@ -17,7 +17,7 @@ defmodule Jido.AI.Accuracy.Verifiers.StaticAnalysisVerifier do
 
   @behaviour Jido.AI.Accuracy.Verifier
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult, ToolExecutor}
+  alias Jido.AI.Accuracy.{Candidate, ToolExecutor, VerificationResult}
 
   @type severity :: :error | :warning | :info | :style | :note
   @type tool :: %{

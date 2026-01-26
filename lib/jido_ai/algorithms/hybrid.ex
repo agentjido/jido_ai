@@ -156,12 +156,12 @@ defmodule Jido.AI.Algorithms.Hybrid do
       _ ->
         normalized_stages = normalize_stages(stages)
 
-        Enum.all?(normalized_stages, fn stage ->
-          Enum.all?(stage.algorithms, fn algo ->
-            algo.can_execute?(input, context)
-          end)
-        end)
+        Enum.all?(normalized_stages, &stage_can_execute?(&1, input, context))
     end
+  end
+
+  defp stage_can_execute?(stage, input, context) do
+    Enum.all?(stage.algorithms, & &1.can_execute?(input, context))
   end
 
   # ============================================================================

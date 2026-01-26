@@ -212,8 +212,12 @@ defmodule Jido.AI.Accuracy.SearchController do
       end)
 
   """
-  @callback search_stream(prompt :: String.t(), generator :: generator(), verifier :: verifier(), opts :: search_opts()) ::
-              stream_result()
+  @callback search_stream(
+              prompt :: String.t(),
+              generator :: generator(),
+              verifier :: verifier(),
+              opts :: search_opts()
+            ) :: stream_result()
 
   @optional_callbacks [search_stream: 4]
 

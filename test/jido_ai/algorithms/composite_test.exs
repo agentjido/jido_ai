@@ -4,12 +4,12 @@ defmodule Jido.AI.Algorithms.CompositeTest do
   alias Jido.AI.Algorithms.Composite
 
   alias Jido.AI.Algorithms.Composite.{
-    SequenceComposite,
-    ParallelComposite,
     ChoiceComposite,
+    ComposeComposite,
+    ParallelComposite,
     RepeatComposite,
-    WhenComposite,
-    ComposeComposite
+    SequenceComposite,
+    WhenComposite
   }
 
   # ============================================================================

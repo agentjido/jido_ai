@@ -42,7 +42,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
     end)
   end
 
-  defp mock_llm_result(call_id, content, opts \\ []) do
+  defp mock_llm_result(call_id, content, opts) do
     usage = Keyword.get(opts, :usage, %{input_tokens: 100, output_tokens: 50})
 
     %{

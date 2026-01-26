@@ -24,7 +24,7 @@ defmodule Jido.AI.Strategies.ReActTest do
   end
 
   # Helper to create a mock agent
-  defp create_agent(opts \\ []) do
+  defp create_agent(opts) do
     %Jido.Agent{
       id: "test-agent",
       name: "test",

@@ -1,8 +1,8 @@
 defmodule Jido.AI.Accuracy.Estimators.LLMDifficultyTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.Estimators.LLMDifficulty
   alias Jido.AI.Accuracy.{DifficultyEstimate, DifficultyEstimator}
+  alias Jido.AI.Accuracy.Estimators.LLMDifficulty
 
   @moduletag :capture_log
 
@@ -18,11 +18,11 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficultyTest do
       assert {:ok, estimator} =
                LLMDifficulty.new(%{
                  model: "anthropic:claude-4-5",
-                 timeout: 10000
+                 timeout: 10_000
                })
 
       assert estimator.model == "anthropic:claude-4-5"
-      assert estimator.timeout == 10000
+      assert estimator.timeout == 10_000
     end
 
     test "creates estimator with custom prompt template" do
@@ -125,7 +125,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficultyTest do
 
   describe "parse_response/2" do
     test "parses valid JSON response" do
-      json = ~s({"level": "easy", "score": 0.2, "confidence": 0.9, "reasoning": "Simple query"})
+      _json = ~s({"level": "easy", "score": 0.2, "confidence": 0.9, "reasoning": "Simple query"})
 
       # The parsing happens internally, so we test via the public interface
       # by verifying the simulation produces correct output
@@ -154,7 +154,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficultyTest do
       {:ok, estimator: estimator}
     end
 
-    test "estimates multiple queries using default batch implementation", context do
+    test "estimates multiple queries using default batch implementation", _context do
       queries = ["What is 2+2?", "complex quantum mechanics question", "Who wrote Hamlet?"]
 
       assert {:ok, estimates} =

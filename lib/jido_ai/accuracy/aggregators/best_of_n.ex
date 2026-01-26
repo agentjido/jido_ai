@@ -175,58 +175,41 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
     end
   end
 
-  defp token_compare(c1, c2) do
+  defp token_compare(%{tokens_used: t1}, %{tokens_used: t2}) when is_number(t1) and is_number(t2) do
     cond do
-      # Both have tokens, fewer wins
-      c1.tokens_used && c2.tokens_used ->
-        cond do
-          c1.tokens_used < c2.tokens_used -> :lt
-          c1.tokens_used > c2.tokens_used -> :gt
-          true -> :eq
-        end
-
-      # c1 has tokens, c2 doesn't, c2 wins (nil is more efficient)
-      c1.tokens_used && !c2.tokens_used ->
-        :gt
-
-      # c2 has tokens, c1 doesn't, c1 wins (nil is more efficient)
-      !c1.tokens_used && c2.tokens_used ->
-        :lt
-
-      # Neither has tokens, equal
-      true ->
-        :eq
+      t1 < t2 -> :lt
+      t1 > t2 -> :gt
+      true -> :eq
     end
   end
 
-  defp timestamp_compare(c1, c2, prefer_early) do
+  defp token_compare(%{tokens_used: t1}, %{tokens_used: t2}) when is_number(t1) and is_nil(t2), do: :gt
+  defp token_compare(%{tokens_used: t1}, %{tokens_used: t2}) when is_nil(t1) and is_number(t2), do: :lt
+  defp token_compare(_, _), do: :eq
+
+  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, prefer_early)
+       when is_struct(ts1, DateTime) and is_struct(ts2, DateTime) do
+    compare_timestamps(ts1, ts2, prefer_early)
+  end
+
+  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, _prefer_early)
+       when is_struct(ts1, DateTime) and is_nil(ts2), do: :lt
+
+  defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, _prefer_early)
+       when is_nil(ts1) and is_struct(ts2, DateTime), do: :gt
+
+  defp timestamp_compare(_, _, _), do: :eq
+
+  @spec compare_timestamps(DateTime.t(), DateTime.t(), boolean()) :: :lt | :gt | :eq
+  defp compare_timestamps(ts1, ts2, true) do
     cond do
-      # Both have timestamps
-      c1.timestamp && c2.timestamp ->
-        # Earlier is better if prefer_early is true
-        if prefer_early do
-          cond do
-            DateTime.before?(c1.timestamp, c2.timestamp) -> :lt
-            DateTime.after?(c1.timestamp, c2.timestamp) -> :gt
-            true -> :eq
-          end
-        else
-          DateTime.compare(c1.timestamp, c2.timestamp)
-        end
-
-      # c1 has timestamp, c2 doesn't, c1 wins
-      c1.timestamp && !c2.timestamp ->
-        :lt
-
-      # c2 has timestamp, c1 doesn't, c2 wins
-      !c1.timestamp && c2.timestamp ->
-        :gt
-
-      # Neither has timestamp, equal
-      true ->
-        :eq
+      DateTime.before?(ts1, ts2) -> :lt
+      DateTime.after?(ts1, ts2) -> :gt
+      true -> :eq
     end
   end
+
+  defp compare_timestamps(ts1, ts2, false), do: DateTime.compare(ts1, ts2)
 
   defp calculate_score_distribution(candidates) do
     candidates

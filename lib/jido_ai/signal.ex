@@ -18,7 +18,7 @@ defmodule Jido.AI.Signal do
   ## Helper Functions
 
   - `extract_tool_calls/1` - Extract tool calls from a ReqLLMResult signal
-  - `is_tool_call?/1` - Check if a signal contains tool calls
+  - `tool_call?/1` - Check if a signal contains tool calls
   - `from_reqllm_response/2` - Create signals from ReqLLM response structs
 
   ## Usage
@@ -294,14 +294,6 @@ defmodule Jido.AI.Signal do
   end
 
   def tool_call?(_signal), do: false
-
-  @doc """
-  Deprecated: Use `tool_call?/1` instead.
-  """
-  @deprecated "Use tool_call?/1 instead"
-  @spec is_tool_call?(Jido.Signal.t()) :: boolean()
-  # credo:disable-for-next-line Credo.Check.Readability.PredicateFunctionNames
-  def is_tool_call?(signal), do: tool_call?(signal)
 
   @doc """
   Creates a ReqLLMResult signal from a ReqLLM response struct.

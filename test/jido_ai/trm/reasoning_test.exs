@@ -362,7 +362,7 @@ defmodule Jido.AI.TRM.ReasoningTest do
         latent_state: %{reasoning_trace: []}
       }
 
-      {system, user} = Reasoning.build_reasoning_prompt(context)
+      {_system, _user} = Reasoning.build_reasoning_prompt(context)
 
       # Simulate LLM response
       llm_response = """

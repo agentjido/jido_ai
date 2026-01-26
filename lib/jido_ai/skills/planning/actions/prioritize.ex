@@ -245,7 +245,9 @@ defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
 
   defp extract_text(%{message: %{content: content}}) do
     case content do
-      c when is_binary(c) -> c
+      c when is_binary(c) ->
+        c
+
       c when is_list(c) ->
         c
         |> Enum.filter(fn
@@ -256,7 +258,9 @@ defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
           %{text: text} -> text
           _ -> ""
         end)
-      _ -> ""
+
+      _ ->
+        ""
     end
   end
 

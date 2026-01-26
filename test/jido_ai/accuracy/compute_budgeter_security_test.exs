@@ -1,7 +1,7 @@
 defmodule Jido.AI.Accuracy.ComputeBudgeterSecurityTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{ComputeBudgeter, ComputeBudget}
+  alias Jido.AI.Accuracy.ComputeBudgeter
 
   @moduletag :security
   @moduletag :compute_budgeter

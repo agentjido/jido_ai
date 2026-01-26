@@ -1,9 +1,11 @@
 defmodule Jido.AI.Accuracy.SelfConsistencyTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.Aggregators.{MajorityVote, BestOfN, Weighted}
-  alias Jido.AI.Accuracy.TestSupport.MockGenerator
+  alias Jido.AI.Accuracy.Aggregators.{BestOfN, MajorityVote, Weighted}
   alias Jido.AI.Accuracy.{Candidate, SelfConsistency}
+  alias Jido.AI.Accuracy.Generators.LLMGenerator
+  alias Jido.AI.Accuracy.SelfConsistencyTestTestHelper
+  alias Jido.AI.Accuracy.TestSupport.MockGenerator
 
   @moduletag :capture_log
 
@@ -277,7 +279,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       :telemetry.attach(
         handler_id,
         [:jido, :accuracy, :self_consistency, :start],
-        fn event, measurements, metadata, _ ->
+        fn _event, _measurements, metadata, _ ->
           send(parent, {:telemetry_data, metadata})
         end,
         nil
@@ -301,7 +303,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       :telemetry.attach(
         handler_id,
         [:jido, :accuracy, :self_consistency, :start],
-        fn event, measurements, metadata, _ ->
+        fn _event, _measurements, metadata, _ ->
           send(parent, {:telemetry_data, metadata})
         end,
         nil
@@ -325,7 +327,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       :telemetry.attach(
         handler_id,
         [:jido, :accuracy, :self_consistency, :start],
-        fn event, measurements, metadata, _ ->
+        fn _event, _measurements, metadata, _ ->
           send(parent, {:telemetry_data, metadata})
         end,
         nil
@@ -357,7 +359,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       # The error should NOT be :invalid_generator (it would be an exception from actual generation)
       result =
         SelfConsistency.run("What is 2+2?",
-          generator: Jido.AI.Accuracy.Generators.LLMGenerator,
+          generator: LLMGenerator,
           num_candidates: 1
         )
 
@@ -368,7 +370,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     test "accepts struct generator" do
       # A struct that implements Generator should be accepted
       # (The validation passes, but we still get error for other reasons)
-      generator = Jido.AI.Accuracy.Generators.LLMGenerator.new!([])
+      generator = LLMGenerator.new!([])
       assert {:error, _} = SelfConsistency.run("What is 2+2?", generator: generator)
     end
   end
@@ -403,7 +405,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
 
       generator = MockGenerator.new(candidates: candidates)
 
-      assert {:ok, best, metadata} =
+      assert {:ok, best, _metadata} =
                SelfConsistency.run("Question",
                  generator: generator,
                  aggregator: :best_of_n
@@ -540,7 +542,7 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
     :telemetry.attach(
       handler_id,
       [:jido, :accuracy, :self_consistency, event_name],
-      &Jido.AI.Accuracy.SelfConsistencyTestTestHelper.handle_event/4,
+      &SelfConsistencyTestTestHelper.handle_event/4,
       pid
     )
   end

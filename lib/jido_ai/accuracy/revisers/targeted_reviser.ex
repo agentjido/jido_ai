@@ -215,14 +215,14 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
     else
       # Detect from content
       cond do
-        is_code?(content) -> :code
-        is_reasoning?(content) -> :reasoning
+        code?(content) -> :code
+        reasoning?(content) -> :reasoning
         true -> :format
       end
     end
   end
 
-  defp is_code?(content) when is_binary(content) do
+  defp code?(content) when is_binary(content) do
     code_indicators = [
       # Python/JS function definition
       ~r/def\s+\w+\(/,
@@ -243,9 +243,9 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
     Enum.any?(code_indicators, fn pattern -> Regex.match?(pattern, content) end)
   end
 
-  defp is_code?(_), do: false
+  defp code?(_), do: false
 
-  defp is_reasoning?(content) when is_binary(content) do
+  defp reasoning?(content) when is_binary(content) do
     reasoning_indicators = [
       ~r/\b(because|therefore|thus|consequently|since|due to)\b/i,
       ~r/\b(first|second|third|finally)\b/i,
@@ -256,7 +256,7 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
     Enum.any?(reasoning_indicators, fn pattern -> Regex.match?(pattern, content) end)
   end
 
-  defp is_reasoning?(_), do: false
+  defp reasoning?(_), do: false
 
   # Code-specific fixes
 
@@ -354,26 +354,19 @@ defmodule Jido.AI.Accuracy.Revisers.TargetedReviser do
     # Add transition words between disconnected statements
     lines = String.split(content, "\n")
 
-    Enum.map(lines, fn line ->
+    Enum.map_join(lines, "\n", fn line ->
       trimmed = String.trim(line)
 
       if trimmed == "" do
         line
       else
-        # Ensure reasoning statements have proper connectors
-        if Regex.match?(~r/^[A-Z]/, trimmed) do
-          line
-        else
-          if Regex.match?(~r/^\d+\./, String.trim_leading(line)) do
-            # It's a numbered list, keep as is
-            line
-          else
-            line
-          end
-        end
+        keep_line_as_is?(line, trimmed) && line || line
       end
     end)
-    |> Enum.join("\n")
+  end
+
+  defp keep_line_as_is?(line, trimmed) do
+    Regex.match?(~r/^[A-Z]/, trimmed) || Regex.match?(~r/^\d+\./, String.trim_leading(line))
   end
 
   defp add_conclusion_markers(content) do

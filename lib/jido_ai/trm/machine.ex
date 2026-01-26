@@ -661,38 +661,35 @@ defmodule Jido.AI.TRM.Machine do
   """
   @spec from_map(map()) :: t()
   def from_map(map) when is_map(map) do
-    status =
-      case map[:status] do
-        nil -> "idle"
-        s when is_atom(s) -> Atom.to_string(s)
-        s when is_binary(s) -> s
-      end
-
-    threshold = map[:act_threshold] || @default_act_threshold
+    threshold = Map.get(map, :act_threshold, @default_act_threshold)
 
     %__MODULE__{
-      status: status,
-      question: map[:question],
-      current_answer: map[:current_answer],
-      answer_history: map[:answer_history] || [],
-      latent_state: map[:latent_state] || initialize_latent_state("", nil),
-      supervision_feedback: map[:supervision_feedback],
-      parsed_feedback: map[:parsed_feedback],
-      supervision_step: map[:supervision_step] || 0,
-      max_supervision_steps: map[:max_supervision_steps] || @default_max_supervision_steps,
+      status: parse_status(map[:status]),
+      question: Map.get(map, :question),
+      current_answer: Map.get(map, :current_answer),
+      answer_history: Map.get(map, :answer_history, []),
+      latent_state: Map.get(map, :latent_state, initialize_latent_state("", nil)),
+      supervision_feedback: Map.get(map, :supervision_feedback),
+      parsed_feedback: Map.get(map, :parsed_feedback),
+      supervision_step: Map.get(map, :supervision_step, 0),
+      max_supervision_steps: Map.get(map, :max_supervision_steps, @default_max_supervision_steps),
       act_threshold: threshold,
-      act_state: map[:act_state] || ACT.new(threshold),
-      act_triggered: map[:act_triggered] || false,
-      best_answer: map[:best_answer],
-      best_score: map[:best_score] || 0.0,
-      result: map[:result],
-      current_call_id: map[:current_call_id],
-      termination_reason: map[:termination_reason],
-      streaming_text: map[:streaming_text] || "",
-      usage: map[:usage] || %{},
-      started_at: map[:started_at]
+      act_state: Map.get(map, :act_state, ACT.new(threshold)),
+      act_triggered: Map.get(map, :act_triggered, false),
+      best_answer: Map.get(map, :best_answer),
+      best_score: Map.get(map, :best_score, 0.0),
+      result: Map.get(map, :result),
+      current_call_id: Map.get(map, :current_call_id),
+      termination_reason: Map.get(map, :termination_reason),
+      streaming_text: Map.get(map, :streaming_text, ""),
+      usage: Map.get(map, :usage, %{}),
+      started_at: Map.get(map, :started_at)
     }
   end
+
+  defp parse_status(nil), do: "idle"
+  defp parse_status(s) when is_atom(s), do: Atom.to_string(s)
+  defp parse_status(s) when is_binary(s), do: s
 
   @doc """
   Generates a unique call ID for LLM requests.

@@ -2,7 +2,7 @@ defmodule Jido.AI.Skills.ReasoningTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Skills.Reasoning
-  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Infer, Explain}
+  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
 
   describe "skill_spec/1" do
     test "returns valid skill specification" do

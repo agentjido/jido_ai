@@ -8,32 +8,10 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Accuracy.{Pipeline, PipelineConfig, PipelineResult, Candidate, Presets}
+  alias Jido.AI.Accuracy.{Candidate, Pipeline, PipelineResult, Presets}
 
   @moduletag :accuracy_validation
   @moduletag :pipeline
-
-  # Mock generator with known failure rate
-  defp fallible_generator(query, _context) do
-    # Simulates a model that gets wrong answers sometimes
-    trick_failed = String.contains?(query, "trick")
-    random_failed = :rand.uniform(10) <= 2
-
-    cond do
-      trick_failed or random_failed ->
-        # 20% failure rate or "trick" questions
-        {:ok, Candidate.new!(%{content: "I'm not sure, maybe 42?", score: 0.5})}
-
-      String.contains?(query, "2+2") ->
-        {:ok, Candidate.new!(%{content: "4", score: 0.9})}
-
-      String.contains?(query, "10*10") ->
-        {:ok, Candidate.new!(%{content: "100", score: 0.9})}
-
-      true ->
-        {:ok, Candidate.new!(%{content: "The answer is 42", score: 0.9})}
-    end
-  end
 
   # Baseline generator (single response, no verification)
   defp baseline_generator(query, _context) do
@@ -101,6 +79,7 @@ defmodule Jido.AI.Accuracy.AccuracyValidationTest do
       refute Enum.empty?(result.trace)
     end
 
+    @tag :flaky
     test "pipeline with verification catches more errors than baseline" do
       # This test verifies that verification stage adds value by checking consistency
 

@@ -48,7 +48,7 @@ defmodule Jido.AI.TRM.MachineTest do
       machine = Machine.new()
       call_id = "trm_test_123"
 
-      {machine, directives} = Machine.update(machine, {:start, "What is 2+2?", call_id})
+      {machine, _directives} = Machine.update(machine, {:start, "What is 2+2?", call_id})
 
       assert machine.status == "reasoning"
       assert machine.question == "What is 2+2?"
@@ -101,7 +101,7 @@ defmodule Jido.AI.TRM.MachineTest do
     test "transitions to supervising on success", %{machine: machine, call_id: call_id} do
       result = {:ok, %{text: "The answer is 4 because 2+2=4"}}
 
-      {machine, directives} = Machine.update(machine, {:reasoning_result, call_id, result})
+      {machine, _directives} = Machine.update(machine, {:reasoning_result, call_id, result})
 
       assert machine.status == "supervising"
       assert machine.current_answer == "The answer is 4 because 2+2=4"
@@ -110,7 +110,7 @@ defmodule Jido.AI.TRM.MachineTest do
     test "returns supervise directive", %{machine: machine, call_id: call_id} do
       result = {:ok, %{text: "The answer is 4"}}
 
-      {machine, directives} = Machine.update(machine, {:reasoning_result, call_id, result})
+      {_machine, directives} = Machine.update(machine, {:reasoning_result, call_id, result})
 
       assert length(directives) == 1
       {:supervise, new_call_id, context} = hd(directives)
@@ -170,7 +170,7 @@ defmodule Jido.AI.TRM.MachineTest do
       call_id = machine.current_call_id
       result = {:ok, %{text: "Score: 0.7. The answer is correct but lacks explanation."}}
 
-      {machine, directives} = Machine.update(machine, {:supervision_result, call_id, result})
+      {machine, _directives} = Machine.update(machine, {:supervision_result, call_id, result})
 
       assert machine.status == "improving"
       assert machine.supervision_feedback =~ "Score: 0.7"
@@ -180,7 +180,7 @@ defmodule Jido.AI.TRM.MachineTest do
       call_id = machine.current_call_id
       result = {:ok, %{text: "The answer needs more detail"}}
 
-      {machine, directives} = Machine.update(machine, {:supervision_result, call_id, result})
+      {_machine, directives} = Machine.update(machine, {:supervision_result, call_id, result})
 
       assert length(directives) == 1
       {:improve, new_call_id, context} = hd(directives)
