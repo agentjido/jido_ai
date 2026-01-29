@@ -68,7 +68,7 @@ defmodule Jido.AI.ReActAgent do
   You can pass per-request context that will be merged with the agent's base tool_context:
 
       # Pass actor/tenant for this specific request
-      :ok = MyApp.WeatherAgent.ask(pid, "Get my preferences", 
+      :ok = MyApp.WeatherAgent.ask(pid, "Get my preferences",
         tool_context: %{actor: current_user, tenant_id: "acme"})
   """
 
@@ -150,16 +150,16 @@ defmodule Jido.AI.ReActAgent do
           %{}
 
         {:%, _, _} = map_ast ->
-           # It's a struct/map AST - expand aliases safely and evaluate
-           expanded_ast = __MODULE__.expand_aliases_in_ast(map_ast, __CALLER__)
-           {evaluated, _} = Code.eval_quoted(expanded_ast, [], __CALLER__)
-           evaluated
+          # It's a struct/map AST - expand aliases safely and evaluate
+          expanded_ast = __MODULE__.expand_aliases_in_ast(map_ast, __CALLER__)
+          {evaluated, _} = Code.eval_quoted(expanded_ast, [], __CALLER__)
+          evaluated
 
-         {:%{}, _, _} = map_ast ->
-           # Plain map AST - expand aliases safely and evaluate
-           expanded_ast = __MODULE__.expand_aliases_in_ast(map_ast, __CALLER__)
-           {evaluated, _} = Code.eval_quoted(expanded_ast, [], __CALLER__)
-           evaluated
+        {:%{}, _, _} = map_ast ->
+          # Plain map AST - expand aliases safely and evaluate
+          expanded_ast = __MODULE__.expand_aliases_in_ast(map_ast, __CALLER__)
+          {evaluated, _} = Code.eval_quoted(expanded_ast, [], __CALLER__)
+          evaluated
 
         other when is_map(other) ->
           other

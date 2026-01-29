@@ -1,0 +1,126 @@
+defmodule Jido.AI.CLI.Adapters.ReAct do
+  @moduledoc """
+  CLI adapter for ReAct-style agents.
+
+  Handles the specifics of ReAct agent lifecycle:
+  - Uses `ask/2` to submit queries
+  - Polls `strategy_snapshot.done?` for completion
+  - Extracts result from `snapshot.result`
+  """
+
+  @behaviour Jido.AI.CLI.Adapter
+
+  @default_model "anthropic:claude-haiku-4-5"
+  @default_max_iterations 10
+  @default_tools [
+    Jido.Tools.Arithmetic.Add,
+    Jido.Tools.Arithmetic.Subtract,
+    Jido.Tools.Arithmetic.Multiply,
+    Jido.Tools.Arithmetic.Divide,
+    Jido.Tools.Weather
+  ]
+
+  @impl true
+  def start_agent(jido_instance, agent_module, _config) do
+    Jido.start_agent(jido_instance, agent_module)
+  end
+
+  @impl true
+  def submit(pid, query, config) do
+    agent_module = config.agent_module
+    agent_module.ask(pid, query)
+  end
+
+  @impl true
+  def await(pid, timeout_ms, _config) do
+    poll_interval = 100
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+
+    poll_loop(pid, deadline, poll_interval)
+  end
+
+  @impl true
+  def stop(pid) do
+    try do
+      GenServer.stop(pid, :normal, 1000)
+    catch
+      :exit, _ -> :ok
+    end
+
+    :ok
+  end
+
+  @impl true
+  def create_ephemeral_agent(config) do
+    suffix = :erlang.unique_integer([:positive])
+    module_name = Module.concat([JidoAi, EphemeralAgent, :"ReAct#{suffix}"])
+
+    tools = config[:tools] || @default_tools
+    model = config[:model] || @default_model
+    max_iterations = config[:max_iterations] || @default_max_iterations
+    system_prompt = config[:system_prompt]
+
+    contents =
+      if system_prompt do
+        quote do
+          use Jido.AI.ReActAgent,
+            name: "cli_react_agent",
+            description: "CLI ephemeral ReAct agent",
+            tools: unquote(tools),
+            model: unquote(model),
+            max_iterations: unquote(max_iterations),
+            system_prompt: unquote(system_prompt)
+        end
+      else
+        quote do
+          use Jido.AI.ReActAgent,
+            name: "cli_react_agent",
+            description: "CLI ephemeral ReAct agent",
+            tools: unquote(tools),
+            model: unquote(model),
+            max_iterations: unquote(max_iterations)
+        end
+      end
+
+    Module.create(module_name, contents, Macro.Env.location(__ENV__))
+    module_name
+  end
+
+  # Private helpers
+
+  defp poll_loop(pid, deadline, interval) do
+    now = System.monotonic_time(:millisecond)
+
+    if now >= deadline do
+      {:error, :timeout}
+    else
+      case Jido.AgentServer.status(pid) do
+        {:ok, status} ->
+          if status.snapshot.done? do
+            # Prefer snapshot.result (general contract), fallback to raw_state.last_answer
+            answer =
+              case status.snapshot.result do
+                nil -> Map.get(status.raw_state, :last_answer, "")
+                "" -> Map.get(status.raw_state, :last_answer, "")
+                result -> result
+              end
+
+            {:ok, %{answer: answer, meta: extract_meta(status)}}
+          else
+            Process.sleep(interval)
+            poll_loop(pid, deadline, interval)
+          end
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp extract_meta(status) do
+    %{
+      status: status.snapshot.status,
+      iterations: Map.get(status.raw_state, :__strategy__, %{}) |> Map.get(:iteration, 0)
+    }
+  end
+end

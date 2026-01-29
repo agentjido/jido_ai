@@ -76,6 +76,7 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0", override: true},
+      {:term_ui, "~> 0.2"},
       {:typedstruct, "~> 0.5"},
       {:uniq, "~> 0.6"},
       {:zoi, "~> 0.16", override: true}
