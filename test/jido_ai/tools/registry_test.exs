@@ -30,18 +30,14 @@ defmodule Jido.AI.Tools.RegistryTest do
     def run(_params, _context), do: {:ok, %{}}
   end
 
-  # Define test Tool modules
-  defmodule TestTools.Echo do
-    use Jido.AI.Tools.Tool,
+  # Additional test Action modules
+  defmodule TestActions.Echo do
+    use Jido.Action,
       name: "echo",
-      description: "Echoes back the input message"
-
-    @impl true
-    def schema do
-      [
+      description: "Echoes back the input message",
+      schema: [
         message: [type: :string, required: true, doc: "Message to echo"]
       ]
-    end
 
     @impl true
     def run(params, _context) do
@@ -49,17 +45,13 @@ defmodule Jido.AI.Tools.RegistryTest do
     end
   end
 
-  defmodule TestTools.Weather do
-    use Jido.AI.Tools.Tool,
+  defmodule TestActions.Weather do
+    use Jido.Action,
       name: "weather",
-      description: "Gets weather information"
-
-    @impl true
-    def schema do
-      [
+      description: "Gets weather information",
+      schema: [
         city: [type: :string, required: true, doc: "City name"]
       ]
-    end
 
     @impl true
     def run(params, _context) do
@@ -84,19 +76,14 @@ defmodule Jido.AI.Tools.RegistryTest do
       assert :ok = Registry.register_action(TestActions.Calculator)
     end
 
-    test "stores action with correct type" do
+    test "stores action module" do
       :ok = Registry.register_action(TestActions.Calculator)
 
-      assert {:ok, {:action, TestActions.Calculator}} = Registry.get("calculator")
+      assert {:ok, TestActions.Calculator} = Registry.get("calculator")
     end
 
     test "returns error for non-action module" do
       assert {:error, :not_an_action} = Registry.register_action(InvalidModule)
-    end
-
-    test "returns error for tool module" do
-      # Tools should not be registered via register_action
-      assert {:error, :not_an_action} = Registry.register_action(TestTools.Echo)
     end
   end
 
@@ -104,8 +91,8 @@ defmodule Jido.AI.Tools.RegistryTest do
     test "registers multiple action modules" do
       assert :ok = Registry.register_actions([TestActions.Calculator, TestActions.Search])
 
-      assert {:ok, {:action, TestActions.Calculator}} = Registry.get("calculator")
-      assert {:ok, {:action, TestActions.Search}} = Registry.get("search")
+      assert {:ok, TestActions.Calculator} = Registry.get("calculator")
+      assert {:ok, TestActions.Search} = Registry.get("search")
     end
 
     test "stops on first error" do
@@ -113,73 +100,25 @@ defmodule Jido.AI.Tools.RegistryTest do
       assert {:error, :not_an_action} = result
 
       # First action should be registered
-      assert {:ok, {:action, TestActions.Calculator}} = Registry.get("calculator")
+      assert {:ok, TestActions.Calculator} = Registry.get("calculator")
     end
   end
 
-  describe "register_tool/1" do
-    test "registers a valid tool module" do
-      assert :ok = Registry.register_tool(TestTools.Echo)
-    end
-
-    test "stores tool with correct type" do
-      :ok = Registry.register_tool(TestTools.Echo)
-
-      assert {:ok, {:tool, TestTools.Echo}} = Registry.get("echo")
-    end
-
-    test "returns error for non-tool module" do
-      assert {:error, :not_a_tool} = Registry.register_tool(InvalidModule)
-    end
-
-    test "returns error for action module" do
-      # Actions should not be registered via register_tool
-      assert {:error, :not_a_tool} = Registry.register_tool(TestActions.Calculator)
-    end
-  end
-
-  describe "register_tools/1" do
-    test "registers multiple tool modules" do
-      assert :ok = Registry.register_tools([TestTools.Echo, TestTools.Weather])
-
-      assert {:ok, {:tool, TestTools.Echo}} = Registry.get("echo")
-      assert {:ok, {:tool, TestTools.Weather}} = Registry.get("weather")
-    end
-
-    test "stops on first error" do
-      result = Registry.register_tools([TestTools.Echo, InvalidModule])
-      assert {:error, :not_a_tool} = result
-
-      # First tool should be registered
-      assert {:ok, {:tool, TestTools.Echo}} = Registry.get("echo")
-    end
-  end
-
-  describe "register/1 auto-detection" do
-    test "auto-detects and registers action" do
+  describe "register/1" do
+    test "registers action" do
       assert :ok = Registry.register(TestActions.Calculator)
-      assert {:ok, {:action, TestActions.Calculator}} = Registry.get("calculator")
-    end
-
-    test "auto-detects and registers tool" do
-      assert :ok = Registry.register(TestTools.Echo)
-      assert {:ok, {:tool, TestTools.Echo}} = Registry.get("echo")
+      assert {:ok, TestActions.Calculator} = Registry.get("calculator")
     end
 
     test "returns error for invalid module" do
-      assert {:error, :invalid_module} = Registry.register(InvalidModule)
+      assert {:error, :not_an_action} = Registry.register(InvalidModule)
     end
   end
 
   describe "get/1" do
-    test "returns action with type" do
+    test "returns action module" do
       :ok = Registry.register_action(TestActions.Calculator)
-      assert {:ok, {:action, TestActions.Calculator}} = Registry.get("calculator")
-    end
-
-    test "returns tool with type" do
-      :ok = Registry.register_tool(TestTools.Echo)
-      assert {:ok, {:tool, TestTools.Echo}} = Registry.get("echo")
+      assert {:ok, TestActions.Calculator} = Registry.get("calculator")
     end
 
     test "returns error for unknown name" do
@@ -188,14 +127,9 @@ defmodule Jido.AI.Tools.RegistryTest do
   end
 
   describe "get!/1" do
-    test "returns action with type" do
+    test "returns action module" do
       :ok = Registry.register_action(TestActions.Calculator)
-      assert {:action, TestActions.Calculator} = Registry.get!("calculator")
-    end
-
-    test "returns tool with type" do
-      :ok = Registry.register_tool(TestTools.Echo)
-      assert {:tool, TestTools.Echo} = Registry.get!("echo")
+      assert TestActions.Calculator = Registry.get!("calculator")
     end
 
     test "raises KeyError for unknown name" do
@@ -212,19 +146,19 @@ defmodule Jido.AI.Tools.RegistryTest do
 
     test "returns all registered items" do
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       items = Registry.list_all()
       assert length(items) == 2
 
-      assert {"calculator", :action, TestActions.Calculator} in items
-      assert {"echo", :tool, TestTools.Echo} in items
+      assert {"calculator", TestActions.Calculator} in items
+      assert {"echo", TestActions.Echo} in items
     end
 
     test "returns items sorted by name" do
-      :ok = Registry.register_tool(TestTools.Weather)
+      :ok = Registry.register_action(TestActions.Weather)
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       items = Registry.list_all()
       names = Enum.map(items, &elem(&1, 0))
@@ -235,41 +169,20 @@ defmodule Jido.AI.Tools.RegistryTest do
 
   describe "list_actions/0" do
     test "returns empty list when no actions registered" do
-      :ok = Registry.register_tool(TestTools.Echo)
       assert [] = Registry.list_actions()
     end
 
     test "returns only actions" do
       :ok = Registry.register_action(TestActions.Calculator)
       :ok = Registry.register_action(TestActions.Search)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       actions = Registry.list_actions()
-      assert length(actions) == 2
+      assert length(actions) == 3
 
       assert {"calculator", TestActions.Calculator} in actions
       assert {"search", TestActions.Search} in actions
-      refute Enum.any?(actions, fn {_, mod} -> mod == TestTools.Echo end)
-    end
-  end
-
-  describe "list_tools/0" do
-    test "returns empty list when no tools registered" do
-      :ok = Registry.register_action(TestActions.Calculator)
-      assert [] = Registry.list_tools()
-    end
-
-    test "returns only tools" do
-      :ok = Registry.register_tool(TestTools.Echo)
-      :ok = Registry.register_tool(TestTools.Weather)
-      :ok = Registry.register_action(TestActions.Calculator)
-
-      tools = Registry.list_tools()
-      assert length(tools) == 2
-
-      assert {"echo", TestTools.Echo} in tools
-      assert {"weather", TestTools.Weather} in tools
-      refute Enum.any?(tools, fn {_, mod} -> mod == TestActions.Calculator end)
+      assert {"echo", TestActions.Echo} in actions
     end
   end
 
@@ -287,18 +200,9 @@ defmodule Jido.AI.Tools.RegistryTest do
       assert tool.description == "Performs arithmetic calculations"
     end
 
-    test "converts tools to ReqLLM.Tool" do
-      :ok = Registry.register_tool(TestTools.Echo)
-
-      [tool] = Registry.to_reqllm_tools()
-      assert %ReqLLM.Tool{} = tool
-      assert tool.name == "echo"
-      assert tool.description == "Echoes back the input message"
-    end
-
-    test "converts mixed actions and tools" do
+    test "converts multiple actions to ReqLLM.Tool" do
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       tools = Registry.to_reqllm_tools()
       assert length(tools) == 2
@@ -312,7 +216,7 @@ defmodule Jido.AI.Tools.RegistryTest do
   describe "clear/0" do
     test "removes all registered items" do
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       assert length(Registry.list_all()) == 2
 
@@ -325,7 +229,7 @@ defmodule Jido.AI.Tools.RegistryTest do
   describe "unregister/1" do
     test "removes registered item by name" do
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       assert length(Registry.list_all()) == 2
 
@@ -333,7 +237,7 @@ defmodule Jido.AI.Tools.RegistryTest do
 
       assert length(Registry.list_all()) == 1
       assert {:error, :not_found} = Registry.get("calculator")
-      assert {:ok, {:tool, TestTools.Echo}} = Registry.get("echo")
+      assert {:ok, TestActions.Echo} = Registry.get("echo")
     end
 
     test "returns ok for non-existent name" do
@@ -346,20 +250,17 @@ defmodule Jido.AI.Tools.RegistryTest do
       tasks =
         for i <- 1..10 do
           Task.async(fn ->
-            # Alternate between registering action and tool
             if rem(i, 2) == 0 do
               Registry.register_action(TestActions.Calculator)
             else
-              Registry.register_tool(TestTools.Echo)
+              Registry.register_action(TestActions.Echo)
             end
           end)
         end
 
       Enum.each(tasks, &Task.await/1)
 
-      # Both should be registered (last write wins for duplicates)
       items = Registry.list_all()
-      # We should have at most 2 items (calculator and echo)
       assert length(items) <= 2
     end
   end

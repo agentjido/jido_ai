@@ -50,9 +50,8 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   Tools are managed through `Jido.AI.Tools.Registry`:
 
-  - **Actions** - Jido.Action modules can be used as tools
-  - **Tools** - Jido.AI.Tools.Tool modules with specialized behavior
-  - Both are registered and executed through the unified interface
+  - **Actions** - Jido.Action modules registered as tools
+  - All actions are executed via `Jido.Exec.run/3` for consistent validation
 
   ## Auto-Execution
 
@@ -65,7 +64,7 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   ## Model Resolution
 
-  Uses `Jido.AI.Config.resolve_model/1` for model aliases:
+  Uses `Jido.AI.resolve_model/1` for model aliases:
   * `:fast` - Quick model for simple tasks (default: `anthropic:claude-haiku-4-5`)
   * `:capable` - Capable model for complex tasks (default: `anthropic:claude-sonnet-4-20250514`)
   * Direct model specs also supported

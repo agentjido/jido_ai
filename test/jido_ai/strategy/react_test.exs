@@ -2,7 +2,6 @@ defmodule Jido.AI.Strategies.ReActTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Config
   alias Jido.AI.Strategies.ReAct
 
   # Test action module
@@ -47,7 +46,7 @@ defmodule Jido.AI.Strategies.ReActTest do
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.model == Config.resolve_model(:fast)
+      assert config.model == Jido.AI.resolve_model(:fast)
       assert is_binary(config.model)
       assert String.contains?(config.model, ":")
     end
@@ -57,7 +56,7 @@ defmodule Jido.AI.Strategies.ReActTest do
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.model == Config.resolve_model(:capable)
+      assert config.model == Jido.AI.resolve_model(:capable)
     end
 
     test "passes through string model specs unchanged" do

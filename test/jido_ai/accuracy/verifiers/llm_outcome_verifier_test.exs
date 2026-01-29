@@ -632,7 +632,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
       mid_score: mid_score
     ]
 
-    rendered = EEx.eval_string(template, assigns: assigns)
+    rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
     {:ok, rendered}
   rescue
     e -> {:error, {:template_error, Exception.message(e)}}

@@ -1,13 +1,13 @@
 defmodule Jido.AI.Tools.Executor do
   @moduledoc """
-  Unified tool execution with validation, error handling, and timeout support.
+  Action execution with validation, error handling, and timeout support.
 
-  This module provides a single entry point for executing both Jido.Actions and
-  Jido.AI.Tools.Tool modules. It handles the full execution lifecycle:
+  This module provides a single entry point for executing Jido.Action modules
+  as LLM tools. It handles the full execution lifecycle:
 
-  1. **Registry Lookup**: Finds the tool by name in the Registry
+  1. **Registry Lookup**: Finds the action by name in the Registry
   2. **Parameter Normalization**: Converts LLM arguments to proper types
-  3. **Execution**: Dispatches to Jido.Exec (Actions) or run/2 (Tools)
+  3. **Execution**: Dispatches to Jido.Exec
   4. **Result Formatting**: Converts results to LLM-friendly format
   5. **Error Handling**: Catches exceptions and returns structured errors
   6. **Timeout Support**: Optional timeout with Task.await
@@ -26,7 +26,7 @@ defmodule Jido.AI.Tools.Executor do
   ## Parameter Normalization
 
   LLM tool calls return arguments with string keys (from JSON). The executor
-  normalizes arguments using the tool's schema:
+  normalizes arguments using the action's schema:
 
   - Converts string keys to atom keys
   - Parses string numbers to integers/floats based on schema type
@@ -117,8 +117,8 @@ defmodule Jido.AI.Tools.Executor do
     start_telemetry(tool_name, params)
 
     case Registry.get(tool_name) do
-      {:ok, {type, module}} ->
-        execute_with_timeout(type, module, tool_name, params, context, timeout)
+      {:ok, module} ->
+        execute_with_timeout(module, tool_name, params, context, timeout)
 
       {:error, :not_found} ->
         error = %{
@@ -135,12 +135,11 @@ defmodule Jido.AI.Tools.Executor do
   @doc """
   Executes a module directly without registry lookup.
 
-  Use this when you already have the module reference and know its type.
+  Use this when you already have the Action module reference.
 
   ## Arguments
 
-    * `module` - The Action or Tool module to execute
-    * `type` - The module type (`:action` or `:tool`)
+    * `module` - The Action module to execute
     * `params` - Parameters to pass to the module
     * `context` - Execution context
     * `opts` - Optional execution options
@@ -154,27 +153,27 @@ defmodule Jido.AI.Tools.Executor do
     * `{:ok, result}` - Execution succeeded
     * `{:error, error_map}` - Execution failed
   """
-  @spec execute_module(module(), :action | :tool, map(), map(), execute_opts()) :: execute_result()
-  def execute_module(module, type, params, context, opts \\ []) do
+  @spec execute_module(module(), map(), map(), execute_opts()) :: execute_result()
+  def execute_module(module, params, context, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     tool_name = module.name()
 
     start_telemetry(tool_name, params)
-    execute_with_timeout(type, module, tool_name, params, context, timeout)
+    execute_with_timeout(module, tool_name, params, context, timeout)
   end
 
   # ============================================================================
   # Execution
   # ============================================================================
 
-  @spec execute_with_timeout(:action | :tool, module(), String.t(), map(), map(), pos_integer()) ::
+  @spec execute_with_timeout(module(), String.t(), map(), map(), pos_integer()) ::
           execute_result()
-  defp execute_with_timeout(type, module, tool_name, params, context, timeout) do
+  defp execute_with_timeout(module, tool_name, params, context, timeout) do
     start_time = System.monotonic_time()
 
     task =
       Task.async(fn ->
-        execute_internal(type, module, tool_name, params, context)
+        execute_internal(module, tool_name, params, context)
       end)
 
     case Task.yield(task, timeout) || Task.shutdown(task) do
@@ -195,18 +194,12 @@ defmodule Jido.AI.Tools.Executor do
     end
   end
 
-  @spec execute_internal(:action | :tool, module(), String.t(), map(), map()) :: execute_result()
-  defp execute_internal(type, module, tool_name, params, context) do
+  @spec execute_internal(module(), String.t(), map(), map()) :: execute_result()
+  defp execute_internal(module, tool_name, params, context) do
     schema = module.schema()
     normalized_params = normalize_params(params, schema)
 
-    result =
-      case type do
-        :action -> execute_action(module, normalized_params, context)
-        :tool -> execute_tool(module, normalized_params, context)
-      end
-
-    case result do
+    case Jido.Exec.run(module, normalized_params, context) do
       {:ok, output} -> {:ok, format_result(output)}
       {:error, reason} -> {:error, format_error(tool_name, reason)}
     end
@@ -216,16 +209,6 @@ defmodule Jido.AI.Tools.Executor do
   catch
     kind, reason ->
       {:error, format_catch(tool_name, kind, reason)}
-  end
-
-  @spec execute_action(module(), map(), map()) :: {:ok, term()} | {:error, term()}
-  defp execute_action(module, params, context) do
-    Jido.Exec.run(module, params, context)
-  end
-
-  @spec execute_tool(module(), map(), map()) :: {:ok, term()} | {:error, term()}
-  defp execute_tool(module, params, context) do
-    module.run(params, context)
   end
 
   # ============================================================================
@@ -394,6 +377,15 @@ defmodule Jido.AI.Tools.Executor do
   # Error Formatting
   # ============================================================================
 
+  defp format_error(tool_name, reason) when is_exception(reason) do
+    %{
+      error: Exception.message(reason),
+      tool_name: tool_name,
+      type: :execution_error,
+      details: %{exception_type: reason.__struct__}
+    }
+  end
+
   defp format_error(tool_name, reason) when is_binary(reason) do
     %{
       error: reason,
@@ -411,7 +403,7 @@ defmodule Jido.AI.Tools.Executor do
     }
   end
 
-  defp format_error(tool_name, reason) do
+  defp format_error(tool_name, reason) when is_atom(reason) or is_tuple(reason) or is_list(reason) do
     %{
       error: inspect(reason),
       tool_name: tool_name,

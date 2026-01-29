@@ -2,9 +2,8 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteTool do
   @moduledoc """
   A Jido.Action for direct tool execution without LLM involvement.
 
-  This action executes a registered tool by name with the given parameters.
-  It uses the unified `Jido.AI.Tools.Executor` for execution, which handles
-  both Jido.Actions and Jido.AI.Tools.Tool modules.
+  This action executes a registered Action by name with the given parameters.
+  It uses `Jido.AI.Tools.Executor` for execution.
 
   ## Parameters
 

@@ -12,9 +12,9 @@ defmodule Jido.AI.Accuracy.VerificationTest do
   """
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Accuracy.{Candidate, VerificationResult, VerificationRunner}
   alias Jido.AI.Accuracy.Prms.LLMPrm
   alias Jido.AI.Accuracy.Verifiers.DeterministicVerifier
+  alias Jido.AI.Accuracy.{Candidate, VerificationResult, VerificationRunner}
 
   @moduletag :integration
   @moduletag :verification

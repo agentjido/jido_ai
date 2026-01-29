@@ -395,14 +395,16 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
   defp call_llm_with_retry(prm, prompt, retries) do
     model = prm.model || Config.default_model()
 
-    messages = [%ReqLLM.Message{role: :user, content: prompt}]
+    context =
+      ReqLLM.Context.new()
+      |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
 
     reqllm_opts = [
       temperature: prm.temperature,
       receive_timeout: prm.timeout
     ]
 
-    case ReqLLM.Generation.generate_text(model, messages, reqllm_opts) do
+    case ReqLLM.Generation.generate_text(model, context, reqllm_opts) do
       {:ok, response} ->
         content = extract_content(response)
         {:ok, %{content: content}}
@@ -552,7 +554,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
   defp midpoint({min, max}), do: (min + max) / 2
 
   defp render_template(template, assigns) do
-    rendered = EEx.eval_string(template, assigns: assigns)
+    rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
     {:ok, rendered}
   rescue
     e in [SyntaxError, TokenMissingError, ArgumentError] ->

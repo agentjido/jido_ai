@@ -2,10 +2,10 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Accuracy.Aggregators.{BestOfN, MajorityVote, Weighted}
-  alias Jido.AI.Accuracy.{Candidate, SelfConsistency}
   alias Jido.AI.Accuracy.Generators.LLMGenerator
   alias Jido.AI.Accuracy.SelfConsistencyTestTestHelper
   alias Jido.AI.Accuracy.TestSupport.MockGenerator
+  alias Jido.AI.Accuracy.{Candidate, SelfConsistency}
 
   @moduletag :capture_log
 
@@ -367,11 +367,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       refute result == {:error, :invalid_generator}
     end
 
+    @tag :requires_api
     test "accepts struct generator" do
       # A struct that implements Generator should be accepted
-      # (The validation passes, but we still get error for other reasons)
       generator = LLMGenerator.new!([])
-      assert {:error, _} = SelfConsistency.run("What is 2+2?", generator: generator)
+      assert {:ok, _best, _metadata} = SelfConsistency.run("What is 2+2?", generator: generator)
     end
   end
 

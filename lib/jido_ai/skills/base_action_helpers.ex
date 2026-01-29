@@ -28,7 +28,7 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
       end
   """
 
-  alias Jido.AI.{Config, Security}
+  alias Jido.AI.Security
 
   @doc """
   Resolves a model parameter to a model spec.
@@ -54,8 +54,8 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
       iex> resolve_model("openai:gpt-4", :fast)
       {:ok, "openai:gpt-4"}
   """
-  def resolve_model(nil, default), do: {:ok, Config.resolve_model(default)}
-  def resolve_model(model, _default) when is_atom(model), do: {:ok, Config.resolve_model(model)}
+  def resolve_model(nil, default), do: {:ok, Jido.AI.resolve_model(default)}
+  def resolve_model(model, _default) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
   def resolve_model(model, _default) when is_binary(model), do: {:ok, model}
   def resolve_model(_model, _default), do: {:error, :invalid_model_format}
 

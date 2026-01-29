@@ -47,9 +47,9 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Helpers
   alias Jido.AI.Security
   alias Jido.AI.Skills.BaseActionHelpers
+  alias ReqLLM.Context
 
   @doc """
   Executes the completion action.
@@ -87,7 +87,7 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
   # Private Functions
 
   defp build_messages(prompt) do
-    Helpers.build_messages(prompt, [])
+    Context.normalize(prompt, [])
   end
 
   defp sanitize_error_for_user(error) when is_struct(error) do

@@ -3,7 +3,7 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
   A Jido.Action for chat-style LLM interactions with optional system prompts.
 
   This action uses ReqLLM directly to generate chat-style responses from
-  language models. It supports model aliases via `Jido.AI.Config` and
+  language models. It supports model aliases via `Jido.AI.resolve_model/1` and
   optional system prompts for conversation context.
 
   ## Parameters
@@ -57,9 +57,9 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Helpers
   alias Jido.AI.Security
   alias Jido.AI.Skills.BaseActionHelpers
+  alias ReqLLM.Context
 
   @doc """
   Executes the chat action.
@@ -107,11 +107,11 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
   defp sanitize_error_for_user(_error), do: "An error occurred"
 
   defp build_messages(prompt, nil) do
-    Helpers.build_messages(prompt, [])
+    Context.normalize(prompt, [])
   end
 
   defp build_messages(prompt, system_prompt) when is_binary(system_prompt) do
-    Helpers.build_messages(prompt, system_prompt: system_prompt)
+    Context.normalize(prompt, system_prompt: system_prompt)
   end
 
   defp format_result(response, model) do
