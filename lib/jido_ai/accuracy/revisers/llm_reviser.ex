@@ -266,7 +266,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
     ]
 
     try do
-      rendered = EEx.eval_string(template, assigns: assigns)
+      rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
       {:ok, rendered}
     rescue
       e ->

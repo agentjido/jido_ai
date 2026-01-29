@@ -280,7 +280,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
     rendered =
       try do
-        EEx.eval_string(template, assigns: assigns)
+        Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
       rescue
         e -> {:error, {:template_error, Exception.message(e)}}
       end
@@ -321,7 +321,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
     rendered =
       try do
-        EEx.eval_string(template, assigns: assigns)
+        Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
       rescue
         e -> {:error, {:template_error, Exception.message(e)}}
       end

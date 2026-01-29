@@ -44,4 +44,40 @@ defmodule Jido.AI.Accuracy.Helpers do
   def get_attr(attrs, key, default) when is_map(attrs) do
     Map.get(attrs, key, default)
   end
+
+  @doc """
+  Evaluates an EEx template without printing compiler diagnostics.
+
+  This wraps `EEx.eval_string/2` to suppress warning/error output that
+  would otherwise pollute test output or logs.
+
+  ## Parameters
+
+  - `template` - The EEx template string
+  - `opts` - Options to pass to `EEx.eval_string/2`
+
+  ## Returns
+
+  The rendered string result.
+
+  ## Raises
+
+  Raises the same exceptions as `EEx.eval_string/2` for invalid templates.
+  """
+  @spec eval_eex_quiet(String.t(), keyword()) :: String.t() | no_return()
+  def eval_eex_quiet(template, opts \\ []) do
+    {{status, result, stacktrace}, _diagnostics} =
+      Code.with_diagnostics(fn ->
+        try do
+          {:ok, EEx.eval_string(template, opts), nil}
+        rescue
+          e -> {:raise, e, __STACKTRACE__}
+        end
+      end)
+
+    case status do
+      :ok -> result
+      :raise -> reraise result, stacktrace
+    end
+  end
 end
