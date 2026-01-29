@@ -255,7 +255,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   # Private functions
 
   defp generate_one(%__MODULE__{} = generator, prompt, temperature, timeout, _opts) do
-    messages = build_messages(generator.system_prompt, prompt)
+    context = build_context(generator.system_prompt, prompt)
 
     reqllm_opts =
       [
@@ -264,7 +264,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
       ]
       |> add_model_opt(generator.model)
 
-    case ReqLLM.Generation.generate_text(generator.model, messages, reqllm_opts) do
+    case ReqLLM.Generation.generate_text(generator.model, context, reqllm_opts) do
       {:ok, response} ->
         content = extract_content(response)
         tokens = count_tokens(response)
@@ -287,15 +287,15 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
       {:error, {:exception, Exception.message(e), struct: e.__struct__}}
   end
 
-  defp build_messages(nil, prompt) do
-    [%ReqLLM.Message{role: :user, content: prompt}]
+  defp build_context(nil, prompt) do
+    ReqLLM.Context.new()
+    |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
   end
 
-  defp build_messages(system_prompt, prompt) do
-    [
-      %ReqLLM.Message{role: :system, content: system_prompt},
-      %ReqLLM.Message{role: :user, content: prompt}
-    ]
+  defp build_context(system_prompt, prompt) do
+    ReqLLM.Context.new()
+    |> ReqLLM.Context.append(ReqLLM.Context.system(system_prompt))
+    |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
   end
 
   defp extract_content(response) do

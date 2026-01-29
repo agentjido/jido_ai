@@ -462,8 +462,7 @@ defmodule Jido.AI.Strategies.ReAct do
   defp lookup_in_registry(tool_name, config) do
     if config[:use_registry] do
       case Registry.get(tool_name) do
-        {:ok, {:action, module}} -> {:ok, module}
-        {:ok, {:tool, module}} -> {:ok, module}
+        {:ok, module} -> {:ok, module}
         _ -> :error
       end
     else

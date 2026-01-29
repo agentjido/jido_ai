@@ -367,11 +367,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
       refute result == {:error, :invalid_generator}
     end
 
+    @tag :requires_api
     test "accepts struct generator" do
       # A struct that implements Generator should be accepted
-      # (The validation passes, but we still get error for other reasons)
       generator = LLMGenerator.new!([])
-      assert {:error, _} = SelfConsistency.run("What is 2+2?", generator: generator)
+      assert {:ok, _best, _metadata} = SelfConsistency.run("What is 2+2?", generator: generator)
     end
   end
 

@@ -9,7 +9,6 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListToolsTest do
   describe "schema" do
     test "has no required fields" do
       refute ListTools.schema().fields[:filter].meta.required
-      refute ListTools.schema().fields[:type].meta.required
     end
 
     test "has default values" do
@@ -30,23 +29,10 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListToolsTest do
       assert result.filter == "test"
     end
 
-    test "includes type in result" do
-      assert {:ok, result} = ListTools.run(%{type: :action}, %{})
-      assert result.type == :action
-    end
-
     test "filters tools by name pattern" do
       assert {:ok, result} = ListTools.run(%{filter: "nonexistent_xyz"}, %{})
       # Should return empty list or filtered results
       assert is_list(result.tools)
-    end
-
-    test "filters tools by type" do
-      assert {:ok, result} = ListTools.run(%{type: :action}, %{})
-      # All tools should be actions
-      Enum.each(result.tools, fn tool ->
-        assert tool.type == :action
-      end)
     end
 
     test "respects include_schema false" do
@@ -67,15 +53,13 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListToolsTest do
   end
 
   describe "tool structure" do
-    test "returns tools with name and type (module excluded for security)" do
+    test "returns tools with name (module excluded for security)" do
       assert {:ok, result} = ListTools.run(%{}, %{})
 
       Enum.each(result.tools, fn tool ->
         assert Map.has_key?(tool, :name)
-        assert Map.has_key?(tool, :type)
         # Module is excluded for security - don't expose internal structure
         refute Map.has_key?(tool, :module)
-        assert tool.type in [:action, :tool]
       end)
     end
   end

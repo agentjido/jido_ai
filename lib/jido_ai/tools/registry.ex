@@ -1,36 +1,31 @@
 defmodule Jido.AI.Tools.Registry do
   @moduledoc """
-  Unified registry for managing both Jido.Actions and Jido.AI.Tools.Tool modules.
+  Registry for managing Jido.Action modules as AI tools.
 
-  This registry provides a single source of truth for tool lookup during LLM
+  This registry provides a single source of truth for action lookup during LLM
   tool execution. When an LLM returns a tool call by name, the executor uses
-  this registry to find the corresponding module and determine how to execute it.
+  this registry to find the corresponding Action module.
 
   ## Design
 
-  - **Unified storage**: Both Actions and Tools are stored in the same registry
-  - **Type-aware**: Each entry is tagged with its type (`:action` or `:tool`)
+  - **Actions only**: All entries are Jido.Action modules
   - **Agent-based**: Uses Elixir Agent for runtime state, auto-starts on first access
   - **Validated**: Modules are validated on registration to ensure they implement
-    the correct behavior
+    the Action behavior
 
   ## Usage
 
-      # Register modules (auto-detects type)
+      # Register actions
       Registry.register(MyApp.Actions.Calculator)
-      Registry.register(MyApp.Tools.Search)
-
-      # Or register explicitly by type
-      Registry.register_action(MyApp.Actions.Calculator)
-      Registry.register_tool(MyApp.Tools.Search)
+      Registry.register_action(MyApp.Actions.Search)
+      Registry.register_actions([MyApp.Actions.Add, MyApp.Actions.Multiply])
 
       # Lookup by name
-      {:ok, {:action, MyApp.Actions.Calculator}} = Registry.get("calculator")
-      {:ok, {:tool, MyApp.Tools.Search}} = Registry.get("search")
+      {:ok, MyApp.Actions.Calculator} = Registry.get("calculator")
 
       # List all
       Registry.list_all()
-      # => [{"calculator", :action, MyApp.Actions.Calculator}, ...]
+      # => [{"calculator", MyApp.Actions.Calculator}, ...]
 
       # Convert to ReqLLM tools
       tools = Registry.to_reqllm_tools()
@@ -39,15 +34,14 @@ defmodule Jido.AI.Tools.Registry do
   ## Relationship to ToolAdapter
 
   `Jido.AI.ToolAdapter` handles conversion of Actions to ReqLLM.Tool format.
-  This Registry uses ToolAdapter internally for that conversion but provides
-  a unified interface for managing both Actions and Tools.
+  This Registry uses ToolAdapter internally for that conversion.
 
   ## Telemetry
 
   The registry emits telemetry events for monitoring:
 
   - `[:jido, :ai, :registry, :register]` - Module registered
-    - Metadata: `%{name: String.t(), type: :action | :tool, module: module()}`
+    - Metadata: `%{name: String.t(), module: module()}`
   - `[:jido, :ai, :registry, :unregister]` - Module unregistered
     - Metadata: `%{name: String.t()}`
 
@@ -57,15 +51,13 @@ defmodule Jido.AI.Tools.Registry do
   use Agent
 
   alias Jido.AI.ToolAdapter
-  alias Jido.AI.Tools.Tool
 
   require Logger
 
   @registry_name __MODULE__
   @max_retries 3
 
-  @type tool_type :: :action | :tool
-  @type entry :: {String.t(), tool_type(), module()}
+  @type entry :: {String.t(), module()}
 
   # ============================================================================
   # Registry Lifecycle
@@ -107,31 +99,31 @@ defmodule Jido.AI.Tools.Registry do
   # ============================================================================
 
   @doc """
-  Registers a module, auto-detecting whether it's an Action or Tool.
+  Registers a Jido.Action module.
 
-  Checks if the module implements `Jido.Action` behavior first, then
-  `Jido.AI.Tools.Tool`. Returns an error if neither behavior is implemented.
+  Validates that the module implements the `Jido.Action` behavior before
+  registering. The action is stored by its tool name (from `module.name()`).
 
   ## Examples
 
       :ok = Registry.register(MyApp.Actions.Calculator)
-      :ok = Registry.register(MyApp.Tools.Search)
-      {:error, :invalid_module} = Registry.register(SomeRandomModule)
+      {:error, :not_an_action} = Registry.register(NotAnAction)
   """
-  @spec register(module()) :: :ok | {:error, :invalid_module}
+  @spec register(module()) :: :ok | {:error, :not_an_action}
   def register(module) when is_atom(module) do
-    cond do
-      action?(module) -> register_action(module)
-      tool?(module) -> register_tool(module)
-      true -> {:error, :invalid_module}
+    if action?(module) do
+      name = module.name()
+      emit_telemetry(:register, %{name: name, module: module})
+      safe_update(fn state -> Map.put(state, name, module) end)
+    else
+      {:error, :not_an_action}
     end
   end
 
   @doc """
   Registers a Jido.Action module.
 
-  Validates that the module implements the `Jido.Action` behavior before
-  registering. The action is stored by its tool name (from `module.name()`).
+  Alias for `register/1` for backwards compatibility.
 
   ## Examples
 
@@ -140,13 +132,7 @@ defmodule Jido.AI.Tools.Registry do
   """
   @spec register_action(module()) :: :ok | {:error, :not_an_action}
   def register_action(module) when is_atom(module) do
-    if action?(module) do
-      name = module.name()
-      emit_telemetry(:register, %{name: name, type: :action, module: module})
-      safe_update(fn state -> Map.put(state, name, {:action, module}) end)
-    else
-      {:error, :not_an_action}
-    end
+    register(module)
   end
 
   @doc """
@@ -159,46 +145,7 @@ defmodule Jido.AI.Tools.Registry do
   @spec register_actions([module()]) :: :ok | {:error, term()}
   def register_actions(modules) when is_list(modules) do
     Enum.reduce_while(modules, :ok, fn module, :ok ->
-      case register_action(module) do
-        :ok -> {:cont, :ok}
-        error -> {:halt, error}
-      end
-    end)
-  end
-
-  @doc """
-  Registers a Jido.AI.Tools.Tool module.
-
-  Validates that the module implements the `Jido.AI.Tools.Tool` behavior before
-  registering. The tool is stored by its name (from `module.name()`).
-
-  ## Examples
-
-      :ok = Registry.register_tool(MyApp.Tools.Calculator)
-      {:error, :not_a_tool} = Registry.register_tool(NotATool)
-  """
-  @spec register_tool(module()) :: :ok | {:error, :not_a_tool}
-  def register_tool(module) when is_atom(module) do
-    if tool?(module) do
-      name = module.name()
-      emit_telemetry(:register, %{name: name, type: :tool, module: module})
-      safe_update(fn state -> Map.put(state, name, {:tool, module}) end)
-    else
-      {:error, :not_a_tool}
-    end
-  end
-
-  @doc """
-  Registers multiple Jido.AI.Tools.Tool modules.
-
-  ## Examples
-
-      :ok = Registry.register_tools([MyApp.Tools.Search, MyApp.Tools.Weather])
-  """
-  @spec register_tools([module()]) :: :ok | {:error, term()}
-  def register_tools(modules) when is_list(modules) do
-    Enum.reduce_while(modules, :ok, fn module, :ok ->
-      case register_tool(module) do
+      case register(module) do
         :ok -> {:cont, :ok}
         error -> {:halt, error}
       end
@@ -210,34 +157,32 @@ defmodule Jido.AI.Tools.Registry do
   # ============================================================================
 
   @doc """
-  Looks up a registered module by its tool name.
+  Looks up a registered Action module by its tool name.
 
-  Returns `{:ok, {type, module}}` if found, where type is `:action` or `:tool`.
-  Returns `{:error, :not_found}` if not registered.
+  Returns `{:ok, module}` if found, `{:error, :not_found}` if not registered.
 
   ## Examples
 
-      {:ok, {:action, MyApp.Actions.Calculator}} = Registry.get("calculator")
-      {:ok, {:tool, MyApp.Tools.Search}} = Registry.get("search")
+      {:ok, MyApp.Actions.Calculator} = Registry.get("calculator")
       {:error, :not_found} = Registry.get("unknown")
   """
-  @spec get(String.t()) :: {:ok, {tool_type(), module()}} | {:error, :not_found}
+  @spec get(String.t()) :: {:ok, module()} | {:error, :not_found}
   def get(name) when is_binary(name) do
     case safe_get(fn state -> Map.get(state, name) end) do
       nil -> {:error, :not_found}
-      {type, module} -> {:ok, {type, module}}
+      module -> {:ok, module}
     end
   end
 
   @doc """
-  Looks up a registered module by name, raising if not found.
+  Looks up a registered Action module by name, raising if not found.
 
   ## Examples
 
-      {:action, MyApp.Actions.Calculator} = Registry.get!("calculator")
+      MyApp.Actions.Calculator = Registry.get!("calculator")
       Registry.get!("unknown")  # raises KeyError
   """
-  @spec get!(String.t()) :: {tool_type(), module()}
+  @spec get!(String.t()) :: module()
   def get!(name) when is_binary(name) do
     case get(name) do
       {:ok, result} -> result
@@ -250,21 +195,21 @@ defmodule Jido.AI.Tools.Registry do
   # ============================================================================
 
   @doc """
-  Lists all registered modules.
+  Lists all registered Action modules.
 
-  Returns a list of `{name, type, module}` tuples.
+  Returns a list of `{name, module}` tuples.
 
   ## Examples
 
       Registry.list_all()
-      # => [{"calculator", :action, MyApp.Actions.Calculator},
-      #     {"search", :tool, MyApp.Tools.Search}]
+      # => [{"calculator", MyApp.Actions.Calculator},
+      #     {"search", MyApp.Actions.Search}]
   """
   @spec list_all() :: [entry()]
   def list_all do
     safe_get(fn state ->
       state
-      |> Enum.map(fn {name, {type, module}} -> {name, type, module} end)
+      |> Enum.map(fn {name, module} -> {name, module} end)
       |> Enum.sort_by(&elem(&1, 0))
     end)
   end
@@ -272,41 +217,16 @@ defmodule Jido.AI.Tools.Registry do
   @doc """
   Lists all registered Action modules.
 
-  Returns a list of `{name, module}` tuples for actions only.
+  Alias for `list_all/0` for backwards compatibility.
 
   ## Examples
 
       Registry.list_actions()
       # => [{"calculator", MyApp.Actions.Calculator}]
   """
-  @spec list_actions() :: [{String.t(), module()}]
+  @spec list_actions() :: [entry()]
   def list_actions do
-    safe_get(fn state ->
-      state
-      |> Enum.filter(fn {_name, {type, _module}} -> type == :action end)
-      |> Enum.map(fn {name, {_type, module}} -> {name, module} end)
-      |> Enum.sort_by(&elem(&1, 0))
-    end)
-  end
-
-  @doc """
-  Lists all registered Tool modules.
-
-  Returns a list of `{name, module}` tuples for tools only.
-
-  ## Examples
-
-      Registry.list_tools()
-      # => [{"search", MyApp.Tools.Search}]
-  """
-  @spec list_tools() :: [{String.t(), module()}]
-  def list_tools do
-    safe_get(fn state ->
-      state
-      |> Enum.filter(fn {_name, {type, _module}} -> type == :tool end)
-      |> Enum.map(fn {name, {_type, module}} -> {name, module} end)
-      |> Enum.sort_by(&elem(&1, 0))
-    end)
+    list_all()
   end
 
   # ============================================================================
@@ -314,10 +234,10 @@ defmodule Jido.AI.Tools.Registry do
   # ============================================================================
 
   @doc """
-  Converts all registered modules to ReqLLM.Tool structs.
+  Converts all registered Action modules to ReqLLM.Tool structs.
 
-  Uses `ToolAdapter.from_action/1` for Actions and `Tool.to_reqllm_tool/1`
-  for Tools. Returns a combined list suitable for passing to ReqLLM.
+  Uses `ToolAdapter.from_action/1` for conversion. Returns a list suitable
+  for passing to ReqLLM.
 
   ## Examples
 
@@ -327,12 +247,9 @@ defmodule Jido.AI.Tools.Registry do
   @spec to_reqllm_tools() :: [ReqLLM.Tool.t()]
   def to_reqllm_tools do
     safe_get(fn state ->
-      Enum.map(state, &convert_to_reqllm_tool/1)
+      Enum.map(state, fn {_name, module} -> ToolAdapter.from_action(module) end)
     end)
   end
-
-  defp convert_to_reqllm_tool({_name, {:action, module}}), do: ToolAdapter.from_action(module)
-  defp convert_to_reqllm_tool({_name, {:tool, module}}), do: Tool.to_reqllm_tool(module)
 
   # ============================================================================
   # Utility Functions
@@ -385,8 +302,6 @@ defmodule Jido.AI.Tools.Registry do
   # Private Helpers - Agent Operations with Retry
   # ============================================================================
 
-  # Wraps Agent.get with retry logic to handle race conditions
-  # where the agent might not be available between ensure_started and the call
   @doc false
   defp safe_get(fun, retries \\ @max_retries)
 
@@ -413,12 +328,10 @@ defmodule Jido.AI.Tools.Registry do
 
   @doc false
   defp safe_get(fun, 0) do
-    # Last attempt - let it fail if it fails
     ensure_started()
     Agent.get(@registry_name, fun)
   end
 
-  # Wraps Agent.update with retry logic
   @doc false
   defp safe_update(fun, retries \\ @max_retries)
 
@@ -445,7 +358,6 @@ defmodule Jido.AI.Tools.Registry do
 
   @doc false
   defp safe_update(fun, 0) do
-    # Last attempt - let it fail if it fails
     ensure_started()
     Agent.update(@registry_name, fun)
   end
@@ -454,15 +366,11 @@ defmodule Jido.AI.Tools.Registry do
   # Private Helpers - Module Introspection
   # ============================================================================
 
-  # Check if a module implements the Jido.Action behavior
-  # We check for Jido.Action in behaviours first, then fall back to function check
-  # for Actions that may not explicitly declare the behavior
   @doc false
   defp action?(module) do
     behaviours = module_behaviours(module)
 
-    Jido.Action in behaviours or
-      (has_action_functions?(module) and Jido.AI.Tools.Tool not in behaviours)
+    Jido.Action in behaviours or has_action_functions?(module)
   end
 
   @doc false
@@ -471,13 +379,6 @@ defmodule Jido.AI.Tools.Registry do
       function_exported?(module, :description, 0) and
       function_exported?(module, :schema, 0) and
       function_exported?(module, :run, 2)
-  end
-
-  # Check if a module implements the Jido.AI.Tools.Tool behavior
-  @doc false
-  defp tool?(module) do
-    behaviours = module_behaviours(module)
-    Jido.AI.Tools.Tool in behaviours
   end
 
   @doc false

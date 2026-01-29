@@ -3,7 +3,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   Integration tests for Phase 2 Tool System.
 
   These tests verify that all Phase 2 components work together correctly:
-  - Registry manages both Actions and Tools
+  - Registry manages Actions
   - Executor executes via Registry lookup
   - ReqLLM tool format generation
   - Error handling flows
@@ -15,10 +15,9 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   alias Jido.AI.Tools.Executor
   alias Jido.AI.Tools.Registry
-  alias Jido.AI.Tools.Tool
 
   # ============================================================================
-  # Test Actions and Tools
+  # Test Actions
   # ============================================================================
 
   defmodule TestActions.Calculator do
@@ -73,17 +72,13 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
   end
 
-  defmodule TestTools.Echo do
-    use Tool,
+  defmodule TestActions.Echo do
+    use Jido.Action,
       name: "echo",
-      description: "Echoes back the input message"
-
-    @impl true
-    def schema do
-      [
+      description: "Echoes back the input message",
+      schema: [
         message: [type: :string, required: true, doc: "Message to echo"]
       ]
-    end
 
     @impl true
     def run(params, _context) do
@@ -91,17 +86,13 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
   end
 
-  defmodule TestTools.UpperCase do
-    use Tool,
+  defmodule TestActions.UpperCase do
+    use Jido.Action,
       name: "uppercase",
-      description: "Converts text to uppercase"
-
-    @impl true
-    def schema do
-      [
+      description: "Converts text to uppercase",
+      schema: [
         text: [type: :string, required: true, doc: "Text to convert"]
       ]
-    end
 
     @impl true
     def run(params, _context) do
@@ -109,17 +100,13 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
   end
 
-  defmodule TestTools.ContextReader do
-    use Tool,
+  defmodule TestActions.ContextReader do
+    use Jido.Action,
       name: "context_reader",
-      description: "Reads values from context"
-
-    @impl true
-    def schema do
-      [
+      description: "Reads values from context",
+      schema: [
         key: [type: :string, required: true, doc: "Key to read from context"]
       ]
-    end
 
     @impl true
     def run(params, context) do
@@ -148,7 +135,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       :ok = Registry.register_action(TestActions.Calculator)
 
       # Verify registration
-      {:ok, {:action, TestActions.Calculator}} = Registry.get("calculator")
+      {:ok, TestActions.Calculator} = Registry.get("calculator")
 
       # Execute via Executor with string keys (like LLM would provide)
       result = Executor.execute("calculator", %{"operation" => "add", "a" => "5", "b" => "3"}, %{})
@@ -156,12 +143,12 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert {:ok, %{result: 8}} = result
     end
 
-    test "register tool → execute by name → get result" do
-      # Register tool
-      :ok = Registry.register_tool(TestTools.Echo)
+    test "register echo action → execute by name → get result" do
+      # Register action
+      :ok = Registry.register_action(TestActions.Echo)
 
       # Verify registration
-      {:ok, {:tool, TestTools.Echo}} = Registry.get("echo")
+      {:ok, TestActions.Echo} = Registry.get("echo")
 
       # Execute via Executor
       result = Executor.execute("echo", %{"message" => "hello world"}, %{})
@@ -169,25 +156,22 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert {:ok, %{echoed: "hello world"}} = result
     end
 
-    test "mixed actions and tools in registry" do
-      # Register both actions and tools
+    test "multiple actions in registry" do
+      # Register multiple actions
       :ok = Registry.register_action(TestActions.Calculator)
       :ok = Registry.register_action(TestActions.ContextAware)
-      :ok = Registry.register_tool(TestTools.Echo)
-      :ok = Registry.register_tool(TestTools.UpperCase)
+      :ok = Registry.register_action(TestActions.Echo)
+      :ok = Registry.register_action(TestActions.UpperCase)
 
       # Verify all registered
       all = Registry.list_all()
       assert length(all) == 4
 
-      # Verify types
+      # Verify list_actions returns same as list_all
       actions = Registry.list_actions()
-      tools = Registry.list_tools()
+      assert length(actions) == 4
 
-      assert length(actions) == 2
-      assert length(tools) == 2
-
-      # Execute each type
+      # Execute each action
       assert {:ok, %{result: 6}} =
                Executor.execute("calculator", %{"operation" => "multiply", "a" => "2", "b" => "3"}, %{})
 
@@ -205,8 +189,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert {:ok, %{key: "user_id", value: "user_123"}} = result
     end
 
-    test "executor handles context for tools" do
-      :ok = Registry.register_tool(TestTools.ContextReader)
+    test "executor handles context for context reader action" do
+      :ok = Registry.register_action(TestActions.ContextReader)
 
       context = %{api_key: "secret_key", environment: "test"}
       result = Executor.execute("context_reader", %{"key" => "environment"}, context)
@@ -222,7 +206,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   describe "2.5.2 ReqLLM Integration" do
     test "Registry.to_reqllm_tools returns valid ReqLLM.Tool structs" do
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       tools = Registry.to_reqllm_tools()
 
@@ -247,8 +231,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert Map.has_key?(tool.parameter_schema["properties"], "b")
     end
 
-    test "tool schemas are properly converted to JSON Schema" do
-      :ok = Registry.register_tool(TestTools.UpperCase)
+    test "uppercase action schema is properly converted to JSON Schema" do
+      :ok = Registry.register_action(TestActions.UpperCase)
 
       [tool] = Registry.to_reqllm_tools()
 
@@ -262,9 +246,9 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert Map.has_key?(tool.parameter_schema["properties"], "text")
     end
 
-    test "both Actions and Tools produce compatible formats" do
+    test "all actions produce compatible formats" do
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       tools = Registry.to_reqllm_tools()
 
@@ -347,13 +331,13 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
 
     test "executor respects timeout configuration" do
-      defmodule SlowTool do
-        use Tool,
-          name: "slow_tool",
-          description: "A slow tool for testing timeouts"
-
-        @impl true
-        def schema, do: [delay: [type: :integer, required: true]]
+      defmodule SlowAction do
+        use Jido.Action,
+          name: "slow_action",
+          description: "A slow action for testing timeouts",
+          schema: [
+            delay: [type: :integer, required: true, doc: "Delay in milliseconds"]
+          ]
 
         @impl true
         def run(params, _context) do
@@ -362,24 +346,24 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
         end
       end
 
-      :ok = Registry.register_tool(SlowTool)
+      :ok = Registry.register_action(SlowAction)
 
       # Should complete within timeout
       assert {:ok, %{completed: true}} =
-               Executor.execute("slow_tool", %{"delay" => "50"}, %{}, timeout: 1000)
+               Executor.execute("slow_action", %{"delay" => "50"}, %{}, timeout: 1000)
 
       # Should timeout
-      result = Executor.execute("slow_tool", %{"delay" => "500"}, %{}, timeout: 100)
+      result = Executor.execute("slow_action", %{"delay" => "500"}, %{}, timeout: 100)
 
       assert {:error, error} = result
       assert error.type == :timeout
-      assert error.tool_name == "slow_tool"
+      assert error.tool_name == "slow_action"
     end
 
     test "complete simulated tool calling flow" do
-      # 1. Register tools
+      # 1. Register actions
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.UpperCase)
+      :ok = Registry.register_action(TestActions.UpperCase)
 
       # 2. Get ReqLLM tools (would be passed to LLM)
       reqllm_tools = Registry.to_reqllm_tools()
@@ -456,7 +440,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   describe "registry lifecycle" do
     test "clear removes all registered items" do
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       assert length(Registry.list_all()) == 2
 
@@ -467,7 +451,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
     test "unregister removes specific item" do
       :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_tool(TestTools.Echo)
+      :ok = Registry.register_action(TestActions.Echo)
 
       :ok = Registry.unregister("calculator")
 
@@ -498,10 +482,10 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       end
 
       :ok = Registry.register_action(CalculatorV1)
-      {:ok, {:action, CalculatorV1}} = Registry.get("calculator")
+      {:ok, CalculatorV1} = Registry.get("calculator")
 
       :ok = Registry.register_action(CalculatorV2)
-      {:ok, {:action, CalculatorV2}} = Registry.get("calculator")
+      {:ok, CalculatorV2} = Registry.get("calculator")
 
       # Execute should use V2
       {:ok, result} = Executor.execute("calculator", %{}, %{})

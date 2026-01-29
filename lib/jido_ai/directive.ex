@@ -96,7 +96,7 @@ defmodule Jido.AI.Directive do
 
   defmodule ToolExec do
     @moduledoc """
-    Directive to execute a Jido.Action or Jido.AI.Tools.Tool as a tool.
+    Directive to execute a Jido.Action as a tool.
 
     The runtime will execute this asynchronously and send the result back
     as an `ai.tool_result` signal.
@@ -104,10 +104,10 @@ defmodule Jido.AI.Directive do
     ## Execution Modes
 
     1. **Direct module execution** (preferred): When `action_module` is provided,
-       the module is executed directly via `Executor.execute_module/5`, bypassing
+       the module is executed directly via `Executor.execute_module/4`, bypassing
        Registry lookup. This is used by strategies that maintain their own tool lists.
 
-    2. **Registry lookup**: When `action_module` is nil, looks up the tool in
+    2. **Registry lookup**: When `action_module` is nil, looks up the action in
        `Jido.AI.Tools.Registry` by name and executes via `Jido.AI.Tools.Executor`.
 
     ## Argument Normalization
@@ -465,8 +465,8 @@ end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   @moduledoc """
-  Spawns an async task to execute a Jido.Action or Jido.AI.Tools.Tool and sends
-  the result back to the agent as an `ai.tool_result` signal.
+  Spawns an async task to execute a Jido.Action and sends the result back
+  to the agent as an `ai.tool_result` signal.
 
   Supports two execution modes:
   1. Direct module execution when `action_module` is provided (bypasses Registry)
@@ -498,7 +498,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
             Executor.execute(tool_name, arguments, context)
 
           module when is_atom(module) ->
-            Executor.execute_module(module, :action, arguments, context)
+            Executor.execute_module(module, arguments, context)
         end
 
       signal =

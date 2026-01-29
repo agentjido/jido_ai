@@ -359,16 +359,14 @@ defmodule Jido.AI.DirectiveTest do
       end
     end
 
-    # Define test Tool module
-    defmodule TestTools.Echo do
-      use Jido.AI.Tools.Tool,
+    # Additional test Action module
+    defmodule TestActions.Echo do
+      use Jido.Action,
         name: "echo",
-        description: "Echoes back the input message"
-
-      @impl true
-      def schema do
-        [message: [type: :string, required: true, doc: "Message to echo"]]
-      end
+        description: "Echoes back the input message",
+        schema: [
+          message: [type: :string, required: true, doc: "Message to echo"]
+        ]
 
       @impl true
       def run(params, _context) do
