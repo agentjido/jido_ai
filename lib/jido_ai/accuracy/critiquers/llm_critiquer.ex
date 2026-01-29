@@ -233,7 +233,9 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
   defp call_llm(%__MODULE__{} = critiquer, prompt) do
     model = critiquer.model || Config.default_model()
 
-    messages = [%ReqLLM.Message{role: :user, content: prompt}]
+    context =
+      ReqLLM.Context.new()
+      |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
 
     reqllm_opts = [
       temperature: critiquer.temperature,
@@ -241,7 +243,7 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
     ]
 
     try do
-      case ReqLLM.Generation.generate_text(model, messages, reqllm_opts) do
+      case ReqLLM.Generation.generate_text(model, context, reqllm_opts) do
         {:ok, response} ->
           content = extract_content(response)
 

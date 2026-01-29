@@ -431,7 +431,9 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     temperature = Keyword.get(opts, :temperature, strategy.temperature)
     timeout = Keyword.get(opts, :timeout, strategy.timeout)
 
-    messages = [%ReqLLM.Message{role: :user, content: prompt}]
+    context =
+      ReqLLM.Context.new()
+      |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
 
     reqllm_opts = [
       temperature: temperature,
@@ -439,7 +441,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     ]
 
     try do
-      case ReqLLM.Generation.generate_text(model, messages, reqllm_opts) do
+      case ReqLLM.Generation.generate_text(model, context, reqllm_opts) do
         {:ok, response} ->
           content = extract_content(response)
 

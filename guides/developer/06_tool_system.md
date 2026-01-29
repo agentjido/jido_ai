@@ -9,15 +9,14 @@ This guide covers the tool system in Jido.AI, which bridges Jido.Actions and LLM
 - [Registry](#registry)
 - [Executor](#executor)
 - [ToolAdapter](#tooladapter)
-- [Tool Behavior](#tool-behavior)
 - [Creating Tools](#creating-tools)
 
 ## Overview
 
 The tool system enables LLMs to execute Jido.Actions as tools. It provides:
 
-1. **Unified Registry**: Single source of truth for tool discovery
-2. **Type-Aware Storage**: Distinguishes between Actions and Tools
+1. **Unified Registry**: Single source of truth for action discovery
+2. **Validated Execution**: All actions run via `Jido.Exec.run/3`
 3. **Argument Normalization**: Converts JSON arguments to atom keys
 4. **Consistent Execution**: Standardized error handling and telemetry
 
@@ -35,9 +34,9 @@ sequenceDiagram
     LLM->>Strategy: Tool call request
     Strategy->>Runtime: Directive.ToolExec
     Runtime->>Registry: get(tool_name)
-    Registry-->>Runtime: {:ok, {:action, module}}
+    Registry-->>Runtime: {:ok, module}
     Runtime->>Executor: execute(tool_name, arguments)
-    Executor->>Action: normalize + run
+    Executor->>Action: normalize + Jido.Exec.run
     Action-->>Executor: {:ok, result}
     Executor-->>Runtime: Signal.ToolResult
     Runtime->>Strategy: signal_routes()
@@ -49,26 +48,25 @@ sequenceDiagram
 
 | Module | Purpose |
 |--------|---------|
-| `Jido.AI.Tools.Registry` | Unified storage and lookup |
-| `Jido.AI.Tools.Executor` | Consistent execution with normalization |
-| `Jido.AI.Tools.Tool` | Behavior for custom tools |
+| `Jido.AI.Tools.Registry` | Action storage and lookup |
+| `Jido.AI.Tools.Executor` | Execution with timeout, telemetry, formatting |
 | `Jido.AI.ToolAdapter` | Converts Actions to ReqLLM format |
 
 ### Storage
 
 ```
 ┌─────────────────────────────────────────┐
-│         Tools.Registry                 │
+│         Tools.Registry                  │
 ├─────────────────────────────────────────┤
-│  "calculator" → {:action, Calculator}   │
-│  "search"     → {:tool, Search}         │
-│  "weather"    → {:action, Weather}       │
+│  "calculator" → Calculator              │
+│  "search"     → Search                  │
+│  "weather"    → Weather                 │
 └─────────────────────────────────────────┘
 ```
 
 ## Registry
 
-The `Jido.AI.Tools.Registry` provides unified storage for Actions and Tools.
+The `Jido.AI.Tools.Registry` provides storage for Action modules used as tools.
 
 ### Starting the Registry
 
@@ -83,13 +81,11 @@ The registry auto-starts on first access. You can also start it explicitly:
 ```elixir
 alias Jido.AI.Tools.Registry
 
-# Auto-detect type (Action or Tool)
+# Register an action
 :ok = Registry.register(MyApp.Actions.Calculator)
-:ok = Registry.register(MyApp.Tools.Search)
 
-# Explicit registration
+# Also available as register_action
 :ok = Registry.register_action(MyApp.Actions.Calculator)
-:ok = Registry.register_tool(MyApp.Tools.Search)
 
 # Batch registration
 :ok = Registry.register_actions([
@@ -102,28 +98,23 @@ alias Jido.AI.Tools.Registry
 
 ```elixir
 # Safe lookup
-{:ok, {:action, module}} = Registry.get("calculator")
-{:ok, {:tool, module}} = Registry.get("search")
+{:ok, module} = Registry.get("calculator")
 {:error, :not_found} = Registry.get("unknown")
 
 # Bang version (raises on not found)
-{:action, module} = Registry.get!("calculator")
+module = Registry.get!("calculator")
 ```
 
 ### Listing
 
 ```elixir
-# List all registered tools
+# List all registered actions
 Registry.list_all()
-# => [{"calculator", :action, Calculator}, {"search", :tool, Search}]
+# => [{"calculator", Calculator}, {"search", Search}]
 
-# List only actions
+# Also available as list_actions
 Registry.list_actions()
-# => [{"calculator", Calculator}]
-
-# List only tools
-Registry.list_tools()
-# => [{"search", Search}]
+# => [{"calculator", Calculator}, {"search", Search}]
 ```
 
 ### ReqLLM Conversion
@@ -146,7 +137,7 @@ ReqLLM.stream_text(model, messages, tools: tools)
 
 ## Executor
 
-The `Jido.AI.Tools.Executor` provides consistent tool execution.
+The `Jido.AI.Tools.Executor` provides consistent action execution with timeout handling.
 
 ### Execution Flow
 
@@ -154,11 +145,10 @@ The `Jido.AI.Tools.Executor` provides consistent tool execution.
 def execute(tool_name, arguments, context \\ %{})
 ```
 
-1. Lookup tool in Registry
+1. Lookup action in Registry
 2. Normalize arguments (string keys → atom keys)
-3. Validate with tool's schema
-4. Execute the tool
-5. Return standardized result
+3. Execute via `Jido.Exec.run/3` (validates with schema)
+4. Format and return result
 
 ### Argument Normalization
 
@@ -177,27 +167,31 @@ LLMs return tool call arguments with string keys (JSON format). The executor nor
 ```elixir
 alias Jido.AI.Tools.Executor
 
-# Execute a tool
+# Execute by name (uses registry)
 {:ok, result} = Executor.execute("calculator", %{
   "a" => 5,
   "b" => 3,
   "operation" => "add"
 })
 
-# With context
-{:ok, result} = Executor.execute("search", %{
-  "query" => "Elixir programming"
-}, %{agent_id: "agent_123"})
+# Execute directly with module (bypasses registry)
+{:ok, result} = Executor.execute_module(MyApp.Actions.Calculator, %{
+  "a" => 5,
+  "b" => 3
+}, %{})
+
+# With timeout
+{:ok, result} = Executor.execute("search", %{"query" => "Elixir"}, %{}, timeout: 5000)
 ```
 
 ### Error Handling
 
-The executor classifies errors:
+The executor returns structured errors:
 
 ```elixir
-{:error, :not_found}     # Tool not in registry
-{:error, :validation}    # Schema validation failed
-{:error, :execution}     # Tool execution failed
+{:error, %{error: "Tool not found: unknown", type: :not_found}}
+{:error, %{error: "...", type: :execution_error, details: %{...}}}
+{:error, %{error: "Tool execution timed out after 30000ms", type: :timeout}}
 ```
 
 ## ToolAdapter
@@ -211,162 +205,55 @@ alias Jido.AI.ToolAdapter
 
 # Single action
 tool = ToolAdapter.from_action(MyApp.Actions.Calculator)
-# => %ReqLLM.Tool{name: "calculator", description: "...", parameters: %{...}}
+# => %ReqLLM.Tool{name: "calculator", description: "...", parameter_schema: %{...}}
 
 # Multiple actions
 tools = ToolAdapter.from_actions([
   MyApp.Actions.Calculator,
   MyApp.Actions.Search
 ])
+
+# With prefix
+tools = ToolAdapter.from_actions(actions, prefix: "myapp_")
 ```
 
 ### Lookup
 
 ```elixir
 # Find action by tool name
-{:ok, action} = ToolAdapter.lookup_action("calculator", actions_by_name)
-```
-
-### Tool Schema Extraction
-
-The adapter extracts Zoi schemas for tool parameters:
-
-```elixir
-defmodule MyApp.Actions.Calculator do
-  use Jido.Action,
-    name: "calculator",
-    description: "Performs calculations"
-
-  @schema Zoi.struct(__MODULE__, %{
-    a: Zoi.number() |> Zoi.default(0),
-    b: Zoi.number() |> Zoi.default(0),
-    operation: Zoi.string() |> Zoi.default("add")
-  }, coerce: true)
-
-  def run(params, _context), do: {:ok, calculate(params)}
-end
-```
-
-The adapter converts this to ReqLLM.Tool format for the LLM.
-
-## Tool Behavior
-
-For more complex tools, implement the `Jido.AI.Tools.Tool` behavior instead of `Jido.Action`.
-
-### Behavior Definition
-
-```elixir
-defmodule Jido.AI.Tools.Tool do
-  @moduledoc """
-  Behavior for custom tool implementations.
-
-  Alternative to Jido.Action for tools that need:
-  - Custom argument normalization
-  - Specialized execution patterns
-  - Tool-specific metadata
-  """
-
-  @callback name() :: String.t()
-  @callback description() :: String.t()
-  @callback parameters() :: map()
-  @callback execute(arguments :: map(), context :: map()) :: {:ok, term()} | {:error, term()}
-  @optional_callbacks [parameters: 0]
-end
-```
-
-### Implementing Tool Behavior
-
-```elixir
-defmodule MyApp.Tools.CustomSearch do
-  @moduledoc """
-  Custom search tool with specialized behavior.
-  """
-
-  @behaviour Jido.AI.Tools.Tool
-
-  @impl true
-  def name, do: "custom_search"
-
-  @impl true
-  def description, do: "Searches with custom ranking"
-
-  @impl true
-  def parameters do
-    %{
-      "query" => %{type: "string", description: "Search query"},
-      "limit" => %{type: "integer", description: "Result limit", default: 10}
-    }
-  end
-
-  @impl true
-  def execute(arguments, _context) do
-    # Custom execution logic
-    query = arguments["query"]
-    limit = arguments["limit"] || 10
-
-    results = perform_search(query, limit)
-    {:ok, %{results: results}}
-  end
-
-  defp perform_search(query, limit) do
-    # Implementation
-  end
-end
+{:ok, action} = ToolAdapter.lookup_action("calculator", action_modules)
 ```
 
 ## Creating Tools
 
-### Option 1: Jido.Action (Simple)
-
-Use `Jido.Action` for simple tools:
+All tools are `Jido.Action` modules. Use the standard Action pattern:
 
 ```elixir
 defmodule MyApp.Tools.Calculator do
   use Jido.Action,
     name: "calculator",
-    description: "Performs basic arithmetic operations"
+    description: "Performs basic arithmetic operations",
+    schema: [
+      a: [type: :number, required: true, doc: "First number"],
+      b: [type: :number, required: true, doc: "Second number"],
+      operation: [type: :string, default: "add", doc: "Operation: add, subtract, multiply, divide"]
+    ]
 
-  @schema Zoi.struct(__MODULE__, %{
-    a: Zoi.number(description: "First number") |> Zoi.required(),
-    b: Zoi.number(description: "Second number") |> Zoi.required(),
-    operation: Zoi.string(description: "Operation: add, subtract, multiply, divide")
-      |> Zoi.default("add")
-  }, coerce: true)
-
+  @impl true
   def run(%{a: a, b: b, operation: op}, _context) do
     result = case op do
       "add" -> a + b
       "subtract" -> a - b
       "multiply" -> a * b
-      "divide" -> a / b
+      "divide" when b != 0 -> a / b
+      "divide" -> {:error, "Division by zero"}
       _ -> {:error, "Unknown operation: #{op}"}
     end
 
-    {:ok, %{result: result}}
-  end
-end
-```
-
-### Option 2: Tool Behavior (Advanced)
-
-Use `Jido.AI.Tools.Tool` for advanced tools:
-
-```elixir
-defmodule MyApp.Tools.AdvancedCalculator do
-  @behaviour Jido.AI.Tools.Tool
-
-  def name, do: "advanced_calculator"
-  def description, do: "Advanced calculator with expression parsing"
-
-  def execute(%{"expression" => expr}, _context) do
-    case evaluate_expression(expr) do
-      {:ok, result} -> {:ok, %{result: result}}
+    case result do
       {:error, reason} -> {:error, reason}
+      value -> {:ok, %{result: value}}
     end
-  end
-
-  defp evaluate_expression(expr) do
-    # Custom evaluation logic
   end
 end
 ```
@@ -379,7 +266,7 @@ defmodule MyApp.Application do
   def start(_type, _args) do
     # Register tools
     Jido.AI.Tools.Registry.register(MyApp.Tools.Calculator)
-    Jido.AI.Tools.Registry.register(MyApp.Tools.AdvancedCalculator)
+    Jido.AI.Tools.Registry.register(MyApp.Tools.Search)
 
     # ...
   end
@@ -390,13 +277,12 @@ end
 
 1. **Use descriptive names**: Clear, action-oriented tool names
 2. **Provide detailed descriptions**: Help LLMs understand when to use tools
-3. **Validate input**: Use Zoi schemas for parameter validation
+3. **Validate input**: Use schemas for parameter validation
 4. **Handle errors**: Return `{:error, reason}` for failures
 5. **Return structured results**: Use maps with clear field names
-6. **Add telemetry**: Emit events for monitoring
 
 ## Next Steps
 
-- [Strategies Guide](./02_strategies.md) - Using tools in strategies
-- [Directives Guide](./04_directives.md) - ToolExec directive
-- [Skills Guide](./07_skills.md) - ToolCalling skill
+- [Strategies Guide](02_strategies.md) - Using tools in strategies
+- [Directives Guide](04_directives.md) - ToolExec directive
+- [Skills Guide](07_skills.md) - ToolCalling skill

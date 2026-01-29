@@ -366,7 +366,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     test "register and retrieve action" do
       :ok = Registry.register_action(TestAction)
 
-      {:ok, {:action, module}} = Registry.get("test_action")
+      {:ok, module} = Registry.get("test_action")
       assert module == TestAction
     end
 

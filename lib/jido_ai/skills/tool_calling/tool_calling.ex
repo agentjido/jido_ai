@@ -50,9 +50,8 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   Tools are managed through `Jido.AI.Tools.Registry`:
 
-  - **Actions** - Jido.Action modules can be used as tools
-  - **Tools** - Jido.AI.Tools.Tool modules with specialized behavior
-  - Both are registered and executed through the unified interface
+  - **Actions** - Jido.Action modules registered as tools
+  - All actions are executed via `Jido.Exec.run/3` for consistent validation
 
   ## Auto-Execution
 
