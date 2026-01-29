@@ -35,7 +35,7 @@ defmodule Jido.AI.Skills.LLM do
 
   ## Model Resolution
 
-  The skill uses `Jido.AI.Config.resolve_model/1` to resolve model aliases:
+  The skill uses `Jido.AI.resolve_model/1` to resolve model aliases:
 
   * `:fast` - Quick model for simple tasks (default: `anthropic:claude-haiku-4-5`)
   * `:capable` - Capable model for complex tasks (default: `anthropic:claude-sonnet-4-20250514`)

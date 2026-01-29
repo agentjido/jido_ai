@@ -65,7 +65,7 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   ## Model Resolution
 
-  Uses `Jido.AI.Config.resolve_model/1` for model aliases:
+  Uses `Jido.AI.resolve_model/1` for model aliases:
   * `:fast` - Quick model for simple tasks (default: `anthropic:claude-haiku-4-5`)
   * `:capable` - Capable model for complex tasks (default: `anthropic:claude-sonnet-4-20250514`)
   * Direct model specs also supported

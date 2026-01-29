@@ -75,7 +75,7 @@ defmodule Jido.AI.Skills.Streaming do
 
   ## Model Resolution
 
-  Uses `Jido.AI.Config.resolve_model/1` for model aliases:
+  Uses `Jido.AI.resolve_model/1` for model aliases:
   * `:fast` - Quick model for streaming (default: `anthropic:claude-haiku-4-5`)
   * `:capable` - Capable model for complex tasks
   * Direct model specs also supported

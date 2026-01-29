@@ -41,7 +41,7 @@ defmodule Jido.AI.Directive do
     ## New Fields
 
     - `system_prompt` - Optional system prompt prepended to context
-    - `model_alias` - Model alias (e.g., `:fast`) resolved via `Jido.AI.Config`
+    - `model_alias` - Model alias (e.g., `:fast`) resolved via `Jido.AI.resolve_model/1`
     - `timeout` - Request timeout in milliseconds
 
     Either `model` or `model_alias` must be provided. If `model_alias` is used,
@@ -266,7 +266,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
   or final answer).
 
   Supports:
-  - `model_alias` resolution via `Jido.AI.Config.resolve_model/1`
+  - `model_alias` resolution via `Jido.AI.resolve_model/1`
   - `system_prompt` prepended to context messages
   - `timeout` passed to HTTP options
 
@@ -524,7 +524,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
   The result is sent as a `reqllm.result` signal.
 
   Supports:
-  - `model_alias` resolution via `Jido.AI.Config.resolve_model/1`
+  - `model_alias` resolution via `Jido.AI.resolve_model/1`
   - `system_prompt` prepended to context messages
   - `timeout` passed to HTTP options
 

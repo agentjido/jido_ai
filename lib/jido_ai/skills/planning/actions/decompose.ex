@@ -54,8 +54,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Config
-  alias Jido.AI.Helpers
+  alias ReqLLM.Context
 
   @decomposition_prompt """
   You are an expert at breaking down complex goals into manageable components.
@@ -125,13 +124,13 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Config.resolve_model(:planning)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Config.resolve_model(model)}
+  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:planning)}
+  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
   defp resolve_model(model) when is_binary(model), do: {:ok, model}
 
   defp build_decompose_messages(params) do
     user_prompt = build_decompose_user_prompt(params)
-    Helpers.build_messages(user_prompt, system_prompt: @decomposition_prompt)
+    Context.normalize(user_prompt, system_prompt: @decomposition_prompt)
   end
 
   defp build_decompose_user_prompt(params) do

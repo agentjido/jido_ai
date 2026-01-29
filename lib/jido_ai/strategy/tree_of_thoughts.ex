@@ -68,7 +68,6 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Config
   alias Jido.AI.Directive
   alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.TreeOfThoughts.Machine
@@ -352,7 +351,7 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
   end
 
   defp resolve_model_spec(model) when is_atom(model) do
-    Config.resolve_model(model)
+    Jido.AI.resolve_model(model)
   end
 
   defp resolve_model_spec(model) when is_binary(model) do
