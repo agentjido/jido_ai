@@ -457,7 +457,15 @@ defmodule Jido.AI.Accuracy.AdaptiveSelfConsistency do
     if total_n == 0 and batch_size > 0 do
       {:error, :all_generators_failed}
     else
-      check_and_continue_or_stop(all_candidates, adapter, run_ctx, total_n, search_state.target_n, search_state.max_n, search_state.level)
+      check_and_continue_or_stop(
+        all_candidates,
+        adapter,
+        run_ctx,
+        total_n,
+        search_state.target_n,
+        search_state.max_n,
+        search_state.level
+      )
     end
   end
 

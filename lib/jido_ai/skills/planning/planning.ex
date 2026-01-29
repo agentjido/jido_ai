@@ -36,7 +36,7 @@ defmodule Jido.AI.Skills.Planning do
 
   ## Model Resolution
 
-  The skill uses `Jido.AI.Config.resolve_model/1` to resolve model aliases:
+  The skill uses `Jido.AI.resolve_model/1` to resolve model aliases:
 
   * `:fast` - Quick model for simple tasks
   * `:capable` - Capable model for complex tasks

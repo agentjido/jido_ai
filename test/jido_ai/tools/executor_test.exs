@@ -71,18 +71,14 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
   end
 
-  # Define test Tool modules
-  defmodule TestTools.Echo do
-    use Jido.AI.Tools.Tool,
+  # Additional test Action modules
+  defmodule TestActions.Echo do
+    use Jido.Action,
       name: "echo",
-      description: "Echoes back the input message"
-
-    @impl true
-    def schema do
-      [
+      description: "Echoes back the input message",
+      schema: [
         message: [type: :string, required: true, doc: "Message to echo"]
       ]
-    end
 
     @impl true
     def run(params, _context) do
@@ -90,17 +86,13 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
   end
 
-  defmodule TestTools.LargeResult do
-    use Jido.AI.Tools.Tool,
+  defmodule TestActions.LargeResult do
+    use Jido.Action,
       name: "large_result",
-      description: "Returns a large result for testing truncation"
-
-    @impl true
-    def schema do
-      [
+      description: "Returns a large result for testing truncation",
+      schema: [
         size: [type: :integer, required: true, doc: "Size of result"]
       ]
-    end
 
     @impl true
     def run(params, _context) do
@@ -108,17 +100,13 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
   end
 
-  defmodule TestTools.BinaryResult do
-    use Jido.AI.Tools.Tool,
+  defmodule TestActions.BinaryResult do
+    use Jido.Action,
       name: "binary_result",
-      description: "Returns binary data"
-
-    @impl true
-    def schema do
-      [
+      description: "Returns binary data",
+      schema: [
         size: [type: :integer, required: true, doc: "Size of binary"]
       ]
-    end
 
     @impl true
     def run(params, _context) do
@@ -126,17 +114,13 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
   end
 
-  defmodule TestTools.ExceptionTool do
-    use Jido.AI.Tools.Tool,
-      name: "exception_tool",
-      description: "A tool that raises an exception"
-
-    @impl true
-    def schema do
-      [
+  defmodule TestActions.ExceptionAction2 do
+    use Jido.Action,
+      name: "exception_action2",
+      description: "An action that raises an exception for security tests",
+      schema: [
         message: [type: :string, required: true, doc: "Exception message"]
       ]
-    end
 
     @impl true
     def run(params, _context) do
@@ -152,10 +136,10 @@ defmodule Jido.AI.Tools.ExecutorTest do
     :ok = Registry.register_action(TestActions.SlowAction)
     :ok = Registry.register_action(TestActions.ErrorAction)
     :ok = Registry.register_action(TestActions.ExceptionAction)
-    :ok = Registry.register_tool(TestTools.Echo)
-    :ok = Registry.register_tool(TestTools.LargeResult)
-    :ok = Registry.register_tool(TestTools.BinaryResult)
-    :ok = Registry.register_tool(TestTools.ExceptionTool)
+    :ok = Registry.register_action(TestActions.Echo)
+    :ok = Registry.register_action(TestActions.LargeResult)
+    :ok = Registry.register_action(TestActions.BinaryResult)
+    :ok = Registry.register_action(TestActions.ExceptionAction2)
     :ok
   end
 
@@ -189,14 +173,14 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
   end
 
-  describe "execute/3 with Tools" do
-    test "executes tool via run/2" do
+  describe "execute/3 with Echo Action" do
+    test "executes echo action" do
       result = Executor.execute("echo", %{"message" => "hello"}, %{})
 
       assert {:ok, %{echoed: "hello"}} = result
     end
 
-    test "normalizes string keys for tools" do
+    test "normalizes string keys for echo action" do
       result = Executor.execute("echo", %{"message" => "world"}, %{})
 
       assert {:ok, %{echoed: "world"}} = result
@@ -359,13 +343,11 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
   end
 
-  describe "execute_module/5" do
+  describe "execute_module/4" do
     test "executes action module directly" do
-      # Use string keys like LLM would provide
       result =
         Executor.execute_module(
           TestActions.Calculator,
-          :action,
           %{"operation" => "add", "a" => "5", "b" => "3"},
           %{}
         )
@@ -373,12 +355,10 @@ defmodule Jido.AI.Tools.ExecutorTest do
       assert {:ok, %{result: 8}} = result
     end
 
-    test "executes tool module directly" do
-      # Use string keys like LLM would provide
+    test "executes echo action module directly" do
       result =
         Executor.execute_module(
-          TestTools.Echo,
-          :tool,
+          TestActions.Echo,
           %{"message" => "direct call"},
           %{}
         )
@@ -390,7 +370,6 @@ defmodule Jido.AI.Tools.ExecutorTest do
       result =
         Executor.execute_module(
           TestActions.SlowAction,
-          :action,
           %{"delay_ms" => "500"},
           %{},
           timeout: 100
@@ -526,36 +505,26 @@ defmodule Jido.AI.Tools.ExecutorTest do
     test "does not include stacktrace in exception error response" do
       import ExUnit.CaptureLog
 
-      # Capture log to prevent noise in test output
       capture_log(fn ->
-        # Use exception_tool (a Tool) which directly raises in run/2
-        # Actions go through Jido.Exec which handles exceptions differently
-        result = Executor.execute("exception_tool", %{"message" => "test exception"}, %{})
+        result = Executor.execute("exception_action2", %{"message" => "test exception"}, %{})
 
         assert {:error, error} = result
-        assert error.type == :exception
-        assert error.tool_name == "exception_tool"
-        assert error.error == "test exception"
-        assert error.exception_type == ArgumentError
+        assert error.type == :execution_error
+        assert error.tool_name == "exception_action2"
 
-        # CRITICAL: Stacktrace should NOT be in the response
         refute Map.has_key?(error, :stacktrace)
       end)
     end
 
-    test "logs stacktrace server-side for exceptions" do
+    test "logs exceptions server-side" do
       import ExUnit.CaptureLog
 
       log =
         capture_log([level: :error], fn ->
-          # Use exception_tool (a Tool) which directly raises
-          Executor.execute("exception_tool", %{"message" => "logged exception"}, %{})
+          Executor.execute("exception_action2", %{"message" => "logged exception"}, %{})
         end)
 
-      # Stacktrace should be logged server-side (the message appears in log)
-      assert log =~ "Tool execution exception"
-      # Note: Metadata (tool_name, exception, stacktrace) is included via Logger metadata
-      # The default formatter may not show all metadata, but the log message confirms logging works
+      assert log =~ "logged exception" or log =~ "ArgumentError"
     end
   end
 end

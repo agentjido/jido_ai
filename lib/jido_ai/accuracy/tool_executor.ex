@@ -342,7 +342,7 @@ defmodule Jido.AI.Accuracy.ToolExecutor do
     port =
       Port.open(
         {:spawn_executable, find_executable(command)},
-        port_options ++ [:binary, :exit_status, :hide, args: args]
+        port_options ++ [:binary, :exit_status, :hide, :stderr_to_stdout, args: args]
       )
 
     # Ensure port is closed even if an error occurs

@@ -271,14 +271,16 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   defp call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries) do
     model = verifier.model || Config.default_model()
 
-    messages = [%ReqLLM.Message{role: :user, content: prompt}]
+    context =
+      ReqLLM.Context.new()
+      |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
 
     reqllm_opts = [
       temperature: verifier.temperature,
       receive_timeout: verifier.timeout
     ]
 
-    case ReqLLM.Generation.generate_text(model, messages, reqllm_opts) do
+    case ReqLLM.Generation.generate_text(model, context, reqllm_opts) do
       {:ok, response} ->
         {:ok, parse_response(response)}
 
@@ -400,7 +402,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
       mid_score: mid_score
     ]
 
-    rendered = EEx.eval_string(template, assigns: assigns)
+    rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
     {:ok, rendered}
   rescue
     e in [SyntaxError, TokenMissingError, ArgumentError] ->

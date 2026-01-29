@@ -61,9 +61,8 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Config
-  alias Jido.AI.Helpers
   alias Jido.AI.Security
+  alias ReqLLM.Context
 
   @basic_prompt """
   You are an expert teacher explaining concepts to beginners.
@@ -138,14 +137,14 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Config.resolve_model(:reasoning)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Config.resolve_model(model)}
+  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:reasoning)}
+  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
   defp resolve_model(model) when is_binary(model), do: {:ok, model}
 
   defp build_explanation_messages(params) do
     system_prompt = build_explanation_system_prompt(params[:detail_level], params[:include_examples])
     user_prompt = build_explanation_user_prompt(params)
-    Helpers.build_messages(user_prompt, system_prompt: system_prompt)
+    Context.normalize(user_prompt, system_prompt: system_prompt)
   end
 
   defp build_explanation_system_prompt(:basic, include_examples?) do

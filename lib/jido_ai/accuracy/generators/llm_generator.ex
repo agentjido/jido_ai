@@ -37,7 +37,6 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   @behaviour Jido.AI.Accuracy.Generator
 
   alias Jido.AI.Accuracy.{Candidate, Config, Generator}
-  alias Jido.AI.Config, as: MainConfig
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -94,7 +93,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
     # Resolve model alias if atom
     resolved_model =
       case model do
-        atom when is_atom(atom) -> MainConfig.resolve_model(atom)
+        atom when is_atom(atom) -> Jido.AI.resolve_model(atom)
         binary when is_binary(binary) -> binary
       end
 
@@ -256,7 +255,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   # Private functions
 
   defp generate_one(%__MODULE__{} = generator, prompt, temperature, timeout, _opts) do
-    messages = build_messages(generator.system_prompt, prompt)
+    context = build_context(generator.system_prompt, prompt)
 
     reqllm_opts =
       [
@@ -265,7 +264,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
       ]
       |> add_model_opt(generator.model)
 
-    case ReqLLM.Generation.generate_text(generator.model, messages, reqllm_opts) do
+    case ReqLLM.Generation.generate_text(generator.model, context, reqllm_opts) do
       {:ok, response} ->
         content = extract_content(response)
         tokens = count_tokens(response)
@@ -288,15 +287,15 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
       {:error, {:exception, Exception.message(e), struct: e.__struct__}}
   end
 
-  defp build_messages(nil, prompt) do
-    [%ReqLLM.Message{role: :user, content: prompt}]
+  defp build_context(nil, prompt) do
+    ReqLLM.Context.new()
+    |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
   end
 
-  defp build_messages(system_prompt, prompt) do
-    [
-      %ReqLLM.Message{role: :system, content: system_prompt},
-      %ReqLLM.Message{role: :user, content: prompt}
-    ]
+  defp build_context(system_prompt, prompt) do
+    ReqLLM.Context.new()
+    |> ReqLLM.Context.append(ReqLLM.Context.system(system_prompt))
+    |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
   end
 
   defp extract_content(response) do
@@ -336,8 +335,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   # Validation functions with security bounds (module attributes for guard compatibility)
 
   defp validate_temperature_range({min, max})
-       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max,
-       do: :ok
+       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max, do: :ok
 
   defp validate_temperature_range(_), do: {:error, :invalid_temperature_range}
 

@@ -50,7 +50,6 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
   @behaviour Jido.AI.Accuracy.Revision
 
   alias Jido.AI.Accuracy.{Candidate, Config, CritiqueResult}
-  alias Jido.AI.Config, as: MainConfig
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -143,7 +142,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
     # Resolve model alias if atom
     resolved_model =
       case model do
-        atom when is_atom(atom) -> MainConfig.resolve_model(atom)
+        atom when is_atom(atom) -> Jido.AI.resolve_model(atom)
         binary when is_binary(binary) -> binary
       end
 
@@ -267,7 +266,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
     ]
 
     try do
-      rendered = EEx.eval_string(template, assigns: assigns)
+      rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
       {:ok, rendered}
     rescue
       e ->
@@ -282,7 +281,9 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
   defp call_llm(%__MODULE__{} = reviser, prompt) do
     model = reviser.model || Config.default_model()
 
-    messages = [%ReqLLM.Message{role: :user, content: prompt}]
+    context =
+      ReqLLM.Context.new()
+      |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
 
     reqllm_opts = [
       temperature: reviser.temperature,
@@ -290,7 +291,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
     ]
 
     try do
-      case ReqLLM.Generation.generate_text(model, messages, reqllm_opts) do
+      case ReqLLM.Generation.generate_text(model, context, reqllm_opts) do
         {:ok, response} ->
           content = extract_content(response)
 

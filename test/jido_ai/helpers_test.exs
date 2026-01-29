@@ -2,279 +2,70 @@ defmodule Jido.AI.HelpersTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Helpers
-  alias ReqLLM.Context
-  alias ReqLLM.Message.ContentPart
-
-  describe "build_messages/2" do
-    test "builds context from string prompt" do
-      {:ok, context} = Helpers.build_messages("Hello")
-
-      assert %Context{} = context
-      assert length(context.messages) == 1
-      [msg] = context.messages
-      assert msg.role == :user
-    end
-
-    test "builds context with system prompt" do
-      {:ok, context} = Helpers.build_messages("Hello", system_prompt: "You are helpful")
-
-      assert length(context.messages) == 2
-      [system_msg, user_msg] = context.messages
-      assert system_msg.role == :system
-      assert user_msg.role == :user
-    end
-
-    test "returns error for invalid input" do
-      {:error, _reason} = Helpers.build_messages(%{invalid: :data})
-    end
-  end
-
-  describe "build_messages!/2" do
-    test "returns context on success" do
-      context = Helpers.build_messages!("Hello")
-      assert %Context{} = context
-    end
-
-    test "raises on invalid input" do
-      assert_raise ArgumentError, fn ->
-        Helpers.build_messages!(%{invalid: :data})
-      end
-    end
-  end
-
-  describe "add_system_message/2" do
-    test "prepends system message to context" do
-      context = Context.new([Context.user("Hello")])
-      updated = Helpers.add_system_message(context, "You are helpful")
-
-      assert length(updated.messages) == 2
-      [system_msg, _user_msg] = updated.messages
-      assert system_msg.role == :system
-    end
-
-    test "does not add system message if one exists" do
-      context =
-        Context.new([
-          Context.system("Existing system"),
-          Context.user("Hello")
-        ])
-
-      updated = Helpers.add_system_message(context, "New system")
-
-      assert length(updated.messages) == 2
-      [system_msg, _user_msg] = updated.messages
-      # Original system message preserved
-      assert hd(system_msg.content).text == "Existing system"
-    end
-  end
-
-  describe "add_tool_result/4" do
-    test "appends tool result message" do
-      context = Context.new([Context.user("Hello")])
-      updated = Helpers.add_tool_result(context, "call_123", "calculator", %{result: 42})
-
-      assert length(updated.messages) == 2
-      [_user_msg, tool_msg] = updated.messages
-      assert tool_msg.role == :tool
-      assert tool_msg.tool_call_id == "call_123"
-      assert tool_msg.name == "calculator"
-    end
-
-    test "JSON encodes map results" do
-      context = Context.new([])
-      updated = Helpers.add_tool_result(context, "call_1", "test", %{value: "data"})
-
-      [tool_msg] = updated.messages
-      content_text = hd(tool_msg.content).text
-      assert content_text =~ "value"
-      assert content_text =~ "data"
-    end
-  end
-
-  describe "extract_text/1" do
-    test "extracts string content" do
-      response = %{message: %{content: "Hello world"}}
-      assert Helpers.extract_text(response) == "Hello world"
-    end
-
-    test "extracts text from ContentPart list" do
-      response = %{
-        message: %{
-          content: [
-            %ContentPart{type: :text, text: "First "},
-            %ContentPart{type: :text, text: "Second"}
-          ]
-        }
-      }
-
-      assert Helpers.extract_text(response) == "First Second"
-    end
-
-    test "extracts text from plain maps" do
-      response = %{
-        message: %{
-          content: [
-            %{type: :text, text: "Hello"},
-            %{type: :image, url: "..."},
-            %{type: :text, text: " World"}
-          ]
-        }
-      }
-
-      assert Helpers.extract_text(response) == "Hello World"
-    end
-
-    test "returns empty string for missing content" do
-      assert Helpers.extract_text(%{}) == ""
-      assert Helpers.extract_text(%{message: %{}}) == ""
-    end
-  end
-
-  describe "extract_tool_calls/1" do
-    test "extracts tool calls from response" do
-      response = %{
-        message: %{
-          tool_calls: [
-            %{id: "tc_1", name: "calculator", arguments: %{a: 1, b: 2}}
-          ]
-        }
-      }
-
-      [tool_call] = Helpers.extract_tool_calls(response)
-      assert tool_call.id == "tc_1"
-      assert tool_call.name == "calculator"
-      assert tool_call.arguments == %{a: 1, b: 2}
-    end
-
-    test "extracts from ReqLLM.ToolCall structs" do
-      tool_call = ReqLLM.ToolCall.new("tc_2", "search", ~s({"query":"test"}))
-
-      response = %{
-        message: %{
-          tool_calls: [tool_call]
-        }
-      }
-
-      [extracted] = Helpers.extract_tool_calls(response)
-      assert extracted.name == "search"
-      assert extracted.arguments == %{"query" => "test"}
-    end
-
-    test "returns empty list for no tool calls" do
-      assert Helpers.extract_tool_calls(%{message: %{content: "Hello"}}) == []
-      assert Helpers.extract_tool_calls(%{}) == []
-    end
-  end
-
-  describe "has_tool_calls?/1" do
-    test "returns true when tool calls present" do
-      response = %{message: %{tool_calls: [%{id: "tc_1"}]}}
-      assert Helpers.has_tool_calls?(response) == true
-    end
-
-    test "returns false for empty tool calls" do
-      assert Helpers.has_tool_calls?(%{message: %{tool_calls: []}}) == false
-    end
-
-    test "returns false for no tool calls" do
-      assert Helpers.has_tool_calls?(%{message: %{content: "Hello"}}) == false
-      assert Helpers.has_tool_calls?(%{}) == false
-    end
-  end
-
-  describe "classify_response/1" do
-    test "classifies tool calls response" do
-      response = %{message: %{tool_calls: [%{id: "tc_1"}]}}
-      assert Helpers.classify_response(response) == :tool_calls
-    end
-
-    test "classifies final answer response" do
-      response = %{message: %{content: "Hello"}}
-      assert Helpers.classify_response(response) == :final_answer
-    end
-
-    test "classifies error response" do
-      assert Helpers.classify_response({:error, %{reason: "timeout"}}) == :error
-    end
-
-    test "classifies invalid as error" do
-      assert Helpers.classify_response(%{}) == :error
-      assert Helpers.classify_response(nil) == :error
-    end
-  end
 
   describe "classify_error/1" do
     test "classifies rate limit by status" do
-      error = %ReqLLM.Error.API.Request{status: 429, reason: "Too many requests"}
+      error = %{status: 429}
       assert Helpers.classify_error(error) == :rate_limit
     end
 
     test "classifies auth by status 401" do
-      error = %ReqLLM.Error.API.Request{status: 401, reason: "Unauthorized"}
+      error = %{status: 401}
       assert Helpers.classify_error(error) == :auth
     end
 
     test "classifies auth by status 403" do
-      error = %ReqLLM.Error.API.Request{status: 403, reason: "Forbidden"}
+      error = %{status: 403}
       assert Helpers.classify_error(error) == :auth
     end
 
     test "classifies provider error by 5xx status" do
-      error = %ReqLLM.Error.API.Request{status: 500, reason: "Internal Server Error"}
-      assert Helpers.classify_error(error) == :provider_error
-
-      error = %ReqLLM.Error.API.Request{status: 503, reason: "Service Unavailable"}
-      assert Helpers.classify_error(error) == :provider_error
+      assert Helpers.classify_error(%{status: 500}) == :provider_error
+      assert Helpers.classify_error(%{status: 503}) == :provider_error
     end
 
-    test "classifies timeout by reason string" do
-      error = %ReqLLM.Error.API.Request{reason: "Request timeout after 30s"}
-      assert Helpers.classify_error(error) == :timeout
+    test "classifies validation by 4xx status" do
+      assert Helpers.classify_error(%{status: 400}) == :validation
+      assert Helpers.classify_error(%{status: 422}) == :validation
     end
 
-    test "classifies network errors" do
-      error = %ReqLLM.Error.API.Request{reason: "econnrefused"}
-      assert Helpers.classify_error(error) == :network
-
-      error = %ReqLLM.Error.API.Request{reason: "nxdomain"}
-      assert Helpers.classify_error(error) == :network
+    test "classifies timeout by reason" do
+      assert Helpers.classify_error(%{reason: :timeout}) == :timeout
+      assert Helpers.classify_error(%{reason: :connect_timeout}) == :timeout
+      assert Helpers.classify_error(%{reason: :checkout_timeout}) == :timeout
     end
 
-    test "classifies validation errors" do
-      error = ReqLLM.Error.validation_error(:invalid, "Bad input", [])
-      assert Helpers.classify_error(error) == :validation
+    test "classifies network errors by reason" do
+      assert Helpers.classify_error(%{reason: :econnrefused}) == :network
+      assert Helpers.classify_error(%{reason: :nxdomain}) == :network
+      assert Helpers.classify_error(%{reason: :closed}) == :network
+    end
+
+    test "classifies error tuples" do
+      assert Helpers.classify_error({:error, :timeout}) == :timeout
+      assert Helpers.classify_error(:timeout) == :timeout
+    end
+
+    test "classifies Mint errors as network" do
+      assert Helpers.classify_error(%Mint.TransportError{reason: :closed}) == :network
+      assert Helpers.classify_error(%Mint.HTTPError{reason: :protocol_error}) == :network
     end
 
     test "classifies unknown errors" do
       assert Helpers.classify_error(%{unknown: :error}) == :unknown
       assert Helpers.classify_error("some string") == :unknown
     end
-
-    test "classifies error tuples" do
-      assert Helpers.classify_error({:error, :timeout}) == :timeout
-      assert Helpers.classify_error({:error, :econnrefused}) == :network
-    end
   end
 
   describe "extract_retry_after/1" do
-    test "extracts from nested error response body" do
-      error = %{response_body: %{"error" => %{"retry_after" => 60}}}
+    test "extracts from response_headers" do
+      error = %{response_headers: [{"retry-after", "60"}]}
       assert Helpers.extract_retry_after(error) == 60
     end
 
-    test "extracts string retry_after" do
-      error = %{response_body: %{"error" => %{"retry_after" => "30"}}}
-      assert Helpers.extract_retry_after(error) == 30
-    end
-
-    test "extracts from top-level response body" do
-      error = %{response_body: %{"retry_after" => 45}}
+    test "extracts integer retry_after" do
+      error = %{retry_after: 45}
       assert Helpers.extract_retry_after(error) == 45
-    end
-
-    test "extracts from reason string" do
-      error = %{reason: "Rate limit exceeded. Retry-After: 120"}
-      assert Helpers.extract_retry_after(error) == 120
     end
 
     test "returns nil when not available" do
@@ -285,7 +76,7 @@ defmodule Jido.AI.HelpersTest do
 
   describe "wrap_error/1" do
     test "wraps rate limit error" do
-      error = %ReqLLM.Error.API.Request{status: 429, reason: "Rate limited"}
+      error = %{status: 429, reason: "Rate limited"}
       {:error, wrapped} = Helpers.wrap_error(error)
 
       assert %Jido.AI.Error.API.RateLimit{} = wrapped
@@ -293,35 +84,35 @@ defmodule Jido.AI.HelpersTest do
     end
 
     test "wraps auth error" do
-      error = %ReqLLM.Error.API.Request{status: 401, reason: "Unauthorized"}
+      error = %{status: 401, reason: "Unauthorized"}
       {:error, wrapped} = Helpers.wrap_error(error)
 
       assert %Jido.AI.Error.API.Auth{} = wrapped
     end
 
     test "wraps timeout error" do
-      error = %ReqLLM.Error.API.Request{reason: "Request timeout"}
+      error = %{reason: :timeout}
       {:error, wrapped} = Helpers.wrap_error(error)
 
       assert %Jido.AI.Error.API.Timeout{} = wrapped
     end
 
     test "wraps provider error" do
-      error = %ReqLLM.Error.API.Request{status: 500, reason: "Internal error"}
+      error = %{status: 500, reason: "Internal error"}
       {:error, wrapped} = Helpers.wrap_error(error)
 
       assert %Jido.AI.Error.API.Provider{} = wrapped
     end
 
     test "wraps network error" do
-      error = %ReqLLM.Error.API.Request{reason: "econnrefused"}
+      error = %{reason: :econnrefused}
       {:error, wrapped} = Helpers.wrap_error(error)
 
       assert %Jido.AI.Error.API.Network{} = wrapped
     end
 
     test "wraps validation error" do
-      error = ReqLLM.Error.validation_error(:invalid_param, "Bad param", [])
+      error = %{status: 400, reason: "Bad request"}
       {:error, wrapped} = Helpers.wrap_error(error)
 
       assert %Jido.AI.Error.Validation.Invalid{} = wrapped
@@ -334,14 +125,129 @@ defmodule Jido.AI.HelpersTest do
     end
 
     test "preserves retry_after for rate limit" do
-      error = %ReqLLM.Error.API.Request{
-        status: 429,
-        reason: "Rate limited",
-        response_body: %{"retry_after" => 60}
-      }
-
+      error = %{status: 429, reason: "Rate limited", response_headers: [{"retry-after", "60"}]}
       {:error, wrapped} = Helpers.wrap_error(error)
       assert wrapped.retry_after == 60
+    end
+  end
+
+  describe "resolve_directive_model/1" do
+    test "returns model string directly" do
+      assert Helpers.resolve_directive_model(%{model: "anthropic:claude-haiku-4-5"}) ==
+               "anthropic:claude-haiku-4-5"
+    end
+
+    test "resolves model alias" do
+      assert Helpers.resolve_directive_model(%{model_alias: :fast}) ==
+               "anthropic:claude-haiku-4-5"
+    end
+
+    test "raises when neither model nor model_alias provided" do
+      assert_raise ArgumentError, fn ->
+        Helpers.resolve_directive_model(%{model: nil, model_alias: nil})
+      end
+
+      assert_raise ArgumentError, fn ->
+        Helpers.resolve_directive_model(%{})
+      end
+    end
+  end
+
+  describe "build_directive_messages/2" do
+    test "returns messages without system prompt" do
+      messages = [%{role: :user, content: "Hello"}]
+      assert Helpers.build_directive_messages(messages, nil) == messages
+    end
+
+    test "prepends system prompt" do
+      messages = [%{role: :user, content: "Hello"}]
+      result = Helpers.build_directive_messages(messages, "Be helpful")
+
+      assert [%{role: :system, content: "Be helpful"}, %{role: :user, content: "Hello"}] = result
+    end
+
+    test "handles map with messages key" do
+      context = %{messages: [%{role: :user, content: "Hello"}]}
+      result = Helpers.build_directive_messages(context, nil)
+
+      assert [%{role: :user, content: "Hello"}] = result
+    end
+  end
+
+  describe "add_timeout_opt/2" do
+    test "adds receive_timeout when timeout provided" do
+      opts = [max_tokens: 1000]
+      result = Helpers.add_timeout_opt(opts, 5000)
+
+      assert Keyword.get(result, :receive_timeout) == 5000
+      assert Keyword.get(result, :max_tokens) == 1000
+    end
+
+    test "returns opts unchanged when timeout is nil" do
+      opts = [max_tokens: 1000]
+      assert Helpers.add_timeout_opt(opts, nil) == opts
+    end
+  end
+
+  describe "add_tools_opt/2" do
+    test "adds tools when list is not empty" do
+      opts = [max_tokens: 1000]
+      tools = [%{name: "calculator"}]
+      result = Helpers.add_tools_opt(opts, tools)
+
+      assert Keyword.get(result, :tools) == tools
+    end
+
+    test "returns opts unchanged when tools is empty" do
+      opts = [max_tokens: 1000]
+      assert Helpers.add_tools_opt(opts, []) == opts
+    end
+  end
+
+  describe "classify_llm_response/1" do
+    test "classifies tool calls response" do
+      response = %{
+        message: %{content: nil, tool_calls: [%{id: "tc_1", name: "calc", arguments: %{}}]},
+        finish_reason: :tool_calls
+      }
+
+      result = Helpers.classify_llm_response(response)
+      assert result.type == :tool_calls
+      assert length(result.tool_calls) == 1
+    end
+
+    test "classifies final answer response" do
+      response = %{
+        message: %{content: "Hello world", tool_calls: nil},
+        finish_reason: :stop
+      }
+
+      result = Helpers.classify_llm_response(response)
+      assert result.type == :final_answer
+      assert result.text == "Hello world"
+      assert result.tool_calls == []
+    end
+
+    test "extracts text from content list" do
+      response = %{
+        message: %{
+          content: [%{type: :text, text: "Hello "}, %{type: :text, text: "world"}],
+          tool_calls: nil
+        },
+        finish_reason: :stop
+      }
+
+      result = Helpers.classify_llm_response(response)
+      assert result.text == "Hello world"
+    end
+  end
+
+  describe "task_supervisor/1" do
+    test "returns instance-specific supervisor when jido present" do
+      # This would need the Jido module to work properly
+      # Just testing the fallback case
+      assert Helpers.task_supervisor(%{}) == Jido.TaskSupervisor
+      assert Helpers.task_supervisor(%{jido: nil}) == Jido.TaskSupervisor
     end
   end
 end

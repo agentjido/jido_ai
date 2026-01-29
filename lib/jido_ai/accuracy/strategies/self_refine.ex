@@ -80,7 +80,6 @@ defmodule Jido.AI.Accuracy.SelfRefine do
   """
 
   alias Jido.AI.Accuracy.{Candidate, Config}
-  alias Jido.AI.Config, as: MainConfig
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -169,7 +168,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     # Resolve model alias if atom
     resolved_model =
       case model do
-        atom when is_atom(atom) -> MainConfig.resolve_model(atom)
+        atom when is_atom(atom) -> Jido.AI.resolve_model(atom)
         binary when is_binary(binary) -> binary
       end
 
@@ -281,7 +280,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
     rendered =
       try do
-        EEx.eval_string(template, assigns: assigns)
+        Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
       rescue
         e -> {:error, {:template_error, Exception.message(e)}}
       end
@@ -322,7 +321,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
     rendered =
       try do
-        EEx.eval_string(template, assigns: assigns)
+        Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
       rescue
         e -> {:error, {:template_error, Exception.message(e)}}
       end
@@ -432,7 +431,9 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     temperature = Keyword.get(opts, :temperature, strategy.temperature)
     timeout = Keyword.get(opts, :timeout, strategy.timeout)
 
-    messages = [%ReqLLM.Message{role: :user, content: prompt}]
+    context =
+      ReqLLM.Context.new()
+      |> ReqLLM.Context.append(ReqLLM.Context.text(:user, prompt))
 
     reqllm_opts = [
       temperature: temperature,
@@ -440,7 +441,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     ]
 
     try do
-      case ReqLLM.Generation.generate_text(model, messages, reqllm_opts) do
+      case ReqLLM.Generation.generate_text(model, context, reqllm_opts) do
         {:ok, response} ->
           content = extract_content(response)
 

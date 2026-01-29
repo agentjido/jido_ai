@@ -3,7 +3,6 @@ defmodule Jido.AI.Strategies.ChainOfThoughtTest do
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.ChainOfThought.Machine
-  alias Jido.AI.Config
   alias Jido.AI.Strategies.ChainOfThought
 
   # Helper to create a mock agent
@@ -45,7 +44,7 @@ defmodule Jido.AI.Strategies.ChainOfThoughtTest do
       agent = create_agent(model: :fast)
       state = StratState.get(agent, %{})
 
-      assert state[:config].model == Config.resolve_model(:fast)
+      assert state[:config].model == Jido.AI.resolve_model(:fast)
     end
 
     test "passes through string model specs" do

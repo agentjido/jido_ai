@@ -3,12 +3,11 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
   A Jido.Action for listing all available tools with their schemas.
 
   This action queries the `Jido.AI.Tools.Registry` and returns information
-  about all registered tools, including their names, types, and schemas.
+  about all registered Action modules, including their names and schemas.
 
   ## Parameters
 
   * `filter` (optional) - Filter tools by name pattern (string)
-  * `type` (optional) - Filter by type (`:action`, `:tool`, or `nil` for all)
   * `include_schema` (optional) - Include tool schemas (default: `true`)
 
   ## Examples
@@ -19,11 +18,6 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
       # Filter by name pattern
       {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ListTools, %{
         filter: "calc"
-      })
-
-      # List only actions
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ListTools, %{
-        type: :action
       })
   """
 
@@ -37,9 +31,6 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
       Zoi.object(%{
         filter:
           Zoi.string(description: "Filter tools by name pattern (substring match)")
-          |> Zoi.optional(),
-        type:
-          Zoi.atom(description: "Filter by type (:action, :tool, or nil for all)")
           |> Zoi.optional(),
         include_schema: Zoi.boolean(description: "Include tool schemas in result") |> Zoi.default(true),
         include_sensitive:
@@ -65,7 +56,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
         Registry.list_all()
         |> filter_sensitive_tools(validated_params[:include_sensitive])
         |> filter_by_allowlist(validated_params[:allowed_tools])
-        |> filter_tools(validated_params[:filter], validated_params[:type])
+        |> filter_by_name(validated_params[:filter])
         |> format_tools(validated_params[:include_schema] != false)
 
       {:ok,
@@ -73,7 +64,6 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
          tools: tools,
          count: length(tools),
          filter: validated_params[:filter],
-         type: validated_params[:type],
          sensitive_excluded: not (validated_params[:include_sensitive] == true)
        }}
     end
@@ -112,7 +102,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
   defp filter_sensitive_tools(tools, true), do: tools
 
   defp filter_sensitive_tools(tools, _include_sensitive) when is_list(tools) do
-    Enum.filter(tools, fn {name, _type, _module} ->
+    Enum.filter(tools, fn {name, _module} ->
       not sensitive_tool?(name)
     end)
   end
@@ -121,7 +111,6 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
   defp sensitive_tool?(name) when is_binary(name) do
     lower_name = String.downcase(name)
 
-    # Exclude tools that could expose system information
     Enum.any?(
       [
         "system",
@@ -147,34 +136,22 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
   defp filter_by_allowlist(tools, allowed_tools) when is_list(allowed_tools) do
     allowed_set = MapSet.new(allowed_tools)
 
-    Enum.filter(tools, fn {name, _type, _module} ->
+    Enum.filter(tools, fn {name, _module} ->
       MapSet.member?(allowed_set, name)
     end)
   end
 
-  defp filter_tools(tools, nil, nil), do: tools
-  defp filter_tools(tools, filter, type), do: filter_tools(tools, filter, type, [])
+  defp filter_by_name(tools, nil), do: tools
 
-  defp filter_tools([], _filter, _type, acc), do: Enum.reverse(acc)
-
-  defp filter_tools([{name, tool_type, module} | rest], filter, type, acc) do
-    matches_filter = filter == nil or String.contains?(name, filter)
-    matches_type = type == nil or tool_type == type
-
-    if matches_filter and matches_type do
-      filter_tools(rest, filter, type, [{name, tool_type, module} | acc])
-    else
-      filter_tools(rest, filter, type, acc)
-    end
+  defp filter_by_name(tools, filter) when is_binary(filter) do
+    Enum.filter(tools, fn {name, _module} ->
+      String.contains?(name, filter)
+    end)
   end
 
   defp format_tools(tools, include_schema) do
-    Enum.map(tools, fn {name, type, module} ->
-      base = %{
-        name: name,
-        type: type
-        # Module name excluded for security
-      }
+    Enum.map(tools, fn {name, module} ->
+      base = %{name: name}
 
       if include_schema do
         Map.put(base, :schema, extract_schema(module))

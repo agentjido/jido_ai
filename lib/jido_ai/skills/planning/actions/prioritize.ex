@@ -62,8 +62,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Config
-  alias Jido.AI.Helpers
+  alias ReqLLM.Context
 
   @prioritization_prompt """
   You are an expert project manager specializing in task prioritization.
@@ -144,13 +143,13 @@ defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
   defp validate_tasks(tasks) when is_list(tasks), do: :ok
   defp validate_tasks(_), do: {:error, :invalid_tasks_format}
 
-  defp resolve_model(nil), do: {:ok, Config.resolve_model(:planning)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Config.resolve_model(model)}
+  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:planning)}
+  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
   defp resolve_model(model) when is_binary(model), do: {:ok, model}
 
   defp build_prioritize_messages(params) do
     user_prompt = build_prioritize_user_prompt(params)
-    Helpers.build_messages(user_prompt, system_prompt: @prioritization_prompt)
+    Context.normalize(user_prompt, system_prompt: @prioritization_prompt)
   end
 
   defp build_prioritize_user_prompt(params) do
