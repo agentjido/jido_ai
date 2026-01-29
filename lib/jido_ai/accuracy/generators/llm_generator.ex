@@ -37,7 +37,6 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   @behaviour Jido.AI.Accuracy.Generator
 
   alias Jido.AI.Accuracy.{Candidate, Config, Generator}
-  alias Jido.AI.Config, as: MainConfig
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -94,7 +93,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
     # Resolve model alias if atom
     resolved_model =
       case model do
-        atom when is_atom(atom) -> MainConfig.resolve_model(atom)
+        atom when is_atom(atom) -> Jido.AI.resolve_model(atom)
         binary when is_binary(binary) -> binary
       end
 

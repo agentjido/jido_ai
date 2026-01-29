@@ -52,9 +52,8 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Config
-  alias Jido.AI.Helpers
   alias Jido.AI.Security
+  alias ReqLLM.Context
 
   @dialyzer [
     {:nowarn_function, run: 2},
@@ -105,13 +104,13 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Config.resolve_model(:reasoning)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Config.resolve_model(model)}
+  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:reasoning)}
+  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
   defp resolve_model(model) when is_binary(model), do: {:ok, model}
 
   defp build_inference_messages(params) do
     user_prompt = build_inference_user_prompt(params)
-    Helpers.build_messages(user_prompt, system_prompt: @inference_prompt)
+    Context.normalize(user_prompt, system_prompt: @inference_prompt)
   end
 
   defp build_inference_user_prompt(params) do

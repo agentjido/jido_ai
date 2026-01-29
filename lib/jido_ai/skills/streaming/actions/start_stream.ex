@@ -77,9 +77,8 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Config
-  alias Jido.AI.Helpers
   alias Jido.AI.Security
+  alias ReqLLM.Context
 
   # Dialyzer has incomplete PLT information about req_llm dependencies
   @dialyzer [
@@ -132,17 +131,17 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Config.resolve_model(:fast)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Config.resolve_model(model)}
+  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:fast)}
+  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
   defp resolve_model(model) when is_binary(model), do: {:ok, model}
   defp resolve_model(_), do: {:error, :invalid_model_format}
 
   defp build_messages(prompt, nil) do
-    Helpers.build_messages(prompt, [])
+    Context.normalize(prompt, [])
   end
 
   defp build_messages(prompt, system_prompt) when is_binary(system_prompt) do
-    Helpers.build_messages(prompt, system_prompt: system_prompt)
+    Context.normalize(prompt, system_prompt: system_prompt)
   end
 
   defp build_opts(params) do

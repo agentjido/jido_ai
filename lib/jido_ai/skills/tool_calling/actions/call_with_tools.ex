@@ -62,7 +62,8 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{Config, Helpers, Security, Tools}
+  alias Jido.AI.{Helpers, Security, Tools}
+  alias ReqLLM.Context
 
   @dialyzer [
     {:nowarn_function, run: 2},
@@ -101,17 +102,17 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Config.resolve_model(:capable)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Config.resolve_model(model)}
+  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:capable)}
+  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
   defp resolve_model(model) when is_binary(model), do: {:ok, model}
   defp resolve_model(_), do: {:error, :invalid_model_format}
 
   defp build_messages(prompt, nil) do
-    Helpers.build_messages(prompt, [])
+    Context.normalize(prompt, [])
   end
 
   defp build_messages(prompt, system_prompt) when is_binary(system_prompt) do
-    Helpers.build_messages(prompt, system_prompt: system_prompt)
+    Context.normalize(prompt, system_prompt: system_prompt)
   end
 
   defp get_tools(nil) do

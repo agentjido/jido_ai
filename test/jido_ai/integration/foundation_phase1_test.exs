@@ -14,12 +14,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Config
   alias Jido.AI.Directive.{ReqLLMEmbed, ReqLLMGenerate, ReqLLMStream}
   alias Jido.AI.Helpers
   alias Jido.AI.Signal
   alias Jido.AI.Signal.{EmbedResult, ReqLLMError, ToolResult, UsageReport}
   alias Jido.AI.Tools.Registry
+  alias ReqLLM.Context
 
   # ============================================================================
   # Directive + Configuration Integration
@@ -39,7 +39,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert is_nil(directive.model)
 
       # Resolve the model alias via Config
-      resolved_model = Config.resolve_model(directive.model_alias)
+      resolved_model = Jido.AI.resolve_model(directive.model_alias)
       assert is_binary(resolved_model)
       assert String.contains?(resolved_model, ":")
     end
@@ -52,7 +52,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
           context: [%{role: :user, content: "Explain this"}]
         })
 
-      resolved_model = Config.resolve_model(directive.model_alias)
+      resolved_model = Jido.AI.resolve_model(directive.model_alias)
       assert is_binary(resolved_model)
     end
 
@@ -66,13 +66,11 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
           context: [%{role: :user, content: "Hello"}]
         })
 
-      # Direct model passes through Config.resolve_model unchanged
-      assert Config.resolve_model(directive.model) == model
+      # Direct model passes through Jido.AI.resolve_model unchanged
+      assert Jido.AI.resolve_model(directive.model) == model
     end
 
-    test "directive defaults match Config.defaults" do
-      defaults = Config.defaults()
-
+    test "directive has default values" do
       directive =
         ReqLLMStream.new!(%{
           id: "stream_3",
@@ -80,11 +78,9 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
           context: [%{role: :user, content: "Hello"}]
         })
 
-      # Directive has its own defaults, but Config.defaults provides guidance
+      # Directive has its own defaults
       assert is_number(directive.temperature)
       assert is_integer(directive.max_tokens)
-      assert is_number(defaults[:temperature])
-      assert is_integer(defaults[:max_tokens])
     end
 
     test "ReqLLMEmbed directive creation" do
@@ -210,12 +206,13 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     end
 
     test "error classification flows through helpers" do
+      # classify_error uses status codes and reason atoms, not string reasons
       errors_and_types = [
-        {%ReqLLM.Error.API.Request{status: 429}, :rate_limit},
-        {%ReqLLM.Error.API.Request{status: 401}, :auth},
-        {%ReqLLM.Error.API.Request{status: 500}, :provider_error},
-        {%ReqLLM.Error.API.Request{reason: "timeout"}, :timeout},
-        {%ReqLLM.Error.API.Request{reason: "econnrefused"}, :network}
+        {%{status: 429}, :rate_limit},
+        {%{status: 401}, :auth},
+        {%{status: 500}, :provider_error},
+        {%{reason: :timeout}, :timeout},
+        {%{reason: :econnrefused}, :network}
       ]
 
       for {error, expected_type} <- errors_and_types do
@@ -293,41 +290,29 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   # ============================================================================
 
   describe "helpers with response processing" do
-    test "extract_text from various response formats" do
-      # String content
-      assert Helpers.extract_text(%{message: %{content: "Hello"}}) == "Hello"
+    test "classify_llm_response determines response type" do
+      tool_response = %{
+        message: %{content: nil, tool_calls: [%{id: "tc_1", name: "test", arguments: %{}}]},
+        finish_reason: :tool_calls
+      }
 
-      # Empty content
-      assert Helpers.extract_text(%{message: %{content: ""}}) == ""
+      text_response = %{
+        message: %{content: "Hello", tool_calls: nil},
+        finish_reason: :stop
+      }
 
-      # Missing message
-      assert Helpers.extract_text(%{}) == ""
-    end
+      tool_result = Helpers.classify_llm_response(tool_response)
+      assert tool_result.type == :tool_calls
 
-    test "classify_response determines response type" do
-      tool_response = %{message: %{tool_calls: [%{id: "tc_1"}]}}
-      text_response = %{message: %{content: "Hello"}}
-      error_response = {:error, %{reason: "failed"}}
-
-      assert Helpers.classify_response(tool_response) == :tool_calls
-      assert Helpers.classify_response(text_response) == :final_answer
-      assert Helpers.classify_response(error_response) == :error
-    end
-
-    test "has_tool_calls? detection" do
-      with_tools = %{message: %{tool_calls: [%{id: "tc_1"}]}}
-      without_tools = %{message: %{content: "text"}}
-      empty_tools = %{message: %{tool_calls: []}}
-
-      assert Helpers.has_tool_calls?(with_tools) == true
-      assert Helpers.has_tool_calls?(without_tools) == false
-      assert Helpers.has_tool_calls?(empty_tools) == false
+      text_result = Helpers.classify_llm_response(text_response)
+      assert text_result.type == :final_answer
+      assert text_result.text == "Hello"
     end
   end
 
-  describe "helpers with message building" do
-    test "build_messages creates valid context" do
-      {:ok, context} = Helpers.build_messages("Hello")
+  describe "message building with ReqLLM.Context" do
+    test "Context.normalize creates valid context" do
+      {:ok, context} = Context.normalize("Hello")
 
       assert %ReqLLM.Context{} = context
       assert length(context.messages) == 1
@@ -335,8 +320,8 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert msg.role == :user
     end
 
-    test "build_messages with system_prompt" do
-      {:ok, context} = Helpers.build_messages("Hello", system_prompt: "Be helpful")
+    test "Context.normalize with system_prompt" do
+      {:ok, context} = Context.normalize("Hello", system_prompt: "Be helpful")
 
       assert length(context.messages) == 2
       [system, user] = context.messages
@@ -344,10 +329,10 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert user.role == :user
     end
 
-    test "add_tool_result appends to context" do
-      {:ok, context} = Helpers.build_messages("Call calculator")
-
-      updated = Helpers.add_tool_result(context, "tc_1", "calculator", %{result: 42})
+    test "Context.append with tool_result_message" do
+      {:ok, context} = Context.normalize("Call calculator")
+      tool_msg = Context.tool_result_message("calculator", "tc_1", %{result: 42})
+      updated = Context.append(context, tool_msg)
 
       assert length(updated.messages) == 2
       [_user, tool] = updated.messages
@@ -405,29 +390,10 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     test "model aliases are consistently resolved" do
       # All default aliases should resolve to valid model specs
       for alias <- [:fast, :capable, :reasoning] do
-        model = Config.resolve_model(alias)
+        model = Jido.AI.resolve_model(alias)
         assert is_binary(model)
         assert String.contains?(model, ":")
       end
-    end
-
-    test "defaults provide valid values" do
-      defaults = Config.defaults()
-
-      assert is_number(defaults[:temperature])
-      assert defaults[:temperature] >= 0
-      assert defaults[:temperature] <= 2
-
-      assert is_integer(defaults[:max_tokens])
-      assert defaults[:max_tokens] > 0
-    end
-
-    test "validate returns ok for default config" do
-      # Clear any custom config
-      Application.delete_env(:jido_ai, :model_aliases)
-      Application.delete_env(:jido_ai, :defaults)
-
-      assert Config.validate() == :ok
     end
 
     test "custom model alias configuration" do
@@ -437,10 +403,10 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
       on_exit(fn -> Application.delete_env(:jido_ai, :model_aliases) end)
 
-      assert Config.resolve_model(:custom_test) == "test:custom-model"
+      assert Jido.AI.resolve_model(:custom_test) == "test:custom-model"
 
       # Default aliases still work
-      assert is_binary(Config.resolve_model(:fast))
+      assert is_binary(Jido.AI.resolve_model(:fast))
     end
   end
 
@@ -460,7 +426,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
         })
 
       # 2. Resolve model for the request
-      model = Config.resolve_model(directive.model_alias)
+      model = Jido.AI.resolve_model(directive.model_alias)
       assert is_binary(model)
 
       # 3. Simulate response (what we'd get from ReqLLM)
@@ -482,8 +448,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert signal.data.model == model
       assert signal.data.duration_ms == 250
 
-      # 6. Use helpers to process
-      assert Helpers.classify_response(mocked_response) == :final_answer
+      # 6. Verify signal has no tool calls
       assert Signal.tool_call?(signal) == false
     end
 
@@ -526,19 +491,20 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
       assert tool_result.data.result == {:ok, %{answer: 35}}
 
-      # 6. Build context with tool result using helpers
-      {:ok, context} = Helpers.build_messages("Calculate 5 * 7")
-      updated_context = Helpers.add_tool_result(context, tc.id, tc.name, %{answer: 35})
+      # 6. Build context with tool result using ReqLLM.Context
+      {:ok, context} = Context.normalize("Calculate 5 * 7")
+      tool_msg = Context.tool_result_message(tc.name, tc.id, %{answer: 35})
+      updated_context = Context.append(context, tool_msg)
 
       assert length(updated_context.messages) == 2
     end
 
     test "error handling flow" do
-      # Simulate error from ReqLLM
-      reqllm_error = %ReqLLM.Error.API.Request{
+      # Simulate error with proper format for classify_error
+      reqllm_error = %{
         status: 429,
         reason: "Rate limit exceeded",
-        response_body: %{"retry_after" => 60}
+        response_headers: [{"retry-after", "60"}]
       }
 
       # 1. Classify error
