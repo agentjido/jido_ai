@@ -400,7 +400,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
       mid_score: mid_score
     ]
 
-    rendered = EEx.eval_string(template, assigns: assigns)
+    rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
     {:ok, rendered}
   rescue
     e in [SyntaxError, TokenMissingError, ArgumentError] ->

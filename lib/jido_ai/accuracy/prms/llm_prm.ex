@@ -552,7 +552,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
   defp midpoint({min, max}), do: (min + max) / 2
 
   defp render_template(template, assigns) do
-    rendered = EEx.eval_string(template, assigns: assigns)
+    rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
     {:ok, rendered}
   rescue
     e in [SyntaxError, TokenMissingError, ArgumentError] ->
