@@ -58,7 +58,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       tool_calling_actions = ToolCalling.actions()
 
       # Verify actions are distinct
-      assert length(llm_actions) == 3
+      assert length(llm_actions) == 4
       assert length(reasoning_actions) == 3
       assert length(planning_actions) == 3
       assert length(streaming_actions) == 3
@@ -412,7 +412,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
       total = llm_count + reasoning_count + planning_count + streaming_count + tool_calling_count
 
-      assert total == 15
+      assert total == 16
     end
   end
 end

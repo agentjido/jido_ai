@@ -2,7 +2,6 @@ defmodule Jido.AI.Tools.ExecutorTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Tools.Executor
-  alias Jido.AI.Tools.Registry
 
   # Define test Action modules
   defmodule TestActions.Calculator do
@@ -129,42 +128,42 @@ defmodule Jido.AI.Tools.ExecutorTest do
   end
 
   setup do
-    # Ensure registry is started and clear it before each test
-    Registry.ensure_started()
-    Registry.clear()
-    :ok = Registry.register_action(TestActions.Calculator)
-    :ok = Registry.register_action(TestActions.SlowAction)
-    :ok = Registry.register_action(TestActions.ErrorAction)
-    :ok = Registry.register_action(TestActions.ExceptionAction)
-    :ok = Registry.register_action(TestActions.Echo)
-    :ok = Registry.register_action(TestActions.LargeResult)
-    :ok = Registry.register_action(TestActions.BinaryResult)
-    :ok = Registry.register_action(TestActions.ExceptionAction2)
-    :ok
+    tools = Executor.build_tools_map([
+      TestActions.Calculator,
+      TestActions.SlowAction,
+      TestActions.ErrorAction,
+      TestActions.ExceptionAction,
+      TestActions.Echo,
+      TestActions.LargeResult,
+      TestActions.BinaryResult,
+      TestActions.ExceptionAction2
+    ])
+
+    {:ok, tools: tools}
   end
 
   describe "execute/3 with Actions" do
-    test "executes action via Jido.Exec" do
+    test "executes action via Jido.Exec", %{tools: tools} do
       # Use string keys like LLM would provide
-      result = Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "2"}, %{})
+      result = Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "2"}, %{}, tools: tools)
 
       assert {:ok, %{result: 3}} = result
     end
 
-    test "normalizes string keys to atom keys" do
-      result = Executor.execute("calculator", %{"operation" => "add", "a" => 1, "b" => 2}, %{})
+    test "normalizes string keys to atom keys", %{tools: tools} do
+      result = Executor.execute("calculator", %{"operation" => "add", "a" => 1, "b" => 2}, %{}, tools: tools)
 
       assert {:ok, %{result: 3}} = result
     end
 
-    test "parses string numbers based on schema" do
-      result = Executor.execute("calculator", %{"operation" => "multiply", "a" => "3", "b" => "4"}, %{})
+    test "parses string numbers based on schema", %{tools: tools} do
+      result = Executor.execute("calculator", %{"operation" => "multiply", "a" => "3", "b" => "4"}, %{}, tools: tools)
 
       assert {:ok, %{result: 12}} = result
     end
 
-    test "returns error from action" do
-      result = Executor.execute("calculator", %{"operation" => "divide", "a" => "10", "b" => "0"}, %{})
+    test "returns error from action", %{tools: tools} do
+      result = Executor.execute("calculator", %{"operation" => "divide", "a" => "10", "b" => "0"}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.error == "Division by zero"
@@ -174,14 +173,14 @@ defmodule Jido.AI.Tools.ExecutorTest do
   end
 
   describe "execute/3 with Echo Action" do
-    test "executes echo action" do
-      result = Executor.execute("echo", %{"message" => "hello"}, %{})
+    test "executes echo action", %{tools: tools} do
+      result = Executor.execute("echo", %{"message" => "hello"}, %{}, tools: tools)
 
       assert {:ok, %{echoed: "hello"}} = result
     end
 
-    test "normalizes string keys for echo action" do
-      result = Executor.execute("echo", %{"message" => "world"}, %{})
+    test "normalizes string keys for echo action", %{tools: tools} do
+      result = Executor.execute("echo", %{"message" => "world"}, %{}, tools: tools)
 
       assert {:ok, %{echoed: "world"}} = result
     end
@@ -189,7 +188,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
 
   describe "execute/3 registry lookup" do
     test "returns error for unknown tool" do
-      result = Executor.execute("unknown_tool", %{}, %{})
+      result = Executor.execute("unknown_tool", %{}, %{}, tools: %{})
 
       assert {:error, error} = result
       assert error.error == "Tool not found: unknown_tool"
@@ -199,14 +198,14 @@ defmodule Jido.AI.Tools.ExecutorTest do
   end
 
   describe "execute/4 with timeout" do
-    test "completes within timeout" do
-      result = Executor.execute("slow_action", %{"delay_ms" => "50"}, %{}, timeout: 1000)
+    test "completes within timeout", %{tools: tools} do
+      result = Executor.execute("slow_action", %{"delay_ms" => "50"}, %{}, tools: tools, timeout: 1000)
 
       assert {:ok, %{completed: true, delay: 50}} = result
     end
 
-    test "times out for slow operations" do
-      result = Executor.execute("slow_action", %{"delay_ms" => "500"}, %{}, timeout: 100)
+    test "times out for slow operations", %{tools: tools} do
+      result = Executor.execute("slow_action", %{"delay_ms" => "500"}, %{}, tools: tools, timeout: 100)
 
       assert {:error, error} = result
       assert error.type == :timeout
@@ -216,8 +215,8 @@ defmodule Jido.AI.Tools.ExecutorTest do
   end
 
   describe "error handling" do
-    test "returns structured error from action" do
-      result = Executor.execute("error_action", %{"message" => "test error"}, %{})
+    test "returns structured error from action", %{tools: tools} do
+      result = Executor.execute("error_action", %{"message" => "test error"}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -225,8 +224,8 @@ defmodule Jido.AI.Tools.ExecutorTest do
       assert error.error == "test error"
     end
 
-    test "handles missing required parameters" do
-      result = Executor.execute("calculator", %{}, %{})
+    test "handles missing required parameters", %{tools: tools} do
+      result = Executor.execute("calculator", %{}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -260,13 +259,12 @@ defmodule Jido.AI.Tools.ExecutorTest do
     end
 
     test "handles mixed string and atom keys" do
-      # Only string keys get converted - atom keys are ignored by convert_params_using_schema
+      # jido_action v2.0.0-rc.2+ supports both string and atom keys
       schema = [a: [type: :integer], b: [type: :string]]
       result = Executor.normalize_params(%{"a" => 1, :b => "test"}, schema)
 
-      # Only "a" is converted, :b is not picked up (string key required)
       assert result.a == 1
-      refute Map.has_key?(result, :b)
+      assert result.b == "test"
     end
 
     test "returns empty map when params is empty" do
@@ -274,6 +272,32 @@ defmodule Jido.AI.Tools.ExecutorTest do
       result = Executor.normalize_params(%{}, schema)
 
       assert result == %{}
+    end
+
+    test "coerces integer to float when schema expects float" do
+      schema = [value: [type: :float], amount: [type: :float]]
+      result = Executor.normalize_params(%{"value" => 20, "amount" => 3}, schema)
+
+      assert result.value == 20.0
+      assert result.amount == 3.0
+      assert is_float(result.value)
+      assert is_float(result.amount)
+    end
+
+    test "preserves float values when schema expects float" do
+      schema = [value: [type: :float]]
+      result = Executor.normalize_params(%{"value" => 20.5}, schema)
+
+      assert result.value == 20.5
+      assert is_float(result.value)
+    end
+
+    test "parses string to float and does not double-coerce" do
+      schema = [value: [type: :float]]
+      result = Executor.normalize_params(%{"value" => "20"}, schema)
+
+      assert result.value == 20.0
+      assert is_float(result.value)
     end
   end
 
@@ -381,7 +405,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
   end
 
   describe "telemetry" do
-    test "emits start and stop events" do
+    test "emits start and stop events", %{tools: tools} do
       test_pid = self()
 
       :telemetry.attach_many(
@@ -396,7 +420,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
         nil
       )
 
-      Executor.execute("calculator", %{operation: "add", a: 1, b: 1}, %{})
+      Executor.execute("calculator", %{operation: "add", a: 1, b: 1}, %{}, tools: tools)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _}, %{tool_name: "calculator"}}
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _}, %{tool_name: "calculator"}}
@@ -404,7 +428,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
       :telemetry.detach("test-handler")
     end
 
-    test "emits exception event on timeout" do
+    test "emits exception event on timeout", %{tools: tools} do
       test_pid = self()
 
       :telemetry.attach(
@@ -416,7 +440,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
         nil
       )
 
-      Executor.execute("slow_action", %{"delay_ms" => "500"}, %{}, timeout: 50)
+      Executor.execute("slow_action", %{"delay_ms" => "500"}, %{}, tools: tools, timeout: 50)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :exception], %{duration: _},
                       %{tool_name: "slow_action", reason: :timeout}},
@@ -425,7 +449,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
       :telemetry.detach("test-exception-handler")
     end
 
-    test "sanitizes sensitive parameters in telemetry" do
+    test "sanitizes sensitive parameters in telemetry", %{tools: tools} do
       test_pid = self()
 
       :telemetry.attach(
@@ -448,7 +472,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
         "secret_value" => "shhh"
       }
 
-      Executor.execute("calculator", sensitive_params, %{})
+      Executor.execute("calculator", sensitive_params, %{}, tools: tools)
 
       assert_receive {:telemetry_params, sanitized_params}
 
@@ -466,7 +490,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
       :telemetry.detach("test-sanitize-handler")
     end
 
-    test "sanitizes nested sensitive parameters" do
+    test "sanitizes nested sensitive parameters", %{tools: tools} do
       test_pid = self()
 
       :telemetry.attach(
@@ -488,7 +512,7 @@ defmodule Jido.AI.Tools.ExecutorTest do
         }
       }
 
-      Executor.execute("calculator", nested_params, %{})
+      Executor.execute("calculator", nested_params, %{}, tools: tools)
 
       assert_receive {:telemetry_params, sanitized_params}
 
@@ -502,11 +526,11 @@ defmodule Jido.AI.Tools.ExecutorTest do
   end
 
   describe "security" do
-    test "does not include stacktrace in exception error response" do
+    test "does not include stacktrace in exception error response", %{tools: tools} do
       import ExUnit.CaptureLog
 
       capture_log(fn ->
-        result = Executor.execute("exception_action2", %{"message" => "test exception"}, %{})
+        result = Executor.execute("exception_action2", %{"message" => "test exception"}, %{}, tools: tools)
 
         assert {:error, error} = result
         assert error.type == :execution_error
@@ -516,12 +540,12 @@ defmodule Jido.AI.Tools.ExecutorTest do
       end)
     end
 
-    test "logs exceptions server-side" do
+    test "logs exceptions server-side", %{tools: tools} do
       import ExUnit.CaptureLog
 
       log =
         capture_log([level: :error], fn ->
-          Executor.execute("exception_action2", %{"message" => "logged exception"}, %{})
+          Executor.execute("exception_action2", %{"message" => "logged exception"}, %{}, tools: tools)
         end)
 
       assert log =~ "logged exception" or log =~ "ArgumentError"

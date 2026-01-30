@@ -37,6 +37,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   @behaviour Jido.AI.Accuracy.Generator
 
   alias Jido.AI.Accuracy.{Candidate, Config, Generator}
+  alias Jido.AI.Helpers.Text
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -299,21 +300,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   end
 
   defp extract_content(response) do
-    case response.message.content do
-      nil ->
-        ""
-
-      content when is_binary(content) ->
-        content
-
-      content when is_list(content) ->
-        content
-        |> Enum.filter(fn
-          %{type: :text} -> true
-          _ -> false
-        end)
-        |> Enum.map_join("", fn %{text: text} -> text end)
-    end
+    Text.extract_text(response)
   end
 
   defp count_tokens(response) do

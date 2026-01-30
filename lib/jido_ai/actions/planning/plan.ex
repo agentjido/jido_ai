@@ -56,6 +56,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Plan do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
+  alias Jido.AI.Helpers.Text
   alias ReqLLM.Context
 
   @planning_prompt """
@@ -182,7 +183,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Plan do
   end
 
   defp format_result(response, model, goal) do
-    plan_text = extract_text(response)
+    plan_text = Text.extract_text(response)
 
     %{
       plan: plan_text,
@@ -198,31 +199,6 @@ defmodule Jido.AI.Skills.Planning.Actions.Plan do
     Regex.scan(~r/^\d+\.\s+\*\*(.*?)\*\*/m, plan_text)
     |> Enum.map(fn [_, name] -> name end)
   end
-
-  defp extract_text(%{message: %{content: content}}) do
-    case content do
-      c when is_binary(c) ->
-        c
-
-      c when is_list(c) ->
-        c
-        |> Enum.filter(fn
-          %{type: :text} -> true
-          _ -> false
-        end)
-        |> Enum.map_join("", fn
-          %{text: text} -> text
-          _ -> ""
-        end)
-
-      _ ->
-        ""
-    end
-  end
-
-  @dialyzer {:nowarn_function, extract_text: 1}
-
-  defp extract_text(_), do: ""
 
   defp extract_usage(%{usage: usage}) when is_map(usage) do
     %{

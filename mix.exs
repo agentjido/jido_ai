@@ -62,9 +62,9 @@ defmodule JidoAi.MixProject do
     [
       # Jido ecosystem
       {:jido, "~> 2.0.0-rc.2"},
-      {:jido_action, "~> 2.0.0-rc.2"},
+      {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, "~> 2.0.0-rc.2"},
-      {:req_llm, github: "agentjido/req_llm", branch: "main"},
+      {:req_llm, path: "../req_llm", override: true},
       {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
 
       # Runtime

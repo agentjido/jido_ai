@@ -80,6 +80,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
 
   alias Jido.AI.Accuracy.{Config, Prm}
   alias Jido.AI.Helpers
+  alias Jido.AI.Helpers.Text
 
   @type t :: %__MODULE__{
           model: String.t() | nil,
@@ -433,18 +434,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
   end
 
   defp extract_content(response) do
-    case response.message.content do
-      nil ->
-        ""
-
-      content when is_binary(content) ->
-        content
-
-      content when is_list(content) ->
-        content
-        |> Enum.filter(fn %{type: type} -> type == :text end)
-        |> Enum.map_join("", fn %{text: text} -> text end)
-    end
+    Text.extract_text(response)
   end
 
   defp extract_score(content, score_range) do

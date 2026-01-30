@@ -54,6 +54,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
+  alias Jido.AI.Helpers.Text
   alias ReqLLM.Context
 
   @decomposition_prompt """
@@ -169,7 +170,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
   end
 
   defp format_result(response, model, goal, depth) do
-    decomposition_text = extract_text(response)
+    decomposition_text = Text.extract_text(response)
 
     %{
       decomposition: decomposition_text,
@@ -187,31 +188,6 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
     |> Enum.map(fn [_, sub_goal] -> String.trim(sub_goal) end)
     |> Enum.filter(fn s -> String.length(s) > 0 end)
   end
-
-  defp extract_text(%{message: %{content: content}}) do
-    case content do
-      c when is_binary(c) ->
-        c
-
-      c when is_list(c) ->
-        c
-        |> Enum.filter(fn
-          %{type: :text} -> true
-          _ -> false
-        end)
-        |> Enum.map_join("", fn
-          %{text: text} -> text
-          _ -> ""
-        end)
-
-      _ ->
-        ""
-    end
-  end
-
-  @dialyzer {:nowarn_function, extract_text: 1}
-
-  defp extract_text(_), do: ""
 
   defp extract_usage(%{usage: usage}) when is_map(usage) do
     %{

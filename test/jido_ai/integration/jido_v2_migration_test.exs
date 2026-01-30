@@ -259,7 +259,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert function_exported?(LLM, :actions, 0)
       actions = LLM.actions()
       assert is_list(actions)
-      assert length(actions) == 3
+      assert length(actions) == 4
     end
 
     test "Reasoning.actions/0 returns action list" do
@@ -299,7 +299,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
     test "LLM router returns expected routes" do
       routes = LLM.router(%{})
       assert is_list(routes)
-      assert length(routes) == 3
+      assert length(routes) == 4
     end
 
     test "Reasoning router returns expected routes" do

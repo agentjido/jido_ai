@@ -42,18 +42,19 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
       })
 
   alias Jido.AI.Security
-  alias Jido.AI.Tools.Registry
 
   @doc """
   Executes the list tools action.
   """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
     with {:ok, validated_params} <- validate_and_sanitize_params(params) do
-      Registry.ensure_started()
+      # Get tools from context - expects %{tools: %{name => module}} or list
+      tools_input = context[:tools] || %{}
+      all_tools = normalize_tools_to_list(tools_input)
 
       tools =
-        Registry.list_all()
+        all_tools
         |> filter_sensitive_tools(validated_params[:include_sensitive])
         |> filter_by_allowlist(validated_params[:allowed_tools])
         |> filter_by_name(validated_params[:filter])
@@ -68,6 +69,16 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
        }}
     end
   end
+
+  defp normalize_tools_to_list(tools) when is_map(tools) do
+    Enum.map(tools, fn {name, module} -> {name, module} end)
+  end
+
+  defp normalize_tools_to_list(tools) when is_list(tools) do
+    Enum.map(tools, fn module -> {module.name(), module} end)
+  end
+
+  defp normalize_tools_to_list(_), do: []
 
   # Private Functions
 

@@ -73,7 +73,6 @@ defmodule Jido.AI.Strategies.ReAct do
   alias Jido.AI.ReAct.Machine
   alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.ToolAdapter
-  alias Jido.AI.Tools.Registry
   alias ReqLLM.Context
 
   @type config :: %{
@@ -83,7 +82,6 @@ defmodule Jido.AI.Strategies.ReAct do
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
-          use_registry: boolean(),
           tool_context: map()
         }
 
@@ -448,26 +446,9 @@ defmodule Jido.AI.Strategies.ReAct do
     end)
   end
 
-  # Looks up a tool by name, first in actions_by_name, then optionally in Registry
-  defp lookup_tool(tool_name, actions_by_name, config) do
-    case Map.fetch(actions_by_name, tool_name) do
-      {:ok, _module} = result ->
-        result
-
-      :error ->
-        lookup_in_registry(tool_name, config)
-    end
-  end
-
-  defp lookup_in_registry(tool_name, config) do
-    if config[:use_registry] do
-      case Registry.get(tool_name) do
-        {:ok, module} -> {:ok, module}
-        _ -> :error
-      end
-    else
-      :error
-    end
+  # Looks up a tool by name in actions_by_name
+  defp lookup_tool(tool_name, actions_by_name, _config) do
+    Map.fetch(actions_by_name, tool_name)
   end
 
   defp convert_to_reqllm_context(conversation) do
@@ -495,9 +476,6 @@ defmodule Jido.AI.Strategies.ReAct do
     raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
 
-    # Whether to also use Registry for tool lookup (for exec_tool fallback)
-    use_registry = Keyword.get(opts, :use_registry, false)
-
     %{
       tools: tools_modules,
       reqllm_tools: reqllm_tools,
@@ -505,7 +483,6 @@ defmodule Jido.AI.Strategies.ReAct do
       system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
-      use_registry: use_registry,
       tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
     }
   end

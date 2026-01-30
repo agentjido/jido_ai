@@ -32,7 +32,7 @@ defmodule Jido.AI.Helpers do
   alias Jido.AI.Error
   alias Jido.AI.Error.API, as: APIError
   alias Jido.AI.Error.Validation, as: ValidationError
-  alias Jido.AI.ToolCall
+  alias Jido.AI.Helpers.Text
 
   # ============================================================================
   # Error Handling
@@ -289,21 +289,18 @@ defmodule Jido.AI.Helpers do
 
     %{
       type: type,
-      text: extract_response_text(response.message.content),
-      tool_calls: Enum.map(tool_calls, &ToolCall.normalize/1)
+      text: Text.extract_from_content(response.message.content),
+      tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)
     }
   end
 
-  @doc false
-  @spec extract_response_text(term()) :: String.t()
-  def extract_response_text(nil), do: ""
-  def extract_response_text(content) when is_binary(content), do: content
+  @doc """
+  Extracts text from a content value.
 
-  def extract_response_text(content) when is_list(content) do
-    content
-    |> Enum.filter(&match?(%{type: :text}, &1))
-    |> Enum.map_join("", & &1.text)
-  end
+  Delegates to `Jido.AI.Helpers.Text.extract_from_content/1`.
+  """
+  @spec extract_response_text(term()) :: String.t()
+  defdelegate extract_response_text(content), to: Text, as: :extract_from_content
 
   # ============================================================================
   # Task Supervisor Helpers

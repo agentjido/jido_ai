@@ -491,11 +491,14 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
+    # Get tools from state (agent's registered actions from skill or strategy)
+    tools = get_tools_from_state(state)
+
     Task.Supervisor.start_child(task_supervisor, fn ->
       result =
         case action_module do
           nil ->
-            Executor.execute(tool_name, arguments, context)
+            Executor.execute(tool_name, arguments, context, tools: tools)
 
           module when is_atom(module) ->
             Executor.execute_module(module, arguments, context)
@@ -512,6 +515,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     end)
 
     {:async, nil, state}
+  end
+
+  defp get_tools_from_state(state) do
+    state[:tools] || get_in(state, [:tool_calling, :tools]) || %{}
   end
 end
 

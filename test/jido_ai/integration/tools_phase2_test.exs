@@ -13,8 +13,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   use ExUnit.Case, async: false
 
+  alias Jido.AI.ToolAdapter
   alias Jido.AI.Tools.Executor
-  alias Jido.AI.Tools.Registry
 
   # ============================================================================
   # Test Actions
@@ -116,84 +116,83 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   end
 
   # ============================================================================
-  # Setup
+  # Setup - Build tools map for each test
   # ============================================================================
 
   setup do
-    Registry.ensure_started()
-    Registry.clear()
-    :ok
+    tools_map =
+      Executor.build_tools_map([
+        TestActions.Calculator,
+        TestActions.ContextAware,
+        TestActions.FailingAction,
+        TestActions.Echo,
+        TestActions.UpperCase,
+        TestActions.ContextReader
+      ])
+
+    {:ok, tools: tools_map}
   end
 
   # ============================================================================
-  # Section 2.5.1: Registry and Executor Integration
+  # Section 2.5.1: Tools Map and Executor Integration
   # ============================================================================
 
-  describe "2.5.1 Registry and Executor Integration" do
-    test "register action → execute by name → get result" do
-      # Register action
-      :ok = Registry.register_action(TestActions.Calculator)
-
-      # Verify registration
-      {:ok, TestActions.Calculator} = Registry.get("calculator")
+  describe "2.5.1 Tools Map and Executor Integration" do
+    test "build tools map → execute by name → get result", %{tools: tools} do
+      # Verify tools map has calculator
+      assert Map.has_key?(tools, "calculator")
+      assert tools["calculator"] == TestActions.Calculator
 
       # Execute via Executor with string keys (like LLM would provide)
-      result = Executor.execute("calculator", %{"operation" => "add", "a" => "5", "b" => "3"}, %{})
+      result =
+        Executor.execute("calculator", %{"operation" => "add", "a" => "5", "b" => "3"}, %{},
+          tools: tools
+        )
 
       assert {:ok, %{result: 8}} = result
     end
 
-    test "register echo action → execute by name → get result" do
-      # Register action
-      :ok = Registry.register_action(TestActions.Echo)
-
-      # Verify registration
-      {:ok, TestActions.Echo} = Registry.get("echo")
+    test "build tools map → execute echo → get result", %{tools: tools} do
+      # Verify tools map has echo
+      assert Map.has_key?(tools, "echo")
+      assert tools["echo"] == TestActions.Echo
 
       # Execute via Executor
-      result = Executor.execute("echo", %{"message" => "hello world"}, %{})
+      result = Executor.execute("echo", %{"message" => "hello world"}, %{}, tools: tools)
 
       assert {:ok, %{echoed: "hello world"}} = result
     end
 
-    test "multiple actions in registry" do
-      # Register multiple actions
-      :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_action(TestActions.ContextAware)
-      :ok = Registry.register_action(TestActions.Echo)
-      :ok = Registry.register_action(TestActions.UpperCase)
-
+    test "multiple actions in tools map", %{tools: tools} do
       # Verify all registered
-      all = Registry.list_all()
-      assert length(all) == 4
-
-      # Verify list_actions returns same as list_all
-      actions = Registry.list_actions()
-      assert length(actions) == 4
+      assert map_size(tools) == 6
 
       # Execute each action
       assert {:ok, %{result: 6}} =
-               Executor.execute("calculator", %{"operation" => "multiply", "a" => "2", "b" => "3"}, %{})
+               Executor.execute(
+                 "calculator",
+                 %{"operation" => "multiply", "a" => "2", "b" => "3"},
+                 %{},
+                 tools: tools
+               )
 
-      assert {:ok, %{echoed: "test"}} = Executor.execute("echo", %{"message" => "test"}, %{})
+      assert {:ok, %{echoed: "test"}} =
+               Executor.execute("echo", %{"message" => "test"}, %{}, tools: tools)
 
-      assert {:ok, %{result: "HELLO"}} = Executor.execute("uppercase", %{"text" => "hello"}, %{})
+      assert {:ok, %{result: "HELLO"}} =
+               Executor.execute("uppercase", %{"text" => "hello"}, %{}, tools: tools)
     end
 
-    test "executor handles context for actions" do
-      :ok = Registry.register_action(TestActions.ContextAware)
-
+    test "executor handles context for actions", %{tools: tools} do
       context = %{user_id: "user_123", role: "admin"}
-      result = Executor.execute("context_aware", %{"key" => "user_id"}, context)
+      result = Executor.execute("context_aware", %{"key" => "user_id"}, context, tools: tools)
 
       assert {:ok, %{key: "user_id", value: "user_123"}} = result
     end
 
-    test "executor handles context for context reader action" do
-      :ok = Registry.register_action(TestActions.ContextReader)
-
+    test "executor handles context for context reader action", %{tools: tools} do
       context = %{api_key: "secret_key", environment: "test"}
-      result = Executor.execute("context_reader", %{"key" => "environment"}, context)
+      result = Executor.execute("context_reader", %{"key" => "environment"}, context, tools: tools)
 
       assert {:ok, %{key: "environment", value: "test"}} = result
     end
@@ -204,20 +203,18 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   # ============================================================================
 
   describe "2.5.2 ReqLLM Integration" do
-    test "Registry.to_reqllm_tools returns valid ReqLLM.Tool structs" do
-      :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_action(TestActions.Echo)
-
-      tools = Registry.to_reqllm_tools()
+    test "ToolAdapter.from_action returns valid ReqLLM.Tool structs" do
+      tools = [
+        ToolAdapter.from_action(TestActions.Calculator),
+        ToolAdapter.from_action(TestActions.Echo)
+      ]
 
       assert length(tools) == 2
       assert Enum.all?(tools, &is_struct(&1, ReqLLM.Tool))
     end
 
     test "action schemas are properly converted to JSON Schema" do
-      :ok = Registry.register_action(TestActions.Calculator)
-
-      [tool] = Registry.to_reqllm_tools()
+      tool = ToolAdapter.from_action(TestActions.Calculator)
 
       assert tool.name == "calculator"
       assert tool.description == "Performs arithmetic calculations"
@@ -232,9 +229,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
 
     test "uppercase action schema is properly converted to JSON Schema" do
-      :ok = Registry.register_action(TestActions.UpperCase)
-
-      [tool] = Registry.to_reqllm_tools()
+      tool = ToolAdapter.from_action(TestActions.UpperCase)
 
       assert tool.name == "uppercase"
       assert tool.description == "Converts text to uppercase"
@@ -247,10 +242,10 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
 
     test "all actions produce compatible formats" do
-      :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_action(TestActions.Echo)
-
-      tools = Registry.to_reqllm_tools()
+      tools = [
+        ToolAdapter.from_action(TestActions.Calculator),
+        ToolAdapter.from_action(TestActions.Echo)
+      ]
 
       # Both should have the same structure
       for tool <- tools do
@@ -264,9 +259,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
 
     test "required fields are marked in JSON Schema" do
-      :ok = Registry.register_action(TestActions.Calculator)
-
-      [tool] = Registry.to_reqllm_tools()
+      tool = ToolAdapter.from_action(TestActions.Calculator)
 
       # All fields in Calculator are required
       assert is_list(tool.parameter_schema["required"])
@@ -281,8 +274,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   # ============================================================================
 
   describe "2.5.3 End-to-End Tool Calling" do
-    test "executor handles tool not found gracefully" do
-      result = Executor.execute("nonexistent_tool", %{}, %{})
+    test "executor handles tool not found gracefully", %{tools: tools} do
+      result = Executor.execute("nonexistent_tool", %{}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.type == :not_found
@@ -290,10 +283,11 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert String.contains?(error.error, "not found")
     end
 
-    test "executor handles tool execution errors gracefully" do
-      :ok = Registry.register_action(TestActions.FailingAction)
-
-      result = Executor.execute("failing_action", %{"message" => "Something went wrong"}, %{})
+    test "executor handles tool execution errors gracefully", %{tools: tools} do
+      result =
+        Executor.execute("failing_action", %{"message" => "Something went wrong"}, %{},
+          tools: tools
+        )
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -301,31 +295,31 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert error.error == "Something went wrong"
     end
 
-    test "executor handles validation errors for missing required params" do
-      :ok = Registry.register_action(TestActions.Calculator)
-
+    test "executor handles validation errors for missing required params", %{tools: tools} do
       # Missing required parameters
-      result = Executor.execute("calculator", %{}, %{})
+      result = Executor.execute("calculator", %{}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.type == :execution_error
       assert String.contains?(error.error, "required")
     end
 
-    test "executor normalizes string keys to atom keys" do
-      :ok = Registry.register_action(TestActions.Calculator)
-
+    test "executor normalizes string keys to atom keys", %{tools: tools} do
       # LLM provides string keys
-      result = Executor.execute("calculator", %{"operation" => "add", "a" => 10, "b" => 20}, %{})
+      result =
+        Executor.execute("calculator", %{"operation" => "add", "a" => 10, "b" => 20}, %{},
+          tools: tools
+        )
 
       assert {:ok, %{result: 30}} = result
     end
 
-    test "executor parses string numbers to integers" do
-      :ok = Registry.register_action(TestActions.Calculator)
-
+    test "executor parses string numbers to integers", %{tools: tools} do
       # LLM might provide numbers as strings
-      result = Executor.execute("calculator", %{"operation" => "add", "a" => "15", "b" => "25"}, %{})
+      result =
+        Executor.execute("calculator", %{"operation" => "add", "a" => "15", "b" => "25"}, %{},
+          tools: tools
+        )
 
       assert {:ok, %{result: 40}} = result
     end
@@ -346,60 +340,64 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
         end
       end
 
-      :ok = Registry.register_action(SlowAction)
+      slow_tools = Executor.build_tools_map([SlowAction])
 
       # Should complete within timeout
       assert {:ok, %{completed: true}} =
-               Executor.execute("slow_action", %{"delay" => "50"}, %{}, timeout: 1000)
+               Executor.execute("slow_action", %{"delay" => "50"}, %{},
+                 tools: slow_tools,
+                 timeout: 1000
+               )
 
       # Should timeout
-      result = Executor.execute("slow_action", %{"delay" => "500"}, %{}, timeout: 100)
+      result =
+        Executor.execute("slow_action", %{"delay" => "500"}, %{}, tools: slow_tools, timeout: 100)
 
       assert {:error, error} = result
       assert error.type == :timeout
       assert error.tool_name == "slow_action"
     end
 
-    test "complete simulated tool calling flow" do
-      # 1. Register actions
-      :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_action(TestActions.UpperCase)
+    test "complete simulated tool calling flow", %{tools: tools} do
+      # 1. Build ReqLLM tools (would be passed to LLM)
+      reqllm_tools = [
+        ToolAdapter.from_action(TestActions.Calculator),
+        ToolAdapter.from_action(TestActions.UpperCase)
+      ]
 
-      # 2. Get ReqLLM tools (would be passed to LLM)
-      reqllm_tools = Registry.to_reqllm_tools()
       assert length(reqllm_tools) == 2
 
-      # 3. Simulate LLM returning a tool call
+      # 2. Simulate LLM returning a tool call
       simulated_tool_call = %{
         id: "call_abc123",
         name: "calculator",
         arguments: %{"operation" => "multiply", "a" => "7", "b" => "8"}
       }
 
-      # 4. Execute the tool call
+      # 3. Execute the tool call
       result =
         Executor.execute(
           simulated_tool_call.name,
           simulated_tool_call.arguments,
-          %{}
+          %{},
+          tools: tools
         )
 
       assert {:ok, %{result: 56}} = result
 
-      # 5. Format result for LLM (would be added back to conversation)
+      # 4. Format result for LLM (would be added back to conversation)
       formatted = Executor.format_result(elem(result, 1))
       assert formatted == %{result: 56}
     end
 
-    test "sequential tool calls maintain state correctly" do
-      :ok = Registry.register_action(TestActions.Calculator)
-
+    test "sequential tool calls maintain state correctly", %{tools: tools} do
       # First tool call
       {:ok, result1} =
         Executor.execute(
           "calculator",
           %{"operation" => "add", "a" => "10", "b" => "20"},
-          %{}
+          %{},
+          tools: tools
         )
 
       assert result1.result == 30
@@ -409,21 +407,21 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
         Executor.execute(
           "calculator",
           %{"operation" => "multiply", "a" => Integer.to_string(result1.result), "b" => "2"},
-          %{}
+          %{},
+          tools: tools
         )
 
       assert result2.result == 60
     end
 
-    test "error during tool execution returns structured error" do
-      :ok = Registry.register_action(TestActions.Calculator)
-
+    test "error during tool execution returns structured error", %{tools: tools} do
       # Division by zero
       result =
         Executor.execute(
           "calculator",
           %{"operation" => "divide", "a" => "10", "b" => "0"},
-          %{}
+          %{},
+          tools: tools
         )
 
       assert {:error, error} = result
@@ -437,30 +435,27 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   # Additional Integration Scenarios
   # ============================================================================
 
-  describe "registry lifecycle" do
-    test "clear removes all registered items" do
-      :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_action(TestActions.Echo)
+  describe "tools map lifecycle" do
+    test "build_tools_map creates map with correct entries" do
+      tools = Executor.build_tools_map([TestActions.Calculator, TestActions.Echo])
 
-      assert length(Registry.list_all()) == 2
-
-      Registry.clear()
-
-      assert Registry.list_all() == []
+      assert map_size(tools) == 2
+      assert Map.has_key?(tools, "calculator")
+      assert Map.has_key?(tools, "echo")
     end
 
-    test "unregister removes specific item" do
-      :ok = Registry.register_action(TestActions.Calculator)
-      :ok = Registry.register_action(TestActions.Echo)
+    test "tools map can be modified by rebuilding" do
+      tools1 = Executor.build_tools_map([TestActions.Calculator, TestActions.Echo])
+      assert map_size(tools1) == 2
 
-      :ok = Registry.unregister("calculator")
-
-      assert length(Registry.list_all()) == 1
-      assert {:error, :not_found} = Registry.get("calculator")
-      assert {:ok, _} = Registry.get("echo")
+      # Build new map without calculator
+      tools2 = Executor.build_tools_map([TestActions.Echo])
+      assert map_size(tools2) == 1
+      refute Map.has_key?(tools2, "calculator")
+      assert Map.has_key?(tools2, "echo")
     end
 
-    test "re-registration overwrites previous entry" do
+    test "later module with same name overwrites in tools map" do
       defmodule CalculatorV1 do
         use Jido.Action,
           name: "calculator",
@@ -481,20 +476,18 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
         def run(_params, _context), do: {:ok, %{version: 2}}
       end
 
-      :ok = Registry.register_action(CalculatorV1)
-      {:ok, CalculatorV1} = Registry.get("calculator")
-
-      :ok = Registry.register_action(CalculatorV2)
-      {:ok, CalculatorV2} = Registry.get("calculator")
+      # Later entry wins in build_tools_map
+      tools = Executor.build_tools_map([CalculatorV1, CalculatorV2])
+      assert tools["calculator"] == CalculatorV2
 
       # Execute should use V2
-      {:ok, result} = Executor.execute("calculator", %{}, %{})
+      {:ok, result} = Executor.execute("calculator", %{}, %{}, tools: tools)
       assert result.version == 2
     end
   end
 
   describe "telemetry integration" do
-    test "executor emits telemetry events for successful execution" do
+    test "executor emits telemetry events for successful execution", %{tools: tools} do
       test_pid = self()
 
       :telemetry.attach_many(
@@ -509,18 +502,20 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
         nil
       )
 
-      :ok = Registry.register_action(TestActions.Calculator)
+      Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "1"}, %{},
+        tools: tools
+      )
 
-      Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "1"}, %{})
+      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _},
+                      %{tool_name: "calculator"}}
 
-      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _}, %{tool_name: "calculator"}}
-
-      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _}, %{tool_name: "calculator"}}
+      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _},
+                      %{tool_name: "calculator"}}
 
       :telemetry.detach("integration-test-handler")
     end
 
-    test "executor emits stop telemetry for not_found errors" do
+    test "executor emits stop telemetry for not_found errors", %{tools: tools} do
       test_pid = self()
 
       :telemetry.attach(
@@ -533,7 +528,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       )
 
       # Execute nonexistent tool - this emits a stop event, not exception
-      Executor.execute("nonexistent", %{}, %{})
+      Executor.execute("nonexistent", %{}, %{}, tools: tools)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _},
                       %{tool_name: "nonexistent", result: {:error, %{type: :not_found}}}}

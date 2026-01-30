@@ -28,6 +28,7 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
       end
   """
 
+  alias Jido.AI.Helpers.Text
   alias Jido.AI.Security
 
   @doc """
@@ -97,7 +98,8 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
   @doc """
   Extracts text content from an LLM response.
 
-  Handles both binary content and list content with text blocks.
+  Delegates to `Jido.AI.Helpers.Text.extract_text/1` which handles
+  multiple response shapes consistently.
 
   ## Parameters
 
@@ -115,21 +117,7 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
       iex> extract_text(%{message: %{content: [%{type: :text, text: "Hi"}]}})
       "Hi"
   """
-  def extract_text(%{message: %{content: content}}) when is_binary(content), do: content
-
-  def extract_text(%{message: %{content: content}}) when is_list(content) do
-    content
-    |> Enum.filter(fn
-      %{type: :text} -> true
-      _ -> false
-    end)
-    |> Enum.map_join("", fn
-      %{text: text} -> text
-      _ -> ""
-    end)
-  end
-
-  def extract_text(_), do: ""
+  defdelegate extract_text(response), to: Text
 
   @doc """
   Extracts usage information from an LLM response.
