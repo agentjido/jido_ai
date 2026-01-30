@@ -59,36 +59,25 @@ defmodule JidoAi.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
-    jido_deps() ++ runtime_deps() ++ dev_test_deps()
-  end
-
-  defp jido_deps do
     [
-      jido_dep(:jido, "../jido", "~> 2.0.0-rc"),
-      # Use github source to match jido's dependency; local path takes precedence if available
-      jido_dep_git(:req_llm, "../req_llm", "agentjido/req_llm", "main"),
-      # Override jido_action to use local copy for development
-      {:jido_action, path: "../jido_action", override: true},
-      # Browser automation for web browsing agents
-      jido_dep(:jido_browser, "../jido_browser", "~> 0.1.0")
-    ]
-  end
+      # Jido ecosystem
+      {:jido, "~> 2.0.0-rc.2", override: true},
+      {:jido_action, "~> 2.0.0-rc.2", override: true},
+      {:jido_signal, "~> 2.0.0-rc.2", override: true},
+      {:req_llm, github: "agentjido/req_llm", branch: "main"},
+      {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
 
-  defp runtime_deps do
-    [
+      # Runtime
       {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
-      {:splode, "~> 0.3.0", override: true},
+      {:splode, "~> 0.3.0"},
       {:term_ui, "~> 0.2"},
       {:typedstruct, "~> 0.5", runtime: false},
       {:uniq, "~> 0.6"},
-      {:zoi, "~> 0.16", override: true}
-    ]
-  end
+      {:zoi, "~> 0.16"},
 
-  defp dev_test_deps do
-    [
+      # Dev/Test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
@@ -99,30 +88,6 @@ defmodule JidoAi.MixProject do
       {:quokka, "~> 2.10", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.0", only: [:dev, :test]}
     ]
-  end
-
-  defp jido_dep(app, rel_path, hex_req, extra_opts \\ []) do
-    path = Path.expand(rel_path, __DIR__)
-
-    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
-      {app, Keyword.merge([path: rel_path, override: true], extra_opts)}
-    else
-      {app, hex_req, extra_opts}
-    end
-    |> case do
-      {app, opts} when is_list(opts) -> {app, opts}
-      {app, req, opts} -> {app, req, opts}
-    end
-  end
-
-  defp jido_dep_git(app, rel_path, github_repo, branch) do
-    path = Path.expand(rel_path, __DIR__)
-
-    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
-      {app, path: rel_path, override: true}
-    else
-      {app, github: github_repo, branch: branch, override: true}
-    end
   end
 
   defp aliases do
