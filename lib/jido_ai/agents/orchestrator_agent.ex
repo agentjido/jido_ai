@@ -124,16 +124,12 @@ defmodule Jido.AI.OrchestratorAgent do
       def cli_adapter, do: Jido.AI.CLI.Adapters.ReAct
 
       def ask(pid, query, opts \\ []) when is_binary(query) do
-        tool_context = Keyword.get(opts, :tool_context, %{})
-        tool_context = Map.put(tool_context, :specialists, @specialists)
+        tool_context =
+          opts
+          |> Keyword.get(:tool_context, %{})
+          |> Map.put(:specialists, @specialists)
 
-        payload =
-          if map_size(tool_context) > 0 do
-            %{query: query, tool_context: tool_context}
-          else
-            %{query: query}
-          end
-
+        payload = %{query: query, tool_context: tool_context}
         signal = Jido.Signal.new!("react.user_query", payload, source: "/orchestrator/agent")
         Jido.AgentServer.cast(pid, signal)
       end
@@ -310,52 +306,18 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     end
   end
 
-  defp extract_text(response) do
-    case response do
-      # ReqLLM.Response struct with message
-      %{message: message} ->
-        extract_text_from_message(message)
+  @spec extract_text(ReqLLM.Response.t()) :: binary()
+  defp extract_text(%ReqLLM.Response{message: nil}), do: ""
 
-      %{content: content} when is_binary(content) ->
-        content
-
-      %{content: [%{text: text} | _]} ->
-        text
-
-      %{"content" => content} when is_binary(content) ->
-        content
-
-      %{"content" => [%{"text" => text} | _]} ->
-        text
-
-      text when is_binary(text) ->
-        text
-
-      _ ->
-        inspect(response)
-    end
+  defp extract_text(%ReqLLM.Response{message: %ReqLLM.Message{content: content}}) do
+    extract_content(content)
   end
 
-  defp extract_text_from_message(message) do
-    case message do
-      %{content: content} when is_binary(content) ->
-        content
-
-      %{content: [%{text: text} | _]} ->
-        text
-
-      %{text: text} when is_binary(text) ->
-        text
-
-      _ ->
-        # Try to get content via Access
-        case Access.get(message, :content) do
-          content when is_binary(content) -> content
-          [%{text: text} | _] -> text
-          _ -> inspect(message)
-        end
-    end
-  end
+  @spec extract_content([map()]) :: binary()
+  defp extract_content([%{text: text} | _]) when is_binary(text), do: text
+  defp extract_content([%{"text" => text} | _]) when is_binary(text), do: text
+  defp extract_content([]), do: ""
+  defp extract_content(other), do: inspect(other)
 
   defp parse_routing_response(text) do
     clean_text =
