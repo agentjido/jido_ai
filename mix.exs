@@ -73,8 +73,6 @@ defmodule JidoAi.MixProject do
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
       {:term_ui, "~> 0.2"},
-      {:typedstruct, "~> 0.5", runtime: false},
-      {:uniq, "~> 0.6"},
       {:zoi, "~> 0.16"},
 
       # Dev/Test
