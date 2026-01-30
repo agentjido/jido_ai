@@ -59,6 +59,7 @@ defmodule Jido.AI.CLI.Adapters.TRMTest do
 
   describe "behavior implementation" do
     test "implements all required callbacks" do
+      Code.ensure_loaded!(TRMAdapter)
       assert function_exported?(TRMAdapter, :start_agent, 3)
       assert function_exported?(TRMAdapter, :submit, 3)
       assert function_exported?(TRMAdapter, :await, 3)

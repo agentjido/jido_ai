@@ -272,12 +272,37 @@ defmodule Jido.AI.Tools.Executor do
       iex> Executor.normalize_params(%{"a" => "42", "b" => "hello"}, schema)
       %{a: 42, b: "hello"}
   """
-  @spec normalize_params(map(), keyword()) :: map()
+  @spec normalize_params(map(), keyword() | struct()) :: map()
   def normalize_params(params, schema) when is_map(params) and is_list(schema) do
     ActionTool.convert_params_using_schema(params, schema)
   end
 
+  def normalize_params(params, %{__struct__: struct_type} = _schema)
+      when is_map(params) and struct_type in [Zoi.Types.Map, Zoi.Types.Object] do
+    # For Zoi schemas, convert string keys to atoms
+    # Zoi will handle the actual type coercion during validation
+    atomize_keys(params)
+  end
+
   def normalize_params(params, _schema) when is_map(params), do: params
+
+  defp atomize_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_binary(k) -> {String.to_existing_atom(k), atomize_keys(v)}
+      {k, v} when is_atom(k) -> {k, atomize_keys(v)}
+      {k, v} -> {k, atomize_keys(v)}
+    end)
+  rescue
+    ArgumentError ->
+      # If atom doesn't exist, try creating it (for dynamic keys)
+      Map.new(map, fn
+        {k, v} when is_binary(k) -> {String.to_atom(k), atomize_keys(v)}
+        {k, v} -> {k, atomize_keys(v)}
+      end)
+  end
+
+  defp atomize_keys(list) when is_list(list), do: Enum.map(list, &atomize_keys/1)
+  defp atomize_keys(other), do: other
 
   # ============================================================================
   # Result Formatting

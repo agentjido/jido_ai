@@ -145,9 +145,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       # Execute via Executor with string keys (like LLM would provide)
       result =
-        Executor.execute("calculator", %{"operation" => "add", "a" => "5", "b" => "3"}, %{},
-          tools: tools
-        )
+        Executor.execute("calculator", %{"operation" => "add", "a" => "5", "b" => "3"}, %{}, tools: tools)
 
       assert {:ok, %{result: 8}} = result
     end
@@ -285,9 +283,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
     test "executor handles tool execution errors gracefully", %{tools: tools} do
       result =
-        Executor.execute("failing_action", %{"message" => "Something went wrong"}, %{},
-          tools: tools
-        )
+        Executor.execute("failing_action", %{"message" => "Something went wrong"}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -307,9 +303,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     test "executor normalizes string keys to atom keys", %{tools: tools} do
       # LLM provides string keys
       result =
-        Executor.execute("calculator", %{"operation" => "add", "a" => 10, "b" => 20}, %{},
-          tools: tools
-        )
+        Executor.execute("calculator", %{"operation" => "add", "a" => 10, "b" => 20}, %{}, tools: tools)
 
       assert {:ok, %{result: 30}} = result
     end
@@ -317,9 +311,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     test "executor parses string numbers to integers", %{tools: tools} do
       # LLM might provide numbers as strings
       result =
-        Executor.execute("calculator", %{"operation" => "add", "a" => "15", "b" => "25"}, %{},
-          tools: tools
-        )
+        Executor.execute("calculator", %{"operation" => "add", "a" => "15", "b" => "25"}, %{}, tools: tools)
 
       assert {:ok, %{result: 40}} = result
     end
@@ -502,15 +494,11 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
         nil
       )
 
-      Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "1"}, %{},
-        tools: tools
-      )
+      Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "1"}, %{}, tools: tools)
 
-      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _},
-                      %{tool_name: "calculator"}}
+      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _}, %{tool_name: "calculator"}}
 
-      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _},
-                      %{tool_name: "calculator"}}
+      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _}, %{tool_name: "calculator"}}
 
       :telemetry.detach("integration-test-handler")
     end

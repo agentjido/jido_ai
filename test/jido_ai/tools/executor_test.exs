@@ -128,16 +128,17 @@ defmodule Jido.AI.Tools.ExecutorTest do
   end
 
   setup do
-    tools = Executor.build_tools_map([
-      TestActions.Calculator,
-      TestActions.SlowAction,
-      TestActions.ErrorAction,
-      TestActions.ExceptionAction,
-      TestActions.Echo,
-      TestActions.LargeResult,
-      TestActions.BinaryResult,
-      TestActions.ExceptionAction2
-    ])
+    tools =
+      Executor.build_tools_map([
+        TestActions.Calculator,
+        TestActions.SlowAction,
+        TestActions.ErrorAction,
+        TestActions.ExceptionAction,
+        TestActions.Echo,
+        TestActions.LargeResult,
+        TestActions.BinaryResult,
+        TestActions.ExceptionAction2
+      ])
 
     {:ok, tools: tools}
   end

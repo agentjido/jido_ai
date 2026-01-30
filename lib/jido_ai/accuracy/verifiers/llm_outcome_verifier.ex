@@ -281,7 +281,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
       receive_timeout: verifier.timeout
     ]
 
-    case ReqLLM.Generation.generate_text(model, context, reqllm_opts) do
+    case ReqLLM.Generation.generate_text(model, context.messages, reqllm_opts) do
       {:ok, response} ->
         {:ok, parse_response(response)}
 

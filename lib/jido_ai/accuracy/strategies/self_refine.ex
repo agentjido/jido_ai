@@ -442,7 +442,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
     ]
 
     try do
-      case ReqLLM.Generation.generate_text(model, context, reqllm_opts) do
+      case ReqLLM.Generation.generate_text(model, context.messages, reqllm_opts) do
         {:ok, response} ->
           content = extract_content(response)
 

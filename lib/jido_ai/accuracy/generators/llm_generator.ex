@@ -265,7 +265,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
       ]
       |> add_model_opt(generator.model)
 
-    case ReqLLM.Generation.generate_text(generator.model, context, reqllm_opts) do
+    case ReqLLM.Generation.generate_text(generator.model, context.messages, reqllm_opts) do
       {:ok, response} ->
         content = extract_content(response)
         tokens = count_tokens(response)
