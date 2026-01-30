@@ -89,7 +89,8 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
          llm_context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          tools = get_tools(validated_params[:tools], context),
          opts = build_opts(validated_params),
-         {:ok, response} <- ReqLLM.Generation.generate_text(model, llm_context.messages, Keyword.put(opts, :tools, tools)) do
+         {:ok, response} <-
+           ReqLLM.Generation.generate_text(model, llm_context.messages, Keyword.put(opts, :tools, tools)) do
       result = classify_and_format_response(response, model)
 
       if validated_params[:auto_execute] && result.type == :tool_calls do

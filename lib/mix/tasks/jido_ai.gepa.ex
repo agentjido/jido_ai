@@ -58,12 +58,12 @@ defmodule Mix.Tasks.JidoAi.Gepa do
 
   @impl Mix.Task
   def run(args) do
-    Mix.Task.run("app.start")
+    Mix.Task.rerun("app.start")
     load_dotenv()
 
     {opts, _rest, _} = OptionParser.parse(args, strict: @switches)
 
-    template = opts[:template] || Mix.raise("--template is required")
+    template = opts[:template] || raise "--template is required"
     model = opts[:model] || "openai:gpt-4o-mini"
     timeout = opts[:timeout] || 30_000
     verbose = opts[:verbose] || false
@@ -99,7 +99,7 @@ defmodule Mix.Tasks.JidoAi.Gepa do
       |> Enum.reject(&is_nil/1)
 
     if Enum.empty?(results) do
-      Mix.raise("All evaluations failed")
+      raise "All evaluations failed"
     end
 
     print_summary(results)
@@ -144,12 +144,10 @@ defmodule Mix.Tasks.JidoAi.Gepa do
     end)
   end
 
-  defp extract_output(%{"choices" => [%{"message" => %{"content" => content}} | _]}), do: content
   defp extract_output(response) when is_binary(response), do: response
   defp extract_output(_), do: ""
 
   defp extract_tokens(%ReqLLM.Response{usage: %{total_tokens: tokens}}), do: tokens
-  defp extract_tokens(%{"usage" => %{"total_tokens" => tokens}}), do: tokens
   defp extract_tokens(_), do: 0
 
   defp build_variants(template, mutate?) do

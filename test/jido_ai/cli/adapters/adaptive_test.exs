@@ -59,6 +59,7 @@ defmodule Jido.AI.CLI.Adapters.AdaptiveTest do
 
   describe "behavior implementation" do
     test "implements all required callbacks" do
+      Code.ensure_loaded!(AdaptiveAdapter)
       assert function_exported?(AdaptiveAdapter, :start_agent, 3)
       assert function_exported?(AdaptiveAdapter, :submit, 3)
       assert function_exported?(AdaptiveAdapter, :await, 3)

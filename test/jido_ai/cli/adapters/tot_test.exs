@@ -68,6 +68,7 @@ defmodule Jido.AI.CLI.Adapters.ToTTest do
 
   describe "behavior implementation" do
     test "implements all required callbacks" do
+      Code.ensure_loaded!(ToTAdapter)
       assert function_exported?(ToTAdapter, :start_agent, 3)
       assert function_exported?(ToTAdapter, :submit, 3)
       assert function_exported?(ToTAdapter, :await, 3)

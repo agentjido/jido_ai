@@ -61,9 +61,7 @@ defmodule Jido.AI.Skills.LLM.Actions.GenerateObject do
     schema:
       Zoi.object(%{
         model:
-          Zoi.string(
-            description: "Model spec (e.g., 'anthropic:claude-haiku-4-5') or alias (e.g., :fast)"
-          )
+          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-haiku-4-5') or alias (e.g., :fast)")
           |> Zoi.optional(),
         prompt: Zoi.string(description: "The prompt describing what object to generate"),
         object_schema: Zoi.any(description: "Zoi schema or NimbleOptions keyword list"),
@@ -71,8 +69,7 @@ defmodule Jido.AI.Skills.LLM.Actions.GenerateObject do
           Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
           |> Zoi.optional(),
         max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
-        temperature:
-          Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
+        temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
@@ -151,5 +148,4 @@ defmodule Jido.AI.Skills.LLM.Actions.GenerateObject do
 
   defp extract_object(%{object: object}) when is_map(object), do: object
   defp extract_object(response) when is_map(response), do: response
-  defp extract_object(_), do: %{}
 end

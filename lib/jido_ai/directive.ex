@@ -517,8 +517,20 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     {:async, nil, state}
   end
 
-  defp get_tools_from_state(state) do
-    state[:tools] || get_in(state, [:tool_calling, :tools]) || %{}
+  defp get_tools_from_state(%Jido.AgentServer.State{agent: agent}) do
+    get_tools_from_state(agent.state)
+  end
+
+  defp get_tools_from_state(state) when is_map(state) do
+    # Check for tools in strategy config first (ReAct pattern)
+    case get_in(state, [:__strategy__, :config, :actions_by_name]) do
+      tools when is_map(tools) and map_size(tools) > 0 ->
+        tools
+
+      _ ->
+        # Fall back to direct tools key or tool_calling skill state
+        state[:tools] || get_in(state, [:tool_calling, :tools]) || %{}
+    end
   end
 end
 

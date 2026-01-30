@@ -105,7 +105,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
 
   @impl Mix.Task
   def run(argv) do
-    Mix.Task.run("app.start")
+    Mix.Task.rerun("app.start")
     load_dotenv()
     start_jido_instance()
 
@@ -306,7 +306,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
     if Code.ensure_loaded?(module) do
       module
     else
-      Mix.raise("Module #{module_string} not found or not loaded")
+      raise "Module #{module_string} not found or not loaded"
     end
   end
 
@@ -320,7 +320,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
       module = Module.concat([mod_string])
 
       if !Code.ensure_loaded?(module) do
-        Mix.raise("Tool module #{mod_string} not found")
+        raise "Tool module #{mod_string} not found"
       end
 
       module

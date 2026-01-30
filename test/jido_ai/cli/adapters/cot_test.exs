@@ -49,6 +49,7 @@ defmodule Jido.AI.CLI.Adapters.CoTTest do
 
   describe "behavior implementation" do
     test "implements all required callbacks" do
+      Code.ensure_loaded!(CoTAdapter)
       assert function_exported?(CoTAdapter, :start_agent, 3)
       assert function_exported?(CoTAdapter, :submit, 3)
       assert function_exported?(CoTAdapter, :await, 3)
