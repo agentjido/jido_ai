@@ -61,9 +61,9 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.0.0-rc.2", override: true},
-      {:jido_action, "~> 2.0.0-rc.2", override: true},
-      {:jido_signal, "~> 2.0.0-rc.2", override: true},
+      {:jido, "~> 2.0.0-rc.2"},
+      {:jido_action, "~> 2.0.0-rc.2"},
+      {:jido_signal, "~> 2.0.0-rc.2"},
       {:req_llm, github: "agentjido/req_llm", branch: "main"},
       {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
 
