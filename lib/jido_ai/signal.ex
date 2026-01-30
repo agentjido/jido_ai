@@ -626,6 +626,129 @@ defmodule Jido.AI.Signal do
   end
 
   # ============================================================================
+  # Orchestration Signals
+  # ============================================================================
+
+  defmodule DelegationRequest do
+    @moduledoc """
+    Signal for task delegation request.
+
+    Emitted when a parent agent delegates a task to a child agent.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID for tracking the delegation
+    - `:task` (required) - Task description being delegated
+    - `:target` (required) - Target agent info (module, pid, or tag)
+    - `:constraints` (optional) - Delegation constraints (timeout, budget, etc.)
+    """
+
+    use Jido.Signal,
+      type: "ai.delegation.request",
+      default_source: "/ai/orchestration",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the delegation"],
+        task: [type: :string, required: true, doc: "Task being delegated"],
+        target: [type: :any, required: true, doc: "Target agent (module, pid, or tag)"],
+        constraints: [type: :map, default: %{}, doc: "Constraints: timeout_ms, max_cost, etc."]
+      ]
+  end
+
+  defmodule DelegationResult do
+    @moduledoc """
+    Signal for delegation completion.
+
+    Emitted when a delegated task completes, carrying the result back to parent.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID matching the original delegation request
+    - `:result` (required) - `{:ok, result}` or `{:error, reason}` from child
+    - `:source_agent` (required) - Agent that completed the task (tag or pid)
+    - `:duration_ms` (optional) - Time taken to complete the task
+    """
+
+    use Jido.Signal,
+      type: "ai.delegation.result",
+      default_source: "/ai/orchestration",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the delegation"],
+        result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"],
+        source_agent: [type: :any, required: true, doc: "Agent that completed the task"],
+        duration_ms: [type: :integer, doc: "Time taken in milliseconds"]
+      ]
+  end
+
+  defmodule DelegationError do
+    @moduledoc """
+    Signal for delegation failure.
+
+    Emitted when a delegated task fails, providing error details.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID matching the original delegation request
+    - `:error_type` (required) - Error classification atom
+    - `:message` (required) - Human-readable error message
+    - `:source_agent` (optional) - Agent where the error occurred
+    """
+
+    use Jido.Signal,
+      type: "ai.delegation.error",
+      default_source: "/ai/orchestration",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the delegation"],
+        error_type: [type: :atom, required: true, doc: "Error classification"],
+        message: [type: :string, required: true, doc: "Human-readable error message"],
+        source_agent: [type: :any, doc: "Agent where the error occurred"]
+      ]
+  end
+
+  defmodule CapabilityQuery do
+    @moduledoc """
+    Signal for capability discovery request.
+
+    Emitted when an orchestrator needs to discover available agent capabilities.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID for the query
+    - `:required_capabilities` (optional) - Filter by required capabilities
+    """
+
+    use Jido.Signal,
+      type: "ai.capability.query",
+      default_source: "/ai/orchestration",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the query"],
+        required_capabilities: [type: {:list, :string}, default: [], doc: "Required capabilities filter"]
+      ]
+  end
+
+  defmodule CapabilityResponse do
+    @moduledoc """
+    Signal for capability discovery response.
+
+    Response to a capability query with agent's capabilities.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID matching the query
+    - `:agent_ref` (required) - Agent reference (module, pid, or tag)
+    - `:capabilities` (required) - Capability descriptor
+    """
+
+    use Jido.Signal,
+      type: "ai.capability.response",
+      default_source: "/ai/orchestration",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the query"],
+        agent_ref: [type: :any, required: true, doc: "Agent reference"],
+        capabilities: [type: :map, required: true, doc: "Capability descriptor"]
+      ]
+  end
+
+  # ============================================================================
   # Helper Functions
   # ============================================================================
 
