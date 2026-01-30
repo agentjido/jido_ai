@@ -94,15 +94,13 @@ defmodule Jido.AI.Skills.ToolCalling do
     tags: ["tool-calling", "function-calling", "llm", "tools"],
     vsn: "1.0.0"
 
-  alias Jido.AI.Tools.Registry
-
   @doc """
   Initialize skill state when mounted to an agent.
   """
   @impl Jido.Skill
   def mount(_agent, config) do
-    # Ensure registry is started
-    Registry.ensure_started()
+    tools = Map.get(config, :tools, [])
+    tools_map = build_tools_map(tools)
 
     initial_state = %{
       default_model: Map.get(config, :default_model, :capable),
@@ -110,7 +108,8 @@ defmodule Jido.AI.Skills.ToolCalling do
       default_temperature: Map.get(config, :default_temperature, 0.7),
       auto_execute: Map.get(config, :auto_execute, false),
       max_turns: Map.get(config, :max_turns, 10),
-      available_tools: list_available_tools()
+      tools: tools_map,
+      available_tools: Map.keys(tools_map)
     }
 
     {:ok, initial_state}
@@ -192,12 +191,9 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   # Private Functions
 
-  defp list_available_tools do
-    Registry.ensure_started()
-
-    Registry.list_all()
-    |> Enum.map(fn {name, type, _module} ->
-      %{name: name, type: type}
-    end)
+  defp build_tools_map(tools) when is_list(tools) do
+    Map.new(tools, fn module -> {module.name(), module} end)
   end
+
+  defp build_tools_map(tools) when is_map(tools), do: tools
 end

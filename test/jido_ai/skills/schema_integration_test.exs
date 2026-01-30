@@ -262,7 +262,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
 
     test "all LLM actions have schemas" do
       llm_actions = LLM.actions()
-      assert length(llm_actions) == 3
+      assert length(llm_actions) == 4
 
       for action <- llm_actions do
         assert function_exported?(action, :schema, 0)
@@ -313,7 +313,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
           length(Streaming.actions()) +
           length(ToolCalling.actions())
 
-      assert total == 15
+      assert total == 16
     end
   end
 end

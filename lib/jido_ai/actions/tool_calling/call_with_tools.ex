@@ -62,17 +62,17 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{Helpers, Security, Tools}
+  alias Jido.AI.{Helpers, Security, ToolAdapter, Tools}
   alias ReqLLM.Context
 
   @dialyzer [
     {:nowarn_function, run: 2},
     {:nowarn_function, classify_and_format_response: 2},
     {:nowarn_function, extract_usage: 1},
-    {:nowarn_function, execute_tool_turns: 5},
-    {:nowarn_function, execute_tools_and_continue: 4},
-    {:nowarn_function, execute_all_tools: 1},
-    {:nowarn_function, execute_single_tool: 1},
+    {:nowarn_function, execute_tool_turns: 6},
+    {:nowarn_function, execute_tools_and_continue: 5},
+    {:nowarn_function, execute_all_tools: 2},
+    {:nowarn_function, execute_single_tool: 2},
     {:nowarn_function, format_tool_result: 1},
     {:nowarn_function, add_tool_results_to_messages: 2}
   ]
@@ -83,17 +83,17 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
   Executes the call with tools action.
   """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
     with {:ok, validated_params} <- validate_and_sanitize_params(params),
          {:ok, model} <- resolve_model(validated_params[:model]),
-         context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
-         tools = get_tools(validated_params[:tools]),
+         llm_context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         tools = get_tools(validated_params[:tools], context),
          opts = build_opts(validated_params),
-         {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, Keyword.put(opts, :tools, tools)) do
+         {:ok, response} <- ReqLLM.Generation.generate_text(model, llm_context.messages, Keyword.put(opts, :tools, tools)) do
       result = classify_and_format_response(response, model)
 
       if validated_params[:auto_execute] && result.type == :tool_calls do
-        execute_tool_turns(result, context.messages, model, validated_params, 1)
+        execute_tool_turns(result, llm_context.messages, model, validated_params, context, 1)
       else
         {:ok, result}
       end
@@ -115,20 +115,28 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
     Context.normalize(prompt, system_prompt: system_prompt)
   end
 
-  defp get_tools(nil) do
-    Tools.Registry.ensure_started()
-    Tools.Registry.to_reqllm_tools()
+  defp get_tools(nil, context) do
+    tools_input = context[:tools] || []
+    convert_to_reqllm_tools(tools_input)
   end
 
-  defp get_tools(tool_names) when is_list(tool_names) do
-    Tools.Registry.ensure_started()
-    all_tools = Tools.Registry.to_reqllm_tools()
+  defp get_tools(tool_names, context) when is_list(tool_names) do
+    all_tools = get_tools(nil, context)
 
     Enum.filter(all_tools, fn tool ->
-      tool_name = get_tool_name(tool)
-      tool_name in tool_names
+      get_tool_name(tool) in tool_names
     end)
   end
+
+  defp convert_to_reqllm_tools(tools) when is_list(tools) do
+    Enum.map(tools, &ToolAdapter.from_action/1)
+  end
+
+  defp convert_to_reqllm_tools(tools) when is_map(tools) do
+    tools |> Map.values() |> convert_to_reqllm_tools()
+  end
+
+  defp convert_to_reqllm_tools(_), do: []
 
   defp get_tool_name(%{name: name}), do: name
   defp get_tool_name(_), do: nil
@@ -172,19 +180,19 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
   defp extract_usage(_), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
 
   # Multi-turn execution for auto_execute
-  defp execute_tool_turns(result, messages, model, params, turn) do
+  defp execute_tool_turns(result, messages, model, params, context, turn) do
     # Use validated max_turns from params (already sanitized with hard limit)
     max_turns = params[:max_turns]
 
     if turn > max_turns do
       {:ok, Map.put(result, :reason, :max_turns_reached)}
     else
-      case execute_tools_and_continue(result.tool_calls, messages, model, params) do
+      case execute_tools_and_continue(result.tool_calls, messages, model, params, context) do
         {:final_answer, final_result} ->
           {:ok, Map.put(final_result, :turns, turn)}
 
         {:more_tools, new_result} ->
-          execute_tool_turns(new_result, messages, model, params, turn + 1)
+          execute_tool_turns(new_result, messages, model, params, context, turn + 1)
 
         {:error, reason} ->
           {:ok, %{type: :error, reason: reason, turns: turn}}
@@ -211,16 +219,16 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
 
   defp validate_system_prompt_if_needed(_params), do: {:ok, nil}
 
-  defp execute_tools_and_continue(tool_calls, messages, model, params) do
-    # Execute all tool calls
-    tool_results = execute_all_tools(tool_calls)
+  defp execute_tools_and_continue(tool_calls, messages, model, params, context) do
+    # Execute all tool calls with tools from context
+    tool_results = execute_all_tools(tool_calls, context)
 
     # Add tool result messages to conversation
     updated_messages = add_tool_results_to_messages(messages, tool_results)
 
     # Build opts for next call
     _opts = build_opts(params)
-    tools = get_tools(params[:tools])
+    tools = get_tools(params[:tools], context)
 
     # Call LLM again with tool results
     case ReqLLM.Generation.generate_text(model, updated_messages, tools: tools) do
@@ -238,9 +246,11 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
     end
   end
 
-  defp execute_all_tools(tool_calls) do
+  defp execute_all_tools(tool_calls, context) do
+    tools = context[:tools] || %{}
+
     Enum.map(tool_calls, fn tool_call ->
-      result = execute_single_tool(tool_call)
+      result = execute_single_tool(tool_call, tools)
 
       %{
         id: Map.get(tool_call, :id, ""),
@@ -250,11 +260,11 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
     end)
   end
 
-  defp execute_single_tool(tool_call) do
+  defp execute_single_tool(tool_call, tools) do
     name = Map.get(tool_call, :name)
     arguments = Map.get(tool_call, :arguments, %{})
 
-    Tools.Executor.execute(name, arguments, %{})
+    Tools.Executor.execute(name, arguments, %{}, tools: tools)
   end
 
   defp format_tool_result({:ok, result}) when is_binary(result), do: result

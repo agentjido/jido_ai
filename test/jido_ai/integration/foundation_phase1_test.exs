@@ -18,7 +18,8 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   alias Jido.AI.Helpers
   alias Jido.AI.Signal
   alias Jido.AI.Signal.{EmbedResult, ReqLLMError, ToolResult, UsageReport}
-  alias Jido.AI.Tools.Registry
+  alias Jido.AI.ToolAdapter
+  alias Jido.AI.Tools.Executor
   alias ReqLLM.Context
 
   # ============================================================================
@@ -358,22 +359,15 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       def run(_params, _context), do: {:ok, %{}}
     end
 
-    setup do
-      Registry.clear()
-      :ok
+    test "build tools map and retrieve action" do
+      tools_map = Executor.build_tools_map([TestAction])
+
+      assert Map.has_key?(tools_map, "test_action")
+      assert tools_map["test_action"] == TestAction
     end
 
-    test "register and retrieve action" do
-      :ok = Registry.register_action(TestAction)
-
-      {:ok, module} = Registry.get("test_action")
-      assert module == TestAction
-    end
-
-    test "convert registered actions to tools" do
-      :ok = Registry.register_action(TestAction)
-
-      tools = Registry.to_reqllm_tools()
+    test "convert action modules to ReqLLM tools" do
+      tools = [ToolAdapter.from_action(TestAction)]
       assert length(tools) == 1
 
       [tool] = tools

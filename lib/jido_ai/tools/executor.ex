@@ -5,7 +5,7 @@ defmodule Jido.AI.Tools.Executor do
   This module provides a single entry point for executing Jido.Action modules
   as LLM tools. It handles the full execution lifecycle:
 
-  1. **Registry Lookup**: Finds the action by name in the Registry
+  1. **Tool Lookup**: Finds the action by name in the provided tools map
   2. **Parameter Normalization**: Converts LLM arguments to proper types
   3. **Execution**: Dispatches to Jido.Exec
   4. **Result Formatting**: Converts results to LLM-friendly format
@@ -14,13 +14,16 @@ defmodule Jido.AI.Tools.Executor do
 
   ## Usage
 
-      # Basic execution
-      {:ok, result} = Executor.execute("calculator", %{"a" => "1", "b" => "2"}, %{})
+      # Build a tools map from action modules
+      tools = Executor.build_tools_map([MyApp.Calculator, MyApp.Search])
+
+      # Execute by name with explicit tools map
+      {:ok, result} = Executor.execute("calculator", %{"a" => "1"}, %{}, tools: tools)
 
       # With timeout (5 seconds)
-      {:ok, result} = Executor.execute("calculator", %{"a" => 1}, %{}, timeout: 5000)
+      {:ok, result} = Executor.execute("calculator", %{"a" => 1}, %{}, tools: tools, timeout: 5000)
 
-      # Execute directly with a module (no registry lookup)
+      # Execute directly with a module (no lookup needed)
       {:ok, result} = Executor.execute_module(MyAction, %{a: 1}, %{})
 
   ## Parameter Normalization
@@ -66,14 +69,14 @@ defmodule Jido.AI.Tools.Executor do
   """
 
   alias Jido.Action.Tool, as: ActionTool
-  alias Jido.AI.Tools.Registry
 
   require Logger
 
   @default_timeout 30_000
   @max_result_size 10_000
 
-  @type execute_opts :: [timeout: pos_integer()]
+  @type tools_map :: %{String.t() => module()}
+  @type execute_opts :: [timeout: pos_integer(), tools: tools_map()]
   @type execute_result :: {:ok, term()} | {:error, map()}
 
   # ============================================================================
@@ -81,20 +84,51 @@ defmodule Jido.AI.Tools.Executor do
   # ============================================================================
 
   @doc """
-  Executes a tool by name with the given parameters and context.
+  Builds a tools map from action modules.
 
-  Looks up the tool in the Registry, normalizes parameters, executes the tool,
-  and returns the formatted result.
+  Accepts a single module or a list of modules.
 
   ## Arguments
 
-    * `tool_name` - The name of the tool to execute (must be registered)
+    * `module_or_modules` - Single Action module or list of Action modules
+
+  ## Returns
+
+    A map of `%{name => module}` for use with `execute/4`.
+
+  ## Examples
+
+      iex> Executor.build_tools_map(MyApp.Calculator)
+      %{"calculator" => MyApp.Calculator}
+
+      iex> Executor.build_tools_map([MyApp.Calculator, MyApp.Search])
+      %{"calculator" => MyApp.Calculator, "search" => MyApp.Search}
+  """
+  @spec build_tools_map(module() | [module()]) :: tools_map()
+  def build_tools_map(module) when is_atom(module) do
+    %{module.name() => module}
+  end
+
+  def build_tools_map(modules) when is_list(modules) do
+    Map.new(modules, fn module -> {module.name(), module} end)
+  end
+
+  @doc """
+  Executes a tool by name with the given parameters and context.
+
+  Looks up the tool in the provided tools map, normalizes parameters,
+  executes the tool, and returns the formatted result.
+
+  ## Arguments
+
+    * `tool_name` - The name of the tool to execute
     * `params` - Parameters to pass to the tool (may have string keys)
     * `context` - Execution context (passed to Jido.Exec or run/2)
     * `opts` - Optional execution options
 
   ## Options
 
+    * `:tools` - Map of `%{name => module}` for tool lookup (required)
     * `:timeout` - Timeout in milliseconds (default: 30_000)
 
   ## Returns
@@ -104,23 +138,25 @@ defmodule Jido.AI.Tools.Executor do
 
   ## Examples
 
-      iex> Executor.execute("calculator", %{"a" => "1", "b" => "2"}, %{})
+      iex> tools = Executor.build_tools_map([Calculator])
+      iex> Executor.execute("calculator", %{"a" => "1", "b" => "2"}, %{}, tools: tools)
       {:ok, %{result: 3}}
 
-      iex> Executor.execute("unknown_tool", %{}, %{})
+      iex> Executor.execute("unknown_tool", %{}, %{}, tools: %{})
       {:error, %{error: "Tool not found: unknown_tool", type: :not_found}}
   """
   @spec execute(String.t(), map(), map(), execute_opts()) :: execute_result()
   def execute(tool_name, params, context, opts \\ []) when is_binary(tool_name) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
+    tools = Keyword.get(opts, :tools, %{})
 
     start_telemetry(tool_name, params)
 
-    case Registry.get(tool_name) do
+    case Map.fetch(tools, tool_name) do
       {:ok, module} ->
         execute_with_timeout(module, tool_name, params, context, timeout)
 
-      {:error, :not_found} ->
+      :error ->
         error = %{
           error: "Tool not found: #{tool_name}",
           tool_name: tool_name,
@@ -238,23 +274,7 @@ defmodule Jido.AI.Tools.Executor do
   """
   @spec normalize_params(map(), keyword()) :: map()
   def normalize_params(params, schema) when is_map(params) and is_list(schema) do
-    # First convert string keys and parse string values
-    converted = ActionTool.convert_params_using_schema(params, schema)
-
-    # Then coerce integer values to floats where schema expects float
-    # (LLMs often return integers like 20 instead of 20.0)
-    Enum.reduce(converted, %{}, fn {key, value}, acc ->
-      schema_entry = Keyword.get(schema, key, [])
-      expected_type = Keyword.get(schema_entry, :type)
-
-      coerced_value =
-        case {expected_type, value} do
-          {:float, val} when is_integer(val) -> val * 1.0
-          _ -> value
-        end
-
-      Map.put(acc, key, coerced_value)
-    end)
+    ActionTool.convert_params_using_schema(params, schema)
   end
 
   def normalize_params(params, _schema) when is_map(params), do: params

@@ -341,8 +341,6 @@ defmodule Jido.AI.DirectiveTest do
   end
 
   describe "ToolExec DirectiveExec" do
-    alias Jido.AI.Tools.Registry
-
     # Define test Action module
     defmodule TestActions.Calculator do
       use Jido.Action,
@@ -374,14 +372,7 @@ defmodule Jido.AI.DirectiveTest do
       end
     end
 
-    setup do
-      # Ensure registry is started and clear before each test
-      Registry.ensure_started()
-      Registry.clear()
-      :ok
-    end
-
-    test "ToolExec creates valid directive for Registry lookup" do
+    test "ToolExec creates valid directive for tools map lookup" do
       directive =
         ToolExec.new!(%{
           id: "call_456",

@@ -231,14 +231,15 @@ defmodule Jido.AI.HelpersTest do
     test "extracts text from content list" do
       response = %{
         message: %{
-          content: [%{type: :text, text: "Hello "}, %{type: :text, text: "world"}],
+          content: [%{type: :text, text: "Hello"}, %{type: :text, text: "world"}],
           tool_calls: nil
         },
         finish_reason: :stop
       }
 
       result = Helpers.classify_llm_response(response)
-      assert result.text == "Hello world"
+      # Text blocks are joined with newlines
+      assert result.text == "Hello\nworld"
     end
   end
 

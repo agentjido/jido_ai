@@ -74,6 +74,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
 
   alias Jido.AI.Accuracy.{Candidate, Config, VerificationResult}
   alias Jido.AI.Helpers
+  alias Jido.AI.Helpers.Text
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -326,18 +327,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   end
 
   defp extract_content(response) do
-    case response.message.content do
-      nil ->
-        ""
-
-      content when is_binary(content) ->
-        content
-
-      content when is_list(content) ->
-        content
-        |> Enum.filter(fn %{type: type} -> type == :text end)
-        |> Enum.map_join("", fn %{text: text} -> text end)
-    end
+    Text.extract_text(response)
   end
 
   defp extract_score_and_reasoning(content) do

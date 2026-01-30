@@ -97,6 +97,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
 
   alias Jido.AI.Accuracy.DifficultyEstimate
   alias Jido.AI.Accuracy.Thresholds
+  alias Jido.AI.Helpers.Text
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -277,10 +278,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
   end
 
   defp extract_content(response) when is_map(response) do
-    case get_in(response, [:choices, Access.at(0), :message, :content]) do
-      nil -> get_in(response, [:message, :content]) || ""
-      content -> content
-    end
+    Text.extract_text(response)
   end
 
   # Fallback simulation for testing without ReqLLM

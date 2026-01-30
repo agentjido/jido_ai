@@ -2,6 +2,7 @@
 require Jido.AI.Skills.LLM.Actions.Chat
 require Jido.AI.Skills.LLM.Actions.Complete
 require Jido.AI.Skills.LLM.Actions.Embed
+require Jido.AI.Skills.LLM.Actions.GenerateObject
 
 defmodule Jido.AI.Skills.LLM do
   @moduledoc """
@@ -58,7 +59,8 @@ defmodule Jido.AI.Skills.LLM do
     actions: [
       Jido.AI.Skills.LLM.Actions.Chat,
       Jido.AI.Skills.LLM.Actions.Complete,
-      Jido.AI.Skills.LLM.Actions.Embed
+      Jido.AI.Skills.LLM.Actions.Embed,
+      Jido.AI.Skills.LLM.Actions.GenerateObject
     ],
     description: "Provides LLM chat, completion, and embedding capabilities",
     category: "ai",
@@ -108,7 +110,8 @@ defmodule Jido.AI.Skills.LLM do
     [
       {"llm.chat", Jido.AI.Skills.LLM.Actions.Chat},
       {"llm.complete", Jido.AI.Skills.LLM.Actions.Complete},
-      {"llm.embed", Jido.AI.Skills.LLM.Actions.Embed}
+      {"llm.embed", Jido.AI.Skills.LLM.Actions.Embed},
+      {"llm.generate_object", Jido.AI.Skills.LLM.Actions.GenerateObject}
     ]
   end
 
@@ -139,7 +142,8 @@ defmodule Jido.AI.Skills.LLM do
     [
       "llm.chat",
       "llm.complete",
-      "llm.embed"
+      "llm.embed",
+      "llm.generate_object"
     ]
   end
 end

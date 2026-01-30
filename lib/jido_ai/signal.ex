@@ -361,7 +361,7 @@ defmodule Jido.AI.Signal do
   # Private helpers for from_reqllm_response
 
   defp extract_response_tool_calls(%{message: %{tool_calls: tool_calls}}) when is_list(tool_calls) do
-    Enum.map(tool_calls, &Jido.AI.ToolCall.normalize/1)
+    Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)
   end
 
   defp extract_response_tool_calls(_), do: []

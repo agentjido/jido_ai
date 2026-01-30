@@ -62,6 +62,7 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
+  alias Jido.AI.Helpers.Text
   alias Jido.AI.Security
   alias ReqLLM.Context
 
@@ -199,37 +200,12 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
 
   defp format_result(response, model, analysis_type) do
     %{
-      result: extract_text(response),
+      result: Text.extract_text(response),
       analysis_type: analysis_type,
       model: model,
       usage: extract_usage(response)
     }
   end
-
-  defp extract_text(%{message: %{content: content}}) do
-    case content do
-      c when is_binary(c) ->
-        c
-
-      c when is_list(c) ->
-        c
-        |> Enum.filter(&text_part?/1)
-        |> Enum.map_join("", fn
-          %{text: text} -> text
-          _ -> ""
-        end)
-
-      _ ->
-        ""
-    end
-  end
-
-  @dialyzer {:nowarn_function, extract_text: 1}
-
-  defp extract_text(_), do: ""
-
-  defp text_part?(%{type: :text}), do: true
-  defp text_part?(_), do: false
 
   defp extract_usage(%{usage: usage}) when is_map(usage) do
     %{

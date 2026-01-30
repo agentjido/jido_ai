@@ -61,27 +61,29 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
       response = %{
         message: %{
           content: [
-            %{type: :text, text: "Hello "},
+            %{type: :text, text: "Hello"},
             %{type: :text, text: "world"}
           ]
         }
       }
 
-      assert "Hello world" = BaseActionHelpers.extract_text(response)
+      # Text blocks are joined with newlines
+      assert "Hello\nworld" = BaseActionHelpers.extract_text(response)
     end
 
     test "filters non-text blocks from content list" do
       response = %{
         message: %{
           content: [
-            %{type: :text, text: "Hello "},
+            %{type: :text, text: "Hello"},
             %{type: :tool_use, id: "123"},
             %{type: :text, text: "world"}
           ]
         }
       }
 
-      assert "Hello world" = BaseActionHelpers.extract_text(response)
+      # Text blocks are joined with newlines, non-text blocks filtered
+      assert "Hello\nworld" = BaseActionHelpers.extract_text(response)
     end
 
     test "returns empty string for malformed response" do

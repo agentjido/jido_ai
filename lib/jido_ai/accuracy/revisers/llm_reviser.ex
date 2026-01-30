@@ -50,6 +50,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
   @behaviour Jido.AI.Accuracy.Revision
 
   alias Jido.AI.Accuracy.{Candidate, Config, CritiqueResult}
+  alias Jido.AI.Helpers.Text
 
   @type t :: %__MODULE__{
           model: String.t(),
@@ -311,18 +312,7 @@ defmodule Jido.AI.Accuracy.Revisers.LLMReviser do
   end
 
   defp extract_content(response) do
-    case response.message.content do
-      nil ->
-        ""
-
-      content when is_binary(content) ->
-        content
-
-      content when is_list(content) ->
-        content
-        |> Enum.filter(fn %{type: type} -> type == :text end)
-        |> Enum.map_join("", fn %{text: text} -> text end)
-    end
+    Text.extract_text(response)
   end
 
   defp parse_revision(response) when is_binary(response) do

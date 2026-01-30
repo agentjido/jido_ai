@@ -234,24 +234,24 @@ defmodule Jido.AI.Strategies.ReActTest do
   end
 
   # ============================================================================
-  # use_registry Option
+  # tools config
   # ============================================================================
 
-  describe "use_registry option" do
-    test "defaults to false" do
+  describe "tools config" do
+    test "builds actions_by_name from tools list" do
       agent = create_agent(tools: [TestCalculator])
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.use_registry == false
+      assert config.actions_by_name == %{"calculator" => TestCalculator}
     end
 
-    test "can be set to true" do
-      agent = create_agent(tools: [TestCalculator], use_registry: true)
+    test "includes tools in reqllm_tools" do
+      agent = create_agent(tools: [TestCalculator])
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.use_registry == true
+      assert length(config.reqllm_tools) == 1
     end
   end
 
