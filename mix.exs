@@ -66,7 +66,11 @@ defmodule JidoAi.MixProject do
     [
       jido_dep(:jido, "../jido", "~> 2.0.0-rc"),
       # Use github source to match jido's dependency; local path takes precedence if available
-      jido_dep_git(:req_llm, "../req_llm", "agentjido/req_llm", "main")
+      jido_dep_git(:req_llm, "../req_llm", "agentjido/req_llm", "main"),
+      # Override jido_action to use local copy for development
+      {:jido_action, path: "../jido_action", override: true},
+      # Browser automation for web browsing agents
+      jido_dep(:jido_browser, "../jido_browser", "~> 0.1.0")
     ]
   end
 
