@@ -1,45 +1,75 @@
 defmodule Mix.Tasks.JidoAi.Gepa do
-  @shortdoc "Evaluate a prompt template using GEPA metrics"
+  @shortdoc "Evaluate and compare prompt templates using GEPA metrics"
 
   @moduledoc """
-  #{@shortdoc}
+  Evaluate prompt templates against test tasks using GEPA (accuracy, cost, latency).
 
-  ## Usage
+  GEPA helps you optimize prompts by measuring:
+  - **Accuracy** - How often does the output match expected results?
+  - **Token Cost** - How many tokens does the prompt consume?
+  - **Latency** - How fast are responses?
 
-      # Evaluate a simple prompt template
+  ## Quick Start
+
+      # Evaluate a prompt template (uses built-in math tasks)
       mix jido_ai.gepa --template "Answer concisely: {{input}}"
 
-      # With a specific model
-      mix jido_ai.gepa --template "{{input}}" --model openai:gpt-4o-mini
-
-      # Add a mutation candidate to compare
+      # Compare original vs. mutated version
       mix jido_ai.gepa --template "{{input}}" --mutate
 
-      # Custom tasks from JSON file
-      mix jido_ai.gepa --template "{{input}}" --tasks tasks.json
+  ## How It Works
 
-      # Verbose output showing per-task results
-      mix jido_ai.gepa --template "{{input}}" --verbose
+  1. Your template's `{{input}}` placeholder is replaced with each task's input
+  2. The LLM response is compared against the expected output
+  3. Metrics are aggregated across all tasks
+  4. Best variant is selected (highest accuracy, then lowest cost)
 
   ## Options
 
-  - `--template` - The prompt template (must include {{input}})
-  - `--model` - LLM model (default: openai:gpt-4o-mini)
-  - `--mutate` - Add a "be concise" mutation candidate for comparison
-  - `--tasks` - JSON file with tasks (format: [{"input": "...", "expected": "..."}])
-  - `--timeout` - Timeout per task in ms (default: 30000)
-  - `--verbose` - Show per-task results
+      --template TEMPLATE  Prompt template with {{input}} placeholder (required)
+      --model MODEL        LLM model (default: openai:gpt-4o-mini)
+      --mutate             Add a "be concise" mutation for A/B comparison
+      --tasks FILE         JSON file with custom tasks
+      --timeout MS         Timeout per task in ms (default: 30000)
+      --verbose            Show per-task pass/fail details
 
-  ## Tasks JSON Format
+  ## Custom Tasks
+
+  Create a JSON file with input/expected pairs:
 
       [
         {"input": "What is 2+2?", "expected": "4"},
-        {"input": "What is 3+3?", "expected": "6"}
+        {"input": "What is 3+3?", "expected": "6"},
+        {"input": "Capital of France?", "expected": "Paris"}
       ]
+
+  Then run:
+
+      mix jido_ai.gepa --template "Answer in one word: {{input}}" --tasks my_tasks.json
+
+  ## Examples
+
+      # Simple evaluation with defaults
+      mix jido_ai.gepa --template "{{input}}"
+
+      # Compare two prompt styles
+      mix jido_ai.gepa --template "You are a helpful assistant. {{input}}" --mutate
+
+      # Detailed per-task results
+      mix jido_ai.gepa --template "Be precise: {{input}}" --verbose
+
+      # Custom model and tasks
+      mix jido_ai.gepa --template "{{input}}" --model anthropic:claude-haiku-4-5 --tasks qa.json
 
   ## Output
 
-  Shows accuracy, token cost, and latency for each variant, then picks the best.
+  Shows a comparison table with accuracy, tokens, and latency for each variant,
+  then displays the winning template with its metrics.
+
+  ## See Also
+
+  - `mix help jido_ai.accuracy` - Improve single-prompt accuracy
+  - `Jido.AI.evaluate_prompt/3` - Programmatic API
   """
 
   use Mix.Task
