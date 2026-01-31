@@ -2,99 +2,101 @@ defmodule Mix.Tasks.JidoAi.Agent do
   @shortdoc "Run a Jido AI agent from the command line"
 
   @moduledoc """
-  #{@shortdoc}
+  Run AI agents with tool use from the command line.
 
-  ## Usage
+  Supports one-shot queries, interactive TUI mode, and batch processing via stdin.
+  Agents can use tools (arithmetic, weather, etc.) and reason through multi-step problems.
 
-      # One-shot query (default)
-      mix jido_ai.agent "What is 2 + 2?"
+  ## Quick Start
 
-      # Interactive TUI mode
+      # One-shot query with default ReAct agent
+      mix jido_ai.agent "Calculate 15 * 7 + 3"
+
+      # Interactive terminal UI
       mix jido_ai.agent --tui
 
-      # Read from stdin (one query per line)
-      echo "What is 15 * 7?" | mix jido_ai.agent --stdin
+      # JSON output for scripting
+      mix jido_ai.agent --format json --quiet "What is 42 * 2?"
 
-      # Use a pre-defined agent module
+  ## Agent Modes
+
+  ### Option A: Ephemeral Agent (default)
+
+  Creates a temporary agent with specified model and tools:
+
+      mix jido_ai.agent "Query here"
+      mix jido_ai.agent --model anthropic:claude-sonnet-4-20250514 "Query"
+      mix jido_ai.agent --tools Jido.Tools.Weather "What's the weather?"
+
+  ### Option B: Pre-defined Agent Module
+
+  Uses an existing agent module from your application:
+
       mix jido_ai.agent --agent MyApp.WeatherAgent "What's the weather in Tokyo?"
-
-      # Configure an ephemeral agent
-      mix jido_ai.agent --model anthropic:claude-sonnet-4-20250514 --tools Jido.Tools.Weather "Get weather"
-
-      # JSON output for AI agent scripting
-      mix jido_ai.agent --format json --quiet "What is 2 + 2?"
 
   ## Options
 
-  ### Agent Selection (choose one approach)
-
-  **Option A: Use a pre-defined agent module**
-  - `--agent` - Use an existing agent module (e.g., MyApp.WeatherAgent)
-    When provided, `--model/--tools/--system/--max-iterations` are ignored.
-
-  **Option B: Configure an ephemeral agent**
-  - `--type` - Agent type/adapter: react (default). Future: cot, tot
-  - `--model` - LLM model (default: anthropic:claude-haiku-4-5)
-  - `--tools` - Comma-separated tool modules (default: arithmetic + weather)
-  - `--system` - System prompt
-  - `--max-iterations` - Max reasoning iterations (default: 10)
+  ### Agent Configuration
+      --agent MODULE       Use existing agent module (ignores --model/--tools/--system)
+      --type TYPE          Agent type: react (default)
+      --model MODEL        LLM model (default: anthropic:claude-haiku-4-5)
+      --tools MODULES      Comma-separated tool modules
+      --system PROMPT      System prompt
+      --max-iterations N   Max reasoning iterations (default: 10)
 
   ### Input Mode
-  - `--stdin` - Read queries from stdin (one per line, JSON Lines output)
-  - `--tui` - Launch interactive terminal UI (enter multiple queries, exit when done)
+      --stdin              Read queries from stdin (one per line)
+      --tui                Interactive terminal UI mode
 
   ### Output Format
-  - `--format` - Output format: text (default), json
-  - `--quiet` - Suppress logs (recommended for json format)
+      --format FORMAT      text (default) | json
+      --quiet              Suppress logs (use with --format json)
 
   ### Execution
-  - `--timeout` - Timeout in ms (default: 60000)
+      --timeout MS         Timeout in ms (default: 60000)
+      --trace              Show signals, directives, and agent events
 
-  ### Observability
-  - `--trace` - Enable trace output showing signals, directives, and agent events
-
-  ## Output Contract
-
-  ### JSON Format (`--format json`)
+  ## JSON Output Format
 
   Success:
+
       {"ok":true,"query":"...","answer":"...","elapsed_ms":1234}
 
   Error:
+
       {"ok":false,"query":"...","error":"...","elapsed_ms":1234}
 
-  In `--stdin` mode, outputs JSON Lines (one object per line).
-
-  ### Exit Codes
-  - `0` - All queries succeeded
-  - `1` - One or more queries failed
+  Exit codes: `0` = success, `1` = failure
 
   ## Examples
 
-      # Basic arithmetic
-      mix jido_ai.agent "Calculate 15 * 7 + 3"
+      # Basic calculation
+      mix jido_ai.agent "What is 847 divided by 7?"
 
-      # JSON output for AI agents (Amp)
-      mix jido_ai.agent --format json --quiet "What is 42 * 2?"
+      # JSON for AI agent pipelines
+      mix jido_ai.agent --format json --quiet "What is 2 + 2?"
 
-      # Batch processing
+      # Batch processing from file
       cat queries.txt | mix jido_ai.agent --stdin --format json --quiet
 
-      # Custom agent
-      mix jido_ai.agent --agent Jido.AI.Examples.ReActDemoAgent "What is 100/4?"
+      # Custom agent with tracing
+      mix jido_ai.agent --agent MyApp.Agent --trace "Complex query"
 
-      # Trace mode to see signals and directives
-      mix jido_ai.agent --trace "Calculate 15 * 7"
+      # Specific model and tools
+      mix jido_ai.agent --model openai:gpt-4o --tools Jido.Tools.Arithmetic "15 * 23"
 
-  ## CLI-Compatible Agent Requirements
+  ## Custom Agent Requirements
 
   Agents used with `--agent` must:
   1. Be startable via `Jido.start_agent/2`
-  2. Implement `ask/2` or `ask/3` for query submission
+  2. Implement `ask/2` or `ask/3`
   3. Signal completion via `strategy_snapshot.done?`
   4. Provide result via `snapshot.result` or `state.last_answer`
 
-  Optionally implement `cli_adapter/0` to specify a custom adapter.
+  ## See Also
+
+  - `mix help jido_ai.accuracy` - Improve accuracy via self-consistency
+  - `mix help jido_ai.gepa` - Evaluate prompt templates
   """
 
   use Mix.Task

@@ -240,10 +240,16 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
     # Generate candidates
     case generate_candidates(generator, cot_prompt, opts) do
       {:ok, candidates} ->
-        # Parse reasoning and content from each candidate
+        # Parse reasoning and content from each candidate, preserving Candidate struct
         parsed_candidates =
           Enum.map(candidates, fn candidate ->
-            parse_reasoning_content(candidate.content)
+            parsed = parse_reasoning_content(candidate.content)
+
+            %{
+              candidate
+              | reasoning: parsed[:reasoning],
+                content: parsed[:content]
+            }
           end)
 
         {:ok, parsed_candidates}
