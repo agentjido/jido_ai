@@ -274,7 +274,9 @@ defmodule Jido.AI.Tools.Executor do
   """
   @spec normalize_params(map(), keyword() | struct()) :: map()
   def normalize_params(params, schema) when is_map(params) and is_list(schema) do
-    ActionTool.convert_params_using_schema(params, schema)
+    params
+    |> ActionTool.convert_params_using_schema(schema)
+    |> coerce_integers_to_floats(schema)
   end
 
   def normalize_params(params, %{__struct__: struct_type} = _schema)
@@ -303,6 +305,22 @@ defmodule Jido.AI.Tools.Executor do
 
   defp atomize_keys(list) when is_list(list), do: Enum.map(list, &atomize_keys/1)
   defp atomize_keys(other), do: other
+
+  defp coerce_integers_to_floats(params, schema) when is_list(schema) do
+    float_keys =
+      schema
+      |> Enum.filter(fn {_key, opts} -> Keyword.get(opts, :type) == :float end)
+      |> Enum.map(fn {key, _opts} -> key end)
+
+    Enum.reduce(float_keys, params, fn key, acc ->
+      case Map.get(acc, key) do
+        val when is_integer(val) -> Map.put(acc, key, val / 1)
+        _ -> acc
+      end
+    end)
+  end
+
+  defp coerce_integers_to_floats(params, _schema), do: params
 
   # ============================================================================
   # Result Formatting
