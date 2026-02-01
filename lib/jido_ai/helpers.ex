@@ -290,7 +290,7 @@ defmodule Jido.AI.Helpers do
     %{
       type: type,
       text: Text.extract_from_content(response.message.content),
-      tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)
+      tool_calls: tool_calls
     }
   end
 
