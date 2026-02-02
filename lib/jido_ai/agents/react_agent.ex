@@ -131,6 +131,22 @@ defmodule Jido.AI.ReActAgent do
             line: Keyword.get(meta, :line, 0)
         end
 
+      # Reject module attributes with clear error
+      {:@, meta, [{name, _, _}]} ->
+        raise CompileError,
+          description:
+            "Module attributes (@#{name}) are not supported in tool_context, tools, or specialists. " <>
+              "Define the value inline or use a compile-time constant.",
+          line: Keyword.get(meta, :line, 0)
+
+      # Reject pinned variables
+      {:^, meta, _} ->
+        raise CompileError,
+          description:
+            "Pinned variables (^) are not supported in tool_context, tools, or specialists. " <>
+              "Use literal values instead.",
+          line: Keyword.get(meta, :line, 0)
+
       other ->
         other
     end)

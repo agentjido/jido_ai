@@ -353,6 +353,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
   """
 
   alias Jido.AI.{Helpers, Signal}
+  alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
     %{
@@ -385,7 +386,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
       agent_pid: agent_pid
     }
 
+    # Capture parent trace context before spawning
+    parent_trace_ctx = TraceContext.get()
+
     Task.Supervisor.start_child(task_supervisor, fn ->
+      # Restore trace context in child task
+      if parent_trace_ctx, do: Process.put({:jido, :trace_context}, parent_trace_ctx)
+
       result =
         try do
           stream_with_callbacks(stream_opts)
@@ -560,6 +567,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
 
   alias Jido.AI.Signal
   alias Jido.AI.Tools.Executor
+  alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
     %{
@@ -576,7 +584,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     # Get tools from state (agent's registered actions from skill or strategy)
     tools = get_tools_from_state(state)
 
+    # Capture parent trace context before spawning
+    parent_trace_ctx = TraceContext.get()
+
     Task.Supervisor.start_child(task_supervisor, fn ->
+      # Restore trace context in child task
+      if parent_trace_ctx, do: Process.put({:jido, :trace_context}, parent_trace_ctx)
+
       # Issue #2 fix: Wrap entire task body in try/rescue/catch to guarantee
       # a tool_result signal is always sent back to the agent
       result =

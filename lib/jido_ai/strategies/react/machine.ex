@@ -22,6 +22,16 @@ defmodule Jido.AI.ReAct.Machine do
       {machine, directives} = Machine.update(machine, {:start, query, call_id})
 
   All state transitions are pure - side effects are described in directives.
+
+  ## Status Type Boundary
+
+  **Internal (Machine struct):** Status is stored as strings (`"idle"`, `"completed"`)
+  due to Fsmx library requirements.
+
+  **External (Strategy state, Snapshots):** Status is converted to atoms (`:idle`,
+  `:completed`) via `to_map/1` before storage in agent state.
+
+  Never compare `machine.status` directly with atoms - use `Machine.to_map/1` first.
   """
 
   use Fsmx.Struct,
@@ -37,7 +47,12 @@ defmodule Jido.AI.ReAct.Machine do
   # Telemetry event names
   @telemetry_prefix [:jido, :ai, :react]
 
-  @type status :: :idle | :awaiting_llm | :awaiting_tool | :completed | :error
+  @typedoc "Internal machine status (string) - required by Fsmx library"
+  @type internal_status :: String.t()
+
+  @typedoc "External status (atom) - used in strategy state after to_map/1 conversion"
+  @type external_status :: :idle | :awaiting_llm | :awaiting_tool | :completed | :error
+
   @type termination_reason :: :final_answer | :max_iterations | :error | nil
 
   @type pending_tool_call :: %{
@@ -56,7 +71,7 @@ defmodule Jido.AI.ReAct.Machine do
         }
 
   @type t :: %__MODULE__{
-          status: String.t(),
+          status: internal_status(),
           iteration: non_neg_integer(),
           conversation: list(),
           pending_tool_calls: [pending_tool_call()],

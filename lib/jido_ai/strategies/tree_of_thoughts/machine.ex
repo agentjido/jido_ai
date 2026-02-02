@@ -46,6 +46,16 @@ defmodule Jido.AI.TreeOfThoughts.Machine do
       {machine, directives} = Machine.update(machine, {:start, prompt, call_id}, env)
 
   All state transitions are pure - side effects are described in directives.
+
+  ## Status Type Boundary
+
+  **Internal (Machine struct):** Status is stored as strings (`"idle"`, `"completed"`)
+  due to Fsmx library requirements.
+
+  **External (Strategy state, Snapshots):** Status is converted to atoms (`:idle`,
+  `:completed`) via `to_map/1` before storage in agent state.
+
+  Never compare `machine.status` directly with atoms - use `Machine.to_map/1` first.
   """
 
   use Fsmx.Struct,
@@ -62,7 +72,12 @@ defmodule Jido.AI.TreeOfThoughts.Machine do
   # Telemetry event names
   @telemetry_prefix [:jido, :ai, :tot]
 
-  @type status :: :idle | :generating | :evaluating | :expanding | :completed | :error
+  @typedoc "Internal machine status (string) - required by Fsmx library"
+  @type internal_status :: String.t()
+
+  @typedoc "External status (atom) - used in strategy state after to_map/1 conversion"
+  @type external_status :: :idle | :generating | :evaluating | :expanding | :completed | :error
+
   @type termination_reason :: :success | :error | :max_depth | nil
   @type traversal_strategy :: :bfs | :dfs | :best_first
 
@@ -82,7 +97,7 @@ defmodule Jido.AI.TreeOfThoughts.Machine do
         }
 
   @type t :: %__MODULE__{
-          status: String.t(),
+          status: internal_status(),
           prompt: String.t() | nil,
           nodes: %{String.t() => thought_node()},
           root_id: String.t() | nil,

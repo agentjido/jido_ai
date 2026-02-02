@@ -469,13 +469,20 @@ defmodule Jido.AI.Strategies.ReAct do
       {:exec_tool, id, tool_name, arguments} ->
         case lookup_tool(tool_name, actions_by_name, config) do
           {:ok, action_module} ->
+            # Include call_id and iteration for telemetry correlation
+            exec_context =
+              Map.merge(effective_tool_context, %{
+                call_id: id,
+                iteration: state[:iteration]
+              })
+
             [
               Directive.ToolExec.new!(%{
                 id: id,
                 tool_name: tool_name,
                 action_module: action_module,
                 arguments: arguments,
-                context: effective_tool_context
+                context: exec_context
               })
             ]
 

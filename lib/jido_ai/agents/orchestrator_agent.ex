@@ -78,14 +78,8 @@ defmodule Jido.AI.OrchestratorAgent do
     specialists =
       specialists_ast
       |> Enum.map(fn spec_ast ->
-        # Expand any module aliases in the spec
-        expanded =
-          Macro.prewalk(spec_ast, fn
-            {:__aliases__, _, _} = alias_node -> Macro.expand(alias_node, __CALLER__)
-            other -> other
-          end)
-
-        # Evaluate to get actual value
+        # Use the same safe AST expansion as ReActAgent
+        expanded = Jido.AI.ReActAgent.expand_aliases_in_ast(spec_ast, __CALLER__)
         {spec, _} = Code.eval_quoted(expanded, [], __CALLER__)
         spec
       end)

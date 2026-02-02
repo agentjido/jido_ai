@@ -58,6 +58,16 @@ defmodule Jido.AI.GraphOfThoughts.Machine do
       {machine, directives} = Machine.update(machine, {:start, prompt, call_id}, env)
 
   All state transitions are pure - side effects are described in directives.
+
+  ## Status Type Boundary
+
+  **Internal (Machine struct):** Status is stored as strings (`"idle"`, `"completed"`)
+  due to Fsmx library requirements.
+
+  **External (Strategy state, Snapshots):** Status is converted to atoms (`:idle`,
+  `:completed`) via `to_map/1` before storage in agent state.
+
+  Never compare `machine.status` directly with atoms - use `Machine.to_map/1` first.
   """
 
   use Fsmx.Struct,
@@ -74,7 +84,12 @@ defmodule Jido.AI.GraphOfThoughts.Machine do
   # Telemetry event names
   @telemetry_prefix [:jido, :ai, :got]
 
-  @type status :: :idle | :generating | :connecting | :aggregating | :completed | :error
+  @typedoc "Internal machine status (string) - required by Fsmx library"
+  @type internal_status :: String.t()
+
+  @typedoc "External status (atom) - used in strategy state after to_map/1 conversion"
+  @type external_status :: :idle | :generating | :connecting | :aggregating | :completed | :error
+
   @type termination_reason :: :success | :error | :max_nodes | :max_depth | nil
   @type aggregation_strategy :: :voting | :weighted | :synthesis
   @type edge_type :: :generates | :refines | :aggregates | :connects
@@ -100,7 +115,7 @@ defmodule Jido.AI.GraphOfThoughts.Machine do
         }
 
   @type t :: %__MODULE__{
-          status: String.t(),
+          status: internal_status(),
           prompt: String.t() | nil,
           nodes: %{String.t() => thought_node()},
           edges: [edge()],
@@ -445,7 +460,7 @@ defmodule Jido.AI.GraphOfThoughts.Machine do
   @doc """
   Returns the current status as an atom.
   """
-  @spec status(t()) :: status()
+  @spec status(t()) :: external_status()
   def status(%__MODULE__{status: status}) do
     status_to_atom(status)
   end

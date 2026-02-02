@@ -65,6 +65,16 @@ defmodule Jido.AI.TRM.Machine do
   Emitted when reasoning completes successfully.
   - **Measurements**: `%{steps: non_neg_integer(), best_score: float(), duration_ms: non_neg_integer()}`
   - **Metadata**: `%{call_id: String.t(), termination_reason: atom(), usage: map()}`
+
+  ## Status Type Boundary
+
+  **Internal (Machine struct):** Status is stored as strings (`"idle"`, `"completed"`)
+  due to Fsmx library requirements.
+
+  **External (Strategy state, Snapshots):** Status is converted to atoms (`:idle`,
+  `:completed`) via `to_map/1` before storage in agent state.
+
+  Never compare `machine.status` directly with atoms - use `Machine.to_map/1` first.
   """
 
   use Fsmx.Struct,
@@ -88,7 +98,12 @@ defmodule Jido.AI.TRM.Machine do
   @default_max_supervision_steps 5
   @default_act_threshold 0.9
 
-  @type status :: :idle | :reasoning | :supervising | :improving | :completed | :error
+  @typedoc "Internal machine status (string) - required by Fsmx library"
+  @type internal_status :: String.t()
+
+  @typedoc "External status (atom) - used in strategy state after to_map/1 conversion"
+  @type external_status :: :idle | :reasoning | :supervising | :improving | :completed | :error
+
   @type termination_reason :: :max_steps | :act_threshold | :convergence_detected | :error | nil
 
   @type latent_state :: %{
@@ -112,7 +127,7 @@ defmodule Jido.AI.TRM.Machine do
         }
 
   @type t :: %__MODULE__{
-          status: String.t(),
+          status: internal_status(),
           question: String.t() | nil,
           current_answer: String.t() | nil,
           answer_history: [String.t()],

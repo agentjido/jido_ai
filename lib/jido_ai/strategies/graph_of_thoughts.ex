@@ -373,6 +373,16 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
         # Completion is handled in state, no directive needed
         []
 
+      # Issue #9 fix: Handle request rejection when agent is busy
+      {:request_error, call_id, reason, message} ->
+        [
+          Directive.EmitRequestError.new!(%{
+            call_id: call_id,
+            reason: reason,
+            message: message
+          })
+        ]
+
       _ ->
         []
     end)
