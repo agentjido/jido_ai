@@ -61,8 +61,25 @@ defmodule Jido.AI.Strategies.ReAct do
         final_answer: String.t() | nil,
         current_llm_call_id: String.t() | nil,
         termination_reason: :final_answer | :max_iterations | :error | nil,
-        config: config()
+        config: config(),
+        run_tool_context: map() | nil  # Ephemeral per-request context
       }
+
+  ## Tool Context
+
+  Tool context is separated into two scopes to prevent cross-request data leakage:
+
+  - **`base_tool_context`** (persistent, in `config`) - Set at agent definition time via
+    `:tool_context` option. Represents stable context like domain modules. Updated only
+    via explicit `react.set_tool_context` action (replaces, not merges).
+
+  - **`run_tool_context`** (ephemeral, in state) - Set per-request via `tool_context:`
+    option in `react.start`. Automatically cleared when the machine reaches `:completed`
+    or `:error` status. Never persists across requests.
+
+  At tool execution time, both contexts are merged (run overrides base) to produce the
+  effective context passed to actions. This ensures multi-tenant isolation - a tenant's
+  request context cannot leak to subsequent requests.
   """
 
   use Jido.Agent.Strategy
@@ -82,7 +99,7 @@ defmodule Jido.AI.Strategies.ReAct do
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
-          tool_context: map()
+          base_tool_context: map()
         }
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -132,7 +149,11 @@ defmodule Jido.AI.Strategies.ReAct do
 
   @action_specs %{
     @start => %{
-      schema: Zoi.object(%{query: Zoi.string()}),
+      schema:
+        Zoi.object(%{
+          query: Zoi.string(),
+          tool_context: Zoi.map() |> Zoi.optional()
+        }),
       doc: "Start a new ReAct conversation with a user query",
       name: "react.start"
     },
@@ -287,19 +308,10 @@ defmodule Jido.AI.Strategies.ReAct do
         process_set_tool_context(agent, params)
 
       @start ->
-        # Handle per-request tool_context before processing start
-        agent =
-          case Map.get(params, :tool_context) do
-            nil ->
-              agent
-
-            ctx when is_map(ctx) and map_size(ctx) > 0 ->
-              {updated_agent, _} = process_set_tool_context(agent, %{tool_context: ctx})
-              updated_agent
-
-            _ ->
-              agent
-          end
+        # Store per-request tool_context in run_tool_context (ephemeral, cleared on completion)
+        # This does NOT mutate base_tool_context - prevents cross-request leakage
+        run_context = Map.get(params, :tool_context) || %{}
+        agent = set_run_tool_context(agent, run_context)
 
         process_machine_message(agent, normalized_action, params)
 
@@ -322,13 +334,24 @@ defmodule Jido.AI.Strategies.ReAct do
 
         {machine, directives} = Machine.update(machine, msg, env)
 
+        machine_state = Machine.to_map(machine)
+
+        # Preserve run_tool_context through the state update
         new_state =
-          machine
-          |> Machine.to_map()
+          machine_state
+          |> Map.put(:run_tool_context, state[:run_tool_context])
           |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
+        # Clear run_tool_context on terminal states to prevent cross-request leakage
+        new_state =
+          if machine_state[:status] in [:completed, :error] do
+            Map.delete(new_state, :run_tool_context)
+          else
+            new_state
+          end
+
         agent = StratState.put(agent, new_state)
-        {agent, lift_directives(directives, config)}
+        {agent, lift_directives(directives, config, state)}
 
       _ ->
         :noop
@@ -375,15 +398,23 @@ defmodule Jido.AI.Strategies.ReAct do
 
   defp process_set_tool_context(agent, %{tool_context: new_context}) when is_map(new_context) do
     state = StratState.get(agent, %{})
-    config = state[:config]
 
-    # Merge new context with existing (new values override)
-    updated_context = Map.merge(config[:tool_context] || %{}, new_context)
-    updated_config = Map.put(config, :tool_context, updated_context)
+    # REPLACE base_tool_context (not merge) to avoid indefinite key accumulation
+    # Use set_config_field to replace just this field without deep merging
+    new_state =
+      StateOpsHelpers.apply_to_state(state, [
+        StateOpsHelpers.set_config_field(:base_tool_context, new_context)
+      ])
 
-    new_state = StateOpsHelpers.apply_to_state(state, [StateOpsHelpers.update_config(updated_config)])
     agent = StratState.put(agent, new_state)
     {agent, []}
+  end
+
+  # Sets ephemeral per-request tool context (cleared on completion)
+  defp set_run_tool_context(agent, context) when is_map(context) do
+    state = StratState.get(agent, %{})
+    new_state = Map.put(state, :run_tool_context, context)
+    StratState.put(agent, new_state)
   end
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
@@ -408,13 +439,18 @@ defmodule Jido.AI.Strategies.ReAct do
 
   defp to_machine_msg(_, _), do: nil
 
-  defp lift_directives(directives, config) do
+  defp lift_directives(directives, config, state) do
     %{
       model: model,
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
-      tool_context: tool_context
+      base_tool_context: base_tool_context
     } = config
+
+    # Merge base (persistent) + run (ephemeral) context at directive emission time
+    # Run context overrides base context; neither is mutated
+    run_tool_context = Map.get(state, :run_tool_context, %{})
+    effective_tool_context = Map.merge(base_tool_context || %{}, run_tool_context)
 
     Enum.flat_map(directives, fn
       {:call_llm_stream, id, conversation} ->
@@ -436,7 +472,7 @@ defmodule Jido.AI.Strategies.ReAct do
                 tool_name: tool_name,
                 action_module: action_module,
                 arguments: arguments,
-                context: tool_context
+                context: effective_tool_context
               })
             ]
 
@@ -501,7 +537,9 @@ defmodule Jido.AI.Strategies.ReAct do
       system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
-      tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
+      # base_tool_context is the persistent context from agent definition
+      # per-request context is stored separately in state[:run_tool_context]
+      base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
     }
   end
 

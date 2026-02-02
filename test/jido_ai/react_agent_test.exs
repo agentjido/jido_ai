@@ -156,9 +156,10 @@ defmodule Jido.AI.ReActAgentTest do
       config = state[:config]
 
       # Modules should be resolved to atoms, not AST tuples
-      assert config.tool_context[:domain] == TestDomain
-      assert config.tool_context[:actor] == TestActor
-      assert config.tool_context[:static_value] == "hello"
+      # Now stored as base_tool_context (persistent)
+      assert config.base_tool_context[:domain] == TestDomain
+      assert config.base_tool_context[:actor] == TestActor
+      assert config.base_tool_context[:static_value] == "hello"
     end
 
     test "tool_context with plain map values works" do
@@ -166,8 +167,9 @@ defmodule Jido.AI.ReActAgentTest do
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.tool_context[:tenant_id] == "tenant_123"
-      assert config.tool_context[:enabled] == true
+      # Now stored as base_tool_context (persistent)
+      assert config.base_tool_context[:tenant_id] == "tenant_123"
+      assert config.base_tool_context[:enabled] == true
     end
 
     test "tools list resolves module aliases" do
