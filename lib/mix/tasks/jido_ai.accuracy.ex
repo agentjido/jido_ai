@@ -299,7 +299,7 @@ defmodule Mix.Tasks.JidoAi.Accuracy do
     reasoning = get_field(best, :reasoning)
     content = get_field(best, :content)
 
-    if use_reasoning and reasoning && reasoning != "" do
+    if (use_reasoning and reasoning) && reasoning != "" do
       IO.puts("Reasoning:")
       IO.puts(reasoning)
       IO.puts("\nAnswer:")

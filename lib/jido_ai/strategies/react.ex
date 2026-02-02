@@ -441,8 +441,26 @@ defmodule Jido.AI.Strategies.ReAct do
             ]
 
           :error ->
-            []
+            # Issue #1 fix: Never silently drop - emit error result for unknown tools
+            # This ensures the Machine receives a tool_result and doesn't deadlock
+            [
+              Directive.EmitToolError.new!(%{
+                id: id,
+                tool_name: tool_name,
+                error: {:unknown_tool, "Tool '#{tool_name}' not found in registered actions"}
+              })
+            ]
         end
+
+      # Issue #3 fix: Handle request rejection when agent is busy
+      {:request_error, call_id, reason, message} ->
+        [
+          Directive.EmitRequestError.new!(%{
+            call_id: call_id,
+            reason: reason,
+            message: message
+          })
+        ]
     end)
   end
 

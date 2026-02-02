@@ -198,6 +198,12 @@ defmodule Jido.AI.GraphOfThoughts.Machine do
     end)
   end
 
+  # Issue #3 fix: Explicitly reject start requests when busy instead of silently dropping
+  def update(%__MODULE__{status: status} = machine, {:start, _prompt, call_id}, _env)
+      when status in ["generating", "connecting", "aggregating"] do
+    {machine, [{:request_error, call_id, :busy, "Agent is busy (status: #{status})"}]}
+  end
+
   def update(%__MODULE__{} = machine, {:llm_result, call_id, result}, env) do
     if call_id == machine.current_call_id do
       handle_llm_result(machine, result, env)

@@ -80,13 +80,15 @@ defmodule Jido.AI.TRM.MachineTest do
       assert machine.latent_state.confidence_score == 0.0
     end
 
-    test "ignores start when not in idle state" do
+    test "rejects start when not in idle state with request_error directive (Issue #3 fix)" do
       machine = %{Machine.new() | status: "reasoning"}
 
       {machine, directives} = Machine.update(machine, {:start, "New question", "call_2"})
 
       assert machine.status == "reasoning"
-      assert directives == []
+      # Issue #3 fix: Now emits request_error instead of silently dropping
+      assert [{:request_error, "call_2", :busy, message}] = directives
+      assert message =~ "reasoning"
     end
   end
 
