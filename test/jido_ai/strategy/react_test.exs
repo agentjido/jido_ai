@@ -316,24 +316,24 @@ defmodule Jido.AI.Strategies.ReActTest do
   # Tool Context Management
   # ============================================================================
 
-  describe "tool_context configuration" do
-    test "tool_context defaults to empty map" do
+  describe "base_tool_context configuration" do
+    test "base_tool_context defaults to empty map" do
       agent = create_agent(tools: [TestCalculator])
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.tool_context == %{}
+      assert config.base_tool_context == %{}
     end
 
-    test "tool_context can be set via options" do
+    test "base_tool_context can be set via options" do
       agent = create_agent(tools: [TestCalculator], tool_context: %{tenant: "acme", actor: :admin})
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.tool_context == %{tenant: "acme", actor: :admin}
+      assert config.base_tool_context == %{tenant: "acme", actor: :admin}
     end
 
-    test "tool_context from agent.state takes precedence over opts" do
+    test "base_tool_context from agent.state takes precedence over opts" do
       # Create agent with tool_context in state
       agent = %Jido.Agent{
         id: "test-agent",
@@ -348,7 +348,7 @@ defmodule Jido.AI.Strategies.ReActTest do
       config = state[:config]
 
       # State should take precedence
-      assert config.tool_context == %{from_state: true}
+      assert config.base_tool_context == %{from_state: true}
     end
   end
 
@@ -363,7 +363,7 @@ defmodule Jido.AI.Strategies.ReActTest do
       assert spec.doc =~ "Update the tool context"
     end
 
-    test "set_tool_context updates config" do
+    test "set_tool_context replaces base_tool_context" do
       agent = create_agent(tools: [TestCalculator], tool_context: %{initial: "value"})
 
       instruction = %Jido.Instruction{
@@ -376,33 +376,12 @@ defmodule Jido.AI.Strategies.ReActTest do
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      # Should merge with existing context
-      assert config.tool_context[:initial] == "value"
-      assert config.tool_context[:new_key] == "new_value"
+      # REPLACES (not merges) to prevent indefinite key accumulation
+      assert config.base_tool_context == %{new_key: "new_value"}
+      refute Map.has_key?(config.base_tool_context, :initial)
     end
 
-    test "set_tool_context merges and overrides existing values" do
-      agent = create_agent(tools: [TestCalculator], tool_context: %{key1: "old", key2: "keep"})
-
-      instruction = %Jido.Instruction{
-        action: ReAct.set_tool_context_action(),
-        params: %{tool_context: %{key1: "new", key3: "added"}}
-      }
-
-      {agent, _directives} = ReAct.cmd(agent, [instruction], %{})
-
-      state = StratState.get(agent, %{})
-      config = state[:config]
-
-      # Overridden
-      assert config.tool_context[:key1] == "new"
-      # Preserved
-      assert config.tool_context[:key2] == "keep"
-      # Added
-      assert config.tool_context[:key3] == "added"
-    end
-
-    test "set_tool_context with empty map preserves existing context" do
+    test "set_tool_context with empty map clears base_tool_context" do
       agent = create_agent(tools: [TestCalculator], tool_context: %{existing: "value"})
 
       instruction = %Jido.Instruction{
@@ -415,12 +394,13 @@ defmodule Jido.AI.Strategies.ReActTest do
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.tool_context[:existing] == "value"
+      # Empty map replaces, so base_tool_context is now empty
+      assert config.base_tool_context == %{}
     end
   end
 
   describe "per-request tool_context in start instruction" do
-    test "start with tool_context merges context before processing" do
+    test "start with tool_context stores in run_tool_context, not base" do
       agent = create_agent(tools: [TestCalculator], tool_context: %{base: "context"})
 
       instruction = %Jido.Instruction{
@@ -433,12 +413,15 @@ defmodule Jido.AI.Strategies.ReActTest do
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      # Both base and per-request context should be present
-      assert config.tool_context[:base] == "context"
-      assert config.tool_context[:request_id] == "req-123"
+      # base_tool_context remains unchanged (persistent)
+      assert config.base_tool_context[:base] == "context"
+      refute Map.has_key?(config.base_tool_context, :request_id)
+
+      # run_tool_context has per-request context (ephemeral)
+      assert state[:run_tool_context][:request_id] == "req-123"
     end
 
-    test "start without tool_context preserves existing context" do
+    test "start without tool_context preserves base_tool_context" do
       agent = create_agent(tools: [TestCalculator], tool_context: %{existing: "value"})
 
       instruction = %Jido.Instruction{
@@ -451,15 +434,36 @@ defmodule Jido.AI.Strategies.ReActTest do
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.tool_context[:existing] == "value"
+      assert config.base_tool_context[:existing] == "value"
     end
 
-    test "per-request tool_context can override base context" do
-      agent = create_agent(tools: [TestCalculator], tool_context: %{actor: :default_actor})
+    test "run_tool_context cleared after completion prevents leakage" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{base: "value"})
+
+      # First request with tenant_a context
+      instruction1 = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "first query", tool_context: %{tenant_id: "tenant_a"}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction1], %{})
+      state = StratState.get(agent, %{})
+
+      # Run context should have tenant_a during the request
+      assert state[:run_tool_context][:tenant_id] == "tenant_a"
+
+      # Simulate completion by directly sending a final answer result
+      # For now, just verify base_tool_context is not polluted
+      config = state[:config]
+      refute Map.has_key?(config.base_tool_context, :tenant_id)
+    end
+
+    test "set_tool_context action replaces base_tool_context" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{old_key: "old_value"})
 
       instruction = %Jido.Instruction{
-        action: ReAct.start_action(),
-        params: %{query: "test query", tool_context: %{actor: :specific_actor}}
+        action: ReAct.set_tool_context_action(),
+        params: %{tool_context: %{new_key: "new_value"}}
       }
 
       {agent, _directives} = ReAct.cmd(agent, [instruction], %{})
@@ -467,7 +471,92 @@ defmodule Jido.AI.Strategies.ReActTest do
       state = StratState.get(agent, %{})
       config = state[:config]
 
-      assert config.tool_context[:actor] == :specific_actor
+      # set_tool_context REPLACES, not merges (prevents key accumulation)
+      assert config.base_tool_context == %{new_key: "new_value"}
+      refute Map.has_key?(config.base_tool_context, :old_key)
+    end
+  end
+
+  # ============================================================================
+  # Issue #6 Fix: Tool Context Leakage Prevention
+  # ============================================================================
+
+  describe "cross-request isolation - Issue #6 fix" do
+    test "run_tool_context is cleared on completion, preventing leakage" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{base: "value"})
+
+      # First request from "tenant_a"
+      instruction1 = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "first query", tool_context: %{tenant_id: "tenant_a", secret: "a_secret"}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction1], %{})
+      state = StratState.get(agent, %{})
+
+      # Run context has tenant_a's data
+      assert state[:run_tool_context][:tenant_id] == "tenant_a"
+      assert state[:run_tool_context][:secret] == "a_secret"
+
+      # Simulate receiving a final answer (causes transition to :completed)
+      llm_result_instruction = %Jido.Instruction{
+        action: ReAct.llm_result_action(),
+        params: %{
+          call_id: state[:current_llm_call_id],
+          result: {:ok, %{type: :final_answer, text: "Final answer"}}
+        }
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [llm_result_instruction], %{})
+      state = StratState.get(agent, %{})
+
+      # After completion, run_tool_context should be cleared
+      assert state[:status] == :completed
+      assert state[:run_tool_context] == nil
+
+      # base_tool_context remains intact
+      config = state[:config]
+      assert config.base_tool_context[:base] == "value"
+      refute Map.has_key?(config.base_tool_context, :tenant_id)
+      refute Map.has_key?(config.base_tool_context, :secret)
+    end
+
+    test "second request does not see first request's run_tool_context" do
+      agent = create_agent(tools: [TestCalculator], tool_context: %{base: "value"})
+
+      # First request from "tenant_a"
+      instruction1 = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "first query", tool_context: %{tenant_id: "tenant_a"}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction1], %{})
+
+      # Simulate completion
+      state = StratState.get(agent, %{})
+
+      llm_result = %Jido.Instruction{
+        action: ReAct.llm_result_action(),
+        params: %{
+          call_id: state[:current_llm_call_id],
+          result: {:ok, %{type: :final_answer, text: "Done"}}
+        }
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [llm_result], %{})
+
+      # Second request from "tenant_b" - should NOT see tenant_a's context
+      instruction2 = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "second query", tool_context: %{tenant_id: "tenant_b"}}
+      }
+
+      {agent, _directives} = ReAct.cmd(agent, [instruction2], %{})
+      state = StratState.get(agent, %{})
+
+      # Only tenant_b's context, no leakage from tenant_a
+      assert state[:run_tool_context] == %{tenant_id: "tenant_b"}
+      refute Map.has_key?(state[:run_tool_context], :secret)
     end
   end
 
