@@ -56,8 +56,8 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
   automatically route these signals to strategy commands:
 
   - `"tot.query"` → `:tot_start`
-  - `"reqllm.result"` → `:tot_llm_result`
-  - `"reqllm.partial"` → `:tot_llm_partial`
+  - `"react.llm.response"` → `:tot_llm_result`
+  - `"react.llm.delta"` → `:tot_llm_partial`
 
   ## State
 
@@ -130,10 +130,10 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
   def signal_routes(_ctx) do
     [
       {"tot.query", {:strategy_cmd, @start}},
-      {"reqllm.result", {:strategy_cmd, @llm_result}},
-      {"reqllm.partial", {:strategy_cmd, @llm_partial}},
+      {"react.llm.response", {:strategy_cmd, @llm_result}},
+      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
       # Usage report is emitted for observability but doesn't need processing
-      {"ai.usage_report", Jido.Actions.Control.Noop}
+      {"react.usage", Jido.Actions.Control.Noop}
     ]
   end
 

@@ -129,10 +129,10 @@ use Jido.Agent,
 ```elixir
 def signal_routes(_ctx) do
   [
-    {"react.user_query", {:strategy_cmd, :react_start}},
-    {"reqllm.result", {:strategy_cmd, :react_llm_result}},
-    {"ai.tool_result", {:strategy_cmd, :react_tool_result}},
-    {"reqllm.partial", {:strategy_cmd, :react_llm_partial}}
+    {"react.input", {:strategy_cmd, :react_start}},
+    {"react.llm.response", {:strategy_cmd, :react_llm_result}},
+    {"react.tool.result", {:strategy_cmd, :react_tool_result}},
+    {"react.llm.delta", {:strategy_cmd, :react_llm_partial}}
   ]
 end
 ```

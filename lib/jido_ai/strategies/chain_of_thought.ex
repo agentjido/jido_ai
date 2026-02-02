@@ -45,8 +45,8 @@ defmodule Jido.AI.Strategies.ChainOfThought do
   automatically route these signals to strategy commands:
 
   - `"cot.query"` → `:cot_start`
-  - `"reqllm.result"` → `:cot_llm_result`
-  - `"reqllm.partial"` → `:cot_llm_partial`
+  - `"react.llm.response"` → `:cot_llm_result`
+  - `"react.llm.delta"` → `:cot_llm_partial`
 
   ## State
 
@@ -127,10 +127,10 @@ defmodule Jido.AI.Strategies.ChainOfThought do
   def signal_routes(_ctx) do
     [
       {"cot.query", {:strategy_cmd, @start}},
-      {"reqllm.result", {:strategy_cmd, @llm_result}},
-      {"reqllm.partial", {:strategy_cmd, @llm_partial}},
+      {"react.llm.response", {:strategy_cmd, @llm_result}},
+      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
       # Usage report is emitted for observability but doesn't need processing
-      {"ai.usage_report", Jido.Actions.Control.Noop}
+      {"react.usage", Jido.Actions.Control.Noop}
     ]
   end
 

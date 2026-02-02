@@ -57,8 +57,8 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
   automatically route these signals to strategy commands:
 
   - `"got.query"` → `:got_start`
-  - `"reqllm.result"` → `:got_llm_result`
-  - `"reqllm.partial"` → `:got_llm_partial`
+  - `"react.llm.response"` → `:got_llm_result`
+  - `"react.llm.delta"` → `:got_llm_partial`
 
   ## State
 
@@ -122,10 +122,10 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
   def signal_routes(_ctx) do
     [
       {"got.query", {:strategy_cmd, @start}},
-      {"reqllm.result", {:strategy_cmd, @llm_result}},
-      {"reqllm.partial", {:strategy_cmd, @llm_partial}},
+      {"react.llm.response", {:strategy_cmd, @llm_result}},
+      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
       # Usage report is emitted for observability but doesn't need processing
-      {"ai.usage_report", Jido.Actions.Control.Noop}
+      {"react.usage", Jido.Actions.Control.Noop}
     ]
   end
 

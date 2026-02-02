@@ -310,7 +310,7 @@ defmodule Jido.AI.DirectiveTest do
 
       assert signal.data.call_id == "embed_123"
       assert signal.data.result == result
-      assert signal.type == "ai.embed_result"
+      assert signal.type == "react.embed.result"
     end
 
     test "creates embed result signal with error result" do

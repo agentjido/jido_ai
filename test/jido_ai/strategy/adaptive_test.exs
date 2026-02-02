@@ -55,8 +55,8 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       routes = Adaptive.signal_routes(ctx)
 
       assert {"adaptive.query", {:strategy_cmd, :adaptive_start}} in routes
-      assert {"reqllm.result", {:strategy_cmd, :adaptive_llm_result}} in routes
-      assert {"reqllm.partial", {:strategy_cmd, :adaptive_llm_partial}} in routes
+      assert {"react.llm.response", {:strategy_cmd, :adaptive_llm_result}} in routes
+      assert {"react.llm.delta", {:strategy_cmd, :adaptive_llm_partial}} in routes
     end
   end
 

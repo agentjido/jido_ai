@@ -2,6 +2,13 @@ defmodule Jido.AI.ReAct.MachineTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.ReAct.Machine
+  alias Jido.AI.Thread
+
+  # Helper to create a thread with a system prompt and optional messages
+  defp make_thread(system_prompt, messages \\ []) do
+    thread = Thread.new(system_prompt: system_prompt)
+    Thread.append_messages(thread, messages)
+  end
 
   # ============================================================================
   # Machine Creation
@@ -12,7 +19,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = Machine.new()
       assert machine.status == "idle"
       assert machine.iteration == 0
-      assert machine.conversation == []
+      assert machine.thread == nil
       assert machine.usage == %{}
       assert machine.started_at == nil
     end
@@ -69,16 +76,18 @@ defmodule Jido.AI.ReAct.MachineTest do
       assert Enum.at(conversation, 1).role == :user
     end
 
-    test "sets up conversation with system and user messages" do
+    test "sets up thread with system prompt and user message" do
       machine = Machine.new()
       env = %{system_prompt: "Be helpful", max_iterations: 10}
 
       {machine, _directives} = Machine.update(machine, {:start, "What is 2+2?", "call_123"}, env)
 
-      assert length(machine.conversation) == 2
-      [system_msg, user_msg] = machine.conversation
-      assert system_msg.content == "Be helpful"
-      assert user_msg.content == "What is 2+2?"
+      assert machine.thread != nil
+      assert machine.thread.system_prompt == "Be helpful"
+      assert Thread.length(machine.thread) == 1
+      [user_entry] = machine.thread.entries
+      assert user_entry.role == :user
+      assert user_entry.content == "What is 2+2?"
     end
   end
 
@@ -91,7 +100,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = %Machine{
         status: "awaiting_llm",
         current_llm_call_id: "call_123",
-        conversation: [],
+        thread: make_thread("Be helpful"),
         usage: %{},
         started_at: System.monotonic_time(:millisecond)
       }
@@ -115,7 +124,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = %Machine{
         status: "awaiting_llm",
         current_llm_call_id: "call_123",
-        conversation: [],
+        thread: make_thread("Be helpful"),
         usage: %{input_tokens: 50, output_tokens: 25},
         started_at: System.monotonic_time(:millisecond)
       }
@@ -140,7 +149,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = %Machine{
         status: "awaiting_llm",
         current_llm_call_id: "call_123",
-        conversation: [],
+        thread: make_thread("Be helpful"),
         usage: %{input_tokens: 50},
         started_at: System.monotonic_time(:millisecond)
       }
@@ -213,7 +222,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = %Machine{
         status: "awaiting_llm",
         current_llm_call_id: "call_123",
-        conversation: [],
+        thread: make_thread("Be helpful"),
         usage: %{},
         started_at: System.monotonic_time(:millisecond)
       }
@@ -239,7 +248,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = %Machine{
         status: "awaiting_llm",
         current_llm_call_id: "call_123",
-        conversation: [],
+        thread: make_thread("Be helpful"),
         usage: %{},
         started_at: System.monotonic_time(:millisecond)
       }
@@ -264,7 +273,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = %Machine{
         status: "awaiting_tool",
         iteration: 10,
-        conversation: [],
+        thread: make_thread("Be helpful"),
         pending_tool_calls: [%{id: "tc_1", name: "calc", arguments: %{}, result: nil}],
         usage: %{},
         started_at: System.monotonic_time(:millisecond)
@@ -352,13 +361,15 @@ defmodule Jido.AI.ReAct.MachineTest do
       )
 
       # Set up a machine that will transition to next iteration (after tool result)
+      thread =
+        make_thread("Be helpful", [
+          %{role: :user, content: "Test"}
+        ])
+
       machine = %Machine{
         status: "awaiting_tool",
         iteration: 1,
-        conversation: [
-          %{role: :system, content: "Be helpful"},
-          %{role: :user, content: "Test"}
-        ],
+        thread: thread,
         pending_tool_calls: [%{id: "tc_1", name: "calc", arguments: %{}, result: nil}],
         usage: %{},
         started_at: System.monotonic_time(:millisecond)
@@ -437,7 +448,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = %Machine{
         status: "awaiting_llm",
         current_llm_call_id: "call_123",
-        conversation: [],
+        thread: make_thread("Be helpful"),
         iteration: 1
       }
 
@@ -458,7 +469,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       machine = %Machine{
         status: "awaiting_tool",
         current_llm_call_id: "call_123",
-        conversation: [],
+        thread: make_thread("Be helpful"),
         iteration: 1,
         pending_tool_calls: [%{id: "tc_1", name: "calc", arguments: %{}, result: nil}]
       }
@@ -483,17 +494,19 @@ defmodule Jido.AI.ReAct.MachineTest do
       {result_machine, directives} = Machine.update(machine, {:start, "Hello", "call_123"}, env)
 
       assert result_machine.status == "awaiting_llm"
-      assert [{:call_llm_stream, "call_123", _conversation}] = directives
+      assert [{:call_llm_stream, "call_123", _messages}] = directives
     end
 
     test "allows start request from completed state (continuation)" do
-      machine = %Machine{
-        status: "completed",
-        conversation: [
-          %{role: :system, content: "Be helpful"},
+      thread =
+        make_thread("Be helpful", [
           %{role: :user, content: "Hello"},
           %{role: :assistant, content: "Hi there!"}
-        ],
+        ])
+
+      machine = %Machine{
+        status: "completed",
+        thread: thread,
         result: "Hi there!",
         termination_reason: :final_answer
       }
@@ -503,18 +516,20 @@ defmodule Jido.AI.ReAct.MachineTest do
       {result_machine, directives} = Machine.update(machine, {:start, "Follow up", "call_456"}, env)
 
       assert result_machine.status == "awaiting_llm"
-      assert [{:call_llm_stream, "call_456", conversation}] = directives
-      # Conversation should include original + new user message
-      assert length(conversation) == 4
+      assert [{:call_llm_stream, "call_456", messages}] = directives
+      # Messages should include system + original entries + new user message
+      assert length(messages) == 4
     end
 
     test "allows start request from error state (recovery)" do
+      thread =
+        make_thread("Be helpful", [
+          %{role: :user, content: "Hello"}
+        ])
+
       machine = %Machine{
         status: "error",
-        conversation: [
-          %{role: :system, content: "Be helpful"},
-          %{role: :user, content: "Hello"}
-        ],
+        thread: thread,
         result: "Error: something went wrong",
         termination_reason: :error
       }
@@ -524,7 +539,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       {result_machine, directives} = Machine.update(machine, {:start, "Try again", "call_789"}, env)
 
       assert result_machine.status == "awaiting_llm"
-      assert [{:call_llm_stream, "call_789", _conversation}] = directives
+      assert [{:call_llm_stream, "call_789", _messages}] = directives
     end
   end
 end

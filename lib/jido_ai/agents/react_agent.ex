@@ -255,7 +255,7 @@ defmodule Jido.AI.ReActAgent do
           pid,
           query,
           Keyword.merge(opts,
-            signal_type: "react.user_query",
+            signal_type: "react.input",
             source: "/react/agent"
           )
         )
@@ -309,7 +309,7 @@ defmodule Jido.AI.ReActAgent do
           pid,
           query,
           Keyword.merge(opts,
-            signal_type: "react.user_query",
+            signal_type: "react.input",
             source: "/react/agent"
           )
         )

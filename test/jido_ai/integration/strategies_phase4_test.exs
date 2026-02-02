@@ -235,8 +235,8 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       route_map = Map.new(routes)
       assert route_map["cot.query"] == {:strategy_cmd, :cot_start}
-      assert route_map["reqllm.result"] == {:strategy_cmd, :cot_llm_result}
-      assert route_map["reqllm.partial"] == {:strategy_cmd, :cot_llm_partial}
+      assert route_map["react.llm.response"] == {:strategy_cmd, :cot_llm_result}
+      assert route_map["react.llm.delta"] == {:strategy_cmd, :cot_llm_partial}
     end
 
     test "ToT signal_routes returns correct mappings" do
@@ -245,8 +245,8 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       route_map = Map.new(routes)
       assert route_map["tot.query"] == {:strategy_cmd, :tot_start}
-      assert route_map["reqllm.result"] == {:strategy_cmd, :tot_llm_result}
-      assert route_map["reqllm.partial"] == {:strategy_cmd, :tot_llm_partial}
+      assert route_map["react.llm.response"] == {:strategy_cmd, :tot_llm_result}
+      assert route_map["react.llm.delta"] == {:strategy_cmd, :tot_llm_partial}
     end
 
     test "GoT signal_routes returns correct mappings" do
@@ -255,8 +255,8 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       route_map = Map.new(routes)
       assert route_map["got.query"] == {:strategy_cmd, :got_start}
-      assert route_map["reqllm.result"] == {:strategy_cmd, :got_llm_result}
-      assert route_map["reqllm.partial"] == {:strategy_cmd, :got_llm_partial}
+      assert route_map["react.llm.response"] == {:strategy_cmd, :got_llm_result}
+      assert route_map["react.llm.delta"] == {:strategy_cmd, :got_llm_partial}
     end
 
     test "ReAct signal_routes includes tool result routing" do
@@ -264,10 +264,10 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       routes = ReAct.signal_routes(ctx)
 
       route_map = Map.new(routes)
-      assert route_map["react.user_query"] == {:strategy_cmd, :react_start}
-      assert route_map["reqllm.result"] == {:strategy_cmd, :react_llm_result}
-      assert route_map["ai.tool_result"] == {:strategy_cmd, :react_tool_result}
-      assert route_map["reqllm.partial"] == {:strategy_cmd, :react_llm_partial}
+      assert route_map["react.input"] == {:strategy_cmd, :react_start}
+      assert route_map["react.llm.response"] == {:strategy_cmd, :react_llm_result}
+      assert route_map["react.tool.result"] == {:strategy_cmd, :react_tool_result}
+      assert route_map["react.llm.delta"] == {:strategy_cmd, :react_llm_partial}
     end
 
     test "Adaptive signal_routes returns base routes before strategy selection" do
@@ -276,8 +276,8 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       route_map = Map.new(routes)
       assert route_map["adaptive.query"] == {:strategy_cmd, :adaptive_start}
-      assert route_map["reqllm.result"] == {:strategy_cmd, :adaptive_llm_result}
-      assert route_map["reqllm.partial"] == {:strategy_cmd, :adaptive_llm_partial}
+      assert route_map["react.llm.response"] == {:strategy_cmd, :adaptive_llm_result}
+      assert route_map["react.llm.delta"] == {:strategy_cmd, :adaptive_llm_partial}
     end
   end
 

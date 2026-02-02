@@ -169,10 +169,10 @@ defmodule Jido.AI.Strategies.Adaptive do
     # Once a strategy is selected, its routes will be merged
     [
       {"adaptive.query", {:strategy_cmd, @start}},
-      {"reqllm.result", {:strategy_cmd, @llm_result}},
-      {"reqllm.partial", {:strategy_cmd, @llm_partial}},
+      {"react.llm.response", {:strategy_cmd, @llm_result}},
+      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
       # Usage report is emitted for observability but doesn't need processing
-      {"ai.usage_report", Jido.Actions.Control.Noop}
+      {"react.usage", Jido.Actions.Control.Noop}
     ]
   end
 

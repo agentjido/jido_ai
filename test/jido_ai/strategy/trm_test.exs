@@ -65,8 +65,8 @@ defmodule Jido.AI.Strategies.TRMTest do
       routes = TRM.signal_routes(%{})
 
       assert {"trm.query", {:strategy_cmd, :trm_start}} in routes
-      assert {"reqllm.result", {:strategy_cmd, :trm_llm_result}} in routes
-      assert {"reqllm.partial", {:strategy_cmd, :trm_llm_partial}} in routes
+      assert {"react.llm.response", {:strategy_cmd, :trm_llm_result}} in routes
+      assert {"react.llm.delta", {:strategy_cmd, :trm_llm_partial}} in routes
     end
   end
 

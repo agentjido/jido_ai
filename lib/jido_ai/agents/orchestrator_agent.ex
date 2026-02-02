@@ -124,7 +124,7 @@ defmodule Jido.AI.OrchestratorAgent do
           |> Map.put(:specialists, @specialists)
 
         payload = %{query: query, tool_context: tool_context}
-        signal = Jido.Signal.new!("react.user_query", payload, source: "/orchestrator/agent")
+        signal = Jido.Signal.new!("react.input", payload, source: "/orchestrator/agent")
         Jido.AgentServer.cast(pid, signal)
       end
 

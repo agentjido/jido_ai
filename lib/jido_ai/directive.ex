@@ -35,8 +35,8 @@ defmodule Jido.AI.Directive do
     Directive asking the runtime to stream an LLM response via ReqLLM.
 
     Uses ReqLLM for streaming. The runtime will execute this asynchronously
-    and send partial tokens as `reqllm.partial` signals and the final result
-    as a `reqllm.result` signal.
+    and send partial tokens as `react.llm.delta` signals and the final result
+    as a `react.llm.response` signal.
 
     ## New Fields
 
@@ -99,7 +99,7 @@ defmodule Jido.AI.Directive do
     Directive to execute a Jido.Action as a tool.
 
     The runtime will execute this asynchronously and send the result back
-    as an `ai.tool_result` signal.
+    as a `react.tool.result` signal.
 
     ## Execution Modes
 
@@ -235,7 +235,7 @@ defmodule Jido.AI.Directive do
 
     Uses `ReqLLM.Generation.generate_text/3` for non-streaming text generation.
     The runtime will execute this asynchronously and send the result as a
-    `reqllm.result` signal.
+    `react.llm.response` signal.
 
     This is simpler than `ReqLLMStream` for cases where streaming is not needed.
     """
@@ -291,7 +291,7 @@ defmodule Jido.AI.Directive do
     Directive asking the runtime to generate embeddings via ReqLLM.
 
     Uses `ReqLLM.Embedding.embed/3` for embedding generation. The runtime will
-    execute this asynchronously and send the result as an `ai.embed_result` signal.
+    execute this asynchronously and send the result as a `react.embed.result` signal.
 
     Supports both single text and batch embedding (list of texts).
     """
@@ -333,8 +333,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
   Spawns an async task to stream an LLM response and sends results back to the agent.
 
   This implementation provides **true streaming**: as tokens arrive from the LLM,
-  they are immediately sent as `reqllm.partial` signals. When the stream completes,
-  a final `reqllm.result` signal is sent with the full classification (tool calls
+  they are immediately sent as `react.llm.delta` signals. When the stream completes,
+  a final `react.llm.response` signal is sent with the full classification (tool calls
   or final answer).
 
   Supports:
@@ -478,7 +478,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
     end
   end
 
-  # Emit ai.usage_report signal for per-call usage tracking
+  # Emit react.usage signal for per-call usage tracking
   defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
 
   defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
@@ -511,7 +511,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMEmbed do
   Spawns an async task to generate embeddings and sends the result back to the agent.
 
   Uses `ReqLLM.Embedding.embed/3` for embedding generation. The result is sent
-  as an `ai.embed_result` signal.
+  as a `react.embed.result` signal.
 
   Supports both single text and batch embedding (list of texts).
   """
@@ -577,7 +577,7 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   @moduledoc """
   Spawns an async task to execute a Jido.Action and sends the result back
-  to the agent as an `ai.tool_result` signal.
+  to the agent as a `react.tool.result` signal.
 
   Supports two execution modes:
   1. Direct module execution when `action_module` is provided (bypasses Registry)
@@ -777,7 +777,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
   the result back to the agent.
 
   Uses `ReqLLM.Generation.generate_text/3` for non-streaming text generation.
-  The result is sent as a `reqllm.result` signal.
+  The result is sent as a `react.llm.response` signal.
 
   Supports:
   - `model_alias` resolution via `Jido.AI.resolve_model/1`
@@ -876,7 +876,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
     end
   end
 
-  # Emit ai.usage_report signal for per-call usage tracking
+  # Emit react.usage signal for per-call usage tracking
   defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
 
   defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do

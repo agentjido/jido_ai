@@ -21,7 +21,7 @@ end
   [:jido, :agent_server, :signal, :start],
   fn _event, _measurements, metadata, _config ->
     case metadata do
-      %{signal_type: "reqllm.partial"} ->
+      %{signal_type: "react.llm.delta"} ->
         # Extract delta from signal data if available
         if delta = get_in(metadata, [:signal, :data, :delta]) do
           IO.write(delta)
