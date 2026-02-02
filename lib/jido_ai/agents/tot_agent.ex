@@ -30,18 +30,33 @@ defmodule Jido.AI.ToTAgent do
 
   ## Generated Functions
 
-  - `explore/2` - Convenience function to start a ToT exploration
-  - `on_before_cmd/2` - Captures last_prompt before processing
-  - `on_after_cmd/3` - Updates last_result and completed when done
+  - `explore/2,3` - Async: sends prompt, returns `{:ok, %Request{}}` for later awaiting
+  - `await/1,2` - Awaits a specific request's completion
+  - `explore_sync/2,3` - Sync convenience: sends prompt and waits for result
+  - `on_before_cmd/2` - Captures request in state before processing
+  - `on_after_cmd/3` - Updates request result when done
+
+  ## Request Tracking
+
+  Each `explore/2` call returns a `Request` struct that can be awaited:
+
+      {:ok, request} = MyAgent.explore(pid, "Solve the 8-puzzle")
+      {:ok, result} = MyAgent.await(request, timeout: 30_000)
+
+  Or use the synchronous convenience wrapper:
+
+      {:ok, result} = MyAgent.explore_sync(pid, "Solve the 8-puzzle")
 
   ## State Fields
 
   The agent state includes:
 
   - `:model` - The LLM model being used
-  - `:last_prompt` - The most recent prompt sent to the agent
-  - `:last_result` - The final result from the last completed exploration
-  - `:completed` - Boolean indicating if the last exploration is complete
+  - `:requests` - Map of request_id => request state (for concurrent tracking)
+  - `:last_request_id` - ID of the most recent request
+  - `:last_prompt` - The most recent prompt (backward compat)
+  - `:last_result` - The final result from the last completed exploration (backward compat)
+  - `:completed` - Boolean indicating if the last exploration is complete (backward compat)
 
   ## Task Supervisor
 
@@ -53,12 +68,13 @@ defmodule Jido.AI.ToTAgent do
   ## Example
 
       {:ok, pid} = Jido.AgentServer.start(agent: MyApp.PuzzleSolver)
-      :ok = MyApp.PuzzleSolver.explore(pid, "Solve the 8-puzzle: [2,8,3,1,6,4,7,_,5]")
 
-      # Wait for completion, then check result
-      agent = Jido.AgentServer.get(pid)
-      agent.state.completed   # => true
-      agent.state.last_result # => "Move tile 5 up..."
+      # Async pattern (preferred for concurrent requests)
+      {:ok, request} = MyApp.PuzzleSolver.explore(pid, "Solve the 8-puzzle: [2,8,3,1,6,4,7,_,5]")
+      {:ok, result} = MyApp.PuzzleSolver.await(request)
+
+      # Sync pattern (convenience for simple cases)
+      {:ok, result} = MyApp.PuzzleSolver.explore_sync(pid, "Solve the 8-puzzle: [2,8,3,1,6,4,7,_,5]")
 
   ## Traversal Strategies
 
@@ -99,11 +115,16 @@ defmodule Jido.AI.ToTAgent do
         if evaluation_prompt, do: Keyword.put(o, :evaluation_prompt, evaluation_prompt), else: o
       end)
 
+    # Includes request tracking fields for concurrent request isolation
     base_schema_ast =
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
           model: Zoi.string() |> Zoi.default(unquote(model)),
+          # Request tracking for concurrent request isolation
+          requests: Zoi.map() |> Zoi.default(%{}),
+          last_request_id: Zoi.string() |> Zoi.optional(),
+          # Backward compatibility fields (convenience pointers to most recent)
           last_prompt: Zoi.string() |> Zoi.default(""),
           last_result: Zoi.string() |> Zoi.default(""),
           completed: Zoi.boolean() |> Zoi.default(false)
@@ -118,27 +139,87 @@ defmodule Jido.AI.ToTAgent do
         strategy: {Jido.AI.Strategies.TreeOfThoughts, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
-      @doc """
-      Start a Tree-of-Thoughts exploration with the given prompt.
+      alias Jido.AI.RequestTracking
 
-      Returns `:ok` immediately; the result arrives asynchronously via the ToT loop.
-      Check `agent.state.completed` and `agent.state.last_result` for the result.
+      @doc """
+      Start a Tree-of-Thoughts exploration asynchronously.
+
+      Returns `{:ok, %Request{}}` immediately. Use `await/2` to wait for the result.
+
+      ## Examples
+
+          {:ok, request} = MyAgent.explore(pid, "Solve the 8-puzzle")
+          {:ok, result} = MyAgent.await(request)
+
       """
-      def explore(pid, prompt) when is_binary(prompt) do
-        signal = Jido.Signal.new!("tot.query", %{prompt: prompt}, source: "/tot/agent")
-        Jido.AgentServer.cast(pid, signal)
+      @spec explore(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, RequestTracking.Request.t()} | {:error, term()}
+      def explore(pid, prompt, opts \\ []) when is_binary(prompt) do
+        RequestTracking.create_and_send(
+          pid,
+          prompt,
+          Keyword.merge(opts,
+            signal_type: "tot.query",
+            source: "/tot/agent"
+          )
+        )
+      end
+
+      @doc """
+      Await the result of a specific request.
+
+      ## Options
+
+      - `:timeout` - How long to wait in milliseconds (default: 30_000)
+
+      ## Examples
+
+          {:ok, request} = MyAgent.explore(pid, "Solve the 8-puzzle")
+          {:ok, result} = MyAgent.await(request, timeout: 10_000)
+
+      """
+      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      def await(request, opts \\ []) do
+        RequestTracking.await(request, opts)
+      end
+
+      @doc """
+      Start exploration and wait for the result synchronously.
+
+      Convenience wrapper that combines `explore/3` and `await/2`.
+
+      ## Options
+
+      - `:timeout` - How long to wait in milliseconds (default: 30_000)
+
+      ## Examples
+
+          {:ok, result} = MyAgent.explore_sync(pid, "Solve the 8-puzzle", timeout: 10_000)
+
+      """
+      @spec explore_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, any()} | {:error, term()}
+      def explore_sync(pid, prompt, opts \\ []) when is_binary(prompt) do
+        RequestTracking.send_and_await(
+          pid,
+          prompt,
+          Keyword.merge(opts,
+            signal_type: "tot.query",
+            source: "/tot/agent"
+          )
+        )
       end
 
       @impl true
-      def on_before_cmd(agent, {:tot_start, %{prompt: prompt}} = action) do
-        agent = %{
-          agent
-          | state:
-              agent.state
-              |> Map.put(:last_prompt, prompt)
-              |> Map.put(:completed, false)
-              |> Map.put(:last_result, "")
-        }
+      def on_before_cmd(agent, {:tot_start, %{prompt: prompt} = params} = action) do
+        # Ensure we have a request_id for tracking
+        {request_id, params} = RequestTracking.ensure_request_id(params)
+        action = {:tot_start, params}
+
+        # Use RequestTracking to manage state (with prompt aliased as query)
+        agent = RequestTracking.start_request(agent, request_id, prompt)
+        # Also set last_prompt for ToT-specific backward compat
+        agent = put_in(agent.state[:last_prompt], prompt)
 
         {:ok, agent, action}
       end
@@ -147,7 +228,24 @@ defmodule Jido.AI.ToTAgent do
       def on_before_cmd(agent, action), do: {:ok, agent, action}
 
       @impl true
+      def on_after_cmd(agent, {:tot_start, %{request_id: request_id}}, directives) do
+        snap = strategy_snapshot(agent)
+
+        agent =
+          if snap.done? do
+            agent = RequestTracking.complete_request(agent, request_id, snap.result)
+            # Also set last_result for ToT-specific backward compat
+            put_in(agent.state[:last_result], snap.result || "")
+          else
+            agent
+          end
+
+        {:ok, agent, directives}
+      end
+
+      @impl true
       def on_after_cmd(agent, _action, directives) do
+        # Fallback for actions without request_id (backward compat)
         snap = strategy_snapshot(agent)
 
         agent =
@@ -167,7 +265,7 @@ defmodule Jido.AI.ToTAgent do
         {:ok, agent, directives}
       end
 
-      defoverridable on_before_cmd: 2, on_after_cmd: 3
+      defoverridable on_before_cmd: 2, on_after_cmd: 3, explore: 3, await: 2, explore_sync: 3
     end
   end
 end

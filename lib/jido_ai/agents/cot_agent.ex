@@ -24,19 +24,34 @@ defmodule Jido.AI.CoTAgent do
 
   ## Generated Functions
 
-  - `think/2` - Convenience function to start a CoT reasoning session
+  - `think/2,3` - Async: sends prompt, returns `{:ok, %Request{}}` for later awaiting
+  - `await/1,2` - Awaits a specific request's completion
+  - `think_sync/2,3` - Sync convenience: sends prompt and waits for result
   - `strategy_opts/0` - Returns the strategy options (for CLI access)
-  - `on_before_cmd/2` - Captures last_prompt before processing
-  - `on_after_cmd/3` - Updates last_result and completed when done
+  - `on_before_cmd/2` - Captures request in state before processing
+  - `on_after_cmd/3` - Updates request result when done
+
+  ## Request Tracking
+
+  Each `think/2` call returns a `Request` struct that can be awaited:
+
+      {:ok, request} = MyAgent.think(pid, "What is 15% of 340?")
+      {:ok, result} = MyAgent.await(request, timeout: 30_000)
+
+  Or use the synchronous convenience wrapper:
+
+      {:ok, result} = MyAgent.think_sync(pid, "What is 15% of 340?")
 
   ## State Fields
 
   The agent state includes:
 
   - `:model` - The LLM model being used
-  - `:last_prompt` - The most recent prompt sent to the agent
-  - `:last_result` - The final result from the last completed reasoning
-  - `:completed` - Boolean indicating if the last reasoning is complete
+  - `:requests` - Map of request_id => request state (for concurrent tracking)
+  - `:last_request_id` - ID of the most recent request
+  - `:last_prompt` - The most recent prompt (backward compat)
+  - `:last_result` - The final result from the last completed reasoning (backward compat)
+  - `:completed` - Boolean indicating if the last reasoning is complete (backward compat)
 
   ## Task Supervisor
 
@@ -48,12 +63,13 @@ defmodule Jido.AI.CoTAgent do
   ## Example
 
       {:ok, pid} = Jido.AgentServer.start(agent: MyApp.Reasoner)
-      :ok = MyApp.Reasoner.think(pid, "What is 15% of 340?")
 
-      # Wait for completion, then check result
-      agent = Jido.AgentServer.get(pid)
-      agent.state.completed   # => true
-      agent.state.last_result # => "Step 1: 15% means 15/100..."
+      # Async pattern (preferred for concurrent requests)
+      {:ok, request} = MyApp.Reasoner.think(pid, "What is 15% of 340?")
+      {:ok, result} = MyApp.Reasoner.await(request)
+
+      # Sync pattern (convenience for simple cases)
+      {:ok, result} = MyApp.Reasoner.think_sync(pid, "What is 15% of 340?")
   """
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -73,11 +89,16 @@ defmodule Jido.AI.CoTAgent do
         if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o
       end)
 
+    # Includes request tracking fields for concurrent request isolation
     base_schema_ast =
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
           model: Zoi.string() |> Zoi.default(unquote(model)),
+          # Request tracking for concurrent request isolation
+          requests: Zoi.map() |> Zoi.default(%{}),
+          last_request_id: Zoi.string() |> Zoi.optional(),
+          # Backward compatibility fields (convenience pointers to most recent)
           last_prompt: Zoi.string() |> Zoi.default(""),
           last_result: Zoi.string() |> Zoi.default(""),
           completed: Zoi.boolean() |> Zoi.default(false)
@@ -92,6 +113,8 @@ defmodule Jido.AI.CoTAgent do
         strategy: {Jido.AI.Strategies.ChainOfThought, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
+      alias Jido.AI.RequestTracking
+
       @doc """
       Returns the strategy options configured for this agent.
       """
@@ -100,26 +123,84 @@ defmodule Jido.AI.CoTAgent do
       end
 
       @doc """
-      Start a Chain-of-Thought reasoning session with the given prompt.
+      Start a Chain-of-Thought reasoning session asynchronously.
 
-      Returns `:ok` immediately; the result arrives asynchronously via the CoT loop.
-      Check `agent.state.completed` and `agent.state.last_result` for the result.
+      Returns `{:ok, %Request{}}` immediately. Use `await/2` to wait for the result.
+
+      ## Examples
+
+          {:ok, request} = MyAgent.think(pid, "What is 15% of 340?")
+          {:ok, result} = MyAgent.await(request)
+
       """
-      def think(pid, prompt) when is_binary(prompt) do
-        signal = Jido.Signal.new!("cot.query", %{prompt: prompt}, source: "/cot/agent")
-        Jido.AgentServer.cast(pid, signal)
+      @spec think(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, RequestTracking.Request.t()} | {:error, term()}
+      def think(pid, prompt, opts \\ []) when is_binary(prompt) do
+        RequestTracking.create_and_send(
+          pid,
+          prompt,
+          Keyword.merge(opts,
+            signal_type: "cot.query",
+            source: "/cot/agent"
+          )
+        )
+      end
+
+      @doc """
+      Await the result of a specific request.
+
+      ## Options
+
+      - `:timeout` - How long to wait in milliseconds (default: 30_000)
+
+      ## Examples
+
+          {:ok, request} = MyAgent.think(pid, "What is 15% of 340?")
+          {:ok, result} = MyAgent.await(request, timeout: 10_000)
+
+      """
+      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      def await(request, opts \\ []) do
+        RequestTracking.await(request, opts)
+      end
+
+      @doc """
+      Start reasoning and wait for the result synchronously.
+
+      Convenience wrapper that combines `think/3` and `await/2`.
+
+      ## Options
+
+      - `:timeout` - How long to wait in milliseconds (default: 30_000)
+
+      ## Examples
+
+          {:ok, result} = MyAgent.think_sync(pid, "What is 15% of 340?", timeout: 10_000)
+
+      """
+      @spec think_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, any()} | {:error, term()}
+      def think_sync(pid, prompt, opts \\ []) when is_binary(prompt) do
+        RequestTracking.send_and_await(
+          pid,
+          prompt,
+          Keyword.merge(opts,
+            signal_type: "cot.query",
+            source: "/cot/agent"
+          )
+        )
       end
 
       @impl true
-      def on_before_cmd(agent, {:cot_start, %{prompt: prompt}} = action) do
-        agent = %{
-          agent
-          | state:
-              agent.state
-              |> Map.put(:last_prompt, prompt)
-              |> Map.put(:completed, false)
-              |> Map.put(:last_result, "")
-        }
+      def on_before_cmd(agent, {:cot_start, %{prompt: prompt} = params} = action) do
+        # Ensure we have a request_id for tracking
+        {request_id, params} = RequestTracking.ensure_request_id(params)
+        action = {:cot_start, params}
+
+        # Use RequestTracking to manage state (with prompt aliased as query)
+        agent = RequestTracking.start_request(agent, request_id, prompt)
+        # Also set last_prompt for CoT-specific backward compat
+        agent = put_in(agent.state[:last_prompt], prompt)
 
         {:ok, agent, action}
       end
@@ -128,7 +209,24 @@ defmodule Jido.AI.CoTAgent do
       def on_before_cmd(agent, action), do: {:ok, agent, action}
 
       @impl true
+      def on_after_cmd(agent, {:cot_start, %{request_id: request_id}}, directives) do
+        snap = strategy_snapshot(agent)
+
+        agent =
+          if snap.done? do
+            agent = RequestTracking.complete_request(agent, request_id, snap.result)
+            # Also set last_result for CoT-specific backward compat
+            put_in(agent.state[:last_result], snap.result || "")
+          else
+            agent
+          end
+
+        {:ok, agent, directives}
+      end
+
+      @impl true
       def on_after_cmd(agent, _action, directives) do
+        # Fallback for actions without request_id (backward compat)
         snap = strategy_snapshot(agent)
 
         agent =
@@ -148,7 +246,7 @@ defmodule Jido.AI.CoTAgent do
         {:ok, agent, directives}
       end
 
-      defoverridable on_before_cmd: 2, on_after_cmd: 3
+      defoverridable on_before_cmd: 2, on_after_cmd: 3, think: 3, await: 2, think_sync: 3
     end
   end
 end

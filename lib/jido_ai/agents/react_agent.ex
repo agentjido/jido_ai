@@ -28,18 +28,36 @@ defmodule Jido.AI.ReActAgent do
 
   ## Generated Functions
 
-  - `ask/2` or `ask/3` - Convenience function to send a query to the agent (with optional per-request tool_context)
-  - `on_before_cmd/2` - Captures last_query before processing
-  - `on_after_cmd/3` - Updates last_answer and completed when done
+  - `ask/2,3` - Async: sends query, returns `{:ok, %Request{}}` for later awaiting
+  - `await/1,2` - Awaits a specific request's completion
+  - `ask_sync/2,3` - Sync convenience: sends query and waits for result
+  - `on_before_cmd/2` - Captures request in state before processing
+  - `on_after_cmd/3` - Updates request result when done
+
+  ## Request Tracking
+
+  Each `ask/2` call returns a `Request` struct that can be awaited:
+
+      {:ok, request} = MyAgent.ask(pid, "What is 2+2?")
+      {:ok, result} = MyAgent.await(request, timeout: 30_000)
+
+  Or use the synchronous convenience wrapper:
+
+      {:ok, result} = MyAgent.ask_sync(pid, "What is 2+2?", timeout: 30_000)
+
+  This pattern follows Elixir's `Task.async/await` idiom and enables safe
+  concurrent request handling.
 
   ## State Fields
 
   The agent state includes:
 
   - `:model` - The LLM model being used
-  - `:last_query` - The most recent query sent to the agent
-  - `:last_answer` - The final answer from the last completed query
-  - `:completed` - Boolean indicating if the last query is complete
+  - `:requests` - Map of request_id => request state (for concurrent tracking)
+  - `:last_request_id` - ID of the most recent request
+  - `:last_query` - The most recent query (backward compat)
+  - `:last_answer` - The final answer from the last completed query (backward compat)
+  - `:completed` - Boolean indicating if the last query is complete (backward compat)
 
   ## Task Supervisor
 
@@ -56,19 +74,19 @@ defmodule Jido.AI.ReActAgent do
   ## Example
 
       {:ok, pid} = Jido.AgentServer.start(agent: MyApp.WeatherAgent)
-      :ok = MyApp.WeatherAgent.ask(pid, "What's the weather in Tokyo?")
 
-      # Wait for completion, then check result
-      agent = Jido.AgentServer.get(pid)
-      agent.state.completed   # => true
-      agent.state.last_answer # => "The weather in Tokyo is..."
+      # Async pattern (preferred for concurrent requests)
+      {:ok, request} = MyApp.WeatherAgent.ask(pid, "What's the weather in Tokyo?")
+      {:ok, answer} = MyApp.WeatherAgent.await(request)
+
+      # Sync pattern (convenience for simple cases)
+      {:ok, answer} = MyApp.WeatherAgent.ask_sync(pid, "What's the weather in Tokyo?")
 
   ## Per-Request Tool Context
 
   You can pass per-request context that will be merged with the agent's base tool_context:
 
-      # Pass actor/tenant for this specific request
-      :ok = MyApp.WeatherAgent.ask(pid, "Get my preferences",
+      {:ok, request} = MyApp.WeatherAgent.ask(pid, "Get my preferences",
         tool_context: %{actor: current_user, tenant_id: "acme"})
   """
 
@@ -170,11 +188,16 @@ defmodule Jido.AI.ReActAgent do
       |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
 
     # Build base_schema AST at macro expansion time
+    # Includes request tracking fields for concurrent request isolation
     base_schema_ast =
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
           model: Zoi.string() |> Zoi.default(unquote(model)),
+          # Request tracking for concurrent request isolation
+          requests: Zoi.map() |> Zoi.default(%{}),
+          last_request_id: Zoi.string() |> Zoi.optional(),
+          # Backward compatibility fields (convenience pointers to most recent)
           last_query: Zoi.string() |> Zoi.default(""),
           last_answer: Zoi.string() |> Zoi.default(""),
           completed: Zoi.boolean() |> Zoi.default(false)
@@ -191,40 +214,99 @@ defmodule Jido.AI.ReActAgent do
 
       import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
 
-      @doc """
-      Send a query to the agent.
+      alias Jido.AI.RequestTracking
 
-      Returns `:ok` immediately; the result arrives asynchronously via the ReAct loop.
-      Check `agent.state.completed` and `agent.state.last_answer` for the result.
+      @doc """
+      Send a query to the agent asynchronously.
+
+      Returns `{:ok, %Request{}}` immediately. Use `await/2` to wait for the result.
 
       ## Options
 
-      - `:tool_context` - Additional context map merged with agent's tool_context for this request
+      - `:tool_context` - Additional context map merged with agent's tool_context
+      - `:timeout` - Timeout for the underlying cast (default: no timeout)
+
+      ## Examples
+
+          {:ok, request} = MyAgent.ask(pid, "What is 2+2?")
+          {:ok, result} = MyAgent.await(request)
+
       """
+      @spec ask(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, RequestTracking.Request.t()} | {:error, term()}
       def ask(pid, query, opts \\ []) when is_binary(query) do
-        tool_context = Keyword.get(opts, :tool_context, %{})
+        RequestTracking.create_and_send(
+          pid,
+          query,
+          Keyword.merge(opts,
+            signal_type: "react.user_query",
+            source: "/react/agent"
+          )
+        )
+      end
 
-        payload =
-          if map_size(tool_context) > 0 do
-            %{query: query, tool_context: tool_context}
-          else
-            %{query: query}
-          end
+      @doc """
+      Await the result of a specific request.
 
-        signal = Jido.Signal.new!("react.user_query", payload, source: "/react/agent")
-        Jido.AgentServer.cast(pid, signal)
+      Blocks until the request completes, fails, or times out.
+
+      ## Options
+
+      - `:timeout` - How long to wait in milliseconds (default: 30_000)
+
+      ## Returns
+
+      - `{:ok, result}` - Request completed successfully
+      - `{:error, :timeout}` - Request didn't complete in time
+      - `{:error, reason}` - Request failed
+
+      ## Examples
+
+          {:ok, request} = MyAgent.ask(pid, "What is 2+2?")
+          {:ok, "4"} = MyAgent.await(request, timeout: 10_000)
+
+      """
+      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      def await(request, opts \\ []) do
+        RequestTracking.await(request, opts)
+      end
+
+      @doc """
+      Send a query and wait for the result synchronously.
+
+      Convenience wrapper that combines `ask/3` and `await/2`.
+
+      ## Options
+
+      - `:tool_context` - Additional context map merged with agent's tool_context
+      - `:timeout` - How long to wait in milliseconds (default: 30_000)
+
+      ## Examples
+
+          {:ok, result} = MyAgent.ask_sync(pid, "What is 2+2?", timeout: 10_000)
+
+      """
+      @spec ask_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, any()} | {:error, term()}
+      def ask_sync(pid, query, opts \\ []) when is_binary(query) do
+        RequestTracking.send_and_await(
+          pid,
+          query,
+          Keyword.merge(opts,
+            signal_type: "react.user_query",
+            source: "/react/agent"
+          )
+        )
       end
 
       @impl true
-      def on_before_cmd(agent, {:react_start, %{query: query}} = action) do
-        agent = %{
-          agent
-          | state:
-              agent.state
-              |> Map.put(:last_query, query)
-              |> Map.put(:completed, false)
-              |> Map.put(:last_answer, "")
-        }
+      def on_before_cmd(agent, {:react_start, %{query: query} = params} = action) do
+        # Ensure we have a request_id for tracking
+        {request_id, params} = RequestTracking.ensure_request_id(params)
+        action = {:react_start, params}
+
+        # Use RequestTracking to manage state
+        agent = RequestTracking.start_request(agent, request_id, query)
 
         {:ok, agent, action}
       end
@@ -233,7 +315,22 @@ defmodule Jido.AI.ReActAgent do
       def on_before_cmd(agent, action), do: {:ok, agent, action}
 
       @impl true
+      def on_after_cmd(agent, {:react_start, %{request_id: request_id}}, directives) do
+        snap = strategy_snapshot(agent)
+
+        agent =
+          if snap.done? do
+            RequestTracking.complete_request(agent, request_id, snap.result)
+          else
+            agent
+          end
+
+        {:ok, agent, directives}
+      end
+
+      @impl true
       def on_after_cmd(agent, _action, directives) do
+        # Fallback for actions without request_id (backward compat)
         snap = strategy_snapshot(agent)
 
         agent =
@@ -253,7 +350,7 @@ defmodule Jido.AI.ReActAgent do
         {:ok, agent, directives}
       end
 
-      defoverridable on_before_cmd: 2, on_after_cmd: 3
+      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3
     end
   end
 

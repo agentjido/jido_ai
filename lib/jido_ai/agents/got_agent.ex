@@ -31,19 +31,34 @@ defmodule Jido.AI.GoTAgent do
 
   ## Generated Functions
 
-  - `explore/2` - Convenience function to start a GoT exploration
+  - `explore/2,3` - Async: sends prompt, returns `{:ok, %Request{}}` for later awaiting
+  - `await/1,2` - Awaits a specific request's completion
+  - `explore_sync/2,3` - Sync convenience: sends prompt and waits for result
   - `strategy_opts/0` - Returns the strategy options for CLI access
-  - `on_before_cmd/2` - Captures last_prompt before processing
-  - `on_after_cmd/3` - Updates last_result and completed when done
+  - `on_before_cmd/2` - Captures request in state before processing
+  - `on_after_cmd/3` - Updates request result when done
+
+  ## Request Tracking
+
+  Each `explore/2` call returns a `Request` struct that can be awaited:
+
+      {:ok, request} = MyAgent.explore(pid, "Analyze the impact of AI on healthcare")
+      {:ok, result} = MyAgent.await(request, timeout: 30_000)
+
+  Or use the synchronous convenience wrapper:
+
+      {:ok, result} = MyAgent.explore_sync(pid, "Analyze the impact of AI on healthcare")
 
   ## State Fields
 
   The agent state includes:
 
   - `:model` - The LLM model being used
-  - `:last_prompt` - The most recent prompt sent to the agent
-  - `:last_result` - The final result from the last completed exploration
-  - `:completed` - Boolean indicating if the last exploration is complete
+  - `:requests` - Map of request_id => request state (for concurrent tracking)
+  - `:last_request_id` - ID of the most recent request
+  - `:last_prompt` - The most recent prompt (backward compat)
+  - `:last_result` - The final result from the last completed exploration (backward compat)
+  - `:completed` - Boolean indicating if the last exploration is complete (backward compat)
 
   ## Task Supervisor
 
@@ -55,12 +70,13 @@ defmodule Jido.AI.GoTAgent do
   ## Example
 
       {:ok, pid} = Jido.AgentServer.start(agent: MyApp.ResearchSynthesizer)
-      :ok = MyApp.ResearchSynthesizer.explore(pid, "Analyze the impact of AI on healthcare")
 
-      # Wait for completion, then check result
-      agent = Jido.AgentServer.get(pid)
-      agent.state.completed   # => true
-      agent.state.last_result # => "Based on multiple perspectives..."
+      # Async pattern (preferred for concurrent requests)
+      {:ok, request} = MyApp.ResearchSynthesizer.explore(pid, "Analyze the impact of AI on healthcare")
+      {:ok, result} = MyApp.ResearchSynthesizer.await(request)
+
+      # Sync pattern (convenience for simple cases)
+      {:ok, result} = MyApp.ResearchSynthesizer.explore_sync(pid, "Analyze the impact of AI on healthcare")
 
   ## Aggregation Strategies
 
@@ -110,6 +126,8 @@ defmodule Jido.AI.GoTAgent do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
           model: Zoi.string() |> Zoi.default(unquote(model)),
+          requests: Zoi.map() |> Zoi.default(%{}),
+          last_request_id: Zoi.string() |> Zoi.optional(),
           last_prompt: Zoi.string() |> Zoi.default(""),
           last_result: Zoi.string() |> Zoi.default(""),
           completed: Zoi.boolean() |> Zoi.default(false)
@@ -124,6 +142,8 @@ defmodule Jido.AI.GoTAgent do
         strategy: {Jido.AI.Strategies.GraphOfThoughts, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
+      alias Jido.AI.RequestTracking
+
       @doc """
       Returns the strategy options configured for this agent.
       Used by the CLI adapter to inspect configuration.
@@ -131,32 +151,102 @@ defmodule Jido.AI.GoTAgent do
       def strategy_opts, do: unquote(Macro.escape(strategy_opts))
 
       @doc """
-      Start a Graph-of-Thoughts exploration with the given prompt.
+      Start a Graph-of-Thoughts exploration asynchronously.
 
-      Returns `:ok` immediately; the result arrives asynchronously via the GoT loop.
-      Check `agent.state.completed` and `agent.state.last_result` for the result.
+      Returns `{:ok, %Request{}}` immediately. Use `await/2` to wait for the result.
+
+      ## Examples
+
+          {:ok, request} = MyAgent.explore(pid, "Analyze the impact of AI on healthcare")
+          {:ok, result} = MyAgent.await(request)
+
       """
-      def explore(pid, prompt) when is_binary(prompt) do
-        signal = Jido.Signal.new!("got.query", %{prompt: prompt}, source: "/got/agent")
-        Jido.AgentServer.cast(pid, signal)
+      @spec explore(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, RequestTracking.Request.t()} | {:error, term()}
+      def explore(pid, prompt, opts \\ []) when is_binary(prompt) do
+        RequestTracking.create_and_send(
+          pid,
+          prompt,
+          Keyword.merge(opts,
+            signal_type: "got.query",
+            source: "/got/agent"
+          )
+        )
+      end
+
+      @doc """
+      Await the result of a specific request.
+
+      ## Options
+
+      - `:timeout` - How long to wait in milliseconds (default: 30_000)
+
+      ## Examples
+
+          {:ok, request} = MyAgent.explore(pid, "Analyze the impact of AI on healthcare")
+          {:ok, result} = MyAgent.await(request, timeout: 10_000)
+
+      """
+      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      def await(request, opts \\ []) do
+        RequestTracking.await(request, opts)
+      end
+
+      @doc """
+      Start exploration and wait for the result synchronously.
+
+      Convenience wrapper that combines `explore/3` and `await/2`.
+
+      ## Options
+
+      - `:timeout` - How long to wait in milliseconds (default: 30_000)
+
+      ## Examples
+
+          {:ok, result} = MyAgent.explore_sync(pid, "Analyze the impact of AI on healthcare", timeout: 10_000)
+
+      """
+      @spec explore_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, any()} | {:error, term()}
+      def explore_sync(pid, prompt, opts \\ []) when is_binary(prompt) do
+        RequestTracking.send_and_await(
+          pid,
+          prompt,
+          Keyword.merge(opts,
+            signal_type: "got.query",
+            source: "/got/agent"
+          )
+        )
       end
 
       @impl true
-      def on_before_cmd(agent, {:got_start, %{prompt: prompt}} = action) do
-        agent = %{
-          agent
-          | state:
-              agent.state
-              |> Map.put(:last_prompt, prompt)
-              |> Map.put(:completed, false)
-              |> Map.put(:last_result, "")
-        }
+      def on_before_cmd(agent, {:got_start, %{prompt: prompt} = params} = action) do
+        {request_id, params} = RequestTracking.ensure_request_id(params)
+        action = {:got_start, params}
+
+        agent = RequestTracking.start_request(agent, request_id, prompt)
+        agent = put_in(agent.state[:last_prompt], prompt)
 
         {:ok, agent, action}
       end
 
       @impl true
       def on_before_cmd(agent, action), do: {:ok, agent, action}
+
+      @impl true
+      def on_after_cmd(agent, {:got_start, %{request_id: request_id}}, directives) do
+        snap = strategy_snapshot(agent)
+
+        agent =
+          if snap.done? do
+            agent = RequestTracking.complete_request(agent, request_id, snap.result)
+            put_in(agent.state[:last_result], snap.result || "")
+          else
+            agent
+          end
+
+        {:ok, agent, directives}
+      end
 
       @impl true
       def on_after_cmd(agent, _action, directives) do
@@ -179,7 +269,7 @@ defmodule Jido.AI.GoTAgent do
         {:ok, agent, directives}
       end
 
-      defoverridable on_before_cmd: 2, on_after_cmd: 3
+      defoverridable on_before_cmd: 2, on_after_cmd: 3, explore: 3, await: 2, explore_sync: 3
     end
   end
 end
