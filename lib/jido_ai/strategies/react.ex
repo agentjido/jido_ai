@@ -203,7 +203,10 @@ defmodule Jido.AI.Strategies.ReAct do
       {"react.user_query", {:strategy_cmd, @start}},
       {"reqllm.result", {:strategy_cmd, @llm_result}},
       {"ai.tool_result", {:strategy_cmd, @tool_result}},
-      {"reqllm.partial", {:strategy_cmd, @llm_partial}}
+      {"reqllm.partial", {:strategy_cmd, @llm_partial}},
+      {"react.register_tool", {:strategy_cmd, @register_tool}},
+      {"react.unregister_tool", {:strategy_cmd, @unregister_tool}},
+      {"react.set_tool_context", {:strategy_cmd, @set_tool_context}}
     ]
   end
 
