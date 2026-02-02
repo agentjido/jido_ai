@@ -206,7 +206,9 @@ defmodule Jido.AI.Strategies.ReAct do
       {"reqllm.partial", {:strategy_cmd, @llm_partial}},
       {"react.register_tool", {:strategy_cmd, @register_tool}},
       {"react.unregister_tool", {:strategy_cmd, @unregister_tool}},
-      {"react.set_tool_context", {:strategy_cmd, @set_tool_context}}
+      {"react.set_tool_context", {:strategy_cmd, @set_tool_context}},
+      # Usage report is emitted for observability but doesn't need processing
+      {"ai.usage_report", Jido.Actions.Control.Noop}
     ]
   end
 

@@ -50,11 +50,10 @@ defmodule Jido.AI.Skills.TaskSupervisorSkill do
   def mount(_agent, _config) do
     case start_supervisor() do
       {:ok, supervisor_pid} ->
-        Logger.debug("Task.Supervisor created: #{inspect(supervisor_pid)}")
         {:ok, %{supervisor: supervisor_pid}}
 
       {:error, reason} ->
-        Logger.error("Failed to start Task.Supervisor: #{inspect(reason)}")
+        Logger.error("Failed to start Task.Supervisor", reason: reason)
         {:error, {:task_supervisor_failed, reason}}
     end
   end

@@ -366,7 +366,28 @@ defmodule Jido.AI.ReActAgent do
         {:ok, agent, directives}
       end
 
-      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3
+      @doc """
+      Cancel an in-flight request.
+
+      Sends a cancellation signal to the agent. Note that this is advisory -
+      the underlying LLM request may still complete.
+
+      ## Options
+
+      - `:reason` - Reason for cancellation (default: :user_cancelled)
+
+      ## Examples
+
+          {:ok, request} = MyAgent.ask(pid, "What is 2+2?")
+          :ok = MyAgent.cancel(pid)
+
+      """
+      @spec cancel(pid() | atom() | {:via, module(), term()}, keyword()) :: :ok | {:error, term()}
+      def cancel(pid, opts \\ []) do
+        Jido.cancel(pid, opts)
+      end
+
+      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3, cancel: 2
     end
   end
 

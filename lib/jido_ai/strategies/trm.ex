@@ -133,7 +133,9 @@ defmodule Jido.AI.Strategies.TRM do
     [
       {"trm.query", {:strategy_cmd, @start}},
       {"reqllm.result", {:strategy_cmd, @llm_result}},
-      {"reqllm.partial", {:strategy_cmd, @llm_partial}}
+      {"reqllm.partial", {:strategy_cmd, @llm_partial}},
+      # Usage report is emitted for observability but doesn't need processing
+      {"ai.usage_report", Jido.Actions.Control.Noop}
     ]
   end
 

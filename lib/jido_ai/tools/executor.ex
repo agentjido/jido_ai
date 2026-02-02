@@ -476,10 +476,9 @@ defmodule Jido.AI.Tools.Executor do
 
   defp format_exception(tool_name, exception, stacktrace) do
     # Log stacktrace server-side for debugging - do NOT include in response
-    Logger.error(
-      "Tool execution exception",
+    Logger.error("Tool execution exception",
       tool_name: tool_name,
-      exception: Exception.message(exception),
+      exception_message: Exception.message(exception),
       exception_type: exception.__struct__,
       stacktrace: format_stacktrace_for_logging(stacktrace)
     )
