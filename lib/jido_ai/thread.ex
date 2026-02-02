@@ -188,6 +188,132 @@ defmodule Jido.AI.Thread do
     end
   end
 
+  @doc """
+  Returns a debug-friendly view of the thread contents.
+
+  ## Options
+
+  - `:last` - Number of entries to include (default: all)
+  - `:truncate` - Max content length before truncation (default: 200)
+
+  ## Example
+
+      Thread.debug_view(thread, last: 5, truncate: 100)
+      # %{
+      #   id: "abc123",
+      #   length: 12,
+      #   system_prompt: "You are a weather...",
+      #   entries: [...]
+      # }
+  """
+  @spec debug_view(t(), keyword()) :: map()
+  def debug_view(%__MODULE__{} = thread, opts \\ []) do
+    last = Keyword.get(opts, :last)
+    truncate = Keyword.get(opts, :truncate, 200)
+
+    entries =
+      case last do
+        nil -> thread.entries
+        n when is_integer(n) and n > 0 -> Enum.take(thread.entries, -n)
+        _ -> thread.entries
+      end
+
+    %{
+      id: thread.id,
+      length: Kernel.length(thread.entries),
+      system_prompt: truncate_string(thread.system_prompt, truncate),
+      entries: Enum.map(entries, &entry_to_debug_map(&1, truncate))
+    }
+  end
+
+  @doc """
+  Pretty-prints the thread to the console for IEx debugging.
+
+  Prints each message with its role and content in a readable format.
+
+  ## Example
+
+      Thread.pp(thread)
+      # [system] You are a weather assistant...
+      # [user]   What's the weather in Seattle?
+      # [asst]   <tool: get_weather>
+      # [tool]   {"temp": 62, "conditions": "cloudy"}
+      # [asst]   The weather is 62°F and cloudy.
+  """
+  @spec pp(t()) :: :ok
+  def pp(%__MODULE__{} = thread) do
+    if thread.system_prompt do
+      IO.puts("[system] #{truncate_string(thread.system_prompt, 60)}")
+    end
+
+    Enum.each(thread.entries, fn entry ->
+      IO.puts(format_entry_for_pp(entry))
+    end)
+
+    :ok
+  end
+
+  defp entry_to_debug_map(entry, truncate) do
+    base = %{role: entry.role}
+
+    base
+    |> maybe_add(:content, truncate_string(entry.content, truncate))
+    |> maybe_add(:tool_calls, format_tool_calls_for_debug(entry.tool_calls))
+    |> maybe_add(:name, entry.name)
+    |> maybe_add(:tool_call_id, entry.tool_call_id)
+  end
+
+  defp maybe_add(map, _key, nil), do: map
+  defp maybe_add(map, key, value), do: Map.put(map, key, value)
+
+  defp format_tool_calls_for_debug(nil), do: nil
+  defp format_tool_calls_for_debug([]), do: nil
+  defp format_tool_calls_for_debug(tool_calls) do
+    Enum.map(tool_calls, fn tc ->
+      case tc do
+        %{name: name} -> name
+        %{"name" => name} -> name
+        _ -> "unknown"
+      end
+    end)
+  end
+
+  defp truncate_string(nil, _max), do: nil
+  defp truncate_string(str, max) when byte_size(str) <= max, do: str
+  defp truncate_string(str, max), do: String.slice(str, 0, max) <> "..."
+
+  defp format_entry_for_pp(%Entry{role: :user, content: content}) do
+    "[user]   #{content}"
+  end
+
+  defp format_entry_for_pp(%Entry{role: :assistant, content: content, tool_calls: nil}) do
+    "[asst]   #{content}"
+  end
+
+  defp format_entry_for_pp(%Entry{role: :assistant, tool_calls: tool_calls}) when is_list(tool_calls) do
+    names = Enum.map(tool_calls, fn tc ->
+      case tc do
+        %{name: name} -> name
+        %{"name" => name} -> name
+        _ -> "?"
+      end
+    end) |> Enum.join(", ")
+    "[asst]   <tool: #{names}>"
+  end
+
+  defp format_entry_for_pp(%Entry{role: :tool, name: name, content: content}) do
+    truncated = truncate_string(content, 60)
+    "[tool]   #{name}: #{truncated}"
+  end
+
+  defp format_entry_for_pp(%Entry{role: :system, content: content}) do
+    "[system] #{content}"
+  end
+
+  defp format_entry_for_pp(%Entry{role: role, content: content}) do
+    "[#{role}] #{content}"
+  end
+
   # Private helpers
 
   defp entry_to_message(%Entry{role: :user, content: content}) do
@@ -231,5 +357,15 @@ defmodule Jido.AI.Thread do
 
   defp generate_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+  end
+end
+
+defimpl Inspect, for: Jido.AI.Thread do
+  def inspect(thread, _opts) do
+    len = Kernel.length(thread.entries)
+    last_roles = thread.entries |> Enum.take(-2) |> Enum.map(& &1.role)
+    
+    suffix = if len > 0, do: ", last: #{Kernel.inspect(last_roles)}", else: ""
+    "#Thread<#{len} entries#{suffix}>"
   end
 end

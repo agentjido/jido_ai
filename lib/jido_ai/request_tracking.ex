@@ -80,31 +80,35 @@ defmodule Jido.AI.RequestTracking do
     await a specific request's completion.
     """
 
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                id: Zoi.string(description: "Unique request identifier (UUID)"),
+                server: Zoi.any(description: "The agent server (pid, atom, or via tuple)"),
+                query: Zoi.string(description: "The original query/prompt"),
+                status:
+                  Zoi.enum([:pending, :completed, :failed, :timeout],
+                    description: "Current request status"
+                  )
+                  |> Zoi.default(:pending),
+                result: Zoi.any(description: "The result when completed") |> Zoi.nullish(),
+                error: Zoi.any(description: "Error details if failed") |> Zoi.nullish(),
+                inserted_at:
+                  Zoi.integer(description: "When the request was created (ms)")
+                  |> Zoi.nullish(),
+                completed_at:
+                  Zoi.integer(description: "When the request completed (ms)")
+                  |> Zoi.nullish()
+              },
+              coerce: true
+            )
+
     @type server :: pid() | atom() | {:via, module(), term()}
     @type status :: :pending | :completed | :failed | :timeout
+    @type t :: unquote(Zoi.type_spec(@schema))
 
-    @type t :: %__MODULE__{
-            id: String.t(),
-            server: server(),
-            query: String.t(),
-            status: status(),
-            result: any(),
-            error: any(),
-            inserted_at: integer(),
-            completed_at: integer() | nil
-          }
-
-    @enforce_keys [:id, :server, :query]
-    defstruct [
-      :id,
-      :server,
-      :query,
-      :result,
-      :error,
-      :completed_at,
-      status: :pending,
-      inserted_at: nil
-    ]
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
 
     @doc """
     Creates a new Request struct.

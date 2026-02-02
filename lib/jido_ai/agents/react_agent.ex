@@ -346,12 +346,14 @@ defmodule Jido.AI.ReActAgent do
 
       @impl true
       def on_after_cmd(agent, _action, directives) do
-        # Fallback for actions without request_id (backward compat)
+        # Fallback for actions without request_id (e.g., react_llm_result, react_tool_result)
+        # When strategy completes, we need to mark the current request as complete
         snap = strategy_snapshot(agent)
 
         agent =
           if snap.done? do
-            %{
+            # Update backward-compat fields
+            agent = %{
               agent
               | state:
                   Map.merge(agent.state, %{
@@ -359,6 +361,12 @@ defmodule Jido.AI.ReActAgent do
                     completed: true
                   })
             }
+
+            # Also complete the tracked request if we have one
+            case agent.state[:last_request_id] do
+              nil -> agent
+              request_id -> RequestTracking.complete_request(agent, request_id, snap.result)
+            end
           else
             agent
           end
