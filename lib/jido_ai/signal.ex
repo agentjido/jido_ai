@@ -3,21 +3,21 @@ defmodule Jido.AI.Signal do
   Custom signal types for LLM-based agents.
 
   These signals are reusable across different LLM strategies (ReAct, Chain of Thought, etc.).
-  They follow a consistent naming convention: `reqllm.<event_type>` for ReqLLM-specific signals
-  and `ai.<event_type>` for generic AI signals.
+  All signals follow a consistent `react.*` namespace convention to indicate ownership by the
+  ReAct machine lifecycle.
 
   ## Signal Types
 
-  - `Jido.AI.Signal.ReqLLMResult` - Result from a ReqLLM streaming/generation call
-  - `Jido.AI.Signal.ReqLLMPartial` - Streaming token chunk from ReqLLM
-  - `Jido.AI.Signal.ReqLLMError` - Structured error from ReqLLM call
-  - `Jido.AI.Signal.UsageReport` - Token usage and cost tracking
-  - `Jido.AI.Signal.ToolResult` - Result from a tool execution
-  - `Jido.AI.Signal.EmbedResult` - Result from an embedding generation call
+  - `Jido.AI.Signal.LLMResponse` - Result from a streaming/generation call (`react.llm.response`)
+  - `Jido.AI.Signal.LLMDelta` - Streaming token chunk (`react.llm.delta`)
+  - `Jido.AI.Signal.LLMError` - Structured error from LLM call (`react.llm.error`)
+  - `Jido.AI.Signal.Usage` - Token usage and cost tracking (`react.usage`)
+  - `Jido.AI.Signal.ToolResult` - Result from a tool execution (`react.tool.result`)
+  - `Jido.AI.Signal.EmbedResult` - Result from an embedding generation call (`react.embed.result`)
 
   ## Helper Functions
 
-  - `extract_tool_calls/1` - Extract tool calls from a ReqLLMResult signal
+  - `extract_tool_calls/1` - Extract tool calls from an LLMResponse signal
   - `tool_call?/1` - Check if a signal contains tool calls
   - `from_reqllm_response/2` - Create signals from ReqLLM response structs
 
@@ -25,8 +25,8 @@ defmodule Jido.AI.Signal do
 
       alias Jido.AI.Signal
 
-      # Create an LLM result signal
-      {:ok, signal} = Signal.ReqLLMResult.new(%{
+      # Create an LLM response signal
+      {:ok, signal} = Signal.LLMResponse.new(%{
         call_id: "call_123",
         result: {:ok, %{type: :final_answer, text: "Hello!", tool_calls: []}}
       })
@@ -39,14 +39,14 @@ defmodule Jido.AI.Signal do
       })
 
       # Bang versions for when you know data is valid
-      signal = Signal.ReqLLMResult.new!(%{call_id: "call_123", result: {:ok, response}})
+      signal = Signal.LLMResponse.new!(%{call_id: "call_123", result: {:ok, response}})
   """
 
-  defmodule ReqLLMResult do
+  defmodule LLMResponse do
     @moduledoc """
-    Signal for ReqLLM streaming/call completion.
+    Signal for LLM streaming/call completion.
 
-    Emitted when a ReqLLM call completes, containing either tool calls to execute
+    Emitted when an LLM call completes, containing either tool calls to execute
     or a final answer.
 
     ## Data Fields
@@ -65,8 +65,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "reqllm.result",
-      default_source: "/reqllm",
+      type: "react.llm.response",
+      default_source: "/react/llm",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"],
@@ -77,9 +77,15 @@ defmodule Jido.AI.Signal do
       ]
   end
 
-  defmodule ReqLLMPartial do
+  defmodule ReqLLMResult do
+    @moduledoc false
+    defdelegate new(data), to: LLMResponse
+    defdelegate new!(data), to: LLMResponse
+  end
+
+  defmodule LLMDelta do
     @moduledoc """
-    Signal for streaming ReqLLM token chunks.
+    Signal for streaming LLM token chunks.
 
     Emitted incrementally as the LLM streams response tokens, enabling real-time
     display of responses before the full answer is complete.
@@ -98,8 +104,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "reqllm.partial",
-      default_source: "/reqllm",
+      type: "react.llm.delta",
+      default_source: "/react/llm",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         delta: [type: :string, required: true, doc: "Text chunk from the stream"],
@@ -107,11 +113,17 @@ defmodule Jido.AI.Signal do
       ]
   end
 
-  defmodule ReqLLMError do
-    @moduledoc """
-    Signal for structured ReqLLM errors.
+  defmodule ReqLLMPartial do
+    @moduledoc false
+    defdelegate new(data), to: LLMDelta
+    defdelegate new!(data), to: LLMDelta
+  end
 
-    Emitted when a ReqLLM call fails, providing structured error information
+  defmodule LLMError do
+    @moduledoc """
+    Signal for structured LLM errors.
+
+    Emitted when an LLM call fails, providing structured error information
     for error handling, retry logic, and monitoring.
 
     ## Data Fields
@@ -134,8 +146,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "reqllm.error",
-      default_source: "/reqllm",
+      type: "react.llm.error",
+      default_source: "/react/llm",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         error_type: [type: :atom, required: true, doc: "Error classification"],
@@ -145,7 +157,13 @@ defmodule Jido.AI.Signal do
       ]
   end
 
-  defmodule UsageReport do
+  defmodule ReqLLMError do
+    @moduledoc false
+    defdelegate new(data), to: LLMError
+    defdelegate new!(data), to: LLMError
+  end
+
+  defmodule Usage do
     @moduledoc """
     Signal for token usage and cost tracking.
 
@@ -164,8 +182,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "ai.usage_report",
-      default_source: "/ai/usage",
+      type: "react.usage",
+      default_source: "/react/usage",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         model: [type: :string, required: true, doc: "Model identifier"],
@@ -175,6 +193,12 @@ defmodule Jido.AI.Signal do
         duration_ms: [type: :integer, doc: "Request duration in milliseconds"],
         metadata: [type: :map, default: %{}, doc: "Additional tracking metadata"]
       ]
+  end
+
+  defmodule UsageReport do
+    @moduledoc false
+    defdelegate new(data), to: Usage
+    defdelegate new!(data), to: Usage
   end
 
   defmodule ToolResult do
@@ -191,8 +215,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "ai.tool_result",
-      default_source: "/ai/tool",
+      type: "react.tool.result",
+      default_source: "/react/tool",
       schema: [
         call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
         tool_name: [type: :string, required: true, doc: "Name of the executed tool"],
@@ -217,8 +241,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "ai.embed_result",
-      default_source: "/ai/embedding",
+      type: "react.embed.result",
+      default_source: "/react/embed",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the embedding call"],
         result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"]
@@ -240,8 +264,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "ai.request_error",
-      default_source: "/ai/strategy",
+      type: "react.request.error",
+      default_source: "/react/strategy",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the request"],
         reason: [type: :atom, required: true, doc: "Error reason atom"],
@@ -377,21 +401,21 @@ defmodule Jido.AI.Signal do
   # ============================================================================
 
   @doc """
-  Extracts tool calls from a ReqLLMResult signal.
+  Extracts tool calls from an LLMResponse signal.
 
   Returns a list of tool call maps if the result contains tool calls,
   or an empty list otherwise.
 
   ## Examples
 
-      iex> signal = Signal.ReqLLMResult.new!(%{
+      iex> signal = Signal.LLMResponse.new!(%{
       ...>   call_id: "call_1",
       ...>   result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1", name: "calc"}]}}
       ...> })
       iex> Signal.extract_tool_calls(signal)
       [%{id: "tc_1", name: "calc"}]
 
-      iex> signal = Signal.ReqLLMResult.new!(%{
+      iex> signal = Signal.LLMResponse.new!(%{
       ...>   call_id: "call_2",
       ...>   result: {:ok, %{type: :final_answer, text: "Hello"}}
       ...> })
@@ -399,7 +423,7 @@ defmodule Jido.AI.Signal do
       []
   """
   @spec extract_tool_calls(Jido.Signal.t()) :: [map()]
-  def extract_tool_calls(%{type: "reqllm.result", data: %{result: {:ok, result}}}) do
+  def extract_tool_calls(%{type: "react.llm.response", data: %{result: {:ok, result}}}) do
     case result do
       %{type: :tool_calls, tool_calls: tool_calls} when is_list(tool_calls) -> tool_calls
       %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> tool_calls
@@ -410,21 +434,21 @@ defmodule Jido.AI.Signal do
   def extract_tool_calls(_signal), do: []
 
   @doc """
-  Checks if a ReqLLMResult signal contains tool calls.
+  Checks if an LLMResponse signal contains tool calls.
 
-  Returns `true` if the signal is a successful ReqLLMResult with tool calls,
+  Returns `true` if the signal is a successful LLMResponse with tool calls,
   `false` otherwise.
 
   ## Examples
 
-      iex> signal = Signal.ReqLLMResult.new!(%{
+      iex> signal = Signal.LLMResponse.new!(%{
       ...>   call_id: "call_1",
       ...>   result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}]}}
       ...> })
       iex> Signal.tool_call?(signal)
       true
 
-      iex> signal = Signal.ReqLLMResult.new!(%{
+      iex> signal = Signal.LLMResponse.new!(%{
       ...>   call_id: "call_2",
       ...>   result: {:ok, %{type: :final_answer, text: "Hello"}}
       ...> })
@@ -432,7 +456,7 @@ defmodule Jido.AI.Signal do
       false
   """
   @spec tool_call?(Jido.Signal.t()) :: boolean()
-  def tool_call?(%{type: "reqllm.result", data: %{result: {:ok, result}}}) do
+  def tool_call?(%{type: "react.llm.response", data: %{result: {:ok, result}}}) do
     case result do
       %{type: :tool_calls} -> true
       %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> true
@@ -443,7 +467,7 @@ defmodule Jido.AI.Signal do
   def tool_call?(_signal), do: false
 
   @doc """
-  Creates a ReqLLMResult signal from a ReqLLM response struct.
+  Creates an LLMResponse signal from a ReqLLM response struct.
 
   Takes a ReqLLM response (from `ReqLLM.stream_text/3` or `ReqLLM.Generation.generate_text/3`)
   and creates a properly formatted signal with extracted metadata.
@@ -458,7 +482,7 @@ defmodule Jido.AI.Signal do
 
       iex> response = %ReqLLM.Response{message: %{content: "Hello"}, usage: %{input_tokens: 10, output_tokens: 5}}
       iex> Signal.from_reqllm_response(response, call_id: "call_1")
-      {:ok, %Jido.Signal{type: "reqllm.result", ...}}
+      {:ok, %Jido.Signal{type: "react.llm.response", ...}}
   """
   @spec from_reqllm_response(map(), keyword()) :: {:ok, Jido.Signal.t()} | {:error, term()}
   def from_reqllm_response(response, opts) do
@@ -502,7 +526,7 @@ defmodule Jido.AI.Signal do
     signal_data = if duration_ms, do: Map.put(signal_data, :duration_ms, duration_ms), else: signal_data
     signal_data = if thinking_content, do: Map.put(signal_data, :thinking_content, thinking_content), else: signal_data
 
-    ReqLLMResult.new(signal_data)
+    LLMResponse.new(signal_data)
   end
 
   # Private helpers for from_reqllm_response

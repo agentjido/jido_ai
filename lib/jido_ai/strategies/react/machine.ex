@@ -14,6 +14,12 @@ defmodule Jido.AI.ReAct.Machine do
   - `:completed` - Final state, conversation complete
   - `:error` - Error state
 
+  ## Thread-based Conversation History
+
+  The machine uses `Jido.AI.Thread` to accumulate conversation history. The thread
+  is a simple append-only list of messages that gets projected to ReqLLM format
+  when making LLM calls.
+
   ## Usage
 
   The machine is used by the ReAct strategy:
@@ -44,6 +50,8 @@ defmodule Jido.AI.ReAct.Machine do
       "error" => ["awaiting_llm"]
     }
 
+  alias Jido.AI.Thread
+
   # Telemetry event names
   @telemetry_prefix [:jido, :ai, :react]
 
@@ -73,7 +81,7 @@ defmodule Jido.AI.ReAct.Machine do
   @type t :: %__MODULE__{
           status: internal_status(),
           iteration: non_neg_integer(),
-          conversation: list(),
+          thread: Thread.t() | nil,
           pending_tool_calls: [pending_tool_call()],
           result: term(),
           current_llm_call_id: String.t() | nil,
@@ -86,7 +94,7 @@ defmodule Jido.AI.ReAct.Machine do
 
   defstruct status: "idle",
             iteration: 0,
-            conversation: [],
+            thread: nil,
             pending_tool_calls: [],
             result: nil,
             current_llm_call_id: nil,
@@ -197,33 +205,41 @@ defmodule Jido.AI.ReAct.Machine do
     {machine, []}
   end
 
-  # Fresh start - no prior conversation
+  # Fresh start - create new thread with system prompt
   defp do_start_fresh(machine, query, call_id, env) do
     system_prompt = Map.fetch!(env, :system_prompt)
-    conversation = [system_message(system_prompt), user_message(query)]
-    do_start_with_conversation(machine, conversation, call_id)
+
+    thread =
+      Thread.new(system_prompt: system_prompt)
+      |> Thread.append_user(query)
+
+    do_start_with_thread(machine, thread, call_id)
   end
 
-  # Continue existing conversation - append user message
+  # Continue existing conversation - append user message to existing thread
   defp do_start_continue(machine, query, call_id, _env) do
-    conversation = machine.conversation ++ [user_message(query)]
-    do_start_with_conversation(machine, conversation, call_id)
+    thread = Thread.append_user(machine.thread, query)
+    do_start_with_thread(machine, thread, call_id)
   end
 
-  defp do_start_with_conversation(machine, conversation, call_id) do
+  defp do_start_with_thread(machine, thread, call_id) do
     started_at = System.monotonic_time(:millisecond)
+
+    # Get the last entry (user message) for telemetry
+    last_entry = Thread.last_entry(thread)
+    query_length = if last_entry, do: String.length(last_entry.content || ""), else: 0
 
     # Emit start telemetry
     emit_telemetry(:start, %{system_time: System.system_time()}, %{
       call_id: call_id,
-      query_length: String.length(List.last(conversation)[:content] || "")
+      query_length: query_length
     })
 
     with_transition(machine, "awaiting_llm", fn machine ->
       machine =
         machine
         |> Map.put(:iteration, 1)
-        |> Map.put(:conversation, conversation)
+        |> Map.put(:thread, thread)
         |> Map.put(:pending_tool_calls, [])
         |> Map.put(:result, nil)
         |> Map.put(:termination_reason, nil)
@@ -233,7 +249,9 @@ defmodule Jido.AI.ReAct.Machine do
         |> Map.put(:usage, %{})
         |> Map.put(:started_at, started_at)
 
-      {machine, [{:call_llm_stream, call_id, conversation}]}
+      # Project thread to messages for LLM call
+      messages = Thread.to_messages(thread)
+      {machine, [{:call_llm_stream, call_id, messages}]}
     end)
   end
 
@@ -269,18 +287,45 @@ defmodule Jido.AI.ReAct.Machine do
 
     with_transition(machine, "awaiting_llm", fn m ->
       m = Map.merge(m, %{current_llm_call_id: new_call_id, streaming_text: "", streaming_thinking: ""})
-      {m, [{:call_llm_stream, new_call_id, m.conversation}]}
+      messages = Thread.to_messages(m.thread)
+      {m, [{:call_llm_stream, new_call_id, messages}]}
     end)
   end
 
   @doc """
   Converts the machine state to a map suitable for strategy state storage.
+
+  The thread is converted to a plain conversation list for storage compatibility.
   """
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = machine) do
     machine
     |> Map.from_struct()
     |> Map.update!(:status, &status_to_atom/1)
+    |> convert_thread_for_storage()
+  end
+
+  # Convert thread to conversation list for backward compatibility with strategy state
+  defp convert_thread_for_storage(map) do
+    case map[:thread] do
+      nil ->
+        map
+        |> Map.delete(:thread)
+        |> Map.put(:conversation, [])
+
+      %Thread{} = thread ->
+        # Store as conversation list (without system prompt, since that's stored separately)
+        # Also store the thread struct for full fidelity
+        map
+        |> Map.put(:conversation, Thread.to_messages(thread))
+        |> Map.put(:thread, thread)
+
+      # Already a list (shouldn't happen, but handle it)
+      list when is_list(list) ->
+        map
+        |> Map.delete(:thread)
+        |> Map.put(:conversation, list)
+    end
   end
 
   defp status_to_atom("idle"), do: :idle
@@ -292,13 +337,15 @@ defmodule Jido.AI.ReAct.Machine do
 
   @doc """
   Creates a machine from a map (e.g., from strategy state storage).
+
+  Handles both thread-based and legacy conversation-based storage.
   """
   @spec from_map(map()) :: t()
   def from_map(map) when is_map(map) do
     %__MODULE__{
       status: parse_status(map[:status]),
       iteration: Map.get(map, :iteration, 0),
-      conversation: Map.get(map, :conversation, []),
+      thread: restore_thread(map),
       pending_tool_calls: Map.get(map, :pending_tool_calls, []),
       result: Map.get(map, :result),
       current_llm_call_id: Map.get(map, :current_llm_call_id),
@@ -308,6 +355,42 @@ defmodule Jido.AI.ReAct.Machine do
       usage: Map.get(map, :usage, %{}),
       started_at: Map.get(map, :started_at)
     }
+  end
+
+  # Restore thread from storage - prefer thread struct if present, otherwise rebuild from conversation
+  defp restore_thread(map) do
+    case map[:thread] do
+      %Thread{} = thread ->
+        thread
+
+      nil ->
+        # Try to rebuild from conversation list (legacy support)
+        case Map.get(map, :conversation, []) do
+          [] -> nil
+          messages when is_list(messages) -> rebuild_thread_from_messages(messages)
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  # Rebuild a thread from a list of messages (for backward compatibility)
+  defp rebuild_thread_from_messages([]) do
+    nil
+  end
+
+  defp rebuild_thread_from_messages(messages) do
+    # Check if first message is system prompt
+    {system_prompt, rest} =
+      case messages do
+        [%{role: :system, content: content} | rest] -> {content, rest}
+        [%{role: "system", content: content} | rest] -> {content, rest}
+        _ -> {nil, messages}
+      end
+
+    Thread.new(system_prompt: system_prompt)
+    |> Thread.append_messages(rest)
   end
 
   defp parse_status(s) when is_atom(s), do: Atom.to_string(s)
@@ -373,7 +456,11 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp handle_tool_calls(machine, tool_calls, _env) do
-    assistant_msg = assistant_tool_calls_message(tool_calls)
+    # Format tool_calls for Thread storage
+    formatted_tool_calls =
+      Enum.map(tool_calls, fn tc ->
+        %{id: tc.id, name: tc.name, arguments: tc.arguments}
+      end)
 
     pending =
       Enum.map(tool_calls, fn tc ->
@@ -381,9 +468,12 @@ defmodule Jido.AI.ReAct.Machine do
       end)
 
     with_transition(machine, "awaiting_tool", fn machine ->
+      # Append assistant message with tool calls to thread
+      thread = Thread.append_assistant(machine.thread, "", formatted_tool_calls)
+
       machine =
         machine
-        |> Map.update!(:conversation, &(&1 ++ [assistant_msg]))
+        |> Map.put(:thread, thread)
         |> Map.put(:pending_tool_calls, pending)
 
       directives =
@@ -396,7 +486,6 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp handle_final_answer(machine, answer) do
-    assistant_msg = assistant_message(answer)
     duration_ms = calculate_duration(machine)
 
     # Emit complete telemetry for final answer
@@ -407,10 +496,13 @@ defmodule Jido.AI.ReAct.Machine do
     })
 
     with_transition(machine, "completed", fn machine ->
+      # Append assistant answer to thread
+      thread = Thread.append_assistant(machine.thread, answer)
+
       machine =
         machine
         |> Map.put(:termination_reason, :final_answer)
-        |> Map.update!(:conversation, &(&1 ++ [assistant_msg]))
+        |> Map.put(:thread, thread)
         |> Map.put(:result, answer)
 
       {machine, []}
@@ -428,11 +520,23 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp append_all_tool_results(machine) do
-    tool_msgs = Enum.map(machine.pending_tool_calls, &tool_result_message/1)
+    # Append all tool results to thread
+    thread =
+      Enum.reduce(machine.pending_tool_calls, machine.thread, fn tc, thread ->
+        content = format_tool_result_content(tc.result)
+        Thread.append_tool_result(thread, tc.id, tc.name, content)
+      end)
 
     machine
-    |> Map.update!(:conversation, &(&1 ++ tool_msgs))
+    |> Map.put(:thread, thread)
     |> Map.put(:pending_tool_calls, [])
+  end
+
+  defp format_tool_result_content(result) do
+    case result do
+      {:ok, res} -> Jason.encode!(res)
+      {:error, reason} -> Jason.encode!(%{error: "Error: #{inspect(reason)}"})
+    end
   end
 
   defp inc_iteration(machine), do: Map.update!(machine, :iteration, &(&1 + 1))
@@ -445,33 +549,20 @@ defmodule Jido.AI.ReAct.Machine do
     "call_#{Jido.Util.generate_id()}"
   end
 
-  # Message builders - these create simple maps that can be converted to ReqLLM messages
-  # by the strategy layer
+  @doc """
+  Returns the thread from the machine, if any.
+  """
+  @spec get_thread(t()) :: Thread.t() | nil
+  def get_thread(%__MODULE__{thread: thread}), do: thread
 
-  defp system_message(content), do: %{role: :system, content: content}
-  defp user_message(content), do: %{role: :user, content: content}
-  defp assistant_message(content), do: %{role: :assistant, content: content}
+  @doc """
+  Returns the conversation history as a list of messages.
 
-  defp assistant_tool_calls_message(tool_calls) do
-    %{
-      role: :assistant,
-      content: "",
-      tool_calls:
-        Enum.map(tool_calls, fn tc ->
-          %{id: tc.id, name: tc.name, arguments: tc.arguments}
-        end)
-    }
-  end
-
-  defp tool_result_message(%{id: id, name: name, result: result}) do
-    content =
-      case result do
-        {:ok, res} -> Jason.encode!(res)
-        {:error, reason} -> Jason.encode!(%{error: "Error: #{inspect(reason)}"})
-      end
-
-    %{role: :tool, tool_call_id: id, name: name, content: content}
-  end
+  This is a convenience function that projects the thread to ReqLLM format.
+  """
+  @spec get_conversation(t()) :: [map()]
+  def get_conversation(%__MODULE__{thread: nil}), do: []
+  def get_conversation(%__MODULE__{thread: thread}), do: Thread.to_messages(thread)
 
   # Telemetry helpers
 

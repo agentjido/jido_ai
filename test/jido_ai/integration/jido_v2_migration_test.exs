@@ -244,9 +244,9 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       routes = ReAct.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert Map.has_key?(route_map, "react.user_query")
-      assert Map.has_key?(route_map, "reqllm.result")
-      assert Map.has_key?(route_map, "ai.tool_result")
+      assert Map.has_key?(route_map, "react.input")
+      assert Map.has_key?(route_map, "react.llm.response")
+      assert Map.has_key?(route_map, "react.tool.result")
     end
   end
 

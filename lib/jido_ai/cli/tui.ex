@@ -265,8 +265,8 @@ defmodule Jido.AI.CLI.TUI do
         metrics =
           [
             "#{elapsed_ms}ms",
-            if(iterations > 0, do: "#{iterations} iter", else: nil),
-            if(tokens > 0, do: "#{format_number(tokens)} tok", else: nil)
+            if(iterations > 0, do: "#{iterations} iter"),
+            if(tokens > 0, do: "#{format_number(tokens)} tok")
           ]
           |> Enum.reject(&is_nil/1)
           |> Enum.join(", ")

@@ -47,7 +47,7 @@ defmodule Jido.AI.RequestTracking do
     # ask/2 now returns {:ok, Request.t()}
     def ask(pid, query, opts \\\\ []) do
       Jido.AI.RequestTracking.create_and_send(pid, query, opts,
-        signal_type: "react.user_query",
+        signal_type: "react.input",
         source: "/react/agent"
       )
     end
@@ -153,14 +153,14 @@ defmodule Jido.AI.RequestTracking do
 
   ## Signal Options (required)
 
-  - `:signal_type` - The signal type to create (e.g., "react.user_query")
+  - `:signal_type` - The signal type to create (e.g., "react.input")
   - `:source` - The signal source (e.g., "/react/agent")
 
   ## Examples
 
       {:ok, request} = RequestTracking.create_and_send(pid, "What is 2+2?",
         tool_context: %{actor: user},
-        signal_type: "react.user_query",
+        signal_type: "react.input",
         source: "/react/agent"
       )
   """
@@ -203,7 +203,7 @@ defmodule Jido.AI.RequestTracking do
 
       {:ok, result} = RequestTracking.send_and_await(pid, "What is 2+2?",
         timeout: 10_000,
-        signal_type: "react.user_query",
+        signal_type: "react.input",
         source: "/react/agent"
       )
   """

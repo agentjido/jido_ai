@@ -42,10 +42,10 @@ defmodule Jido.AI.Strategies.ReAct do
   This strategy implements `signal_routes/1` which AgentServer uses to
   automatically route these signals to strategy commands:
 
-  - `"react.user_query"` -> `:react_start`
-  - `"reqllm.result"` -> `:react_llm_result`
-  - `"ai.tool_result"` -> `:react_tool_result`
-  - `"reqllm.partial"` -> `:react_llm_partial`
+  - `"react.input"` -> `:react_start`
+  - `"react.llm.response"` -> `:react_llm_result`
+  - `"react.tool.result"` -> `:react_tool_result`
+  - `"react.llm.delta"` -> `:react_llm_partial`
 
   No custom signal handling code is needed in your agent.
 
@@ -200,15 +200,15 @@ defmodule Jido.AI.Strategies.ReAct do
   @impl true
   def signal_routes(_ctx) do
     [
-      {"react.user_query", {:strategy_cmd, @start}},
-      {"reqllm.result", {:strategy_cmd, @llm_result}},
-      {"ai.tool_result", {:strategy_cmd, @tool_result}},
-      {"reqllm.partial", {:strategy_cmd, @llm_partial}},
+      {"react.input", {:strategy_cmd, @start}},
+      {"react.llm.response", {:strategy_cmd, @llm_result}},
+      {"react.tool.result", {:strategy_cmd, @tool_result}},
+      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
       {"react.register_tool", {:strategy_cmd, @register_tool}},
       {"react.unregister_tool", {:strategy_cmd, @unregister_tool}},
       {"react.set_tool_context", {:strategy_cmd, @set_tool_context}},
       # Usage report is emitted for observability but doesn't need processing
-      {"ai.usage_report", Jido.Actions.Control.Noop}
+      {"react.usage", Jido.Actions.Control.Noop}
     ]
   end
 

@@ -71,8 +71,8 @@ graph TB
     end
 
     subgraph "Signal Layer"
-        ReqLLMResult[ReqLLMResult]
-        ReqLLMPartial[ReqLLMPartial]
+        LLMResponse[LLMResponse]
+        LLMDelta[LLMDelta]
         ToolResult[ToolResult]
     end
 
@@ -101,13 +101,13 @@ graph TB
     ToolExec --> Executor
     Registry --> ToolAdapter
 
-    ReqLLMStream --> ReqLLMResult
-    ReqLLMStream --> ReqLLMPartial
+    ReqLLMStream --> LLMResponse
+    ReqLLMStream --> LLMDelta
     Executor --> ToolResult
 
-    ReqLLMResult --> ReActMachine
+    LLMResponse --> ReActMachine
     ToolResult --> ReActMachine
-    ReqLLMPartial --> ReActMachine
+    LLMDelta --> ReActMachine
 
     Agent --> LLM
     Agent --> Planning
@@ -210,12 +210,12 @@ Typed signals for event-driven communication.
 
 | Signal | Type | Purpose |
 |--------|------|---------|
-| `ReqLLMResult` | `reqllm.result` | LLM call completed |
-| `ReqLLMPartial` | `reqllm.partial` | Streaming token chunk |
-| `ReqLLMError` | `reqllm.error` | Structured error |
-| `ToolResult` | `ai.tool_result` | Tool execution completed |
-| `EmbedResult` | `ai.embed_result` | Embedding generated |
-| `UsageReport` | `ai.usage_report` | Token usage tracking |
+| `LLMResponse` | `react.llm.response` | LLM call completed |
+| `LLMDelta` | `react.llm.delta` | Streaming token chunk |
+| `LLMError` | `react.llm.error` | Structured error |
+| `ToolResult` | `react.tool.result` | Tool execution completed |
+| `EmbedResult` | `react.embed.result` | Embedding generated |
+| `Usage` | `react.usage` | Token usage tracking |
 
 ### 7. Skill Framework (`Jido.AI.Skills.*`)
 
@@ -255,14 +255,14 @@ sequenceDiagram
 
     Runtime->>LLM: stream_text(model, context)
     LLM-->>Runtime: Streaming tokens
-    Runtime->>Agent: Signal.ReqLLMPartial (each token)
-    Agent->>Strategy: signal_routes(reqllm.partial)
+    Runtime->>Agent: Signal.LLMDelta (each token)
+    Agent->>Strategy: signal_routes(react.llm.delta)
     Strategy->>Machine: update({:llm_partial, delta})
     Machine-->>Strategy: :ok (state updated)
 
     LLM-->>Runtime: Final response (tool calls)
-    Runtime->>Agent: Signal.ReqLLMResult (tool_calls)
-    Agent->>Strategy: signal_routes(reqllm.result)
+    Runtime->>Agent: Signal.LLMResponse (tool_calls)
+    Agent->>Strategy: signal_routes(react.llm.response)
     Strategy->>Machine: update({:llm_result, tool_calls})
     Machine-->>Strategy: {:exec_tool, id, name, args}
     Strategy->>Runtime: Directive.ToolExec
@@ -270,7 +270,7 @@ sequenceDiagram
     Runtime->>Tool: execute(tool_name, arguments)
     Tool-->>Runtime: Result
     Runtime->>Agent: Signal.ToolResult
-    Agent->>Strategy: signal_routes(ai.tool_result)
+    Agent->>Strategy: signal_routes(react.tool.result)
     Strategy->>Machine: update({:tool_result, result})
     Machine-->>Strategy: {:call_llm_stream, id, context}
 
@@ -318,10 +318,10 @@ Strategies declare which signals they handle:
 ```elixir
 def signal_routes(_ctx) do
   [
-    {"react.user_query", {:strategy_cmd, @start}},
-    {"reqllm.result", {:strategy_cmd, @llm_result}},
-    {"ai.tool_result", {:strategy_cmd, @tool_result}},
-    {"reqllm.partial", {:strategy_cmd, @llm_partial}}
+    {"react.input", {:strategy_cmd, @start}},
+    {"react.llm.response", {:strategy_cmd, @llm_result}},
+    {"react.tool.result", {:strategy_cmd, @tool_result}},
+    {"react.llm.delta", {:strategy_cmd, @llm_partial}}
   ]
 end
 ```

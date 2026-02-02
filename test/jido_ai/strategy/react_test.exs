@@ -226,10 +226,10 @@ defmodule Jido.AI.Strategies.ReActTest do
 
       route_map = Map.new(routes)
 
-      assert route_map["react.user_query"] == {:strategy_cmd, :react_start}
-      assert route_map["reqllm.result"] == {:strategy_cmd, :react_llm_result}
-      assert route_map["ai.tool_result"] == {:strategy_cmd, :react_tool_result}
-      assert route_map["reqllm.partial"] == {:strategy_cmd, :react_llm_partial}
+      assert route_map["react.input"] == {:strategy_cmd, :react_start}
+      assert route_map["react.llm.response"] == {:strategy_cmd, :react_llm_result}
+      assert route_map["react.tool.result"] == {:strategy_cmd, :react_tool_result}
+      assert route_map["react.llm.delta"] == {:strategy_cmd, :react_llm_partial}
     end
   end
 

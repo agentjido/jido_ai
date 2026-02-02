@@ -95,7 +95,7 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
           message: "Agent is busy processing another request"
         })
 
-      assert signal.type == "ai.request_error"
+      assert signal.type == "react.request.error"
       assert signal.data.call_id == "call_123"
       assert signal.data.reason == :busy
       assert signal.data.message == "Agent is busy processing another request"
@@ -111,7 +111,7 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
           result: {:error, {:unknown_tool, "Tool 'unknown_tool' not found"}}
         })
 
-      assert signal.type == "ai.tool_result"
+      assert signal.type == "react.tool.result"
       assert signal.data.call_id == "tc_123"
       assert signal.data.tool_name == "unknown_tool"
       assert {:error, {:unknown_tool, _}} = signal.data.result
@@ -132,7 +132,7 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
              }}
         })
 
-      assert signal.type == "ai.tool_result"
+      assert signal.type == "react.tool.result"
 
       assert signal.data.result ==
                {:error,
