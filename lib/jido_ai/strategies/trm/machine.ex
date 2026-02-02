@@ -262,6 +262,12 @@ defmodule Jido.AI.TRM.Machine do
     end)
   end
 
+  # Issue #3 fix: Explicitly reject start requests when busy instead of silently dropping
+  def update(%__MODULE__{status: status} = machine, {:start, _question, call_id}, _env)
+      when status in ["reasoning", "supervising", "improving"] do
+    {machine, [{:request_error, call_id, :busy, "Agent is busy (status: #{status})"}]}
+  end
+
   # Reasoning result: reasoning → supervising
   def update(%__MODULE__{status: "reasoning"} = machine, {:reasoning_result, call_id, result}, _env) do
     if call_id == machine.current_call_id do

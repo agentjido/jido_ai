@@ -130,6 +130,12 @@ defmodule Jido.AI.ReAct.Machine do
     do_start_continue(machine, query, call_id, env)
   end
 
+  # Issue #3 fix: Explicitly reject start requests when busy instead of silently dropping
+  def update(%__MODULE__{status: status} = machine, {:start, _query, call_id}, _env)
+      when status in ["awaiting_llm", "awaiting_tool"] do
+    {machine, [{:request_error, call_id, :busy, "Agent is busy (status: #{status})"}]}
+  end
+
   def update(%__MODULE__{status: "awaiting_llm"} = machine, {:llm_result, call_id, result}, env) do
     if call_id == machine.current_llm_call_id do
       handle_llm_response(machine, result, env)

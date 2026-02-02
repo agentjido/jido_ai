@@ -157,6 +157,78 @@ defmodule Jido.AI.Directive do
     end
   end
 
+  defmodule EmitToolError do
+    @moduledoc """
+    Directive to immediately emit a tool error result signal.
+
+    Used when a tool cannot be executed (e.g., unknown tool name, configuration error).
+    This directive ensures the Machine receives a tool_result signal and doesn't deadlock
+    waiting for a response that will never arrive.
+
+    Unlike `ToolExec`, this directive does not spawn a task - it synchronously emits
+    an error signal back to the agent.
+    """
+
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                id: Zoi.string(description: "Tool call ID from LLM (ReqLLM.ToolCall.id)"),
+                tool_name: Zoi.string(description: "Name of the tool that could not be resolved"),
+                error: Zoi.any(description: "Error tuple or map describing the failure")
+              },
+              coerce: true
+            )
+
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
+
+    @doc false
+    def schema, do: @schema
+
+    @doc "Create a new EmitToolError directive."
+    def new!(attrs) when is_map(attrs) do
+      case Zoi.parse(@schema, attrs) do
+        {:ok, directive} -> directive
+        {:error, errors} -> raise "Invalid EmitToolError: #{inspect(errors)}"
+      end
+    end
+  end
+
+  defmodule EmitRequestError do
+    @moduledoc """
+    Directive to immediately emit a request error signal.
+
+    Used when a request cannot be processed (e.g., agent is busy). This ensures
+    the caller receives feedback instead of the request being silently dropped.
+    """
+
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                call_id: Zoi.string(description: "Correlation ID for the request"),
+                reason: Zoi.atom(description: "Error reason atom (e.g., :busy)"),
+                message: Zoi.string(description: "Human-readable error message")
+              },
+              coerce: true
+            )
+
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
+
+    @doc false
+    def schema, do: @schema
+
+    @doc "Create a new EmitRequestError directive."
+    def new!(attrs) when is_map(attrs) do
+      case Zoi.parse(@schema, attrs) do
+        {:ok, directive} -> directive
+        {:error, errors} -> raise "Invalid EmitRequestError: #{inspect(errors)}"
+      end
+    end
+  end
+
   defmodule ReqLLMGenerate do
     @moduledoc """
     Directive asking the runtime to generate an LLM response (non-streaming).
@@ -474,10 +546,20 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
 
   Uses `Jido.AI.Tools.Executor` for execution, which provides consistent error
   handling, parameter normalization, and telemetry.
+
+  ## Error Handling (Issue #2 Fix)
+
+  The entire task body is wrapped in try/rescue/catch to ensure that a
+  `tool_result` signal is always sent back to the agent, even if:
+  - The Executor raises an exception
+  - Signal construction fails
+  - Any other unexpected error occurs
+
+  This prevents the Machine from deadlocking in `awaiting_tool` state.
   """
 
+  alias Jido.AI.Signal
   alias Jido.AI.Tools.Executor
-  alias Jido.AI.{Helpers, Signal}
 
   def exec(directive, _input_signal, state) do
     %{
@@ -495,26 +577,69 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     tools = get_tools_from_state(state)
 
     Task.Supervisor.start_child(task_supervisor, fn ->
+      # Issue #2 fix: Wrap entire task body in try/rescue/catch to guarantee
+      # a tool_result signal is always sent back to the agent
       result =
-        case action_module do
-          nil ->
-            Executor.execute(tool_name, arguments, context, tools: tools)
+        try do
+          case action_module do
+            nil ->
+              Executor.execute(tool_name, arguments, context, tools: tools)
 
-          module when is_atom(module) ->
-            Executor.execute_module(module, arguments, context)
+            module when is_atom(module) ->
+              Executor.execute_module(module, arguments, context)
+          end
+        rescue
+          e ->
+            {:error,
+             %{
+               error: Exception.message(e),
+               tool_name: tool_name,
+               type: :exception,
+               exception_type: e.__struct__
+             }}
+        catch
+          kind, reason ->
+            {:error,
+             %{
+               error: "Caught #{kind}: #{inspect(reason)}",
+               tool_name: tool_name,
+               type: :caught
+             }}
         end
 
-      signal =
-        Signal.ToolResult.new!(%{
-          call_id: call_id,
-          tool_name: tool_name,
-          result: result
-        })
-
-      Jido.AgentServer.cast(agent_pid, signal)
+      # Signal construction in a separate try to ensure we always attempt delivery
+      send_tool_result(agent_pid, call_id, tool_name, result)
     end)
 
     {:async, nil, state}
+  end
+
+  # Sends tool result signal, with fallback for signal construction failures
+  defp send_tool_result(agent_pid, call_id, tool_name, result) do
+    signal =
+      Signal.ToolResult.new!(%{
+        call_id: call_id,
+        tool_name: tool_name,
+        result: result
+      })
+
+    Jido.AgentServer.cast(agent_pid, signal)
+  rescue
+    e ->
+      # If signal construction fails, try with a minimal error signal
+      fallback_signal =
+        Signal.ToolResult.new!(%{
+          call_id: call_id,
+          tool_name: tool_name || "unknown",
+          result:
+            {:error,
+             %{
+               error: "Signal construction failed: #{Exception.message(e)}",
+               type: :internal_error
+             }}
+        })
+
+      Jido.AgentServer.cast(agent_pid, fallback_signal)
   end
 
   defp get_tools_from_state(%Jido.AgentServer.State{agent: agent}) do
@@ -531,6 +656,72 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
         # Fall back to direct tools key or tool_calling skill state
         state[:tools] || get_in(state, [:tool_calling, :tools]) || %{}
     end
+  end
+end
+
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
+  @moduledoc """
+  Immediately emits a tool error result signal without spawning a task.
+
+  Used when a tool cannot be resolved (Issue #1 fix). This ensures the Machine
+  receives a tool_result signal for every pending tool call, preventing deadlock.
+  """
+
+  alias Jido.AI.Signal
+
+  def exec(directive, _input_signal, state) do
+    %{
+      id: call_id,
+      tool_name: tool_name,
+      error: error
+    } = directive
+
+    agent_pid = self()
+
+    # Emit the error result synchronously (no task needed)
+    signal =
+      Signal.ToolResult.new!(%{
+        call_id: call_id,
+        tool_name: tool_name,
+        result: {:error, error}
+      })
+
+    Jido.AgentServer.cast(agent_pid, signal)
+
+    {:sync, nil, state}
+  end
+end
+
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitRequestError do
+  @moduledoc """
+  Immediately emits a request error signal without spawning a task.
+
+  Used when a request cannot be processed (Issue #3 fix). This ensures
+  callers receive feedback when the agent is busy instead of silent drops.
+  """
+
+  alias Jido.AI.Signal
+
+  def exec(directive, _input_signal, state) do
+    %{
+      call_id: call_id,
+      reason: reason,
+      message: message
+    } = directive
+
+    agent_pid = self()
+
+    # Emit the request error synchronously
+    signal =
+      Signal.RequestError.new!(%{
+        call_id: call_id,
+        reason: reason,
+        message: message
+      })
+
+    Jido.AgentServer.cast(agent_pid, signal)
+
+    {:sync, nil, state}
   end
 end
 

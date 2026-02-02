@@ -225,6 +225,30 @@ defmodule Jido.AI.Signal do
       ]
   end
 
+  defmodule RequestError do
+    @moduledoc """
+    Signal for request rejection.
+
+    Emitted when a request cannot be processed (e.g., agent is busy).
+    This provides feedback to the caller instead of silently dropping requests.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID for the rejected request
+    - `:reason` (required) - Error reason atom (e.g., :busy, :invalid_state)
+    - `:message` (required) - Human-readable error message
+    """
+
+    use Jido.Signal,
+      type: "ai.request_error",
+      default_source: "/ai/strategy",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the request"],
+        reason: [type: :atom, required: true, doc: "Error reason atom"],
+        message: [type: :string, required: true, doc: "Human-readable error message"]
+      ]
+  end
+
   # ============================================================================
   # Orchestration Signals
   # ============================================================================

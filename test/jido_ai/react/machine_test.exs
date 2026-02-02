@@ -427,4 +427,104 @@ defmodule Jido.AI.ReAct.MachineTest do
       assert id1 != id2
     end
   end
+
+  # ============================================================================
+  # Issue #3 Fix: Busy State Handling (Explicit Rejection)
+  # ============================================================================
+
+  describe "busy state handling - Issue #3 fix" do
+    test "rejects start request when in awaiting_llm state with request_error directive" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_123",
+        conversation: [],
+        iteration: 1
+      }
+
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {result_machine, directives} = Machine.update(machine, {:start, "New query", "call_456"}, env)
+
+      # Machine state should be unchanged
+      assert result_machine.status == "awaiting_llm"
+      assert result_machine.current_llm_call_id == "call_123"
+
+      # Should return a request_error directive
+      assert [{:request_error, "call_456", :busy, message}] = directives
+      assert message =~ "awaiting_llm"
+    end
+
+    test "rejects start request when in awaiting_tool state with request_error directive" do
+      machine = %Machine{
+        status: "awaiting_tool",
+        current_llm_call_id: "call_123",
+        conversation: [],
+        iteration: 1,
+        pending_tool_calls: [%{id: "tc_1", name: "calc", arguments: %{}, result: nil}]
+      }
+
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {result_machine, directives} = Machine.update(machine, {:start, "New query", "call_456"}, env)
+
+      # Machine state should be unchanged
+      assert result_machine.status == "awaiting_tool"
+      assert result_machine.pending_tool_calls == machine.pending_tool_calls
+
+      # Should return a request_error directive
+      assert [{:request_error, "call_456", :busy, message}] = directives
+      assert message =~ "awaiting_tool"
+    end
+
+    test "allows start request from idle state" do
+      machine = Machine.new()
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {result_machine, directives} = Machine.update(machine, {:start, "Hello", "call_123"}, env)
+
+      assert result_machine.status == "awaiting_llm"
+      assert [{:call_llm_stream, "call_123", _conversation}] = directives
+    end
+
+    test "allows start request from completed state (continuation)" do
+      machine = %Machine{
+        status: "completed",
+        conversation: [
+          %{role: :system, content: "Be helpful"},
+          %{role: :user, content: "Hello"},
+          %{role: :assistant, content: "Hi there!"}
+        ],
+        result: "Hi there!",
+        termination_reason: :final_answer
+      }
+
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {result_machine, directives} = Machine.update(machine, {:start, "Follow up", "call_456"}, env)
+
+      assert result_machine.status == "awaiting_llm"
+      assert [{:call_llm_stream, "call_456", conversation}] = directives
+      # Conversation should include original + new user message
+      assert length(conversation) == 4
+    end
+
+    test "allows start request from error state (recovery)" do
+      machine = %Machine{
+        status: "error",
+        conversation: [
+          %{role: :system, content: "Be helpful"},
+          %{role: :user, content: "Hello"}
+        ],
+        result: "Error: something went wrong",
+        termination_reason: :error
+      }
+
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {result_machine, directives} = Machine.update(machine, {:start, "Try again", "call_789"}, env)
+
+      assert result_machine.status == "awaiting_llm"
+      assert [{:call_llm_stream, "call_789", _conversation}] = directives
+    end
+  end
 end

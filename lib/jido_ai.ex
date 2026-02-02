@@ -58,8 +58,8 @@ defmodule Jido.AI do
   """
 
   alias Jido.AI.Accuracy.{Pipeline, Presets, SelfConsistency}
-  alias Jido.AI.GEPA.{Evaluator, PromptVariant}
   alias Jido.AI.GEPA.Task, as: GEPATask
+  alias Jido.AI.GEPA.{Evaluator, PromptVariant}
 
   @type model_alias :: :fast | :capable | :reasoning | :planning | atom()
   @type model_spec :: String.t()
