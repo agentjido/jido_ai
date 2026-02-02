@@ -61,7 +61,7 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.0.0-rc.2"},
+      {:jido, path: "../jido", override: true},
       {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, "~> 2.0.0-rc.2"},
       {:req_llm, path: "../req_llm", override: true},

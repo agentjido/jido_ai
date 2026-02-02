@@ -269,12 +269,13 @@ defmodule Jido.AI.Helpers do
 
   ## Returns
 
-    A map with `:type`, `:text`, and `:tool_calls` keys.
+    A map with `:type`, `:text`, `:tool_calls`, `:usage`, and `:model` keys.
+    The `:usage` map contains token counts and cost information when available.
 
   ## Examples
 
       iex> Helpers.classify_llm_response(%{message: %{content: "Hello", tool_calls: []}, finish_reason: :stop})
-      %{type: :final_answer, text: "Hello", tool_calls: []}
+      %{type: :final_answer, text: "Hello", tool_calls: [], usage: nil, model: nil}
   """
   @spec classify_llm_response(map()) :: map()
   def classify_llm_response(response) do
@@ -290,9 +291,29 @@ defmodule Jido.AI.Helpers do
     %{
       type: type,
       text: Text.extract_from_content(response.message.content),
-      tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)
+      tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1),
+      usage: normalize_usage(Map.get(response, :usage)),
+      model: Map.get(response, :model)
     }
   end
+
+  # Normalizes usage map to ensure numeric values
+  defp normalize_usage(nil), do: nil
+
+  defp normalize_usage(usage) when is_map(usage) do
+    usage
+    |> Map.new(fn {k, v} -> {k, normalize_usage_value(v)} end)
+  end
+
+  defp normalize_usage_value(v) when is_binary(v) do
+    case Float.parse(v) do
+      {float, _} -> float
+      :error -> 0
+    end
+  end
+
+  defp normalize_usage_value(v) when is_number(v), do: v
+  defp normalize_usage_value(_), do: 0
 
   @doc """
   Extracts text from a content value.

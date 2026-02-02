@@ -462,7 +462,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
                on_thinking: on_thinking
              ) do
           {:ok, response} ->
-            {:ok, Helpers.classify_llm_response(response)}
+            classified = Helpers.classify_llm_response(response)
+
+            # Emit usage report signal for per-call tracking
+            emit_usage_report(agent_pid, call_id, model, classified[:usage])
+
+            {:ok, classified}
 
           {:error, reason} ->
             {:error, reason}
@@ -471,6 +476,33 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # Emit ai.usage_report signal for per-call usage tracking
+  defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
+
+  defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
+    input_tokens = Map.get(usage, :input_tokens) || Map.get(usage, "input_tokens") || 0
+    output_tokens = Map.get(usage, :output_tokens) || Map.get(usage, "output_tokens") || 0
+
+    if input_tokens > 0 or output_tokens > 0 do
+      signal =
+        Signal.UsageReport.new!(%{
+          call_id: call_id,
+          model: model || "unknown",
+          input_tokens: input_tokens,
+          output_tokens: output_tokens,
+          total_tokens: input_tokens + output_tokens,
+          metadata: %{
+            cache_creation_input_tokens: Map.get(usage, :cache_creation_input_tokens),
+            cache_read_input_tokens: Map.get(usage, :cache_read_input_tokens)
+          }
+        })
+
+      Jido.AgentServer.cast(agent_pid, signal)
+    end
+
+    :ok
   end
 end
 
@@ -782,6 +814,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
       result =
         try do
           generate_text(
+            agent_pid,
+            call_id,
             model,
             context,
             system_prompt,
@@ -806,7 +840,18 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
     {:async, nil, state}
   end
 
-  defp generate_text(model, context, system_prompt, tools, tool_choice, max_tokens, temperature, timeout) do
+  defp generate_text(
+         agent_pid,
+         call_id,
+         model,
+         context,
+         system_prompt,
+         tools,
+         tool_choice,
+         max_tokens,
+         temperature,
+         timeout
+       ) do
     opts =
       []
       |> Helpers.add_tools_opt(tools)
@@ -819,11 +864,43 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
 
     case ReqLLM.Generation.generate_text(model, messages, opts) do
       {:ok, response} ->
-        {:ok, Helpers.classify_llm_response(response)}
+        classified = Helpers.classify_llm_response(response)
+
+        # Emit usage report signal for per-call tracking
+        emit_usage_report(agent_pid, call_id, model, classified[:usage])
+
+        {:ok, classified}
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # Emit ai.usage_report signal for per-call usage tracking
+  defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
+
+  defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
+    input_tokens = Map.get(usage, :input_tokens) || Map.get(usage, "input_tokens") || 0
+    output_tokens = Map.get(usage, :output_tokens) || Map.get(usage, "output_tokens") || 0
+
+    if input_tokens > 0 or output_tokens > 0 do
+      signal =
+        Signal.UsageReport.new!(%{
+          call_id: call_id,
+          model: model || "unknown",
+          input_tokens: input_tokens,
+          output_tokens: output_tokens,
+          total_tokens: input_tokens + output_tokens,
+          metadata: %{
+            cache_creation_input_tokens: Map.get(usage, :cache_creation_input_tokens),
+            cache_read_input_tokens: Map.get(usage, :cache_read_input_tokens)
+          }
+        })
+
+      Jido.AgentServer.cast(agent_pid, signal)
+    end
+
+    :ok
   end
 end
 

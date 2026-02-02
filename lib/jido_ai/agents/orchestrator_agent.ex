@@ -218,7 +218,10 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     task = params.task
     specialists = get_specialists(context)
 
-    Logger.debug("[DelegateAndExecute] Task: #{task}, Specialists: #{length(specialists)}")
+    Logger.debug("[DelegateAndExecute] Starting delegation",
+      task: task,
+      specialist_count: length(specialists)
+    )
 
     if Enum.empty?(specialists) do
       {:ok, %{result: "No specialists available. Task: #{task}", delegated_to: nil}}
@@ -233,7 +236,7 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     # The tool_context from the strategy IS the context passed to the action
     # So specialists are at context[:specialists], not context[:tool_context][:specialists]
     specialists = context[:specialists] || context[:tool_context][:specialists] || []
-    Logger.debug("[DelegateAndExecute] Found #{length(specialists)} specialists")
+    Logger.debug("[DelegateAndExecute] Found specialists", specialist_count: length(specialists))
     specialists
   end
 
@@ -292,7 +295,7 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     case ReqLLM.Generation.generate_text(model, [%{role: :user, content: prompt}]) do
       {:ok, response} ->
         text = extract_text(response)
-        Logger.debug("[Routing] Raw LLM response: #{inspect(text)}")
+        Logger.debug("[Routing] LLM response received", response_length: String.length(text))
         parse_routing_response(text)
 
       {:error, reason} ->
@@ -380,7 +383,10 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     suffix = :erlang.unique_integer([:positive])
     module_name = Module.concat([JidoAi, EphemeralSpecialist, :"Spec#{suffix}"])
 
-    Logger.debug("[Orchestrator] Creating specialist module #{inspect(module_name)} for #{spec_name}")
+    Logger.debug("[Orchestrator] Creating specialist module",
+      module_name: module_name,
+      specialist_name: spec_name
+    )
 
     contents =
       quote do
@@ -396,28 +402,32 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
 
     jido_name = :"jido_specialist_#{suffix}"
 
-    Logger.debug("[Orchestrator] Starting Jido instance #{jido_name}")
+    Logger.debug("[Orchestrator] Starting Jido instance", jido_name: jido_name)
     {:ok, _jido} = Jido.start_link(name: jido_name)
 
     try do
-      Logger.debug("[Orchestrator] Starting agent #{inspect(module_name)}")
+      Logger.debug("[Orchestrator] Starting agent", module_name: module_name)
 
       case Jido.start_agent(jido_name, module_name) do
         {:ok, pid} ->
-          Logger.debug("[Orchestrator] Agent started, asking: #{task}")
+          Logger.debug("[Orchestrator] Agent started", agent_pid: pid, task: task)
           :ok = module_name.ask(pid, task)
           result = await_specialist(pid, 30_000)
-          Logger.debug("[Orchestrator] Specialist result: #{inspect(result)}")
+          Logger.debug("[Orchestrator] Specialist completed", result_type: result_type(result))
           GenServer.stop(pid, :normal, 1000)
           result
 
         {:error, reason} ->
-          Logger.error("[Orchestrator] Failed to start agent: #{inspect(reason)}")
+          Logger.error("[Orchestrator] Failed to start agent", reason: reason)
           {:error, reason}
       end
     rescue
       e ->
-        Logger.error("[Orchestrator] Exception in specialist: #{Exception.message(e)}")
+        Logger.error("[Orchestrator] Exception in specialist",
+          exception_message: Exception.message(e),
+          exception_type: e.__struct__
+        )
+
         {:error, Exception.message(e)}
     after
       if Process.whereis(jido_name), do: Supervisor.stop(jido_name)
@@ -456,4 +466,8 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
       end
     end
   end
+
+  defp result_type({:ok, _}), do: :ok
+  defp result_type({:error, _}), do: :error
+  defp result_type(_), do: :unknown
 end

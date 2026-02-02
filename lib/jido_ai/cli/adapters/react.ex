@@ -118,9 +118,31 @@ defmodule Jido.AI.CLI.Adapters.ReAct do
   end
 
   defp extract_meta(status) do
+    strategy_state = Map.get(status.raw_state, :__strategy__, %{})
+    details = Map.get(status.snapshot, :details, %{})
+
     %{
       status: status.snapshot.status,
-      iterations: Map.get(status.raw_state, :__strategy__, %{}) |> Map.get(:iteration, 0)
+      iterations: Map.get(strategy_state, :iteration, 0),
+      usage: extract_usage(strategy_state, details),
+      model: Map.get(details, :model)
     }
+  end
+
+  defp extract_usage(strategy_state, details) do
+    # Try strategy state first (accumulated), then snapshot details
+    usage = Map.get(strategy_state, :usage) || Map.get(details, :usage) || %{}
+
+    if map_size(usage) > 0 do
+      %{
+        input_tokens: Map.get(usage, :input_tokens, 0),
+        output_tokens: Map.get(usage, :output_tokens, 0),
+        total_tokens:
+          Map.get(usage, :total_tokens) ||
+            Map.get(usage, :input_tokens, 0) + Map.get(usage, :output_tokens, 0),
+        cache_creation_input_tokens: Map.get(usage, :cache_creation_input_tokens),
+        cache_read_input_tokens: Map.get(usage, :cache_read_input_tokens)
+      }
+    end
   end
 end

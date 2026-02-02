@@ -222,7 +222,10 @@ defmodule Mix.Tasks.JidoAi.Agent do
           ok: true,
           query: query,
           answer: result.answer,
-          elapsed_ms: elapsed
+          elapsed_ms: elapsed,
+          usage: Map.get(result.meta, :usage),
+          iterations: Map.get(result.meta, :iterations),
+          model: Map.get(result.meta, :model)
         })
 
       {:error, reason} ->
@@ -244,7 +247,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
     case adapter.start_agent(JidoAi.CliJido, agent_module, config) do
       {:ok, pid} ->
         try do
-          :ok = adapter.submit(pid, query, config)
+          {:ok, _request} = adapter.submit(pid, query, config)
           adapter.await(pid, config.timeout, config)
         after
           adapter.stop(pid)
@@ -265,9 +268,38 @@ defmodule Mix.Tasks.JidoAi.Agent do
       "text" ->
         if !config.quiet, do: IO.puts("\n--- Answer ---")
         IO.puts(result.answer)
-        if !config.quiet, do: IO.puts("\n(#{result.elapsed_ms}ms)")
+        if !config.quiet, do: IO.puts("\n#{format_stats(result)}")
     end
   end
+
+  defp format_stats(result) do
+    parts = ["(#{result.elapsed_ms}ms"]
+
+    parts =
+      if result[:iterations] && result[:iterations] > 0 do
+        parts ++ ["#{result[:iterations]} iterations"]
+      else
+        parts
+      end
+
+    parts =
+      case result[:usage] do
+        %{input_tokens: input, output_tokens: output} when input > 0 or output > 0 ->
+          total = input + output
+          parts ++ ["#{format_number(total)} tokens (#{format_number(input)} in / #{format_number(output)} out)"]
+
+        _ ->
+          parts
+      end
+
+    Enum.join(parts, ", ") <> ")"
+  end
+
+  defp format_number(n) when n >= 1000 do
+    "#{Float.round(n / 1000, 1)}k"
+  end
+
+  defp format_number(n), do: "#{n}"
 
   defp output_error(config, result) do
     case config.format do
