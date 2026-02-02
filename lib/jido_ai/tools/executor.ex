@@ -150,7 +150,7 @@ defmodule Jido.AI.Tools.Executor do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     tools = Keyword.get(opts, :tools, %{})
 
-    start_telemetry(tool_name, params)
+    start_telemetry(tool_name, params, context)
 
     case Map.fetch(tools, tool_name) do
       {:ok, module} ->
@@ -194,7 +194,7 @@ defmodule Jido.AI.Tools.Executor do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     tool_name = module.name()
 
-    start_telemetry(tool_name, params)
+    start_telemetry(tool_name, params, context)
     execute_with_timeout(module, tool_name, params, context, timeout)
   end
 
@@ -534,12 +534,38 @@ defmodule Jido.AI.Tools.Executor do
     ~r/_password$/i
   ]
 
-  defp start_telemetry(tool_name, params) do
+  defp start_telemetry(tool_name, params, context) do
+    metadata =
+      %{
+        tool_name: tool_name,
+        params: sanitize_params(params),
+        call_id: context[:call_id],
+        agent_id: context[:agent_id],
+        iteration: context[:iteration]
+      }
+      |> Map.merge(get_trace_metadata())
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
+
     :telemetry.execute(
       [:jido, :ai, :tool, :execute, :start],
       %{system_time: System.system_time()},
-      %{tool_name: tool_name, params: sanitize_params(params)}
+      metadata
     )
+  end
+
+  defp get_trace_metadata do
+    case Jido.Tracing.Context.get() do
+      nil ->
+        %{}
+
+      ctx ->
+        %{
+          jido_trace_id: ctx[:trace_id],
+          jido_span_id: ctx[:span_id],
+          jido_parent_span_id: ctx[:parent_span_id]
+        }
+    end
   end
 
   @doc false
