@@ -60,36 +60,38 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
   @type answer :: String.t()
 
   # Answer extraction patterns
-  @answer_patterns [
-    # Quoted answer
-    {~r/"([^"]+)"/, :quote},
-    # "Answer:" prefix (with double newline)
-    {"\n\nAnswer:", :answer_prefix},
-    # "Therefore:" prefix (with double newline)
-    {"\n\nTherefore:", :therefore_prefix},
-    # "Thus:" prefix (with double newline)
-    {"\n\nThus:", :thus_prefix},
-    # "So:" prefix (with double newline)
-    {"\n\nSo:", :so_prefix},
-    # "The answer is:" prefix (with double newline)
-    {"\n\nThe answer is:", :the_answer_is_prefix},
-    # "Result:" prefix (with double newline)
-    {"\n\nResult:", :result_prefix},
-    # Single newline patterns (also at start of content)
-    {~r/\nAnswer:\s*/i, :answer_prefix_regex_single},
-    {~r/\nTherefore:\s*/i, :therefore_prefix_regex_single},
-    {~r/\nThus:\s*/i, :thus_prefix_regex_single},
-    {~r/\nSo:\s*/i, :so_prefix_regex_single},
-    {~r/\nThe answer is:\s*/i, :the_answer_is_prefix_regex_single},
-    {~r/\nResult:\s*/i, :result_prefix_regex_single},
-    # Case-insensitive regex patterns as fallback with double newline
-    {~r/\n\nAnswer:\s*/i, :answer_prefix_regex},
-    {~r/\n\nTherefore:\s*/i, :therefore_prefix_regex},
-    {~r/\n\nThus:\s*/i, :thus_prefix_regex},
-    {~r/\n\nSo:\s*/i, :so_prefix_regex},
-    {~r/\n\nThe answer is:\s*/i, :the_answer_is_prefix_regex},
-    {~r/\n\nResult:\s*/i, :result_prefix_regex}
-  ]
+  defp answer_patterns do
+    [
+      # Quoted answer
+      {~r/"([^"]+)"/, :quote},
+      # "Answer:" prefix (with double newline)
+      {"\n\nAnswer:", :answer_prefix},
+      # "Therefore:" prefix (with double newline)
+      {"\n\nTherefore:", :therefore_prefix},
+      # "Thus:" prefix (with double newline)
+      {"\n\nThus:", :thus_prefix},
+      # "So:" prefix (with double newline)
+      {"\n\nSo:", :so_prefix},
+      # "The answer is:" prefix (with double newline)
+      {"\n\nThe answer is:", :the_answer_is_prefix},
+      # "Result:" prefix (with double newline)
+      {"\n\nResult:", :result_prefix},
+      # Single newline patterns (also at start of content)
+      {~r/\nAnswer:\s*/i, :answer_prefix_regex_single},
+      {~r/\nTherefore:\s*/i, :therefore_prefix_regex_single},
+      {~r/\nThus:\s*/i, :thus_prefix_regex_single},
+      {~r/\nSo:\s*/i, :so_prefix_regex_single},
+      {~r/\nThe answer is:\s*/i, :the_answer_is_prefix_regex_single},
+      {~r/\nResult:\s*/i, :result_prefix_regex_single},
+      # Case-insensitive regex patterns as fallback with double newline
+      {~r/\n\nAnswer:\s*/i, :answer_prefix_regex},
+      {~r/\n\nTherefore:\s*/i, :therefore_prefix_regex},
+      {~r/\n\nThus:\s*/i, :thus_prefix_regex},
+      {~r/\n\nSo:\s*/i, :so_prefix_regex},
+      {~r/\n\nThe answer is:\s*/i, :the_answer_is_prefix_regex},
+      {~r/\n\nResult:\s*/i, :result_prefix_regex}
+    ]
+  end
 
   @doc """
   Aggregates candidates using majority voting.
@@ -221,7 +223,7 @@ defmodule Jido.AI.Accuracy.Aggregators.MajorityVote do
   @spec extract_answer_from_content(String.t()) :: String.t()
   def extract_answer_from_content(content) do
     # Try each pattern in order
-    extract_with_patterns(content, @answer_patterns) || fallback_to_last_line(content)
+    extract_with_patterns(content, answer_patterns()) || fallback_to_last_line(content)
   end
 
   @doc """

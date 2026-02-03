@@ -515,23 +515,25 @@ defmodule Jido.AI.Executor do
 
   # Patterns for sensitive keys that should be redacted in telemetry
   # These match common credential field names but avoid partial matches (e.g. "credentials" container)
-  @sensitive_key_patterns [
-    ~r/^api_?key$/i,
-    ~r/^password$/i,
-    ~r/^secret$/i,
-    ~r/^token$/i,
-    ~r/^auth_?token$/i,
-    ~r/^private_?key$/i,
-    ~r/^access_?key$/i,
-    ~r/^bearer$/i,
-    ~r/^api_?secret$/i,
-    ~r/^client_?secret$/i,
-    ~r/secret_/i,
-    ~r/_secret$/i,
-    ~r/_key$/i,
-    ~r/_token$/i,
-    ~r/_password$/i
-  ]
+  defp sensitive_key_patterns do
+    [
+      ~r/^api_?key$/i,
+      ~r/^password$/i,
+      ~r/^secret$/i,
+      ~r/^token$/i,
+      ~r/^auth_?token$/i,
+      ~r/^private_?key$/i,
+      ~r/^access_?key$/i,
+      ~r/^bearer$/i,
+      ~r/^api_?secret$/i,
+      ~r/^client_?secret$/i,
+      ~r/secret_/i,
+      ~r/_secret$/i,
+      ~r/_key$/i,
+      ~r/_token$/i,
+      ~r/_password$/i
+    ]
+  end
 
   defp start_telemetry(tool_name, params, context) do
     metadata =
@@ -589,7 +591,7 @@ defmodule Jido.AI.Executor do
   end
 
   defp sensitive_key?(key) when is_binary(key) do
-    Enum.any?(@sensitive_key_patterns, &Regex.match?(&1, key))
+    Enum.any?(sensitive_key_patterns(), &Regex.match?(&1, key))
   end
 
   defp sensitive_key?(_key), do: false

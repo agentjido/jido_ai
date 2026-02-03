@@ -193,10 +193,12 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
   end
 
   defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, _prefer_early)
-       when is_struct(ts1, DateTime) and is_nil(ts2), do: :lt
+       when is_struct(ts1, DateTime) and is_nil(ts2),
+       do: :lt
 
   defp timestamp_compare(%{timestamp: ts1}, %{timestamp: ts2}, _prefer_early)
-       when is_nil(ts1) and is_struct(ts2, DateTime), do: :gt
+       when is_nil(ts1) and is_struct(ts2, DateTime),
+       do: :gt
 
   defp timestamp_compare(_, _, _), do: :eq
 

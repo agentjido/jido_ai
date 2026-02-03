@@ -79,33 +79,37 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
           min_matches: integer()
         }
 
-  @default_aleatoric_patterns [
-    # Subjective adjectives
-    ~r/\b(best|better|worst|favorite|prefer|greatest)\b/i,
-    # Ambiguity markers
-    ~r/\b(maybe|possibly|perhaps|depends|could be|might be)\b/i,
-    # Opinion words
-    ~r/\b(think|believe|feel|opinion|view|perspective)\b/i,
-    # Open-ended questions
-    ~r/\b(how should|what way|in your opinion|what do you think)\b/i,
-    # Preference words
-    ~r/\b(like|love|enjoy|prefer|would rather)\b/i,
-    # Subjective nouns
-    ~r/\b(beautiful|ugly|good|bad|right|wrong|fair|unfair)\b/i,
-    # Comparative
-    ~r/\b(more|less|rather|than|compared to)\b/i
-  ]
+  defp default_aleatoric_patterns do
+    [
+      # Subjective adjectives
+      ~r/\b(best|better|worst|favorite|prefer|greatest)\b/i,
+      # Ambiguity markers
+      ~r/\b(maybe|possibly|perhaps|depends|could be|might be)\b/i,
+      # Opinion words
+      ~r/\b(think|believe|feel|opinion|view|perspective)\b/i,
+      # Open-ended questions
+      ~r/\b(how should|what way|in your opinion|what do you think)\b/i,
+      # Preference words
+      ~r/\b(like|love|enjoy|prefer|would rather)\b/i,
+      # Subjective nouns
+      ~r/\b(beautiful|ugly|good|bad|right|wrong|fair|unfair)\b/i,
+      # Comparative
+      ~r/\b(more|less|rather|than|compared to)\b/i
+    ]
+  end
 
-  @default_epistemic_patterns [
-    # Future speculation
-    ~r/\b(will happen|predict|forecast|future of|going to be)\b/i,
-    # Future tense questions
-    ~r/\bwho will|what will|when will|where will\b/i,
-    # Unanswerable factual questions
-    ~r/\b(what is the population of|who is the CEO of)\b/i,
-    # Prediction language
-    ~r/\b(will win|will happen|predict the)\b/i
-  ]
+  defp default_epistemic_patterns do
+    [
+      # Future speculation
+      ~r/\b(will happen|predict|forecast|future of|going to be)\b/i,
+      # Future tense questions
+      ~r/\bwho will|what will|when will|where will\b/i,
+      # Unanswerable factual questions
+      ~r/\b(what is the population of|who is the CEO of)\b/i,
+      # Prediction language
+      ~r/\b(will win|will happen|predict the)\b/i
+    ]
+  end
 
   # Maximum pattern source length to prevent ReDoS attacks
   @max_pattern_length 500
@@ -140,8 +144,8 @@ defmodule Jido.AI.Accuracy.UncertaintyQuantification do
   """
   @spec new(keyword() | map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_list(attrs) or is_map(attrs) do
-    aleatoric_patterns = get_attr(attrs, :aleatoric_patterns, @default_aleatoric_patterns)
-    epistemic_patterns = get_attr(attrs, :epistemic_patterns, @default_epistemic_patterns)
+    aleatoric_patterns = get_attr(attrs, :aleatoric_patterns, default_aleatoric_patterns())
+    epistemic_patterns = get_attr(attrs, :epistemic_patterns, default_epistemic_patterns())
     domain_keywords = get_attr(attrs, :domain_keywords, [])
     min_matches = get_attr(attrs, :min_matches, 1)
 

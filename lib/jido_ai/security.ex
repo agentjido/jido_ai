@@ -47,45 +47,47 @@ defmodule Jido.AI.Security do
   @callback_timeout 5_000
 
   # Known prompt injection patterns
-  @injection_patterns [
-    # Direct instruction overrides
-    ~r/ignore\s+(the\s+)?(previous|above)\s+instructions/i,
-    ~r/ignore\s+all\s+(previous|above)?\s+instructions/i,
-    ~r/override\s+(your\s+)?system/i,
-    ~r/disregard\s+(the\s+)?(previous|above)\s+instructions/i,
-    ~r/disregard\s+all\s+(previous|above)?\s+instructions/i,
-    ~r/pay\s+no\s+attention\s+to\s+(the\s+)?(previous|above)/i,
-    ~r/forget\s+(everything|all\s+instructions)/i,
+  defp injection_patterns do
+    [
+      # Direct instruction overrides
+      ~r/ignore\s+(the\s+)?(previous|above)\s+instructions/i,
+      ~r/ignore\s+all\s+(previous|above)?\s+instructions/i,
+      ~r/override\s+(your\s+)?system/i,
+      ~r/disregard\s+(the\s+)?(previous|above)\s+instructions/i,
+      ~r/disregard\s+all\s+(previous|above)?\s+instructions/i,
+      ~r/pay\s+no\s+attention\s+to\s+(the\s+)?(previous|above)/i,
+      ~r/forget\s+(everything|all\s+instructions)/i,
 
-    # Delimiter-based injection attempts
-    ~r/\n\n\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
-    ~r/###\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
-    ~r/---\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
+      # Delimiter-based injection attempts
+      ~r/\n\n\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
+      ~r/###\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
+      ~r/---\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
 
-    # Role switching attempts
-    ~r/you\s+are\s+now\s+a\s+(different|new)/i,
-    ~r/act\s+as\s+if\s+you\s+are/i,
-    ~r/pretend\s+(to\s+be|you\s+are)/i,
-    ~r/switch\s+roles?\s+with\s+me/i,
-    ~r/roleplay\s+as\s+(a\s+)?(different|new|dangerous)/i,
+      # Role switching attempts
+      ~r/you\s+are\s+now\s+a\s+(different|new)/i,
+      ~r/act\s+as\s+if\s+you\s+are/i,
+      ~r/pretend\s+(to\s+be|you\s+are)/i,
+      ~r/switch\s+roles?\s+with\s+me/i,
+      ~r/roleplay\s+as\s+(a\s+)?(different|new|dangerous)/i,
 
-    # JSON/XML format injection
-    ~r/\{[^}]*"role"\s*:\s*"system"/i,
-    ~r/<[^>]*system[^>]*>/i,
+      # JSON/XML format injection
+      ~r/\{[^}]*"role"\s*:\s*"system"/i,
+      ~r/<[^>]*system[^>]*>/i,
 
-    # Jailbreak patterns
-    ~r/dan\s+\d+\.?\d*/i,
-    ~r/(developer|admin|root)\s+mode/i,
-    ~r/unrestricted\s+mode/i,
-    ~r/bypass\s+(all\s+)?(safety|filters?|security)/i,
+      # Jailbreak patterns
+      ~r/dan\s+\d+\.?\d*/i,
+      ~r/(developer|admin|root)\s+mode/i,
+      ~r/unrestricted\s+mode/i,
+      ~r/bypass\s+(all\s+)?(safety|filters?|security)/i,
 
-    # Output format manipulation
-    ~r/(print|output|display|say|echo)\s+(everything|all\s+the\s+(above|text|instructions))/i,
-    ~r/(repeat|return|show)\s+your\s+(system\s+)?prompt/i,
+      # Output format manipulation
+      ~r/(print|output|display|say|echo)\s+(everything|all\s+the\s+(above|text|instructions))/i,
+      ~r/(repeat|return|show)\s+your\s+(system\s+)?prompt/i,
 
-    # Translation/encoding attempts
-    ~r/translate\s+(this|the\s+above)\s+to\s+(base64|binary|hex)/i
-  ]
+      # Translation/encoding attempts
+      ~r/translate\s+(this|the\s+above)\s+to\s+(base64|binary|hex)/i
+    ]
+  end
 
   # Dangerous characters that should not appear in prompts (stored as byte integers)
   @dangerous_bytes [
@@ -235,7 +237,7 @@ defmodule Jido.AI.Security do
   end
 
   defp contains_injection_pattern?(prompt) do
-    Enum.any?(@injection_patterns, fn pattern ->
+    Enum.any?(injection_patterns(), fn pattern ->
       Regex.match?(pattern, prompt)
     end)
   end
