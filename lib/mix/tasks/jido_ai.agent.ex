@@ -4,13 +4,16 @@ defmodule Mix.Tasks.JidoAi.Agent do
   @moduledoc """
   Run AI agents with tool use from the command line.
 
-  Supports one-shot queries and batch processing via stdin.
+  Supports one-shot queries, interactive TUI mode, and batch processing via stdin.
   Agents can use tools (arithmetic, weather, etc.) and reason through multi-step problems.
 
   ## Quick Start
 
       # One-shot query with default ReAct agent
       mix jido_ai.agent "Calculate 15 * 7 + 3"
+
+      # Interactive terminal UI
+      mix jido_ai.agent --tui
 
       # JSON output for scripting
       mix jido_ai.agent --format json --quiet "What is 42 * 2?"
@@ -43,6 +46,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
 
   ### Input Mode
       --stdin              Read queries from stdin (one per line)
+      --tui                Interactive terminal UI mode
 
   ### Output Format
       --format FORMAT      text (default) | json
@@ -116,6 +120,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
           system: :string,
           max_iterations: :integer,
           stdin: :boolean,
+          tui: :boolean,
           format: :string,
           quiet: :boolean,
           timeout: :integer,
@@ -141,14 +146,25 @@ defmodule Mix.Tasks.JidoAi.Agent do
       attach_trace_handlers()
     end
 
-    # Resolve adapter and agent module once per invocation
-    case resolve_adapter_and_agent(config) do
-      {:ok, adapter, agent_module} ->
-        config = Map.merge(config, %{adapter: adapter, agent_module: agent_module})
-        run_queries(args, config)
+    # TUI mode bypasses normal query flow
+    if config.tui do
+      tui_module = Module.concat(Jido.AI.CLI, TUI)
 
-      {:error, reason} ->
-        output_fatal_error(config, reason)
+      if Code.ensure_loaded?(tui_module) and function_exported?(tui_module, :run, 1) do
+        apply(tui_module, :run, [config])
+      else
+        output_fatal_error(config, :tui_unavailable)
+      end
+    else
+      # Resolve adapter and agent module once per invocation
+      case resolve_adapter_and_agent(config) do
+        {:ok, adapter, agent_module} ->
+          config = Map.merge(config, %{adapter: adapter, agent_module: agent_module})
+          run_queries(args, config)
+
+        {:error, reason} ->
+          output_fatal_error(config, reason)
+      end
     end
   end
 
@@ -164,6 +180,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
       quiet: opts[:quiet] || false,
       timeout: opts[:timeout] || 60_000,
       stdin: opts[:stdin] || false,
+      tui: opts[:tui] || false,
       trace: opts[:trace] || false
     }
   end
@@ -315,6 +332,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
 
   defp format_error(:timeout), do: "Timeout waiting for agent completion"
   defp format_error(:not_found), do: "Agent process not found"
+  defp format_error(:tui_unavailable), do: "TUI is unavailable in this build"
   defp format_error(reason) when is_binary(reason), do: reason
   defp format_error(reason), do: inspect(reason)
 
