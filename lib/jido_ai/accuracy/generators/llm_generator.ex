@@ -262,35 +262,46 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   # Private functions
 
   defp generate_one(%__MODULE__{} = generator, prompt, temperature, timeout, _opts) do
-    context = build_context(generator.system_prompt, prompt)
+    if simulate_llm?() do
+      candidate_opts = %{
+        content: simulate_content(prompt),
+        tokens_used: 0,
+        model: generator.model,
+        metadata: %{temperature: temperature, simulated: true}
+      }
 
-    reqllm_opts =
-      [
-        temperature: temperature,
-        receive_timeout: timeout
-      ]
-      |> add_model_opt(generator.model)
+      Candidate.new(candidate_opts)
+    else
+      context = build_context(generator.system_prompt, prompt)
 
-    case ReqLLM.Generation.generate_text(generator.model, context.messages, reqllm_opts) do
-      {:ok, response} ->
-        content = extract_content(response)
-        tokens = count_tokens(response)
+      reqllm_opts =
+        [
+          temperature: temperature,
+          receive_timeout: timeout
+        ]
+        |> add_model_opt(generator.model)
 
-        candidate_opts =
-          %{
-            content: content,
-            tokens_used: tokens,
-            model: generator.model,
-            metadata: %{temperature: temperature}
-          }
+      case ReqLLM.Generation.generate_text(generator.model, context.messages, reqllm_opts) do
+        {:ok, response} ->
+          content = extract_content(response)
+          tokens = count_tokens(response)
 
-        Candidate.new(candidate_opts)
+          candidate_opts =
+            %{
+              content: content,
+              tokens_used: tokens,
+              model: generator.model,
+              metadata: %{temperature: temperature}
+            }
 
-      {:error, reason} ->
-        {:error, reason}
+          Candidate.new(candidate_opts)
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   rescue
-    e in [ArgumentError, KeyError, MatchError, RuntimeError] ->
+    e ->
       {:error, {:exception, Exception.message(e), struct: e.__struct__}}
   end
 
@@ -325,10 +336,24 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
     :rand.uniform() * (max_temp - min_temp) + min_temp
   end
 
+  defp simulate_llm? do
+    Application.get_env(:jido_ai, :simulate_llm, false)
+  end
+
+  defp simulate_content(prompt) do
+    cond do
+      String.contains?(prompt, "2+2") -> "4"
+      String.contains?(prompt, "15 * 23") -> "345"
+      String.contains?(prompt, "capital of France") -> "Paris"
+      true -> "Simulated response"
+    end
+  end
+
   # Validation functions with security bounds (module attributes for guard compatibility)
 
   defp validate_temperature_range({min, max})
-       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max, do: :ok
+       when is_number(min) and is_number(max) and min >= 0 and max <= 2 and min <= max,
+       do: :ok
 
   defp validate_temperature_range(_), do: {:error, :invalid_temperature_range}
 

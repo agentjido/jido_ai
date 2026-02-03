@@ -197,16 +197,20 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   """
   @spec verify(t(), Candidate.t(), map()) :: {:ok, VerificationResult.t()} | {:error, term()}
   def verify(%__MODULE__{} = verifier, %Candidate{} = candidate, context) do
-    prompt = Map.get(context, :prompt, "")
+    if simulate_llm?() do
+      {:ok, simulated_result(verifier, candidate)}
+    else
+      prompt = Map.get(context, :prompt, "")
 
-    template = verifier.prompt_template || @default_prompt_template
+      template = verifier.prompt_template || @default_prompt_template
 
-    case render_prompt(template, prompt, candidate, verifier.score_range) do
-      {:ok, rendered_prompt} ->
-        call_llm_with_retry(verifier, rendered_prompt, candidate)
+      case render_prompt(template, prompt, candidate, verifier.score_range) do
+        {:ok, rendered_prompt} ->
+          call_llm_with_retry(verifier, rendered_prompt, candidate)
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
@@ -234,20 +238,25 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
   """
   @spec verify_batch(t(), [Candidate.t()], map()) :: {:ok, [VerificationResult.t()]} | {:error, term()}
   def verify_batch(%__MODULE__{} = verifier, candidates, context) when is_list(candidates) do
-    if Enum.empty?(candidates) do
-      {:ok, []}
-    else
-      prompt = Map.get(context, :prompt, "")
+    cond do
+      Enum.empty?(candidates) ->
+        {:ok, []}
 
-      template = build_batch_template(verifier, length(candidates))
+      simulate_llm?() ->
+        {:ok, Enum.map(candidates, &simulated_result(verifier, &1))}
 
-      case render_prompt(template, prompt, candidates, verifier.score_range) do
-        {:ok, rendered_prompt} ->
-          parse_batch_results(call_llm_with_retry(verifier, rendered_prompt, candidates), candidates)
+      true ->
+        prompt = Map.get(context, :prompt, "")
 
-        {:error, reason} ->
-          {:error, reason}
-      end
+        template = build_batch_template(verifier, length(candidates))
+
+        case render_prompt(template, prompt, candidates, verifier.score_range) do
+          {:ok, rendered_prompt} ->
+            parse_batch_results(call_llm_with_retry(verifier, rendered_prompt, candidates), candidates)
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 
@@ -281,36 +290,57 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
       receive_timeout: verifier.timeout
     ]
 
-    case ReqLLM.Generation.generate_text(model, context.messages, reqllm_opts) do
-      {:ok, response} ->
-        {:ok, parse_response(response)}
+    try do
+      case ReqLLM.Generation.generate_text(model, context.messages, reqllm_opts) do
+        {:ok, response} ->
+          {:ok, parse_response(response)}
 
-      {:error, error} when retries > 0 ->
-        # Use Helpers.classify_error to determine if we should retry
-        case Helpers.classify_error(error) do
-          :timeout ->
-            # Retry on timeout
-            call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
+        {:error, error} when retries > 0 ->
+          # Use Helpers.classify_error to determine if we should retry
+          case Helpers.classify_error(error) do
+            :timeout ->
+              # Retry on timeout
+              call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
 
-          :rate_limit ->
-            # Retry on rate limit with exponential backoff
-            backoff = trunc(:math.pow(2, verifier.max_retries - retries + 1) * 1000)
-            Process.sleep(backoff)
-            call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
+            :rate_limit ->
+              # Retry on rate limit with exponential backoff
+              backoff = trunc(:math.pow(2, verifier.max_retries - retries + 1) * 1000)
+              Process.sleep(backoff)
+              call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
 
-          :network ->
-            # Retry on network errors
-            Process.sleep(1000)
-            call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
+            :network ->
+              # Retry on network errors
+              Process.sleep(1000)
+              call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
 
-          _ ->
-            # Don't retry on other errors
-            {:error, error}
-        end
+            _ ->
+              # Don't retry on other errors
+              {:error, error}
+          end
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
+    rescue
+      e ->
+        {:error, {:llm_exception, Exception.message(e), struct: e.__struct__}}
     end
+  end
+
+  defp simulate_llm? do
+    Application.get_env(:jido_ai, :simulate_llm, false)
+  end
+
+  defp simulated_result(%__MODULE__{score_range: {min_score, max_score}}, %Candidate{} = candidate) do
+    mid_score = (min_score + max_score) / 2
+
+    %VerificationResult{
+      candidate_id: candidate.id,
+      score: mid_score,
+      confidence: 0.5,
+      reasoning: "Simulated verification",
+      metadata: %{simulated: true}
+    }
   end
 
   defp parse_response(response) do

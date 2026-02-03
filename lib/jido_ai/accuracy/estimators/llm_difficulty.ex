@@ -250,13 +250,21 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
   end
 
   defp call_llm(estimator, model, prompt) do
-    # Check if ReqLLM.chat is available
-    if Code.ensure_loaded?(ReqLLM) and function_exported?(ReqLLM, :chat, 1) do
-      call_req_llm(estimator, model, prompt)
-    else
-      # Fallback: simulate for testing environments
+    if simulate_llm?() do
       simulate_llm_response(prompt)
+    else
+      # Check if ReqLLM.chat is available
+      if Code.ensure_loaded?(ReqLLM) and function_exported?(ReqLLM, :chat, 1) do
+        call_req_llm(estimator, model, prompt)
+      else
+        # Fallback: simulate for testing environments
+        simulate_llm_response(prompt)
+      end
     end
+  end
+
+  defp simulate_llm? do
+    Application.get_env(:jido_ai, :simulate_llm, false)
   end
 
   defp call_req_llm(%__MODULE__{timeout: timeout}, model, prompt) do
