@@ -71,30 +71,38 @@ defmodule Jido.AI.CLI.Adapters.ToT do
   end
 
   defp poll_loop(pid, deadline, interval) do
-    now = System.monotonic_time(:millisecond)
-
-    if now >= deadline do
+    if deadline_reached?(deadline) do
       {:error, :timeout}
     else
-      case Jido.AgentServer.status(pid) do
-        {:ok, status} ->
-          if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_result, "")
-                "" -> Map.get(status.raw_state, :last_result, "")
-                result -> result
-              end
+      fetch_status(pid, deadline, interval)
+    end
+  end
 
-            {:ok, %{answer: answer, meta: extract_meta(status)}}
-          else
-            Process.sleep(interval)
-            poll_loop(pid, deadline, interval)
-          end
+  defp deadline_reached?(deadline) do
+    System.monotonic_time(:millisecond) >= deadline
+  end
 
-        {:error, reason} ->
-          {:error, reason}
-      end
+  defp fetch_status(pid, deadline, interval) do
+    case Jido.AgentServer.status(pid) do
+      {:ok, status} -> handle_status(status, pid, deadline, interval)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp handle_status(status, pid, deadline, interval) do
+    if status.snapshot.done? do
+      {:ok, %{answer: extract_answer(status), meta: extract_meta(status)}}
+    else
+      Process.sleep(interval)
+      poll_loop(pid, deadline, interval)
+    end
+  end
+
+  defp extract_answer(status) do
+    case status.snapshot.result do
+      nil -> Map.get(status.raw_state, :last_result, "")
+      "" -> Map.get(status.raw_state, :last_result, "")
+      result -> result
     end
   end
 

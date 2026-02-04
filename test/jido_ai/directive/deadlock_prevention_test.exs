@@ -7,7 +7,7 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
   """
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Directive.{EmitToolError, EmitRequestError, ToolExec}
+  alias Jido.AI.Directive.{EmitRequestError, EmitToolError, ToolExec}
   alias Jido.AI.Signal
 
   # ============================================================================

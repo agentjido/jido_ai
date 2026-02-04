@@ -283,9 +283,9 @@ result.confidence  # Confidence score [0-1]
 - [Configuration](guides/developer/08_configuration.md) - Model aliases and providers
 
 ### Examples
-See the [`examples/`](examples/) directory for runnable code:
-- [`examples/accuracy/`](examples/accuracy/) - Accuracy improvement examples
-- [`examples/strategies/`](examples/strategies/) - Reasoning strategy examples
+See the `examples/` directory for runnable code:
+- `examples/accuracy/` - Accuracy improvement examples
+- `examples/strategies/` - Reasoning strategy examples
 
 ## Quick Decision Guide
 
@@ -324,7 +324,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## License
 
-Apache-2.0 - See [LICENSE](LICENSE) for details.
+Apache-2.0 - See [LICENSE.md](LICENSE.md) for details.
 
 ---
 

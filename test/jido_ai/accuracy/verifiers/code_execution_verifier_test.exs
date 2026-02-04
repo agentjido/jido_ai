@@ -146,7 +146,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifierTest do
     end
 
     test "handles whitespace-only content", %{verifier: verifier} do
-      candidate = Candidate.new!(%{content: "   \\n  \\n  "})
+      candidate = Candidate.new!(%{content: "   \n  \n  "})
       {:ok, result} = CodeExecutionVerifier.verify(verifier, candidate, %{})
 
       assert result.score == 0.0

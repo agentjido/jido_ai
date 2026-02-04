@@ -131,58 +131,20 @@ defmodule Mix.Tasks.JidoAi.Accuracy do
   # ============================================================================
 
   defp run_self_consistency(prompt, opts) do
-    model = opts[:model] || "anthropic:claude-haiku-4-5"
-    num_candidates = opts[:candidates] || 5
-    aggregator = parse_aggregator(opts[:aggregator] || "majority_vote")
-    use_reasoning = opts[:reasoning] || false
-    timeout = opts[:timeout] || 30_000
-    max_concurrency = opts[:concurrency] || 3
-    verbose = opts[:verbose] || false
+    params = self_consistency_params(opts)
 
-    IO.puts("\n=== Jido AI Accuracy (Self-Consistency) ===\n")
-    IO.puts("Prompt: #{prompt}")
-    IO.puts("Model: #{model}")
-    IO.puts("Candidates: #{num_candidates}")
-    IO.puts("Aggregator: #{aggregator}")
+    print_self_consistency_header(prompt, params)
 
-    if use_reasoning do
-      IO.puts("Mode: Chain-of-Thought")
-    end
+    sc_opts = build_self_consistency_opts(params, opts)
 
-    IO.puts("")
+    IO.write("Generating #{params.num_candidates} candidates... ")
 
-    sc_opts =
-      [
-        model: model,
-        num_candidates: num_candidates,
-        aggregator: aggregator,
-        timeout: timeout,
-        max_concurrency: max_concurrency
-      ]
-      |> maybe_add_temperature(opts[:temperature])
-      |> maybe_add_system_prompt(opts[:system_prompt])
+    {result, duration} =
+      time_ms(fn ->
+        run_self_consistency_request(prompt, sc_opts, params.use_reasoning)
+      end)
 
-    IO.write("Generating #{num_candidates} candidates... ")
-    start_time = System.monotonic_time(:millisecond)
-
-    result =
-      if use_reasoning do
-        SelfConsistency.run_with_reasoning(prompt, sc_opts)
-      else
-        SelfConsistency.run(prompt, sc_opts)
-      end
-
-    duration = System.monotonic_time(:millisecond) - start_time
-
-    case result do
-      {:ok, best, metadata} ->
-        IO.puts("done (#{duration}ms)\n")
-        print_self_consistency_result(best, metadata, use_reasoning, verbose)
-
-      {:error, reason} ->
-        IO.puts("failed\n")
-        IO.puts("Error: #{inspect(reason)}")
-    end
+    handle_self_consistency_result(result, duration, params.use_reasoning, params.verbose)
   end
 
   # ============================================================================
@@ -190,50 +152,142 @@ defmodule Mix.Tasks.JidoAi.Accuracy do
   # ============================================================================
 
   defp run_pipeline(prompt, opts) do
-    preset = parse_preset(opts[:preset])
-    model = opts[:model] || "anthropic:claude-haiku-4-5"
-    timeout = opts[:timeout] || 60_000
-    verbose = opts[:verbose] || false
+    params = pipeline_params(opts)
 
-    IO.puts("\n=== Jido AI Accuracy (Pipeline) ===\n")
-    IO.puts("Prompt: #{prompt}")
-    IO.puts("Model: #{model}")
-    IO.puts("Preset: #{preset}")
+    print_pipeline_header(prompt, params)
 
-    case Presets.get(preset) do
+    case Presets.get(params.preset) do
       {:ok, config} ->
-        IO.puts("Stages: #{inspect(config.stages)}")
-        IO.puts("")
-
-        generator = build_generator(model)
-
-        IO.write("Running pipeline... ")
-        start_time = System.monotonic_time(:millisecond)
-
-        case Pipeline.new(%{config: config}) do
-          {:ok, pipeline} ->
-            result = Pipeline.run(pipeline, prompt, generator: generator, timeout: timeout)
-            duration = System.monotonic_time(:millisecond) - start_time
-
-            case result do
-              {:ok, pipeline_result} ->
-                IO.puts("done (#{duration}ms)\n")
-                print_pipeline_result(pipeline_result, verbose)
-
-              {:error, reason} ->
-                IO.puts("failed\n")
-                IO.puts("Error: #{inspect(reason)}")
-            end
-
-          {:error, reason} ->
-            IO.puts("failed\n")
-            IO.puts("Pipeline creation error: #{inspect(reason)}")
-        end
+        run_pipeline_with_config(prompt, config, params)
 
       {:error, :unknown_preset} ->
-        IO.puts("\nError: Unknown preset '#{opts[:preset]}'")
-        IO.puts("Available presets: #{inspect(Presets.list())}")
+        print_unknown_preset(opts[:preset])
     end
+  end
+
+  defp self_consistency_params(opts) do
+    %{
+      model: opts[:model] || "anthropic:claude-haiku-4-5",
+      num_candidates: opts[:candidates] || 5,
+      aggregator: parse_aggregator(opts[:aggregator] || "majority_vote"),
+      use_reasoning: opts[:reasoning] || false,
+      timeout: opts[:timeout] || 30_000,
+      max_concurrency: opts[:concurrency] || 3,
+      verbose: opts[:verbose] || false
+    }
+  end
+
+  defp print_self_consistency_header(prompt, params) do
+    IO.puts("\n=== Jido AI Accuracy (Self-Consistency) ===\n")
+    IO.puts("Prompt: #{prompt}")
+    IO.puts("Model: #{params.model}")
+    IO.puts("Candidates: #{params.num_candidates}")
+    IO.puts("Aggregator: #{params.aggregator}")
+
+    if params.use_reasoning do
+      IO.puts("Mode: Chain-of-Thought")
+    end
+
+    IO.puts("")
+  end
+
+  defp build_self_consistency_opts(params, opts) do
+    [
+      model: params.model,
+      num_candidates: params.num_candidates,
+      aggregator: params.aggregator,
+      timeout: params.timeout,
+      max_concurrency: params.max_concurrency
+    ]
+    |> maybe_add_temperature(opts[:temperature])
+    |> maybe_add_system_prompt(opts[:system_prompt])
+  end
+
+  defp run_self_consistency_request(prompt, sc_opts, true) do
+    SelfConsistency.run_with_reasoning(prompt, sc_opts)
+  end
+
+  defp run_self_consistency_request(prompt, sc_opts, false) do
+    SelfConsistency.run(prompt, sc_opts)
+  end
+
+  defp handle_self_consistency_result({:ok, best, metadata}, duration, use_reasoning, verbose) do
+    IO.puts("done (#{duration}ms)\n")
+    print_self_consistency_result(best, metadata, use_reasoning, verbose)
+  end
+
+  defp handle_self_consistency_result({:error, reason}, _duration, _use_reasoning, _verbose) do
+    IO.puts("failed\n")
+    IO.puts("Error: #{inspect(reason)}")
+  end
+
+  defp pipeline_params(opts) do
+    %{
+      preset: parse_preset(opts[:preset]),
+      model: opts[:model] || "anthropic:claude-haiku-4-5",
+      timeout: opts[:timeout] || 60_000,
+      verbose: opts[:verbose] || false
+    }
+  end
+
+  defp print_pipeline_header(prompt, params) do
+    IO.puts("\n=== Jido AI Accuracy (Pipeline) ===\n")
+    IO.puts("Prompt: #{prompt}")
+    IO.puts("Model: #{params.model}")
+    IO.puts("Preset: #{params.preset}")
+  end
+
+  defp run_pipeline_with_config(prompt, config, params) do
+    IO.puts("Stages: #{inspect(config.stages)}")
+    IO.puts("")
+
+    generator = build_generator(params.model)
+
+    IO.write("Running pipeline... ")
+
+    {result, duration} =
+      time_ms(fn ->
+        run_pipeline_execution(config, prompt, generator, params.timeout)
+      end)
+
+    handle_pipeline_execution_result(result, duration, params.verbose)
+  end
+
+  defp run_pipeline_execution(config, prompt, generator, timeout) do
+    case Pipeline.new(%{config: config}) do
+      {:ok, pipeline} ->
+        Pipeline.run(pipeline, prompt, generator: generator, timeout: timeout)
+
+      {:error, reason} ->
+        {:error, {:pipeline_creation, reason}}
+    end
+  end
+
+  defp handle_pipeline_execution_result({:ok, pipeline_result}, duration, verbose) do
+    IO.puts("done (#{duration}ms)\n")
+    print_pipeline_result(pipeline_result, verbose)
+  end
+
+  defp handle_pipeline_execution_result({:error, {:pipeline_creation, reason}}, _duration, _verbose) do
+    IO.puts("failed\n")
+    IO.puts("Pipeline creation error: #{inspect(reason)}")
+  end
+
+  defp handle_pipeline_execution_result({:error, reason}, _duration, _verbose) do
+    IO.puts("failed\n")
+    IO.puts("Error: #{inspect(reason)}")
+  end
+
+  defp print_unknown_preset(preset) do
+    IO.puts("\nError: Unknown preset '#{preset}'")
+    IO.puts("Available presets: #{inspect(Presets.list())}")
+  end
+
+  defp time_ms(fun) when is_function(fun, 0) do
+    start_time = System.monotonic_time(:millisecond)
+    result = fun.()
+    duration = System.monotonic_time(:millisecond) - start_time
+    {result, duration}
   end
 
   defp build_generator(model) do
@@ -262,7 +316,6 @@ defmodule Mix.Tasks.JidoAi.Accuracy do
     end)
   end
 
-  defp extract_output(response) when is_binary(response), do: response
   defp extract_output(_), do: ""
 
   # ============================================================================
@@ -334,18 +387,18 @@ defmodule Mix.Tasks.JidoAi.Accuracy do
     IO.puts("Confidence:  #{Float.round(result.confidence * 100, 1)}%")
     IO.puts("Action:      #{result.action}")
 
-    if result.metadata do
-      if result.metadata[:total_duration_ms] do
-        IO.puts("Duration:    #{result.metadata[:total_duration_ms]}ms")
-      end
+    metadata = result.metadata
 
-      if result.metadata[:num_candidates] && result.metadata[:num_candidates] > 0 do
-        IO.puts("Candidates:  #{result.metadata[:num_candidates]}")
-      end
+    if metadata[:total_duration_ms] do
+      IO.puts("Duration:    #{metadata[:total_duration_ms]}ms")
+    end
 
-      if result.metadata[:difficulty] do
-        IO.puts("Difficulty:  #{result.metadata[:difficulty]}")
-      end
+    if metadata[:num_candidates] && metadata[:num_candidates] > 0 do
+      IO.puts("Candidates:  #{metadata[:num_candidates]}")
+    end
+
+    if metadata[:difficulty] do
+      IO.puts("Difficulty:  #{metadata[:difficulty]}")
     end
 
     if verbose do
@@ -400,7 +453,6 @@ defmodule Mix.Tasks.JidoAi.Accuracy do
   end
 
   defp get_field(%{__struct__: _} = struct, field), do: Map.get(struct, field)
-  defp get_field(map, field) when is_map(map), do: Map.get(map, field) || map[to_string(field)]
 
   defp load_dotenv do
     if Code.ensure_loaded?(Dotenvy) do

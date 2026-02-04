@@ -489,7 +489,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       signal =
         Signal.Usage.new!(%{
           call_id: call_id,
-          model: model || "unknown",
+          model: model,
           input_tokens: input_tokens,
           output_tokens: output_tokens,
           total_tokens: input_tokens + output_tokens,
@@ -734,7 +734,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
 
     Jido.AgentServer.cast(agent_pid, signal)
 
-    {:sync, nil, state}
+    {:ok, state}
   end
 end
 
@@ -767,7 +767,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitRequestError 
 
     Jido.AgentServer.cast(agent_pid, signal)
 
-    {:sync, nil, state}
+    {:ok, state}
   end
 end
 
@@ -813,18 +813,18 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     Task.Supervisor.start_child(task_supervisor, fn ->
       result =
         try do
-          generate_text(
-            agent_pid,
-            call_id,
-            model,
-            context,
-            system_prompt,
-            tools,
-            tool_choice,
-            max_tokens,
-            temperature,
-            timeout
-          )
+          generate_text(%{
+            agent_pid: agent_pid,
+            call_id: call_id,
+            model: model,
+            context: context,
+            system_prompt: system_prompt,
+            tools: tools,
+            tool_choice: tool_choice,
+            max_tokens: max_tokens,
+            temperature: temperature,
+            timeout: timeout
+          })
         rescue
           e ->
             {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
@@ -840,18 +840,18 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     {:async, nil, state}
   end
 
-  defp generate_text(
-         agent_pid,
-         call_id,
-         model,
-         context,
-         system_prompt,
-         tools,
-         tool_choice,
-         max_tokens,
-         temperature,
-         timeout
-       ) do
+  defp generate_text(%{
+         agent_pid: agent_pid,
+         call_id: call_id,
+         model: model,
+         context: context,
+         system_prompt: system_prompt,
+         tools: tools,
+         tool_choice: tool_choice,
+         max_tokens: max_tokens,
+         temperature: temperature,
+         timeout: timeout
+       }) do
     opts =
       []
       |> Helpers.add_tools_opt(tools)
@@ -887,7 +887,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
       signal =
         Signal.Usage.new!(%{
           call_id: call_id,
-          model: model || "unknown",
+          model: model,
           input_tokens: input_tokens,
           output_tokens: output_tokens,
           total_tokens: input_tokens + output_tokens,

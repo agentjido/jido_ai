@@ -97,7 +97,10 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfNTest do
         Candidate.new!(%{content: "B"})
       ]
 
-      assert {:error, :no_scores} = BestOfN.aggregate(candidates)
+      assert {:ok, best, metadata} = BestOfN.aggregate(candidates)
+      assert best.content == "A"
+      assert metadata.fallback == :no_scores
+      assert metadata.confidence == 0.0
     end
 
     test "filters out candidates without scores" do

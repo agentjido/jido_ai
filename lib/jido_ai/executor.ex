@@ -69,6 +69,7 @@ defmodule Jido.AI.Executor do
   """
 
   alias Jido.Action.Tool, as: ActionTool
+  alias Jido.Tracing.Context
 
   require Logger
 
@@ -556,7 +557,7 @@ defmodule Jido.AI.Executor do
   end
 
   defp get_trace_metadata do
-    case Jido.Tracing.Context.get() do
+    case Context.get() do
       nil ->
         %{}
 

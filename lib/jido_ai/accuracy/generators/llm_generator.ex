@@ -341,11 +341,43 @@ defmodule Jido.AI.Accuracy.Generators.LLMGenerator do
   end
 
   defp simulate_content(prompt) do
+    prompt = String.downcase(prompt)
+
     cond do
-      String.contains?(prompt, "2+2") -> "4"
-      String.contains?(prompt, "15 * 23") -> "345"
-      String.contains?(prompt, "capital of France") -> "Paris"
-      true -> "Simulated response"
+      String.contains?(prompt, "capital of france") ->
+        "Paris"
+
+      math = simulate_math(prompt) ->
+        math
+
+      true ->
+        "Simulated response"
+    end
+  end
+
+  defp simulate_math(prompt) do
+    case Regex.run(~r/(\d+)\s*\*\s*(\d+)(?:\s*\+\s*(\d+))?/, prompt) do
+      [_, a, b, c] ->
+        a = String.to_integer(a)
+        b = String.to_integer(b)
+        c = String.to_integer(c)
+        Integer.to_string(a * b + c)
+
+      [_, a, b] ->
+        a = String.to_integer(a)
+        b = String.to_integer(b)
+        Integer.to_string(a * b)
+
+      nil ->
+        case Regex.run(~r/(\d+)\s*\+\s*(\d+)/, prompt) do
+          [_, a, b] ->
+            a = String.to_integer(a)
+            b = String.to_integer(b)
+            Integer.to_string(a + b)
+
+          _ ->
+            nil
+        end
     end
   end
 

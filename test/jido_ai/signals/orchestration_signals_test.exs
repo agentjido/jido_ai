@@ -2,11 +2,11 @@ defmodule JidoAITest.Signals.OrchestrationSignalsTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Signal.{
-    DelegationRequest,
-    DelegationResult,
-    DelegationError,
     CapabilityQuery,
-    CapabilityResponse
+    CapabilityResponse,
+    DelegationError,
+    DelegationRequest,
+    DelegationResult
   }
 
   alias Jido.AI.Skills.Orchestration

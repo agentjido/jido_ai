@@ -78,6 +78,7 @@ defmodule Jido.AI do
   alias Jido.AI.Accuracy.{Pipeline, Presets, SelfConsistency}
   alias Jido.AI.GEPA.Task, as: GEPATask
   alias Jido.AI.GEPA.{Evaluator, PromptVariant}
+  alias Jido.AI.Strategies.ReAct
 
   @type model_alias :: :fast | :capable | :reasoning | :planning | atom()
   @type model_spec :: String.t()
@@ -424,7 +425,6 @@ defmodule Jido.AI do
     end)
   end
 
-  defp extract_output(response) when is_binary(response), do: response
   defp extract_output(_), do: ""
 
   defp extract_tokens(%ReqLLM.Response{usage: %{total_tokens: tokens}}), do: tokens
@@ -505,7 +505,7 @@ defmodule Jido.AI do
   @spec list_tools(Jido.Agent.t() | GenServer.server()) ::
           [module()] | {:ok, [module()]} | {:error, term()}
   def list_tools(%Jido.Agent{} = agent) do
-    Jido.AI.Strategies.ReAct.list_tools(agent)
+    ReAct.list_tools(agent)
   end
 
   def list_tools(agent_server) do

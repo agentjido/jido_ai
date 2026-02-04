@@ -2,6 +2,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Accuracy.Candidate
+  alias Jido.AI.Accuracy.Helpers
   alias Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier
 
   @moduletag :capture_log
@@ -632,7 +633,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
       mid_score: mid_score
     ]
 
-    rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
+    rendered = Helpers.eval_eex_quiet(template, assigns: assigns)
     {:ok, rendered}
   rescue
     e -> {:error, {:template_error, Exception.message(e)}}

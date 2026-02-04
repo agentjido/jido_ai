@@ -43,8 +43,9 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
 
   ## Without Scores
 
-  If candidates don't have scores, the aggregator returns an error.
-  For unsupervised selection, use `MajorityVote` instead.
+  If candidates don't have scores, the aggregator falls back to the first
+  candidate with low confidence. For unsupervised selection, consider
+  `MajorityVote` instead.
   """
 
   @behaviour Jido.AI.Accuracy.Aggregator
@@ -98,7 +99,18 @@ defmodule Jido.AI.Accuracy.Aggregators.BestOfN do
     scored_candidates = Enum.filter(candidates, & &1.score)
 
     if Enum.empty?(scored_candidates) do
-      {:error, :no_scores}
+      best = List.first(candidates)
+
+      metadata = %{
+        confidence: 0.0,
+        score_distribution: %{},
+        total_candidates: length(candidates),
+        scored_candidates: 0,
+        min_score: min_score,
+        fallback: :no_scores
+      }
+
+      {:ok, best, metadata}
     else
       # Find the best candidate using score comparison
       best =

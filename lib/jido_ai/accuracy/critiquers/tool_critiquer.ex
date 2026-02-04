@@ -16,7 +16,7 @@ defmodule Jido.AI.Accuracy.Critiquers.ToolCritiquer do
 
   Each tool is a map with:
   - `:name` - Tool name for identification
-  -:command` - Command to execute
+  - `:command` - Command to execute
   - `:args` - Arguments to pass (candidate content will be available)
   - `:severity_on_fail` - Severity when tool fails (default: 0.8)
 

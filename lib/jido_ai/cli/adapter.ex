@@ -64,38 +64,33 @@ defmodule Jido.AI.CLI.Adapter do
   """
   @callback create_ephemeral_agent(config()) :: module()
 
+  @adapter_by_type %{
+    "react" => Jido.AI.CLI.Adapters.ReAct,
+    "tot" => Jido.AI.CLI.Adapters.ToT,
+    "cot" => Jido.AI.CLI.Adapters.CoT,
+    "got" => Jido.AI.CLI.Adapters.GoT,
+    "trm" => Jido.AI.CLI.Adapters.TRM,
+    "adaptive" => Jido.AI.CLI.Adapters.Adaptive,
+    nil => Jido.AI.CLI.Adapters.ReAct
+  }
+
   @doc """
   Resolve the adapter module for an agent type or agent module.
   """
   @spec resolve(type :: String.t() | nil, agent_module :: module() | nil) ::
           {:ok, module()} | {:error, term()}
   def resolve(type, agent_module) do
-    cond do
+    if agent_module && function_exported?(agent_module, :cli_adapter, 0) do
       # If agent module provides its own adapter, use it
-      agent_module && function_exported?(agent_module, :cli_adapter, 0) ->
-        {:ok, agent_module.cli_adapter()}
+      {:ok, agent_module.cli_adapter()}
+    else
+      case Map.get(@adapter_by_type, type) do
+        nil ->
+          {:error, "Unknown agent type: #{type}. Supported: react, tot, cot, got, trm, adaptive"}
 
-      # Type explicitly specified
-      type == "react" || type == nil ->
-        {:ok, Jido.AI.CLI.Adapters.ReAct}
-
-      type == "tot" ->
-        {:ok, Jido.AI.CLI.Adapters.ToT}
-
-      type == "cot" ->
-        {:ok, Jido.AI.CLI.Adapters.CoT}
-
-      type == "got" ->
-        {:ok, Jido.AI.CLI.Adapters.GoT}
-
-      type == "trm" ->
-        {:ok, Jido.AI.CLI.Adapters.TRM}
-
-      type == "adaptive" ->
-        {:ok, Jido.AI.CLI.Adapters.Adaptive}
-
-      true ->
-        {:error, "Unknown agent type: #{type}. Supported: react, tot, cot, got, trm, adaptive"}
+        adapter ->
+          {:ok, adapter}
+      end
     end
   end
 end

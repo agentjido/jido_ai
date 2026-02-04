@@ -396,7 +396,7 @@ defmodule Jido.AI.Accuracy.Pipeline do
   defp update_stage_state(state, stage_name) do
     state
     |> Map.put(:last_stage, stage_name)
-    |> Map.update(:stages_completed, [], &[&1 ++ [stage_name]])
+    |> Map.update(:stages_completed, [stage_name], fn stages -> stages ++ [stage_name] end)
   end
 
   defp build_stage_config(config, stage_name, state, opts) do

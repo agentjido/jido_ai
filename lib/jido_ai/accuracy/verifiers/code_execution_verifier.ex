@@ -259,7 +259,7 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
 
       case execute_code(verifier, code, language) do
         {:ok, result} ->
-          score = calculate_score(result)
+          score = calculate_score(result, language)
           reasoning = build_reasoning(result, language)
 
           verification_result = %VerificationResult{
@@ -405,12 +405,56 @@ defmodule Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier do
   # Default to Python
   defp build_command(_, code), do: {"python3", ["-c", code]}
 
-  defp calculate_score(%{exit_code: 0, timed_out: false}), do: 1.0
-  defp calculate_score(%{exit_code: _, timed_out: true}), do: 0.0
+  defp calculate_score(%{exit_code: 0, timed_out: false}, _language), do: 1.0
+  defp calculate_score(%{exit_code: _, timed_out: true}, _language), do: 0.0
 
-  defp calculate_score(%{stdout: stdout, exit_code: _}) do
-    # Non-zero exit code but produced some output - partial credit
-    if String.trim(stdout) == "", do: 0.0, else: 0.5
+  defp calculate_score(result, language) do
+    output = combined_output(result)
+
+    cond do
+      output == "" ->
+        0.0
+
+      error_output?(output, language) ->
+        0.0
+
+      true ->
+        0.5
+    end
+  end
+
+  defp combined_output(%{stdout: stdout, stderr: stderr}) do
+    [stdout, stderr]
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.join("\n")
+    |> String.trim()
+  end
+
+  defp error_output?(output, :python) do
+    Regex.match?(
+      ~r/Traceback \(most recent call last\)|\bSyntaxError:|\bIndentationError:|\bNameError:|\bTypeError:/,
+      output
+    )
+  end
+
+  defp error_output?(output, :javascript) do
+    Regex.match?(~r/\bSyntaxError:|\bReferenceError:|\bTypeError:|\bRangeError:/, output)
+  end
+
+  defp error_output?(output, :elixir) do
+    Regex.match?(~r/^\*\* \([^)]+Error\)/m, output)
+  end
+
+  defp error_output?(output, :ruby) do
+    Regex.match?(~r/\bSyntaxError:|\bNameError:|\bNoMethodError:|\bTypeError:/, output)
+  end
+
+  defp error_output?(output, :bash) do
+    Regex.match?(~r/^bash: /m, output)
+  end
+
+  defp error_output?(output, _language) do
+    Regex.match?(~r/\bSyntaxError:|\bTraceback\b/, output)
   end
 
   defp calculate_confidence(%{timed_out: true}), do: 0.0

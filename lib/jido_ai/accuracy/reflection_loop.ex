@@ -178,27 +178,35 @@ defmodule Jido.AI.Accuracy.ReflectionLoop do
       # Retrieve similar critiques from memory if available
       context_with_memory = maybe_add_memory_context(loop, prompt, context)
 
-      current_candidate = starting_candidate
-
-      # Run iterations
-      {result, _} =
-        Stream.iterate(0, &(&1 + 1))
-        |> Enum.reduce_while({%{iterations: [], best_candidate: current_candidate}, current_candidate}, fn
-          iteration_num, {state, candidate} ->
-            if iteration_num >= loop.max_iterations do
-              # Max iterations reached
-              final_result = finalize_result(state, loop, :max_iterations)
-              {:halt, {final_result, candidate}}
-            else
-              run_single_iteration(loop, prompt, candidate, iteration_num, state, context_with_memory)
-            end
-        end)
+      result = run_iterations(loop, prompt, starting_candidate, context_with_memory)
 
       # Store in memory if available
       _ = maybe_store_in_memory(loop, prompt, result)
 
       {:ok, result}
     end
+  end
+
+  defp run_iterations(loop, prompt, starting_candidate, context) do
+    initial_state = %{iterations: [], best_candidate: starting_candidate}
+
+    {result, _} =
+      Stream.iterate(0, &(&1 + 1))
+      |> Enum.reduce_while({initial_state, starting_candidate}, fn iteration_num, {state, candidate} ->
+        iteration_step(loop, prompt, candidate, iteration_num, state, context)
+      end)
+
+    result
+  end
+
+  defp iteration_step(loop, _prompt, candidate, iteration_num, state, _context)
+       when iteration_num >= loop.max_iterations do
+    final_result = finalize_result(state, loop, :max_iterations)
+    {:halt, {final_result, candidate}}
+  end
+
+  defp iteration_step(loop, prompt, candidate, iteration_num, state, context) do
+    run_single_iteration(loop, prompt, candidate, iteration_num, state, context)
   end
 
   @doc """

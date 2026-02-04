@@ -295,36 +295,38 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
         {:ok, response} ->
           {:ok, parse_response(response)}
 
-        {:error, error} when retries > 0 ->
-          # Use Helpers.classify_error to determine if we should retry
-          case Helpers.classify_error(error) do
-            :timeout ->
-              # Retry on timeout
-              call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
-
-            :rate_limit ->
-              # Retry on rate limit with exponential backoff
-              backoff = trunc(:math.pow(2, verifier.max_retries - retries + 1) * 1000)
-              Process.sleep(backoff)
-              call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
-
-            :network ->
-              # Retry on network errors
-              Process.sleep(1000)
-              call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
-
-            _ ->
-              # Don't retry on other errors
-              {:error, error}
-          end
-
-        {:error, reason} ->
-          {:error, reason}
+        {:error, error} ->
+          handle_llm_error(error, verifier, prompt, candidate_or_candidates, retries)
       end
     rescue
       e ->
         {:error, {:llm_exception, Exception.message(e), struct: e.__struct__}}
     end
+  end
+
+  defp handle_llm_error(error, verifier, prompt, candidate_or_candidates, retries) do
+    case Helpers.classify_error(error) do
+      :timeout ->
+        retry_llm(verifier, prompt, candidate_or_candidates, retries, 0)
+
+      :rate_limit ->
+        retry_llm(verifier, prompt, candidate_or_candidates, retries, rate_limit_backoff(verifier, retries))
+
+      :network ->
+        retry_llm(verifier, prompt, candidate_or_candidates, retries, 1000)
+
+      _ ->
+        {:error, error}
+    end
+  end
+
+  defp retry_llm(verifier, prompt, candidate_or_candidates, retries, backoff_ms) do
+    if backoff_ms > 0, do: Process.sleep(backoff_ms)
+    call_llm_with_retry(verifier, prompt, candidate_or_candidates, retries - 1)
+  end
+
+  defp rate_limit_backoff(verifier, retries) do
+    trunc(:math.pow(2, verifier.max_retries - retries + 1) * 1000)
   end
 
   defp simulate_llm? do

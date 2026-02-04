@@ -67,7 +67,7 @@ defmodule Jido.AI.Skills.Orchestration do
     tags: ["orchestration", "multi-agent", "delegation", "coordination"],
     vsn: "1.0.0"
 
-  alias Jido.AI.Signal.{DelegationRequest, DelegationResult, DelegationError}
+  alias Jido.AI.Signal.{DelegationError, DelegationRequest, DelegationResult}
 
   @doc """
   Initialize skill state when mounted to an agent.

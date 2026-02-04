@@ -16,7 +16,7 @@ defmodule Jido.AI.Accuracy.ReflexionMemory do
   - `:storage` - Storage backend (:ets or :memory)
   - `:max_entries` - Maximum stored critiques (default: 1000)
   - `:similarity_threshold` - For retrieval matching (default: 0.7)
-  -:table_name` - ETS table name (auto-generated if nil)
+  - `:table_name` - ETS table name (auto-generated if nil)
 
   ## Usage
 

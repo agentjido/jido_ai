@@ -37,11 +37,13 @@ defmodule Jido.AI.Accuracy.Directive do
         }
       end
 
-  def handle_accuracy_result(agent, signal) do
-    # signal.answer contains the final answer
-    # signal.confidence contains the confidence score
-    {:ok, agent}
-  end
+      def handle_accuracy_result(agent, signal) do
+        # signal.answer contains the final answer
+        # signal.confidence contains the confidence score
+        # Returns {:ok, agent}
+        {:ok, updated_agent}
+      end
+
   """
 
   defmodule Run do

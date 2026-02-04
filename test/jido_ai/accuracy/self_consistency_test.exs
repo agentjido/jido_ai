@@ -2,10 +2,11 @@ defmodule Jido.AI.Accuracy.SelfConsistencyTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Accuracy.Aggregators.{BestOfN, MajorityVote, Weighted}
+  alias Jido.AI.Accuracy.Candidate
   alias Jido.AI.Accuracy.Generators.LLMGenerator
+  alias Jido.AI.Accuracy.SelfConsistency
   alias Jido.AI.Accuracy.SelfConsistencyTestTestHelper
   alias Jido.AI.Accuracy.TestSupport.MockGenerator
-  alias Jido.AI.Accuracy.{Candidate, SelfConsistency}
 
   @moduletag :capture_log
 
