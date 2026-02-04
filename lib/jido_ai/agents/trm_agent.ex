@@ -92,9 +92,9 @@ defmodule Jido.AI.TRMAgent do
     model = Keyword.get(opts, :model, @default_model)
     max_supervision_steps = Keyword.get(opts, :max_supervision_steps, @default_max_supervision_steps)
     act_threshold = Keyword.get(opts, :act_threshold, @default_act_threshold)
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     strategy_opts = [
       model: model,
@@ -122,7 +122,7 @@ defmodule Jido.AI.TRMAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.TRM, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

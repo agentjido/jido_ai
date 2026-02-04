@@ -31,7 +31,7 @@ defmodule Jido.AI.Skills.TaskSupervisorSkill do
   key `__task_supervisor_skill__`.
   """
 
-  use Jido.Skill,
+  use Jido.Plugin,
     name: "ai_task_supervisor",
     description: "Manages per-instance task supervisor for async operations",
     category: "ai",
@@ -46,7 +46,7 @@ defmodule Jido.AI.Skills.TaskSupervisorSkill do
 
   Creates and stores the Task.Supervisor PID.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def mount(_agent, _config) do
     case start_supervisor() do
       {:ok, supervisor_pid} ->

@@ -171,10 +171,10 @@ defmodule Jido.AI.ReActAgent do
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
     # Don't extract tool_context here - it contains AST with module aliases
     # that need to be evaluated in the calling module's context
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
     # TaskSupervisorSkill is always included for per-instance task supervision
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     # Extract tool_context at macro expansion time
     # Use safe alias-only expansion instead of Code.eval_quoted
@@ -224,7 +224,7 @@ defmodule Jido.AI.ReActAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

@@ -97,9 +97,9 @@ defmodule Jido.AI.ToTAgent do
     traversal_strategy = Keyword.get(opts, :traversal_strategy, @default_traversal_strategy)
     generation_prompt = Keyword.get(opts, :generation_prompt)
     evaluation_prompt = Keyword.get(opts, :evaluation_prompt)
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     strategy_opts =
       [
@@ -135,7 +135,7 @@ defmodule Jido.AI.ToTAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.TreeOfThoughts, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

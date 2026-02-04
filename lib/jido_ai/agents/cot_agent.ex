@@ -79,9 +79,9 @@ defmodule Jido.AI.CoTAgent do
     description = Keyword.get(opts, :description, "CoT agent #{name}")
     model = Keyword.get(opts, :model, @default_model)
     system_prompt = Keyword.get(opts, :system_prompt)
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     strategy_opts =
       [model: model]
@@ -109,7 +109,7 @@ defmodule Jido.AI.CoTAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.ChainOfThought, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

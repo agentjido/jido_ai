@@ -3,9 +3,9 @@ defmodule Jido.AI.Skills.LLMTest do
 
   alias Jido.AI.Skills.LLM
 
-  describe "skill_spec/1" do
+  describe "plugin_spec/1" do
     test "returns valid skill specification" do
-      spec = LLM.skill_spec(%{})
+      spec = LLM.plugin_spec(%{})
 
       assert spec.module == Jido.AI.Skills.LLM
       assert spec.name == "llm"
@@ -17,7 +17,7 @@ defmodule Jido.AI.Skills.LLMTest do
     end
 
     test "includes all three actions" do
-      spec = LLM.skill_spec(%{})
+      spec = LLM.plugin_spec(%{})
 
       assert Jido.AI.Skills.LLM.Actions.Chat in spec.actions
       assert Jido.AI.Skills.LLM.Actions.Complete in spec.actions

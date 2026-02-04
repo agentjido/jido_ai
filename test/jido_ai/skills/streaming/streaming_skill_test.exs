@@ -3,9 +3,9 @@ defmodule Jido.AI.Skills.StreamingTest do
 
   alias Jido.AI.Skills.Streaming
 
-  describe "skill_spec/1" do
+  describe "plugin_spec/1" do
     test "returns valid skill spec with empty config" do
-      spec = Streaming.skill_spec(%{})
+      spec = Streaming.plugin_spec(%{})
 
       assert spec.module == Streaming
       assert spec.name == "streaming"
@@ -17,7 +17,7 @@ defmodule Jido.AI.Skills.StreamingTest do
 
     test "includes config in skill spec" do
       config = %{default_model: :fast, default_buffer_size: 4096}
-      spec = Streaming.skill_spec(config)
+      spec = Streaming.plugin_spec(config)
 
       assert spec.config == config
     end

@@ -81,7 +81,7 @@ defmodule Jido.AI.Skills.ToolCalling do
   `Registry.to_reqllm_tools/0`.
   """
 
-  use Jido.Skill,
+  use Jido.Plugin,
     name: "tool_calling",
     state_key: :tool_calling,
     actions: [
@@ -97,7 +97,7 @@ defmodule Jido.AI.Skills.ToolCalling do
   @doc """
   Initialize skill state when mounted to an agent.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def mount(_agent, config) do
     tools = Map.get(config, :tools, [])
     tools_map = build_tools_map(tools)
@@ -149,7 +149,7 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   Maps signal patterns to action modules.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def router(_config) do
     [
       {"tool.call", Jido.AI.Skills.ToolCalling.Actions.CallWithTools},
@@ -163,7 +163,7 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   Currently returns :continue to allow normal routing.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def handle_signal(_signal, _context) do
     {:ok, :continue}
   end
@@ -173,7 +173,7 @@ defmodule Jido.AI.Skills.ToolCalling do
 
   Currently passes through results unchanged.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def transform_result(_action, result, _context) do
     result
   end

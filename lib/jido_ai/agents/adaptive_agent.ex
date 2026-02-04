@@ -101,9 +101,9 @@ defmodule Jido.AI.AdaptiveAgent do
     default_strategy = Keyword.get(opts, :default_strategy, @default_strategy)
     available_strategies = Keyword.get(opts, :available_strategies, @default_available_strategies)
     complexity_thresholds = Keyword.get(opts, :complexity_thresholds)
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     strategy_opts =
       [
@@ -138,7 +138,7 @@ defmodule Jido.AI.AdaptiveAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.Adaptive, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

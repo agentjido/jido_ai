@@ -100,9 +100,9 @@ defmodule Jido.AI.GoTAgent do
     generation_prompt = Keyword.get(opts, :generation_prompt)
     connection_prompt = Keyword.get(opts, :connection_prompt)
     aggregation_prompt = Keyword.get(opts, :aggregation_prompt)
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     strategy_opts =
       [
@@ -138,7 +138,7 @@ defmodule Jido.AI.GoTAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.GraphOfThoughts, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

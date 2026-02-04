@@ -55,7 +55,7 @@ defmodule Jido.AI.Skills.Reasoning do
   **Stateless**: The skill maintains no internal state.
   """
 
-  use Jido.Skill,
+  use Jido.Plugin,
     name: "reasoning",
     state_key: :reasoning,
     actions: [
@@ -73,7 +73,7 @@ defmodule Jido.AI.Skills.Reasoning do
 
   Returns initial state with any configured defaults.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def mount(_agent, config) do
     initial_state = %{
       default_model: Map.get(config, :default_model, :reasoning),
@@ -106,7 +106,7 @@ defmodule Jido.AI.Skills.Reasoning do
 
   Maps signal patterns to action modules.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def router(_config) do
     [
       {"reasoning.analyze", Jido.AI.Skills.Reasoning.Actions.Analyze},
@@ -120,7 +120,7 @@ defmodule Jido.AI.Skills.Reasoning do
 
   Currently returns :continue to allow normal routing.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def handle_signal(_signal, _context) do
     {:ok, :continue}
   end
@@ -130,7 +130,7 @@ defmodule Jido.AI.Skills.Reasoning do
 
   Currently passes through results unchanged.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def transform_result(_action, result, _context) do
     result
   end

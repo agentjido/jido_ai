@@ -268,6 +268,7 @@ defmodule Jido.AI.Thread do
 
   defp format_tool_calls_for_debug(nil), do: nil
   defp format_tool_calls_for_debug([]), do: nil
+
   defp format_tool_calls_for_debug(tool_calls) do
     Enum.map(tool_calls, fn tc ->
       case tc do
@@ -291,13 +292,16 @@ defmodule Jido.AI.Thread do
   end
 
   defp format_entry_for_pp(%Entry{role: :assistant, tool_calls: tool_calls}) when is_list(tool_calls) do
-    names = Enum.map(tool_calls, fn tc ->
-      case tc do
-        %{name: name} -> name
-        %{"name" => name} -> name
-        _ -> "?"
-      end
-    end) |> Enum.join(", ")
+    names =
+      Enum.map(tool_calls, fn tc ->
+        case tc do
+          %{name: name} -> name
+          %{"name" => name} -> name
+          _ -> "?"
+        end
+      end)
+      |> Enum.join(", ")
+
     "[asst]   <tool: #{names}>"
   end
 
@@ -364,7 +368,7 @@ defimpl Inspect, for: Jido.AI.Thread do
   def inspect(thread, _opts) do
     len = Kernel.length(thread.entries)
     last_roles = thread.entries |> Enum.take(-2) |> Enum.map(& &1.role)
-    
+
     suffix = if len > 0, do: ", last: #{Kernel.inspect(last_roles)}", else: ""
     "#Thread<#{len} entries#{suffix}>"
   end

@@ -184,33 +184,33 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
   # ============================================================================
 
   describe "Public API Stability" do
-    test "LLM.skill_spec/1 is available" do
-      assert function_exported?(LLM, :skill_spec, 1)
-      spec = LLM.skill_spec(%{})
+    test "LLM.plugin_spec/1 is available" do
+      assert function_exported?(LLM, :plugin_spec, 1)
+      spec = LLM.plugin_spec(%{})
       assert spec.module == LLM
     end
 
-    test "Reasoning.skill_spec/1 is available" do
-      assert function_exported?(Reasoning, :skill_spec, 1)
-      spec = Reasoning.skill_spec(%{})
+    test "Reasoning.plugin_spec/1 is available" do
+      assert function_exported?(Reasoning, :plugin_spec, 1)
+      spec = Reasoning.plugin_spec(%{})
       assert spec.module == Reasoning
     end
 
-    test "Planning.skill_spec/1 is available" do
-      assert function_exported?(Planning, :skill_spec, 1)
-      spec = Planning.skill_spec(%{})
+    test "Planning.plugin_spec/1 is available" do
+      assert function_exported?(Planning, :plugin_spec, 1)
+      spec = Planning.plugin_spec(%{})
       assert spec.module == Planning
     end
 
-    test "Streaming.skill_spec/1 is available" do
-      assert function_exported?(Streaming, :skill_spec, 1)
-      spec = Streaming.skill_spec(%{})
+    test "Streaming.plugin_spec/1 is available" do
+      assert function_exported?(Streaming, :plugin_spec, 1)
+      spec = Streaming.plugin_spec(%{})
       assert spec.module == Streaming
     end
 
-    test "ToolCalling.skill_spec/1 is available" do
-      assert function_exported?(ToolCalling, :skill_spec, 1)
-      spec = ToolCalling.skill_spec(%{})
+    test "ToolCalling.plugin_spec/1 is available" do
+      assert function_exported?(ToolCalling, :plugin_spec, 1)
+      spec = ToolCalling.plugin_spec(%{})
       assert spec.module == ToolCalling
     end
 
@@ -405,12 +405,12 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert Code.ensure_loaded?(ToolCalling)
     end
 
-    test "all skills have skill_spec/1" do
-      assert function_exported?(LLM, :skill_spec, 1)
-      assert function_exported?(Reasoning, :skill_spec, 1)
-      assert function_exported?(Planning, :skill_spec, 1)
-      assert function_exported?(Streaming, :skill_spec, 1)
-      assert function_exported?(ToolCalling, :skill_spec, 1)
+    test "all skills have plugin_spec/1" do
+      assert function_exported?(LLM, :plugin_spec, 1)
+      assert function_exported?(Reasoning, :plugin_spec, 1)
+      assert function_exported?(Planning, :plugin_spec, 1)
+      assert function_exported?(Streaming, :plugin_spec, 1)
+      assert function_exported?(ToolCalling, :plugin_spec, 1)
     end
 
     test "all skills have mount/2" do

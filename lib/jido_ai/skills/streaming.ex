@@ -91,7 +91,7 @@ defmodule Jido.AI.Skills.Streaming do
   **Callback Flexibility**: Supports function, PID, and Registry-based callbacks.
   """
 
-  use Jido.Skill,
+  use Jido.Plugin,
     name: "streaming",
     state_key: :streaming,
     actions: [
@@ -107,7 +107,7 @@ defmodule Jido.AI.Skills.Streaming do
   @doc """
   Initialize skill state when mounted to an agent.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def mount(_agent, config) do
     initial_state = %{
       default_model: Map.get(config, :default_model, :fast),
@@ -148,7 +148,7 @@ defmodule Jido.AI.Skills.Streaming do
 
   Maps signal patterns to action modules.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def router(_config) do
     [
       {"stream.start", Jido.AI.Skills.Streaming.Actions.StartStream},
@@ -162,7 +162,7 @@ defmodule Jido.AI.Skills.Streaming do
 
   Currently returns :continue to allow normal routing.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def handle_signal(_signal, _context) do
     {:ok, :continue}
   end
@@ -172,7 +172,7 @@ defmodule Jido.AI.Skills.Streaming do
 
   Currently passes through results unchanged.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def transform_result(_action, result, _context) do
     result
   end
