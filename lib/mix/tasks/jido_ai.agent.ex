@@ -91,6 +91,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
 
   ## See Also
 
+  - `mix help jido_ai.chat` - Interactive multi-turn conversations
   - `mix help jido_ai.accuracy` - Improve accuracy via self-consistency
   - `mix help jido_ai.gepa` - Evaluate prompt templates
   """

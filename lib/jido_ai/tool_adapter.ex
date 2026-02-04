@@ -76,9 +76,22 @@ defmodule Jido.AI.ToolAdapter do
     prefix = Keyword.get(opts, :prefix)
     filter_fn = Keyword.get(opts, :filter)
 
-    action_modules
-    |> maybe_filter(filter_fn)
-    |> Enum.map(fn module -> from_action(module, prefix: prefix) end)
+    tools =
+      action_modules
+      |> maybe_filter(filter_fn)
+      |> Enum.map(fn module -> from_action(module, prefix: prefix) end)
+
+    # Check for duplicate tool names
+    names = Enum.map(tools, & &1.name)
+    duplicates = names -- Enum.uniq(names)
+
+    if duplicates != [] do
+      raise ArgumentError,
+            "Duplicate tool names detected: #{inspect(Enum.uniq(duplicates))}. " <>
+              "Each action must have a unique name."
+    end
+
+    tools
   end
 
   @doc """
@@ -140,11 +153,45 @@ defmodule Jido.AI.ToolAdapter do
       {:error, :not_found} = ToolAdapter.lookup_action("unknown", [Calculator])
       # => {:error, :not_found}
   """
-  @spec lookup_action(String.t(), [module()]) :: {:ok, module()} | {:error, :not_found}
-  def lookup_action(tool_name, action_modules) when is_binary(tool_name) and is_list(action_modules) do
-    case Enum.find(action_modules, fn mod -> mod.name() == tool_name end) do
+  @spec lookup_action(String.t(), [module()], keyword()) :: {:ok, module()} | {:error, :not_found}
+  def lookup_action(tool_name, action_modules, opts \\ [])
+
+  def lookup_action(tool_name, action_modules, opts) when is_binary(tool_name) and is_list(action_modules) do
+    prefix = Keyword.get(opts, :prefix)
+
+    case Enum.find(action_modules, fn mod -> apply_prefix(mod.name(), prefix) == tool_name end) do
       nil -> {:error, :not_found}
       module -> {:ok, module}
+    end
+  end
+
+  @doc """
+  Validates that all modules in the list implement the Jido.Action behaviour.
+
+  Returns `:ok` if all modules are valid, or `{:error, {:invalid_action, module, reason}}`
+  for the first invalid module found.
+
+  ## Example
+
+      :ok = ToolAdapter.validate_actions([Calculator, Search])
+      {:error, {:invalid_action, BadModule, :missing_name}} = ToolAdapter.validate_actions([BadModule])
+  """
+  @spec validate_actions([module()]) :: :ok | {:error, {:invalid_action, module(), atom()}}
+  def validate_actions(action_modules) when is_list(action_modules) do
+    Enum.reduce_while(action_modules, :ok, fn module, :ok ->
+      case validate_action_module(module) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, {:invalid_action, module, reason}}}
+      end
+    end)
+  end
+
+  defp validate_action_module(module) do
+    cond do
+      not function_exported?(module, :name, 0) -> {:error, :missing_name}
+      not function_exported?(module, :description, 0) -> {:error, :missing_description}
+      not function_exported?(module, :schema, 0) -> {:error, :missing_schema}
+      true -> :ok
     end
   end
 

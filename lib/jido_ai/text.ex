@@ -1,4 +1,4 @@
-defmodule Jido.AI.Helpers.Text do
+defmodule Jido.AI.Text do
   @moduledoc """
   Centralized text extraction utilities for LLM responses.
 
@@ -53,16 +53,16 @@ defmodule Jido.AI.Helpers.Text do
 
   ## Examples
 
-      iex> Jido.AI.Helpers.Text.extract_text(%{message: %{content: "Hello world"}})
+      iex> Jido.AI.Text.extract_text(%{message: %{content: "Hello world"}})
       "Hello world"
 
-      iex> Jido.AI.Helpers.Text.extract_text(%{message: %{content: [%{type: :text, text: "Part 1"}, %{type: :text, text: "Part 2"}]}})
+      iex> Jido.AI.Text.extract_text(%{message: %{content: [%{type: :text, text: "Part 1"}, %{type: :text, text: "Part 2"}]}})
       "Part 1\\nPart 2"
 
-      iex> Jido.AI.Helpers.Text.extract_text("already a string")
+      iex> Jido.AI.Text.extract_text("already a string")
       "already a string"
 
-      iex> Jido.AI.Helpers.Text.extract_text(nil)
+      iex> Jido.AI.Text.extract_text(nil)
       ""
   """
   @spec extract_text(term()) :: String.t()
@@ -131,10 +131,10 @@ defmodule Jido.AI.Helpers.Text do
 
   ## Examples
 
-      iex> Jido.AI.Helpers.Text.extract_from_content("hello")
+      iex> Jido.AI.Text.extract_from_content("hello")
       "hello"
 
-      iex> Jido.AI.Helpers.Text.extract_from_content([%{type: :text, text: "hello"}])
+      iex> Jido.AI.Text.extract_from_content([%{type: :text, text: "hello"}])
       "hello"
   """
   @spec extract_from_content(term()) :: String.t()

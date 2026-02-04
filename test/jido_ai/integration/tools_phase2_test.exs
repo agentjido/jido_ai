@@ -13,8 +13,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   use ExUnit.Case, async: false
 
+  alias Jido.AI.Executor
   alias Jido.AI.ToolAdapter
-  alias Jido.AI.Tools.Executor
 
   # ============================================================================
   # Test Actions

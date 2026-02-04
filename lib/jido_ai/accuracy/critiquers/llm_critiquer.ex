@@ -55,7 +55,7 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
   @behaviour Jido.AI.Accuracy.Critique
 
   alias Jido.AI.Accuracy.{Candidate, Config, CritiqueResult}
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
 
   @type t :: %__MODULE__{
           model: String.t(),

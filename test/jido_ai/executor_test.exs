@@ -1,7 +1,7 @@
-defmodule Jido.AI.Tools.ExecutorTest do
+defmodule Jido.AI.ExecutorTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Tools.Executor
+  alias Jido.AI.Executor
 
   # Define test Action modules
   defmodule TestActions.Calculator do

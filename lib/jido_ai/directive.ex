@@ -108,7 +108,7 @@ defmodule Jido.AI.Directive do
        Registry lookup. This is used by strategies that maintain their own tool lists.
 
     2. **Registry lookup**: When `action_module` is nil, looks up the action in
-       `Jido.AI.Tools.Registry` by name and executes via `Jido.AI.Tools.Executor`.
+       `Jido.AI.Tools.Registry` by name and executes via `Jido.AI.Executor`.
 
     ## Argument Normalization
 
@@ -404,7 +404,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
             {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
         end
 
-      signal = Signal.LLMResult.new!(%{call_id: call_id, result: result})
+      signal = Signal.LLMResponse.new!(%{call_id: call_id, result: result})
       Jido.AgentServer.cast(agent_pid, signal)
     end)
 
@@ -437,7 +437,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       {:ok, stream_response} ->
         on_content = fn text ->
           partial_signal =
-            Signal.LLMPartial.new!(%{
+            Signal.LLMDelta.new!(%{
               call_id: call_id,
               delta: text,
               chunk_type: :content
@@ -448,7 +448,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
         on_thinking = fn text ->
           partial_signal =
-            Signal.LLMPartial.new!(%{
+            Signal.LLMDelta.new!(%{
               call_id: call_id,
               delta: text,
               chunk_type: :thinking
@@ -487,7 +487,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
     if input_tokens > 0 or output_tokens > 0 do
       signal =
-        Signal.UsageReport.new!(%{
+        Signal.Usage.new!(%{
           call_id: call_id,
           model: model || "unknown",
           input_tokens: input_tokens,
@@ -583,7 +583,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   1. Direct module execution when `action_module` is provided (bypasses Registry)
   2. Registry lookup by `tool_name` when `action_module` is nil
 
-  Uses `Jido.AI.Tools.Executor` for execution, which provides consistent error
+  Uses `Jido.AI.Executor` for execution, which provides consistent error
   handling, parameter normalization, and telemetry.
 
   ## Error Handling (Issue #2 Fix)
@@ -597,8 +597,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   This prevents the Machine from deadlocking in `awaiting_tool` state.
   """
 
+  alias Jido.AI.Executor
   alias Jido.AI.Signal
-  alias Jido.AI.Tools.Executor
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -833,7 +833,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
             {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
         end
 
-      signal = Signal.LLMResult.new!(%{call_id: call_id, result: result})
+      signal = Signal.LLMResponse.new!(%{call_id: call_id, result: result})
       Jido.AgentServer.cast(agent_pid, signal)
     end)
 
@@ -885,7 +885,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
     if input_tokens > 0 or output_tokens > 0 do
       signal =
-        Signal.UsageReport.new!(%{
+        Signal.Usage.new!(%{
           call_id: call_id,
           model: model || "unknown",
           input_tokens: input_tokens,

@@ -3,16 +3,14 @@ defmodule Jido.AI.Error do
   Splode-based error handling for Jido.AI.
 
   Provides structured error types for AI operations including:
-  - API errors (rate limits, authentication, etc.)
+  - API errors (rate limits, authentication, transient failures)
   - Validation errors
-  - Execution errors
   """
 
   use Splode,
     error_classes: [
       api: Jido.AI.Error.API,
-      validation: Jido.AI.Error.Validation,
-      execution: Jido.AI.Error.Execution
+      validation: Jido.AI.Error.Validation
     ],
     unknown_error: Jido.AI.Error.Unknown
 end
@@ -29,13 +27,6 @@ defmodule Jido.AI.Error.Validation do
 
   use Splode.ErrorClass,
     class: :validation
-end
-
-defmodule Jido.AI.Error.Execution do
-  @moduledoc "Execution and runtime errors"
-
-  use Splode.ErrorClass,
-    class: :execution
 end
 
 defmodule Jido.AI.Error.Unknown do
@@ -83,41 +74,27 @@ defmodule Jido.AI.Error.API.Auth do
   def message(_), do: "Authentication failed"
 end
 
-defmodule Jido.AI.Error.API.Timeout do
-  @moduledoc "Request timeout error"
+defmodule Jido.AI.Error.API.Request do
+  @moduledoc """
+  Transient request failure error.
+
+  Covers timeout, network, and provider errors - all transient failures
+  that may be retried.
+  """
 
   use Splode.Error,
-    fields: [:message],
+    fields: [:message, :kind, :status],
     class: :api
+
+  @type kind :: :timeout | :network | :provider
 
   @impl true
   def message(%{message: message}) when is_binary(message), do: message
-  def message(_), do: "Request timed out"
-end
-
-defmodule Jido.AI.Error.API.Provider do
-  @moduledoc "Provider-side error (5xx)"
-
-  use Splode.Error,
-    fields: [:message, :status],
-    class: :api
-
-  @impl true
-  def message(%{message: message}) when is_binary(message), do: message
-  def message(%{status: status}) when is_integer(status), do: "Provider error (#{status})"
-  def message(_), do: "Provider error"
-end
-
-defmodule Jido.AI.Error.API.Network do
-  @moduledoc "Network connectivity error"
-
-  use Splode.Error,
-    fields: [:message],
-    class: :api
-
-  @impl true
-  def message(%{message: message}) when is_binary(message), do: message
-  def message(_), do: "Network error"
+  def message(%{kind: :timeout}), do: "Request timed out"
+  def message(%{kind: :network}), do: "Network error"
+  def message(%{kind: :provider, status: status}) when is_integer(status), do: "Provider error (#{status})"
+  def message(%{kind: :provider}), do: "Provider error"
+  def message(_), do: "Request failed"
 end
 
 # ============================================================================
