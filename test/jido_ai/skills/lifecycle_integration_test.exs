@@ -343,45 +343,45 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
   end
 
   # ============================================================================
-  # Skill Spec Tests
+  # Plugin Spec Tests
   # ============================================================================
 
-  describe "Skill Spec" do
-    test "LLM skill_spec returns valid spec" do
-      assert function_exported?(LLM, :skill_spec, 1)
-      spec = LLM.skill_spec(%{})
+  describe "Plugin Spec" do
+    test "LLM plugin_spec returns valid spec" do
+      assert function_exported?(LLM, :plugin_spec, 1)
+      spec = LLM.plugin_spec(%{})
       assert spec.module == LLM
       assert spec.name == "llm"
       assert spec.state_key == :llm
     end
 
-    test "Reasoning skill_spec returns valid spec" do
-      assert function_exported?(Reasoning, :skill_spec, 1)
-      spec = Reasoning.skill_spec(%{})
+    test "Reasoning plugin_spec returns valid spec" do
+      assert function_exported?(Reasoning, :plugin_spec, 1)
+      spec = Reasoning.plugin_spec(%{})
       assert spec.module == Reasoning
       assert spec.name == "reasoning"
       assert spec.state_key == :reasoning
     end
 
-    test "Planning skill_spec returns valid spec" do
-      assert function_exported?(Planning, :skill_spec, 1)
-      spec = Planning.skill_spec(%{})
+    test "Planning plugin_spec returns valid spec" do
+      assert function_exported?(Planning, :plugin_spec, 1)
+      spec = Planning.plugin_spec(%{})
       assert spec.module == Planning
       assert spec.name == "planning"
       assert spec.state_key == :planning
     end
 
-    test "Streaming skill_spec returns valid spec" do
-      assert function_exported?(Streaming, :skill_spec, 1)
-      spec = Streaming.skill_spec(%{})
+    test "Streaming plugin_spec returns valid spec" do
+      assert function_exported?(Streaming, :plugin_spec, 1)
+      spec = Streaming.plugin_spec(%{})
       assert spec.module == Streaming
       assert spec.name == "streaming"
       assert spec.state_key == :streaming
     end
 
-    test "ToolCalling skill_spec returns valid spec" do
-      assert function_exported?(ToolCalling, :skill_spec, 1)
-      spec = ToolCalling.skill_spec(%{})
+    test "ToolCalling plugin_spec returns valid spec" do
+      assert function_exported?(ToolCalling, :plugin_spec, 1)
+      spec = ToolCalling.plugin_spec(%{})
       assert spec.module == ToolCalling
       assert spec.name == "tool_calling"
       assert spec.state_key == :tool_calling

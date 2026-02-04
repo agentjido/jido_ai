@@ -3,9 +3,9 @@ defmodule Jido.AI.Skills.ToolCallingTest do
 
   alias Jido.AI.Skills.ToolCalling
 
-  describe "skill_spec/1" do
+  describe "plugin_spec/1" do
     test "returns valid skill spec with empty config" do
-      spec = ToolCalling.skill_spec(%{})
+      spec = ToolCalling.plugin_spec(%{})
 
       assert spec.module == ToolCalling
       assert spec.name == "tool_calling"
@@ -17,7 +17,7 @@ defmodule Jido.AI.Skills.ToolCallingTest do
 
     test "includes config in skill spec" do
       config = %{auto_execute: true, max_turns: 5}
-      spec = ToolCalling.skill_spec(config)
+      spec = ToolCalling.plugin_spec(config)
 
       assert spec.config == config
     end

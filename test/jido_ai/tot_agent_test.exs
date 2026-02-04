@@ -95,17 +95,17 @@ defmodule Jido.AI.ToTAgentTest do
     end
   end
 
-  describe "skills" do
+  describe "plugins" do
     test "includes TaskSupervisorSkill" do
-      skills = TestToTAgent.skills()
+      plugins = TestToTAgent.plugins()
 
-      skill_mods =
-        Enum.map(skills, fn
+      plugin_mods =
+        Enum.map(plugins, fn
           {mod, _opts} -> mod
           mod when is_atom(mod) -> mod
         end)
 
-      assert Jido.AI.Skills.TaskSupervisorSkill in skill_mods
+      assert Jido.AI.Skills.TaskSupervisorSkill in plugin_mods
     end
   end
 

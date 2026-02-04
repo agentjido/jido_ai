@@ -52,7 +52,7 @@ defmodule Jido.AI.Skills.Orchestration do
   - `AggregateResults` - Combine results from multiple sources
   """
 
-  use Jido.Skill,
+  use Jido.Plugin,
     name: "orchestration",
     state_key: :orchestration,
     actions: [
@@ -72,7 +72,7 @@ defmodule Jido.AI.Skills.Orchestration do
   @doc """
   Initialize skill state when mounted to an agent.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def mount(_agent, _config) do
     initial_state = %{
       children: %{},
@@ -86,7 +86,7 @@ defmodule Jido.AI.Skills.Orchestration do
   @doc """
   Returns the signal router for this skill.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def router(_config) do
     [
       {"orchestration.spawn", Jido.AI.Actions.Orchestration.SpawnChildAgent},
@@ -100,7 +100,7 @@ defmodule Jido.AI.Skills.Orchestration do
   @doc """
   Handle incoming signals for orchestration events.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def handle_signal(signal, context) do
     case signal.type do
       "jido.agent.child.started" ->
@@ -123,7 +123,7 @@ defmodule Jido.AI.Skills.Orchestration do
   @doc """
   Transform action results, potentially updating orchestration state.
   """
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def transform_result(action, result, _context) do
     case action do
       Jido.AI.Actions.Orchestration.SpawnChildAgent ->
