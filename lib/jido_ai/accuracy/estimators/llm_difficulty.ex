@@ -97,7 +97,7 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficulty do
 
   alias Jido.AI.Accuracy.DifficultyEstimate
   alias Jido.AI.Accuracy.Thresholds
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
 
   @type t :: %__MODULE__{
           model: String.t(),

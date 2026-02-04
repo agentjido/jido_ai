@@ -75,7 +75,7 @@ defmodule Jido.AI.Skills.ToolCalling do
   `tools:` option directly, following the core design principle of Jido.AI.
 
   **Registry Integration**: Uses `Jido.AI.Tools.Registry` for tool discovery
-  and `Jido.AI.Tools.Executor` for execution.
+  and `Jido.AI.Executor` for execution.
 
   **Tool Format**: Tools are converted to ReqLLM format via
   `Registry.to_reqllm_tools/0`.

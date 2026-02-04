@@ -1,4 +1,4 @@
-defmodule Jido.AI.Tools.Executor do
+defmodule Jido.AI.Executor do
   @moduledoc """
   Action execution with validation, error handling, and timeout support.
 

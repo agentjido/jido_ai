@@ -1,7 +1,7 @@
-defmodule Jido.AI.Helpers.TextTest do
+defmodule Jido.AI.TextTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
 
   describe "extract_text/1" do
     test "returns binary strings unchanged" do

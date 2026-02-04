@@ -28,8 +28,8 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
       end
   """
 
-  alias Jido.AI.Helpers.Text
   alias Jido.AI.Security
+  alias Jido.AI.Text
 
   @doc """
   Resolves a model parameter to a model spec.
@@ -98,7 +98,7 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
   @doc """
   Extracts text content from an LLM response.
 
-  Delegates to `Jido.AI.Helpers.Text.extract_text/1` which handles
+  Delegates to `Jido.AI.Text.extract_text/1` which handles
   multiple response shapes consistently.
 
   ## Parameters

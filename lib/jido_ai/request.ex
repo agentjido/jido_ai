@@ -1,4 +1,4 @@
-defmodule Jido.AI.RequestTracking do
+defmodule Jido.AI.Request do
   @moduledoc """
   Request tracking for AI agents with per-request isolation and correlation.
 
@@ -34,7 +34,7 @@ defmodule Jido.AI.RequestTracking do
 
   Agents using request tracking should include in their state:
 
-      requests: %{request_id => Request.t()}
+      requests: %{request_id => Handle.t()}
 
   This module provides helpers for managing this map.
 
@@ -44,9 +44,9 @@ defmodule Jido.AI.RequestTracking do
   defmodule MyAgent do
     use Jido.AI.ReActAgent, ...
 
-    # ask/2 now returns {:ok, Request.t()}
+    # ask/2 now returns {:ok, Handle.t()}
     def ask(pid, query, opts \\\\ []) do
-      Jido.AI.RequestTracking.create_and_send(pid, query, opts,
+      Jido.AI.Request.create_and_send(pid, query, opts,
         signal_type: "react.input",
         source: "/react/agent"
       )
@@ -54,7 +54,7 @@ defmodule Jido.AI.RequestTracking do
 
     # await/2 waits for specific request
     def await(request, opts \\\\ []) do
-      Jido.AI.RequestTracking.await(request, opts)
+      Jido.AI.Request.await(request, opts)
     end
   end
   ```
@@ -69,12 +69,12 @@ defmodule Jido.AI.RequestTracking do
   @default_max_requests 100
 
   # ---------------------------------------------------------------------------
-  # Request Struct
+  # Handle Struct
   # ---------------------------------------------------------------------------
 
-  defmodule Request do
+  defmodule Handle do
     @moduledoc """
-    Represents a tracked request with correlation ID.
+    Represents a tracked request handle with correlation ID.
 
     Similar to `%Task{}`, this struct holds the information needed to
     await a specific request's completion.
@@ -111,7 +111,7 @@ defmodule Jido.AI.RequestTracking do
     defstruct Zoi.Struct.struct_fields(@schema)
 
     @doc """
-    Creates a new Request struct.
+    Creates a new Handle struct.
     """
     @spec new(String.t(), server(), String.t()) :: t()
     def new(id, server, query) do
@@ -162,14 +162,14 @@ defmodule Jido.AI.RequestTracking do
 
   ## Examples
 
-      {:ok, request} = RequestTracking.create_and_send(pid, "What is 2+2?",
+      {:ok, request} = Request.create_and_send(pid, "What is 2+2?",
         tool_context: %{actor: user},
         signal_type: "react.input",
         source: "/react/agent"
       )
   """
   @spec create_and_send(server(), String.t(), keyword()) ::
-          {:ok, Request.t()} | {:error, term()}
+          {:ok, Handle.t()} | {:error, term()}
   def create_and_send(server, query, opts) when is_binary(query) do
     signal_type = Keyword.fetch!(opts, :signal_type)
     source = Keyword.fetch!(opts, :source)
@@ -185,7 +185,7 @@ defmodule Jido.AI.RequestTracking do
 
     case Jido.AgentServer.cast(server, signal) do
       :ok ->
-        request = Request.new(request_id, server, query)
+        request = Handle.new(request_id, server, query)
         {:ok, request}
 
       {:error, _} = error ->
@@ -205,7 +205,7 @@ defmodule Jido.AI.RequestTracking do
 
   ## Examples
 
-      {:ok, result} = RequestTracking.send_and_await(pid, "What is 2+2?",
+      {:ok, result} = Request.send_and_await(pid, "What is 2+2?",
         timeout: 10_000,
         signal_type: "react.input",
         source: "/react/agent"
@@ -246,10 +246,10 @@ defmodule Jido.AI.RequestTracking do
   ## Examples
 
       {:ok, request} = MyAgent.ask(pid, "question")
-      {:ok, result} = RequestTracking.await(request, timeout: 10_000)
+      {:ok, result} = Request.await(request, timeout: 10_000)
   """
-  @spec await(Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
-  def await(%Request{id: request_id, server: server}, opts \\ []) do
+  @spec await(Handle.t(), keyword()) :: {:ok, any()} | {:error, term()}
+  def await(%Handle{id: request_id, server: server}, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
 
     # Use AgentServer's await_completion with request-specific paths
@@ -276,7 +276,7 @@ defmodule Jido.AI.RequestTracking do
   A list of results in the same order as the input requests.
   Each element is either `{:ok, result}` or `{:error, reason}`.
   """
-  @spec await_many([Request.t()], keyword()) :: [{:ok, any()} | {:error, term()}]
+  @spec await_many([Handle.t()], keyword()) :: [{:ok, any()} | {:error, term()}]
   def await_many(requests, opts \\ []) when is_list(requests) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
 
@@ -309,7 +309,7 @@ defmodule Jido.AI.RequestTracking do
 
   ## Examples
 
-      state = RequestTracking.init_state(%{})
+      state = Request.init_state(%{})
       # => %{requests: %{}, __request_tracking__: %{max_requests: 100}}
   """
   @spec init_state(map(), keyword()) :: map()
@@ -329,7 +329,7 @@ defmodule Jido.AI.RequestTracking do
   ## Examples
 
       def on_before_cmd(agent, {:react_start, %{query: query, request_id: req_id}} = action) do
-        agent = RequestTracking.start_request(agent, req_id, query)
+        agent = Request.start_request(agent, req_id, query)
         {:ok, agent, action}
       end
   """
@@ -367,7 +367,7 @@ defmodule Jido.AI.RequestTracking do
       def on_after_cmd(agent, {:react_start, %{request_id: req_id}}, directives) do
         snap = strategy_snapshot(agent)
         if snap.done? do
-          agent = RequestTracking.complete_request(agent, req_id, snap.result)
+          agent = Request.complete_request(agent, req_id, snap.result)
         end
         {:ok, agent, directives}
       end
@@ -470,7 +470,7 @@ defmodule Jido.AI.RequestTracking do
             model: Zoi.string() |> Zoi.default("..."),
             # ... other fields
           },
-          Jido.AI.RequestTracking.schema_fields()
+          Jido.AI.Request.schema_fields()
         ))
       end
   """

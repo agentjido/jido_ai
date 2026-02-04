@@ -80,7 +80,7 @@ defmodule Jido.AI.Accuracy.Prms.LLMPrm do
 
   alias Jido.AI.Accuracy.{Config, Prm}
   alias Jido.AI.Helpers
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
 
   @type t :: %__MODULE__{
           model: String.t() | nil,

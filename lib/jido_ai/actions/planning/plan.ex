@@ -56,7 +56,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Plan do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
   alias ReqLLM.Context
 
   @planning_prompt """

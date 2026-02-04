@@ -5,7 +5,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   These tests verify that all Phase 1 components work together correctly:
   - Configuration (model aliases, defaults, provider config)
   - Directives (LLMStream, LLMGenerate, LLMEmbed)
-  - Signals (LLMResult, LLMError, UsageReport, ToolResult, EmbedResult)
+  - Signals (LLMResponse, LLMError, Usage, ToolResult, EmbedResult)
   - Helpers (message building, response processing, error handling)
   - Tool Adapter (action registry, tool conversion)
 
@@ -15,11 +15,11 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Directive.{LLMEmbed, LLMGenerate, LLMStream}
+  alias Jido.AI.Executor
   alias Jido.AI.Helpers
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.{EmbedResult, LLMError, ToolResult, UsageReport}
+  alias Jido.AI.Signal.{EmbedResult, LLMError, ToolResult, Usage}
   alias Jido.AI.ToolAdapter
-  alias Jido.AI.Tools.Executor
   alias ReqLLM.Context
 
   # ============================================================================
@@ -223,9 +223,9 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   end
 
   describe "usage report signal integration" do
-    test "UsageReport signal with full metadata" do
+    test "Usage signal with full metadata" do
       usage_signal =
-        UsageReport.new!(%{
+        Usage.new!(%{
           call_id: "call_usage_1",
           model: "anthropic:claude-haiku-4-5",
           input_tokens: 100,

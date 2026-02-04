@@ -83,4 +83,71 @@ defmodule Jido.AI.ToolAdapterTest do
       assert {:error, :not_found} = ToolAdapter.lookup_action("unknown", [ParamAction])
     end
   end
+
+  describe "lookup_action/3 with prefix" do
+    test "finds action by prefixed tool name" do
+      assert {:ok, ParamAction} =
+               ToolAdapter.lookup_action("myapp_param_action", [EmptySchemaAction, ParamAction], prefix: "myapp_")
+    end
+
+    test "returns error when prefix doesn't match" do
+      assert {:error, :not_found} =
+               ToolAdapter.lookup_action("param_action", [ParamAction], prefix: "myapp_")
+    end
+
+    test "returns error for unknown prefixed tool" do
+      assert {:error, :not_found} =
+               ToolAdapter.lookup_action("myapp_unknown", [ParamAction], prefix: "myapp_")
+    end
+  end
+
+  describe "validate_actions/1" do
+    defmodule NotAnAction do
+      def some_function, do: :ok
+    end
+
+    test "returns :ok for valid action modules" do
+      assert :ok = ToolAdapter.validate_actions([EmptySchemaAction, ParamAction])
+    end
+
+    test "returns error for invalid action module" do
+      assert {:error, {:invalid_action, NotAnAction, _reason}} =
+               ToolAdapter.validate_actions([ParamAction, NotAnAction])
+    end
+  end
+
+  describe "duplicate detection" do
+    defmodule DuplicateNameAction do
+      use Jido.Action,
+        name: "param_action",
+        description: "Same name as ParamAction",
+        schema: []
+    end
+
+    test "from_actions raises on duplicate tool names" do
+      assert_raise ArgumentError, ~r/duplicate tool names/i, fn ->
+        ToolAdapter.from_actions([ParamAction, DuplicateNameAction])
+      end
+    end
+
+    test "from_actions raises on duplicate names after prefix" do
+      defmodule AAction do
+        use Jido.Action,
+          name: "action",
+          description: "First action",
+          schema: []
+      end
+
+      defmodule BAction do
+        use Jido.Action,
+          name: "action",
+          description: "Second action with same name",
+          schema: []
+      end
+
+      assert_raise ArgumentError, ~r/duplicate tool names/i, fn ->
+        ToolAdapter.from_actions([AAction, BAction], prefix: "test_")
+      end
+    end
+  end
 end

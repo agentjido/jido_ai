@@ -74,7 +74,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier do
 
   alias Jido.AI.Accuracy.{Candidate, Config, VerificationResult}
   alias Jido.AI.Helpers
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
 
   @type t :: %__MODULE__{
           model: String.t(),

@@ -113,7 +113,7 @@ defmodule Jido.AI.CoTAgent do
         strategy: {Jido.AI.Strategies.ChainOfThought, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
-      alias Jido.AI.RequestTracking
+      alias Jido.AI.Request
 
       @doc """
       Returns the strategy options configured for this agent.
@@ -134,9 +134,9 @@ defmodule Jido.AI.CoTAgent do
 
       """
       @spec think(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
-              {:ok, RequestTracking.Request.t()} | {:error, term()}
+              {:ok, Request.Handle.t()} | {:error, term()}
       def think(pid, prompt, opts \\ []) when is_binary(prompt) do
-        RequestTracking.create_and_send(
+        Request.create_and_send(
           pid,
           prompt,
           Keyword.merge(opts,
@@ -159,9 +159,9 @@ defmodule Jido.AI.CoTAgent do
           {:ok, result} = MyAgent.await(request, timeout: 10_000)
 
       """
-      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      @spec await(Request.Handle.t(), keyword()) :: {:ok, any()} | {:error, term()}
       def await(request, opts \\ []) do
-        RequestTracking.await(request, opts)
+        Request.await(request, opts)
       end
 
       @doc """
@@ -181,7 +181,7 @@ defmodule Jido.AI.CoTAgent do
       @spec think_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, any()} | {:error, term()}
       def think_sync(pid, prompt, opts \\ []) when is_binary(prompt) do
-        RequestTracking.send_and_await(
+        Request.send_and_await(
           pid,
           prompt,
           Keyword.merge(opts,
@@ -194,11 +194,11 @@ defmodule Jido.AI.CoTAgent do
       @impl true
       def on_before_cmd(agent, {:cot_start, %{prompt: prompt} = params} = action) do
         # Ensure we have a request_id for tracking
-        {request_id, params} = RequestTracking.ensure_request_id(params)
+        {request_id, params} = Request.ensure_request_id(params)
         action = {:cot_start, params}
 
         # Use RequestTracking to manage state (with prompt aliased as query)
-        agent = RequestTracking.start_request(agent, request_id, prompt)
+        agent = Request.start_request(agent, request_id, prompt)
         # Also set last_prompt for CoT-specific backward compat
         agent = put_in(agent.state[:last_prompt], prompt)
 
@@ -214,7 +214,7 @@ defmodule Jido.AI.CoTAgent do
 
         agent =
           if snap.done? do
-            agent = RequestTracking.complete_request(agent, request_id, snap.result)
+            agent = Request.complete_request(agent, request_id, snap.result)
             # Also set last_result for CoT-specific backward compat
             put_in(agent.state[:last_result], snap.result || "")
           else

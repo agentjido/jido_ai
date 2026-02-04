@@ -62,7 +62,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{Helpers, Security, ToolAdapter, Tools}
+  alias Jido.AI.{Executor, Helpers, Security, ToolAdapter}
   alias ReqLLM.Context
 
   @dialyzer [
@@ -265,7 +265,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
     name = Map.get(tool_call, :name)
     arguments = Map.get(tool_call, :arguments, %{})
 
-    Tools.Executor.execute(name, arguments, %{}, tools: tools)
+    Executor.execute(name, arguments, %{}, tools: tools)
   end
 
   defp format_tool_result({:ok, result}) when is_binary(result), do: result

@@ -80,7 +80,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
   """
 
   alias Jido.AI.Accuracy.{Candidate, Config}
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
 
   @type t :: %__MODULE__{
           model: String.t(),
