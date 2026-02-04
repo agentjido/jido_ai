@@ -283,7 +283,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
       # Should have an LLM stream directive
       assert directives != []
-      assert Enum.any?(directives, fn d -> match?(%Jido.AI.Directive.ReqLLMStream{}, d) end)
+      assert Enum.any?(directives, fn d -> match?(%Jido.AI.Directive.LLMStream{}, d) end)
     end
   end
 
@@ -707,7 +707,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
       # Should have a directive from TRM strategy
       assert directives != []
-      assert Enum.any?(directives, fn d -> match?(%Jido.AI.Directive.ReqLLMStream{}, d) end)
+      assert Enum.any?(directives, fn d -> match?(%Jido.AI.Directive.LLMStream{}, d) end)
 
       # State should show TRM is selected
       state = StratState.get(agent, %{})

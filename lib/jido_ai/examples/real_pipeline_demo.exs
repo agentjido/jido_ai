@@ -11,18 +11,18 @@
 # Requirements: Set ANTHROPIC_API_KEY in .env file or environment
 #   echo "ANTHROPIC_API_KEY=your-key-here" >> .env
 
-# Load .env file if present (dotenvy is a dep of req_llm)
+alias Jido.AI.Accuracy.{
+  # Load .env file if present (dotenvy is a dep of req_llm)
+  Pipeline,
+  PipelineConfig,
+  Candidate
+}
+
 if File.exists?(".env") do
   Dotenvy.source!([".env"])
 end
 
 Application.ensure_all_started(:jido_ai)
-
-alias Jido.AI.Accuracy.{
-  Pipeline,
-  PipelineConfig,
-  Candidate
-}
 
 defmodule AccuracyDemo do
   @moduledoc """
@@ -89,19 +89,20 @@ defmodule AccuracyDemo do
         :ok
 
       true ->
-        {:error, """
-        ⚠️  No API key found!
+        {:error,
+         """
+         ⚠️  No API key found!
 
-        Please set one of:
-          export ANTHROPIC_API_KEY=your-key-here
-          export OPENAI_API_KEY=your-key-here
+         Please set one of:
+           export ANTHROPIC_API_KEY=your-key-here
+           export OPENAI_API_KEY=your-key-here
 
-        Or add to .env file:
-          echo "ANTHROPIC_API_KEY=sk-..." >> .env
+         Or add to .env file:
+           echo "ANTHROPIC_API_KEY=sk-..." >> .env
 
-        Then run again:
-          mix run examples/accuracy/real_pipeline_demo.exs
-        """}
+         Then run again:
+           mix run examples/accuracy/real_pipeline_demo.exs
+         """}
     end
   end
 

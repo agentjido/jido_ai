@@ -89,7 +89,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       # Verify directive emitted
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.metadata[:phase] == :reasoning
     end
 
@@ -102,7 +102,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         params: %{prompt: "What is 2 + 2?"}
       }
 
-      {agent, [%Directive.ReqLLMStream{id: call_id}]} = TRM.cmd(agent, [start_instruction], %{})
+      {agent, [%Directive.LLMStream{id: call_id}]} = TRM.cmd(agent, [start_instruction], %{})
 
       # Simulate reasoning response
       llm_result = mock_llm_result(call_id, "The answer is 4 because 2 plus 2 equals 4.", phase: :reasoning)
@@ -122,7 +122,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       # Verify supervision directive
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.metadata[:phase] == :supervising
     end
 
@@ -130,11 +130,11 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       {agent, _ctx} = create_agent(TRM)
 
       # Start → Reasoning
-      {agent, [%Directive.ReqLLMStream{id: call_id1}]} =
+      {agent, [%Directive.LLMStream{id: call_id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Explain recursion"}}], %{})
 
       # Reasoning → Supervision
-      {agent, [%Directive.ReqLLMStream{id: call_id2}]} =
+      {agent, [%Directive.LLMStream{id: call_id2}]} =
         TRM.cmd(
           agent,
           [
@@ -175,7 +175,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       # Verify improvement directive
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.metadata[:phase] == :improving
     end
 
@@ -183,10 +183,10 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 5)
 
       # Full cycle: Start → Reasoning → Supervision → Improvement → Reasoning
-      {agent, [%Directive.ReqLLMStream{id: call_id1}]} =
+      {agent, [%Directive.LLMStream{id: call_id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test question"}}], %{})
 
-      {agent, [%Directive.ReqLLMStream{id: call_id2}]} =
+      {agent, [%Directive.LLMStream{id: call_id2}]} =
         TRM.cmd(
           agent,
           [
@@ -198,7 +198,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: call_id3}]} =
+      {agent, [%Directive.LLMStream{id: call_id3}]} =
         TRM.cmd(
           agent,
           [
@@ -231,7 +231,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       # Verify new reasoning directive
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.metadata[:phase] == :reasoning
     end
 
@@ -239,11 +239,11 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 2)
 
       # Step 1: Start
-      {agent, [%Directive.ReqLLMStream{id: call_id1}]} =
+      {agent, [%Directive.LLMStream{id: call_id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
       # Step 1: Reasoning
-      {agent, [%Directive.ReqLLMStream{id: call_id2}]} =
+      {agent, [%Directive.LLMStream{id: call_id2}]} =
         TRM.cmd(
           agent,
           [
@@ -256,7 +256,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # Step 1: Supervision
-      {agent, [%Directive.ReqLLMStream{id: call_id3}]} =
+      {agent, [%Directive.LLMStream{id: call_id3}]} =
         TRM.cmd(
           agent,
           [
@@ -269,7 +269,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # Step 1: Improvement
-      {agent, [%Directive.ReqLLMStream{id: call_id4}]} =
+      {agent, [%Directive.LLMStream{id: call_id4}]} =
         TRM.cmd(
           agent,
           [
@@ -282,7 +282,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # Step 2: Reasoning
-      {agent, [%Directive.ReqLLMStream{id: call_id5}]} =
+      {agent, [%Directive.LLMStream{id: call_id5}]} =
         TRM.cmd(
           agent,
           [
@@ -295,7 +295,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # Step 2: Supervision
-      {agent, [%Directive.ReqLLMStream{id: call_id6}]} =
+      {agent, [%Directive.LLMStream{id: call_id6}]} =
         TRM.cmd(
           agent,
           [
@@ -330,17 +330,17 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 3)
 
       # Run through multiple improvement cycles
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
-      {agent, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id1, "Initial", phase: :reasoning)}],
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id3}]} =
+      {agent, [%Directive.LLMStream{id: id3}]} =
         TRM.cmd(
           agent,
           [
@@ -352,7 +352,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id4}]} =
+      {agent, [%Directive.LLMStream{id: id4}]} =
         TRM.cmd(
           agent,
           [
@@ -361,7 +361,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id5}]} =
+      {agent, [%Directive.LLMStream{id: id5}]} =
         TRM.cmd(
           agent,
           [
@@ -373,7 +373,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id6}]} =
+      {agent, [%Directive.LLMStream{id: id6}]} =
         TRM.cmd(
           agent,
           [
@@ -410,10 +410,10 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 10, act_threshold: 0.8)
 
       # Run through one cycle with high confidence score
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
-      {agent, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id1, "Initial", phase: :reasoning)}],
@@ -421,7 +421,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # High confidence score should trigger ACT
-      {agent, [%Directive.ReqLLMStream{id: id3}]} =
+      {agent, [%Directive.LLMStream{id: id3}]} =
         TRM.cmd(
           agent,
           [
@@ -457,10 +457,10 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
     test "ACT allows continuation when confidence below threshold" do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 5, act_threshold: 0.9)
 
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
-      {agent, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id1, "Initial", phase: :reasoning)}],
@@ -468,7 +468,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # Below threshold score should not trigger ACT
-      {agent, [%Directive.ReqLLMStream{id: id3}]} =
+      {agent, [%Directive.LLMStream{id: id3}]} =
         TRM.cmd(
           agent,
           [
@@ -512,17 +512,17 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
     test "termination on max_supervision_steps" do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 1)
 
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
-      {agent, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id1, "Initial", phase: :reasoning)}],
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id3}]} =
+      {agent, [%Directive.LLMStream{id: id3}]} =
         TRM.cmd(
           agent,
           [
@@ -550,7 +550,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
     test "error handling transitions to error state" do
       {agent, _ctx} = create_agent(TRM)
 
-      {agent, [%Directive.ReqLLMStream{id: call_id}]} =
+      {agent, [%Directive.LLMStream{id: call_id}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
       # Simulate LLM error (mock_llm_error not used directly, inline error params)
@@ -591,17 +591,17 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       # Completed phase (via max_steps=1)
       {agent2, _} = create_agent(TRM, max_supervision_steps: 1)
 
-      {agent2, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent2, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent2, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], ctx)
 
-      {agent2, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent2, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent2,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id1, "A", phase: :reasoning)}],
           ctx
         )
 
-      {agent2, [%Directive.ReqLLMStream{id: id3}]} =
+      {agent2, [%Directive.LLMStream{id: id3}]} =
         TRM.cmd(
           agent2,
           [
@@ -664,14 +664,14 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       # Should emit TRM reasoning directive
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
     end
 
     test "TRM completion result is accessible through Adaptive" do
       {agent, ctx} = create_agent(Adaptive)
 
       # Start with puzzle prompt
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         Adaptive.cmd(
           agent,
           [
@@ -689,7 +689,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
 
       # Process through TRM phases (simulate completing with max_steps=1 via mock)
       # The Adaptive should delegate LLM results to the selected TRM strategy
-      {agent, [%Directive.ReqLLMStream{id: _id2}]} =
+      {agent, [%Directive.LLMStream{id: _id2}]} =
         Adaptive.cmd(
           agent,
           [
@@ -717,10 +717,10 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 5)
 
       # Start and get initial answer
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Explain AI"}}], %{})
 
-      {agent, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent,
           [
@@ -733,7 +733,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # First supervision with low score
-      {agent, [%Directive.ReqLLMStream{id: id3}]} =
+      {agent, [%Directive.LLMStream{id: id3}]} =
         TRM.cmd(
           agent,
           [
@@ -749,7 +749,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       assert state1[:best_score] == 0.4
 
       # Improvement
-      {agent, [%Directive.ReqLLMStream{id: id4}]} =
+      {agent, [%Directive.LLMStream{id: id4}]} =
         TRM.cmd(
           agent,
           [
@@ -761,7 +761,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id5}]} =
+      {agent, [%Directive.LLMStream{id: id5}]} =
         TRM.cmd(
           agent,
           [
@@ -794,17 +794,17 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
     test "quality scores tracked across supervision steps" do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 3)
 
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
-      {agent, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id1, "A1", phase: :reasoning)}],
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id3}]} =
+      {agent, [%Directive.LLMStream{id: id3}]} =
         TRM.cmd(
           agent,
           [
@@ -818,14 +818,14 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
 
       assert TRM.get_best_score(agent) == 0.3
 
-      {agent, [%Directive.ReqLLMStream{id: id4}]} =
+      {agent, [%Directive.LLMStream{id: id4}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id3, "A2", phase: :improving)}],
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id5}]} =
+      {agent, [%Directive.LLMStream{id: id5}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id4, "R2", phase: :reasoning)}],
@@ -851,10 +851,10 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
     test "best answer is tracked and returned on completion" do
       {agent, _ctx} = create_agent(TRM, max_supervision_steps: 2)
 
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
-      {agent, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent,
           [
@@ -867,7 +867,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # First supervision - moderate score
-      {agent, [%Directive.ReqLLMStream{id: id3}]} =
+      {agent, [%Directive.LLMStream{id: id3}]} =
         TRM.cmd(
           agent,
           [
@@ -881,7 +881,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
 
       assert TRM.get_best_answer(agent) == "First answer"
 
-      {agent, [%Directive.ReqLLMStream{id: id4}]} =
+      {agent, [%Directive.LLMStream{id: id4}]} =
         TRM.cmd(
           agent,
           [
@@ -893,7 +893,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
           %{}
         )
 
-      {agent, [%Directive.ReqLLMStream{id: id5}]} =
+      {agent, [%Directive.LLMStream{id: id5}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id4, "R2", phase: :reasoning)}],
@@ -901,7 +901,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
         )
 
       # Second supervision - lower score (should not replace best)
-      {agent, [%Directive.ReqLLMStream{id: id6}]} =
+      {agent, [%Directive.LLMStream{id: id6}]} =
         TRM.cmd(
           agent,
           [
@@ -970,12 +970,12 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
       assert TRM.get_supervision_step(agent) == 0
 
       # After some processing
-      {agent, [%Directive.ReqLLMStream{id: id1}]} =
+      {agent, [%Directive.LLMStream{id: id1}]} =
         TRM.cmd(agent, [%Instruction{action: TRM.start_action(), params: %{prompt: "Test"}}], %{})
 
       assert TRM.get_supervision_step(agent) == 1
 
-      {agent, [%Directive.ReqLLMStream{id: id2}]} =
+      {agent, [%Directive.LLMStream{id: id2}]} =
         TRM.cmd(
           agent,
           [%Instruction{action: TRM.llm_result_action(), params: mock_llm_result(id1, "Answer", phase: :reasoning)}],
@@ -984,7 +984,7 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
 
       assert TRM.get_current_answer(agent) == "Answer"
 
-      {agent, [%Directive.ReqLLMStream{id: _id3}]} =
+      {agent, [%Directive.LLMStream{id: _id3}]} =
         TRM.cmd(
           agent,
           [

@@ -4,8 +4,8 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   These tests verify that all Phase 1 components work together correctly:
   - Configuration (model aliases, defaults, provider config)
-  - Directives (ReqLLMStream, ReqLLMGenerate, ReqLLMEmbed)
-  - Signals (ReqLLMResult, ReqLLMError, UsageReport, ToolResult, EmbedResult)
+  - Directives (LLMStream, LLMGenerate, LLMEmbed)
+  - Signals (LLMResult, LLMError, UsageReport, ToolResult, EmbedResult)
   - Helpers (message building, response processing, error handling)
   - Tool Adapter (action registry, tool conversion)
 
@@ -14,10 +14,10 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Directive.{ReqLLMEmbed, ReqLLMGenerate, ReqLLMStream}
+  alias Jido.AI.Directive.{LLMEmbed, LLMGenerate, LLMStream}
   alias Jido.AI.Helpers
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.{EmbedResult, ReqLLMError, ToolResult, UsageReport}
+  alias Jido.AI.Signal.{EmbedResult, LLMError, ToolResult, UsageReport}
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Tools.Executor
   alias ReqLLM.Context
@@ -27,10 +27,10 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   # ============================================================================
 
   describe "directive with config integration" do
-    test "ReqLLMStream uses model_alias resolution" do
+    test "LLMStream uses model_alias resolution" do
       # Create directive with model_alias
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "stream_1",
           model_alias: :fast,
           context: [%{role: :user, content: "Hello"}]
@@ -45,9 +45,9 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert String.contains?(resolved_model, ":")
     end
 
-    test "ReqLLMGenerate uses model_alias resolution" do
+    test "LLMGenerate uses model_alias resolution" do
       directive =
-        ReqLLMGenerate.new!(%{
+        LLMGenerate.new!(%{
           id: "gen_1",
           model_alias: :capable,
           context: [%{role: :user, content: "Explain this"}]
@@ -61,7 +61,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       model = "anthropic:claude-haiku-4-5"
 
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "stream_2",
           model: model,
           context: [%{role: :user, content: "Hello"}]
@@ -73,7 +73,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
     test "directive has default values" do
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "stream_3",
           model: "test:model",
           context: [%{role: :user, content: "Hello"}]
@@ -84,9 +84,9 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert is_integer(directive.max_tokens)
     end
 
-    test "ReqLLMEmbed directive creation" do
+    test "LLMEmbed directive creation" do
       directive =
-        ReqLLMEmbed.new!(%{
+        LLMEmbed.new!(%{
           id: "embed_1",
           model: "openai:text-embedding-3-small",
           texts: ["Hello", "World"]
@@ -180,9 +180,9 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   end
 
   describe "error signal integration" do
-    test "ReqLLMError signal creation" do
+    test "LLMError signal creation" do
       error_signal =
-        ReqLLMError.new!(%{
+        LLMError.new!(%{
           call_id: "call_err_1",
           error_type: :rate_limit,
           message: "Rate limit exceeded",
@@ -412,7 +412,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     test "complete request -> response -> signal flow" do
       # 1. Create directive with model alias
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "e2e_1",
           model_alias: :fast,
           system_prompt: "You are helpful.",
@@ -449,7 +449,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     test "complete tool call flow" do
       # 1. Create directive
       directive =
-        ReqLLMGenerate.new!(%{
+        LLMGenerate.new!(%{
           id: "tool_e2e_1",
           model: "test:model",
           context: [%{role: :user, content: "Calculate 5 * 7"}]
@@ -514,7 +514,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
       # 4. Create error signal
       error_signal =
-        ReqLLMError.new!(%{
+        LLMError.new!(%{
           call_id: "err_flow_1",
           error_type: :rate_limit,
           message: "Rate limit exceeded",

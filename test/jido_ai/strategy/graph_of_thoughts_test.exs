@@ -120,7 +120,7 @@ defmodule Jido.AI.Strategies.GraphOfThoughtsTest do
       {_agent, directives} = GraphOfThoughts.cmd(agent, [instruction], %{})
 
       assert length(directives) == 1
-      assert %Jido.AI.Directive.ReqLLMStream{} = hd(directives)
+      assert %Jido.AI.Directive.LLMStream{} = hd(directives)
     end
 
     test "directive contains correct model from config" do

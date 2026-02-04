@@ -39,10 +39,10 @@ graph LR
 | Signal | Type | Emitted By | Purpose |
 |--------|------|------------|---------|
 | `LLMResponse` | `react.llm.response` | ReqLLM directives | LLM call completed |
-| `LLMDelta` | `react.llm.delta` | ReqLLMStream | Streaming token chunk |
+| `LLMDelta` | `react.llm.delta` | LLMStream | Streaming token chunk |
 | `LLMError` | `react.llm.error` | ReqLLM directives | Structured error |
 | `ToolResult` | `react.tool.result` | ToolExec | Tool execution completed |
-| `EmbedResult` | `react.embed.result` | ReqLLMEmbed | Embedding generated |
+| `EmbedResult` | `react.embed.result` | LLMEmbed | Embedding generated |
 | `Usage` | `react.usage` | Telemetry | Token usage tracking |
 
 ## Signal Naming Convention

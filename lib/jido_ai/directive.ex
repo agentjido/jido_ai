@@ -7,7 +7,7 @@ defmodule Jido.AI.Directive do
 
   ## Available Directives
 
-  - `Jido.AI.Directive.ReqLLMStream` - Stream an LLM response with optional tool support
+  - `Jido.AI.Directive.LLMStream` - Stream an LLM response with optional tool support
   - `Jido.AI.Directive.ToolExec` - Execute a Jido.Action as a tool
 
   ## Usage
@@ -15,7 +15,7 @@ defmodule Jido.AI.Directive do
       alias Jido.AI.Directive
 
       # Create an LLM streaming directive
-      directive = Directive.ReqLLMStream.new!(%{
+      directive = Directive.LLMStream.new!(%{
         id: "call_123",
         model: "anthropic:claude-haiku-4-5",
         context: messages,
@@ -30,7 +30,7 @@ defmodule Jido.AI.Directive do
       })
   """
 
-  defmodule ReqLLMStream do
+  defmodule LLMStream do
     @moduledoc """
     Directive asking the runtime to stream an LLM response via ReqLLM.
 
@@ -85,11 +85,11 @@ defmodule Jido.AI.Directive do
     @doc false
     def schema, do: @schema
 
-    @doc "Create a new ReqLLMStream directive."
+    @doc "Create a new LLMStream directive."
     def new!(attrs) when is_map(attrs) do
       case Zoi.parse(@schema, attrs) do
         {:ok, directive} -> directive
-        {:error, errors} -> raise "Invalid ReqLLMStream: #{inspect(errors)}"
+        {:error, errors} -> raise "Invalid LLMStream: #{inspect(errors)}"
       end
     end
   end
@@ -229,7 +229,7 @@ defmodule Jido.AI.Directive do
     end
   end
 
-  defmodule ReqLLMGenerate do
+  defmodule LLMGenerate do
     @moduledoc """
     Directive asking the runtime to generate an LLM response (non-streaming).
 
@@ -237,7 +237,7 @@ defmodule Jido.AI.Directive do
     The runtime will execute this asynchronously and send the result as a
     `react.llm.response` signal.
 
-    This is simpler than `ReqLLMStream` for cases where streaming is not needed.
+    This is simpler than `LLMStream` for cases where streaming is not needed.
     """
 
     @schema Zoi.struct(
@@ -277,16 +277,16 @@ defmodule Jido.AI.Directive do
     @doc false
     def schema, do: @schema
 
-    @doc "Create a new ReqLLMGenerate directive."
+    @doc "Create a new LLMGenerate directive."
     def new!(attrs) when is_map(attrs) do
       case Zoi.parse(@schema, attrs) do
         {:ok, directive} -> directive
-        {:error, errors} -> raise "Invalid ReqLLMGenerate: #{inspect(errors)}"
+        {:error, errors} -> raise "Invalid LLMGenerate: #{inspect(errors)}"
       end
     end
   end
 
-  defmodule ReqLLMEmbed do
+  defmodule LLMEmbed do
     @moduledoc """
     Directive asking the runtime to generate embeddings via ReqLLM.
 
@@ -318,17 +318,17 @@ defmodule Jido.AI.Directive do
     @doc false
     def schema, do: @schema
 
-    @doc "Create a new ReqLLMEmbed directive."
+    @doc "Create a new LLMEmbed directive."
     def new!(attrs) when is_map(attrs) do
       case Zoi.parse(@schema, attrs) do
         {:ok, directive} -> directive
-        {:error, errors} -> raise "Invalid ReqLLMEmbed: #{inspect(errors)}"
+        {:error, errors} -> raise "Invalid LLMEmbed: #{inspect(errors)}"
       end
     end
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   @moduledoc """
   Spawns an async task to stream an LLM response and sends results back to the agent.
 
@@ -404,7 +404,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
             {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
         end
 
-      signal = Signal.ReqLLMResult.new!(%{call_id: call_id, result: result})
+      signal = Signal.LLMResult.new!(%{call_id: call_id, result: result})
       Jido.AgentServer.cast(agent_pid, signal)
     end)
 
@@ -437,7 +437,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
       {:ok, stream_response} ->
         on_content = fn text ->
           partial_signal =
-            Signal.ReqLLMPartial.new!(%{
+            Signal.LLMPartial.new!(%{
               call_id: call_id,
               delta: text,
               chunk_type: :content
@@ -448,7 +448,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
 
         on_thinking = fn text ->
           partial_signal =
-            Signal.ReqLLMPartial.new!(%{
+            Signal.LLMPartial.new!(%{
               call_id: call_id,
               delta: text,
               chunk_type: :thinking
@@ -506,7 +506,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMStream do
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMEmbed do
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
   @moduledoc """
   Spawns an async task to generate embeddings and sends the result back to the agent.
 
@@ -771,7 +771,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitRequestError 
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   @moduledoc """
   Spawns an async task to generate an LLM response (non-streaming) and sends
   the result back to the agent.
@@ -833,7 +833,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ReqLLMGenerate do
             {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
         end
 
-      signal = Signal.ReqLLMResult.new!(%{call_id: call_id, result: result})
+      signal = Signal.LLMResult.new!(%{call_id: call_id, result: result})
       Jido.AgentServer.cast(agent_pid, signal)
     end)
 

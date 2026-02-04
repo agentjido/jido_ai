@@ -402,7 +402,7 @@ defmodule Jido.AI.Strategies.TRM do
       %{role: :user, content: user}
     ]
 
-    Directive.ReqLLMStream.new!(%{
+    Directive.LLMStream.new!(%{
       id: id,
       model: model,
       context: convert_to_reqllm_context(messages),
@@ -428,7 +428,7 @@ defmodule Jido.AI.Strategies.TRM do
       %{role: :user, content: user}
     ]
 
-    Directive.ReqLLMStream.new!(%{
+    Directive.LLMStream.new!(%{
       id: id,
       model: model,
       context: convert_to_reqllm_context(messages),
@@ -456,7 +456,7 @@ defmodule Jido.AI.Strategies.TRM do
       %{role: :user, content: user}
     ]
 
-    Directive.ReqLLMStream.new!(%{
+    Directive.LLMStream.new!(%{
       id: id,
       model: model,
       context: convert_to_reqllm_context(messages),
