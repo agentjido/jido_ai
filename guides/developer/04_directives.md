@@ -7,10 +7,10 @@ This guide covers the directive system in Jido.AI, which provides declarative si
 - [Overview](#overview)
 - [Available Directives](#available-directives)
 - [Directive Lifecycle](#directive-lifecycle)
-- [ReqLLMStream Directive](#reqllmstream-directive)
+- [LLMStream Directive](#llmstream-directive)
 - [ToolExec Directive](#toolexec-directive)
-- [ReqLLMGenerate Directive](#reqllmgenerate-directive)
-- [ReqLLMEmbed Directive](#reqllmembed-directive)
+- [LLMGenerate Directive](#llmgenerate-directive)
+- [LLMEmbed Directive](#llmembed-directive)
 - [Creating Custom Directives](#creating-custom-directives)
 
 ## Overview
@@ -38,9 +38,9 @@ graph LR
 
 | Directive | Module | Purpose |
 |-----------|--------|---------|
-| `ReqLLMStream` | `Jido.AI.Directive.ReqLLMStream` | Stream LLM response |
-| `ReqLLMGenerate` | `Jido.AI.Directive.ReqLLMGenerate` | Generate non-streaming response |
-| `ReqLLMEmbed` | `Jido.AI.Directive.ReqLLMEmbed` | Generate embeddings |
+| `LLMStream` | `Jido.AI.Directive.LLMStream` | Stream LLM response |
+| `LLMGenerate` | `Jido.AI.Directive.LLMGenerate` | Generate non-streaming response |
+| `LLMEmbed` | `Jido.AI.Directive.LLMEmbed` | Generate embeddings |
 | `ToolExec` | `Jido.AI.Directive.ToolExec` | Execute a tool |
 
 ## Directive Lifecycle
@@ -66,7 +66,7 @@ sequenceDiagram
     Strategy->>Machine: update(machine, message)
 ```
 
-## ReqLLMStream Directive
+## LLMStream Directive
 
 Streams an LLM response with optional tool support.
 
@@ -103,7 +103,7 @@ Streams an LLM response with optional tool support.
 alias Jido.AI.Directive
 
 # Using model alias
-directive = Directive.ReqLLMStream.new!(%{
+directive = Directive.LLMStream.new!(%{
   id: "call_123",
   model_alias: :fast,
   context: [
@@ -115,7 +115,7 @@ directive = Directive.ReqLLMStream.new!(%{
 })
 
 # Using direct model spec
-directive = Directive.ReqLLMStream.new!(%{
+directive = Directive.LLMStream.new!(%{
   id: "call_123",
   model: "anthropic:claude-haiku-4-5",
   context: context,
@@ -233,7 +233,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Directive.ToolExec do
 end
 ```
 
-## ReqLLMGenerate Directive
+## LLMGenerate Directive
 
 Generates a non-streaming LLM response.
 
@@ -262,14 +262,14 @@ Generates a non-streaming LLM response.
 - When you need the complete response before processing
 
 ```elixir
-directive = Directive.ReqLLMGenerate.new!(%{
+directive = Directive.LLMGenerate.new!(%{
   id: "call_123",
   model_alias: :fast,
   context: messages
 })
 ```
 
-## ReqLLMEmbed Directive
+## LLMEmbed Directive
 
 Generates embeddings for text.
 
@@ -291,14 +291,14 @@ Generates embeddings for text.
 
 ```elixir
 # Single text
-directive = Directive.ReqLLMEmbed.new!(%{
+directive = Directive.LLMEmbed.new!(%{
   id: "embed_123",
   model: "openai:text-embedding-3-small",
   texts: "Hello, world!"
 })
 
 # Batch embedding
-directive = Directive.ReqLLMEmbed.new!(%{
+directive = Directive.LLMEmbed.new!(%{
   id: "embed_124",
   model: "openai:text-embedding-3-small",
   texts: ["Text 1", "Text 2", "Text 3"],

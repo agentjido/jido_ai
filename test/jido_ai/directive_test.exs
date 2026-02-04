@@ -1,13 +1,13 @@
 defmodule Jido.AI.DirectiveTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Directive.{ReqLLMEmbed, ReqLLMGenerate, ReqLLMStream, ToolExec}
+  alias Jido.AI.Directive.{LLMEmbed, LLMGenerate, LLMStream, ToolExec}
   alias Jido.AI.Signal.EmbedResult
 
-  describe "ReqLLMStream" do
+  describe "LLMStream" do
     test "creates directive with required fields" do
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "call_123",
           model: "anthropic:claude-haiku-4-5",
           context: [%{role: :user, content: "Hello"}]
@@ -24,7 +24,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates directive with model_alias" do
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "call_456",
           model_alias: :fast,
           context: [%{role: :user, content: "Test"}]
@@ -36,7 +36,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates directive with system_prompt" do
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "call_789",
           model: "anthropic:claude-haiku-4-5",
           system_prompt: "You are a helpful assistant.",
@@ -48,7 +48,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates directive with timeout" do
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "call_abc",
           model: "anthropic:claude-haiku-4-5",
           timeout: 30_000,
@@ -60,7 +60,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates directive with all optional fields" do
       directive =
-        ReqLLMStream.new!(%{
+        LLMStream.new!(%{
           id: "call_full",
           model: "anthropic:claude-haiku-4-5",
           model_alias: :capable,
@@ -86,16 +86,16 @@ defmodule Jido.AI.DirectiveTest do
     end
 
     test "raises on missing required fields" do
-      assert_raise RuntimeError, ~r/Invalid ReqLLMStream/, fn ->
-        ReqLLMStream.new!(%{model: "anthropic:claude-haiku-4-5"})
+      assert_raise RuntimeError, ~r/Invalid LLMStream/, fn ->
+        LLMStream.new!(%{model: "anthropic:claude-haiku-4-5"})
       end
     end
   end
 
-  describe "ReqLLMGenerate" do
+  describe "LLMGenerate" do
     test "creates non-streaming directive with required fields" do
       directive =
-        ReqLLMGenerate.new!(%{
+        LLMGenerate.new!(%{
           id: "gen_123",
           model: "anthropic:claude-haiku-4-5",
           context: [%{role: :user, content: "Hello"}]
@@ -112,7 +112,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates directive with model_alias" do
       directive =
-        ReqLLMGenerate.new!(%{
+        LLMGenerate.new!(%{
           id: "gen_456",
           model_alias: :reasoning,
           context: [%{role: :user, content: "Solve this problem"}]
@@ -124,7 +124,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates directive with system_prompt and timeout" do
       directive =
-        ReqLLMGenerate.new!(%{
+        LLMGenerate.new!(%{
           id: "gen_789",
           model: "openai:gpt-4o",
           system_prompt: "You are an expert.",
@@ -137,16 +137,16 @@ defmodule Jido.AI.DirectiveTest do
     end
 
     test "raises on missing required fields" do
-      assert_raise RuntimeError, ~r/Invalid ReqLLMGenerate/, fn ->
-        ReqLLMGenerate.new!(%{model: "anthropic:claude-haiku-4-5"})
+      assert_raise RuntimeError, ~r/Invalid LLMGenerate/, fn ->
+        LLMGenerate.new!(%{model: "anthropic:claude-haiku-4-5"})
       end
     end
   end
 
-  describe "ReqLLMEmbed" do
+  describe "LLMEmbed" do
     test "creates embedding directive with single text" do
       directive =
-        ReqLLMEmbed.new!(%{
+        LLMEmbed.new!(%{
           id: "embed_123",
           model: "openai:text-embedding-3-small",
           texts: "Hello, world!"
@@ -163,7 +163,7 @@ defmodule Jido.AI.DirectiveTest do
       texts = ["Hello", "World", "Test"]
 
       directive =
-        ReqLLMEmbed.new!(%{
+        LLMEmbed.new!(%{
           id: "embed_batch",
           model: "openai:text-embedding-3-small",
           texts: texts
@@ -174,7 +174,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates embedding directive with dimensions" do
       directive =
-        ReqLLMEmbed.new!(%{
+        LLMEmbed.new!(%{
           id: "embed_dims",
           model: "openai:text-embedding-3-small",
           texts: "Test text",
@@ -186,7 +186,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates embedding directive with timeout" do
       directive =
-        ReqLLMEmbed.new!(%{
+        LLMEmbed.new!(%{
           id: "embed_timeout",
           model: "openai:text-embedding-3-small",
           texts: "Test text",
@@ -198,7 +198,7 @@ defmodule Jido.AI.DirectiveTest do
 
     test "creates embedding directive with metadata" do
       directive =
-        ReqLLMEmbed.new!(%{
+        LLMEmbed.new!(%{
           id: "embed_meta",
           model: "openai:text-embedding-3-small",
           texts: "Test",
@@ -209,8 +209,8 @@ defmodule Jido.AI.DirectiveTest do
     end
 
     test "raises on missing required fields" do
-      assert_raise RuntimeError, ~r/Invalid ReqLLMEmbed/, fn ->
-        ReqLLMEmbed.new!(%{id: "embed_123"})
+      assert_raise RuntimeError, ~r/Invalid LLMEmbed/, fn ->
+        LLMEmbed.new!(%{id: "embed_123"})
       end
     end
   end

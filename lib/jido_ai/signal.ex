@@ -51,7 +51,7 @@ defmodule Jido.AI.Signal do
 
     ## Data Fields
 
-    - `:call_id` (required) - Correlation ID matching the original ReqLLMStream directive
+    - `:call_id` (required) - Correlation ID matching the original LLMStream directive
     - `:result` (required) - `{:ok, result_map}` or `{:error, reason}` from the LLM call
     - `:usage` (optional) - Token usage map with `:input_tokens` and `:output_tokens`
     - `:model` (optional) - The actual model used for the request
@@ -77,7 +77,7 @@ defmodule Jido.AI.Signal do
       ]
   end
 
-  defmodule ReqLLMResult do
+  defmodule LLMResult do
     @moduledoc false
     defdelegate new(data), to: LLMResponse
     defdelegate new!(data), to: LLMResponse
@@ -92,7 +92,7 @@ defmodule Jido.AI.Signal do
 
     ## Data Fields
 
-    - `:call_id` (required) - Correlation ID matching the original ReqLLMStream directive
+    - `:call_id` (required) - Correlation ID matching the original LLMStream directive
     - `:delta` (required) - The text chunk/token from the stream
     - `:chunk_type` (optional) - Type of chunk: `:content` or `:thinking` (default: `:content`)
 
@@ -113,7 +113,7 @@ defmodule Jido.AI.Signal do
       ]
   end
 
-  defmodule ReqLLMPartial do
+  defmodule LLMPartial do
     @moduledoc false
     defdelegate new(data), to: LLMDelta
     defdelegate new!(data), to: LLMDelta
@@ -155,12 +155,6 @@ defmodule Jido.AI.Signal do
         details: [type: :map, default: %{}, doc: "Additional error details"],
         retry_after: [type: :integer, doc: "Seconds to wait before retry (for rate limits)"]
       ]
-  end
-
-  defmodule ReqLLMError do
-    @moduledoc false
-    defdelegate new(data), to: LLMError
-    defdelegate new!(data), to: LLMError
   end
 
   defmodule Usage do
@@ -232,7 +226,7 @@ defmodule Jido.AI.Signal do
 
     ## Data Fields
 
-    - `:call_id` (required) - Correlation ID matching the original ReqLLMEmbed directive
+    - `:call_id` (required) - Correlation ID matching the original LLMEmbed directive
     - `:result` (required) - `{:ok, result_map}` or `{:error, reason}` from the embedding call
 
     The result map (when successful) contains:

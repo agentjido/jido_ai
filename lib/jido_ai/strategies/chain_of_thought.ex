@@ -255,7 +255,7 @@ defmodule Jido.AI.Strategies.ChainOfThought do
     Enum.flat_map(directives, fn
       {:call_llm_stream, id, conversation} ->
         [
-          Directive.ReqLLMStream.new!(%{
+          Directive.LLMStream.new!(%{
             id: id,
             model: model,
             context: convert_to_reqllm_context(conversation),

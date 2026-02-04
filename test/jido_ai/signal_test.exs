@@ -2,12 +2,12 @@ defmodule Jido.AI.SignalTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.{ReqLLMError, ReqLLMPartial, ReqLLMResult, UsageReport}
+  alias Jido.AI.Signal.{LLMError, LLMPartial, LLMResult, UsageReport}
 
-  describe "ReqLLMResult" do
+  describe "LLMResult" do
     test "creates signal with required fields" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_123",
           result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
         })
@@ -21,7 +21,7 @@ defmodule Jido.AI.SignalTest do
       usage = %{input_tokens: 100, output_tokens: 50}
 
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_456",
           result: {:ok, %{type: :final_answer, text: "Hi"}},
           usage: usage
@@ -32,7 +32,7 @@ defmodule Jido.AI.SignalTest do
 
     test "creates signal with model metadata" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_789",
           result: {:ok, %{type: :final_answer, text: "Hi"}},
           model: "anthropic:claude-haiku-4-5"
@@ -43,7 +43,7 @@ defmodule Jido.AI.SignalTest do
 
     test "creates signal with duration_ms metadata" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_abc",
           result: {:ok, %{type: :final_answer, text: "Hi"}},
           duration_ms: 1500
@@ -54,7 +54,7 @@ defmodule Jido.AI.SignalTest do
 
     test "creates signal with thinking_content metadata" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_def",
           result: {:ok, %{type: :final_answer, text: "Hi"}},
           thinking_content: "Let me think about this..."
@@ -65,7 +65,7 @@ defmodule Jido.AI.SignalTest do
 
     test "creates signal with all metadata fields" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_full",
           result: {:ok, %{type: :final_answer, text: "Complete"}},
           usage: %{input_tokens: 200, output_tokens: 100},
@@ -82,10 +82,10 @@ defmodule Jido.AI.SignalTest do
     end
   end
 
-  describe "ReqLLMPartial" do
+  describe "LLMPartial" do
     test "creates partial signal with required fields" do
       signal =
-        ReqLLMPartial.new!(%{
+        LLMPartial.new!(%{
           call_id: "call_partial_1",
           delta: "Hello"
         })
@@ -98,7 +98,7 @@ defmodule Jido.AI.SignalTest do
 
     test "creates partial signal with default chunk_type :content" do
       signal =
-        ReqLLMPartial.new!(%{
+        LLMPartial.new!(%{
           call_id: "call_partial_2",
           delta: " world"
         })
@@ -108,7 +108,7 @@ defmodule Jido.AI.SignalTest do
 
     test "creates partial signal with chunk_type :thinking" do
       signal =
-        ReqLLMPartial.new!(%{
+        LLMPartial.new!(%{
           call_id: "call_partial_3",
           delta: "Let me think about this...",
           chunk_type: :thinking
@@ -120,7 +120,7 @@ defmodule Jido.AI.SignalTest do
 
     test "creates partial signal with empty delta" do
       signal =
-        ReqLLMPartial.new!(%{
+        LLMPartial.new!(%{
           call_id: "call_partial_4",
           delta: ""
         })
@@ -133,7 +133,7 @@ defmodule Jido.AI.SignalTest do
 
       signals =
         Enum.map(chunks, fn chunk ->
-          ReqLLMPartial.new!(%{
+          LLMPartial.new!(%{
             call_id: "call_stream_1",
             delta: chunk
           })
@@ -148,10 +148,10 @@ defmodule Jido.AI.SignalTest do
     end
   end
 
-  describe "ReqLLMError" do
+  describe "LLMError" do
     test "creates error signal with required fields" do
       signal =
-        ReqLLMError.new!(%{
+        LLMError.new!(%{
           call_id: "call_err_1",
           error_type: :rate_limit,
           message: "Rate limit exceeded"
@@ -166,7 +166,7 @@ defmodule Jido.AI.SignalTest do
 
     test "creates error signal with retry_after" do
       signal =
-        ReqLLMError.new!(%{
+        LLMError.new!(%{
           call_id: "call_err_2",
           error_type: :rate_limit,
           message: "Too many requests",
@@ -180,7 +180,7 @@ defmodule Jido.AI.SignalTest do
       details = %{provider: "anthropic", error_code: "overloaded"}
 
       signal =
-        ReqLLMError.new!(%{
+        LLMError.new!(%{
           call_id: "call_err_3",
           error_type: :provider_error,
           message: "Provider is overloaded",
@@ -195,7 +195,7 @@ defmodule Jido.AI.SignalTest do
 
       for error_type <- error_types do
         signal =
-          ReqLLMError.new!(%{
+          LLMError.new!(%{
             call_id: "call_#{error_type}",
             error_type: error_type,
             message: "Error of type #{error_type}"
@@ -274,7 +274,7 @@ defmodule Jido.AI.SignalTest do
       ]
 
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_tc_1",
           result: {:ok, %{type: :tool_calls, tool_calls: tool_calls, text: ""}}
         })
@@ -286,7 +286,7 @@ defmodule Jido.AI.SignalTest do
       tool_calls = [%{id: "tc_3", name: "search", arguments: %{query: "test"}}]
 
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_tc_2",
           result: {:ok, %{tool_calls: tool_calls, text: "Some text"}}
         })
@@ -296,7 +296,7 @@ defmodule Jido.AI.SignalTest do
 
     test "returns empty list for final_answer type" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_tc_3",
           result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
         })
@@ -306,7 +306,7 @@ defmodule Jido.AI.SignalTest do
 
     test "returns empty list for error result" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_tc_4",
           result: {:error, %{reason: "timeout"}}
         })
@@ -314,7 +314,7 @@ defmodule Jido.AI.SignalTest do
       assert Signal.extract_tool_calls(signal) == []
     end
 
-    test "returns empty list for non-ReqLLMResult signals" do
+    test "returns empty list for non-LLMResult signals" do
       signal =
         UsageReport.new!(%{
           call_id: "call_usage",
@@ -330,7 +330,7 @@ defmodule Jido.AI.SignalTest do
   describe "tool_call?/1" do
     test "returns true for result with tool_calls type" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_is_tc_1",
           result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
         })
@@ -340,7 +340,7 @@ defmodule Jido.AI.SignalTest do
 
     test "returns true when tool_calls list is non-empty" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_is_tc_2",
           result: {:ok, %{tool_calls: [%{id: "tc_1"}], text: "text"}}
         })
@@ -350,7 +350,7 @@ defmodule Jido.AI.SignalTest do
 
     test "returns false for final_answer type" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_is_tc_3",
           result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
         })
@@ -360,7 +360,7 @@ defmodule Jido.AI.SignalTest do
 
     test "returns false for error result" do
       signal =
-        ReqLLMResult.new!(%{
+        LLMResult.new!(%{
           call_id: "call_is_tc_4",
           result: {:error, %{reason: "failed"}}
         })
@@ -368,9 +368,9 @@ defmodule Jido.AI.SignalTest do
       assert Signal.tool_call?(signal) == false
     end
 
-    test "returns false for non-ReqLLMResult signals" do
+    test "returns false for non-LLMResult signals" do
       signal =
-        ReqLLMError.new!(%{
+        LLMError.new!(%{
           call_id: "call_err",
           error_type: :timeout,
           message: "Timeout"
