@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Streaming.Actions.ProcessTokens do
+defmodule Jido.AI.Actions.Streaming.ProcessTokens do
   @moduledoc """
   A Jido.Action for processing tokens from an active stream.
 
@@ -17,19 +17,19 @@ defmodule Jido.AI.Skills.Streaming.Actions.ProcessTokens do
   ## Examples
 
       # Basic token processing
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.ProcessTokens, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.ProcessTokens, %{
         stream_id: "abc123",
         on_token: fn token -> IO.write(token) end
       })
 
       # With filtering
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.ProcessTokens, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.ProcessTokens, %{
         stream_id: "abc123",
         filter: fn token -> String.length(token) > 0 end
       })
 
       # With transformation
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.ProcessTokens, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.ProcessTokens, %{
         stream_id: "abc123",
         transform: fn token -> String.upcase(token) end,
         on_token: fn token -> send(pid, {:token, token}) end

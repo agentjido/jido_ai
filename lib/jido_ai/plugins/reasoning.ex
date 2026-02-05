@@ -1,9 +1,9 @@
 # Ensure actions are compiled before the skill
-require Jido.AI.Skills.Reasoning.Actions.Analyze
-require Jido.AI.Skills.Reasoning.Actions.Explain
-require Jido.AI.Skills.Reasoning.Actions.Infer
+require Jido.AI.Actions.Reasoning.Analyze
+require Jido.AI.Actions.Reasoning.Explain
+require Jido.AI.Actions.Reasoning.Infer
 
-defmodule Jido.AI.Skills.Reasoning do
+defmodule Jido.AI.Plugins.Reasoning do
   @moduledoc """
   A Jido.Skill providing AI-powered reasoning capabilities.
 
@@ -23,13 +23,13 @@ defmodule Jido.AI.Skills.Reasoning do
         use Jido.Agent,
 
         skills: [
-          {Jido.AI.Skills.Reasoning, []}
+          {Jido.AI.Plugins.Reasoning, []}
         ]
       end
 
   Or use the action directly:
 
-      Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Analyze, %{
+      Jido.Exec.run(Jido.AI.Actions.Reasoning.Analyze, %{
         input: "I loved the product!",
         analysis_type: :sentiment
       })
@@ -59,9 +59,9 @@ defmodule Jido.AI.Skills.Reasoning do
     name: "reasoning",
     state_key: :reasoning,
     actions: [
-      Jido.AI.Skills.Reasoning.Actions.Analyze,
-      Jido.AI.Skills.Reasoning.Actions.Infer,
-      Jido.AI.Skills.Reasoning.Actions.Explain
+      Jido.AI.Actions.Reasoning.Analyze,
+      Jido.AI.Actions.Reasoning.Infer,
+      Jido.AI.Actions.Reasoning.Explain
     ],
     description: "Provides AI-powered analysis, inference, and explanation capabilities",
     category: "ai",
@@ -109,9 +109,9 @@ defmodule Jido.AI.Skills.Reasoning do
   @impl Jido.Plugin
   def router(_config) do
     [
-      {"reasoning.analyze", Jido.AI.Skills.Reasoning.Actions.Analyze},
-      {"reasoning.explain", Jido.AI.Skills.Reasoning.Actions.Explain},
-      {"reasoning.infer", Jido.AI.Skills.Reasoning.Actions.Infer}
+      {"reasoning.analyze", Jido.AI.Actions.Reasoning.Analyze},
+      {"reasoning.explain", Jido.AI.Actions.Reasoning.Explain},
+      {"reasoning.infer", Jido.AI.Actions.Reasoning.Infer}
     ]
   end
 

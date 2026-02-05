@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.TaskSupervisorSkill do
+defmodule Jido.AI.Plugins.TaskSupervisor do
   @moduledoc """
   Skill that creates and manages a per-instance Task.Supervisor for Jido.AI agents.
 

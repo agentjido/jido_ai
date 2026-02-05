@@ -1,10 +1,10 @@
 # Ensure actions are compiled before the skill
-require Jido.AI.Skills.LLM.Actions.Chat
-require Jido.AI.Skills.LLM.Actions.Complete
-require Jido.AI.Skills.LLM.Actions.Embed
-require Jido.AI.Skills.LLM.Actions.GenerateObject
+require Jido.AI.Actions.LLM.Chat
+require Jido.AI.Actions.LLM.Complete
+require Jido.AI.Actions.LLM.Embed
+require Jido.AI.Actions.LLM.GenerateObject
 
-defmodule Jido.AI.Skills.LLM do
+defmodule Jido.AI.Plugins.LLM do
   @moduledoc """
   A Jido.Skill providing LLM capabilities for chat, completion, and embeddings.
 
@@ -23,13 +23,13 @@ defmodule Jido.AI.Skills.LLM do
         use Jido.Agent,
 
         skills: [
-          {Jido.AI.Skills.LLM, []}
+          {Jido.AI.Plugins.LLM, []}
         ]
       end
 
   Or use the action directly:
 
-      Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Chat, %{
+      Jido.Exec.run(Jido.AI.Actions.LLM.Chat, %{
         model: :fast,
         prompt: "What is Elixir?"
       })
@@ -57,10 +57,10 @@ defmodule Jido.AI.Skills.LLM do
     name: "llm",
     state_key: :llm,
     actions: [
-      Jido.AI.Skills.LLM.Actions.Chat,
-      Jido.AI.Skills.LLM.Actions.Complete,
-      Jido.AI.Skills.LLM.Actions.Embed,
-      Jido.AI.Skills.LLM.Actions.GenerateObject
+      Jido.AI.Actions.LLM.Chat,
+      Jido.AI.Actions.LLM.Complete,
+      Jido.AI.Actions.LLM.Embed,
+      Jido.AI.Actions.LLM.GenerateObject
     ],
     description: "Provides LLM chat, completion, and embedding capabilities",
     category: "ai",
@@ -108,10 +108,10 @@ defmodule Jido.AI.Skills.LLM do
   @impl Jido.Plugin
   def router(_config) do
     [
-      {"llm.chat", Jido.AI.Skills.LLM.Actions.Chat},
-      {"llm.complete", Jido.AI.Skills.LLM.Actions.Complete},
-      {"llm.embed", Jido.AI.Skills.LLM.Actions.Embed},
-      {"llm.generate_object", Jido.AI.Skills.LLM.Actions.GenerateObject}
+      {"llm.chat", Jido.AI.Actions.LLM.Chat},
+      {"llm.complete", Jido.AI.Actions.LLM.Complete},
+      {"llm.embed", Jido.AI.Actions.LLM.Embed},
+      {"llm.generate_object", Jido.AI.Actions.LLM.GenerateObject}
     ]
   end
 

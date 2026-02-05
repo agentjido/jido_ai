@@ -62,7 +62,7 @@ defmodule Jido.AI.ReActAgent do
   ## Task Supervisor
 
   Each agent instance gets its own Task.Supervisor automatically started via the
-  `Jido.AI.Skills.TaskSupervisorSkill`. This supervisor is used for:
+  `Jido.AI.Plugins.TaskSupervisor`. This supervisor is used for:
   - LLM streaming operations
   - Tool execution
   - Other async operations within the agent's lifecycle
@@ -174,7 +174,7 @@ defmodule Jido.AI.ReActAgent do
     plugins = Keyword.get(opts, :plugins, [])
 
     # TaskSupervisorSkill is always included for per-instance task supervision
-    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
 
     # Extract tool_context at macro expansion time
     # Use safe alias-only expansion instead of Code.eval_quoted

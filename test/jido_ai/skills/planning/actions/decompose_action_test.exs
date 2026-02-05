@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.Planning.Actions.DecomposeTest do
+defmodule Jido.AI.Actions.Planning.DecomposeTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Planning.Actions.Decompose
+  alias Jido.AI.Actions.Planning.Decompose
 
   @moduletag :unit
   @moduletag :capture_log

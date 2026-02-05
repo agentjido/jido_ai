@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.Reasoning.Actions.ExplainTest do
+defmodule Jido.AI.Actions.Reasoning.ExplainTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Reasoning.Actions.Explain
+  alias Jido.AI.Actions.Reasoning.Explain
 
   describe "Explain action" do
     test "has correct metadata" do

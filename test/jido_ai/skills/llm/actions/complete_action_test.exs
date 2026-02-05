@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.LLM.Actions.CompleteTest do
+defmodule Jido.AI.Actions.LLM.CompleteTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.LLM.Actions.Complete
+  alias Jido.AI.Actions.LLM.Complete
 
   describe "Complete action" do
     test "has correct metadata" do

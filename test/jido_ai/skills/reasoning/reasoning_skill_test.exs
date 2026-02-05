@@ -1,14 +1,14 @@
-defmodule Jido.AI.Skills.ReasoningTest do
+defmodule Jido.AI.Plugins.ReasoningTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Reasoning
-  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
+  alias Jido.AI.Plugins.Reasoning
+  alias Jido.AI.Actions.Reasoning.{Analyze, Explain, Infer}
 
   describe "plugin_spec/1" do
     test "returns valid skill specification" do
       spec = Reasoning.plugin_spec(%{})
 
-      assert spec.module == Jido.AI.Skills.Reasoning
+      assert spec.module == Jido.AI.Plugins.Reasoning
       assert spec.name == "reasoning"
       assert spec.state_key == :reasoning
       assert spec.description == "Provides AI-powered analysis, inference, and explanation capabilities"
@@ -20,9 +20,9 @@ defmodule Jido.AI.Skills.ReasoningTest do
     test "includes all three actions" do
       spec = Reasoning.plugin_spec(%{})
 
-      assert Jido.AI.Skills.Reasoning.Actions.Analyze in spec.actions
-      assert Jido.AI.Skills.Reasoning.Actions.Infer in spec.actions
-      assert Jido.AI.Skills.Reasoning.Actions.Explain in spec.actions
+      assert Jido.AI.Actions.Reasoning.Analyze in spec.actions
+      assert Jido.AI.Actions.Reasoning.Infer in spec.actions
+      assert Jido.AI.Actions.Reasoning.Explain in spec.actions
     end
   end
 
