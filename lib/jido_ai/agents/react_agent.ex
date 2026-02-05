@@ -316,9 +316,18 @@ defmodule Jido.AI.ReActAgent do
       end
 
       @impl true
-      def on_before_cmd(agent, {:react_start, %{query: query} = params} = action) do
+      def on_before_cmd(agent, {:react_start, %{query: query} = params} = _action) do
         # Ensure we have a request_id for tracking
         {request_id, params} = Request.ensure_request_id(params)
+
+        # Inject agent_id into tool_context so memory actions (and others)
+        # can scope operations to this agent without the LLM needing to know
+        tool_context =
+          params
+          |> Map.get(:tool_context, %{})
+          |> Map.put_new(:agent_id, agent.id || agent.name)
+
+        params = Map.put(params, :tool_context, tool_context)
         action = {:react_start, params}
 
         # Use RequestTracking to manage state
