@@ -497,6 +497,8 @@ defmodule Jido.AI.Executor do
 
   # Patterns for sensitive keys that should be redacted in telemetry
   # These match common credential field names but avoid partial matches (e.g. "credentials" container)
+  # Defined as a function instead of module attribute for Elixir 1.18+ compatibility
+  # (compiled Regex references cannot be escaped in module attributes).
   defp sensitive_key_patterns do
     [
       ~r/^api_?key$/i,

@@ -100,6 +100,28 @@ end
 See the [`examples/`](examples/) directory for runnable code:
 - [`examples/strategies/`](examples/strategies/) - Reasoning strategy examples
 
+## Autonomous Agent Sessions (Mode 2)
+
+For tasks that benefit from full autonomous execution — where the AI provider handles its own tool loop — Jido.AI supports delegating to external agents like Claude Code CLI or Codex CLI via [`agent_session_manager`](https://hex.pm/packages/agent_session_manager).
+
+```elixir
+# Optional dependency — add to mix.exs:
+{:agent_session_manager, "~> 0.2"}
+```
+
+```elixir
+# Delegate to Claude Code CLI
+directive = Jido.AI.Directive.AgentSession.new!(%{
+  id: Jido.Util.generate_id(),
+  adapter: AgentSessionManager.Adapters.ClaudeAdapter,
+  input: "Refactor the auth module to use JWT tokens",
+  timeout: 600_000,
+  session_config: %{working_directory: "/path/to/project"}
+})
+```
+
+The agent runs autonomously while jido_ai observes events as `ai.agent_session.*` signals (Started, Message, ToolCall, Progress, Completed, Failed). See the [Directives Guide](guides/developer/04_directives.md#agentsession-directive) and [Signals Guide](guides/developer/05_signals.md#agent-session-signals) for details.
+
 ## Quick Decision Guide
 
 Not sure which technique to use? Start here:
@@ -107,7 +129,8 @@ Not sure which technique to use? Start here:
 ```
 Building an agent?
 ├─ Need to use tools/APIs?
-│  └─ Use ReAct Strategy
+│  ├─ App controls the loop → Use ReAct Strategy (Mode 1)
+│  └─ Provider controls the loop → Use AgentSession (Mode 2)
 ├─ Multi-step reasoning?
 │  └─ Use Chain-of-Thought
 └─ Complex planning?

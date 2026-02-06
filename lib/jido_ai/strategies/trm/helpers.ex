@@ -136,7 +136,9 @@ defmodule Jido.AI.TRM.Helpers do
 
   # Private helpers for sanitization
 
-  defp injection_patterns do
+  # Injection patterns — defined as function for Elixir 1.18+ compatibility
+  # (compiled Regex references cannot be escaped in module attributes).
+  defp trm_injection_patterns do
     [
       # Common prompt injection patterns
       ~r/ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
@@ -163,7 +165,7 @@ defmodule Jido.AI.TRM.Helpers do
   ]
 
   defp filter_injection_patterns(text) do
-    Enum.reduce(injection_patterns(), text, fn pattern, acc ->
+    Enum.reduce(trm_injection_patterns(), text, fn pattern, acc ->
       Regex.replace(pattern, acc, "[FILTERED]")
     end)
   end

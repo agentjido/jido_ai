@@ -10,6 +10,7 @@ This guide covers the signal system in Jido.AI, which provides event-driven comm
 - [LLMResponse Signal](#llmresponse-signal)
 - [LLMDelta Signal](#llmdelta-signal)
 - [ToolResult Signal](#toolresult-signal)
+- [Agent Session Signals](#agent-session-signals)
 - [Signal Routing](#signal-routing)
 - [Helper Functions](#helper-functions)
 
@@ -44,14 +45,21 @@ graph LR
 | `ToolResult` | `react.tool.result` | ToolExec | Tool execution completed |
 | `EmbedResult` | `react.embed.result` | LLMEmbed | Embedding generated |
 | `Usage` | `react.usage` | Telemetry | Token usage tracking |
+| `AgentSession.Started` | `ai.agent_session.started` | AgentSession | Agent began execution |
+| `AgentSession.Message` | `ai.agent_session.message` | AgentSession | Text output from agent |
+| `AgentSession.ToolCall` | `ai.agent_session.tool_call` | AgentSession | Agent invoked a tool |
+| `AgentSession.Progress` | `ai.agent_session.progress` | AgentSession | Progress update |
+| `AgentSession.Completed` | `ai.agent_session.completed` | AgentSession | Agent finished |
+| `AgentSession.Failed` | `ai.agent_session.failed` | AgentSession | Agent failed/cancelled |
 
 ## Signal Naming Convention
 
 Jido.AI follows a consistent naming pattern:
 
-- **LLM signals**: `react.llm.<event>` - LLM-related events
-- **Tool signals**: `react.tool.<event>` - Tool execution events
-- **Generic React signals**: `react.<event>` - General React loop events
+- **LLM signals**: `react.llm.<event>` - LLM-related events (Mode 1)
+- **Tool signals**: `react.tool.<event>` - Tool execution events (Mode 1)
+- **Generic React signals**: `react.<event>` - General React loop events (Mode 1)
+- **Agent session signals**: `ai.agent_session.<event>` - Autonomous agent events (Mode 2)
 
 This naming convention makes it easy to:
 - Identify signal sources
@@ -290,6 +298,157 @@ Result structure:
   embeddings: [0.1, 0.2, ...] | [[0.1, ...], [0.2, ...]],
   count: 1 | N
 }}
+```
+
+## Agent Session Signals
+
+Agent session signals are emitted by the `AgentSession` directive when delegating to an autonomous agent via `agent_session_manager`. These signals are observational — jido_ai watches what the autonomous agent does but does not control it.
+
+> **Note:** These signals require the optional `agent_session_manager` dependency.
+
+### Started
+
+Emitted when an agent session begins execution.
+
+```elixir
+use Jido.Signal,
+  type: "ai.agent_session.started",
+  default_source: "/ai/agent_session",
+  schema: [
+    session_id: [type: :string, required: true, doc: "Session identifier"],
+    run_id: [type: :string, required: true, doc: "Run identifier"],
+    directive_id: [type: :string, doc: "Originating directive ID"],
+    adapter: [type: :atom, doc: "Adapter module used"],
+    model: [type: :string, doc: "Model identifier"],
+    input: [type: :string, doc: "Input prompt sent to the agent"],
+    metadata: [type: :map, default: %{}, doc: "Arbitrary metadata"]
+  ]
+```
+
+### Message
+
+Text output from the agent (streaming or complete).
+
+```elixir
+use Jido.Signal,
+  type: "ai.agent_session.message",
+  default_source: "/ai/agent_session",
+  schema: [
+    session_id: [type: :string, required: true, doc: "Session identifier"],
+    run_id: [type: :string, required: true, doc: "Run identifier"],
+    role: [type: :atom, default: :assistant, doc: "Message role"],
+    content: [type: :string, required: true, doc: "Text content"],
+    delta: [type: :boolean, default: false, doc: "true = streaming chunk"]
+  ]
+```
+
+### ToolCall
+
+Emitted when the agent invokes a tool. This is observational — jido_ai cannot intercept or modify it.
+
+```elixir
+use Jido.Signal,
+  type: "ai.agent_session.tool_call",
+  default_source: "/ai/agent_session",
+  schema: [
+    session_id: [type: :string, required: true, doc: "Session identifier"],
+    run_id: [type: :string, required: true, doc: "Run identifier"],
+    tool_name: [type: :string, required: true, doc: "Name of the tool"],
+    tool_input: [type: :map, default: %{}, doc: "Tool input parameters"],
+    tool_id: [type: :string, doc: "Tool call identifier"],
+    status: [type: :atom, required: true, doc: ":started, :completed, or :failed"]
+  ]
+```
+
+### Progress
+
+Progress updates during long-running agent sessions.
+
+```elixir
+use Jido.Signal,
+  type: "ai.agent_session.progress",
+  default_source: "/ai/agent_session",
+  schema: [
+    session_id: [type: :string, required: true, doc: "Session identifier"],
+    run_id: [type: :string, required: true, doc: "Run identifier"],
+    turn: [type: :integer, doc: "Current turn number"],
+    max_turns: [type: :integer, doc: "Maximum turns allowed"],
+    tokens_used: [type: :map, default: %{}, doc: "Token usage so far"]
+  ]
+```
+
+### Completed
+
+Emitted when the agent finishes successfully.
+
+```elixir
+use Jido.Signal,
+  type: "ai.agent_session.completed",
+  default_source: "/ai/agent_session",
+  schema: [
+    session_id: [type: :string, required: true, doc: "Session identifier"],
+    run_id: [type: :string, required: true, doc: "Run identifier"],
+    directive_id: [type: :string, doc: "Originating directive ID"],
+    output: [type: :any, required: true, doc: "Final output from the agent"],
+    token_usage: [type: :map, default: %{}, doc: "Total token usage"],
+    duration_ms: [type: :integer, doc: "Execution duration in milliseconds"],
+    metadata: [type: :map, default: %{}, doc: "Arbitrary metadata"]
+  ]
+```
+
+### Failed
+
+Emitted when the agent fails or is cancelled.
+
+```elixir
+use Jido.Signal,
+  type: "ai.agent_session.failed",
+  default_source: "/ai/agent_session",
+  schema: [
+    session_id: [type: :string, required: true, doc: "Session identifier"],
+    run_id: [type: :string, required: true, doc: "Run identifier"],
+    directive_id: [type: :string, doc: "Originating directive ID"],
+    reason: [type: :atom, required: true, doc: ":timeout, :cancelled, or :error"],
+    error_message: [type: :string, doc: "Human-readable error message"],
+    partial_output: [type: :any, doc: "Output produced before failure"],
+    token_usage: [type: :map, default: %{}, doc: "Token usage before failure"],
+    metadata: [type: :map, default: %{}, doc: "Arbitrary metadata"]
+  ]
+```
+
+### Event-to-Signal Mapping
+
+The `Jido.AI.Signal.AgentSession.from_event/2` helper converts `agent_session_manager` events to signals:
+
+| Event Type | Signal Type |
+|------------|-------------|
+| `:run_started` | `Started` |
+| `:message_received` | `Message` (delta: false) |
+| `:message_streamed` | `Message` (delta: true) |
+| `:tool_call_started` | `ToolCall` (status: :started) |
+| `:tool_call_completed` | `ToolCall` (status: :completed) |
+| `:tool_call_failed` | `ToolCall` (status: :failed) |
+| `:run_completed` | `Completed` |
+| `:run_failed` | `Failed` (reason: :error) |
+| `:run_cancelled` | `Failed` (reason: :cancelled) |
+| `:token_usage_updated` | `Progress` |
+| (other) | `Progress` |
+
+```elixir
+alias Jido.AI.Signal.AgentSession, as: Signals
+
+# Convert an event from agent_session_manager
+event = %{type: :message_streamed, data: %{delta: "Hello"}, session_id: "s1", run_id: "r1"}
+context = %{session_id: "s1", run_id: "r1", directive_id: "d1", metadata: %{}}
+signal = Signals.from_event(event, context)
+signal.type
+#=> "ai.agent_session.message"
+
+# Build a Completed signal from a run result
+signal = Signals.completed(%{output: "Done!", token_usage: %{}}, context)
+
+# Build a Failed signal from an error
+signal = Signals.failed("Something went wrong", context)
 ```
 
 ## Signal Routing

@@ -46,7 +46,8 @@ defmodule Jido.AI.Security do
   @max_hard_turns 50
   @callback_timeout 5_000
 
-  # Known prompt injection patterns
+  # Known prompt injection patterns — defined as function for Elixir 1.18+ compatibility
+  # (compiled Regex references cannot be escaped in module attributes).
   defp injection_patterns do
     [
       # Direct instruction overrides
