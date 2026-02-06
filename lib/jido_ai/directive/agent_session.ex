@@ -170,16 +170,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
       callback =
         if directive.emit_events do
           fn event ->
-            if event.type not in terminal_events do
-              signal_context =
-                Map.merge(context, %{
-                  session_id: event.session_id || "unknown",
-                  run_id: event.run_id || "unknown"
-                })
-
-              signal = Signals.from_event(event, signal_context)
-              Jido.AgentServer.cast(agent_pid, signal)
-            end
+            maybe_emit_event_signal(event, terminal_events, context, agent_pid)
           end
         else
           fn _event -> :ok end
@@ -241,6 +232,19 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     end
 
     defp build_adapter_opts(_adapter_module, _directive), do: []
+
+    defp maybe_emit_event_signal(event, terminal_events, context, agent_pid) do
+      if event.type not in terminal_events do
+        signal_context =
+          Map.merge(context, %{
+            session_id: event.session_id || "unknown",
+            run_id: event.run_id || "unknown"
+          })
+
+        signal = Signals.from_event(event, signal_context)
+        Jido.AgentServer.cast(agent_pid, signal)
+      end
+    end
 
     defp maybe_put(opts, _key, nil), do: opts
     defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)

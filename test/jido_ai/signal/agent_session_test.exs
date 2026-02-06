@@ -178,12 +178,12 @@ defmodule Jido.AI.Signal.AgentSessionTest do
           run_id: "run_def456",
           turn: 5,
           max_turns: 20,
-          tokens_used: %{input: 12500, output: 3200}
+          tokens_used: %{input: 12_500, output: 3200}
         })
 
       assert signal.data.turn == 5
       assert signal.data.max_turns == 20
-      assert signal.data.tokens_used == %{input: 12500, output: 3200}
+      assert signal.data.tokens_used == %{input: 12_500, output: 3200}
     end
   end
 
@@ -209,14 +209,14 @@ defmodule Jido.AI.Signal.AgentSessionTest do
           run_id: "run_def456",
           directive_id: "dir_ghi789",
           output: "Refactoring complete.",
-          token_usage: %{input_tokens: 45000, output_tokens: 12000},
-          duration_ms: 47000,
+          token_usage: %{input_tokens: 45_000, output_tokens: 12_000},
+          duration_ms: 47_000,
           metadata: %{files_changed: 3}
         })
 
       assert signal.data.directive_id == "dir_ghi789"
-      assert signal.data.token_usage == %{input_tokens: 45000, output_tokens: 12000}
-      assert signal.data.duration_ms == 47000
+      assert signal.data.token_usage == %{input_tokens: 45_000, output_tokens: 12_000}
+      assert signal.data.duration_ms == 47_000
       assert signal.data.metadata == %{files_changed: 3}
     end
   end
@@ -245,7 +245,7 @@ defmodule Jido.AI.Signal.AgentSessionTest do
           reason: :error,
           error_message: "API rate limit exceeded",
           partial_output: "I started refactoring but...",
-          token_usage: %{input_tokens: 30000, output_tokens: 8000},
+          token_usage: %{input_tokens: 30_000, output_tokens: 8000},
           metadata: %{retry_count: 2}
         })
 
@@ -253,7 +253,7 @@ defmodule Jido.AI.Signal.AgentSessionTest do
       assert signal.data.reason == :error
       assert signal.data.error_message == "API rate limit exceeded"
       assert signal.data.partial_output == "I started refactoring but..."
-      assert signal.data.token_usage == %{input_tokens: 30000, output_tokens: 8000}
+      assert signal.data.token_usage == %{input_tokens: 30_000, output_tokens: 8000}
       assert signal.data.metadata == %{retry_count: 2}
     end
 
@@ -458,7 +458,7 @@ defmodule Jido.AI.Signal.AgentSessionTest do
     test "builds Completed signal from run result" do
       run_result = %{
         output: "Refactoring complete.",
-        token_usage: %{input_tokens: 45000, output_tokens: 12000},
+        token_usage: %{input_tokens: 45_000, output_tokens: 12_000},
         events: []
       }
 
@@ -473,7 +473,7 @@ defmodule Jido.AI.Signal.AgentSessionTest do
 
       assert signal.type == "ai.agent_session.completed"
       assert signal.data.output == "Refactoring complete."
-      assert signal.data.token_usage == %{input_tokens: 45000, output_tokens: 12000}
+      assert signal.data.token_usage == %{input_tokens: 45_000, output_tokens: 12_000}
       assert signal.data.session_id == "sess_abc123"
       assert signal.data.run_id == "run_def456"
       assert signal.data.directive_id == "dir_ghi789"

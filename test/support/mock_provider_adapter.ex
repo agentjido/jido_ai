@@ -68,31 +68,32 @@ if Code.ensure_loaded?(AgentSessionManager.Ports.ProviderAdapter) do
 
     def handle_call({:execute, run, session, opts}, from, state) do
       case state.fail_with do
-        nil ->
-          case state.execution_mode do
-            :instant ->
-              result = build_and_emit(run, session, opts)
-              {:reply, result, state}
-
-            :streaming ->
-              me = self()
-
-              spawn_link(fn ->
-                result = execute_streaming(state, run, session, opts)
-                GenServer.reply(from, result)
-                send(me, :streaming_done)
-              end)
-
-              {:noreply, state}
-          end
-
-        error ->
-          {:reply, {:error, error}, state}
+        nil -> do_execute(state, run, session, opts, from)
+        error -> {:reply, {:error, error}, state}
       end
     end
 
     def handle_call({:validate_config, _config}, _from, state) do
       {:reply, :ok, state}
+    end
+
+    defp do_execute(state, run, session, opts, from) do
+      case state.execution_mode do
+        :instant ->
+          result = build_and_emit(run, session, opts)
+          {:reply, result, state}
+
+        :streaming ->
+          me = self()
+
+          spawn_link(fn ->
+            result = execute_streaming(state, run, session, opts)
+            GenServer.reply(from, result)
+            send(me, :streaming_done)
+          end)
+
+          {:noreply, state}
+      end
     end
 
     @impl GenServer
