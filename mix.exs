@@ -80,7 +80,6 @@ defmodule JidoAi.MixProject do
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:mimic, "~> 2.0", only: :test},
-      {:quokka, "~> 2.10", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.0", only: [:dev, :test]}
     ]
   end
