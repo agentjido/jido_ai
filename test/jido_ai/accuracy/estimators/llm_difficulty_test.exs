@@ -142,10 +142,6 @@ defmodule Jido.AI.Accuracy.Estimators.LLMDifficultyTest do
     test "implements estimator?/1 correctly" do
       assert DifficultyEstimator.estimator?(LLMDifficulty)
     end
-
-    test "exports estimate/3" do
-      assert function_exported?(LLMDifficulty, :estimate, 3)
-    end
   end
 
   describe "estimate_batch/3" do

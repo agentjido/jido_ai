@@ -2,6 +2,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Accuracy.Generators.LLMGenerator
+  alias Jido.AI.Test.ModuleExports
 
   @moduletag :capture_log
 
@@ -172,7 +173,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
       _generator = LLMGenerator.new!(num_candidates: 1, max_concurrency: 1)
 
       # Verify the function exists and has correct arity
-      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates, 3)
     end
   end
 
@@ -192,7 +193,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
       _generator = LLMGenerator.new!(num_candidates: 1)
 
       # Verify the function exists
-      assert function_exported?(LLMGenerator, :generate_with_reasoning, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_with_reasoning, 3)
     end
   end
 
@@ -299,7 +300,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
       _generator = LLMGenerator.new!(timeout: 2000)
 
       # Verify the generator handles timeouts without crashing
-      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates, 3)
     end
 
     test "handles rate limit errors" do
@@ -309,7 +310,7 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
       # 1. Log the error
       # 2. Return {:error, :rate_limited} or similar
       # 3. Not crash
-      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates, 3)
     end
 
     test "handles network connectivity errors" do
@@ -317,14 +318,14 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
 
       # Network errors should be handled gracefully
       # Return {:error, reason} tuple with appropriate error info
-      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates, 3)
     end
 
     test "handles authentication errors" do
       _generator = LLMGenerator.new!([])
 
       # Invalid API key (HTTP 401/403) should return structured error
-      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates, 3)
     end
 
     test "handles malformed LLM responses" do
@@ -332,14 +333,14 @@ defmodule Jido.AI.Accuracy.Generators.LLMGeneratorTest do
 
       # Invalid JSON or unexpected format should be handled
       # Return {:error, {:malformed_response, _}} or similar
-      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates, 3)
     end
 
     test "handles service unavailable errors" do
       _generator = LLMGenerator.new!([])
 
       # HTTP 503 should be handled gracefully
-      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates, 3)
     end
   end
 end

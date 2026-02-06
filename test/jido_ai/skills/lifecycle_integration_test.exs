@@ -14,10 +14,16 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
 
   alias Jido.Agent
   alias Jido.AI.Skills.LLM
+  alias Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
   alias Jido.AI.Skills.Planning
+  alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
   alias Jido.AI.Skills.Reasoning
+  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
   alias Jido.AI.Skills.Streaming
+  alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
   alias Jido.AI.Skills.ToolCalling
+  alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
+  alias Jido.AI.Test.ModuleExports
 
   # Ensure all skill modules are loaded before tests
   require Jido.AI.Skills.LLM
@@ -86,31 +92,31 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
 
   describe "Skill Schema" do
     test "LLM skill has Zoi schema" do
-      assert function_exported?(LLM, :schema, 0)
+      assert ModuleExports.exported?(LLM, :schema, 0)
       schema = LLM.schema()
       assert is_map(schema) or is_struct(schema)
     end
 
     test "Reasoning skill has Zoi schema" do
-      assert function_exported?(Reasoning, :schema, 0)
+      assert ModuleExports.exported?(Reasoning, :schema, 0)
       schema = Reasoning.schema()
       assert is_map(schema) or is_struct(schema)
     end
 
     test "Planning skill has Zoi schema" do
-      assert function_exported?(Planning, :schema, 0)
+      assert ModuleExports.exported?(Planning, :schema, 0)
       schema = Planning.schema()
       assert is_map(schema) or is_struct(schema)
     end
 
     test "Streaming skill has Zoi schema" do
-      assert function_exported?(Streaming, :schema, 0)
+      assert ModuleExports.exported?(Streaming, :schema, 0)
       schema = Streaming.schema()
       assert is_map(schema) or is_struct(schema)
     end
 
     test "ToolCalling skill has Zoi schema" do
-      assert function_exported?(ToolCalling, :schema, 0)
+      assert ModuleExports.exported?(ToolCalling, :schema, 0)
       schema = ToolCalling.schema()
       assert is_map(schema) or is_struct(schema)
     end
@@ -122,7 +128,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
 
   describe "Router/1 Callback" do
     test "LLM skill router returns route list" do
-      assert function_exported?(LLM, :router, 1)
+      assert ModuleExports.exported?(LLM, :router, 1)
       routes = LLM.router(%{})
       assert is_list(routes)
     end
@@ -131,13 +137,13 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = LLM.router(%{})
       route_map = Map.new(routes)
 
-      assert route_map["llm.chat"] == Jido.AI.Skills.LLM.Actions.Chat
-      assert route_map["llm.complete"] == Jido.AI.Skills.LLM.Actions.Complete
-      assert route_map["llm.embed"] == Jido.AI.Skills.LLM.Actions.Embed
+      assert route_map["llm.chat"] == Chat
+      assert route_map["llm.complete"] == Complete
+      assert route_map["llm.embed"] == Embed
     end
 
     test "Reasoning skill router returns route list" do
-      assert function_exported?(Reasoning, :router, 1)
+      assert ModuleExports.exported?(Reasoning, :router, 1)
       routes = Reasoning.router(%{})
       assert is_list(routes)
     end
@@ -146,13 +152,13 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = Reasoning.router(%{})
       route_map = Map.new(routes)
 
-      assert route_map["reasoning.analyze"] == Jido.AI.Skills.Reasoning.Actions.Analyze
-      assert route_map["reasoning.explain"] == Jido.AI.Skills.Reasoning.Actions.Explain
-      assert route_map["reasoning.infer"] == Jido.AI.Skills.Reasoning.Actions.Infer
+      assert route_map["reasoning.analyze"] == Analyze
+      assert route_map["reasoning.explain"] == Explain
+      assert route_map["reasoning.infer"] == Infer
     end
 
     test "Planning skill router returns route list" do
-      assert function_exported?(Planning, :router, 1)
+      assert ModuleExports.exported?(Planning, :router, 1)
       routes = Planning.router(%{})
       assert is_list(routes)
     end
@@ -161,13 +167,13 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = Planning.router(%{})
       route_map = Map.new(routes)
 
-      assert route_map["planning.plan"] == Jido.AI.Skills.Planning.Actions.Plan
-      assert route_map["planning.decompose"] == Jido.AI.Skills.Planning.Actions.Decompose
-      assert route_map["planning.prioritize"] == Jido.AI.Skills.Planning.Actions.Prioritize
+      assert route_map["planning.plan"] == Plan
+      assert route_map["planning.decompose"] == Decompose
+      assert route_map["planning.prioritize"] == Prioritize
     end
 
     test "Streaming skill router returns route list" do
-      assert function_exported?(Streaming, :router, 1)
+      assert ModuleExports.exported?(Streaming, :router, 1)
       routes = Streaming.router(%{})
       assert is_list(routes)
     end
@@ -176,13 +182,13 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = Streaming.router(%{})
       route_map = Map.new(routes)
 
-      assert route_map["stream.start"] == Jido.AI.Skills.Streaming.Actions.StartStream
-      assert route_map["stream.process"] == Jido.AI.Skills.Streaming.Actions.ProcessTokens
-      assert route_map["stream.end"] == Jido.AI.Skills.Streaming.Actions.EndStream
+      assert route_map["stream.start"] == StartStream
+      assert route_map["stream.process"] == ProcessTokens
+      assert route_map["stream.end"] == EndStream
     end
 
     test "ToolCalling skill router returns route list" do
-      assert function_exported?(ToolCalling, :router, 1)
+      assert ModuleExports.exported?(ToolCalling, :router, 1)
       routes = ToolCalling.router(%{})
       assert is_list(routes)
     end
@@ -191,9 +197,9 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = ToolCalling.router(%{})
       route_map = Map.new(routes)
 
-      assert route_map["tool.call"] == Jido.AI.Skills.ToolCalling.Actions.CallWithTools
-      assert route_map["tool.execute"] == Jido.AI.Skills.ToolCalling.Actions.ExecuteTool
-      assert route_map["tool.list"] == Jido.AI.Skills.ToolCalling.Actions.ListTools
+      assert route_map["tool.call"] == CallWithTools
+      assert route_map["tool.execute"] == ExecuteTool
+      assert route_map["tool.list"] == ListTools
     end
   end
 
@@ -203,27 +209,27 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
 
   describe "Handle Signal/2 Callback" do
     test "LLM skill implements handle_signal/2" do
-      assert function_exported?(LLM, :handle_signal, 2)
+      assert ModuleExports.exported?(LLM, :handle_signal, 2)
       assert {:ok, :continue} = LLM.handle_signal(%{}, %{})
     end
 
     test "Reasoning skill implements handle_signal/2" do
-      assert function_exported?(Reasoning, :handle_signal, 2)
+      assert ModuleExports.exported?(Reasoning, :handle_signal, 2)
       assert {:ok, :continue} = Reasoning.handle_signal(%{}, %{})
     end
 
     test "Planning skill implements handle_signal/2" do
-      assert function_exported?(Planning, :handle_signal, 2)
+      assert ModuleExports.exported?(Planning, :handle_signal, 2)
       assert {:ok, :continue} = Planning.handle_signal(%{}, %{})
     end
 
     test "Streaming skill implements handle_signal/2" do
-      assert function_exported?(Streaming, :handle_signal, 2)
+      assert ModuleExports.exported?(Streaming, :handle_signal, 2)
       assert {:ok, :continue} = Streaming.handle_signal(%{}, %{})
     end
 
     test "ToolCalling skill implements handle_signal/2" do
-      assert function_exported?(ToolCalling, :handle_signal, 2)
+      assert ModuleExports.exported?(ToolCalling, :handle_signal, 2)
       assert {:ok, :continue} = ToolCalling.handle_signal(%{}, %{})
     end
   end
@@ -234,31 +240,31 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
 
   describe "Transform Result/3 Callback" do
     test "LLM skill implements transform_result/3" do
-      assert function_exported?(LLM, :transform_result, 3)
+      assert ModuleExports.exported?(LLM, :transform_result, 3)
       result = %{text: "test"}
       assert LLM.transform_result(nil, result, %{}) == result
     end
 
     test "Reasoning skill implements transform_result/3" do
-      assert function_exported?(Reasoning, :transform_result, 3)
+      assert ModuleExports.exported?(Reasoning, :transform_result, 3)
       result = %{analysis: "test"}
       assert Reasoning.transform_result(nil, result, %{}) == result
     end
 
     test "Planning skill implements transform_result/3" do
-      assert function_exported?(Planning, :transform_result, 3)
+      assert ModuleExports.exported?(Planning, :transform_result, 3)
       result = %{plan: "test"}
       assert Planning.transform_result(nil, result, %{}) == result
     end
 
     test "Streaming skill implements transform_result/3" do
-      assert function_exported?(Streaming, :transform_result, 3)
+      assert ModuleExports.exported?(Streaming, :transform_result, 3)
       result = %{stream: "test"}
       assert Streaming.transform_result(nil, result, %{}) == result
     end
 
     test "ToolCalling skill implements transform_result/3" do
-      assert function_exported?(ToolCalling, :transform_result, 3)
+      assert ModuleExports.exported?(ToolCalling, :transform_result, 3)
       result = %{tool_result: "test"}
       assert ToolCalling.transform_result(nil, result, %{}) == result
     end
@@ -270,7 +276,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
 
   describe "Signal Patterns" do
     test "LLM skill has signal_patterns" do
-      assert function_exported?(LLM, :signal_patterns, 0)
+      assert ModuleExports.exported?(LLM, :signal_patterns, 0)
       patterns = LLM.signal_patterns()
       assert is_list(patterns)
     end
@@ -285,25 +291,25 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
     end
 
     test "Reasoning skill has signal_patterns" do
-      assert function_exported?(Reasoning, :signal_patterns, 0)
+      assert ModuleExports.exported?(Reasoning, :signal_patterns, 0)
       patterns = Reasoning.signal_patterns()
       assert is_list(patterns)
     end
 
     test "Planning skill has signal_patterns" do
-      assert function_exported?(Planning, :signal_patterns, 0)
+      assert ModuleExports.exported?(Planning, :signal_patterns, 0)
       patterns = Planning.signal_patterns()
       assert is_list(patterns)
     end
 
     test "Streaming skill has signal_patterns" do
-      assert function_exported?(Streaming, :signal_patterns, 0)
+      assert ModuleExports.exported?(Streaming, :signal_patterns, 0)
       patterns = Streaming.signal_patterns()
       assert is_list(patterns)
     end
 
     test "ToolCalling skill has signal_patterns" do
-      assert function_exported?(ToolCalling, :signal_patterns, 0)
+      assert ModuleExports.exported?(ToolCalling, :signal_patterns, 0)
       patterns = ToolCalling.signal_patterns()
       assert is_list(patterns)
     end
@@ -348,7 +354,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
 
   describe "Plugin Spec" do
     test "LLM plugin_spec returns valid spec" do
-      assert function_exported?(LLM, :plugin_spec, 1)
+      assert ModuleExports.exported?(LLM, :plugin_spec, 1)
       spec = LLM.plugin_spec(%{})
       assert spec.module == LLM
       assert spec.name == "llm"
@@ -356,7 +362,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
     end
 
     test "Reasoning plugin_spec returns valid spec" do
-      assert function_exported?(Reasoning, :plugin_spec, 1)
+      assert ModuleExports.exported?(Reasoning, :plugin_spec, 1)
       spec = Reasoning.plugin_spec(%{})
       assert spec.module == Reasoning
       assert spec.name == "reasoning"
@@ -364,7 +370,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
     end
 
     test "Planning plugin_spec returns valid spec" do
-      assert function_exported?(Planning, :plugin_spec, 1)
+      assert ModuleExports.exported?(Planning, :plugin_spec, 1)
       spec = Planning.plugin_spec(%{})
       assert spec.module == Planning
       assert spec.name == "planning"
@@ -372,7 +378,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
     end
 
     test "Streaming plugin_spec returns valid spec" do
-      assert function_exported?(Streaming, :plugin_spec, 1)
+      assert ModuleExports.exported?(Streaming, :plugin_spec, 1)
       spec = Streaming.plugin_spec(%{})
       assert spec.module == Streaming
       assert spec.name == "streaming"
@@ -380,7 +386,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
     end
 
     test "ToolCalling plugin_spec returns valid spec" do
-      assert function_exported?(ToolCalling, :plugin_spec, 1)
+      assert ModuleExports.exported?(ToolCalling, :plugin_spec, 1)
       spec = ToolCalling.plugin_spec(%{})
       assert spec.module == ToolCalling
       assert spec.name == "tool_calling"
@@ -397,7 +403,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :router, 1), "#{skill} must implement router/1"
+        assert ModuleExports.exported?(skill, :router, 1), "#{skill} must implement router/1"
       end
     end
 
@@ -405,7 +411,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :handle_signal, 2), "#{skill} must implement handle_signal/2"
+        assert ModuleExports.exported?(skill, :handle_signal, 2), "#{skill} must implement handle_signal/2"
       end
     end
 
@@ -413,7 +419,8 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :transform_result, 3), "#{skill} must implement transform_result/3"
+        assert ModuleExports.exported?(skill, :transform_result, 3),
+               "#{skill} must implement transform_result/3"
       end
     end
 
@@ -421,7 +428,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :schema, 0), "#{skill} must implement schema/0"
+        assert ModuleExports.exported?(skill, :schema, 0), "#{skill} must implement schema/0"
       end
     end
 
@@ -429,7 +436,7 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :mount, 2), "#{skill} must implement mount/2"
+        assert ModuleExports.exported?(skill, :mount, 2), "#{skill} must implement mount/2"
         assert {:ok, _state} = skill.mount(%Agent{}, %{})
       end
     end
@@ -438,7 +445,9 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :signal_patterns, 0), "#{skill} must implement signal_patterns/0"
+        assert ModuleExports.exported?(skill, :signal_patterns, 0),
+               "#{skill} must implement signal_patterns/0"
+
         patterns = skill.signal_patterns()
         assert is_list(patterns), "#{skill} signal_patterns must return a list"
       end

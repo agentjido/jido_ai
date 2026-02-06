@@ -2,6 +2,7 @@ defmodule Jido.AI.CLI.Adapters.CoTTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.CLI.Adapters.CoT, as: CoTAdapter
+  alias Jido.AI.Test.ModuleExports
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do
@@ -9,8 +10,8 @@ defmodule Jido.AI.CLI.Adapters.CoTTest do
       module = CoTAdapter.create_ephemeral_agent(config)
 
       assert is_atom(module)
-      assert function_exported?(module, :think, 2)
-      assert function_exported?(module, :name, 0)
+      assert ModuleExports.exported?(module, :think, 2)
+      assert ModuleExports.exported?(module, :name, 0)
       assert module.name() == "cli_cot_agent"
     end
 
@@ -50,11 +51,11 @@ defmodule Jido.AI.CLI.Adapters.CoTTest do
   describe "behavior implementation" do
     test "implements all required callbacks" do
       Code.ensure_loaded!(CoTAdapter)
-      assert function_exported?(CoTAdapter, :start_agent, 3)
-      assert function_exported?(CoTAdapter, :submit, 3)
-      assert function_exported?(CoTAdapter, :await, 3)
-      assert function_exported?(CoTAdapter, :stop, 1)
-      assert function_exported?(CoTAdapter, :create_ephemeral_agent, 1)
+      assert ModuleExports.exported?(CoTAdapter, :start_agent, 3)
+      assert ModuleExports.exported?(CoTAdapter, :submit, 3)
+      assert ModuleExports.exported?(CoTAdapter, :await, 3)
+      assert ModuleExports.exported?(CoTAdapter, :stop, 1)
+      assert ModuleExports.exported?(CoTAdapter, :create_ephemeral_agent, 1)
     end
   end
 end

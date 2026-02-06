@@ -79,7 +79,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
   """
 
-  alias Jido.AI.Accuracy.{Candidate, Config}
+  alias Jido.AI.Accuracy.{Candidate, Config, Helpers}
   alias Jido.AI.Text
 
   @type t :: %__MODULE__{
@@ -281,7 +281,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
     rendered =
       try do
-        Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
+        Helpers.eval_eex_quiet(template, assigns: assigns)
       rescue
         e -> {:error, {:template_error, Exception.message(e)}}
       end
@@ -322,7 +322,7 @@ defmodule Jido.AI.Accuracy.SelfRefine do
 
     rendered =
       try do
-        Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
+        Helpers.eval_eex_quiet(template, assigns: assigns)
       rescue
         e -> {:error, {:template_error, Exception.message(e)}}
       end

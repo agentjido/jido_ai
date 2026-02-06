@@ -54,7 +54,7 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
 
   @behaviour Jido.AI.Accuracy.Critique
 
-  alias Jido.AI.Accuracy.{Candidate, Config, CritiqueResult}
+  alias Jido.AI.Accuracy.{Candidate, Config, CritiqueResult, Helpers}
   alias Jido.AI.Text
 
   @type t :: %__MODULE__{
@@ -213,7 +213,7 @@ defmodule Jido.AI.Accuracy.Critiquers.LLMCritiquer do
     ]
 
     try do
-      rendered = Jido.AI.Accuracy.Helpers.eval_eex_quiet(template, assigns: assigns)
+      rendered = Helpers.eval_eex_quiet(template, assigns: assigns)
       {:ok, rendered}
     rescue
       e ->

@@ -4,6 +4,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
   alias Jido.AI.Accuracy.Candidate
   alias Jido.AI.Accuracy.Helpers
   alias Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifier
+  alias Jido.AI.Test.ModuleExports
 
   @moduletag :capture_log
 
@@ -500,7 +501,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
       # Note: This test verifies the error handling path exists.
       # In actual API calls, timeout would return {:error, :timeout} or similar.
       # The verifier should handle this gracefully and return a default score.
-      assert function_exported?(LLMOutcomeVerifier, :verify, 3)
+      assert ModuleExports.exported?(LLMOutcomeVerifier, :verify, 3)
     end
 
     test "handles rate limit errors" do
@@ -511,7 +512,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
       # 1. Log the error
       # 2. Return a default/mid-range score
       # 3. Not crash
-      assert function_exported?(LLMOutcomeVerifier, :verify, 3)
+      assert ModuleExports.exported?(LLMOutcomeVerifier, :verify, 3)
     end
 
     test "handles network connectivity errors" do
@@ -520,7 +521,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
 
       # Network errors (e.g., :econnrefused, :nxdomain) should be handled
       # Result: {:ok, VerificationResult} with mid score and error in metadata
-      assert function_exported?(LLMOutcomeVerifier, :verify, 3)
+      assert ModuleExports.exported?(LLMOutcomeVerifier, :verify, 3)
     end
 
     test "handles authentication errors" do
@@ -529,7 +530,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
 
       # Invalid API key (HTTP 401/403) should be handled gracefully
       # The verifier should not crash and should return a structured error
-      assert function_exported?(LLMOutcomeVerifier, :verify, 3)
+      assert ModuleExports.exported?(LLMOutcomeVerifier, :verify, 3)
     end
 
     test "handles malformed LLM responses" do
@@ -539,7 +540,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
 
       # Should extract best-effort score and reasoning
       # Return mid score if parsing completely fails
-      assert function_exported?(LLMOutcomeVerifier, :verify, 3)
+      assert ModuleExports.exported?(LLMOutcomeVerifier, :verify, 3)
     end
 
     test "handles empty LLM responses" do
@@ -548,7 +549,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
 
       # Empty response should result in mid-range score
       # with reasoning indicating no response received
-      assert function_exported?(LLMOutcomeVerifier, :verify, 3)
+      assert ModuleExports.exported?(LLMOutcomeVerifier, :verify, 3)
     end
 
     test "handles service unavailable errors" do
@@ -557,7 +558,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
 
       # HTTP 503 should be handled gracefully
       # Return mid score with appropriate metadata
-      assert function_exported?(LLMOutcomeVerifier, :verify, 3)
+      assert ModuleExports.exported?(LLMOutcomeVerifier, :verify, 3)
     end
 
     test "handles content filtered by safety policies" do
@@ -566,7 +567,7 @@ defmodule Jido.AI.Accuracy.Verifiers.LLMOutcomeVerifierTest do
 
       # When LLM refuses to answer due to content policies
       # Should return a neutral score and note the content filter
-      assert function_exported?(LLMOutcomeVerifier, :verify, 3)
+      assert ModuleExports.exported?(LLMOutcomeVerifier, :verify, 3)
     end
   end
 

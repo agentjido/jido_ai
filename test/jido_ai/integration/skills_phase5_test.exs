@@ -13,12 +13,14 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Skills.LLM
-  alias Jido.AI.Skills.LLM.Actions.Chat
-  alias Jido.AI.Skills.Planning
-  alias Jido.AI.Skills.Reasoning
-  alias Jido.AI.Skills.Streaming
-  alias Jido.AI.Skills.ToolCalling
+  alias Jido.Agent
+  alias Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
+  alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
+  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
+  alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
+  alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
+  alias Jido.AI.Skills.{LLM, Planning, Reasoning, Streaming, ToolCalling}
+  alias Jido.AI.Test.ModuleExports
 
   # ============================================================================
   # Skill Composition Integration Tests
@@ -76,11 +78,11 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     end
 
     test "skills maintain independent state" do
-      {:ok, llm_state} = LLM.mount(%Jido.Agent{}, %{default_model: :fast})
-      {:ok, reasoning_state} = Reasoning.mount(%Jido.Agent{}, %{default_model: :reasoning})
-      {:ok, planning_state} = Planning.mount(%Jido.Agent{}, %{default_model: :planning})
-      {:ok, streaming_state} = Streaming.mount(%Jido.Agent{}, %{})
-      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      {:ok, llm_state} = LLM.mount(%Agent{}, %{default_model: :fast})
+      {:ok, reasoning_state} = Reasoning.mount(%Agent{}, %{default_model: :reasoning})
+      {:ok, planning_state} = Planning.mount(%Agent{}, %{default_model: :planning})
+      {:ok, streaming_state} = Streaming.mount(%Agent{}, %{})
+      {:ok, tool_calling_state} = ToolCalling.mount(%Agent{}, %{})
 
       # Each skill maintains its own state
       assert llm_state.default_model == :fast
@@ -96,8 +98,6 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "LLM Skill Integration" do
-    alias Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
-
     test "all LLM actions are accessible" do
       assert Chat in LLM.actions()
       assert Complete in LLM.actions()
@@ -131,8 +131,6 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Reasoning Skill Integration" do
-    alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
-
     test "all Reasoning actions are accessible" do
       assert Analyze in Reasoning.actions()
       assert Explain in Reasoning.actions()
@@ -166,8 +164,6 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Planning Skill Integration" do
-    alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
-
     test "all Planning actions are accessible" do
       assert Plan in Planning.actions()
       assert Decompose in Planning.actions()
@@ -200,8 +196,6 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Streaming Skill Integration" do
-    alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
-
     test "all Streaming actions are accessible" do
       assert StartStream in Streaming.actions()
       assert ProcessTokens in Streaming.actions()
@@ -234,8 +228,6 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Tool Calling Skill Integration" do
-    alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
-
     test "all Tool Calling actions are accessible" do
       assert CallWithTools in ToolCalling.actions()
       assert ExecuteTool in ToolCalling.actions()
@@ -271,8 +263,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   describe "Cross-Skill Integration" do
     test "LLM and Reasoning skills can be used together" do
       # Both skills should be mountable
-      {:ok, llm_state} = LLM.mount(%Jido.Agent{}, %{})
-      {:ok, reasoning_state} = Reasoning.mount(%Jido.Agent{}, %{})
+      {:ok, llm_state} = LLM.mount(%Agent{}, %{})
+      {:ok, reasoning_state} = Reasoning.mount(%Agent{}, %{})
 
       # States should be independent
       assert llm_state.default_model == :fast
@@ -288,8 +280,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
     test "Planning and Tool Calling skills can be used together" do
       # Both skills should be mountable
-      {:ok, planning_state} = Planning.mount(%Jido.Agent{}, %{})
-      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      {:ok, planning_state} = Planning.mount(%Agent{}, %{})
+      {:ok, tool_calling_state} = ToolCalling.mount(%Agent{}, %{})
 
       # Tool Calling should have access to available tools
       assert is_list(tool_calling_state.available_tools)
@@ -298,8 +290,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
     test "Streaming and Tool Calling skills can be used together" do
       # Both skills should be mountable
-      {:ok, streaming_state} = Streaming.mount(%Jido.Agent{}, %{})
-      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      {:ok, streaming_state} = Streaming.mount(%Agent{}, %{})
+      {:ok, tool_calling_state} = ToolCalling.mount(%Agent{}, %{})
 
       # Streaming should have buffer configuration
       assert is_map(streaming_state.active_streams)
@@ -340,11 +332,11 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
     test "all skills support mount/2 callback" do
       # All should return {:ok, state} tuple
-      assert {:ok, _state} = LLM.mount(%Jido.Agent{}, %{})
-      assert {:ok, _state} = Reasoning.mount(%Jido.Agent{}, %{})
-      assert {:ok, _state} = Planning.mount(%Jido.Agent{}, %{})
-      assert {:ok, _state} = Streaming.mount(%Jido.Agent{}, %{})
-      assert {:ok, _state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      assert {:ok, _state} = LLM.mount(%Agent{}, %{})
+      assert {:ok, _state} = Reasoning.mount(%Agent{}, %{})
+      assert {:ok, _state} = Planning.mount(%Agent{}, %{})
+      assert {:ok, _state} = Streaming.mount(%Agent{}, %{})
+      assert {:ok, _state} = ToolCalling.mount(%Agent{}, %{})
     end
   end
 
@@ -356,50 +348,50 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     test "LLM Skill has Chat, Complete, and Embed actions" do
       actions = LLM.actions()
 
-      assert Jido.AI.Skills.LLM.Actions.Chat in actions
-      assert Jido.AI.Skills.LLM.Actions.Complete in actions
-      assert Jido.AI.Skills.LLM.Actions.Embed in actions
+      assert Chat in actions
+      assert Complete in actions
+      assert Embed in actions
     end
 
     test "Reasoning Skill has Analyze, Infer, and Explain actions" do
       actions = Reasoning.actions()
 
-      assert Jido.AI.Skills.Reasoning.Actions.Analyze in actions
-      assert Jido.AI.Skills.Reasoning.Actions.Infer in actions
-      assert Jido.AI.Skills.Reasoning.Actions.Explain in actions
+      assert Analyze in actions
+      assert Infer in actions
+      assert Explain in actions
     end
 
     test "Planning Skill has Plan, Decompose, and Prioritize actions" do
       actions = Planning.actions()
 
-      assert Jido.AI.Skills.Planning.Actions.Plan in actions
-      assert Jido.AI.Skills.Planning.Actions.Decompose in actions
-      assert Jido.AI.Skills.Planning.Actions.Prioritize in actions
+      assert Plan in actions
+      assert Decompose in actions
+      assert Prioritize in actions
     end
 
     test "Streaming Skill has StartStream, ProcessTokens, and EndStream actions" do
       actions = Streaming.actions()
 
-      assert Jido.AI.Skills.Streaming.Actions.StartStream in actions
-      assert Jido.AI.Skills.Streaming.Actions.ProcessTokens in actions
-      assert Jido.AI.Skills.Streaming.Actions.EndStream in actions
+      assert StartStream in actions
+      assert ProcessTokens in actions
+      assert EndStream in actions
     end
 
     test "Tool Calling Skill has CallWithTools, ExecuteTool, and ListTools actions" do
       actions = ToolCalling.actions()
 
-      assert Jido.AI.Skills.ToolCalling.Actions.CallWithTools in actions
-      assert Jido.AI.Skills.ToolCalling.Actions.ExecuteTool in actions
-      assert Jido.AI.Skills.ToolCalling.Actions.ListTools in actions
+      assert CallWithTools in actions
+      assert ExecuteTool in actions
+      assert ListTools in actions
     end
 
     test "all 5 skills are available" do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :plugin_spec, 1)
-        assert function_exported?(skill, :mount, 2)
-        assert function_exported?(skill, :actions, 0)
+        assert ModuleExports.exported?(skill, :plugin_spec, 1)
+        assert ModuleExports.exported?(skill, :mount, 2)
+        assert ModuleExports.exported?(skill, :actions, 0)
       end
     end
 

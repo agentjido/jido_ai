@@ -2,6 +2,7 @@ defmodule Jido.AI.CLI.Adapters.TRMTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.CLI.Adapters.TRM, as: TRMAdapter
+  alias Jido.AI.Test.ModuleExports
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do
@@ -9,8 +10,8 @@ defmodule Jido.AI.CLI.Adapters.TRMTest do
       module = TRMAdapter.create_ephemeral_agent(config)
 
       assert is_atom(module)
-      assert function_exported?(module, :reason, 2)
-      assert function_exported?(module, :name, 0)
+      assert ModuleExports.exported?(module, :reason, 2)
+      assert ModuleExports.exported?(module, :name, 0)
       assert module.name() == "cli_trm_agent"
     end
 
@@ -60,11 +61,11 @@ defmodule Jido.AI.CLI.Adapters.TRMTest do
   describe "behavior implementation" do
     test "implements all required callbacks" do
       Code.ensure_loaded!(TRMAdapter)
-      assert function_exported?(TRMAdapter, :start_agent, 3)
-      assert function_exported?(TRMAdapter, :submit, 3)
-      assert function_exported?(TRMAdapter, :await, 3)
-      assert function_exported?(TRMAdapter, :stop, 1)
-      assert function_exported?(TRMAdapter, :create_ephemeral_agent, 1)
+      assert ModuleExports.exported?(TRMAdapter, :start_agent, 3)
+      assert ModuleExports.exported?(TRMAdapter, :submit, 3)
+      assert ModuleExports.exported?(TRMAdapter, :await, 3)
+      assert ModuleExports.exported?(TRMAdapter, :stop, 1)
+      assert ModuleExports.exported?(TRMAdapter, :create_ephemeral_agent, 1)
     end
   end
 end

@@ -2,6 +2,7 @@ defmodule Jido.AI.CLI.Adapters.AdaptiveTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.CLI.Adapters.Adaptive, as: AdaptiveAdapter
+  alias Jido.AI.Test.ModuleExports
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do
@@ -9,8 +10,8 @@ defmodule Jido.AI.CLI.Adapters.AdaptiveTest do
       module = AdaptiveAdapter.create_ephemeral_agent(config)
 
       assert is_atom(module)
-      assert function_exported?(module, :ask, 2)
-      assert function_exported?(module, :name, 0)
+      assert ModuleExports.exported?(module, :ask, 2)
+      assert ModuleExports.exported?(module, :name, 0)
       assert module.name() == "cli_adaptive_agent"
     end
 
@@ -60,11 +61,11 @@ defmodule Jido.AI.CLI.Adapters.AdaptiveTest do
   describe "behavior implementation" do
     test "implements all required callbacks" do
       Code.ensure_loaded!(AdaptiveAdapter)
-      assert function_exported?(AdaptiveAdapter, :start_agent, 3)
-      assert function_exported?(AdaptiveAdapter, :submit, 3)
-      assert function_exported?(AdaptiveAdapter, :await, 3)
-      assert function_exported?(AdaptiveAdapter, :stop, 1)
-      assert function_exported?(AdaptiveAdapter, :create_ephemeral_agent, 1)
+      assert ModuleExports.exported?(AdaptiveAdapter, :start_agent, 3)
+      assert ModuleExports.exported?(AdaptiveAdapter, :submit, 3)
+      assert ModuleExports.exported?(AdaptiveAdapter, :await, 3)
+      assert ModuleExports.exported?(AdaptiveAdapter, :stop, 1)
+      assert ModuleExports.exported?(AdaptiveAdapter, :create_ephemeral_agent, 1)
     end
   end
 end

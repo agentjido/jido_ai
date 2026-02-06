@@ -20,9 +20,11 @@ defmodule Jido.AI.CLI.TUI do
 
   alias Jido.AI.CLI.Adapter
   alias TermUI.Command
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   require Logger
+
+  @runtime_config_key {__MODULE__, :runtime_config}
 
   @doc """
   Starts the TUI with the given configuration.
@@ -32,7 +34,14 @@ defmodule Jido.AI.CLI.TUI do
     case resolve_adapter_and_agent(config) do
       {:ok, adapter, agent_module} ->
         config = Map.merge(config, %{adapter: adapter, agent_module: agent_module})
-        TermUI.Runtime.run(root: __MODULE__, opts: config)
+
+        :persistent_term.put(@runtime_config_key, config)
+
+        try do
+          TermUI.Runtime.run(root: __MODULE__)
+        after
+          :persistent_term.erase(@runtime_config_key)
+        end
 
       {:error, reason} ->
         IO.puts(:stderr, "Fatal: #{format_error(reason)}")
@@ -41,8 +50,8 @@ defmodule Jido.AI.CLI.TUI do
   end
 
   @impl true
-  def init(opts) do
-    config = Keyword.get(opts, :opts, %{})
+  def init(_opts) do
+    config = :persistent_term.get(@runtime_config_key, %{})
 
     %{
       adapter: config[:adapter],

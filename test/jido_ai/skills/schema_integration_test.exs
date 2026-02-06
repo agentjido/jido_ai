@@ -19,6 +19,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
   alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
   alias Jido.AI.Skills.ToolCalling
   alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
+  alias Jido.AI.Test.ModuleExports
 
   # Ensure all skill modules are loaded before tests
   require Jido.AI.Skills.LLM
@@ -38,7 +39,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
 
   describe "LLM Skill Schemas" do
     test "Chat action has schema function" do
-      assert function_exported?(Chat, :schema, 0)
+      assert ModuleExports.exported?(Chat, :schema, 0)
     end
 
     test "Chat schema returns a map-like structure" do
@@ -47,7 +48,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "Complete action has schema function" do
-      assert function_exported?(Complete, :schema, 0)
+      assert ModuleExports.exported?(Complete, :schema, 0)
     end
 
     test "Complete schema returns a map-like structure" do
@@ -56,7 +57,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "Embed action has schema function" do
-      assert function_exported?(Embed, :schema, 0)
+      assert ModuleExports.exported?(Embed, :schema, 0)
     end
 
     test "Embed schema returns a map-like structure" do
@@ -71,7 +72,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
 
   describe "Reasoning Skill Schemas" do
     test "Analyze action has schema function" do
-      assert function_exported?(Analyze, :schema, 0)
+      assert ModuleExports.exported?(Analyze, :schema, 0)
     end
 
     test "Analyze schema returns a map-like structure" do
@@ -80,7 +81,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "Explain action has schema function" do
-      assert function_exported?(Explain, :schema, 0)
+      assert ModuleExports.exported?(Explain, :schema, 0)
     end
 
     test "Explain schema returns a map-like structure" do
@@ -89,7 +90,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "Infer action has schema function" do
-      assert function_exported?(Infer, :schema, 0)
+      assert ModuleExports.exported?(Infer, :schema, 0)
     end
 
     test "Infer schema returns a map-like structure" do
@@ -104,7 +105,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
 
   describe "Planning Skill Schemas" do
     test "Plan action has schema function" do
-      assert function_exported?(Plan, :schema, 0)
+      assert ModuleExports.exported?(Plan, :schema, 0)
     end
 
     test "Plan schema returns a map-like structure" do
@@ -113,7 +114,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "Decompose action has schema function" do
-      assert function_exported?(Decompose, :schema, 0)
+      assert ModuleExports.exported?(Decompose, :schema, 0)
     end
 
     test "Decompose schema returns a map-like structure" do
@@ -122,7 +123,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "Prioritize action has schema function" do
-      assert function_exported?(Prioritize, :schema, 0)
+      assert ModuleExports.exported?(Prioritize, :schema, 0)
     end
 
     test "Prioritize schema returns a map-like structure" do
@@ -137,7 +138,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
 
   describe "Streaming Skill Schemas" do
     test "StartStream action has schema function" do
-      assert function_exported?(StartStream, :schema, 0)
+      assert ModuleExports.exported?(StartStream, :schema, 0)
     end
 
     test "StartStream schema returns a map-like structure" do
@@ -146,7 +147,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "ProcessTokens action has schema function" do
-      assert function_exported?(ProcessTokens, :schema, 0)
+      assert ModuleExports.exported?(ProcessTokens, :schema, 0)
     end
 
     test "ProcessTokens schema returns a map-like structure" do
@@ -155,7 +156,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "EndStream action has schema function" do
-      assert function_exported?(EndStream, :schema, 0)
+      assert ModuleExports.exported?(EndStream, :schema, 0)
     end
 
     test "EndStream schema returns a map-like structure" do
@@ -170,7 +171,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
 
   describe "Tool Calling Skill Schemas" do
     test "CallWithTools action has schema function" do
-      assert function_exported?(CallWithTools, :schema, 0)
+      assert ModuleExports.exported?(CallWithTools, :schema, 0)
     end
 
     test "CallWithTools schema returns a map-like structure" do
@@ -179,7 +180,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "ExecuteTool action has schema function" do
-      assert function_exported?(ExecuteTool, :schema, 0)
+      assert ModuleExports.exported?(ExecuteTool, :schema, 0)
     end
 
     test "ExecuteTool schema returns a map-like structure" do
@@ -188,7 +189,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
     end
 
     test "ListTools action has schema function" do
-      assert function_exported?(ListTools, :schema, 0)
+      assert ModuleExports.exported?(ListTools, :schema, 0)
     end
 
     test "ListTools schema returns a map-like structure" do
@@ -255,7 +256,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
       ]
 
       for {action_module, _name} <- actions do
-        assert function_exported?(action_module, :schema, 0),
+        assert ModuleExports.exported?(action_module, :schema, 0),
                "#{action_module} must have schema/0 function"
       end
     end
@@ -265,7 +266,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
       assert length(llm_actions) == 4
 
       for action <- llm_actions do
-        assert function_exported?(action, :schema, 0)
+        assert ModuleExports.exported?(action, :schema, 0)
       end
     end
 
@@ -274,7 +275,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
       assert length(reasoning_actions) == 3
 
       for action <- reasoning_actions do
-        assert function_exported?(action, :schema, 0)
+        assert ModuleExports.exported?(action, :schema, 0)
       end
     end
 
@@ -283,7 +284,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
       assert length(planning_actions) == 3
 
       for action <- planning_actions do
-        assert function_exported?(action, :schema, 0)
+        assert ModuleExports.exported?(action, :schema, 0)
       end
     end
 
@@ -292,7 +293,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
       assert length(streaming_actions) == 3
 
       for action <- streaming_actions do
-        assert function_exported?(action, :schema, 0)
+        assert ModuleExports.exported?(action, :schema, 0)
       end
     end
 
@@ -301,7 +302,7 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
       assert length(tool_calling_actions) == 3
 
       for action <- tool_calling_actions do
-        assert function_exported?(action, :schema, 0)
+        assert ModuleExports.exported?(action, :schema, 0)
       end
     end
 

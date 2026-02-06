@@ -12,10 +12,9 @@
 #   echo "ANTHROPIC_API_KEY=your-key-here" >> .env
 
 alias Jido.AI.Accuracy.{
-  # Load .env file if present (dotenvy is a dep of req_llm)
+  Candidate,
   Pipeline,
-  PipelineConfig,
-  Candidate
+  PipelineConfig
 }
 
 if File.exists?(".env") do
@@ -316,12 +315,7 @@ defmodule AccuracyDemo do
         IO.puts("  └─────────────────────────────────────────┘")
 
         IO.puts("\n  Execution trace:")
-
-        result.trace
-        |> Enum.each(fn entry ->
-          status = if entry.status == :ok, do: "✓", else: "✗"
-          IO.puts("    #{status} #{entry.stage} (#{entry.duration_ms}ms)")
-        end)
+        Enum.each(result.trace, &print_trace_entry/1)
 
         IO.puts("\n  Pipeline metadata:")
         IO.puts("    • Total duration: #{duration}ms")
@@ -360,6 +354,11 @@ defmodule AccuracyDemo do
     ║  • Confidence scores let you decide when to trust the answer    ║
     ╚══════════════════════════════════════════════════════════════════╝
     """)
+  end
+
+  defp print_trace_entry(entry) do
+    status = if entry.status == :ok, do: "✓", else: "✗"
+    IO.puts("    #{status} #{entry.stage} (#{entry.duration_ms}ms)")
   end
 
   # Helper: Generate a single response using ReqLLM.Context

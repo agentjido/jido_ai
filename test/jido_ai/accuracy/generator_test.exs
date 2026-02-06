@@ -2,6 +2,7 @@ defmodule Jido.AI.Accuracy.GeneratorTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Accuracy.Generators.LLMGenerator
+  alias Jido.AI.Test.ModuleExports
 
   describe "behavior contract" do
     test "defines generate_candidates callback" do
@@ -12,17 +13,17 @@ defmodule Jido.AI.Accuracy.GeneratorTest do
       # Note: Implementation has opts \\ [] default, so both arity 2 and 3 are exported
       _generator = LLMGenerator.new!([])
       # Should have the function because of @impl
-      assert function_exported?(LLMGenerator, :generate_candidates, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates, 3)
     end
 
     test "defines generate_candidates_async callback" do
       Code.ensure_loaded(LLMGenerator)
-      assert function_exported?(LLMGenerator, :generate_candidates_async, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_candidates_async, 3)
     end
 
     test "defines generate_with_reasoning callback" do
       Code.ensure_loaded(LLMGenerator)
-      assert function_exported?(LLMGenerator, :generate_with_reasoning, 3)
+      assert ModuleExports.exported?(LLMGenerator, :generate_with_reasoning, 3)
     end
   end
 

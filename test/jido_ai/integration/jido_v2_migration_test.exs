@@ -13,25 +13,34 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
+  alias Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
+  alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
+  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
+  alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
+  alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
   alias Jido.AI.Skills.{LLM, Planning, Reasoning, Streaming, ToolCalling}
   alias Jido.AI.Strategies.ReAct
+  alias Jido.AI.Strategy.StateOpsHelpers
+  alias Jido.AI.Test.ModuleExports
+  alias Jido.Instruction
+
+  require Analyze
+  require CallWithTools
 
   # Ensure all skill actions are compiled before tests run
-  require Jido.AI.Skills.LLM.Actions.Chat
-  require Jido.AI.Skills.LLM.Actions.Complete
-  require Jido.AI.Skills.LLM.Actions.Embed
-  require Jido.AI.Skills.Planning.Actions.Decompose
-  require Jido.AI.Skills.Planning.Actions.Plan
-  require Jido.AI.Skills.Planning.Actions.Prioritize
-  require Jido.AI.Skills.Reasoning.Actions.Analyze
-  require Jido.AI.Skills.Reasoning.Actions.Explain
-  require Jido.AI.Skills.Reasoning.Actions.Infer
-  require Jido.AI.Skills.Streaming.Actions.EndStream
-  require Jido.AI.Skills.Streaming.Actions.ProcessTokens
-  require Jido.AI.Skills.Streaming.Actions.StartStream
-  require Jido.AI.Skills.ToolCalling.Actions.CallWithTools
-  require Jido.AI.Skills.ToolCalling.Actions.ExecuteTool
-  require Jido.AI.Skills.ToolCalling.Actions.ListTools
+  require Chat
+  require Complete
+  require Decompose
+  require Embed
+  require EndStream
+  require ExecuteTool
+  require Explain
+  require Infer
+  require ListTools
+  require Plan
+  require Prioritize
+  require ProcessTokens
+  require StartStream
 
   # ============================================================================
   # Test Fixtures
@@ -107,33 +116,33 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       }
 
       # Verify action exists and has schema
-      action = Jido.AI.Skills.LLM.Actions.Chat
-      assert function_exported?(action, :schema, 0)
-      assert function_exported?(action, :run, 2)
+      action = Chat
+      assert ModuleExports.exported?(action, :schema, 0)
+      assert ModuleExports.exported?(action, :run, 2)
     end
 
     test "Reasoning Analyze action can be executed directly" do
-      action = Jido.AI.Skills.Reasoning.Actions.Analyze
-      assert function_exported?(action, :schema, 0)
-      assert function_exported?(action, :run, 2)
+      action = Analyze
+      assert ModuleExports.exported?(action, :schema, 0)
+      assert ModuleExports.exported?(action, :run, 2)
     end
 
     test "Planning Plan action can be executed directly" do
-      action = Jido.AI.Skills.Planning.Actions.Plan
-      assert function_exported?(action, :schema, 0)
-      assert function_exported?(action, :run, 2)
+      action = Plan
+      assert ModuleExports.exported?(action, :schema, 0)
+      assert ModuleExports.exported?(action, :run, 2)
     end
 
     test "Streaming StartStream action can be executed directly" do
-      action = Jido.AI.Skills.Streaming.Actions.StartStream
-      assert function_exported?(action, :schema, 0)
-      assert function_exported?(action, :run, 2)
+      action = StartStream
+      assert ModuleExports.exported?(action, :schema, 0)
+      assert ModuleExports.exported?(action, :run, 2)
     end
 
     test "ToolCalling ExecuteTool action can be executed directly" do
-      action = Jido.AI.Skills.ToolCalling.Actions.ExecuteTool
-      assert function_exported?(action, :schema, 0)
-      assert function_exported?(action, :run, 2)
+      action = ExecuteTool
+      assert ModuleExports.exported?(action, :schema, 0)
+      assert ModuleExports.exported?(action, :run, 2)
     end
 
     test "custom actions can be executed" do
@@ -185,46 +194,46 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   describe "Public API Stability" do
     test "LLM.plugin_spec/1 is available" do
-      assert function_exported?(LLM, :plugin_spec, 1)
+      assert ModuleExports.exported?(LLM, :plugin_spec, 1)
       spec = LLM.plugin_spec(%{})
       assert spec.module == LLM
     end
 
     test "Reasoning.plugin_spec/1 is available" do
-      assert function_exported?(Reasoning, :plugin_spec, 1)
+      assert ModuleExports.exported?(Reasoning, :plugin_spec, 1)
       spec = Reasoning.plugin_spec(%{})
       assert spec.module == Reasoning
     end
 
     test "Planning.plugin_spec/1 is available" do
-      assert function_exported?(Planning, :plugin_spec, 1)
+      assert ModuleExports.exported?(Planning, :plugin_spec, 1)
       spec = Planning.plugin_spec(%{})
       assert spec.module == Planning
     end
 
     test "Streaming.plugin_spec/1 is available" do
-      assert function_exported?(Streaming, :plugin_spec, 1)
+      assert ModuleExports.exported?(Streaming, :plugin_spec, 1)
       spec = Streaming.plugin_spec(%{})
       assert spec.module == Streaming
     end
 
     test "ToolCalling.plugin_spec/1 is available" do
-      assert function_exported?(ToolCalling, :plugin_spec, 1)
+      assert ModuleExports.exported?(ToolCalling, :plugin_spec, 1)
       spec = ToolCalling.plugin_spec(%{})
       assert spec.module == ToolCalling
     end
 
     test "ReAct.start_action/0 is available" do
-      assert function_exported?(ReAct, :start_action, 0)
+      assert ModuleExports.exported?(ReAct, :start_action, 0)
       assert ReAct.start_action() == :react_start
     end
 
     test "ReAct.list_tools/1 is available" do
-      assert function_exported?(ReAct, :list_tools, 1)
+      assert ModuleExports.exported?(ReAct, :list_tools, 1)
     end
 
     test "ReAct.register_tool_action/0 is available" do
-      assert function_exported?(ReAct, :register_tool_action, 0)
+      assert ModuleExports.exported?(ReAct, :register_tool_action, 0)
       assert ReAct.register_tool_action() == :react_register_tool
     end
   end
@@ -235,7 +244,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   describe "Signal Routes" do
     test "ReAct signal_routes/1 is available" do
-      assert function_exported?(ReAct, :signal_routes, 1)
+      assert ModuleExports.exported?(ReAct, :signal_routes, 1)
       routes = ReAct.signal_routes(%{})
       assert is_list(routes)
     end
@@ -256,35 +265,35 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   describe "Skill Action Lists" do
     test "LLM.actions/0 returns action list" do
-      assert function_exported?(LLM, :actions, 0)
+      assert ModuleExports.exported?(LLM, :actions, 0)
       actions = LLM.actions()
       assert is_list(actions)
       assert length(actions) == 4
     end
 
     test "Reasoning.actions/0 returns action list" do
-      assert function_exported?(Reasoning, :actions, 0)
+      assert ModuleExports.exported?(Reasoning, :actions, 0)
       actions = Reasoning.actions()
       assert is_list(actions)
       assert length(actions) == 3
     end
 
     test "Planning.actions/0 returns action list" do
-      assert function_exported?(Planning, :actions, 0)
+      assert ModuleExports.exported?(Planning, :actions, 0)
       actions = Planning.actions()
       assert is_list(actions)
       assert length(actions) == 3
     end
 
     test "Streaming.actions/0 returns action list" do
-      assert function_exported?(Streaming, :actions, 0)
+      assert ModuleExports.exported?(Streaming, :actions, 0)
       actions = Streaming.actions()
       assert is_list(actions)
       assert length(actions) == 3
     end
 
     test "ToolCalling.actions/0 returns action list" do
-      assert function_exported?(ToolCalling, :actions, 0)
+      assert ModuleExports.exported?(ToolCalling, :actions, 0)
       actions = ToolCalling.actions()
       assert is_list(actions)
       assert length(actions) == 3
@@ -333,19 +342,19 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   describe "StateOps Helpers Availability" do
     test "StateOpsHelpers module is available" do
-      assert Code.ensure_loaded?(Jido.AI.Strategy.StateOpsHelpers)
+      assert Code.ensure_loaded?(StateOpsHelpers)
     end
 
     test "StateOpsHelpers has expected functions" do
-      helpers = Jido.AI.Strategy.StateOpsHelpers
+      helpers = StateOpsHelpers
 
-      assert function_exported?(helpers, :update_strategy_state, 1)
-      assert function_exported?(helpers, :set_strategy_field, 2)
-      assert function_exported?(helpers, :set_iteration_status, 1)
-      assert function_exported?(helpers, :set_iteration, 1)
-      assert function_exported?(helpers, :append_conversation, 1)
-      assert function_exported?(helpers, :set_pending_tools, 1)
-      assert function_exported?(helpers, :clear_pending_tools, 0)
+      assert ModuleExports.exported?(helpers, :update_strategy_state, 1)
+      assert ModuleExports.exported?(helpers, :set_strategy_field, 2)
+      assert ModuleExports.exported?(helpers, :set_iteration_status, 1)
+      assert ModuleExports.exported?(helpers, :set_iteration, 1)
+      assert ModuleExports.exported?(helpers, :append_conversation, 1)
+      assert ModuleExports.exported?(helpers, :set_pending_tools, 1)
+      assert ModuleExports.exported?(helpers, :clear_pending_tools, 0)
     end
   end
 
@@ -381,7 +390,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       agent = %Agent{id: "test", name: "test", state: %{}}
       {agent, _} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
 
-      instruction = %Jido.Instruction{
+      instruction = %Instruction{
         action: ReAct.start_action(),
         params: %{query: "test"}
       }
@@ -406,31 +415,31 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
     end
 
     test "all skills have plugin_spec/1" do
-      assert function_exported?(LLM, :plugin_spec, 1)
-      assert function_exported?(Reasoning, :plugin_spec, 1)
-      assert function_exported?(Planning, :plugin_spec, 1)
-      assert function_exported?(Streaming, :plugin_spec, 1)
-      assert function_exported?(ToolCalling, :plugin_spec, 1)
+      assert ModuleExports.exported?(LLM, :plugin_spec, 1)
+      assert ModuleExports.exported?(Reasoning, :plugin_spec, 1)
+      assert ModuleExports.exported?(Planning, :plugin_spec, 1)
+      assert ModuleExports.exported?(Streaming, :plugin_spec, 1)
+      assert ModuleExports.exported?(ToolCalling, :plugin_spec, 1)
     end
 
     test "all skills have mount/2" do
-      assert function_exported?(LLM, :mount, 2)
-      assert function_exported?(Reasoning, :mount, 2)
-      assert function_exported?(Planning, :mount, 2)
-      assert function_exported?(Streaming, :mount, 2)
-      assert function_exported?(ToolCalling, :mount, 2)
+      assert ModuleExports.exported?(LLM, :mount, 2)
+      assert ModuleExports.exported?(Reasoning, :mount, 2)
+      assert ModuleExports.exported?(Planning, :mount, 2)
+      assert ModuleExports.exported?(Streaming, :mount, 2)
+      assert ModuleExports.exported?(ToolCalling, :mount, 2)
     end
 
     test "all skills have router/1" do
-      assert function_exported?(LLM, :router, 1)
-      assert function_exported?(Reasoning, :router, 1)
-      assert function_exported?(Planning, :router, 1)
-      assert function_exported?(Streaming, :router, 1)
-      assert function_exported?(ToolCalling, :router, 1)
+      assert ModuleExports.exported?(LLM, :router, 1)
+      assert ModuleExports.exported?(Reasoning, :router, 1)
+      assert ModuleExports.exported?(Planning, :router, 1)
+      assert ModuleExports.exported?(Streaming, :router, 1)
+      assert ModuleExports.exported?(ToolCalling, :router, 1)
     end
 
     test "StateOpsHelpers is available" do
-      assert Code.ensure_loaded?(Jido.AI.Strategy.StateOpsHelpers)
+      assert Code.ensure_loaded?(StateOpsHelpers)
     end
 
     test "no breaking changes in core APIs" do
@@ -441,9 +450,9 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert Map.has_key?(agent, :state)
 
       # ReAct strategy APIs unchanged
-      assert function_exported?(ReAct, :init, 2)
-      assert function_exported?(ReAct, :cmd, 3)
-      assert function_exported?(ReAct, :signal_routes, 1)
+      assert ModuleExports.exported?(ReAct, :init, 2)
+      assert ModuleExports.exported?(ReAct, :cmd, 3)
+      assert ModuleExports.exported?(ReAct, :signal_routes, 1)
     end
   end
 end

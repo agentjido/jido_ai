@@ -69,7 +69,7 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
-      {:term_ui, path: "../../term_ui"},
+      {:term_ui, github: "nshkrdotcom/term_ui", branch: "cleanup-dialyzer-credo"},
       {:zoi, "~> 0.16"},
 
       # Dev/Test
@@ -121,6 +121,7 @@ defmodule JidoAi.MixProject do
       source_ref: "v#{@version}",
       extras: [
         "README.md",
+        "LICENSE.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
         # Developer Guides
@@ -144,24 +145,11 @@ defmodule JidoAi.MixProject do
         "guides/user/09_prm.md",
         "guides/user/10_confidence_calibration.md",
         "guides/user/11_difficulty_estimation.md",
-        "guides/user/12_pipeline.md",
-        # Examples
-        "examples/accuracy/adaptive_self_consistency/example.md",
-        "examples/accuracy/pipeline/example.md",
-        "examples/accuracy/reflection/example.md",
-        "examples/accuracy/search/example.md",
-        "examples/accuracy/self_consistency/example.md",
-        "examples/accuracy/verification/example.md",
-        "examples/strategies/adaptive_strategy.md",
-        "examples/strategies/chain_of_thought.md",
-        "examples/strategies/react_agent.md",
-        "examples/strategies/tree_of_thoughts.md"
+        "guides/user/12_pipeline.md"
       ],
       groups_for_extras: [
         {"Developer Guides", ~r/guides\/developer/},
-        {"User Guides", ~r/guides\/user/},
-        {"Examples - Accuracy", ~r/examples\/accuracy/},
-        {"Examples - Strategies", ~r/examples\/strategies/}
+        {"User Guides", ~r/guides\/user/}
       ],
       groups_for_modules: [
         Core: [

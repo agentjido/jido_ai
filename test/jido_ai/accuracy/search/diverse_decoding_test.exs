@@ -2,6 +2,7 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecodingTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Accuracy.{Candidate, Search.DiverseDecoding}
+  alias Jido.AI.Test.ModuleExports
 
   @moduletag :capture_log
 
@@ -302,7 +303,7 @@ defmodule Jido.AI.Accuracy.Search.DiverseDecodingTest do
     test "implements search/4 callback" do
       # Ensure module is fully loaded before checking function_exported?
       Code.ensure_loaded!(DiverseDecoding)
-      assert function_exported?(DiverseDecoding, :search, 4)
+      assert ModuleExports.exported?(DiverseDecoding, :search, 4)
     end
 
     test "returns {:ok, candidate} on success" do

@@ -16,6 +16,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Strategies.ReAct
   alias Jido.AI.Strategy.StateOpsHelpers
+  alias Jido.AI.Test.ModuleExports
 
   # ============================================================================
   # Test Fixtures
@@ -336,10 +337,10 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   describe "Phase 9.1 Success Criteria" do
     test "StateOpsHelpers module exists and is accessible" do
       assert Code.ensure_loaded?(StateOpsHelpers)
-      assert function_exported?(StateOpsHelpers, :update_strategy_state, 1)
-      assert function_exported?(StateOpsHelpers, :set_strategy_field, 2)
-      assert function_exported?(StateOpsHelpers, :set_iteration_status, 1)
-      assert function_exported?(StateOpsHelpers, :set_iteration, 1)
+      assert ModuleExports.exported?(StateOpsHelpers, :update_strategy_state, 1)
+      assert ModuleExports.exported?(StateOpsHelpers, :set_strategy_field, 2)
+      assert ModuleExports.exported?(StateOpsHelpers, :set_iteration_status, 1)
+      assert ModuleExports.exported?(StateOpsHelpers, :set_iteration, 1)
     end
 
     test "state ops can be composed" do
@@ -356,8 +357,8 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     test "ReAct strategy uses StratState for state management" do
       agent = create_agent()
 
-      assert function_exported?(StratState, :get, 2)
-      assert function_exported?(StratState, :put, 2)
+      assert ModuleExports.exported?(StratState, :get, 2)
+      assert ModuleExports.exported?(StratState, :put, 2)
 
       state = StratState.get(agent, %{})
       assert is_map(state)

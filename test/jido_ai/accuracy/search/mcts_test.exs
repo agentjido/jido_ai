@@ -2,6 +2,7 @@ defmodule Jido.AI.Accuracy.Search.MCTSTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Accuracy.{Candidate, Search.MCTS, Search.MCTSNode}
+  alias Jido.AI.Test.ModuleExports
 
   @moduletag :capture_log
 
@@ -185,7 +186,7 @@ defmodule Jido.AI.Accuracy.Search.MCTSTest do
     test "implements search/4 callback" do
       # Ensure module is fully loaded before checking function_exported?
       Code.ensure_loaded!(MCTS)
-      assert function_exported?(MCTS, :search, 4)
+      assert ModuleExports.exported?(MCTS, :search, 4)
     end
 
     test "returns {:ok, candidate} on success" do

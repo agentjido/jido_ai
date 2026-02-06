@@ -2,6 +2,7 @@ defmodule Jido.AI.Accuracy.SelfRefineTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Accuracy.{Candidate, SelfRefine}
+  alias Jido.AI.Test.ModuleExports
 
   @moduletag :capture_log
 
@@ -176,8 +177,8 @@ defmodule Jido.AI.Accuracy.SelfRefineTest do
 
       # Empty prompt should work but return empty result
       # We're testing the function signature here
-      assert function_exported?(SelfRefine, :run, 2)
-      assert function_exported?(SelfRefine, :run, 3)
+      assert ModuleExports.exported?(SelfRefine, :run, 2)
+      assert ModuleExports.exported?(SelfRefine, :run, 3)
     end
 
     test "accepts initial_candidate option" do

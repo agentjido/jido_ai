@@ -134,6 +134,7 @@ defmodule Jido.AI.AdaptiveAgent do
         })
       end
 
+    # credo:disable-for-next-line Credo.Check.Refactor.LongQuoteBlocks
     quote location: :keep do
       use Jido.Agent,
         name: unquote(name),

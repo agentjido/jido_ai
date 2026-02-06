@@ -2,18 +2,22 @@ defmodule Jido.AI.Accuracy.AggregatorTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Accuracy.Aggregator
+  alias Jido.AI.Accuracy.Aggregators.BestOfN
+  alias Jido.AI.Accuracy.Aggregators.MajorityVote
+  alias Jido.AI.Accuracy.Aggregators.Weighted
+  alias Jido.AI.Test.ModuleExports
 
   describe "behavior contract" do
     test "defines aggregate callback" do
-      assert function_exported?(Jido.AI.Accuracy.Aggregators.MajorityVote, :aggregate, 2)
-      assert function_exported?(Jido.AI.Accuracy.Aggregators.BestOfN, :aggregate, 2)
-      assert function_exported?(Jido.AI.Accuracy.Aggregators.Weighted, :aggregate, 2)
+      assert ModuleExports.exported?(MajorityVote, :aggregate, 2)
+      assert ModuleExports.exported?(BestOfN, :aggregate, 2)
+      assert ModuleExports.exported?(Weighted, :aggregate, 2)
     end
 
     test "defines distribution callback" do
-      assert function_exported?(Jido.AI.Accuracy.Aggregators.MajorityVote, :distribution, 1)
-      assert function_exported?(Jido.AI.Accuracy.Aggregators.BestOfN, :distribution, 1)
-      assert function_exported?(Jido.AI.Accuracy.Aggregators.Weighted, :distribution, 1)
+      assert ModuleExports.exported?(MajorityVote, :distribution, 1)
+      assert ModuleExports.exported?(BestOfN, :distribution, 1)
+      assert ModuleExports.exported?(Weighted, :distribution, 1)
     end
   end
 

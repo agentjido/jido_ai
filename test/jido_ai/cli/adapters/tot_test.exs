@@ -2,6 +2,7 @@ defmodule Jido.AI.CLI.Adapters.ToTTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.CLI.Adapters.ToT, as: ToTAdapter
+  alias Jido.AI.Test.ModuleExports
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do
@@ -9,8 +10,8 @@ defmodule Jido.AI.CLI.Adapters.ToTTest do
       module = ToTAdapter.create_ephemeral_agent(config)
 
       assert is_atom(module)
-      assert function_exported?(module, :explore, 2)
-      assert function_exported?(module, :name, 0)
+      assert ModuleExports.exported?(module, :explore, 2)
+      assert ModuleExports.exported?(module, :name, 0)
       assert module.name() == "cli_tot_agent"
     end
 
@@ -69,11 +70,11 @@ defmodule Jido.AI.CLI.Adapters.ToTTest do
   describe "behavior implementation" do
     test "implements all required callbacks" do
       Code.ensure_loaded!(ToTAdapter)
-      assert function_exported?(ToTAdapter, :start_agent, 3)
-      assert function_exported?(ToTAdapter, :submit, 3)
-      assert function_exported?(ToTAdapter, :await, 3)
-      assert function_exported?(ToTAdapter, :stop, 1)
-      assert function_exported?(ToTAdapter, :create_ephemeral_agent, 1)
+      assert ModuleExports.exported?(ToTAdapter, :start_agent, 3)
+      assert ModuleExports.exported?(ToTAdapter, :submit, 3)
+      assert ModuleExports.exported?(ToTAdapter, :await, 3)
+      assert ModuleExports.exported?(ToTAdapter, :stop, 1)
+      assert ModuleExports.exported?(ToTAdapter, :create_ephemeral_agent, 1)
     end
   end
 end

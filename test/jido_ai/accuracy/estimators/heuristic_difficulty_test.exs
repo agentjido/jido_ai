@@ -231,10 +231,6 @@ defmodule Jido.AI.Accuracy.Estimators.HeuristicDifficultyTest do
     test "implements estimator?/1 correctly" do
       assert DifficultyEstimator.estimator?(HeuristicDifficulty)
     end
-
-    test "exports estimate/3" do
-      assert function_exported?(HeuristicDifficulty, :estimate, 3)
-    end
   end
 
   describe "estimate_batch/3" do

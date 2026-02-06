@@ -307,6 +307,7 @@ defmodule Jido.AI.Executor do
   defp atomize_keys(list) when is_list(list), do: Enum.map(list, &atomize_keys/1)
   defp atomize_keys(other), do: other
 
+  @spec coerce_integers_to_floats(map(), keyword()) :: map()
   defp coerce_integers_to_floats(params, schema) when is_list(schema) do
     float_keys =
       schema
@@ -320,8 +321,6 @@ defmodule Jido.AI.Executor do
       end
     end)
   end
-
-  defp coerce_integers_to_floats(params, _schema), do: params
 
   # ============================================================================
   # Result Formatting
@@ -441,37 +440,13 @@ defmodule Jido.AI.Executor do
   # Error Formatting
   # ============================================================================
 
-  defp format_error(tool_name, reason) when is_exception(reason) do
+  @spec format_error(String.t(), Exception.t()) :: map()
+  defp format_error(tool_name, reason) do
     %{
       error: Exception.message(reason),
       tool_name: tool_name,
       type: :execution_error,
       details: %{exception_type: reason.__struct__}
-    }
-  end
-
-  defp format_error(tool_name, reason) when is_binary(reason) do
-    %{
-      error: reason,
-      tool_name: tool_name,
-      type: :execution_error
-    }
-  end
-
-  defp format_error(tool_name, reason) when is_map(reason) do
-    %{
-      error: Map.get(reason, :message, inspect(reason)),
-      tool_name: tool_name,
-      type: :execution_error,
-      details: reason
-    }
-  end
-
-  defp format_error(tool_name, reason) when is_atom(reason) or is_tuple(reason) or is_list(reason) do
-    %{
-      error: inspect(reason),
-      tool_name: tool_name,
-      type: :execution_error
     }
   end
 
