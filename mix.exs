@@ -60,7 +60,7 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.0.0-rc.4"},
+      {:jido, "~> 2.0.0-rc.3"},
       {:req_llm, "~> 1.5"},
       {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
 
@@ -69,8 +69,7 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
-      {:term_ui, "~> 0.2"},
-      {:yaml_elixir, "~> 2.9"},
+      {:term_ui, path: "../../term_ui"},
       {:zoi, "~> 0.16"},
 
       # Dev/Test
@@ -81,6 +80,7 @@ defmodule JidoAi.MixProject do
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:mimic, "~> 2.0", only: :test},
+      {:quokka, "~> 2.10", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.0", only: [:dev, :test]}
     ]
   end
