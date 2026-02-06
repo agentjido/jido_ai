@@ -27,11 +27,11 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   describe "Skill Composition" do
     test "multiple skills can be mounted on a single agent" do
       # Verify all skills can be loaded together
-      llm_spec = LLM.skill_spec(%{})
-      reasoning_spec = Reasoning.skill_spec(%{})
-      planning_spec = Planning.skill_spec(%{})
-      streaming_spec = Streaming.skill_spec(%{})
-      tool_calling_spec = ToolCalling.skill_spec(%{})
+      llm_spec = LLM.plugin_spec(%{})
+      reasoning_spec = Reasoning.plugin_spec(%{})
+      planning_spec = Planning.plugin_spec(%{})
+      streaming_spec = Streaming.plugin_spec(%{})
+      tool_calling_spec = ToolCalling.plugin_spec(%{})
 
       # Each skill should have a unique name and state_key
       assert llm_spec.name == "llm"
@@ -322,12 +322,12 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       assert schema.fields[:prompt].meta.required == true
     end
 
-    test "all skills have proper skill_spec/1" do
-      llm_spec = LLM.skill_spec(%{})
-      reasoning_spec = Reasoning.skill_spec(%{})
-      planning_spec = Planning.skill_spec(%{})
-      streaming_spec = Streaming.skill_spec(%{})
-      tool_calling_spec = ToolCalling.skill_spec(%{})
+    test "all skills have proper plugin_spec/1" do
+      llm_spec = LLM.plugin_spec(%{})
+      reasoning_spec = Reasoning.plugin_spec(%{})
+      planning_spec = Planning.plugin_spec(%{})
+      streaming_spec = Streaming.plugin_spec(%{})
+      tool_calling_spec = ToolCalling.plugin_spec(%{})
 
       # Each spec should have required fields
       for spec <- [llm_spec, reasoning_spec, planning_spec, streaming_spec, tool_calling_spec] do
@@ -397,7 +397,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :skill_spec, 1)
+        assert function_exported?(skill, :plugin_spec, 1)
         assert function_exported?(skill, :mount, 2)
         assert function_exported?(skill, :actions, 0)
       end

@@ -8,12 +8,34 @@ defmodule Jido.AI.Signal do
 
   ## Signal Types
 
-  - `Jido.AI.Signal.LLMResponse` - Result from a streaming/generation call (`react.llm.response`)
-  - `Jido.AI.Signal.LLMDelta` - Streaming token chunk (`react.llm.delta`)
-  - `Jido.AI.Signal.LLMError` - Structured error from LLM call (`react.llm.error`)
-  - `Jido.AI.Signal.Usage` - Token usage and cost tracking (`react.usage`)
-  - `Jido.AI.Signal.ToolResult` - Result from a tool execution (`react.tool.result`)
-  - `Jido.AI.Signal.EmbedResult` - Result from an embedding generation call (`react.embed.result`)
+  ### LLM Signals
+  - `LLMRequest` - LLM call initiated (`react.llm.request`)
+  - `LLMResponse` - LLM call completed (`react.llm.response`)
+  - `LLMDelta` - Streaming token chunk (`react.llm.delta`)
+  - `LLMError` - Structured LLM error (`react.llm.error`)
+  - `LLMCancelled` - LLM call cancelled (`react.llm.cancelled`)
+  - `Usage` - Token usage tracking (`react.usage`)
+
+  ### Tool Signals
+  - `ToolCall` - Tool invocation intent (`react.tool.call`)
+  - `ToolResult` - Tool execution completed (`react.tool.result`)
+  - `ToolError` - Structured tool error (`react.tool.error`)
+
+  ### Embedding Signals
+  - `EmbedRequest` - Embedding request initiated (`react.embed.request`)
+  - `EmbedResult` - Embedding completed (`react.embed.result`)
+  - `EmbedError` - Structured embedding error (`react.embed.error`)
+
+  ### Orchestration Signals
+  - `RequestError` - Request rejected (`react.request.error`)
+  - `DelegationRequest` - Task delegation (`ai.delegation.request`)
+  - `DelegationResult` - Delegation completed (`ai.delegation.result`)
+  - `DelegationError` - Delegation failed (`ai.delegation.error`)
+  - `CapabilityQuery` - Capability discovery (`ai.capability.query`)
+  - `CapabilityResponse` - Capability response (`ai.capability.response`)
+
+  ### ReAct Signals
+  - `Step` - ReAct step tracking (`react.step`)
 
   ## Helper Functions
 
@@ -51,7 +73,7 @@ defmodule Jido.AI.Signal do
 
     ## Data Fields
 
-    - `:call_id` (required) - Correlation ID matching the original ReqLLMStream directive
+    - `:call_id` (required) - Correlation ID matching the original LLMStream directive
     - `:result` (required) - `{:ok, result_map}` or `{:error, reason}` from the LLM call
     - `:usage` (optional) - Token usage map with `:input_tokens` and `:output_tokens`
     - `:model` (optional) - The actual model used for the request
@@ -77,12 +99,6 @@ defmodule Jido.AI.Signal do
       ]
   end
 
-  defmodule ReqLLMResult do
-    @moduledoc false
-    defdelegate new(data), to: LLMResponse
-    defdelegate new!(data), to: LLMResponse
-  end
-
   defmodule LLMDelta do
     @moduledoc """
     Signal for streaming LLM token chunks.
@@ -92,7 +108,7 @@ defmodule Jido.AI.Signal do
 
     ## Data Fields
 
-    - `:call_id` (required) - Correlation ID matching the original ReqLLMStream directive
+    - `:call_id` (required) - Correlation ID matching the original LLMStream directive
     - `:delta` (required) - The text chunk/token from the stream
     - `:chunk_type` (optional) - Type of chunk: `:content` or `:thinking` (default: `:content`)
 
@@ -111,12 +127,6 @@ defmodule Jido.AI.Signal do
         delta: [type: :string, required: true, doc: "Text chunk from the stream"],
         chunk_type: [type: :atom, default: :content, doc: "Type: :content or :thinking"]
       ]
-  end
-
-  defmodule ReqLLMPartial do
-    @moduledoc false
-    defdelegate new(data), to: LLMDelta
-    defdelegate new!(data), to: LLMDelta
   end
 
   defmodule LLMError do
@@ -157,12 +167,6 @@ defmodule Jido.AI.Signal do
       ]
   end
 
-  defmodule ReqLLMError do
-    @moduledoc false
-    defdelegate new(data), to: LLMError
-    defdelegate new!(data), to: LLMError
-  end
-
   defmodule Usage do
     @moduledoc """
     Signal for token usage and cost tracking.
@@ -193,12 +197,6 @@ defmodule Jido.AI.Signal do
         duration_ms: [type: :integer, doc: "Request duration in milliseconds"],
         metadata: [type: :map, default: %{}, doc: "Additional tracking metadata"]
       ]
-  end
-
-  defmodule UsageReport do
-    @moduledoc false
-    defdelegate new(data), to: Usage
-    defdelegate new!(data), to: Usage
   end
 
   defmodule ToolResult do
@@ -232,7 +230,7 @@ defmodule Jido.AI.Signal do
 
     ## Data Fields
 
-    - `:call_id` (required) - Correlation ID matching the original ReqLLMEmbed directive
+    - `:call_id` (required) - Correlation ID matching the original LLMEmbed directive
     - `:result` (required) - `{:ok, result_map}` or `{:error, reason}` from the embedding call
 
     The result map (when successful) contains:
@@ -393,6 +391,237 @@ defmodule Jido.AI.Signal do
         call_id: [type: :string, required: true, doc: "Correlation ID for the query"],
         agent_ref: [type: :any, required: true, doc: "Agent reference"],
         capabilities: [type: :map, required: true, doc: "Capability descriptor"]
+      ]
+  end
+
+  # ============================================================================
+  # LLM Lifecycle Signals
+  # ============================================================================
+
+  defmodule LLMRequest do
+    @moduledoc """
+    Signal for LLM call initiation.
+
+    Emitted when an LLM call starts, enabling tracing, concurrency control,
+    and cancellation support.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID for the LLM call
+    - `:model` (required) - Model identifier being used
+    - `:message_count` (optional) - Number of messages in the conversation
+    - `:tool_count` (optional) - Number of tools available
+    - `:params` (optional) - Request parameters (temperature, max_tokens, etc.)
+    - `:trace_id` (optional) - Parent trace ID for distributed tracing
+    """
+
+    use Jido.Signal,
+      type: "react.llm.request",
+      default_source: "/react/llm",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
+        model: [type: :string, required: true, doc: "Model identifier"],
+        message_count: [type: :integer, doc: "Number of messages in conversation"],
+        tool_count: [type: :integer, doc: "Number of tools available"],
+        params: [type: :map, default: %{}, doc: "Request parameters"],
+        trace_id: [type: :string, doc: "Parent trace ID for distributed tracing"]
+      ]
+  end
+
+  defmodule LLMCancelled do
+    @moduledoc """
+    Signal for LLM call cancellation.
+
+    Emitted when an LLM call is cancelled before completion.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID matching the original request
+    - `:reason` (required) - Cancellation reason atom
+    - `:at_ms` (optional) - Timestamp when cancellation occurred
+
+    ## Reason Types
+
+    - `:user_cancel` - User-initiated cancellation
+    - `:timeout` - Request timed out
+    - `:superseded` - Replaced by a newer request
+    - `:shutdown` - System shutdown
+    """
+
+    use Jido.Signal,
+      type: "react.llm.cancelled",
+      default_source: "/react/llm",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
+        reason: [type: :atom, required: true, doc: "Cancellation reason"],
+        at_ms: [type: :integer, doc: "Timestamp when cancellation occurred"]
+      ]
+  end
+
+  # ============================================================================
+  # Tool Lifecycle Signals
+  # ============================================================================
+
+  defmodule ToolCall do
+    @moduledoc """
+    Signal for tool invocation intent.
+
+    Emitted when a tool is about to be executed, before `ToolResult`.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Tool call ID from the LLM
+    - `:llm_call_id` (optional) - Parent LLM call ID for correlation
+    - `:tool_name` (required) - Name of the tool to execute
+    - `:args` (required) - Arguments passed to the tool
+    - `:timeout_ms` (optional) - Timeout for tool execution
+    """
+
+    use Jido.Signal,
+      type: "react.tool.call",
+      default_source: "/react/tool",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
+        llm_call_id: [type: :string, doc: "Parent LLM call ID"],
+        tool_name: [type: :string, required: true, doc: "Name of the tool to execute"],
+        args: [type: :map, required: true, doc: "Arguments passed to the tool"],
+        timeout_ms: [type: :integer, doc: "Timeout for tool execution"]
+      ]
+  end
+
+  defmodule ToolError do
+    @moduledoc """
+    Signal for structured tool execution errors.
+
+    Emitted when a tool execution fails, providing structured error information
+    analogous to `LLMError`.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Tool call ID from the LLM
+    - `:tool_name` (required) - Name of the tool that failed
+    - `:error_type` (required) - Error classification atom
+    - `:message` (required) - Human-readable error message
+    - `:details` (optional) - Additional error details
+    - `:retry_after` (optional) - Seconds to wait before retry
+
+    ## Error Types
+
+    - `:timeout` - Tool execution timed out
+    - `:validation` - Invalid arguments
+    - `:not_found` - Tool not found
+    - `:rate_limit` - Rate limit exceeded
+    - `:auth` - Authorization error
+    - `:tool_crash` - Tool raised an exception
+    - `:unknown` - Unclassified error
+    """
+
+    use Jido.Signal,
+      type: "react.tool.error",
+      default_source: "/react/tool",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
+        tool_name: [type: :string, required: true, doc: "Name of the tool that failed"],
+        error_type: [type: :atom, required: true, doc: "Error classification"],
+        message: [type: :string, required: true, doc: "Human-readable error message"],
+        details: [type: :map, default: %{}, doc: "Additional error details"],
+        retry_after: [type: :integer, doc: "Seconds to wait before retry"]
+      ]
+  end
+
+  # ============================================================================
+  # Embedding Lifecycle Signals
+  # ============================================================================
+
+  defmodule EmbedRequest do
+    @moduledoc """
+    Signal for embedding request initiation.
+
+    Emitted when an embedding request starts.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID for the embedding call
+    - `:model` (required) - Embedding model identifier
+    - `:input_count` (required) - Number of texts to embed
+    - `:dimensions` (optional) - Requested embedding dimensions
+    """
+
+    use Jido.Signal,
+      type: "react.embed.request",
+      default_source: "/react/embed",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the embedding call"],
+        model: [type: :string, required: true, doc: "Embedding model identifier"],
+        input_count: [type: :integer, required: true, doc: "Number of texts to embed"],
+        dimensions: [type: :integer, doc: "Requested embedding dimensions"]
+      ]
+  end
+
+  defmodule EmbedError do
+    @moduledoc """
+    Signal for structured embedding errors.
+
+    Emitted when an embedding request fails.
+
+    ## Data Fields
+
+    - `:call_id` (required) - Correlation ID matching the original request
+    - `:error_type` (required) - Error classification atom
+    - `:message` (required) - Human-readable error message
+    - `:details` (optional) - Additional error details
+    - `:retry_after` (optional) - Seconds to wait before retry
+    """
+
+    use Jido.Signal,
+      type: "react.embed.error",
+      default_source: "/react/embed",
+      schema: [
+        call_id: [type: :string, required: true, doc: "Correlation ID for the embedding call"],
+        error_type: [type: :atom, required: true, doc: "Error classification"],
+        message: [type: :string, required: true, doc: "Human-readable error message"],
+        details: [type: :map, default: %{}, doc: "Additional error details"],
+        retry_after: [type: :integer, doc: "Seconds to wait before retry"]
+      ]
+  end
+
+  # ============================================================================
+  # ReAct Step Signals
+  # ============================================================================
+
+  defmodule Step do
+    @moduledoc """
+    Signal for ReAct step tracking.
+
+    Provides normalized step records for debugging, evaluation, and replay.
+
+    ## Data Fields
+
+    - `:step_id` (required) - Unique identifier for this step
+    - `:call_id` (required) - Root request correlation ID
+    - `:step_type` (required) - Type of step
+    - `:content` (required) - Step content (text or structured data)
+    - `:parent_step_id` (optional) - Parent step for nested reasoning
+    - `:at_ms` (optional) - Timestamp when step occurred
+
+    ## Step Types
+
+    - `:thought` - Agent reasoning/planning
+    - `:action` - Tool invocation decision
+    - `:observation` - Tool result observation
+    - `:final` - Final answer
+    """
+
+    use Jido.Signal,
+      type: "react.step",
+      default_source: "/react/step",
+      schema: [
+        step_id: [type: :string, required: true, doc: "Unique step identifier"],
+        call_id: [type: :string, required: true, doc: "Root request correlation ID"],
+        step_type: [type: :atom, required: true, doc: "Step type: :thought, :action, :observation, :final"],
+        content: [type: :any, required: true, doc: "Step content"],
+        parent_step_id: [type: :string, doc: "Parent step for nested reasoning"],
+        at_ms: [type: :integer, doc: "Timestamp when step occurred"]
       ]
   end
 

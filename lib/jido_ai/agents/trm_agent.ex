@@ -92,9 +92,9 @@ defmodule Jido.AI.TRMAgent do
     model = Keyword.get(opts, :model, @default_model)
     max_supervision_steps = Keyword.get(opts, :max_supervision_steps, @default_max_supervision_steps)
     act_threshold = Keyword.get(opts, :act_threshold, @default_act_threshold)
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     strategy_opts = [
       model: model,
@@ -122,11 +122,11 @@ defmodule Jido.AI.TRMAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.TRM, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
-      alias Jido.AI.RequestTracking
+      alias Jido.AI.Request
 
       @doc """
       Returns the strategy options for this agent.
@@ -149,9 +149,9 @@ defmodule Jido.AI.TRMAgent do
 
       """
       @spec reason(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
-              {:ok, RequestTracking.Request.t()} | {:error, term()}
+              {:ok, Request.Handle.t()} | {:error, term()}
       def reason(pid, prompt, opts \\ []) when is_binary(prompt) do
-        RequestTracking.create_and_send(
+        Request.create_and_send(
           pid,
           prompt,
           Keyword.merge(opts,
@@ -174,9 +174,9 @@ defmodule Jido.AI.TRMAgent do
           {:ok, result} = MyAgent.await(request, timeout: 10_000)
 
       """
-      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      @spec await(Request.Handle.t(), keyword()) :: {:ok, any()} | {:error, term()}
       def await(request, opts \\ []) do
-        RequestTracking.await(request, opts)
+        Request.await(request, opts)
       end
 
       @doc """
@@ -196,7 +196,7 @@ defmodule Jido.AI.TRMAgent do
       @spec reason_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, any()} | {:error, term()}
       def reason_sync(pid, prompt, opts \\ []) when is_binary(prompt) do
-        RequestTracking.send_and_await(
+        Request.send_and_await(
           pid,
           prompt,
           Keyword.merge(opts,
@@ -209,11 +209,11 @@ defmodule Jido.AI.TRMAgent do
       @impl true
       def on_before_cmd(agent, {:trm_start, %{prompt: prompt} = params} = action) do
         # Ensure we have a request_id for tracking
-        {request_id, params} = RequestTracking.ensure_request_id(params)
+        {request_id, params} = Request.ensure_request_id(params)
         action = {:trm_start, params}
 
         # Use RequestTracking to manage state (with prompt aliased as query)
-        agent = RequestTracking.start_request(agent, request_id, prompt)
+        agent = Request.start_request(agent, request_id, prompt)
         # Also set last_prompt for TRM-specific backward compat
         agent = put_in(agent.state[:last_prompt], prompt)
 
@@ -229,7 +229,7 @@ defmodule Jido.AI.TRMAgent do
 
         agent =
           if snap.done? do
-            agent = RequestTracking.complete_request(agent, request_id, snap.result)
+            agent = Request.complete_request(agent, request_id, snap.result)
             # Also set last_result for TRM-specific backward compat
             put_in(agent.state[:last_result], snap.result || "")
           else

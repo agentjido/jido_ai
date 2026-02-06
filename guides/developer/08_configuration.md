@@ -63,7 +63,7 @@ use Jido.Agent,
   }
 
 # In directives
-directive = Directive.ReqLLMStream.new!(%{
+directive = Directive.LLMStream.new!(%{
   id: "call_123",
   model_alias: :fast,
   context: context
@@ -214,14 +214,14 @@ graph TD
 
 ```elixir
 # Directives support both model and model_alias
-directive = Directive.ReqLLMStream.new!(%{
+directive = Directive.LLMStream.new!(%{
   id: "call_123",
   model_alias: :fast,  # Resolved at execution time
   context: context
 })
 
 # Or use direct model
-directive = Directive.ReqLLMStream.new!(%{
+directive = Directive.LLMStream.new!(%{
   id: "call_123",
   model: "anthropic:claude-haiku-4-5",  # Used directly
   context: context

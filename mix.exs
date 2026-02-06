@@ -31,8 +31,7 @@ defmodule JidoAi.MixProject do
 
       # Dialyzer
       dialyzer: [
-        plt_local_path: "priv/plts/project.plt",
-        plt_core_path: "priv/plts/core.plt"
+        plt_add_apps: [:mix]
       ]
     ]
   end
@@ -61,11 +60,9 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, path: "../jido", override: true},
-      {:jido_action, path: "../jido_action", override: true},
-      {:jido_signal, "~> 2.0.0-rc.2"},
-      {:req_llm, path: "../req_llm", override: true},
-      {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
+      {:jido, "~> 2.0.0-rc.3"},
+      {:req_llm, "~> 1.5"},
+      {:jido_browser, "~> 0.8.0"},
 
       # Runtime
       {:fsmx, "~> 0.5"},

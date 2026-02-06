@@ -171,10 +171,10 @@ defmodule Jido.AI.ReActAgent do
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
     # Don't extract tool_context here - it contains AST with module aliases
     # that need to be evaluated in the calling module's context
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
     # TaskSupervisorSkill is always included for per-instance task supervision
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     # Extract tool_context at macro expansion time
     # Use safe alias-only expansion instead of Code.eval_quoted
@@ -224,13 +224,13 @@ defmodule Jido.AI.ReActAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
       import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
 
-      alias Jido.AI.RequestTracking
+      alias Jido.AI.Request
 
       @doc """
       Send a query to the agent asynchronously.
@@ -249,9 +249,9 @@ defmodule Jido.AI.ReActAgent do
 
       """
       @spec ask(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
-              {:ok, RequestTracking.Request.t()} | {:error, term()}
+              {:ok, Request.Handle.t()} | {:error, term()}
       def ask(pid, query, opts \\ []) when is_binary(query) do
-        RequestTracking.create_and_send(
+        Request.create_and_send(
           pid,
           query,
           Keyword.merge(opts,
@@ -282,9 +282,9 @@ defmodule Jido.AI.ReActAgent do
           {:ok, "4"} = MyAgent.await(request, timeout: 10_000)
 
       """
-      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      @spec await(Request.Handle.t(), keyword()) :: {:ok, any()} | {:error, term()}
       def await(request, opts \\ []) do
-        RequestTracking.await(request, opts)
+        Request.await(request, opts)
       end
 
       @doc """
@@ -305,7 +305,7 @@ defmodule Jido.AI.ReActAgent do
       @spec ask_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, any()} | {:error, term()}
       def ask_sync(pid, query, opts \\ []) when is_binary(query) do
-        RequestTracking.send_and_await(
+        Request.send_and_await(
           pid,
           query,
           Keyword.merge(opts,
@@ -318,11 +318,11 @@ defmodule Jido.AI.ReActAgent do
       @impl true
       def on_before_cmd(agent, {:react_start, %{query: query} = params} = action) do
         # Ensure we have a request_id for tracking
-        {request_id, params} = RequestTracking.ensure_request_id(params)
+        {request_id, params} = Request.ensure_request_id(params)
         action = {:react_start, params}
 
         # Use RequestTracking to manage state
-        agent = RequestTracking.start_request(agent, request_id, query)
+        agent = Request.start_request(agent, request_id, query)
 
         {:ok, agent, action}
       end
@@ -336,7 +336,7 @@ defmodule Jido.AI.ReActAgent do
 
         agent =
           if snap.done? do
-            RequestTracking.complete_request(agent, request_id, snap.result)
+            Request.complete_request(agent, request_id, snap.result)
           else
             agent
           end
@@ -365,7 +365,7 @@ defmodule Jido.AI.ReActAgent do
             # Also complete the tracked request if we have one
             case agent.state[:last_request_id] do
               nil -> agent
-              request_id -> RequestTracking.complete_request(agent, request_id, snap.result)
+              request_id -> Request.complete_request(agent, request_id, snap.result)
             end
           else
             agent

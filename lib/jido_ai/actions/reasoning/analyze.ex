@@ -62,8 +62,8 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Helpers.Text
   alias Jido.AI.Security
+  alias Jido.AI.Text
   alias ReqLLM.Context
 
   @sentiment_prompt """

@@ -131,10 +131,10 @@ defmodule Jido.AI.Strategies.ChainOfThoughtTest do
       assert state[:status] == :reasoning
       assert state[:prompt] == "What is 2+2?"
 
-      # Should have returned a ReqLLMStream directive
+      # Should have returned a LLMStream directive
       assert length(directives) == 1
       [directive] = directives
-      assert directive.__struct__ == Jido.AI.Directive.ReqLLMStream
+      assert directive.__struct__ == Jido.AI.Directive.LLMStream
     end
 
     test "directive contains correct model from config" do

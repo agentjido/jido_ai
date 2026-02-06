@@ -94,21 +94,21 @@ defmodule Jido.AI.HelpersTest do
       error = %{reason: :timeout}
       {:error, wrapped} = Helpers.wrap_error(error)
 
-      assert %Jido.AI.Error.API.Timeout{} = wrapped
+      assert %Jido.AI.Error.API.Request{kind: :timeout} = wrapped
     end
 
     test "wraps provider error" do
       error = %{status: 500, reason: "Internal error"}
       {:error, wrapped} = Helpers.wrap_error(error)
 
-      assert %Jido.AI.Error.API.Provider{} = wrapped
+      assert %Jido.AI.Error.API.Request{kind: :provider, status: 500} = wrapped
     end
 
     test "wraps network error" do
       error = %{reason: :econnrefused}
       {:error, wrapped} = Helpers.wrap_error(error)
 
-      assert %Jido.AI.Error.API.Network{} = wrapped
+      assert %Jido.AI.Error.API.Request{kind: :network} = wrapped
     end
 
     test "wraps validation error" do

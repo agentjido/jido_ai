@@ -49,7 +49,7 @@ sequenceDiagram
 | Module | Purpose |
 |--------|---------|
 | `Jido.AI.Tools.Registry` | Action storage and lookup |
-| `Jido.AI.Tools.Executor` | Execution with timeout, telemetry, formatting |
+| `Jido.AI.Executor` | Execution with timeout, telemetry, formatting |
 | `Jido.AI.ToolAdapter` | Converts Actions to ReqLLM format |
 
 ### Storage
@@ -137,7 +137,7 @@ ReqLLM.stream_text(model, messages, tools: tools)
 
 ## Executor
 
-The `Jido.AI.Tools.Executor` provides consistent action execution with timeout handling.
+The `Jido.AI.Executor` provides consistent action execution with timeout handling.
 
 ### Execution Flow
 
@@ -165,7 +165,7 @@ LLMs return tool call arguments with string keys (JSON format). The executor nor
 ### Usage
 
 ```elixir
-alias Jido.AI.Tools.Executor
+alias Jido.AI.Executor
 
 # Execute by name (uses registry)
 {:ok, result} = Executor.execute("calculator", %{

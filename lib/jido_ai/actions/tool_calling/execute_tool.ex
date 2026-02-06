@@ -3,7 +3,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteTool do
   A Jido.Action for direct tool execution without LLM involvement.
 
   This action executes a registered Action by name with the given parameters.
-  It uses `Jido.AI.Tools.Executor` for execution.
+  It uses `Jido.AI.Executor` for execution.
 
   ## Parameters
 
@@ -46,7 +46,7 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteTool do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Tools.Executor
+  alias Jido.AI.Executor
 
   @doc """
   Executes the tool by name.

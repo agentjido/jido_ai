@@ -157,7 +157,7 @@ defmodule Jido.AI.Strategies.TRMTest do
       assert length(directives) == 1
       directive = hd(directives)
 
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.model == "anthropic:claude-haiku-4-5"
       assert directive.metadata.phase == :reasoning
     end
@@ -226,7 +226,7 @@ defmodule Jido.AI.Strategies.TRMTest do
 
       assert length(directives) == 1
       directive = hd(directives)
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.metadata.phase == :supervising
     end
 

@@ -4,9 +4,9 @@ defmodule Jido.AI.Skills.ReasoningTest do
   alias Jido.AI.Skills.Reasoning
   alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
 
-  describe "skill_spec/1" do
+  describe "plugin_spec/1" do
     test "returns valid skill specification" do
-      spec = Reasoning.skill_spec(%{})
+      spec = Reasoning.plugin_spec(%{})
 
       assert spec.module == Jido.AI.Skills.Reasoning
       assert spec.name == "reasoning"
@@ -18,7 +18,7 @@ defmodule Jido.AI.Skills.ReasoningTest do
     end
 
     test "includes all three actions" do
-      spec = Reasoning.skill_spec(%{})
+      spec = Reasoning.plugin_spec(%{})
 
       assert Jido.AI.Skills.Reasoning.Actions.Analyze in spec.actions
       assert Jido.AI.Skills.Reasoning.Actions.Infer in spec.actions

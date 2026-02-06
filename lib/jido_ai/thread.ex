@@ -74,11 +74,17 @@ defmodule Jido.AI.Thread do
 
   @doc """
   Append an entry to the thread.
+
+  If the entry already has a timestamp, it is preserved. Otherwise, the current
+  UTC time is set.
+
+  Note: Entries are stored in reverse order internally for O(1) append performance.
+  They are reversed to chronological order when projected via `to_messages/2`.
   """
   @spec append(t(), Entry.t()) :: t()
   def append(%__MODULE__{} = thread, %Entry{} = entry) do
-    entry = %{entry | timestamp: DateTime.utc_now()}
-    %{thread | entries: thread.entries ++ [entry]}
+    entry = if entry.timestamp, do: entry, else: %{entry | timestamp: DateTime.utc_now()}
+    %{thread | entries: [entry | thread.entries]}
   end
 
   @doc """
@@ -118,11 +124,15 @@ defmodule Jido.AI.Thread do
   def to_messages(%__MODULE__{} = thread, opts \\ []) do
     limit = Keyword.get(opts, :limit)
 
+    # Entries are stored in reverse order, so reverse to get chronological order
+    chronological = Enum.reverse(thread.entries)
+
     entries =
       case limit do
-        nil -> thread.entries
-        n when is_integer(n) and n > 0 -> Enum.take(thread.entries, -n)
-        _ -> thread.entries
+        nil -> chronological
+        0 -> []
+        n when is_integer(n) and n > 0 -> Enum.take(chronological, -n)
+        _ -> chronological
       end
 
     messages = Enum.map(entries, &entry_to_message/1)
@@ -172,15 +182,15 @@ defmodule Jido.AI.Thread do
   """
   @spec last_entry(t()) :: Entry.t() | nil
   def last_entry(%__MODULE__{entries: []}), do: nil
-  def last_entry(%__MODULE__{entries: entries}), do: List.last(entries)
+  def last_entry(%__MODULE__{entries: [last | _]}), do: last
 
   @doc """
   Get the last assistant response content.
   """
   @spec last_assistant_content(t()) :: String.t() | nil
   def last_assistant_content(%__MODULE__{entries: entries}) do
+    # Entries are stored in reverse order, so first match is most recent
     entries
-    |> Enum.reverse()
     |> Enum.find(&(&1.role == :assistant))
     |> case do
       nil -> nil
@@ -211,11 +221,14 @@ defmodule Jido.AI.Thread do
     last = Keyword.get(opts, :last)
     truncate = Keyword.get(opts, :truncate, 200)
 
+    # Entries are stored in reverse order, so reverse to get chronological order
+    chronological = Enum.reverse(thread.entries)
+
     entries =
       case last do
-        nil -> thread.entries
-        n when is_integer(n) and n > 0 -> Enum.take(thread.entries, -n)
-        _ -> thread.entries
+        nil -> chronological
+        n when is_integer(n) and n > 0 -> Enum.take(chronological, -n)
+        _ -> chronological
       end
 
     %{
@@ -246,7 +259,10 @@ defmodule Jido.AI.Thread do
       IO.puts("[system] #{truncate_string(thread.system_prompt, 60)}")
     end
 
-    Enum.each(thread.entries, fn entry ->
+    # Entries are stored in reverse order, so reverse for display
+    thread.entries
+    |> Enum.reverse()
+    |> Enum.each(fn entry ->
       IO.puts(format_entry_for_pp(entry))
     end)
 
@@ -268,6 +284,7 @@ defmodule Jido.AI.Thread do
 
   defp format_tool_calls_for_debug(nil), do: nil
   defp format_tool_calls_for_debug([]), do: nil
+
   defp format_tool_calls_for_debug(tool_calls) do
     Enum.map(tool_calls, fn tc ->
       case tc do
@@ -291,13 +308,16 @@ defmodule Jido.AI.Thread do
   end
 
   defp format_entry_for_pp(%Entry{role: :assistant, tool_calls: tool_calls}) when is_list(tool_calls) do
-    names = Enum.map(tool_calls, fn tc ->
-      case tc do
-        %{name: name} -> name
-        %{"name" => name} -> name
-        _ -> "?"
-      end
-    end) |> Enum.join(", ")
+    names =
+      Enum.map(tool_calls, fn tc ->
+        case tc do
+          %{name: name} -> name
+          %{"name" => name} -> name
+          _ -> "?"
+        end
+      end)
+      |> Enum.join(", ")
+
     "[asst]   <tool: #{names}>"
   end
 
@@ -336,16 +356,24 @@ defmodule Jido.AI.Thread do
     %{role: :system, content: content}
   end
 
-  defp message_to_entry(%{role: role} = msg) do
+  defp message_to_entry(msg) when is_map(msg) do
+    role = get_field(msg, :role, "role")
+
     %Entry{
       role: normalize_role(role),
-      content: Map.get(msg, :content),
-      tool_calls: Map.get(msg, :tool_calls),
-      tool_call_id: Map.get(msg, :tool_call_id),
-      name: Map.get(msg, :name)
+      content: get_field(msg, :content, "content"),
+      tool_calls: get_field(msg, :tool_calls, "tool_calls"),
+      tool_call_id: get_field(msg, :tool_call_id, "tool_call_id"),
+      name: get_field(msg, :name, "name")
     }
   end
 
+  # Helper to get a field from either atom or string key
+  defp get_field(map, atom_key, string_key) do
+    Map.get(map, atom_key) || Map.get(map, string_key)
+  end
+
+  # Known roles - normalize to atoms
   defp normalize_role(:user), do: :user
   defp normalize_role(:assistant), do: :assistant
   defp normalize_role(:tool), do: :tool
@@ -354,6 +382,13 @@ defmodule Jido.AI.Thread do
   defp normalize_role("assistant"), do: :assistant
   defp normalize_role("tool"), do: :tool
   defp normalize_role("system"), do: :system
+  # OpenAI-specific roles
+  defp normalize_role(:developer), do: :developer
+  defp normalize_role("developer"), do: :developer
+  defp normalize_role(:function), do: :function
+  defp normalize_role("function"), do: :function
+  # Pass through unknown roles as-is (atoms stay atoms, strings stay strings)
+  defp normalize_role(role), do: role
 
   defp generate_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
@@ -364,7 +399,7 @@ defimpl Inspect, for: Jido.AI.Thread do
   def inspect(thread, _opts) do
     len = Kernel.length(thread.entries)
     last_roles = thread.entries |> Enum.take(-2) |> Enum.map(& &1.role)
-    
+
     suffix = if len > 0, do: ", last: #{Kernel.inspect(last_roles)}", else: ""
     "#Thread<#{len} entries#{suffix}>"
   end

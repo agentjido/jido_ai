@@ -32,7 +32,7 @@ defmodule Jido.AI.Helpers do
   alias Jido.AI.Error
   alias Jido.AI.Error.API, as: APIError
   alias Jido.AI.Error.Validation, as: ValidationError
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
 
   # ============================================================================
   # Error Handling
@@ -140,13 +140,14 @@ defmodule Jido.AI.Helpers do
           APIError.Auth.exception(message: message)
 
         :timeout ->
-          APIError.Timeout.exception(message: message)
+          APIError.Request.exception(message: message, kind: :timeout)
 
         :provider_error ->
-          APIError.Provider.exception(message: message)
+          status = extract_status(error)
+          APIError.Request.exception(message: message, kind: :provider, status: status)
 
         :network ->
-          APIError.Network.exception(message: message)
+          APIError.Request.exception(message: message, kind: :network)
 
         :validation ->
           ValidationError.Invalid.exception(message: message)
@@ -157,6 +158,9 @@ defmodule Jido.AI.Helpers do
 
     {:error, jido_error}
   end
+
+  defp extract_status(%{status: status}) when is_integer(status), do: status
+  defp extract_status(_), do: nil
 
   defp extract_error_message(%{reason: reason}) when is_binary(reason), do: reason
   defp extract_error_message(%{message: message}) when is_binary(message), do: message
@@ -318,7 +322,7 @@ defmodule Jido.AI.Helpers do
   @doc """
   Extracts text from a content value.
 
-  Delegates to `Jido.AI.Helpers.Text.extract_from_content/1`.
+  Delegates to `Jido.AI.Text.extract_from_content/1`.
   """
   @spec extract_response_text(term()) :: String.t()
   defdelegate extract_response_text(content), to: Text, as: :extract_from_content

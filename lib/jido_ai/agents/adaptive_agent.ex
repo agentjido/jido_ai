@@ -101,9 +101,9 @@ defmodule Jido.AI.AdaptiveAgent do
     default_strategy = Keyword.get(opts, :default_strategy, @default_strategy)
     available_strategies = Keyword.get(opts, :available_strategies, @default_available_strategies)
     complexity_thresholds = Keyword.get(opts, :complexity_thresholds)
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     strategy_opts =
       [
@@ -138,11 +138,11 @@ defmodule Jido.AI.AdaptiveAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.Adaptive, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
-      alias Jido.AI.RequestTracking
+      alias Jido.AI.Request
 
       @doc """
       Returns the strategy options configured for this agent.
@@ -167,9 +167,9 @@ defmodule Jido.AI.AdaptiveAgent do
 
       """
       @spec ask(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
-              {:ok, RequestTracking.Request.t()} | {:error, term()}
+              {:ok, Request.Handle.t()} | {:error, term()}
       def ask(pid, prompt, opts \\ []) when is_binary(prompt) do
-        RequestTracking.create_and_send(
+        Request.create_and_send(
           pid,
           prompt,
           Keyword.merge(opts,
@@ -192,9 +192,9 @@ defmodule Jido.AI.AdaptiveAgent do
           {:ok, result} = MyAgent.await(request, timeout: 10_000)
 
       """
-      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      @spec await(Request.Handle.t(), keyword()) :: {:ok, any()} | {:error, term()}
       def await(request, opts \\ []) do
-        RequestTracking.await(request, opts)
+        Request.await(request, opts)
       end
 
       @doc """
@@ -214,7 +214,7 @@ defmodule Jido.AI.AdaptiveAgent do
       @spec ask_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, any()} | {:error, term()}
       def ask_sync(pid, prompt, opts \\ []) when is_binary(prompt) do
-        RequestTracking.send_and_await(
+        Request.send_and_await(
           pid,
           prompt,
           Keyword.merge(opts,
@@ -227,11 +227,11 @@ defmodule Jido.AI.AdaptiveAgent do
       @impl true
       def on_before_cmd(agent, {:adaptive_start, %{prompt: prompt} = params} = _action) do
         # Ensure we have a request_id for tracking
-        {request_id, params} = RequestTracking.ensure_request_id(params)
+        {request_id, params} = Request.ensure_request_id(params)
         action = {:adaptive_start, params}
 
         # Use RequestTracking to manage state
-        agent = RequestTracking.start_request(agent, request_id, prompt)
+        agent = Request.start_request(agent, request_id, prompt)
         # Also set last_prompt for adaptive-specific backward compat
         agent = put_in(agent.state[:last_prompt], prompt)
 
@@ -251,7 +251,7 @@ defmodule Jido.AI.AdaptiveAgent do
 
         agent =
           if snap.done? do
-            agent = RequestTracking.complete_request(agent, request_id, snap.result)
+            agent = Request.complete_request(agent, request_id, snap.result)
             # Also set selected_strategy for adaptive-specific backward compat
             put_in(agent.state[:selected_strategy], selected_strategy)
           else
