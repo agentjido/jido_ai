@@ -284,7 +284,7 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
     Enum.flat_map(directives, fn
       {:generate_thoughts, id, conversation, _count} ->
         [
-          Directive.ReqLLMStream.new!(%{
+          Directive.LLMStream.new!(%{
             id: id,
             model: model,
             context: convert_to_reqllm_context(conversation),
@@ -296,7 +296,7 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
         context = build_evaluation_context(thoughts, config)
 
         [
-          Directive.ReqLLMStream.new!(%{
+          Directive.LLMStream.new!(%{
             id: id,
             model: model,
             context: convert_to_reqllm_context(context),
@@ -306,7 +306,7 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
 
       {:call_llm_stream, id, conversation} ->
         [
-          Directive.ReqLLMStream.new!(%{
+          Directive.LLMStream.new!(%{
             id: id,
             model: model,
             context: convert_to_reqllm_context(conversation),

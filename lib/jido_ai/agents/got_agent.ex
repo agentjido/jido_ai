@@ -100,9 +100,9 @@ defmodule Jido.AI.GoTAgent do
     generation_prompt = Keyword.get(opts, :generation_prompt)
     connection_prompt = Keyword.get(opts, :connection_prompt)
     aggregation_prompt = Keyword.get(opts, :aggregation_prompt)
-    skills = Keyword.get(opts, :skills, [])
+    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_skills = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
 
     strategy_opts =
       [
@@ -138,11 +138,11 @@ defmodule Jido.AI.GoTAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: unquote(ai_skills) ++ unquote(skills),
+        plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.GraphOfThoughts, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
-      alias Jido.AI.RequestTracking
+      alias Jido.AI.Request
 
       @doc """
       Returns the strategy options configured for this agent.
@@ -162,9 +162,9 @@ defmodule Jido.AI.GoTAgent do
 
       """
       @spec explore(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
-              {:ok, RequestTracking.Request.t()} | {:error, term()}
+              {:ok, Request.Handle.t()} | {:error, term()}
       def explore(pid, prompt, opts \\ []) when is_binary(prompt) do
-        RequestTracking.create_and_send(
+        Request.create_and_send(
           pid,
           prompt,
           Keyword.merge(opts,
@@ -187,9 +187,9 @@ defmodule Jido.AI.GoTAgent do
           {:ok, result} = MyAgent.await(request, timeout: 10_000)
 
       """
-      @spec await(RequestTracking.Request.t(), keyword()) :: {:ok, any()} | {:error, term()}
+      @spec await(Request.Handle.t(), keyword()) :: {:ok, any()} | {:error, term()}
       def await(request, opts \\ []) do
-        RequestTracking.await(request, opts)
+        Request.await(request, opts)
       end
 
       @doc """
@@ -209,7 +209,7 @@ defmodule Jido.AI.GoTAgent do
       @spec explore_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, any()} | {:error, term()}
       def explore_sync(pid, prompt, opts \\ []) when is_binary(prompt) do
-        RequestTracking.send_and_await(
+        Request.send_and_await(
           pid,
           prompt,
           Keyword.merge(opts,
@@ -221,10 +221,10 @@ defmodule Jido.AI.GoTAgent do
 
       @impl true
       def on_before_cmd(agent, {:got_start, %{prompt: prompt} = params} = action) do
-        {request_id, params} = RequestTracking.ensure_request_id(params)
+        {request_id, params} = Request.ensure_request_id(params)
         action = {:got_start, params}
 
-        agent = RequestTracking.start_request(agent, request_id, prompt)
+        agent = Request.start_request(agent, request_id, prompt)
         agent = put_in(agent.state[:last_prompt], prompt)
 
         {:ok, agent, action}
@@ -239,7 +239,7 @@ defmodule Jido.AI.GoTAgent do
 
         agent =
           if snap.done? do
-            agent = RequestTracking.complete_request(agent, request_id, snap.result)
+            agent = Request.complete_request(agent, request_id, snap.result)
             put_in(agent.state[:last_result], snap.result || "")
           else
             agent

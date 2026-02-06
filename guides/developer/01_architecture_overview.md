@@ -58,10 +58,10 @@ graph TB
     end
 
     subgraph "Directive Layer"
-        ReqLLMStream[ReqLLMStream]
+        LLMStream[LLMStream]
         ToolExec[ToolExec]
-        ReqLLMGenerate[ReqLLMGenerate]
-        ReqLLMEmbed[ReqLLMEmbed]
+        LLMGenerate[LLMGenerate]
+        LLMEmbed[LLMEmbed]
     end
 
     subgraph "Tool Layer"
@@ -94,15 +94,15 @@ graph TB
     ToT --> ToTMachine
     GoT --> GoTMachine
 
-    ReActMachine --> ReqLLMStream
+    ReActMachine --> LLMStream
     ReActMachine --> ToolExec
 
     ToolExec --> Registry
     ToolExec --> Executor
     Registry --> ToolAdapter
 
-    ReqLLMStream --> LLMResponse
-    ReqLLMStream --> LLMDelta
+    LLMStream --> LLMResponse
+    LLMStream --> LLMDelta
     Executor --> ToolResult
 
     LLMResponse --> ReActMachine
@@ -168,14 +168,14 @@ Directives are declarative descriptions of side effects. The AgentServer runtime
 
 | Directive | Purpose |
 |-----------|---------|
-| `ReqLLMStream` | Stream LLM response with tools |
-| `ReqLLMGenerate` | Non-streaming text generation |
-| `ReqLLMEmbed` | Generate embeddings |
+| `LLMStream` | Stream LLM response with tools |
+| `LLMGenerate` | Non-streaming text generation |
+| `LLMEmbed` | Generate embeddings |
 | `ToolExec` | Execute a tool (Jido.Action) |
 
 ```elixir
 # Create an LLM streaming directive
-directive = Directive.ReqLLMStream.new!(%{
+directive = Directive.LLMStream.new!(%{
   id: "call_123",
   model: "anthropic:claude-haiku-4-5",
   context: messages,
@@ -251,7 +251,7 @@ sequenceDiagram
     Agent->>Strategy: cmd(:react_start, query)
     Strategy->>Machine: update({:start, query})
     Machine-->>Strategy: {:call_llm_stream, id, context}
-    Strategy->>Runtime: Directive.ReqLLMStream
+    Strategy->>Runtime: Directive.LLMStream
 
     Runtime->>LLM: stream_text(model, context)
     LLM-->>Runtime: Streaming tokens

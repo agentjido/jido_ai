@@ -88,7 +88,7 @@ defmodule Jido.AI.OrchestratorAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        skills: [
+        plugins: [
           Jido.AI.Skills.TaskSupervisorSkill,
           {Jido.AI.Skills.Orchestration, []}
         ],

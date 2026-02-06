@@ -51,7 +51,8 @@ defmodule Jido.AI.ThreadTest do
         |> Thread.append_user("Second")
 
       assert Thread.length(thread) == 2
-      [first, second] = thread.entries
+      # Entries are stored in reverse order internally
+      [second, first] = thread.entries
       assert first.content == "First"
       assert second.content == "Second"
     end
@@ -110,6 +111,15 @@ defmodule Jido.AI.ThreadTest do
       [appended] = thread.entries
       assert appended.content == "Test"
       assert %DateTime{} = appended.timestamp
+    end
+
+    test "preserves existing timestamp when provided" do
+      original_time = ~U[2024-01-15 10:30:00Z]
+      entry = %Entry{role: :user, content: "Test", timestamp: original_time}
+      thread = Thread.new() |> Thread.append(entry)
+
+      [appended] = thread.entries
+      assert appended.timestamp == original_time
     end
   end
 
@@ -181,6 +191,28 @@ defmodule Jido.AI.ThreadTest do
       assert Enum.at(messages, 0).role == :system
       assert Enum.at(messages, 1).content == "Second"
       assert Enum.at(messages, 2).content == "Reply 2"
+    end
+
+    test "limit: 0 returns only system prompt" do
+      thread =
+        Thread.new(system_prompt: "System")
+        |> Thread.append_user("First")
+        |> Thread.append_assistant("Reply")
+
+      messages = Thread.to_messages(thread, limit: 0)
+
+      assert length(messages) == 1
+      assert Enum.at(messages, 0).role == :system
+    end
+
+    test "limit: 0 returns empty list when no system prompt" do
+      thread =
+        Thread.new()
+        |> Thread.append_user("First")
+
+      messages = Thread.to_messages(thread, limit: 0)
+
+      assert messages == []
     end
   end
 
@@ -276,7 +308,8 @@ defmodule Jido.AI.ThreadTest do
       thread = Thread.new() |> Thread.append_messages(messages)
 
       assert Thread.length(thread) == 2
-      [first, second] = thread.entries
+      # Entries are stored in reverse order internally
+      [second, first] = thread.entries
       assert first.role == :user
       assert first.content == "Hello"
       assert second.role == :assistant
@@ -291,9 +324,61 @@ defmodule Jido.AI.ThreadTest do
 
       thread = Thread.new() |> Thread.append_messages(messages)
 
-      [first, second] = thread.entries
+      # Entries are stored in reverse order internally
+      [second, first] = thread.entries
       assert first.role == :user
       assert second.role == :assistant
+    end
+
+    test "handles string-keyed maps from JSON" do
+      messages = [
+        %{"role" => "user", "content" => "Hello from JSON"},
+        %{"role" => "assistant", "content" => "Hi!", "tool_calls" => [%{"id" => "tc_1", "name" => "calc"}]},
+        %{"role" => "tool", "tool_call_id" => "tc_1", "name" => "calc", "content" => "42"}
+      ]
+
+      thread = Thread.new() |> Thread.append_messages(messages)
+
+      assert Thread.length(thread) == 3
+      # Entries are stored in reverse order internally
+      [tool, assistant, user] = thread.entries
+      assert user.role == :user
+      assert user.content == "Hello from JSON"
+      assert assistant.role == :assistant
+      assert assistant.tool_calls == [%{"id" => "tc_1", "name" => "calc"}]
+      assert tool.role == :tool
+      assert tool.tool_call_id == "tc_1"
+      assert tool.name == "calc"
+    end
+
+    test "handles known extended roles (developer, function)" do
+      messages = [
+        %{role: "developer", content: "Some developer message"},
+        %{role: :function, content: "Some function result"}
+      ]
+
+      thread = Thread.new() |> Thread.append_messages(messages)
+
+      assert Thread.length(thread) == 2
+      # Entries are stored in reverse order internally
+      [second, first] = thread.entries
+      assert first.role == :developer
+      assert second.role == :function
+    end
+
+    test "passes through unknown roles as-is" do
+      messages = [
+        %{role: "custom_role", content: "Custom message"},
+        %{role: :other_role, content: "Other message"}
+      ]
+
+      thread = Thread.new() |> Thread.append_messages(messages)
+
+      # Entries are stored in reverse order internally
+      [second, first] = thread.entries
+      # String roles stay as strings, atom roles stay as atoms
+      assert first.role == "custom_role"
+      assert second.role == :other_role
     end
 
     test "preserves tool_calls and tool_call_id" do
@@ -304,7 +389,8 @@ defmodule Jido.AI.ThreadTest do
 
       thread = Thread.new() |> Thread.append_messages(messages)
 
-      [assistant, tool] = thread.entries
+      # Entries are stored in reverse order internally
+      [tool, assistant] = thread.entries
       assert assistant.tool_calls == [%{id: "tc_1", name: "calc"}]
       assert tool.tool_call_id == "tc_1"
       assert tool.name == "calc"
@@ -323,8 +409,10 @@ defmodule Jido.AI.ThreadTest do
         |> Thread.append_assistant("Hi there!")
 
       # Project to messages (excluding system since it's in thread.system_prompt)
+      # Entries are stored in reverse order, so reverse to get chronological
       messages =
         original.entries
+        |> Enum.reverse()
         |> Enum.map(fn entry ->
           case entry do
             %{role: :user, content: c} -> %{role: :user, content: c}

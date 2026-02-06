@@ -3,9 +3,9 @@ defmodule Jido.AI.Skills.PlanningTest do
 
   alias Jido.AI.Skills.Planning
 
-  describe "skill_spec/1" do
+  describe "plugin_spec/1" do
     test "returns valid skill spec with empty config" do
-      spec = Planning.skill_spec(%{})
+      spec = Planning.plugin_spec(%{})
 
       assert spec.module == Planning
       assert spec.name == "planning"
@@ -17,7 +17,7 @@ defmodule Jido.AI.Skills.PlanningTest do
 
     test "includes config in skill spec" do
       config = %{default_model: :capable, default_max_tokens: 8192}
-      spec = Planning.skill_spec(config)
+      spec = Planning.plugin_spec(config)
 
       assert spec.config == config
     end

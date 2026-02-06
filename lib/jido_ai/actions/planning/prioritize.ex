@@ -62,7 +62,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Helpers.Text
+  alias Jido.AI.Text
   alias ReqLLM.Context
 
   @prioritization_prompt """

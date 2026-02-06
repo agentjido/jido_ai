@@ -76,7 +76,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       # Verify directive emitted
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.model == "anthropic:claude-haiku-4-5"
     end
 
@@ -90,7 +90,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       }
 
       {agent, directives} = ChainOfThought.cmd(agent, [start_instruction], %{})
-      [%Directive.ReqLLMStream{id: call_id}] = directives
+      [%Directive.LLMStream{id: call_id}] = directives
 
       # Simulate LLM response with steps
       llm_result =
@@ -141,7 +141,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
     end
 
     test "GoT strategy initializes with graph state" do
@@ -168,7 +168,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
     end
 
     test "ReAct strategy initializes with tool configuration" do
@@ -218,7 +218,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       # Verify tools are included in directive
       refute Enum.empty?(directive.tools)
     end
@@ -286,7 +286,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   # ============================================================================
 
   describe "directive execution integration" do
-    test "ReqLLMStream directive has correct structure for CoT" do
+    test "LLMStream directive has correct structure for CoT" do
       {agent, _ctx} = create_agent(ChainOfThought, model: "anthropic:claude-sonnet-4-20250514")
 
       instruction = %Instruction{
@@ -296,13 +296,13 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {_agent, [directive]} = ChainOfThought.cmd(agent, [instruction], %{})
 
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.id != nil
       assert is_list(directive.context)
       assert directive.model == "anthropic:claude-sonnet-4-20250514"
     end
 
-    test "ReqLLMStream directive has correct structure for ReAct with tools" do
+    test "LLMStream directive has correct structure for ReAct with tools" do
       defmodule DirectiveTestTool do
         use Jido.Action,
           name: "test_tool",
@@ -322,7 +322,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {_agent, [directive]} = ReAct.cmd(agent, [instruction], %{})
 
-      assert %Directive.ReqLLMStream{} = directive
+      assert %Directive.LLMStream{} = directive
       assert directive.tools != nil
       assert length(directive.tools) == 1
       # Tools are included in the directive
@@ -350,7 +350,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         params: %{query: "Execute the test"}
       }
 
-      {agent, [%Directive.ReqLLMStream{id: call_id}]} =
+      {agent, [%Directive.LLMStream{id: call_id}]} =
         ReAct.cmd(agent, [start_instruction], %{})
 
       # Simulate LLM response with tool call using correct format
@@ -481,7 +481,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         params: %{prompt: "What is the meaning of life?"}
       }
 
-      {agent, [%Directive.ReqLLMStream{id: call_id}]} =
+      {agent, [%Directive.LLMStream{id: call_id}]} =
         Adaptive.cmd(agent, [start_instruction], %{})
 
       # Verify CoT was selected

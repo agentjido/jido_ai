@@ -239,7 +239,7 @@ sequenceDiagram
 
     Note over Runtime: Execute LLM call
 
-    Runtime->>Strategy: Signal.ReqLLMResult
+    Runtime->>Strategy: Signal.LLMResponse
     Strategy->>Machine: update(machine, {:llm_result, result}, env)
     Machine-->>Strategy: {machine, [{:exec_tool, ...}]}
     Strategy->>Runtime: Directive
