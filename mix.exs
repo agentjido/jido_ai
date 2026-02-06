@@ -69,7 +69,7 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
-      {:term_ui, "~> 0.2"},
+      {:term_ui, path: "../../term_ui"},
       {:zoi, "~> 0.16"},
 
       # Dev/Test
