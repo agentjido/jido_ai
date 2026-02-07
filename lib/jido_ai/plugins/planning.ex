@@ -107,7 +107,7 @@ defmodule Jido.AI.Skills.Planning do
   Maps signal patterns to action modules.
   """
   @impl Jido.Plugin
-  def router(_config) do
+  def signal_routes(_config) do
     [
       {"planning.plan", Jido.AI.Skills.Planning.Actions.Plan},
       {"planning.decompose", Jido.AI.Skills.Planning.Actions.Decompose},
