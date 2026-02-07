@@ -117,18 +117,18 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
   end
 
   # ============================================================================
-  # Router/1 Callback Tests
+  # signal_routes/1 Callback Tests
   # ============================================================================
 
-  describe "Router/1 Callback" do
-    test "LLM skill router returns route list" do
-      assert function_exported?(LLM, :router, 1)
-      routes = LLM.router(%{})
+  describe "signal_routes/1 Callback" do
+    test "LLM skill signal_routes returns route list" do
+      assert function_exported?(LLM, :signal_routes, 1)
+      routes = LLM.signal_routes(%{})
       assert is_list(routes)
     end
 
-    test "LLM skill router has correct routes" do
-      routes = LLM.router(%{})
+    test "LLM skill signal_routes has correct routes" do
+      routes = LLM.signal_routes(%{})
       route_map = Map.new(routes)
 
       assert route_map["llm.chat"] == Jido.AI.Skills.LLM.Actions.Chat
@@ -136,14 +136,14 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       assert route_map["llm.embed"] == Jido.AI.Skills.LLM.Actions.Embed
     end
 
-    test "Reasoning skill router returns route list" do
-      assert function_exported?(Reasoning, :router, 1)
-      routes = Reasoning.router(%{})
+    test "Reasoning skill signal_routes returns route list" do
+      assert function_exported?(Reasoning, :signal_routes, 1)
+      routes = Reasoning.signal_routes(%{})
       assert is_list(routes)
     end
 
-    test "Reasoning skill router has correct routes" do
-      routes = Reasoning.router(%{})
+    test "Reasoning skill signal_routes has correct routes" do
+      routes = Reasoning.signal_routes(%{})
       route_map = Map.new(routes)
 
       assert route_map["reasoning.analyze"] == Jido.AI.Skills.Reasoning.Actions.Analyze
@@ -151,14 +151,14 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       assert route_map["reasoning.infer"] == Jido.AI.Skills.Reasoning.Actions.Infer
     end
 
-    test "Planning skill router returns route list" do
-      assert function_exported?(Planning, :router, 1)
-      routes = Planning.router(%{})
+    test "Planning skill signal_routes returns route list" do
+      assert function_exported?(Planning, :signal_routes, 1)
+      routes = Planning.signal_routes(%{})
       assert is_list(routes)
     end
 
-    test "Planning skill router has correct routes" do
-      routes = Planning.router(%{})
+    test "Planning skill signal_routes has correct routes" do
+      routes = Planning.signal_routes(%{})
       route_map = Map.new(routes)
 
       assert route_map["planning.plan"] == Jido.AI.Skills.Planning.Actions.Plan
@@ -166,14 +166,14 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       assert route_map["planning.prioritize"] == Jido.AI.Skills.Planning.Actions.Prioritize
     end
 
-    test "Streaming skill router returns route list" do
-      assert function_exported?(Streaming, :router, 1)
-      routes = Streaming.router(%{})
+    test "Streaming skill signal_routes returns route list" do
+      assert function_exported?(Streaming, :signal_routes, 1)
+      routes = Streaming.signal_routes(%{})
       assert is_list(routes)
     end
 
-    test "Streaming skill router has correct routes" do
-      routes = Streaming.router(%{})
+    test "Streaming skill signal_routes has correct routes" do
+      routes = Streaming.signal_routes(%{})
       route_map = Map.new(routes)
 
       assert route_map["stream.start"] == Jido.AI.Skills.Streaming.Actions.StartStream
@@ -181,14 +181,14 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       assert route_map["stream.end"] == Jido.AI.Skills.Streaming.Actions.EndStream
     end
 
-    test "ToolCalling skill router returns route list" do
-      assert function_exported?(ToolCalling, :router, 1)
-      routes = ToolCalling.router(%{})
+    test "ToolCalling skill signal_routes returns route list" do
+      assert function_exported?(ToolCalling, :signal_routes, 1)
+      routes = ToolCalling.signal_routes(%{})
       assert is_list(routes)
     end
 
-    test "ToolCalling skill router has correct routes" do
-      routes = ToolCalling.router(%{})
+    test "ToolCalling skill signal_routes has correct routes" do
+      routes = ToolCalling.signal_routes(%{})
       route_map = Map.new(routes)
 
       assert route_map["tool.call"] == Jido.AI.Skills.ToolCalling.Actions.CallWithTools
@@ -275,9 +275,9 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       assert is_list(patterns)
     end
 
-    test "LLM skill signal patterns match router" do
+    test "LLM skill signal patterns match signal_routes" do
       patterns = LLM.signal_patterns()
-      routes = LLM.router(%{})
+      routes = LLM.signal_routes(%{})
       route_keys = routes |> MapSet.new(fn {k, _v} -> k end)
       pattern_set = MapSet.new(patterns)
 
@@ -393,11 +393,11 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
   # ============================================================================
 
   describe "Phase 9.3 Success Criteria" do
-    test "all 5 skills implement router/1 callback" do
+    test "all 5 skills implement signal_routes/1 callback" do
       skills = [LLM, Reasoning, Planning, Streaming, ToolCalling]
 
       for skill <- skills do
-        assert function_exported?(skill, :router, 1), "#{skill} must implement router/1"
+        assert function_exported?(skill, :signal_routes, 1), "#{skill} must implement signal_routes/1"
       end
     end
 

@@ -106,7 +106,7 @@ defmodule Jido.AI.Skills.LLM do
   Maps signal patterns to action modules.
   """
   @impl Jido.Plugin
-  def router(_config) do
+  def signal_routes(_config) do
     [
       {"llm.chat", Jido.AI.Skills.LLM.Actions.Chat},
       {"llm.complete", Jido.AI.Skills.LLM.Actions.Complete},

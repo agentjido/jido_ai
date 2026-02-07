@@ -149,7 +149,7 @@ defmodule Jido.AI.Skills.Streaming do
   Maps signal patterns to action modules.
   """
   @impl Jido.Plugin
-  def router(_config) do
+  def signal_routes(_config) do
     [
       {"stream.start", Jido.AI.Skills.Streaming.Actions.StartStream},
       {"stream.process", Jido.AI.Skills.Streaming.Actions.ProcessTokens},

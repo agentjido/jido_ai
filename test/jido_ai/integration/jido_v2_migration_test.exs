@@ -295,33 +295,33 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
   # Skill Router Tests
   # ============================================================================
 
-  describe "Skill Routers" do
-    test "LLM router returns expected routes" do
-      routes = LLM.router(%{})
+  describe "Skill Signal Routes" do
+    test "LLM signal_routes returns expected routes" do
+      routes = LLM.signal_routes(%{})
       assert is_list(routes)
       assert length(routes) == 4
     end
 
-    test "Reasoning router returns expected routes" do
-      routes = Reasoning.router(%{})
+    test "Reasoning signal_routes returns expected routes" do
+      routes = Reasoning.signal_routes(%{})
       assert is_list(routes)
       assert length(routes) == 3
     end
 
-    test "Planning router returns expected routes" do
-      routes = Planning.router(%{})
+    test "Planning signal_routes returns expected routes" do
+      routes = Planning.signal_routes(%{})
       assert is_list(routes)
       assert length(routes) == 3
     end
 
-    test "Streaming router returns expected routes" do
-      routes = Streaming.router(%{})
+    test "Streaming signal_routes returns expected routes" do
+      routes = Streaming.signal_routes(%{})
       assert is_list(routes)
       assert length(routes) == 3
     end
 
-    test "ToolCalling router returns expected routes" do
-      routes = ToolCalling.router(%{})
+    test "ToolCalling signal_routes returns expected routes" do
+      routes = ToolCalling.signal_routes(%{})
       assert is_list(routes)
       assert length(routes) == 3
     end
@@ -421,12 +421,12 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert function_exported?(ToolCalling, :mount, 2)
     end
 
-    test "all skills have router/1" do
-      assert function_exported?(LLM, :router, 1)
-      assert function_exported?(Reasoning, :router, 1)
-      assert function_exported?(Planning, :router, 1)
-      assert function_exported?(Streaming, :router, 1)
-      assert function_exported?(ToolCalling, :router, 1)
+    test "all skills have signal_routes/1" do
+      assert function_exported?(LLM, :signal_routes, 1)
+      assert function_exported?(Reasoning, :signal_routes, 1)
+      assert function_exported?(Planning, :signal_routes, 1)
+      assert function_exported?(Streaming, :signal_routes, 1)
+      assert function_exported?(ToolCalling, :signal_routes, 1)
     end
 
     test "StateOpsHelpers is available" do

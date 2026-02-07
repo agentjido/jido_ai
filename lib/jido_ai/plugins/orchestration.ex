@@ -87,7 +87,7 @@ defmodule Jido.AI.Skills.Orchestration do
   Returns the signal router for this skill.
   """
   @impl Jido.Plugin
-  def router(_config) do
+  def signal_routes(_config) do
     [
       {"orchestration.spawn", Jido.AI.Actions.Orchestration.SpawnChildAgent},
       {"orchestration.stop", Jido.AI.Actions.Orchestration.StopChildAgent},

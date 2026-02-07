@@ -107,7 +107,7 @@ defmodule Jido.AI.Skills.Reasoning do
   Maps signal patterns to action modules.
   """
   @impl Jido.Plugin
-  def router(_config) do
+  def signal_routes(_config) do
     [
       {"reasoning.analyze", Jido.AI.Skills.Reasoning.Actions.Analyze},
       {"reasoning.explain", Jido.AI.Skills.Reasoning.Actions.Explain},
