@@ -49,8 +49,15 @@ if Code.ensure_loaded?(AgentSessionManager.Ports.ProviderAdapter) do
       state = %{
         execution_mode: Keyword.get(opts, :execution_mode, :streaming),
         chunk_delay_ms: Keyword.get(opts, :chunk_delay_ms, 1),
-        fail_with: Keyword.get(opts, :fail_with)
+        fail_with: Keyword.get(opts, :fail_with),
+        model: Keyword.get(opts, :model),
+        max_turns: Keyword.get(opts, :max_turns),
+        notify_pid: Keyword.get(opts, :notify_pid)
       }
+
+      if is_pid(state.notify_pid) do
+        send(state.notify_pid, {:mock_adapter_init_opts, self(), opts})
+      end
 
       {:ok, state}
     end
@@ -80,7 +87,7 @@ if Code.ensure_loaded?(AgentSessionManager.Ports.ProviderAdapter) do
     defp do_execute(state, run, session, opts, from) do
       case state.execution_mode do
         :instant ->
-          result = build_and_emit(run, session, opts)
+          result = build_and_emit(state, run, session, opts)
           {:reply, result, state}
 
         :streaming ->
@@ -99,14 +106,24 @@ if Code.ensure_loaded?(AgentSessionManager.Ports.ProviderAdapter) do
     @impl GenServer
     def handle_info(:streaming_done, state), do: {:noreply, state}
 
+    @impl GenServer
+    def terminate(_reason, state) do
+      if is_pid(state.notify_pid) do
+        send(state.notify_pid, {:mock_adapter_terminated, self()})
+      end
+
+      :ok
+    end
+
     # Private
 
-    defp build_and_emit(run, session, opts) do
+    defp build_and_emit(state, run, session, opts) do
       event_callback = Keyword.get(opts, :event_callback)
       content = "Mock response"
+      model = state.model || "mock-model"
 
       if event_callback do
-        emit(event_callback, :run_started, run, session, %{model: "mock-model"})
+        emit(event_callback, :run_started, run, session, %{model: model})
 
         emit(event_callback, :message_received, run, session, %{
           content: content,
@@ -122,9 +139,10 @@ if Code.ensure_loaded?(AgentSessionManager.Ports.ProviderAdapter) do
     defp execute_streaming(state, run, session, opts) do
       event_callback = Keyword.get(opts, :event_callback)
       content = "Mock streaming response"
+      model = state.model || "mock-model"
 
       if event_callback do
-        emit(event_callback, :run_started, run, session, %{model: "mock-model"})
+        emit(event_callback, :run_started, run, session, %{model: model})
         Process.sleep(state.chunk_delay_ms)
 
         for chunk <- chunk_string(content, 8) do

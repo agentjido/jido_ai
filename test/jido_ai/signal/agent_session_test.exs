@@ -311,6 +311,20 @@ defmodule Jido.AI.Signal.AgentSessionTest do
       assert signal.data.delta == false
     end
 
+    test "maps unknown message role safely without raising", %{context: context} do
+      event = %{
+        type: :message_received,
+        data: %{content: "Hello, world!", role: "unknown_role"},
+        session_id: "sess_abc123",
+        run_id: "run_def456"
+      }
+
+      signal = AgentSession.from_event(event, context)
+
+      assert signal.type == "ai.agent_session.message"
+      assert signal.data.role == :assistant
+    end
+
     test "maps :message_streamed event to Message signal (delta: true)", %{context: context} do
       event = %{
         type: :message_streamed,
@@ -497,6 +511,19 @@ defmodule Jido.AI.Signal.AgentSessionTest do
       assert signal.data.reason == :error
       assert signal.data.session_id == "sess_abc123"
       assert signal.data.directive_id == "dir_ghi789"
+    end
+
+    test "uses timeout reason when provided by error map" do
+      signal =
+        AgentSession.failed(%{reason: :timeout, message: "timed out"}, %{
+          session_id: "sess_1",
+          run_id: "run_1",
+          directive_id: "dir_1",
+          metadata: %{}
+        })
+
+      assert signal.data.reason == :timeout
+      assert signal.data.error_message == "timed out"
     end
 
     test "extracts error message from string error" do

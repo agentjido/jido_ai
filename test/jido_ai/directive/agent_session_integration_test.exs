@@ -258,5 +258,90 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
         assert "ai.agent_session.completed" in signal_types
       end
     end
+
+    describe "exec/3 runtime safeguards" do
+      test "fails fast when session_id resume is requested" do
+        directive =
+          AgentSession.new!(%{
+            id: "test-resume-unsupported",
+            adapter: Jido.AI.Test.MockProviderAdapter,
+            input: "Resume run",
+            session_id: "existing-session-1",
+            timeout: 10_000
+          })
+
+        state = build_state()
+        exec_impl = DirectiveExec.impl_for!(directive)
+        exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
+
+        Process.sleep(150)
+        signals = receive_all_signals(200)
+
+        failed = Enum.find(signals, fn s -> s.type == "ai.agent_session.failed" end)
+        assert failed != nil
+        assert failed.data.reason == :error
+        assert String.contains?(failed.data.error_message, "session_id resume is not supported")
+      end
+
+      test "enforces directive timeout at runtime" do
+        directive =
+          AgentSession.new!(%{
+            id: "test-timeout-enforced",
+            adapter: Jido.AI.Test.MockProviderAdapter,
+            input: "Slow run",
+            timeout: 50,
+            session_config: %{
+              adapter_opts: %{
+                execution_mode: :streaming,
+                chunk_delay_ms: 200
+              }
+            }
+          })
+
+        state = build_state()
+        exec_impl = DirectiveExec.impl_for!(directive)
+        exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
+
+        Process.sleep(250)
+        signals = receive_all_signals(300)
+
+        failed = Enum.find(signals, fn s -> s.type == "ai.agent_session.failed" end)
+        assert failed != nil
+        assert failed.data.reason == :timeout
+        assert String.contains?(failed.data.error_message, "timed out")
+      end
+
+      test "forwards model/max_turns adapter opts and shuts down adapter process" do
+        directive =
+          AgentSession.new!(%{
+            id: "test-adapter-opts-forwarded",
+            adapter: Jido.AI.Test.MockProviderAdapter,
+            input: "Quick task",
+            model: "mock-model-1",
+            max_turns: 7,
+            timeout: 5_000,
+            session_config: %{
+              adapter_opts: %{
+                execution_mode: :instant,
+                notify_pid: self()
+              }
+            }
+          })
+
+        state = build_state()
+        exec_impl = DirectiveExec.impl_for!(directive)
+        exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
+
+        assert_receive {:mock_adapter_init_opts, adapter_pid, init_opts}, 1_000
+        assert Keyword.get(init_opts, :model) == "mock-model-1"
+        assert Keyword.get(init_opts, :max_turns) == 7
+
+        assert_receive {:mock_adapter_terminated, ^adapter_pid}, 1_000
+
+        signals = receive_all_signals(200)
+        signal_types = Enum.map(signals, & &1.type)
+        assert "ai.agent_session.completed" in signal_types
+      end
+    end
   end
 end

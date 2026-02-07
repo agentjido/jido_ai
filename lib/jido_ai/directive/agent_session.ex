@@ -13,11 +13,11 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     - `id` (required) - Unique directive ID for correlation
     - `adapter` (required) - `agent_session_manager` adapter module
     - `input` (required) - Prompt / task description to send to the agent
-    - `session_id` (optional) - Session ID to resume; `nil` for new session
+    - `session_id` (optional) - Reserved for future session resume support (currently unsupported)
     - `session_config` (optional) - Adapter-specific session configuration
-    - `model` (optional) - Model identifier (e.g. `"claude-sonnet-4-5-20250929"`)
-    - `timeout` (optional) - Timeout in ms for the entire agent run (default: 300,000)
-    - `max_turns` (optional) - Max tool-use turns the agent can take
+    - `model` (optional) - Model identifier passed to the adapter (if supported)
+    - `timeout` (optional) - Hard timeout in ms for the full delegated run (default: 300,000)
+    - `max_turns` (optional) - Max-turns hint passed to adapter (if supported)
     - `emit_events` (optional) - Whether to emit intermediate events as signals (default: `true`)
     - `metadata` (optional) - Arbitrary metadata passed through to signals
 
@@ -102,8 +102,8 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     for minutes (the agent's tool loop) and returns `{:async, ref, state}`
     immediately. Events stream back as signals via `Jido.AgentServer.cast/2`.
 
-    Uses `SessionManager.run_once/4` which handles the complete session lifecycle
-    (create, activate, run, execute, complete/fail) in a single call.
+    Uses `SessionManager.run_once/4` for lifecycle orchestration and wraps it in a
+    directive-level timeout so this directive's timeout contract is always enforced.
 
     ## Task Supervisor
 
@@ -159,61 +159,104 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     end
 
     defp execute_session(directive, context, agent_pid) do
-      {:ok, store} = AgentSessionManager.Adapters.InMemorySessionStore.start_link([])
-      {:ok, adapter} = start_adapter(directive)
+      with :ok <- validate_runtime_support(directive),
+           {:ok, store, adapter} <- start_session_components(directive) do
+        try do
+          # Build event callback that converts events to signals.
+          # Skip terminal events in the callback — run_once's return value
+          # handles completed/failed with the full result.
+          terminal_events = [:run_completed, :run_failed, :run_cancelled]
 
-      # Build event callback that converts events to signals
-      # Skip terminal events in the callback — run_once's return value
-      # handles completed/failed with the full result.
-      terminal_events = [:run_completed, :run_failed, :run_cancelled]
+          callback =
+            if directive.emit_events do
+              fn event ->
+                maybe_emit_event_signal(event, terminal_events, context, agent_pid)
+              end
+            else
+              fn _event -> :ok end
+            end
 
-      callback =
-        if directive.emit_events do
-          fn event ->
-            maybe_emit_event_signal(event, terminal_events, context, agent_pid)
+          opts = [
+            context: directive.session_config,
+            event_callback: callback
+          ]
+
+          input = %{messages: [%{role: "user", content: directive.input}]}
+
+          case run_once_with_timeout(store, adapter, input, directive.timeout, opts) do
+            {:ok, result} ->
+              signal_context =
+                Map.merge(context, %{
+                  session_id: result.session_id,
+                  run_id: result.run_id
+                })
+
+              signal = Signals.completed(result, signal_context)
+              Jido.AgentServer.cast(agent_pid, signal)
+              :ok
+
+            {:error, error} ->
+              signal_context =
+                Map.merge(context, %{
+                  session_id: "unknown",
+                  run_id: "unknown"
+                })
+
+              signal = Signals.failed(error, signal_context)
+              Jido.AgentServer.cast(agent_pid, signal)
+              :ok
           end
-        else
-          fn _event -> :ok end
+        after
+          stop_process(adapter)
+          stop_process(store)
         end
+      else
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
 
-      # Build run_once options
-      opts =
-        [
-          context: directive.session_config,
-          event_callback: callback
-        ]
-        |> maybe_put(:timeout, directive.timeout)
+    defp validate_runtime_support(%{session_id: session_id})
+         when is_binary(session_id) and session_id != "" do
+      {:error,
+       %{
+         reason: :unsupported_feature,
+         message: "AgentSession session_id resume is not supported yet"
+       }}
+    end
 
-      # Execute the full session lifecycle in one call
-      case SessionManager.run_once(
-             store,
-             adapter,
-             %{
-               messages: [%{role: "user", content: directive.input}]
-             },
-             opts
-           ) do
+    defp validate_runtime_support(_directive), do: :ok
+
+    defp start_session_components(directive) do
+      case AgentSessionManager.Adapters.InMemorySessionStore.start_link([]) do
+        {:ok, store} ->
+          case start_adapter(directive) do
+            {:ok, adapter} ->
+              {:ok, store, adapter}
+
+            {:error, reason} ->
+              stop_process(store)
+              {:error, reason}
+          end
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+
+    defp run_once_with_timeout(store, adapter, input, timeout_ms, opts) do
+      task = Task.async(fn -> SessionManager.run_once(store, adapter, input, opts) end)
+
+      case Task.yield(task, timeout_ms) do
         {:ok, result} ->
-          signal_context =
-            Map.merge(context, %{
-              session_id: result.session_id,
-              run_id: result.run_id
-            })
+          result
 
-          signal = Signals.completed(result, signal_context)
-          Jido.AgentServer.cast(agent_pid, signal)
-          :ok
+        {:exit, reason} ->
+          {:error, %{reason: :execution_crash, message: "AgentSession execution crashed: #{inspect(reason)}"}}
 
-        {:error, error} ->
-          signal_context =
-            Map.merge(context, %{
-              session_id: "unknown",
-              run_id: "unknown"
-            })
-
-          signal = Signals.failed(error, signal_context)
-          Jido.AgentServer.cast(agent_pid, signal)
-          :ok
+        nil ->
+          Task.shutdown(task, :brutal_kill)
+          {:error, %{reason: :timeout, message: "AgentSession timed out after #{timeout_ms}ms"}}
       end
     end
 
@@ -223,15 +266,44 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     end
 
     defp build_adapter_opts(AgentSessionManager.Adapters.CodexAdapter, directive) do
+      common_opts = build_common_adapter_opts(directive)
+
       working_dir =
         get_in(directive.session_config, [:working_directory]) ||
           get_in(directive.session_config, ["working_directory"]) ||
           File.cwd!()
 
-      [working_directory: working_dir]
+      Keyword.put_new(common_opts, :working_directory, working_dir)
     end
 
-    defp build_adapter_opts(_adapter_module, _directive), do: []
+    defp build_adapter_opts(_adapter_module, directive), do: build_common_adapter_opts(directive)
+
+    defp build_common_adapter_opts(directive) do
+      directive
+      |> extract_adapter_opts()
+      |> maybe_put_kw(:model, directive.model)
+      |> maybe_put_kw(:max_turns, directive.max_turns)
+    end
+
+    defp extract_adapter_opts(%{session_config: session_config}) when is_map(session_config) do
+      case get_in(session_config, [:adapter_opts]) || get_in(session_config, ["adapter_opts"]) do
+        opts when is_list(opts) ->
+          opts
+
+        opts when is_map(opts) ->
+          opts
+          |> Enum.reduce([], fn
+            {key, value}, acc when is_atom(key) -> [{key, value} | acc]
+            {_key, _value}, acc -> acc
+          end)
+          |> Enum.reverse()
+
+        _ ->
+          []
+      end
+    end
+
+    defp extract_adapter_opts(_directive), do: []
 
     defp maybe_emit_event_signal(event, terminal_events, context, agent_pid) do
       if event.type not in terminal_events do
@@ -246,7 +318,19 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
       end
     end
 
-    defp maybe_put(opts, _key, nil), do: opts
-    defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+    defp stop_process(pid) when is_pid(pid) do
+      if Process.alive?(pid) do
+        try do
+          GenServer.stop(pid, :normal, 500)
+        catch
+          :exit, _ -> :ok
+        end
+      else
+        :ok
+      end
+    end
+
+    defp maybe_put_kw(opts, _key, nil), do: opts
+    defp maybe_put_kw(opts, key, value), do: Keyword.put(opts, key, value)
   end
 end

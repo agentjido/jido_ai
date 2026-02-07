@@ -365,6 +365,8 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     end
 
     def failed(error, context) do
+      reason = extract_failed_reason(error)
+
       error_message =
         cond do
           is_map(error) && Map.has_key?(error, :message) -> to_string(error.message)
@@ -376,7 +378,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
         session_id: context.session_id,
         run_id: context.run_id,
         directive_id: context[:directive_id],
-        reason: :error,
+        reason: reason,
         error_message: error_message,
         metadata: context[:metadata] || %{}
       })
@@ -385,8 +387,36 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     # Private helpers
 
     defp to_role(nil), do: :assistant
-    defp to_role(role) when is_atom(role), do: role
-    defp to_role(role) when is_binary(role), do: String.to_existing_atom(role)
+    defp to_role(:assistant), do: :assistant
+    defp to_role(:system), do: :system
+    defp to_role(:user), do: :user
+    defp to_role(:tool), do: :tool
+
+    defp to_role(role) when is_binary(role) do
+      case String.downcase(role) do
+        "assistant" -> :assistant
+        "system" -> :system
+        "user" -> :user
+        "tool" -> :tool
+        _ -> :assistant
+      end
+    end
+
+    defp to_role(_role), do: :assistant
+
+    defp extract_failed_reason(error) when is_map(error) do
+      case Map.get(error, :reason) do
+        :timeout -> :timeout
+        :cancelled -> :cancelled
+        :error -> :error
+        "timeout" -> :timeout
+        "cancelled" -> :cancelled
+        "error" -> :error
+        _ -> :error
+      end
+    end
+
+    defp extract_failed_reason(_error), do: :error
 
     defp build_tool_call_signal(event, context, status) do
       ToolCall.new!(%{
