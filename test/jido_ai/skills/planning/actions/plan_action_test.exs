@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.Planning.Actions.PlanTest do
+defmodule Jido.AI.Actions.Planning.PlanTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Planning.Actions.Plan
+  alias Jido.AI.Actions.Planning.Plan
 
   @moduletag :unit
   @moduletag :capture_log

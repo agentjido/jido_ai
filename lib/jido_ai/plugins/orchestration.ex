@@ -5,7 +5,7 @@ require Jido.AI.Actions.Orchestration.DiscoverCapabilities
 require Jido.AI.Actions.Orchestration.SpawnChildAgent
 require Jido.AI.Actions.Orchestration.StopChildAgent
 
-defmodule Jido.AI.Skills.Orchestration do
+defmodule Jido.AI.Plugins.Orchestration do
   @moduledoc """
   Multi-agent coordination and delegation skill.
 
@@ -23,7 +23,7 @@ defmodule Jido.AI.Skills.Orchestration do
       defmodule MyOrchestrator do
         use Jido.Agent,
           skills: [
-            {Jido.AI.Skills.Orchestration, []}
+            {Jido.AI.Plugins.Orchestration, []}
           ]
       end
 
@@ -87,7 +87,7 @@ defmodule Jido.AI.Skills.Orchestration do
   Returns the signal router for this skill.
   """
   @impl Jido.Plugin
-  def router(_config) do
+  def signal_routes(_config) do
     [
       {"orchestration.spawn", Jido.AI.Actions.Orchestration.SpawnChildAgent},
       {"orchestration.stop", Jido.AI.Actions.Orchestration.StopChildAgent},
