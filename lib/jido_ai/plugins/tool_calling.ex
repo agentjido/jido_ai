@@ -150,7 +150,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
   Maps signal patterns to action modules.
   """
   @impl Jido.Plugin
-  def router(_config) do
+  def signal_routes(_config) do
     [
       {"tool.call", Jido.AI.Actions.ToolCalling.CallWithTools},
       {"tool.execute", Jido.AI.Actions.ToolCalling.ExecuteTool},
