@@ -241,6 +241,46 @@ defmodule Jido.AI.HelpersTest do
       # Text blocks are joined with newlines
       assert result.text == "Hello\nworld"
     end
+
+    test "extracts thinking_content from content blocks" do
+      response = %{
+        message: %{
+          content: [
+            %{type: :thinking, thinking: "Let me analyze this..."},
+            %{type: :text, text: "The answer is 42"}
+          ],
+          tool_calls: nil
+        },
+        finish_reason: :stop
+      }
+
+      result = Helpers.classify_llm_response(response)
+      assert result.text == "The answer is 42"
+      assert result.thinking_content == "Let me analyze this..."
+    end
+
+    test "returns nil thinking_content for plain string content" do
+      response = %{
+        message: %{content: "Just text", tool_calls: nil},
+        finish_reason: :stop
+      }
+
+      result = Helpers.classify_llm_response(response)
+      assert result.thinking_content == nil
+    end
+
+    test "returns nil thinking_content when no thinking blocks" do
+      response = %{
+        message: %{
+          content: [%{type: :text, text: "Hello"}],
+          tool_calls: nil
+        },
+        finish_reason: :stop
+      }
+
+      result = Helpers.classify_llm_response(response)
+      assert result.thinking_content == nil
+    end
   end
 
   describe "task_supervisor/1" do

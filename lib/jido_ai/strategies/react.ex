@@ -238,6 +238,7 @@ defmodule Jido.AI.Strategies.ReAct do
       termination_reason: state[:termination_reason],
       streaming_text: state[:streaming_text],
       streaming_thinking: state[:streaming_thinking],
+      thinking_trace: state[:thinking_trace],
       usage: state[:usage],
       duration_ms: calculate_duration(state[:started_at]),
       tool_calls: format_tool_calls(state[:pending_tool_calls] || []),

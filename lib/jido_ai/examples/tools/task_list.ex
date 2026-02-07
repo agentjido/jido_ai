@@ -35,14 +35,12 @@ defmodule Jido.AI.Examples.Tools.TaskList.AddTasks do
           Zoi.list(
             Zoi.object(%{
               title: Zoi.string(description: "Short title for the task"),
-              description:
-                Zoi.string(description: "Detailed description of the task") |> Zoi.optional(),
+              description: Zoi.string(description: "Detailed description of the task") |> Zoi.optional(),
               priority:
                 Zoi.integer(description: "Priority number, lower is higher priority (1-100)")
                 |> Zoi.optional()
             }),
-            description:
-              "List of tasks to add. Each must have a title, optional description and priority."
+            description: "List of tasks to add. Each must have a title, optional description and priority."
           )
       })
 

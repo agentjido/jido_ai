@@ -336,7 +336,7 @@ defmodule Jido.AI.ReActAgent do
 
         agent =
           if snap.done? do
-            Request.complete_request(agent, request_id, snap.result)
+            Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
           else
             agent
           end
@@ -346,13 +346,10 @@ defmodule Jido.AI.ReActAgent do
 
       @impl true
       def on_after_cmd(agent, _action, directives) do
-        # Fallback for actions without request_id (e.g., react_llm_result, react_tool_result)
-        # When strategy completes, we need to mark the current request as complete
         snap = strategy_snapshot(agent)
 
         agent =
           if snap.done? do
-            # Update backward-compat fields
             agent = %{
               agent
               | state:
@@ -362,16 +359,32 @@ defmodule Jido.AI.ReActAgent do
                   })
             }
 
-            # Also complete the tracked request if we have one
             case agent.state[:last_request_id] do
               nil -> agent
-              request_id -> Request.complete_request(agent, request_id, snap.result)
+              request_id -> Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
             end
           else
             agent
           end
 
         {:ok, agent, directives}
+      end
+
+      defp thinking_meta(snap) do
+        details = snap.details || %{}
+        meta = %{}
+
+        meta =
+          if details[:thinking_trace] && details[:thinking_trace] != [],
+            do: Map.put(meta, :thinking_trace, details[:thinking_trace]),
+            else: meta
+
+        meta =
+          if details[:streaming_thinking] && details[:streaming_thinking] != "",
+            do: Map.put(meta, :last_thinking, details[:streaming_thinking]),
+            else: meta
+
+        meta
       end
 
       @doc """
