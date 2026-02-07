@@ -11,6 +11,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     """
     use ExUnit.Case, async: false
 
+    alias Jido.AgentServer.DirectiveExec
     alias Jido.AI.Directive.AgentSession
     alias Jido.AI.Test.MockProviderAdapter
 
@@ -55,7 +56,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
 
       test "returns {:async, nil, state}", %{directive: directive} do
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         result = exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
@@ -64,7 +65,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
 
       test "delivers intermediate signals when emit_events is true", %{directive: directive} do
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
@@ -86,7 +87,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
 
       test "final signal is Completed with session_id and run_id", %{directive: directive} do
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
@@ -108,7 +109,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
         directive: directive
       } do
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
@@ -131,7 +132,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
 
       test "delivers Started signal as first intermediate event", %{directive: directive} do
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
@@ -149,7 +150,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
 
       test "propagates directive metadata into signals", %{directive: directive} do
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
@@ -184,7 +185,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
           })
 
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
@@ -215,7 +216,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
           })
 
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
@@ -246,7 +247,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
           })
 
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
 
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 

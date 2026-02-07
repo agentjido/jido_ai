@@ -14,6 +14,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     """
     use ExUnit.Case, async: false
 
+    alias Jido.AgentServer.DirectiveExec
     alias Jido.AI.Directive.AgentSession
 
     # Collect signals until we see a terminal one (completed/failed) or timeout.
@@ -80,7 +81,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
           })
 
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
         signals = collect_signals(30_000)
@@ -115,7 +116,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
           })
 
         state = build_state()
-        exec_impl = Jido.AgentServer.DirectiveExec.impl_for!(directive)
+        exec_impl = DirectiveExec.impl_for!(directive)
         exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
 
         signals = collect_signals(30_000)

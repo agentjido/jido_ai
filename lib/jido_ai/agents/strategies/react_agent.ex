@@ -232,6 +232,10 @@ defmodule Jido.AI.ReActAgent do
 
       alias Jido.AI.Request
 
+      @doc false
+      @spec plugin_specs() :: [Jido.Plugin.Spec.t()]
+      def plugin_specs, do: super()
+
       @doc """
       Send a query to the agent asynchronously.
 
