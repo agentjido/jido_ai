@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
+defmodule Jido.AI.Actions.Reasoning.Analyze do
   @moduledoc """
   A Jido.Action for performing deep analysis of text/data with structured output.
 
@@ -18,19 +18,19 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Analyze do
   ## Examples
 
       # Sentiment analysis
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Analyze, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Reasoning.Analyze, %{
         input: "I absolutely loved the movie! The acting was superb.",
         analysis_type: :sentiment
       })
 
       # Topic extraction
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Analyze, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Reasoning.Analyze, %{
         input: article_text,
         analysis_type: :topics
       })
 
       # Custom analysis
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Analyze, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Reasoning.Analyze, %{
         input: data,
         analysis_type: :custom,
         custom_prompt: "Analyze this data for trends and anomalies."

@@ -1,9 +1,9 @@
-require Jido.AI.Skills.Planning.Actions.Decompose
+require Jido.AI.Actions.Planning.Decompose
 # Ensure actions are compiled before the skill
-require Jido.AI.Skills.Planning.Actions.Plan
-require Jido.AI.Skills.Planning.Actions.Prioritize
+require Jido.AI.Actions.Planning.Plan
+require Jido.AI.Actions.Planning.Prioritize
 
-defmodule Jido.AI.Skills.Planning do
+defmodule Jido.AI.Plugins.Planning do
   @moduledoc """
   A Jido.Skill providing AI-powered planning capabilities.
 
@@ -22,13 +22,13 @@ defmodule Jido.AI.Skills.Planning do
         use Jido.Agent,
 
         skills: [
-          {Jido.AI.Skills.Planning, []}
+          {Jido.AI.Plugins.Planning, []}
         ]
       end
 
   Or use the action directly:
 
-      Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Plan, %{
+      Jido.Exec.run(Jido.AI.Actions.Planning.Plan, %{
         goal: "Build a web application",
         constraints: ["Must use Elixir", "Budget limited"],
         resources: ["2 developers", "3 months"]
@@ -59,9 +59,9 @@ defmodule Jido.AI.Skills.Planning do
     name: "planning",
     state_key: :planning,
     actions: [
-      Jido.AI.Skills.Planning.Actions.Plan,
-      Jido.AI.Skills.Planning.Actions.Decompose,
-      Jido.AI.Skills.Planning.Actions.Prioritize
+      Jido.AI.Actions.Planning.Plan,
+      Jido.AI.Actions.Planning.Decompose,
+      Jido.AI.Actions.Planning.Prioritize
     ],
     description: "Provides AI-powered planning, goal decomposition, and task prioritization",
     category: "ai",
@@ -109,9 +109,9 @@ defmodule Jido.AI.Skills.Planning do
   @impl Jido.Plugin
   def signal_routes(_config) do
     [
-      {"planning.plan", Jido.AI.Skills.Planning.Actions.Plan},
-      {"planning.decompose", Jido.AI.Skills.Planning.Actions.Decompose},
-      {"planning.prioritize", Jido.AI.Skills.Planning.Actions.Prioritize}
+      {"planning.plan", Jido.AI.Actions.Planning.Plan},
+      {"planning.decompose", Jido.AI.Actions.Planning.Decompose},
+      {"planning.prioritize", Jido.AI.Actions.Planning.Prioritize}
     ]
   end
 

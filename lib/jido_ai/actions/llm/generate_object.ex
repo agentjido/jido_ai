@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.LLM.Actions.GenerateObject do
+defmodule Jido.AI.Actions.LLM.GenerateObject do
   @moduledoc """
   A Jido.Action for generating structured JSON objects using LLM with schema validation.
 
@@ -24,14 +24,14 @@ defmodule Jido.AI.Skills.LLM.Actions.GenerateObject do
         occupation: Zoi.string()
       })
 
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.GenerateObject, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.GenerateObject, %{
         prompt: "Generate a person named Alice who is a software engineer",
         object_schema: schema
       })
       # => %{object: %{name: "Alice", age: 28, occupation: "Software Engineer"}, ...}
 
       # With model and system prompt
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.GenerateObject, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.GenerateObject, %{
         model: :capable,
         prompt: "Generate a product review",
         object_schema: review_schema,
@@ -74,7 +74,7 @@ defmodule Jido.AI.Skills.LLM.Actions.GenerateObject do
       })
 
   alias Jido.AI.Security
-  alias Jido.AI.Skills.BaseActionHelpers
+  alias Jido.AI.Actions.Helpers
   alias ReqLLM.Context
 
   @doc """
@@ -99,11 +99,11 @@ defmodule Jido.AI.Skills.LLM.Actions.GenerateObject do
   """
   @impl Jido.Action
   def run(params, _context) do
-    with {:ok, validated_params} <- BaseActionHelpers.validate_and_sanitize_input(params),
+    with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
          {:ok, _schema} <- validate_object_schema(validated_params[:object_schema]),
-         {:ok, model} <- BaseActionHelpers.resolve_model(validated_params[:model], :fast),
+         {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
          context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
-         opts = BaseActionHelpers.build_opts(validated_params),
+         opts = Helpers.build_opts(validated_params),
          {:ok, response} <-
            ReqLLM.Generation.generate_object(
              model,
@@ -142,7 +142,7 @@ defmodule Jido.AI.Skills.LLM.Actions.GenerateObject do
     %{
       object: extract_object(response),
       model: model,
-      usage: BaseActionHelpers.extract_usage(response)
+      usage: Helpers.extract_usage(response)
     }
   end
 

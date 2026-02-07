@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithToolsTest do
+defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.ToolCalling.Actions.CallWithTools
+  alias Jido.AI.Actions.ToolCalling.CallWithTools
 
   @moduletag :unit
   @moduletag :capture_log

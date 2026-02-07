@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.PlanningTest do
+defmodule Jido.AI.Plugins.PlanningTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Planning
+  alias Jido.AI.Plugins.Planning
 
   describe "plugin_spec/1" do
     test "returns valid skill spec with empty config" do
@@ -47,9 +47,9 @@ defmodule Jido.AI.Skills.PlanningTest do
       actions = Planning.actions()
 
       assert length(actions) == 3
-      assert Jido.AI.Skills.Planning.Actions.Plan in actions
-      assert Jido.AI.Skills.Planning.Actions.Decompose in actions
-      assert Jido.AI.Skills.Planning.Actions.Prioritize in actions
+      assert Jido.AI.Actions.Planning.Plan in actions
+      assert Jido.AI.Actions.Planning.Decompose in actions
+      assert Jido.AI.Actions.Planning.Prioritize in actions
     end
   end
 end

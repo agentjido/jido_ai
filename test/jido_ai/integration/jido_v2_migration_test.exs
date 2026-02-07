@@ -13,25 +13,25 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
-  alias Jido.AI.Skills.{LLM, Planning, Reasoning, Streaming, ToolCalling}
+  alias Jido.AI.Plugins.{LLM, Planning, Reasoning, Streaming, ToolCalling}
   alias Jido.AI.Strategies.ReAct
 
   # Ensure all skill actions are compiled before tests run
-  require Jido.AI.Skills.LLM.Actions.Chat
-  require Jido.AI.Skills.LLM.Actions.Complete
-  require Jido.AI.Skills.LLM.Actions.Embed
-  require Jido.AI.Skills.Planning.Actions.Decompose
-  require Jido.AI.Skills.Planning.Actions.Plan
-  require Jido.AI.Skills.Planning.Actions.Prioritize
-  require Jido.AI.Skills.Reasoning.Actions.Analyze
-  require Jido.AI.Skills.Reasoning.Actions.Explain
-  require Jido.AI.Skills.Reasoning.Actions.Infer
-  require Jido.AI.Skills.Streaming.Actions.EndStream
-  require Jido.AI.Skills.Streaming.Actions.ProcessTokens
-  require Jido.AI.Skills.Streaming.Actions.StartStream
-  require Jido.AI.Skills.ToolCalling.Actions.CallWithTools
-  require Jido.AI.Skills.ToolCalling.Actions.ExecuteTool
-  require Jido.AI.Skills.ToolCalling.Actions.ListTools
+  require Jido.AI.Actions.LLM.Chat
+  require Jido.AI.Actions.LLM.Complete
+  require Jido.AI.Actions.LLM.Embed
+  require Jido.AI.Actions.Planning.Decompose
+  require Jido.AI.Actions.Planning.Plan
+  require Jido.AI.Actions.Planning.Prioritize
+  require Jido.AI.Actions.Reasoning.Analyze
+  require Jido.AI.Actions.Reasoning.Explain
+  require Jido.AI.Actions.Reasoning.Infer
+  require Jido.AI.Actions.Streaming.EndStream
+  require Jido.AI.Actions.Streaming.ProcessTokens
+  require Jido.AI.Actions.Streaming.StartStream
+  require Jido.AI.Actions.ToolCalling.CallWithTools
+  require Jido.AI.Actions.ToolCalling.ExecuteTool
+  require Jido.AI.Actions.ToolCalling.ListTools
 
   # ============================================================================
   # Test Fixtures
@@ -107,31 +107,31 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       }
 
       # Verify action exists and has schema
-      action = Jido.AI.Skills.LLM.Actions.Chat
+      action = Jido.AI.Actions.LLM.Chat
       assert function_exported?(action, :schema, 0)
       assert function_exported?(action, :run, 2)
     end
 
     test "Reasoning Analyze action can be executed directly" do
-      action = Jido.AI.Skills.Reasoning.Actions.Analyze
+      action = Jido.AI.Actions.Reasoning.Analyze
       assert function_exported?(action, :schema, 0)
       assert function_exported?(action, :run, 2)
     end
 
     test "Planning Plan action can be executed directly" do
-      action = Jido.AI.Skills.Planning.Actions.Plan
+      action = Jido.AI.Actions.Planning.Plan
       assert function_exported?(action, :schema, 0)
       assert function_exported?(action, :run, 2)
     end
 
     test "Streaming StartStream action can be executed directly" do
-      action = Jido.AI.Skills.Streaming.Actions.StartStream
+      action = Jido.AI.Actions.Streaming.StartStream
       assert function_exported?(action, :schema, 0)
       assert function_exported?(action, :run, 2)
     end
 
     test "ToolCalling ExecuteTool action can be executed directly" do
-      action = Jido.AI.Skills.ToolCalling.Actions.ExecuteTool
+      action = Jido.AI.Actions.ToolCalling.ExecuteTool
       assert function_exported?(action, :schema, 0)
       assert function_exported?(action, :run, 2)
     end

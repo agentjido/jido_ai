@@ -1,9 +1,9 @@
 # Ensure actions are compiled before the skill
-require Jido.AI.Skills.ToolCalling.Actions.CallWithTools
-require Jido.AI.Skills.ToolCalling.Actions.ExecuteTool
-require Jido.AI.Skills.ToolCalling.Actions.ListTools
+require Jido.AI.Actions.ToolCalling.CallWithTools
+require Jido.AI.Actions.ToolCalling.ExecuteTool
+require Jido.AI.Actions.ToolCalling.ListTools
 
-defmodule Jido.AI.Skills.ToolCalling do
+defmodule Jido.AI.Plugins.ToolCalling do
   @moduledoc """
   A Jido.Skill providing LLM tool/function calling capabilities.
 
@@ -24,7 +24,7 @@ defmodule Jido.AI.Skills.ToolCalling do
         use Jido.Agent,
 
         skills: [
-          {Jido.AI.Skills.ToolCalling,
+          {Jido.AI.Plugins.ToolCalling,
            auto_execute: true, max_turns: 10}
         ]
       end
@@ -32,19 +32,19 @@ defmodule Jido.AI.Skills.ToolCalling do
   Or use actions directly:
 
       # Call LLM with tools
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.CallWithTools, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.CallWithTools, %{
         prompt: "What's the weather in Tokyo?",
         tools: ["weather"]
       })
 
       # Execute a tool directly
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ExecuteTool, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.ExecuteTool, %{
         tool_name: "calculator",
         params: %{"operation" => "add", "a" => 5, "b" => 3}
       })
 
       # List available tools
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ListTools, %{})
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.ListTools, %{})
 
   ## Tool Registry
 
@@ -85,9 +85,9 @@ defmodule Jido.AI.Skills.ToolCalling do
     name: "tool_calling",
     state_key: :tool_calling,
     actions: [
-      Jido.AI.Skills.ToolCalling.Actions.CallWithTools,
-      Jido.AI.Skills.ToolCalling.Actions.ExecuteTool,
-      Jido.AI.Skills.ToolCalling.Actions.ListTools
+      Jido.AI.Actions.ToolCalling.CallWithTools,
+      Jido.AI.Actions.ToolCalling.ExecuteTool,
+      Jido.AI.Actions.ToolCalling.ListTools
     ],
     description: "Provides LLM tool/function calling capabilities",
     category: "ai",
@@ -152,9 +152,9 @@ defmodule Jido.AI.Skills.ToolCalling do
   @impl Jido.Plugin
   def signal_routes(_config) do
     [
-      {"tool.call", Jido.AI.Skills.ToolCalling.Actions.CallWithTools},
-      {"tool.execute", Jido.AI.Skills.ToolCalling.Actions.ExecuteTool},
-      {"tool.list", Jido.AI.Skills.ToolCalling.Actions.ListTools}
+      {"tool.call", Jido.AI.Actions.ToolCalling.CallWithTools},
+      {"tool.execute", Jido.AI.Actions.ToolCalling.ExecuteTool},
+      {"tool.list", Jido.AI.Actions.ToolCalling.ListTools}
     ]
   end
 

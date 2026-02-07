@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.LLM.Actions.ChatTest do
+defmodule Jido.AI.Actions.LLM.ChatTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.LLM.Actions.Chat
+  alias Jido.AI.Actions.LLM.Chat
 
   describe "Chat action" do
     test "has correct metadata" do

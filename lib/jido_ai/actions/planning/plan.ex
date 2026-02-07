@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Planning.Actions.Plan do
+defmodule Jido.AI.Actions.Planning.Plan do
   @moduledoc """
   A Jido.Action for generating structured plans from goals.
 
@@ -19,12 +19,12 @@ defmodule Jido.AI.Skills.Planning.Actions.Plan do
   ## Examples
 
       # Basic planning
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Plan, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Planning.Plan, %{
         goal: "Build a personal blog website"
       })
 
       # With constraints and resources
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Plan, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Planning.Plan, %{
         goal: "Launch a SaaS product",
         constraints: ["Budget under $10k", "Must launch in 3 months"],
         resources: ["2 developers", "Existing customer base"],

@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.Reasoning.Actions.InferTest do
+defmodule Jido.AI.Actions.Reasoning.InferTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Reasoning.Actions.Infer
+  alias Jido.AI.Actions.Reasoning.Infer
 
   describe "Infer action" do
     test "has correct metadata" do

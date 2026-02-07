@@ -62,7 +62,7 @@ defmodule Jido.AI.Actions.Orchestration.AggregateResults do
         model: Zoi.string(description: "Model for LLM summarization") |> Zoi.optional()
       })
 
-  alias Jido.AI.Skills.BaseActionHelpers
+  alias Jido.AI.Actions.Helpers
 
   @impl Jido.Action
   def run(params, _context) do
@@ -107,12 +107,12 @@ defmodule Jido.AI.Actions.Orchestration.AggregateResults do
   end
 
   defp aggregate(results, :llm_summarize, params) do
-    with {:ok, model} <- BaseActionHelpers.resolve_model(params[:model], :fast) do
+    with {:ok, model} <- Helpers.resolve_model(params[:model], :fast) do
       prompt = build_summarize_prompt(results)
 
       case ReqLLM.Generation.generate_text(model, [%{role: :user, content: prompt}]) do
         {:ok, response} ->
-          {:ok, %{summary: BaseActionHelpers.extract_text(response), inputs: results}}
+          {:ok, %{summary: Helpers.extract_text(response), inputs: results}}
 
         {:error, reason} ->
           {:error, reason}

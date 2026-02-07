@@ -63,7 +63,7 @@ defmodule Jido.AI.Actions.Orchestration.DelegateTask do
         mode: Zoi.any(description: "Routing mode: :spawn, :reuse, or :auto") |> Zoi.default(:auto)
       })
 
-  alias Jido.AI.Skills.BaseActionHelpers
+  alias Jido.AI.Actions.Helpers
 
   @routing_prompt """
   You are a task router. Given a task and available specialist agents, decide the best routing.
@@ -88,7 +88,7 @@ defmodule Jido.AI.Actions.Orchestration.DelegateTask do
 
   @impl Jido.Action
   def run(params, _context) do
-    with {:ok, model} <- BaseActionHelpers.resolve_model(params[:model], :fast),
+    with {:ok, model} <- Helpers.resolve_model(params[:model], :fast),
          prompt = build_routing_prompt(params.task, params.available_agents),
          {:ok, response} <- call_llm(model, prompt),
          {:ok, routing} <- parse_routing_response(response) do
@@ -106,7 +106,7 @@ defmodule Jido.AI.Actions.Orchestration.DelegateTask do
 
     case ReqLLM.Generation.generate_text(model, [%{role: :user, content: json_prompt}]) do
       {:ok, response} ->
-        text = BaseActionHelpers.extract_text(response)
+        text = Helpers.extract_text(response)
         {:ok, text}
 
       {:error, reason} ->

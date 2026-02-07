@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.LLM.Actions.Complete do
+defmodule Jido.AI.Actions.LLM.Complete do
   @moduledoc """
   A Jido.Action for simple text completion without system prompts.
 
@@ -17,12 +17,12 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
   ## Examples
 
       # Basic completion
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Complete, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Complete, %{
         prompt: "The capital of France is"
       })
 
       # With custom settings
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Complete, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Complete, %{
         model: :capable,
         prompt: "Elixir is a functional programming language",
         max_tokens: 500,
@@ -48,7 +48,7 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
       })
 
   alias Jido.AI.Security
-  alias Jido.AI.Skills.BaseActionHelpers
+  alias Jido.AI.Actions.Helpers
   alias ReqLLM.Context
 
   @doc """
@@ -73,10 +73,10 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
   """
   @impl Jido.Action
   def run(params, _context) do
-    with {:ok, validated_params} <- BaseActionHelpers.validate_and_sanitize_input(params),
-         {:ok, model} <- BaseActionHelpers.resolve_model(validated_params[:model], :fast),
+    with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
+         {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
          context = build_messages(validated_params[:prompt]),
-         opts = BaseActionHelpers.build_opts(validated_params),
+         opts = Helpers.build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
       {:ok, format_result(response, model)}
     else
@@ -102,9 +102,9 @@ defmodule Jido.AI.Skills.LLM.Actions.Complete do
 
   defp format_result(response, model) do
     %{
-      text: BaseActionHelpers.extract_text(response),
+      text: Helpers.extract_text(response),
       model: model,
-      usage: BaseActionHelpers.extract_usage(response)
+      usage: Helpers.extract_usage(response)
     }
   end
 end
