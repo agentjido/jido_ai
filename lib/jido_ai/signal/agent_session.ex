@@ -229,30 +229,34 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     """
     @spec from_event(map(), map()) :: Jido.Signal.t()
     def from_event(%{type: :run_started} = event, context) do
-      Started.new!(%{
-        session_id: event.session_id || context.session_id,
-        run_id: event.run_id || context.run_id,
-        directive_id: context[:directive_id],
+      %{
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context),
         metadata: context[:metadata] || %{}
-      })
+      }
+      |> maybe_put_optional(:directive_id, context[:directive_id])
+      |> Started.new!()
     end
 
     def from_event(%{type: :message_received} = event, context) do
+      data = event_data(event)
+
       Message.new!(%{
-        session_id: event.session_id || context.session_id,
-        run_id: event.run_id || context.run_id,
-        content: event.data[:content] || "",
-        role: to_role(event.data[:role]),
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context),
+        content: data[:content] || data["content"] || "",
+        role: to_role(data[:role] || data["role"]),
         delta: false
       })
     end
 
     def from_event(%{type: :message_streamed} = event, context) do
-      content = event.data[:delta] || event.data[:content] || ""
+      data = event_data(event)
+      content = data[:delta] || data["delta"] || data[:content] || data["content"] || ""
 
       Message.new!(%{
-        session_id: event.session_id || context.session_id,
-        run_id: event.run_id || context.run_id,
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context),
         content: content,
         role: :assistant,
         delta: true
@@ -272,55 +276,65 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     end
 
     def from_event(%{type: :run_completed} = event, context) do
-      Completed.new!(%{
-        session_id: event.session_id || context.session_id,
-        run_id: event.run_id || context.run_id,
-        directive_id: context[:directive_id],
-        output: event.data[:output] || event.data[:content] || "",
-        token_usage: event.data[:token_usage] || %{},
+      data = event_data(event)
+
+      %{
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context),
+        output: data[:output] || data["output"] || data[:content] || data["content"] || "",
+        token_usage: data[:token_usage] || data["token_usage"] || %{},
         metadata: context[:metadata] || %{}
-      })
+      }
+      |> maybe_put_optional(:directive_id, context[:directive_id])
+      |> Completed.new!()
     end
 
     def from_event(%{type: :run_failed} = event, context) do
+      data = event_data(event)
+
       error_msg =
-        event.data[:error_message] ||
-          (event.data[:reason] && to_string(event.data[:reason])) ||
+        data[:error_message] ||
+          data["error_message"] ||
+          ((data[:reason] || data["reason"]) && to_string(data[:reason] || data["reason"])) ||
           "run failed"
 
-      Failed.new!(%{
-        session_id: event.session_id || context.session_id,
-        run_id: event.run_id || context.run_id,
-        directive_id: context[:directive_id],
+      %{
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context),
         reason: :error,
         error_message: error_msg,
         metadata: context[:metadata] || %{}
-      })
+      }
+      |> maybe_put_optional(:directive_id, context[:directive_id])
+      |> Failed.new!()
     end
 
     def from_event(%{type: :run_cancelled} = event, context) do
-      Failed.new!(%{
-        session_id: event.session_id || context.session_id,
-        run_id: event.run_id || context.run_id,
-        directive_id: context[:directive_id],
+      %{
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context),
         reason: :cancelled,
         metadata: context[:metadata] || %{}
-      })
+      }
+      |> maybe_put_optional(:directive_id, context[:directive_id])
+      |> Failed.new!()
     end
 
     def from_event(%{type: :token_usage_updated} = event, context) do
+      data = event_data(event)
+
       Progress.new!(%{
-        session_id: event.session_id || context.session_id,
-        run_id: event.run_id || context.run_id,
-        tokens_used: Map.delete(event.data, :raw)
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context),
+        tokens_used: Map.delete(data, :raw)
       })
     end
 
     # Fallback for unrecognized event types
     def from_event(event, context) do
       Progress.new!(%{
-        session_id: event[:session_id] || event.session_id || context.session_id,
-        run_id: event[:run_id] || event.run_id || context.run_id
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context)
       })
     end
 
@@ -334,14 +348,15 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     """
     @spec completed(map(), map()) :: Jido.Signal.t()
     def completed(run_result, context) do
-      Completed.new!(%{
-        session_id: context.session_id,
-        run_id: context.run_id,
-        directive_id: context[:directive_id],
-        output: run_result[:output] || run_result.output,
-        token_usage: run_result[:token_usage] || %{},
+      %{
+        session_id: map_get(context, :session_id, "unknown"),
+        run_id: map_get(context, :run_id, "unknown"),
+        output: map_get(run_result, :output, ""),
+        token_usage: map_get(run_result, :token_usage, %{}),
         metadata: context[:metadata] || %{}
-      })
+      }
+      |> maybe_put_optional(:directive_id, context[:directive_id])
+      |> Completed.new!()
     end
 
     @doc """
@@ -354,14 +369,15 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     """
     @spec failed(term(), map()) :: Jido.Signal.t()
     def failed(error, context) when is_binary(error) do
-      Failed.new!(%{
-        session_id: context.session_id,
-        run_id: context.run_id,
-        directive_id: context[:directive_id],
+      %{
+        session_id: map_get(context, :session_id, "unknown"),
+        run_id: map_get(context, :run_id, "unknown"),
         reason: :error,
         error_message: error,
         metadata: context[:metadata] || %{}
-      })
+      }
+      |> maybe_put_optional(:directive_id, context[:directive_id])
+      |> Failed.new!()
     end
 
     def failed(error, context) do
@@ -374,17 +390,55 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
           true -> inspect(error)
         end
 
-      Failed.new!(%{
-        session_id: context.session_id,
-        run_id: context.run_id,
-        directive_id: context[:directive_id],
+      %{
+        session_id: map_get(context, :session_id, "unknown"),
+        run_id: map_get(context, :run_id, "unknown"),
         reason: reason,
         error_message: error_message,
         metadata: context[:metadata] || %{}
-      })
+      }
+      |> maybe_put_optional(:directive_id, context[:directive_id])
+      |> Failed.new!()
     end
 
     # Private helpers
+
+    defp event_session_id(event, context) do
+      map_get(event, :session_id, map_get(context, :session_id, "unknown"))
+    end
+
+    defp event_run_id(event, context) do
+      map_get(event, :run_id, map_get(context, :run_id, "unknown"))
+    end
+
+    defp event_data(event) do
+      case map_get(event, :data, %{}) do
+        data when is_map(data) -> data
+        _ -> %{}
+      end
+    end
+
+    defp map_get(map, key, default) when is_map(map) and is_atom(key) do
+      case Map.fetch(map, key) do
+        {:ok, value} ->
+          value
+
+        :error ->
+          case Map.fetch(map, Atom.to_string(key)) do
+            {:ok, value} -> value
+            :error -> default
+          end
+      end
+    end
+
+    defp map_get(map, key, default) when is_map(map) do
+      Map.get(map, key, default)
+    end
+
+    defp map_get(_other, _key, default), do: default
+
+    defp maybe_put_optional(attrs, _key, nil), do: attrs
+    defp maybe_put_optional(attrs, key, value), do: Map.put(attrs, key, value)
 
     defp to_role(nil), do: :assistant
     defp to_role(:assistant), do: :assistant
@@ -419,12 +473,14 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     defp extract_failed_reason(_error), do: :error
 
     defp build_tool_call_signal(event, context, status) do
+      data = event_data(event)
+
       ToolCall.new!(%{
-        session_id: event.session_id || context.session_id,
-        run_id: event.run_id || context.run_id,
-        tool_name: event.data[:tool_name] || "unknown",
-        tool_input: event.data[:tool_input] || %{},
-        tool_id: event.data[:tool_id],
+        session_id: event_session_id(event, context),
+        run_id: event_run_id(event, context),
+        tool_name: map_get(data, :tool_name, "unknown"),
+        tool_input: map_get(data, :tool_input, %{}),
+        tool_id: map_get(data, :tool_id, nil),
         status: status
       })
     end

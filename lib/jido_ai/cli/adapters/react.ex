@@ -9,6 +9,7 @@ defmodule Jido.AI.CLI.Adapters.ReAct do
   """
 
   @behaviour Jido.AI.CLI.Adapter
+  alias Jido.AI.CLI.Adapters.Polling
 
   @default_model "anthropic:claude-haiku-4-5"
   @default_max_iterations 10
@@ -33,10 +34,7 @@ defmodule Jido.AI.CLI.Adapters.ReAct do
 
   @impl true
   def await(pid, timeout_ms, _config) do
-    poll_interval = 100
-    deadline = System.monotonic_time(:millisecond) + timeout_ms
-
-    poll_loop(pid, deadline, poll_interval)
+    Polling.await(pid, timeout_ms, :last_answer, &extract_meta/1)
   end
 
   @impl true

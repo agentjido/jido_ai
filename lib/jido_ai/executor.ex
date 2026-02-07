@@ -290,17 +290,10 @@ defmodule Jido.AI.Executor do
 
   defp atomize_keys(map) when is_map(map) do
     Map.new(map, fn
-      {k, v} when is_binary(k) -> {String.to_existing_atom(k), atomize_keys(v)}
+      {k, v} when is_binary(k) -> {to_existing_atom_or_string(k), atomize_keys(v)}
       {k, v} when is_atom(k) -> {k, atomize_keys(v)}
       {k, v} -> {k, atomize_keys(v)}
     end)
-  rescue
-    ArgumentError ->
-      # If atom doesn't exist, try creating it (for dynamic keys)
-      Map.new(map, fn
-        {k, v} when is_binary(k) -> {String.to_atom(k), atomize_keys(v)}
-        {k, v} -> {k, atomize_keys(v)}
-      end)
   end
 
   defp atomize_keys(list) when is_list(list), do: Enum.map(list, &atomize_keys/1)

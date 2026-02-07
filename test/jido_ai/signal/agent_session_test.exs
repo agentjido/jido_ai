@@ -466,6 +466,16 @@ defmodule Jido.AI.Signal.AgentSessionTest do
 
       assert signal.type == "ai.agent_session.progress"
     end
+
+    test "maps unknown event with missing ids using context fallback", %{context: context} do
+      event = %{type: :some_unknown_event, data: %{foo: "bar"}}
+
+      signal = AgentSession.from_event(event, context)
+
+      assert signal.type == "ai.agent_session.progress"
+      assert signal.data.session_id == context.session_id
+      assert signal.data.run_id == context.run_id
+    end
   end
 
   describe "completed/2" do
@@ -491,6 +501,24 @@ defmodule Jido.AI.Signal.AgentSessionTest do
       assert signal.data.session_id == "sess_abc123"
       assert signal.data.run_id == "run_def456"
       assert signal.data.directive_id == "dir_ghi789"
+    end
+
+    test "builds Completed signal without directive_id when context omits it" do
+      run_result = %{output: "ok", token_usage: %{}}
+
+      context = %{
+        session_id: "sess_abc123",
+        run_id: "run_def456",
+        metadata: %{origin: :test}
+      }
+
+      signal = AgentSession.completed(run_result, context)
+
+      assert signal.type == "ai.agent_session.completed"
+      refute Map.has_key?(signal.data, :directive_id)
+      assert signal.data.session_id == "sess_abc123"
+      assert signal.data.run_id == "run_def456"
+      assert signal.data.metadata == %{origin: :test}
     end
   end
 
@@ -536,6 +564,21 @@ defmodule Jido.AI.Signal.AgentSessionTest do
         })
 
       assert signal.data.error_message == "something went wrong"
+    end
+
+    test "builds Failed signal without directive_id when context omits it" do
+      signal =
+        AgentSession.failed(%{reason: :timeout, message: "timed out"}, %{
+          session_id: "sess_1",
+          run_id: "run_1",
+          metadata: %{origin: :test}
+        })
+
+      assert signal.type == "ai.agent_session.failed"
+      refute Map.has_key?(signal.data, :directive_id)
+      assert signal.data.reason == :timeout
+      assert signal.data.error_message == "timed out"
+      assert signal.data.metadata == %{origin: :test}
     end
   end
 end

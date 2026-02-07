@@ -120,7 +120,13 @@ defmodule Jido.AI.Actions.Orchestration.DelegateTask do
 
     case Jason.decode(clean_text) do
       {:ok, %{"decision" => decision} = parsed} ->
-        {:ok, parsed |> Map.put("decision", String.to_atom(decision))}
+        case parse_decision(decision) do
+          {:ok, parsed_decision} ->
+            {:ok, Map.put(parsed, "decision", parsed_decision)}
+
+          :error ->
+            {:error, :invalid_routing_decision}
+        end
 
       {:ok, _} ->
         {:error, :invalid_routing_response}
@@ -129,6 +135,12 @@ defmodule Jido.AI.Actions.Orchestration.DelegateTask do
         {:error, :json_parse_failed}
     end
   end
+
+  defp parse_decision("delegate"), do: {:ok, :delegate}
+  defp parse_decision("local"), do: {:ok, :local}
+  defp parse_decision(:delegate), do: {:ok, :delegate}
+  defp parse_decision(:local), do: {:ok, :local}
+  defp parse_decision(_), do: :error
 
   defp extract_json_from_markdown(text) do
     # Try to extract JSON from markdown code blocks

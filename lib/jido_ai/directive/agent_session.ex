@@ -127,7 +127,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
       Task.Supervisor.start_child(task_supervisor, fn ->
         result =
           try do
-            execute_session(directive, context, agent_pid)
+            execute_session(directive, context, agent_pid, task_supervisor)
           rescue
             e ->
               {:error, %{exception: Exception.message(e), type: e.__struct__}}
@@ -158,7 +158,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
       {:async, nil, state}
     end
 
-    defp execute_session(directive, context, agent_pid) do
+    defp execute_session(directive, context, agent_pid, task_supervisor) do
       with :ok <- validate_runtime_support(directive),
            {:ok, store, adapter} <- start_session_components(directive) do
         try do
@@ -183,7 +183,7 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
 
           input = %{messages: [%{role: "user", content: directive.input}]}
 
-          case run_once_with_timeout(store, adapter, input, directive.timeout, opts) do
+          case run_once_with_timeout(task_supervisor, store, adapter, input, directive.timeout, opts) do
             {:ok, result} ->
               signal_context =
                 Map.merge(context, %{
@@ -230,8 +230,11 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     defp start_session_components(directive) do
       case AgentSessionManager.Adapters.InMemorySessionStore.start_link([]) do
         {:ok, store} ->
+          Process.unlink(store)
+
           case start_adapter(directive) do
             {:ok, adapter} ->
+              Process.unlink(adapter)
               {:ok, store, adapter}
 
             {:error, reason} ->
@@ -244,18 +247,33 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
       end
     end
 
-    defp run_once_with_timeout(store, adapter, input, timeout_ms, opts) do
-      task = Task.async(fn -> SessionManager.run_once(store, adapter, input, opts) end)
+    defp run_once_with_timeout(_task_supervisor, store, adapter, input, timeout_ms, opts) do
+      run_ref = make_ref()
+      caller = self()
 
-      case Task.yield(task, timeout_ms) do
-        {:ok, result} ->
+      {pid, mon_ref} =
+        spawn_monitor(fn ->
+          result = SessionManager.run_once(store, adapter, input, opts)
+          send(caller, {run_ref, result})
+        end)
+
+      receive do
+        {^run_ref, result} ->
+          Process.demonitor(mon_ref, [:flush])
           result
 
-        {:exit, reason} ->
+        {:DOWN, ^mon_ref, :process, _pid, reason} ->
           {:error, %{reason: :execution_crash, message: "AgentSession execution crashed: #{inspect(reason)}"}}
+      after
+        timeout_ms ->
+          Process.exit(pid, :kill)
 
-        nil ->
-          Task.shutdown(task, :brutal_kill)
+          receive do
+            {:DOWN, ^mon_ref, :process, _pid, _reason} -> :ok
+          after
+            100 -> :ok
+          end
+
           {:error, %{reason: :timeout, message: "AgentSession timed out after #{timeout_ms}ms"}}
       end
     end
@@ -309,8 +327,8 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
       if event.type not in terminal_events do
         signal_context =
           Map.merge(context, %{
-            session_id: event.session_id || "unknown",
-            run_id: event.run_id || "unknown"
+            session_id: Map.get(event, :session_id) || "unknown",
+            run_id: Map.get(event, :run_id) || "unknown"
           })
 
         signal = Signals.from_event(event, signal_context)
@@ -319,16 +337,13 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     end
 
     defp stop_process(pid) when is_pid(pid) do
-      if Process.alive?(pid) do
-        try do
-          GenServer.stop(pid, :normal, 500)
-        catch
-          :exit, _ -> :ok
-        end
-      else
-        :ok
-      end
+      GenServer.stop(pid, :normal, 500)
+      :ok
+    catch
+      :exit, _ -> :ok
     end
+
+    defp stop_process(_pid), do: :ok
 
     defp maybe_put_kw(opts, _key, nil), do: opts
     defp maybe_put_kw(opts, key, value), do: Keyword.put(opts, key, value)

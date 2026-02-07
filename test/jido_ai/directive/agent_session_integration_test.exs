@@ -231,6 +231,30 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
         assert failed.data.directive_id == "test-failure"
         assert failed.data.metadata == %{expect: :failure}
       end
+
+      test "delivers Failed signal when adapter crashes during run_once" do
+        directive =
+          AgentSession.new!(%{
+            id: "test-crash",
+            adapter: Jido.AI.Test.CrashingMockProviderAdapter,
+            input: "This will crash",
+            timeout: 10_000
+          })
+
+        state = build_state()
+        exec_impl = DirectiveExec.impl_for!(directive)
+
+        exec_impl.exec(directive, %Jido.Signal{type: "test", source: "/test", id: "test-input"}, state)
+
+        Process.sleep(500)
+        signals = receive_all_signals(300)
+
+        failed =
+          Enum.find(signals, fn s -> s.type == "ai.agent_session.failed" end)
+
+        assert failed != nil
+        assert failed.data.reason == :error
+      end
     end
 
     describe "exec/3 with instant mode" do

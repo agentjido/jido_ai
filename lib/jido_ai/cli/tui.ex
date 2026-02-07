@@ -48,6 +48,7 @@ defmodule Jido.AI.CLI.TUI do
       adapter: config[:adapter],
       agent_module: config[:agent_module],
       agent_pid: nil,
+      pending_query_ref: nil,
       timeout: config[:timeout] || 60_000,
       config: config,
       input_buffer: "",
@@ -130,29 +131,46 @@ defmodule Jido.AI.CLI.TUI do
   def update({:do_query, query}, state) do
     case ensure_agent_started(state) do
       {:ok, pid, new_state} ->
-        start_time = System.monotonic_time(:millisecond)
+        query_ref = make_ref()
+        started_at_ms = System.monotonic_time(:millisecond)
+        owner = self()
 
-        case execute_query(pid, query, new_state) do
-          {:ok, result} ->
-            elapsed = System.monotonic_time(:millisecond) - start_time
+        Task.start(fn ->
+          result = execute_query(pid, query, new_state)
+          send(owner, {:tui_query_result, query_ref, started_at_ms, result})
+        end)
 
-            assistant_msg = %{
-              role: :assistant,
-              content: result.answer,
-              timestamp: DateTime.utc_now(),
-              meta: Map.put(result.meta, :elapsed_ms, elapsed)
-            }
-
-            messages = new_state.messages ++ [assistant_msg]
-
-            {%{new_state | messages: messages, status: :ready, last_meta: result.meta}, []}
-
-          {:error, reason} ->
-            {%{new_state | status: :error, error: format_error(reason)}, []}
-        end
+        {%{new_state | pending_query_ref: query_ref, status: :thinking}, []}
 
       {:error, reason} ->
         {%{state | status: :error, error: format_error(reason)}, []}
+    end
+  end
+
+  def update({:tui_query_result, query_ref, started_at_ms, {:ok, result}}, state) do
+    if state.pending_query_ref == query_ref do
+      elapsed = System.monotonic_time(:millisecond) - started_at_ms
+
+      assistant_msg = %{
+        role: :assistant,
+        content: result.answer,
+        timestamp: DateTime.utc_now(),
+        meta: Map.put(result.meta, :elapsed_ms, elapsed)
+      }
+
+      messages = state.messages ++ [assistant_msg]
+
+      {%{state | messages: messages, status: :ready, last_meta: result.meta, pending_query_ref: nil}, []}
+    else
+      {state, []}
+    end
+  end
+
+  def update({:tui_query_result, query_ref, _started_at_ms, {:error, reason}}, state) do
+    if state.pending_query_ref == query_ref do
+      {%{state | status: :error, error: format_error(reason), pending_query_ref: nil}, []}
+    else
+      {state, []}
     end
   end
 
@@ -344,19 +362,21 @@ defmodule Jido.AI.CLI.TUI do
   end
 
   defp ensure_agent_started(%{agent_pid: pid} = state) when is_pid(pid) do
-    if Process.alive?(pid) do
-      {:ok, pid, state}
-    else
-      adapter = state.adapter
-      agent_module = state.agent_module
+    case Jido.AgentServer.status(pid) do
+      {:ok, _status} ->
+        {:ok, pid, state}
 
-      case adapter.start_agent(JidoAi.TuiJido, agent_module, state.config) do
-        {:ok, new_pid} ->
-          {:ok, new_pid, %{state | agent_pid: new_pid}}
+      {:error, _reason} ->
+        adapter = state.adapter
+        agent_module = state.agent_module
 
-        {:error, reason} ->
-          {:error, reason}
-      end
+        case adapter.start_agent(JidoAi.TuiJido, agent_module, state.config) do
+          {:ok, new_pid} ->
+            {:ok, new_pid, %{state | agent_pid: new_pid}}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 

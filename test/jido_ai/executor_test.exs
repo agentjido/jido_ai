@@ -300,6 +300,23 @@ defmodule Jido.AI.ExecutorTest do
       assert result.value == 20.0
       assert is_float(result.value)
     end
+
+    test "does not create atoms for unknown keys in Zoi schemas" do
+      unique_key = "unknown_param_#{System.unique_integer([:positive])}"
+
+      assert_raise ArgumentError, fn ->
+        String.to_existing_atom(unique_key)
+      end
+
+      schema = Zoi.object(%{known: Zoi.string()})
+      result = Executor.normalize_params(%{unique_key => "value"}, schema)
+
+      assert Map.get(result, unique_key) == "value"
+
+      assert_raise ArgumentError, fn ->
+        String.to_existing_atom(unique_key)
+      end
+    end
   end
 
   describe "format_result/1" do

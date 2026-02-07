@@ -245,4 +245,59 @@ if Code.ensure_loaded?(AgentSessionManager.Ports.ProviderAdapter) do
       {:reply, :ok, state}
     end
   end
+
+  defmodule Jido.AI.Test.CrashingMockProviderAdapter do
+    @moduledoc """
+    Mock adapter that exits during execution to simulate hard crashes.
+    """
+
+    @behaviour AgentSessionManager.Ports.ProviderAdapter
+
+    use GenServer
+
+    alias AgentSessionManager.Core.Capability
+
+    def start_link(_opts \\ []) do
+      GenServer.start_link(__MODULE__, [])
+    end
+
+    @impl AgentSessionManager.Ports.ProviderAdapter
+    def name(_adapter), do: "crashing_mock"
+
+    @impl AgentSessionManager.Ports.ProviderAdapter
+    def capabilities(_adapter) do
+      {:ok, [%Capability{name: "chat", type: :tool, enabled: true}]}
+    end
+
+    @impl AgentSessionManager.Ports.ProviderAdapter
+    def execute(adapter, run, session, opts \\ []) do
+      GenServer.call(adapter, {:execute, run, session, opts})
+    end
+
+    @impl AgentSessionManager.Ports.ProviderAdapter
+    def cancel(_adapter, run_id), do: {:ok, run_id}
+
+    @impl AgentSessionManager.Ports.ProviderAdapter
+    def validate_config(_adapter, _config), do: :ok
+
+    @impl GenServer
+    def init(_opts), do: {:ok, %{}}
+
+    @impl GenServer
+    def handle_call(:name, _from, state), do: {:reply, "crashing_mock", state}
+
+    def handle_call(:capabilities, _from, state) do
+      {:reply, {:ok, [%Capability{name: "chat", type: :tool, enabled: true}]}, state}
+    end
+
+    def handle_call({:execute, _run, _session, _opts}, _from, state) do
+      # Simulate a hard process crash
+      exit(:adapter_crash)
+      {:reply, :ok, state}
+    end
+
+    def handle_call({:validate_config, _config}, _from, state) do
+      {:reply, :ok, state}
+    end
+  end
 end
