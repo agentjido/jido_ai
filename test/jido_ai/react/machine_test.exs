@@ -542,4 +542,267 @@ defmodule Jido.AI.ReAct.MachineTest do
       assert [{:call_llm_stream, "call_789", _messages}] = directives
     end
   end
+
+  # ============================================================================
+  # Thinking Trace
+  # ============================================================================
+
+  describe "thinking_trace" do
+    test "starts with empty thinking_trace" do
+      machine = Machine.new()
+      assert machine.thinking_trace == []
+    end
+
+    test "captures streaming_thinking into trace on final answer" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_123",
+        thread: make_thread("Be helpful"),
+        streaming_thinking: "I need to think about this carefully",
+        usage: %{},
+        thinking_trace: [],
+        started_at: System.monotonic_time(:millisecond),
+        iteration: 1
+      }
+
+      result = {:ok, %{type: :final_answer, text: "The answer is 42."}}
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {machine, _directives} = Machine.update(machine, {:llm_result, "call_123", result}, env)
+
+      assert machine.status == "completed"
+      assert length(machine.thinking_trace) == 1
+      [entry] = machine.thinking_trace
+      assert entry.call_id == "call_123"
+      assert entry.iteration == 1
+      assert entry.thinking == "I need to think about this carefully"
+    end
+
+    test "captures thinking from classified result when streaming_thinking is empty" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_123",
+        thread: make_thread("Be helpful"),
+        streaming_thinking: "",
+        usage: %{},
+        thinking_trace: [],
+        started_at: System.monotonic_time(:millisecond),
+        iteration: 1
+      }
+
+      result = {:ok, %{type: :final_answer, text: "Done.", thinking_content: "Classified thinking here"}}
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {machine, _directives} = Machine.update(machine, {:llm_result, "call_123", result}, env)
+
+      assert length(machine.thinking_trace) == 1
+      [entry] = machine.thinking_trace
+      assert entry.thinking == "Classified thinking here"
+    end
+
+    test "prefers streaming_thinking over classified thinking_content" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_123",
+        thread: make_thread("Be helpful"),
+        streaming_thinking: "Full streaming thinking",
+        usage: %{},
+        thinking_trace: [],
+        started_at: System.monotonic_time(:millisecond),
+        iteration: 1
+      }
+
+      result = {:ok, %{type: :final_answer, text: "Done.", thinking_content: "Partial classified"}}
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {machine, _directives} = Machine.update(machine, {:llm_result, "call_123", result}, env)
+
+      [entry] = machine.thinking_trace
+      assert entry.thinking == "Full streaming thinking"
+    end
+
+    test "does not create trace entry when no thinking present" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_123",
+        thread: make_thread("Be helpful"),
+        streaming_thinking: "",
+        usage: %{},
+        thinking_trace: [],
+        started_at: System.monotonic_time(:millisecond),
+        iteration: 1
+      }
+
+      result = {:ok, %{type: :final_answer, text: "Done."}}
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {machine, _directives} = Machine.update(machine, {:llm_result, "call_123", result}, env)
+
+      assert machine.thinking_trace == []
+    end
+
+    test "accumulates thinking across iterations" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_1",
+        thread: make_thread("Be helpful"),
+        streaming_thinking: "Thinking for iteration 1",
+        usage: %{},
+        thinking_trace: [],
+        started_at: System.monotonic_time(:millisecond),
+        iteration: 1
+      }
+
+      tool_calls_result =
+        {:ok,
+         %{
+           type: :tool_calls,
+           text: "",
+           tool_calls: [%{id: "tc_1", name: "calc", arguments: %{x: 1}}]
+         }}
+
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {machine, _directives} =
+        Machine.update(machine, {:llm_result, "call_1", tool_calls_result}, env)
+
+      assert length(machine.thinking_trace) == 1
+      assert hd(machine.thinking_trace).thinking == "Thinking for iteration 1"
+
+      # Tool result triggers handle_iteration_check which also captures thinking
+      # before resetting streaming_thinking, so iteration 1 thinking appears twice
+      {machine, _directives} =
+        Machine.update(machine, {:tool_result, "tc_1", {:ok, %{result: 42}}}, env)
+
+      assert length(machine.thinking_trace) == 2
+
+      machine = %{machine | streaming_thinking: "Thinking for iteration 2"}
+
+      second_call_id = machine.current_llm_call_id
+      final_result = {:ok, %{type: :final_answer, text: "The answer is 42."}}
+
+      {machine, _directives} =
+        Machine.update(machine, {:llm_result, second_call_id, final_result}, env)
+
+      assert length(machine.thinking_trace) == 3
+      [first, second, third] = machine.thinking_trace
+      assert first.thinking == "Thinking for iteration 1"
+      assert second.thinking == "Thinking for iteration 1"
+      assert third.thinking == "Thinking for iteration 2"
+    end
+
+    test "resets thinking_trace on fresh start" do
+      machine = Machine.new()
+      machine = %{machine | thinking_trace: [%{call_id: "old", iteration: 1, thinking: "old"}]}
+
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+      {machine, _directives} = Machine.update(machine, {:start, "New query", "call_new"}, env)
+
+      assert machine.thinking_trace == []
+    end
+
+    test "round-trips thinking_trace through to_map/from_map" do
+      trace = [
+        %{call_id: "call_1", iteration: 1, thinking: "First thought"},
+        %{call_id: "call_2", iteration: 2, thinking: "Second thought"}
+      ]
+
+      machine = %Machine{thinking_trace: trace}
+      map = Machine.to_map(machine)
+      restored = Machine.from_map(map)
+
+      assert restored.thinking_trace == trace
+    end
+  end
+
+  # ============================================================================
+  # Thinking in Thread
+  # ============================================================================
+
+  describe "thinking content in thread" do
+    test "stores thinking in thread on final answer" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_123",
+        thread: make_thread("Be helpful"),
+        streaming_thinking: "Let me reason step by step",
+        usage: %{},
+        thinking_trace: [],
+        started_at: System.monotonic_time(:millisecond),
+        iteration: 1
+      }
+
+      result = {:ok, %{type: :final_answer, text: "The answer is 42."}}
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {machine, _directives} = Machine.update(machine, {:llm_result, "call_123", result}, env)
+
+      messages = Thread.to_messages(machine.thread)
+      assistant_msg = List.last(messages)
+
+      assert assistant_msg.role == :assistant
+      assert is_list(assistant_msg.content)
+      [thinking_block, text_block] = assistant_msg.content
+      assert thinking_block == %{type: :thinking, thinking: "Let me reason step by step"}
+      assert text_block == %{type: :text, text: "The answer is 42."}
+    end
+
+    test "stores thinking in thread on tool calls" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_123",
+        thread: make_thread("Be helpful"),
+        streaming_thinking: "I need to use a tool",
+        usage: %{},
+        thinking_trace: [],
+        started_at: System.monotonic_time(:millisecond),
+        iteration: 1
+      }
+
+      result =
+        {:ok,
+         %{
+           type: :tool_calls,
+           text: "",
+           tool_calls: [%{id: "tc_1", name: "calc", arguments: %{x: 1}}]
+         }}
+
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {machine, _directives} = Machine.update(machine, {:llm_result, "call_123", result}, env)
+
+      messages = Thread.to_messages(machine.thread)
+      assistant_msg = List.last(messages)
+
+      assert assistant_msg.role == :assistant
+      assert is_list(assistant_msg.content)
+      [thinking_block, text_block] = assistant_msg.content
+      assert thinking_block == %{type: :thinking, thinking: "I need to use a tool"}
+      assert text_block == %{type: :text, text: ""}
+    end
+
+    test "does not add thinking blocks when streaming_thinking is empty" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        current_llm_call_id: "call_123",
+        thread: make_thread("Be helpful"),
+        streaming_thinking: "",
+        usage: %{},
+        thinking_trace: [],
+        started_at: System.monotonic_time(:millisecond),
+        iteration: 1
+      }
+
+      result = {:ok, %{type: :final_answer, text: "Simple answer."}}
+      env = %{system_prompt: "Be helpful", max_iterations: 10}
+
+      {machine, _directives} = Machine.update(machine, {:llm_result, "call_123", result}, env)
+
+      messages = Thread.to_messages(machine.thread)
+      assistant_msg = List.last(messages)
+
+      assert assistant_msg.role == :assistant
+      assert assistant_msg.content == "Simple answer."
+    end
+  end
 end

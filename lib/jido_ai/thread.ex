@@ -47,13 +47,14 @@ defmodule Jido.AI.Thread do
     @type t :: %__MODULE__{
             role: :user | :assistant | :tool | :system,
             content: String.t() | nil,
+            thinking: String.t() | nil,
             tool_calls: list() | nil,
             tool_call_id: String.t() | nil,
             name: String.t() | nil,
             timestamp: DateTime.t() | nil
           }
 
-    defstruct [:role, :content, :tool_calls, :tool_call_id, :name, :timestamp]
+    defstruct [:role, :content, :thinking, :tool_calls, :tool_call_id, :name, :timestamp]
   end
 
   @doc """
@@ -96,11 +97,12 @@ defmodule Jido.AI.Thread do
   end
 
   @doc """
-  Append an assistant message to the thread, optionally with tool calls.
+  Append an assistant message to the thread, optionally with tool calls and thinking content.
   """
-  @spec append_assistant(t(), String.t() | nil, list() | nil) :: t()
-  def append_assistant(thread, content, tool_calls \\ nil) do
-    append(thread, %Entry{role: :assistant, content: content, tool_calls: tool_calls})
+  @spec append_assistant(t(), String.t() | nil, list() | nil, keyword()) :: t()
+  def append_assistant(thread, content, tool_calls \\ nil, opts \\ []) do
+    thinking = Keyword.get(opts, :thinking)
+    append(thread, %Entry{role: :assistant, content: content, tool_calls: tool_calls, thinking: thinking})
   end
 
   @doc """
@@ -340,12 +342,12 @@ defmodule Jido.AI.Thread do
     %{role: :user, content: content}
   end
 
-  defp entry_to_message(%Entry{role: :assistant, content: content, tool_calls: nil}) do
-    %{role: :assistant, content: content}
+  defp entry_to_message(%Entry{role: :assistant, content: content, thinking: thinking, tool_calls: nil}) do
+    %{role: :assistant, content: build_assistant_content(content, thinking)}
   end
 
-  defp entry_to_message(%Entry{role: :assistant, content: content, tool_calls: tool_calls}) do
-    %{role: :assistant, content: content || "", tool_calls: tool_calls}
+  defp entry_to_message(%Entry{role: :assistant, content: content, thinking: thinking, tool_calls: tool_calls}) do
+    %{role: :assistant, content: build_assistant_content(content || "", thinking), tool_calls: tool_calls}
   end
 
   defp entry_to_message(%Entry{role: :tool, tool_call_id: id, name: name, content: content}) do
@@ -356,17 +358,62 @@ defmodule Jido.AI.Thread do
     %{role: :system, content: content}
   end
 
+  defp build_assistant_content(content, nil), do: content
+  defp build_assistant_content(content, ""), do: content
+
+  defp build_assistant_content(content, thinking) when is_binary(thinking) do
+    [
+      %{type: :thinking, thinking: thinking},
+      %{type: :text, text: content || ""}
+    ]
+  end
+
   defp message_to_entry(msg) when is_map(msg) do
     role = get_field(msg, :role, "role")
+    content = get_field(msg, :content, "content")
+    {text_content, thinking} = extract_entry_thinking(content)
 
     %Entry{
       role: normalize_role(role),
-      content: get_field(msg, :content, "content"),
+      content: text_content,
+      thinking: thinking,
       tool_calls: get_field(msg, :tool_calls, "tool_calls"),
       tool_call_id: get_field(msg, :tool_call_id, "tool_call_id"),
       name: get_field(msg, :name, "name")
     }
   end
+
+  defp extract_entry_thinking(content) when is_list(content) do
+    thinking =
+      content
+      |> Enum.filter(fn
+        %{type: :thinking} -> true
+        %{type: "thinking"} -> true
+        _ -> false
+      end)
+      |> Enum.map_join("", fn
+        %{thinking: t} when is_binary(t) -> t
+        %{text: t} when is_binary(t) -> t
+        _ -> ""
+      end)
+
+    text =
+      content
+      |> Enum.filter(fn
+        %{type: :text} -> true
+        %{type: "text"} -> true
+        _ -> false
+      end)
+      |> Enum.map_join("", fn
+        %{text: t} when is_binary(t) -> t
+        _ -> ""
+      end)
+
+    thinking = if thinking == "", do: nil, else: thinking
+    {text, thinking}
+  end
+
+  defp extract_entry_thinking(content), do: {content, nil}
 
   # Helper to get a field from either atom or string key
   defp get_field(map, atom_key, string_key) do

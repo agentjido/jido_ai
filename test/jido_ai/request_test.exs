@@ -109,6 +109,34 @@ defmodule JidoTest.AI.RequestTest do
       assert agent.state.completed == true
     end
 
+    test "complete_request/4 stores meta alongside result" do
+      agent = %MockAgent{state: Request.init_state(%{})}
+      agent = Request.start_request(agent, "req-1", "query")
+
+      thinking_meta = %{
+        thinking_trace: [%{call_id: "call_1", iteration: 1, thinking: "Step by step..."}],
+        last_thinking: "Final reasoning"
+      }
+
+      agent = Request.complete_request(agent, "req-1", "The answer", meta: thinking_meta)
+
+      request = agent.state.requests["req-1"]
+      assert request.status == :completed
+      assert request.result == "The answer"
+      assert request.meta.thinking_trace == [%{call_id: "call_1", iteration: 1, thinking: "Step by step..."}]
+      assert request.meta.last_thinking == "Final reasoning"
+    end
+
+    test "complete_request/4 defaults meta to empty map" do
+      agent = %MockAgent{state: Request.init_state(%{})}
+      agent = Request.start_request(agent, "req-1", "query")
+      agent = Request.complete_request(agent, "req-1", "answer")
+
+      request = agent.state.requests["req-1"]
+      assert request.status == :completed
+      assert request.meta == %{}
+    end
+
     test "fail_request/3 updates request with error" do
       agent = %MockAgent{state: Request.init_state(%{})}
       agent = Request.start_request(agent, "req-1", "query")
