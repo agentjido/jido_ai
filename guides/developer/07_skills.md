@@ -1,438 +1,296 @@
 # Skills Guide
 
-This guide covers the skill framework in Jido.AI, which provides modular capabilities for agents.
+This guide covers skills in Jido.AI - prompt-based capabilities that extend agent behavior.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Skill Architecture](#skill-architecture)
-- [Available Skills](#available-skills)
-- [Skill Lifecycle](#skill-lifecycle)
-- [LLM Skill](#llm-skill)
-- [Planning Skill](#planning-skill)
-- [Reasoning Skill](#reasoning-skill)
-- [ToolCalling Skill](#toolcalling-skill)
-- [Streaming Skill](#streaming-skill)
+- [Module-Based Skills](#module-based-skills)
+- [File-Based Skills](#file-based-skills)
+- [Skill API](#skill-api)
+- [Prompt Rendering](#prompt-rendering)
+- [Built-in Example Skills](#built-in-example-skills)
 - [Creating Custom Skills](#creating-custom-skills)
 
 ## Overview
 
-Skills in Jido.AI provide modular capabilities that can be mounted on agents. Each skill:
+`Jido.AI.Skill` provides a unified skill abstraction following the [agentskills.io](https://agentskills.io) specification. Skills inject prompt context into agents, guiding LLM behavior for specific tasks.
 
-- Contains related actions (capabilities)
-- Implements lifecycle callbacks
-- Has its own configuration schema
-- Can route and handle signals
-- Provides clean separation of concerns
+**Key concepts:**
 
-```mermaid
-graph TB
-    Agent[Jido.Agent] --> Skill1[LLM Skill]
-    Agent --> Skill2[Planning Skill]
-    Agent --> Skill3[ToolCalling Skill]
+| Concept | Description |
+|---------|-------------|
+| **Skill** | Prompt instructions + tool allowlist for a specific capability |
+| **Plugin** | Runtime capability with actions, state, and signal routing (`Jido.Plugin`) |
+| **Action** | Executable function that can be exposed as an LLM tool (`Jido.Action`) |
 
-    Skill1 --> Action1[Chat Action]
-    Skill1 --> Action2[Complete Action]
-    Skill1 --> Action3[Embed Action]
+Skills are defined two ways:
 
-    Skill2 --> Action4[Plan Action]
-    Skill2 --> Action5[Decompose Action]
+1. **Compile-time modules** using `use Jido.AI.Skill`
+2. **Runtime-loaded SKILL.md files** with YAML frontmatter
 
-    Skill3 --> Action6[CallWithTools Action]
-    Skill3 --> Action7[ExecuteTool Action]
-```
+## Module-Based Skills
 
-## Skill Architecture
-
-### Skill Structure
-
-```
-lib/jido_ai/skills/
-├── llm/
-│   ├── llm.ex                 # Main skill module
-│   └── actions/
-│       ├── chat.ex            # Chat action
-│       ├── complete.ex        # Completion action
-│       └── embed.ex           # Embedding action
-├── planning/
-│   ├── planning.ex            # Main skill module
-│   └── actions/
-│       ├── plan.ex
-│       ├── decompose.ex
-│       └── prioritize.ex
-├── reasoning/
-│   ├── reasoning.ex
-│   └── actions/
-│       ├── analyze.ex
-│       ├── explain.ex
-│       └── infer.ex
-├── tool_calling/
-│   ├── tool_calling.ex
-│   └── actions/
-│       ├── call_with_tools.ex
-│       ├── execute_tool.ex
-│       └── list_tools.ex
-└── streaming/
-    ├── streaming.ex
-    └── actions/
-        ├── start_stream.ex
-        ├── process_tokens.ex
-        └── end_stream.ex
-```
-
-### Skill Module
-
-Each skill is a module that:
-
-1. Uses `Jido.Skill`
-2. Defines actions
-3. Implements lifecycle callbacks
-4. Provides a configuration schema
+Define skills as Elixir modules with `use Jido.AI.Skill`:
 
 ```elixir
-defmodule Jido.AI.Skills.LLM do
-  use Jido.Skill,
-    name: "llm",
-    description: "LLM capabilities for text generation and embeddings"
+defmodule MyApp.Skills.WeatherAdvisor do
+  use Jido.AI.Skill,
+    name: "weather-advisor",
+    description: "Provides weather-aware travel and activity advice.",
+    license: "MIT",
+    allowed_tools: ~w(weather_geocode weather_forecast),
+    actions: [MyApp.Actions.Weather.Forecast],
+    body: """
+    # Weather Advisor
 
-  # Actions
-  defactions [
-    Jido.AI.Skills.LLM.Actions.Chat,
-    Jido.AI.Skills.LLM.Actions.Complete,
-    Jido.AI.Skills.LLM.Actions.Embed
-  ]
-
-  # Lifecycle callbacks
-  def skill_spec(config), do: # ...
-  def router(config), do: # ...
-  def handle_signal(signal, ctx), do: # ...
+    ## Workflow
+    1. Determine location
+    2. Fetch weather data
+    3. Provide contextual advice
+    """
 end
 ```
 
-## Available Skills
+## File-Based Skills
 
-| Skill | Module | Actions | Purpose |
-|-------|--------|---------|---------|
-| **LLM** | `Jido.AI.Skills.LLM` | Chat, Complete, Embed | Text generation and embeddings |
-| **Planning** | `Jido.AI.Skills.Planning` | Plan, Decompose, Prioritize | Task planning and decomposition |
-| **Reasoning** | `Jido.AI.Skills.Reasoning` | Analyze, Explain, Infer | Logical reasoning |
-| **ToolCalling** | `Jido.AI.Skills.ToolCalling` | CallWithTools, ExecuteTool, ListTools | LLM tool calling |
-| **Streaming** | `Jido.AI.Skills.Streaming` | StartStream, ProcessTokens, EndStream | Streaming responses |
+Create a `SKILL.md` file with YAML frontmatter:
 
-## Skill Lifecycle
+```markdown
+---
+name: code-review
+description: Reviews code for quality, security, and best practices.
+license: Apache-2.0
+allowed-tools: read_file grep git_diff
+metadata:
+  author: jido-team
+  version: "1.0.0"
+---
 
-### Callbacks
+# Code Review
+
+Review code changes and provide feedback...
+```
+
+Load at runtime:
 
 ```elixir
-@callback skill_spec(config :: map()) :: Jido.Skill.Spec.t()
-@callback router(config :: map()) :: [{Signal.type(), route()}]
-@callback handle_signal(signal :: Signal.t(), ctx :: map()) :: {:ok, Signal.t()} | :pass
-@callback mount(agent :: Agent.t(), config :: map()) :: {:ok, Agent.t()} | {:error, term()}
+{:ok, spec} = Jido.AI.Skill.Loader.load("priv/skills/code-review/SKILL.md")
+Jido.AI.Skill.Registry.register(spec)
 ```
 
-### Lifecycle Flow
+## Skill API
 
-```mermaid
-stateDiagram-v2
-    [*] --> skill_spec: Definition
-    skill_spec --> mount: Agent starts
-    mount --> [*]: Ready
-
-    mount --> router: Signal received
-    router --> handle_signal: Matched
-    router --> [*]: No match
-
-    handle_signal --> [*]: Processed/Passed
-```
-
-### skill_spec/1
-
-Returns the skill specification including actions and default state:
+Both module and file-based skills support the same interface:
 
 ```elixir
-def skill_spec(config) do
-  %Jido.Skill.Spec{
-    name: "llm",
-    actions: [
-      {Jido.AI.Skills.LLM.Actions.Chat, []},
-      {Jido.AI.Skills.LLM.Actions.Complete, []},
-      {Jido.AI.Skills.LLM.Actions.Embed, []}
-    ],
-    state: %{
-      default_model: Keyword.get(config, :model, "anthropic:claude-haiku-4-5")
-    }
-  }
-end
+# Get the skill specification
+Jido.AI.Skill.manifest(skill)
+
+# Get the skill body text
+Jido.AI.Skill.body(skill)
+
+# Get allowed tools
+Jido.AI.Skill.allowed_tools(skill)
+
+# Get associated actions
+Jido.AI.Skill.actions(skill)
+
+# Resolve a skill (module, spec, or name string)
+Jido.AI.Skill.resolve("weather-advisor")
 ```
 
-### router/1
+### Frontmatter Fields
 
-Returns signal routing configuration:
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | 1-64 chars, lowercase kebab-case (`^[a-z0-9]+(-[a-z0-9]+)*$`) |
+| `description` | Yes | 1-1024 chars |
+| `license` | No | License identifier (e.g., "MIT", "Apache-2.0") |
+| `compatibility` | No | Version requirements (max 500 chars) |
+| `metadata` | No | Arbitrary metadata map |
+| `allowed-tools` | No | Space-delimited or list of tool names |
+| `tags` | No | List of categorization tags |
+
+## Prompt Rendering
+
+Use `Jido.AI.Skill.Prompt` to render skills into system prompts:
 
 ```elixir
-def router(_config) do
-  [
-    {"llm.chat", {:action, Jido.AI.Skills.LLM.Actions.Chat, :run}},
-    {"llm.complete", {:action, Jido.AI.Skills.LLM.Actions.Complete, :run}},
-    {"llm.embed", {:action, Jido.AI.Skills.LLM.Actions.Embed, :run}}
-  ]
-end
+alias Jido.AI.Skill.Prompt
+
+# Render multiple skills
+skills = [MyApp.Skills.Calculator, "code-review"]
+prompt_text = Prompt.render(skills)
+
+# Render a single skill
+Prompt.render_one(MyApp.Skills.Calculator)
+
+# Collect allowed tools from skills
+Prompt.collect_allowed_tools(skills)
+# => ["add", "subtract", "read_file", "grep"]
+
+# Filter tools by skill allowlists
+Prompt.filter_tools(all_tools, skills)
 ```
 
-### handle_signal/2
+### Rendered Output Example
 
-Pre-process signals before action execution:
+```markdown
+You have access to the following skills:
+
+## calculator
+Performs precise arithmetic calculations using tool calls.
+Allowed tools: add, subtract, multiply, divide
+
+# Calculator Skill
+
+## Purpose
+Use this skill when users need help with arithmetic...
+
+## code-review
+Reviews code for quality and best practices.
+Allowed tools: read_file, grep, git_diff
+
+# Code Review
+
+Review code changes and provide feedback...
+```
+
+## Built-in Example Skills
+
+| Skill | Module | Purpose |
+|-------|--------|---------|
+| **Calculator** | `Jido.AI.Examples.Skills.Calculator` | Arithmetic operations |
+| **Skill Writer** | `Jido.AI.Examples.Skills.SkillWriter` | Creates new skill definitions |
+
+### Calculator Skill
 
 ```elixir
-def handle_signal(%Signal{type: "llm.chat"} = signal, ctx) do
-  # Add model from skill state if not present
-  data = Map.put_new(signal.data, :model, ctx.skill_state.default_model)
-  {:ok, %Signal{signal | data: data}}
-end
-
-def handle_signal(_signal, _ctx), do: :pass
+Jido.AI.Examples.Skills.Calculator
+# Allowed tools: add, subtract, multiply, divide
+# Actions: Jido.Tools.Arithmetic.*
 ```
 
-## LLM Skill
+### Skill Writer Skill
 
-Provides LLM capabilities for text generation and embeddings.
-
-### Actions
-
-| Action | Description |
-|--------|-------------|
-| `Chat` | Chat-style interaction with system prompts |
-| `Complete` | Simple text completion |
-| `Embed` | Text embedding generation |
-
-### Usage
+A meta-skill for creating new skills:
 
 ```elixir
-# Mount the skill on an agent
-use Jido.Agent,
-  name: "my_agent",
-  skills: [
-    {Jido.AI.Skills.LLM, model: "anthropic:claude-haiku-4-5"}
-  ]
-
-# Or use actions directly
-alias Jido.AI.Skills.LLM.Actions.Chat
-
-Chat.run(%{
-  model: "anthropic:claude-haiku-4-5",
-  prompt: "Hello!"
-}, %{})
+Jido.AI.Examples.Skills.SkillWriter
+# Allowed tools: validate_skill_name, write_module_skill, write_file_skill
 ```
 
-### Chat Action Schema
+## Skills vs Plugins
 
-```elixir
-@schema Zoi.struct(__MODULE__, %{
-  model: Zoi.string(description: "Model identifier") |> Zoi.required(),
-  prompt: Zoi.string(description: "User prompt") |> Zoi.required(),
-  system_prompt: Zoi.string(description: "System prompt") |> Zoi.optional(),
-  max_tokens: Zoi.integer(description: "Max tokens") |> Zoi.default(1024),
-  temperature: Zoi.number(description: "Temperature") |> Zoi.default(0.7)
-}, coerce: true)
-```
+Skills and Plugins serve different purposes:
 
-## Planning Skill
-
-Provides task planning and decomposition capabilities.
-
-### Actions
-
-| Action | Description |
-|--------|-------------|
-| `Plan` | Create a plan for a task |
-| `Decompose` | Break down a task into subtasks |
-| `Prioritize` | Prioritize tasks |
-
-### Usage
-
-```elixir
-alias Jido.AI.Skills.Planning.Actions.Decompose
-
-Decompose.run(%{
-  task: "Build a web application"
-}, %{})
-# => {:ok, %{subtasks: ["Design database", "Create API", ...]}}
-```
-
-### Decompose Action Schema
-
-```elixir
-@schema Zoi.struct(__MODULE__, %{
-  task: Zoi.string(description: "Task to decompose") |> Zoi.required(),
-  max_depth: Zoi.integer(description: "Decomposition depth") |> Zoi.default(3),
-  model: Zoi.string(description: "Model to use") |> Zoi.optional()
-}, coerce: true)
-```
-
-## Reasoning Skill
-
-Provides logical reasoning capabilities.
-
-### Actions
-
-| Action | Description |
-|--------|-------------|
-| `Analyze` | Analyze a problem |
-| `Explain` | Explain a concept |
-| `Infer` | Make inferences from data |
-
-### Usage
-
-```elixir
-alias Jido.AI.Skills.Reasoning.Actions.Analyze
-
-Analyze.run(%{
-  problem: "Why is the sky blue?",
-  analysis_type: :causal
-}, %{})
-# => {:ok, %{analysis: "The sky appears blue due to..."}}
-```
-
-## ToolCalling Skill
-
-Provides LLM tool calling capabilities.
-
-### Actions
-
-| Action | Description |
-|--------|-------------|
-| `CallWithTools` | Send prompt to LLM with available tools |
-| `ExecuteTool` | Direct tool execution |
-| `ListTools` | List available tools |
-
-### Usage
-
-```elixir
-alias Jido.AI.Skills.ToolCalling.Actions.CallWithTools
-
-CallWithTools.run(%{
-  model: "anthropic:claude-haiku-4-5",
-  prompt: "What's 2 + 2?",
-  tools: [Calculator],
-  auto_execute: true
-}, %{})
-```
-
-### CallWithTools Schema
-
-```elixir
-@schema Zoi.struct(__MODULE__, %{
-  model: Zoi.string(description: "Model identifier") |> Zoi.required(),
-  prompt: Zoi.string(description: "User prompt") |> Zoi.required(),
-  tools: Zoi.list(Zoi.any(), description: "Action modules") |> Zoi.required(),
-  system_prompt: Zoi.string(description: "System prompt") |> Zoi.optional(),
-  max_iterations: Zoi.integer(description: "Max tool iterations") |> Zoi.default(10),
-  auto_execute: Zoi.boolean(description: "Auto-execute tools") |> Zoi.default(true)
-}, coerce: true)
-```
-
-## Streaming Skill
-
-Provides streaming response capabilities.
-
-### Actions
-
-| Action | Description |
-|--------|-------------|
-| `StartStream` | Start a streaming LLM call |
-| `ProcessTokens` | Process streaming tokens |
-| `EndStream` | End a streaming session |
+| Aspect | Skill (`Jido.AI.Skill`) | Plugin (`Jido.Plugin`) |
+|--------|-------------------------|------------------------|
+| **Purpose** | Prompt instructions for LLM | Runtime agent capabilities |
+| **Execution** | Injected into system prompt | Executes actions, routes signals |
+| **State** | Stateless (prompt text only) | Has state, lifecycle callbacks |
+| **Definition** | Module or SKILL.md file | Elixir module only |
+| **Use case** | Guide LLM behavior | Add capabilities to agents |
 
 ## Creating Custom Skills
 
-### Step 1: Define the Skill Module
+### Module-Based Skill
 
 ```elixir
-defmodule MyApp.Skills.MySkill do
-  use Jido.Skill,
-    name: "my_skill",
-    description: "My custom skill"
+defmodule MyApp.Skills.DocumentSummarizer do
+  use Jido.AI.Skill,
+    name: "document-summarizer",
+    description: "Summarizes long documents into key points and actionable insights.",
+    license: "MIT",
+    allowed_tools: ~w(extract_text chunk_text summarize),
+    actions: [
+      MyApp.Actions.ExtractText,
+      MyApp.Actions.ChunkText,
+      MyApp.Actions.Summarize
+    ],
+    tags: ["nlp", "summarization", "documents"],
+    body: """
+    # Document Summarizer
 
-  # Define actions
-  defactions [
-    MyApp.Skills.MySkill.Action1,
-    MyApp.Skills.MySkill.Action2
-  ]
+    ## Purpose
+    Use when users need to condense long documents into key points.
 
-  # Skill specification
-  def skill_spec(config) do
-    %Jido.Skill.Spec{
-      name: "my_skill",
-      actions: [
-        {MyApp.Skills.MySkill.Action1, Keyword.get(config, :action1_opts, [])},
-        {MyApp.Skills.MySkill.Action2, Keyword.get(config, :action2_opts, [])}
-      ],
-      state: %{
-        setting: Keyword.get(config, :setting, :default)
-      }
-    }
-  end
+    ## Workflow
+    1. Extract text from the document
+    2. Chunk into manageable sections
+    3. Summarize each chunk
+    4. Combine into final summary
 
-  # Signal routing
-  def router(_config) do
-    [
-      {"my_skill.action1", {:action, MyApp.Skills.MySkill.Action1, :run}},
-      {"my_skill.action2", {:action, MyApp.Skills.MySkill.Action2, :run}}
-    ]
-  end
-
-  # Optional: Signal preprocessing
-  def handle_signal(%Signal{type: "my_skill." <> _} = signal, ctx) do
-    # Preprocess signal
-    {:ok, signal}
-  end
-
-  def handle_signal(_signal, _ctx), do: :pass
+    ## Best Practices
+    - Preserve key facts and figures
+    - Maintain logical flow
+    - Highlight actionable items
+    """
 end
 ```
 
-### Step 2: Define Actions
+### File-Based Skill
 
-```elixir
-defmodule MyApp.Skills.MySkill.Action1 do
-  use Jido.Action,
-    name: "my_action1",
-    description: "My custom action"
+Create `priv/skills/my-skill/SKILL.md`:
 
-  @schema Zoi.struct(__MODULE__, %{
-    input: Zoi.string(description: "Input data") |> Zoi.required(),
-    option: Zoi.string(description: "Optional parameter") |> Zoi.optional()
-  }, coerce: true)
+```markdown
+---
+name: my-skill
+description: Description of what the skill does.
+license: Apache-2.0
+allowed-tools: tool1 tool2 tool3
+tags:
+  - category1
+  - category2
+metadata:
+  author: your-name
+  version: "1.0"
+---
 
-  def run(params, _context) do
-    # Action logic
-    result = process(params)
-    {:ok, %{result: result}}
-  end
-end
+# My Skill
+
+## Purpose
+When to use this skill...
+
+## Workflow
+1. Step one
+2. Step two
+3. Step three
+
+## Examples
+Show concrete examples...
 ```
 
-### Step 3: Mount on Agent
+Load at runtime:
 
 ```elixir
-use Jido.Agent,
-  name: "my_agent",
-  skills: [
-    {MyApp.Skills.MySkill, setting: :value}
-  ]
+# In application startup
+Jido.AI.Skill.Registry.start_link()
+Jido.AI.Skill.Registry.load_from_paths(["priv/skills"])
 ```
 
 ## Skill Best Practices
 
-1. **Related actions**: Group related actions in a skill
-2. **Clear naming**: Use descriptive signal types like `skill_name.action`
-3. **State isolation**: Each skill has its own state
-4. **Error handling**: Return `{:error, reason}` from actions
-5. **Schema validation**: Use Zoi schemas for all parameters
-6. **Documentation**: Document actions and their usage
+1. **Clear purpose**: Define when the skill should be activated
+2. **Workflow documentation**: Step-by-step instructions for the LLM
+3. **Concrete examples**: Show input/output examples
+4. **Tool alignment**: `allowed_tools` should match available actions
+5. **Descriptive names**: Use lowercase kebab-case (e.g., `code-review`)
+
+## Running the Demo
+
+```bash
+mix run scripts/skills_demo.exs
+```
+
+This demonstrates:
+- Loading module and file-based skills
+- Skill introspection and prompt rendering
+- Agent interaction with multiple skills
 
 ## Next Steps
 
-- [Configuration Guide](./08_configuration.md) - Model aliases and providers
-- [Tool System Guide](./06_tool_system.md) - Tool execution
-- [Strategies Guide](./02_strategies.md) - Using skills with strategies
+- [Plugins Guide](./05_plugins.md) - Runtime agent capabilities
+- [Tool System Guide](./06_tool_system.md) - Action execution
+- [Strategies Guide](./02_strategies.md) - ReAct and other strategies

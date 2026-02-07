@@ -63,7 +63,7 @@ defmodule Jido.AI.GoTAgent do
   ## Task Supervisor
 
   Each agent instance gets its own Task.Supervisor automatically started via the
-  `Jido.AI.Skills.TaskSupervisorSkill`. This supervisor is used for:
+  `Jido.AI.Plugins.TaskSupervisor`. This supervisor is used for:
   - LLM streaming operations
   - Other async operations within the agent's lifecycle
 
@@ -102,7 +102,7 @@ defmodule Jido.AI.GoTAgent do
     aggregation_prompt = Keyword.get(opts, :aggregation_prompt)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Skills.TaskSupervisorSkill]
+    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
 
     strategy_opts =
       [

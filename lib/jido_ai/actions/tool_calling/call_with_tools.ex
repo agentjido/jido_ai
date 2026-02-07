@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
+defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   @moduledoc """
   A Jido.Action for LLM calls with tool/function calling support.
 
@@ -21,13 +21,13 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.CallWithTools do
   ## Examples
 
       # Basic tool call
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.CallWithTools, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.CallWithTools, %{
         prompt: "What's 5 + 3?",
         tools: ["calculator"]
       })
 
       # With auto-execution
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.CallWithTools, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.CallWithTools, %{
         prompt: "Calculate 15 * 7",
         auto_execute: true
       })

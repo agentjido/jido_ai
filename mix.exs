@@ -70,6 +70,7 @@ defmodule JidoAi.MixProject do
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
       {:term_ui, "~> 0.2"},
+      {:yaml_elixir, "~> 2.9"},
       {:zoi, "~> 0.16"},
 
       # Dev/Test

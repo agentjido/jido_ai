@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.BaseActionHelpers do
+defmodule Jido.AI.Actions.Helpers do
   @moduledoc """
   Shared helper functions for Jido.AI skill actions.
 
@@ -15,7 +15,7 @@ defmodule Jido.AI.Skills.BaseActionHelpers do
 
   ## Examples
 
-      use Jido.AI.Skills.BaseActionHelpers
+      use Jido.AI.Actions.Helpers
 
       # In an action
       def run(params, _context) do

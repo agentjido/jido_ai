@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.LifecycleIntegrationTest do
+defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
   @moduledoc """
   Integration tests for Phase 9.3 Skill Lifecycle enhancement.
 
@@ -13,18 +13,18 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
-  alias Jido.AI.Skills.LLM
-  alias Jido.AI.Skills.Planning
-  alias Jido.AI.Skills.Reasoning
-  alias Jido.AI.Skills.Streaming
-  alias Jido.AI.Skills.ToolCalling
+  alias Jido.AI.Plugins.LLM
+  alias Jido.AI.Plugins.Planning
+  alias Jido.AI.Plugins.Reasoning
+  alias Jido.AI.Plugins.Streaming
+  alias Jido.AI.Plugins.ToolCalling
 
   # Ensure all skill modules are loaded before tests
-  require Jido.AI.Skills.LLM
-  require Jido.AI.Skills.Planning
-  require Jido.AI.Skills.Reasoning
-  require Jido.AI.Skills.Streaming
-  require Jido.AI.Skills.ToolCalling
+  require Jido.AI.Plugins.LLM
+  require Jido.AI.Plugins.Planning
+  require Jido.AI.Plugins.Reasoning
+  require Jido.AI.Plugins.Streaming
+  require Jido.AI.Plugins.ToolCalling
 
   # ============================================================================
   # Skill Mount/2 Tests
@@ -131,9 +131,9 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = LLM.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert route_map["llm.chat"] == Jido.AI.Skills.LLM.Actions.Chat
-      assert route_map["llm.complete"] == Jido.AI.Skills.LLM.Actions.Complete
-      assert route_map["llm.embed"] == Jido.AI.Skills.LLM.Actions.Embed
+      assert route_map["llm.chat"] == Jido.AI.Actions.LLM.Chat
+      assert route_map["llm.complete"] == Jido.AI.Actions.LLM.Complete
+      assert route_map["llm.embed"] == Jido.AI.Actions.LLM.Embed
     end
 
     test "Reasoning skill signal_routes returns route list" do
@@ -146,9 +146,9 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = Reasoning.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert route_map["reasoning.analyze"] == Jido.AI.Skills.Reasoning.Actions.Analyze
-      assert route_map["reasoning.explain"] == Jido.AI.Skills.Reasoning.Actions.Explain
-      assert route_map["reasoning.infer"] == Jido.AI.Skills.Reasoning.Actions.Infer
+      assert route_map["reasoning.analyze"] == Jido.AI.Actions.Reasoning.Analyze
+      assert route_map["reasoning.explain"] == Jido.AI.Actions.Reasoning.Explain
+      assert route_map["reasoning.infer"] == Jido.AI.Actions.Reasoning.Infer
     end
 
     test "Planning skill signal_routes returns route list" do
@@ -161,9 +161,9 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = Planning.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert route_map["planning.plan"] == Jido.AI.Skills.Planning.Actions.Plan
-      assert route_map["planning.decompose"] == Jido.AI.Skills.Planning.Actions.Decompose
-      assert route_map["planning.prioritize"] == Jido.AI.Skills.Planning.Actions.Prioritize
+      assert route_map["planning.plan"] == Jido.AI.Actions.Planning.Plan
+      assert route_map["planning.decompose"] == Jido.AI.Actions.Planning.Decompose
+      assert route_map["planning.prioritize"] == Jido.AI.Actions.Planning.Prioritize
     end
 
     test "Streaming skill signal_routes returns route list" do
@@ -176,9 +176,9 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = Streaming.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert route_map["stream.start"] == Jido.AI.Skills.Streaming.Actions.StartStream
-      assert route_map["stream.process"] == Jido.AI.Skills.Streaming.Actions.ProcessTokens
-      assert route_map["stream.end"] == Jido.AI.Skills.Streaming.Actions.EndStream
+      assert route_map["stream.start"] == Jido.AI.Actions.Streaming.StartStream
+      assert route_map["stream.process"] == Jido.AI.Actions.Streaming.ProcessTokens
+      assert route_map["stream.end"] == Jido.AI.Actions.Streaming.EndStream
     end
 
     test "ToolCalling skill signal_routes returns route list" do
@@ -191,9 +191,9 @@ defmodule Jido.AI.Skills.LifecycleIntegrationTest do
       routes = ToolCalling.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert route_map["tool.call"] == Jido.AI.Skills.ToolCalling.Actions.CallWithTools
-      assert route_map["tool.execute"] == Jido.AI.Skills.ToolCalling.Actions.ExecuteTool
-      assert route_map["tool.list"] == Jido.AI.Skills.ToolCalling.Actions.ListTools
+      assert route_map["tool.call"] == Jido.AI.Actions.ToolCalling.CallWithTools
+      assert route_map["tool.execute"] == Jido.AI.Actions.ToolCalling.ExecuteTool
+      assert route_map["tool.list"] == Jido.AI.Actions.ToolCalling.ListTools
     end
   end
 
