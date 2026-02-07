@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.SchemaIntegrationTest do
+defmodule Jido.AI.Plugins.SchemaIntegrationTest do
   @moduledoc """
   Integration tests for Phase 9.2 Zoi schema migration in skills.
 
@@ -9,28 +9,28 @@ defmodule Jido.AI.Skills.SchemaIntegrationTest do
 
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Skills.LLM
-  alias Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
-  alias Jido.AI.Skills.Planning
-  alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
-  alias Jido.AI.Skills.Reasoning
-  alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
-  alias Jido.AI.Skills.Streaming
-  alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
-  alias Jido.AI.Skills.ToolCalling
-  alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
+  alias Jido.AI.Plugins.LLM
+  alias Jido.AI.Actions.LLM.{Chat, Complete, Embed}
+  alias Jido.AI.Plugins.Planning
+  alias Jido.AI.Actions.Planning.{Decompose, Plan, Prioritize}
+  alias Jido.AI.Plugins.Reasoning
+  alias Jido.AI.Actions.Reasoning.{Analyze, Explain, Infer}
+  alias Jido.AI.Plugins.Streaming
+  alias Jido.AI.Actions.Streaming.{EndStream, ProcessTokens, StartStream}
+  alias Jido.AI.Plugins.ToolCalling
+  alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
   # Ensure all skill modules are loaded before tests
-  require Jido.AI.Skills.LLM
-  require Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
-  require Jido.AI.Skills.Planning
-  require Jido.AI.Skills.Planning.Actions.{Plan, Decompose, Prioritize}
-  require Jido.AI.Skills.Reasoning
-  require Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
-  require Jido.AI.Skills.Streaming
-  require Jido.AI.Skills.Streaming.Actions.{StartStream, ProcessTokens, EndStream}
-  require Jido.AI.Skills.ToolCalling
-  require Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
+  require Jido.AI.Plugins.LLM
+  require Jido.AI.Actions.LLM.{Chat, Complete, Embed}
+  require Jido.AI.Plugins.Planning
+  require Jido.AI.Actions.Planning.{Plan, Decompose, Prioritize}
+  require Jido.AI.Plugins.Reasoning
+  require Jido.AI.Actions.Reasoning.{Analyze, Explain, Infer}
+  require Jido.AI.Plugins.Streaming
+  require Jido.AI.Actions.Streaming.{StartStream, ProcessTokens, EndStream}
+  require Jido.AI.Plugins.ToolCalling
+  require Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
   # ============================================================================
   # LLM Skill Schema Tests

@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
+defmodule Jido.AI.Actions.ToolCalling.ListTools do
   @moduledoc """
   A Jido.Action for listing all available tools with their schemas.
 
@@ -13,10 +13,10 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ListTools do
   ## Examples
 
       # List all tools
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ListTools, %{})
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.ListTools, %{})
 
       # Filter by name pattern
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ListTools, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.ListTools, %{
         filter: "calc"
       })
   """

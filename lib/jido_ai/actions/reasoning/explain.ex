@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
+defmodule Jido.AI.Actions.Reasoning.Explain do
   @moduledoc """
   A Jido.Action for getting clear explanations of complex topics.
 
@@ -19,20 +19,20 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Explain do
   ## Examples
 
       # Basic explanation
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Explain, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Reasoning.Explain, %{
         topic: "Recursion",
         detail_level: :basic
       })
 
       # Advanced explanation
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Explain, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Reasoning.Explain, %{
         topic: "Tail Call Optimization",
         detail_level: :advanced,
         audience: "Elixir developers"
       })
 
       # Without examples
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Explain, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Reasoning.Explain, %{
         topic: "Machine Learning",
         detail_level: :intermediate,
         include_examples: false

@@ -1,9 +1,9 @@
-require Jido.AI.Skills.Streaming.Actions.EndStream
-require Jido.AI.Skills.Streaming.Actions.ProcessTokens
+require Jido.AI.Actions.Streaming.EndStream
+require Jido.AI.Actions.Streaming.ProcessTokens
 # Ensure actions are compiled before the skill
-require Jido.AI.Skills.Streaming.Actions.StartStream
+require Jido.AI.Actions.Streaming.StartStream
 
-defmodule Jido.AI.Skills.Streaming do
+defmodule Jido.AI.Plugins.Streaming do
   @moduledoc """
   A Jido.Skill providing real-time streaming response capabilities from LLMs.
 
@@ -25,20 +25,20 @@ defmodule Jido.AI.Skills.Streaming do
         use Jido.Agent,
 
         skills: [
-          {Jido.AI.Skills.Streaming, []}
+          {Jido.AI.Plugins.Streaming, []}
         ]
       end
 
   Or use actions directly:
 
       # Start a stream
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.StartStream, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
         prompt: "Tell me a story",
         on_token: fn token -> IO.write(token) end
       })
 
       # Process tokens (if using separate callback)
-      {:ok, _} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.ProcessTokens, %{
+      {:ok, _} = Jido.Exec.run(Jido.AI.Actions.Streaming.ProcessTokens, %{
         stream_id: result.stream_id
       })
 
@@ -47,7 +47,7 @@ defmodule Jido.AI.Skills.Streaming do
   ### Pattern 1: Inline Callback
   Pass `on_token` callback to StartStream for automatic processing:
 
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.StartStream, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
         prompt: "Hello",
         on_token: fn token -> send(pid, {:token, token}) end
       })
@@ -55,7 +55,7 @@ defmodule Jido.AI.Skills.Streaming do
   ### Pattern 2: Buffered Collection
   Enable buffering to collect full response:
 
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.StartStream, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
         prompt: "Write code",
         buffer: true
       })
@@ -63,12 +63,12 @@ defmodule Jido.AI.Skills.Streaming do
   ### Pattern 3: Manual Processing
   Use ProcessTokens action for manual token handling:
 
-      {:ok, stream} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.StartStream, %{
+      {:ok, stream} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
         prompt: "Generate",
         auto_process: false
       })
 
-      {:ok, _} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.ProcessTokens, %{
+      {:ok, _} = Jido.Exec.run(Jido.AI.Actions.Streaming.ProcessTokens, %{
         stream_id: stream.stream_id,
         on_token: &MyProcessor.handle/1
       })
@@ -95,9 +95,9 @@ defmodule Jido.AI.Skills.Streaming do
     name: "streaming",
     state_key: :streaming,
     actions: [
-      Jido.AI.Skills.Streaming.Actions.StartStream,
-      Jido.AI.Skills.Streaming.Actions.ProcessTokens,
-      Jido.AI.Skills.Streaming.Actions.EndStream
+      Jido.AI.Actions.Streaming.StartStream,
+      Jido.AI.Actions.Streaming.ProcessTokens,
+      Jido.AI.Actions.Streaming.EndStream
     ],
     description: "Provides real-time streaming LLM response capabilities",
     category: "ai",
@@ -149,11 +149,11 @@ defmodule Jido.AI.Skills.Streaming do
   Maps signal patterns to action modules.
   """
   @impl Jido.Plugin
-  def router(_config) do
+  def signal_routes(_config) do
     [
-      {"stream.start", Jido.AI.Skills.Streaming.Actions.StartStream},
-      {"stream.process", Jido.AI.Skills.Streaming.Actions.ProcessTokens},
-      {"stream.end", Jido.AI.Skills.Streaming.Actions.EndStream}
+      {"stream.start", Jido.AI.Actions.Streaming.StartStream},
+      {"stream.process", Jido.AI.Actions.Streaming.ProcessTokens},
+      {"stream.end", Jido.AI.Actions.Streaming.EndStream}
     ]
   end
 

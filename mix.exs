@@ -60,9 +60,9 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.0.0-rc.3"},
+      {:jido, "~> 2.0.0-rc.4"},
       {:req_llm, "~> 1.5"},
-      {:jido_browser, "~> 0.8.0"},
+      {:jido_browser, "~> 0.8.1"},
 
       # Runtime
       {:fsmx, "~> 0.5"},
@@ -70,6 +70,7 @@ defmodule JidoAi.MixProject do
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
       {:term_ui, "~> 0.2"},
+      {:yaml_elixir, "~> 2.9"},
       {:zoi, "~> 0.16"},
 
       # Dev/Test

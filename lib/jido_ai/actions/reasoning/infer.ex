@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
+defmodule Jido.AI.Actions.Reasoning.Infer do
   @moduledoc """
   A Jido.Action for drawing logical inferences from given premises.
 
@@ -18,13 +18,13 @@ defmodule Jido.AI.Skills.Reasoning.Actions.Infer do
   ## Examples
 
       # Basic inference
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Infer, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Reasoning.Infer, %{
         premises: "All cats are mammals. Fluffy is a cat.",
         question: "Is Fluffy a mammal?"
       })
 
       # With context
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Reasoning.Actions.Infer, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Reasoning.Infer, %{
         premises: "If it rains, the ground gets wet. The ground is wet.",
         question: "Can we conclude that it rained?",
         context: "Consider that sprinklers can also make the ground wet."

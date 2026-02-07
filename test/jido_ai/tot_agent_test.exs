@@ -105,7 +105,7 @@ defmodule Jido.AI.ToTAgentTest do
           mod when is_atom(mod) -> mod
         end)
 
-      assert Jido.AI.Skills.TaskSupervisorSkill in plugin_mods
+      assert Jido.AI.Plugins.TaskSupervisor in plugin_mods
     end
   end
 

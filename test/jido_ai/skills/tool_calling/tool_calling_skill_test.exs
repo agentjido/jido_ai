@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.ToolCallingTest do
+defmodule Jido.AI.Plugins.ToolCallingTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.ToolCalling
+  alias Jido.AI.Plugins.ToolCalling
 
   describe "plugin_spec/1" do
     test "returns valid skill spec with empty config" do
@@ -50,9 +50,9 @@ defmodule Jido.AI.Skills.ToolCallingTest do
       actions = ToolCalling.actions()
 
       assert length(actions) == 3
-      assert Jido.AI.Skills.ToolCalling.Actions.CallWithTools in actions
-      assert Jido.AI.Skills.ToolCalling.Actions.ExecuteTool in actions
-      assert Jido.AI.Skills.ToolCalling.Actions.ListTools in actions
+      assert Jido.AI.Actions.ToolCalling.CallWithTools in actions
+      assert Jido.AI.Actions.ToolCalling.ExecuteTool in actions
+      assert Jido.AI.Actions.ToolCalling.ListTools in actions
     end
   end
 end

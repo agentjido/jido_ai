@@ -13,12 +13,12 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Skills.LLM
-  alias Jido.AI.Skills.LLM.Actions.Chat
-  alias Jido.AI.Skills.Planning
-  alias Jido.AI.Skills.Reasoning
-  alias Jido.AI.Skills.Streaming
-  alias Jido.AI.Skills.ToolCalling
+  alias Jido.AI.Plugins.LLM
+  alias Jido.AI.Actions.LLM.Chat
+  alias Jido.AI.Plugins.Planning
+  alias Jido.AI.Plugins.Reasoning
+  alias Jido.AI.Plugins.Streaming
+  alias Jido.AI.Plugins.ToolCalling
 
   # ============================================================================
   # Skill Composition Integration Tests
@@ -96,7 +96,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "LLM Skill Integration" do
-    alias Jido.AI.Skills.LLM.Actions.{Chat, Complete, Embed}
+    alias Jido.AI.Actions.LLM.{Chat, Complete, Embed}
 
     test "all LLM actions are accessible" do
       assert Chat in LLM.actions()
@@ -131,7 +131,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Reasoning Skill Integration" do
-    alias Jido.AI.Skills.Reasoning.Actions.{Analyze, Explain, Infer}
+    alias Jido.AI.Actions.Reasoning.{Analyze, Explain, Infer}
 
     test "all Reasoning actions are accessible" do
       assert Analyze in Reasoning.actions()
@@ -166,7 +166,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Planning Skill Integration" do
-    alias Jido.AI.Skills.Planning.Actions.{Decompose, Plan, Prioritize}
+    alias Jido.AI.Actions.Planning.{Decompose, Plan, Prioritize}
 
     test "all Planning actions are accessible" do
       assert Plan in Planning.actions()
@@ -200,7 +200,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Streaming Skill Integration" do
-    alias Jido.AI.Skills.Streaming.Actions.{EndStream, ProcessTokens, StartStream}
+    alias Jido.AI.Actions.Streaming.{EndStream, ProcessTokens, StartStream}
 
     test "all Streaming actions are accessible" do
       assert StartStream in Streaming.actions()
@@ -234,7 +234,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   # ============================================================================
 
   describe "Tool Calling Skill Integration" do
-    alias Jido.AI.Skills.ToolCalling.Actions.{CallWithTools, ExecuteTool, ListTools}
+    alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
     test "all Tool Calling actions are accessible" do
       assert CallWithTools in ToolCalling.actions()
@@ -356,41 +356,41 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     test "LLM Skill has Chat, Complete, and Embed actions" do
       actions = LLM.actions()
 
-      assert Jido.AI.Skills.LLM.Actions.Chat in actions
-      assert Jido.AI.Skills.LLM.Actions.Complete in actions
-      assert Jido.AI.Skills.LLM.Actions.Embed in actions
+      assert Jido.AI.Actions.LLM.Chat in actions
+      assert Jido.AI.Actions.LLM.Complete in actions
+      assert Jido.AI.Actions.LLM.Embed in actions
     end
 
     test "Reasoning Skill has Analyze, Infer, and Explain actions" do
       actions = Reasoning.actions()
 
-      assert Jido.AI.Skills.Reasoning.Actions.Analyze in actions
-      assert Jido.AI.Skills.Reasoning.Actions.Infer in actions
-      assert Jido.AI.Skills.Reasoning.Actions.Explain in actions
+      assert Jido.AI.Actions.Reasoning.Analyze in actions
+      assert Jido.AI.Actions.Reasoning.Infer in actions
+      assert Jido.AI.Actions.Reasoning.Explain in actions
     end
 
     test "Planning Skill has Plan, Decompose, and Prioritize actions" do
       actions = Planning.actions()
 
-      assert Jido.AI.Skills.Planning.Actions.Plan in actions
-      assert Jido.AI.Skills.Planning.Actions.Decompose in actions
-      assert Jido.AI.Skills.Planning.Actions.Prioritize in actions
+      assert Jido.AI.Actions.Planning.Plan in actions
+      assert Jido.AI.Actions.Planning.Decompose in actions
+      assert Jido.AI.Actions.Planning.Prioritize in actions
     end
 
     test "Streaming Skill has StartStream, ProcessTokens, and EndStream actions" do
       actions = Streaming.actions()
 
-      assert Jido.AI.Skills.Streaming.Actions.StartStream in actions
-      assert Jido.AI.Skills.Streaming.Actions.ProcessTokens in actions
-      assert Jido.AI.Skills.Streaming.Actions.EndStream in actions
+      assert Jido.AI.Actions.Streaming.StartStream in actions
+      assert Jido.AI.Actions.Streaming.ProcessTokens in actions
+      assert Jido.AI.Actions.Streaming.EndStream in actions
     end
 
     test "Tool Calling Skill has CallWithTools, ExecuteTool, and ListTools actions" do
       actions = ToolCalling.actions()
 
-      assert Jido.AI.Skills.ToolCalling.Actions.CallWithTools in actions
-      assert Jido.AI.Skills.ToolCalling.Actions.ExecuteTool in actions
-      assert Jido.AI.Skills.ToolCalling.Actions.ListTools in actions
+      assert Jido.AI.Actions.ToolCalling.CallWithTools in actions
+      assert Jido.AI.Actions.ToolCalling.ExecuteTool in actions
+      assert Jido.AI.Actions.ToolCalling.ListTools in actions
     end
 
     test "all 5 skills are available" do

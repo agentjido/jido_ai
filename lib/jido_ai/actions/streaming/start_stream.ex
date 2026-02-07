@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
+defmodule Jido.AI.Actions.Streaming.StartStream do
   @moduledoc """
   A Jido.Action for initiating a streaming LLM request.
 
@@ -21,19 +21,19 @@ defmodule Jido.AI.Skills.Streaming.Actions.StartStream do
   ## Examples
 
       # Basic streaming with inline callback
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.StartStream, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
         prompt: "Tell me a joke",
         on_token: fn token -> IO.write(token) end
       })
 
       # Buffered collection
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.StartStream, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
         prompt: "Write a poem",
         buffer: true
       })
 
       # Get stream_id for manual processing
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.StartStream, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
         prompt: "Generate code",
         auto_process: false
       })

@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.LLM.Actions.GenerateObjectTest do
+defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.LLM.Actions.GenerateObject
+  alias Jido.AI.Actions.LLM.GenerateObject
 
   describe "GenerateObject action" do
     test "has correct metadata" do

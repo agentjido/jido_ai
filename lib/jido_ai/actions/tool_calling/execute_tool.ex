@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteTool do
+defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   @moduledoc """
   A Jido.Action for direct tool execution without LLM involvement.
 
@@ -14,13 +14,13 @@ defmodule Jido.AI.Skills.ToolCalling.Actions.ExecuteTool do
   ## Examples
 
       # Execute calculator tool
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ExecuteTool, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.ExecuteTool, %{
         tool_name: "calculator",
         params: %{"operation" => "add", "a" => 5, "b" => 3}
       })
 
       # Execute with timeout
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.ToolCalling.Actions.ExecuteTool, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.ExecuteTool, %{
         tool_name: "search",
         params: %{"query" => "Elixir programming"},
         timeout: 5000

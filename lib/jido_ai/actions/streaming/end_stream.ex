@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Streaming.Actions.EndStream do
+defmodule Jido.AI.Actions.Streaming.EndStream do
   @moduledoc """
   A Jido.Action for finalizing a stream and collecting usage metadata.
 
@@ -15,12 +15,12 @@ defmodule Jido.AI.Skills.Streaming.Actions.EndStream do
   ## Examples
 
       # Basic stream finalization
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.EndStream, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.EndStream, %{
         stream_id: "abc123"
       })
 
       # With custom timeout
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Streaming.Actions.EndStream, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.EndStream, %{
         stream_id: "abc123",
         timeout: 5000
       })

@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.StreamingTest do
+defmodule Jido.AI.Plugins.StreamingTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Streaming
+  alias Jido.AI.Plugins.Streaming
 
   describe "plugin_spec/1" do
     test "returns valid skill spec with empty config" do
@@ -49,9 +49,9 @@ defmodule Jido.AI.Skills.StreamingTest do
       actions = Streaming.actions()
 
       assert length(actions) == 3
-      assert Jido.AI.Skills.Streaming.Actions.StartStream in actions
-      assert Jido.AI.Skills.Streaming.Actions.ProcessTokens in actions
-      assert Jido.AI.Skills.Streaming.Actions.EndStream in actions
+      assert Jido.AI.Actions.Streaming.StartStream in actions
+      assert Jido.AI.Actions.Streaming.ProcessTokens in actions
+      assert Jido.AI.Actions.Streaming.EndStream in actions
     end
   end
 end

@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.LLM.Actions.Embed do
+defmodule Jido.AI.Actions.LLM.Embed do
   @moduledoc """
   A Jido.Action for generating text embeddings using LLM embedding models.
 
@@ -16,19 +16,19 @@ defmodule Jido.AI.Skills.LLM.Actions.Embed do
   ## Examples
 
       # Single text embedding
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Embed, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Embed, %{
         model: "openai:text-embedding-3-small",
         texts: "Hello world"
       })
 
       # Batch embeddings
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Embed, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Embed, %{
         model: "openai:text-embedding-3-small",
         texts: ["Hello world", "Elixir is great"]
       })
 
       # With dimensions
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Embed, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Embed, %{
         model: "openai:text-embedding-3-small",
         texts: "Semantic search",
         dimensions: 1536

@@ -9,7 +9,7 @@ defmodule JidoAITest.Signals.OrchestrationSignalsTest do
     CapabilityResponse
   }
 
-  alias Jido.AI.Skills.Orchestration
+  alias Jido.AI.Plugins.Orchestration
 
   describe "DelegationRequest" do
     test "creates valid delegation request signal" do

@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.LLM.Actions.EmbedTest do
+defmodule Jido.AI.Actions.LLM.EmbedTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.LLM.Actions.Embed
+  alias Jido.AI.Actions.LLM.Embed
 
   describe "Embed action" do
     test "has correct metadata" do
