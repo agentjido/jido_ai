@@ -1,5 +1,7 @@
 # Jido.AI
 
+NOTE: This branch is to preserve the GEPA and Accuracy code in the original Jido.AI repository.
+
 **AI integration layer for the Jido ecosystem** - LLM orchestration, accuracy improvement techniques, and reasoning strategies for building intelligent agents in Elixir.
 
 ## Overview
@@ -47,15 +49,16 @@ config :jido_ai, :models,
 
 Strategies are agent patterns that determine how an LLM approaches a problem. They are the foundation of building intelligent agents with Jido.AI.
 
-| Strategy | Pattern | Best For | Guide |
-|----------|---------|----------|-------|
-| **ReAct** | Reason-Act loop | Tool-using agents | [Guide](guides/user/02_strategies.md#react-reason-act) |
-| **Chain-of-Thought** | Sequential reasoning | Multi-step problems | [Guide](guides/user/02_strategies.md#chain-of-thought) |
-| **Tree-of-Thoughts** | Explore multiple paths | Complex planning | [Guide](guides/user/02_strategies.md#tree-of-thoughts) |
-| **Graph-of-Thoughts** | Networked reasoning | Interconnected concepts | [Guide](guides/user/02_strategies.md#graph-of-thoughts) |
-| **Adaptive** | Strategy selection | Variable problem types | [Guide](guides/user/02_strategies.md#adaptive-strategy) |
+| Strategy              | Pattern                | Best For                | Guide                                                   |
+| --------------------- | ---------------------- | ----------------------- | ------------------------------------------------------- |
+| **ReAct**             | Reason-Act loop        | Tool-using agents       | [Guide](guides/user/02_strategies.md#react-reason-act)  |
+| **Chain-of-Thought**  | Sequential reasoning   | Multi-step problems     | [Guide](guides/user/02_strategies.md#chain-of-thought)  |
+| **Tree-of-Thoughts**  | Explore multiple paths | Complex planning        | [Guide](guides/user/02_strategies.md#tree-of-thoughts)  |
+| **Graph-of-Thoughts** | Networked reasoning    | Interconnected concepts | [Guide](guides/user/02_strategies.md#graph-of-thoughts) |
+| **Adaptive**          | Strategy selection     | Variable problem types  | [Guide](guides/user/02_strategies.md#adaptive-strategy) |
 
 **When to use which strategy:**
+
 - **ReAct** - When your agent needs to use tools or APIs
 - **Chain-of-Thought** - For multi-step reasoning and math problems
 - **Tree-of-Thoughts** - When exploring multiple solution paths is beneficial
@@ -88,12 +91,13 @@ Beyond strategies, Jido.AI provides research-backed techniques to improve LLM ou
 
 Generate multiple candidates and aggregate results for more reliable answers.
 
-| Technique | Best For | Guide |
-|-----------|----------|-------|
-| **Self-Consistency** | Multi-step reasoning, math problems | [Guide](guides/user/03_self_consistency.md) |
-| **Adaptive Self-Consistency** | Dynamic resource allocation | [Guide](guides/user/04_adaptive_self_consistency.md) |
+| Technique                     | Best For                            | Guide                                                |
+| ----------------------------- | ----------------------------------- | ---------------------------------------------------- |
+| **Self-Consistency**          | Multi-step reasoning, math problems | [Guide](guides/user/03_self_consistency.md)          |
+| **Adaptive Self-Consistency** | Dynamic resource allocation         | [Guide](guides/user/04_adaptive_self_consistency.md) |
 
 **When to use consensus methods:**
+
 - Problems with definite answers (math, logic, factual)
 - When you can afford multiple LLM calls
 - When majority voting improves reliability
@@ -113,13 +117,14 @@ Generate multiple candidates and aggregate results for more reliable answers.
 
 Systematically explore the reasoning space to find optimal solutions.
 
-| Algorithm | Best For | Guide |
-|-----------|----------|-------|
-| **Beam Search** | Focused exploration, limited depth | [Guide](guides/user/05_search_algorithms.md#beam-search) |
-| **MCTS** | Complex reasoning, game-like scenarios | [Guide](guides/user/05_search_algorithms.md#monte-carlo-tree-search-mcts) |
-| **Diverse Decoding** | Creative brainstorming | [Guide](guides/user/05_search_algorithms.md#diverse-decoding) |
+| Algorithm            | Best For                               | Guide                                                                     |
+| -------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
+| **Beam Search**      | Focused exploration, limited depth     | [Guide](guides/user/05_search_algorithms.md#beam-search)                  |
+| **MCTS**             | Complex reasoning, game-like scenarios | [Guide](guides/user/05_search_algorithms.md#monte-carlo-tree-search-mcts) |
+| **Diverse Decoding** | Creative brainstorming                 | [Guide](guides/user/05_search_algorithms.md#diverse-decoding)             |
 
 **When to use search algorithms:**
+
 - Problems with clear branching structure
 - When systematic exploration beats single-shot
 - Game-like or planning scenarios
@@ -140,15 +145,16 @@ Systematically explore the reasoning space to find optimal solutions.
 
 Validate outputs before accepting them, catching hallucinations and errors.
 
-| Verifier Type | Best For | Guide |
-|---------------|----------|-------|
-| **LLM Verifier** | General purpose checking | [Guide](guides/user/06_verification.md) |
-| **Code Execution** | Code generation, math | [Guide](guides/user/06_verification.md#code-execution-verifier) |
-| **Deterministic** | Known answers, test cases | [Guide](guides/user/06_verification.md#deterministic-verifier) |
-| **Static Analysis** | Code quality checks | [Guide](guides/user/06_verification.md#static-analysis-verifier) |
-| **Unit Test** | Test-driven validation | [Guide](guides/user/06_verification.md#unit-test-verifier) |
+| Verifier Type       | Best For                  | Guide                                                            |
+| ------------------- | ------------------------- | ---------------------------------------------------------------- |
+| **LLM Verifier**    | General purpose checking  | [Guide](guides/user/06_verification.md)                          |
+| **Code Execution**  | Code generation, math     | [Guide](guides/user/06_verification.md#code-execution-verifier)  |
+| **Deterministic**   | Known answers, test cases | [Guide](guides/user/06_verification.md#deterministic-verifier)   |
+| **Static Analysis** | Code quality checks       | [Guide](guides/user/06_verification.md#static-analysis-verifier) |
+| **Unit Test**       | Test-driven validation    | [Guide](guides/user/06_verification.md#unit-test-verifier)       |
 
 **When to use verification:**
+
 - When hallucinations are costly
 - For code generation or mathematical outputs
 - When you have reference answers or tests
@@ -174,13 +180,14 @@ verifier = Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier.new!(%{
 
 Iteratively refine outputs through self-critique and revision.
 
-| Technique | Best For | Guide |
-|-----------|----------|-------|
-| **Self-Refine** | Improving draft outputs | [Guide](guides/user/07_reflection.md) |
-| **Reflection Stages** | Multi-stage refinement | [Guide](guides/user/07_reflection.md#reflection-stages) |
-| **Critique & Revision** | Structured improvement cycles | [Guide](guides/user/08_critique_revision.md) |
+| Technique               | Best For                      | Guide                                                   |
+| ----------------------- | ----------------------------- | ------------------------------------------------------- |
+| **Self-Refine**         | Improving draft outputs       | [Guide](guides/user/07_reflection.md)                   |
+| **Reflection Stages**   | Multi-stage refinement        | [Guide](guides/user/07_reflection.md#reflection-stages) |
+| **Critique & Revision** | Structured improvement cycles | [Guide](guides/user/08_critique_revision.md)            |
 
 **When to use reflection:**
+
 - When initial drafts need refinement
 - For writing, code, or complex explanations
 - When you have time for iteration
@@ -199,13 +206,14 @@ result.refined_candidate  # The improved response
 
 Estimate confidence and difficulty to allocate resources appropriately.
 
-| Technique | Best For | Guide |
-|-----------|----------|-------|
-| **Confidence Calibration** | Reliability scoring | [Guide](guides/user/10_confidence_calibration.md) |
-| **Difficulty Estimation** | Resource allocation | [Guide](guides/user/11_difficulty_estimation.md) |
-| **Process Reward Models** | Step-by-step quality | [Guide](guides/user/09_prm.md) |
+| Technique                  | Best For             | Guide                                             |
+| -------------------------- | -------------------- | ------------------------------------------------- |
+| **Confidence Calibration** | Reliability scoring  | [Guide](guides/user/10_confidence_calibration.md) |
+| **Difficulty Estimation**  | Resource allocation  | [Guide](guides/user/11_difficulty_estimation.md)  |
+| **Process Reward Models**  | Step-by-step quality | [Guide](guides/user/09_prm.md)                    |
 
 **When to use quality estimation:**
+
 - Variable-difficulty workloads
 - Cost-sensitive applications
 - When you need confidence scores
@@ -232,7 +240,7 @@ end
 
 Combine multiple techniques into powerful pipelines that adapt to your needs.
 
-[**Pipeline Guide &rarr;](guides/user/12_pipeline.md)**
+[\*\*Pipeline Guide &rarr;](guides/user/12_pipeline.md)\*\*
 
 ```elixir
 # Build a pipeline that adapts based on difficulty
@@ -250,6 +258,7 @@ result.confidence  # Confidence score [0-1]
 ```
 
 **When to use pipelines:**
+
 - Complex problems requiring multiple techniques
 - When you need adaptive processing
 - Production workflows with quality requirements
@@ -259,6 +268,7 @@ result.confidence  # Confidence score [0-1]
 ## Documentation
 
 ### User Guides
+
 - [Overview](guides/user/01_overview.md) - Library introduction and concepts
 - [Strategies](guides/user/02_strategies.md) - Reasoning strategies
 - [Self-Consistency](guides/user/03_self_consistency.md) - Consensus-based improvement
@@ -273,6 +283,7 @@ result.confidence  # Confidence score [0-1]
 - [Pipeline](guides/user/12_pipeline.md) - Combining techniques into workflows
 
 ### Developer Guides
+
 - [Architecture Overview](guides/developer/01_architecture_overview.md) - System design
 - [Strategies](guides/developer/02_strategies.md) - Strategy implementation
 - [State Machines](guides/developer/03_state_machines.md) - Pure state machine pattern
@@ -283,7 +294,9 @@ result.confidence  # Confidence score [0-1]
 - [Configuration](guides/developer/08_configuration.md) - Model aliases and providers
 
 ### Examples
+
 See the [`examples/`](examples/) directory for runnable code:
+
 - [`examples/accuracy/`](examples/accuracy/) - Accuracy improvement examples
 - [`examples/strategies/`](examples/strategies/) - Reasoning strategy examples
 
