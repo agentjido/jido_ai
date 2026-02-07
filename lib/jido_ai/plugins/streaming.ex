@@ -1,13 +1,13 @@
 require Jido.AI.Actions.Streaming.EndStream
 require Jido.AI.Actions.Streaming.ProcessTokens
-# Ensure actions are compiled before the skill
+# Ensure actions are compiled before the plugin
 require Jido.AI.Actions.Streaming.StartStream
 
 defmodule Jido.AI.Plugins.Streaming do
   @moduledoc """
-  A Jido.Skill providing real-time streaming response capabilities from LLMs.
+  A Jido.Plugin providing real-time streaming response capabilities from LLMs.
 
-  This skill provides token-by-token streaming for real-time response handling.
+  This plugin provides token-by-token streaming for real-time response handling.
   It supports callbacks for each token, buffering for full response capture,
   and proper resource cleanup.
 
@@ -24,7 +24,7 @@ defmodule Jido.AI.Plugins.Streaming do
       defmodule MyAgent do
         use Jido.Agent,
 
-        skills: [
+        plugins: [
           {Jido.AI.Plugins.Streaming, []}
         ]
       end
@@ -105,7 +105,7 @@ defmodule Jido.AI.Plugins.Streaming do
     vsn: "1.0.0"
 
   @doc """
-  Initialize skill state when mounted to an agent.
+  Initialize plugin state when mounted to an agent.
   """
   @impl Jido.Plugin
   def mount(_agent, config) do
@@ -121,9 +121,9 @@ defmodule Jido.AI.Plugins.Streaming do
   end
 
   @doc """
-  Returns the schema for skill state.
+  Returns the schema for plugin state.
 
-  Defines the structure and defaults for Streaming skill state.
+  Defines the structure and defaults for Streaming plugin state.
   """
   def schema do
     Zoi.object(%{
@@ -144,7 +144,7 @@ defmodule Jido.AI.Plugins.Streaming do
   end
 
   @doc """
-  Returns the signal router for this skill.
+  Returns the signal router for this plugin.
 
   Maps signal patterns to action modules.
   """
@@ -178,7 +178,7 @@ defmodule Jido.AI.Plugins.Streaming do
   end
 
   @doc """
-  Returns signal patterns this skill responds to.
+  Returns signal patterns this plugin responds to.
   """
   def signal_patterns do
     [

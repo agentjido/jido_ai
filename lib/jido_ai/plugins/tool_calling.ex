@@ -1,13 +1,13 @@
-# Ensure actions are compiled before the skill
+# Ensure actions are compiled before the plugin
 require Jido.AI.Actions.ToolCalling.CallWithTools
 require Jido.AI.Actions.ToolCalling.ExecuteTool
 require Jido.AI.Actions.ToolCalling.ListTools
 
 defmodule Jido.AI.Plugins.ToolCalling do
   @moduledoc """
-  A Jido.Skill providing LLM tool/function calling capabilities.
+  A Jido.Plugin providing LLM tool/function calling capabilities.
 
-  This skill enables LLMs to call registered tools as functions during generation,
+  This plugin enables LLMs to call registered tools as functions during generation,
   with support for automatic tool execution and multi-turn conversations.
 
   ## Actions
@@ -23,7 +23,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
       defmodule MyAgent do
         use Jido.Agent,
 
-        skills: [
+        plugins: [
           {Jido.AI.Plugins.ToolCalling,
            auto_execute: true, max_turns: 10}
         ]
@@ -55,7 +55,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
 
   ## Auto-Execution
 
-  When `auto_execute: true`, the skill will:
+  When `auto_execute: true`, the plugin will:
 
   1. Send prompt to LLM with available tools
   2. If LLM returns tool calls, execute them automatically
@@ -95,7 +95,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
     vsn: "1.0.0"
 
   @doc """
-  Initialize skill state when mounted to an agent.
+  Initialize plugin state when mounted to an agent.
   """
   @impl Jido.Plugin
   def mount(_agent, config) do
@@ -116,9 +116,9 @@ defmodule Jido.AI.Plugins.ToolCalling do
   end
 
   @doc """
-  Returns the schema for skill state.
+  Returns the schema for plugin state.
 
-  Defines the structure and defaults for Tool Calling skill state.
+  Defines the structure and defaults for Tool Calling plugin state.
   """
   def schema do
     Zoi.object(%{
@@ -145,7 +145,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
   end
 
   @doc """
-  Returns the signal router for this skill.
+  Returns the signal router for this plugin.
 
   Maps signal patterns to action modules.
   """
@@ -179,7 +179,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
   end
 
   @doc """
-  Returns signal patterns this skill responds to.
+  Returns signal patterns this plugin responds to.
   """
   def signal_patterns do
     [

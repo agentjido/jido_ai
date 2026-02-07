@@ -1,4 +1,4 @@
-# Ensure actions are compiled before the skill
+# Ensure actions are compiled before the plugin
 require Jido.AI.Actions.LLM.Chat
 require Jido.AI.Actions.LLM.Complete
 require Jido.AI.Actions.LLM.Embed
@@ -6,9 +6,9 @@ require Jido.AI.Actions.LLM.GenerateObject
 
 defmodule Jido.AI.Plugins.LLM do
   @moduledoc """
-  A Jido.Skill providing LLM capabilities for chat, completion, and embeddings.
+  A Jido.Plugin providing LLM capabilities for chat, completion, and embeddings.
 
-  This skill wraps ReqLLM functionality into composable actions that can be
+  This plugin wraps ReqLLM functionality into composable actions that can be
   attached to any Jido agent. It provides three core actions:
 
   * `Chat` - Chat-style interaction with optional system prompts
@@ -22,7 +22,7 @@ defmodule Jido.AI.Plugins.LLM do
       defmodule MyAgent do
         use Jido.Agent,
 
-        skills: [
+        plugins: [
           {Jido.AI.Plugins.LLM, []}
         ]
       end
@@ -36,7 +36,7 @@ defmodule Jido.AI.Plugins.LLM do
 
   ## Model Resolution
 
-  The skill uses `Jido.AI.resolve_model/1` to resolve model aliases:
+  The plugin uses `Jido.AI.resolve_model/1` to resolve model aliases:
 
   * `:fast` - Quick model for simple tasks (default: `anthropic:claude-haiku-4-5`)
   * `:capable` - Capable model for complex tasks (default: `anthropic:claude-sonnet-4-20250514`)
@@ -46,10 +46,10 @@ defmodule Jido.AI.Plugins.LLM do
 
   ## Architecture Notes
 
-  **Direct ReqLLM Calls**: This skill calls ReqLLM functions directly without
+  **Direct ReqLLM Calls**: This plugin calls ReqLLM functions directly without
   any adapter layer, following the core design principle of Jido.AI.
 
-  **Stateless**: The skill maintains no internal state - all configuration
+  **Stateless**: The plugin maintains no internal state - all configuration
   is passed via action parameters.
   """
 
@@ -68,7 +68,7 @@ defmodule Jido.AI.Plugins.LLM do
     vsn: "1.0.0"
 
   @doc """
-  Initialize skill state when mounted to an agent.
+  Initialize plugin state when mounted to an agent.
 
   Returns initial state with any configured defaults.
   """
@@ -84,9 +84,9 @@ defmodule Jido.AI.Plugins.LLM do
   end
 
   @doc """
-  Returns the schema for skill state.
+  Returns the schema for plugin state.
 
-  Defines the structure and defaults for LLM skill state.
+  Defines the structure and defaults for LLM plugin state.
   """
   def schema do
     Zoi.object(%{
@@ -101,7 +101,7 @@ defmodule Jido.AI.Plugins.LLM do
   end
 
   @doc """
-  Returns the signal router for this skill.
+  Returns the signal router for this plugin.
 
   Maps signal patterns to action modules.
   """
@@ -136,7 +136,7 @@ defmodule Jido.AI.Plugins.LLM do
   end
 
   @doc """
-  Returns signal patterns this skill responds to.
+  Returns signal patterns this plugin responds to.
   """
   def signal_patterns do
     [
