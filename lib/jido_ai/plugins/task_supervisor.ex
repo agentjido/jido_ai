@@ -1,17 +1,17 @@
 defmodule Jido.AI.Plugins.TaskSupervisor do
   @moduledoc """
-  Skill that creates and manages a per-instance Task.Supervisor for Jido.AI agents.
+  Plugin that creates and manages a per-instance Task.Supervisor for Jido.AI agents.
 
   In Jido 2.0, each agent instance requires its own task supervisor to properly
   scope async operations (like LLM streaming and tool execution) to the agent's
   lifecycle.
 
-  This skill is automatically added to Jido.AI agents to handle supervisor creation
+  This plugin is automatically added to Jido.AI agents to handle supervisor creation
   and cleanup.
 
   ## Supervisor Storage
 
-  The supervisor PID is stored in `agent.state.__task_supervisor_skill__` (the skill's
+  The supervisor PID is stored in `agent.state.__task_supervisor_skill__` (the plugin's
   internal state) and is accessed by directives via `Directive.Helper.get_task_supervisor/1`.
 
   ## Lifecycle
@@ -21,13 +21,13 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
 
   ## Usage
 
-  This skill is automatically included when using `Jido.AI.ReActAgent`. Manual
+  This plugin is automatically included when using `Jido.AI.ReActAgent`. Manual
   inclusion is not typically needed.
 
   ## Implementation Notes
 
-  This skill has no actions - it only provides lifecycle hooks for supervisor
-  management. The supervisor PID is stored in the skill's state under the internal
+  This plugin has no actions - it only provides lifecycle hooks for supervisor
+  management. The supervisor PID is stored in the plugin's state under the internal
   key `__task_supervisor_skill__`.
   """
 
@@ -42,7 +42,7 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
   require Logger
 
   @doc """
-  Initialize skill state when mounted to an agent.
+  Initialize plugin state when mounted to an agent.
 
   Creates and stores the Task.Supervisor PID.
   """

@@ -1,15 +1,15 @@
 require Jido.AI.Actions.Orchestration.AggregateResults
 require Jido.AI.Actions.Orchestration.DelegateTask
 require Jido.AI.Actions.Orchestration.DiscoverCapabilities
-# Ensure actions are compiled before the skill
+# Ensure actions are compiled before the plugin
 require Jido.AI.Actions.Orchestration.SpawnChildAgent
 require Jido.AI.Actions.Orchestration.StopChildAgent
 
 defmodule Jido.AI.Plugins.Orchestration do
   @moduledoc """
-  Multi-agent coordination and delegation skill.
+  Multi-agent coordination and delegation plugin.
 
-  This skill provides orchestration primitives for spawning, managing,
+  This plugin provides orchestration primitives for spawning, managing,
   and coordinating child agents. It enables patterns like:
 
   * **Hierarchical delegation** - Parent delegates tasks to specialist children
@@ -22,21 +22,21 @@ defmodule Jido.AI.Plugins.Orchestration do
 
       defmodule MyOrchestrator do
         use Jido.Agent,
-          skills: [
+          plugins: [
             {Jido.AI.Plugins.Orchestration, []}
           ]
       end
 
   ## State Structure
 
-  The skill tracks:
+  The plugin tracks:
   - `children` - Map of tag => child info
   - `inflight` - Map of call_id => pending delegation info
   - `capability_cache` - Cached capability descriptors
 
   ## Signal Routing
 
-  The skill handles:
+  The plugin handles:
   - `jido.agent.child.started` - Child spawn confirmation
   - `jido.agent.child.exit` - Child termination
   - `ai.delegation.request` - Incoming delegation requests
@@ -70,7 +70,7 @@ defmodule Jido.AI.Plugins.Orchestration do
   alias Jido.AI.Signal.{DelegationRequest, DelegationResult, DelegationError}
 
   @doc """
-  Initialize skill state when mounted to an agent.
+  Initialize plugin state when mounted to an agent.
   """
   @impl Jido.Plugin
   def mount(_agent, _config) do
@@ -84,7 +84,7 @@ defmodule Jido.AI.Plugins.Orchestration do
   end
 
   @doc """
-  Returns the signal router for this skill.
+  Returns the signal router for this plugin.
   """
   @impl Jido.Plugin
   def signal_routes(_config) do
@@ -138,7 +138,7 @@ defmodule Jido.AI.Plugins.Orchestration do
   end
 
   @doc """
-  Returns signal patterns this skill responds to.
+  Returns signal patterns this plugin responds to.
   """
   def signal_patterns do
     [
