@@ -135,23 +135,7 @@ defmodule JidoAi.MixProject do
         # User Guides
         "guides/user/01_overview.md",
         "guides/user/02_strategies.md",
-        "guides/user/03_self_consistency.md",
-        "guides/user/04_adaptive_self_consistency.md",
-        "guides/user/05_search_algorithms.md",
-        "guides/user/06_verification.md",
-        "guides/user/07_reflection.md",
-        "guides/user/08_critique_revision.md",
-        "guides/user/09_prm.md",
-        "guides/user/10_confidence_calibration.md",
-        "guides/user/11_difficulty_estimation.md",
-        "guides/user/12_pipeline.md",
         # Examples
-        "examples/accuracy/adaptive_self_consistency/example.md",
-        "examples/accuracy/pipeline/example.md",
-        "examples/accuracy/reflection/example.md",
-        "examples/accuracy/search/example.md",
-        "examples/accuracy/self_consistency/example.md",
-        "examples/accuracy/verification/example.md",
         "examples/strategies/adaptive_strategy.md",
         "examples/strategies/chain_of_thought.md",
         "examples/strategies/react_agent.md",
@@ -160,7 +144,6 @@ defmodule JidoAi.MixProject do
       groups_for_extras: [
         {"Developer Guides", ~r/guides\/developer/},
         {"User Guides", ~r/guides\/user/},
-        {"Examples - Accuracy", ~r/examples\/accuracy/},
         {"Examples - Strategies", ~r/examples\/strategies/}
       ],
       groups_for_modules: [
