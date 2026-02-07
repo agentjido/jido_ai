@@ -234,8 +234,6 @@ defmodule Mix.Tasks.JidoAi.Skill do
   end
 
   defp get_body(%Spec{body_ref: {:inline, content}}), do: content
-  defp get_body(%Spec{body_ref: {:file, path}}), do: File.read!(path)
-  defp get_body(%Spec{body_ref: nil}), do: ""
 
   defp format_error(%{__struct__: struct} = error) do
     case struct do

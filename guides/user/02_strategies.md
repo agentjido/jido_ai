@@ -371,7 +371,3 @@ flowchart TD
 | Iterative refinement | TRM |
 
 ## Next Steps
-
-- [Self-Consistency Guide](./03_self_consistency.md) - Combine strategies with accuracy techniques
-- [Search Algorithms Guide](./05_search_algorithms.md) - Deeper exploration techniques
-- [Pipeline Guide](./12_pipeline.md) - Orchestrate complete workflows
