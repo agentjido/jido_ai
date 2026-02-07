@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.Streaming.Actions.ProcessTokensTest do
+defmodule Jido.AI.Actions.Streaming.ProcessTokensTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Streaming.Actions.ProcessTokens
+  alias Jido.AI.Actions.Streaming.ProcessTokens
 
   @moduletag :unit
   @moduletag :capture_log

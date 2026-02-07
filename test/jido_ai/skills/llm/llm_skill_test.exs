@@ -1,13 +1,13 @@
-defmodule Jido.AI.Skills.LLMTest do
+defmodule Jido.AI.Plugins.LLMTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.LLM
+  alias Jido.AI.Plugins.LLM
 
   describe "plugin_spec/1" do
     test "returns valid skill specification" do
       spec = LLM.plugin_spec(%{})
 
-      assert spec.module == Jido.AI.Skills.LLM
+      assert spec.module == Jido.AI.Plugins.LLM
       assert spec.name == "llm"
       assert spec.state_key == :llm
       assert spec.description == "Provides LLM chat, completion, and embedding capabilities"
@@ -19,9 +19,9 @@ defmodule Jido.AI.Skills.LLMTest do
     test "includes all three actions" do
       spec = LLM.plugin_spec(%{})
 
-      assert Jido.AI.Skills.LLM.Actions.Chat in spec.actions
-      assert Jido.AI.Skills.LLM.Actions.Complete in spec.actions
-      assert Jido.AI.Skills.LLM.Actions.Embed in spec.actions
+      assert Jido.AI.Actions.LLM.Chat in spec.actions
+      assert Jido.AI.Actions.LLM.Complete in spec.actions
+      assert Jido.AI.Actions.LLM.Embed in spec.actions
     end
   end
 

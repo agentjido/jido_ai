@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.Planning.Actions.PrioritizeTest do
+defmodule Jido.AI.Actions.Planning.PrioritizeTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Planning.Actions.Prioritize
+  alias Jido.AI.Actions.Planning.Prioritize
 
   @moduletag :unit
   @moduletag :capture_log

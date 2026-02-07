@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
+defmodule Jido.AI.Actions.Planning.Prioritize do
   @moduledoc """
   A Jido.Action for prioritizing tasks based on given criteria.
 
@@ -18,7 +18,7 @@ defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
   ## Examples
 
       # Basic prioritization
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Prioritize, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Planning.Prioritize, %{
         tasks: [
           "Fix critical bug",
           "Update documentation",
@@ -28,13 +28,13 @@ defmodule Jido.AI.Skills.Planning.Actions.Prioritize do
       })
 
       # With specific criteria
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Prioritize, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Planning.Prioritize, %{
         tasks: ["Task A", "Task B", "Task C"],
         criteria: "Business impact, development effort, and dependencies"
       })
 
       # With context
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Prioritize, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Planning.Prioritize, %{
         tasks: ["Design database", "Build API", "Create UI"],
         criteria: "Dependencies and value delivery",
         context: "Early-stage startup, need MVP quickly"

@@ -1,7 +1,7 @@
-defmodule Jido.AI.Skills.Streaming.Actions.EndStreamTest do
+defmodule Jido.AI.Actions.Streaming.EndStreamTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.Streaming.Actions.EndStream
+  alias Jido.AI.Actions.Streaming.EndStream
 
   @moduletag :unit
   @moduletag :capture_log

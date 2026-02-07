@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.LLM.Actions.Chat do
+defmodule Jido.AI.Actions.LLM.Chat do
   @moduledoc """
   A Jido.Action for chat-style LLM interactions with optional system prompts.
 
@@ -18,12 +18,12 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
   ## Examples
 
       # Basic chat
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Chat, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Chat, %{
         prompt: "What is Elixir?"
       })
 
       # With system prompt
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Chat, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Chat, %{
         model: :capable,
         prompt: "Explain GenServers",
         system_prompt: "You are an expert Elixir teacher.",
@@ -31,7 +31,7 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
       })
 
       # Direct model spec
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.LLM.Actions.Chat, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Chat, %{
         model: "openai:gpt-4",
         prompt: "Hello!"
       })
@@ -58,7 +58,7 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
       })
 
   alias Jido.AI.Security
-  alias Jido.AI.Skills.BaseActionHelpers
+  alias Jido.AI.Actions.Helpers
   alias ReqLLM.Context
 
   @doc """
@@ -83,10 +83,10 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
   """
   @impl Jido.Action
   def run(params, _context) do
-    with {:ok, validated_params} <- BaseActionHelpers.validate_and_sanitize_input(params),
-         {:ok, model} <- BaseActionHelpers.resolve_model(validated_params[:model], :fast),
+    with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
+         {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
          context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
-         opts = BaseActionHelpers.build_opts(validated_params),
+         opts = Helpers.build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
       {:ok, format_result(response, model)}
     else
@@ -116,9 +116,9 @@ defmodule Jido.AI.Skills.LLM.Actions.Chat do
 
   defp format_result(response, model) do
     %{
-      text: BaseActionHelpers.extract_text(response),
+      text: Helpers.extract_text(response),
       model: model,
-      usage: BaseActionHelpers.extract_usage(response)
+      usage: Helpers.extract_usage(response)
     }
   end
 end

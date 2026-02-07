@@ -1,4 +1,4 @@
-defmodule Jido.AI.Skills.Planning.Actions.Decompose do
+defmodule Jido.AI.Actions.Planning.Decompose do
   @moduledoc """
   A Jido.Action for breaking down complex goals into hierarchical sub-goals.
 
@@ -18,18 +18,18 @@ defmodule Jido.AI.Skills.Planning.Actions.Decompose do
   ## Examples
 
       # Basic decomposition
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Decompose, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Planning.Decompose, %{
         goal: "Build a mobile app"
       })
 
       # With specific depth
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Decompose, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Planning.Decompose, %{
         goal: "Launch a startup",
         max_depth: 4
       })
 
       # With context
-      {:ok, result} = Jido.Exec.run(Jido.AI.Skills.Planning.Actions.Decompose, %{
+      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Planning.Decompose, %{
         goal: "Organize a conference",
         context: "Technology conference with 500 attendees, limited budget"
       })

@@ -1,34 +1,34 @@
-defmodule Jido.AI.Skills.BaseActionHelpersTest do
+defmodule Jido.AI.Actions.HelpersTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skills.BaseActionHelpers
+  alias Jido.AI.Actions.Helpers
 
   describe "resolve_model/2" do
     test "resolves nil to default model" do
-      assert {:ok, model} = BaseActionHelpers.resolve_model(nil, :fast)
+      assert {:ok, model} = Helpers.resolve_model(nil, :fast)
       assert is_binary(model)
       assert String.contains?(model, "claude")
     end
 
     test "resolves atom alias to model spec" do
-      assert {:ok, model} = BaseActionHelpers.resolve_model(:fast, :fast)
+      assert {:ok, model} = Helpers.resolve_model(:fast, :fast)
       assert is_binary(model)
     end
 
     test "passes through binary model spec" do
-      assert {:ok, "openai:gpt-4"} = BaseActionHelpers.resolve_model("openai:gpt-4", :fast)
+      assert {:ok, "openai:gpt-4"} = Helpers.resolve_model("openai:gpt-4", :fast)
     end
 
     test "returns error for invalid model format" do
-      assert {:error, :invalid_model_format} = BaseActionHelpers.resolve_model(123, :fast)
-      assert {:error, :invalid_model_format} = BaseActionHelpers.resolve_model([:invalid], :fast)
+      assert {:error, :invalid_model_format} = Helpers.resolve_model(123, :fast)
+      assert {:error, :invalid_model_format} = Helpers.resolve_model([:invalid], :fast)
     end
   end
 
   describe "build_opts/1" do
     test "builds options from params" do
       params = %{max_tokens: 1000, temperature: 0.5}
-      opts = BaseActionHelpers.build_opts(params)
+      opts = Helpers.build_opts(params)
 
       assert opts[:max_tokens] == 1000
       assert opts[:temperature] == 0.5
@@ -37,14 +37,14 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
 
     test "adds receive_timeout when provided" do
       params = %{max_tokens: 1000, temperature: 0.5, timeout: 5000}
-      opts = BaseActionHelpers.build_opts(params)
+      opts = Helpers.build_opts(params)
 
       assert opts[:receive_timeout] == 5000
     end
 
     test "handles missing optional params" do
       params = %{max_tokens: 1000}
-      opts = BaseActionHelpers.build_opts(params)
+      opts = Helpers.build_opts(params)
 
       assert opts[:max_tokens] == 1000
       assert opts[:temperature] == nil
@@ -54,7 +54,7 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
   describe "extract_text/1" do
     test "extracts binary content" do
       response = %{message: %{content: "Hello world"}}
-      assert "Hello world" = BaseActionHelpers.extract_text(response)
+      assert "Hello world" = Helpers.extract_text(response)
     end
 
     test "extracts text from content list" do
@@ -68,7 +68,7 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
       }
 
       # Text blocks are joined with newlines
-      assert "Hello\nworld" = BaseActionHelpers.extract_text(response)
+      assert "Hello\nworld" = Helpers.extract_text(response)
     end
 
     test "filters non-text blocks from content list" do
@@ -83,13 +83,13 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
       }
 
       # Text blocks are joined with newlines, non-text blocks filtered
-      assert "Hello\nworld" = BaseActionHelpers.extract_text(response)
+      assert "Hello\nworld" = Helpers.extract_text(response)
     end
 
     test "returns empty string for malformed response" do
-      assert "" = BaseActionHelpers.extract_text(%{})
-      assert "" = BaseActionHelpers.extract_text(%{message: %{}})
-      assert "" = BaseActionHelpers.extract_text(nil)
+      assert "" = Helpers.extract_text(%{})
+      assert "" = Helpers.extract_text(%{message: %{}})
+      assert "" = Helpers.extract_text(nil)
     end
   end
 
@@ -103,7 +103,7 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
         }
       }
 
-      usage = BaseActionHelpers.extract_usage(response)
+      usage = Helpers.extract_usage(response)
 
       assert usage.input_tokens == 10
       assert usage.output_tokens == 20
@@ -112,7 +112,7 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
 
     test "handles missing usage fields" do
       response = %{usage: %{input_tokens: 10}}
-      usage = BaseActionHelpers.extract_usage(response)
+      usage = Helpers.extract_usage(response)
 
       assert usage.input_tokens == 10
       assert usage.output_tokens == 0
@@ -120,7 +120,7 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
     end
 
     test "returns empty usage for malformed response" do
-      usage = BaseActionHelpers.extract_usage(%{})
+      usage = Helpers.extract_usage(%{})
 
       assert usage.input_tokens == 0
       assert usage.output_tokens == 0
@@ -131,82 +131,82 @@ defmodule Jido.AI.Skills.BaseActionHelpersTest do
   describe "validate_and_sanitize_input/2" do
     test "accepts valid input with prompt" do
       params = %{prompt: "Hello world"}
-      assert {:ok, ^params} = BaseActionHelpers.validate_and_sanitize_input(params)
+      assert {:ok, ^params} = Helpers.validate_and_sanitize_input(params)
     end
 
     test "rejects empty prompt when required" do
       params = %{prompt: ""}
-      assert {:error, :prompt_required} = BaseActionHelpers.validate_and_sanitize_input(params)
+      assert {:error, :prompt_required} = Helpers.validate_and_sanitize_input(params)
     end
 
     test "rejects nil prompt when required" do
       params = %{}
-      assert {:error, :prompt_required} = BaseActionHelpers.validate_and_sanitize_input(params)
+      assert {:error, :prompt_required} = Helpers.validate_and_sanitize_input(params)
     end
 
     test "allows nil prompt when not required" do
       params = %{other: "data"}
-      assert {:ok, ^params} = BaseActionHelpers.validate_and_sanitize_input(params, required_prompt: false)
+      assert {:ok, ^params} = Helpers.validate_and_sanitize_input(params, required_prompt: false)
     end
 
     test "validates system_prompt when present" do
       params = %{prompt: "Hello", system_prompt: "You are helpful"}
-      assert {:ok, _} = BaseActionHelpers.validate_and_sanitize_input(params)
+      assert {:ok, _} = Helpers.validate_and_sanitize_input(params)
     end
 
     test "rejects dangerous characters in prompt" do
       params = %{prompt: "Hello" <> <<0>>}
-      assert {:error, {:dangerous_character, _}} = BaseActionHelpers.validate_and_sanitize_input(params)
+      assert {:error, {:dangerous_character, _}} = Helpers.validate_and_sanitize_input(params)
     end
 
     test "rejects dangerous characters in system_prompt" do
       params = %{prompt: "Hello", system_prompt: "You are" <> <<1>>}
-      assert {:error, {:dangerous_character, _}} = BaseActionHelpers.validate_and_sanitize_input(params)
+      assert {:error, {:dangerous_character, _}} = Helpers.validate_and_sanitize_input(params)
     end
 
     test "enforces max length for prompt" do
       long_prompt = String.duplicate("a", 200_000)
       params = %{prompt: long_prompt}
-      assert {:error, :string_too_long} = BaseActionHelpers.validate_and_sanitize_input(params)
+      assert {:error, :string_too_long} = Helpers.validate_and_sanitize_input(params)
     end
 
     test "accepts valid custom max length" do
       prompt = String.duplicate("a", 100)
       params = %{prompt: prompt}
-      assert {:ok, _} = BaseActionHelpers.validate_and_sanitize_input(params, max_prompt_length: 100)
+      assert {:ok, _} = Helpers.validate_and_sanitize_input(params, max_prompt_length: 100)
     end
   end
 
   describe "sanitize_error/1" do
     test "returns generic message for runtime errors" do
       error = %RuntimeError{message: "Detailed internal error"}
-      assert "An error occurred" = BaseActionHelpers.sanitize_error(error)
+      assert "An error occurred" = Helpers.sanitize_error(error)
     end
 
     test "returns specific message for known error types" do
-      assert "Request timed out" = BaseActionHelpers.sanitize_error(:timeout)
-      assert "Connection failed" = BaseActionHelpers.sanitize_error(:econnrefused)
+      assert "Request timed out" = Helpers.sanitize_error(:timeout)
+      assert "Connection failed" = Helpers.sanitize_error(:econnrefused)
     end
 
     test "returns generic message for tuple errors" do
-      assert "An error occurred" = BaseActionHelpers.sanitize_error({:error, :reason})
+      assert "An error occurred" = Helpers.sanitize_error({:error, :reason})
     end
   end
 
   describe "format_result/1" do
     test "passes through ok results" do
       result = {:ok, %{text: "Hello"}}
-      assert ^result = BaseActionHelpers.format_result(result)
+      assert ^result = Helpers.format_result(result)
     end
 
     test "sanitizes error results" do
       result = {:error, %RuntimeError{message: "Internal error"}}
-      assert {:error, "An error occurred"} = BaseActionHelpers.format_result(result)
+      assert {:error, "An error occurred"} = Helpers.format_result(result)
     end
 
     test "sanitizes atom errors" do
       result = {:error, :timeout}
-      assert {:error, "Request timed out"} = BaseActionHelpers.format_result(result)
+      assert {:error, "Request timed out"} = Helpers.format_result(result)
     end
   end
 end
