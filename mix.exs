@@ -62,7 +62,7 @@ defmodule JidoAi.MixProject do
       # Jido ecosystem
       {:jido, "~> 2.0.0-rc.4"},
       {:req_llm, "~> 1.5"},
-      {:jido_browser, "~> 0.8.1"},
+      {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
 
       # Runtime
       {:fsmx, "~> 0.5"},
