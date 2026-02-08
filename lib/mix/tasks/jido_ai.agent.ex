@@ -151,7 +151,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
       tui_module = Module.concat(Jido.AI.CLI, TUI)
 
       if Code.ensure_loaded?(tui_module) and function_exported?(tui_module, :run, 1) do
-        apply(tui_module, :run, [config])
+        tui_module.run(config)
       else
         output_fatal_error(config, :tui_unavailable)
       end

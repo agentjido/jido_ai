@@ -86,35 +86,6 @@ defmodule Jido.AI.CLI.Adapters.ReAct do
 
   # Private helpers
 
-  defp poll_loop(pid, deadline, interval) do
-    now = System.monotonic_time(:millisecond)
-
-    if now >= deadline do
-      {:error, :timeout}
-    else
-      case Jido.AgentServer.status(pid) do
-        {:ok, status} ->
-          if status.snapshot.done? do
-            # Prefer snapshot.result (general contract), fallback to raw_state.last_answer
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_answer, "")
-                "" -> Map.get(status.raw_state, :last_answer, "")
-                result -> result
-              end
-
-            {:ok, %{answer: answer, meta: extract_meta(status)}}
-          else
-            Process.sleep(interval)
-            poll_loop(pid, deadline, interval)
-          end
-
-        {:error, reason} ->
-          {:error, reason}
-      end
-    end
-  end
-
   defp extract_meta(status) do
     strategy_state = Map.get(status.raw_state, :__strategy__, %{})
     details = Map.get(status.snapshot, :details, %{})

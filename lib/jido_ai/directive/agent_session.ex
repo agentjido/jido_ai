@@ -111,6 +111,9 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     started automatically by Jido.AI when an agent is created.
     """
 
+    @compile {:no_warn_undefined, AgentSessionManager.SessionManager}
+    @compile {:no_warn_undefined, AgentSessionManager.Adapters.InMemorySessionStore}
+
     alias AgentSessionManager.SessionManager
     alias Jido.AI.Signal.AgentSession, as: Signals
 

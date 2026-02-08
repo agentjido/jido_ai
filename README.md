@@ -100,8 +100,11 @@ end
 - [Configuration](guides/developer/08_configuration.md) - Model aliases and providers
 
 ### Examples
-See the [`examples/`](examples/) directory for runnable code:
-- [`examples/strategies/`](examples/strategies/) - Reasoning strategy examples
+See these locations for runnable examples:
+- [`lib/jido_ai/examples/calculator_agent.ex`](lib/jido_ai/examples/calculator_agent.ex) - Basic agent demo
+- [`lib/jido_ai/examples/orchestrator_demo.ex`](lib/jido_ai/examples/orchestrator_demo.ex) - Orchestration demo
+- [`lib/jido_ai/examples/skills_demo_agent.ex`](lib/jido_ai/examples/skills_demo_agent.ex) - Skills demo agent
+- [`guides/user/02_strategies.md`](guides/user/02_strategies.md) - Strategy usage walkthroughs
 
 ## Skills
 
@@ -201,7 +204,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## License
 
-Apache-2.0 - See [LICENSE](LICENSE) for details.
+Apache-2.0 - See [LICENSE.md](LICENSE.md) for details.
 
 ---
 

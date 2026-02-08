@@ -1,5 +1,21 @@
 import Config
 
+config :logger, :default_formatter,
+  metadata: [
+    :agent_pid,
+    :exception_message,
+    :exception_type,
+    :module_name,
+    :reason,
+    :response_length,
+    :result_type,
+    :specialist_count,
+    :specialist_name,
+    :stacktrace,
+    :task,
+    :tool_name
+  ]
+
 if config_env() == :dev do
   config :git_hooks,
     auto_install: true,

@@ -60,16 +60,20 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.0.0-rc.4"},
+      {:jido, git: "https://github.com/nshkrdotcom/jido.git", branch: "refactor/otp-cleanup", override: true},
+      {:jido_action,
+       git: "https://github.com/nshkrdotcom/jido_action.git", branch: "refactor/otp-cleanup", override: true},
       {:req_llm, "~> 1.5"},
       {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
+      {:agent_session_manager, "~> 0.5.1", optional: true},
 
       # Runtime
       {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
-      {:term_ui, path: "../../term_ui"},
+      {:term_ui, github: "nshkrdotcom/term_ui", branch: "cleanup-dialyzer-credo"},
+      {:yaml_elixir, "~> 2.9"},
       {:zoi, "~> 0.16"},
 
       # Dev/Test
@@ -102,7 +106,7 @@ defmodule JidoAi.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "CHANGELOG.md", "usage-rules.md", "guides", "examples"],
+      files: ["lib", "mix.exs", "README.md", "LICENSE.md", "CHANGELOG.md", "usage-rules.md", "guides"],
       maintainers: ["Mike Hostetler <mike.hostetler@gmail.com>", "Pascal Charbon <pcharbon70@gmail.com>"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -121,6 +125,7 @@ defmodule JidoAi.MixProject do
       source_ref: "v#{@version}",
       extras: [
         "README.md",
+        "LICENSE.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
         # Developer Guides
@@ -134,17 +139,11 @@ defmodule JidoAi.MixProject do
         "guides/developer/08_configuration.md",
         # User Guides
         "guides/user/01_overview.md",
-        "guides/user/02_strategies.md",
-        # Examples
-        "examples/strategies/adaptive_strategy.md",
-        "examples/strategies/chain_of_thought.md",
-        "examples/strategies/react_agent.md",
-        "examples/strategies/tree_of_thoughts.md"
+        "guides/user/02_strategies.md"
       ],
       groups_for_extras: [
         {"Developer Guides", ~r/guides\/developer/},
-        {"User Guides", ~r/guides\/user/},
-        {"Examples - Strategies", ~r/examples\/strategies/}
+        {"User Guides", ~r/guides\/user/}
       ],
       groups_for_modules: [
         Core: [

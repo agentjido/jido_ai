@@ -38,7 +38,6 @@ defmodule Mix.Tasks.JidoAi.Skill do
 
   use Mix.Task
 
-  alias Jido.AI.Skill
   alias Jido.AI.Skill.{Loader, Spec}
 
   @impl Mix.Task

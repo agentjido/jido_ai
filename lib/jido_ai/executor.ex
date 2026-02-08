@@ -69,6 +69,7 @@ defmodule Jido.AI.Executor do
   """
 
   alias Jido.Action.Tool, as: ActionTool
+  alias Jido.Tracing.Context, as: TracingContext
 
   require Logger
 
@@ -298,6 +299,12 @@ defmodule Jido.AI.Executor do
 
   defp atomize_keys(list) when is_list(list), do: Enum.map(list, &atomize_keys/1)
   defp atomize_keys(other), do: other
+
+  defp to_existing_atom_or_string(key) when is_binary(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
+  end
 
   defp coerce_integers_to_floats(params, schema) when is_list(schema) do
     float_keys =
@@ -533,7 +540,7 @@ defmodule Jido.AI.Executor do
   end
 
   defp get_trace_metadata do
-    case Jido.Tracing.Context.get() do
+    case TracingContext.get() do
       nil ->
         %{}
 
