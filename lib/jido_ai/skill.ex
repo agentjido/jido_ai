@@ -45,7 +45,7 @@ defmodule Jido.AI.Skill do
       Jido.AI.Skill.actions(skill)       # Returns list of action modules
   """
 
-  alias Jido.AI.Skill.{Spec, Registry, Error}
+  alias Jido.AI.Skill.{Error, Registry, Spec}
 
   @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
   @max_name_length 64
@@ -154,7 +154,9 @@ defmodule Jido.AI.Skill do
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
-      @behaviour Jido.AI.Skill
+      alias Jido.AI.Skill
+
+      @behaviour Skill
 
       name = Keyword.fetch!(opts, :name)
       description = Keyword.fetch!(opts, :description)
@@ -163,7 +165,7 @@ defmodule Jido.AI.Skill do
       metadata = Keyword.get(opts, :metadata, %{})
 
       allowed_tools =
-        Jido.AI.Skill.__normalize_allowed_tools__(Keyword.get(opts, :allowed_tools, []))
+        Skill.__normalize_allowed_tools__(Keyword.get(opts, :allowed_tools, []))
 
       actions = Keyword.get(opts, :actions, [])
       plugins = Keyword.get(opts, :plugins, [])
@@ -172,10 +174,10 @@ defmodule Jido.AI.Skill do
       vsn = Keyword.get(opts, :vsn)
       tags = Keyword.get(opts, :tags, [])
 
-      Jido.AI.Skill.__validate_name__!(name)
-      Jido.AI.Skill.__validate_description__!(description)
+      Skill.__validate_name__!(name)
+      Skill.__validate_description__!(description)
 
-      body_ref = Jido.AI.Skill.__body_ref__(body, body_file)
+      body_ref = Skill.__body_ref__(body, body_file)
 
       @skill_spec %Jido.AI.Skill.Spec{
         name: name,
@@ -192,19 +194,19 @@ defmodule Jido.AI.Skill do
         tags: tags
       }
 
-      @impl Jido.AI.Skill
+      @impl Skill
       def manifest, do: @skill_spec
 
-      @impl Jido.AI.Skill
-      def body, do: Jido.AI.Skill.__get_body__(@skill_spec.body_ref)
+      @impl Skill
+      def body, do: Skill.__get_body__(@skill_spec.body_ref)
 
-      @impl Jido.AI.Skill
+      @impl Skill
       def allowed_tools, do: @skill_spec.allowed_tools
 
-      @impl Jido.AI.Skill
+      @impl Skill
       def actions, do: @skill_spec.actions
 
-      @impl Jido.AI.Skill
+      @impl Skill
       def plugins, do: @skill_spec.plugins
     end
   end

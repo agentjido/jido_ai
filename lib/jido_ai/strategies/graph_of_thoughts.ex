@@ -31,7 +31,7 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
 
   Configure via strategy options when defining your agent:
 
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: "my_got_agent",
         strategy: {
           Jido.AI.Strategies.GraphOfThoughts,

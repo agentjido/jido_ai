@@ -63,6 +63,8 @@ defmodule Jido.AI.OrchestratorAgent do
       agent.state.last_answer  # => "105"
   """
 
+  alias Jido.AI.ReActAgent
+
   @default_model "anthropic:claude-haiku-4-5"
   @default_max_iterations 10
 
@@ -79,13 +81,13 @@ defmodule Jido.AI.OrchestratorAgent do
       specialists_ast
       |> Enum.map(fn spec_ast ->
         # Use the same safe AST expansion as ReActAgent
-        expanded = Jido.AI.ReActAgent.expand_aliases_in_ast(spec_ast, __CALLER__)
+        expanded = ReActAgent.expand_aliases_in_ast(spec_ast, __CALLER__)
         {spec, _} = Code.eval_quoted(expanded, [], __CALLER__)
         spec
       end)
 
     quote location: :keep do
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: unquote(name),
         description: unquote(description),
         plugins: [
@@ -212,6 +214,8 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
       })
 
   require Logger
+  @specialist_jido_instance JidoAi.OrchestratorSpecialistJido
+  @specialist_timeout_ms 30_000
 
   @impl Jido.Action
   def run(params, context) do
@@ -325,12 +329,18 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
 
     case Jason.decode(clean_text) do
       {:ok, %{"decision" => decision, "target_name" => target_name} = parsed} ->
-        {:ok,
-         %{
-           decision: String.to_atom(decision),
-           target: if(target_name, do: %{name: target_name}),
-           reasoning: parsed["reasoning"]
-         }}
+        case parse_decision(decision) do
+          {:ok, parsed_decision} ->
+            {:ok,
+             %{
+               decision: parsed_decision,
+               target: if(target_name, do: %{name: target_name}),
+               reasoning: parsed["reasoning"]
+             }}
+
+          :error ->
+            {:error, :invalid_routing_decision}
+        end
 
       {:ok, _} ->
         {:error, :invalid_routing_response}
@@ -339,6 +349,12 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
         {:error, :json_parse_failed}
     end
   end
+
+  defp parse_decision("delegate"), do: {:ok, :delegate}
+  defp parse_decision("local"), do: {:ok, :local}
+  defp parse_decision(:delegate), do: {:ok, :delegate}
+  defp parse_decision(:local), do: {:ok, :local}
+  defp parse_decision(_), do: :error
 
   defp execute_routing(%{decision: :local, reasoning: reasoning}, task, _specialists) do
     {:ok,
@@ -371,55 +387,33 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     end
   end
 
-  defp execute_routing(_, task, _) do
-    {:ok, %{result: "Could not route task: #{task}", delegated_to: nil}}
-  end
-
   defp run_specialist(specialist, task) do
-    tools = specialist[:tools] || []
-    model = specialist[:model] || "anthropic:claude-haiku-4-5"
     spec_name = specialist[:name] || "unnamed"
 
-    suffix = :erlang.unique_integer([:positive])
-    module_name = Module.concat([JidoAi, EphemeralSpecialist, :"Spec#{suffix}"])
-
-    Logger.debug("[Orchestrator] Creating specialist module",
-      module_name: module_name,
-      specialist_name: spec_name
-    )
-
-    contents =
-      quote do
-        use Jido.AI.ReActAgent,
-          name: unquote(spec_name),
-          description: unquote(specialist[:description] || "Specialist agent"),
-          tools: unquote(tools),
-          model: unquote(model),
-          max_iterations: 5
-      end
-
-    Module.create(module_name, contents, Macro.Env.location(__ENV__))
-
-    jido_name = :"jido_specialist_#{suffix}"
-
-    Logger.debug("[Orchestrator] Starting Jido instance", jido_name: jido_name)
-    {:ok, _jido} = Jido.start_link(name: jido_name)
-
     try do
-      Logger.debug("[Orchestrator] Starting agent", module_name: module_name)
+      with :ok <- ensure_specialist_instance_started() do
+        module_name = ensure_specialist_module(specialist)
 
-      case Jido.start_agent(jido_name, module_name) do
-        {:ok, pid} ->
-          Logger.debug("[Orchestrator] Agent started", agent_pid: pid, task: task)
-          :ok = module_name.ask(pid, task)
-          result = await_specialist(pid, 30_000)
-          Logger.debug("[Orchestrator] Specialist completed", result_type: result_type(result))
-          GenServer.stop(pid, :normal, 1000)
-          result
+        Logger.debug("[Orchestrator] Starting specialist agent",
+          module_name: module_name,
+          specialist_name: spec_name
+        )
 
-        {:error, reason} ->
-          Logger.error("[Orchestrator] Failed to start agent", reason: reason)
-          {:error, reason}
+        agent_id = "specialist-#{:erlang.unique_integer([:positive])}"
+
+        case Jido.start_agent(@specialist_jido_instance, module_name, id: agent_id) do
+          {:ok, pid} ->
+            Logger.debug("[Orchestrator] Agent started", agent_pid: pid, task: task)
+            :ok = module_name.ask(pid, task)
+            result = await_specialist(pid, @specialist_timeout_ms)
+            Logger.debug("[Orchestrator] Specialist completed", result_type: result_type(result))
+            stop_specialist_agent(pid)
+            result
+
+          {:error, reason} ->
+            Logger.error("[Orchestrator] Failed to start agent", reason: reason)
+            {:error, reason}
+        end
       end
     rescue
       e ->
@@ -429,9 +423,61 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
         )
 
         {:error, Exception.message(e)}
-    after
-      if Process.whereis(jido_name), do: Supervisor.stop(jido_name)
     end
+  end
+
+  defp ensure_specialist_instance_started do
+    case Jido.start_link(name: @specialist_jido_instance) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp ensure_specialist_module(specialist) do
+    module_id =
+      :erlang.phash2({
+        specialist[:name],
+        specialist[:description],
+        specialist[:tools],
+        specialist[:model]
+      })
+
+    module_name = Module.concat([JidoAi, OrchestratorSpecialist, :"Spec#{module_id}"])
+
+    if Code.ensure_loaded?(module_name) do
+      module_name
+    else
+      tools = specialist[:tools] || []
+      model = specialist[:model] || "anthropic:claude-haiku-4-5"
+      spec_name = specialist[:name] || "unnamed"
+
+      contents =
+        quote do
+          use Jido.AI.ReActAgent,
+            name: unquote(spec_name),
+            description: unquote(specialist[:description] || "Specialist agent"),
+            tools: unquote(tools),
+            model: unquote(model),
+            max_iterations: 5
+        end
+
+      try do
+        Module.create(module_name, contents, Macro.Env.location(__ENV__))
+      rescue
+        ArgumentError ->
+          :ok
+      end
+
+      module_name
+    end
+  end
+
+  defp stop_specialist_agent(pid) when is_pid(pid) do
+    GenServer.stop(pid, :normal, 1000)
+    :ok
+  catch
+    :exit, _ -> :ok
   end
 
   defp await_specialist(pid, timeout_ms) do
@@ -447,19 +493,7 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     else
       case Jido.AgentServer.status(pid) do
         {:ok, status} ->
-          if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_answer, "")
-                "" -> Map.get(status.raw_state, :last_answer, "")
-                result -> result
-              end
-
-            {:ok, answer}
-          else
-            Process.sleep(100)
-            poll_specialist(pid, deadline)
-          end
+          handle_specialist_status(status, pid, deadline)
 
         {:error, reason} ->
           {:error, reason}
@@ -467,7 +501,23 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     end
   end
 
+  defp handle_specialist_status(status, pid, deadline) do
+    if status.snapshot.done? do
+      {:ok, extract_specialist_answer(status)}
+    else
+      Process.sleep(100)
+      poll_specialist(pid, deadline)
+    end
+  end
+
+  defp extract_specialist_answer(status) do
+    case status.snapshot.result do
+      nil -> Map.get(status.raw_state, :last_answer, "")
+      "" -> Map.get(status.raw_state, :last_answer, "")
+      result -> result
+    end
+  end
+
   defp result_type({:ok, _}), do: :ok
   defp result_type({:error, _}), do: :error
-  defp result_type(_), do: :unknown
 end

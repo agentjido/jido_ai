@@ -1,7 +1,7 @@
 defmodule Jido.AI.Skill.PromptTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Skill.{Prompt, Spec, Registry}
+  alias Jido.AI.Skill.{Prompt, Registry, Spec}
 
   # Test module skill
   defmodule TestSkill do

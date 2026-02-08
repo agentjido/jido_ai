@@ -135,7 +135,7 @@ defmodule Jido.AI.GoTAgent do
       end
 
     quote location: :keep do
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
@@ -143,6 +143,10 @@ defmodule Jido.AI.GoTAgent do
         schema: unquote(base_schema_ast)
 
       alias Jido.AI.Request
+
+      @doc false
+      @spec plugin_specs() :: [Jido.Plugin.Spec.t()]
+      def plugin_specs, do: super()
 
       @doc """
       Returns the strategy options configured for this agent.

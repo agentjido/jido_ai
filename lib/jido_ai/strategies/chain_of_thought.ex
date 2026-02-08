@@ -26,7 +26,7 @@ defmodule Jido.AI.Strategies.ChainOfThought do
 
   Configure via strategy options when defining your agent:
 
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: "my_cot_agent",
         strategy: {
           Jido.AI.Strategies.ChainOfThought,

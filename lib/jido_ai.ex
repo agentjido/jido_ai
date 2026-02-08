@@ -46,6 +46,8 @@ defmodule Jido.AI do
 
   """
 
+  alias Jido.AI.Strategies.ReAct, as: ReActStrategy
+
   @type model_alias :: :fast | :capable | :reasoning | :planning | atom()
   @type model_spec :: String.t()
 
@@ -189,7 +191,7 @@ defmodule Jido.AI do
   @spec list_tools(Jido.Agent.t() | GenServer.server()) ::
           [module()] | {:ok, [module()]} | {:error, term()}
   def list_tools(%Jido.Agent{} = agent) do
-    Jido.AI.Strategies.ReAct.list_tools(agent)
+    ReActStrategy.list_tools(agent)
   end
 
   def list_tools(agent_server) do

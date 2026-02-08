@@ -20,7 +20,7 @@ defmodule Jido.AI.Strategies.ReAct do
 
   Configure via strategy options when defining your agent:
 
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: "my_react_agent",
         strategy: {
           Jido.AI.Strategies.ReAct,

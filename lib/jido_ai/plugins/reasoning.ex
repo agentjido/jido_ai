@@ -20,7 +20,7 @@ defmodule Jido.AI.Plugins.Reasoning do
   Attach to an agent:
 
       defmodule MyAgent do
-        use Jido.Agent,
+        use Jido.AI.Agent,
 
         plugins: [
           {Jido.AI.Plugins.Reasoning, []}

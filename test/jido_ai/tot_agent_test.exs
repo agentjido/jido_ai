@@ -2,6 +2,7 @@ defmodule Jido.AI.ToTAgentTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Strategies.TreeOfThoughts
 
   defmodule TestToTAgent do
     use Jido.AI.ToTAgent,
@@ -136,7 +137,7 @@ defmodule Jido.AI.ToTAgentTest do
     test "agent initializes with strategy state" do
       agent = TestToTAgent.new()
       ctx = %{strategy_opts: TestToTAgent.strategy_opts()}
-      {agent, _directives} = Jido.AI.Strategies.TreeOfThoughts.init(agent, ctx)
+      {agent, _directives} = TreeOfThoughts.init(agent, ctx)
 
       state = StratState.get(agent, %{})
       assert state[:status] == :idle

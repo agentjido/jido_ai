@@ -5,7 +5,7 @@ defmodule Jido.AI.Skill.Loader do
   Supports the agentskills.io format with YAML frontmatter.
   """
 
-  alias Jido.AI.Skill.{Spec, Error}
+  alias Jido.AI.Skill.{Error, Spec}
 
   @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
   @max_name_length 64

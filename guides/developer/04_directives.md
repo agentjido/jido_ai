@@ -11,6 +11,7 @@ This guide covers the directive system in Jido.AI, which provides declarative si
 - [ToolExec Directive](#toolexec-directive)
 - [LLMGenerate Directive](#llmgenerate-directive)
 - [LLMEmbed Directive](#llmembed-directive)
+- [AgentSession Directive](#agentsession-directive)
 - [Creating Custom Directives](#creating-custom-directives)
 
 ## Overview
@@ -42,6 +43,7 @@ graph LR
 | `LLMGenerate` | `Jido.AI.Directive.LLMGenerate` | Generate non-streaming response |
 | `LLMEmbed` | `Jido.AI.Directive.LLMEmbed` | Generate embeddings |
 | `ToolExec` | `Jido.AI.Directive.ToolExec` | Execute a tool |
+| `AgentSession` | `Jido.AI.Directive.AgentSession` | Delegate to autonomous agent |
 
 ## Directive Lifecycle
 
@@ -319,6 +321,147 @@ directive = Directive.LLMEmbed.new!(%{
     }}
   }
 }
+```
+
+## AgentSession Directive
+
+Delegates execution to an external autonomous agent via `agent_session_manager`.
+
+Unlike `LLMStream` or `LLMGenerate`, this directive does not manage tool calls. The external agent (Claude Code CLI, Codex CLI, or any `agent_session_manager` adapter) handles everything autonomously. jido_ai observes events as signals but does not control tool execution.
+
+> **Note:** This directive requires the optional `agent_session_manager` dependency.
+> Add `{:agent_session_manager, "~> 0.2"}` to your `mix.exs` deps.
+
+### Two Modes of AI Operation
+
+```mermaid
+graph TB
+    subgraph "Mode 1: App-Orchestrated"
+        S1[Strategy] -->|LLMStream| R[ReqLLM]
+        R -->|Response| S1
+        S1 -->|ToolExec| T[Tool]
+        T -->|Result| S1
+    end
+
+    subgraph "Mode 2: Provider-Orchestrated"
+        S2[Strategy] -->|AgentSession| ASM[agent_session_manager]
+        ASM -->|Events| Sig[Signals]
+        Sig -->|Observe| S2
+    end
+```
+
+### Schema
+
+```elixir
+@schema Zoi.struct(__MODULE__, %{
+  id: Zoi.string(description: "Unique directive ID for correlation"),
+  adapter: Zoi.atom(description: "agent_session_manager adapter module"),
+  input: Zoi.string(description: "Prompt / task description"),
+  session_id: Zoi.string(description: "Session ID to resume; nil for new")
+    |> Zoi.optional(),
+  session_config: Zoi.map(description: "Adapter-specific session configuration")
+    |> Zoi.default(%{}),
+  model: Zoi.string(description: "Model identifier")
+    |> Zoi.optional(),
+  timeout: Zoi.integer(description: "Timeout in ms for the entire agent run")
+    |> Zoi.default(300_000),
+  max_turns: Zoi.integer(description: "Max tool-use turns")
+    |> Zoi.optional(),
+  emit_events: Zoi.boolean(description: "Emit intermediate events as signals")
+    |> Zoi.default(true),
+  metadata: Zoi.map(description: "Arbitrary metadata")
+    |> Zoi.default(%{})
+}, coerce: true)
+```
+
+### Creating the Directive
+
+```elixir
+alias Jido.AI.Directive
+
+# Delegate to Claude Code CLI
+directive = Directive.AgentSession.new!(%{
+  id: Jido.Util.generate_id(),
+  adapter: AgentSessionManager.Adapters.ClaudeAdapter,
+  input: "Refactor the authentication module to use JWT tokens",
+  model: "claude-sonnet-4-5-20250929",
+  timeout: 600_000,
+  session_config: %{
+    allowed_tools: ["read", "write", "bash"],
+    working_directory: "/path/to/project"
+  }
+})
+
+# Delegate to Codex CLI
+directive = Directive.AgentSession.new!(%{
+  id: Jido.Util.generate_id(),
+  adapter: AgentSessionManager.Adapters.CodexAdapter,
+  input: "Add comprehensive test coverage for the User module",
+  session_config: %{
+    working_directory: "/path/to/project"
+  }
+})
+```
+
+### Execution Behavior
+
+The directive implementation:
+
+1. Starts an `InMemorySessionStore` and the configured adapter
+2. Spawns an async task via `Task.Supervisor`
+3. Calls `SessionManager.run_once/4` which handles the full lifecycle
+4. Streams intermediate events as `ai.agent_session.*` signals (if `emit_events: true`)
+5. Sends a `Completed` or `Failed` signal when the agent finishes
+
+### Signals Emitted
+
+```elixir
+# Agent started
+%Jido.Signal{type: "ai.agent_session.started", data: %{session_id: "s1", run_id: "r1"}}
+
+# Streaming text output
+%Jido.Signal{type: "ai.agent_session.message", data: %{content: "Hello", delta: true}}
+
+# Tool invocation observed
+%Jido.Signal{type: "ai.agent_session.tool_call", data: %{tool_name: "write", status: :started}}
+
+# Progress update
+%Jido.Signal{type: "ai.agent_session.progress", data: %{tokens_used: %{input: 500}}}
+
+# Completion
+%Jido.Signal{type: "ai.agent_session.completed", data: %{output: "Done!", token_usage: %{}}}
+
+# Failure
+%Jido.Signal{type: "ai.agent_session.failed", data: %{reason: :timeout, error_message: "..."}}
+```
+
+### Handling in Strategy
+
+```elixir
+@impl true
+def signal_routes(_ctx) do
+  [
+    # Mode 1 routes
+    {"react.llm.response", {:strategy_cmd, :react_llm_result}},
+    {"react.tool.result", {:strategy_cmd, :react_tool_result}},
+
+    # Mode 2 routes
+    {"ai.agent_session.completed", {:strategy_cmd, :agent_completed}},
+    {"ai.agent_session.failed", {:strategy_cmd, :agent_failed}},
+    {"ai.agent_session.message", {:strategy_cmd, :agent_message}}
+  ]
+end
+```
+
+### Relationship to Existing Directives
+
+```
+Jido.AI.Directive
+├── LLMStream        (Mode 1: streaming completion via req_llm)
+├── LLMGenerate      (Mode 1: blocking completion via req_llm)
+├── LLMEmbed         (Mode 1: embedding generation via req_llm)
+├── ToolExec         (Mode 1: execute a tool locally)
+└── AgentSession     (Mode 2: delegate to autonomous agent)
 ```
 
 ## Creating Custom Directives

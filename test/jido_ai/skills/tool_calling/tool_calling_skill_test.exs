@@ -25,7 +25,7 @@ defmodule Jido.AI.Plugins.ToolCallingTest do
 
   describe "mount/2" do
     test "initializes state with defaults" do
-      {:ok, state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      {:ok, state} = ToolCalling.mount(%Jido.Agent{id: "test-agent"}, %{})
 
       assert state.default_model == :capable
       assert state.default_max_tokens == 4096
@@ -37,7 +37,7 @@ defmodule Jido.AI.Plugins.ToolCallingTest do
 
     test "merges custom config into initial state" do
       {:ok, state} =
-        ToolCalling.mount(%Jido.Agent{}, %{auto_execute: true, max_turns: 5})
+        ToolCalling.mount(%Jido.Agent{id: "test-agent"}, %{auto_execute: true, max_turns: 5})
 
       assert state.auto_execute == true
       assert state.max_turns == 5

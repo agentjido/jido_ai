@@ -25,7 +25,7 @@ defmodule Jido.AI.Plugins.StreamingTest do
 
   describe "mount/2" do
     test "initializes state with defaults" do
-      {:ok, state} = Streaming.mount(%Jido.Agent{}, %{})
+      {:ok, state} = Streaming.mount(%Jido.Agent{id: "test-agent"}, %{})
 
       assert state.default_model == :fast
       assert state.default_max_tokens == 1024
@@ -36,7 +36,7 @@ defmodule Jido.AI.Plugins.StreamingTest do
 
     test "merges custom config into initial state" do
       {:ok, state} =
-        Streaming.mount(%Jido.Agent{}, %{default_model: :capable, default_max_tokens: 2048})
+        Streaming.mount(%Jido.Agent{id: "test-agent"}, %{default_model: :capable, default_max_tokens: 2048})
 
       assert state.default_model == :capable
       assert state.default_max_tokens == 2048

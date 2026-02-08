@@ -18,20 +18,25 @@ Jido.AI is the **AI integration layer** for the Jido ecosystem. It provides a un
 ### What Jido.AI Provides
 
 - **Multi-LLM Support**: Anthropic, OpenAI, Google, and other providers through ReqLLM
+- **Two Execution Modes**: Mode 1 (app-orchestrated via ReAct/ReqLLM) and Mode 2 (provider-orchestrated via agent_session_manager)
 - **Reasoning Strategies**: ReAct, Chain-of-Thought, Tree-of-Thought, Graph-of-Thought, TRM, and Adaptive
-- **Tool System**: Execute Jido.Actions as tools for LLMs
+- **Tool System**: Execute Jido.Actions as tools for LLMs with registry, execution, and adapter layers
+- **Skill System**: Prompt-based capabilities following the [agentskills.io](https://agentskills.io) specification (compile-time modules and runtime SKILL.md files)
 - **State Management**: Pure state machines for predictable agent behavior
 - **Signal-Driven Architecture**: Event-based communication between components
-- **Skill Framework**: Modular capabilities (LLM, Planning, Reasoning, ToolCalling, Streaming)
+- **Orchestration Actions**: Pre-built actions for multi-agent coordination and task delegation
+- **Accuracy Techniques**: Self-Consistency, Search, Verification, Reflection, Pipeline orchestration
 
 ## Design Principles
 
 1. **Pure State Machines**: All reasoning strategies use pure functional state machines
 2. **Directive Pattern**: Declarative side effects separate from business logic
 3. **Signal-Driven Communication**: Components communicate via typed signals
-4. **Composability**: Skills and strategies are composable building blocks
-5. **Type Safety**: Zoi schemas and TypeSpecs throughout
-6. **Observability**: Built-in telemetry and usage tracking
+4. **Two-Mode Architecture**: Mode 1 (app controls the tool loop) and Mode 2 (provider controls autonomously)
+5. **Composability**: Skills, strategies, and actions are composable building blocks
+6. **Type Safety**: Zoi schemas and TypeSpecs throughout
+7. **Optional Dependencies**: Mode 2 features conditionally compiled via `Code.ensure_loaded?/1`
+8. **Observability**: Built-in telemetry and usage tracking
 
 ## Architecture Diagram
 
@@ -57,11 +62,15 @@ graph TB
         GoTMachine[GraphOfThoughts.Machine]
     end
 
-    subgraph "Directive Layer"
+    subgraph "Directive Layer (Mode 1)"
         LLMStream[LLMStream]
         ToolExec[ToolExec]
         LLMGenerate[LLMGenerate]
         LLMEmbed[LLMEmbed]
+    end
+
+    subgraph "Directive Layer (Mode 2)"
+        AgentSession[AgentSession]
     end
 
     subgraph "Tool Layer"
@@ -74,14 +83,22 @@ graph TB
         LLMResponse[LLMResponse]
         LLMDelta[LLMDelta]
         ToolResult[ToolResult]
+        ASStarted[AgentSession.Started]
+        ASCompleted[AgentSession.Completed]
+        ASMessage[AgentSession.Message]
     end
 
     subgraph "Skill Layer"
-        LLM[LLM Skill]
-        Planning[Planning Skill]
-        Reasoning[Reasoning Skill]
-        ToolCalling[ToolCalling Skill]
-        Streaming[Streaming Skill]
+        SkillMod[Module Skills]
+        SkillFile[SKILL.md Files]
+        SkillRegistry[Skill.Registry]
+        SkillPrompt[Skill.Prompt]
+    end
+
+    subgraph "External (Mode 2)"
+        ASM[agent_session_manager]
+        ClaudeCLI[Claude Code CLI]
+        CodexCLI[Codex CLI]
     end
 
     Agent --> AgentServer
@@ -109,9 +126,19 @@ graph TB
     ToolResult --> ReActMachine
     LLMDelta --> ReActMachine
 
-    Agent --> LLM
-    Agent --> Planning
-    Agent --> ToolCalling
+    AgentSession --> ASM
+    ASM --> ClaudeCLI
+    ASM --> CodexCLI
+    ASM --> ASStarted
+    ASM --> ASCompleted
+    ASM --> ASMessage
+
+    SkillMod --> SkillRegistry
+    SkillFile --> SkillRegistry
+    SkillRegistry --> SkillPrompt
+    SkillPrompt --> ReAct
+
+    Agent --> SkillRegistry
 ```
 
 ## Core Components
@@ -166,12 +193,15 @@ Pure state machines using [Fsmx](https://hex.pm/packages/fsmx). Each machine:
 
 Directives are declarative descriptions of side effects. The AgentServer runtime executes them.
 
-| Directive | Purpose |
-|-----------|---------|
-| `LLMStream` | Stream LLM response with tools |
-| `LLMGenerate` | Non-streaming text generation |
-| `LLMEmbed` | Generate embeddings |
-| `ToolExec` | Execute a tool (Jido.Action) |
+| Directive | Mode | Purpose |
+|-----------|------|---------|
+| `LLMStream` | 1 | Stream LLM response with tools |
+| `LLMGenerate` | 1 | Non-streaming text generation |
+| `LLMEmbed` | 1 | Generate embeddings |
+| `ToolExec` | 1 | Execute a tool (Jido.Action) |
+| `AgentSession` | 2 | Delegate to autonomous agent via agent_session_manager |
+| `EmitToolError` | 1 | Signal tool execution failure |
+| `EmitRequestError` | 1 | Signal request rejection (deadlock prevention) |
 
 ```elixir
 # Create an LLM streaming directive
@@ -208,30 +238,53 @@ Registry.register(MyApp.Tools.Search)
 
 Typed signals for event-driven communication.
 
-| Signal | Type | Purpose |
-|--------|------|---------|
-| `LLMResponse` | `react.llm.response` | LLM call completed |
-| `LLMDelta` | `react.llm.delta` | Streaming token chunk |
-| `LLMError` | `react.llm.error` | Structured error |
-| `ToolResult` | `react.tool.result` | Tool execution completed |
-| `EmbedResult` | `react.embed.result` | Embedding generated |
-| `Usage` | `react.usage` | Token usage tracking |
+| Signal | Type | Mode | Purpose |
+|--------|------|------|---------|
+| `LLMResponse` | `react.llm.response` | 1 | LLM call completed |
+| `LLMDelta` | `react.llm.delta` | 1 | Streaming token chunk |
+| `LLMError` | `react.llm.error` | 1 | Structured error |
+| `ToolResult` | `react.tool.result` | 1 | Tool execution completed |
+| `EmbedResult` | `react.embed.result` | 1 | Embedding generated |
+| `Usage` | `react.usage` | 1 | Token usage tracking |
+| `AgentSession.Started` | `ai.agent_session.started` | 2 | Agent began execution |
+| `AgentSession.Message` | `ai.agent_session.message` | 2 | Text output from agent |
+| `AgentSession.ToolCall` | `ai.agent_session.tool_call` | 2 | Agent invoked a tool |
+| `AgentSession.Progress` | `ai.agent_session.progress` | 2 | Progress update |
+| `AgentSession.Completed` | `ai.agent_session.completed` | 2 | Agent finished |
+| `AgentSession.Failed` | `ai.agent_session.failed` | 2 | Agent failed/cancelled |
 
-### 7. Skill Framework (`Jido.AI.Skills.*`)
+### 7. Skill System (`Jido.AI.Skill.*`)
 
-Skills provide modular capabilities. Each skill:
+Skills provide prompt-based capabilities following the [agentskills.io](https://agentskills.io) specification. They inject context into agent system prompts and enforce tool allowlists.
 
-- Contains related actions
-- Implements lifecycle callbacks
-- Has its own Zoi schema for configuration
+| Module | Purpose |
+|--------|---------|
+| `Skill` | Behaviour + `use` macro for module-based skills |
+| `Skill.Spec` | Specification struct with Zoi validation |
+| `Skill.Loader` | Runtime SKILL.md file parsing |
+| `Skill.Registry` | ETS-backed GenServer for discovery and lookup |
+| `Skill.Prompt` | Prompt rendering and tool collection helpers |
 
-| Skill | Actions |
-|-------|---------|
-| `LLM` | Chat, Complete, Embed |
-| `Planning` | Plan, Decompose, Prioritize |
-| `Reasoning` | Analyze, Explain, Infer |
-| `ToolCalling` | CallWithTools, ExecuteTool, ListTools |
-| `Streaming` | StartStream, ProcessTokens, EndStream |
+**Skills vs Plugins:**
+
+| Aspect | Skill (`Jido.AI.Skill`) | Plugin (`Jido.Plugin`) |
+|--------|-------------------------|------------------------|
+| Purpose | Prompt instructions for LLM | Runtime agent capabilities |
+| Execution | Injected into system prompt | Executes actions, routes signals |
+| State | Stateless (prompt text only) | Has state, lifecycle callbacks |
+| Definition | Module or SKILL.md file | Elixir module only |
+
+### 8. Action Framework (`Jido.AI.Actions.*`)
+
+Pre-built actions organized by category.
+
+| Category | Actions |
+|----------|---------|
+| **LLM** | Chat, Complete, Embed, GenerateObject |
+| **Orchestration** | DelegateTask, SpawnChildAgent, StopChildAgent, AggregateResults, DiscoverCapabilities |
+| **Planning** | Plan, Decompose, Prioritize |
+| **Reasoning** | Analyze, Explain, Infer |
+| **Streaming** | StartStream, ProcessTokens, EndStream |
 
 ## Data Flow
 

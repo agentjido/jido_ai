@@ -9,16 +9,16 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
 
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Plugins.LLM
   alias Jido.AI.Actions.LLM.{Chat, Complete, Embed}
-  alias Jido.AI.Plugins.Planning
   alias Jido.AI.Actions.Planning.{Decompose, Plan, Prioritize}
-  alias Jido.AI.Plugins.Reasoning
   alias Jido.AI.Actions.Reasoning.{Analyze, Explain, Infer}
-  alias Jido.AI.Plugins.Streaming
   alias Jido.AI.Actions.Streaming.{EndStream, ProcessTokens, StartStream}
-  alias Jido.AI.Plugins.ToolCalling
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
+  alias Jido.AI.Plugins.LLM
+  alias Jido.AI.Plugins.Planning
+  alias Jido.AI.Plugins.Reasoning
+  alias Jido.AI.Plugins.Streaming
+  alias Jido.AI.Plugins.ToolCalling
 
   # Ensure all skill modules are loaded before tests
   require Jido.AI.Plugins.LLM

@@ -291,6 +291,6 @@ This demonstrates:
 
 ## Next Steps
 
-- [Plugins Guide](./05_plugins.md) - Runtime agent capabilities
-- [Tool System Guide](./06_tool_system.md) - Action execution
-- [Strategies Guide](./02_strategies.md) - ReAct and other strategies
+- [Configuration Guide](./08_configuration.md) - Model aliases and providers
+- [Tool System Guide](./06_tool_system.md) - Tool execution
+- [Strategies Guide](./02_strategies.md) - Using skills with strategies

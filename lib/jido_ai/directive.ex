@@ -794,6 +794,30 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   alias Jido.AI.{Helpers, Signal}
 
   def exec(directive, _input_signal, state) do
+    model = Helpers.resolve_directive_model(directive)
+    agent_pid = self()
+    task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
+
+    Task.Supervisor.start_child(task_supervisor, fn ->
+      result =
+        try do
+          generate_text(agent_pid, directive, model)
+        rescue
+          e ->
+            {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
+        catch
+          kind, reason ->
+            {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
+        end
+
+      signal = Signal.LLMResponse.new!(%{call_id: directive.id, result: result})
+      Jido.AgentServer.cast(agent_pid, signal)
+    end)
+
+    {:async, nil, state}
+  end
+
+  defp generate_text(agent_pid, directive, model) do
     %{
       id: call_id,
       context: context,
@@ -803,55 +827,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
       temperature: temperature
     } = directive
 
-    model = Helpers.resolve_directive_model(directive)
     system_prompt = Map.get(directive, :system_prompt)
     timeout = Map.get(directive, :timeout)
 
-    agent_pid = self()
-    task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
-
-    Task.Supervisor.start_child(task_supervisor, fn ->
-      result =
-        try do
-          generate_text(
-            agent_pid,
-            call_id,
-            model,
-            context,
-            system_prompt,
-            tools,
-            tool_choice,
-            max_tokens,
-            temperature,
-            timeout
-          )
-        rescue
-          e ->
-            {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
-        catch
-          kind, reason ->
-            {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
-        end
-
-      signal = Signal.LLMResponse.new!(%{call_id: call_id, result: result})
-      Jido.AgentServer.cast(agent_pid, signal)
-    end)
-
-    {:async, nil, state}
-  end
-
-  defp generate_text(
-         agent_pid,
-         call_id,
-         model,
-         context,
-         system_prompt,
-         tools,
-         tool_choice,
-         max_tokens,
-         temperature,
-         timeout
-       ) do
     opts =
       []
       |> Helpers.add_tools_opt(tools)
