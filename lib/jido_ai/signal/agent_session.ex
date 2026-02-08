@@ -475,14 +475,24 @@ if Code.ensure_loaded?(AgentSessionManager.SessionManager) do
     defp build_tool_call_signal(event, context, status) do
       data = event_data(event)
 
-      ToolCall.new!(%{
+      %{
         session_id: event_session_id(event, context),
         run_id: event_run_id(event, context),
-        tool_name: map_get(data, :tool_name, "unknown"),
-        tool_input: map_get(data, :tool_input, %{}),
-        tool_id: map_get(data, :tool_id, nil),
+        tool_name: map_get(data, :tool_name, map_get(data, :name, "unknown")),
+        tool_input: normalize_tool_input(map_get(data, :tool_input, map_get(data, :input, %{}))),
         status: status
-      })
+      }
+      |> maybe_put_optional(
+        :tool_id,
+        map_get(data, :tool_id, map_get(data, :tool_call_id, map_get(data, :call_id, nil)))
+      )
+      |> ToolCall.new!()
     end
+
+    defp normalize_tool_input(input) when is_map(input) do
+      if Enum.all?(Map.keys(input), &is_atom/1), do: input, else: %{}
+    end
+
+    defp normalize_tool_input(_), do: %{}
   end
 end

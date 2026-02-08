@@ -5,8 +5,7 @@
 - `mix test` - Run tests (excludes flaky and live CLI tests)
 - `mix test path/to/specific_test.exs` - Run a single test file
 - `mix test --include flaky` - Run all tests including flaky ones
-- `mix test --include requires_claude_code_cli` - Run live Claude Code CLI tests
-- `mix test --include requires_codex_cli` - Run live Codex CLI tests
+- `mix test --include requires_live_agent_cli` - Run live agent session tests (Claude, Codex, Amp)
 - `mix quality` or `mix q` - Run full quality check (format, compile, dialyzer, credo)
 - `mix format` - Auto-format code
 - `mix dialyzer` - Type checking
@@ -20,12 +19,11 @@
 | Tag | Purpose | Default |
 |-----|---------|---------|
 | `@tag :flaky` | Non-deterministic tests | Excluded |
-| `@tag :requires_claude_code_cli` | Live Claude Code CLI integration | Excluded |
-| `@tag :requires_codex_cli` | Live Codex CLI integration | Excluded |
+| `@tag :requires_live_agent_cli` | Live AgentSession provider matrix (Claude/Codex/Amp) | Excluded |
 
 To run excluded tests, use the `--include` flag:
 ```bash
-mix test --include requires_claude_code_cli --include requires_codex_cli
+mix test --include requires_live_agent_cli
 ```
 
 ## Architecture

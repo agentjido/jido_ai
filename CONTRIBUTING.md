@@ -38,11 +38,8 @@ mix test path/to/specific_test.exs
 # Include flaky tests
 mix test --include flaky
 
-# Include live Claude Code CLI tests (requires CLI installed)
-mix test --include requires_claude_code_cli
-
-# Include live Codex CLI tests (requires CLI installed)
-mix test --include requires_codex_cli
+# Include live AgentSession provider matrix (Claude/Codex/Amp)
+mix test --include requires_live_agent_cli
 ```
 
 ### Test Tags
@@ -50,8 +47,7 @@ mix test --include requires_codex_cli
 | Tag | Purpose |
 |-----|---------|
 | `@tag :flaky` | Non-deterministic tests (excluded by default) |
-| `@tag :requires_claude_code_cli` | Live Claude Code integration (excluded by default) |
-| `@tag :requires_codex_cli` | Live Codex integration (excluded by default) |
+| `@tag :requires_live_agent_cli` | Live AgentSession provider matrix (excluded by default) |
 
 ## Pull Request Process
 

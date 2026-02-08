@@ -397,6 +397,39 @@ defmodule Jido.AI.Signal.AgentSessionTest do
       assert signal.data.status == :failed
     end
 
+    test "maps tool call events without tool_id by omitting optional field", %{context: context} do
+      event = %{
+        type: :tool_call_started,
+        data: %{name: "bash", input: %{command: "pwd"}},
+        session_id: "sess_abc123",
+        run_id: "run_def456"
+      }
+
+      signal = AgentSession.from_event(event, context)
+
+      assert signal.type == "ai.agent_session.tool_call"
+      assert signal.data.tool_name == "bash"
+      assert signal.data.tool_input == %{command: "pwd"}
+      refute Map.has_key?(signal.data, :tool_id)
+      assert signal.data.status == :started
+    end
+
+    test "normalizes string-keyed tool_input maps to a schema-safe value", %{context: context} do
+      event = %{
+        type: :tool_call_started,
+        data: %{tool_name: "search", tool_input: %{"query" => "jido ai"}},
+        session_id: "sess_abc123",
+        run_id: "run_def456"
+      }
+
+      signal = AgentSession.from_event(event, context)
+
+      assert signal.type == "ai.agent_session.tool_call"
+      assert signal.data.tool_name == "search"
+      assert signal.data.tool_input == %{}
+      assert signal.data.status == :started
+    end
+
     test "maps :run_completed event to Completed signal", %{context: context} do
       event = %{
         type: :run_completed,
