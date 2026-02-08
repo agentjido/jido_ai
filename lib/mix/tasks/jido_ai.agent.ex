@@ -306,6 +306,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
 
   defp format_number(n), do: "#{n}"
 
+  @spec output_error(map(), map()) :: no_return()
   defp output_error(config, result) do
     case config.format do
       "json" ->
@@ -318,6 +319,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
     System.halt(1)
   end
 
+  @spec output_fatal_error(map(), term()) :: no_return()
   defp output_fatal_error(config, reason) do
     case config.format do
       "json" ->

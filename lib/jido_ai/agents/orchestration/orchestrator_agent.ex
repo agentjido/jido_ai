@@ -85,7 +85,7 @@ defmodule Jido.AI.OrchestratorAgent do
       end)
 
     quote location: :keep do
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: unquote(name),
         description: unquote(description),
         plugins: [
@@ -385,10 +385,6 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     end
   end
 
-  defp execute_routing(_, task, _) do
-    {:ok, %{result: "Could not route task: #{task}", delegated_to: nil}}
-  end
-
   defp run_specialist(specialist, task) do
     spec_name = specialist[:name] || "unnamed"
 
@@ -481,8 +477,6 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
   catch
     :exit, _ -> :ok
   end
-
-  defp stop_specialist_agent(_), do: :ok
 
   defp await_specialist(pid, timeout_ms) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms

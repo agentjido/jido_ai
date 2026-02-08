@@ -135,7 +135,7 @@ defmodule Jido.AI.AdaptiveAgent do
       end
 
     quote location: :keep do
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
