@@ -3,7 +3,7 @@
 #
 # Requires valid LLM API keys configured.
 
-Logger.configure(level: :debug)
+Logger.configure(level: :warning)
 
 defmodule C do
   def cyan(text), do: "\e[36m#{text}\e[0m"
@@ -187,8 +187,15 @@ lines =
 
 context = Enum.join(lines, "\n")
 
-IO.puts("Context size: #{byte_size(context)} bytes (#{length(lines)} lines)")
+context_bytes = byte_size(context)
+context_lines = length(lines)
+estimated_tokens = div(context_bytes, 4)
+
+IO.puts("Context size: #{context_bytes} bytes (#{context_lines} lines)")
+IO.puts("Estimated tokens: ~#{estimated_tokens}")
 IO.puts(C.bold("Starting RLM exploration...\n"))
+
+explore_start = System.monotonic_time(:millisecond)
 
 # Start agent via Jido supervisor
 {:ok, pid} = Jido.start_agent(Jido.default_instance(), NeedleHaystackAgent)
@@ -200,18 +207,35 @@ case NeedleHaystackAgent.explore_sync(pid, "Find the magic number hidden in this
        timeout: 300_000
      ) do
   {:ok, result} ->
-    elapsed = System.monotonic_time(:millisecond) - start_time
+    explore_elapsed = System.monotonic_time(:millisecond) - explore_start
+    total_elapsed = System.monotonic_time(:millisecond) - start_time
+
+    found_number = Regex.run(~r/#{magic_number}/, to_string(result))
+
     IO.puts("\n" <> String.duplicate("=", 60))
     IO.puts(C.bold(C.green("RESULT")))
     IO.puts(String.duplicate("=", 60))
     IO.puts(result)
     IO.puts(String.duplicate("=", 60))
-    IO.puts(C.dim("Total wall time: #{elapsed}ms"))
+    IO.puts("")
+    IO.puts(C.bold("Stats:"))
+    IO.puts("  Context:          #{context_bytes} bytes / #{context_lines} lines / ~#{estimated_tokens} tokens")
+    IO.puts("  Explore time:     #{explore_elapsed}ms (#{Float.round(explore_elapsed / 1000, 1)}s)")
+    IO.puts("  Total wall time:  #{total_elapsed}ms (#{Float.round(total_elapsed / 1000, 1)}s)")
+    IO.puts("  Needle line:      #{needle_line}")
+    IO.puts("  Magic number:     #{magic_number}")
+    IO.puts("  Found correctly:  #{if found_number, do: C.green("YES"), else: C.red("NO")}")
 
   {:error, reason} ->
-    elapsed = System.monotonic_time(:millisecond) - start_time
+    explore_elapsed = System.monotonic_time(:millisecond) - explore_start
+    total_elapsed = System.monotonic_time(:millisecond) - start_time
+
     IO.puts("\n" <> C.red("Error: #{inspect(reason)}"))
-    IO.puts(C.dim("Total wall time: #{elapsed}ms"))
+    IO.puts("")
+    IO.puts(C.bold("Stats:"))
+    IO.puts("  Context:          #{context_bytes} bytes / #{context_lines} lines / ~#{estimated_tokens} tokens")
+    IO.puts("  Explore time:     #{explore_elapsed}ms (#{Float.round(explore_elapsed / 1000, 1)}s)")
+    IO.puts("  Total wall time:  #{total_elapsed}ms (#{Float.round(total_elapsed / 1000, 1)}s)")
 end
 
 Jido.stop_agent(Jido.default_instance(), pid)
