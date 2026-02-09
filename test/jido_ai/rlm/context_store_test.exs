@@ -58,6 +58,31 @@ defmodule Jido.AI.RLM.ContextStoreTest do
     end
   end
 
+  describe "workspace tier" do
+    test "put/fetch/delete cycle with workspace ref" do
+      {:ok, ws_ref} = Jido.AI.RLM.Workspace.init("ws-ctx-1")
+      {:ok, ref} = ContextStore.put(@large_data, "req-ws-1", workspace_ref: ws_ref)
+      assert ref.backend == :workspace
+      assert {:ok, @large_data} == ContextStore.fetch(ref)
+      assert :ok == ContextStore.delete(ref)
+      Jido.AI.RLM.Workspace.destroy(ws_ref)
+    end
+
+    test "fetch_range with workspace ref" do
+      {:ok, ws_ref} = Jido.AI.RLM.Workspace.init("ws-ctx-2")
+      {:ok, ref} = ContextStore.put("abcdefghij", "req-ws-2", inline_threshold: 1, workspace_ref: ws_ref)
+      assert {:ok, "cdef"} == ContextStore.fetch_range(ref, 2, 4)
+      Jido.AI.RLM.Workspace.destroy(ws_ref)
+    end
+
+    test "size with workspace ref" do
+      {:ok, ws_ref} = Jido.AI.RLM.Workspace.init("ws-ctx-3")
+      {:ok, ref} = ContextStore.put(@large_data, "req-ws-3", workspace_ref: ws_ref)
+      assert ContextStore.size(ref) == byte_size(@large_data)
+      Jido.AI.RLM.Workspace.destroy(ws_ref)
+    end
+  end
+
   describe "tier selection" do
     test "data below threshold uses inline" do
       {:ok, ref} = ContextStore.put("tiny", "req-9", inline_threshold: 100)

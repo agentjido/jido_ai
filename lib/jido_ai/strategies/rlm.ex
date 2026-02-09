@@ -207,10 +207,13 @@ defmodule Jido.AI.Strategies.RLM do
         state = StratState.get(agent, %{})
         config = state[:config]
 
+        request_id = Jido.Util.generate_id()
+        {:ok, workspace_ref} = WorkspaceStore.init(request_id)
+
         context_ref =
           cond do
             is_binary(Map.get(params, :context)) ->
-              store_context(params, config)
+              store_context(params, config, workspace_ref)
 
             is_map(Map.get(params, :context_ref)) ->
               params.context_ref
@@ -218,9 +221,6 @@ defmodule Jido.AI.Strategies.RLM do
             true ->
               nil
           end
-
-        request_id = Jido.Util.generate_id()
-        {:ok, workspace_ref} = WorkspaceStore.init(request_id)
 
         run_context =
           (Map.get(params, :tool_context) || %{})
@@ -447,11 +447,14 @@ defmodule Jido.AI.Strategies.RLM do
 
   defp to_machine_msg(_, _), do: nil
 
-  defp store_context(%{context: context}, config) when is_binary(context) do
+  defp store_context(%{context: context}, config, workspace_ref) when is_binary(context) do
     request_id = Jido.Util.generate_id()
 
     {:ok, ref} =
-      ContextStore.put(context, request_id, inline_threshold: config[:context_inline_threshold])
+      ContextStore.put(context, request_id,
+        inline_threshold: config[:context_inline_threshold],
+        workspace_ref: workspace_ref
+      )
 
     ref
   end
@@ -506,7 +509,13 @@ defmodule Jido.AI.Strategies.RLM do
   defp filter_tools_for_depth(tools, _current_depth, _max_depth), do: tools
 
   defp cleanup_rlm_state(state) do
-    if state[:context_ref], do: ContextStore.delete(state[:context_ref])
+    if ref = state[:context_ref] do
+      case ref do
+        %{backend: :workspace} -> :ok
+        _ -> ContextStore.delete(ref)
+      end
+    end
+
     if state[:workspace_ref], do: WorkspaceStore.delete(state[:workspace_ref])
   end
 end

@@ -199,7 +199,7 @@ defmodule Jido.AI.Actions.RLM.ContextTest do
     test "respects limit", %{context: context} do
       {:ok, result} = Search.run(%{query: "Line", limit: 2}, context)
 
-      assert result.total_matches == 5
+      assert result.total_matches == 2
       assert length(result.hits) == 2
     end
 

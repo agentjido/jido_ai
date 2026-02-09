@@ -51,7 +51,7 @@ defmodule Jido.AI.Actions.RLM.Context.Stats do
     if sample_size == 0 do
       0
     else
-      newlines_in_sample = sample |> String.graphemes() |> Enum.count(&(&1 == "\n"))
+      newlines_in_sample = :binary.matches(sample, "\n") |> length()
       lines_per_byte = (newlines_in_sample + 1) / sample_size
       round(lines_per_byte * total_bytes)
     end

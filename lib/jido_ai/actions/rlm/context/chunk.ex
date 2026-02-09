@@ -83,19 +83,26 @@ defmodule Jido.AI.Actions.RLM.Context.Chunk do
   end
 
   defp build_chunks(data, "lines", size, overlap) do
-    lines = String.split(data, "\n")
+    total_bytes = byte_size(data)
+    newline_offsets = :binary.matches(data, "\n")
+    line_starts = [0 | Enum.map(newline_offsets, fn {pos, _} -> pos + 1 end)]
+    total_lines = length(line_starts)
+    line_starts_arr = List.to_tuple(line_starts)
     step = max(size - overlap, 1)
 
-    lines
-    |> Enum.chunk_every(size, step, :discard)
+    Stream.iterate(0, &(&1 + step))
+    |> Enum.take_while(&(&1 < total_lines))
     |> Enum.with_index()
-    |> Enum.map(fn {chunk_lines, idx} ->
-      start_line = idx * step
-      end_line = start_line + length(chunk_lines) - 1
+    |> Enum.map(fn {start_line, idx} ->
+      end_line = min(start_line + size - 1, total_lines - 1)
+      byte_start = elem(line_starts_arr, start_line)
 
-      byte_start = byte_offset_for_line(lines, start_line)
-      chunk_text = Enum.join(chunk_lines, "\n")
-      byte_end = byte_start + byte_size(chunk_text)
+      byte_end =
+        if end_line + 1 < total_lines do
+          elem(line_starts_arr, end_line + 1)
+        else
+          total_bytes
+        end
 
       %{
         id: "c_#{idx}",
@@ -116,34 +123,12 @@ defmodule Jido.AI.Actions.RLM.Context.Chunk do
     |> Enum.map(fn {byte_start, idx} ->
       byte_end = min(byte_start + size, total)
 
-      chunk_data = binary_part(data, byte_start, byte_end - byte_start)
-      line_start = count_newlines_before(data, byte_start) + 1
-      line_end = line_start + count_newlines(chunk_data)
-
       %{
         id: "c_#{idx}",
         byte_start: byte_start,
         byte_end: byte_end,
-        lines: "#{line_start}-#{line_end}"
+        lines: nil
       }
     end)
-  end
-
-  defp byte_offset_for_line(lines, line_index) do
-    lines
-    |> Enum.take(line_index)
-    |> Enum.reduce(0, fn line, acc -> acc + byte_size(line) + 1 end)
-  end
-
-  defp count_newlines_before(data, offset) do
-    if offset == 0 do
-      0
-    else
-      binary_part(data, 0, offset) |> count_newlines()
-    end
-  end
-
-  defp count_newlines(binary) do
-    binary |> String.graphemes() |> Enum.count(&(&1 == "\n"))
   end
 end

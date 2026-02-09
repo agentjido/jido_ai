@@ -147,13 +147,19 @@ defmodule Jido.AI.Actions.RLM.Agent.Spawn do
              timeout: timeout
            ) do
         {:ok, result} ->
-          %{status: :ok, chunk_id: chunk_id, answer: to_string(result), summary: ""}
+          answer = extract_text(result)
+          summary = String.slice(String.trim(answer), 0, 300)
+          %{status: :ok, chunk_id: chunk_id, answer: answer, summary: summary}
 
         {:error, reason} ->
           %{status: :error, chunk_id: chunk_id, error: inspect(reason)}
       end
     after
-      GenServer.stop(pid, :normal, 5_000)
+      try do
+        GenServer.stop(pid, :normal, 5_000)
+      catch
+        :exit, _ -> :ok
+      end
     end
   end
 
@@ -165,7 +171,8 @@ defmodule Jido.AI.Actions.RLM.Agent.Spawn do
     case ReqLLM.Generation.generate_text(model, messages, []) do
       {:ok, response} ->
         answer = extract_text(response)
-        %{status: :ok, chunk_id: chunk_id, answer: answer, summary: ""}
+        summary = String.slice(String.trim(answer), 0, 300)
+        %{status: :ok, chunk_id: chunk_id, answer: answer, summary: summary}
 
       {:error, reason} ->
         %{status: :error, chunk_id: chunk_id, error: inspect(reason)}

@@ -15,10 +15,9 @@ defmodule Jido.AI.RLM.WorkspaceStoreTest do
       assert WorkspaceStore.get(ref) == seed
     end
 
-    test "accepts existing ETS table" do
-      table = :ets.new(:custom, [:set, :private])
-      {:ok, ref} = WorkspaceStore.init("req-3", %{}, table: table)
-      assert ref.table == table
+    test "creates workspace with adapter-managed table" do
+      {:ok, ref} = WorkspaceStore.init("req-3")
+      assert is_reference(ref.table)
       assert WorkspaceStore.get(ref) == %{}
     end
   end
@@ -146,10 +145,11 @@ defmodule Jido.AI.RLM.WorkspaceStoreTest do
   end
 
   describe "delete/1" do
-    test "delete then get returns empty map" do
+    test "delete destroys the workspace" do
       {:ok, ref} = WorkspaceStore.init("req-14", %{data: "important"})
+      assert WorkspaceStore.get(ref) == %{data: "important"}
       :ok = WorkspaceStore.delete(ref)
-      assert WorkspaceStore.get(ref) == %{}
+      assert_raise ArgumentError, fn -> WorkspaceStore.get(ref) end
     end
   end
 end

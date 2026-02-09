@@ -2,7 +2,7 @@ defmodule Jido.AI.RLM.WorkspaceStore do
   @moduledoc """
   Per-request exploration state that tools read and write.
 
-  Workspace state is stored in ETS keyed by a workspace reference map.
+  Workspace state is stored via a `Jido.AI.RLM.Workspace` adapter.
   Tools use `update/2` to accumulate exploration progress (chunks indexed,
   hits found, notes, subquery results, etc.) and `summary/2` to produce
   a compact text representation of that progress.
@@ -16,31 +16,36 @@ defmodule Jido.AI.RLM.WorkspaceStore do
       :ok = WorkspaceStore.delete(ref)
   """
 
-  @default_max_chars 2000
+  alias Jido.AI.RLM.Workspace
 
-  @type workspace_ref :: %{table: :ets.tid(), key: {String.t(), :workspace}}
+  @default_max_chars 2000
+  @workspace_key :workspace
+
+  @type workspace_ref :: Workspace.ref()
 
   @spec init(String.t(), map(), keyword()) :: {:ok, workspace_ref()}
   def init(request_id, seed \\ %{}, opts \\ []) do
-    table = Keyword.get(opts, :table) || :ets.new(:workspace_store, [:set, :public])
-    key = {request_id, :workspace}
-    :ets.insert(table, {key, seed})
-    {:ok, %{table: table, key: key}}
+    case Workspace.init(request_id, opts) do
+      {:ok, ref} ->
+        :ok = Workspace.put(ref, @workspace_key, seed)
+        {:ok, ref}
+
+      error ->
+        error
+    end
   end
 
   @spec get(workspace_ref()) :: map()
-  def get(%{table: table, key: key}) do
-    case :ets.lookup(table, key) do
-      [{^key, workspace}] -> workspace
-      [] -> %{}
+  def get(ref) do
+    case Workspace.fetch(ref, @workspace_key) do
+      {:ok, workspace} -> workspace
+      :error -> %{}
     end
   end
 
   @spec update(workspace_ref(), (map() -> map())) :: :ok
-  def update(%{table: table, key: key} = ref, fun) when is_function(fun, 1) do
-    current = get(ref)
-    :ets.insert(table, {key, fun.(current)})
-    :ok
+  def update(ref, fun) when is_function(fun, 1) do
+    Workspace.update(ref, @workspace_key, %{}, fun)
   end
 
   @spec summary(workspace_ref(), keyword()) :: String.t()
@@ -52,6 +57,7 @@ defmodule Jido.AI.RLM.WorkspaceStore do
       [
         chunks_summary(workspace),
         hits_summary(workspace),
+        searches_summary(workspace),
         notes_summary(workspace),
         subquery_summary(workspace)
       ]
@@ -67,9 +73,8 @@ defmodule Jido.AI.RLM.WorkspaceStore do
   end
 
   @spec delete(workspace_ref()) :: :ok
-  def delete(%{table: table, key: key}) do
-    :ets.delete(table, key)
-    :ok
+  def delete(ref) do
+    Workspace.destroy(ref)
   end
 
   defp chunks_summary(%{chunks: chunks}) when is_list(chunks) do
@@ -89,6 +94,14 @@ defmodule Jido.AI.RLM.WorkspaceStore do
   end
 
   defp hits_summary(_), do: nil
+
+  defp searches_summary(%{searches: searches}) when is_list(searches) and length(searches) > 0 do
+    count = length(searches)
+    latest = hd(searches)
+    "Searches: #{count} performed (latest: \"#{latest.query}\")."
+  end
+
+  defp searches_summary(_), do: nil
 
   defp notes_summary(%{notes: notes}) when is_list(notes) do
     count = length(notes)
