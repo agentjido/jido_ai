@@ -1,13 +1,13 @@
 require Jido.AI.Actions.Planning.Decompose
-# Ensure actions are compiled before the skill
+# Ensure actions are compiled before the plugin
 require Jido.AI.Actions.Planning.Plan
 require Jido.AI.Actions.Planning.Prioritize
 
 defmodule Jido.AI.Plugins.Planning do
   @moduledoc """
-  A Jido.Skill providing AI-powered planning capabilities.
+  A Jido.Plugin providing AI-powered planning capabilities.
 
-  This skill wraps ReqLLM functionality into composable actions that provide
+  This plugin wraps ReqLLM functionality into composable actions that provide
   higher-level planning operations. It provides three core actions:
 
   * `Plan` - Generate structured plans from goals with constraints and resources
@@ -21,7 +21,7 @@ defmodule Jido.AI.Plugins.Planning do
       defmodule MyAgent do
         use Jido.Agent,
 
-        skills: [
+        plugins: [
           {Jido.AI.Plugins.Planning, []}
         ]
       end
@@ -36,7 +36,7 @@ defmodule Jido.AI.Plugins.Planning do
 
   ## Model Resolution
 
-  The skill uses `Jido.AI.resolve_model/1` to resolve model aliases:
+  The plugin uses `Jido.AI.resolve_model/1` to resolve model aliases:
 
   * `:fast` - Quick model for simple tasks
   * `:capable` - Capable model for complex tasks
@@ -46,13 +46,13 @@ defmodule Jido.AI.Plugins.Planning do
 
   ## Architecture Notes
 
-  **Direct ReqLLM Calls**: This skill calls ReqLLM functions directly without
+  **Direct ReqLLM Calls**: This plugin calls ReqLLM functions directly without
   any adapter layer, following the core design principle of Jido.AI.
 
   **Specialized Prompts**: Each action uses a carefully crafted system prompt
   tailored to its specific planning task.
 
-  **Stateless**: The skill maintains no internal state.
+  **Stateless**: The plugin maintains no internal state.
   """
 
   use Jido.Plugin,
@@ -69,7 +69,7 @@ defmodule Jido.AI.Plugins.Planning do
     vsn: "1.0.0"
 
   @doc """
-  Initialize skill state when mounted to an agent.
+  Initialize plugin state when mounted to an agent.
 
   Returns initial state with any configured defaults.
   """
@@ -85,9 +85,9 @@ defmodule Jido.AI.Plugins.Planning do
   end
 
   @doc """
-  Returns the schema for skill state.
+  Returns the schema for plugin state.
 
-  Defines the structure and defaults for Planning skill state.
+  Defines the structure and defaults for Planning plugin state.
   """
   def schema do
     Zoi.object(%{
@@ -102,7 +102,7 @@ defmodule Jido.AI.Plugins.Planning do
   end
 
   @doc """
-  Returns the signal router for this skill.
+  Returns the signal router for this plugin.
 
   Maps signal patterns to action modules.
   """
@@ -136,7 +136,7 @@ defmodule Jido.AI.Plugins.Planning do
   end
 
   @doc """
-  Returns signal patterns this skill responds to.
+  Returns signal patterns this plugin responds to.
   """
   def signal_patterns do
     [

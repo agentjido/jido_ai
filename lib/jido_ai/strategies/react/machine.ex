@@ -88,6 +88,7 @@ defmodule Jido.AI.ReAct.Machine do
           termination_reason: termination_reason(),
           streaming_text: String.t(),
           streaming_thinking: String.t(),
+          thinking_trace: [%{call_id: String.t(), iteration: non_neg_integer(), thinking: String.t()}],
           usage: usage(),
           started_at: integer() | nil
         }
@@ -101,6 +102,7 @@ defmodule Jido.AI.ReAct.Machine do
             termination_reason: nil,
             streaming_text: "",
             streaming_thinking: "",
+            thinking_trace: [],
             usage: %{},
             started_at: nil
 
@@ -246,6 +248,7 @@ defmodule Jido.AI.ReAct.Machine do
         |> Map.put(:current_llm_call_id, call_id)
         |> Map.put(:streaming_text, "")
         |> Map.put(:streaming_thinking, "")
+        |> Map.put(:thinking_trace, [])
         |> Map.put(:usage, %{})
         |> Map.put(:started_at, started_at)
 
@@ -279,7 +282,8 @@ defmodule Jido.AI.ReAct.Machine do
   defp handle_iteration_check(machine, _max_iterations) do
     new_call_id = generate_call_id()
 
-    # Emit iteration telemetry
+    machine = capture_thinking_to_trace(machine)
+
     emit_telemetry(:iteration, %{system_time: System.system_time()}, %{
       iteration: machine.iteration,
       call_id: new_call_id
@@ -352,6 +356,7 @@ defmodule Jido.AI.ReAct.Machine do
       termination_reason: Map.get(map, :termination_reason),
       streaming_text: Map.get(map, :streaming_text, ""),
       streaming_thinking: Map.get(map, :streaming_thinking, ""),
+      thinking_trace: Map.get(map, :thinking_trace, []),
       usage: Map.get(map, :usage, %{}),
       started_at: Map.get(map, :started_at)
     }
@@ -428,8 +433,8 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp handle_llm_response(machine, {:ok, result}, env) do
-    # Extract and accumulate usage metadata
     machine = accumulate_usage(machine, result)
+    machine = capture_thinking_to_trace(machine, Map.get(result, :thinking_content))
 
     case result.type do
       :tool_calls -> handle_tool_calls(machine, result.tool_calls, env)
@@ -455,6 +460,35 @@ defmodule Jido.AI.ReAct.Machine do
     end
   end
 
+  defp capture_thinking_to_trace(machine, classified_thinking \\ nil) do
+    thinking = pick_thinking(machine.streaming_thinking, classified_thinking)
+
+    case thinking do
+      nil ->
+        machine
+
+      content ->
+        entry = %{
+          call_id: machine.current_llm_call_id,
+          iteration: machine.iteration,
+          thinking: content
+        }
+
+        %{machine | thinking_trace: machine.thinking_trace ++ [entry]}
+    end
+  end
+
+  defp pick_thinking("", nil), do: nil
+  defp pick_thinking("", classified) when is_binary(classified) and classified != "", do: classified
+  defp pick_thinking(streaming, _) when is_binary(streaming) and streaming != "", do: streaming
+  defp pick_thinking(_, _), do: nil
+
+  defp thinking_opts(%{streaming_thinking: thinking}) when is_binary(thinking) and thinking != "" do
+    [thinking: thinking]
+  end
+
+  defp thinking_opts(_), do: []
+
   defp handle_tool_calls(machine, tool_calls, _env) do
     # Format tool_calls for Thread storage
     formatted_tool_calls =
@@ -468,8 +502,8 @@ defmodule Jido.AI.ReAct.Machine do
       end)
 
     with_transition(machine, "awaiting_tool", fn machine ->
-      # Append assistant message with tool calls to thread
-      thread = Thread.append_assistant(machine.thread, "", formatted_tool_calls)
+      thinking_opts = thinking_opts(machine)
+      thread = Thread.append_assistant(machine.thread, "", formatted_tool_calls, thinking_opts)
 
       machine =
         machine
@@ -496,8 +530,8 @@ defmodule Jido.AI.ReAct.Machine do
     })
 
     with_transition(machine, "completed", fn machine ->
-      # Append assistant answer to thread
-      thread = Thread.append_assistant(machine.thread, answer)
+      thinking_opts = thinking_opts(machine)
+      thread = Thread.append_assistant(machine.thread, answer, nil, thinking_opts)
 
       machine =
         machine

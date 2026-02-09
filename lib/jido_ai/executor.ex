@@ -320,8 +320,6 @@ defmodule Jido.AI.Executor do
     end)
   end
 
-  defp coerce_integers_to_floats(params, _schema), do: params
-
   # ============================================================================
   # Result Formatting
   # ============================================================================
@@ -449,28 +447,12 @@ defmodule Jido.AI.Executor do
     }
   end
 
-  defp format_error(tool_name, reason) when is_binary(reason) do
-    %{
-      error: reason,
-      tool_name: tool_name,
-      type: :execution_error
-    }
-  end
-
-  defp format_error(tool_name, reason) when is_map(reason) do
-    %{
-      error: Map.get(reason, :message, inspect(reason)),
-      tool_name: tool_name,
-      type: :execution_error,
-      details: reason
-    }
-  end
-
-  defp format_error(tool_name, reason) when is_atom(reason) or is_tuple(reason) or is_list(reason) do
+  defp format_error(tool_name, reason) do
     %{
       error: inspect(reason),
       tool_name: tool_name,
-      type: :execution_error
+      type: :execution_error,
+      details: if(is_map(reason), do: reason, else: nil)
     }
   end
 

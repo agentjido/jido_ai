@@ -279,7 +279,7 @@ defmodule Jido.AI.Helpers do
   ## Examples
 
       iex> Helpers.classify_llm_response(%{message: %{content: "Hello", tool_calls: []}, finish_reason: :stop})
-      %{type: :final_answer, text: "Hello", tool_calls: [], usage: nil, model: nil}
+      %{type: :final_answer, text: "Hello", thinking_content: nil, tool_calls: [], usage: nil, model: nil}
   """
   @spec classify_llm_response(map()) :: map()
   def classify_llm_response(response) do
@@ -295,11 +295,26 @@ defmodule Jido.AI.Helpers do
     %{
       type: type,
       text: Text.extract_from_content(response.message.content),
+      thinking_content: extract_thinking_content(response.message.content),
       tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1),
       usage: normalize_usage(Map.get(response, :usage)),
       model: Map.get(response, :model)
     }
   end
+
+  defp extract_thinking_content(content) when is_list(content) do
+    result =
+      content
+      |> Enum.filter(fn
+        %{type: :thinking} -> true
+        _ -> false
+      end)
+      |> Enum.map_join("\n\n", & &1.thinking)
+
+    if result == "", do: nil, else: result
+  end
+
+  defp extract_thinking_content(_content), do: nil
 
   # Normalizes usage map to ensure numeric values
   defp normalize_usage(nil), do: nil

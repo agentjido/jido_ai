@@ -1,10 +1,10 @@
 # Jido.AI
 
-**AI integration layer for the Jido ecosystem** - LLM orchestration, accuracy improvement techniques, and reasoning strategies for building intelligent agents in Elixir.
+**AI integration layer for the Jido ecosystem** - LLM orchestration and reasoning strategies for building intelligent agents in Elixir.
 
 ## Overview
 
-Jido.AI provides a comprehensive toolkit for improving LLM output quality through proven accuracy enhancement techniques. It implements research-backed algorithms for self-consistency, search, verification, reflection, and more - all designed to get better results from language models.
+Jido.AI provides a comprehensive toolkit for building intelligent agents with LLMs. It implements proven reasoning strategies for tool use, multi-step reasoning, and complex planning - all designed to get better results from language models.
 
 ```elixir
 # Quick example: ReAct agent with tool use
@@ -80,197 +80,11 @@ end
 
 ---
 
-## Accuracy Improvement Techniques
-
-Beyond strategies, Jido.AI provides research-backed techniques to improve LLM output quality. These are organized by how they enhance results:
-
-### Consensus-Based Methods
-
-Generate multiple candidates and aggregate results for more reliable answers.
-
-| Technique | Best For | Guide |
-|-----------|----------|-------|
-| **Self-Consistency** | Multi-step reasoning, math problems | [Guide](guides/user/03_self_consistency.md) |
-| **Adaptive Self-Consistency** | Dynamic resource allocation | [Guide](guides/user/04_adaptive_self_consistency.md) |
-
-**When to use consensus methods:**
-- Problems with definite answers (math, logic, factual)
-- When you can afford multiple LLM calls
-- When majority voting improves reliability
-
-```elixir
-# Generate 5 candidates, use majority vote
-{:ok, best, _meta} = Jido.AI.Accuracy.SelfConsistency.run(
-  "If 3 cats catch 3 mice in 3 minutes, how long for 100 cats?",
-  num_candidates: 5,
-  aggregator: :majority_vote
-)
-```
-
----
-
-### Search Algorithms
-
-Systematically explore the reasoning space to find optimal solutions.
-
-| Algorithm | Best For | Guide |
-|-----------|----------|-------|
-| **Beam Search** | Focused exploration, limited depth | [Guide](guides/user/05_search_algorithms.md#beam-search) |
-| **MCTS** | Complex reasoning, game-like scenarios | [Guide](guides/user/05_search_algorithms.md#monte-carlo-tree-search-mcts) |
-| **Diverse Decoding** | Creative brainstorming | [Guide](guides/user/05_search_algorithms.md#diverse-decoding) |
-
-**When to use search algorithms:**
-- Problems with clear branching structure
-- When systematic exploration beats single-shot
-- Game-like or planning scenarios
-
-```elixir
-# MCTS for complex reasoning
-{:ok, best} = Jido.AI.Accuracy.Search.MCTS.search(
-  "Solve: x^2 + 5x + 6 = 0 for x",
-  llm_generator,
-  llm_verifier,
-  simulations: 100
-)
-```
-
----
-
-### Verification
-
-Validate outputs before accepting them, catching hallucinations and errors.
-
-| Verifier Type | Best For | Guide |
-|---------------|----------|-------|
-| **LLM Verifier** | General purpose checking | [Guide](guides/user/06_verification.md) |
-| **Code Execution** | Code generation, math | [Guide](guides/user/06_verification.md#code-execution-verifier) |
-| **Deterministic** | Known answers, test cases | [Guide](guides/user/06_verification.md#deterministic-verifier) |
-| **Static Analysis** | Code quality checks | [Guide](guides/user/06_verification.md#static-analysis-verifier) |
-| **Unit Test** | Test-driven validation | [Guide](guides/user/06_verification.md#unit-test-verifier) |
-
-**When to use verification:**
-- When hallucinations are costly
-- For code generation or mathematical outputs
-- When you have reference answers or tests
-
-```elixir
-# Create a code execution verifier
-verifier = Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier.new!(%{
-  language: :elixir,
-  timeout: 5000
-})
-
-# Verify code outputs
-{:ok, result} = Jido.AI.Accuracy.Verifiers.CodeExecutionVerifier.verify(
-  verifier,
-  candidate,
-  %{}
-)
-```
-
----
-
-### Reflection & Improvement
-
-Iteratively refine outputs through self-critique and revision.
-
-| Technique | Best For | Guide |
-|-----------|----------|-------|
-| **Self-Refine** | Improving draft outputs | [Guide](guides/user/07_reflection.md) |
-| **Reflection Stages** | Multi-stage refinement | [Guide](guides/user/07_reflection.md#reflection-stages) |
-| **Critique & Revision** | Structured improvement cycles | [Guide](guides/user/08_critique_revision.md) |
-
-**When to use reflection:**
-- When initial drafts need refinement
-- For writing, code, or complex explanations
-- When you have time for iteration
-
-```elixir
-# Self-refine for better outputs
-strategy = Jido.AI.Accuracy.SelfRefine.new!(%{})
-{:ok, result} = Jido.AI.Accuracy.SelfRefine.run(strategy, "Write a function to sort a list")
-
-result.refined_candidate  # The improved response
-```
-
----
-
-### Quality Estimation
-
-Estimate confidence and difficulty to allocate resources appropriately.
-
-| Technique | Best For | Guide |
-|-----------|----------|-------|
-| **Confidence Calibration** | Reliability scoring | [Guide](guides/user/10_confidence_calibration.md) |
-| **Difficulty Estimation** | Resource allocation | [Guide](guides/user/11_difficulty_estimation.md) |
-| **Process Reward Models** | Step-by-step quality | [Guide](guides/user/09_prm.md) |
-
-**When to use quality estimation:**
-- Variable-difficulty workloads
-- Cost-sensitive applications
-- When you need confidence scores
-
-```elixir
-# Estimate difficulty to allocate resources
-estimator = Jido.AI.Accuracy.Estimators.HeuristicDifficulty.new!(%{})
-
-{:ok, estimate} = Jido.AI.Accuracy.Estimators.HeuristicDifficulty.estimate(
-  estimator,
-  "What is the square root of 144 multiplied by the sum of the first 10 primes?",
-  %{}
-)
-
-case estimate.level do
-  :easy -> use_fast_model()
-  :hard -> use_full_pipeline()
-end
-```
-
----
-
-## Pipeline Orchestration
-
-Combine multiple techniques into powerful pipelines that adapt to your needs.
-
-[**Pipeline Guide &rarr;](guides/user/12_pipeline.md)**
-
-```elixir
-# Build a pipeline that adapts based on difficulty
-{:ok, pipeline} = Jido.AI.Accuracy.Pipeline.new(%{})
-
-generator = fn query, _context ->
-  # Your LLM generation logic here
-  {:ok, "Answer to: #{query}"}
-end
-
-{:ok, result} = Jido.AI.Accuracy.Pipeline.run(pipeline, "Solve this complex problem...", generator: generator)
-
-result.answer  # The final answer
-result.confidence  # Confidence score [0-1]
-```
-
-**When to use pipelines:**
-- Complex problems requiring multiple techniques
-- When you need adaptive processing
-- Production workflows with quality requirements
-
----
-
 ## Documentation
 
 ### User Guides
 - [Overview](guides/user/01_overview.md) - Library introduction and concepts
 - [Strategies](guides/user/02_strategies.md) - Reasoning strategies
-- [Self-Consistency](guides/user/03_self_consistency.md) - Consensus-based improvement
-- [Adaptive Self-Consistency](guides/user/04_adaptive_self_consistency.md) - Dynamic resource allocation
-- [Search Algorithms](guides/user/05_search_algorithms.md) - Beam search, MCTS, diverse decoding
-- [Verification](guides/user/06_verification.md) - Output validation techniques
-- [Reflection](guides/user/07_reflection.md) - Self-refine and reflection stages
-- [Critique & Revision](guides/user/08_critique_revision.md) - Structured improvement cycles
-- [Process Reward Models](guides/user/09_prm.md) - Step-by-step quality scoring
-- [Confidence Calibration](guides/user/10_confidence_calibration.md) - Reliability estimation
-- [Difficulty Estimation](guides/user/11_difficulty_estimation.md) - Resource-aware processing
-- [Pipeline](guides/user/12_pipeline.md) - Combining techniques into workflows
 
 ### Developer Guides
 - [Architecture Overview](guides/developer/01_architecture_overview.md) - System design
@@ -284,7 +98,6 @@ result.confidence  # Confidence score [0-1]
 
 ### Examples
 See the [`examples/`](examples/) directory for runnable code:
-- [`examples/accuracy/`](examples/accuracy/) - Accuracy improvement examples
 - [`examples/strategies/`](examples/strategies/) - Reasoning strategy examples
 
 ## Quick Decision Guide
@@ -299,23 +112,6 @@ Building an agent?
 │  └─ Use Chain-of-Thought
 └─ Complex planning?
    └─ Use Tree-of-Thoughts
-
-Improving accuracy?
-├─ Problem has definite answer?
-│  └─ Use Self-Consistency
-│
-├─ Requires exploration/planning?
-│  ├─ Shallow depth → Beam Search
-│  └─ Deep/complex → MCTS
-│
-├─ Output needs validation?
-│  └─ Add Verification
-│
-├─ Initial draft acceptable?
-│  └─ Use Self-Refine
-│
-└─ Variable difficulty?
-   └─ Use Pipeline with difficulty estimation
 ```
 
 ## Contributing
