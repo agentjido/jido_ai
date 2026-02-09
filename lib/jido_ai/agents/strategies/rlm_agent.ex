@@ -24,6 +24,8 @@ defmodule Jido.AI.RLMAgent do
   - `:model` - Primary model identifier (default: "anthropic:claude-sonnet-4-20250514")
   - `:recursive_model` - Model for sub-LLM queries (default: "anthropic:claude-haiku-4-5")
   - `:max_iterations` - Maximum exploration iterations (default: 15)
+  - `:max_depth` - Maximum recursion depth for agent spawning (default: 0, no spawning)
+  - `:child_agent` - Module to use for child agents (default: `Jido.AI.RLM.ChildAgent`)
   - `:extra_tools` - Additional Jido.Action modules beyond RLM exploration tools
   - `:plugins` - Additional plugins (TaskSupervisorSkill is auto-included)
 
@@ -55,6 +57,8 @@ defmodule Jido.AI.RLMAgent do
     model = Keyword.get(opts, :model, @default_model)
     recursive_model = Keyword.get(opts, :recursive_model, @default_recursive_model)
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
+    max_depth = Keyword.get(opts, :max_depth, 0)
+    child_agent = Keyword.get(opts, :child_agent, nil)
     plugins = Keyword.get(opts, :plugins, [])
 
     extra_tools_ast = Keyword.get(opts, :extra_tools, [])
@@ -71,6 +75,8 @@ defmodule Jido.AI.RLMAgent do
       model: model,
       recursive_model: recursive_model,
       max_iterations: max_iterations,
+      max_depth: max_depth,
+      child_agent: child_agent,
       extra_tools: extra_tools
     ]
 

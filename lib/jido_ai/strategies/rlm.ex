@@ -227,6 +227,9 @@ defmodule Jido.AI.Strategies.RLM do
           |> Map.put(:context_ref, context_ref)
           |> Map.put(:workspace_ref, workspace_ref)
           |> Map.put(:recursive_model, config[:recursive_model])
+          |> Map.put(:current_depth, get_in(params, [:tool_context, :current_depth]) || 0)
+          |> Map.put(:max_depth, config[:max_depth])
+          |> Map.put(:child_agent, config[:child_agent])
 
         agent = set_run_tool_context(agent, run_context)
 
@@ -268,17 +271,7 @@ defmodule Jido.AI.Strategies.RLM do
           |> Map.put(:workspace_ref, state[:workspace_ref])
           |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
-        new_state =
-          if machine_state[:status] in [:completed, :error] do
-            cleanup_rlm_state(new_state)
-
-            new_state
-            |> Map.delete(:run_tool_context)
-            |> Map.delete(:context_ref)
-            |> Map.delete(:workspace_ref)
-          else
-            new_state
-          end
+        new_state = maybe_finalize(new_state, machine_state[:status])
 
         agent = StratState.put(agent, new_state)
         {agent, lift_directives(directives, config, new_state)}
@@ -303,22 +296,28 @@ defmodule Jido.AI.Strategies.RLM do
       {:call_llm_stream, id, conversation} ->
         workspace_summary = get_workspace_summary(state)
         iteration = state[:iteration] || 1
+        current_depth = get_in(state, [:run_tool_context, :current_depth]) || 0
+        max_depth_val = get_in(state, [:run_tool_context, :max_depth]) || 0
 
         next_step =
           Prompts.next_step_prompt(%{
             query: state[:query],
             iteration: iteration,
-            workspace_summary: workspace_summary
+            workspace_summary: workspace_summary,
+            current_depth: current_depth,
+            max_depth: max_depth_val
           })
 
         augmented = conversation ++ [next_step]
+
+        effective_tools = filter_tools_for_depth(reqllm_tools, current_depth, max_depth_val)
 
         [
           Directive.LLMStream.new!(%{
             id: id,
             model: model,
             context: convert_to_reqllm_context(augmented),
-            tools: reqllm_tools
+            tools: effective_tools
           })
         ]
 
@@ -380,7 +379,16 @@ defmodule Jido.AI.Strategies.RLM do
         _ -> []
       end
 
-    tools_modules = @rlm_tools ++ extra_tools
+    max_depth = Keyword.get(opts, :max_depth, 0)
+
+    spawn_tools =
+      if max_depth > 0 do
+        [Jido.AI.Actions.RLM.Agent.Spawn]
+      else
+        []
+      end
+
+    tools_modules = @rlm_tools ++ spawn_tools ++ extra_tools
 
     actions_by_name = Map.new(tools_modules, &{&1.name(), &1})
     reqllm_tools = ToolAdapter.from_actions(tools_modules)
@@ -400,7 +408,9 @@ defmodule Jido.AI.Strategies.RLM do
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       context_inline_threshold: Keyword.get(opts, :context_inline_threshold, @default_context_inline_threshold),
       max_concurrency: Keyword.get(opts, :max_concurrency, @default_max_concurrency),
-      base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
+      base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{}),
+      max_depth: max_depth,
+      child_agent: Keyword.get(opts, :child_agent, nil)
     }
 
     system_prompt = Prompts.system_prompt(config)
@@ -470,6 +480,30 @@ defmodule Jido.AI.Strategies.RLM do
       ref -> WorkspaceStore.summary(ref)
     end
   end
+
+  defp maybe_finalize(state, status) when status in [:completed, :error] do
+    final_summary =
+      case state[:workspace_ref] do
+        nil -> ""
+        ref -> WorkspaceStore.summary(ref)
+      end
+
+    cleanup_rlm_state(state)
+
+    state
+    |> Map.put(:final_workspace_summary, final_summary)
+    |> Map.delete(:run_tool_context)
+    |> Map.delete(:context_ref)
+    |> Map.delete(:workspace_ref)
+  end
+
+  defp maybe_finalize(state, _status), do: state
+
+  defp filter_tools_for_depth(tools, current_depth, max_depth) when current_depth >= max_depth do
+    Enum.reject(tools, fn tool -> tool.name == "rlm_spawn_agent" end)
+  end
+
+  defp filter_tools_for_depth(tools, _current_depth, _max_depth), do: tools
 
   defp cleanup_rlm_state(state) do
     if state[:context_ref], do: ContextStore.delete(state[:context_ref])
