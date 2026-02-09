@@ -372,19 +372,20 @@ defmodule Jido.AI.Request do
         {:ok, agent, directives}
       end
   """
-  @spec complete_request(struct(), String.t(), any()) :: struct()
-  def complete_request(agent, request_id, result) do
+  @spec complete_request(struct(), String.t(), any(), keyword()) :: struct()
+  def complete_request(agent, request_id, result, opts \\ []) do
+    meta = Keyword.get(opts, :meta, %{})
+
     state =
       agent.state
       |> update_in([:requests, request_id], fn
         nil ->
-          # Request not found, create minimal entry
-          %{status: :completed, result: result, completed_at: System.system_time(:millisecond)}
+          %{status: :completed, result: result, meta: meta, completed_at: System.system_time(:millisecond)}
 
         req ->
           %{req | status: :completed, result: result, completed_at: System.system_time(:millisecond)}
+          |> Map.put(:meta, Map.merge(Map.get(req, :meta, %{}), meta))
       end)
-      # Update convenience fields
       |> Map.put(:last_answer, result || "")
       |> Map.put(:completed, true)
 

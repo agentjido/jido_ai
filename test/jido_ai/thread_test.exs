@@ -88,6 +88,41 @@ defmodule Jido.AI.ThreadTest do
     end
   end
 
+  describe "append_assistant/4 with thinking" do
+    test "appends assistant message with thinking content" do
+      thread =
+        Thread.new()
+        |> Thread.append_assistant("The answer is 4.", nil, thinking: "Let me work through this step by step...")
+
+      [entry] = thread.entries
+      assert entry.role == :assistant
+      assert entry.content == "The answer is 4."
+      assert entry.thinking == "Let me work through this step by step..."
+      assert entry.tool_calls == nil
+    end
+
+    test "thinking defaults to nil when not provided" do
+      thread =
+        Thread.new()
+        |> Thread.append_assistant("Hello!")
+
+      [entry] = thread.entries
+      assert entry.thinking == nil
+    end
+
+    test "appends assistant with both tool calls and thinking" do
+      tool_calls = [%{id: "tc_1", name: "calc", arguments: %{x: 1}}]
+
+      thread =
+        Thread.new()
+        |> Thread.append_assistant("", tool_calls, thinking: "I need to calculate this")
+
+      [entry] = thread.entries
+      assert entry.thinking == "I need to calculate this"
+      assert entry.tool_calls == tool_calls
+    end
+  end
+
   describe "append_tool_result/4" do
     test "appends tool result" do
       thread =
@@ -213,6 +248,31 @@ defmodule Jido.AI.ThreadTest do
       messages = Thread.to_messages(thread, limit: 0)
 
       assert messages == []
+    end
+
+    test "projects assistant message with thinking as content blocks" do
+      thread =
+        Thread.new()
+        |> Thread.append_assistant("The answer is 42.", nil, thinking: "Let me reason about this...")
+
+      [message] = Thread.to_messages(thread)
+
+      assert message.role == :assistant
+      assert is_list(message.content)
+      assert [thinking_block, text_block] = message.content
+      assert thinking_block == %{type: :thinking, thinking: "Let me reason about this..."}
+      assert text_block == %{type: :text, text: "The answer is 42."}
+    end
+
+    test "projects assistant message without thinking as plain string" do
+      thread =
+        Thread.new()
+        |> Thread.append_assistant("Just text")
+
+      [message] = Thread.to_messages(thread)
+
+      assert message.role == :assistant
+      assert message.content == "Just text"
     end
   end
 
@@ -394,6 +454,70 @@ defmodule Jido.AI.ThreadTest do
       assert assistant.tool_calls == [%{id: "tc_1", name: "calc"}]
       assert tool.tool_call_id == "tc_1"
       assert tool.name == "calc"
+    end
+  end
+
+  # ============================================================================
+  # Thinking Content Round-trip
+  # ============================================================================
+
+  describe "thinking content round-trip via append_messages" do
+    test "round-trips thinking content through message format" do
+      messages = [
+        %{
+          role: :assistant,
+          content: [
+            %{type: :thinking, thinking: "Step 1: analyze the problem"},
+            %{type: :text, text: "Here is my answer"}
+          ]
+        }
+      ]
+
+      thread = Thread.new() |> Thread.append_messages(messages)
+
+      [entry] = thread.entries
+      assert entry.role == :assistant
+      assert entry.content == "Here is my answer"
+      assert entry.thinking == "Step 1: analyze the problem"
+
+      projected = Thread.to_messages(thread)
+      [msg] = projected
+      assert is_list(msg.content)
+
+      assert [
+               %{type: :thinking, thinking: "Step 1: analyze the problem"},
+               %{type: :text, text: "Here is my answer"}
+             ] = msg.content
+    end
+
+    test "handles messages with string type keys" do
+      messages = [
+        %{
+          role: :assistant,
+          content: [
+            %{type: "thinking", text: "Some reasoning"},
+            %{type: "text", text: "The result"}
+          ]
+        }
+      ]
+
+      thread = Thread.new() |> Thread.append_messages(messages)
+
+      [entry] = thread.entries
+      assert entry.content == "The result"
+      assert entry.thinking == "Some reasoning"
+    end
+
+    test "handles plain string content without thinking" do
+      messages = [
+        %{role: :assistant, content: "Just a plain message"}
+      ]
+
+      thread = Thread.new() |> Thread.append_messages(messages)
+
+      [entry] = thread.entries
+      assert entry.content == "Just a plain message"
+      assert entry.thinking == nil
     end
   end
 

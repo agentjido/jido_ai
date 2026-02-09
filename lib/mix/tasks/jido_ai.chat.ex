@@ -54,7 +54,6 @@ defmodule Mix.Tasks.JidoAi.Chat do
   ## See Also
 
   - `mix help jido_ai.agent` - Single-shot queries
-  - `mix help jido_ai.accuracy` - Accuracy evaluation
   """
 
   use Mix.Task
