@@ -65,7 +65,7 @@ defmodule JidoAi.MixProject do
        git: "https://github.com/nshkrdotcom/jido_action.git", branch: "refactor/otp-cleanup", override: true},
       {:req_llm, "~> 1.5"},
       {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
-      {:agent_session_manager, "~> 0.5.1", optional: true},
+      {:agent_session_manager, "~> 0.6", optional: true},
 
       # Runtime
       {:fsmx, "~> 0.5"},
