@@ -70,32 +70,28 @@ defmodule Jido.AI.CLI.Adapter do
   @spec resolve(type :: String.t() | nil, agent_module :: module() | nil) ::
           {:ok, module()} | {:error, term()}
   def resolve(type, agent_module) do
-    cond do
-      # If agent module provides its own adapter, use it
-      agent_module && function_exported?(agent_module, :cli_adapter, 0) ->
-        {:ok, agent_module.cli_adapter()}
+    if agent_module && function_exported?(agent_module, :cli_adapter, 0) do
+      {:ok, agent_module.cli_adapter()}
+    else
+      resolve_by_type(type)
+    end
+  end
 
-      # Type explicitly specified
-      type == "react" || type == nil ->
-        {:ok, Jido.AI.CLI.Adapters.ReAct}
+  @adapter_map %{
+    "react" => Jido.AI.CLI.Adapters.ReAct,
+    "tot" => Jido.AI.CLI.Adapters.ToT,
+    "cot" => Jido.AI.CLI.Adapters.CoT,
+    "got" => Jido.AI.CLI.Adapters.GoT,
+    "trm" => Jido.AI.CLI.Adapters.TRM,
+    "adaptive" => Jido.AI.CLI.Adapters.Adaptive
+  }
 
-      type == "tot" ->
-        {:ok, Jido.AI.CLI.Adapters.ToT}
+  defp resolve_by_type(nil), do: {:ok, Jido.AI.CLI.Adapters.ReAct}
 
-      type == "cot" ->
-        {:ok, Jido.AI.CLI.Adapters.CoT}
-
-      type == "got" ->
-        {:ok, Jido.AI.CLI.Adapters.GoT}
-
-      type == "trm" ->
-        {:ok, Jido.AI.CLI.Adapters.TRM}
-
-      type == "adaptive" ->
-        {:ok, Jido.AI.CLI.Adapters.Adaptive}
-
-      true ->
-        {:error, "Unknown agent type: #{type}. Supported: react, tot, cot, got, trm, adaptive"}
+  defp resolve_by_type(type) do
+    case Map.fetch(@adapter_map, type) do
+      {:ok, adapter} -> {:ok, adapter}
+      :error -> {:error, "Unknown agent type: #{type}. Supported: react, tot, cot, got, trm, adaptive"}
     end
   end
 end

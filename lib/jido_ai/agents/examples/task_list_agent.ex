@@ -244,7 +244,7 @@ defmodule Jido.AI.Examples.TaskListAgent do
   end
 
   defp sync_tasks_from_conversation(agent, snap) do
-    details = snap.details || %{}
+    details = snap.details
     conversation = Map.get(details, :conversation, [])
 
     tasks = extract_tasks_from_conversation(conversation, load_tasks(agent))

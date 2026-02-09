@@ -13,8 +13,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Plugins.LLM
   alias Jido.AI.Actions.LLM.Chat
+  alias Jido.AI.Plugins.LLM
   alias Jido.AI.Plugins.Planning
   alias Jido.AI.Plugins.Reasoning
   alias Jido.AI.Plugins.Streaming

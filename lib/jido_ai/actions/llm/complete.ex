@@ -47,8 +47,8 @@ defmodule Jido.AI.Actions.LLM.Complete do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Security
   alias Jido.AI.Actions.Helpers
+  alias Jido.AI.Security
   alias ReqLLM.Context
 
   @doc """

@@ -82,26 +82,30 @@ defmodule Mix.Tasks.JidoAi.Skill do
 
       Mix.shell().info(Jason.encode!(data, pretty: true))
     else
-      Mix.shell().info("\n#{IO.ANSI.bright()}Skills found: #{length(valid_skills)}#{IO.ANSI.reset()}\n")
+      print_skills_list(valid_skills, errors)
+    end
+  end
 
-      Enum.each(valid_skills, fn {:ok, spec} ->
-        tools =
-          case spec.allowed_tools do
-            [] -> ""
-            tools -> " [#{Enum.join(tools, ", ")}]"
-          end
+  defp print_skills_list(valid_skills, errors) do
+    Mix.shell().info("\n#{IO.ANSI.bright()}Skills found: #{length(valid_skills)}#{IO.ANSI.reset()}\n")
 
-        Mix.shell().info("  #{IO.ANSI.cyan()}#{spec.name}#{IO.ANSI.reset()}#{tools}")
-        Mix.shell().info("    #{spec.description}\n")
+    Enum.each(valid_skills, fn {:ok, spec} ->
+      tools =
+        case spec.allowed_tools do
+          [] -> ""
+          tools -> " [#{Enum.join(tools, ", ")}]"
+        end
+
+      Mix.shell().info("  #{IO.ANSI.cyan()}#{spec.name}#{IO.ANSI.reset()}#{tools}")
+      Mix.shell().info("    #{spec.description}\n")
+    end)
+
+    if errors != [] do
+      Mix.shell().info("#{IO.ANSI.red()}Errors: #{length(errors)}#{IO.ANSI.reset()}")
+
+      Enum.each(errors, fn {:error, {path, reason}} ->
+        Mix.shell().error("  #{path}: #{format_error(reason)}")
       end)
-
-      if errors != [] do
-        Mix.shell().info("#{IO.ANSI.red()}Errors: #{length(errors)}#{IO.ANSI.reset()}")
-
-        Enum.each(errors, fn {:error, {path, reason}} ->
-          Mix.shell().error("  #{path}: #{format_error(reason)}")
-        end)
-      end
     end
   end
 
@@ -109,61 +113,69 @@ defmodule Mix.Tasks.JidoAi.Skill do
     case Loader.load(path) do
       {:ok, spec} ->
         if opts[:json] do
-          data = %{
-            name: spec.name,
-            description: spec.description,
-            license: spec.license,
-            compatibility: spec.compatibility,
-            metadata: spec.metadata,
-            allowed_tools: spec.allowed_tools,
-            vsn: spec.vsn,
-            tags: spec.tags,
-            body: if(opts[:body], do: get_body(spec))
-          }
-
-          Mix.shell().info(Jason.encode!(data, pretty: true))
+          show_skill_json(spec, opts)
         else
-          Mix.shell().info("")
-          Mix.shell().info("#{IO.ANSI.bright()}#{spec.name}#{IO.ANSI.reset()}")
-          Mix.shell().info("#{IO.ANSI.faint()}#{String.duplicate("─", String.length(spec.name))}#{IO.ANSI.reset()}")
-          Mix.shell().info("")
-          Mix.shell().info("#{IO.ANSI.cyan()}Description:#{IO.ANSI.reset()} #{spec.description}")
-
-          if spec.license, do: Mix.shell().info("#{IO.ANSI.cyan()}License:#{IO.ANSI.reset()} #{spec.license}")
-
-          if spec.compatibility,
-            do: Mix.shell().info("#{IO.ANSI.cyan()}Compatibility:#{IO.ANSI.reset()} #{spec.compatibility}")
-
-          if spec.vsn, do: Mix.shell().info("#{IO.ANSI.cyan()}Version:#{IO.ANSI.reset()} #{spec.vsn}")
-
-          if spec.tags != [],
-            do: Mix.shell().info("#{IO.ANSI.cyan()}Tags:#{IO.ANSI.reset()} #{Enum.join(spec.tags, ", ")}")
-
-          if spec.allowed_tools != [] do
-            Mix.shell().info("#{IO.ANSI.cyan()}Allowed Tools:#{IO.ANSI.reset()} #{Enum.join(spec.allowed_tools, ", ")}")
-          end
-
-          if spec.metadata && map_size(spec.metadata) > 0 do
-            Mix.shell().info("#{IO.ANSI.cyan()}Metadata:#{IO.ANSI.reset()}")
-
-            Enum.each(spec.metadata, fn {k, v} ->
-              Mix.shell().info("  #{k}: #{inspect(v)}")
-            end)
-          end
-
-          if opts[:body] do
-            Mix.shell().info("")
-            Mix.shell().info("#{IO.ANSI.cyan()}Body:#{IO.ANSI.reset()}")
-            Mix.shell().info("#{IO.ANSI.faint()}#{String.duplicate("─", 40)}#{IO.ANSI.reset()}")
-            Mix.shell().info(get_body(spec))
-          end
-
-          Mix.shell().info("")
+          show_skill_text(spec, opts)
         end
 
       {:error, reason} ->
         Mix.shell().error("Failed to load skill: #{format_error(reason)}")
     end
+  end
+
+  defp show_skill_json(spec, opts) do
+    data = %{
+      name: spec.name,
+      description: spec.description,
+      license: spec.license,
+      compatibility: spec.compatibility,
+      metadata: spec.metadata,
+      allowed_tools: spec.allowed_tools,
+      vsn: spec.vsn,
+      tags: spec.tags,
+      body: if(opts[:body], do: get_body(spec))
+    }
+
+    Mix.shell().info(Jason.encode!(data, pretty: true))
+  end
+
+  defp show_skill_text(spec, opts) do
+    Mix.shell().info("")
+    Mix.shell().info("#{IO.ANSI.bright()}#{spec.name}#{IO.ANSI.reset()}")
+    Mix.shell().info("#{IO.ANSI.faint()}#{String.duplicate("─", String.length(spec.name))}#{IO.ANSI.reset()}")
+    Mix.shell().info("")
+    Mix.shell().info("#{IO.ANSI.cyan()}Description:#{IO.ANSI.reset()} #{spec.description}")
+
+    if spec.license, do: Mix.shell().info("#{IO.ANSI.cyan()}License:#{IO.ANSI.reset()} #{spec.license}")
+
+    if spec.compatibility,
+      do: Mix.shell().info("#{IO.ANSI.cyan()}Compatibility:#{IO.ANSI.reset()} #{spec.compatibility}")
+
+    if spec.vsn, do: Mix.shell().info("#{IO.ANSI.cyan()}Version:#{IO.ANSI.reset()} #{spec.vsn}")
+
+    if spec.tags != [],
+      do: Mix.shell().info("#{IO.ANSI.cyan()}Tags:#{IO.ANSI.reset()} #{Enum.join(spec.tags, ", ")}")
+
+    if spec.allowed_tools != [] do
+      Mix.shell().info("#{IO.ANSI.cyan()}Allowed Tools:#{IO.ANSI.reset()} #{Enum.join(spec.allowed_tools, ", ")}")
+    end
+
+    if spec.metadata && map_size(spec.metadata) > 0 do
+      Mix.shell().info("#{IO.ANSI.cyan()}Metadata:#{IO.ANSI.reset()}")
+
+      Enum.each(spec.metadata, fn {k, v} ->
+        Mix.shell().info("  #{k}: #{inspect(v)}")
+      end)
+    end
+
+    if opts[:body] do
+      Mix.shell().info("")
+      Mix.shell().info("#{IO.ANSI.cyan()}Body:#{IO.ANSI.reset()}")
+      Mix.shell().info("#{IO.ANSI.faint()}#{String.duplicate("─", 40)}#{IO.ANSI.reset()}")
+      Mix.shell().info(get_body(spec))
+    end
+
+    Mix.shell().info("")
   end
 
   defp validate_skills([], _opts) do

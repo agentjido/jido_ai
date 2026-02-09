@@ -4,6 +4,7 @@ defmodule Jido.AI.ToolApiTest do
   """
   use ExUnit.Case, async: true
 
+  alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI
   alias Jido.AI.Strategies.ReAct
 
@@ -80,14 +81,14 @@ defmodule Jido.AI.ToolApiTest do
       # Test with a manually constructed agent state
       agent = TestAgent.new()
       # Manually clear tools from strategy state for testing
-      state = Jido.Agent.Strategy.State.get(agent, %{})
+      state = StratState.get(agent, %{})
       config = state[:config] || %{}
       new_config = Map.put(config, :tools, [])
 
       new_state =
         Map.put(state, :config, new_config)
 
-      agent = Jido.Agent.Strategy.State.put(agent, new_state)
+      agent = StratState.put(agent, new_state)
       tools = AI.list_tools(agent)
 
       assert tools == []

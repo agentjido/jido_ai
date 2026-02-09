@@ -311,14 +311,13 @@ defmodule Jido.AI.Thread do
 
   defp format_entry_for_pp(%Entry{role: :assistant, tool_calls: tool_calls}) when is_list(tool_calls) do
     names =
-      Enum.map(tool_calls, fn tc ->
+      Enum.map_join(tool_calls, ", ", fn tc ->
         case tc do
           %{name: name} -> name
           %{"name" => name} -> name
           _ -> "?"
         end
       end)
-      |> Enum.join(", ")
 
     "[asst]   <tool: #{names}>"
   end

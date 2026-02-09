@@ -63,6 +63,8 @@ defmodule Jido.AI.OrchestratorAgent do
       agent.state.last_answer  # => "105"
   """
 
+  alias Jido.AI.ReActAgent
+
   @default_model "anthropic:claude-haiku-4-5"
   @default_max_iterations 10
 
@@ -79,7 +81,7 @@ defmodule Jido.AI.OrchestratorAgent do
       specialists_ast
       |> Enum.map(fn spec_ast ->
         # Use the same safe AST expansion as ReActAgent
-        expanded = Jido.AI.ReActAgent.expand_aliases_in_ast(spec_ast, __CALLER__)
+        expanded = ReActAgent.expand_aliases_in_ast(spec_ast, __CALLER__)
         {spec, _} = Code.eval_quoted(expanded, [], __CALLER__)
         spec
       end)
@@ -446,20 +448,12 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
       {:error, :timeout}
     else
       case Jido.AgentServer.status(pid) do
-        {:ok, status} ->
-          if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_answer, "")
-                "" -> Map.get(status.raw_state, :last_answer, "")
-                result -> result
-              end
+        {:ok, status} when status.snapshot.done? ->
+          {:ok, extract_specialist_answer(status)}
 
-            {:ok, answer}
-          else
-            Process.sleep(100)
-            poll_specialist(pid, deadline)
-          end
+        {:ok, _status} ->
+          Process.sleep(100)
+          poll_specialist(pid, deadline)
 
         {:error, reason} ->
           {:error, reason}
@@ -467,7 +461,14 @@ defmodule Jido.AI.OrchestratorAgent.DelegateAndExecute do
     end
   end
 
+  defp extract_specialist_answer(status) do
+    case status.snapshot.result do
+      nil -> Map.get(status.raw_state, :last_answer, "")
+      "" -> Map.get(status.raw_state, :last_answer, "")
+      result -> result
+    end
+  end
+
   defp result_type({:ok, _}), do: :ok
   defp result_type({:error, _}), do: :error
-  defp result_type(_), do: :unknown
 end

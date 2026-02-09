@@ -810,21 +810,23 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
+    gen_params = %{
+      agent_pid: agent_pid,
+      call_id: call_id,
+      model: model,
+      context: context,
+      system_prompt: system_prompt,
+      tools: tools,
+      tool_choice: tool_choice,
+      max_tokens: max_tokens,
+      temperature: temperature,
+      timeout: timeout
+    }
+
     Task.Supervisor.start_child(task_supervisor, fn ->
       result =
         try do
-          generate_text(
-            agent_pid,
-            call_id,
-            model,
-            context,
-            system_prompt,
-            tools,
-            tool_choice,
-            max_tokens,
-            temperature,
-            timeout
-          )
+          generate_text(gen_params)
         rescue
           e ->
             {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
@@ -840,34 +842,23 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     {:async, nil, state}
   end
 
-  defp generate_text(
-         agent_pid,
-         call_id,
-         model,
-         context,
-         system_prompt,
-         tools,
-         tool_choice,
-         max_tokens,
-         temperature,
-         timeout
-       ) do
+  defp generate_text(params) do
     opts =
       []
-      |> Helpers.add_tools_opt(tools)
-      |> Keyword.put(:tool_choice, tool_choice)
-      |> Keyword.put(:max_tokens, max_tokens)
-      |> Keyword.put(:temperature, temperature)
-      |> Helpers.add_timeout_opt(timeout)
+      |> Helpers.add_tools_opt(params.tools)
+      |> Keyword.put(:tool_choice, params.tool_choice)
+      |> Keyword.put(:max_tokens, params.max_tokens)
+      |> Keyword.put(:temperature, params.temperature)
+      |> Helpers.add_timeout_opt(params.timeout)
 
-    messages = Helpers.build_directive_messages(context, system_prompt)
+    messages = Helpers.build_directive_messages(params.context, params.system_prompt)
 
-    case ReqLLM.Generation.generate_text(model, messages, opts) do
+    case ReqLLM.Generation.generate_text(params.model, messages, opts) do
       {:ok, response} ->
         classified = Helpers.classify_llm_response(response)
 
         # Emit usage report signal for per-call tracking
-        emit_usage_report(agent_pid, call_id, model, classified[:usage])
+        emit_usage_report(params.agent_pid, params.call_id, params.model, classified[:usage])
 
         {:ok, classified}
 

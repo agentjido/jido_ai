@@ -1,7 +1,7 @@
 defmodule Jido.AI.Skill.RegistryTest do
   use ExUnit.Case
 
-  alias Jido.AI.Skill.{Registry, Spec, Error}
+  alias Jido.AI.Skill.{Error, Registry, Spec}
 
   @fixtures_path Path.join([__DIR__, "..", "..", "fixtures", "skills", "registry"])
 

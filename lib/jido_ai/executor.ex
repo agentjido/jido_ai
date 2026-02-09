@@ -69,6 +69,7 @@ defmodule Jido.AI.Executor do
   """
 
   alias Jido.Action.Tool, as: ActionTool
+  alias Jido.Tracing.Context, as: TracingContext
 
   require Logger
 
@@ -495,25 +496,28 @@ defmodule Jido.AI.Executor do
   # Telemetry
   # ============================================================================
 
-  # Patterns for sensitive keys that should be redacted in telemetry
-  # These match common credential field names but avoid partial matches (e.g. "credentials" container)
-  @sensitive_key_patterns [
-    ~r/^api_?key$/i,
-    ~r/^password$/i,
-    ~r/^secret$/i,
-    ~r/^token$/i,
-    ~r/^auth_?token$/i,
-    ~r/^private_?key$/i,
-    ~r/^access_?key$/i,
-    ~r/^bearer$/i,
-    ~r/^api_?secret$/i,
-    ~r/^client_?secret$/i,
-    ~r/secret_/i,
-    ~r/_secret$/i,
-    ~r/_key$/i,
-    ~r/_token$/i,
-    ~r/_password$/i
+  # Sensitive keys that should be redacted in telemetry.
+  # Keep exact matches strict to avoid redacting broad container keys like "credentials".
+  @sensitive_exact_keys [
+    "api_key",
+    "apikey",
+    "password",
+    "secret",
+    "token",
+    "auth_token",
+    "authtoken",
+    "private_key",
+    "privatekey",
+    "access_key",
+    "accesskey",
+    "bearer",
+    "api_secret",
+    "apisecret",
+    "client_secret",
+    "clientsecret"
   ]
+
+  @sensitive_key_suffixes ["_secret", "_key", "_token", "_password"]
 
   defp start_telemetry(tool_name, params, context) do
     metadata =
@@ -536,7 +540,7 @@ defmodule Jido.AI.Executor do
   end
 
   defp get_trace_metadata do
-    case Jido.Tracing.Context.get() do
+    case TracingContext.get() do
       nil ->
         %{}
 
@@ -571,7 +575,11 @@ defmodule Jido.AI.Executor do
   end
 
   defp sensitive_key?(key) when is_binary(key) do
-    Enum.any?(@sensitive_key_patterns, &Regex.match?(&1, key))
+    normalized = String.downcase(key)
+
+    normalized in @sensitive_exact_keys or
+      String.contains?(normalized, "secret_") or
+      String.ends_with?(normalized, @sensitive_key_suffixes)
   end
 
   defp sensitive_key?(_key), do: false

@@ -134,23 +134,39 @@ defmodule Jido.AI.AdaptiveAgent do
         })
       end
 
-    quote location: :keep do
-      use Jido.Agent,
-        name: unquote(name),
-        description: unquote(description),
-        plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Strategies.Adaptive, unquote(Macro.escape(strategy_opts))},
-        schema: unquote(base_schema_ast)
+    agent_ast =
+      quote location: :keep do
+        use Jido.Agent,
+          name: unquote(name),
+          description: unquote(description),
+          plugins: unquote(ai_plugins) ++ unquote(plugins),
+          strategy: {Jido.AI.Strategies.Adaptive, unquote(Macro.escape(strategy_opts))},
+          schema: unquote(base_schema_ast)
 
-      alias Jido.AI.Request
+        alias Jido.AI.Request
 
-      @doc """
-      Returns the strategy options configured for this agent.
-      """
-      def strategy_opts do
-        unquote(Macro.escape(strategy_opts))
+        @doc """
+        Returns the strategy options configured for this agent.
+        """
+        def strategy_opts do
+          unquote(Macro.escape(strategy_opts))
+        end
       end
 
+    api_ast = __quote_adaptive_api__()
+    callbacks_ast = __quote_adaptive_callbacks__()
+
+    quote do
+      unquote(agent_ast)
+      unquote(api_ast)
+      unquote(callbacks_ast)
+      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3
+    end
+  end
+
+  @doc false
+  def __quote_adaptive_api__ do
+    quote location: :keep do
       @doc """
       Send an adaptive query to the agent asynchronously.
 
@@ -223,18 +239,18 @@ defmodule Jido.AI.AdaptiveAgent do
           )
         )
       end
+    end
+  end
 
+  @doc false
+  def __quote_adaptive_callbacks__ do
+    quote location: :keep do
       @impl true
       def on_before_cmd(agent, {:adaptive_start, %{prompt: prompt} = params} = _action) do
-        # Ensure we have a request_id for tracking
         {request_id, params} = Request.ensure_request_id(params)
         action = {:adaptive_start, params}
-
-        # Use RequestTracking to manage state
         agent = Request.start_request(agent, request_id, prompt)
-        # Also set last_prompt for adaptive-specific backward compat
         agent = put_in(agent.state[:last_prompt], prompt)
-
         {:ok, agent, action}
       end
 
@@ -244,15 +260,12 @@ defmodule Jido.AI.AdaptiveAgent do
       @impl true
       def on_after_cmd(agent, {:adaptive_start, %{request_id: request_id}}, directives) do
         snap = strategy_snapshot(agent)
-
-        # Extract selected strategy from strategy state
         strategy_state = Map.get(agent.state, :__strategy__, %{})
         selected_strategy = Map.get(strategy_state, :strategy_type)
 
         agent =
           if snap.done? do
             agent = Request.complete_request(agent, request_id, snap.result)
-            # Also set selected_strategy for adaptive-specific backward compat
             put_in(agent.state[:selected_strategy], selected_strategy)
           else
             put_in(agent.state[:selected_strategy], selected_strategy)
@@ -263,10 +276,7 @@ defmodule Jido.AI.AdaptiveAgent do
 
       @impl true
       def on_after_cmd(agent, _action, directives) do
-        # Fallback for actions without request_id (backward compat)
         snap = strategy_snapshot(agent)
-
-        # Extract selected strategy from strategy state
         strategy_state = Map.get(agent.state, :__strategy__, %{})
         selected_strategy = Map.get(strategy_state, :strategy_type)
 
@@ -290,8 +300,6 @@ defmodule Jido.AI.AdaptiveAgent do
 
         {:ok, agent, directives}
       end
-
-      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3
     end
   end
 end

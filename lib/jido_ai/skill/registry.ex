@@ -8,7 +8,7 @@ defmodule Jido.AI.Skill.Registry do
 
   use GenServer
 
-  alias Jido.AI.Skill.{Spec, Loader, Error}
+  alias Jido.AI.Skill.{Error, Loader, Spec}
 
   @table_name :jido_skill_registry
 

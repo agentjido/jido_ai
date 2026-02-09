@@ -1,7 +1,7 @@
 defmodule Jido.AI.Skill.LoaderTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Skill.{Loader, Spec, Error}
+  alias Jido.AI.Skill.{Error, Loader, Spec}
 
   @fixtures_path Path.join([__DIR__, "..", "..", "fixtures", "skills"])
 

@@ -95,25 +95,25 @@ defmodule Jido.AI.CLI.Adapters.ReAct do
       {:error, :timeout}
     else
       case Jido.AgentServer.status(pid) do
-        {:ok, status} ->
-          if status.snapshot.done? do
-            # Prefer snapshot.result (general contract), fallback to raw_state.last_answer
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_answer, "")
-                "" -> Map.get(status.raw_state, :last_answer, "")
-                result -> result
-              end
+        {:ok, status} when status.snapshot.done? ->
+          {:ok, %{answer: extract_answer(status), meta: extract_meta(status)}}
 
-            {:ok, %{answer: answer, meta: extract_meta(status)}}
-          else
-            Process.sleep(interval)
-            poll_loop(pid, deadline, interval)
-          end
+        {:ok, _status} ->
+          Process.sleep(interval)
+          poll_loop(pid, deadline, interval)
 
         {:error, reason} ->
           {:error, reason}
       end
+    end
+  end
+
+  # Prefer snapshot.result (general contract), fallback to raw_state.last_answer
+  defp extract_answer(status) do
+    case status.snapshot.result do
+      nil -> Map.get(status.raw_state, :last_answer, "")
+      "" -> Map.get(status.raw_state, :last_answer, "")
+      result -> result
     end
   end
 

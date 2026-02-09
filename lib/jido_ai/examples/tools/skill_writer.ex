@@ -8,8 +8,9 @@ defmodule Jido.AI.Examples.Tools.ValidateSkillName do
       name: [type: :string, required: true, doc: "The proposed skill name to validate"]
     ]
 
-  @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
   @max_length 64
+
+  defp valid_name_regex, do: ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
 
   @impl true
   def run(params, _context) do
@@ -22,7 +23,7 @@ defmodule Jido.AI.Examples.Tools.ValidateSkillName do
       String.length(name) > @max_length ->
         {:ok, %{valid: false, name: name, error: "Name exceeds #{@max_length} characters"}}
 
-      not Regex.match?(@name_regex, name) ->
+      not Regex.match?(valid_name_regex(), name) ->
         {:ok,
          %{
            valid: false,
@@ -113,9 +114,7 @@ defmodule Jido.AI.Examples.Tools.WriteModuleSkill do
 
   defp format_actions(actions) do
     actions_str =
-      actions
-      |> Enum.map(&"      #{&1}")
-      |> Enum.join(",\n")
+      Enum.map_join(actions, ",\n", &"      #{&1}")
 
     "actions: [\n#{actions_str}\n    ]"
   end

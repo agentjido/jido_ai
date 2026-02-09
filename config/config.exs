@@ -1,5 +1,23 @@
 import Config
 
+config :logger, :console,
+  metadata: [
+    :jido_ai,
+    :tool_name,
+    :exception_message,
+    :exception_type,
+    :stacktrace,
+    :reason,
+    :result_type,
+    :agent_pid,
+    :task,
+    :module_name,
+    :jido_name,
+    :specialist_name,
+    :specialist_count,
+    :response_length
+  ]
+
 if config_env() == :dev do
   config :git_hooks,
     auto_install: true,

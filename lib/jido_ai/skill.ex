@@ -45,9 +45,8 @@ defmodule Jido.AI.Skill do
       Jido.AI.Skill.actions(skill)       # Returns list of action modules
   """
 
-  alias Jido.AI.Skill.{Spec, Registry, Error}
+  alias Jido.AI.Skill.{Error, Registry, Spec}
 
-  @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
   @max_name_length 64
   @max_description_length 1024
 
@@ -154,7 +153,10 @@ defmodule Jido.AI.Skill do
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
-      @behaviour Jido.AI.Skill
+      alias Jido.AI.Skill, as: AISkill
+      alias Jido.AI.Skill.Spec, as: SkillSpec
+
+      @behaviour AISkill
 
       name = Keyword.fetch!(opts, :name)
       description = Keyword.fetch!(opts, :description)
@@ -163,7 +165,7 @@ defmodule Jido.AI.Skill do
       metadata = Keyword.get(opts, :metadata, %{})
 
       allowed_tools =
-        Jido.AI.Skill.__normalize_allowed_tools__(Keyword.get(opts, :allowed_tools, []))
+        AISkill.__normalize_allowed_tools__(Keyword.get(opts, :allowed_tools, []))
 
       actions = Keyword.get(opts, :actions, [])
       plugins = Keyword.get(opts, :plugins, [])
@@ -172,12 +174,12 @@ defmodule Jido.AI.Skill do
       vsn = Keyword.get(opts, :vsn)
       tags = Keyword.get(opts, :tags, [])
 
-      Jido.AI.Skill.__validate_name__!(name)
-      Jido.AI.Skill.__validate_description__!(description)
+      AISkill.__validate_name__!(name)
+      AISkill.__validate_description__!(description)
 
-      body_ref = Jido.AI.Skill.__body_ref__(body, body_file)
+      body_ref = AISkill.__body_ref__(body, body_file)
 
-      @skill_spec %Jido.AI.Skill.Spec{
+      @skill_spec %SkillSpec{
         name: name,
         description: description,
         license: license,
@@ -192,19 +194,19 @@ defmodule Jido.AI.Skill do
         tags: tags
       }
 
-      @impl Jido.AI.Skill
+      @impl AISkill
       def manifest, do: @skill_spec
 
-      @impl Jido.AI.Skill
-      def body, do: Jido.AI.Skill.__get_body__(@skill_spec.body_ref)
+      @impl AISkill
+      def body, do: AISkill.__get_body__(@skill_spec.body_ref)
 
-      @impl Jido.AI.Skill
+      @impl AISkill
       def allowed_tools, do: @skill_spec.allowed_tools
 
-      @impl Jido.AI.Skill
+      @impl AISkill
       def actions, do: @skill_spec.actions
 
-      @impl Jido.AI.Skill
+      @impl AISkill
       def plugins, do: @skill_spec.plugins
     end
   end
@@ -216,11 +218,13 @@ defmodule Jido.AI.Skill do
 
   def __normalize_allowed_tools__(_), do: []
 
+  defp valid_name_regex, do: ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
+
   @doc false
   def __validate_name__!(name) do
     if !(is_binary(name) and
            String.length(name) <= @max_name_length and
-           Regex.match?(@name_regex, name)) do
+           Regex.match?(valid_name_regex(), name)) do
       raise ArgumentError,
             "Invalid skill name '#{name}': must be 1-#{@max_name_length} chars, " <>
               "lowercase alphanumeric with hyphens (e.g., 'my-skill-name')"
