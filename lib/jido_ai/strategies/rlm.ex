@@ -18,6 +18,29 @@ defmodule Jido.AI.Strategies.RLM do
           max_iterations: 15,
           extra_tools: []
         }
+
+  ## Workspace & Context Lifecycle
+
+  Workspace and context can be managed independently of queries:
+
+      # Create workspace ahead of time
+      signal = Jido.Signal.new!("rlm.workspace.create", %{})
+      # ... workspace_ref returned via directive
+
+      # Load context separately
+      signal = Jido.Signal.new!("rlm.context.load", %{context: large_binary})
+      # ... context_ref returned via directive
+
+      # Run query with pre-existing refs
+      signal = Jido.Signal.new!("rlm.explore", %{
+        query: "find the answer",
+        workspace_ref: workspace_ref,
+        context_ref: context_ref
+      })
+
+      # Cleanup when done (caller's responsibility for externally-created refs)
+      signal = Jido.Signal.new!("rlm.workspace.delete", %{workspace_ref: workspace_ref})
+      signal = Jido.Signal.new!("rlm.context.delete", %{context_ref: context_ref})
   """
 
   use Jido.Agent.Strategy
@@ -51,6 +74,10 @@ defmodule Jido.AI.Strategies.RLM do
   @llm_result :rlm_llm_result
   @tool_result :rlm_tool_result
   @llm_partial :rlm_llm_partial
+  @workspace_create :rlm_workspace_create
+  @workspace_delete :rlm_workspace_delete
+  @context_load :rlm_context_load
+  @context_delete :rlm_context_delete
 
   @spec start_action() :: :rlm_start
   def start_action, do: @start
@@ -64,6 +91,18 @@ defmodule Jido.AI.Strategies.RLM do
   @spec llm_partial_action() :: :rlm_llm_partial
   def llm_partial_action, do: @llm_partial
 
+  @spec workspace_create_action() :: :rlm_workspace_create
+  def workspace_create_action, do: @workspace_create
+
+  @spec workspace_delete_action() :: :rlm_workspace_delete
+  def workspace_delete_action, do: @workspace_delete
+
+  @spec context_load_action() :: :rlm_context_load
+  def context_load_action, do: @context_load
+
+  @spec context_delete_action() :: :rlm_context_delete
+  def context_delete_action, do: @context_delete
+
   @action_specs %{
     @start => %{
       schema:
@@ -71,6 +110,7 @@ defmodule Jido.AI.Strategies.RLM do
           query: Zoi.string(),
           context: Zoi.any() |> Zoi.optional(),
           context_ref: Zoi.map() |> Zoi.optional(),
+          workspace_ref: Zoi.map() |> Zoi.optional(),
           tool_context: Zoi.map() |> Zoi.optional()
         }),
       doc: "Start RLM context exploration with a query and large context",
@@ -95,6 +135,39 @@ defmodule Jido.AI.Strategies.RLM do
         }),
       doc: "Handle streaming LLM token",
       name: "rlm.llm_partial"
+    },
+    @workspace_create => %{
+      schema:
+        Zoi.object(%{
+          seed: Zoi.map() |> Zoi.optional()
+        }),
+      doc: "Create a workspace for exploration state",
+      name: "rlm.workspace.create"
+    },
+    @workspace_delete => %{
+      schema:
+        Zoi.object(%{
+          workspace_ref: Zoi.map()
+        }),
+      doc: "Delete a workspace and free its resources",
+      name: "rlm.workspace.delete"
+    },
+    @context_load => %{
+      schema:
+        Zoi.object(%{
+          context: Zoi.any(),
+          workspace_ref: Zoi.map() |> Zoi.optional()
+        }),
+      doc: "Load context into a store and return a reference",
+      name: "rlm.context.load"
+    },
+    @context_delete => %{
+      schema:
+        Zoi.object(%{
+          context_ref: Zoi.map()
+        }),
+      doc: "Delete context and free its resources",
+      name: "rlm.context.delete"
     }
   }
 
@@ -108,7 +181,11 @@ defmodule Jido.AI.Strategies.RLM do
       {"react.llm.response", {:strategy_cmd, @llm_result}},
       {"react.tool.result", {:strategy_cmd, @tool_result}},
       {"react.llm.delta", {:strategy_cmd, @llm_partial}},
-      {"react.usage", Jido.Actions.Control.Noop}
+      {"react.usage", Jido.Actions.Control.Noop},
+      {"rlm.workspace.create", {:strategy_cmd, @workspace_create}},
+      {"rlm.workspace.delete", {:strategy_cmd, @workspace_delete}},
+      {"rlm.context.load", {:strategy_cmd, @context_load}},
+      {"rlm.context.delete", {:strategy_cmd, @context_delete}}
     ]
   end
 
@@ -144,6 +221,8 @@ defmodule Jido.AI.Strategies.RLM do
       tool_calls: format_tool_calls(state[:pending_tool_calls] || []),
       conversation: Map.get(state, :conversation, []),
       current_llm_call_id: state[:current_llm_call_id],
+      workspace_ref: state[:workspace_ref],
+      context_ref: state[:context_ref],
       model: config[:model],
       max_iterations: config[:max_iterations],
       available_tools: Enum.map(Map.get(config, :tools, []), & &1.name())
@@ -207,8 +286,16 @@ defmodule Jido.AI.Strategies.RLM do
         state = StratState.get(agent, %{})
         config = state[:config]
 
-        request_id = Jido.Util.generate_id()
-        {:ok, workspace_ref} = WorkspaceStore.init(request_id)
+        workspace_ref =
+          case Map.get(params, :workspace_ref) do
+            nil ->
+              request_id = Jido.Util.generate_id()
+              {:ok, ref} = WorkspaceStore.init(request_id)
+              ref
+
+            existing_ref when is_map(existing_ref) ->
+              existing_ref
+          end
 
         context_ref =
           cond do
@@ -221,6 +308,9 @@ defmodule Jido.AI.Strategies.RLM do
             true ->
               nil
           end
+
+        owns_workspace = is_nil(Map.get(params, :workspace_ref))
+        owns_context = is_nil(Map.get(params, :context_ref))
 
         run_context =
           (Map.get(params, :tool_context) || %{})
@@ -240,7 +330,99 @@ defmodule Jido.AI.Strategies.RLM do
             workspace_ref: workspace_ref
           })
 
+        state = StratState.get(agent, %{})
+
+        new_state =
+          state
+          |> Map.put(:owns_workspace, owns_workspace)
+          |> Map.put(:owns_context, owns_context)
+
+        agent = StratState.put(agent, new_state)
+
         process_machine_message(agent, normalized_action, params)
+
+      @workspace_create ->
+        state = StratState.get(agent, %{})
+        seed = Map.get(params, :seed, %{})
+        request_id = Jido.Util.generate_id()
+        {:ok, workspace_ref} = WorkspaceStore.init(request_id, seed)
+
+        agent =
+          store_rlm_state(agent, %{
+            query: state[:query],
+            context_ref: state[:context_ref],
+            workspace_ref: workspace_ref
+          })
+
+        {agent, [{:workspace_created, workspace_ref}]}
+
+      @workspace_delete ->
+        state = StratState.get(agent, %{})
+        workspace_ref = Map.get(params, :workspace_ref) || state[:workspace_ref]
+
+        if workspace_ref do
+          WorkspaceStore.delete(workspace_ref)
+
+          agent =
+            if state[:workspace_ref] == workspace_ref do
+              store_rlm_state(agent, %{
+                query: state[:query],
+                context_ref: state[:context_ref],
+                workspace_ref: nil
+              })
+            else
+              agent
+            end
+
+          {agent, [{:workspace_deleted, workspace_ref}]}
+        else
+          {agent, []}
+        end
+
+      @context_load ->
+        state = StratState.get(agent, %{})
+        config = state[:config]
+        context = params.context
+        workspace_ref = Map.get(params, :workspace_ref) || state[:workspace_ref]
+
+        context_ref =
+          if is_binary(context) do
+            store_context(%{context: context}, config, workspace_ref)
+          else
+            nil
+          end
+
+        agent =
+          store_rlm_state(agent, %{
+            query: state[:query],
+            context_ref: context_ref,
+            workspace_ref: state[:workspace_ref]
+          })
+
+        {agent, [{:context_loaded, context_ref}]}
+
+      @context_delete ->
+        state = StratState.get(agent, %{})
+        context_ref = Map.get(params, :context_ref) || state[:context_ref]
+
+        if context_ref do
+          ContextStore.delete(context_ref)
+
+          agent =
+            if state[:context_ref] == context_ref do
+              store_rlm_state(agent, %{
+                query: state[:query],
+                context_ref: nil,
+                workspace_ref: state[:workspace_ref]
+              })
+            else
+              agent
+            end
+
+          {agent, [{:context_deleted, context_ref}]}
+        else
+          {agent, []}
+        end
 
       _ ->
         process_machine_message(agent, normalized_action, params)
@@ -269,6 +451,8 @@ defmodule Jido.AI.Strategies.RLM do
           |> Map.put(:query, state[:query])
           |> Map.put(:context_ref, state[:context_ref])
           |> Map.put(:workspace_ref, state[:workspace_ref])
+          |> Map.put(:owns_workspace, state[:owns_workspace])
+          |> Map.put(:owns_context, state[:owns_context])
           |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
         new_state = maybe_finalize(new_state, machine_state[:status])
@@ -383,7 +567,7 @@ defmodule Jido.AI.Strategies.RLM do
 
     spawn_tools =
       if max_depth > 0 do
-        [Jido.AI.Actions.RLM.Agent.Spawn]
+        [Jido.AI.Actions.RLM.Agent.Spawn, Jido.AI.Actions.RLM.Orchestrate.LuaPlan]
       else
         []
       end
@@ -503,19 +687,23 @@ defmodule Jido.AI.Strategies.RLM do
   defp maybe_finalize(state, _status), do: state
 
   defp filter_tools_for_depth(tools, current_depth, max_depth) when current_depth >= max_depth do
-    Enum.reject(tools, fn tool -> tool.name == "rlm_spawn_agent" end)
+    Enum.reject(tools, fn tool -> tool.name in ["rlm_spawn_agent", "rlm_lua_plan"] end)
   end
 
   defp filter_tools_for_depth(tools, _current_depth, _max_depth), do: tools
 
   defp cleanup_rlm_state(state) do
-    if ref = state[:context_ref] do
-      case ref do
-        %{backend: :workspace} -> :ok
-        _ -> ContextStore.delete(ref)
+    if state[:owns_context] != false do
+      if ref = state[:context_ref] do
+        case ref do
+          %{backend: :workspace} -> :ok
+          _ -> ContextStore.delete(ref)
+        end
       end
     end
 
-    if state[:workspace_ref], do: WorkspaceStore.delete(state[:workspace_ref])
+    if state[:owns_workspace] != false do
+      if state[:workspace_ref], do: WorkspaceStore.delete(state[:workspace_ref])
+    end
   end
 end

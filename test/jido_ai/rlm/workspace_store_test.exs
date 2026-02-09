@@ -93,12 +93,12 @@ defmodule Jido.AI.RLM.WorkspaceStoreTest do
       assert summary =~ "1 finding"
     end
 
-    test "workspace with subqueries" do
+    test "workspace with subquery_results" do
       {:ok, ref} =
         WorkspaceStore.init("req-11", %{
-          subqueries: [
-            %{query: "q1", status: :completed},
-            %{query: "q2", status: :completed},
+          subquery_results: [
+            %{query: "q1", status: :ok},
+            %{query: "q2", status: :ok},
             %{query: "q3", status: :pending}
           ]
         })
@@ -107,18 +107,32 @@ defmodule Jido.AI.RLM.WorkspaceStoreTest do
       assert summary =~ "Subquery results: 2 completed"
     end
 
+    test "workspace with spawn_results" do
+      {:ok, ref} =
+        WorkspaceStore.init("req-11b", %{
+          spawn_results: [
+            %{agent: "a1", status: :ok},
+            %{agent: "a2", status: :ok},
+            %{agent: "a3", status: :error}
+          ]
+        })
+
+      summary = WorkspaceStore.summary(ref)
+      assert summary =~ "Spawn results: 2 completed"
+    end
+
     test "full workspace summary" do
       {:ok, ref} =
         WorkspaceStore.init("req-12", %{
           chunks: %{count: 100, type: "lines", size: 1000},
           hits: ["a", "b", "c"],
           notes: [%{type: "hypothesis", text: "h1"}, %{type: "finding", text: "f1"}],
-          subqueries: [
-            %{query: "q1", status: :completed},
-            %{query: "q2", status: :completed},
-            %{query: "q3", status: :completed},
-            %{query: "q4", status: :completed},
-            %{query: "q5", status: :completed}
+          subquery_results: [
+            %{query: "q1", status: :ok},
+            %{query: "q2", status: :ok},
+            %{query: "q3", status: :ok},
+            %{query: "q4", status: :ok},
+            %{query: "q5", status: :ok}
           ]
         })
 
@@ -135,7 +149,7 @@ defmodule Jido.AI.RLM.WorkspaceStoreTest do
           chunks: %{count: 100, type: "lines", size: 1000},
           hits: List.duplicate("hit", 100),
           notes: List.duplicate(%{type: "finding", text: "note"}, 50),
-          subqueries: List.duplicate(%{query: "q", status: :completed}, 200)
+          subquery_results: List.duplicate(%{query: "q", status: :ok}, 200)
         })
 
       summary = WorkspaceStore.summary(ref, max_chars: 50)

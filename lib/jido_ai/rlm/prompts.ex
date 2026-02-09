@@ -49,7 +49,15 @@ defmodule Jido.AI.RLM.Prompts do
         ## Tool Selection Guide
 
         - **`llm_subquery_batch`** — Single-step map-reduce. Ask a simple question of each chunk (e.g., "does this chunk contain X?"). Fast and cheap.
-        - **`rlm_spawn_agent`** — Multi-step deep exploration. Spawns a child agent that can chunk, search, and reason within a context subset. Use when a chunk requires complex analysis (e.g., "analyze this section and extract all Y with supporting evidence").
+        - **`rlm_spawn_agent`** — Multi-step deep exploration. Spawns a child agent that can chunk, search, and reason within a context subset. Use when a chunk requires complex analysis (e.g., "analyze this section and extract all Y with supporting evidence"). Best for small, targeted fan-outs (2-5 chunks).
+        - **`rlm_lua_plan`** — Code-driven orchestration. Write a Lua script that inspects the chunk index and returns a structured plan for which chunks to explore and what to ask. Use when you need to selectively filter or group chunks before spawning (e.g., filter by preview content, group related chunks, apply different queries to different regions). The script receives `chunks`, `query`, `workspace_summary`, and `budget` as globals. Return an array of `{chunk_ids = {...}, query = "..."}` items. Example:
+          ```lua
+          local plan = {}
+          for i = 1, math.min(#chunks, budget.max_total_chunks) do
+            plan[#plan+1] = { chunk_ids = {chunks[i].id}, query = query }
+          end
+          return plan
+          ```
         """
     else
       base

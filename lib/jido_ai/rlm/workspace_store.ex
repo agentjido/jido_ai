@@ -59,7 +59,8 @@ defmodule Jido.AI.RLM.WorkspaceStore do
         hits_summary(workspace),
         searches_summary(workspace),
         notes_summary(workspace),
-        subquery_summary(workspace)
+        subquery_summary(workspace),
+        spawn_summary(workspace)
       ]
       |> Enum.reject(&is_nil/1)
 
@@ -117,12 +118,19 @@ defmodule Jido.AI.RLM.WorkspaceStore do
 
   defp notes_summary(_), do: nil
 
-  defp subquery_summary(%{subqueries: subqueries}) when is_list(subqueries) do
-    completed = Enum.count(subqueries, &subquery_completed?/1)
+  defp subquery_summary(%{subquery_results: results}) when is_list(results) do
+    completed = Enum.count(results, &result_ok?/1)
     "Subquery results: #{completed} completed."
   end
 
   defp subquery_summary(_), do: nil
+
+  defp spawn_summary(%{spawn_results: results}) when is_list(results) do
+    completed = Enum.count(results, &result_ok?/1)
+    "Spawn results: #{completed} completed."
+  end
+
+  defp spawn_summary(_), do: nil
 
   defp chunk_size(%{size: size}), do: size
   defp chunk_size(chunk) when is_binary(chunk), do: byte_size(chunk)
@@ -131,7 +139,7 @@ defmodule Jido.AI.RLM.WorkspaceStore do
   defp note_type(%{type: type}), do: type
   defp note_type(_), do: "note"
 
-  defp subquery_completed?(%{status: :completed}), do: true
-  defp subquery_completed?(%{status: "completed"}), do: true
-  defp subquery_completed?(_), do: false
+  defp result_ok?(%{status: :ok}), do: true
+  defp result_ok?(%{status: "ok"}), do: true
+  defp result_ok?(_), do: false
 end

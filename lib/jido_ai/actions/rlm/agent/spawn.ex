@@ -117,18 +117,20 @@ defmodule Jido.AI.Actions.RLM.Agent.Spawn do
 
   defp run_recursive(params, workspace, context, current_depth, max_depth) do
     child_mod = context[:child_agent] || Jido.AI.RLM.ChildAgent
+    jido_instance = Map.get(context, :jido)
 
     child_tool_ctx = %{
       current_depth: current_depth + 1,
       max_depth: max_depth,
-      child_agent: child_mod
+      child_agent: child_mod,
+      jido: jido_instance
     }
 
     params.chunk_ids
     |> Task.async_stream(
       fn chunk_id ->
         text = fetch_chunk_text(chunk_id, workspace, context.context_ref, params.max_chunk_bytes)
-        run_child_agent(child_mod, chunk_id, text, params.query, child_tool_ctx, params.timeout)
+        run_child_agent(child_mod, chunk_id, text, params.query, child_tool_ctx, params.timeout, jido_instance)
       end,
       max_concurrency: params.max_concurrency,
       timeout: params.timeout,
@@ -137,8 +139,13 @@ defmodule Jido.AI.Actions.RLM.Agent.Spawn do
     |> Enum.map(&normalize_result/1)
   end
 
-  defp run_child_agent(child_mod, chunk_id, chunk_text, query, child_tool_ctx, timeout) do
-    {:ok, pid} = Jido.AgentServer.start(agent: child_mod)
+  defp run_child_agent(child_mod, chunk_id, chunk_text, query, child_tool_ctx, timeout, jido_instance) do
+    start_opts =
+      if jido_instance,
+        do: [agent: child_mod, jido: jido_instance],
+        else: [agent: child_mod]
+
+    {:ok, pid} = Jido.AgentServer.start(start_opts)
 
     try do
       case child_mod.explore_sync(pid, query,

@@ -35,6 +35,29 @@ defmodule Jido.AI.RLMAgent do
   - `await/2` - Awaits a specific request's completion
   - `explore_sync/3` - Sync convenience: sends query and waits for result
   - `cancel/2` - Cancel in-flight request
+  - `create_workspace/2` - Create an independent workspace, returns `{:ok, workspace_ref}`
+  - `delete_workspace/2` - Delete a workspace
+  - `load_context/3` - Load context into a store, returns `{:ok, context_ref}`
+  - `delete_context/2` - Delete context from store
+
+  ## Workspace & Context Lifecycle
+
+  Workspace and context can be created independently of queries, enabling
+  multi-turn exploration and resource reuse:
+
+      # Pre-create workspace and load context
+      {:ok, workspace_ref} = MyAgent.create_workspace(pid)
+      {:ok, context_ref} = MyAgent.load_context(pid, large_text)
+
+      # Multiple queries reuse the same workspace + context
+      {:ok, r1} = MyAgent.explore_sync(pid, "Find X",
+        workspace_ref: workspace_ref, context_ref: context_ref)
+      {:ok, r2} = MyAgent.explore_sync(pid, "Now find Y",
+        workspace_ref: workspace_ref, context_ref: context_ref)
+
+      # Caller manages cleanup
+      :ok = MyAgent.delete_context(pid, context_ref)
+      :ok = MyAgent.delete_workspace(pid, workspace_ref)
 
   ## Example
 
@@ -112,6 +135,7 @@ defmodule Jido.AI.RLMAgent do
 
       - `:context` - The large text context to explore (binary)
       - `:context_ref` - Pre-stored context reference (advanced, alternative to `:context`)
+      - `:workspace_ref` - Pre-created workspace reference (enables multi-turn)
       - `:tool_context` - Additional context map merged with agent's tool_context
       - `:timeout` - Timeout for the underlying cast
 
@@ -133,6 +157,10 @@ defmodule Jido.AI.RLMAgent do
           %{query: query, request_id: request_id}
           |> then(fn p -> if context, do: Map.put(p, :context, context), else: p end)
           |> then(fn p -> if context_ref, do: Map.put(p, :context_ref, context_ref), else: p end)
+          |> then(fn p ->
+            ws_ref = Keyword.get(opts, :workspace_ref)
+            if ws_ref, do: Map.put(p, :workspace_ref, ws_ref), else: p
+          end)
           |> then(fn p ->
             if map_size(tool_context) > 0, do: Map.put(p, :tool_context, tool_context), else: p
           end)
@@ -171,6 +199,7 @@ defmodule Jido.AI.RLMAgent do
 
       - `:context` - The large text context to explore (binary)
       - `:context_ref` - Pre-stored context reference
+      - `:workspace_ref` - Pre-created workspace reference (enables multi-turn)
       - `:tool_context` - Additional context map
       - `:timeout` - How long to wait in milliseconds (default: 30_000)
 
@@ -246,12 +275,78 @@ defmodule Jido.AI.RLMAgent do
         Jido.cancel(pid, opts)
       end
 
+      @doc """
+      Create an independent workspace for exploration state.
+
+      The workspace persists until explicitly deleted, enabling multi-turn
+      exploration across multiple `explore/3` calls.
+
+      ## Options
+
+      - `:seed` - Initial workspace state map (default: `%{}`)
+      """
+      @spec create_workspace(pid() | atom() | {:via, module(), term()}, keyword()) ::
+              {:ok, Jido.AI.RLM.WorkspaceStore.workspace_ref()} | {:error, term()}
+      def create_workspace(pid, opts \\ []) do
+        seed = Keyword.get(opts, :seed, %{})
+        request_id = Jido.Signal.ID.generate!()
+
+        {:ok, workspace_ref} = Jido.AI.RLM.WorkspaceStore.init(request_id, seed)
+        {:ok, workspace_ref}
+      end
+
+      @doc """
+      Delete a workspace and free its resources.
+      """
+      @spec delete_workspace(pid() | atom() | {:via, module(), term()}, Jido.AI.RLM.WorkspaceStore.workspace_ref()) ::
+              :ok
+      def delete_workspace(_pid, workspace_ref) do
+        Jido.AI.RLM.WorkspaceStore.delete(workspace_ref)
+      end
+
+      @doc """
+      Load context into a store and return a reference.
+
+      The context persists until explicitly deleted, enabling reuse across
+      multiple queries without re-storing.
+
+      ## Options
+
+      - `:workspace_ref` - Associate context with a workspace for co-located storage
+      - `:inline_threshold` - Byte threshold for inline vs ETS storage (default: 2MB)
+      """
+      @spec load_context(pid() | atom() | {:via, module(), term()}, binary(), keyword()) ::
+              {:ok, Jido.AI.RLM.ContextStore.context_ref()} | {:error, term()}
+      def load_context(_pid, context, opts \\ []) when is_binary(context) do
+        request_id = Jido.Signal.ID.generate!()
+        workspace_ref = Keyword.get(opts, :workspace_ref)
+        inline_threshold = Keyword.get(opts, :inline_threshold, 2_000_000)
+
+        store_opts = [inline_threshold: inline_threshold]
+        store_opts = if workspace_ref, do: Keyword.put(store_opts, :workspace_ref, workspace_ref), else: store_opts
+
+        Jido.AI.RLM.ContextStore.put(context, request_id, store_opts)
+      end
+
+      @doc """
+      Delete context and free its resources.
+      """
+      @spec delete_context(pid() | atom() | {:via, module(), term()}, Jido.AI.RLM.ContextStore.context_ref()) ::
+              :ok
+      def delete_context(_pid, context_ref) do
+        Jido.AI.RLM.ContextStore.delete(context_ref)
+      end
+
       defoverridable on_before_cmd: 2,
                      on_after_cmd: 3,
                      explore: 3,
                      await: 2,
                      explore_sync: 3,
-                     cancel: 2
+                     cancel: 2,
+                     create_workspace: 2,
+                     delete_workspace: 2,
+                     load_context: 3,
+                     delete_context: 2
     end
   end
 end

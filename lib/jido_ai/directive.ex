@@ -609,6 +609,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
       context: context
     } = directive
 
+    context =
+      if state.jido && !Map.has_key?(context, :jido),
+        do: Map.put(context, :jido, state.jido),
+        else: context
+
     action_module = Map.get(directive, :action_module)
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
