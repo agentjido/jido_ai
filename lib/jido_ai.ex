@@ -168,9 +168,13 @@ defmodule Jido.AI do
     signal =
       Jido.Signal.new!("react.unregister_tool", %{tool_name: tool_name}, source: "/jido/ai")
 
-    case Jido.AgentServer.call(agent_server, signal, timeout) do
-      {:ok, agent} -> {:ok, agent}
-      {:error, _} = error -> error
+    try do
+      case Jido.AgentServer.call(agent_server, signal, timeout) do
+        {:ok, agent} -> {:ok, agent}
+        {:error, _} = error -> error
+      end
+    catch
+      :exit, reason -> {:error, {:agent_server_exit, reason}}
     end
   end
 
@@ -237,9 +241,13 @@ defmodule Jido.AI do
     signal =
       Jido.Signal.new!("react.register_tool", %{tool_module: tool_module}, source: "/jido/ai")
 
-    case Jido.AgentServer.call(agent_server, signal, timeout) do
-      {:ok, agent} -> {:ok, agent}
-      {:error, _} = error -> error
+    try do
+      case Jido.AgentServer.call(agent_server, signal, timeout) do
+        {:ok, agent} -> {:ok, agent}
+        {:error, _} = error -> error
+      end
+    catch
+      :exit, reason -> {:error, {:agent_server_exit, reason}}
     end
   end
 

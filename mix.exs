@@ -60,11 +60,11 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, git: "https://github.com/nshkrdotcom/jido.git", branch: "refactor/otp-cleanup", override: true},
-      {:jido_action,
-       git: "https://github.com/nshkrdotcom/jido_action.git", branch: "refactor/otp-cleanup", override: true},
+      {:jido, "~> 2.0.0-rc.4"},
       {:req_llm, "~> 1.5"},
       {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
+
+      # External agents
       {:agent_session_manager, "~> 0.6", optional: true},
 
       # Runtime
@@ -72,7 +72,7 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
-      {:term_ui, github: "nshkrdotcom/term_ui", branch: "cleanup-dialyzer-credo"},
+      {:term_ui, github: "pcharbon70/term_ui", branch: "develop"},
       {:yaml_elixir, "~> 2.9"},
       {:zoi, "~> 0.16"},
 
