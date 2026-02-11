@@ -268,11 +268,13 @@ defmodule Jido.AI.ReAct.Machine do
       usage: machine.usage
     })
 
+    best_effort_result = extract_best_effort_result(machine)
+
     with_transition(machine, "completed", fn m ->
       m =
         Map.merge(m, %{
           termination_reason: :max_iterations,
-          result: "Maximum iterations reached without a final answer."
+          result: best_effort_result
         })
 
       {m, []}
@@ -597,6 +599,28 @@ defmodule Jido.AI.ReAct.Machine do
   @spec get_conversation(t()) :: [map()]
   def get_conversation(%__MODULE__{thread: nil}), do: []
   def get_conversation(%__MODULE__{thread: thread}), do: Thread.to_messages(thread)
+
+  defp extract_best_effort_result(machine) do
+    cond do
+      is_binary(machine.streaming_text) and String.trim(machine.streaming_text) != "" ->
+        String.trim(machine.streaming_text)
+
+      not is_nil(machine.thread) ->
+        messages = Thread.to_messages(machine.thread)
+
+        messages
+        |> Enum.reverse()
+        |> Enum.find_value(fn
+          %{role: role, content: content} when role in ["assistant", :assistant] and is_binary(content) and content != "" ->
+            String.trim(content)
+          _ -> nil
+        end)
+        |> Kernel.||("Maximum iterations reached without a final answer.")
+
+      true ->
+        "Maximum iterations reached without a final answer."
+    end
+  end
 
   # Telemetry helpers
 

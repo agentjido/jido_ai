@@ -2,6 +2,7 @@ defmodule JidoAITest.Actions.RLM.ContextSearchTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Actions.RLM.Context.Search
+  alias Jido.AI.RLM.ChunkProjection
   alias Jido.AI.RLM.{ContextStore, WorkspaceStore}
 
   setup do
@@ -101,21 +102,14 @@ defmodule JidoAITest.Actions.RLM.ContextSearchTest do
     test "maps hits to chunk IDs when chunks are indexed", ctx do
       data = "aaaa\nbbbb\ncccc\ndddd\n"
       {:ok, context_ref} = ContextStore.put(data, "req-search-8")
-
-      WorkspaceStore.update(ctx.workspace_ref, fn ws ->
-        Map.put(ws, :chunks, %{
-          index: %{
-            "c_0" => %{byte_start: 0, byte_end: 10},
-            "c_1" => %{byte_start: 10, byte_end: 20}
-          }
-        })
-      end)
+      {:ok, projection, _} = ChunkProjection.create(ctx.workspace_ref, context_ref, %{strategy: "lines", size: 2}, %{})
 
       params = %{query: "cccc", mode: "substring"}
       context = %{context_ref: context_ref, workspace_ref: ctx.workspace_ref}
 
       {:ok, result} = Search.run(params, context)
       assert result.total_matches == 1
+      assert result.projection_id == projection.id
       assert hd(result.hits).chunk_id == "c_1"
     end
   end

@@ -49,7 +49,7 @@ defmodule Jido.AI.Strategies.RLM do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.ReAct.Machine
-  alias Jido.AI.RLM.{ContextStore, WorkspaceStore, Prompts}
+  alias Jido.AI.RLM.{BudgetStore, ContextStore, PartialCollector, Reaper, WorkspaceStore, Prompts}
   alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.ToolAdapter
   alias ReqLLM.Context
@@ -69,6 +69,7 @@ defmodule Jido.AI.Strategies.RLM do
   @default_max_iterations 15
   @default_context_inline_threshold 2_000_000
   @default_max_concurrency 10
+  @default_orchestration_mode :auto
 
   @start :rlm_start
   @llm_result :rlm_llm_result
@@ -78,6 +79,8 @@ defmodule Jido.AI.Strategies.RLM do
   @workspace_delete :rlm_workspace_delete
   @context_load :rlm_context_load
   @context_delete :rlm_context_delete
+  @usage :rlm_usage
+  @fanout_complete :rlm_fanout_complete
 
   @spec start_action() :: :rlm_start
   def start_action, do: @start
@@ -102,6 +105,12 @@ defmodule Jido.AI.Strategies.RLM do
 
   @spec context_delete_action() :: :rlm_context_delete
   def context_delete_action, do: @context_delete
+
+  @spec usage_action() :: :rlm_usage
+  def usage_action, do: @usage
+
+  @spec fanout_complete_action() :: :rlm_fanout_complete
+  def fanout_complete_action, do: @fanout_complete
 
   @action_specs %{
     @start => %{
@@ -168,6 +177,31 @@ defmodule Jido.AI.Strategies.RLM do
         }),
       doc: "Delete context and free its resources",
       name: "rlm.context.delete"
+    },
+    @usage => %{
+      schema:
+        Zoi.object(%{
+          usage: Zoi.any() |> Zoi.optional(),
+          total_tokens: Zoi.integer() |> Zoi.optional(),
+          input_tokens: Zoi.integer() |> Zoi.optional(),
+          output_tokens: Zoi.integer() |> Zoi.optional(),
+          model: Zoi.string() |> Zoi.optional(),
+          call_id: Zoi.string() |> Zoi.optional(),
+          metadata: Zoi.any() |> Zoi.optional()
+        }),
+      doc: "Handle LLM usage/token tracking",
+      name: "rlm.usage"
+    },
+    @fanout_complete => %{
+      schema:
+        Zoi.object(%{
+          chunk_count: Zoi.integer() |> Zoi.optional(),
+          completed: Zoi.integer() |> Zoi.optional(),
+          errors: Zoi.integer() |> Zoi.optional(),
+          skipped: Zoi.integer() |> Zoi.optional()
+        }),
+      doc: "Handle completion of runtime-driven parallel fan-out",
+      name: "rlm.fanout_complete"
     }
   }
 
@@ -181,11 +215,12 @@ defmodule Jido.AI.Strategies.RLM do
       {"react.llm.response", {:strategy_cmd, @llm_result}},
       {"react.tool.result", {:strategy_cmd, @tool_result}},
       {"react.llm.delta", {:strategy_cmd, @llm_partial}},
-      {"react.usage", Jido.Actions.Control.Noop},
+      {"react.usage", {:strategy_cmd, @usage}},
       {"rlm.workspace.create", {:strategy_cmd, @workspace_create}},
       {"rlm.workspace.delete", {:strategy_cmd, @workspace_delete}},
       {"rlm.context.load", {:strategy_cmd, @context_load}},
-      {"rlm.context.delete", {:strategy_cmd, @context_delete}}
+      {"rlm.context.delete", {:strategy_cmd, @context_delete}},
+      {"rlm.fanout_complete", {:strategy_cmd, @fanout_complete}}
     ]
   end
 
@@ -206,6 +241,8 @@ defmodule Jido.AI.Strategies.RLM do
   defp snapshot_status(:completed), do: :success
   defp snapshot_status(:error), do: :failure
   defp snapshot_status(:idle), do: :idle
+  defp snapshot_status(:preparing), do: :running
+  defp snapshot_status(:synthesizing), do: :running
   defp snapshot_status(_), do: :running
 
   defp build_snapshot_details(state, config) do
@@ -286,60 +323,110 @@ defmodule Jido.AI.Strategies.RLM do
         state = StratState.get(agent, %{})
         config = state[:config]
 
-        workspace_ref =
-          case Map.get(params, :workspace_ref) do
-            nil ->
-              request_id = Jido.Util.generate_id()
-              {:ok, ref} = WorkspaceStore.init(request_id)
-              ref
+        if state[:status] in [:preparing, :synthesizing] do
+          call_id = Machine.generate_call_id()
 
-            existing_ref when is_map(existing_ref) ->
-              existing_ref
+          {agent,
+           [
+             {:request_error, call_id, :busy, "Agent is busy (#{state[:status]})"}
+           ]}
+        else
+          workspace_ref =
+            case Map.get(params, :workspace_ref) do
+              nil ->
+                request_id = Jido.Util.generate_id()
+                {:ok, ref} = WorkspaceStore.init(request_id)
+                ref
+
+              existing_ref when is_map(existing_ref) ->
+                existing_ref
+            end
+
+          context_ref =
+            cond do
+              is_binary(Map.get(params, :context)) ->
+                store_context(params, config, workspace_ref)
+
+              is_map(Map.get(params, :context_ref)) ->
+                params.context_ref
+
+              true ->
+                nil
+            end
+
+          owns_workspace = is_nil(Map.get(params, :workspace_ref))
+          owns_context = is_nil(Map.get(params, :context_ref))
+
+          {budget_ref, owns_budget} =
+            cond do
+              not is_nil(get_in(params, [:tool_context, :budget_ref])) ->
+                {get_in(params, [:tool_context, :budget_ref]), false}
+
+              not is_nil(config[:max_children_total]) or not is_nil(config[:token_budget]) ->
+                request_id = Jido.Util.generate_id()
+
+                {:ok, ref} =
+                  BudgetStore.new(request_id,
+                    max_children_total: config[:max_children_total],
+                    token_budget: config[:token_budget]
+                  )
+
+                {ref, true}
+
+              true ->
+                {nil, false}
+            end
+
+          reaper_alive? = Process.whereis(Jido.AI.RLM.Reaper) != nil
+          resource_ttl_ms = config[:resource_ttl_ms]
+
+          if reaper_alive? and not is_nil(resource_ttl_ms) do
+            if owns_workspace, do: Reaper.track({:workspace, workspace_ref}, resource_ttl_ms)
+            if owns_context and not is_nil(context_ref), do: Reaper.track({:context, context_ref}, resource_ttl_ms)
+            if owns_budget and not is_nil(budget_ref), do: Reaper.track({:budget, budget_ref}, resource_ttl_ms)
           end
 
-        context_ref =
-          cond do
-            is_binary(Map.get(params, :context)) ->
-              store_context(params, config, workspace_ref)
+          run_context =
+            (Map.get(params, :tool_context) || %{})
+            |> Map.put(:context_ref, context_ref)
+            |> Map.put(:workspace_ref, workspace_ref)
+            |> Map.put(:recursive_model, config[:recursive_model])
+            |> Map.put(:chunk_defaults, chunk_defaults(config))
+            |> Map.put(:current_depth, get_in(params, [:tool_context, :current_depth]) || 0)
+            |> Map.put(:max_depth, config[:max_depth])
+            |> Map.put(:child_agent, config[:child_agent])
+            |> then(fn ctx -> if budget_ref, do: Map.put(ctx, :budget_ref, budget_ref), else: ctx end)
 
-            is_map(Map.get(params, :context_ref)) ->
-              params.context_ref
+          agent = set_run_tool_context(agent, run_context)
 
-            true ->
-              nil
+          agent =
+            store_rlm_state(agent, %{
+              query: params.query,
+              context_ref: context_ref,
+              workspace_ref: workspace_ref
+            })
+
+          state = StratState.get(agent, %{})
+
+          new_state =
+            state
+            |> Map.put(:owns_workspace, owns_workspace)
+            |> Map.put(:owns_context, owns_context)
+            |> Map.put(:budget_ref, budget_ref)
+            |> Map.put(:owns_budget, owns_budget)
+
+          agent = StratState.put(agent, new_state)
+
+          if config[:parallel_mode] == :runtime and config[:max_depth] > 0 and not is_nil(context_ref) do
+            start_prepare_phase(agent, config, params, context_ref, workspace_ref, run_context)
+          else
+            agent = maybe_auto_spawn(agent, config, context_ref, workspace_ref, run_context, params)
+            process_machine_message(agent, normalized_action, params)
           end
+        end
 
-        owns_workspace = is_nil(Map.get(params, :workspace_ref))
-        owns_context = is_nil(Map.get(params, :context_ref))
-
-        run_context =
-          (Map.get(params, :tool_context) || %{})
-          |> Map.put(:context_ref, context_ref)
-          |> Map.put(:workspace_ref, workspace_ref)
-          |> Map.put(:recursive_model, config[:recursive_model])
-          |> Map.put(:current_depth, get_in(params, [:tool_context, :current_depth]) || 0)
-          |> Map.put(:max_depth, config[:max_depth])
-          |> Map.put(:child_agent, config[:child_agent])
-
-        agent = set_run_tool_context(agent, run_context)
-
-        agent =
-          store_rlm_state(agent, %{
-            query: params.query,
-            context_ref: context_ref,
-            workspace_ref: workspace_ref
-          })
-
-        state = StratState.get(agent, %{})
-
-        new_state =
-          state
-          |> Map.put(:owns_workspace, owns_workspace)
-          |> Map.put(:owns_context, owns_context)
-
-        agent = StratState.put(agent, new_state)
-
-        process_machine_message(agent, normalized_action, params)
+      @fanout_complete ->
+        handle_fanout_complete(agent, params)
 
       @workspace_create ->
         state = StratState.get(agent, %{})
@@ -424,9 +511,230 @@ defmodule Jido.AI.Strategies.RLM do
           {agent, []}
         end
 
+      @usage ->
+        state = StratState.get(agent, %{})
+        budget_ref = state[:budget_ref]
+        tokens = extract_total_tokens(params)
+
+        agent =
+          if budget_ref && tokens > 0 do
+            case BudgetStore.add_tokens(budget_ref, tokens) do
+              :ok ->
+                agent
+
+              {:error, :token_budget_exceeded} ->
+                new_state = Map.put(state, :budget_exceeded, true)
+                StratState.put(agent, new_state)
+            end
+          else
+            agent
+          end
+
+        {agent, []}
+
+      @tool_result ->
+        state = StratState.get(agent, %{})
+
+        if state[:status] == :preparing do
+          handle_prepare_tool_result(agent, state, params)
+        else
+          process_machine_message(agent, normalized_action, params)
+        end
+
       _ ->
         process_machine_message(agent, normalized_action, params)
     end
+  end
+
+  defp start_prepare_phase(agent, config, params, context_ref, workspace_ref, run_context) do
+    chunk_call_id = "prepare_chunk_#{Jido.Util.generate_id()}"
+
+    state = StratState.get(agent, %{})
+
+    new_state =
+      state
+      |> Map.put(:status, :preparing)
+      |> Map.put(:prepare, %{
+        phase: :chunking,
+        chunk_call_id: chunk_call_id,
+        spawn_call_id: nil,
+        query: params.query,
+        run_context: run_context
+      })
+      |> Map.put(:started_at, System.monotonic_time(:millisecond))
+
+    agent = StratState.put(agent, new_state)
+
+    chunk_directive =
+      Directive.ToolExec.new!(%{
+        id: chunk_call_id,
+        tool_name: "context_chunk",
+        action_module: Jido.AI.Actions.RLM.Context.Chunk,
+        arguments: %{
+          "strategy" => config[:chunk_strategy] || "lines",
+          "size" => config[:chunk_size] || 1000,
+          "overlap" => config[:chunk_overlap] || 0,
+          "max_chunks" => config[:prepare_max_chunks] || config[:max_chunks] || 500,
+          "preview_bytes" => config[:chunk_preview_bytes] || 100
+        },
+        context: %{
+          context_ref: context_ref,
+          workspace_ref: workspace_ref
+        }
+      })
+
+    {agent, [chunk_directive]}
+  end
+
+  defp handle_prepare_tool_result(agent, state, params) do
+    prepare = state[:prepare] || %{}
+    call_id = params[:call_id]
+
+    cond do
+      prepare[:phase] == :chunking and call_id == prepare[:chunk_call_id] ->
+        handle_chunk_result(agent, state, prepare, params)
+
+      prepare[:phase] == :spawning and call_id == prepare[:spawn_call_id] ->
+        handle_spawn_result(agent, state, prepare, params)
+
+      true ->
+        process_machine_message(agent, @tool_result, params)
+    end
+  end
+
+  defp handle_chunk_result(agent, state, prepare, params) do
+    config = state[:config]
+    run_context = prepare[:run_context]
+
+    {chunk_ids, projection_id} =
+      case params[:result] do
+        {:ok, %{chunks: chunks} = result} -> {Enum.map(chunks, & &1.id), result[:projection_id]}
+        _ -> {[], nil}
+      end
+
+    if chunk_ids == [] do
+      new_state =
+        state
+        |> Map.put(:status, :idle)
+        |> Map.delete(:prepare)
+
+      agent = StratState.put(agent, new_state)
+      process_machine_message(agent, @start, %{query: prepare[:query]})
+    else
+      spawn_call_id = "prepare_spawn_#{Jido.Util.generate_id()}"
+
+      new_prepare =
+        prepare
+        |> Map.put(:phase, :spawning)
+        |> Map.put(:spawn_call_id, spawn_call_id)
+        |> Map.put(:chunk_count, length(chunk_ids))
+
+      new_state = Map.put(state, :prepare, new_prepare)
+      agent = StratState.put(agent, new_state)
+
+      spawn_context =
+        run_context
+        |> Map.put(:current_depth, run_context[:max_depth] || 1)
+
+      spawn_directive =
+        Directive.ToolExec.new!(%{
+          id: spawn_call_id,
+          tool_name: "rlm_spawn_agent",
+          action_module: Jido.AI.Actions.RLM.Agent.Spawn,
+          arguments:
+            %{
+              "chunk_ids" => chunk_ids,
+              "query" => prepare[:query],
+              "max_iterations" => config[:child_max_iterations] || 8,
+              "timeout" => config[:child_timeout] || 120_000,
+              "max_concurrency" => config[:max_concurrency] || @default_max_concurrency,
+              "max_chunk_bytes" => config[:max_chunk_bytes] || 100_000
+            }
+            |> then(fn args ->
+              if projection_id, do: Map.put(args, "projection_id", projection_id), else: args
+            end),
+          context: spawn_context
+        })
+
+      {agent, [spawn_directive]}
+    end
+  end
+
+  defp handle_spawn_result(agent, state, prepare, params) do
+    {completed, errors, skipped} =
+      case params[:result] do
+        {:ok, result} ->
+          {result[:completed] || 0, result[:errors] || 0, result[:skipped] || 0}
+
+        _ ->
+          {0, 1, 0}
+      end
+
+    new_state =
+      state
+      |> Map.put(:status, :synthesizing)
+      |> Map.delete(:prepare)
+
+    agent = StratState.put(agent, new_state)
+
+    start_synthesis(agent, new_state, %{
+      chunk_count: prepare[:chunk_count] || 0,
+      completed: completed,
+      errors: errors,
+      skipped: skipped
+    })
+  end
+
+  defp handle_fanout_complete(agent, params) do
+    state = StratState.get(agent, %{})
+
+    new_state =
+      state
+      |> Map.put(:status, :synthesizing)
+      |> Map.delete(:prepare)
+
+    agent = StratState.put(agent, new_state)
+    start_synthesis(agent, new_state, params)
+  end
+
+  defp start_synthesis(agent, state, params) do
+    config = state[:config]
+
+    workspace_summary =
+      case state[:workspace_ref] do
+        nil -> ""
+        ref -> WorkspaceStore.summary(ref, max_chars: 16_000)
+      end
+
+    synthesis_query =
+      Prompts.synthesis_prompt(%{
+        original_query: state[:query],
+        workspace_summary: workspace_summary,
+        chunk_count: params[:chunk_count] || 0,
+        completed: params[:completed] || 0,
+        errors: params[:errors] || 0
+      })
+
+    synthesis_config =
+      config
+      |> Map.put(:max_iterations, 1)
+      |> Map.put(:reqllm_tools, [])
+      |> Map.put(:actions_by_name, %{})
+      |> Map.put(
+        :system_prompt,
+        "You are a precise synthesizer. Combine child analysis results into a single coherent answer. You have no tools available."
+      )
+
+    machine = Machine.new()
+
+    new_state =
+      state
+      |> Map.merge(Machine.to_map(machine))
+      |> Map.put(:config, synthesis_config)
+
+    agent = StratState.put(agent, new_state)
+
+    process_machine_message(agent, @start, %{query: synthesis_query.content})
   end
 
   defp process_machine_message(agent, action, params) do
@@ -453,9 +761,14 @@ defmodule Jido.AI.Strategies.RLM do
           |> Map.put(:workspace_ref, state[:workspace_ref])
           |> Map.put(:owns_workspace, state[:owns_workspace])
           |> Map.put(:owns_context, state[:owns_context])
+          |> Map.put(:budget_ref, state[:budget_ref])
+          |> Map.put(:owns_budget, state[:owns_budget])
+          |> Map.put(:budget_exceeded, state[:budget_exceeded])
           |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
         new_state = maybe_finalize(new_state, machine_state[:status])
+
+        maybe_emit_partial(action, params, new_state)
 
         agent = StratState.put(agent, new_state)
         {agent, lift_directives(directives, config, new_state)}
@@ -464,6 +777,22 @@ defmodule Jido.AI.Strategies.RLM do
         :noop
     end
   end
+
+  defp maybe_emit_partial(@llm_partial, %{chunk_type: :content, delta: delta}, state) do
+    with sink_pid when is_pid(sink_pid) <- get_in(state, [:run_tool_context, :partial_sink_pid]),
+         chunk_id when not is_nil(chunk_id) <- get_in(state, [:run_tool_context, :chunk_id]) do
+      PartialCollector.emit(sink_pid, %{
+        chunk_id: chunk_id,
+        type: :content,
+        text: delta,
+        at_ms: System.monotonic_time(:millisecond)
+      })
+    end
+
+    :ok
+  end
+
+  defp maybe_emit_partial(_action, _params, _state), do: :ok
 
   defp lift_directives(directives, config, state) do
     %{
@@ -508,6 +837,8 @@ defmodule Jido.AI.Strategies.RLM do
       {:exec_tool, id, tool_name, arguments} ->
         case lookup_tool(tool_name, actions_by_name) do
           {:ok, action_module} ->
+            arguments = maybe_apply_tool_defaults(tool_name, arguments, config)
+
             exec_context =
               Map.merge(effective_tool_context, %{
                 call_id: id,
@@ -557,6 +888,9 @@ defmodule Jido.AI.Strategies.RLM do
   defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []
 
+    orchestration_mode =
+      normalize_orchestration_mode(Keyword.get(opts, :orchestration_mode, @default_orchestration_mode))
+
     extra_tools =
       case Keyword.fetch(opts, :extra_tools) do
         {:ok, mods} when is_list(mods) -> mods
@@ -564,13 +898,7 @@ defmodule Jido.AI.Strategies.RLM do
       end
 
     max_depth = Keyword.get(opts, :max_depth, 0)
-
-    spawn_tools =
-      if max_depth > 0 do
-        [Jido.AI.Actions.RLM.Agent.Spawn, Jido.AI.Actions.RLM.Orchestrate.LuaPlan]
-      else
-        []
-      end
+    spawn_tools = spawn_tools_for(max_depth, orchestration_mode)
 
     tools_modules = @rlm_tools ++ spawn_tools ++ extra_tools
 
@@ -594,7 +922,25 @@ defmodule Jido.AI.Strategies.RLM do
       max_concurrency: Keyword.get(opts, :max_concurrency, @default_max_concurrency),
       base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{}),
       max_depth: max_depth,
-      child_agent: Keyword.get(opts, :child_agent, nil)
+      child_agent: Keyword.get(opts, :child_agent, nil),
+      max_children_total: Keyword.get(opts, :max_children_total, nil),
+      token_budget: Keyword.get(opts, :token_budget, nil),
+      budget_ttl_ms: Keyword.get(opts, :budget_ttl_ms, nil),
+      resource_ttl_ms: Keyword.get(opts, :resource_ttl_ms, nil),
+      auto_spawn?: Keyword.get(opts, :auto_spawn?, false),
+      auto_spawn_threshold_bytes: Keyword.get(opts, :auto_spawn_threshold_bytes, nil),
+      parallel_mode: Keyword.get(opts, :parallel_mode, :llm_driven),
+      orchestration_mode: orchestration_mode,
+      chunk_strategy: Keyword.get(opts, :chunk_strategy, nil),
+      chunk_size: Keyword.get(opts, :chunk_size, nil),
+      chunk_overlap: Keyword.get(opts, :chunk_overlap, nil),
+      max_chunks: Keyword.get(opts, :max_chunks, nil),
+      prepare_max_chunks: Keyword.get(opts, :prepare_max_chunks, nil),
+      chunk_preview_bytes: Keyword.get(opts, :chunk_preview_bytes, nil),
+      enforce_chunk_defaults: Keyword.get(opts, :enforce_chunk_defaults, false),
+      child_max_iterations: Keyword.get(opts, :child_max_iterations, nil),
+      child_timeout: Keyword.get(opts, :child_timeout, nil),
+      max_chunk_bytes: Keyword.get(opts, :max_chunk_bytes, nil)
     }
 
     system_prompt = Prompts.system_prompt(config)
@@ -608,6 +954,50 @@ defmodule Jido.AI.Strategies.RLM do
   defp resolve_model_spec(model) when is_binary(model) do
     model
   end
+
+  defp spawn_tools_for(max_depth, _mode) when max_depth <= 0, do: []
+
+  defp spawn_tools_for(_max_depth, :lua_only), do: [Jido.AI.Actions.RLM.Orchestrate.LuaPlan]
+  defp spawn_tools_for(_max_depth, :spawn_only), do: [Jido.AI.Actions.RLM.Agent.Spawn]
+
+  defp spawn_tools_for(_max_depth, _mode) do
+    [Jido.AI.Actions.RLM.Agent.Spawn, Jido.AI.Actions.RLM.Orchestrate.LuaPlan]
+  end
+
+  defp normalize_orchestration_mode(:lua_only), do: :lua_only
+  defp normalize_orchestration_mode(:spawn_only), do: :spawn_only
+  defp normalize_orchestration_mode("lua_only"), do: :lua_only
+  defp normalize_orchestration_mode("spawn_only"), do: :spawn_only
+  defp normalize_orchestration_mode("lua"), do: :lua_only
+  defp normalize_orchestration_mode("spawn"), do: :spawn_only
+  defp normalize_orchestration_mode(_), do: @default_orchestration_mode
+
+  defp maybe_apply_tool_defaults("context_chunk", arguments, config) do
+    if config[:enforce_chunk_defaults] do
+      arguments
+      |> normalize_tool_args()
+      |> maybe_put_arg("strategy", config[:chunk_strategy])
+      |> maybe_put_arg("size", config[:chunk_size])
+      |> maybe_put_arg("overlap", config[:chunk_overlap])
+      |> maybe_put_arg("max_chunks", config[:max_chunks] || config[:prepare_max_chunks])
+      |> maybe_put_arg("preview_bytes", config[:chunk_preview_bytes])
+    else
+      arguments
+    end
+  end
+
+  defp maybe_apply_tool_defaults(_tool_name, arguments, _config), do: arguments
+
+  defp normalize_tool_args(nil), do: %{}
+
+  defp normalize_tool_args(arguments) when is_map(arguments) do
+    Map.new(arguments, fn {k, v} -> {to_string(k), v} end)
+  end
+
+  defp normalize_tool_args(_), do: %{}
+
+  defp maybe_put_arg(arguments, _key, nil), do: arguments
+  defp maybe_put_arg(arguments, key, value), do: Map.put(arguments, key, value)
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
   defp normalize_action(action), do: action
@@ -675,6 +1065,18 @@ defmodule Jido.AI.Strategies.RLM do
         ref -> WorkspaceStore.summary(ref)
       end
 
+    if status == :completed do
+      with sink_pid when is_pid(sink_pid) <- get_in(state, [:run_tool_context, :partial_sink_pid]),
+           chunk_id when not is_nil(chunk_id) <- get_in(state, [:run_tool_context, :chunk_id]) do
+        PartialCollector.emit(sink_pid, %{
+          chunk_id: chunk_id,
+          type: :done,
+          text: "",
+          at_ms: System.monotonic_time(:millisecond)
+        })
+      end
+    end
+
     cleanup_rlm_state(state)
 
     state
@@ -682,6 +1084,8 @@ defmodule Jido.AI.Strategies.RLM do
     |> Map.delete(:run_tool_context)
     |> Map.delete(:context_ref)
     |> Map.delete(:workspace_ref)
+    |> Map.delete(:budget_ref)
+    |> Map.delete(:owns_budget)
   end
 
   defp maybe_finalize(state, _status), do: state
@@ -693,8 +1097,12 @@ defmodule Jido.AI.Strategies.RLM do
   defp filter_tools_for_depth(tools, _current_depth, _max_depth), do: tools
 
   defp cleanup_rlm_state(state) do
+    reaper_alive? = Process.whereis(Jido.AI.RLM.Reaper) != nil
+
     if state[:owns_context] != false do
       if ref = state[:context_ref] do
+        if reaper_alive?, do: Reaper.untrack({:context, ref})
+
         case ref do
           %{backend: :workspace} -> :ok
           _ -> ContextStore.delete(ref)
@@ -703,7 +1111,76 @@ defmodule Jido.AI.Strategies.RLM do
     end
 
     if state[:owns_workspace] != false do
-      if state[:workspace_ref], do: WorkspaceStore.delete(state[:workspace_ref])
+      if ref = state[:workspace_ref] do
+        if reaper_alive?, do: Reaper.untrack({:workspace, ref})
+        WorkspaceStore.delete(ref)
+      end
     end
+
+    if state[:owns_budget] == true do
+      if ref = state[:budget_ref] do
+        if reaper_alive?, do: Reaper.untrack({:budget, ref})
+        BudgetStore.destroy(ref)
+      end
+    end
+  end
+
+  defp extract_total_tokens(params) do
+    cond do
+      is_integer(params[:total_tokens]) ->
+        params[:total_tokens]
+
+      is_map(params[:usage]) and is_integer(params[:usage][:total_tokens]) ->
+        params[:usage][:total_tokens]
+
+      is_map(params[:usage]) and is_integer(Map.get(params[:usage], "total_tokens")) ->
+        Map.get(params[:usage], "total_tokens")
+
+      true ->
+        0
+    end
+  end
+
+  defp maybe_auto_spawn(agent, config, context_ref, workspace_ref, run_context, params) do
+    if config[:auto_spawn?] and config[:max_depth] > 0 and not is_nil(context_ref) do
+      ctx_size = ContextStore.size(context_ref)
+      threshold = config[:auto_spawn_threshold_bytes]
+      should_spawn = if threshold, do: ctx_size >= threshold, else: ctx_size > 0
+
+      if should_spawn do
+        case Jido.AI.Actions.RLM.Context.Chunk.run(%{}, %{
+               context_ref: context_ref,
+               workspace_ref: workspace_ref,
+               chunk_defaults: chunk_defaults(config)
+             }) do
+          {:ok, %{chunks: chunks, projection_id: projection_id}} ->
+            chunk_ids = Enum.map(chunks, & &1.id)
+
+            Jido.AI.Actions.RLM.Agent.Spawn.run(
+              %{chunk_ids: chunk_ids, query: params.query, projection_id: projection_id},
+              run_context
+            )
+
+            agent
+
+          {:error, _} ->
+            agent
+        end
+      else
+        agent
+      end
+    else
+      agent
+    end
+  end
+
+  defp chunk_defaults(config) do
+    %{
+      strategy: config[:chunk_strategy] || "lines",
+      size: config[:chunk_size] || 1000,
+      overlap: config[:chunk_overlap] || 0,
+      max_chunks: config[:max_chunks] || config[:prepare_max_chunks] || 500,
+      preview_bytes: config[:chunk_preview_bytes] || 100
+    }
   end
 end

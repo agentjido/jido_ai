@@ -27,6 +27,22 @@ defmodule Jido.AI.RLMAgent do
   - `:max_depth` - Maximum recursion depth for agent spawning (default: 0, no spawning)
   - `:child_agent` - Module to use for child agents (default: `Jido.AI.RLM.ChildAgent`)
   - `:extra_tools` - Additional Jido.Action modules beyond RLM exploration tools
+  - `:max_children_total` - Tree-wide cap on total spawned child agents (default: nil, unlimited)
+  - `:token_budget` - Total token cap across all agents in the tree (default: nil, unlimited)
+  - `:resource_ttl_ms` - TTL for auto-cleanup of workspace/context/budget via Reaper (default: nil, disabled)
+  - `:auto_spawn?` - Enable runtime-driven auto-chunk → auto-spawn (default: false)
+  - `:auto_spawn_threshold_bytes` - Context size threshold for auto-spawn (default: nil)
+  - `:parallel_mode` - Orchestration mode: `:llm_driven` (default, existing behavior) or `:runtime` (deterministic chunk→spawn→synthesize, bypasses 2 LLM calls)
+  - `:orchestration_mode` - Fan-out tool policy in llm-driven mode: `:auto` (default), `:lua_only`, or `:spawn_only`
+  - `:chunk_strategy` - Default chunking strategy for `context_chunk` (`"lines"` or `"bytes"`)
+  - `:chunk_size` - Default chunk size for `context_chunk` and runtime prepare phase
+  - `:chunk_overlap` - Default chunk overlap for `context_chunk` and runtime prepare phase
+  - `:max_chunks` - Default max chunks for `context_chunk` and runtime prepare phase
+  - `:chunk_preview_bytes` - Default preview byte size for `context_chunk`
+  - `:enforce_chunk_defaults` - When true, force configured chunk defaults onto every `context_chunk` call
+  - `:child_max_iterations` - Default child-agent max iterations during runtime/Lua spawn fan-out
+  - `:child_timeout` - Default child-agent timeout (ms) during runtime/Lua spawn fan-out
+  - `:max_chunk_bytes` - Default max bytes read per chunk during child fan-out
   - `:plugins` - Additional plugins (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
@@ -75,16 +91,49 @@ defmodule Jido.AI.RLMAgent do
   @default_max_iterations 15
 
   defmacro __using__(opts) do
-    name = Keyword.fetch!(opts, :name)
-    description = Keyword.get(opts, :description, "RLM agent #{name}")
-    model = Keyword.get(opts, :model, @default_model)
-    recursive_model = Keyword.get(opts, :recursive_model, @default_recursive_model)
-    max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
-    max_depth = Keyword.get(opts, :max_depth, 0)
-    child_agent = Keyword.get(opts, :child_agent, nil)
-    plugins = Keyword.get(opts, :plugins, [])
+    resolve_opt = fn value ->
+      expanded = Macro.expand(value, __CALLER__)
 
-    extra_tools_ast = Keyword.get(opts, :extra_tools, [])
+      case expanded do
+        {_, _, _} = ast ->
+          try do
+            {evaluated, _binding} = Code.eval_quoted(ast, [], __CALLER__)
+            evaluated
+          rescue
+            _ -> expanded
+          end
+
+        other ->
+          other
+      end
+    end
+
+    name = opts |> Keyword.fetch!(:name) |> resolve_opt.()
+    description = opts |> Keyword.get(:description, "RLM agent #{name}") |> resolve_opt.()
+    model = opts |> Keyword.get(:model, @default_model) |> resolve_opt.()
+    recursive_model = opts |> Keyword.get(:recursive_model, @default_recursive_model) |> resolve_opt.()
+    max_iterations = opts |> Keyword.get(:max_iterations, @default_max_iterations) |> resolve_opt.()
+    max_depth = opts |> Keyword.get(:max_depth, 0) |> resolve_opt.()
+    child_agent = opts |> Keyword.get(:child_agent, nil) |> resolve_opt.()
+    max_children_total = opts |> Keyword.get(:max_children_total, nil) |> resolve_opt.()
+    token_budget = opts |> Keyword.get(:token_budget, nil) |> resolve_opt.()
+    resource_ttl_ms = opts |> Keyword.get(:resource_ttl_ms, nil) |> resolve_opt.()
+    auto_spawn? = opts |> Keyword.get(:auto_spawn?, false) |> resolve_opt.()
+    auto_spawn_threshold_bytes = opts |> Keyword.get(:auto_spawn_threshold_bytes, nil) |> resolve_opt.()
+    parallel_mode = opts |> Keyword.get(:parallel_mode, :llm_driven) |> resolve_opt.()
+    orchestration_mode = opts |> Keyword.get(:orchestration_mode, :auto) |> resolve_opt.()
+    chunk_strategy = opts |> Keyword.get(:chunk_strategy, nil) |> resolve_opt.()
+    chunk_size = opts |> Keyword.get(:chunk_size, nil) |> resolve_opt.()
+    chunk_overlap = opts |> Keyword.get(:chunk_overlap, nil) |> resolve_opt.()
+    max_chunks = opts |> Keyword.get(:max_chunks, nil) |> resolve_opt.()
+    chunk_preview_bytes = opts |> Keyword.get(:chunk_preview_bytes, nil) |> resolve_opt.()
+    enforce_chunk_defaults = opts |> Keyword.get(:enforce_chunk_defaults, false) |> resolve_opt.()
+    child_max_iterations = opts |> Keyword.get(:child_max_iterations, nil) |> resolve_opt.()
+    child_timeout = opts |> Keyword.get(:child_timeout, nil) |> resolve_opt.()
+    max_chunk_bytes = opts |> Keyword.get(:max_chunk_bytes, nil) |> resolve_opt.()
+    plugins = opts |> Keyword.get(:plugins, []) |> resolve_opt.()
+
+    extra_tools_ast = opts |> Keyword.get(:extra_tools, []) |> resolve_opt.()
 
     extra_tools =
       Enum.map(extra_tools_ast, fn
@@ -100,7 +149,23 @@ defmodule Jido.AI.RLMAgent do
       max_iterations: max_iterations,
       max_depth: max_depth,
       child_agent: child_agent,
-      extra_tools: extra_tools
+      extra_tools: extra_tools,
+      max_children_total: max_children_total,
+      token_budget: token_budget,
+      resource_ttl_ms: resource_ttl_ms,
+      auto_spawn?: auto_spawn?,
+      auto_spawn_threshold_bytes: auto_spawn_threshold_bytes,
+      parallel_mode: parallel_mode,
+      orchestration_mode: orchestration_mode,
+      chunk_strategy: chunk_strategy,
+      chunk_size: chunk_size,
+      chunk_overlap: chunk_overlap,
+      max_chunks: max_chunks,
+      chunk_preview_bytes: chunk_preview_bytes,
+      enforce_chunk_defaults: enforce_chunk_defaults,
+      child_max_iterations: child_max_iterations,
+      child_timeout: child_timeout,
+      max_chunk_bytes: max_chunk_bytes
     ]
 
     base_schema_ast =

@@ -25,6 +25,31 @@ defmodule Jido.AI.RLM.PromptsTest do
       assert result =~ "Tool Selection Guide"
       assert result =~ "llm_subquery_batch"
       assert result =~ "rlm_spawn_agent"
+      assert result =~ "rlm_lua_plan"
+    end
+
+    test "lua_only mode excludes direct spawn guidance" do
+      result =
+        Prompts.system_prompt(%{
+          tools: [SomeTool],
+          max_depth: 2,
+          orchestration_mode: :lua_only
+        })
+
+      assert result =~ "rlm_lua_plan"
+      refute result =~ "rlm_spawn_agent"
+    end
+
+    test "spawn_only mode excludes lua plan guidance" do
+      result =
+        Prompts.system_prompt(%{
+          tools: [SomeTool],
+          max_depth: 2,
+          orchestration_mode: :spawn_only
+        })
+
+      assert result =~ "rlm_spawn_agent"
+      refute result =~ "rlm_lua_plan"
     end
 
     test "when max_depth is 0, does NOT include rlm_spawn_agent" do

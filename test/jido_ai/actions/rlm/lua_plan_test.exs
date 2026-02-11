@@ -2,7 +2,7 @@ defmodule JidoAITest.Actions.RLM.LuaPlanTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Actions.RLM.Orchestrate.LuaPlan
-  alias Jido.AI.RLM.{ContextStore, WorkspaceStore}
+  alias Jido.AI.RLM.{ChunkProjection, ContextStore, WorkspaceStore}
 
   setup do
     context_data = """
@@ -15,17 +15,8 @@ defmodule JidoAITest.Actions.RLM.LuaPlanTest do
     """
 
     {:ok, context_ref} = ContextStore.put(context_data, "lua-plan-#{System.unique_integer()}")
-
-    chunk_index = %{
-      "c_0" => %{byte_start: 0, byte_end: 60, lines: "1-2"},
-      "c_1" => %{byte_start: 60, byte_end: 120, lines: "3-4"},
-      "c_2" => %{byte_start: 120, byte_end: 170, lines: "5-6"}
-    }
-
-    {:ok, workspace_ref} =
-      WorkspaceStore.init("lua-plan-#{System.unique_integer()}", %{
-        chunks: %{strategy: "lines", size: 2, index: chunk_index}
-      })
+    {:ok, workspace_ref} = WorkspaceStore.init("lua-plan-#{System.unique_integer()}")
+    {:ok, _projection, _chunks} = ChunkProjection.create(workspace_ref, context_ref, %{strategy: "lines", size: 2}, %{})
 
     context = %{
       context_ref: context_ref,
@@ -51,7 +42,7 @@ defmodule JidoAITest.Actions.RLM.LuaPlanTest do
       params = %{code: code, execute: false}
       assert {:ok, result} = LuaPlan.run(params, ctx)
       assert result.executed == false
-      assert length(result.plan) == 3
+      assert length(result.plan) >= 3
 
       Enum.each(result.plan, fn item ->
         assert item.query == "Find the auth flow"

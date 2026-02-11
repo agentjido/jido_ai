@@ -8,6 +8,7 @@ defmodule Jido.AI.Actions.RLM.Context.ReadChunk do
   ## Parameters
 
   * `chunk_id` (required) - The chunk identifier (e.g., `"c_0"`)
+  * `projection_id` (optional) - Chunk projection ID to read from (defaults to active projection)
   * `max_bytes` (optional) - Maximum bytes to return (default: `50_000`)
 
   ## Returns
@@ -30,23 +31,33 @@ defmodule Jido.AI.Actions.RLM.Context.ReadChunk do
     schema:
       Zoi.object(%{
         chunk_id: Zoi.string(description: "The chunk identifier (e.g., 'c_0')"),
+        projection_id:
+          Zoi.string(description: "Projection ID; defaults to active chunk projection")
+          |> Zoi.optional(),
         max_bytes:
           Zoi.integer(description: "Maximum bytes to return")
           |> Zoi.default(50_000)
       })
 
+  alias Jido.AI.RLM.ChunkProjection
   alias Jido.AI.RLM.ContextStore
-  alias Jido.AI.RLM.WorkspaceStore
 
   @impl Jido.Action
   @spec run(map(), map()) :: {:ok, map()} | {:error, any()}
   def run(params, context) do
     chunk_id = params[:chunk_id]
     max_bytes = params[:max_bytes] || 50_000
+    projection_id = params[:projection_id]
+    defaults = Map.get(context, :chunk_defaults, %{})
 
-    workspace = WorkspaceStore.get(context.workspace_ref)
-
-    with {:ok, chunk_info} <- lookup_chunk(workspace, chunk_id) do
+    with {:ok, projection} <-
+           ChunkProjection.ensure(
+             context.workspace_ref,
+             context.context_ref,
+             %{projection_id: projection_id},
+             defaults
+           ),
+         {:ok, chunk_info} <- lookup_chunk(projection, chunk_id) do
       byte_start = chunk_info.byte_start
       byte_end = chunk_info.byte_end
       chunk_size = byte_end - byte_start
@@ -57,6 +68,7 @@ defmodule Jido.AI.Actions.RLM.Context.ReadChunk do
         {:ok,
          %{
            chunk_id: chunk_id,
+           projection_id: projection.id,
            text: text,
            byte_start: byte_start,
            byte_end: byte_start + read_size,
@@ -66,14 +78,10 @@ defmodule Jido.AI.Actions.RLM.Context.ReadChunk do
     end
   end
 
-  defp lookup_chunk(%{chunks: %{index: index}}, chunk_id) do
-    case Map.fetch(index, chunk_id) do
+  defp lookup_chunk(projection, chunk_id) do
+    case ChunkProjection.lookup_chunk(projection, chunk_id) do
       {:ok, info} -> {:ok, info}
-      :error -> {:error, "chunk not found: #{chunk_id}"}
+      {:error, :chunk_not_found} -> {:error, "chunk not found: #{chunk_id}"}
     end
-  end
-
-  defp lookup_chunk(_, _chunk_id) do
-    {:error, "no chunks indexed — run context_chunk first"}
   end
 end

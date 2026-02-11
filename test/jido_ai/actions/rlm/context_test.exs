@@ -67,6 +67,7 @@ defmodule Jido.AI.Actions.RLM.ContextTest do
 
       assert result.chunk_count > 0
       assert length(result.chunks) == result.chunk_count
+      assert is_binary(result.projection_id)
 
       first = hd(result.chunks)
       assert first.id == "c_0"
@@ -85,15 +86,17 @@ defmodule Jido.AI.Actions.RLM.ContextTest do
     end
 
     test "stores chunk index in workspace", %{context: context, workspace_ref: workspace_ref} do
-      {:ok, _result} = Chunk.run(%{strategy: "lines", size: 2, overlap: 0}, context)
+      {:ok, result} = Chunk.run(%{strategy: "lines", size: 2, overlap: 0}, context)
 
       workspace = WorkspaceStore.get(workspace_ref)
-      assert workspace.chunks.strategy == "lines"
-      assert workspace.chunks.size == 2
-      assert is_map(workspace.chunks.index)
-      assert Map.has_key?(workspace.chunks.index, "c_0")
+      assert workspace.active_projections.chunks == result.projection_id
+      projection = get_in(workspace, [:projections, :chunks, result.projection_id])
+      assert projection.spec.strategy == "lines"
+      assert projection.spec.size == 2
+      assert is_map(projection.index)
+      assert Map.has_key?(projection.index, "c_0")
 
-      chunk_info = workspace.chunks.index["c_0"]
+      chunk_info = projection.index["c_0"]
       assert is_integer(chunk_info.byte_start)
       assert is_integer(chunk_info.byte_end)
       assert is_binary(chunk_info.lines)
@@ -125,6 +128,7 @@ defmodule Jido.AI.Actions.RLM.ContextTest do
       {:ok, result} = ReadChunk.run(%{chunk_id: "c_0"}, context)
 
       assert result.chunk_id == "c_0"
+      assert is_binary(result.projection_id)
       assert is_binary(result.text)
       assert String.contains?(result.text, "Line 1:")
       assert result.truncated == false
@@ -138,8 +142,10 @@ defmodule Jido.AI.Actions.RLM.ContextTest do
       assert {:error, "chunk not found: c_999"} = ReadChunk.run(%{chunk_id: "c_999"}, context)
     end
 
-    test "returns error when no chunks indexed", %{context: context} do
-      assert {:error, "no chunks indexed" <> _} = ReadChunk.run(%{chunk_id: "c_0"}, context)
+    test "auto-builds projection when none exists", %{context: context} do
+      {:ok, result} = ReadChunk.run(%{chunk_id: "c_0"}, context)
+      assert result.chunk_id == "c_0"
+      assert is_binary(result.projection_id)
     end
 
     test "truncates when max_bytes is smaller than chunk", %{context: context} do
@@ -189,11 +195,12 @@ defmodule Jido.AI.Actions.RLM.ContextTest do
       assert hit.chunk_id != nil
     end
 
-    test "returns nil chunk_id when no chunks indexed", %{context: context} do
+    test "maps hit to chunk_id even when projection was not pre-built", %{context: context} do
       {:ok, result} = Search.run(%{query: "magic number"}, context)
 
       hit = hd(result.hits)
-      assert hit.chunk_id == nil
+      assert hit.chunk_id != nil
+      assert is_binary(result.projection_id)
     end
 
     test "respects limit", %{context: context} do

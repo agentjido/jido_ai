@@ -31,6 +31,7 @@ defmodule Jido.AI.Actions.RLM.Orchestrate.LuaPlan do
   ## Parameters
 
   * `code` (required) — Lua code that returns a plan table
+  * `projection_id` (optional) — chunk projection ID to inspect (defaults to active projection)
   * `execute` (optional, default `true`) — execute the plan or just validate and return it
   * `max_plan_items` (optional, default `10`) — max number of plan items
   * `max_total_chunks` (optional, default `30`) — max total chunk_ids across all items
@@ -51,6 +52,7 @@ defmodule Jido.AI.Actions.RLM.Orchestrate.LuaPlan do
     schema:
       Zoi.object(%{
         code: Zoi.string(),
+        projection_id: Zoi.string() |> Zoi.optional(),
         execute: Zoi.boolean() |> Zoi.default(true),
         max_plan_items: Zoi.integer() |> Zoi.default(10),
         max_total_chunks: Zoi.integer() |> Zoi.default(30),
@@ -60,59 +62,55 @@ defmodule Jido.AI.Actions.RLM.Orchestrate.LuaPlan do
       })
 
   alias Jido.AI.Actions.RLM.Agent.Spawn
+  alias Jido.AI.RLM.ChunkProjection
   alias Jido.AI.RLM.WorkspaceStore
 
   @impl Jido.Action
   @spec run(map(), map()) :: {:ok, map()} | {:error, any()}
   def run(params, context) do
-    workspace = WorkspaceStore.get(context.workspace_ref)
-    chunk_index = get_in(workspace, [:chunks, :index]) || %{}
+    defaults = Map.get(context, :chunk_defaults, %{})
 
-    globals = build_globals(params, context, workspace, chunk_index)
+    with {:ok, projection} <-
+           ChunkProjection.ensure(
+             context.workspace_ref,
+             context.context_ref,
+             %{projection_id: params[:projection_id]},
+             defaults
+           ) do
+      globals = build_globals(params, context, projection)
 
-    case eval_lua(params.code, globals, params[:timeout_ms] || 500) do
-      {:ok, raw_plan} ->
-        valid_ids = MapSet.new(Map.keys(chunk_index))
-        max_items = params[:max_plan_items] || 10
-        max_chunks = params[:max_total_chunks] || 30
+      case eval_lua(params.code, globals, params[:timeout_ms] || 500) do
+        {:ok, raw_plan} ->
+          valid_ids = MapSet.new(Map.keys(projection.index))
+          max_items = params[:max_plan_items] || 10
+          max_chunks = params[:max_total_chunks] || 30
 
-        case validate_plan(raw_plan, valid_ids, max_items, max_chunks, context[:query]) do
-          {:ok, plan} ->
-            if params[:execute] != false do
-              results = execute_plan(plan, params, context)
+          case validate_plan(raw_plan, valid_ids, max_items, max_chunks, context[:query]) do
+            {:ok, plan} ->
+              if params[:execute] != false do
+                results = execute_plan(plan, params, context, projection.id)
 
-              WorkspaceStore.update(context.workspace_ref, fn ws ->
-                Map.update(ws, :lua_plans, [plan], &[plan | &1])
-              end)
+                WorkspaceStore.update(context.workspace_ref, fn ws ->
+                  entry = %{projection_id: projection.id, plan: plan}
+                  Map.update(ws, :lua_plans, [entry], &[entry | &1])
+                end)
 
-              {:ok, %{plan: plan, executed: true, results: results}}
-            else
-              {:ok, %{plan: plan, executed: false}}
-            end
+                {:ok, %{plan: plan, executed: true, results: results, projection_id: projection.id}}
+              else
+                {:ok, %{plan: plan, executed: false, projection_id: projection.id}}
+              end
 
-          {:error, reason} ->
-            {:error, "Invalid Lua plan: #{reason}"}
-        end
+            {:error, reason} ->
+              {:error, "Invalid Lua plan: #{reason}"}
+          end
 
-      {:error, reason} ->
-        {:error, "Lua execution failed: #{reason}"}
+        {:error, reason} ->
+          {:error, "Lua execution failed: #{reason}"}
+      end
     end
   end
 
-  defp build_globals(params, context, _workspace, chunk_index) do
-    chunks_list =
-      chunk_index
-      |> Enum.sort_by(fn {id, _} -> id end)
-      |> Enum.map(fn {id, meta} ->
-        %{
-          "id" => id,
-          "lines" => meta[:lines] || "",
-          "byte_start" => meta.byte_start,
-          "byte_end" => meta.byte_end,
-          "size_bytes" => meta.byte_end - meta.byte_start
-        }
-      end)
-
+  defp build_globals(params, context, projection) do
     summary = WorkspaceStore.summary(context.workspace_ref)
 
     budget = %{
@@ -124,8 +122,18 @@ defmodule Jido.AI.Actions.RLM.Orchestrate.LuaPlan do
 
     %{
       "query" => context[:query] || "",
-      "chunks" => chunks_list,
-      "chunk_count" => length(chunks_list),
+      "chunks" =>
+        Enum.map(projection.chunks, fn chunk ->
+          %{
+            "id" => chunk.id,
+            "lines" => chunk.lines || "",
+            "byte_start" => chunk.byte_start,
+            "byte_end" => chunk.byte_end,
+            "size_bytes" => chunk.size_bytes,
+            "preview" => chunk.preview
+          }
+        end),
+      "chunk_count" => projection.chunk_count,
       "workspace_summary" => summary,
       "budget" => budget
     }
@@ -274,11 +282,12 @@ defmodule Jido.AI.Actions.RLM.Orchestrate.LuaPlan do
     end
   end
 
-  defp execute_plan(plan, params, context) do
+  defp execute_plan(plan, params, context, projection_id) do
     Enum.map(plan, fn %{chunk_ids: chunk_ids, query: query} ->
       spawn_params = %{
         chunk_ids: chunk_ids,
         query: query,
+        projection_id: projection_id,
         timeout: params[:spawn_timeout] || 120_000,
         max_concurrency: params[:max_concurrency] || 5,
         max_chunk_bytes: 100_000

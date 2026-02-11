@@ -10,6 +10,7 @@ defmodule Jido.AI.Actions.RLM.LLM.SubqueryBatch do
 
   * `chunk_ids` (required) - List of chunk identifiers to process
   * `prompt` (required) - The prompt template to apply to each chunk
+  * `projection_id` (optional) - Chunk projection ID to read chunk boundaries from
   * `model` (optional) - Model spec override (defaults to context's recursive model or `"anthropic:claude-haiku-4-5"`)
   * `max_concurrency` (optional) - Maximum concurrent sub-queries (default: `10`)
   * `timeout` (optional) - Per-chunk timeout in milliseconds (default: `60_000`)
@@ -33,57 +34,64 @@ defmodule Jido.AI.Actions.RLM.LLM.SubqueryBatch do
       Zoi.object(%{
         chunk_ids: Zoi.list(Zoi.string()),
         prompt: Zoi.string(),
+        projection_id: Zoi.string() |> Zoi.optional(),
         model: Zoi.string() |> Zoi.optional(),
         max_concurrency: Zoi.integer() |> Zoi.default(10),
         timeout: Zoi.integer() |> Zoi.default(60_000),
         max_chunk_bytes: Zoi.integer() |> Zoi.default(50_000)
       })
 
-  alias Jido.AI.RLM.{ContextStore, WorkspaceStore}
+  alias Jido.AI.RLM.{ChunkProjection, ContextStore, WorkspaceStore}
 
   @impl Jido.Action
   @spec run(map(), map()) :: {:ok, map()}
   def run(params, context) do
     model = params[:model] || context[:recursive_model] || "anthropic:claude-haiku-4-5"
-    workspace = WorkspaceStore.get(context.workspace_ref)
+    defaults = Map.get(context, :chunk_defaults, %{})
 
-    results =
-      params.chunk_ids
-      |> Task.async_stream(
-        fn chunk_id ->
-          text = fetch_chunk_text(chunk_id, workspace, context.context_ref, params.max_chunk_bytes)
-          run_subquery(model, params.prompt, text, chunk_id)
-        end,
-        max_concurrency: params.max_concurrency,
-        timeout: params.timeout,
-        on_timeout: :kill_task
-      )
-      |> Enum.map(&normalize_result/1)
+    with {:ok, projection} <-
+           ChunkProjection.ensure(
+             context.workspace_ref,
+             context.context_ref,
+             %{projection_id: params[:projection_id]},
+             defaults
+           ) do
+      results =
+        params.chunk_ids
+        |> Task.async_stream(
+          fn chunk_id ->
+            text = fetch_chunk_text(chunk_id, projection, context.context_ref, params.max_chunk_bytes)
+            run_subquery(model, params.prompt, text, chunk_id)
+          end,
+          max_concurrency: params.max_concurrency,
+          timeout: params.timeout,
+          on_timeout: :kill_task
+        )
+        |> Enum.map(&normalize_result/1)
 
-    {successes, errors} = Enum.split_with(results, &(&1.status == :ok))
+      {successes, errors} = Enum.split_with(results, &(&1.status == :ok))
 
-    :ok =
-      WorkspaceStore.update(context.workspace_ref, fn ws ->
-        Map.update(ws, :subquery_results, results, &(results ++ &1))
-      end)
+      :ok =
+        WorkspaceStore.update(context.workspace_ref, fn ws ->
+          Map.update(ws, :subquery_results, results, &(results ++ &1))
+        end)
 
-    {:ok,
-     %{
-       completed: length(successes),
-       errors: length(errors),
-       results: Enum.map(successes, &Map.take(&1, [:chunk_id, :answer]))
-     }}
+      {:ok,
+       %{
+         completed: length(successes),
+         errors: length(errors),
+         results: Enum.map(successes, &Map.take(&1, [:chunk_id, :answer])),
+         projection_id: projection.id
+       }}
+    end
   end
 
   @doc false
-  @spec fetch_chunk_text(String.t(), map(), ContextStore.context_ref(), non_neg_integer()) ::
+  @spec fetch_chunk_text(String.t(), ChunkProjection.projection(), ContextStore.context_ref(), non_neg_integer()) ::
           String.t()
-  def fetch_chunk_text(chunk_id, workspace, context_ref, max_bytes) do
-    case get_in(workspace, [:chunks, :index, chunk_id]) do
-      nil ->
-        ""
-
-      chunk_meta ->
+  def fetch_chunk_text(chunk_id, projection, context_ref, max_bytes) do
+    case ChunkProjection.lookup_chunk(projection, chunk_id) do
+      {:ok, chunk_meta} ->
         byte_start = chunk_meta.byte_start
         length = min(chunk_meta.byte_end - byte_start, max_bytes)
 
@@ -91,6 +99,9 @@ defmodule Jido.AI.Actions.RLM.LLM.SubqueryBatch do
           {:ok, text} -> text
           _ -> ""
         end
+
+      {:error, :chunk_not_found} ->
+        ""
     end
   end
 

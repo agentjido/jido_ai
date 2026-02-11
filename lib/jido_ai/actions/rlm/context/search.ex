@@ -9,6 +9,7 @@ defmodule Jido.AI.Actions.RLM.Context.Search do
   ## Parameters
 
   * `query` (required) - The search string or regex pattern
+  * `projection_id` (optional) - Chunk projection ID to map hit offsets to chunk IDs
   * `mode` (optional) - Search mode: `"substring"` or `"regex"` (default: `"substring"`)
   * `limit` (optional) - Maximum number of matches to return (default: `20`)
   * `window_bytes` (optional) - Bytes of surrounding context per match (default: `200`)
@@ -32,6 +33,9 @@ defmodule Jido.AI.Actions.RLM.Context.Search do
     schema:
       Zoi.object(%{
         query: Zoi.string(description: "The search string or regex pattern"),
+        projection_id:
+          Zoi.string(description: "Projection ID; defaults to active chunk projection")
+          |> Zoi.optional(),
         mode:
           Zoi.enum(["substring", "regex"], description: "Search mode")
           |> Zoi.default("substring"),
@@ -46,6 +50,7 @@ defmodule Jido.AI.Actions.RLM.Context.Search do
           |> Zoi.default(true)
       })
 
+  alias Jido.AI.RLM.ChunkProjection
   alias Jido.AI.RLM.ContextStore
   alias Jido.AI.RLM.WorkspaceStore
 
@@ -54,15 +59,17 @@ defmodule Jido.AI.Actions.RLM.Context.Search do
   def run(params, context) do
     query = params[:query]
     mode = params[:mode] || "substring"
+    projection_id = params[:projection_id]
     limit = params[:limit] || 20
     window_bytes = params[:window_bytes] || 200
     case_sensitive = params[:case_sensitive] != false
+    defaults = Map.get(context, :chunk_defaults, %{})
 
     with {:ok, data} <- ContextStore.fetch(context.context_ref),
          {:ok, offsets} <- find_matches(data, query, mode, limit, case_sensitive) do
       workspace = WorkspaceStore.get(context.workspace_ref)
-      chunk_index = get_in(workspace, [:chunks, :index])
-      sorted_chunks = build_sorted_chunks(chunk_index)
+      projection = get_projection(context, projection_id, defaults)
+      sorted_chunks = projection && ChunkProjection.sorted_chunks(projection)
       total_size = byte_size(data)
 
       hits =
@@ -81,7 +88,13 @@ defmodule Jido.AI.Actions.RLM.Context.Search do
         |> Map.update(:searches, [search_entry], &[search_entry | &1])
       end)
 
-      {:ok, %{total_matches: length(offsets), hits: hits}}
+      {:ok,
+       %{
+         total_matches: length(offsets),
+         hits: hits,
+         projection_id: projection && projection.id,
+         active_projection_id: ChunkProjection.active_projection_id(workspace)
+       }}
     end
   end
 
@@ -158,15 +171,6 @@ defmodule Jido.AI.Actions.RLM.Context.Search do
     binary_part(data, snippet_start, snippet_end - snippet_start)
   end
 
-  defp build_sorted_chunks(nil), do: nil
-
-  defp build_sorted_chunks(chunk_index) do
-    chunk_index
-    |> Enum.map(fn {id, %{byte_start: bs, byte_end: be}} -> {bs, be, id} end)
-    |> Enum.sort()
-    |> List.to_tuple()
-  end
-
   defp resolve_chunk_id(_offset, nil), do: nil
 
   defp resolve_chunk_id(offset, sorted_chunks) do
@@ -183,6 +187,20 @@ defmodule Jido.AI.Actions.RLM.Context.Search do
       offset >= bs and offset < be -> id
       offset < bs -> binary_search_chunk(sorted, offset, lo, mid - 1)
       true -> binary_search_chunk(sorted, offset, mid + 1, hi)
+    end
+  end
+
+  defp get_projection(context, projection_id, defaults) do
+    params =
+      if projection_id do
+        %{projection_id: projection_id}
+      else
+        %{}
+      end
+
+    case ChunkProjection.ensure(context.workspace_ref, context.context_ref, params, defaults) do
+      {:ok, projection} -> projection
+      _ -> nil
     end
   end
 end

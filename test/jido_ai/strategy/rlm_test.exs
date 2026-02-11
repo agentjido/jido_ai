@@ -101,6 +101,7 @@ defmodule Jido.AI.Strategies.RLMTest do
 
       tool_names = Enum.map(config[:tools], & &1.name())
       assert "rlm_spawn_agent" in tool_names
+      assert "rlm_lua_plan" in tool_names
     end
 
     test "excludes spawn tool when max_depth is 0" do
@@ -110,6 +111,26 @@ defmodule Jido.AI.Strategies.RLMTest do
 
       tool_names = Enum.map(config[:tools], & &1.name())
       refute "rlm_spawn_agent" in tool_names
+    end
+
+    test "supports lua-only orchestration mode" do
+      agent = create_agent(max_depth: 1, orchestration_mode: :lua_only)
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      tool_names = Enum.map(config[:tools], & &1.name())
+      assert "rlm_lua_plan" in tool_names
+      refute "rlm_spawn_agent" in tool_names
+    end
+
+    test "supports spawn-only orchestration mode" do
+      agent = create_agent(max_depth: 1, orchestration_mode: :spawn_only)
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      tool_names = Enum.map(config[:tools], & &1.name())
+      assert "rlm_spawn_agent" in tool_names
+      refute "rlm_lua_plan" in tool_names
     end
   end
 

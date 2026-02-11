@@ -78,14 +78,23 @@ defmodule Jido.AI.RLM.WorkspaceStore do
     Workspace.destroy(ref)
   end
 
-  defp chunks_summary(%{chunks: chunks}) when is_list(chunks) do
-    count = length(chunks)
-    total_size = chunks |> Enum.map(&chunk_size/1) |> Enum.sum()
-    "Chunks: #{count} indexed (size #{total_size})."
+  defp chunks_summary(%{active_projections: %{chunks: projection_id}, projections: %{chunks: projections}})
+       when is_map(projections) do
+    case Map.get(projections, projection_id) do
+      nil ->
+        "Chunks: active projection #{projection_id} is missing."
+
+      projection ->
+        strategy = get_in(projection, [:spec, :strategy]) || "lines"
+        size = get_in(projection, [:spec, :size]) || 0
+        count = projection[:chunk_count] || map_size(projection[:index] || %{})
+        "Chunks: #{count} indexed (#{strategy}, size #{size}, projection #{projection_id})."
+    end
   end
 
-  defp chunks_summary(%{chunks: %{count: count, type: type, size: size}}) do
-    "Chunks: #{count} indexed (#{type}, size #{size})."
+  defp chunks_summary(%{projections: %{chunks: projections}}) when is_map(projections) and map_size(projections) > 0 do
+    count = map_size(projections)
+    "Chunks: #{count} projections available."
   end
 
   defp chunks_summary(_), do: nil
@@ -126,15 +135,26 @@ defmodule Jido.AI.RLM.WorkspaceStore do
   defp subquery_summary(_), do: nil
 
   defp spawn_summary(%{spawn_results: results}) when is_list(results) do
-    completed = Enum.count(results, &result_ok?/1)
-    "Spawn results: #{completed} completed."
+    completed = Enum.filter(results, &result_ok?/1)
+    count = length(completed)
+
+    if count == 0 do
+      nil
+    else
+      details =
+        completed
+        |> Enum.map(fn r ->
+          chunk = r[:chunk_id] || "?"
+          text = r[:summary] || r[:answer] || ""
+          "[#{chunk}] #{text}"
+        end)
+        |> Enum.join("\n")
+
+      "Spawn results: #{count} completed.\n#{details}"
+    end
   end
 
   defp spawn_summary(_), do: nil
-
-  defp chunk_size(%{size: size}), do: size
-  defp chunk_size(chunk) when is_binary(chunk), do: byte_size(chunk)
-  defp chunk_size(_), do: 0
 
   defp note_type(%{type: type}), do: type
   defp note_type(_), do: "note"

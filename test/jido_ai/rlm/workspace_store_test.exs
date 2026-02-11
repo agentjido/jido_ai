@@ -48,24 +48,39 @@ defmodule Jido.AI.RLM.WorkspaceStoreTest do
     test "workspace with chunks" do
       {:ok, ref} =
         WorkspaceStore.init("req-7", %{
-          chunks: %{count: 100, type: "lines", size: 1000}
+          projections: %{
+            chunks: %{
+              "proj-1" => %{
+                id: "proj-1",
+                chunk_count: 100,
+                spec: %{strategy: "lines", size: 1000},
+                index: %{}
+              }
+            }
+          },
+          active_projections: %{chunks: "proj-1"}
         })
 
       summary = WorkspaceStore.summary(ref)
       assert summary =~ "Chunks: 100 indexed"
       assert summary =~ "lines"
       assert summary =~ "size 1000"
+      assert summary =~ "projection proj-1"
     end
 
-    test "workspace with chunk list" do
+    test "workspace with multiple chunk projections" do
       {:ok, ref} =
         WorkspaceStore.init("req-8", %{
-          chunks: [%{size: 500}, %{size: 300}]
+          projections: %{
+            chunks: %{
+              "proj-a" => %{id: "proj-a", chunk_count: 2, spec: %{strategy: "lines", size: 500}, index: %{}},
+              "proj-b" => %{id: "proj-b", chunk_count: 4, spec: %{strategy: "bytes", size: 300}, index: %{}}
+            }
+          }
         })
 
       summary = WorkspaceStore.summary(ref)
-      assert summary =~ "Chunks: 2 indexed"
-      assert summary =~ "size 800"
+      assert summary =~ "Chunks: 2 projections available"
     end
 
     test "workspace with hits" do
@@ -124,7 +139,17 @@ defmodule Jido.AI.RLM.WorkspaceStoreTest do
     test "full workspace summary" do
       {:ok, ref} =
         WorkspaceStore.init("req-12", %{
-          chunks: %{count: 100, type: "lines", size: 1000},
+          projections: %{
+            chunks: %{
+              "proj-full" => %{
+                id: "proj-full",
+                chunk_count: 100,
+                spec: %{strategy: "lines", size: 1000},
+                index: %{}
+              }
+            }
+          },
+          active_projections: %{chunks: "proj-full"},
           hits: ["a", "b", "c"],
           notes: [%{type: "hypothesis", text: "h1"}, %{type: "finding", text: "f1"}],
           subquery_results: [
@@ -146,7 +171,17 @@ defmodule Jido.AI.RLM.WorkspaceStoreTest do
     test "respects max_chars option" do
       {:ok, ref} =
         WorkspaceStore.init("req-13", %{
-          chunks: %{count: 100, type: "lines", size: 1000},
+          projections: %{
+            chunks: %{
+              "proj-long" => %{
+                id: "proj-long",
+                chunk_count: 100,
+                spec: %{strategy: "lines", size: 1000},
+                index: %{}
+              }
+            }
+          },
+          active_projections: %{chunks: "proj-long"},
           hits: List.duplicate("hit", 100),
           notes: List.duplicate(%{type: "finding", text: "note"}, 50),
           subquery_results: List.duplicate(%{query: "q", status: :ok}, 200)

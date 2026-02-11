@@ -23,7 +23,9 @@ defmodule JidoAITest.Actions.RLM.ContextChunkTest do
       assert result.chunk_count == 3
 
       workspace = WorkspaceStore.get(ctx.workspace_ref)
-      index = workspace.chunks.index
+      projection_id = workspace.active_projections.chunks
+      projection = get_in(workspace, [:projections, :chunks, projection_id])
+      index = projection.index
 
       byte_ranges =
         index
@@ -66,7 +68,8 @@ defmodule JidoAITest.Actions.RLM.ContextChunkTest do
       assert result.chunk_count == 1
 
       workspace = WorkspaceStore.get(ctx.workspace_ref)
-      chunk = workspace.chunks.index["c_0"]
+      projection_id = workspace.active_projections.chunks
+      chunk = get_in(workspace, [:projections, :chunks, projection_id, :index, "c_0"])
       assert chunk.byte_start == 0
       assert chunk.byte_end == byte_size(data)
     end
@@ -93,7 +96,8 @@ defmodule JidoAITest.Actions.RLM.ContextChunkTest do
       {:ok, _result} = Chunk.run(params, context)
 
       workspace = WorkspaceStore.get(ctx.workspace_ref)
-      index = workspace.chunks.index
+      projection_id = workspace.active_projections.chunks
+      index = get_in(workspace, [:projections, :chunks, projection_id, :index])
 
       c0 = index["c_0"]
       assert binary_part(data, c0.byte_start, c0.byte_end - c0.byte_start) == "abc\ndef\n"
