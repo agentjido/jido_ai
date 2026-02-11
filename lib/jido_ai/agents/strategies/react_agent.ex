@@ -20,6 +20,7 @@ defmodule Jido.AI.ReActAgent do
   - `:name` (required) - Agent name
   - `:tools` (required) - List of `Jido.Action` modules to use as tools
   - `:description` - Agent description (default: "ReAct agent \#{name}")
+  - `:tags` - Agent tags for discovery/classification (default: `[]`)
   - `:system_prompt` - Custom system prompt for the LLM
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
@@ -166,6 +167,7 @@ defmodule Jido.AI.ReActAgent do
       end)
 
     description = Keyword.get(opts, :description, "ReAct agent #{name}")
+    tags = Keyword.get(opts, :tags, [])
     system_prompt = Keyword.get(opts, :system_prompt)
     model = Keyword.get(opts, :model, @default_model)
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
@@ -224,6 +226,7 @@ defmodule Jido.AI.ReActAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
+        tags: unquote(tags),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
         strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)

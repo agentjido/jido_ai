@@ -197,7 +197,7 @@ defmodule Jido.AI.ReAct.Machine do
       machine
       |> append_all_tool_results()
       |> inc_iteration()
-      |> handle_iteration_check(max_iterations)
+      |> handle_iteration_check(max_iterations, env)
     else
       {machine, []}
     end
@@ -215,16 +215,16 @@ defmodule Jido.AI.ReAct.Machine do
       Thread.new(system_prompt: system_prompt)
       |> Thread.append_user(query)
 
-    do_start_with_thread(machine, thread, call_id)
+    do_start_with_thread(machine, thread, call_id, env)
   end
 
   # Continue existing conversation - append user message to existing thread
-  defp do_start_continue(machine, query, call_id, _env) do
+  defp do_start_continue(machine, query, call_id, env) do
     thread = Thread.append_user(machine.thread, query)
-    do_start_with_thread(machine, thread, call_id)
+    do_start_with_thread(machine, thread, call_id, env)
   end
 
-  defp do_start_with_thread(machine, thread, call_id) do
+  defp do_start_with_thread(machine, thread, call_id, env) do
     started_at = System.monotonic_time(:millisecond)
 
     # Get the last entry (user message) for telemetry
@@ -232,10 +232,16 @@ defmodule Jido.AI.ReAct.Machine do
     query_length = if last_entry, do: String.length(last_entry.content || ""), else: 0
 
     # Emit start telemetry
-    emit_telemetry(:start, %{system_time: System.system_time()}, %{
-      call_id: call_id,
-      query_length: query_length
-    })
+    emit_telemetry(
+      :start,
+      %{system_time: System.system_time()},
+      %{
+        call_id: call_id,
+        query_length: query_length,
+        thread_id: thread.id
+      },
+      env
+    )
 
     with_transition(machine, "awaiting_llm", fn machine ->
       machine =
@@ -258,15 +264,21 @@ defmodule Jido.AI.ReAct.Machine do
     end)
   end
 
-  defp handle_iteration_check(machine, max_iterations) when machine.iteration > max_iterations do
+  defp handle_iteration_check(machine, max_iterations, env) when machine.iteration > max_iterations do
     duration_ms = calculate_duration(machine)
 
     # Emit complete telemetry for max iterations
-    emit_telemetry(:complete, %{duration: duration_ms}, %{
-      iteration: machine.iteration,
-      termination_reason: :max_iterations,
-      usage: machine.usage
-    })
+    emit_telemetry(
+      :complete,
+      %{duration: duration_ms},
+      %{
+        iteration: machine.iteration,
+        termination_reason: :max_iterations,
+        usage: machine.usage,
+        thread_id: thread_id(machine)
+      },
+      env
+    )
 
     with_transition(machine, "completed", fn m ->
       m =
@@ -279,15 +291,21 @@ defmodule Jido.AI.ReAct.Machine do
     end)
   end
 
-  defp handle_iteration_check(machine, _max_iterations) do
+  defp handle_iteration_check(machine, _max_iterations, env) do
     new_call_id = generate_call_id()
 
     machine = capture_thinking_to_trace(machine)
 
-    emit_telemetry(:iteration, %{system_time: System.system_time()}, %{
-      iteration: machine.iteration,
-      call_id: new_call_id
-    })
+    emit_telemetry(
+      :iteration,
+      %{system_time: System.system_time()},
+      %{
+        iteration: machine.iteration,
+        call_id: new_call_id,
+        thread_id: thread_id(machine)
+      },
+      env
+    )
 
     with_transition(machine, "awaiting_llm", fn m ->
       m = Map.merge(m, %{current_llm_call_id: new_call_id, streaming_text: "", streaming_thinking: ""})
@@ -411,16 +429,22 @@ defmodule Jido.AI.ReAct.Machine do
     end
   end
 
-  defp handle_llm_response(machine, {:error, reason}, _env) do
+  defp handle_llm_response(machine, {:error, reason}, env) do
     duration_ms = calculate_duration(machine)
 
     # Emit complete telemetry for error
-    emit_telemetry(:complete, %{duration: duration_ms}, %{
-      iteration: machine.iteration,
-      termination_reason: :error,
-      error: reason,
-      usage: machine.usage
-    })
+    emit_telemetry(
+      :complete,
+      %{duration: duration_ms},
+      %{
+        iteration: machine.iteration,
+        termination_reason: :error,
+        error: reason,
+        usage: machine.usage,
+        thread_id: thread_id(machine)
+      },
+      env
+    )
 
     with_transition(machine, "error", fn machine ->
       machine =
@@ -438,7 +462,7 @@ defmodule Jido.AI.ReAct.Machine do
 
     case result.type do
       :tool_calls -> handle_tool_calls(machine, result.tool_calls, env)
-      :final_answer -> handle_final_answer(machine, result.text)
+      :final_answer -> handle_final_answer(machine, result.text, env)
     end
   end
 
@@ -519,15 +543,21 @@ defmodule Jido.AI.ReAct.Machine do
     end)
   end
 
-  defp handle_final_answer(machine, answer) do
+  defp handle_final_answer(machine, answer, env) do
     duration_ms = calculate_duration(machine)
 
     # Emit complete telemetry for final answer
-    emit_telemetry(:complete, %{duration: duration_ms}, %{
-      iteration: machine.iteration,
-      termination_reason: :final_answer,
-      usage: machine.usage
-    })
+    emit_telemetry(
+      :complete,
+      %{duration: duration_ms},
+      %{
+        iteration: machine.iteration,
+        termination_reason: :final_answer,
+        usage: machine.usage,
+        thread_id: thread_id(machine)
+      },
+      env
+    )
 
     with_transition(machine, "completed", fn machine ->
       thinking_opts = thinking_opts(machine)
@@ -600,9 +630,24 @@ defmodule Jido.AI.ReAct.Machine do
 
   # Telemetry helpers
 
-  defp emit_telemetry(event, measurements, metadata) do
-    :telemetry.execute(@telemetry_prefix ++ [event], measurements, metadata)
+  defp emit_telemetry(event, measurements, metadata, env) do
+    telemetry_metadata =
+      env
+      |> Map.get(:telemetry_metadata, %{})
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+      |> Map.new()
+
+    merged_metadata =
+      metadata
+      |> Map.merge(telemetry_metadata)
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+      |> Map.new()
+
+    :telemetry.execute(@telemetry_prefix ++ [event], measurements, merged_metadata)
   end
+
+  defp thread_id(%{thread: %{id: id}}) when is_binary(id), do: id
+  defp thread_id(_), do: nil
 
   defp calculate_duration(%{started_at: nil}), do: 0
 
