@@ -149,6 +149,7 @@ defmodule Jido.AI.Executor do
   def execute(tool_name, params, context, opts \\ []) when is_binary(tool_name) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     tools = Keyword.get(opts, :tools, %{})
+    start_time = System.monotonic_time()
 
     start_telemetry(tool_name, params, context)
 
@@ -163,7 +164,7 @@ defmodule Jido.AI.Executor do
           type: :not_found
         }
 
-        stop_telemetry(tool_name, {:error, error}, System.monotonic_time())
+        stop_telemetry(tool_name, {:error, error}, start_time, context)
         {:error, error}
     end
   end
@@ -214,7 +215,7 @@ defmodule Jido.AI.Executor do
 
     case Task.yield(task, timeout) || Task.shutdown(task) do
       {:ok, result} ->
-        stop_telemetry(tool_name, result, start_time)
+        stop_telemetry(tool_name, result, start_time, context)
         result
 
       nil ->
@@ -225,7 +226,7 @@ defmodule Jido.AI.Executor do
           timeout_ms: timeout
         }
 
-        exception_telemetry(tool_name, :timeout, start_time)
+        exception_telemetry(tool_name, :timeout, start_time, context)
         {:error, error}
     end
   end
@@ -576,23 +577,49 @@ defmodule Jido.AI.Executor do
 
   defp sensitive_key?(_key), do: false
 
-  defp stop_telemetry(tool_name, result, start_time) do
+  defp stop_telemetry(tool_name, result, start_time, context) do
     duration = System.monotonic_time() - start_time
+
+    metadata =
+      %{
+        tool_name: tool_name,
+        result: result,
+        call_id: context[:call_id],
+        agent_id: context[:agent_id],
+        thread_id: context[:thread_id],
+        iteration: context[:iteration]
+      }
+      |> Map.merge(get_trace_metadata())
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
 
     :telemetry.execute(
       [:jido, :ai, :tool, :execute, :stop],
       %{duration: duration},
-      %{tool_name: tool_name, result: result}
+      metadata
     )
   end
 
-  defp exception_telemetry(tool_name, reason, start_time) do
+  defp exception_telemetry(tool_name, reason, start_time, context) do
     duration = System.monotonic_time() - start_time
+
+    metadata =
+      %{
+        tool_name: tool_name,
+        reason: reason,
+        call_id: context[:call_id],
+        agent_id: context[:agent_id],
+        thread_id: context[:thread_id],
+        iteration: context[:iteration]
+      }
+      |> Map.merge(get_trace_metadata())
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
 
     :telemetry.execute(
       [:jido, :ai, :tool, :execute, :exception],
       %{duration: duration},
-      %{tool_name: tool_name, reason: reason}
+      metadata
     )
   end
 end

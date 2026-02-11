@@ -39,6 +39,7 @@ defmodule Jido.AI.Examples.WeatherAgent do
   use Jido.AI.ReActAgent,
     name: "weather_agent",
     description: "Weather assistant with travel and activity advice",
+    tags: ["example"],
     tools: [
       Jido.Tools.Weather,
       Jido.Tools.Weather.ByLocation,
