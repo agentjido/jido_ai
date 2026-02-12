@@ -99,7 +99,8 @@ defmodule Jido.AI.Strategies.ReAct do
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
-          base_tool_context: map()
+          base_tool_context: map(),
+          streaming: boolean()
         }
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -466,16 +467,22 @@ defmodule Jido.AI.Strategies.ReAct do
     agent_id = Map.get(state, :agent_id)
     thread_id = thread_id_from_state(state)
 
+    streaming = Map.get(config, :streaming, true)
+
     Enum.flat_map(directives, fn
       {:call_llm_stream, id, conversation} ->
-        [
-          Directive.LLMStream.new!(%{
-            id: id,
-            model: model,
-            context: convert_to_reqllm_context(conversation),
-            tools: reqllm_tools
-          })
-        ]
+        directive_attrs = %{
+          id: id,
+          model: model,
+          context: convert_to_reqllm_context(conversation),
+          tools: reqllm_tools
+        }
+
+        if streaming do
+          [Directive.LLMStream.new!(directive_attrs)]
+        else
+          [Directive.LLMGenerate.new!(directive_attrs)]
+        end
 
       {:exec_tool, id, tool_name, arguments} ->
         case lookup_tool(tool_name, actions_by_name, config) do
@@ -574,7 +581,8 @@ defmodule Jido.AI.Strategies.ReAct do
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       # base_tool_context is the persistent context from agent definition
       # per-request context is stored separately in state[:run_tool_context]
-      base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
+      base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{}),
+      streaming: Keyword.get(opts, :streaming, true)
     }
   end
 
