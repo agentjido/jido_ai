@@ -254,6 +254,15 @@ defmodule Jido.AI.Helpers do
   end
 
   @doc """
+  Adds req_http_options to a keyword list if any are specified.
+  """
+  @spec add_req_http_options(keyword(), list()) :: keyword()
+  def add_req_http_options(opts, []), do: opts
+
+  def add_req_http_options(opts, req_http_options) when is_list(req_http_options),
+    do: Keyword.put(opts, :req_http_options, req_http_options)
+
+  @doc """
   Adds tools option to a keyword list if tools are specified.
   """
   @spec add_tools_opt(keyword(), list()) :: keyword()

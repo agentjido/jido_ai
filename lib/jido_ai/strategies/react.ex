@@ -99,7 +99,8 @@ defmodule Jido.AI.Strategies.ReAct do
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
-          base_tool_context: map()
+          base_tool_context: map(),
+          base_req_http_options: list()
         }
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -152,7 +153,8 @@ defmodule Jido.AI.Strategies.ReAct do
       schema:
         Zoi.object(%{
           query: Zoi.string(),
-          tool_context: Zoi.map() |> Zoi.optional()
+          tool_context: Zoi.map() |> Zoi.optional(),
+          req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional()
         }),
       doc: "Start a new ReAct conversation with a user query",
       name: "react.start"
@@ -320,6 +322,10 @@ defmodule Jido.AI.Strategies.ReAct do
         run_context = Map.get(params, :tool_context) || %{}
         agent = set_run_tool_context(agent, run_context)
 
+        # Store per-request req_http_options (ephemeral, cleared on completion)
+        run_req_http_options = Map.get(params, :req_http_options) || []
+        agent = set_run_req_http_options(agent, run_req_http_options)
+
         process_machine_message(agent, normalized_action, params)
 
       _ ->
@@ -347,17 +353,20 @@ defmodule Jido.AI.Strategies.ReAct do
 
         machine_state = Machine.to_map(machine)
 
-        # Preserve run_tool_context through the state update
+        # Preserve run_tool_context and run_req_http_options through the state update
         new_state =
           machine_state
           |> Map.put(:run_tool_context, state[:run_tool_context])
+          |> Map.put(:run_req_http_options, state[:run_req_http_options])
           |> Map.put(:agent_id, state[:agent_id] || Map.get(agent, :id))
           |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
-        # Clear run_tool_context on terminal states to prevent cross-request leakage
+        # Clear ephemeral per-request state on terminal states to prevent cross-request leakage
         new_state =
           if machine_state[:status] in [:completed, :error] do
-            Map.delete(new_state, :run_tool_context)
+            new_state
+            |> Map.delete(:run_tool_context)
+            |> Map.delete(:run_req_http_options)
           else
             new_state
           end
@@ -429,6 +438,13 @@ defmodule Jido.AI.Strategies.ReAct do
     StratState.put(agent, new_state)
   end
 
+  # Sets ephemeral per-request req_http_options (cleared on completion)
+  defp set_run_req_http_options(agent, req_http_options) when is_list(req_http_options) do
+    state = StratState.get(agent, %{})
+    new_state = Map.put(state, :run_req_http_options, req_http_options)
+    StratState.put(agent, new_state)
+  end
+
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
   defp normalize_action(action), do: action
 
@@ -466,6 +482,11 @@ defmodule Jido.AI.Strategies.ReAct do
     agent_id = Map.get(state, :agent_id)
     thread_id = thread_id_from_state(state)
 
+    # Merge base + run req_http_options (run appended after base)
+    base_req_http_options = Map.get(config, :base_req_http_options, [])
+    run_req_http_options = Map.get(state, :run_req_http_options, [])
+    effective_req_http_options = base_req_http_options ++ run_req_http_options
+
     Enum.flat_map(directives, fn
       {:call_llm_stream, id, conversation} ->
         [
@@ -473,7 +494,8 @@ defmodule Jido.AI.Strategies.ReAct do
             id: id,
             model: model,
             context: convert_to_reqllm_context(conversation),
-            tools: reqllm_tools
+            tools: reqllm_tools,
+            req_http_options: effective_req_http_options
           })
         ]
 
@@ -574,7 +596,8 @@ defmodule Jido.AI.Strategies.ReAct do
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       # base_tool_context is the persistent context from agent definition
       # per-request context is stored separately in state[:run_tool_context]
-      base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
+      base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{}),
+      base_req_http_options: Keyword.get(opts, :req_http_options, [])
     }
   end
 

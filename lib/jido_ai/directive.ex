@@ -73,7 +73,12 @@ defmodule Jido.AI.Directive do
                 max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
                 temperature: Zoi.number(description: "Sampling temperature (0.0–2.0)") |> Zoi.default(0.2),
                 timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
-                metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
+                metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{}),
+                req_http_options:
+                  Zoi.list(Zoi.any(),
+                    description: "Req HTTP client options passed through to ReqLLM"
+                  )
+                  |> Zoi.default([])
               },
               coerce: true
             )
@@ -265,7 +270,12 @@ defmodule Jido.AI.Directive do
                 max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
                 temperature: Zoi.number(description: "Sampling temperature (0.0–2.0)") |> Zoi.default(0.2),
                 timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
-                metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
+                metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{}),
+                req_http_options:
+                  Zoi.list(Zoi.any(),
+                    description: "Req HTTP client options passed through to ReqLLM"
+                  )
+                  |> Zoi.default([])
               },
               coerce: true
             )
@@ -369,6 +379,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     model = Helpers.resolve_directive_model(directive)
     system_prompt = Map.get(directive, :system_prompt)
     timeout = Map.get(directive, :timeout)
+    req_http_options = Map.get(directive, :req_http_options, [])
 
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
@@ -383,6 +394,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       max_tokens: max_tokens,
       temperature: temperature,
       timeout: timeout,
+      req_http_options: req_http_options,
       agent_pid: agent_pid
     }
 
@@ -421,6 +433,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
          max_tokens: max_tokens,
          temperature: temperature,
          timeout: timeout,
+         req_http_options: req_http_options,
          agent_pid: agent_pid
        }) do
     opts =
@@ -430,6 +443,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       |> Keyword.put(:max_tokens, max_tokens)
       |> Keyword.put(:temperature, temperature)
       |> Helpers.add_timeout_opt(timeout)
+      |> Helpers.add_req_http_options(req_http_options)
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
@@ -806,6 +820,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     model = Helpers.resolve_directive_model(directive)
     system_prompt = Map.get(directive, :system_prompt)
     timeout = Map.get(directive, :timeout)
+    req_http_options = Map.get(directive, :req_http_options, [])
 
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
@@ -823,7 +838,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
             tool_choice,
             max_tokens,
             temperature,
-            timeout
+            timeout,
+            req_http_options
           )
         rescue
           e ->
@@ -850,7 +866,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
          tool_choice,
          max_tokens,
          temperature,
-         timeout
+         timeout,
+         req_http_options
        ) do
     opts =
       []
@@ -859,6 +876,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
       |> Keyword.put(:max_tokens, max_tokens)
       |> Keyword.put(:temperature, temperature)
       |> Helpers.add_timeout_opt(timeout)
+      |> Helpers.add_req_http_options(req_http_options)
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
