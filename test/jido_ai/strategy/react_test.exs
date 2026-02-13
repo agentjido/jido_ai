@@ -2,6 +2,7 @@ defmodule Jido.AI.Strategies.ReActTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Directive
   alias Jido.AI.Strategies.ReAct
 
   # Test action module
@@ -230,6 +231,8 @@ defmodule Jido.AI.Strategies.ReActTest do
       assert route_map["react.llm.response"] == {:strategy_cmd, :react_llm_result}
       assert route_map["react.tool.result"] == {:strategy_cmd, :react_tool_result}
       assert route_map["react.llm.delta"] == {:strategy_cmd, :react_llm_partial}
+      assert route_map["react.cancel"] == {:strategy_cmd, :react_cancel}
+      assert route_map["react.request.error"] == {:strategy_cmd, :react_request_error}
     end
   end
 
@@ -282,6 +285,14 @@ defmodule Jido.AI.Strategies.ReActTest do
 
     test "unregister_tool_action/0 returns correct atom" do
       assert ReAct.unregister_tool_action() == :react_unregister_tool
+    end
+
+    test "cancel_action/0 returns correct atom" do
+      assert ReAct.cancel_action() == :react_cancel
+    end
+
+    test "request_error_action/0 returns correct atom" do
+      assert ReAct.request_error_action() == :react_request_error
     end
   end
 
@@ -565,22 +576,36 @@ defmodule Jido.AI.Strategies.ReActTest do
   # ============================================================================
 
   describe "unknown tool handling - Issue #1 fix" do
-    test "lift_directives returns EmitToolError for unknown tool instead of empty list" do
-      # This test verifies the fix at the Strategy layer
-      # We need to simulate what happens when the machine emits an exec_tool for an unknown tool
-
+    test "emits EmitToolError directive for unknown tool call" do
       agent = create_agent(tools: [TestCalculator])
+
+      start_instruction = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "Use an unknown tool"}
+      }
+
+      {agent, _} = ReAct.cmd(agent, [start_instruction], %{})
       state = StratState.get(agent, %{})
-      config = state[:config]
 
-      # Simulate lift_directives being called with an unknown tool
-      # We can't easily call lift_directives directly since it's private,
-      # but we can verify the config structure is correct for the fix
-      assert config.actions_by_name == %{"calculator" => TestCalculator}
-      refute Map.has_key?(config.actions_by_name, "unknown_tool")
+      llm_result_instruction = %Jido.Instruction{
+        action: ReAct.llm_result_action(),
+        params: %{
+          call_id: state[:current_llm_call_id],
+          result:
+            {:ok,
+             %{
+               type: :tool_calls,
+               text: "",
+               tool_calls: [%{id: "tc_1", name: "unknown_tool", arguments: %{}}]
+             }}
+        }
+      }
 
-      # The fix ensures that when lookup_tool returns :error,
-      # we emit an EmitToolError directive instead of returning []
+      {_agent, directives} = ReAct.cmd(agent, [llm_result_instruction], %{})
+
+      assert [%Directive.EmitToolError{} = directive] = directives
+      assert directive.tool_name == "unknown_tool"
+      assert {:unknown_tool, _} = directive.error
     end
   end
 
@@ -589,16 +614,29 @@ defmodule Jido.AI.Strategies.ReActTest do
   # ============================================================================
 
   describe "busy state handling - Issue #3 fix" do
-    test "request_error directive is handled in lift_directives" do
-      # This test verifies the Strategy can handle the request_error directive
-      # that the Machine now emits when busy
-
+    test "emits EmitRequestError directive when a second request starts while busy" do
       agent = create_agent(tools: [TestCalculator])
 
-      # The fix adds handling for {:request_error, call_id, reason, message}
-      # in the lift_directives function, which converts it to EmitRequestError directive
-      # This is verified by the fact that the code compiles and tests pass
-      assert agent != nil
+      first_request = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "first", request_id: "req_1"}
+      }
+
+      {agent, _} = ReAct.cmd(agent, [first_request], %{})
+
+      second_request = %Jido.Instruction{
+        action: ReAct.start_action(),
+        params: %{query: "second", request_id: "req_2"}
+      }
+
+      {agent, directives} = ReAct.cmd(agent, [second_request], %{})
+
+      assert [%Directive.EmitRequestError{} = directive] = directives
+      assert directive.call_id == "req_2"
+      assert directive.reason == :busy
+
+      state = StratState.get(agent, %{})
+      assert state[:status] == :awaiting_llm
     end
   end
 end

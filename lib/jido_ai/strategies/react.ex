@@ -99,7 +99,13 @@ defmodule Jido.AI.Strategies.ReAct do
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
-          base_tool_context: map()
+          base_tool_context: map(),
+          request_policy: :reject,
+          tool_timeout_ms: pos_integer(),
+          tool_max_retries: non_neg_integer(),
+          tool_retry_backoff_ms: non_neg_integer(),
+          observability: map(),
+          agent_id: String.t() | nil
         }
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -115,6 +121,8 @@ defmodule Jido.AI.Strategies.ReAct do
   @llm_result :react_llm_result
   @tool_result :react_tool_result
   @llm_partial :react_llm_partial
+  @cancel :react_cancel
+  @request_error :react_request_error
   @register_tool :react_register_tool
   @unregister_tool :react_unregister_tool
   @set_tool_context :react_set_tool_context
@@ -143,6 +151,14 @@ defmodule Jido.AI.Strategies.ReAct do
   @spec llm_partial_action() :: :react_llm_partial
   def llm_partial_action, do: @llm_partial
 
+  @doc "Returns the action atom for request cancellation."
+  @spec cancel_action() :: :react_cancel
+  def cancel_action, do: @cancel
+
+  @doc "Returns the action atom for handling request rejections."
+  @spec request_error_action() :: :react_request_error
+  def request_error_action, do: @request_error
+
   @doc "Returns the action atom for updating tool context."
   @spec set_tool_context_action() :: :react_set_tool_context
   def set_tool_context_action, do: @set_tool_context
@@ -152,6 +168,7 @@ defmodule Jido.AI.Strategies.ReAct do
       schema:
         Zoi.object(%{
           query: Zoi.string(),
+          request_id: Zoi.string() |> Zoi.optional(),
           tool_context: Zoi.map() |> Zoi.optional()
         }),
       doc: "Start a new ReAct conversation with a user query",
@@ -176,6 +193,25 @@ defmodule Jido.AI.Strategies.ReAct do
         }),
       doc: "Handle streaming LLM token chunk",
       name: "react.llm_partial"
+    },
+    @cancel => %{
+      schema:
+        Zoi.object(%{
+          request_id: Zoi.string() |> Zoi.optional(),
+          reason: Zoi.atom() |> Zoi.default(:user_cancelled)
+        }),
+      doc: "Cancel an in-flight ReAct request",
+      name: "react.cancel"
+    },
+    @request_error => %{
+      schema:
+        Zoi.object(%{
+          call_id: Zoi.string(),
+          reason: Zoi.atom(),
+          message: Zoi.string()
+        }),
+      doc: "Handle request rejection event",
+      name: "react.request_error"
     },
     @register_tool => %{
       schema: Zoi.object(%{tool_module: Zoi.atom()}),
@@ -204,9 +240,14 @@ defmodule Jido.AI.Strategies.ReAct do
       {"react.llm.response", {:strategy_cmd, @llm_result}},
       {"react.tool.result", {:strategy_cmd, @tool_result}},
       {"react.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"react.cancel", {:strategy_cmd, @cancel}},
+      {"react.request.error", {:strategy_cmd, @request_error}},
       {"react.register_tool", {:strategy_cmd, @register_tool}},
       {"react.unregister_tool", {:strategy_cmd, @unregister_tool}},
       {"react.set_tool_context", {:strategy_cmd, @set_tool_context}},
+      {"react.request.started", Jido.Actions.Control.Noop},
+      {"react.request.completed", Jido.Actions.Control.Noop},
+      {"react.request.failed", Jido.Actions.Control.Noop},
       # Usage report is emitted for observability but doesn't need processing
       {"react.usage", Jido.Actions.Control.Noop}
     ]
@@ -244,8 +285,14 @@ defmodule Jido.AI.Strategies.ReAct do
       tool_calls: format_tool_calls(state[:pending_tool_calls] || []),
       conversation: Map.get(state, :conversation, []),
       current_llm_call_id: state[:current_llm_call_id],
+      active_request_id: state[:active_request_id],
+      cancel_reason: state[:cancel_reason],
       model: config[:model],
       max_iterations: config[:max_iterations],
+      request_policy: config[:request_policy],
+      tool_timeout_ms: config[:tool_timeout_ms],
+      tool_max_retries: config[:tool_max_retries],
+      tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
       available_tools: Enum.map(Map.get(config, :tools, []), & &1.name())
     }
     |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} or v == [] end)
@@ -313,6 +360,9 @@ defmodule Jido.AI.Strategies.ReAct do
       @set_tool_context ->
         process_set_tool_context(agent, params)
 
+      @request_error ->
+        process_request_error(agent, params)
+
       @start ->
         # Store per-request tool_context in run_tool_context (ephemeral, cleared on completion)
         # This does NOT mutate base_tool_context - prevents cross-request leakage
@@ -335,7 +385,8 @@ defmodule Jido.AI.Strategies.ReAct do
 
         env = %{
           system_prompt: config[:system_prompt],
-          max_iterations: config[:max_iterations]
+          max_iterations: config[:max_iterations],
+          request_policy: config[:request_policy]
         }
 
         {machine, directives} = Machine.update(machine, msg, env)
@@ -357,7 +408,7 @@ defmodule Jido.AI.Strategies.ReAct do
           end
 
         agent = StratState.put(agent, new_state)
-        {agent, lift_directives(directives, config, state)}
+        {agent, lift_directives(directives, config, new_state)}
 
       _ ->
         :noop
@@ -416,6 +467,13 @@ defmodule Jido.AI.Strategies.ReAct do
     {agent, []}
   end
 
+  defp process_request_error(agent, %{call_id: call_id, reason: reason, message: message}) do
+    state = StratState.get(agent, %{})
+    new_state = Map.put(state, :last_request_error, %{request_id: call_id, reason: reason, message: message})
+    agent = StratState.put(agent, new_state)
+    {agent, []}
+  end
+
   # Sets ephemeral per-request tool context (cleared on completion)
   defp set_run_tool_context(agent, context) when is_map(context) do
     state = StratState.get(agent, %{})
@@ -426,9 +484,14 @@ defmodule Jido.AI.Strategies.ReAct do
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
   defp normalize_action(action), do: action
 
-  defp to_machine_msg(@start, %{query: query}) do
-    call_id = generate_call_id()
-    {:start, query, call_id}
+  defp to_machine_msg(@start, %{query: query} = params) do
+    request_id =
+      case Map.get(params, :request_id) do
+        id when is_binary(id) -> id
+        _ -> generate_call_id()
+      end
+
+    {:start, query, request_id}
   end
 
   defp to_machine_msg(@llm_result, %{call_id: call_id, result: result}) do
@@ -443,6 +506,10 @@ defmodule Jido.AI.Strategies.ReAct do
     {:llm_partial, call_id, delta, chunk_type}
   end
 
+  defp to_machine_msg(@cancel, params) do
+    {:cancel, Map.get(params, :request_id), Map.get(params, :reason, :user_cancelled)}
+  end
+
   defp to_machine_msg(_, _), do: nil
 
   defp lift_directives(directives, config, state) do
@@ -450,7 +517,12 @@ defmodule Jido.AI.Strategies.ReAct do
       model: model,
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
-      base_tool_context: base_tool_context
+      base_tool_context: base_tool_context,
+      tool_timeout_ms: tool_timeout_ms,
+      tool_max_retries: tool_max_retries,
+      tool_retry_backoff_ms: tool_retry_backoff_ms,
+      observability: observability,
+      agent_id: agent_id
     } = config
 
     # Merge base (persistent) + run (ephemeral) context at directive emission time
@@ -465,7 +537,14 @@ defmodule Jido.AI.Strategies.ReAct do
             id: id,
             model: model,
             context: convert_to_reqllm_context(conversation),
-            tools: reqllm_tools
+            tools: reqllm_tools,
+            metadata: %{
+              request_id: state[:active_request_id],
+              run_id: state[:active_request_id],
+              iteration: state[:iteration],
+              agent_id: agent_id,
+              observability: observability
+            }
           })
         ]
 
@@ -476,7 +555,11 @@ defmodule Jido.AI.Strategies.ReAct do
             exec_context =
               Map.merge(effective_tool_context, %{
                 call_id: id,
-                iteration: state[:iteration]
+                iteration: state[:iteration],
+                request_id: state[:active_request_id],
+                run_id: state[:active_request_id],
+                agent_id: agent_id,
+                observability: observability
               })
 
             [
@@ -485,7 +568,19 @@ defmodule Jido.AI.Strategies.ReAct do
                 tool_name: tool_name,
                 action_module: action_module,
                 arguments: arguments,
-                context: exec_context
+                context: exec_context,
+                timeout_ms: tool_timeout_ms,
+                max_retries: tool_max_retries,
+                retry_backoff_ms: tool_retry_backoff_ms,
+                request_id: state[:active_request_id],
+                iteration: state[:iteration],
+                metadata: %{
+                  request_id: state[:active_request_id],
+                  run_id: state[:active_request_id],
+                  iteration: state[:iteration],
+                  agent_id: agent_id,
+                  observability: observability
+                }
               })
             ]
 
@@ -543,6 +638,12 @@ defmodule Jido.AI.Strategies.ReAct do
     raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
 
+    request_policy =
+      case Keyword.get(opts, :request_policy, :reject) do
+        :reject -> :reject
+        _ -> :reject
+      end
+
     %{
       tools: tools_modules,
       reqllm_tools: reqllm_tools,
@@ -550,6 +651,21 @@ defmodule Jido.AI.Strategies.ReAct do
       system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
+      request_policy: request_policy,
+      tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, 15_000),
+      tool_max_retries: Keyword.get(opts, :tool_max_retries, 1),
+      tool_retry_backoff_ms: Keyword.get(opts, :tool_retry_backoff_ms, 200),
+      observability:
+        Map.merge(
+          %{
+            emit_telemetry?: true,
+            emit_lifecycle_signals?: true,
+            redact_tool_args?: true,
+            emit_llm_deltas?: true
+          },
+          Keyword.get(opts, :observability, %{})
+        ),
+      agent_id: agent.id,
       # base_tool_context is the persistent context from agent definition
       # per-request context is stored separately in state[:run_tool_context]
       base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})

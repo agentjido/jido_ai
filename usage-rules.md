@@ -1,85 +1,82 @@
 # Jido.AI Usage Rules
 
-Jido.AI provides AI integration for the Jido ecosystem, built on ReqLLM and jido_action.
+Jido.AI is an AI integration layer for Jido agents. Prefer action modules and strategy agents over ad-hoc facade calls.
 
 ## Core Usage
 
-### Text Generation
+### Model Selection
 
 ```elixir
-# Via Jido.AI facade
-{:ok, response} = Jido.AI.generate_text("anthropic:claude-haiku-4-5", "Hello!")
-
-# Via Action execution
-{:ok, result} = Jido.Exec.run(Jido.AI.Actions.GenerateText, %{
-  model: "openai:gpt-4o-mini",
-  prompt: "Explain recursion"
-})
+Jido.AI.resolve_model(:fast)
+#=> "anthropic:claude-haiku-4-5"
 ```
 
-### Structured Output
+### Text Generation via Actions
 
 ```elixir
-schema = Zoi.object(%{
-  name: Zoi.string(),
-  age: Zoi.integer() |> Zoi.min(0)
-})
+{:ok, result} =
+  Jido.Exec.run(Jido.AI.Actions.LLM.Chat, %{
+    model: "anthropic:claude-haiku-4-5",
+    prompt: "Explain recursion",
+    temperature: 0.3
+  })
 
-{:ok, person} = Jido.AI.generate_object("openai:gpt-4", "Generate a person", schema)
+result.text
 ```
 
-### Streaming
+### Structured Output via Actions
 
 ```elixir
-{:ok, stream} = Jido.AI.stream_text("anthropic:claude-haiku-4-5", "Write a story")
-stream |> Stream.each(&IO.write(&1.text)) |> Stream.run()
+schema = Zoi.object(%{name: Zoi.string(), age: Zoi.integer()})
+
+{:ok, result} =
+  Jido.Exec.run(Jido.AI.Actions.LLM.GenerateObject, %{
+    model: "openai:gpt-4o-mini",
+    prompt: "Generate a person object",
+    schema: schema
+  })
 ```
 
-## Action Patterns
-
-### Creating AI Actions
+## ReAct Agent Pattern
 
 ```elixir
-defmodule MyApp.Actions.Summarize do
-  use Jido.Action,
-    name: "summarize",
-    description: "Summarizes text content",
-    schema: Zoi.object(%{
-      text: Zoi.string() |> Zoi.min_length(10),
-      model: Zoi.string() |> Zoi.optional() |> Zoi.default("anthropic:claude-haiku-4-5")
-    })
-
-  def run(params, _context) do
-    Jido.AI.generate_text(params.model, """
-    Summarize the following text concisely:
-
-    #{params.text}
-    """)
-  end
+defmodule MyApp.Agent do
+  use Jido.AI.ReActAgent,
+    name: "my_agent",
+    tools: [Jido.Tools.Arithmetic.Add],
+    model: :fast,
+    request_policy: :reject,
+    tool_timeout_ms: 15_000,
+    tool_max_retries: 1,
+    tool_retry_backoff_ms: 200
 end
+
+{:ok, pid} = Jido.AgentServer.start(agent: MyApp.Agent)
+{:ok, request} = MyApp.Agent.ask(pid, "What is 2 + 2?")
+{:ok, answer} = MyApp.Agent.await(request, timeout: 30_000)
 ```
 
 ## Error Handling
 
 ```elixir
-case Jido.AI.generate_text("anthropic:claude-haiku-4-5", prompt) do
-  {:ok, response} -> 
-    {:ok, response.text}
-  {:error, %Jido.AI.Error.RateLimit{retry_after: seconds}} -> 
-    {:retry, seconds}
-  {:error, %Jido.AI.Error.Authentication{}} -> 
-    {:error, :auth_failed}
-  {:error, error} -> 
-    {:error, error}
+case MyApp.Agent.ask_sync(pid, "Run a complex task", timeout: 10_000) do
+  {:ok, result} -> {:ok, result}
+  {:error, {:rejected, :busy, _msg}} -> {:error, :agent_busy}
+  {:error, {:cancelled, reason}} -> {:error, {:cancelled, reason}}
+  {:error, :timeout} -> {:error, :timeout}
+  {:error, reason} -> {:error, reason}
 end
 ```
 
-## Model Specification
+## Observability
 
-```elixir
-# String format
-Jido.AI.generate_text("anthropic:claude-haiku-4-5", "Hello")
+Attach telemetry to ReAct lifecycle/tool/LLM events. Start with:
 
-# With options
-Jido.AI.generate_text("openai:gpt-4", "Hello", temperature: 0.7, max_tokens: 100)
-```
+- `[:jido, :ai, :react, :request, :start]`
+- `[:jido, :ai, :react, :request, :complete]`
+- `[:jido, :ai, :react, :request, :failed]`
+- `[:jido, :ai, :react, :llm, :start]`
+- `[:jido, :ai, :react, :llm, :complete]`
+- `[:jido, :ai, :react, :tool, :start]`
+- `[:jido, :ai, :react, :tool, :complete]`
+- `[:jido, :ai, :react, :tool, :error]`

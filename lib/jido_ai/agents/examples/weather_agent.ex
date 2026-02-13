@@ -22,6 +22,13 @@ defmodule Jido.AI.Examples.WeatherAgent do
       agent = Jido.AgentServer.get(pid)
       agent.state.last_answer
 
+      # Async request handle (production-friendly)
+      {:ok, req} = Jido.AI.Examples.WeatherAgent.ask(pid, "Do I need a jacket in Boston tonight?")
+      {:ok, answer} = Jido.AI.Examples.WeatherAgent.await(req, timeout: 30_000)
+
+      # Optional cancellation with request scope
+      :ok = Jido.AI.Examples.WeatherAgent.cancel(pid, request_id: req.id, reason: :user_cancelled)
+
   ## CLI Usage
 
       mix jido_ai.agent --agent Jido.AI.Examples.WeatherAgent \\
@@ -39,6 +46,16 @@ defmodule Jido.AI.Examples.WeatherAgent do
   use Jido.AI.ReActAgent,
     name: "weather_agent",
     description: "Weather assistant with travel and activity advice",
+    request_policy: :reject,
+    tool_timeout_ms: 15_000,
+    tool_max_retries: 1,
+    tool_retry_backoff_ms: 200,
+    observability: %{
+      emit_telemetry?: true,
+      emit_lifecycle_signals?: true,
+      redact_tool_args?: true,
+      emit_llm_deltas?: true
+    },
     tools: [
       Jido.Tools.Weather,
       Jido.Tools.Weather.ByLocation,
