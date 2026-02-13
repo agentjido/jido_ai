@@ -222,8 +222,10 @@ defmodule Jido.AI.ReActAgent do
         })
       end
 
+    api_functions = quoted_react_api_functions()
+
     quote location: :keep do
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: unquote(name),
         description: unquote(description),
         tags: unquote(tags),
@@ -235,6 +237,87 @@ defmodule Jido.AI.ReActAgent do
 
       alias Jido.AI.Request
 
+      @doc false
+      @spec plugin_specs() :: [Jido.Plugin.Spec.t()]
+      def plugin_specs, do: super()
+
+      unquote(api_functions)
+
+      @impl true
+      def on_before_cmd(agent, {:react_start, %{query: query} = params} = action) do
+        {request_id, params} = Request.ensure_request_id(params)
+        action = {:react_start, params}
+        agent = Request.start_request(agent, request_id, query)
+
+        {:ok, agent, action}
+      end
+
+      @impl true
+      def on_before_cmd(agent, action), do: {:ok, agent, action}
+
+      @impl true
+      def on_after_cmd(agent, {:react_start, %{request_id: request_id}}, directives) do
+        snap = strategy_snapshot(agent)
+
+        agent =
+          if snap.done? do
+            Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
+          else
+            agent
+          end
+
+        {:ok, agent, directives}
+      end
+
+      @impl true
+      def on_after_cmd(agent, _action, directives) do
+        snap = strategy_snapshot(agent)
+
+        agent =
+          if snap.done? do
+            agent = %{
+              agent
+              | state:
+                  Map.merge(agent.state, %{
+                    last_answer: snap.result || "",
+                    completed: true
+                  })
+            }
+
+            case agent.state[:last_request_id] do
+              nil -> agent
+              request_id -> Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
+            end
+          else
+            agent
+          end
+
+        {:ok, agent, directives}
+      end
+
+      defp thinking_meta(snap) do
+        details = snap.details
+        meta = %{}
+
+        meta =
+          if details[:thinking_trace] && details[:thinking_trace] != [],
+            do: Map.put(meta, :thinking_trace, details[:thinking_trace]),
+            else: meta
+
+        meta =
+          if details[:streaming_thinking] && details[:streaming_thinking] != "",
+            do: Map.put(meta, :last_thinking, details[:streaming_thinking]),
+            else: meta
+
+        meta
+      end
+
+      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3, cancel: 2
+    end
+  end
+
+  defp quoted_react_api_functions do
+    quote do
       @doc """
       Send a query to the agent asynchronously.
 
@@ -318,78 +401,6 @@ defmodule Jido.AI.ReActAgent do
         )
       end
 
-      @impl true
-      def on_before_cmd(agent, {:react_start, %{query: query} = params} = action) do
-        # Ensure we have a request_id for tracking
-        {request_id, params} = Request.ensure_request_id(params)
-        action = {:react_start, params}
-
-        # Use RequestTracking to manage state
-        agent = Request.start_request(agent, request_id, query)
-
-        {:ok, agent, action}
-      end
-
-      @impl true
-      def on_before_cmd(agent, action), do: {:ok, agent, action}
-
-      @impl true
-      def on_after_cmd(agent, {:react_start, %{request_id: request_id}}, directives) do
-        snap = strategy_snapshot(agent)
-
-        agent =
-          if snap.done? do
-            Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
-          else
-            agent
-          end
-
-        {:ok, agent, directives}
-      end
-
-      @impl true
-      def on_after_cmd(agent, _action, directives) do
-        snap = strategy_snapshot(agent)
-
-        agent =
-          if snap.done? do
-            agent = %{
-              agent
-              | state:
-                  Map.merge(agent.state, %{
-                    last_answer: snap.result || "",
-                    completed: true
-                  })
-            }
-
-            case agent.state[:last_request_id] do
-              nil -> agent
-              request_id -> Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
-            end
-          else
-            agent
-          end
-
-        {:ok, agent, directives}
-      end
-
-      defp thinking_meta(snap) do
-        details = snap.details || %{}
-        meta = %{}
-
-        meta =
-          if details[:thinking_trace] && details[:thinking_trace] != [],
-            do: Map.put(meta, :thinking_trace, details[:thinking_trace]),
-            else: meta
-
-        meta =
-          if details[:streaming_thinking] && details[:streaming_thinking] != "",
-            do: Map.put(meta, :last_thinking, details[:streaming_thinking]),
-            else: meta
-
-        meta
-      end
-
       @doc """
       Cancel an in-flight request.
 
@@ -410,8 +421,6 @@ defmodule Jido.AI.ReActAgent do
       def cancel(pid, opts \\ []) do
         Jido.cancel(pid, opts)
       end
-
-      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3, cancel: 2
     end
   end
 

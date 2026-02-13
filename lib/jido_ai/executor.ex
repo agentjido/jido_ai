@@ -69,6 +69,7 @@ defmodule Jido.AI.Executor do
   """
 
   alias Jido.Action.Tool, as: ActionTool
+  alias Jido.Tracing.Context, as: TracingContext
 
   require Logger
 
@@ -291,21 +292,20 @@ defmodule Jido.AI.Executor do
 
   defp atomize_keys(map) when is_map(map) do
     Map.new(map, fn
-      {k, v} when is_binary(k) -> {String.to_existing_atom(k), atomize_keys(v)}
+      {k, v} when is_binary(k) -> {to_existing_atom_or_string(k), atomize_keys(v)}
       {k, v} when is_atom(k) -> {k, atomize_keys(v)}
       {k, v} -> {k, atomize_keys(v)}
     end)
-  rescue
-    ArgumentError ->
-      # If atom doesn't exist, try creating it (for dynamic keys)
-      Map.new(map, fn
-        {k, v} when is_binary(k) -> {String.to_atom(k), atomize_keys(v)}
-        {k, v} -> {k, atomize_keys(v)}
-      end)
   end
 
   defp atomize_keys(list) when is_list(list), do: Enum.map(list, &atomize_keys/1)
   defp atomize_keys(other), do: other
+
+  defp to_existing_atom_or_string(key) when is_binary(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> key
+  end
 
   defp coerce_integers_to_floats(params, schema) when is_list(schema) do
     float_keys =
@@ -498,23 +498,27 @@ defmodule Jido.AI.Executor do
 
   # Patterns for sensitive keys that should be redacted in telemetry
   # These match common credential field names but avoid partial matches (e.g. "credentials" container)
-  @sensitive_key_patterns [
-    ~r/^api_?key$/i,
-    ~r/^password$/i,
-    ~r/^secret$/i,
-    ~r/^token$/i,
-    ~r/^auth_?token$/i,
-    ~r/^private_?key$/i,
-    ~r/^access_?key$/i,
-    ~r/^bearer$/i,
-    ~r/^api_?secret$/i,
-    ~r/^client_?secret$/i,
-    ~r/secret_/i,
-    ~r/_secret$/i,
-    ~r/_key$/i,
-    ~r/_token$/i,
-    ~r/_password$/i
-  ]
+  # Defined as a function instead of module attribute for Elixir 1.18+ compatibility
+  # (compiled Regex references cannot be escaped in module attributes).
+  defp sensitive_key_patterns do
+    [
+      ~r/^api_?key$/i,
+      ~r/^password$/i,
+      ~r/^secret$/i,
+      ~r/^token$/i,
+      ~r/^auth_?token$/i,
+      ~r/^private_?key$/i,
+      ~r/^access_?key$/i,
+      ~r/^bearer$/i,
+      ~r/^api_?secret$/i,
+      ~r/^client_?secret$/i,
+      ~r/secret_/i,
+      ~r/_secret$/i,
+      ~r/_key$/i,
+      ~r/_token$/i,
+      ~r/_password$/i
+    ]
+  end
 
   defp start_telemetry(tool_name, params, context) do
     metadata =
@@ -537,7 +541,7 @@ defmodule Jido.AI.Executor do
   end
 
   defp get_trace_metadata do
-    case Jido.Tracing.Context.get() do
+    case TracingContext.get() do
       nil ->
         %{}
 
@@ -572,7 +576,7 @@ defmodule Jido.AI.Executor do
   end
 
   defp sensitive_key?(key) when is_binary(key) do
-    Enum.any?(@sensitive_key_patterns, &Regex.match?(&1, key))
+    Enum.any?(sensitive_key_patterns(), &Regex.match?(&1, key))
   end
 
   defp sensitive_key?(_key), do: false

@@ -13,8 +13,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Plugins.LLM
   alias Jido.AI.Actions.LLM.Chat
+  alias Jido.AI.Plugins.LLM
   alias Jido.AI.Plugins.Planning
   alias Jido.AI.Plugins.Reasoning
   alias Jido.AI.Plugins.Streaming
@@ -76,11 +76,11 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     end
 
     test "skills maintain independent state" do
-      {:ok, llm_state} = LLM.mount(%Jido.Agent{}, %{default_model: :fast})
-      {:ok, reasoning_state} = Reasoning.mount(%Jido.Agent{}, %{default_model: :reasoning})
-      {:ok, planning_state} = Planning.mount(%Jido.Agent{}, %{default_model: :planning})
-      {:ok, streaming_state} = Streaming.mount(%Jido.Agent{}, %{})
-      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      {:ok, llm_state} = LLM.mount(%Jido.Agent{id: "test-agent"}, %{default_model: :fast})
+      {:ok, reasoning_state} = Reasoning.mount(%Jido.Agent{id: "test-agent"}, %{default_model: :reasoning})
+      {:ok, planning_state} = Planning.mount(%Jido.Agent{id: "test-agent"}, %{default_model: :planning})
+      {:ok, streaming_state} = Streaming.mount(%Jido.Agent{id: "test-agent"}, %{})
+      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{id: "test-agent"}, %{})
 
       # Each skill maintains its own state
       assert llm_state.default_model == :fast
@@ -271,8 +271,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   describe "Cross-Skill Integration" do
     test "LLM and Reasoning skills can be used together" do
       # Both skills should be mountable
-      {:ok, llm_state} = LLM.mount(%Jido.Agent{}, %{})
-      {:ok, reasoning_state} = Reasoning.mount(%Jido.Agent{}, %{})
+      {:ok, llm_state} = LLM.mount(%Jido.Agent{id: "test-agent"}, %{})
+      {:ok, reasoning_state} = Reasoning.mount(%Jido.Agent{id: "test-agent"}, %{})
 
       # States should be independent
       assert llm_state.default_model == :fast
@@ -288,8 +288,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
     test "Planning and Tool Calling skills can be used together" do
       # Both skills should be mountable
-      {:ok, planning_state} = Planning.mount(%Jido.Agent{}, %{})
-      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      {:ok, planning_state} = Planning.mount(%Jido.Agent{id: "test-agent"}, %{})
+      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{id: "test-agent"}, %{})
 
       # Tool Calling should have access to available tools
       assert is_list(tool_calling_state.available_tools)
@@ -298,8 +298,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
     test "Streaming and Tool Calling skills can be used together" do
       # Both skills should be mountable
-      {:ok, streaming_state} = Streaming.mount(%Jido.Agent{}, %{})
-      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      {:ok, streaming_state} = Streaming.mount(%Jido.Agent{id: "test-agent"}, %{})
+      {:ok, tool_calling_state} = ToolCalling.mount(%Jido.Agent{id: "test-agent"}, %{})
 
       # Streaming should have buffer configuration
       assert is_map(streaming_state.active_streams)
@@ -340,11 +340,11 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
     test "all skills support mount/2 callback" do
       # All should return {:ok, state} tuple
-      assert {:ok, _state} = LLM.mount(%Jido.Agent{}, %{})
-      assert {:ok, _state} = Reasoning.mount(%Jido.Agent{}, %{})
-      assert {:ok, _state} = Planning.mount(%Jido.Agent{}, %{})
-      assert {:ok, _state} = Streaming.mount(%Jido.Agent{}, %{})
-      assert {:ok, _state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      assert {:ok, _state} = LLM.mount(%Jido.Agent{id: "test-agent"}, %{})
+      assert {:ok, _state} = Reasoning.mount(%Jido.Agent{id: "test-agent"}, %{})
+      assert {:ok, _state} = Planning.mount(%Jido.Agent{id: "test-agent"}, %{})
+      assert {:ok, _state} = Streaming.mount(%Jido.Agent{id: "test-agent"}, %{})
+      assert {:ok, _state} = ToolCalling.mount(%Jido.Agent{id: "test-agent"}, %{})
     end
   end
 

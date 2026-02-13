@@ -41,7 +41,7 @@ defmodule Jido.AI.Strategies.Adaptive do
 
   Configure via strategy options when defining your agent:
 
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: "my_adaptive_agent",
         strategy: {
           Jido.AI.Strategies.Adaptive,

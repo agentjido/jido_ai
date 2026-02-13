@@ -46,6 +46,8 @@ defmodule Jido.AI do
 
   """
 
+  alias Jido.AI.Strategies.ReAct, as: ReActStrategy
+
   @type model_alias :: :fast | :capable | :reasoning | :planning | atom()
   @type model_spec :: String.t()
 
@@ -166,9 +168,13 @@ defmodule Jido.AI do
     signal =
       Jido.Signal.new!("react.unregister_tool", %{tool_name: tool_name}, source: "/jido/ai")
 
-    case Jido.AgentServer.call(agent_server, signal, timeout) do
-      {:ok, agent} -> {:ok, agent}
-      {:error, _} = error -> error
+    try do
+      case Jido.AgentServer.call(agent_server, signal, timeout) do
+        {:ok, agent} -> {:ok, agent}
+        {:error, _} = error -> error
+      end
+    catch
+      :exit, reason -> {:error, {:agent_server_exit, reason}}
     end
   end
 
@@ -189,7 +195,7 @@ defmodule Jido.AI do
   @spec list_tools(Jido.Agent.t() | GenServer.server()) ::
           [module()] | {:ok, [module()]} | {:error, term()}
   def list_tools(%Jido.Agent{} = agent) do
-    Jido.AI.Strategies.ReAct.list_tools(agent)
+    ReActStrategy.list_tools(agent)
   end
 
   def list_tools(agent_server) do
@@ -235,9 +241,13 @@ defmodule Jido.AI do
     signal =
       Jido.Signal.new!("react.register_tool", %{tool_module: tool_module}, source: "/jido/ai")
 
-    case Jido.AgentServer.call(agent_server, signal, timeout) do
-      {:ok, agent} -> {:ok, agent}
-      {:error, _} = error -> error
+    try do
+      case Jido.AgentServer.call(agent_server, signal, timeout) do
+        {:ok, agent} -> {:ok, agent}
+        {:error, _} = error -> error
+      end
+    catch
+      :exit, reason -> {:error, {:agent_server_exit, reason}}
     end
   end
 

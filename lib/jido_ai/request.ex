@@ -61,6 +61,7 @@ defmodule Jido.AI.Request do
   """
 
   alias Jido.Signal
+  alias Jido.Signal.ID, as: SignalID
 
   @type status :: :pending | :completed | :failed | :timeout
   @type server :: pid() | atom() | {:via, module(), term()}
@@ -494,7 +495,7 @@ defmodule Jido.AI.Request do
   # ---------------------------------------------------------------------------
 
   defp generate_id do
-    Jido.Signal.ID.generate!()
+    SignalID.generate!()
   end
 
   defp maybe_add_tool_context(payload, tool_context) when map_size(tool_context) > 0 do

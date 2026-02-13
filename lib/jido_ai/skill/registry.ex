@@ -8,7 +8,7 @@ defmodule Jido.AI.Skill.Registry do
 
   use GenServer
 
-  alias Jido.AI.Skill.{Spec, Loader, Error}
+  alias Jido.AI.Skill.{Error, Loader, Spec}
 
   @table_name :jido_skill_registry
 
@@ -61,7 +61,9 @@ defmodule Jido.AI.Skill.Registry do
   """
   @spec load_from_paths([String.t()]) :: {:ok, non_neg_integer()} | {:error, term()}
   def load_from_paths(paths) do
-    GenServer.call(__MODULE__, {:load_paths, paths})
+    with :ok <- ensure_registry_started() do
+      do_load_paths(paths)
+    end
   end
 
   @doc """
@@ -104,12 +106,14 @@ defmodule Jido.AI.Skill.Registry do
     {:reply, :ok, state}
   end
 
-  def handle_call({:load_paths, paths}, _from, state) do
-    result = do_load_paths(paths)
-    {:reply, result, state}
-  end
-
   # Private functions
+
+  defp ensure_registry_started do
+    case :ets.whereis(@table_name) do
+      :undefined -> {:error, :registry_not_started}
+      _tid -> :ok
+    end
+  end
 
   defp do_load_paths(paths) do
     paths

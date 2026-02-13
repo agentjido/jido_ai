@@ -4,10 +4,10 @@ defmodule JidoAITest.Actions.OrchestrationTest do
   alias Jido.Agent.Directive
 
   alias Jido.AI.Actions.Orchestration.{
-    SpawnChildAgent,
-    StopChildAgent,
+    AggregateResults,
     DiscoverCapabilities,
-    AggregateResults
+    SpawnChildAgent,
+    StopChildAgent
   }
 
   describe "SpawnChildAgent" do

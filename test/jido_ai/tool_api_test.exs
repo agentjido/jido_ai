@@ -4,6 +4,7 @@ defmodule Jido.AI.ToolApiTest do
   """
   use ExUnit.Case, async: true
 
+  alias Jido.Agent.Strategy.State, as: StrategyState
   alias Jido.AI
   alias Jido.AI.Strategies.ReAct
 
@@ -57,11 +58,10 @@ defmodule Jido.AI.ToolApiTest do
 
     test "skips validation when validate: false" do
       # When validation is skipped, registration proceeds to AgentServer call
-      # Using a fake pid will fail at the GenServer call level (exits)
+      # Using a fake pid fails at the AgentServer call level
       fake_pid = spawn(fn -> :ok end)
 
-      # The GenServer.call will exit because the process is dead
-      assert catch_exit(AI.register_tool(fake_pid, NotATool, validate: false, timeout: 100))
+      assert {:error, _reason} = AI.register_tool(fake_pid, NotATool, validate: false, timeout: 100)
     end
   end
 
@@ -80,14 +80,14 @@ defmodule Jido.AI.ToolApiTest do
       # Test with a manually constructed agent state
       agent = TestAgent.new()
       # Manually clear tools from strategy state for testing
-      state = Jido.Agent.Strategy.State.get(agent, %{})
+      state = StrategyState.get(agent, %{})
       config = state[:config] || %{}
       new_config = Map.put(config, :tools, [])
 
       new_state =
         Map.put(state, :config, new_config)
 
-      agent = Jido.Agent.Strategy.State.put(agent, new_state)
+      agent = StrategyState.put(agent, new_state)
       tools = AI.list_tools(agent)
 
       assert tools == []

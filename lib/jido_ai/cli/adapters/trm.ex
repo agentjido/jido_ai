@@ -9,6 +9,7 @@ defmodule Jido.AI.CLI.Adapters.TRM do
   """
 
   @behaviour Jido.AI.CLI.Adapter
+  alias Jido.AI.CLI.Adapters.Polling
 
   @default_model "anthropic:claude-haiku-4-5"
   @default_max_supervision_steps 5
@@ -27,10 +28,7 @@ defmodule Jido.AI.CLI.Adapters.TRM do
 
   @impl true
   def await(pid, timeout_ms, _config) do
-    poll_interval = 100
-    deadline = System.monotonic_time(:millisecond) + timeout_ms
-
-    poll_loop(pid, deadline, poll_interval)
+    Polling.await(pid, timeout_ms, :last_result, &extract_meta/1)
   end
 
   @impl true
@@ -65,34 +63,6 @@ defmodule Jido.AI.CLI.Adapters.TRM do
 
     Module.create(module_name, contents, Macro.Env.location(__ENV__))
     module_name
-  end
-
-  defp poll_loop(pid, deadline, interval) do
-    now = System.monotonic_time(:millisecond)
-
-    if now >= deadline do
-      {:error, :timeout}
-    else
-      case Jido.AgentServer.status(pid) do
-        {:ok, status} ->
-          if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_result, "")
-                "" -> Map.get(status.raw_state, :last_result, "")
-                result -> result
-              end
-
-            {:ok, %{answer: answer, meta: extract_meta(status)}}
-          else
-            Process.sleep(interval)
-            poll_loop(pid, deadline, interval)
-          end
-
-        {:error, reason} ->
-          {:error, reason}
-      end
-    end
   end
 
   defp extract_meta(status) do

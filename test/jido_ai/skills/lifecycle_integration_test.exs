@@ -32,7 +32,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
   describe "Skill Mount/2 Initialization" do
     test "LLM skill mount/2 returns {:ok, state}" do
-      assert {:ok, state} = LLM.mount(%Agent{}, %{})
+      assert {:ok, state} = LLM.mount(%Agent{id: "test-agent"}, %{})
       assert is_map(state)
       assert state.default_model == :fast
       assert state.default_max_tokens == 1024
@@ -40,13 +40,13 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "LLM skill mount/2 applies config overrides" do
-      assert {:ok, state} = LLM.mount(%Agent{}, %{default_model: :capable, default_max_tokens: 2048})
+      assert {:ok, state} = LLM.mount(%Agent{id: "test-agent"}, %{default_model: :capable, default_max_tokens: 2048})
       assert state.default_model == :capable
       assert state.default_max_tokens == 2048
     end
 
     test "Reasoning skill mount/2 returns {:ok, state}" do
-      assert {:ok, state} = Reasoning.mount(%Agent{}, %{})
+      assert {:ok, state} = Reasoning.mount(%Agent{id: "test-agent"}, %{})
       assert is_map(state)
       assert state.default_model == :reasoning
       assert state.default_max_tokens == 2048
@@ -54,7 +54,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "Planning skill mount/2 returns {:ok, state}" do
-      assert {:ok, state} = Planning.mount(%Agent{}, %{})
+      assert {:ok, state} = Planning.mount(%Agent{id: "test-agent"}, %{})
       assert is_map(state)
       assert state.default_model == :planning
       assert state.default_max_tokens == 4096
@@ -62,7 +62,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "Streaming skill mount/2 returns {:ok, state}" do
-      assert {:ok, state} = Streaming.mount(%Agent{}, %{})
+      assert {:ok, state} = Streaming.mount(%Agent{id: "test-agent"}, %{})
       assert is_map(state)
       assert state.default_model == :fast
       assert state.default_max_tokens == 1024
@@ -71,7 +71,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "ToolCalling skill mount/2 returns {:ok, state}" do
-      assert {:ok, state} = ToolCalling.mount(%Agent{}, %{})
+      assert {:ok, state} = ToolCalling.mount(%Agent{id: "test-agent"}, %{})
       assert is_map(state)
       assert state.default_model == :capable
       assert state.auto_execute == false
@@ -315,8 +315,8 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
   describe "Skill State Isolation" do
     test "LLM and Reasoning skills have independent state" do
-      {:ok, llm_state} = LLM.mount(%Agent{}, %{default_model: :fast})
-      {:ok, reasoning_state} = Reasoning.mount(%Agent{}, %{default_model: :reasoning})
+      {:ok, llm_state} = LLM.mount(%Agent{id: "test-agent"}, %{default_model: :fast})
+      {:ok, reasoning_state} = Reasoning.mount(%Agent{id: "test-agent"}, %{default_model: :reasoning})
 
       assert llm_state.default_model == :fast
       assert reasoning_state.default_model == :reasoning
@@ -324,8 +324,8 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "Planning and ToolCalling skills have independent state" do
-      {:ok, planning_state} = Planning.mount(%Agent{}, %{})
-      {:ok, tool_calling_state} = ToolCalling.mount(%Agent{}, %{})
+      {:ok, planning_state} = Planning.mount(%Agent{id: "test-agent"}, %{})
+      {:ok, tool_calling_state} = ToolCalling.mount(%Agent{id: "test-agent"}, %{})
 
       assert planning_state.default_model == :planning
       assert tool_calling_state.default_model == :capable
@@ -334,7 +334,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "Streaming skill state has unique fields" do
-      {:ok, streaming_state} = Streaming.mount(%Agent{}, %{})
+      {:ok, streaming_state} = Streaming.mount(%Agent{id: "test-agent"}, %{})
 
       assert is_map(streaming_state.active_streams)
       assert Map.has_key?(streaming_state, :default_buffer_size)
@@ -430,7 +430,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
       for skill <- skills do
         assert function_exported?(skill, :mount, 2), "#{skill} must implement mount/2"
-        assert {:ok, _state} = skill.mount(%Agent{}, %{})
+        assert {:ok, _state} = skill.mount(%Agent{id: "test-agent"}, %{})
       end
     end
 

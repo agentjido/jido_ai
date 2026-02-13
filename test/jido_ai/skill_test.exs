@@ -2,7 +2,7 @@ defmodule Jido.AI.SkillTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Skill
-  alias Jido.AI.Skill.{Spec, Registry}
+  alias Jido.AI.Skill.{Registry, Spec}
 
   # Test module-based skill
   defmodule TestSkill do

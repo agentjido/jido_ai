@@ -25,7 +25,7 @@ defmodule Jido.AI.Plugins.PlanningTest do
 
   describe "mount/2" do
     test "initializes state with defaults" do
-      {:ok, state} = Planning.mount(%Jido.Agent{}, %{})
+      {:ok, state} = Planning.mount(%Jido.Agent{id: "test-agent"}, %{})
 
       assert state.default_model == :planning
       assert state.default_max_tokens == 4096
@@ -34,7 +34,7 @@ defmodule Jido.AI.Plugins.PlanningTest do
 
     test "merges custom config into initial state" do
       {:ok, state} =
-        Planning.mount(%Jido.Agent{}, %{default_model: :fast, default_max_tokens: 1024})
+        Planning.mount(%Jido.Agent{id: "test-agent"}, %{default_model: :fast, default_max_tokens: 1024})
 
       assert state.default_model == :fast
       assert state.default_max_tokens == 1024

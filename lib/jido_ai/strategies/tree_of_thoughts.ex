@@ -31,7 +31,7 @@ defmodule Jido.AI.Strategies.TreeOfThoughts do
 
   Configure via strategy options when defining your agent:
 
-      use Jido.Agent,
+      use Jido.AI.Agent,
         name: "my_tot_agent",
         strategy: {
           Jido.AI.Strategies.TreeOfThoughts,
