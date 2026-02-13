@@ -324,6 +324,7 @@ defmodule Jido.AI.Strategies.ReAct do
     state =
       machine
       |> Machine.to_map()
+      |> Map.put(:agent_id, Map.get(agent, :id))
       |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
     agent = StratState.put(agent, state)
@@ -386,7 +387,11 @@ defmodule Jido.AI.Strategies.ReAct do
         env = %{
           system_prompt: config[:system_prompt],
           max_iterations: config[:max_iterations],
-          request_policy: config[:request_policy]
+          request_policy: config[:request_policy],
+          telemetry_metadata: %{
+            agent_id: state[:agent_id] || Map.get(agent, :id),
+            thread_id: thread_id_from_state(state)
+          }
         }
 
         {machine, directives} = Machine.update(machine, msg, env)
@@ -397,6 +402,7 @@ defmodule Jido.AI.Strategies.ReAct do
         new_state =
           machine_state
           |> Map.put(:run_tool_context, state[:run_tool_context])
+          |> Map.put(:agent_id, state[:agent_id] || Map.get(agent, :id))
           |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
 
         # Clear run_tool_context on terminal states to prevent cross-request leakage
@@ -529,6 +535,8 @@ defmodule Jido.AI.Strategies.ReAct do
     # Run context overrides base context; neither is mutated
     run_tool_context = Map.get(state, :run_tool_context, %{})
     effective_tool_context = Map.merge(base_tool_context || %{}, run_tool_context)
+    agent_id = Map.get(state, :agent_id) || agent_id
+    thread_id = thread_id_from_state(state)
 
     Enum.flat_map(directives, fn
       {:call_llm_stream, id, conversation} ->
@@ -543,6 +551,7 @@ defmodule Jido.AI.Strategies.ReAct do
               run_id: state[:active_request_id],
               iteration: state[:iteration],
               agent_id: agent_id,
+              thread_id: thread_id,
               observability: observability
             }
           })
@@ -553,14 +562,18 @@ defmodule Jido.AI.Strategies.ReAct do
           {:ok, action_module} ->
             # Include call_id and iteration for telemetry correlation
             exec_context =
-              Map.merge(effective_tool_context, %{
+              effective_tool_context
+              |> Map.merge(%{
                 call_id: id,
                 iteration: state[:iteration],
                 request_id: state[:active_request_id],
                 run_id: state[:active_request_id],
                 agent_id: agent_id,
+                thread_id: thread_id,
                 observability: observability
               })
+              |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+              |> Map.new()
 
             [
               Directive.ToolExec.new!(%{
@@ -579,6 +592,7 @@ defmodule Jido.AI.Strategies.ReAct do
                   run_id: state[:active_request_id],
                   iteration: state[:iteration],
                   agent_id: agent_id,
+                  thread_id: thread_id,
                   observability: observability
                 }
               })
@@ -616,6 +630,13 @@ defmodule Jido.AI.Strategies.ReAct do
   defp convert_to_reqllm_context(conversation) do
     {:ok, context} = Context.normalize(conversation, validate: false)
     Context.to_list(context)
+  end
+
+  defp thread_id_from_state(state) when is_map(state) do
+    case Map.get(state, :thread) do
+      %{id: id} when is_binary(id) -> id
+      _ -> nil
+    end
   end
 
   defp build_config(agent, ctx) do

@@ -56,6 +56,7 @@ defmodule Jido.AI.Examples.WeatherAgent do
       redact_tool_args?: true,
       emit_llm_deltas?: true
     },
+    tags: ["example"],
     tools: [
       Jido.Tools.Weather,
       Jido.Tools.Weather.ByLocation,
