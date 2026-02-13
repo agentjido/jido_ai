@@ -28,8 +28,8 @@
 
 ## Phase 4
 - [x] Add ReAct request/llm/tool telemetry events
-- [x] Add shared observability helper module
-- [x] Add optional OpenTelemetry bridge
+- [x] Route ReAct emissions through upstream `Jido.Observe`
+- [x] Align optional OpenTelemetry path with `Jido.Observe.Tracer`
 - [x] Expand CLI trace handlers for ReAct observability events
 
 ## Phase 5

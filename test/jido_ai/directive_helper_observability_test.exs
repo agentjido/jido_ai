@@ -1,11 +1,10 @@
-defmodule Jido.AI.ObservabilityTest do
+defmodule Jido.AI.DirectiveHelperObservabilityTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Observability
-  alias Jido.AI.Observability.OTel
+  alias Jido.AI.Directive.Helper
 
   test "ensure_required_metadata fills required keys" do
-    metadata = Observability.ensure_required_metadata(%{request_id: "req_1", model: "test"})
+    metadata = Helper.ensure_required_metadata(%{request_id: "req_1", model: "test"})
 
     assert Map.has_key?(metadata, :agent_id)
     assert Map.has_key?(metadata, :request_id)
@@ -16,7 +15,7 @@ defmodule Jido.AI.ObservabilityTest do
   end
 
   test "ensure_required_measurements fills required keys" do
-    measurements = Observability.ensure_required_measurements(%{duration_ms: 10})
+    measurements = Helper.ensure_required_measurements(%{duration_ms: 10})
 
     assert measurements.duration_ms == 10
     assert measurements.input_tokens == 0
@@ -26,11 +25,12 @@ defmodule Jido.AI.ObservabilityTest do
     assert measurements.queue_ms == 0
   end
 
-  test "emit executes telemetry without crashing" do
+  test "emit_react_event executes telemetry without crashing" do
     ref = make_ref()
+    handler_id = "directive-helper-obs-test-#{inspect(ref)}"
 
     :telemetry.attach(
-      "obs-test-#{inspect(ref)}",
+      handler_id,
       [:jido, :ai, :react, :request, :start],
       fn event, measurements, metadata, _ ->
         send(self(), {:telemetry_seen, event, measurements, metadata})
@@ -39,7 +39,8 @@ defmodule Jido.AI.ObservabilityTest do
     )
 
     :ok =
-      Observability.emit(
+      Helper.emit_react_event(
+        %{emit_telemetry?: true},
         [:jido, :ai, :react, :request, :start],
         %{duration_ms: 1},
         %{request_id: "req_1", run_id: "req_1"}
@@ -48,11 +49,34 @@ defmodule Jido.AI.ObservabilityTest do
     assert_receive {:telemetry_seen, [:jido, :ai, :react, :request, :start], measurements, metadata}
     assert measurements.duration_ms == 1
     assert metadata.request_id == "req_1"
+    assert Map.has_key?(metadata, :agent_id)
 
-    :telemetry.detach("obs-test-#{inspect(ref)}")
+    :telemetry.detach(handler_id)
   end
 
-  test "otel bridge is safe no-op" do
-    assert :ok == OTel.handle_telemetry_event([:jido, :ai, :react, :request, :start], %{}, %{})
+  test "emit_react_event does not emit when disabled" do
+    ref = make_ref()
+    handler_id = "directive-helper-obs-disabled-test-#{inspect(ref)}"
+
+    :telemetry.attach(
+      handler_id,
+      [:jido, :ai, :react, :request, :start],
+      fn event, measurements, metadata, _ ->
+        send(self(), {:unexpected_telemetry, event, measurements, metadata})
+      end,
+      nil
+    )
+
+    :ok =
+      Helper.emit_react_event(
+        %{emit_telemetry?: false},
+        [:jido, :ai, :react, :request, :start],
+        %{duration_ms: 1},
+        %{request_id: "req_1", run_id: "req_1"}
+      )
+
+    refute_receive {:unexpected_telemetry, _, _, _}, 50
+
+    :telemetry.detach(handler_id)
   end
 end

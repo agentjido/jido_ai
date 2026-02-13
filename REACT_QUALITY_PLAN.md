@@ -28,9 +28,9 @@ This plan upgrades ReAct to a production-grade, decision-complete lifecycle with
    - `RequestCompleted` (`react.request.completed`)
    - `RequestFailed` (`react.request.failed`)
 4. `Jido.AI.Request` await normalization hardening for deterministic error returns.
-5. New observability helper modules:
-   - `lib/jido_ai/observability.ex`
-   - `lib/jido_ai/observability/otel.ex`
+5. Observability integration:
+   - Use upstream `Jido.Observe` for ReAct telemetry emission.
+   - Optional OpenTelemetry support is provided via upstream `Jido.Observe.Tracer`.
 
 ## Phased Implementation
 ### Phase 0: Tracking and Plan Artifacts

@@ -361,7 +361,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Observability, Signal}
+  alias Jido.AI.{Helpers, Signal}
+  alias Jido.Observe
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -420,6 +421,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       if parent_trace_ctx, do: Process.put({:jido, :trace_context}, parent_trace_ctx)
 
       started_at = System.monotonic_time(:millisecond)
+      span_ctx = Observe.start_span([:jido, :ai, :react, :llm, :span], event_meta)
 
       maybe_emit(obs_cfg, [:jido, :ai, :react, :llm, :start], %{duration_ms: 0, queue_ms: 0}, event_meta)
 
@@ -438,9 +440,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
       case result do
         {:ok, _} ->
+          Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
           maybe_emit(obs_cfg, [:jido, :ai, :react, :llm, :complete], %{duration_ms: duration_ms}, event_meta)
 
         {:error, reason} ->
+          Observe.finish_span_error(span_ctx, :error, reason, [])
+
           error_type =
             case reason do
               %{error_type: type} when is_atom(type) -> type
@@ -563,16 +568,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
-    if Map.get(obs_cfg, :emit_telemetry?, true) do
-      Observability.emit(event, measurements, metadata)
-    else
-      :ok
-    end
+    Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
   end
 
   defp maybe_emit_delta(obs_cfg, event, measurements, metadata) do
     if Map.get(obs_cfg, :emit_telemetry?, true) and Map.get(obs_cfg, :emit_llm_deltas?, true) do
-      Observability.emit(event, measurements, metadata)
+      Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
     else
       :ok
     end
@@ -589,7 +590,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
   Supports both single text and batch embedding (list of texts).
   """
 
-  alias Jido.AI.{Helpers, Observability, Signal}
+  alias Jido.AI.{Helpers, Signal}
 
   def exec(directive, _input_signal, state) do
     %{
@@ -671,8 +672,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   """
 
   alias Jido.AI.Executor
-  alias Jido.AI.Observability
   alias Jido.AI.Signal
+  alias Jido.Observe
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -721,6 +722,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
       }
 
       start_ms = System.monotonic_time(:millisecond)
+      span_ctx = Observe.start_span([:jido, :ai, :react, :tool, :span], event_meta)
 
       maybe_emit(
         obs_cfg,
@@ -748,6 +750,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
 
       case result do
         {:ok, _res} ->
+          Observe.finish_span(span_ctx, %{duration_ms: duration_ms, retry_count: retry_count})
+
           maybe_emit(
             obs_cfg,
             [:jido, :ai, :react, :tool, :complete],
@@ -756,6 +760,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           )
 
         {:error, %{type: :timeout} = error} ->
+          Observe.finish_span_error(span_ctx, :error, error, [])
+
           timeout_meta = Map.merge(event_meta, %{error_type: :timeout})
 
           maybe_emit(
@@ -772,9 +778,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
             Map.put(timeout_meta, :termination_reason, :error)
           )
 
-          _ = error
-
         {:error, %{type: type}} ->
+          Observe.finish_span_error(span_ctx, :error, %{type: type}, [])
+
           maybe_emit(
             obs_cfg,
             [:jido, :ai, :react, :tool, :error],
@@ -783,6 +789,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           )
 
         {:error, _other} ->
+          Observe.finish_span_error(span_ctx, :error, %{type: :executor}, [])
+
           maybe_emit(
             obs_cfg,
             [:jido, :ai, :react, :tool, :error],
@@ -969,11 +977,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
-    if Map.get(obs_cfg, :emit_telemetry?, true) do
-      Observability.emit(event, measurements, metadata)
-    else
-      :ok
-    end
+    Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
   end
 
   # Sends tool result signal, with fallback for signal construction failures
@@ -1107,7 +1111,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Observability, Signal}
+  alias Jido.AI.{Helpers, Signal}
+  alias Jido.Observe
 
   def exec(directive, _input_signal, state) do
     %{
@@ -1143,6 +1148,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
     Task.Supervisor.start_child(task_supervisor, fn ->
       started_at = System.monotonic_time(:millisecond)
+      span_ctx = Observe.start_span([:jido, :ai, :react, :llm, :span], event_meta)
 
       maybe_emit(obs_cfg, [:jido, :ai, :react, :llm, :start], %{duration_ms: 0, queue_ms: 0}, event_meta)
 
@@ -1173,9 +1179,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
       case result do
         {:ok, _} ->
+          Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
           maybe_emit(obs_cfg, [:jido, :ai, :react, :llm, :complete], %{duration_ms: duration_ms}, event_meta)
 
         {:error, reason} ->
+          Observe.finish_span_error(span_ctx, :error, reason, [])
+
           error_type =
             case reason do
               %{error_type: type} when is_atom(type) -> type
@@ -1262,11 +1271,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
-    if Map.get(obs_cfg, :emit_telemetry?, true) do
-      Observability.emit(event, measurements, metadata)
-    else
-      :ok
-    end
+    Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
   end
 end
 
@@ -1275,6 +1280,44 @@ defmodule Jido.AI.Directive.Helper do
   @moduledoc """
   Helper functions for DirectiveExec implementations.
   """
+
+  @required_metadata_keys [
+    :agent_id,
+    :request_id,
+    :run_id,
+    :iteration,
+    :llm_call_id,
+    :tool_call_id,
+    :tool_name,
+    :model,
+    :termination_reason,
+    :error_type
+  ]
+
+  @required_measurement_keys [
+    :duration_ms,
+    :input_tokens,
+    :output_tokens,
+    :total_tokens,
+    :retry_count,
+    :queue_ms
+  ]
+
+  @doc """
+  Emits a ReAct telemetry event through upstream `Jido.Observe` with normalized schema.
+  """
+  @spec emit_react_event(map(), [atom()], map(), map()) :: :ok
+  def emit_react_event(obs_cfg, event, measurements, metadata) do
+    if Map.get(obs_cfg, :emit_telemetry?, true) do
+      :telemetry.execute(
+        event,
+        ensure_required_measurements(measurements || %{}),
+        ensure_required_metadata(metadata || %{})
+      )
+    else
+      :ok
+    end
+  end
 
   @doc """
   Gets the task supervisor from agent state.
@@ -1325,5 +1368,19 @@ defmodule Jido.AI.Directive.Helper do
             supervisor
         end
     end
+  end
+
+  @spec ensure_required_metadata(map()) :: map()
+  def ensure_required_metadata(metadata) when is_map(metadata) do
+    Enum.reduce(@required_metadata_keys, metadata, fn key, acc ->
+      Map.put_new(acc, key, nil)
+    end)
+  end
+
+  @spec ensure_required_measurements(map()) :: map()
+  def ensure_required_measurements(measurements) when is_map(measurements) do
+    Enum.reduce(@required_measurement_keys, measurements, fn key, acc ->
+      Map.put_new(acc, key, 0)
+    end)
   end
 end

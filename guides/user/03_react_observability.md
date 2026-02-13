@@ -52,10 +52,11 @@ The trace output includes request lifecycle, LLM lifecycle, tool start/retry/tim
 )
 ```
 
-## 4. Optional OpenTelemetry Bridge
+## 4. Optional OpenTelemetry Integration
 
-`Jido.AI.Observability.OTel` is safe when OTel is unavailable. When OpenTelemetry is present,
-request-level spans and LLM/tool events are bridged from telemetry.
+ReAct now emits through upstream `Jido.Observe`. To enable tracing, configure
+`config :jido, :observability, tracer: ...` with a `Jido.Observe.Tracer`
+implementation (default is `Jido.Observe.NoopTracer`).
 
 ## 5. Request Lifecycle Guarantees
 

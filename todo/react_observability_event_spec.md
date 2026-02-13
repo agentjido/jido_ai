@@ -48,5 +48,6 @@
 
 ## Notes
 - Metadata and measurements are normalized to include required keys with defaults.
-- OpenTelemetry bridge is optional and must be a no-op when OTel libraries are unavailable.
+- ReAct event emission uses upstream `Jido.Observe` APIs.
+- OpenTelemetry integration should be provided through `Jido.Observe.Tracer` implementations.
 - Tool and LLM telemetry should include request/run correlation IDs whenever available.
