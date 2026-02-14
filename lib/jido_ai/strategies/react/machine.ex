@@ -54,6 +54,19 @@ defmodule Jido.AI.ReAct.Machine do
 
   # Telemetry event names
   @telemetry_prefix [:jido, :ai, :react]
+  @required_metadata_keys [
+    :agent_id,
+    :request_id,
+    :run_id,
+    :iteration,
+    :llm_call_id,
+    :tool_call_id,
+    :tool_name,
+    :model,
+    :termination_reason,
+    :error_type
+  ]
+  @required_measurement_keys [:duration_ms, :input_tokens, :output_tokens, :total_tokens, :retry_count, :queue_ms]
 
   @typedoc "Internal machine status (string) - required by Fsmx library"
   @type internal_status :: String.t()
@@ -61,7 +74,7 @@ defmodule Jido.AI.ReAct.Machine do
   @typedoc "External status (atom) - used in strategy state after to_map/1 conversion"
   @type external_status :: :idle | :awaiting_llm | :awaiting_tool | :completed | :error
 
-  @type termination_reason :: :final_answer | :max_iterations | :error | nil
+  @type termination_reason :: :final_answer | :max_iterations | :error | :cancelled | nil
 
   @type pending_tool_call :: %{
           id: String.t(),
@@ -84,8 +97,10 @@ defmodule Jido.AI.ReAct.Machine do
           thread: Thread.t() | nil,
           pending_tool_calls: [pending_tool_call()],
           result: term(),
+          active_request_id: String.t() | nil,
           current_llm_call_id: String.t() | nil,
           termination_reason: termination_reason(),
+          cancel_reason: atom() | nil,
           streaming_text: String.t(),
           streaming_thinking: String.t(),
           thinking_trace: [%{call_id: String.t(), iteration: non_neg_integer(), thinking: String.t()}],
@@ -98,8 +113,10 @@ defmodule Jido.AI.ReAct.Machine do
             thread: nil,
             pending_tool_calls: [],
             result: nil,
+            active_request_id: nil,
             current_llm_call_id: nil,
             termination_reason: nil,
+            cancel_reason: nil,
             streaming_text: "",
             streaming_thinking: "",
             thinking_trace: [],
@@ -107,14 +124,16 @@ defmodule Jido.AI.ReAct.Machine do
             started_at: nil
 
   @type msg ::
-          {:start, query :: String.t(), call_id :: String.t()}
+          {:start, query :: String.t(), request_id :: String.t()}
           | {:llm_result, call_id :: String.t(), result :: term()}
           | {:llm_partial, call_id :: String.t(), delta :: String.t(), chunk_type :: atom()}
           | {:tool_result, call_id :: String.t(), result :: term()}
+          | {:cancel, request_id :: String.t() | nil, reason :: atom()}
 
   @type directive ::
           {:call_llm_stream, id :: String.t(), context :: list()}
           | {:exec_tool, id :: String.t(), tool_name :: String.t(), arguments :: map()}
+          | {:request_error, request_id :: String.t(), reason :: atom(), message :: String.t()}
 
   @doc """
   Creates a new machine in the idle state.
@@ -145,20 +164,33 @@ defmodule Jido.AI.ReAct.Machine do
   @spec update(t(), msg(), map()) :: {t(), [directive()]}
   def update(machine, msg, env \\ %{})
 
-  def update(%__MODULE__{status: "idle"} = machine, {:start, query, call_id}, env) do
-    do_start_fresh(machine, query, call_id, env)
+  def update(%__MODULE__{status: "idle"} = machine, {:start, query, request_id}, env) do
+    do_start_fresh(machine, query, request_id, env)
   end
 
-  def update(%__MODULE__{status: status} = machine, {:start, query, call_id}, env)
+  def update(%__MODULE__{status: status} = machine, {:start, query, request_id}, env)
       when status in ["completed", "error"] do
     # Continue conversation - append new user message to existing history
-    do_start_continue(machine, query, call_id, env)
+    do_start_continue(machine, query, request_id, env)
   end
 
   # Issue #3 fix: Explicitly reject start requests when busy instead of silently dropping
-  def update(%__MODULE__{status: status} = machine, {:start, _query, call_id}, _env)
+  def update(%__MODULE__{status: status} = machine, {:start, _query, request_id}, env)
       when status in ["awaiting_llm", "awaiting_tool"] do
-    {machine, [{:request_error, call_id, :busy, "Agent is busy (status: #{status})"}]}
+    case Map.get(env, :request_policy, :reject) do
+      :reject ->
+        emit_request_event(:rejected, %{duration_ms: 0}, %{
+          request_id: request_id,
+          run_id: request_id,
+          termination_reason: :busy,
+          error_type: :busy
+        })
+
+        {machine, [{:request_error, request_id, :busy, "Agent is busy (status: #{status})"}]}
+
+      _ ->
+        {machine, [{:request_error, request_id, :busy, "Agent is busy (status: #{status})"}]}
+    end
   end
 
   def update(%__MODULE__{status: "awaiting_llm"} = machine, {:llm_result, call_id, result}, env) do
@@ -203,28 +235,54 @@ defmodule Jido.AI.ReAct.Machine do
     end
   end
 
+  def update(%__MODULE__{status: status} = machine, {:cancel, request_id, reason}, _env)
+      when status in ["awaiting_llm", "awaiting_tool"] do
+    if is_nil(request_id) or request_id == machine.active_request_id do
+      duration_ms = calculate_duration(machine)
+
+      emit_request_event(:cancelled, %{duration_ms: duration_ms}, %{
+        request_id: machine.active_request_id,
+        run_id: machine.active_request_id,
+        termination_reason: :cancelled,
+        error_type: reason
+      })
+
+      with_transition(machine, "error", fn m ->
+        m =
+          m
+          |> Map.put(:termination_reason, :cancelled)
+          |> Map.put(:cancel_reason, reason)
+          |> Map.put(:result, "Request cancelled (reason: #{inspect(reason)})")
+
+        {m, []}
+      end)
+    else
+      {machine, []}
+    end
+  end
+
   def update(machine, _msg, _env) do
     {machine, []}
   end
 
   # Fresh start - create new thread with system prompt
-  defp do_start_fresh(machine, query, call_id, env) do
+  defp do_start_fresh(machine, query, request_id, env) do
     system_prompt = Map.fetch!(env, :system_prompt)
 
     thread =
       Thread.new(system_prompt: system_prompt)
       |> Thread.append_user(query)
 
-    do_start_with_thread(machine, thread, call_id, env)
+    do_start_with_thread(machine, thread, request_id, env)
   end
 
   # Continue existing conversation - append user message to existing thread
-  defp do_start_continue(machine, query, call_id, env) do
+  defp do_start_continue(machine, query, request_id, env) do
     thread = Thread.append_user(machine.thread, query)
-    do_start_with_thread(machine, thread, call_id, env)
+    do_start_with_thread(machine, thread, request_id, env)
   end
 
-  defp do_start_with_thread(machine, thread, call_id, env) do
+  defp do_start_with_thread(machine, thread, request_id, env) do
     started_at = System.monotonic_time(:millisecond)
 
     # Get the last entry (user message) for telemetry
@@ -236,12 +294,19 @@ defmodule Jido.AI.ReAct.Machine do
       :start,
       %{system_time: System.system_time()},
       %{
-        call_id: call_id,
+        call_id: request_id,
         query_length: query_length,
         thread_id: thread.id
       },
       env
     )
+
+    emit_request_event(:start, %{duration_ms: 0}, %{
+      request_id: request_id,
+      run_id: request_id,
+      termination_reason: nil,
+      error_type: nil
+    })
 
     with_transition(machine, "awaiting_llm", fn machine ->
       machine =
@@ -250,8 +315,10 @@ defmodule Jido.AI.ReAct.Machine do
         |> Map.put(:thread, thread)
         |> Map.put(:pending_tool_calls, [])
         |> Map.put(:result, nil)
+        |> Map.put(:active_request_id, request_id)
         |> Map.put(:termination_reason, nil)
-        |> Map.put(:current_llm_call_id, call_id)
+        |> Map.put(:cancel_reason, nil)
+        |> Map.put(:current_llm_call_id, request_id)
         |> Map.put(:streaming_text, "")
         |> Map.put(:streaming_thinking, "")
         |> Map.put(:thinking_trace, [])
@@ -260,7 +327,7 @@ defmodule Jido.AI.ReAct.Machine do
 
       # Project thread to messages for LLM call
       messages = Thread.to_messages(thread)
-      {machine, [{:call_llm_stream, call_id, messages}]}
+      {machine, [{:call_llm_stream, request_id, messages}]}
     end)
   end
 
@@ -280,6 +347,13 @@ defmodule Jido.AI.ReAct.Machine do
       env
     )
 
+    emit_request_event(:complete, %{duration_ms: duration_ms}, %{
+      request_id: machine.active_request_id,
+      run_id: machine.active_request_id,
+      termination_reason: :max_iterations,
+      error_type: nil
+    })
+
     with_transition(machine, "completed", fn m ->
       m =
         Map.merge(m, %{
@@ -292,7 +366,7 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp handle_iteration_check(machine, _max_iterations, env) do
-    new_call_id = generate_call_id()
+    new_call_id = generate_call_id(machine.active_request_id)
 
     machine = capture_thinking_to_trace(machine)
 
@@ -370,8 +444,10 @@ defmodule Jido.AI.ReAct.Machine do
       thread: restore_thread(map),
       pending_tool_calls: Map.get(map, :pending_tool_calls, []),
       result: Map.get(map, :result),
+      active_request_id: Map.get(map, :active_request_id),
       current_llm_call_id: Map.get(map, :current_llm_call_id),
       termination_reason: Map.get(map, :termination_reason),
+      cancel_reason: Map.get(map, :cancel_reason),
       streaming_text: Map.get(map, :streaming_text, ""),
       streaming_thinking: Map.get(map, :streaming_thinking, ""),
       thinking_trace: Map.get(map, :thinking_trace, []),
@@ -445,6 +521,13 @@ defmodule Jido.AI.ReAct.Machine do
       },
       env
     )
+
+    emit_request_event(:failed, %{duration_ms: duration_ms}, %{
+      request_id: machine.active_request_id,
+      run_id: machine.active_request_id,
+      termination_reason: :error,
+      error_type: :llm_error
+    })
 
     with_transition(machine, "error", fn machine ->
       machine =
@@ -559,6 +642,13 @@ defmodule Jido.AI.ReAct.Machine do
       env
     )
 
+    emit_request_event(:complete, %{duration_ms: duration_ms}, %{
+      request_id: machine.active_request_id,
+      run_id: machine.active_request_id,
+      termination_reason: :final_answer,
+      error_type: nil
+    })
+
     with_transition(machine, "completed", fn machine ->
       thinking_opts = thinking_opts(machine)
       thread = Thread.append_assistant(machine.thread, answer, nil, thinking_opts)
@@ -613,6 +703,15 @@ defmodule Jido.AI.ReAct.Machine do
     "call_#{Jido.Util.generate_id()}"
   end
 
+  @spec generate_call_id(String.t() | nil) :: String.t()
+  def generate_call_id(request_id) when is_binary(request_id) do
+    "call_#{request_id}_#{Jido.Util.generate_id()}"
+  end
+
+  def generate_call_id(nil) do
+    generate_call_id()
+  end
+
   @doc """
   Returns the thread from the machine, if any.
   """
@@ -646,6 +745,14 @@ defmodule Jido.AI.ReAct.Machine do
     :telemetry.execute(@telemetry_prefix ++ [event], measurements, merged_metadata)
   end
 
+  defp emit_request_event(event, measurements, metadata) do
+    :telemetry.execute(
+      [:jido, :ai, :react, :request, event],
+      ensure_required_measurements(measurements),
+      ensure_required_metadata(metadata)
+    )
+  end
+
   defp thread_id(%{thread: %{id: id}}) when is_binary(id), do: id
   defp thread_id(_), do: nil
 
@@ -653,5 +760,17 @@ defmodule Jido.AI.ReAct.Machine do
 
   defp calculate_duration(%{started_at: started_at}) do
     System.monotonic_time(:millisecond) - started_at
+  end
+
+  defp ensure_required_metadata(metadata) when is_map(metadata) do
+    Enum.reduce(@required_metadata_keys, metadata, fn key, acc ->
+      Map.put_new(acc, key, nil)
+    end)
+  end
+
+  defp ensure_required_measurements(measurements) when is_map(measurements) do
+    Enum.reduce(@required_measurement_keys, measurements, fn key, acc ->
+      Map.put_new(acc, key, 0)
+    end)
   end
 end

@@ -24,6 +24,11 @@ defmodule Jido.AI.ReActAgent do
   - `:system_prompt` - Custom system prompt for the LLM
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
+  - `:request_policy` - Request concurrency policy (default: `:reject`)
+  - `:tool_timeout_ms` - Per-attempt tool execution timeout in ms (default: 15_000)
+  - `:tool_max_retries` - Number of retries for tool failures (default: 1)
+  - `:tool_retry_backoff_ms` - Retry backoff in ms (default: 200)
+  - `:observability` - Observability options map
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`)
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
@@ -171,6 +176,11 @@ defmodule Jido.AI.ReActAgent do
     system_prompt = Keyword.get(opts, :system_prompt)
     model = Keyword.get(opts, :model, @default_model)
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
+    request_policy = Keyword.get(opts, :request_policy, :reject)
+    tool_timeout_ms = Keyword.get(opts, :tool_timeout_ms, 15_000)
+    tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
+    tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
+    observability = Keyword.get(opts, :observability, %{})
     # Don't extract tool_context here - it contains AST with module aliases
     # that need to be evaluated in the calling module's context
     plugins = Keyword.get(opts, :plugins, [])
@@ -202,7 +212,17 @@ defmodule Jido.AI.ReActAgent do
       end
 
     strategy_opts =
-      [tools: tools, model: model, max_iterations: max_iterations, tool_context: tool_context]
+      [
+        tools: tools,
+        model: model,
+        max_iterations: max_iterations,
+        request_policy: request_policy,
+        tool_timeout_ms: tool_timeout_ms,
+        tool_max_retries: tool_max_retries,
+        tool_retry_backoff_ms: tool_retry_backoff_ms,
+        observability: observability,
+        tool_context: tool_context
+      ]
       |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
 
     # Build base_schema AST at macro expansion time
@@ -233,7 +253,7 @@ defmodule Jido.AI.ReActAgent do
 
       import Jido.AI.ReActAgent, only: [tools_from_skills: 1]
 
-      alias Jido.AI.Request
+      alias Jido.AI.{Request, Signal}
 
       @doc """
       Send a query to the agent asynchronously.
@@ -326,7 +346,25 @@ defmodule Jido.AI.ReActAgent do
 
         # Use RequestTracking to manage state
         agent = Request.start_request(agent, request_id, query)
+        emit_request_started_signal(agent, request_id, query)
 
+        {:ok, agent, action}
+      end
+
+      @impl true
+      def on_before_cmd(
+            agent,
+            {:react_request_error, %{call_id: request_id, reason: reason, message: message}} = action
+          ) do
+        agent = Request.fail_request(agent, request_id, {:rejected, reason, message})
+        emit_request_failed_signal(agent, request_id, {:rejected, reason, message})
+        {:ok, agent, action}
+      end
+
+      @impl true
+      def on_before_cmd(agent, {:react_cancel, params}) do
+        request_id = params[:request_id] || agent.state[:last_request_id]
+        action = {:react_cancel, Map.put(params, :request_id, request_id)}
         {:ok, agent, action}
       end
 
@@ -339,11 +377,44 @@ defmodule Jido.AI.ReActAgent do
 
         agent =
           if snap.done? do
-            Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
+            case snap.status do
+              :success ->
+                agent = Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
+                emit_request_completed_signal(agent, request_id, snap.result)
+                agent
+
+              :failure ->
+                reason = failure_reason(snap)
+                agent = Request.fail_request(agent, request_id, reason)
+                emit_request_failed_signal(agent, request_id, reason)
+                agent
+
+              _ ->
+                agent
+            end
           else
             agent
           end
 
+        {:ok, agent, directives}
+      end
+
+      @impl true
+      def on_after_cmd(agent, {:react_cancel, %{request_id: request_id, reason: reason}}, directives) do
+        agent =
+          if is_binary(request_id) do
+            failure = {:cancelled, reason}
+            emit_request_failed_signal(agent, request_id, failure)
+            Request.fail_request(agent, request_id, failure)
+          else
+            agent
+          end
+
+        {:ok, agent, directives}
+      end
+
+      @impl true
+      def on_after_cmd(agent, {:react_request_error, _params}, directives) do
         {:ok, agent, directives}
       end
 
@@ -363,8 +434,25 @@ defmodule Jido.AI.ReActAgent do
             }
 
             case agent.state[:last_request_id] do
-              nil -> agent
-              request_id -> Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
+              nil ->
+                agent
+
+              request_id ->
+                case snap.status do
+                  :success ->
+                    agent = Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
+                    emit_request_completed_signal(agent, request_id, snap.result)
+                    agent
+
+                  :failure ->
+                    reason = failure_reason(snap)
+                    agent = Request.fail_request(agent, request_id, reason)
+                    emit_request_failed_signal(agent, request_id, reason)
+                    agent
+
+                  _ ->
+                    agent
+                end
             end
           else
             agent
@@ -374,7 +462,7 @@ defmodule Jido.AI.ReActAgent do
       end
 
       defp thinking_meta(snap) do
-        details = snap.details || %{}
+        details = snap.details
         meta = %{}
 
         meta =
@@ -388,6 +476,70 @@ defmodule Jido.AI.ReActAgent do
             else: meta
 
         meta
+      end
+
+      defp failure_reason(snap) do
+        details = snap.details
+
+        case details[:termination_reason] do
+          :cancelled ->
+            {:cancelled, details[:cancel_reason] || :cancelled}
+
+          reason when not is_nil(reason) ->
+            {:failed, reason, snap.result}
+
+          _ ->
+            {:failed, :unknown, snap.result}
+        end
+      end
+
+      defp emit_request_started_signal(agent, request_id, query) do
+        if lifecycle_signals_enabled?(agent) do
+          signal =
+            Signal.RequestStarted.new!(%{
+              request_id: request_id,
+              query: query,
+              run_id: request_id
+            })
+
+          Jido.AgentServer.cast(self(), signal)
+        end
+      rescue
+        _ -> :ok
+      end
+
+      defp emit_request_completed_signal(agent, request_id, result) do
+        if lifecycle_signals_enabled?(agent) do
+          signal =
+            Signal.RequestCompleted.new!(%{
+              request_id: request_id,
+              result: result,
+              run_id: request_id
+            })
+
+          Jido.AgentServer.cast(self(), signal)
+        end
+      rescue
+        _ -> :ok
+      end
+
+      defp emit_request_failed_signal(agent, request_id, error) do
+        if lifecycle_signals_enabled?(agent) do
+          signal =
+            Signal.RequestFailed.new!(%{
+              request_id: request_id,
+              error: error,
+              run_id: request_id
+            })
+
+          Jido.AgentServer.cast(self(), signal)
+        end
+      rescue
+        _ -> :ok
+      end
+
+      defp lifecycle_signals_enabled?(agent) do
+        get_in(agent.state, [:__strategy__, :config, :observability, :emit_lifecycle_signals?]) != false
       end
 
       @doc """
@@ -408,7 +560,17 @@ defmodule Jido.AI.ReActAgent do
       """
       @spec cancel(pid() | atom() | {:via, module(), term()}, keyword()) :: :ok | {:error, term()}
       def cancel(pid, opts \\ []) do
-        Jido.cancel(pid, opts)
+        reason = Keyword.get(opts, :reason, :user_cancelled)
+        request_id = Keyword.get(opts, :request_id)
+
+        payload =
+          %{reason: reason}
+          |> then(fn p ->
+            if is_binary(request_id), do: Map.put(p, :request_id, request_id), else: p
+          end)
+
+        signal = Jido.Signal.new!("react.cancel", payload, source: "/react/agent")
+        Jido.AgentServer.cast(pid, signal)
       end
 
       defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3, cancel: 2
