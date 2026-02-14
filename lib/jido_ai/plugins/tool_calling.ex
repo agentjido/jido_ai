@@ -78,7 +78,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
   and `Jido.AI.Executor` for execution.
 
   **Tool Format**: Tools are converted to ReqLLM format via
-  `Registry.to_reqllm_tools/0`.
+  `Jido.AI.ToolAdapter.from_actions/1`.
   """
 
   use Jido.Plugin,

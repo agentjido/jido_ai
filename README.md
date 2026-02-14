@@ -15,8 +15,8 @@ defmodule MyApp.Agent do
     model: :fast
 end
 
-{:ok, agent} = MyApp.Agent.start_link()
-{:ok, response} = MyApp.Agent.chat(agent, "What is 15 * 23?")
+{:ok, pid} = Jido.AgentServer.start(agent: MyApp.Agent)
+{:ok, response} = MyApp.Agent.ask_sync(pid, "What is 15 * 23?")
 ```
 
 ## Installation
@@ -71,11 +71,15 @@ defmodule MyApp.Agent do
     model: :fast
 end
 
-# Chain-of-Thought for step-by-step reasoning
-{:ok, result} = Jido.AI.Strategies.ChainOfThought.run(
-  "If 3 cats catch 3 mice in 3 minutes, how many cats are needed to catch 100 mice in 100 minutes?",
-  model: :fast
-)
+# Chain-of-Thought agent for step-by-step reasoning
+defmodule MyApp.Reasoner do
+  use Jido.AI.CoTAgent,
+    name: "reasoner",
+    model: :fast
+end
+
+{:ok, pid} = Jido.AgentServer.start(agent: MyApp.Reasoner)
+{:ok, result} = MyApp.Reasoner.think_sync(pid, "Solve: 3 cats catch 3 mice in 3 minutes...")
 ```
 
 ---
@@ -97,8 +101,17 @@ end
 - [Configuration](guides/developer/08_configuration.md) - Model aliases and providers
 
 ### Examples
-See the [`examples/`](examples/) directory for runnable code:
-- [`examples/strategies/`](examples/strategies/) - Reasoning strategy examples
+- [`examples/strategies/react_agent.md`](examples/strategies/react_agent.md) - ReAct strategy example
+- [`examples/strategies/chain_of_thought.md`](examples/strategies/chain_of_thought.md) - Chain-of-Thought example
+- [`examples/strategies/tree_of_thoughts.md`](examples/strategies/tree_of_thoughts.md) - Tree-of-Thoughts example
+- [`examples/strategies/adaptive_strategy.md`](examples/strategies/adaptive_strategy.md) - Adaptive strategy example
+
+## ReAct Production Defaults
+
+Use these references as the production baseline for ReAct:
+- [`lib/jido_ai/agents/examples/weather_agent.ex`](lib/jido_ai/agents/examples/weather_agent.ex)
+- [`examples/strategies/react_agent.md`](examples/strategies/react_agent.md)
+- [`guides/user/03_react_observability.md`](guides/user/03_react_observability.md)
 
 ## Quick Decision Guide
 
@@ -120,7 +133,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## License
 
-Apache-2.0 - See [LICENSE](LICENSE) for details.
+Apache-2.0 - See [LICENSE.md](LICENSE.md) for details.
 
 ---
 

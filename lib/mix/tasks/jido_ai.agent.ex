@@ -388,7 +388,21 @@ defmodule Mix.Tasks.JidoAi.Agent do
     [:jido, :agent, :strategy, :cmd, :stop],
     [:jido, :agent, :strategy, :cmd, :exception],
     [:jido, :agent, :strategy, :tick, :start],
-    [:jido, :agent, :strategy, :tick, :stop]
+    [:jido, :agent, :strategy, :tick, :stop],
+    [:jido, :ai, :react, :request, :start],
+    [:jido, :ai, :react, :request, :complete],
+    [:jido, :ai, :react, :request, :failed],
+    [:jido, :ai, :react, :request, :rejected],
+    [:jido, :ai, :react, :request, :cancelled],
+    [:jido, :ai, :react, :llm, :start],
+    [:jido, :ai, :react, :llm, :delta],
+    [:jido, :ai, :react, :llm, :complete],
+    [:jido, :ai, :react, :llm, :error],
+    [:jido, :ai, :react, :tool, :start],
+    [:jido, :ai, :react, :tool, :retry],
+    [:jido, :ai, :react, :tool, :complete],
+    [:jido, :ai, :react, :tool, :error],
+    [:jido, :ai, :react, :tool, :timeout]
   ]
 
   @colors %{
@@ -502,6 +516,40 @@ defmodule Mix.Tasks.JidoAi.Agent do
   defp handle_trace_event([:jido, :agent, :strategy, :tick, :stop], measurements, _metadata, _c) do
     duration_ms = div(measurements[:duration] || 0, 1_000_000)
     IO.puts("  #{@colors.blue}⟲ Strategy TICK#{@colors.reset} #{@colors.dim}(#{duration_ms}ms)#{@colors.reset}")
+  end
+
+  defp handle_trace_event([:jido, :ai, :react, :request, event], measurements, metadata, _config)
+       when event in [:start, :complete, :failed, :rejected, :cancelled] do
+    req = metadata[:request_id] || "?"
+    duration = measurements[:duration_ms] || 0
+    reason = metadata[:termination_reason] || metadata[:error_type]
+
+    IO.puts(
+      "  #{@colors.blue}REQ #{String.upcase(to_string(event))}#{@colors.reset} id=#{req} #{@colors.dim}(#{duration}ms#{if(reason, do: ", #{reason}", else: "")})#{@colors.reset}"
+    )
+  end
+
+  defp handle_trace_event([:jido, :ai, :react, :llm, event], measurements, metadata, _config)
+       when event in [:start, :delta, :complete, :error] do
+    call_id = metadata[:llm_call_id] || "?"
+    model = metadata[:model] || "?"
+    duration = measurements[:duration_ms] || 0
+
+    IO.puts(
+      "    #{@colors.cyan}LLM #{String.upcase(to_string(event))}#{@colors.reset} call=#{call_id} model=#{model} #{@colors.dim}(#{duration}ms)#{@colors.reset}"
+    )
+  end
+
+  defp handle_trace_event([:jido, :ai, :react, :tool, event], measurements, metadata, _config)
+       when event in [:start, :retry, :complete, :error, :timeout] do
+    tool = metadata[:tool_name] || "?"
+    call_id = metadata[:tool_call_id] || "?"
+    duration = measurements[:duration_ms] || 0
+    retries = measurements[:retry_count] || 0
+
+    IO.puts(
+      "    #{@colors.yellow}TOOL #{String.upcase(to_string(event))}#{@colors.reset} #{tool} call=#{call_id} #{@colors.dim}(#{duration}ms, retries=#{retries})#{@colors.reset}"
+    )
   end
 
   defp handle_trace_event(_event, _measurements, _metadata, _config) do

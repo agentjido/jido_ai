@@ -118,15 +118,16 @@ graph TB
 
 ### 1. Facade Layer (`Jido.AI`)
 
-The main entry point for AI interactions. Provides simple functions for text generation and structured output.
+The facade currently focuses on model alias resolution and runtime tool management.
 
 ```elixir
-# Generate text
-{:ok, response} = Jido.AI.generate_text("anthropic:claude-haiku-4-5", "Hello!")
+# Resolve model aliases
+Jido.AI.resolve_model(:fast)
 
-# Generate structured output
-schema = Zoi.object(%{name: Zoi.string(), age: Zoi.integer()})
-{:ok, person} = Jido.AI.generate_object("openai:gpt-4", "Generate a person", schema)
+# Runtime tool management for ReAct agents
+{:ok, _agent} = Jido.AI.register_tool(agent_pid, MyApp.Tools.Calculator)
+{:ok, _agent} = Jido.AI.unregister_tool(agent_pid, "calculator")
+{:ok, tools} = Jido.AI.list_tools(agent_pid)
 ```
 
 ### 2. Strategy Layer (`Jido.AI.Strategies.*`)

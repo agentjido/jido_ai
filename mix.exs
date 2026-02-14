@@ -62,7 +62,8 @@ defmodule JidoAi.MixProject do
       # Jido ecosystem
       {:jido, "~> 2.0.0-rc.4"},
       {:req_llm, "~> 1.5"},
-      {:jido_browser, github: "agentjido/jido_browser", branch: "main"},
+      # Example-only browser tools (kept out of Hex runtime dependency graph)
+      {:jido_browser, github: "agentjido/jido_browser", branch: "main", only: [:dev, :test], runtime: false},
 
       # Runtime
       {:fsmx, "~> 0.5"},
@@ -102,7 +103,7 @@ defmodule JidoAi.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE", "CHANGELOG.md", "usage-rules.md", "guides", "examples"],
+      files: ["lib", "mix.exs", "README.md", "LICENSE.md", "CHANGELOG.md", "usage-rules.md", "guides", "examples"],
       maintainers: ["Mike Hostetler <mike.hostetler@gmail.com>", "Pascal Charbon <pcharbon70@gmail.com>"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -121,6 +122,7 @@ defmodule JidoAi.MixProject do
       source_ref: "v#{@version}",
       extras: [
         "README.md",
+        "LICENSE.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
         # Developer Guides
@@ -135,6 +137,7 @@ defmodule JidoAi.MixProject do
         # User Guides
         "guides/user/01_overview.md",
         "guides/user/02_strategies.md",
+        "guides/user/03_react_observability.md",
         # Examples
         "examples/strategies/adaptive_strategy.md",
         "examples/strategies/chain_of_thought.md",

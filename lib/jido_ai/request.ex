@@ -507,7 +507,15 @@ defmodule Jido.AI.Request do
     {:ok, result}
   end
 
-  defp normalize_await_result({:ok, %{status: :failed, result: error}}) do
+  defp normalize_await_result({:ok, %{status: :failed} = payload}) do
+    {:error, payload[:error] || payload[:result] || :failed}
+  end
+
+  defp normalize_await_result({:ok, %{status: :timeout}}) do
+    {:error, :timeout}
+  end
+
+  defp normalize_await_result({:ok, %{error: error}}) when not is_nil(error) do
     {:error, error}
   end
 
