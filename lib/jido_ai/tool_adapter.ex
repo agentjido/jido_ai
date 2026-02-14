@@ -50,6 +50,8 @@ defmodule Jido.AI.ToolAdapter do
 
     * `:prefix` - String prefix to add to all tool names (e.g., `"myapp_"`)
     * `:filter` - Function `(module -> boolean)` to filter which actions to include
+    * `:strict` - Whether to enable strict mode on the tools. When not set,
+      auto-detects based on each action's `strict?/0` callback (defaults to `false`).
 
   ## Returns
 
@@ -75,11 +77,20 @@ defmodule Jido.AI.ToolAdapter do
   def from_actions(action_modules, opts) when is_list(action_modules) do
     prefix = Keyword.get(opts, :prefix)
     filter_fn = Keyword.get(opts, :filter)
+    explicit_strict = Keyword.fetch(opts, :strict)
 
     tools =
       action_modules
       |> maybe_filter(filter_fn)
-      |> Enum.map(fn module -> from_action(module, prefix: prefix) end)
+      |> Enum.map(fn module ->
+        strict =
+          case explicit_strict do
+            {:ok, val} -> val
+            :error -> infer_strict?(module)
+          end
+
+        from_action(module, prefix: prefix, strict: strict)
+      end)
 
     # Check for duplicate tool names
     names = Enum.map(tools, & &1.name)
@@ -105,6 +116,8 @@ defmodule Jido.AI.ToolAdapter do
   ## Options
 
     * `:prefix` - String prefix to add to the tool name (e.g., `"myapp_"`)
+    * `:strict` - Whether to enable strict mode on the tool. When not set,
+      auto-detects based on the action's `strict?/0` callback (defaults to `false`).
 
   ## Returns
 
@@ -121,11 +134,15 @@ defmodule Jido.AI.ToolAdapter do
   def from_action(action_module, opts) when is_atom(action_module) do
     prefix = Keyword.get(opts, :prefix)
 
+    strict =
+      Keyword.get_lazy(opts, :strict, fn -> infer_strict?(action_module) end)
+
     ReqLLM.Tool.new!(
       name: apply_prefix(action_module.name(), prefix),
       description: action_module.description(),
       parameter_schema: build_json_schema(action_module.schema()),
-      callback: &noop_callback/1
+      callback: &noop_callback/1,
+      strict: strict
     )
   end
 
@@ -211,8 +228,62 @@ defmodule Jido.AI.ToolAdapter do
         %{"type" => "object", "properties" => %{}, "required" => []}
 
       json_schema ->
-        json_schema
+        disallow_additional_properties(json_schema)
     end
+  end
+
+  # Recursively sets additionalProperties: false on all object types in the
+  # JSON schema. This is required for OpenAI/Anthropic strict mode tool calling.
+  #
+  # Jido.Action.Schema.to_json_schema/1 does not set this field, so the adapter
+  # must add it before passing schemas to ReqLLM.
+  #
+  # Handles both atom keys (defensive, for Zoi-generated schemas) and string
+  # keys (the standard output from NimbleOptions-based schemas).
+  defp disallow_additional_properties(%{type: :object} = schema) do
+    schema
+    |> Map.put(:additionalProperties, false)
+    |> update_nested_properties(&disallow_additional_properties/1)
+  end
+
+  defp disallow_additional_properties(%{"type" => "object"} = schema) do
+    schema
+    |> Map.put("additionalProperties", false)
+    |> update_nested_properties(&disallow_additional_properties/1)
+  end
+
+  defp disallow_additional_properties(schema) when is_map(schema) do
+    update_nested_properties(schema, &disallow_additional_properties/1)
+  end
+
+  defp disallow_additional_properties(schema), do: schema
+
+  defp update_nested_properties(schema, fun) do
+    schema
+    |> maybe_update_key(:properties, fn props ->
+      Map.new(props, fn {k, v} -> {k, fun.(v)} end)
+    end)
+    |> maybe_update_key("properties", fn props ->
+      Map.new(props, fn {k, v} -> {k, fun.(v)} end)
+    end)
+    |> maybe_update_key(:items, fun)
+    |> maybe_update_key("items", fun)
+  end
+
+  defp maybe_update_key(map, key, fun) do
+    case Map.fetch(map, key) do
+      {:ok, value} when is_map(value) -> Map.put(map, key, fun.(value))
+      _ -> map
+    end
+  end
+
+  # Infers whether an action should use strict mode for LLM tool calling.
+  #
+  # Checks for a `strict?/0` callback on the action module, defaulting to false.
+  # This callback is not part of the Jido.Action behaviour; it is detected via
+  # `function_exported?/3` to keep this adapter decoupled from the action library.
+  defp infer_strict?(module) do
+    if function_exported?(module, :strict?, 0), do: module.strict?(), else: false
   end
 
   defp noop_callback(_args), do: {:ok, %{}}

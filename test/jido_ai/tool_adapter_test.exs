@@ -22,6 +22,30 @@ defmodule Jido.AI.ToolAdapterTest do
       ]
   end
 
+  # Test action with explicit strict?/0 callback
+  defmodule StrictAction do
+    use Jido.Action,
+      name: "strict_action",
+      description: "An action that explicitly opts into strict mode",
+      schema: [
+        value: [type: :string, required: true, doc: "A value"]
+      ]
+
+    def strict?, do: true
+  end
+
+  # Test action with nested object schema
+  defmodule NestedSchemaAction do
+    use Jido.Action,
+      name: "nested_action",
+      description: "An action with nested objects",
+      schema: [
+        name: [type: :string, required: true, doc: "Name"],
+        config: [type: :map, required: true, doc: "Configuration object"],
+        items: [type: {:list, :map}, required: true, doc: "List of objects"]
+      ]
+  end
+
   describe "from_action/2" do
     test "converts action to ReqLLM.Tool struct" do
       tool = ToolAdapter.from_action(ParamAction)
@@ -38,13 +62,53 @@ defmodule Jido.AI.ToolAdapterTest do
       assert tool.name == "myapp_param_action"
     end
 
+    test "auto-detects strict: true via strict?/0 callback" do
+      tool = ToolAdapter.from_action(StrictAction)
+
+      assert tool.strict == true
+    end
+
+    test "defaults to strict: false without strict?/0 callback" do
+      tool = ToolAdapter.from_action(ParamAction)
+
+      assert tool.strict == false
+    end
+
+    test "respects explicit strict: true override" do
+      tool = ToolAdapter.from_action(ParamAction, strict: true)
+
+      assert tool.strict == true
+    end
+
+    test "respects explicit strict: false override" do
+      tool = ToolAdapter.from_action(StrictAction, strict: false)
+
+      assert tool.strict == false
+    end
+
+    test "sets additionalProperties: false on nested object types" do
+      tool = ToolAdapter.from_action(NestedSchemaAction)
+
+      schema = tool.parameter_schema
+
+      # Top-level object
+      assert schema["additionalProperties"] == false
+
+      # Nested map property
+      assert schema["properties"]["config"]["additionalProperties"] == false
+
+      # Nested objects inside array items
+      assert schema["properties"]["items"]["items"]["additionalProperties"] == false
+    end
+
     test "handles empty schema with valid JSON schema output" do
       tool = ToolAdapter.from_action(EmptySchemaAction)
 
       assert %ReqLLM.Tool{} = tool
       assert tool.name == "empty_action"
-      # Key assertion: empty schema must produce valid object schema with required array
-      assert tool.parameter_schema == %{"type" => "object", "properties" => %{}, "required" => []}
+      # Key assertion: empty schema must produce valid object schema with required array and no additional properties
+      assert tool.parameter_schema ==
+               %{"type" => "object", "properties" => %{}, "required" => [], "additionalProperties" => false}
     end
   end
 
