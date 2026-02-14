@@ -27,6 +27,9 @@ defmodule Jido.AI.Signal do
   - `EmbedError` - Structured embedding error (`react.embed.error`)
 
   ### Orchestration Signals
+  - `RequestStarted` - Request lifecycle started (`react.request.started`)
+  - `RequestCompleted` - Request lifecycle completed (`react.request.completed`)
+  - `RequestFailed` - Request lifecycle failed (`react.request.failed`)
   - `RequestError` - Request rejected (`react.request.error`)
   - `DelegationRequest` - Task delegation (`ai.delegation.request`)
   - `DelegationResult` - Delegation completed (`ai.delegation.result`)
@@ -268,6 +271,57 @@ defmodule Jido.AI.Signal do
         call_id: [type: :string, required: true, doc: "Correlation ID for the request"],
         reason: [type: :atom, required: true, doc: "Error reason atom"],
         message: [type: :string, required: true, doc: "Human-readable error message"]
+      ]
+  end
+
+  defmodule RequestStarted do
+    @moduledoc """
+    Signal for request lifecycle start.
+
+    Emitted when a ReAct request is accepted for processing.
+    """
+
+    use Jido.Signal,
+      type: "react.request.started",
+      default_source: "/react/request",
+      schema: [
+        request_id: [type: :string, required: true, doc: "Request correlation ID"],
+        query: [type: :string, required: true, doc: "Original user query"],
+        run_id: [type: :string, doc: "Request-scoped run ID"]
+      ]
+  end
+
+  defmodule RequestCompleted do
+    @moduledoc """
+    Signal for request lifecycle completion.
+
+    Emitted when a ReAct request reaches a successful terminal state.
+    """
+
+    use Jido.Signal,
+      type: "react.request.completed",
+      default_source: "/react/request",
+      schema: [
+        request_id: [type: :string, required: true, doc: "Request correlation ID"],
+        result: [type: :any, required: true, doc: "Final result payload"],
+        run_id: [type: :string, doc: "Request-scoped run ID"]
+      ]
+  end
+
+  defmodule RequestFailed do
+    @moduledoc """
+    Signal for request lifecycle failure.
+
+    Emitted when a ReAct request fails, is rejected, or is cancelled.
+    """
+
+    use Jido.Signal,
+      type: "react.request.failed",
+      default_source: "/react/request",
+      schema: [
+        request_id: [type: :string, required: true, doc: "Request correlation ID"],
+        error: [type: :any, required: true, doc: "Failure reason payload"],
+        run_id: [type: :string, doc: "Request-scoped run ID"]
       ]
   end
 

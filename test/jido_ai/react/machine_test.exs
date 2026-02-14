@@ -20,6 +20,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       assert machine.status == "idle"
       assert machine.iteration == 0
       assert machine.thread == nil
+      assert machine.active_request_id == nil
       assert machine.usage == %{}
       assert machine.started_at == nil
     end
@@ -38,6 +39,7 @@ defmodule Jido.AI.ReAct.MachineTest do
 
       assert machine.status == "awaiting_llm"
       assert machine.iteration == 1
+      assert machine.active_request_id == "call_123"
       assert machine.current_llm_call_id == "call_123"
     end
 
@@ -260,6 +262,48 @@ defmodule Jido.AI.ReAct.MachineTest do
 
       assert machine.status == "error"
       assert machine.termination_reason == :error
+      assert directives == []
+    end
+  end
+
+  # ============================================================================
+  # Cancellation
+  # ============================================================================
+
+  describe "cancellation" do
+    test "cancels active request while awaiting_llm" do
+      machine = %Machine{
+        status: "awaiting_llm",
+        active_request_id: "req_123",
+        current_llm_call_id: "req_123",
+        thread: make_thread("Be helpful"),
+        iteration: 1,
+        started_at: System.monotonic_time(:millisecond)
+      }
+
+      {machine, directives} = Machine.update(machine, {:cancel, "req_123", :user_cancelled}, %{})
+
+      assert machine.status == "error"
+      assert machine.termination_reason == :cancelled
+      assert machine.cancel_reason == :user_cancelled
+      assert machine.result =~ "cancelled"
+      assert directives == []
+    end
+
+    test "ignores cancellation for non-active request id" do
+      machine = %Machine{
+        status: "awaiting_tool",
+        active_request_id: "req_active",
+        current_llm_call_id: "call_1",
+        thread: make_thread("Be helpful"),
+        iteration: 1,
+        pending_tool_calls: [%{id: "tc_1", name: "calc", arguments: %{}, result: nil}],
+        started_at: System.monotonic_time(:millisecond)
+      }
+
+      {result_machine, directives} = Machine.update(machine, {:cancel, "req_other", :user_cancelled}, %{})
+
+      assert result_machine.status == "awaiting_tool"
       assert directives == []
     end
   end

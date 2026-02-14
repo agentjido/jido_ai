@@ -8,11 +8,13 @@
 
   # plugin_specs/0 contract mismatch - the Zoi-generated type spec in jido's Agent
   # macro doesn't match Dialyzer's success typing for the concrete struct values.
-  {"lib/jido_ai/agents/api_smoke_test_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/issue_triage_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/react_demo_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/release_notes_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/weather_agent.ex", :invalid_contract},
+  {"lib/jido_ai/agents/examples/api_smoke_test_agent.ex", :invalid_contract},
+  {"lib/jido_ai/agents/examples/browser_agent.ex", :invalid_contract},
+  {"lib/jido_ai/agents/examples/issue_triage_agent.ex", :invalid_contract},
+  {"lib/jido_ai/agents/examples/react_demo_agent.ex", :invalid_contract},
+  {"lib/jido_ai/agents/examples/release_notes_agent.ex", :invalid_contract},
+  {"lib/jido_ai/agents/examples/task_list_agent.ex", :invalid_contract},
+  {"lib/jido_ai/agents/examples/weather_agent.ex", :invalid_contract},
 
   # MapSet opaque type warnings - dialyzer doesn't handle MapSet's opaque internal
   # structure correctly when passed through recursive functions or across module boundaries
@@ -33,7 +35,8 @@
   ~r/lib\/jido_ai\/directive\.ex.*guard_fail/,
 
   # Pattern match coverage - fallback clauses for defensive programming
-  ~r/lib\/jido_ai\/agents\/orchestrator_agent\.ex.*pattern_match_cov/,
+  ~r/lib\/jido_ai\/agents\/orchestration\/orchestrator_agent\.ex.*pattern_match_cov/,
+  ~r/lib\/jido_ai\/agents\/examples\/task_list_agent\.ex.*guard_fail/,
 
   # Example agent plugin_specs contract mismatch - same as agents above
   {"lib/jido_ai/examples/calculator_agent.ex", :invalid_contract},
