@@ -3,6 +3,7 @@ defmodule Jido.AI.ReActAgentTest do
   Tests for Jido.AI.ReActAgent macro and compile-time alias expansion.
   """
   use ExUnit.Case, async: true
+  import ExUnit.CaptureIO
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Request
@@ -181,6 +182,27 @@ defmodule Jido.AI.ReActAgentTest do
       assert TestCalculator in tools
       assert TestSearch in tools
       assert Enum.all?(tools, &is_atom/1)
+    end
+
+    test "does not warn when consumer defines its own thinking_meta/1" do
+      module_name = Module.concat(__MODULE__, :"CollisionAgent#{System.unique_integer([:positive, :monotonic])}")
+
+      source = """
+      defmodule #{inspect(module_name)} do
+        use Jido.AI.ReActAgent,
+          name: "collision_agent",
+          tools: [#{inspect(TestCalculator)}]
+
+        defp thinking_meta(_), do: %{custom: true}
+      end
+      """
+
+      warnings =
+        capture_io(:stderr, fn ->
+          Code.compile_string(source)
+        end)
+
+      refute warnings =~ "this clause for thinking_meta/1 cannot match"
     end
   end
 
