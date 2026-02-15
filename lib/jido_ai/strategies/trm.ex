@@ -53,9 +53,9 @@ defmodule Jido.AI.Strategies.TRM do
   This strategy implements `signal_routes/1` which AgentServer uses to
   automatically route these signals to strategy commands:
 
-  - `"trm.query"` → `:trm_start`
-  - `"react.llm.response"` → `:trm_llm_result`
-  - `"react.llm.delta"` → `:trm_llm_partial`
+  - `"ai.trm.query"` → `:trm_start`
+  - `"ai.llm.response"` → `:trm_llm_result`
+  - `"ai.llm.delta"` → `:trm_llm_partial`
 
   ## State
 
@@ -86,6 +86,7 @@ defmodule Jido.AI.Strategies.TRM do
   @start :trm_start
   @llm_result :trm_llm_result
   @llm_partial :trm_llm_partial
+  @request_error :trm_request_error
 
   @doc "Returns the action atom for starting TRM reasoning."
   @spec start_action() :: :trm_start
@@ -99,12 +100,16 @@ defmodule Jido.AI.Strategies.TRM do
   @spec llm_partial_action() :: :trm_llm_partial
   def llm_partial_action, do: @llm_partial
 
+  @doc "Returns the action atom for handling request rejection events."
+  @spec request_error_action() :: :trm_request_error
+  def request_error_action, do: @request_error
+
   # Maximum prompt length to prevent resource exhaustion (enforced in sanitization)
   # Length validation is handled by Jido.AI.TRM.Helpers.sanitize_user_input/2
 
   @action_specs %{
     @start => %{
-      schema: Zoi.object(%{prompt: Zoi.string()}),
+      schema: Zoi.object(%{prompt: Zoi.string(), request_id: Zoi.string() |> Zoi.optional()}),
       doc: "Start TRM recursive reasoning with a prompt",
       name: "trm.start"
     },
@@ -122,6 +127,16 @@ defmodule Jido.AI.Strategies.TRM do
         }),
       doc: "Handle streaming LLM token chunk",
       name: "trm.llm_partial"
+    },
+    @request_error => %{
+      schema:
+        Zoi.object(%{
+          request_id: Zoi.string(),
+          reason: Zoi.atom(),
+          message: Zoi.string()
+        }),
+      doc: "Handle rejected request lifecycle event",
+      name: "trm.request_error"
     }
   }
 
@@ -131,11 +146,12 @@ defmodule Jido.AI.Strategies.TRM do
   @impl true
   def signal_routes(_ctx) do
     [
-      {"trm.query", {:strategy_cmd, @start}},
-      {"react.llm.response", {:strategy_cmd, @llm_result}},
-      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.trm.query", {:strategy_cmd, @start}},
+      {"ai.llm.response", {:strategy_cmd, @llm_result}},
+      {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.request.error", {:strategy_cmd, @request_error}},
       # Usage report is emitted for observability but doesn't need processing
-      {"react.usage", Jido.Actions.Control.Noop}
+      {"ai.usage", Jido.Actions.Control.Noop}
     ]
   end
 
@@ -301,24 +317,32 @@ defmodule Jido.AI.Strategies.TRM do
   end
 
   defp process_instruction(agent, %Jido.Instruction{action: action, params: params}) do
-    case to_machine_msg(normalize_action(action), params) do
-      msg when not is_nil(msg) ->
-        state = StratState.get(agent, %{})
-        config = state[:config]
-        machine = Machine.from_map(state)
+    normalized_action = normalize_action(action)
 
-        {machine, directives} = Machine.update(machine, msg, %{})
-
-        new_state =
-          machine
-          |> Machine.to_map()
-          |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
-
-        agent = StratState.put(agent, new_state)
-        {agent, lift_directives(directives, config)}
+    case normalized_action do
+      @request_error ->
+        process_request_error(agent, params)
 
       _ ->
-        :noop
+        case to_machine_msg(normalized_action, params) do
+          msg when not is_nil(msg) ->
+            state = StratState.get(agent, %{})
+            config = state[:config]
+            machine = Machine.from_map(state)
+
+            {machine, directives} = Machine.update(machine, msg, %{})
+
+            new_state =
+              machine
+              |> Machine.to_map()
+              |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+
+            agent = StratState.put(agent, new_state)
+            {agent, lift_directives(directives, config)}
+
+          _ ->
+            :noop
+        end
     end
   end
 
@@ -327,8 +351,8 @@ defmodule Jido.AI.Strategies.TRM do
 
   defp to_machine_msg(@start, params) do
     prompt = Map.get(params, :prompt) || Map.get(params, "prompt")
-    call_id = Machine.generate_call_id()
-    {:start, prompt, call_id}
+    request_id = Map.get(params, :request_id) || Map.get(params, "request_id") || Machine.generate_call_id()
+    {:start, prompt, request_id}
   end
 
   defp to_machine_msg(@llm_result, params) do
@@ -354,6 +378,20 @@ defmodule Jido.AI.Strategies.TRM do
 
   defp to_machine_msg(_, _), do: nil
 
+  defp process_request_error(agent, params) do
+    request_id = Map.get(params, :request_id) || Map.get(params, "request_id")
+    reason = Map.get(params, :reason) || Map.get(params, "reason")
+    message = Map.get(params, :message) || Map.get(params, "message")
+
+    if is_binary(request_id) do
+      state = StratState.get(agent, %{})
+      new_state = Map.put(state, :last_request_error, %{request_id: request_id, reason: reason, message: message})
+      {StratState.put(agent, new_state), []}
+    else
+      :noop
+    end
+  end
+
   # NOTE: The directive building functions below (build_*_directive and
   # convert_to_reqllm_context) share patterns with other strategies like ReAct.
   # A future refactoring could extract these into a shared Jido.AI.Strategy.Helpers
@@ -373,10 +411,10 @@ defmodule Jido.AI.Strategies.TRM do
         [build_improvement_directive(id, context, model, config)]
 
       # Issue #9 fix: Handle request rejection when agent is busy
-      {:request_error, call_id, reason, message} ->
+      {:request_error, request_id, reason, message} ->
         [
           Directive.EmitRequestError.new!(%{
-            call_id: call_id,
+            request_id: request_id,
             reason: reason,
             message: message
           })

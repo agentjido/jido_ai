@@ -134,6 +134,7 @@ defmodule JidoAi.MixProject do
         "guides/developer/06_tool_system.md",
         "guides/developer/07_skills.md",
         "guides/developer/08_configuration.md",
+        "guides/developer/09_namespace_migration.md",
         # User Guides
         "guides/user/01_overview.md",
         "guides/user/02_strategies.md",

@@ -1,50 +1,13 @@
 [
-  # Mix.Task behaviour info not available in PLT - false positive
-  ~r/lib\/mix\/tasks\/jido_ai\..*\.ex.*callback_info_missing/,
-  ~r/lib\/mix\/tasks\/jido_ai\..*\.ex.*unknown_function.*Mix\.Task/,
-
-  # Mix tasks with System.halt(1) in error paths report no_return - expected behavior
-  ~r/lib\/mix\/tasks\/jido_ai\..*\.ex.*no_return/,
-
-  # plugin_specs/0 contract mismatch - the Zoi-generated type spec in jido's Agent
-  # macro doesn't match Dialyzer's success typing for the concrete struct values.
-  {"lib/jido_ai/agents/examples/api_smoke_test_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/examples/browser_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/examples/issue_triage_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/examples/react_demo_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/examples/release_notes_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/examples/task_list_agent.ex", :invalid_contract},
-  {"lib/jido_ai/agents/examples/weather_agent.ex", :invalid_contract},
-
-  # MapSet opaque type warnings - dialyzer doesn't handle MapSet's opaque internal
-  # structure correctly when passed through recursive functions or across module boundaries
-  ~r/lib\/jido_ai\/strategies\/graph_of_thoughts\/machine\.ex.*call_without_opaque/,
-
-  # Executor pattern_match at module level - false positive from type narrowing
-  ~r/lib\/jido_ai\/executor\.ex:1:pattern_match/,
-
-  # Jido dependency callback_type_mismatch - issues in deps/jido not jido_ai
-  ~r/deps\/jido\/lib\/jido\/agent\.ex.*callback_type_mismatch/,
+  # Upstream Jido typing warnings (dependency code outside this repo).
   ~r/deps\/jido\/lib\/jido\/agent\.ex.*pattern_match/,
 
-  # Directive exec callback type mismatch - sync tuple return vs expected ok/async/stop
-  ~r/lib\/jido_ai\/directive\.ex.*callback_type_mismatch/,
-
-  # Guard fail for binary checks on structs - expected for defensive programming
-  ~r/lib\/jido_ai\.ex.*guard_fail/,
-  ~r/lib\/jido_ai\/directive\.ex.*guard_fail/,
-
-  # Pattern match coverage - fallback clauses for defensive programming
-  ~r/lib\/jido_ai\/agents\/orchestration\/orchestrator_agent\.ex.*pattern_match_cov/,
-  ~r/lib\/jido_ai\/agents\/examples\/task_list_agent\.ex.*guard_fail/,
-
-  # Example agent plugin_specs contract mismatch - same as agents above
-  {"lib/jido_ai/examples/calculator_agent.ex", :invalid_contract},
-  {"lib/jido_ai/examples/skills_demo_agent.ex", :invalid_contract},
-
-  # TUI module - blanket ignore all issues
+  # TermUI currently triggers opaque/no_return analysis noise in the renderer.
   ~r/lib\/jido_ai\/cli\/tui\.ex/,
 
-  # Chat mix task pattern_match caused by TUI return type
-  ~r/lib\/mix\/tasks\/jido_ai\.chat\.ex.*pattern_match/
+  # False positive: dialyzer reports an impossible boolean match at module line 1.
+  ~r/lib\/jido_ai\/executor\.ex:1:pattern_match/,
+
+  # Same module-level false positive in unified CLI mix task.
+  ~r/lib\/mix\/tasks\/jido_ai\.ex:1:pattern_match/
 ]

@@ -28,10 +28,10 @@ defmodule Jido.AI.Examples.TaskListAgent do
 
   ## CLI Usage
 
-      mix jido_ai.agent --agent Jido.AI.Examples.TaskListAgent \\
+      mix jido_ai --agent Jido.AI.Examples.TaskListAgent \\
         "Create a plan to set up a CI/CD pipeline for an Elixir project"
 
-      mix jido_ai.agent --agent Jido.AI.Examples.TaskListAgent \\
+      mix jido_ai --agent Jido.AI.Examples.TaskListAgent \\
         "Help me organize a product launch - what needs to happen?"
 
   ## How It Works
@@ -171,7 +171,7 @@ defmodule Jido.AI.Examples.TaskListAgent do
   # --- Lifecycle Callbacks ---
 
   @impl true
-  def on_before_cmd(agent, {:react_start, %{query: _query} = params} = _action) do
+  def on_before_cmd(agent, {:ai_react_start, %{query: _query} = params} = _action) do
     {request_id, params} = Request.ensure_request_id(params)
 
     agent = MemoryAgent.ensure(agent)
@@ -184,14 +184,14 @@ defmodule Jido.AI.Examples.TaskListAgent do
 
     agent = Request.start_request(agent, request_id, params[:query])
 
-    {:ok, agent, {:react_start, updated_params}}
+    {:ok, agent, {:ai_react_start, updated_params}}
   end
 
   @impl true
   def on_before_cmd(agent, action), do: {:ok, agent, action}
 
   @impl true
-  def on_after_cmd(agent, {:react_start, %{request_id: request_id}}, directives) do
+  def on_after_cmd(agent, {:ai_react_start, %{request_id: request_id}}, directives) do
     snap = strategy_snapshot(agent)
     agent = sync_tasks_from_conversation(agent, snap)
     agent = refresh_tool_context_tasks(agent)
@@ -244,7 +244,7 @@ defmodule Jido.AI.Examples.TaskListAgent do
   end
 
   defp sync_tasks_from_conversation(agent, snap) do
-    details = snap.details || %{}
+    details = Map.get(snap, :details, %{})
     conversation = Map.get(details, :conversation, [])
 
     tasks = extract_tasks_from_conversation(conversation, load_tasks(agent))

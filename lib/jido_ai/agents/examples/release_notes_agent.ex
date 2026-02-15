@@ -27,10 +27,10 @@ defmodule Jido.AI.Examples.ReleaseNotesAgent do
 
   ## CLI Usage
 
-      mix jido_ai.agent --agent Jido.AI.Examples.ReleaseNotesAgent \\
+      mix jido_ai --agent Jido.AI.Examples.ReleaseNotesAgent \\
         "Create release notes summarizing recent changes to the Jido framework"
 
-      mix jido_ai.agent --agent Jido.AI.Examples.ReleaseNotesAgent \\
+      mix jido_ai --agent Jido.AI.Examples.ReleaseNotesAgent \\
         "Synthesize a changelog from these themes: new agent strategies, \\
          improved error handling, and CLI enhancements"
 

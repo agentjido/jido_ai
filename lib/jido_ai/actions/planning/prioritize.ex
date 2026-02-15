@@ -50,7 +50,7 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
     schema:
       Zoi.object(%{
         model:
-          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :planning)")
+          Zoi.any(description: "Model alias (e.g., :planning) or direct model spec string")
           |> Zoi.optional(),
         tasks: Zoi.list(Zoi.string(), description: "List of tasks to prioritize"),
         criteria:
@@ -62,6 +62,8 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
+  alias Jido.AI.Actions.Helpers
+  alias Jido.AI.LLMClient
   alias Jido.AI.Text
   alias ReqLLM.Context
 
@@ -127,12 +129,12 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
       }
   """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
     with :ok <- validate_tasks(params[:tasks]),
          {:ok, model} <- resolve_model(params[:model]),
-         context = build_prioritize_messages(params),
+         {:ok, req_context} <- build_prioritize_messages(params),
          opts = build_opts(params),
-         {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
+         {:ok, response} <- LLMClient.generate_text(context, model, req_context.messages, opts) do
       {:ok, format_result(response, model)}
     end
   end
@@ -236,20 +238,37 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
   end
 
   defp extract_scores(text) do
-    # Extract scores from priority sections
-    Regex.scan(~r/^\d+\.\s+\*\*(.+?)\*\*\s+-\s+Score:\s+\((\d+)\)/m, text)
-    |> Map.new(fn [_, task, score] ->
-      {String.trim(task), String.to_integer(score)}
+    text
+    |> String.split("\n")
+    |> Enum.reduce(%{}, fn line, acc ->
+      case parse_score_line(line) do
+        nil -> acc
+        {task, score} -> Map.put(acc, task, score)
+      end
     end)
   end
 
-  defp extract_usage(%{usage: usage}) when is_map(usage) do
-    %{
-      input_tokens: Map.get(usage, :input_tokens, 0),
-      output_tokens: Map.get(usage, :output_tokens, 0),
-      total_tokens: Map.get(usage, :total_tokens, 0)
-    }
+  defp parse_score_line(line) do
+    # Supports common score formats:
+    #   **Task** - Score: 8
+    #   **Task** - Score: (8)
+    #   **Task** - Score: [8-10]
+    case Regex.run(~r/^\d+\.\s+\*\*(.+?)\*\*.*?Score:\s*(?:\((\d+)\)|\[(\d+)(?:-\d+)?\]|(\d+))/i, line) do
+      [_, task, paren, range_start, plain] ->
+        score =
+          cond do
+            is_binary(paren) and paren != "" -> String.to_integer(paren)
+            is_binary(range_start) and range_start != "" -> String.to_integer(range_start)
+            is_binary(plain) and plain != "" -> String.to_integer(plain)
+            true -> 0
+          end
+
+        {String.trim(task), score}
+
+      _ ->
+        nil
+    end
   end
 
-  defp extract_usage(_), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
+  defp extract_usage(response), do: Helpers.extract_usage(response)
 end

@@ -46,7 +46,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
     schema:
       Zoi.object(%{
         model:
-          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :reasoning)")
+          Zoi.any(description: "Model alias (e.g., :reasoning) or direct model spec string")
           |> Zoi.optional(),
         input: Zoi.string(description: "The text or data to analyze"),
         analysis_type:
@@ -62,6 +62,8 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
+  alias Jido.AI.Actions.Helpers
+  alias Jido.AI.LLMClient
   alias Jido.AI.Security
   alias Jido.AI.Text
   alias ReqLLM.Context
@@ -127,12 +129,12 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
       }
   """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
     with {:ok, model} <- resolve_model(params[:model]),
          {:ok, validated_params} <- validate_and_sanitize_params(params),
-         context = build_analysis_messages(validated_params),
+         {:ok, req_context} <- build_analysis_messages(validated_params),
          opts = build_opts(validated_params),
-         {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
+         {:ok, response} <- LLMClient.generate_text(context, model, req_context.messages, opts) do
       {:ok, format_result(response, model, validated_params[:analysis_type])}
     end
   end
@@ -203,17 +205,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
       result: Text.extract_text(response),
       analysis_type: analysis_type,
       model: model,
-      usage: extract_usage(response)
+      usage: Helpers.extract_usage(response)
     }
   end
-
-  defp extract_usage(%{usage: usage}) when is_map(usage) do
-    %{
-      input_tokens: Map.get(usage, :input_tokens, 0),
-      output_tokens: Map.get(usage, :output_tokens, 0),
-      total_tokens: Map.get(usage, :total_tokens, 0)
-    }
-  end
-
-  defp extract_usage(_), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
 end

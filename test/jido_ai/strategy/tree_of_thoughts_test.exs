@@ -122,9 +122,9 @@ defmodule Jido.AI.Strategies.TreeOfThoughtsTest do
       routes = TreeOfThoughts.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert route_map["tot.query"] == {:strategy_cmd, :tot_start}
-      assert route_map["react.llm.response"] == {:strategy_cmd, :tot_llm_result}
-      assert route_map["react.llm.delta"] == {:strategy_cmd, :tot_llm_partial}
+      assert route_map["ai.tot.query"] == {:strategy_cmd, :tot_start}
+      assert route_map["ai.llm.response"] == {:strategy_cmd, :tot_llm_result}
+      assert route_map["ai.llm.delta"] == {:strategy_cmd, :tot_llm_partial}
     end
   end
 

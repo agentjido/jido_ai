@@ -61,7 +61,7 @@ defmodule Jido.AI.Actions.LLM.GenerateObject do
     schema:
       Zoi.object(%{
         model:
-          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-haiku-4-5') or alias (e.g., :fast)")
+          Zoi.any(description: "Model alias (e.g., :fast) or direct model spec string")
           |> Zoi.optional(),
         prompt: Zoi.string(description: "The prompt describing what object to generate"),
         object_schema: Zoi.any(description: "Zoi schema or NimbleOptions keyword list"),
@@ -102,12 +102,12 @@ defmodule Jido.AI.Actions.LLM.GenerateObject do
     with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
          {:ok, _schema} <- validate_object_schema(validated_params[:object_schema]),
          {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
-         context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         {:ok, req_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          opts = Helpers.build_opts(validated_params),
          {:ok, response} <-
            ReqLLM.Generation.generate_object(
              model,
-             context.messages,
+             req_context.messages,
              validated_params[:object_schema],
              opts
            ) do

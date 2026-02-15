@@ -1,0 +1,174 @@
+defmodule Jido.AI.TestSupport.FakeLLMClient do
+  @moduledoc false
+
+  @behaviour Jido.AI.LLMClient
+
+  @impl true
+  def generate_text(model, messages, opts) do
+    tools = Keyword.get(opts, :tools, [])
+    prompt = extract_latest_user_prompt(messages)
+    has_tool_result? = Enum.any?(messages, &tool_message?/1)
+
+    response =
+      cond do
+        tools != [] and String.contains?(prompt, "loop tool") ->
+          tool_call_response(model)
+
+        tools != [] and has_tool_result? ->
+          max_tokens = Keyword.get(opts, :max_tokens)
+          temperature = Keyword.get(opts, :temperature)
+
+          final_answer_response(
+            model,
+            "Tool execution complete: 8 (max_tokens=#{max_tokens}, temperature=#{temperature})"
+          )
+
+        tools != [] and String.contains?(prompt, "Calculate") ->
+          tool_call_response(model)
+
+        String.starts_with?(prompt, "Goal:") ->
+          plan_response(model)
+
+        String.starts_with?(prompt, "Goal to decompose:") ->
+          decompose_response(model)
+
+        String.starts_with?(prompt, "Tasks to prioritize:") ->
+          prioritize_response(model)
+
+        true ->
+          final_answer_response(model, "Stubbed response for: #{prompt}")
+      end
+
+    {:ok, response}
+  end
+
+  @impl true
+  def stream_text(model, messages, _opts) do
+    prompt = extract_latest_user_prompt(messages)
+    chunks = ["Stubbed ", "stream ", "for ", prompt]
+    content = Enum.join(chunks, "")
+
+    {:ok,
+     %{
+       chunks: chunks,
+       final: final_answer_response(model, content)
+     }}
+  end
+
+  @impl true
+  def process_stream(%{chunks: chunks, final: final}, opts) when is_list(chunks) do
+    on_result = Keyword.get(opts, :on_result, fn _chunk -> :ok end)
+
+    Enum.each(chunks, fn chunk ->
+      _ = on_result.(chunk)
+    end)
+
+    {:ok, final}
+  end
+
+  def process_stream(_other, _opts), do: {:error, :invalid_stream_response}
+
+  defp extract_latest_user_prompt(messages) when is_list(messages) do
+    messages
+    |> Enum.reverse()
+    |> Enum.find_value("", fn
+      %{role: role, content: content} when role in [:user, "user"] ->
+        normalize_content(content)
+
+      _ ->
+        nil
+    end)
+  end
+
+  defp extract_latest_user_prompt(_), do: ""
+
+  defp normalize_content(content) when is_binary(content), do: content
+  defp normalize_content(content) when is_list(content), do: Jido.AI.Text.extract_from_content(content)
+  defp normalize_content(_), do: ""
+
+  defp tool_message?(%{role: role}) when role in [:tool, "tool"], do: true
+  defp tool_message?(_), do: false
+
+  defp final_answer_response(model, content) do
+    %{
+      message: %{content: content, tool_calls: nil},
+      finish_reason: :stop,
+      usage: %{input_tokens: 12, output_tokens: 24},
+      model: model
+    }
+  end
+
+  defp tool_call_response(model) do
+    %{
+      message: %{
+        content: nil,
+        tool_calls: [
+          %{
+            id: "tc_1",
+            name: "calculator",
+            arguments: %{"operation" => "add", "a" => 5, "b" => 3}
+          }
+        ]
+      },
+      finish_reason: :tool_calls,
+      usage: %{input_tokens: 10, output_tokens: 8},
+      model: model
+    }
+  end
+
+  defp plan_response(model) do
+    text =
+      """
+      ## Plan Overview
+      Build and ship incrementally.
+
+      ## Steps
+      1. **Define Scope**
+         - Description: Capture MVP requirements.
+      2. **Implement Core Features**
+         - Description: Build and test major flows.
+      3. **Deploy**
+         - Description: Ship and monitor.
+      """
+      |> String.replace(~r/^\s+/m, "")
+      |> String.trim()
+
+    final_answer_response(model, text)
+  end
+
+  defp decompose_response(model) do
+    text =
+      """
+      ## Level 1: Main Goal Areas
+      1. Product
+      - 1.1. Define requirements
+      - 1.2. Build MVP
+      2. Delivery
+      - 2.1. Set milestones
+      - 2.2. Release plan
+      """
+      |> String.replace(~r/^\s+/m, "")
+      |> String.trim()
+
+    final_answer_response(model, text)
+  end
+
+  defp prioritize_response(model) do
+    text =
+      """
+      ## Priority Analysis
+      1. **Fix critical bug** - Score: 9
+      2. **Add new feature** - Score: (7)
+      3. **Update documentation** - Score: [5-7]
+
+      ## Recommended Execution Order
+      1. **Fix critical bug**
+      2. **Add new feature**
+      3. **Update documentation**
+      """
+      |> String.replace(~r/^\s+/m, "")
+      |> String.trim()
+
+    final_answer_response(model, text)
+  end
+end

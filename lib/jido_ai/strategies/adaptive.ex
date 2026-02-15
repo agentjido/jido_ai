@@ -122,6 +122,7 @@ defmodule Jido.AI.Strategies.Adaptive do
   @start :adaptive_start
   @llm_result :adaptive_llm_result
   @llm_partial :adaptive_llm_partial
+  @request_error :adaptive_request_error
 
   @doc "Returns the action atom for starting an adaptive exploration."
   @spec start_action() :: :adaptive_start
@@ -135,9 +136,13 @@ defmodule Jido.AI.Strategies.Adaptive do
   @spec llm_partial_action() :: :adaptive_llm_partial
   def llm_partial_action, do: @llm_partial
 
+  @doc "Returns the action atom for handling request rejection events."
+  @spec request_error_action() :: :adaptive_request_error
+  def request_error_action, do: @request_error
+
   @action_specs %{
     @start => %{
-      schema: Zoi.object(%{prompt: Zoi.string()}),
+      schema: Zoi.object(%{prompt: Zoi.string(), request_id: Zoi.string() |> Zoi.optional()}),
       doc: "Start adaptive reasoning with automatic strategy selection",
       name: "adaptive.start"
     },
@@ -155,6 +160,16 @@ defmodule Jido.AI.Strategies.Adaptive do
         }),
       doc: "Handle streaming LLM token chunk (delegated to selected strategy)",
       name: "adaptive.llm_partial"
+    },
+    @request_error => %{
+      schema:
+        Zoi.object(%{
+          request_id: Zoi.string(),
+          reason: Zoi.atom(),
+          message: Zoi.string()
+        }),
+      doc: "Handle request lifecycle rejection (delegated to selected strategy)",
+      name: "adaptive.request_error"
     }
   }
 
@@ -168,11 +183,12 @@ defmodule Jido.AI.Strategies.Adaptive do
     # Base routes for adaptive strategy
     # Once a strategy is selected, its routes will be merged
     [
-      {"adaptive.query", {:strategy_cmd, @start}},
-      {"react.llm.response", {:strategy_cmd, @llm_result}},
-      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.adaptive.query", {:strategy_cmd, @start}},
+      {"ai.llm.response", {:strategy_cmd, @llm_result}},
+      {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.request.error", {:strategy_cmd, @request_error}},
       # Usage report is emitted for observability but doesn't need processing
-      {"react.usage", Jido.Actions.Control.Noop}
+      {"ai.usage", Jido.Actions.Control.Noop}
     ]
   end
 
@@ -242,7 +258,7 @@ defmodule Jido.AI.Strategies.Adaptive do
     has_start =
       Enum.any?(instructions, fn
         %{action: @start} -> true
-        %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start, :trm_start] -> true
+        %{action: action} when action in [:cot_start, :ai_react_start, :tot_start, :got_start, :trm_start] -> true
         _ -> false
       end)
 
@@ -325,7 +341,7 @@ defmodule Jido.AI.Strategies.Adaptive do
     start_instr =
       Enum.find(instructions, fn
         %{action: @start} -> true
-        %{action: action} when action in [:cot_start, :react_start, :tot_start, :got_start, :trm_start] -> true
+        %{action: action} when action in [:cot_start, :ai_react_start, :tot_start, :got_start, :trm_start] -> true
         _ -> false
       end)
 
@@ -402,6 +418,7 @@ defmodule Jido.AI.Strategies.Adaptive do
           @start -> start_action_for(strategy_type)
           @llm_result -> llm_result_action_for(strategy_type)
           @llm_partial -> llm_partial_action_for(strategy_type)
+          @request_error -> request_error_action_for(strategy_type)
           other -> other
         end
 
@@ -432,22 +449,28 @@ defmodule Jido.AI.Strategies.Adaptive do
   end
 
   defp start_action_for(:cot), do: :cot_start
-  defp start_action_for(:react), do: :react_start
+  defp start_action_for(:react), do: :ai_react_start
   defp start_action_for(:tot), do: :tot_start
   defp start_action_for(:got), do: :got_start
   defp start_action_for(:trm), do: :trm_start
 
   defp llm_result_action_for(:cot), do: :cot_llm_result
-  defp llm_result_action_for(:react), do: :react_llm_result
+  defp llm_result_action_for(:react), do: :ai_react_llm_result
   defp llm_result_action_for(:tot), do: :tot_llm_result
   defp llm_result_action_for(:got), do: :got_llm_result
   defp llm_result_action_for(:trm), do: :trm_llm_result
 
   defp llm_partial_action_for(:cot), do: :cot_llm_partial
-  defp llm_partial_action_for(:react), do: :react_llm_partial
+  defp llm_partial_action_for(:react), do: :ai_react_llm_partial
   defp llm_partial_action_for(:tot), do: :tot_llm_partial
   defp llm_partial_action_for(:got), do: :got_llm_partial
   defp llm_partial_action_for(:trm), do: :trm_llm_partial
+
+  defp request_error_action_for(:cot), do: :cot_request_error
+  defp request_error_action_for(:react), do: :ai_react_request_error
+  defp request_error_action_for(:tot), do: :tot_request_error
+  defp request_error_action_for(:got), do: :got_request_error
+  defp request_error_action_for(:trm), do: :trm_request_error
 
   defp select_strategy_for_task(prompt, config) do
     # Check for manual override

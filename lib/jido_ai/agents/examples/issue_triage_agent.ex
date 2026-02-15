@@ -35,12 +35,12 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
 
   ## CLI Usage
 
-      GITHUB_TOKEN=ghp_xxx mix jido_ai.agent --agent Jido.AI.Examples.IssueTriageAgent \\
+      GITHUB_TOKEN=ghp_xxx mix jido_ai --agent Jido.AI.Examples.IssueTriageAgent \\
         "List the 5 most recent issues in agentjido/jido and categorize them"
 
   ## How Token Injection Works
 
-  1. `on_before_cmd/2` intercepts the `:react_start` action
+  1. `on_before_cmd/2` intercepts the `:ai_react_start` action
   2. Reads `GITHUB_TOKEN` from environment
   3. Creates `Tentacat.Client` with the token
   4. Merges `%{client: client}` into `tool_context` in the action params
@@ -84,7 +84,7 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
     max_iterations: 15
 
   @impl true
-  def on_before_cmd(agent, {:react_start, %{query: query} = params} = _action) do
+  def on_before_cmd(agent, {:ai_react_start, %{query: query} = params} = _action) do
     # Read token from environment
     case System.get_env("GITHUB_TOKEN") do
       nil ->
@@ -100,7 +100,7 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
               |> Map.put(:github_token_present, false)
         }
 
-        {:ok, agent, {:react_start, params}}
+        {:ok, agent, {:ai_react_start, params}}
 
       token when is_binary(token) and byte_size(token) > 0 ->
         # Create Tentacat client with token
@@ -122,7 +122,7 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
               |> Map.put(:github_token_present, true)
         }
 
-        {:ok, agent, {:react_start, updated_params}}
+        {:ok, agent, {:ai_react_start, updated_params}}
     end
   end
 

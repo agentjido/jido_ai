@@ -2,38 +2,9 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokens do
   @moduledoc """
   A Jido.Action for processing tokens from an active stream.
 
-  This action provides manual control over token processing for streams
-  that were started with `auto_process: false`. It allows for custom
-  token handling logic, filtering, and transformation.
-
-  ## Parameters
-
-  * `stream_id` (required) - The ID of the stream to process
-  * `on_token` (optional) - Callback function for each token
-  * `on_complete` (optional) - Callback function when stream completes
-  * `filter` (optional) - Function to filter tokens (return true to include)
-  * `transform` (optional) - Function to transform each token
-
-  ## Examples
-
-      # Basic token processing
-      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.ProcessTokens, %{
-        stream_id: "abc123",
-        on_token: fn token -> IO.write(token) end
-      })
-
-      # With filtering
-      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.ProcessTokens, %{
-        stream_id: "abc123",
-        filter: fn token -> String.length(token) > 0 end
-      })
-
-      # With transformation
-      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.ProcessTokens, %{
-        stream_id: "abc123",
-        transform: fn token -> String.upcase(token) end,
-        on_token: fn token -> send(pid, {:token, token}) end
-      })
+  This action consumes the stream response stored in
+  `Jido.AI.Streaming.Registry`, applies optional callbacks/filtering, and
+  updates stream lifecycle state.
   """
 
   use Jido.Action,
@@ -55,44 +26,139 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokens do
         transform: Zoi.any(description: "Function to transform each token") |> Zoi.optional()
       })
 
-  @doc """
-  Executes the process tokens action.
+  alias Jido.AI.Actions.Helpers
+  alias Jido.AI.LLMClient
+  alias Jido.AI.Streaming.Registry
 
-  ## Returns
-
-  * `{:ok, result}` - Processing result with `stream_id`, `status`, `token_count`
-  * `{:error, reason}` - Error if stream not found or already processed
-
-  ## Result Format
-
-      %{
-        stream_id: "abc123",
-        status: :processing | :completed,
-        token_count: 42
-      }
-  """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
     stream_id = params[:stream_id]
 
-    case validate_stream_id(stream_id) do
-      :ok ->
-        # For now, return a placeholder result
-        # In a full implementation, this would interface with a stream registry
-        {:ok,
-         %{
-           stream_id: stream_id,
-           status: :processing,
-           token_count: 0,
-           note: "Stream processing configured"
-         }}
-
-      {:error, reason} ->
-        {:error, reason}
+    with :ok <- validate_stream_id(stream_id),
+         {:ok, entry} <- Registry.get(stream_id) do
+      maybe_process(entry, params, context)
     end
   end
 
-  # Private Functions
+  defp maybe_process(%{status: status} = entry, _params, _context) when status in [:completed, :error] do
+    {:ok, format_result(entry)}
+  end
+
+  defp maybe_process(%{stream_response: nil}, _params, _context), do: {:error, :stream_not_processible}
+
+  defp maybe_process(entry, params, context) do
+    stream_id = entry.stream_id
+    on_token = params[:on_token] || entry[:on_token]
+    on_complete = params[:on_complete]
+    filter = params[:filter]
+    transform = params[:transform]
+
+    with {:ok, _entry} <- Registry.mark_processing(stream_id),
+         {:ok, response} <-
+           LLMClient.process_stream(context, entry.stream_response,
+             on_result: fn chunk ->
+               handle_chunk(stream_id, chunk, on_token, filter, transform)
+             end
+           ),
+         usage = Helpers.extract_usage(response),
+         {:ok, completed_entry} <-
+           Registry.mark_completed(stream_id, %{usage: usage, response: response, stream_response: nil}) do
+      maybe_invoke_on_complete(on_complete, completed_entry)
+      {:ok, format_result(completed_entry)}
+    else
+      {:error, reason} = error ->
+        _ = Registry.mark_error(stream_id, reason)
+
+        with {:ok, failed_entry} <- Registry.get(stream_id) do
+          maybe_invoke_on_complete(on_complete, failed_entry)
+        end
+
+        error
+    end
+  end
+
+  defp handle_chunk(stream_id, chunk, on_token, filter, transform) when is_binary(chunk) do
+    if include_token?(chunk, filter) do
+      token = transform_token(chunk, transform)
+      _ = Registry.append_token(stream_id, token)
+      maybe_invoke_on_token(on_token, token)
+    end
+
+    :ok
+  end
+
+  defp handle_chunk(_stream_id, _chunk, _on_token, _filter, _transform), do: :ok
+
+  defp include_token?(_token, nil), do: true
+
+  defp include_token?(token, filter) when is_function(filter, 1) do
+    try do
+      filter.(token)
+    rescue
+      _ -> true
+    catch
+      _, _ -> true
+    end
+  end
+
+  defp include_token?(_token, _filter), do: true
+
+  defp transform_token(token, nil), do: token
+
+  defp transform_token(token, transform) when is_function(transform, 1) do
+    try do
+      transformed = transform.(token)
+      if is_binary(transformed), do: transformed, else: token
+    rescue
+      _ -> token
+    catch
+      _, _ -> token
+    end
+  end
+
+  defp transform_token(token, _transform), do: token
+
+  defp maybe_invoke_on_token(nil, _token), do: :ok
+
+  defp maybe_invoke_on_token(on_token, token) when is_function(on_token, 1) do
+    try do
+      on_token.(token)
+      :ok
+    rescue
+      _ -> :ok
+    catch
+      _, _ -> :ok
+    end
+  end
+
+  defp maybe_invoke_on_token(_on_token, _token), do: :ok
+
+  defp maybe_invoke_on_complete(nil, _result), do: :ok
+
+  defp maybe_invoke_on_complete(on_complete, result) when is_function(on_complete, 1) do
+    try do
+      on_complete.(format_result(result))
+      :ok
+    rescue
+      _ -> :ok
+    catch
+      _, _ -> :ok
+    end
+  end
+
+  defp maybe_invoke_on_complete(_on_complete, _result), do: :ok
+
+  defp format_result(entry) do
+    %{
+      stream_id: entry.stream_id,
+      status: entry.status,
+      token_count: Map.get(entry, :token_count, 0),
+      text: Map.get(entry, :text, ""),
+      usage: Map.get(entry, :usage, %{input_tokens: 0, output_tokens: 0, total_tokens: 0}),
+      model: Map.get(entry, :model),
+      error: Map.get(entry, :error)
+    }
+  end
 
   defp validate_stream_id(nil), do: {:error, :stream_id_required}
   defp validate_stream_id(""), do: {:error, :stream_id_required}

@@ -105,9 +105,9 @@ defmodule Jido.AI.Strategies.ChainOfThoughtTest do
       routes = ChainOfThought.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert route_map["cot.query"] == {:strategy_cmd, :cot_start}
-      assert route_map["react.llm.response"] == {:strategy_cmd, :cot_llm_result}
-      assert route_map["react.llm.delta"] == {:strategy_cmd, :cot_llm_partial}
+      assert route_map["ai.cot.query"] == {:strategy_cmd, :cot_start}
+      assert route_map["ai.llm.response"] == {:strategy_cmd, :cot_llm_result}
+      assert route_map["ai.llm.delta"] == {:strategy_cmd, :cot_llm_partial}
     end
   end
 

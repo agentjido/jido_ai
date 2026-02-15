@@ -164,7 +164,7 @@ defmodule Jido.AI do
     timeout = Keyword.get(opts, :timeout, 5000)
 
     signal =
-      Jido.Signal.new!("react.unregister_tool", %{tool_name: tool_name}, source: "/jido/ai")
+      Jido.Signal.new!("ai.react.unregister_tool", %{tool_name: tool_name}, source: "/jido/ai")
 
     case Jido.AgentServer.call(agent_server, signal, timeout) do
       {:ok, agent} -> {:ok, agent}
@@ -233,7 +233,7 @@ defmodule Jido.AI do
     timeout = Keyword.get(opts, :timeout, 5000)
 
     signal =
-      Jido.Signal.new!("react.register_tool", %{tool_module: tool_module}, source: "/jido/ai")
+      Jido.Signal.new!("ai.react.register_tool", %{tool_module: tool_module}, source: "/jido/ai")
 
     case Jido.AgentServer.call(agent_server, signal, timeout) do
       {:ok, agent} -> {:ok, agent}

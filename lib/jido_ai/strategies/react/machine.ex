@@ -51,22 +51,10 @@ defmodule Jido.AI.ReAct.Machine do
     }
 
   alias Jido.AI.Thread
+  alias Jido.AI.Observability.Events
 
   # Telemetry event names
-  @telemetry_prefix [:jido, :ai, :react]
-  @required_metadata_keys [
-    :agent_id,
-    :request_id,
-    :run_id,
-    :iteration,
-    :llm_call_id,
-    :tool_call_id,
-    :tool_name,
-    :model,
-    :termination_reason,
-    :error_type
-  ]
-  @required_measurement_keys [:duration_ms, :input_tokens, :output_tokens, :total_tokens, :retry_count, :queue_ms]
+  @telemetry_prefix [:jido, :ai, :strategy, :react]
 
   @typedoc "Internal machine status (string) - required by Fsmx library"
   @type internal_status :: String.t()
@@ -747,7 +735,7 @@ defmodule Jido.AI.ReAct.Machine do
 
   defp emit_request_event(event, measurements, metadata) do
     :telemetry.execute(
-      [:jido, :ai, :react, :request, event],
+      Events.request(event),
       ensure_required_measurements(measurements),
       ensure_required_metadata(metadata)
     )
@@ -763,14 +751,10 @@ defmodule Jido.AI.ReAct.Machine do
   end
 
   defp ensure_required_metadata(metadata) when is_map(metadata) do
-    Enum.reduce(@required_metadata_keys, metadata, fn key, acc ->
-      Map.put_new(acc, key, nil)
-    end)
+    Events.ensure_required_metadata(metadata)
   end
 
   defp ensure_required_measurements(measurements) when is_map(measurements) do
-    Enum.reduce(@required_measurement_keys, measurements, fn key, acc ->
-      Map.put_new(acc, key, 0)
-    end)
+    Events.ensure_required_measurements(measurements)
   end
 end

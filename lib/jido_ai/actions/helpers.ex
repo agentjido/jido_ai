@@ -136,10 +136,14 @@ defmodule Jido.AI.Actions.Helpers do
       %{input_tokens: 10, output_tokens: 20, total_tokens: 30}
   """
   def extract_usage(%{usage: usage}) when is_map(usage) do
+    input_tokens = Map.get(usage, :input_tokens) || Map.get(usage, "input_tokens") || 0
+    output_tokens = Map.get(usage, :output_tokens) || Map.get(usage, "output_tokens") || 0
+    total_tokens = Map.get(usage, :total_tokens) || Map.get(usage, "total_tokens") || input_tokens + output_tokens
+
     %{
-      input_tokens: Map.get(usage, :input_tokens, 0),
-      output_tokens: Map.get(usage, :output_tokens, 0),
-      total_tokens: Map.get(usage, :total_tokens, 0)
+      input_tokens: input_tokens,
+      output_tokens: output_tokens,
+      total_tokens: total_tokens
     }
   end
 

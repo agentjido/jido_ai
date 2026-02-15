@@ -2,6 +2,7 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Actions.Planning.Prioritize
+  alias Jido.AI.TestSupport.FakeLLMClient
 
   @moduletag :unit
   @moduletag :capture_log
@@ -35,7 +36,6 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
       assert {:error, _} = Prioritize.run(%{tasks: []}, %{})
     end
 
-    @tag :skip
     test "generates prioritization with valid tasks" do
       params = %{
         tasks: [
@@ -45,7 +45,7 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
         ]
       }
 
-      assert {:ok, result} = Prioritize.run(params, %{})
+      assert {:ok, result} = Prioritize.run(params, %{llm_client: FakeLLMClient})
       assert is_binary(result.prioritization)
       assert result.prioritization != ""
       assert is_list(result.ordered_tasks)
@@ -53,36 +53,33 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
       assert Map.has_key?(result, :usage)
     end
 
-    @tag :skip
     test "includes criteria in prioritization" do
       params = %{
         tasks: ["Task A", "Task B", "Task C"],
         criteria: "Business impact and development effort"
       }
 
-      assert {:ok, result} = Prioritize.run(params, %{})
+      assert {:ok, result} = Prioritize.run(params, %{llm_client: FakeLLMClient})
       assert String.length(result.prioritization) > 0
       assert map_size(result.scores) > 0
     end
 
-    @tag :skip
     test "includes context in prioritization" do
       params = %{
         tasks: ["Design API", "Build frontend", "Test"],
         context: "Early-stage startup, need MVP quickly"
       }
 
-      assert {:ok, result} = Prioritize.run(params, %{})
+      assert {:ok, result} = Prioritize.run(params, %{llm_client: FakeLLMClient})
       refute Enum.empty?(result.ordered_tasks)
     end
 
-    @tag :skip
     test "orders all provided tasks" do
       params = %{
         tasks: ["Task 1", "Task 2", "Task 3", "Task 4", "Task 5"]
       }
 
-      assert {:ok, result} = Prioritize.run(params, %{})
+      assert {:ok, result} = Prioritize.run(params, %{llm_client: FakeLLMClient})
       refute Enum.empty?(result.ordered_tasks)
     end
   end

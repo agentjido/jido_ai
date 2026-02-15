@@ -44,9 +44,9 @@ defmodule Jido.AI.Strategies.ChainOfThought do
   This strategy implements `signal_routes/1` which AgentServer uses to
   automatically route these signals to strategy commands:
 
-  - `"cot.query"` → `:cot_start`
-  - `"react.llm.response"` → `:cot_llm_result`
-  - `"react.llm.delta"` → `:cot_llm_partial`
+  - `"ai.cot.query"` → `:cot_start`
+  - `"ai.llm.response"` → `:cot_llm_result`
+  - `"ai.llm.delta"` → `:cot_llm_partial`
 
   ## State
 
@@ -84,6 +84,7 @@ defmodule Jido.AI.Strategies.ChainOfThought do
   @start :cot_start
   @llm_result :cot_llm_result
   @llm_partial :cot_llm_partial
+  @request_error :cot_request_error
 
   @doc "Returns the action atom for starting a CoT reasoning session."
   @spec start_action() :: :cot_start
@@ -97,9 +98,13 @@ defmodule Jido.AI.Strategies.ChainOfThought do
   @spec llm_partial_action() :: :cot_llm_partial
   def llm_partial_action, do: @llm_partial
 
+  @doc "Returns the action atom for handling request rejection events."
+  @spec request_error_action() :: :cot_request_error
+  def request_error_action, do: @request_error
+
   @action_specs %{
     @start => %{
-      schema: Zoi.object(%{prompt: Zoi.string()}),
+      schema: Zoi.object(%{prompt: Zoi.string(), request_id: Zoi.string() |> Zoi.optional()}),
       doc: "Start a new Chain-of-Thought reasoning session",
       name: "cot.start"
     },
@@ -117,6 +122,16 @@ defmodule Jido.AI.Strategies.ChainOfThought do
         }),
       doc: "Handle streaming LLM token chunk",
       name: "cot.llm_partial"
+    },
+    @request_error => %{
+      schema:
+        Zoi.object(%{
+          request_id: Zoi.string(),
+          reason: Zoi.atom(),
+          message: Zoi.string()
+        }),
+      doc: "Handle rejected request lifecycle event",
+      name: "cot.request_error"
     }
   }
 
@@ -126,11 +141,12 @@ defmodule Jido.AI.Strategies.ChainOfThought do
   @impl true
   def signal_routes(_ctx) do
     [
-      {"cot.query", {:strategy_cmd, @start}},
-      {"react.llm.response", {:strategy_cmd, @llm_result}},
-      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.cot.query", {:strategy_cmd, @start}},
+      {"ai.llm.response", {:strategy_cmd, @llm_result}},
+      {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.request.error", {:strategy_cmd, @request_error}},
       # Usage report is emitted for observability but doesn't need processing
-      {"react.usage", Jido.Actions.Control.Noop}
+      {"ai.usage", Jido.Actions.Control.Noop}
     ]
   end
 
@@ -206,37 +222,50 @@ defmodule Jido.AI.Strategies.ChainOfThought do
   end
 
   defp process_instruction(agent, %Jido.Instruction{action: action, params: params}) do
-    case to_machine_msg(normalize_action(action), params) do
-      msg when not is_nil(msg) ->
-        state = StratState.get(agent, %{})
-        config = state[:config]
-        machine = Machine.from_map(state)
+    normalized_action = normalize_action(action)
 
-        env = %{
-          system_prompt: config[:system_prompt]
-        }
-
-        {machine, directives} = Machine.update(machine, msg, env)
-
-        new_state =
-          machine
-          |> Machine.to_map()
-          |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
-
-        agent = StratState.put(agent, new_state)
-        {agent, lift_directives(directives, config)}
+    case normalized_action do
+      @request_error ->
+        process_request_error(agent, params)
 
       _ ->
-        :noop
+        case to_machine_msg(normalized_action, params) do
+          msg when not is_nil(msg) ->
+            state = StratState.get(agent, %{})
+            config = state[:config]
+            machine = Machine.from_map(state)
+
+            env = %{
+              system_prompt: config[:system_prompt]
+            }
+
+            {machine, directives} = Machine.update(machine, msg, env)
+
+            new_state =
+              machine
+              |> Machine.to_map()
+              |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+
+            agent = StratState.put(agent, new_state)
+            {agent, lift_directives(directives, config)}
+
+          _ ->
+            :noop
+        end
     end
   end
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
   defp normalize_action(action), do: action
 
-  defp to_machine_msg(@start, %{prompt: prompt}) do
-    call_id = generate_call_id()
-    {:start, prompt, call_id}
+  defp to_machine_msg(@start, %{prompt: prompt} = params) do
+    request_id =
+      case Map.get(params, :request_id) do
+        id when is_binary(id) -> id
+        _ -> generate_call_id()
+      end
+
+    {:start, prompt, request_id}
   end
 
   defp to_machine_msg(@llm_result, %{call_id: call_id, result: result}) do
@@ -248,6 +277,15 @@ defmodule Jido.AI.Strategies.ChainOfThought do
   end
 
   defp to_machine_msg(_, _), do: nil
+
+  defp process_request_error(agent, %{request_id: request_id, reason: reason, message: message}) do
+    state = StratState.get(agent, %{})
+    new_state = Map.put(state, :last_request_error, %{request_id: request_id, reason: reason, message: message})
+    agent = StratState.put(agent, new_state)
+    {agent, []}
+  end
+
+  defp process_request_error(_, _), do: :noop
 
   defp lift_directives(directives, config) do
     %{model: model} = config
@@ -264,10 +302,10 @@ defmodule Jido.AI.Strategies.ChainOfThought do
         ]
 
       # Issue #9 fix: Handle request rejection when agent is busy
-      {:request_error, call_id, reason, message} ->
+      {:request_error, request_id, reason, message} ->
         [
           Directive.EmitRequestError.new!(%{
-            call_id: call_id,
+            request_id: request_id,
             reason: reason,
             message: message
           })

@@ -129,10 +129,10 @@ use Jido.Agent,
 ```elixir
 def signal_routes(_ctx) do
   [
-    {"react.input", {:strategy_cmd, :react_start}},
-    {"react.llm.response", {:strategy_cmd, :react_llm_result}},
-    {"react.tool.result", {:strategy_cmd, :react_tool_result}},
-    {"react.llm.delta", {:strategy_cmd, :react_llm_partial}}
+    {"ai.react.query", {:strategy_cmd, :ai_react_start}},
+    {"ai.llm.response", {:strategy_cmd, :ai_react_llm_result}},
+    {"ai.tool.result", {:strategy_cmd, :ai_react_tool_result}},
+    {"ai.llm.delta", {:strategy_cmd, :ai_react_llm_partial}}
   ]
 end
 ```
@@ -142,13 +142,13 @@ end
 ```elixir
 # Register a tool at runtime
 Jido.AgentServer.cast(agent_pid, %Jido.Signal{
-  type: "react.register_tool",
+  type: "ai.react.register_tool",
   data: %{tool_module: MyApp.Actions.NewTool}
 })
 
 # Unregister a tool
 Jido.AgentServer.cast(agent_pid, %Jido.Signal{
-  type: "react.unregister_tool",
+  type: "ai.react.unregister_tool",
   data: %{tool_name: "old_tool"}
 })
 ```
