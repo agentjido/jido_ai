@@ -9,36 +9,31 @@ defmodule Jido.AI.Signal do
   ## Signal Types
 
   ### LLM Signals
-  - `LLMRequest` - LLM call initiated (`react.llm.request`)
-  - `LLMResponse` - LLM call completed (`react.llm.response`)
-  - `LLMDelta` - Streaming token chunk (`react.llm.delta`)
-  - `LLMError` - Structured LLM error (`react.llm.error`)
-  - `LLMCancelled` - LLM call cancelled (`react.llm.cancelled`)
-  - `Usage` - Token usage tracking (`react.usage`)
+  - `LLMRequest` - LLM call initiated (`ai.llm.request`)
+  - `LLMResponse` - LLM call completed (`ai.llm.response`)
+  - `LLMDelta` - Streaming token chunk (`ai.llm.delta`)
+  - `LLMError` - Structured LLM error (`ai.llm.error`)
+  - `LLMCancelled` - LLM call cancelled (`ai.llm.cancelled`)
+  - `Usage` - Token usage tracking (`ai.usage`)
 
   ### Tool Signals
-  - `ToolCall` - Tool invocation intent (`react.tool.call`)
-  - `ToolResult` - Tool execution completed (`react.tool.result`)
-  - `ToolError` - Structured tool error (`react.tool.error`)
+  - `ToolCall` - Tool invocation intent (`ai.tool.call`)
+  - `ToolResult` - Tool execution completed (`ai.tool.result`)
+  - `ToolError` - Structured tool error (`ai.tool.error`)
 
   ### Embedding Signals
-  - `EmbedRequest` - Embedding request initiated (`react.embed.request`)
-  - `EmbedResult` - Embedding completed (`react.embed.result`)
-  - `EmbedError` - Structured embedding error (`react.embed.error`)
+  - `EmbedRequest` - Embedding request initiated (`ai.embed.request`)
+  - `EmbedResult` - Embedding completed (`ai.embed.result`)
+  - `EmbedError` - Structured embedding error (`ai.embed.error`)
 
-  ### Orchestration Signals
-  - `RequestStarted` - Request lifecycle started (`react.request.started`)
-  - `RequestCompleted` - Request lifecycle completed (`react.request.completed`)
-  - `RequestFailed` - Request lifecycle failed (`react.request.failed`)
-  - `RequestError` - Request rejected (`react.request.error`)
-  - `DelegationRequest` - Task delegation (`ai.delegation.request`)
-  - `DelegationResult` - Delegation completed (`ai.delegation.result`)
-  - `DelegationError` - Delegation failed (`ai.delegation.error`)
-  - `CapabilityQuery` - Capability discovery (`ai.capability.query`)
-  - `CapabilityResponse` - Capability response (`ai.capability.response`)
+  ### Request Lifecycle Signals
+  - `RequestStarted` - Request lifecycle started (`ai.request.started`)
+  - `RequestCompleted` - Request lifecycle completed (`ai.request.completed`)
+  - `RequestFailed` - Request lifecycle failed (`ai.request.failed`)
+  - `RequestError` - Request rejected (`ai.request.error`)
 
   ### ReAct Signals
-  - `Step` - ReAct step tracking (`react.step`)
+  - `Step` - ReAct step tracking (`ai.react.step`)
 
   ## Helper Functions
 
@@ -90,8 +85,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.llm.response",
-      default_source: "/react/llm",
+      type: "ai.llm.response",
+      default_source: "/ai/llm",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"],
@@ -123,8 +118,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.llm.delta",
-      default_source: "/react/llm",
+      type: "ai.llm.delta",
+      default_source: "/ai/llm",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         delta: [type: :string, required: true, doc: "Text chunk from the stream"],
@@ -159,8 +154,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.llm.error",
-      default_source: "/react/llm",
+      type: "ai.llm.error",
+      default_source: "/ai/llm",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         error_type: [type: :atom, required: true, doc: "Error classification"],
@@ -189,8 +184,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.usage",
-      default_source: "/react/usage",
+      type: "ai.usage",
+      default_source: "/ai/usage",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         model: [type: :string, required: true, doc: "Model identifier"],
@@ -216,8 +211,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.tool.result",
-      default_source: "/react/tool",
+      type: "ai.tool.result",
+      default_source: "/ai/tool",
       schema: [
         call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
         tool_name: [type: :string, required: true, doc: "Name of the executed tool"],
@@ -242,8 +237,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.embed.result",
-      default_source: "/react/embed",
+      type: "ai.embed.result",
+      default_source: "/ai/embed",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the embedding call"],
         result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"]
@@ -259,16 +254,16 @@ defmodule Jido.AI.Signal do
 
     ## Data Fields
 
-    - `:call_id` (required) - Correlation ID for the rejected request
+    - `:request_id` (required) - Correlation ID for the rejected request
     - `:reason` (required) - Error reason atom (e.g., :busy, :invalid_state)
     - `:message` (required) - Human-readable error message
     """
 
     use Jido.Signal,
-      type: "react.request.error",
-      default_source: "/react/strategy",
+      type: "ai.request.error",
+      default_source: "/ai/strategy",
       schema: [
-        call_id: [type: :string, required: true, doc: "Correlation ID for the request"],
+        request_id: [type: :string, required: true, doc: "Correlation ID for the request"],
         reason: [type: :atom, required: true, doc: "Error reason atom"],
         message: [type: :string, required: true, doc: "Human-readable error message"]
       ]
@@ -282,8 +277,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.request.started",
-      default_source: "/react/request",
+      type: "ai.request.started",
+      default_source: "/ai/request",
       schema: [
         request_id: [type: :string, required: true, doc: "Request correlation ID"],
         query: [type: :string, required: true, doc: "Original user query"],
@@ -299,8 +294,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.request.completed",
-      default_source: "/react/request",
+      type: "ai.request.completed",
+      default_source: "/ai/request",
       schema: [
         request_id: [type: :string, required: true, doc: "Request correlation ID"],
         result: [type: :any, required: true, doc: "Final result payload"],
@@ -316,135 +311,12 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.request.failed",
-      default_source: "/react/request",
+      type: "ai.request.failed",
+      default_source: "/ai/request",
       schema: [
         request_id: [type: :string, required: true, doc: "Request correlation ID"],
         error: [type: :any, required: true, doc: "Failure reason payload"],
         run_id: [type: :string, doc: "Request-scoped run ID"]
-      ]
-  end
-
-  # ============================================================================
-  # Orchestration Signals
-  # ============================================================================
-
-  defmodule DelegationRequest do
-    @moduledoc """
-    Signal for task delegation request.
-
-    Emitted when a parent agent delegates a task to a child agent.
-
-    ## Data Fields
-
-    - `:call_id` (required) - Correlation ID for tracking the delegation
-    - `:task` (required) - Task description being delegated
-    - `:target` (required) - Target agent info (module, pid, or tag)
-    - `:constraints` (optional) - Delegation constraints (timeout, budget, etc.)
-    """
-
-    use Jido.Signal,
-      type: "ai.delegation.request",
-      default_source: "/ai/orchestration",
-      schema: [
-        call_id: [type: :string, required: true, doc: "Correlation ID for the delegation"],
-        task: [type: :string, required: true, doc: "Task being delegated"],
-        target: [type: :any, required: true, doc: "Target agent (module, pid, or tag)"],
-        constraints: [type: :map, default: %{}, doc: "Constraints: timeout_ms, max_cost, etc."]
-      ]
-  end
-
-  defmodule DelegationResult do
-    @moduledoc """
-    Signal for delegation completion.
-
-    Emitted when a delegated task completes, carrying the result back to parent.
-
-    ## Data Fields
-
-    - `:call_id` (required) - Correlation ID matching the original delegation request
-    - `:result` (required) - `{:ok, result}` or `{:error, reason}` from child
-    - `:source_agent` (required) - Agent that completed the task (tag or pid)
-    - `:duration_ms` (optional) - Time taken to complete the task
-    """
-
-    use Jido.Signal,
-      type: "ai.delegation.result",
-      default_source: "/ai/orchestration",
-      schema: [
-        call_id: [type: :string, required: true, doc: "Correlation ID for the delegation"],
-        result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"],
-        source_agent: [type: :any, required: true, doc: "Agent that completed the task"],
-        duration_ms: [type: :integer, doc: "Time taken in milliseconds"]
-      ]
-  end
-
-  defmodule DelegationError do
-    @moduledoc """
-    Signal for delegation failure.
-
-    Emitted when a delegated task fails, providing error details.
-
-    ## Data Fields
-
-    - `:call_id` (required) - Correlation ID matching the original delegation request
-    - `:error_type` (required) - Error classification atom
-    - `:message` (required) - Human-readable error message
-    - `:source_agent` (optional) - Agent where the error occurred
-    """
-
-    use Jido.Signal,
-      type: "ai.delegation.error",
-      default_source: "/ai/orchestration",
-      schema: [
-        call_id: [type: :string, required: true, doc: "Correlation ID for the delegation"],
-        error_type: [type: :atom, required: true, doc: "Error classification"],
-        message: [type: :string, required: true, doc: "Human-readable error message"],
-        source_agent: [type: :any, doc: "Agent where the error occurred"]
-      ]
-  end
-
-  defmodule CapabilityQuery do
-    @moduledoc """
-    Signal for capability discovery request.
-
-    Emitted when an orchestrator needs to discover available agent capabilities.
-
-    ## Data Fields
-
-    - `:call_id` (required) - Correlation ID for the query
-    - `:required_capabilities` (optional) - Filter by required capabilities
-    """
-
-    use Jido.Signal,
-      type: "ai.capability.query",
-      default_source: "/ai/orchestration",
-      schema: [
-        call_id: [type: :string, required: true, doc: "Correlation ID for the query"],
-        required_capabilities: [type: {:list, :string}, default: [], doc: "Required capabilities filter"]
-      ]
-  end
-
-  defmodule CapabilityResponse do
-    @moduledoc """
-    Signal for capability discovery response.
-
-    Response to a capability query with agent's capabilities.
-
-    ## Data Fields
-
-    - `:call_id` (required) - Correlation ID matching the query
-    - `:agent_ref` (required) - Agent reference (module, pid, or tag)
-    - `:capabilities` (required) - Capability descriptor
-    """
-
-    use Jido.Signal,
-      type: "ai.capability.response",
-      default_source: "/ai/orchestration",
-      schema: [
-        call_id: [type: :string, required: true, doc: "Correlation ID for the query"],
-        agent_ref: [type: :any, required: true, doc: "Agent reference"],
-        capabilities: [type: :map, required: true, doc: "Capability descriptor"]
       ]
   end
 
@@ -470,8 +342,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.llm.request",
-      default_source: "/react/llm",
+      type: "ai.llm.request",
+      default_source: "/ai/llm",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         model: [type: :string, required: true, doc: "Model identifier"],
@@ -503,8 +375,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.llm.cancelled",
-      default_source: "/react/llm",
+      type: "ai.llm.cancelled",
+      default_source: "/ai/llm",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
         reason: [type: :atom, required: true, doc: "Cancellation reason"],
@@ -532,8 +404,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.tool.call",
-      default_source: "/react/tool",
+      type: "ai.tool.call",
+      default_source: "/ai/tool",
       schema: [
         call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
         llm_call_id: [type: :string, doc: "Parent LLM call ID"],
@@ -571,8 +443,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.tool.error",
-      default_source: "/react/tool",
+      type: "ai.tool.error",
+      default_source: "/ai/tool",
       schema: [
         call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
         tool_name: [type: :string, required: true, doc: "Name of the tool that failed"],
@@ -602,8 +474,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.embed.request",
-      default_source: "/react/embed",
+      type: "ai.embed.request",
+      default_source: "/ai/embed",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the embedding call"],
         model: [type: :string, required: true, doc: "Embedding model identifier"],
@@ -628,8 +500,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.embed.error",
-      default_source: "/react/embed",
+      type: "ai.embed.error",
+      default_source: "/ai/embed",
       schema: [
         call_id: [type: :string, required: true, doc: "Correlation ID for the embedding call"],
         error_type: [type: :atom, required: true, doc: "Error classification"],
@@ -667,8 +539,8 @@ defmodule Jido.AI.Signal do
     """
 
     use Jido.Signal,
-      type: "react.step",
-      default_source: "/react/step",
+      type: "ai.react.step",
+      default_source: "/ai/react/step",
       schema: [
         step_id: [type: :string, required: true, doc: "Unique step identifier"],
         call_id: [type: :string, required: true, doc: "Root request correlation ID"],
@@ -706,7 +578,7 @@ defmodule Jido.AI.Signal do
       []
   """
   @spec extract_tool_calls(Jido.Signal.t()) :: [map()]
-  def extract_tool_calls(%{type: "react.llm.response", data: %{result: {:ok, result}}}) do
+  def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) do
     case result do
       %{type: :tool_calls, tool_calls: tool_calls} when is_list(tool_calls) -> tool_calls
       %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> tool_calls
@@ -739,7 +611,7 @@ defmodule Jido.AI.Signal do
       false
   """
   @spec tool_call?(Jido.Signal.t()) :: boolean()
-  def tool_call?(%{type: "react.llm.response", data: %{result: {:ok, result}}}) do
+  def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) do
     case result do
       %{type: :tool_calls} -> true
       %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> true
@@ -765,7 +637,7 @@ defmodule Jido.AI.Signal do
 
       iex> response = %ReqLLM.Response{message: %{content: "Hello"}, usage: %{input_tokens: 10, output_tokens: 5}}
       iex> Signal.from_reqllm_response(response, call_id: "call_1")
-      {:ok, %Jido.Signal{type: "react.llm.response", ...}}
+      {:ok, %Jido.Signal{type: "ai.llm.response", ...}}
   """
   @spec from_reqllm_response(map(), keyword()) :: {:ok, Jido.Signal.t()} | {:error, term()}
   def from_reqllm_response(response, opts) do
