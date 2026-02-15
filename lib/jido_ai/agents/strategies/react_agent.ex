@@ -382,7 +382,14 @@ defmodule Jido.AI.ReActAgent do
           if snap.done? do
             case snap.status do
               :success ->
-                agent = Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
+                agent =
+                  Request.complete_request(
+                    agent,
+                    request_id,
+                    snap.result,
+                    meta: jido_ai_react_thinking_meta(snap)
+                  )
+
                 emit_request_completed_signal(agent, request_id, snap.result)
                 agent
 
@@ -443,7 +450,14 @@ defmodule Jido.AI.ReActAgent do
               request_id ->
                 case snap.status do
                   :success ->
-                    agent = Request.complete_request(agent, request_id, snap.result, meta: thinking_meta(snap))
+                    agent =
+                      Request.complete_request(
+                        agent,
+                        request_id,
+                        snap.result,
+                        meta: jido_ai_react_thinking_meta(snap)
+                      )
+
                     emit_request_completed_signal(agent, request_id, snap.result)
                     agent
 
@@ -464,7 +478,9 @@ defmodule Jido.AI.ReActAgent do
         {:ok, agent, directives}
       end
 
-      defp thinking_meta(snap) do
+      # Use a prefixed helper name to avoid collisions with user-defined functions
+      # in modules that `use Jido.AI.ReActAgent`.
+      defp jido_ai_react_thinking_meta(snap) do
         details = snap.details
         meta = %{}
 
