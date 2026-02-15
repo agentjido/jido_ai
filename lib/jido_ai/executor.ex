@@ -291,21 +291,22 @@ defmodule Jido.AI.Executor do
 
   defp atomize_keys(map) when is_map(map) do
     Map.new(map, fn
-      {k, v} when is_binary(k) -> {String.to_existing_atom(k), atomize_keys(v)}
+      {k, v} when is_binary(k) -> {existing_atom_or_key(k), atomize_keys(v)}
       {k, v} when is_atom(k) -> {k, atomize_keys(v)}
       {k, v} -> {k, atomize_keys(v)}
     end)
-  rescue
-    ArgumentError ->
-      # If atom doesn't exist, try creating it (for dynamic keys)
-      Map.new(map, fn
-        {k, v} when is_binary(k) -> {String.to_atom(k), atomize_keys(v)}
-        {k, v} -> {k, atomize_keys(v)}
-      end)
   end
 
   defp atomize_keys(list) when is_list(list), do: Enum.map(list, &atomize_keys/1)
   defp atomize_keys(other), do: other
+
+  defp existing_atom_or_key(key) do
+    try do
+      String.to_existing_atom(key)
+    rescue
+      ArgumentError -> key
+    end
+  end
 
   defp coerce_integers_to_floats(params, schema) when is_list(schema) do
     float_keys =

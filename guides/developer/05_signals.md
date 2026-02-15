@@ -38,20 +38,20 @@ graph LR
 
 | Signal | Type | Emitted By | Purpose |
 |--------|------|------------|---------|
-| `LLMResponse` | `react.llm.response` | ReqLLM directives | LLM call completed |
-| `LLMDelta` | `react.llm.delta` | LLMStream | Streaming token chunk |
-| `LLMError` | `react.llm.error` | ReqLLM directives | Structured error |
-| `ToolResult` | `react.tool.result` | ToolExec | Tool execution completed |
-| `EmbedResult` | `react.embed.result` | LLMEmbed | Embedding generated |
-| `Usage` | `react.usage` | Telemetry | Token usage tracking |
+| `LLMResponse` | `ai.llm.response` | ReqLLM directives | LLM call completed |
+| `LLMDelta` | `ai.llm.delta` | LLMStream | Streaming token chunk |
+| `LLMError` | `ai.llm.error` | ReqLLM directives | Structured error |
+| `ToolResult` | `ai.tool.result` | ToolExec | Tool execution completed |
+| `EmbedResult` | `ai.embed.result` | LLMEmbed | Embedding generated |
+| `Usage` | `ai.usage` | Telemetry | Token usage tracking |
 
 ## Signal Naming Convention
 
 Jido.AI follows a consistent naming pattern:
 
-- **LLM signals**: `react.llm.<event>` - LLM-related events
-- **Tool signals**: `react.tool.<event>` - Tool execution events
-- **Generic React signals**: `react.<event>` - General React loop events
+- **LLM signals**: `ai.llm.<event>` - LLM-related events
+- **Tool signals**: `ai.tool.<event>` - Tool execution events
+- **Request signals**: `ai.request.<event>` - Request lifecycle events
 
 This naming convention makes it easy to:
 - Identify signal sources
@@ -66,7 +66,7 @@ Emitted when a ReqLLM call completes.
 
 ```elixir
 use Jido.Signal,
-  type: "react.llm.response",
+  type: "ai.llm.response",
   default_source: "/reqllm",
   schema: [
     call_id: [type: :string, required: true, doc: "Correlation ID"],
@@ -153,7 +153,7 @@ Emitted incrementally during streaming LLM responses.
 
 ```elixir
 use Jido.Signal,
-  type: "react.llm.delta",
+  type: "ai.llm.delta",
   default_source: "/reqllm",
   schema: [
     call_id: [type: :string, required: true, doc: "Correlation ID"],
@@ -208,7 +208,7 @@ Emitted when a tool execution completes.
 
 ```elixir
 use Jido.Signal,
-  type: "react.tool.result",
+  type: "ai.tool.result",
   default_source: "/ai/tool",
   schema: [
     call_id: [type: :string, required: true, doc: "Tool call ID from LLM"],
@@ -243,7 +243,7 @@ Structured error information:
 
 ```elixir
 use Jido.Signal,
-  type: "react.llm.error",
+  type: "ai.llm.error",
   schema: [
     call_id: [type: :string, required: true],
     error_type: [type: :atom, required: true],
@@ -259,7 +259,7 @@ Token usage and cost tracking:
 
 ```elixir
 use Jido.Signal,
-  type: "react.usage",
+  type: "ai.usage",
   schema: [
     call_id: [type: :string, required: true],
     model: [type: :string, required: true],
@@ -277,7 +277,7 @@ Embedding generation result:
 
 ```elixir
 use Jido.Signal,
-  type: "react.embed.result",
+  type: "ai.embed.result",
   schema: [
     call_id: [type: :string, required: true],
     result: [type: :any, required: true]
@@ -301,10 +301,10 @@ Strategies declare which signals they handle via `signal_routes/1`:
 def signal_routes(_ctx) do
   [
     # Route specific signal types to strategy commands
-    {"react.input", {:strategy_cmd, :react_start}},
-    {"react.llm.response", {:strategy_cmd, :react_llm_result}},
-    {"react.tool.result", {:strategy_cmd, :react_tool_result}},
-    {"react.llm.delta", {:strategy_cmd, :react_llm_partial}}
+    {"ai.react.query", {:strategy_cmd, :ai_react_start}},
+    {"ai.llm.response", {:strategy_cmd, :ai_react_llm_result}},
+    {"ai.tool.result", {:strategy_cmd, :ai_react_tool_result}},
+    {"ai.llm.delta", {:strategy_cmd, :ai_react_llm_partial}}
   ]
 end
 ```
@@ -322,9 +322,9 @@ end
 Signals are matched by their `type` field:
 
 ```elixir
-# This signal matches the "react.llm.response" route
+# This signal matches the "ai.llm.response" route
 %Jido.Signal{
-  type: "react.llm.response",
+  type: "ai.llm.response",
   data: %{call_id: "call_123", result: {:ok, %{...}}}
 }
 ```
@@ -335,7 +335,7 @@ Signals are matched by their `type` field:
 
 ```elixir
 @spec extract_tool_calls(Jido.Signal.t()) :: [map()]
-def extract_tool_calls(%{type: "react.llm.response", data: %{result: {:ok, result}}}) do
+def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) do
   case result do
     %{type: :tool_calls, tool_calls: tool_calls} when is_list(tool_calls) -> tool_calls
     %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> tool_calls
@@ -349,7 +349,7 @@ def extract_tool_calls(_signal), do: []
 
 ```elixir
 @spec tool_call?(Jido.Signal.t()) :: boolean()
-def tool_call?(%{type: "react.llm.response", data: %{result: {:ok, result}}}) do
+def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) do
   case result do
     %{type: :tool_calls} -> true
     %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> true

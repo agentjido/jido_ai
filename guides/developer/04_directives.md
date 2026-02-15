@@ -131,15 +131,15 @@ The directive implementation:
 2. Prepends system prompt (if provided)
 3. Spawns an async task
 4. Streams tokens from LLM
-5. Sends `react.llm.delta` signals for each chunk
-6. Sends `react.llm.response` signal on completion
+5. Sends `ai.llm.delta` signals for each chunk
+6. Sends `ai.llm.response` signal on completion
 
 ### Signals Emitted
 
 ```elixir
 # During streaming
 %Jido.Signal{
-  type: "react.llm.delta",
+  type: "ai.llm.delta",
   data: %{
     call_id: "call_123",
     delta: "Hello",
@@ -149,7 +149,7 @@ The directive implementation:
 
 # On completion
 %Jido.Signal{
-  type: "react.llm.response",
+  type: "ai.llm.response",
   data: %{
     call_id: "call_123",
     result: {:ok, %{type: :final_answer, text: "Hello!"}}
@@ -310,7 +310,7 @@ directive = Directive.LLMEmbed.new!(%{
 
 ```elixir
 %Jido.Signal{
-  type: "react.embed.result",
+  type: "ai.embed.result",
   data: %{
     call_id: "embed_123",
     result: {:ok, %{

@@ -1,18 +1,17 @@
 defmodule Jido.AI.Integration.JidoV2MigrationTest do
   @moduledoc """
-  Backward compatibility integration tests for Jido V2 migration.
+  2.0-beta contract integration tests.
 
   These tests verify that:
-  - Existing agents still work after StateOps migration
-  - Direct action execution works
-  - Strategy configuration works
-  - No breaking changes in public APIs
-  - Existing demo agents continue to function
+  - Core strategy and skill surfaces remain coherent
+  - Public APIs are available for 2.0 usage
+  - Strict breaking contract is enforced (no legacy 1.x namespace aliases)
   """
 
   use ExUnit.Case, async: false
 
   alias Jido.Agent
+  alias Jido.AI.Signal
   alias Jido.AI.Plugins.{LLM, Planning, Reasoning, Streaming, ToolCalling}
   alias Jido.AI.Strategies.ReAct
 
@@ -216,7 +215,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
     test "ReAct.start_action/0 is available" do
       assert function_exported?(ReAct, :start_action, 0)
-      assert ReAct.start_action() == :react_start
+      assert ReAct.start_action() == :ai_react_start
     end
 
     test "ReAct.list_tools/1 is available" do
@@ -225,7 +224,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
     test "ReAct.register_tool_action/0 is available" do
       assert function_exported?(ReAct, :register_tool_action, 0)
-      assert ReAct.register_tool_action() == :react_register_tool
+      assert ReAct.register_tool_action() == :ai_react_register_tool
     end
   end
 
@@ -244,9 +243,40 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       routes = ReAct.signal_routes(%{})
       route_map = Map.new(routes)
 
-      assert Map.has_key?(route_map, "react.input")
-      assert Map.has_key?(route_map, "react.llm.response")
-      assert Map.has_key?(route_map, "react.tool.result")
+      assert Map.has_key?(route_map, "ai.react.query")
+      assert Map.has_key?(route_map, "ai.llm.response")
+      assert Map.has_key?(route_map, "ai.tool.result")
+    end
+  end
+
+  describe "Strict Break Contracts" do
+    test "legacy react.* signal names are not routed" do
+      route_map = ReAct.signal_routes(%{}) |> Map.new()
+
+      refute Map.has_key?(route_map, "react.input")
+      refute Map.has_key?(route_map, "react.cancel")
+      refute Map.has_key?(route_map, "react.llm.response")
+      refute Map.has_key?(route_map, "react.tool.result")
+      refute Map.has_key?(route_map, "react.request.error")
+    end
+
+    test "RequestError requires request_id payload key" do
+      assert {:error, _} =
+               Signal.RequestError.new(%{
+                 call_id: "legacy_call",
+                 reason: :busy,
+                 message: "legacy payload"
+               })
+
+      assert {:ok, signal} =
+               Signal.RequestError.new(%{
+                 request_id: "req_1",
+                 reason: :busy,
+                 message: "busy"
+               })
+
+      assert signal.type == "ai.request.error"
+      assert signal.data.request_id == "req_1"
     end
   end
 

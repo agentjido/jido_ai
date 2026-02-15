@@ -115,7 +115,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
           duration_ms: 500
         )
 
-      assert signal.type == "react.llm.response"
+      assert signal.type == "ai.llm.response"
       assert signal.data.call_id == "call_123"
       assert signal.data.duration_ms == 500
       assert signal.data.model == "anthropic:claude-haiku-4-5"
@@ -189,7 +189,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
           retry_after: 60
         })
 
-      assert error_signal.type == "react.llm.error"
+      assert error_signal.type == "ai.llm.error"
       assert error_signal.data.error_type == :rate_limit
       assert error_signal.data.retry_after == 60
     end
@@ -235,7 +235,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
           metadata: %{request_id: "req_123"}
         })
 
-      assert usage_signal.type == "react.usage"
+      assert usage_signal.type == "ai.usage"
       assert usage_signal.data.model == "anthropic:claude-haiku-4-5"
       assert usage_signal.data.input_tokens == 100
       assert usage_signal.data.output_tokens == 50
@@ -252,7 +252,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
           result: {:ok, %{answer: 42}}
         })
 
-      assert tool_signal.type == "react.tool.result"
+      assert tool_signal.type == "ai.tool.result"
       assert tool_signal.data.tool_name == "calculator"
       assert tool_signal.data.result == {:ok, %{answer: 42}}
     end
@@ -279,7 +279,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
           result: {:ok, %{embeddings: embeddings, count: 2}}
         })
 
-      assert embed_signal.type == "react.embed.result"
+      assert embed_signal.type == "ai.embed.result"
       {:ok, result} = embed_signal.data.result
       assert result.embeddings == embeddings
       assert result.count == 2

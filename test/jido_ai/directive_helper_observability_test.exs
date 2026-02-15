@@ -31,7 +31,7 @@ defmodule Jido.AI.DirectiveHelperObservabilityTest do
 
     :telemetry.attach(
       handler_id,
-      [:jido, :ai, :react, :request, :start],
+      [:jido, :ai, :request, :start],
       fn event, measurements, metadata, _ ->
         send(self(), {:telemetry_seen, event, measurements, metadata})
       end,
@@ -41,12 +41,12 @@ defmodule Jido.AI.DirectiveHelperObservabilityTest do
     :ok =
       Helper.emit_react_event(
         %{emit_telemetry?: true},
-        [:jido, :ai, :react, :request, :start],
+        [:jido, :ai, :request, :start],
         %{duration_ms: 1},
         %{request_id: "req_1", run_id: "req_1"}
       )
 
-    assert_receive {:telemetry_seen, [:jido, :ai, :react, :request, :start], measurements, metadata}
+    assert_receive {:telemetry_seen, [:jido, :ai, :request, :start], measurements, metadata}
     assert measurements.duration_ms == 1
     assert metadata.request_id == "req_1"
     assert Map.has_key?(metadata, :agent_id)
@@ -60,7 +60,7 @@ defmodule Jido.AI.DirectiveHelperObservabilityTest do
 
     :telemetry.attach(
       handler_id,
-      [:jido, :ai, :react, :request, :start],
+      [:jido, :ai, :request, :start],
       fn event, measurements, metadata, _ ->
         send(self(), {:unexpected_telemetry, event, measurements, metadata})
       end,
@@ -70,7 +70,7 @@ defmodule Jido.AI.DirectiveHelperObservabilityTest do
     :ok =
       Helper.emit_react_event(
         %{emit_telemetry?: false},
-        [:jido, :ai, :react, :request, :start],
+        [:jido, :ai, :request, :start],
         %{duration_ms: 1},
         %{request_id: "req_1", run_id: "req_1"}
       )

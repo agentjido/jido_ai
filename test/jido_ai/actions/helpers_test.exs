@@ -116,7 +116,7 @@ defmodule Jido.AI.Actions.HelpersTest do
 
       assert usage.input_tokens == 10
       assert usage.output_tokens == 0
-      assert usage.total_tokens == 0
+      assert usage.total_tokens == 10
     end
 
     test "returns empty usage for malformed response" do

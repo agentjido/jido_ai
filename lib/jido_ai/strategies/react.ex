@@ -42,10 +42,10 @@ defmodule Jido.AI.Strategies.ReAct do
   This strategy implements `signal_routes/1` which AgentServer uses to
   automatically route these signals to strategy commands:
 
-  - `"react.input"` -> `:react_start`
-  - `"react.llm.response"` -> `:react_llm_result`
-  - `"react.tool.result"` -> `:react_tool_result`
-  - `"react.llm.delta"` -> `:react_llm_partial`
+  - `"ai.react.query"` -> `:ai_react_start`
+  - `"ai.llm.response"` -> `:ai_react_llm_result`
+  - `"ai.tool.result"` -> `:ai_react_tool_result`
+  - `"ai.llm.delta"` -> `:ai_react_llm_partial`
 
   No custom signal handling code is needed in your agent.
 
@@ -71,10 +71,10 @@ defmodule Jido.AI.Strategies.ReAct do
 
   - **`base_tool_context`** (persistent, in `config`) - Set at agent definition time via
     `:tool_context` option. Represents stable context like domain modules. Updated only
-    via explicit `react.set_tool_context` action (replaces, not merges).
+    via explicit `ai.react.set_tool_context` action (replaces, not merges).
 
   - **`run_tool_context`** (ephemeral, in state) - Set per-request via `tool_context:`
-    option in `react.start`. Automatically cleared when the machine reaches `:completed`
+    option in `ai.react.start`. Automatically cleared when the machine reaches `:completed`
     or `:error` status. Never persists across requests.
 
   At tool execution time, both contexts are merged (run overrides base) to produce the
@@ -117,50 +117,50 @@ defmodule Jido.AI.Strategies.ReAct do
   Think step by step and explain your reasoning.
   """
 
-  @start :react_start
-  @llm_result :react_llm_result
-  @tool_result :react_tool_result
-  @llm_partial :react_llm_partial
-  @cancel :react_cancel
-  @request_error :react_request_error
-  @register_tool :react_register_tool
-  @unregister_tool :react_unregister_tool
-  @set_tool_context :react_set_tool_context
+  @start :ai_react_start
+  @llm_result :ai_react_llm_result
+  @tool_result :ai_react_tool_result
+  @llm_partial :ai_react_llm_partial
+  @cancel :ai_react_cancel
+  @request_error :ai_react_request_error
+  @register_tool :ai_react_register_tool
+  @unregister_tool :ai_react_unregister_tool
+  @set_tool_context :ai_react_set_tool_context
 
   @doc "Returns the action atom for starting a ReAct conversation."
-  @spec start_action() :: :react_start
+  @spec start_action() :: :ai_react_start
   def start_action, do: @start
 
   @doc "Returns the action atom for handling LLM results."
-  @spec llm_result_action() :: :react_llm_result
+  @spec llm_result_action() :: :ai_react_llm_result
   def llm_result_action, do: @llm_result
 
   @doc "Returns the action atom for registering a tool dynamically."
-  @spec register_tool_action() :: :react_register_tool
+  @spec register_tool_action() :: :ai_react_register_tool
   def register_tool_action, do: @register_tool
 
   @doc "Returns the action atom for unregistering a tool."
-  @spec unregister_tool_action() :: :react_unregister_tool
+  @spec unregister_tool_action() :: :ai_react_unregister_tool
   def unregister_tool_action, do: @unregister_tool
 
   @doc "Returns the action atom for handling tool results."
-  @spec tool_result_action() :: :react_tool_result
+  @spec tool_result_action() :: :ai_react_tool_result
   def tool_result_action, do: @tool_result
 
   @doc "Returns the action atom for handling streaming LLM partial tokens."
-  @spec llm_partial_action() :: :react_llm_partial
+  @spec llm_partial_action() :: :ai_react_llm_partial
   def llm_partial_action, do: @llm_partial
 
   @doc "Returns the action atom for request cancellation."
-  @spec cancel_action() :: :react_cancel
+  @spec cancel_action() :: :ai_react_cancel
   def cancel_action, do: @cancel
 
   @doc "Returns the action atom for handling request rejections."
-  @spec request_error_action() :: :react_request_error
+  @spec request_error_action() :: :ai_react_request_error
   def request_error_action, do: @request_error
 
   @doc "Returns the action atom for updating tool context."
-  @spec set_tool_context_action() :: :react_set_tool_context
+  @spec set_tool_context_action() :: :ai_react_set_tool_context
   def set_tool_context_action, do: @set_tool_context
 
   @action_specs %{
@@ -172,17 +172,17 @@ defmodule Jido.AI.Strategies.ReAct do
           tool_context: Zoi.map() |> Zoi.optional()
         }),
       doc: "Start a new ReAct conversation with a user query",
-      name: "react.start"
+      name: "ai.react.start"
     },
     @llm_result => %{
       schema: Zoi.object(%{call_id: Zoi.string(), result: Zoi.any()}),
       doc: "Handle LLM response (tool calls or final answer)",
-      name: "react.llm_result"
+      name: "ai.react.llm_result"
     },
     @tool_result => %{
       schema: Zoi.object(%{call_id: Zoi.string(), tool_name: Zoi.string(), result: Zoi.any()}),
       doc: "Handle tool execution result",
-      name: "react.tool_result"
+      name: "ai.react.tool_result"
     },
     @llm_partial => %{
       schema:
@@ -192,7 +192,7 @@ defmodule Jido.AI.Strategies.ReAct do
           chunk_type: Zoi.atom() |> Zoi.default(:content)
         }),
       doc: "Handle streaming LLM token chunk",
-      name: "react.llm_partial"
+      name: "ai.react.llm_partial"
     },
     @cancel => %{
       schema:
@@ -201,32 +201,32 @@ defmodule Jido.AI.Strategies.ReAct do
           reason: Zoi.atom() |> Zoi.default(:user_cancelled)
         }),
       doc: "Cancel an in-flight ReAct request",
-      name: "react.cancel"
+      name: "ai.react.cancel"
     },
     @request_error => %{
       schema:
         Zoi.object(%{
-          call_id: Zoi.string(),
+          request_id: Zoi.string(),
           reason: Zoi.atom(),
           message: Zoi.string()
         }),
       doc: "Handle request rejection event",
-      name: "react.request_error"
+      name: "ai.react.request_error"
     },
     @register_tool => %{
       schema: Zoi.object(%{tool_module: Zoi.atom()}),
       doc: "Register a new tool dynamically at runtime",
-      name: "react.register_tool"
+      name: "ai.react.register_tool"
     },
     @unregister_tool => %{
       schema: Zoi.object(%{tool_name: Zoi.string()}),
       doc: "Unregister a tool by name",
-      name: "react.unregister_tool"
+      name: "ai.react.unregister_tool"
     },
     @set_tool_context => %{
       schema: Zoi.object(%{tool_context: Zoi.map()}),
       doc: "Update the tool context for subsequent tool executions",
-      name: "react.set_tool_context"
+      name: "ai.react.set_tool_context"
     }
   }
 
@@ -236,20 +236,20 @@ defmodule Jido.AI.Strategies.ReAct do
   @impl true
   def signal_routes(_ctx) do
     [
-      {"react.input", {:strategy_cmd, @start}},
-      {"react.llm.response", {:strategy_cmd, @llm_result}},
-      {"react.tool.result", {:strategy_cmd, @tool_result}},
-      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
-      {"react.cancel", {:strategy_cmd, @cancel}},
-      {"react.request.error", {:strategy_cmd, @request_error}},
-      {"react.register_tool", {:strategy_cmd, @register_tool}},
-      {"react.unregister_tool", {:strategy_cmd, @unregister_tool}},
-      {"react.set_tool_context", {:strategy_cmd, @set_tool_context}},
-      {"react.request.started", Jido.Actions.Control.Noop},
-      {"react.request.completed", Jido.Actions.Control.Noop},
-      {"react.request.failed", Jido.Actions.Control.Noop},
+      {"ai.react.query", {:strategy_cmd, @start}},
+      {"ai.llm.response", {:strategy_cmd, @llm_result}},
+      {"ai.tool.result", {:strategy_cmd, @tool_result}},
+      {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.react.cancel", {:strategy_cmd, @cancel}},
+      {"ai.request.error", {:strategy_cmd, @request_error}},
+      {"ai.react.register_tool", {:strategy_cmd, @register_tool}},
+      {"ai.react.unregister_tool", {:strategy_cmd, @unregister_tool}},
+      {"ai.react.set_tool_context", {:strategy_cmd, @set_tool_context}},
+      {"ai.request.started", Jido.Actions.Control.Noop},
+      {"ai.request.completed", Jido.Actions.Control.Noop},
+      {"ai.request.failed", Jido.Actions.Control.Noop},
       # Usage report is emitted for observability but doesn't need processing
-      {"react.usage", Jido.Actions.Control.Noop}
+      {"ai.usage", Jido.Actions.Control.Noop}
     ]
   end
 
@@ -473,9 +473,9 @@ defmodule Jido.AI.Strategies.ReAct do
     {agent, []}
   end
 
-  defp process_request_error(agent, %{call_id: call_id, reason: reason, message: message}) do
+  defp process_request_error(agent, %{request_id: request_id, reason: reason, message: message}) do
     state = StratState.get(agent, %{})
-    new_state = Map.put(state, :last_request_error, %{request_id: call_id, reason: reason, message: message})
+    new_state = Map.put(state, :last_request_error, %{request_id: request_id, reason: reason, message: message})
     agent = StratState.put(agent, new_state)
     {agent, []}
   end
@@ -611,10 +611,10 @@ defmodule Jido.AI.Strategies.ReAct do
         end
 
       # Issue #3 fix: Handle request rejection when agent is busy
-      {:request_error, call_id, reason, message} ->
+      {:request_error, request_id, reason, message} ->
         [
           Directive.EmitRequestError.new!(%{
-            call_id: call_id,
+            request_id: request_id,
             reason: reason,
             message: message
           })

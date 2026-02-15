@@ -2,6 +2,7 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Actions.Streaming.StartStream
+  alias Jido.AI.TestSupport.FakeLLMClient
 
   @moduletag :unit
   @moduletag :capture_log
@@ -31,49 +32,67 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
       assert {:error, _} = StartStream.run(%{prompt: ""}, %{})
     end
 
-    @tag :skip
     test "generates stream_id with valid params" do
       params = %{
-        prompt: "Test prompt"
+        prompt: "Test prompt",
+        auto_process: false
       }
 
-      assert {:ok, result} = StartStream.run(params, %{})
+      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
       assert is_binary(result.stream_id)
       assert String.length(result.stream_id) > 0
-      assert result.status == :streaming
+      assert result.status == :pending
     end
 
-    @tag :skip
     test "includes on_token callback in result" do
       params = %{
         prompt: "Tell me a story",
-        on_token: fn token -> send(self(), {:token, token}) end
+        on_token: fn token -> send(self(), {:token, token}) end,
+        auto_process: false
       }
 
-      assert {:ok, result} = StartStream.run(params, %{})
+      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
       assert is_binary(result.stream_id)
-      # Would receive tokens in async test
     end
 
-    @tag :skip
     test "respects buffer parameter" do
       params = %{
         prompt: "Write code",
-        buffer: true
+        buffer: true,
+        auto_process: false
       }
 
-      assert {:ok, result} = StartStream.run(params, %{})
+      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
       assert result.buffered == true
     end
 
-    @tag :skip
     test "respects auto_process false" do
       params = %{
         prompt: "Generate text",
         auto_process: false
       }
 
-      assert {:ok, result} = StartStream.run(params, %{})
+      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
+      assert is_binary(result.stream_id)
+      assert result.status == :pending
+    end
+
+    test "returns structured error when auto_process true and supervisor is missing" do
+      params = %{prompt: "Generate text", auto_process: true}
+      assert {:error, :missing_task_supervisor} = StartStream.run(params, %{llm_client: FakeLLMClient})
+    end
+
+    test "auto-processes when task supervisor is provided" do
+      {:ok, task_supervisor} = Task.Supervisor.start_link()
+
+      params = %{
+        prompt: "Generate text",
+        auto_process: true,
+        task_supervisor: task_supervisor
+      }
+
+      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
+      assert result.status == :streaming
       assert is_binary(result.stream_id)
     end
   end

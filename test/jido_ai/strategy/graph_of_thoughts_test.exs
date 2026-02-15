@@ -102,9 +102,9 @@ defmodule Jido.AI.Strategies.GraphOfThoughtsTest do
     test "returns correct signal routes" do
       routes = GraphOfThoughts.signal_routes(%{})
 
-      assert {"got.query", {:strategy_cmd, :got_start}} in routes
-      assert {"react.llm.response", {:strategy_cmd, :got_llm_result}} in routes
-      assert {"react.llm.delta", {:strategy_cmd, :got_llm_partial}} in routes
+      assert {"ai.got.query", {:strategy_cmd, :got_start}} in routes
+      assert {"ai.llm.response", {:strategy_cmd, :got_llm_result}} in routes
+      assert {"ai.llm.delta", {:strategy_cmd, :got_llm_partial}} in routes
     end
   end
 

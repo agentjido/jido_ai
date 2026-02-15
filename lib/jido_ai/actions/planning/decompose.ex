@@ -44,7 +44,7 @@ defmodule Jido.AI.Actions.Planning.Decompose do
     schema:
       Zoi.object(%{
         model:
-          Zoi.string(description: "Model spec (e.g., 'anthropic:claude-sonnet-4-20250514') or alias (e.g., :planning)")
+          Zoi.any(description: "Model alias (e.g., :planning) or direct model spec string")
           |> Zoi.optional(),
         goal: Zoi.string(description: "The goal to decompose"),
         max_depth: Zoi.integer(description: "Maximum depth of decomposition (1-5)") |> Zoi.default(3),
@@ -54,6 +54,8 @@ defmodule Jido.AI.Actions.Planning.Decompose do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
+  alias Jido.AI.Actions.Helpers
+  alias Jido.AI.LLMClient
   alias Jido.AI.Text
   alias ReqLLM.Context
 
@@ -114,12 +116,12 @@ defmodule Jido.AI.Actions.Planning.Decompose do
       }
   """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
     with {:ok, model} <- resolve_model(params[:model]),
-         {:ok, context} <- build_decompose_messages(params),
+         {:ok, req_context} <- build_decompose_messages(params),
          opts = build_opts(params),
-         {:ok, response} <- ReqLLM.Generation.generate_text(model, context.messages, opts) do
-      {:ok, format_result(response, model, params[:goal], params[:max_depth])}
+         {:ok, response} <- LLMClient.generate_text(context, model, req_context.messages, opts) do
+      {:ok, format_result(response, model, params[:goal], clamp_depth(params[:max_depth] || 3))}
     end
   end
 
@@ -176,9 +178,9 @@ defmodule Jido.AI.Actions.Planning.Decompose do
       decomposition: decomposition_text,
       sub_goals: extract_sub_goals(decomposition_text),
       goal: goal,
-      depth: depth || 3,
+      depth: depth,
       model: model,
-      usage: extract_usage(response)
+      usage: Helpers.extract_usage(response)
     }
   end
 
@@ -188,14 +190,4 @@ defmodule Jido.AI.Actions.Planning.Decompose do
     |> Enum.map(fn [_, sub_goal] -> String.trim(sub_goal) end)
     |> Enum.filter(fn s -> String.length(s) > 0 end)
   end
-
-  defp extract_usage(%{usage: usage}) when is_map(usage) do
-    %{
-      input_tokens: Map.get(usage, :input_tokens, 0),
-      output_tokens: Map.get(usage, :output_tokens, 0),
-      total_tokens: Map.get(usage, :total_tokens, 0)
-    }
-  end
-
-  defp extract_usage(_), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
 end

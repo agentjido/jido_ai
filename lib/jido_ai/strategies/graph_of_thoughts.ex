@@ -56,9 +56,9 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
   This strategy implements `signal_routes/1` which AgentServer uses to
   automatically route these signals to strategy commands:
 
-  - `"got.query"` → `:got_start`
-  - `"react.llm.response"` → `:got_llm_result`
-  - `"react.llm.delta"` → `:got_llm_partial`
+  - `"ai.got.query"` → `:got_start`
+  - `"ai.llm.response"` → `:got_llm_result`
+  - `"ai.llm.delta"` → `:got_llm_partial`
 
   ## State
 
@@ -79,6 +79,7 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
   @start :got_start
   @llm_result :got_llm_result
   @llm_partial :got_llm_partial
+  @request_error :got_request_error
 
   @doc "Returns the action atom for starting a GoT exploration."
   @spec start_action() :: :got_start
@@ -92,9 +93,13 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
   @spec llm_partial_action() :: :got_llm_partial
   def llm_partial_action, do: @llm_partial
 
+  @doc "Returns the action atom for handling request rejection events."
+  @spec request_error_action() :: :got_request_error
+  def request_error_action, do: @request_error
+
   @action_specs %{
     @start => %{
-      schema: Zoi.object(%{prompt: Zoi.string()}),
+      schema: Zoi.object(%{prompt: Zoi.string(), request_id: Zoi.string() |> Zoi.optional()}),
       doc: "Start a new Graph-of-Thoughts exploration",
       name: "got.start"
     },
@@ -112,6 +117,16 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
         }),
       doc: "Handle streaming LLM token chunk",
       name: "got.llm_partial"
+    },
+    @request_error => %{
+      schema:
+        Zoi.object(%{
+          request_id: Zoi.string(),
+          reason: Zoi.atom(),
+          message: Zoi.string()
+        }),
+      doc: "Handle rejected request lifecycle event",
+      name: "got.request_error"
     }
   }
 
@@ -121,11 +136,12 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
   @impl true
   def signal_routes(_ctx) do
     [
-      {"got.query", {:strategy_cmd, @start}},
-      {"react.llm.response", {:strategy_cmd, @llm_result}},
-      {"react.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.got.query", {:strategy_cmd, @start}},
+      {"ai.llm.response", {:strategy_cmd, @llm_result}},
+      {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.request.error", {:strategy_cmd, @request_error}},
       # Usage report is emitted for observability but doesn't need processing
-      {"react.usage", Jido.Actions.Control.Noop}
+      {"ai.usage", Jido.Actions.Control.Noop}
     ]
   end
 
@@ -300,9 +316,9 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
     machine = Machine.from_map(state)
 
     prompt = Map.get(params, :prompt) || Map.get(params, "prompt")
-    call_id = Machine.generate_call_id()
+    request_id = Map.get(params, :request_id) || Map.get(params, "request_id") || Machine.generate_call_id()
 
-    {updated_machine, directives} = Machine.update(machine, {:start, prompt, call_id}, %{})
+    {updated_machine, directives} = Machine.update(machine, {:start, prompt, request_id}, %{})
     lifted = lift_directives(directives, state)
 
     updated_state =
@@ -355,6 +371,20 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
     {updated_agent, lifted}
   end
 
+  defp process_instruction(agent, %{action: @request_error, params: params}) do
+    request_id = Map.get(params, :request_id) || Map.get(params, "request_id")
+    reason = Map.get(params, :reason) || Map.get(params, "reason")
+    message = Map.get(params, :message) || Map.get(params, "message")
+
+    if is_binary(request_id) do
+      state = StratState.get(agent, %{})
+      new_state = Map.put(state, :last_request_error, %{request_id: request_id, reason: reason, message: message})
+      {StratState.put(agent, new_state), []}
+    else
+      :noop
+    end
+  end
+
   defp process_instruction(_agent, _instruction), do: :noop
 
   defp lift_directives(directives, state) do
@@ -376,10 +406,10 @@ defmodule Jido.AI.Strategies.GraphOfThoughts do
         []
 
       # Issue #9 fix: Handle request rejection when agent is busy
-      {:request_error, call_id, reason, message} ->
+      {:request_error, request_id, reason, message} ->
         [
           Directive.EmitRequestError.new!(%{
-            call_id: call_id,
+            request_id: request_id,
             reason: reason,
             message: message
           })

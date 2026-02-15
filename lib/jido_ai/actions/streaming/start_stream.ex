@@ -3,42 +3,10 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
   A Jido.Action for initiating a streaming LLM request.
 
   This action starts a streaming text generation from an LLM and returns
-  a stream handle that can be used to process tokens. The actual streaming
-  happens in a background task.
-
-  ## Parameters
-
-  * `model` (optional) - Model alias (e.g., `:fast`) or direct spec
-  * `prompt` (required) - The user prompt to send to the LLM
-  * `system_prompt` (optional) - System prompt to guide behavior
-  * `max_tokens` (optional) - Maximum tokens to generate (default: `1024`)
-  * `temperature` (optional) - Sampling temperature (default: `0.7`)
-  * `timeout` (optional) - Request timeout in milliseconds
-  * `on_token` (optional) - Callback function invoked for each token
-  * `buffer` (optional) - Whether to buffer tokens for full response (default: `false`)
-  * `auto_process` (optional) - Whether to auto-process stream (default: `true`)
-
-  ## Examples
-
-      # Basic streaming with inline callback
-      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
-        prompt: "Tell me a joke",
-        on_token: fn token -> IO.write(token) end
-      })
-
-      # Buffered collection
-      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
-        prompt: "Write a poem",
-        buffer: true
-      })
-
-      # Get stream_id for manual processing
-      {:ok, result} = Jido.Exec.run(Jido.AI.Actions.Streaming.StartStream, %{
-        prompt: "Generate code",
-        auto_process: false
-      })
-      # Use result.stream_id with ProcessTokens action
+  a stream handle that can be used to process tokens. Streams are tracked in
+  `Jido.AI.Streaming.Registry` and can be consumed automatically or manually.
   """
+
   use Jido.Action,
     name: "streaming_start",
     description: "Start a streaming LLM request",
@@ -77,68 +45,38 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Security
+  alias Jido.AI.{LLMClient, Security}
+  alias Jido.AI.Actions.Streaming.ProcessTokens
+  alias Jido.AI.Streaming.Registry
   alias ReqLLM.Context
 
-  # Dialyzer has incomplete PLT information about req_llm dependencies
-  @dialyzer [
-    {:nowarn_function, run: 2},
-    {:nowarn_function, build_opts: 1},
-    {:nowarn_function, start_stream_processor: 3},
-    {:nowarn_function, process_stream: 5},
-    {:nowarn_function, handle_token: 4},
-    {:nowarn_function, finalize_stream: 4},
-    {:nowarn_function, extract_buffered_text: 2}
-  ]
-
-  @doc """
-  Executes the start stream action.
-
-  ## Returns
-
-  * `{:ok, result}` - Successful stream start with `stream_id`, `model`, `status`
-  * `{:error, reason}` - Error from ReqLLM or validation
-
-  ## Result Format
-
-      %{
-        stream_id: "unique_stream_identifier",
-        model: "anthropic:claude-haiku-4-5",
-        status: :streaming | :completed,
-        text: "accumulated text if buffered"
-      }
-  """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
     with {:ok, validated_params} <- validate_and_sanitize_params(params),
          {:ok, model} <- resolve_model(validated_params[:model]),
-         context = build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         {:ok, req_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          {:ok, stream_id} <- Security.generate_stream_id() |> Security.validate_stream_id(),
          opts = build_opts(validated_params),
-         {:ok, stream_response} <- ReqLLM.stream_text(model, context.messages, opts) do
-      # Start background task to process the stream
-      start_stream_processor(stream_id, stream_response, validated_params)
-
+         {:ok, stream_response} <- LLMClient.stream_text(context, model, req_context.messages, opts),
+         {:ok, _entry} <- register_stream(stream_id, model, stream_response, validated_params),
+         :ok <- maybe_start_processor(stream_id, validated_params, context) do
       {:ok,
        %{
          stream_id: stream_id,
          model: model,
-         status: :streaming,
-         buffered: validated_params[:buffer] || false
+         status: initial_status(validated_params),
+         buffered: validated_params[:buffer] || false,
+         auto_process: validated_params[:auto_process] != false
        }}
     end
   end
-
-  # Private Functions
 
   defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:fast)}
   defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
   defp resolve_model(model) when is_binary(model), do: {:ok, model}
   defp resolve_model(_), do: {:error, :invalid_model_format}
 
-  defp build_messages(prompt, nil) do
-    Context.normalize(prompt, [])
-  end
+  defp build_messages(prompt, nil), do: Context.normalize(prompt, [])
 
   defp build_messages(prompt, system_prompt) when is_binary(system_prompt) do
     Context.normalize(prompt, system_prompt: system_prompt)
@@ -150,23 +88,57 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
       temperature: params[:temperature]
     ]
 
-    opts =
-      if params[:timeout] do
-        Keyword.put(opts, :receive_timeout, params[:timeout])
-      else
-        opts
-      end
-
-    opts
+    if params[:timeout], do: Keyword.put(opts, :receive_timeout, params[:timeout]), else: opts
   end
 
-  # Validates and sanitizes input parameters to prevent security issues
+  defp register_stream(stream_id, model, stream_response, params) do
+    Registry.register(stream_id, %{
+      status: initial_status(params),
+      model: model,
+      auto_process: params[:auto_process] != false,
+      buffered: params[:buffer] || false,
+      on_token: params[:on_token],
+      stream_response: stream_response
+    })
+  end
+
+  defp initial_status(params) do
+    if params[:auto_process] == false, do: :pending, else: :streaming
+  end
+
+  defp maybe_start_processor(stream_id, params, context) do
+    if params[:auto_process] == false do
+      :ok
+    else
+      with {:ok, task_supervisor} <- resolve_task_supervisor(params[:task_supervisor]),
+           {:ok, _pid} <-
+             Task.Supervisor.start_child(task_supervisor, fn ->
+               _ = ProcessTokens.run(%{stream_id: stream_id}, context)
+             end) do
+        :ok
+      else
+        {:error, reason} = error ->
+          _ = Registry.mark_error(stream_id, reason)
+          error
+      end
+    end
+  end
+
+  defp resolve_task_supervisor(supervisor) when is_pid(supervisor), do: {:ok, supervisor}
+
+  defp resolve_task_supervisor(nil) do
+    case Application.get_env(:jido_ai, :task_supervisor) do
+      supervisor when is_pid(supervisor) -> {:ok, supervisor}
+      _ -> {:error, :missing_task_supervisor}
+    end
+  end
+
   defp validate_and_sanitize_params(params) do
     with {:ok, _prompt} <-
            Security.validate_string(params[:prompt], max_length: Security.max_input_length()),
          {:ok, _validated} <- validate_system_prompt_if_needed(params),
-         {:ok, validated_callback} <- validate_callback_if_needed(params) do
-      {:ok, Map.put(params, :on_token, validated_callback)}
+         {:ok, on_token} <- validate_callback_if_needed(params[:on_token]) do
+      {:ok, Map.put(params, :on_token, on_token)}
     else
       {:error, :empty_string} -> {:error, :prompt_required}
       {:error, reason} -> {:error, reason}
@@ -179,143 +151,7 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
 
   defp validate_system_prompt_if_needed(_params), do: {:ok, nil}
 
-  defp validate_callback_if_needed(%{on_token: on_token, task_supervisor: task_supervisor})
-       when is_function(on_token) do
-    supervisor = resolve_task_supervisor(task_supervisor)
-
-    Security.validate_and_wrap_callback(
-      on_token,
-      timeout: Security.callback_timeout(),
-      task_supervisor: supervisor
-    )
-  end
-
-  defp validate_callback_if_needed(%{on_token: on_token}) when is_function(on_token) do
-    task_supervisor = resolve_task_supervisor(nil)
-
-    Security.validate_and_wrap_callback(
-      on_token,
-      timeout: Security.callback_timeout(),
-      task_supervisor: task_supervisor
-    )
-  end
-
-  defp validate_callback_if_needed(_params), do: {:ok, nil}
-
-  defp start_stream_processor(stream_id, stream_response, params) do
-    on_token = params[:on_token]
-    buffer? = params[:buffer] || false
-    auto_process = params[:auto_process] != false
-    task_supervisor = resolve_task_supervisor(params[:task_supervisor])
-
-    Task.Supervisor.start_child(task_supervisor, fn ->
-      process_stream(stream_id, stream_response, on_token, buffer?, auto_process)
-    end)
-  end
-
-  defp resolve_task_supervisor(supervisor) when is_pid(supervisor), do: supervisor
-
-  defp resolve_task_supervisor(nil) do
-    case Application.get_env(:jido_ai, :task_supervisor) do
-      nil ->
-        raise """
-        Task supervisor not configured.
-
-        For streaming actions, you must either:
-        1. Pass task_supervisor as a parameter
-        2. Configure it in application environment:
-           Application.put_env(:jido_ai, :task_supervisor, supervisor_pid)
-
-        When using Jido.AI with agents, the supervisor is automatically
-        configured. For standalone action execution, you must provide it.
-        """
-
-      supervisor when is_pid(supervisor) ->
-        supervisor
-    end
-  end
-
-  defp process_stream(stream_id, stream_response, on_token, buffer?, _auto_process) do
-    # Initialize state
-    buffer_ref = if buffer?, do: :ets.new(:stream_buffer, [:private, :multiset])
-
-    try do
-      case ReqLLM.StreamResponse.process_stream(stream_response,
-             on_result: fn
-               chunk when is_binary(chunk) ->
-                 handle_token(stream_id, chunk, on_token, buffer_ref)
-
-               _other ->
-                 :ok
-             end
-           ) do
-        {:ok, response} ->
-          finalize_stream(stream_id, :completed, buffer_ref, response)
-
-        {:error, reason} ->
-          finalize_stream(stream_id, {:error, reason}, buffer_ref, nil)
-      end
-    rescue
-      e -> finalize_stream(stream_id, {:error, Exception.message(e)}, buffer_ref, nil)
-    catch
-      kind, reason -> finalize_stream(stream_id, {:error, {kind, reason}}, buffer_ref, nil)
-    after
-      if buffer_ref, do: :ets.delete(buffer_ref)
-    end
-  end
-
-  defp handle_token(stream_id, chunk, on_token, buffer_ref) do
-    cond do
-      # Buffer exists (ETS tid is always truthy)
-      buffer_ref != nil ->
-        # Store in buffer
-        :ets.insert(buffer_ref, {stream_id, chunk})
-
-        # Also call on_token if provided (already validated and wrapped)
-        if on_token && is_function(on_token, 1) do
-          try do
-            on_token.(chunk)
-          catch
-            _, _ -> :ok
-          end
-        else
-          :ok
-        end
-
-      # No buffer, has callback
-      on_token != nil and is_function(on_token, 1) ->
-        try do
-          on_token.(chunk)
-        catch
-          _, _ -> :ok
-        end
-
-      # No buffer, no callback
-      true ->
-        :ok
-    end
-  end
-
-  defp finalize_stream(_stream_id, status, nil, _response), do: status
-
-  defp finalize_stream(_stream_id, {:error, _reason} = status, buffer_ref, _response) do
-    # Could notify error via callback here
-    if buffer_ref, do: :ets.delete(buffer_ref)
-    status
-  end
-
-  defp finalize_stream(stream_id, :completed, buffer_ref, _response) do
-    # Extract buffered text for potential future use
-    _ = extract_buffered_text(buffer_ref, stream_id)
-
-    # Could store completion status in Registry here
-
-    :completed
-  end
-
-  defp extract_buffered_text(buffer_ref, stream_id) do
-    buffer_ref
-    |> :ets.select([{{stream_id, :"$1"}, [], [:"$1"]}])
-    |> Enum.join("")
-  end
+  defp validate_callback_if_needed(nil), do: {:ok, nil}
+  defp validate_callback_if_needed(callback) when is_function(callback, 1), do: {:ok, callback}
+  defp validate_callback_if_needed(_), do: {:error, :invalid_on_token_callback}
 end

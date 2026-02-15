@@ -393,16 +393,16 @@ defmodule Jido.AI.GraphOfThoughts.Machine do
   @spec has_cycle?(t()) :: boolean()
   def has_cycle?(%__MODULE__{nodes: nodes} = machine) do
     node_ids = Map.keys(nodes)
-    initial_path = MapSet.new()
+    initial_path = []
     Enum.any?(node_ids, &cycle_from_node?(machine, &1, initial_path))
   end
 
-  @spec cycle_from_node?(t(), String.t(), MapSet.t(String.t())) :: boolean()
+  @spec cycle_from_node?(t(), String.t(), [String.t()]) :: boolean()
   defp cycle_from_node?(machine, node_id, path) do
-    if MapSet.member?(path, node_id) do
+    if node_id in path do
       true
     else
-      new_path = MapSet.put(path, node_id)
+      new_path = [node_id | path]
       children = get_children(machine, node_id)
       Enum.any?(children, &cycle_from_node?(machine, &1, new_path))
     end

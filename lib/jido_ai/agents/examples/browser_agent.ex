@@ -16,7 +16,7 @@ defmodule Jido.AI.Examples.BrowserAgent do
 
   ## CLI Usage
 
-      mix jido_ai.agent --agent Jido.AI.Examples.BrowserAgent \\
+      mix jido_ai --agent Jido.AI.Examples.BrowserAgent \\
         "Read https://example.com and summarize it"
 
   """

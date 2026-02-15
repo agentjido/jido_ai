@@ -208,7 +208,10 @@ defmodule Jido.AI.ReActAgentTest do
       agent = Request.start_request(agent, "req_1", "query")
 
       {:ok, agent, _action} =
-        BasicAgent.on_before_cmd(agent, {:react_request_error, %{call_id: "req_1", reason: :busy, message: "busy"}})
+        BasicAgent.on_before_cmd(
+          agent,
+          {:ai_react_request_error, %{request_id: "req_1", reason: :busy, message: "busy"}}
+        )
 
       assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
       assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}

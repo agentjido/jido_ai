@@ -43,19 +43,19 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
     test "creates valid EmitRequestError directive" do
       directive =
         EmitRequestError.new!(%{
-          call_id: "call_456",
+          request_id: "req_456",
           reason: :busy,
           message: "Agent is busy"
         })
 
-      assert directive.call_id == "call_456"
+      assert directive.request_id == "req_456"
       assert directive.reason == :busy
       assert directive.message == "Agent is busy"
     end
 
     test "raises on invalid EmitRequestError directive" do
       assert_raise RuntimeError, ~r/Invalid EmitRequestError/, fn ->
-        EmitRequestError.new!(%{call_id: "call_123"})
+        EmitRequestError.new!(%{request_id: "req_123"})
       end
     end
   end
@@ -90,13 +90,13 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
     test "creates valid RequestError signal" do
       {:ok, signal} =
         Signal.RequestError.new(%{
-          call_id: "call_123",
+          request_id: "req_123",
           reason: :busy,
           message: "Agent is busy processing another request"
         })
 
-      assert signal.type == "react.request.error"
-      assert signal.data.call_id == "call_123"
+      assert signal.type == "ai.request.error"
+      assert signal.data.request_id == "req_123"
       assert signal.data.reason == :busy
       assert signal.data.message == "Agent is busy processing another request"
     end
@@ -111,7 +111,7 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
           result: {:error, {:unknown_tool, "Tool 'unknown_tool' not found"}}
         })
 
-      assert signal.type == "react.tool.result"
+      assert signal.type == "ai.tool.result"
       assert signal.data.call_id == "tc_123"
       assert signal.data.tool_name == "unknown_tool"
       assert {:error, {:unknown_tool, _}} = signal.data.result
@@ -132,7 +132,7 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
              }}
         })
 
-      assert signal.type == "react.tool.result"
+      assert signal.type == "ai.tool.result"
 
       assert signal.data.result ==
                {:error,

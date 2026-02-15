@@ -12,7 +12,7 @@ defmodule Jido.AI.SignalTest do
           result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
         })
 
-      assert signal.type == "react.llm.response"
+      assert signal.type == "ai.llm.response"
       assert signal.data.call_id == "call_123"
       assert signal.data.result == {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
     end
@@ -90,7 +90,7 @@ defmodule Jido.AI.SignalTest do
           delta: "Hello"
         })
 
-      assert signal.type == "react.llm.delta"
+      assert signal.type == "ai.llm.delta"
       assert signal.data.call_id == "call_partial_1"
       assert signal.data.delta == "Hello"
       assert signal.data.chunk_type == :content
@@ -140,7 +140,7 @@ defmodule Jido.AI.SignalTest do
         end)
 
       assert length(signals) == 4
-      assert Enum.all?(signals, &(&1.type == "react.llm.delta"))
+      assert Enum.all?(signals, &(&1.type == "ai.llm.delta"))
       assert Enum.all?(signals, &(&1.data.call_id == "call_stream_1"))
 
       accumulated = signals |> Enum.map_join(& &1.data.delta)
@@ -157,7 +157,7 @@ defmodule Jido.AI.SignalTest do
           message: "Rate limit exceeded"
         })
 
-      assert signal.type == "react.llm.error"
+      assert signal.type == "ai.llm.error"
       assert signal.data.call_id == "call_err_1"
       assert signal.data.error_type == :rate_limit
       assert signal.data.message == "Rate limit exceeded"
@@ -216,7 +216,7 @@ defmodule Jido.AI.SignalTest do
           output_tokens: 75
         })
 
-      assert signal.type == "react.usage"
+      assert signal.type == "ai.usage"
       assert signal.data.call_id == "call_usage_1"
       assert signal.data.model == "anthropic:claude-haiku-4-5"
       assert signal.data.input_tokens == 150
@@ -389,7 +389,7 @@ defmodule Jido.AI.SignalTest do
 
       {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_1")
 
-      assert signal.type == "react.llm.response"
+      assert signal.type == "ai.llm.response"
       assert signal.data.call_id == "call_from_1"
       assert {:ok, result} = signal.data.result
       assert result.type == :final_answer

@@ -399,7 +399,7 @@ defmodule Jido.AI.ReAct.MachineTest do
 
       :telemetry.attach(
         "test-iteration-handler-#{inspect(ref)}",
-        [:jido, :ai, :react, :iteration],
+        [:jido, :ai, :strategy, :react, :iteration],
         handler,
         nil
       )
@@ -425,7 +425,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       {_machine, _directives} = Machine.update(machine, {:tool_result, "tc_1", {:ok, %{result: 42}}}, env)
 
       # Verify telemetry was emitted
-      assert_receive {:telemetry_event, ^ref, [:jido, :ai, :react, :iteration], measurements, metadata}, 1000
+      assert_receive {:telemetry_event, ^ref, [:jido, :ai, :strategy, :react, :iteration], measurements, metadata}, 1000
 
       assert is_map(measurements)
       assert Map.has_key?(measurements, :system_time)
@@ -446,7 +446,7 @@ defmodule Jido.AI.ReAct.MachineTest do
 
       :telemetry.attach(
         "test-start-handler-#{inspect(ref)}",
-        [:jido, :ai, :react, :start],
+        [:jido, :ai, :strategy, :react, :start],
         handler,
         nil
       )
@@ -457,7 +457,7 @@ defmodule Jido.AI.ReAct.MachineTest do
       {_machine, _directives} = Machine.update(machine, {:start, "Hello world", "call_123"}, env)
 
       # Should emit start telemetry
-      assert_receive {:telemetry_event, ^ref, [:jido, :ai, :react, :start], measurements, metadata}, 1000
+      assert_receive {:telemetry_event, ^ref, [:jido, :ai, :strategy, :react, :start], measurements, metadata}, 1000
 
       assert Map.has_key?(measurements, :system_time)
       assert metadata.call_id == "call_123"

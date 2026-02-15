@@ -2,6 +2,22 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Actions.ToolCalling.CallWithTools
+  alias Jido.AI.TestSupport.FakeLLMClient
+
+  defmodule TestCalculator do
+    use Jido.Action,
+      name: "calculator",
+      description: "Test calculator",
+      schema:
+        Zoi.object(%{
+          operation: Zoi.string(),
+          a: Zoi.integer(),
+          b: Zoi.integer()
+        })
+
+    def run(%{operation: "add", a: a, b: b}, _context), do: {:ok, %{result: a + b}}
+    def run(_params, _context), do: {:error, :unsupported_operation}
+  end
 
   @moduletag :unit
   @moduletag :capture_log
@@ -30,27 +46,72 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       assert {:error, _} = CallWithTools.run(%{prompt: ""}, %{})
     end
 
-    @tag :skip
     test "returns result with valid prompt" do
       params = %{
         prompt: "What is 2 + 2?"
       }
 
-      assert {:ok, result} = CallWithTools.run(params, %{})
+      assert {:ok, result} = CallWithTools.run(params, %{llm_client: FakeLLMClient})
       assert Map.has_key?(result, :type)
       assert Map.has_key?(result, :model)
     end
 
-    @tag :skip
     test "includes tools in LLM call" do
-      # Register a test tool first
       params = %{
         prompt: "Calculate 5 + 3",
         tools: ["calculator"]
       }
 
-      assert {:ok, result} = CallWithTools.run(params, %{})
+      context = %{
+        llm_client: FakeLLMClient,
+        tools: %{TestCalculator.name() => TestCalculator}
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
       assert Map.has_key?(result, :type)
+    end
+
+    test "preserves generation opts across multi-turn auto_execute" do
+      params = %{
+        prompt: "Calculate 5 + 3",
+        tools: ["calculator"],
+        auto_execute: true,
+        max_tokens: 123,
+        temperature: 0.2
+      }
+
+      context = %{
+        llm_client: FakeLLMClient,
+        tools: %{TestCalculator.name() => TestCalculator}
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+      assert result.type == :final_answer
+      assert result.text =~ "max_tokens=123"
+      assert result.text =~ "temperature=0.2"
+      assert result.turns >= 1
+      assert is_map(result.usage)
+      assert result.usage.total_tokens > 0
+    end
+
+    test "enforces max_turns and returns deterministic terminal shape" do
+      params = %{
+        prompt: "loop tool execution",
+        tools: ["calculator"],
+        auto_execute: true,
+        max_turns: 1
+      }
+
+      context = %{
+        llm_client: FakeLLMClient,
+        tools: %{TestCalculator.name() => TestCalculator}
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+      assert result.reason == :max_turns_reached
+      assert result.turns == 1
+      assert is_map(result.usage)
+      assert Map.has_key?(result.usage, :total_tokens)
     end
   end
 

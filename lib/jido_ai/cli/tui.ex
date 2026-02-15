@@ -20,7 +20,7 @@ defmodule Jido.AI.CLI.TUI do
 
   alias Jido.AI.CLI.Adapter
   alias TermUI.Command
-  alias TermUI.Style
+  alias TermUI.Renderer.Style
 
   require Logger
 
@@ -163,7 +163,7 @@ defmodule Jido.AI.CLI.TUI do
   @impl true
   def view(state) do
     header = render_header()
-    separator = text("─────────────────────────────────────────────────")
+    separator = text("-------------------------------------------------")
     messages_area = render_messages(state.messages)
     input_area = render_input(state)
     status_bar = render_status_bar(state)
@@ -272,7 +272,7 @@ defmodule Jido.AI.CLI.TUI do
           parts
       end
 
-    if Enum.empty?(parts), do: "", else: "(#{Enum.join(parts, " • ")})"
+    if Enum.empty?(parts), do: "", else: "(#{Enum.join(parts, " | ")})"
   end
 
   defp format_tokens(n) when n >= 1000, do: "#{Float.round(n / 1000, 1)}k"
@@ -282,10 +282,10 @@ defmodule Jido.AI.CLI.TUI do
     {prompt, prompt_style} =
       case state.status do
         :thinking ->
-          {"⏳ Thinking...", Style.new() |> Style.fg(:yellow)}
+          {"Thinking...", Style.new() |> Style.fg(:yellow)}
 
         :error ->
-          {"❌ Error", Style.new() |> Style.fg(:red)}
+          {"Error", Style.new() |> Style.fg(:red)}
 
         _ ->
           {"> ", Style.new() |> Style.fg(:green)}
@@ -295,7 +295,7 @@ defmodule Jido.AI.CLI.TUI do
 
     cursor =
       if state.status == :ready do
-        "█"
+        "_"
       else
         ""
       end

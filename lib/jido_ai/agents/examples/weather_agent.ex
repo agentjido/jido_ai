@@ -31,10 +31,10 @@ defmodule Jido.AI.Examples.WeatherAgent do
 
   ## CLI Usage
 
-      mix jido_ai.agent --agent Jido.AI.Examples.WeatherAgent \\
+      mix jido_ai --agent Jido.AI.Examples.WeatherAgent \\
         "Should I bring an umbrella to Chicago this weekend?"
 
-      mix jido_ai.agent --agent Jido.AI.Examples.WeatherAgent \\
+      mix jido_ai --agent Jido.AI.Examples.WeatherAgent \\
         "I'm hiking in Denver tomorrow - what should I wear?"
 
   ## Notes

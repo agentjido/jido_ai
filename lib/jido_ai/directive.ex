@@ -35,8 +35,8 @@ defmodule Jido.AI.Directive do
     Directive asking the runtime to stream an LLM response via ReqLLM.
 
     Uses ReqLLM for streaming. The runtime will execute this asynchronously
-    and send partial tokens as `react.llm.delta` signals and the final result
-    as a `react.llm.response` signal.
+    and send partial tokens as `ai.llm.delta` signals and the final result
+    as a `ai.llm.response` signal.
 
     ## New Fields
 
@@ -99,7 +99,7 @@ defmodule Jido.AI.Directive do
     Directive to execute a Jido.Action as a tool.
 
     The runtime will execute this asynchronously and send the result back
-    as a `react.tool.result` signal.
+    as a `ai.tool.result` signal.
 
     ## Execution Modes
 
@@ -215,7 +215,7 @@ defmodule Jido.AI.Directive do
     @schema Zoi.struct(
               __MODULE__,
               %{
-                call_id: Zoi.string(description: "Correlation ID for the request"),
+                request_id: Zoi.string(description: "Correlation ID for the request"),
                 reason: Zoi.atom(description: "Error reason atom (e.g., :busy)"),
                 message: Zoi.string(description: "Human-readable error message")
               },
@@ -244,7 +244,7 @@ defmodule Jido.AI.Directive do
 
     Uses `ReqLLM.Generation.generate_text/3` for non-streaming text generation.
     The runtime will execute this asynchronously and send the result as a
-    `react.llm.response` signal.
+    `ai.llm.response` signal.
 
     This is simpler than `LLMStream` for cases where streaming is not needed.
     """
@@ -300,7 +300,7 @@ defmodule Jido.AI.Directive do
     Directive asking the runtime to generate embeddings via ReqLLM.
 
     Uses `ReqLLM.Embedding.embed/3` for embedding generation. The runtime will
-    execute this asynchronously and send the result as a `react.embed.result` signal.
+    execute this asynchronously and send the result as a `ai.embed.result` signal.
 
     Supports both single text and batch embedding (list of texts).
     """
@@ -342,8 +342,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   Spawns an async task to stream an LLM response and sends results back to the agent.
 
   This implementation provides **true streaming**: as tokens arrive from the LLM,
-  they are immediately sent as `react.llm.delta` signals. When the stream completes,
-  a final `react.llm.response` signal is sent with the full classification (tool calls
+  they are immediately sent as `ai.llm.delta` signals. When the stream completes,
+  a final `ai.llm.response` signal is sent with the full classification (tool calls
   or final answer).
 
   Supports:
@@ -361,7 +361,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Signal}
+  alias Jido.AI.{Helpers, LLMClient, Signal}
   alias Jido.Observe
   alias Jido.Tracing.Context, as: TraceContext
 
@@ -381,6 +381,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     timeout = Map.get(directive, :timeout)
     metadata = Map.get(directive, :metadata, %{})
     obs_cfg = metadata[:observability] || %{}
+    llm_context = llm_client_context(context, metadata)
 
     event_meta = %{
       agent_id: metadata[:agent_id],
@@ -408,6 +409,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       max_tokens: max_tokens,
       temperature: temperature,
       timeout: timeout,
+      llm_context: llm_context,
       agent_pid: agent_pid,
       event_meta: event_meta,
       obs_cfg: obs_cfg
@@ -416,55 +418,66 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     # Capture parent trace context before spawning
     parent_trace_ctx = TraceContext.get()
 
-    Task.Supervisor.start_child(task_supervisor, fn ->
-      # Restore trace context in child task
-      if parent_trace_ctx, do: Process.put({:jido, :trace_context}, parent_trace_ctx)
+    case Task.Supervisor.start_child(task_supervisor, fn ->
+           # Restore trace context in child task
+           if parent_trace_ctx, do: Process.put({:jido, :trace_context}, parent_trace_ctx)
 
-      started_at = System.monotonic_time(:millisecond)
-      span_ctx = Observe.start_span([:jido, :ai, :react, :llm, :span], event_meta)
+           started_at = System.monotonic_time(:millisecond)
+           span_ctx = Observe.start_span([:jido, :ai, :llm, :span], event_meta)
 
-      maybe_emit(obs_cfg, [:jido, :ai, :react, :llm, :start], %{duration_ms: 0, queue_ms: 0}, event_meta)
+           maybe_emit(obs_cfg, [:jido, :ai, :llm, :start], %{duration_ms: 0, queue_ms: 0}, event_meta)
 
-      result =
-        try do
-          stream_with_callbacks(stream_opts)
-        rescue
-          e ->
-            {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
-        catch
-          kind, reason ->
-            {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
-        end
+           result =
+             try do
+               stream_with_callbacks(stream_opts)
+             rescue
+               e ->
+                 {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
+             catch
+               kind, reason ->
+                 {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
+             end
 
-      duration_ms = System.monotonic_time(:millisecond) - started_at
+           duration_ms = System.monotonic_time(:millisecond) - started_at
 
-      case result do
-        {:ok, _} ->
-          Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
-          maybe_emit(obs_cfg, [:jido, :ai, :react, :llm, :complete], %{duration_ms: duration_ms}, event_meta)
+           case result do
+             {:ok, _} ->
+               Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
+               maybe_emit(obs_cfg, [:jido, :ai, :llm, :complete], %{duration_ms: duration_ms}, event_meta)
 
-        {:error, reason} ->
-          Observe.finish_span_error(span_ctx, :error, reason, [])
+             {:error, reason} ->
+               Observe.finish_span_error(span_ctx, :error, reason, [])
 
-          error_type =
-            case reason do
-              %{error_type: type} when is_atom(type) -> type
-              _ -> :unknown
-            end
+               error_type =
+                 case reason do
+                   %{error_type: type} when is_atom(type) -> type
+                   _ -> :unknown
+                 end
 
-          maybe_emit(
-            obs_cfg,
-            [:jido, :ai, :react, :llm, :error],
-            %{duration_ms: duration_ms},
-            Map.put(event_meta, :error_type, error_type)
-          )
-      end
+               maybe_emit(
+                 obs_cfg,
+                 [:jido, :ai, :llm, :error],
+                 %{duration_ms: duration_ms},
+                 Map.put(event_meta, :error_type, error_type)
+               )
+           end
 
-      signal = Signal.LLMResponse.new!(%{call_id: call_id, result: result})
-      Jido.AgentServer.cast(agent_pid, signal)
-    end)
+           signal = Signal.LLMResponse.new!(%{call_id: call_id, result: result})
+           Jido.AgentServer.cast(agent_pid, signal)
+         end) do
+      {:ok, _pid} ->
+        {:async, nil, state}
 
-    {:async, nil, state}
+      {:error, reason} ->
+        signal =
+          Signal.LLMResponse.new!(%{
+            call_id: call_id,
+            result: {:error, %{type: :supervisor, reason: inspect(reason), error_type: :unknown}}
+          })
+
+        Jido.AgentServer.cast(agent_pid, signal)
+        {:ok, state}
+    end
   end
 
   defp stream_with_callbacks(%{
@@ -477,6 +490,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
          max_tokens: max_tokens,
          temperature: temperature,
          timeout: timeout,
+         llm_context: llm_context,
          agent_pid: agent_pid,
          event_meta: event_meta,
          obs_cfg: obs_cfg
@@ -491,7 +505,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
-    case ReqLLM.stream_text(model, messages, opts) do
+    case LLMClient.stream_text(llm_context, model, messages, opts) do
       {:ok, stream_response} ->
         on_content = fn text ->
           partial_signal =
@@ -503,7 +517,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
           Jido.AgentServer.cast(agent_pid, partial_signal)
 
-          maybe_emit_delta(obs_cfg, [:jido, :ai, :react, :llm, :delta], %{duration_ms: 0}, event_meta)
+          maybe_emit_delta(obs_cfg, [:jido, :ai, :llm, :delta], %{duration_ms: 0}, event_meta)
         end
 
         on_thinking = fn text ->
@@ -516,10 +530,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
           Jido.AgentServer.cast(agent_pid, partial_signal)
 
-          maybe_emit_delta(obs_cfg, [:jido, :ai, :react, :llm, :delta], %{duration_ms: 0}, event_meta)
+          maybe_emit_delta(obs_cfg, [:jido, :ai, :llm, :delta], %{duration_ms: 0}, event_meta)
         end
 
-        case ReqLLM.StreamResponse.process_stream(stream_response,
+        case LLMClient.process_stream(llm_context, stream_response,
                on_result: on_content,
                on_thinking: on_thinking
              ) do
@@ -540,7 +554,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     end
   end
 
-  # Emit react.usage signal for per-call usage tracking
+  # Emit ai.usage signal for per-call usage tracking
   defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
 
   defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
@@ -551,7 +565,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       signal =
         Signal.Usage.new!(%{
           call_id: call_id,
-          model: model || "unknown",
+          model: model,
           input_tokens: input_tokens,
           output_tokens: output_tokens,
           total_tokens: input_tokens + output_tokens,
@@ -578,6 +592,19 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       :ok
     end
   end
+
+  defp llm_client_context(context, metadata) do
+    cond do
+      is_map(context) and not is_nil(context[:llm_client]) ->
+        %{llm_client: context[:llm_client]}
+
+      is_map(metadata) and not is_nil(metadata[:llm_client]) ->
+        %{llm_client: metadata[:llm_client]}
+
+      true ->
+        %{}
+    end
+  end
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
@@ -585,7 +612,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
   Spawns an async task to generate embeddings and sends the result back to the agent.
 
   Uses `ReqLLM.Embedding.embed/3` for embedding generation. The result is sent
-  as a `react.embed.result` signal.
+  as a `ai.embed.result` signal.
 
   Supports both single text and batch embedding (list of texts).
   """
@@ -605,23 +632,34 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
-    Task.Supervisor.start_child(task_supervisor, fn ->
-      result =
-        try do
-          generate_embeddings(model, texts, dimensions, timeout)
-        rescue
-          e ->
-            {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
-        catch
-          kind, reason ->
-            {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
-        end
+    case Task.Supervisor.start_child(task_supervisor, fn ->
+           result =
+             try do
+               generate_embeddings(model, texts, dimensions, timeout)
+             rescue
+               e ->
+                 {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
+             catch
+               kind, reason ->
+                 {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
+             end
 
-      signal = Signal.EmbedResult.new!(%{call_id: call_id, result: result})
-      Jido.AgentServer.cast(agent_pid, signal)
-    end)
+           signal = Signal.EmbedResult.new!(%{call_id: call_id, result: result})
+           Jido.AgentServer.cast(agent_pid, signal)
+         end) do
+      {:ok, _pid} ->
+        {:async, nil, state}
 
-    {:async, nil, state}
+      {:error, reason} ->
+        signal =
+          Signal.EmbedResult.new!(%{
+            call_id: call_id,
+            result: {:error, %{type: :supervisor, reason: inspect(reason), error_type: :unknown}}
+          })
+
+        Jido.AgentServer.cast(agent_pid, signal)
+        {:ok, state}
+    end
   end
 
   defp generate_embeddings(model, texts, dimensions, timeout) do
@@ -651,7 +689,7 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   @moduledoc """
   Spawns an async task to execute a Jido.Action and sends the result back
-  to the agent as a `react.tool.result` signal.
+  to the agent as a `ai.tool.result` signal.
 
   Supports two execution modes:
   1. Direct module execution when `action_module` is provided (bypasses Registry)
@@ -704,106 +742,117 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     # Capture parent trace context before spawning
     parent_trace_ctx = TraceContext.get()
 
-    Task.Supervisor.start_child(task_supervisor, fn ->
-      # Restore trace context in child task
-      if parent_trace_ctx, do: Process.put({:jido, :trace_context}, parent_trace_ctx)
+    case Task.Supervisor.start_child(task_supervisor, fn ->
+           # Restore trace context in child task
+           if parent_trace_ctx, do: Process.put({:jido, :trace_context}, parent_trace_ctx)
 
-      event_meta = %{
-        agent_id: agent_id,
-        request_id: request_id,
-        run_id: run_id,
-        iteration: iteration,
-        llm_call_id: nil,
-        tool_call_id: call_id,
-        tool_name: tool_name,
-        model: nil,
-        termination_reason: nil,
-        error_type: nil
-      }
+           event_meta = %{
+             agent_id: agent_id,
+             request_id: request_id,
+             run_id: run_id,
+             iteration: iteration,
+             llm_call_id: nil,
+             tool_call_id: call_id,
+             tool_name: tool_name,
+             model: nil,
+             termination_reason: nil,
+             error_type: nil
+           }
 
-      start_ms = System.monotonic_time(:millisecond)
-      span_ctx = Observe.start_span([:jido, :ai, :react, :tool, :span], event_meta)
+           start_ms = System.monotonic_time(:millisecond)
+           span_ctx = Observe.start_span([:jido, :ai, :tool, :span], event_meta)
 
-      maybe_emit(
-        obs_cfg,
-        [:jido, :ai, :react, :tool, :start],
-        %{duration_ms: 0, queue_ms: 0, retry_count: 0},
-        event_meta
-      )
+           maybe_emit(
+             obs_cfg,
+             [:jido, :ai, :tool, :start],
+             %{duration_ms: 0, queue_ms: 0, retry_count: 0},
+             event_meta
+           )
 
-      {result, retry_count} =
-        execute_with_retries(
-          task_supervisor,
-          action_module,
+           {result, retry_count} =
+             execute_with_retries(
+               task_supervisor,
+               action_module,
+               tool_name,
+               arguments,
+               context,
+               tools,
+               timeout_ms,
+               max_retries,
+               retry_backoff_ms,
+               event_meta,
+               obs_cfg
+             )
+
+           duration_ms = System.monotonic_time(:millisecond) - start_ms
+
+           case result do
+             {:ok, _res} ->
+               Observe.finish_span(span_ctx, %{duration_ms: duration_ms, retry_count: retry_count})
+
+               maybe_emit(
+                 obs_cfg,
+                 [:jido, :ai, :tool, :complete],
+                 %{duration_ms: duration_ms, retry_count: retry_count},
+                 event_meta
+               )
+
+             {:error, %{type: :timeout} = error} ->
+               Observe.finish_span_error(span_ctx, :error, error, [])
+
+               timeout_meta = Map.merge(event_meta, %{error_type: :timeout})
+
+               maybe_emit(
+                 obs_cfg,
+                 [:jido, :ai, :tool, :timeout],
+                 %{duration_ms: duration_ms, retry_count: retry_count},
+                 timeout_meta
+               )
+
+               maybe_emit(
+                 obs_cfg,
+                 [:jido, :ai, :tool, :error],
+                 %{duration_ms: duration_ms, retry_count: retry_count},
+                 Map.put(timeout_meta, :termination_reason, :error)
+               )
+
+             {:error, %{type: type}} ->
+               Observe.finish_span_error(span_ctx, :error, %{type: type}, [])
+
+               maybe_emit(
+                 obs_cfg,
+                 [:jido, :ai, :tool, :error],
+                 %{duration_ms: duration_ms, retry_count: retry_count},
+                 Map.merge(event_meta, %{error_type: type, termination_reason: :error})
+               )
+
+             {:error, _other} ->
+               Observe.finish_span_error(span_ctx, :error, %{type: :executor}, [])
+
+               maybe_emit(
+                 obs_cfg,
+                 [:jido, :ai, :tool, :error],
+                 %{duration_ms: duration_ms, retry_count: retry_count},
+                 Map.merge(event_meta, %{error_type: :executor, termination_reason: :error})
+               )
+           end
+
+           # Signal construction in a separate try to ensure we always attempt delivery
+           send_tool_result(agent_pid, call_id, tool_name, result)
+         end) do
+      {:ok, _pid} ->
+        {:async, nil, state}
+
+      {:error, reason} ->
+        send_tool_result(
+          agent_pid,
+          call_id,
           tool_name,
-          arguments,
-          context,
-          tools,
-          timeout_ms,
-          max_retries,
-          retry_backoff_ms,
-          event_meta,
-          obs_cfg
+          {:error, error_envelope(:supervisor, "Failed to start tool execution task", %{reason: inspect(reason)}, true)}
         )
 
-      duration_ms = System.monotonic_time(:millisecond) - start_ms
-
-      case result do
-        {:ok, _res} ->
-          Observe.finish_span(span_ctx, %{duration_ms: duration_ms, retry_count: retry_count})
-
-          maybe_emit(
-            obs_cfg,
-            [:jido, :ai, :react, :tool, :complete],
-            %{duration_ms: duration_ms, retry_count: retry_count},
-            event_meta
-          )
-
-        {:error, %{type: :timeout} = error} ->
-          Observe.finish_span_error(span_ctx, :error, error, [])
-
-          timeout_meta = Map.merge(event_meta, %{error_type: :timeout})
-
-          maybe_emit(
-            obs_cfg,
-            [:jido, :ai, :react, :tool, :timeout],
-            %{duration_ms: duration_ms, retry_count: retry_count},
-            timeout_meta
-          )
-
-          maybe_emit(
-            obs_cfg,
-            [:jido, :ai, :react, :tool, :error],
-            %{duration_ms: duration_ms, retry_count: retry_count},
-            Map.put(timeout_meta, :termination_reason, :error)
-          )
-
-        {:error, %{type: type}} ->
-          Observe.finish_span_error(span_ctx, :error, %{type: type}, [])
-
-          maybe_emit(
-            obs_cfg,
-            [:jido, :ai, :react, :tool, :error],
-            %{duration_ms: duration_ms, retry_count: retry_count},
-            Map.merge(event_meta, %{error_type: type, termination_reason: :error})
-          )
-
-        {:error, _other} ->
-          Observe.finish_span_error(span_ctx, :error, %{type: :executor}, [])
-
-          maybe_emit(
-            obs_cfg,
-            [:jido, :ai, :react, :tool, :error],
-            %{duration_ms: duration_ms, retry_count: retry_count},
-            Map.merge(event_meta, %{error_type: :executor, termination_reason: :error})
-          )
-      end
-
-      # Signal construction in a separate try to ensure we always attempt delivery
-      send_tool_result(agent_pid, call_id, tool_name, result)
-    end)
-
-    {:async, nil, state}
+        {:ok, state}
+    end
   end
 
   defp execute_with_retries(
@@ -822,7 +871,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     0..max_retries
     |> Enum.reduce_while({{:error, error_envelope(:executor, "uninitialized error")}, 0}, fn attempt, _acc ->
       if attempt > 0 do
-        maybe_emit(obs_cfg, [:jido, :ai, :react, :tool, :retry], %{duration_ms: 0, retry_count: attempt}, event_meta)
+        maybe_emit(obs_cfg, [:jido, :ai, :tool, :retry], %{duration_ms: 0, retry_count: attempt}, event_meta)
 
         if retry_backoff_ms > 0, do: Process.sleep(retry_backoff_ms)
       end
@@ -1054,7 +1103,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
 
     Jido.AgentServer.cast(agent_pid, signal)
 
-    {:sync, nil, state}
+    {:ok, state}
   end
 end
 
@@ -1070,7 +1119,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitRequestError 
 
   def exec(directive, _input_signal, state) do
     %{
-      call_id: call_id,
+      request_id: request_id,
       reason: reason,
       message: message
     } = directive
@@ -1080,14 +1129,14 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitRequestError 
     # Emit the request error synchronously
     signal =
       Signal.RequestError.new!(%{
-        call_id: call_id,
+        request_id: request_id,
         reason: reason,
         message: message
       })
 
     Jido.AgentServer.cast(agent_pid, signal)
 
-    {:sync, nil, state}
+    {:ok, state}
   end
 end
 
@@ -1097,7 +1146,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   the result back to the agent.
 
   Uses `ReqLLM.Generation.generate_text/3` for non-streaming text generation.
-  The result is sent as a `react.llm.response` signal.
+  The result is sent as a `ai.llm.response` signal.
 
   Supports:
   - `model_alias` resolution via `Jido.AI.resolve_model/1`
@@ -1111,7 +1160,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Signal}
+  alias Jido.AI.{Helpers, LLMClient, Signal}
   alias Jido.Observe
 
   def exec(directive, _input_signal, state) do
@@ -1129,6 +1178,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     timeout = Map.get(directive, :timeout)
     metadata = Map.get(directive, :metadata, %{})
     obs_cfg = metadata[:observability] || %{}
+    llm_context = llm_client_context(context, metadata)
 
     event_meta = %{
       agent_id: metadata[:agent_id],
@@ -1146,64 +1196,75 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
 
-    Task.Supervisor.start_child(task_supervisor, fn ->
-      started_at = System.monotonic_time(:millisecond)
-      span_ctx = Observe.start_span([:jido, :ai, :react, :llm, :span], event_meta)
+    case Task.Supervisor.start_child(task_supervisor, fn ->
+           started_at = System.monotonic_time(:millisecond)
+           span_ctx = Observe.start_span([:jido, :ai, :llm, :span], event_meta)
 
-      maybe_emit(obs_cfg, [:jido, :ai, :react, :llm, :start], %{duration_ms: 0, queue_ms: 0}, event_meta)
+           maybe_emit(obs_cfg, [:jido, :ai, :llm, :start], %{duration_ms: 0, queue_ms: 0}, event_meta)
 
-      result =
-        try do
-          generate_text(
-            agent_pid,
-            call_id,
-            model,
-            context,
-            system_prompt,
-            tools,
-            tool_choice,
-            max_tokens,
-            temperature,
-            timeout,
-            event_meta
-          )
-        rescue
-          e ->
-            {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
-        catch
-          kind, reason ->
-            {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
-        end
+           result =
+             try do
+               generate_text(
+                 agent_pid,
+                 call_id,
+                 model,
+                 context,
+                 system_prompt,
+                 tools,
+                 tool_choice,
+                 max_tokens,
+                 temperature,
+                 timeout,
+                 llm_context
+               )
+             rescue
+               e ->
+                 {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
+             catch
+               kind, reason ->
+                 {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
+             end
 
-      duration_ms = System.monotonic_time(:millisecond) - started_at
+           duration_ms = System.monotonic_time(:millisecond) - started_at
 
-      case result do
-        {:ok, _} ->
-          Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
-          maybe_emit(obs_cfg, [:jido, :ai, :react, :llm, :complete], %{duration_ms: duration_ms}, event_meta)
+           case result do
+             {:ok, _} ->
+               Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
+               maybe_emit(obs_cfg, [:jido, :ai, :llm, :complete], %{duration_ms: duration_ms}, event_meta)
 
-        {:error, reason} ->
-          Observe.finish_span_error(span_ctx, :error, reason, [])
+             {:error, reason} ->
+               Observe.finish_span_error(span_ctx, :error, reason, [])
 
-          error_type =
-            case reason do
-              %{error_type: type} when is_atom(type) -> type
-              _ -> :unknown
-            end
+               error_type =
+                 case reason do
+                   %{error_type: type} when is_atom(type) -> type
+                   _ -> :unknown
+                 end
 
-          maybe_emit(
-            obs_cfg,
-            [:jido, :ai, :react, :llm, :error],
-            %{duration_ms: duration_ms},
-            Map.put(event_meta, :error_type, error_type)
-          )
-      end
+               maybe_emit(
+                 obs_cfg,
+                 [:jido, :ai, :llm, :error],
+                 %{duration_ms: duration_ms},
+                 Map.put(event_meta, :error_type, error_type)
+               )
+           end
 
-      signal = Signal.LLMResponse.new!(%{call_id: call_id, result: result})
-      Jido.AgentServer.cast(agent_pid, signal)
-    end)
+           signal = Signal.LLMResponse.new!(%{call_id: call_id, result: result})
+           Jido.AgentServer.cast(agent_pid, signal)
+         end) do
+      {:ok, _pid} ->
+        {:async, nil, state}
 
-    {:async, nil, state}
+      {:error, reason} ->
+        signal =
+          Signal.LLMResponse.new!(%{
+            call_id: call_id,
+            result: {:error, %{type: :supervisor, reason: inspect(reason), error_type: :unknown}}
+          })
+
+        Jido.AgentServer.cast(agent_pid, signal)
+        {:ok, state}
+    end
   end
 
   defp generate_text(
@@ -1217,7 +1278,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
          max_tokens,
          temperature,
          timeout,
-         _event_meta
+         llm_context
        ) do
     opts =
       []
@@ -1229,7 +1290,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
-    case ReqLLM.Generation.generate_text(model, messages, opts) do
+    case LLMClient.generate_text(llm_context, model, messages, opts) do
       {:ok, response} ->
         classified = Helpers.classify_llm_response(response)
 
@@ -1243,7 +1304,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     end
   end
 
-  # Emit react.usage signal for per-call usage tracking
+  # Emit ai.usage signal for per-call usage tracking
   defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
 
   defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
@@ -1254,7 +1315,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
       signal =
         Signal.Usage.new!(%{
           call_id: call_id,
-          model: model || "unknown",
+          model: model,
           input_tokens: input_tokens,
           output_tokens: output_tokens,
           total_tokens: input_tokens + output_tokens,
@@ -1273,6 +1334,19 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
     Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
   end
+
+  defp llm_client_context(context, metadata) do
+    cond do
+      is_map(context) and not is_nil(context[:llm_client]) ->
+        %{llm_client: context[:llm_client]}
+
+      is_map(metadata) and not is_nil(metadata[:llm_client]) ->
+        %{llm_client: metadata[:llm_client]}
+
+      true ->
+        %{}
+    end
+  end
 end
 
 # Helper functions for DirectiveExec implementations
@@ -1280,43 +1354,15 @@ defmodule Jido.AI.Directive.Helper do
   @moduledoc """
   Helper functions for DirectiveExec implementations.
   """
-
-  @required_metadata_keys [
-    :agent_id,
-    :request_id,
-    :run_id,
-    :iteration,
-    :llm_call_id,
-    :tool_call_id,
-    :tool_name,
-    :model,
-    :termination_reason,
-    :error_type
-  ]
-
-  @required_measurement_keys [
-    :duration_ms,
-    :input_tokens,
-    :output_tokens,
-    :total_tokens,
-    :retry_count,
-    :queue_ms
-  ]
+  alias Jido.AI.Observability.Emitter
+  alias Jido.AI.Observability.Events
 
   @doc """
-  Emits a ReAct telemetry event through upstream `Jido.Observe` with normalized schema.
+  Emits an AI telemetry event through upstream `Jido.Observe` with normalized schema.
   """
   @spec emit_react_event(map(), [atom()], map(), map()) :: :ok
   def emit_react_event(obs_cfg, event, measurements, metadata) do
-    if Map.get(obs_cfg, :emit_telemetry?, true) do
-      :telemetry.execute(
-        event,
-        ensure_required_measurements(measurements || %{}),
-        ensure_required_metadata(metadata || %{})
-      )
-    else
-      :ok
-    end
+    Emitter.emit(obs_cfg, event, measurements, metadata)
   end
 
   @doc """
@@ -1372,15 +1418,11 @@ defmodule Jido.AI.Directive.Helper do
 
   @spec ensure_required_metadata(map()) :: map()
   def ensure_required_metadata(metadata) when is_map(metadata) do
-    Enum.reduce(@required_metadata_keys, metadata, fn key, acc ->
-      Map.put_new(acc, key, nil)
-    end)
+    Events.ensure_required_metadata(metadata)
   end
 
   @spec ensure_required_measurements(map()) :: map()
   def ensure_required_measurements(measurements) when is_map(measurements) do
-    Enum.reduce(@required_measurement_keys, measurements, fn key, acc ->
-      Map.put_new(acc, key, 0)
-    end)
+    Events.ensure_required_measurements(measurements)
   end
 end

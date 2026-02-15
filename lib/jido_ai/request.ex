@@ -47,8 +47,8 @@ defmodule Jido.AI.Request do
     # ask/2 now returns {:ok, Handle.t()}
     def ask(pid, query, opts \\\\ []) do
       Jido.AI.Request.create_and_send(pid, query, opts,
-        signal_type: "react.input",
-        source: "/react/agent"
+        signal_type: "ai.react.query",
+        source: "/ai/react/agent"
       )
     end
 
@@ -157,15 +157,15 @@ defmodule Jido.AI.Request do
 
   ## Signal Options (required)
 
-  - `:signal_type` - The signal type to create (e.g., "react.input")
-  - `:source` - The signal source (e.g., "/react/agent")
+  - `:signal_type` - The signal type to create (e.g., "ai.react.query")
+  - `:source` - The signal source (e.g., "/ai/react/agent")
 
   ## Examples
 
       {:ok, request} = Request.create_and_send(pid, "What is 2+2?",
         tool_context: %{actor: user},
-        signal_type: "react.input",
-        source: "/react/agent"
+        signal_type: "ai.react.query",
+        source: "/ai/react/agent"
       )
   """
   @spec create_and_send(server(), String.t(), keyword()) ::
@@ -176,9 +176,10 @@ defmodule Jido.AI.Request do
     tool_context = Keyword.get(opts, :tool_context, %{})
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
 
-    # Build payload with request_id for correlation
+    # Build payload with request_id for correlation.
+    # Keep both query and prompt keys so all strategy start schemas can consume it.
     payload =
-      %{query: query, request_id: request_id}
+      %{query: query, prompt: query, request_id: request_id}
       |> maybe_add_tool_context(tool_context)
 
     signal = Signal.new!(signal_type, payload, source: source)
@@ -207,8 +208,8 @@ defmodule Jido.AI.Request do
 
       {:ok, result} = Request.send_and_await(pid, "What is 2+2?",
         timeout: 10_000,
-        signal_type: "react.input",
-        source: "/react/agent"
+        signal_type: "ai.react.query",
+        source: "/ai/react/agent"
       )
   """
   @spec send_and_await(server(), String.t(), keyword()) ::
@@ -328,7 +329,7 @@ defmodule Jido.AI.Request do
 
   ## Examples
 
-      def on_before_cmd(agent, {:react_start, %{query: query, request_id: req_id}} = action) do
+      def on_before_cmd(agent, {:ai_react_start, %{query: query, request_id: req_id}} = action) do
         agent = Request.start_request(agent, req_id, query)
         {:ok, agent, action}
       end
@@ -364,7 +365,7 @@ defmodule Jido.AI.Request do
 
   ## Examples
 
-      def on_after_cmd(agent, {:react_start, %{request_id: req_id}}, directives) do
+      def on_after_cmd(agent, {:ai_react_start, %{request_id: req_id}}, directives) do
         snap = strategy_snapshot(agent)
         if snap.done? do
           agent = Request.complete_request(agent, req_id, snap.result)

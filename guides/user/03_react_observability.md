@@ -25,7 +25,7 @@ end
 ## 2. Run with CLI Tracing
 
 ```bash
-mix jido_ai.agent --agent MyApp.WeatherAgent --trace "Will it rain in Seattle today?"
+mix jido_ai --agent MyApp.WeatherAgent --trace "Will it rain in Seattle today?"
 ```
 
 The trace output includes request lifecycle, LLM lifecycle, tool start/retry/timeout/error, and token usage signals.
@@ -36,14 +36,14 @@ The trace output includes request lifecycle, LLM lifecycle, tool start/retry/tim
 :telemetry.attach_many(
   "react-observe",
   [
-    [:jido, :ai, :react, :request, :start],
-    [:jido, :ai, :react, :request, :complete],
-    [:jido, :ai, :react, :request, :failed],
-    [:jido, :ai, :react, :llm, :start],
-    [:jido, :ai, :react, :llm, :complete],
-    [:jido, :ai, :react, :tool, :start],
-    [:jido, :ai, :react, :tool, :complete],
-    [:jido, :ai, :react, :tool, :error]
+    [:jido, :ai, :request, :start],
+    [:jido, :ai, :request, :complete],
+    [:jido, :ai, :request, :failed],
+    [:jido, :ai, :llm, :start],
+    [:jido, :ai, :llm, :complete],
+    [:jido, :ai, :tool, :start],
+    [:jido, :ai, :tool, :complete],
+    [:jido, :ai, :tool, :error]
   ],
   fn event, measurements, metadata, _ ->
     IO.inspect({event, measurements, metadata}, label: "react.telemetry")
@@ -60,7 +60,7 @@ implementation (default is `Jido.Observe.NoopTracer`).
 
 ## 5. Request Lifecycle Guarantees
 
-- Busy requests are rejected deterministically (`react.request.error`).
+- Busy requests are rejected deterministically (`ai.request.error`).
 - Tool execution has bounded retries and per-attempt timeout.
 - Cancellation is request-scoped and results in `{:cancelled, reason}` failure.
 - `ask_sync/await` return deterministic success/error/timeout tuples.

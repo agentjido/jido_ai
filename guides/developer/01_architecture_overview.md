@@ -211,12 +211,12 @@ Typed signals for event-driven communication.
 
 | Signal | Type | Purpose |
 |--------|------|---------|
-| `LLMResponse` | `react.llm.response` | LLM call completed |
-| `LLMDelta` | `react.llm.delta` | Streaming token chunk |
-| `LLMError` | `react.llm.error` | Structured error |
-| `ToolResult` | `react.tool.result` | Tool execution completed |
-| `EmbedResult` | `react.embed.result` | Embedding generated |
-| `Usage` | `react.usage` | Token usage tracking |
+| `LLMResponse` | `ai.llm.response` | LLM call completed |
+| `LLMDelta` | `ai.llm.delta` | Streaming token chunk |
+| `LLMError` | `ai.llm.error` | Structured error |
+| `ToolResult` | `ai.tool.result` | Tool execution completed |
+| `EmbedResult` | `ai.embed.result` | Embedding generated |
+| `Usage` | `ai.usage` | Token usage tracking |
 
 ### 7. Skill Framework (`Jido.AI.Skills.*`)
 
@@ -249,7 +249,7 @@ sequenceDiagram
     participant Tool as Tool.Exec
 
     User->>Agent: Send query
-    Agent->>Strategy: cmd(:react_start, query)
+    Agent->>Strategy: cmd(:ai_react_start, query)
     Strategy->>Machine: update({:start, query})
     Machine-->>Strategy: {:call_llm_stream, id, context}
     Strategy->>Runtime: Directive.LLMStream
@@ -257,13 +257,13 @@ sequenceDiagram
     Runtime->>LLM: stream_text(model, context)
     LLM-->>Runtime: Streaming tokens
     Runtime->>Agent: Signal.LLMDelta (each token)
-    Agent->>Strategy: signal_routes(react.llm.delta)
+    Agent->>Strategy: signal_routes(ai.llm.delta)
     Strategy->>Machine: update({:llm_partial, delta})
     Machine-->>Strategy: :ok (state updated)
 
     LLM-->>Runtime: Final response (tool calls)
     Runtime->>Agent: Signal.LLMResponse (tool_calls)
-    Agent->>Strategy: signal_routes(react.llm.response)
+    Agent->>Strategy: signal_routes(ai.llm.response)
     Strategy->>Machine: update({:llm_result, tool_calls})
     Machine-->>Strategy: {:exec_tool, id, name, args}
     Strategy->>Runtime: Directive.ToolExec
@@ -271,7 +271,7 @@ sequenceDiagram
     Runtime->>Tool: execute(tool_name, arguments)
     Tool-->>Runtime: Result
     Runtime->>Agent: Signal.ToolResult
-    Agent->>Strategy: signal_routes(react.tool.result)
+    Agent->>Strategy: signal_routes(ai.tool.result)
     Strategy->>Machine: update({:tool_result, result})
     Machine-->>Strategy: {:call_llm_stream, id, context}
 
@@ -319,10 +319,10 @@ Strategies declare which signals they handle:
 ```elixir
 def signal_routes(_ctx) do
   [
-    {"react.input", {:strategy_cmd, @start}},
-    {"react.llm.response", {:strategy_cmd, @llm_result}},
-    {"react.tool.result", {:strategy_cmd, @tool_result}},
-    {"react.llm.delta", {:strategy_cmd, @llm_partial}}
+    {"ai.react.query", {:strategy_cmd, @start}},
+    {"ai.llm.response", {:strategy_cmd, @llm_result}},
+    {"ai.tool.result", {:strategy_cmd, @tool_result}},
+    {"ai.llm.delta", {:strategy_cmd, @llm_partial}}
   ]
 end
 ```

@@ -196,19 +196,19 @@ defmodule Jido.AI.Strategies.ReActTest do
   describe "action_spec/1" do
     test "returns spec for start action" do
       spec = ReAct.action_spec(ReAct.start_action())
-      assert spec.name == "react.start"
+      assert spec.name == "ai.react.start"
       assert spec.doc =~ "Start a new ReAct conversation"
     end
 
     test "returns spec for register_tool action" do
       spec = ReAct.action_spec(ReAct.register_tool_action())
-      assert spec.name == "react.register_tool"
+      assert spec.name == "ai.react.register_tool"
       assert spec.doc =~ "Register a new tool"
     end
 
     test "returns spec for unregister_tool action" do
       spec = ReAct.action_spec(ReAct.unregister_tool_action())
-      assert spec.name == "react.unregister_tool"
+      assert spec.name == "ai.react.unregister_tool"
       assert spec.doc =~ "Unregister a tool"
     end
 
@@ -227,12 +227,12 @@ defmodule Jido.AI.Strategies.ReActTest do
 
       route_map = Map.new(routes)
 
-      assert route_map["react.input"] == {:strategy_cmd, :react_start}
-      assert route_map["react.llm.response"] == {:strategy_cmd, :react_llm_result}
-      assert route_map["react.tool.result"] == {:strategy_cmd, :react_tool_result}
-      assert route_map["react.llm.delta"] == {:strategy_cmd, :react_llm_partial}
-      assert route_map["react.cancel"] == {:strategy_cmd, :react_cancel}
-      assert route_map["react.request.error"] == {:strategy_cmd, :react_request_error}
+      assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
+      assert route_map["ai.llm.response"] == {:strategy_cmd, :ai_react_llm_result}
+      assert route_map["ai.tool.result"] == {:strategy_cmd, :ai_react_tool_result}
+      assert route_map["ai.llm.delta"] == {:strategy_cmd, :ai_react_llm_partial}
+      assert route_map["ai.react.cancel"] == {:strategy_cmd, :ai_react_cancel}
+      assert route_map["ai.request.error"] == {:strategy_cmd, :ai_react_request_error}
     end
   end
 
@@ -264,35 +264,35 @@ defmodule Jido.AI.Strategies.ReActTest do
 
   describe "action helper functions" do
     test "start_action/0 returns correct atom" do
-      assert ReAct.start_action() == :react_start
+      assert ReAct.start_action() == :ai_react_start
     end
 
     test "llm_result_action/0 returns correct atom" do
-      assert ReAct.llm_result_action() == :react_llm_result
+      assert ReAct.llm_result_action() == :ai_react_llm_result
     end
 
     test "tool_result_action/0 returns correct atom" do
-      assert ReAct.tool_result_action() == :react_tool_result
+      assert ReAct.tool_result_action() == :ai_react_tool_result
     end
 
     test "llm_partial_action/0 returns correct atom" do
-      assert ReAct.llm_partial_action() == :react_llm_partial
+      assert ReAct.llm_partial_action() == :ai_react_llm_partial
     end
 
     test "register_tool_action/0 returns correct atom" do
-      assert ReAct.register_tool_action() == :react_register_tool
+      assert ReAct.register_tool_action() == :ai_react_register_tool
     end
 
     test "unregister_tool_action/0 returns correct atom" do
-      assert ReAct.unregister_tool_action() == :react_unregister_tool
+      assert ReAct.unregister_tool_action() == :ai_react_unregister_tool
     end
 
     test "cancel_action/0 returns correct atom" do
-      assert ReAct.cancel_action() == :react_cancel
+      assert ReAct.cancel_action() == :ai_react_cancel
     end
 
     test "request_error_action/0 returns correct atom" do
-      assert ReAct.request_error_action() == :react_request_error
+      assert ReAct.request_error_action() == :ai_react_request_error
     end
   end
 
@@ -365,12 +365,12 @@ defmodule Jido.AI.Strategies.ReActTest do
 
   describe "set_tool_context action" do
     test "set_tool_context_action/0 returns correct atom" do
-      assert ReAct.set_tool_context_action() == :react_set_tool_context
+      assert ReAct.set_tool_context_action() == :ai_react_set_tool_context
     end
 
     test "action_spec returns spec for set_tool_context" do
       spec = ReAct.action_spec(ReAct.set_tool_context_action())
-      assert spec.name == "react.set_tool_context"
+      assert spec.name == "ai.react.set_tool_context"
       assert spec.doc =~ "Update the tool context"
     end
 
@@ -632,7 +632,7 @@ defmodule Jido.AI.Strategies.ReActTest do
       {agent, directives} = ReAct.cmd(agent, [second_request], %{})
 
       assert [%Directive.EmitRequestError{} = directive] = directives
-      assert directive.call_id == "req_2"
+      assert directive.request_id == "req_2"
       assert directive.reason == :busy
 
       state = StratState.get(agent, %{})

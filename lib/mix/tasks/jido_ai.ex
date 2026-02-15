@@ -1,41 +1,34 @@
-defmodule Mix.Tasks.JidoAi.Agent do
-  @shortdoc "Run a Jido AI agent from the command line"
+defmodule Mix.Tasks.JidoAi do
+  @shortdoc "Run Jido AI from the command line (chat by default)"
 
   @moduledoc """
-  Run AI agents with tool use from the command line.
+  Unified Jido AI CLI task.
 
-  Supports one-shot queries and batch processing via stdin.
-  Agents can use tools (arithmetic, weather, etc.) and reason through multi-step problems.
+  Default behavior starts interactive TUI chat. Provide a query for one-shot
+  execution, or `--stdin` for batch mode.
 
   ## Quick Start
 
-      # One-shot query with default ReAct agent
-      mix jido_ai.agent "Calculate 15 * 7 + 3"
+      # Interactive chat (default)
+      mix jido_ai
 
-      # JSON output for scripting
-      mix jido_ai.agent --format json --quiet "What is 42 * 2?"
+      # One-shot query
+      mix jido_ai "Calculate 15 * 7 + 3"
 
-  ## Agent Modes
+      # Batch mode from stdin
+      cat queries.txt | mix jido_ai --stdin --format json --quiet
 
-  ### Option A: Ephemeral Agent (default)
+  ## Modes
 
-  Creates a temporary agent with specified model and tools:
-
-      mix jido_ai.agent "Query here"
-      mix jido_ai.agent --model anthropic:claude-sonnet-4-20250514 "Query"
-      mix jido_ai.agent --tools Jido.Tools.Weather "What's the weather?"
-
-  ### Option B: Pre-defined Agent Module
-
-  Uses an existing agent module from your application:
-
-      mix jido_ai.agent --agent MyApp.WeatherAgent "What's the weather in Tokyo?"
+  - Chat mode: no positional query args
+  - One-shot mode: query args provided
+  - Stdin mode: `--stdin`
 
   ## Options
 
   ### Agent Configuration
       --agent MODULE       Use existing agent module (ignores --model/--tools/--system)
-      --type TYPE          Agent type: react (default)
+      --type TYPE          Agent type: react (default), cot, tot, got, trm, adaptive
       --model MODEL        LLM model (default: anthropic:claude-haiku-4-5)
       --tools MODULES      Comma-separated tool modules
       --system PROMPT      System prompt
@@ -44,67 +37,39 @@ defmodule Mix.Tasks.JidoAi.Agent do
   ### Input Mode
       --stdin              Read queries from stdin (one per line)
 
-  ### Output Format
+  ### Output Format (one-shot/stdin)
       --format FORMAT      text (default) | json
       --quiet              Suppress logs (use with --format json)
 
   ### Execution
       --timeout MS         Timeout in ms (default: 60000)
-      --trace              Show signals, directives, and agent events
-
-  ## JSON Output Format
-
-  Success:
-
-      {"ok":true,"query":"...","answer":"...","elapsed_ms":1234}
-
-  Error:
-
-      {"ok":false,"query":"...","error":"...","elapsed_ms":1234}
-
-  Exit codes: `0` = success, `1` = failure
+      --trace              Show signals, directives, and AI lifecycle events
 
   ## Examples
 
-      # Basic calculation
-      mix jido_ai.agent "What is 847 divided by 7?"
+      # Chat with a custom agent
+      mix jido_ai --agent MyApp.WeatherAgent
 
-      # JSON for AI agent pipelines
-      mix jido_ai.agent --format json --quiet "What is 2 + 2?"
+      # One-shot with specific model/tools
+      mix jido_ai --model openai:gpt-4o --tools Jido.Tools.Arithmetic "15 * 23"
 
-      # Batch processing from file
-      cat queries.txt | mix jido_ai.agent --stdin --format json --quiet
-
-      # Custom agent with tracing
-      mix jido_ai.agent --agent MyApp.Agent --trace "Complex query"
-
-      # Specific model and tools
-      mix jido_ai.agent --model openai:gpt-4o --tools Jido.Tools.Arithmetic "15 * 23"
-
-  ## Custom Agent Requirements
-
-  Agents used with `--agent` must:
-  1. Be startable via `Jido.start_agent/2`
-  2. Implement `ask/2` or `ask/3`
-  3. Signal completion via `strategy_snapshot.done?`
-  4. Provide result via `snapshot.result` or `state.last_answer`
-
-  ## See Also
-
-  - `mix help jido_ai.chat` - Interactive multi-turn conversations
+      # One-shot with tracing
+      mix jido_ai --trace "Will it rain in Seattle today?"
   """
 
   use Mix.Task
 
   alias Jido.AI.CLI.Adapter
+  alias Jido.AI.CLI.TUI
 
   require Logger
+
+  @dialyzer {:nowarn_function, run: 1}
 
   @impl Mix.Task
   def run(argv) do
     Mix.Task.rerun("app.start")
     load_dotenv()
-    start_jido_instance()
 
     {opts, args, _invalid} =
       OptionParser.parse(argv,
@@ -141,14 +106,18 @@ defmodule Mix.Tasks.JidoAi.Agent do
       attach_trace_handlers()
     end
 
-    # Resolve adapter and agent module once per invocation
-    case resolve_adapter_and_agent(config) do
-      {:ok, adapter, agent_module} ->
-        config = Map.merge(config, %{adapter: adapter, agent_module: agent_module})
-        run_queries(args, config)
+    cond do
+      config.stdin ->
+        start_jido_instance(JidoAi.CliJido)
+        run_non_interactive(args, config)
 
-      {:error, reason} ->
-        output_fatal_error(config, reason)
+      Enum.empty?(args) ->
+        start_jido_instance(JidoAi.TuiJido)
+        run_chat(config)
+
+      true ->
+        start_jido_instance(JidoAi.CliJido)
+        run_non_interactive(args, config)
     end
   end
 
@@ -168,25 +137,44 @@ defmodule Mix.Tasks.JidoAi.Agent do
     }
   end
 
+  @spec run_chat(map()) :: no_return()
+  defp run_chat(config) do
+    if not supports_tui_terminal?() do
+      output_fatal_error(
+        config,
+        "Interactive TUI requires a terminal with raw mode support. Use one-shot mode: mix jido_ai \"<prompt>\""
+      )
+    end
+
+    {:error, reason} = TUI.run(config)
+    output_fatal_error(config, "Failed to start TUI: #{format_error(reason)}")
+  end
+
+  defp run_non_interactive(args, config) do
+    case resolve_adapter_and_agent(config) do
+      {:ok, adapter, agent_module} ->
+        config = Map.merge(config, %{adapter: adapter, agent_module: agent_module})
+
+        if config.stdin do
+          run_stdin_mode(config)
+        else
+          query = Enum.join(args, " ")
+          run_one_shot(query, config)
+        end
+
+      {:error, reason} ->
+        output_fatal_error(config, reason)
+    end
+  end
+
   defp resolve_adapter_and_agent(config) do
     case Adapter.resolve(config.type, config.user_agent_module) do
       {:ok, adapter} ->
-        agent_module =
-          config.user_agent_module || adapter.create_ephemeral_agent(config)
-
+        agent_module = config.user_agent_module || adapter.create_ephemeral_agent(config)
         {:ok, adapter, agent_module}
 
       {:error, reason} ->
         {:error, reason}
-    end
-  end
-
-  defp run_queries(args, config) do
-    if config.stdin || Enum.empty?(args) do
-      run_stdin_mode(config)
-    else
-      query = Enum.join(args, " ")
-      run_one_shot(query, config)
     end
   end
 
@@ -235,8 +223,11 @@ defmodule Mix.Tasks.JidoAi.Agent do
     case adapter.start_agent(JidoAi.CliJido, agent_module, config) do
       {:ok, pid} ->
         try do
-          {:ok, _request} = adapter.submit(pid, query, config)
-          adapter.await(pid, config.timeout, config)
+          case adapter.submit(pid, query, config) do
+            {:ok, _request} -> adapter.await(pid, config.timeout, config)
+            :ok -> adapter.await(pid, config.timeout, config)
+            {:error, reason} -> {:error, reason}
+          end
         after
           adapter.stop(pid)
         end
@@ -245,8 +236,6 @@ defmodule Mix.Tasks.JidoAi.Agent do
         {:error, reason}
     end
   end
-
-  # Output helpers
 
   defp output_result(config, result) do
     case config.format do
@@ -283,12 +272,10 @@ defmodule Mix.Tasks.JidoAi.Agent do
     Enum.join(parts, ", ") <> ")"
   end
 
-  defp format_number(n) when n >= 1000 do
-    "#{Float.round(n / 1000, 1)}k"
-  end
-
+  defp format_number(n) when n >= 1000, do: "#{Float.round(n / 1000, 1)}k"
   defp format_number(n), do: "#{n}"
 
+  @spec output_error(map(), map()) :: no_return()
   defp output_error(config, result) do
     case config.format do
       "json" ->
@@ -301,6 +288,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
     System.halt(1)
   end
 
+  @spec output_fatal_error(map(), term()) :: no_return()
   defp output_fatal_error(config, reason) do
     case config.format do
       "json" ->
@@ -317,8 +305,6 @@ defmodule Mix.Tasks.JidoAi.Agent do
   defp format_error(:not_found), do: "Agent process not found"
   defp format_error(reason) when is_binary(reason), do: reason
   defp format_error(reason), do: inspect(reason)
-
-  # Parsing helpers
 
   defp parse_module(nil), do: nil
 
@@ -349,12 +335,19 @@ defmodule Mix.Tasks.JidoAi.Agent do
     end)
   end
 
-  # Setup helpers
+  defp supports_tui_terminal? do
+    case System.cmd("stty", ["-g"], stderr_to_stdout: true) do
+      {_output, 0} -> true
+      _ -> false
+    end
+  rescue
+    _ -> false
+  end
 
-  defp start_jido_instance do
-    case Process.whereis(JidoAi.CliJido) do
+  defp start_jido_instance(instance_name) do
+    case Process.whereis(instance_name) do
       nil ->
-        {:ok, _pid} = Jido.start_link(name: JidoAi.CliJido)
+        {:ok, _pid} = Jido.start_link(name: instance_name)
         :ok
 
       _pid ->
@@ -372,8 +365,6 @@ defmodule Mix.Tasks.JidoAi.Agent do
     end
   end
 
-  # Trace helpers
-
   @trace_events [
     [:jido, :agent, :cmd, :start],
     [:jido, :agent, :cmd, :stop],
@@ -389,20 +380,20 @@ defmodule Mix.Tasks.JidoAi.Agent do
     [:jido, :agent, :strategy, :cmd, :exception],
     [:jido, :agent, :strategy, :tick, :start],
     [:jido, :agent, :strategy, :tick, :stop],
-    [:jido, :ai, :react, :request, :start],
-    [:jido, :ai, :react, :request, :complete],
-    [:jido, :ai, :react, :request, :failed],
-    [:jido, :ai, :react, :request, :rejected],
-    [:jido, :ai, :react, :request, :cancelled],
-    [:jido, :ai, :react, :llm, :start],
-    [:jido, :ai, :react, :llm, :delta],
-    [:jido, :ai, :react, :llm, :complete],
-    [:jido, :ai, :react, :llm, :error],
-    [:jido, :ai, :react, :tool, :start],
-    [:jido, :ai, :react, :tool, :retry],
-    [:jido, :ai, :react, :tool, :complete],
-    [:jido, :ai, :react, :tool, :error],
-    [:jido, :ai, :react, :tool, :timeout]
+    [:jido, :ai, :request, :start],
+    [:jido, :ai, :request, :complete],
+    [:jido, :ai, :request, :failed],
+    [:jido, :ai, :request, :rejected],
+    [:jido, :ai, :request, :cancelled],
+    [:jido, :ai, :llm, :start],
+    [:jido, :ai, :llm, :delta],
+    [:jido, :ai, :llm, :complete],
+    [:jido, :ai, :llm, :error],
+    [:jido, :ai, :tool, :start],
+    [:jido, :ai, :tool, :retry],
+    [:jido, :ai, :tool, :complete],
+    [:jido, :ai, :tool, :error],
+    [:jido, :ai, :tool, :timeout]
   ]
 
   @colors %{
@@ -417,12 +408,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
   }
 
   defp attach_trace_handlers do
-    :telemetry.attach_many(
-      "jido-ai-agent-cli-trace",
-      @trace_events,
-      &handle_trace_event/4,
-      nil
-    )
+    :telemetry.attach_many("jido-ai-cli-trace", @trace_events, &handle_trace_event/4, nil)
   end
 
   defp handle_trace_event([:jido, :agent, :cmd, :start], _measurements, metadata, _config) do
@@ -518,7 +504,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
     IO.puts("  #{@colors.blue}⟲ Strategy TICK#{@colors.reset} #{@colors.dim}(#{duration_ms}ms)#{@colors.reset}")
   end
 
-  defp handle_trace_event([:jido, :ai, :react, :request, event], measurements, metadata, _config)
+  defp handle_trace_event([:jido, :ai, :request, event], measurements, metadata, _config)
        when event in [:start, :complete, :failed, :rejected, :cancelled] do
     req = metadata[:request_id] || "?"
     duration = measurements[:duration_ms] || 0
@@ -529,7 +515,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
     )
   end
 
-  defp handle_trace_event([:jido, :ai, :react, :llm, event], measurements, metadata, _config)
+  defp handle_trace_event([:jido, :ai, :llm, event], measurements, metadata, _config)
        when event in [:start, :delta, :complete, :error] do
     call_id = metadata[:llm_call_id] || "?"
     model = metadata[:model] || "?"
@@ -540,7 +526,7 @@ defmodule Mix.Tasks.JidoAi.Agent do
     )
   end
 
-  defp handle_trace_event([:jido, :ai, :react, :tool, event], measurements, metadata, _config)
+  defp handle_trace_event([:jido, :ai, :tool, event], measurements, metadata, _config)
        when event in [:start, :retry, :complete, :error, :timeout] do
     tool = metadata[:tool_name] || "?"
     call_id = metadata[:tool_call_id] || "?"
@@ -552,7 +538,5 @@ defmodule Mix.Tasks.JidoAi.Agent do
     )
   end
 
-  defp handle_trace_event(_event, _measurements, _metadata, _config) do
-    :ok
-  end
+  defp handle_trace_event(_event, _measurements, _metadata, _config), do: :ok
 end

@@ -2,6 +2,7 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Actions.Planning.Decompose
+  alias Jido.AI.TestSupport.FakeLLMClient
 
   @moduletag :unit
   @moduletag :capture_log
@@ -25,13 +26,12 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
       assert {:error, _} = Decompose.run(%{}, %{})
     end
 
-    @tag :skip
     test "generates decomposition with valid goal" do
       params = %{
         goal: "Build a mobile application"
       }
 
-      assert {:ok, result} = Decompose.run(params, %{})
+      assert {:ok, result} = Decompose.run(params, %{llm_client: FakeLLMClient})
       assert result.goal == "Build a mobile application"
       assert is_binary(result.decomposition)
       assert result.decomposition != ""
@@ -40,36 +40,33 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
       assert Map.has_key?(result, :usage)
     end
 
-    @tag :skip
     test "includes context in decomposition" do
       params = %{
         goal: "Organize an event",
         context: "Tech conference for developers, limited budget"
       }
 
-      assert {:ok, result} = Decompose.run(params, %{})
+      assert {:ok, result} = Decompose.run(params, %{llm_client: FakeLLMClient})
       assert String.length(result.decomposition) > 0
     end
 
-    @tag :skip
     test "respects max_depth parameter" do
       params = %{
         goal: "Start a business",
         max_depth: 2
       }
 
-      assert {:ok, result} = Decompose.run(params, %{})
+      assert {:ok, result} = Decompose.run(params, %{llm_client: FakeLLMClient})
       assert result.depth == 2
     end
 
-    @tag :skip
     test "clamps max_depth to reasonable range" do
       params = %{
         goal: "Test goal",
         max_depth: 10
       }
 
-      assert {:ok, result} = Decompose.run(params, %{})
+      assert {:ok, result} = Decompose.run(params, %{llm_client: FakeLLMClient})
       assert result.depth <= 5
     end
   end
