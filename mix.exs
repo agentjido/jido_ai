@@ -77,6 +77,7 @@ defmodule JidoAi.MixProject do
       # Dev/Test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:doctor, "~> 0.22", only: [:dev], runtime: false},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18", only: [:dev, :test]},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
@@ -96,6 +97,7 @@ defmodule JidoAi.MixProject do
         "compile --warnings-as-errors",
         "docs.check",
         "credo --min-priority higher",
+        "doctor --summary --raise",
         "dialyzer"
       ],
       docs: "docs -f html"
@@ -126,20 +128,29 @@ defmodule JidoAi.MixProject do
         "LICENSE.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
-        # Developer Guides
-        "guides/developer/01_architecture_overview.md",
-        "guides/developer/02_strategies.md",
-        "guides/developer/03_state_machines.md",
-        "guides/developer/04_directives.md",
-        "guides/developer/05_signals.md",
-        "guides/developer/06_tool_system.md",
-        "guides/developer/07_skills.md",
-        "guides/developer/08_configuration.md",
-        "guides/developer/09_namespace_migration.md",
-        # User Guides
-        "guides/user/01_overview.md",
-        "guides/user/02_strategies.md",
-        "guides/user/03_react_observability.md",
+        # Build With Jido.AI
+        "guides/user/getting_started.md",
+        "guides/user/strategy_selection_playbook.md",
+        "guides/user/first_react_agent.md",
+        "guides/user/request_lifecycle_and_concurrency.md",
+        "guides/user/thread_context_and_message_projection.md",
+        "guides/user/tool_calling_with_actions.md",
+        "guides/user/streaming_workflows.md",
+        "guides/user/observability_basics.md",
+        "guides/user/cli_workflows.md",
+        # Extend Jido.AI
+        "guides/developer/architecture_and_runtime_flow.md",
+        "guides/developer/strategy_internals.md",
+        "guides/developer/directives_runtime_contract.md",
+        "guides/developer/signals_namespaces_contracts.md",
+        "guides/developer/llm_client_boundary.md",
+        "guides/developer/plugins_and_actions_composition.md",
+        "guides/developer/skills_system.md",
+        "guides/developer/security_and_validation.md",
+        "guides/developer/error_model_and_recovery.md",
+        # Reference
+        "guides/developer/actions_catalog.md",
+        "guides/developer/configuration_reference.md",
         # Examples
         "examples/strategies/adaptive_strategy.md",
         "examples/strategies/chain_of_thought.md",
@@ -147,8 +158,10 @@ defmodule JidoAi.MixProject do
         "examples/strategies/tree_of_thoughts.md"
       ],
       groups_for_extras: [
-        {"Developer Guides", ~r/guides\/developer/},
-        {"User Guides", ~r/guides\/user/},
+        {"Build With Jido.AI", ~r/guides\/user/},
+        {"Extend Jido.AI",
+         ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|llm_client_boundary|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
+        {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/},
         {"Examples - Strategies", ~r/examples\/strategies/}
       ],
       groups_for_modules: [

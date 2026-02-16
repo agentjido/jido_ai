@@ -30,7 +30,7 @@ def deps do
 end
 ```
 
-Configure model aliases and LLM provider credentials (see [Configuration Guide](guides/developer/08_configuration.md)):
+Configure model aliases and LLM provider credentials (see [Configuration Reference](guides/developer/configuration_reference.md)):
 
 ```elixir
 # config/config.exs
@@ -49,13 +49,13 @@ config :req_llm,
 
 Strategies are agent patterns that determine how an LLM approaches a problem. They are the foundation of building intelligent agents with Jido.AI.
 
-| Strategy | Pattern | Best For | Guide |
-|----------|---------|----------|-------|
-| **ReAct** | Reason-Act loop | Tool-using agents | [Guide](guides/user/02_strategies.md#react-reason-act) |
-| **Chain-of-Thought** | Sequential reasoning | Multi-step problems | [Guide](guides/user/02_strategies.md#chain-of-thought) |
-| **Tree-of-Thoughts** | Explore multiple paths | Complex planning | [Guide](guides/user/02_strategies.md#tree-of-thoughts) |
-| **Graph-of-Thoughts** | Networked reasoning | Interconnected concepts | [Guide](guides/user/02_strategies.md#graph-of-thoughts) |
-| **Adaptive** | Strategy selection | Variable problem types | [Guide](guides/user/02_strategies.md#adaptive-strategy) |
+| Strategy | Pattern | Best For |
+|----------|---------|----------|
+| **ReAct** | Reason-Act loop | Tool-using agents |
+| **Chain-of-Thought** | Sequential reasoning | Multi-step problems |
+| **Tree-of-Thoughts** | Explore multiple paths | Complex planning |
+| **Graph-of-Thoughts** | Networked reasoning | Interconnected concepts |
+| **Adaptive** | Strategy selection | Variable problem types |
 
 **When to use which strategy:**
 - **ReAct** - When your agent needs to use tools or APIs
@@ -88,19 +88,31 @@ end
 
 ## Documentation
 
-### User Guides
-- [Overview](guides/user/01_overview.md) - Library introduction and concepts
-- [Strategies](guides/user/02_strategies.md) - Reasoning strategies
+### Build With Jido.AI
+- [Getting Started](guides/user/getting_started.md) - First working agent in minutes
+- [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md) - Choose CoT/ReAct/ToT/GoT/TRM/Adaptive
+- [First ReAct Agent](guides/user/first_react_agent.md) - Tool-using ReAct with request handles
+- [Request Lifecycle And Concurrency](guides/user/request_lifecycle_and_concurrency.md) - `ask/await` and concurrent safety
+- [Thread Context And Message Projection](guides/user/thread_context_and_message_projection.md) - Multi-turn context management
+- [Tool Calling With Actions](guides/user/tool_calling_with_actions.md) - Adapt `Jido.Action` modules as tools
+- [Streaming Workflows](guides/user/streaming_workflows.md) - Token streaming with buffering and callbacks
+- [Observability Basics](guides/user/observability_basics.md) - Telemetry events and normalization
+- [CLI Workflows](guides/user/cli_workflows.md) - Interactive, one-shot, and batch CLI usage
 
-### Developer Guides
-- [Architecture Overview](guides/developer/01_architecture_overview.md) - System design
-- [Strategies](guides/developer/02_strategies.md) - Strategy implementation
-- [State Machines](guides/developer/03_state_machines.md) - Pure state machine pattern
-- [Directives](guides/developer/04_directives.md) - Declarative side effects
-- [Signals](guides/developer/05_signals.md) - Event-driven communication
-- [Tool System](guides/developer/06_tool_system.md) - Tool registry and execution
-- [Skills](guides/developer/07_skills.md) - Modular agent capabilities
-- [Configuration](guides/developer/08_configuration.md) - Model aliases and providers
+### Extend Jido.AI
+- [Architecture And Runtime Flow](guides/developer/architecture_and_runtime_flow.md) - Query to runtime lifecycle
+- [Strategy Internals](guides/developer/strategy_internals.md) - Extending strategy adapters safely
+- [Directives Runtime Contract](guides/developer/directives_runtime_contract.md) - Runtime side-effect semantics
+- [Signals, Namespaces, Contracts](guides/developer/signals_namespaces_contracts.md) - Canonical event contracts
+- [LLM Client Boundary](guides/developer/llm_client_boundary.md) - Provider abstraction and injection
+- [Plugins And Actions Composition](guides/developer/plugins_and_actions_composition.md) - Lifecycle and action composition
+- [Skills System](guides/developer/skills_system.md) - Load/register/use skills
+- [Security And Validation](guides/developer/security_and_validation.md) - Input and error hardening
+- [Error Model And Recovery](guides/developer/error_model_and_recovery.md) - Retry and failure policy
+
+### Reference
+- [Actions Catalog](guides/developer/actions_catalog.md) - Built-in action inventory
+- [Configuration Reference](guides/developer/configuration_reference.md) - Defaults and config keys
 
 ### Examples
 - [`examples/strategies/react_agent.md`](examples/strategies/react_agent.md) - ReAct strategy example
@@ -113,7 +125,6 @@ end
 Use these references as the production baseline for ReAct:
 - [`lib/jido_ai/agents/examples/weather_agent.ex`](lib/jido_ai/agents/examples/weather_agent.ex)
 - [`examples/strategies/react_agent.md`](examples/strategies/react_agent.md)
-- [`guides/user/03_react_observability.md`](guides/user/03_react_observability.md)
 
 ## Quick Decision Guide
 

@@ -18,21 +18,38 @@ defmodule Jido.AI.LLMClient do
 
   @default_client Jido.AI.LLMClient.ReqLLM
 
+  @doc """
+  Generates a non-streaming text response using the configured client.
+
+  Client resolution order:
+  1. `:llm_client` in `context`
+  2. `:llm_client` in application env
+  3. `Jido.AI.LLMClient.ReqLLM`
+  """
   @spec generate_text(context(), model_spec(), messages(), opts()) :: {:ok, map()} | {:error, term()}
   def generate_text(context, model, messages, opts \\ []) do
     client_module(context).generate_text(model, messages, opts)
   end
 
+  @doc """
+  Starts a streaming text response using the configured client.
+  """
   @spec stream_text(context(), model_spec(), messages(), opts()) :: {:ok, term()} | {:error, term()}
   def stream_text(context, model, messages, opts \\ []) do
     client_module(context).stream_text(model, messages, opts)
   end
 
+  @doc """
+  Processes a stream response returned by `stream_text/4`.
+  """
   @spec process_stream(context(), term(), opts()) :: {:ok, map()} | {:error, term()}
   def process_stream(context, stream_response, opts \\ []) do
     client_module(context).process_stream(stream_response, opts)
   end
 
+  @doc """
+  Resolves which client module to use for LLM operations.
+  """
   @spec client_module(context()) :: module()
   def client_module(context \\ nil) do
     from_context(context) ||
