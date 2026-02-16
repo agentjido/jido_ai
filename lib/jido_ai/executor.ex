@@ -68,6 +68,7 @@ defmodule Jido.AI.Executor do
   token, secret, etc.) to prevent credential leakage in logs.
   """
 
+  alias Jido.AI.Observe
   alias Jido.Action.Tool, as: ActionTool
 
   require Logger
@@ -497,88 +498,30 @@ defmodule Jido.AI.Executor do
   # Telemetry
   # ============================================================================
 
-  # Patterns for sensitive keys that should be redacted in telemetry
-  # These match common credential field names but avoid partial matches (e.g. "credentials" container)
-  @sensitive_key_patterns [
-    ~r/^api_?key$/i,
-    ~r/^password$/i,
-    ~r/^secret$/i,
-    ~r/^token$/i,
-    ~r/^auth_?token$/i,
-    ~r/^private_?key$/i,
-    ~r/^access_?key$/i,
-    ~r/^bearer$/i,
-    ~r/^api_?secret$/i,
-    ~r/^client_?secret$/i,
-    ~r/secret_/i,
-    ~r/_secret$/i,
-    ~r/_key$/i,
-    ~r/_token$/i,
-    ~r/_password$/i
-  ]
-
   defp start_telemetry(tool_name, params, context) do
+    obs_cfg = context[:observability] || %{}
+
     metadata =
       %{
         tool_name: tool_name,
-        params: sanitize_params(params),
+        params: Observe.sanitize_sensitive(params),
         call_id: context[:call_id],
         agent_id: context[:agent_id],
         iteration: context[:iteration]
       }
-      |> Map.merge(get_trace_metadata())
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
       |> Map.new()
 
-    :telemetry.execute(
-      [:jido, :ai, :tool, :execute, :start],
+    Observe.emit(
+      obs_cfg,
+      Observe.tool_execute(:start),
       %{system_time: System.system_time()},
       metadata
     )
   end
 
-  defp get_trace_metadata do
-    case Jido.Tracing.Context.get() do
-      nil ->
-        %{}
-
-      ctx ->
-        %{
-          jido_trace_id: ctx[:trace_id],
-          jido_span_id: ctx[:span_id],
-          jido_parent_span_id: ctx[:parent_span_id]
-        }
-    end
-  end
-
-  @doc false
-  defp sanitize_params(params) when is_map(params) do
-    Map.new(params, fn {key, value} ->
-      if sensitive_key?(key) do
-        {key, "[REDACTED]"}
-      else
-        {key, sanitize_value(value)}
-      end
-    end)
-  end
-
-  defp sanitize_params(params), do: params
-
-  defp sanitize_value(value) when is_map(value), do: sanitize_params(value)
-  defp sanitize_value(value) when is_list(value), do: Enum.map(value, &sanitize_value/1)
-  defp sanitize_value(value), do: value
-
-  defp sensitive_key?(key) when is_atom(key) do
-    key |> Atom.to_string() |> sensitive_key?()
-  end
-
-  defp sensitive_key?(key) when is_binary(key) do
-    Enum.any?(@sensitive_key_patterns, &Regex.match?(&1, key))
-  end
-
-  defp sensitive_key?(_key), do: false
-
   defp stop_telemetry(tool_name, result, start_time, context) do
+    obs_cfg = context[:observability] || %{}
     duration = System.monotonic_time() - start_time
 
     metadata =
@@ -590,18 +533,19 @@ defmodule Jido.AI.Executor do
         thread_id: context[:thread_id],
         iteration: context[:iteration]
       }
-      |> Map.merge(get_trace_metadata())
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
       |> Map.new()
 
-    :telemetry.execute(
-      [:jido, :ai, :tool, :execute, :stop],
+    Observe.emit(
+      obs_cfg,
+      Observe.tool_execute(:stop),
       %{duration: duration},
       metadata
     )
   end
 
   defp exception_telemetry(tool_name, reason, start_time, context) do
+    obs_cfg = context[:observability] || %{}
     duration = System.monotonic_time() - start_time
 
     metadata =
@@ -613,12 +557,12 @@ defmodule Jido.AI.Executor do
         thread_id: context[:thread_id],
         iteration: context[:iteration]
       }
-      |> Map.merge(get_trace_metadata())
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
       |> Map.new()
 
-    :telemetry.execute(
-      [:jido, :ai, :tool, :execute, :exception],
+    Observe.emit(
+      obs_cfg,
+      Observe.tool_execute(:exception),
       %{duration: duration},
       metadata
     )
