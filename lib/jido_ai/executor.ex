@@ -1,244 +1,100 @@
 defmodule Jido.AI.Executor do
   @moduledoc """
-  Action execution with validation, error handling, and timeout support.
+  Action execution boundary for LLM tool calls.
 
-  This module provides a single entry point for executing Jido.Action modules
-  as LLM tools. It handles the full execution lifecycle:
+  This module is intentionally narrow:
 
-  1. **Tool Lookup**: Finds the action by name in the provided tools map
-  2. **Parameter Normalization**: Converts LLM arguments to proper types
-  3. **Execution**: Dispatches to Jido.Exec
-  4. **Result Formatting**: Converts results to LLM-friendly format
-  5. **Error Handling**: Catches exceptions and returns structured errors
-  6. **Timeout Support**: Optional timeout with Task.await
+  1. Resolves tool names to action modules
+  2. Normalizes LLM arguments against action schema
+  3. Executes via `Jido.Exec`
+  4. Normalizes errors into a stable envelope
+  5. Emits tool execution telemetry
 
-  ## Usage
-
-      # Build a tools map from action modules
-      tools = Executor.build_tools_map([MyApp.Calculator, MyApp.Search])
-
-      # Execute by name with explicit tools map
-      {:ok, result} = Executor.execute("calculator", %{"a" => "1"}, %{}, tools: tools)
-
-      # With timeout (5 seconds)
-      {:ok, result} = Executor.execute("calculator", %{"a" => 1}, %{}, tools: tools, timeout: 5000)
-
-      # Execute directly with a module (no lookup needed)
-      {:ok, result} = Executor.execute_module(MyAction, %{a: 1}, %{})
-
-  ## Parameter Normalization
-
-  LLM tool calls return arguments with string keys (from JSON). The executor
-  normalizes arguments using the action's schema:
-
-  - Converts string keys to atom keys
-  - Parses string numbers to integers/floats based on schema type
-
-  ## Result Formatting
-
-  Results are formatted for LLM consumption:
-
-  - Maps and structs are JSON-encoded
-  - Large results are truncated with size indicators
-  - Binary data is base64-encoded or described
-
-  ## Error Handling
-
-  All errors are returned as `{:error, error_map}` with structured information:
-
-      {:error, %{
-        error: "Error message for LLM",
-        tool_name: "calculator",
-        type: :execution_error,
-        details: %{...}
-      }}
-
-  Note: Stacktraces are logged server-side for debugging but are NOT included
-  in error responses to prevent information disclosure.
-
-  ## Telemetry
-
-  The executor emits telemetry events for monitoring:
-
-  - `[:jido, :ai, :tool, :execute, :start]` - Execution started
-  - `[:jido, :ai, :tool, :execute, :stop]` - Execution completed
-  - `[:jido, :ai, :tool, :execute, :exception]` - Execution failed with exception
-
-  Note: Telemetry metadata sanitizes sensitive parameters (api_key, password,
-  token, secret, etc.) to prevent credential leakage in logs.
+  Result formatting for tool messages is handled by `Jido.AI.Turn`.
   """
 
   alias Jido.AI.{Observe, ToolAdapter}
+  alias Jido.Action.Error.TimeoutError
   alias Jido.Action.Tool, as: ActionTool
 
   require Logger
 
   @default_timeout 30_000
-  @max_result_size 10_000
 
   @type tools_map :: %{String.t() => module()}
-  @type execute_opts :: [timeout: pos_integer(), tools: tools_map()]
+  @type execute_opts :: [timeout: pos_integer() | nil, tools: tools_map() | [module()] | module() | nil]
   @type execute_result :: {:ok, term()} | {:error, map()}
-
-  # ============================================================================
-  # Public API
-  # ============================================================================
 
   @doc """
   Builds a tools map from action modules.
-
-  Accepts a single module or a list of modules.
-
-  ## Arguments
-
-    * `module_or_modules` - Single Action module or list of Action modules
-
-  ## Returns
-
-    A map of `%{name => module}` for use with `execute/4`.
-
-  ## Examples
-
-      iex> Executor.build_tools_map(MyApp.Calculator)
-      %{"calculator" => MyApp.Calculator}
-
-      iex> Executor.build_tools_map([MyApp.Calculator, MyApp.Search])
-      %{"calculator" => MyApp.Calculator, "search" => MyApp.Search}
   """
   @spec build_tools_map(module() | [module()]) :: tools_map()
-  def build_tools_map(module) when is_atom(module) do
-    ToolAdapter.to_action_map(module)
-  end
-
-  def build_tools_map(modules) when is_list(modules) do
-    ToolAdapter.to_action_map(modules)
-  end
+  def build_tools_map(module) when is_atom(module), do: ToolAdapter.to_action_map(module)
+  def build_tools_map(modules) when is_list(modules), do: ToolAdapter.to_action_map(modules)
 
   @doc """
   Executes a tool by name with the given parameters and context.
 
-  Looks up the tool in the provided tools map, normalizes parameters,
-  executes the tool, and returns the formatted result.
-
-  ## Arguments
-
-    * `tool_name` - The name of the tool to execute
-    * `params` - Parameters to pass to the tool (may have string keys)
-    * `context` - Execution context (passed to Jido.Exec or run/2)
-    * `opts` - Optional execution options
-
   ## Options
 
-    * `:tools` - Map of `%{name => module}` for tool lookup (required)
-    * `:timeout` - Timeout in milliseconds (default: 30_000)
-
-  ## Returns
-
-    * `{:ok, result}` - Execution succeeded
-    * `{:error, error_map}` - Execution failed
-
-  ## Examples
-
-      iex> tools = Executor.build_tools_map([Calculator])
-      iex> Executor.execute("calculator", %{"a" => "1", "b" => "2"}, %{}, tools: tools)
-      {:ok, %{result: 3}}
-
-      iex> Executor.execute("unknown_tool", %{}, %{}, tools: %{})
-      {:error, %{error: "Tool not found: unknown_tool", type: :not_found}}
+    * `:tools` - tool registry as map/list/module
+    * `:timeout` - timeout in milliseconds (default: 30_000)
   """
   @spec execute(String.t(), map(), map(), execute_opts()) :: execute_result()
   def execute(tool_name, params, context, opts \\ []) when is_binary(tool_name) do
+    context = normalize_context(context)
     timeout = Keyword.get(opts, :timeout, @default_timeout)
-    tools = Keyword.get(opts, :tools, %{})
+    tools = opts |> Keyword.get(:tools, %{}) |> ToolAdapter.to_action_map()
     start_time = System.monotonic_time()
 
     start_telemetry(tool_name, params, context)
 
-    case Map.fetch(tools, tool_name) do
-      {:ok, module} ->
-        execute_with_timeout(module, tool_name, params, context, timeout)
+    result =
+      case Map.fetch(tools, tool_name) do
+        {:ok, module} ->
+          execute_internal(module, tool_name, params, context, timeout)
 
-      :error ->
-        error = %{
-          error: "Tool not found: #{tool_name}",
-          tool_name: tool_name,
-          type: :not_found
-        }
+        :error ->
+          {:error,
+           %{
+             error: "Tool not found: #{tool_name}",
+             tool_name: tool_name,
+             type: :not_found
+           }}
+      end
 
-        stop_telemetry(tool_name, {:error, error}, start_time, context)
-        {:error, error}
-    end
+    finalize_telemetry(tool_name, result, start_time, context)
+    result
   end
 
   @doc """
   Executes a module directly without registry lookup.
-
-  Use this when you already have the Action module reference.
-
-  ## Arguments
-
-    * `module` - The Action module to execute
-    * `params` - Parameters to pass to the module
-    * `context` - Execution context
-    * `opts` - Optional execution options
-
-  ## Options
-
-    * `:timeout` - Timeout in milliseconds (default: 30_000)
-
-  ## Returns
-
-    * `{:ok, result}` - Execution succeeded
-    * `{:error, error_map}` - Execution failed
   """
   @spec execute_module(module(), map(), map(), execute_opts()) :: execute_result()
   def execute_module(module, params, context, opts \\ []) do
+    context = normalize_context(context)
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     tool_name = module.name()
+    start_time = System.monotonic_time()
 
     start_telemetry(tool_name, params, context)
-    execute_with_timeout(module, tool_name, params, context, timeout)
+    result = execute_internal(module, tool_name, params, context, timeout)
+    finalize_telemetry(tool_name, result, start_time, context)
+
+    result
   end
 
   # ============================================================================
   # Execution
   # ============================================================================
 
-  @spec execute_with_timeout(module(), String.t(), map(), map(), pos_integer()) ::
-          execute_result()
-  defp execute_with_timeout(module, tool_name, params, context, timeout) do
-    start_time = System.monotonic_time()
-
-    task =
-      Task.async(fn ->
-        execute_internal(module, tool_name, params, context)
-      end)
-
-    case Task.yield(task, timeout) || Task.shutdown(task) do
-      {:ok, result} ->
-        stop_telemetry(tool_name, result, start_time, context)
-        result
-
-      nil ->
-        error = %{
-          error: "Tool execution timed out after #{timeout}ms",
-          tool_name: tool_name,
-          type: :timeout,
-          timeout_ms: timeout
-        }
-
-        exception_telemetry(tool_name, :timeout, start_time, context)
-        {:error, error}
-    end
-  end
-
-  @spec execute_internal(module(), String.t(), map(), map()) :: execute_result()
-  defp execute_internal(module, tool_name, params, context) do
+  @spec execute_internal(module(), String.t(), map(), map(), pos_integer() | nil) :: execute_result()
+  defp execute_internal(module, tool_name, params, context, timeout) do
     schema = module.schema()
     normalized_params = normalize_params(params, schema)
 
-    case Jido.Exec.run(module, normalized_params, context) do
-      {:ok, output} -> {:ok, format_result(output)}
+    case Jido.Exec.run(module, normalized_params, context, timeout_opts(timeout)) do
+      {:ok, output} -> {:ok, output}
       {:error, reason} -> {:error, format_error(tool_name, reason)}
     end
   rescue
@@ -255,24 +111,6 @@ defmodule Jido.AI.Executor do
 
   @doc """
   Normalizes parameters from LLM format to schema-compliant format.
-
-  Converts string keys to atom keys and parses string values based on
-  the schema type definitions.
-
-  ## Arguments
-
-    * `params` - Parameters with potentially string keys and values
-    * `schema` - NimbleOptions schema defining expected types
-
-  ## Returns
-
-    A map with normalized parameters.
-
-  ## Examples
-
-      iex> schema = [a: [type: :integer], b: [type: :string]]
-      iex> Executor.normalize_params(%{"a" => "42", "b" => "hello"}, schema)
-      %{a: 42, b: "hello"}
   """
   @spec normalize_params(map(), keyword() | struct()) :: map()
   def normalize_params(params, schema) when is_map(params) do
@@ -280,122 +118,33 @@ defmodule Jido.AI.Executor do
   end
 
   # ============================================================================
-  # Result Formatting
+  # Legacy Compatibility
   # ============================================================================
 
+  @deprecated "Use Jido.AI.Turn.format_tool_result_content/1 for tool message formatting."
   @doc """
-  Formats a tool result for LLM consumption.
+  Returns the result unchanged.
 
-  Handles various result types:
-  - Maps and structs are JSON-encoded
-  - Large results are truncated
-  - Binary data is base64-encoded or described
-  - Primitives are returned as-is
-
-  ## Arguments
-
-    * `result` - The raw tool result
-
-  ## Returns
-
-    A formatted result suitable for LLM consumption.
-
-  ## Examples
-
-      iex> Executor.format_result(%{answer: 42})
-      %{answer: 42}
-
-      iex> Executor.format_result("simple string")
-      "simple string"
+  Kept for backward compatibility. Formatting for tool messages lives in `Jido.AI.Turn`.
   """
   @spec format_result(term()) :: term()
-  def format_result(result) when is_binary(result) do
-    if String.valid?(result) do
-      truncate_result(result)
-    else
-      format_binary(result)
-    end
-  end
-
-  def format_result(result) when is_map(result) do
-    case Jason.encode(result) do
-      {:ok, json} ->
-        if byte_size(json) > @max_result_size do
-          truncate_map_result(result, json)
-        else
-          result
-        end
-
-      {:error, _} ->
-        result |> inspect() |> truncate_result()
-    end
-  end
-
-  def format_result(result) when is_list(result) do
-    case Jason.encode(result) do
-      {:ok, json} ->
-        if byte_size(json) > @max_result_size do
-          %{
-            truncated: true,
-            count: length(result),
-            sample: Enum.take(result, 3),
-            message: "Result list truncated (#{length(result)} items, #{byte_size(json)} bytes)"
-          }
-        else
-          result
-        end
-
-      {:error, _} ->
-        result |> inspect() |> truncate_result()
-    end
-  end
-
   def format_result(result), do: result
-
-  defp truncate_result(string) when byte_size(string) > @max_result_size do
-    truncated = String.slice(string, 0, @max_result_size)
-    "#{truncated}... [truncated, #{byte_size(string)} bytes total]"
-  end
-
-  defp truncate_result(string), do: string
-
-  defp truncate_map_result(result, json) do
-    %{
-      truncated: true,
-      size_bytes: byte_size(json),
-      keys: Map.keys(result) |> Enum.take(10),
-      message: "Result map truncated (#{byte_size(json)} bytes)"
-    }
-  end
-
-  defp format_binary(binary) do
-    size = byte_size(binary)
-    # Base64 encoding increases size by ~33%, so limit raw bytes to stay under max_result_size
-    # For a 10KB limit, we can encode up to ~7.5KB of raw binary data
-    max_raw_size = trunc(@max_result_size * 0.75)
-
-    if size <= max_raw_size do
-      encoded = Base.encode64(binary)
-
-      %{
-        type: :binary,
-        encoding: :base64,
-        data: encoded,
-        size_bytes: size
-      }
-    else
-      %{
-        type: :binary,
-        encoding: :description,
-        message: "Binary data (#{size} bytes) - too large to encode",
-        size_bytes: size
-      }
-    end
-  end
 
   # ============================================================================
   # Error Formatting
   # ============================================================================
+
+  defp format_error(tool_name, %TimeoutError{} = reason) do
+    timeout_ms = reason.timeout || timeout_from_details(reason.details)
+
+    %{
+      error: Exception.message(reason),
+      tool_name: tool_name,
+      type: :timeout,
+      timeout_ms: timeout_ms,
+      details: reason.details
+    }
+  end
 
   defp format_error(tool_name, reason) when is_exception(reason) do
     %{
@@ -416,7 +165,6 @@ defmodule Jido.AI.Executor do
   end
 
   defp format_exception(tool_name, exception, stacktrace) do
-    # Log stacktrace server-side for debugging - do NOT include in response
     Logger.error("Tool execution exception",
       tool_name: tool_name,
       exception_message: Exception.message(exception),
@@ -424,7 +172,6 @@ defmodule Jido.AI.Executor do
       stacktrace: format_stacktrace_for_logging(stacktrace)
     )
 
-    # Return sanitized error without stacktrace to prevent information disclosure
     %{
       error: Exception.message(exception),
       tool_name: tool_name,
@@ -442,7 +189,9 @@ defmodule Jido.AI.Executor do
     }
   end
 
-  # Formats stacktrace for server-side logging only - never include in responses
+  defp timeout_from_details(%{} = details), do: Map.get(details, :timeout) || Map.get(details, "timeout")
+  defp timeout_from_details(_), do: nil
+
   @doc false
   defp format_stacktrace_for_logging(stacktrace) do
     stacktrace
@@ -453,6 +202,14 @@ defmodule Jido.AI.Executor do
   # ============================================================================
   # Telemetry
   # ============================================================================
+
+  defp finalize_telemetry(tool_name, {:error, %{type: :timeout}}, start_time, context) do
+    exception_telemetry(tool_name, :timeout, start_time, context)
+  end
+
+  defp finalize_telemetry(tool_name, result, start_time, context) do
+    stop_telemetry(tool_name, result, start_time, context)
+  end
 
   defp start_telemetry(tool_name, params, context) do
     obs_cfg = context[:observability] || %{}
@@ -523,4 +280,10 @@ defmodule Jido.AI.Executor do
       metadata
     )
   end
+
+  defp timeout_opts(timeout) when is_integer(timeout) and timeout > 0, do: [timeout: timeout]
+  defp timeout_opts(_), do: []
+
+  defp normalize_context(context) when is_map(context), do: context
+  defp normalize_context(_), do: %{}
 end

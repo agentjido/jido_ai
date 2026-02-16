@@ -302,69 +302,14 @@ defmodule Jido.AI.ExecutorTest do
     end
   end
 
-  describe "format_result/1" do
-    test "returns simple strings as-is" do
-      assert Executor.format_result("hello") == "hello"
-    end
+  describe "format_result/1 (legacy passthrough)" do
+    test "returns the value unchanged" do
+      value = %{nested: [1, 2, 3], data: String.duplicate("x", 20_000)}
 
-    test "returns small maps as-is" do
-      result = %{a: 1, b: 2}
-      assert Executor.format_result(result) == result
-    end
-
-    test "returns primitives as-is" do
-      assert Executor.format_result(42) == 42
-      assert Executor.format_result(true) == true
-      assert Executor.format_result(nil) == nil
-    end
-
-    test "truncates large strings" do
-      large_string = String.duplicate("x", 15_000)
-      result = Executor.format_result(large_string)
-
-      assert is_binary(result)
-      assert String.contains?(result, "[truncated")
-      assert byte_size(result) < 15_000
-    end
-
-    test "truncates large maps" do
-      large_map = %{data: String.duplicate("x", 15_000)}
-      result = Executor.format_result(large_map)
-
-      assert result.truncated == true
-      assert is_integer(result.size_bytes)
-      assert is_list(result.keys)
-    end
-
-    test "truncates large lists" do
-      large_list = Enum.to_list(1..1000)
-      result = Executor.format_result(large_list)
-
-      # This list is small enough to not be truncated (JSON is small)
-      assert is_list(result)
-    end
-
-    test "handles binary data with base64 for small binaries" do
-      # Use a binary with invalid UTF-8 sequence (0xFF is not valid in UTF-8)
-      binary = <<0xFF, 0xFE, 0x00, 0x01>>
-      result = Executor.format_result(binary)
-
-      assert result.type == :binary
-      assert result.encoding == :base64
-      assert result.data == Base.encode64(binary)
-      assert result.size_bytes == 4
-    end
-
-    test "describes large binary data" do
-      # Use a binary with invalid UTF-8 to ensure it's treated as binary
-      # Binary must be larger than max_result_size * 0.75 (7500 bytes) to get description
-      binary = <<0xFF>> <> :crypto.strong_rand_bytes(7999)
-      result = Executor.format_result(binary)
-
-      assert result.type == :binary
-      assert result.encoding == :description
-      assert result.size_bytes == 8000
-      assert String.contains?(result.message, "8000 bytes")
+      # format_result/1 is deprecated; use apply/3 in tests to avoid compile-time warnings.
+      assert apply(Executor, :format_result, [value]) == value
+      assert apply(Executor, :format_result, [42]) == 42
+      assert apply(Executor, :format_result, [<<0xFF, 0xFE, 0x00, 0x01>>]) == <<0xFF, 0xFE, 0x00, 0x01>>
     end
   end
 
