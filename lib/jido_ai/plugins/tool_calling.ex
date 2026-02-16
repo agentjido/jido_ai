@@ -46,12 +46,10 @@ defmodule Jido.AI.Plugins.ToolCalling do
       # List available tools
       {:ok, result} = Jido.Exec.run(Jido.AI.Actions.ToolCalling.ListTools, %{})
 
-  ## Tool Registry
+  ## Tool Source
 
-  Tools are managed through `Jido.AI.Tools.Registry`:
-
-  - **Actions** - Jido.Action modules registered as tools
-  - All actions are executed via `Jido.Exec.run/3` for consistent validation
+  Tools are supplied through plugin configuration (`tools:`) and stored in plugin state.
+  The plugin passes these tool modules through action context for discovery/execution.
 
   ## Auto-Execution
 
@@ -74,7 +72,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
   **Direct ReqLLM Calls**: Calls `ReqLLM.Generation.generate_text/3` with
   `tools:` option directly, following the core design principle of Jido.AI.
 
-  **Registry Integration**: Uses `Jido.AI.Tools.Registry` for tool discovery
+  **Tool Integration**: Uses context-provided tool maps for discovery
   and `Jido.AI.Executor` for execution.
 
   **Tool Format**: Tools are converted to ReqLLM format via

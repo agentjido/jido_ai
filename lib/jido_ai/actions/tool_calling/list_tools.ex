@@ -2,8 +2,8 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
   @moduledoc """
   A Jido.Action for listing all available tools with their schemas.
 
-  This action queries the `Jido.AI.Tools.Registry` and returns information
-  about all registered Action modules, including their names and schemas.
+  This action reads tools from action context (`context[:tools]`) and returns
+  information about available Action modules, including their names and schemas.
 
   ## Parameters
 

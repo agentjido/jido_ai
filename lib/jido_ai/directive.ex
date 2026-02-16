@@ -105,10 +105,10 @@ defmodule Jido.AI.Directive do
 
     1. **Direct module execution** (preferred): When `action_module` is provided,
        the module is executed directly via `Executor.execute_module/4`, bypassing
-       Registry lookup. This is used by strategies that maintain their own tool lists.
+       name-based lookup. This is used by strategies that maintain their own tool lists.
 
-    2. **Registry lookup**: When `action_module` is nil, looks up the action in
-       `Jido.AI.Tools.Registry` by name and executes via `Jido.AI.Executor`.
+    2. **Name lookup**: When `action_module` is nil, runtime resolves the tool name
+       against the current strategy/plugin tool map and executes via `Jido.AI.Executor`.
 
     ## Argument Normalization
 
@@ -126,9 +126,11 @@ defmodule Jido.AI.Directive do
               %{
                 id: Zoi.string(description: "Tool call ID from LLM (ReqLLM.ToolCall.id)"),
                 tool_name:
-                  Zoi.string(description: "Name of the tool (used for Registry lookup if action_module not provided)"),
+                  Zoi.string(
+                    description: "Name of the tool (resolved from runtime tool map if action_module not provided)"
+                  ),
                 action_module:
-                  Zoi.atom(description: "Module to execute directly (bypasses Registry lookup)")
+                  Zoi.atom(description: "Module to execute directly (bypasses name lookup)")
                   |> Zoi.optional(),
                 arguments:
                   Zoi.map(description: "Arguments from LLM (string keys, normalized before exec)")
