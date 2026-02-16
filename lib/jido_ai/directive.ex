@@ -1418,11 +1418,17 @@ defmodule Jido.AI.Directive.Helper do
     end
   end
 
+  @doc """
+  Ensures required observability metadata keys are present.
+  """
   @spec ensure_required_metadata(map()) :: map()
   def ensure_required_metadata(metadata) when is_map(metadata) do
     Events.ensure_required_metadata(metadata)
   end
 
+  @doc """
+  Ensures required observability measurement keys are present.
+  """
   @spec ensure_required_measurements(map()) :: map()
   def ensure_required_measurements(measurements) when is_map(measurements) do
     Events.ensure_required_measurements(measurements)
