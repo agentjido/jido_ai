@@ -57,7 +57,6 @@ defmodule Jido.AI.Actions.LLM.Chat do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.LLMClient
   alias Jido.AI.Security
   alias Jido.AI.Actions.Helpers
   alias ReqLLM.Context
@@ -83,12 +82,12 @@ defmodule Jido.AI.Actions.LLM.Chat do
       }
   """
   @impl Jido.Action
-  def run(params, context) do
+  def run(params, _context) do
     with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
          {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
          {:ok, req_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          opts = Helpers.build_opts(validated_params),
-         {:ok, response} <- LLMClient.generate_text(context, model, req_context.messages, opts) do
+         {:ok, response} <- ReqLLM.Generation.generate_text(model, req_context.messages, opts) do
       {:ok, format_result(response, model)}
     else
       {:error, reason} -> {:error, sanitize_error_for_user(reason)}

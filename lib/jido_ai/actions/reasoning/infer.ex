@@ -53,7 +53,6 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.LLMClient
   alias Jido.AI.Security
   alias Jido.AI.Text
   alias ReqLLM.Context
@@ -93,12 +92,12 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
       }
   """
   @impl Jido.Action
-  def run(params, context) do
+  def run(params, _context) do
     with {:ok, model} <- resolve_model(params[:model]),
          {:ok, validated_params} <- validate_and_sanitize_params(params),
          {:ok, req_context} <- build_inference_messages(validated_params),
          opts = build_opts(validated_params),
-         {:ok, response} <- LLMClient.generate_text(context, model, req_context.messages, opts) do
+         {:ok, response} <- ReqLLM.Generation.generate_text(model, req_context.messages, opts) do
       {:ok, format_result(response, model)}
     end
   end

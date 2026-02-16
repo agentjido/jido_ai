@@ -104,7 +104,6 @@ end
 - [Strategy Internals](guides/developer/strategy_internals.md) - Extending strategy adapters safely
 - [Directives Runtime Contract](guides/developer/directives_runtime_contract.md) - Runtime side-effect semantics
 - [Signals, Namespaces, Contracts](guides/developer/signals_namespaces_contracts.md) - Canonical event contracts
-- [LLM Client Boundary](guides/developer/llm_client_boundary.md) - Provider abstraction and injection
 - [Plugins And Actions Composition](guides/developer/plugins_and_actions_composition.md) - Lifecycle and action composition
 - [Skills System](guides/developer/skills_system.md) - Load/register/use skills
 - [Security And Validation](guides/developer/security_and_validation.md) - Input and error hardening

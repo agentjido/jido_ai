@@ -1,11 +1,17 @@
 defmodule Jido.AI.Actions.Planning.DecomposeTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.Actions.Planning.Decompose
-  alias Jido.AI.TestSupport.FakeLLMClient
+  alias Jido.AI.TestSupport.FakeReqLLM
 
   @moduletag :unit
   @moduletag :capture_log
+
+  setup :set_mimic_from_context
+  setup :stub_req_llm
+
+  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   describe "schema" do
     test "has required fields" do
@@ -31,7 +37,7 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
         goal: "Build a mobile application"
       }
 
-      assert {:ok, result} = Decompose.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Decompose.run(params, %{})
       assert result.goal == "Build a mobile application"
       assert is_binary(result.decomposition)
       assert result.decomposition != ""
@@ -46,7 +52,7 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
         context: "Tech conference for developers, limited budget"
       }
 
-      assert {:ok, result} = Decompose.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Decompose.run(params, %{})
       assert String.length(result.decomposition) > 0
     end
 
@@ -56,7 +62,7 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
         max_depth: 2
       }
 
-      assert {:ok, result} = Decompose.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Decompose.run(params, %{})
       assert result.depth == 2
     end
 
@@ -66,7 +72,7 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
         max_depth: 10
       }
 
-      assert {:ok, result} = Decompose.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Decompose.run(params, %{})
       assert result.depth <= 5
     end
   end

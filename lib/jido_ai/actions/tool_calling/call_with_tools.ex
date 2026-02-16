@@ -62,7 +62,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{Executor, Helpers, LLMClient, Security, ToolAdapter}
+  alias Jido.AI.{Executor, Helpers, Security, ToolAdapter}
   alias Jido.AI.Actions.Helpers, as: ActionHelpers
   alias ReqLLM.Context
 
@@ -90,7 +90,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
          tools = get_tools(validated_params[:tools], context),
          opts = build_opts(validated_params),
          {:ok, response} <-
-           LLMClient.generate_text(context, model, llm_context.messages, Keyword.put(opts, :tools, tools)) do
+           ReqLLM.Generation.generate_text(model, llm_context.messages, Keyword.put(opts, :tools, tools)) do
       result = classify_and_format_response(response, model)
 
       if validated_params[:auto_execute] && result.type == :tool_calls do
@@ -241,7 +241,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
     turn_opts = opts |> Keyword.put(:tools, tools)
 
     # Call LLM again with tool results
-    case LLMClient.generate_text(context, model, updated_messages, turn_opts) do
+    case ReqLLM.Generation.generate_text(model, updated_messages, turn_opts) do
       {:ok, response} ->
         result = classify_and_format_response(response, model)
         next_messages = append_assistant_message(updated_messages, result)

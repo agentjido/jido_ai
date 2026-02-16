@@ -67,4 +67,4 @@ Do not use this when:
 
 - [Streaming Workflows](streaming_workflows.md)
 - [First ReAct Agent](first_react_agent.md)
-- [LLM Client Boundary](../developer/llm_client_boundary.md)
+- [Configuration Reference](../developer/configuration_reference.md)

@@ -45,7 +45,7 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.{LLMClient, Security}
+  alias Jido.AI.Security
   alias Jido.AI.Actions.Streaming.ProcessTokens
   alias Jido.AI.Streaming.Registry
   alias ReqLLM.Context
@@ -57,7 +57,7 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
          {:ok, req_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          {:ok, stream_id} <- Security.generate_stream_id() |> Security.validate_stream_id(),
          opts = build_opts(validated_params),
-         {:ok, stream_response} <- LLMClient.stream_text(context, model, req_context.messages, opts),
+         {:ok, stream_response} <- ReqLLM.stream_text(model, req_context.messages, opts),
          {:ok, _entry} <- register_stream(stream_id, model, stream_response, validated_params),
          :ok <- maybe_start_processor(stream_id, validated_params, context) do
       {:ok,

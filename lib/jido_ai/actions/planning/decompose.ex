@@ -55,7 +55,6 @@ defmodule Jido.AI.Actions.Planning.Decompose do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.LLMClient
   alias Jido.AI.Text
   alias ReqLLM.Context
 
@@ -116,11 +115,11 @@ defmodule Jido.AI.Actions.Planning.Decompose do
       }
   """
   @impl Jido.Action
-  def run(params, context) do
+  def run(params, _context) do
     with {:ok, model} <- resolve_model(params[:model]),
          {:ok, req_context} <- build_decompose_messages(params),
          opts = build_opts(params),
-         {:ok, response} <- LLMClient.generate_text(context, model, req_context.messages, opts) do
+         {:ok, response} <- ReqLLM.Generation.generate_text(model, req_context.messages, opts) do
       {:ok, format_result(response, model, params[:goal], clamp_depth(params[:max_depth] || 3))}
     end
   end

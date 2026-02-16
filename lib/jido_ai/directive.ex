@@ -363,7 +363,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, LLMClient, Signal}
+  alias Jido.AI.{Helpers, Signal}
   alias Jido.Observe
   alias Jido.Tracing.Context, as: TraceContext
 
@@ -383,7 +383,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     timeout = Map.get(directive, :timeout)
     metadata = Map.get(directive, :metadata, %{})
     obs_cfg = metadata[:observability] || %{}
-    llm_context = llm_client_context(context, metadata)
 
     event_meta = %{
       agent_id: metadata[:agent_id],
@@ -411,7 +410,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       max_tokens: max_tokens,
       temperature: temperature,
       timeout: timeout,
-      llm_context: llm_context,
       agent_pid: agent_pid,
       event_meta: event_meta,
       obs_cfg: obs_cfg
@@ -492,7 +490,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
          max_tokens: max_tokens,
          temperature: temperature,
          timeout: timeout,
-         llm_context: llm_context,
          agent_pid: agent_pid,
          event_meta: event_meta,
          obs_cfg: obs_cfg
@@ -507,7 +504,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
-    case LLMClient.stream_text(llm_context, model, messages, opts) do
+    case ReqLLM.stream_text(model, messages, opts) do
       {:ok, stream_response} ->
         on_content = fn text ->
           partial_signal =
@@ -535,7 +532,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
           maybe_emit_delta(obs_cfg, [:jido, :ai, :llm, :delta], %{duration_ms: 0}, event_meta)
         end
 
-        case LLMClient.process_stream(llm_context, stream_response,
+        case ReqLLM.StreamResponse.process_stream(stream_response,
                on_result: on_content,
                on_thinking: on_thinking
              ) do
@@ -592,19 +589,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
     else
       :ok
-    end
-  end
-
-  defp llm_client_context(context, metadata) do
-    cond do
-      is_map(context) and not is_nil(context[:llm_client]) ->
-        %{llm_client: context[:llm_client]}
-
-      is_map(metadata) and not is_nil(metadata[:llm_client]) ->
-        %{llm_client: metadata[:llm_client]}
-
-      true ->
-        %{}
     end
   end
 end
@@ -1162,7 +1146,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, LLMClient, Signal}
+  alias Jido.AI.{Helpers, Signal}
   alias Jido.Observe
 
   def exec(directive, _input_signal, state) do
@@ -1180,7 +1164,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     timeout = Map.get(directive, :timeout)
     metadata = Map.get(directive, :metadata, %{})
     obs_cfg = metadata[:observability] || %{}
-    llm_context = llm_client_context(context, metadata)
 
     event_meta = %{
       agent_id: metadata[:agent_id],
@@ -1216,8 +1199,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
                  tool_choice,
                  max_tokens,
                  temperature,
-                 timeout,
-                 llm_context
+                 timeout
                )
              rescue
                e ->
@@ -1279,8 +1261,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
          tool_choice,
          max_tokens,
          temperature,
-         timeout,
-         llm_context
+         timeout
        ) do
     opts =
       []
@@ -1292,7 +1273,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
-    case LLMClient.generate_text(llm_context, model, messages, opts) do
+    case ReqLLM.Generation.generate_text(model, messages, opts) do
       {:ok, response} ->
         classified = Helpers.classify_llm_response(response)
 
@@ -1335,19 +1316,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
     Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
-  end
-
-  defp llm_client_context(context, metadata) do
-    cond do
-      is_map(context) and not is_nil(context[:llm_client]) ->
-        %{llm_client: context[:llm_client]}
-
-      is_map(metadata) and not is_nil(metadata[:llm_client]) ->
-        %{llm_client: metadata[:llm_client]}
-
-      true ->
-        %{}
-    end
   end
 end
 
