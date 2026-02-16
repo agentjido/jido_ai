@@ -8,6 +8,9 @@ defmodule Jido.AI.Streaming.Registry do
   @type stream_id :: String.t()
   @type entry :: map()
 
+  @doc """
+  Registers a new stream entry with defaults merged with `attrs`.
+  """
   @spec register(stream_id(), map()) :: {:ok, entry()}
   def register(stream_id, attrs \\ %{}) when is_binary(stream_id) and is_map(attrs) do
     ensure_started()
@@ -33,6 +36,9 @@ defmodule Jido.AI.Streaming.Registry do
     {:ok, entry}
   end
 
+  @doc """
+  Replaces an existing stream entry by `stream_id`.
+  """
   @spec put(entry()) :: {:ok, entry()}
   def put(%{stream_id: stream_id} = entry) when is_binary(stream_id) do
     ensure_started()
@@ -40,6 +46,9 @@ defmodule Jido.AI.Streaming.Registry do
     {:ok, entry}
   end
 
+  @doc """
+  Fetches a stream entry by ID.
+  """
   @spec get(stream_id()) :: {:ok, entry()} | {:error, :stream_not_found}
   def get(stream_id) when is_binary(stream_id) do
     ensure_started()
@@ -50,6 +59,9 @@ defmodule Jido.AI.Streaming.Registry do
     end
   end
 
+  @doc """
+  Updates a stream entry atomically with the provided function.
+  """
   @spec update(stream_id(), (entry() -> entry())) :: {:ok, entry()} | {:error, :stream_not_found}
   def update(stream_id, fun) when is_binary(stream_id) and is_function(fun, 1) do
     ensure_started()
@@ -66,6 +78,9 @@ defmodule Jido.AI.Streaming.Registry do
     end)
   end
 
+  @doc """
+  Appends a token to a stream, updating token count and optional buffer text.
+  """
   @spec append_token(stream_id(), String.t()) :: {:ok, entry()} | {:error, :stream_not_found}
   def append_token(stream_id, token) when is_binary(stream_id) and is_binary(token) do
     update(stream_id, fn entry ->
@@ -82,16 +97,25 @@ defmodule Jido.AI.Streaming.Registry do
     end)
   end
 
+  @doc """
+  Marks a stream as `:processing`.
+  """
   @spec mark_processing(stream_id()) :: {:ok, entry()} | {:error, :stream_not_found}
   def mark_processing(stream_id) when is_binary(stream_id) do
     update(stream_id, &Map.put(&1, :status, :processing))
   end
 
+  @doc """
+  Marks a stream as `:streaming`.
+  """
   @spec mark_streaming(stream_id()) :: {:ok, entry()} | {:error, :stream_not_found}
   def mark_streaming(stream_id) when is_binary(stream_id) do
     update(stream_id, &Map.put(&1, :status, :streaming))
   end
 
+  @doc """
+  Marks a stream as `:completed`, merging in final attributes.
+  """
   @spec mark_completed(stream_id(), map()) :: {:ok, entry()} | {:error, :stream_not_found}
   def mark_completed(stream_id, attrs \\ %{}) when is_binary(stream_id) and is_map(attrs) do
     update(stream_id, fn entry ->
@@ -102,6 +126,9 @@ defmodule Jido.AI.Streaming.Registry do
     end)
   end
 
+  @doc """
+  Marks a stream as `:error` and stores the failure reason.
+  """
   @spec mark_error(stream_id(), term()) :: {:ok, entry()} | {:error, :stream_not_found}
   def mark_error(stream_id, reason) when is_binary(stream_id) do
     update(stream_id, fn entry ->
@@ -111,6 +138,9 @@ defmodule Jido.AI.Streaming.Registry do
     end)
   end
 
+  @doc """
+  Deletes a stream entry from the registry.
+  """
   @spec delete(stream_id()) :: :ok
   def delete(stream_id) when is_binary(stream_id) do
     ensure_started()
@@ -118,6 +148,9 @@ defmodule Jido.AI.Streaming.Registry do
     :ok
   end
 
+  @doc """
+  Waits until a stream reaches a terminal state (`:completed` or `:error`).
+  """
   @spec wait_for_terminal(stream_id(), non_neg_integer()) ::
           {:ok, entry()} | {:error, :stream_not_found | :timeout}
   def wait_for_terminal(stream_id, timeout_ms) when is_binary(stream_id) and is_integer(timeout_ms) do

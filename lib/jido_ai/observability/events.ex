@@ -25,18 +25,33 @@ defmodule Jido.AI.Observability.Events do
     :queue_ms
   ]
 
+  @doc """
+  Builds an LLM telemetry event path under `[:jido, :ai, :llm, ...]`.
+  """
   @spec llm(atom()) :: [atom()]
   def llm(event), do: [:jido, :ai, :llm, event]
 
+  @doc """
+  Builds a tool telemetry event path under `[:jido, :ai, :tool, ...]`.
+  """
   @spec tool(atom()) :: [atom()]
   def tool(event), do: [:jido, :ai, :tool, event]
 
+  @doc """
+  Builds a request telemetry event path under `[:jido, :ai, :request, ...]`.
+  """
   @spec request(atom()) :: [atom()]
   def request(event), do: [:jido, :ai, :request, event]
 
+  @doc """
+  Builds a strategy telemetry event path under `[:jido, :ai, :strategy, strategy, ...]`.
+  """
   @spec strategy(atom(), atom()) :: [atom()]
   def strategy(strategy, event), do: [:jido, :ai, :strategy, strategy, event]
 
+  @doc """
+  Ensures required metadata keys are present with `nil` defaults.
+  """
   @spec ensure_required_metadata(map()) :: map()
   def ensure_required_metadata(metadata) when is_map(metadata) do
     Enum.reduce(@required_metadata_keys, metadata, fn key, acc ->
@@ -44,6 +59,9 @@ defmodule Jido.AI.Observability.Events do
     end)
   end
 
+  @doc """
+  Ensures required measurement keys are present with `0` defaults.
+  """
   @spec ensure_required_measurements(map()) :: map()
   def ensure_required_measurements(measurements) when is_map(measurements) do
     Enum.reduce(@required_measurement_keys, measurements, fn key, acc ->
