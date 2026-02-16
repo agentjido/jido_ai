@@ -235,8 +235,9 @@ defmodule Jido.AI.Request do
   ## Options
 
   - `:timeout` - How long to wait (default: 30_000ms)
-  - `:status_path` - Path to status in agent state (default: `[:requests, request_id, :status]`)
-  - `:result_path` - Path to result in agent state (default: `[:requests, request_id, :result]`)
+
+  `Request.await/2` always uses the internal request paths under
+  `state.requests[request_id]` for status, result, and error tracking.
 
   ## Returns
 
