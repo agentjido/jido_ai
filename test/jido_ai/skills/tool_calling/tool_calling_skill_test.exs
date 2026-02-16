@@ -43,6 +43,13 @@ defmodule Jido.AI.Plugins.ToolCallingTest do
       assert state.max_turns == 5
       assert state.default_model == :capable
     end
+
+    test "mounted state validates against plugin schema" do
+      {:ok, state} =
+        ToolCalling.mount(%Jido.Agent{}, %{tools: [Jido.AI.Actions.ToolCalling.ExecuteTool]})
+
+      assert {:ok, _parsed_state} = Zoi.parse(ToolCalling.schema(), state)
+    end
   end
 
   describe "actions" do
