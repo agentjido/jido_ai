@@ -43,7 +43,7 @@ end
 
 ```elixir
 signal = Jido.Signal.new!(
-  Jido.AI.Namespaces.react_set_tool_context(),
+  "ai.react.set_tool_context",
   %{tool_context: %{tenant_id: "acme"}},
   source: "/docs/example"
 )

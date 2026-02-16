@@ -46,7 +46,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Executor
+  alias Jido.AI.{Executor, ToolAdapter}
 
   @doc """
   Executes the tool by name.
@@ -93,7 +93,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   defp resolve_tools(context) when is_map(context) do
     context
     |> find_tools()
-    |> normalize_tools()
+    |> ToolAdapter.to_action_map()
   end
 
   defp resolve_tools(_), do: %{}
@@ -105,12 +105,6 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
       get_in(context, [:agent, :state, :tool_calling, :tools]) ||
       get_in(context, [:plugin_state, :tool_calling, :tools])
   end
-
-  defp normalize_tools(nil), do: %{}
-  defp normalize_tools(tools) when is_map(tools), do: tools
-  defp normalize_tools(tools) when is_list(tools), do: Executor.build_tools_map(tools)
-  defp normalize_tools(module) when is_atom(module), do: Executor.build_tools_map(module)
-  defp normalize_tools(_), do: %{}
 
   defp format_result(result) when is_binary(result), do: %{text: result}
   defp format_result(result) when is_map(result), do: result

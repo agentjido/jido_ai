@@ -4,15 +4,13 @@ You need stable event names and payload semantics across strategies, runtime, an
 
 After this guide, you can add signals without namespace drift.
 
-## Canonical Namespace Helpers
+## Canonical Signal Names
 
-`Jido.AI.Namespaces` centralizes runtime strings like:
+Signal names are stable string contracts:
 
 - strategy queries: `ai.react.query`, `ai.cot.query`, `ai.tot.query`, `ai.got.query`, `ai.trm.query`, `ai.adaptive.query`
 - lifecycle: `ai.request.started`, `ai.request.completed`, `ai.request.failed`, `ai.request.error`
 - llm/tool/embed: `ai.llm.*`, `ai.tool.*`, `ai.embed.*`
-
-Use helper functions (`react_query/0`, `tool_result/0`, etc.) instead of hard-coded strings.
 
 ## Signal Modules
 
@@ -39,12 +37,12 @@ Symptom:
 - strategy route never fires
 
 Fix:
-- use `Jido.AI.Namespaces` helpers everywhere signals are created
+- use canonical signal strings consistently everywhere signals are created
 - keep `signal_routes/1` aligned with canonical names
 
 ## Defaults You Should Know
 
-- `Jido.AI.Namespaces.all_signals/0` gives the canonical list
+- canonical list lives in `Jido.AI.Signal` and strategy `signal_routes/1`
 - signal payload schemas should remain backward compatible when possible
 
 ## When To Use / Not Use

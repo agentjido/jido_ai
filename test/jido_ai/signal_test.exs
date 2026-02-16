@@ -449,7 +449,7 @@ defmodule Jido.AI.SignalTest do
       {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_5")
 
       {:ok, result} = signal.data.result
-      assert result.text == "First part. Second part."
+      assert result.text == "First part. \nSecond part."
     end
 
     test "extracts thinking content from response" do
