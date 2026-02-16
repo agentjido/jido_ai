@@ -363,7 +363,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Observe, Signal}
+  alias Jido.AI.{Helpers, Observe, Signal, Turn}
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -536,12 +536,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
                on_thinking: on_thinking
              ) do
           {:ok, response} ->
-            classified = Helpers.classify_llm_response(response)
+            turn = Turn.from_response(response, model: model)
 
             # Emit usage report signal for per-call tracking
-            emit_usage_report(agent_pid, call_id, model, classified[:usage])
+            emit_usage_report(agent_pid, call_id, model, turn.usage)
 
-            {:ok, classified}
+            {:ok, turn}
 
           {:error, reason} ->
             {:error, reason}
@@ -1141,7 +1141,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Observe, Signal}
+  alias Jido.AI.{Helpers, Observe, Signal, Turn}
 
   def exec(directive, _input_signal, state) do
     %{
@@ -1269,12 +1269,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
     case ReqLLM.Generation.generate_text(model, messages, opts) do
       {:ok, response} ->
-        classified = Helpers.classify_llm_response(response)
+        turn = Turn.from_response(response, model: model)
 
         # Emit usage report signal for per-call tracking
-        emit_usage_report(agent_pid, call_id, model, classified[:usage])
+        emit_usage_report(agent_pid, call_id, model, turn.usage)
 
-        {:ok, classified}
+        {:ok, turn}
 
       {:error, reason} ->
         {:error, reason}

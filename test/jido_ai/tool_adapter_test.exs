@@ -180,6 +180,29 @@ defmodule Jido.AI.ToolAdapterTest do
     end
   end
 
+  describe "to_action_map/1" do
+    test "normalizes nil to empty map" do
+      assert ToolAdapter.to_action_map(nil) == %{}
+    end
+
+    test "normalizes list of modules to name => module map" do
+      assert ToolAdapter.to_action_map([ParamAction]) == %{
+               ParamAction.name() => ParamAction
+             }
+    end
+
+    test "normalizes single module to map" do
+      assert ToolAdapter.to_action_map(ParamAction) == %{
+               ParamAction.name() => ParamAction
+             }
+    end
+
+    test "keeps already-normalized maps intact" do
+      tools = %{ParamAction.name() => ParamAction}
+      assert ToolAdapter.to_action_map(tools) == tools
+    end
+  end
+
   describe "duplicate detection" do
     defmodule DuplicateNameAction do
       use Jido.Action,

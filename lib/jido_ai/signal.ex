@@ -62,6 +62,8 @@ defmodule Jido.AI.Signal do
       signal = Signal.LLMResponse.new!(%{call_id: "call_123", result: {:ok, response}})
   """
 
+  alias Jido.AI.Turn
+
   defmodule LLMResponse do
     @moduledoc """
     Signal for LLM streaming/call completion.
@@ -579,11 +581,9 @@ defmodule Jido.AI.Signal do
   """
   @spec extract_tool_calls(Jido.Signal.t()) :: [map()]
   def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) do
-    case result do
-      %{type: :tool_calls, tool_calls: tool_calls} when is_list(tool_calls) -> tool_calls
-      %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> tool_calls
-      _ -> []
-    end
+    result
+    |> Turn.from_result_map()
+    |> Map.get(:tool_calls, [])
   end
 
   def extract_tool_calls(_signal), do: []
@@ -612,11 +612,9 @@ defmodule Jido.AI.Signal do
   """
   @spec tool_call?(Jido.Signal.t()) :: boolean()
   def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) do
-    case result do
-      %{type: :tool_calls} -> true
-      %{tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] -> true
-      _ -> false
-    end
+    result
+    |> Turn.from_result_map()
+    |> Turn.needs_tools?()
   end
 
   def tool_call?(_signal), do: false
@@ -644,85 +642,23 @@ defmodule Jido.AI.Signal do
     call_id = Keyword.fetch!(opts, :call_id)
     duration_ms = Keyword.get(opts, :duration_ms)
     model_override = Keyword.get(opts, :model)
+    turn_opts = if is_binary(model_override), do: [model: model_override], else: []
 
-    # Extract tool calls from response
-    tool_calls = extract_response_tool_calls(response)
-
-    # Determine response type
-    type = if tool_calls == [], do: :final_answer, else: :tool_calls
-
-    # Extract text content
-    text = extract_response_text(response)
-
-    # Extract thinking content if present
-    thinking_content = extract_thinking_content(response)
-
-    # Build result map
-    result = %{
-      type: type,
-      text: text,
-      tool_calls: tool_calls
-    }
-
-    # Extract usage from response
-    usage = extract_response_usage(response)
-
-    # Extract model from response or use override
-    model = model_override || extract_response_model(response)
+    turn = Turn.from_response(response, turn_opts)
 
     # Build signal data
     signal_data = %{
       call_id: call_id,
-      result: {:ok, result}
+      result: {:ok, turn}
     }
 
-    signal_data = if usage, do: Map.put(signal_data, :usage, usage), else: signal_data
-    signal_data = if model, do: Map.put(signal_data, :model, model), else: signal_data
+    signal_data = if turn.usage, do: Map.put(signal_data, :usage, turn.usage), else: signal_data
+    signal_data = if turn.model, do: Map.put(signal_data, :model, turn.model), else: signal_data
     signal_data = if duration_ms, do: Map.put(signal_data, :duration_ms, duration_ms), else: signal_data
-    signal_data = if thinking_content, do: Map.put(signal_data, :thinking_content, thinking_content), else: signal_data
+
+    signal_data =
+      if turn.thinking_content, do: Map.put(signal_data, :thinking_content, turn.thinking_content), else: signal_data
 
     LLMResponse.new(signal_data)
   end
-
-  # Private helpers for from_reqllm_response
-
-  defp extract_response_tool_calls(%{message: %{tool_calls: tool_calls}}) when is_list(tool_calls) do
-    Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1)
-  end
-
-  defp extract_response_tool_calls(_), do: []
-
-  defp extract_response_text(%{message: %{content: content}}) when is_binary(content), do: content
-
-  defp extract_response_text(%{message: %{content: content}}) when is_list(content) do
-    content
-    |> Enum.filter(&match?(%{type: :text}, &1))
-    |> Enum.map_join("", & &1.text)
-  end
-
-  defp extract_response_text(_), do: ""
-
-  defp extract_thinking_content(%{message: %{content: content}}) when is_list(content) do
-    thinking =
-      content
-      |> Enum.filter(&match?(%{type: :thinking}, &1))
-      |> Enum.map_join("", & &1.thinking)
-
-    if thinking != "", do: thinking
-  end
-
-  defp extract_thinking_content(_), do: nil
-
-  defp extract_response_usage(%{usage: %{input_tokens: input, output_tokens: output}}) do
-    %{input_tokens: input, output_tokens: output}
-  end
-
-  defp extract_response_usage(%{usage: %{"input_tokens" => input, "output_tokens" => output}}) do
-    %{input_tokens: input, output_tokens: output}
-  end
-
-  defp extract_response_usage(_), do: nil
-
-  defp extract_response_model(%{model: model}) when is_binary(model), do: model
-  defp extract_response_model(_), do: nil
 end

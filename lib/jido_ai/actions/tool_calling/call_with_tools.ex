@@ -62,8 +62,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{Executor, Helpers, Security, ToolAdapter}
-  alias Jido.AI.Actions.Helpers, as: ActionHelpers
+  alias Jido.AI.{Security, ToolAdapter, ToolRunner, Turn}
   alias ReqLLM.Context
 
   @dialyzer [
@@ -71,10 +70,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
     {:nowarn_function, classify_and_format_response: 2},
     {:nowarn_function, execute_tool_turns: 8},
     {:nowarn_function, execute_tools_and_continue: 6},
-    {:nowarn_function, execute_all_tools: 2},
-    {:nowarn_function, execute_single_tool: 2},
-    {:nowarn_function, format_tool_result: 1},
-    {:nowarn_function, add_tool_results_to_messages: 2}
+    {:nowarn_function, append_assistant_message: 2}
   ]
 
   @dialyzer {:nowarn_function, run: 2}
@@ -91,12 +87,12 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
          opts = build_opts(validated_params),
          {:ok, response} <-
            ReqLLM.Generation.generate_text(model, llm_context.messages, Keyword.put(opts, :tools, tools)) do
-      result = classify_and_format_response(response, model)
+      turn = classify_and_format_response(response, model)
 
-      if validated_params[:auto_execute] && result.type == :tool_calls do
-        execute_tool_turns(result, llm_context.messages, model, validated_params, context, opts, 1, result.usage)
+      if validated_params[:auto_execute] && Turn.needs_tools?(turn) do
+        execute_tool_turns(turn, llm_context.messages, model, validated_params, context, opts, 1, turn.usage)
       else
-        {:ok, result}
+        {:ok, public_result(turn)}
       end
     end
   end
@@ -158,54 +154,46 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
     opts
   end
 
-  defp classify_and_format_response(response, model) do
-    classification = Helpers.classify_llm_response(response)
-
-    %{
-      type: classification.type,
-      text: Map.get(classification, :text, ""),
-      tool_calls: Map.get(classification, :tool_calls, []),
-      model: model,
-      usage: ActionHelpers.extract_usage(response)
-    }
-  end
+  defp classify_and_format_response(response, model), do: Turn.from_response(response, model: model)
 
   # Multi-turn execution for auto_execute
-  defp execute_tool_turns(result, messages, model, params, context, opts, turn, usage_acc) do
+  defp execute_tool_turns(turn, messages, model, params, context, opts, turn_count, usage_acc) do
     # Use validated max_turns from params (already sanitized with hard limit)
     max_turns = params[:max_turns]
 
-    if turn > max_turns do
+    if turn_count > max_turns do
       {:ok,
-       result
+       turn
+       |> public_result()
        |> Map.put(:reason, :max_turns_reached)
        |> Map.put(:turns, max_turns)
        |> Map.put(:usage, usage_acc)}
     else
-      messages_with_assistant = append_assistant_message(messages, result)
+      messages_with_assistant = append_assistant_message(messages, turn)
 
-      case execute_tools_and_continue(result.tool_calls, messages_with_assistant, model, params, context, opts) do
-        {:final_answer, final_result, next_messages} ->
+      case execute_tools_and_continue(turn, messages_with_assistant, model, params, context, opts) do
+        {:final_answer, final_turn, next_messages} ->
           {:ok,
-           final_result
-           |> Map.put(:turns, turn)
+           final_turn
+           |> public_result()
+           |> Map.put(:turns, turn_count)
            |> Map.put(:messages, next_messages)
-           |> Map.put(:usage, merge_usage(usage_acc, final_result.usage))}
+           |> Map.put(:usage, merge_usage(usage_acc, final_turn.usage))}
 
-        {:more_tools, new_result, next_messages} ->
+        {:more_tools, next_turn, next_messages} ->
           execute_tool_turns(
-            new_result,
+            next_turn,
             next_messages,
             model,
             params,
             context,
             opts,
-            turn + 1,
-            merge_usage(usage_acc, new_result.usage)
+            turn_count + 1,
+            merge_usage(usage_acc, next_turn.usage)
           )
 
         {:error, reason} ->
-          {:ok, %{type: :error, reason: reason, turns: turn, model: model, usage: usage_acc}}
+          {:ok, %{type: :error, reason: reason, turns: turn_count, model: model, usage: usage_acc}}
       end
     end
   end
@@ -229,73 +217,33 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
 
   defp validate_system_prompt_if_needed(_params), do: {:ok, nil}
 
-  defp execute_tools_and_continue(tool_calls, messages, model, params, context, opts) do
-    # Execute all tool calls with tools from context
-    tool_results = execute_all_tools(tool_calls, context)
+  defp execute_tools_and_continue(turn, messages, model, params, context, opts) do
+    with {:ok, turn_with_results} <- ToolRunner.run_turn(turn, context, timeout: params[:timeout]) do
+      updated_messages = messages ++ Turn.tool_messages(turn_with_results)
 
-    # Add tool result messages to conversation
-    updated_messages = add_tool_results_to_messages(messages, tool_results)
+      # Preserve generation options across all turns
+      tools = get_tools(params[:tools], context)
+      turn_opts = opts |> Keyword.put(:tools, tools)
 
-    # Preserve generation options across all turns
-    tools = get_tools(params[:tools], context)
-    turn_opts = opts |> Keyword.put(:tools, tools)
+      # Call LLM again with tool results
+      case ReqLLM.Generation.generate_text(model, updated_messages, turn_opts) do
+        {:ok, response} ->
+          next_turn = classify_and_format_response(response, model)
+          next_messages = append_assistant_message(updated_messages, next_turn)
 
-    # Call LLM again with tool results
-    case ReqLLM.Generation.generate_text(model, updated_messages, turn_opts) do
-      {:ok, response} ->
-        result = classify_and_format_response(response, model)
-        next_messages = append_assistant_message(updated_messages, result)
+          if Turn.needs_tools?(next_turn) do
+            {:more_tools, next_turn, next_messages}
+          else
+            {:final_answer, next_turn, next_messages}
+          end
 
-        if result.type == :tool_calls do
-          {:more_tools, result, next_messages}
-        else
-          {:final_answer, result, next_messages}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
     end
   end
 
-  defp execute_all_tools(tool_calls, context) do
-    tools = context[:tools] || %{}
-
-    Enum.map(tool_calls, fn tool_call ->
-      result = execute_single_tool(tool_call, tools)
-
-      %{
-        id: Map.get(tool_call, :id, ""),
-        name: Map.get(tool_call, :name, ""),
-        result: format_tool_result(result)
-      }
-    end)
-  end
-
-  defp execute_single_tool(tool_call, tools) do
-    name = Map.get(tool_call, :name)
-    arguments = Map.get(tool_call, :arguments, %{})
-
-    Executor.execute(name, arguments, %{}, tools: tools)
-  end
-
-  defp format_tool_result({:ok, result}) when is_binary(result), do: result
-  defp format_tool_result({:ok, result}) when is_map(result) or is_list(result), do: Jason.encode!(result)
-  defp format_tool_result({:ok, result}), do: inspect(result)
-  defp format_tool_result({:error, error}) when is_map(error), do: Map.get(error, :error, "Execution failed")
-
-  defp add_tool_results_to_messages(messages, tool_results) do
-    tool_messages =
-      Enum.map(tool_results, fn tool_result ->
-        %{
-          role: :tool,
-          tool_call_id: tool_result.id,
-          name: tool_result.name,
-          content: tool_result.result
-        }
-      end)
-
-    messages ++ tool_messages
-  end
+  defp append_assistant_message(messages, %Turn{} = turn), do: messages ++ [Turn.assistant_message(turn)]
 
   defp append_assistant_message(messages, %{type: :tool_calls} = result) do
     messages ++ [%{role: :assistant, content: result.text || "", tool_calls: result.tool_calls || []}]
@@ -304,6 +252,9 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   defp append_assistant_message(messages, result) do
     messages ++ [%{role: :assistant, content: Map.get(result, :text, "")}]
   end
+
+  defp public_result(%Turn{} = turn), do: Turn.to_result_map(turn)
+  defp public_result(result) when is_map(result), do: result
 
   defp merge_usage(first, second) do
     first_usage = normalize_usage(first)
@@ -318,6 +269,8 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
       total_tokens: input_tokens + output_tokens
     }
   end
+
+  defp normalize_usage(nil), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
 
   defp normalize_usage(%{} = usage) do
     input_tokens = Map.get(usage, :input_tokens, 0)

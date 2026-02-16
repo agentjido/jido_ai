@@ -642,6 +642,8 @@ defmodule Jido.AI.Strategies.ReAct do
 
   defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []
+    observability_overrides = opts |> Keyword.get(:observability, %{}) |> normalize_map_opt()
+    tool_context_opt = opts |> Keyword.get(:tool_context, %{}) |> normalize_map_opt()
 
     tools_modules =
       case Keyword.fetch(opts, :tools) do
@@ -685,12 +687,12 @@ defmodule Jido.AI.Strategies.ReAct do
             redact_tool_args?: true,
             emit_llm_deltas?: true
           },
-          Keyword.get(opts, :observability, %{})
+          observability_overrides
         ),
       agent_id: agent.id,
       # base_tool_context is the persistent context from agent definition
       # per-request context is stored separately in state[:run_tool_context]
-      base_tool_context: Map.get(agent.state, :tool_context) || Keyword.get(opts, :tool_context, %{})
+      base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt
     }
   end
 
@@ -702,6 +704,10 @@ defmodule Jido.AI.Strategies.ReAct do
   defp resolve_model_spec(model) when is_binary(model) do
     model
   end
+
+  defp normalize_map_opt(%{} = value), do: value
+  defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
+  defp normalize_map_opt(_), do: %{}
 
   defp generate_call_id, do: Machine.generate_call_id()
 

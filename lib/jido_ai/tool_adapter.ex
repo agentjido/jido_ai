@@ -147,6 +147,44 @@ defmodule Jido.AI.ToolAdapter do
   end
 
   @doc """
+  Normalizes tool input into an action lookup map (`%{name => module}`).
+
+  Accepts any of the common tool container shapes used by actions/skills:
+
+  - `nil` -> `%{}`
+  - `%{"tool_name" => MyAction}` -> unchanged
+  - `%{tool_name: MyAction}` -> `%{"tool_name" => MyAction}` when values are modules
+  - `[MyAction, OtherAction]` -> `%{"my_action" => MyAction, "other_action" => OtherAction}`
+  - `MyAction` -> `%{"my_action" => MyAction}`
+  """
+  @spec to_action_map(nil | map() | [module()] | module()) :: %{String.t() => module()}
+  def to_action_map(nil), do: %{}
+
+  def to_action_map(%{} = tools) do
+    cond do
+      Enum.all?(tools, fn {name, mod} -> is_binary(name) and is_atom(mod) end) ->
+        tools
+
+      true ->
+        tools
+        |> Map.values()
+        |> to_action_map()
+    end
+  end
+
+  def to_action_map(modules) when is_list(modules) do
+    modules
+    |> Enum.filter(&is_atom/1)
+    |> Map.new(fn module -> {module.name(), module} end)
+  end
+
+  def to_action_map(module) when is_atom(module) do
+    %{module.name() => module}
+  end
+
+  def to_action_map(_), do: %{}
+
+  @doc """
   Looks up an action module by tool name from a list of action modules.
 
   Useful for finding which action module corresponds to a tool name returned

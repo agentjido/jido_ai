@@ -52,7 +52,7 @@ Fix:
 
 - strategies store internal data in `agent.state.__strategy__`
 - request lifecycle signals are standardized under `ai.request.*`
-- canonical namespace helpers live in `Jido.AI.Namespaces`
+- canonical signal contracts are defined by `Jido.AI.Signal` and strategy routes
 
 ## Registry Lifecycle Guarantees
 

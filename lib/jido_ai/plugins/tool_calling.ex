@@ -92,6 +92,8 @@ defmodule Jido.AI.Plugins.ToolCalling do
     tags: ["tool-calling", "function-calling", "llm", "tools"],
     vsn: "1.0.0"
 
+  alias Jido.AI.ToolAdapter
+
   @doc """
   Initialize plugin state when mounted to an agent.
   """
@@ -190,8 +192,8 @@ defmodule Jido.AI.Plugins.ToolCalling do
   # Private Functions
 
   defp build_tools_map(tools) when is_list(tools) do
-    Map.new(tools, fn module -> {module.name(), module} end)
+    ToolAdapter.to_action_map(tools)
   end
 
-  defp build_tools_map(tools) when is_map(tools), do: tools
+  defp build_tools_map(tools) when is_map(tools), do: ToolAdapter.to_action_map(tools)
 end

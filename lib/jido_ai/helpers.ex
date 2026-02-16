@@ -4,7 +4,6 @@ defmodule Jido.AI.Helpers do
 
   This module provides utilities for:
   - Error handling and classification (mapping ReqLLM errors → Jido.AI.Error)
-  - Response classification for LLM responses
   - Directive execution support
 
   For message building and context management, use `ReqLLM.Context` directly:
@@ -18,10 +17,6 @@ defmodule Jido.AI.Helpers do
 
       alias Jido.AI.Helpers
 
-      # Classify an LLM response
-      result = Helpers.classify_llm_response(response)
-      # => %{type: :final_answer, text: "Hello", tool_calls: []}
-
       # Convert ReqLLM error to Jido.AI.Error
       {:error, jido_error} = Helpers.wrap_error(reqllm_error)
 
@@ -32,7 +27,6 @@ defmodule Jido.AI.Helpers do
   alias Jido.AI.Error
   alias Jido.AI.Error.API, as: APIError
   alias Jido.AI.Error.Validation, as: ValidationError
-  alias Jido.AI.Text
 
   # ============================================================================
   # Error Handling
@@ -259,103 +253,4 @@ defmodule Jido.AI.Helpers do
   @spec add_tools_opt(keyword(), list()) :: keyword()
   def add_tools_opt(opts, []), do: opts
   def add_tools_opt(opts, tools), do: Keyword.put(opts, :tools, tools)
-
-  # ============================================================================
-  # Response Classification
-  # ============================================================================
-
-  @doc """
-  Classifies a ReqLLM response into a result map.
-
-  ## Arguments
-
-    * `response` - A ReqLLM response struct
-
-  ## Returns
-
-    A map with `:type`, `:text`, `:tool_calls`, `:usage`, and `:model` keys.
-    The `:usage` map contains token counts and cost information when available.
-
-  ## Examples
-
-      iex> Helpers.classify_llm_response(%{message: %{content: "Hello", tool_calls: []}, finish_reason: :stop})
-      %{type: :final_answer, text: "Hello", thinking_content: nil, tool_calls: [], usage: nil, model: nil}
-  """
-  @spec classify_llm_response(map()) :: map()
-  def classify_llm_response(response) do
-    tool_calls = response.message.tool_calls || []
-
-    type =
-      cond do
-        tool_calls != [] -> :tool_calls
-        response.finish_reason == :tool_calls -> :tool_calls
-        true -> :final_answer
-      end
-
-    %{
-      type: type,
-      text: Text.extract_from_content(response.message.content),
-      thinking_content: extract_thinking_content(response.message.content),
-      tool_calls: Enum.map(tool_calls, &ReqLLM.ToolCall.from_map/1),
-      usage: normalize_usage(Map.get(response, :usage)),
-      model: Map.get(response, :model)
-    }
-  end
-
-  defp extract_thinking_content(content) when is_list(content) do
-    result =
-      content
-      |> Enum.filter(fn
-        %{type: :thinking} -> true
-        _ -> false
-      end)
-      |> Enum.map_join("\n\n", & &1.thinking)
-
-    if result == "", do: nil, else: result
-  end
-
-  defp extract_thinking_content(_content), do: nil
-
-  # Normalizes usage map to ensure numeric values
-  defp normalize_usage(nil), do: nil
-
-  defp normalize_usage(usage) when is_map(usage) do
-    usage
-    |> Map.new(fn {k, v} -> {k, normalize_usage_value(v)} end)
-  end
-
-  defp normalize_usage_value(v) when is_binary(v) do
-    case Float.parse(v) do
-      {float, _} -> float
-      :error -> 0
-    end
-  end
-
-  defp normalize_usage_value(v) when is_number(v), do: v
-  defp normalize_usage_value(_), do: 0
-
-  @doc """
-  Extracts text from a content value.
-
-  Delegates to `Jido.AI.Text.extract_from_content/1`.
-  """
-  @spec extract_response_text(term()) :: String.t()
-  defdelegate extract_response_text(content), to: Text, as: :extract_from_content
-
-  # ============================================================================
-  # Task Supervisor Helpers
-  # ============================================================================
-
-  @doc """
-  Returns the task supervisor name for the given Jido instance.
-
-  Uses instance-specific task supervisor from state.jido if available,
-  otherwise falls back to global Jido.TaskSupervisor for backwards compatibility.
-  """
-  @spec task_supervisor(map()) :: atom()
-  def task_supervisor(%{jido: jido}) when not is_nil(jido) do
-    Jido.task_supervisor_name(jido)
-  end
-
-  def task_supervisor(_state), do: Jido.TaskSupervisor
 end
