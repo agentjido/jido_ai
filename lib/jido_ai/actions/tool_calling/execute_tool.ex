@@ -3,7 +3,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   A Jido.Action for direct tool execution without LLM involvement.
 
   This action executes a registered Action by name with the given parameters.
-  It uses `Jido.AI.Executor` for execution.
+  It uses `Jido.AI.Turn` tool execution to keep result formatting consistent.
 
   ## Parameters
 
@@ -46,7 +46,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.{Executor, ToolAdapter}
+  alias Jido.AI.Turn
 
   @doc """
   Executes the tool by name.
@@ -56,11 +56,10 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
     tool_name = params[:tool_name]
     tool_params = params[:params] || %{}
     timeout = params[:timeout] || 30_000
-    tools = resolve_tools(context)
 
     with :ok <- validate_tool_name(tool_name),
          :ok <- validate_tool_params(tool_params),
-         {:ok, result} <- execute_tool(tool_name, tool_params, timeout, tools) do
+         {:ok, result} <- execute_tool(tool_name, tool_params, timeout, context) do
       {:ok,
        %{
          tool_name: tool_name,
@@ -80,30 +79,22 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   defp validate_tool_params(params) when is_map(params), do: :ok
   defp validate_tool_params(_), do: {:error, :invalid_params_format}
 
-  defp execute_tool(tool_name, params, timeout, tools) do
-    case Executor.execute(tool_name, params, %{}, timeout: timeout, tools: tools) do
-      {:ok, result} ->
+  defp execute_tool(tool_name, params, timeout, context) do
+    tool_call = %{id: "direct_tool_exec", name: tool_name, arguments: params}
+
+    case Turn.run_tool_calls([tool_call], context, timeout: timeout) do
+      {:ok, [%{raw_result: {:ok, result}}]} ->
         {:ok, format_result(result)}
 
-      {:error, error} when is_map(error) ->
-        {:error, Map.get(error, :error, "Tool execution failed")}
+      {:ok, [%{content: content, raw_result: {:error, _reason}}]} when is_binary(content) ->
+        {:error, content}
+
+      {:ok, [_]} ->
+        {:error, "Tool execution failed"}
+
+      {:ok, []} ->
+        {:error, "Tool execution failed"}
     end
-  end
-
-  defp resolve_tools(context) when is_map(context) do
-    context
-    |> find_tools()
-    |> ToolAdapter.to_action_map()
-  end
-
-  defp resolve_tools(_), do: %{}
-
-  defp find_tools(context) do
-    context[:tools] ||
-      get_in(context, [:tool_calling, :tools]) ||
-      get_in(context, [:state, :tool_calling, :tools]) ||
-      get_in(context, [:agent, :state, :tool_calling, :tools]) ||
-      get_in(context, [:plugin_state, :tool_calling, :tools])
   end
 
   defp format_result(result) when is_binary(result), do: %{text: result}

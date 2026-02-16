@@ -68,7 +68,7 @@ defmodule Jido.AI.Executor do
   token, secret, etc.) to prevent credential leakage in logs.
   """
 
-  alias Jido.AI.Observe
+  alias Jido.AI.{Observe, ToolAdapter}
   alias Jido.Action.Tool, as: ActionTool
 
   require Logger
@@ -107,11 +107,11 @@ defmodule Jido.AI.Executor do
   """
   @spec build_tools_map(module() | [module()]) :: tools_map()
   def build_tools_map(module) when is_atom(module) do
-    %{module.name() => module}
+    ToolAdapter.to_action_map(module)
   end
 
   def build_tools_map(modules) when is_list(modules) do
-    Map.new(modules, fn module -> {module.name(), module} end)
+    ToolAdapter.to_action_map(modules)
   end
 
   @doc """
@@ -275,52 +275,8 @@ defmodule Jido.AI.Executor do
       %{a: 42, b: "hello"}
   """
   @spec normalize_params(map(), keyword() | struct()) :: map()
-  def normalize_params(params, schema) when is_map(params) and is_list(schema) do
-    params
-    |> ActionTool.convert_params_using_schema(schema)
-    |> coerce_integers_to_floats(schema)
-  end
-
-  def normalize_params(params, %{__struct__: struct_type} = _schema)
-      when is_map(params) and struct_type in [Zoi.Types.Map, Zoi.Types.Object] do
-    # For Zoi schemas, convert string keys to atoms
-    # Zoi will handle the actual type coercion during validation
-    atomize_keys(params)
-  end
-
-  def normalize_params(params, _schema) when is_map(params), do: params
-
-  defp atomize_keys(map) when is_map(map) do
-    Map.new(map, fn
-      {k, v} when is_binary(k) -> {existing_atom_or_key(k), atomize_keys(v)}
-      {k, v} when is_atom(k) -> {k, atomize_keys(v)}
-      {k, v} -> {k, atomize_keys(v)}
-    end)
-  end
-
-  defp atomize_keys(list) when is_list(list), do: Enum.map(list, &atomize_keys/1)
-  defp atomize_keys(other), do: other
-
-  defp existing_atom_or_key(key) do
-    try do
-      String.to_existing_atom(key)
-    rescue
-      ArgumentError -> key
-    end
-  end
-
-  defp coerce_integers_to_floats(params, schema) when is_list(schema) do
-    float_keys =
-      schema
-      |> Enum.filter(fn {_key, opts} -> Keyword.get(opts, :type) == :float end)
-      |> Enum.map(fn {key, _opts} -> key end)
-
-    Enum.reduce(float_keys, params, fn key, acc ->
-      case Map.get(acc, key) do
-        val when is_integer(val) -> Map.put(acc, key, val / 1)
-        _ -> acc
-      end
-    end)
+  def normalize_params(params, schema) when is_map(params) do
+    ActionTool.convert_params_using_schema(params, schema)
   end
 
   # ============================================================================

@@ -12,9 +12,10 @@ defmodule Jido.AI.Turn do
   - Optional executed tool results
   """
 
-  alias Jido.AI.Text
+  alias Jido.AI.{Executor, Text, ToolAdapter}
 
   @type response_type :: :tool_calls | :final_answer
+  @type run_opts :: [timeout: pos_integer() | nil, tools: map() | [module()] | module() | nil]
 
   @type tool_result :: %{
           id: String.t(),
@@ -48,7 +49,7 @@ defmodule Jido.AI.Turn do
 
   - `:model` - Override model from the response payload
   """
-  @spec from_response(map() | t(), keyword()) :: t()
+  @spec from_response(map() | ReqLLM.Response.t() | t(), keyword()) :: t()
   def from_response(response, opts \\ [])
 
   def from_response(%__MODULE__{} = turn, opts) do
@@ -56,6 +57,20 @@ defmodule Jido.AI.Turn do
       {:ok, model} -> %{turn | model: model}
       :error -> turn
     end
+  end
+
+  def from_response(%ReqLLM.Response{} = response, opts) do
+    classified = ReqLLM.Response.classify(response)
+
+    %__MODULE__{
+      type: normalize_type(classified.type),
+      text: normalize_text(classified.text),
+      thinking_content: normalize_optional_string(classified.thinking),
+      tool_calls: normalize_tool_calls(classified.tool_calls),
+      usage: normalize_usage(ReqLLM.Response.usage(response)),
+      model: Keyword.get(opts, :model, response.model),
+      tool_results: []
+    }
   end
 
   def from_response(%{} = response, opts) do
@@ -125,6 +140,36 @@ defmodule Jido.AI.Turn do
   end
 
   @doc """
+  Executes all requested tools for the turn and returns the updated turn.
+  """
+  @spec run_tools(t(), map(), run_opts()) :: {:ok, t()} | {:error, term()}
+  def run_tools(%__MODULE__{} = turn, context, opts \\ []) do
+    if needs_tools?(turn) do
+      with {:ok, tool_results} <- run_tool_calls(turn.tool_calls, context, opts) do
+        {:ok, with_tool_results(turn, tool_results)}
+      end
+    else
+      {:ok, turn}
+    end
+  end
+
+  @doc """
+  Executes normalized tool calls and returns normalized tool results.
+  """
+  @spec run_tool_calls([term()], map(), run_opts()) :: {:ok, [tool_result()]}
+  def run_tool_calls(tool_calls, context, opts \\ []) when is_list(tool_calls) do
+    tools = resolve_tools(context, opts)
+    timeout = normalize_timeout(Keyword.get(opts, :timeout))
+
+    tool_results =
+      Enum.map(tool_calls, fn tool_call ->
+        run_single_tool(tool_call, context, tools, timeout)
+      end)
+
+    {:ok, tool_results}
+  end
+
+  @doc """
   Projects tool results into `role: :tool` messages.
   """
   @spec tool_messages(t() | [map()]) :: [map()]
@@ -183,7 +228,7 @@ defmodule Jido.AI.Turn do
   defp normalize_text(text) when is_binary(text), do: text
   defp normalize_text(_), do: ""
 
-  defp normalize_optional_string(value) when is_binary(value), do: value
+  defp normalize_optional_string(value) when is_binary(value) and value != "", do: value
   defp normalize_optional_string(_), do: nil
 
   defp extract_thinking_content(content) when is_list(content) do
@@ -282,6 +327,52 @@ defmodule Jido.AI.Turn do
   end
 
   defp normalize_usage_value(_), do: 0
+
+  defp run_single_tool(tool_call, context, tools, timeout) do
+    call_id = normalize_text(extract_tool_call_id(tool_call))
+    tool_name = normalize_text(extract_tool_call_name(tool_call))
+    arguments = normalize_tool_arguments(extract_tool_call_arguments(tool_call))
+
+    exec_opts =
+      [tools: tools]
+      |> maybe_add_timeout(timeout)
+
+    raw_result =
+      case tool_name do
+        "" ->
+          {:error, %{type: :validation, message: "Missing tool name"}}
+
+        _ ->
+          Executor.execute(tool_name, arguments, context, exec_opts)
+      end
+
+    %{
+      id: call_id,
+      name: tool_name,
+      content: format_tool_result_content(raw_result),
+      raw_result: raw_result
+    }
+  end
+
+  defp resolve_tools(context, opts) do
+    context = if is_map(context), do: context, else: %{}
+
+    tools_input =
+      Keyword.get(opts, :tools) ||
+        get_field(context, :tools) ||
+        get_in(context, [:tool_calling, :tools]) ||
+        get_in(context, [:state, :tool_calling, :tools]) ||
+        get_in(context, [:agent, :state, :tool_calling, :tools]) ||
+        get_in(context, [:plugin_state, :tool_calling, :tools])
+
+    ToolAdapter.to_action_map(tools_input)
+  end
+
+  defp normalize_timeout(timeout) when is_integer(timeout) and timeout > 0, do: timeout
+  defp normalize_timeout(_), do: nil
+
+  defp maybe_add_timeout(opts, nil), do: opts
+  defp maybe_add_timeout(opts, timeout), do: Keyword.put(opts, :timeout, timeout)
 
   defp get_field(map, key, default \\ nil) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
