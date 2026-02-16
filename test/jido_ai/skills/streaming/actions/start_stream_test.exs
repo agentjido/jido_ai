@@ -95,6 +95,46 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
       assert result.status == :streaming
       assert is_binary(result.stream_id)
     end
+
+    test "auto-processes using task supervisor from runtime context" do
+      {:ok, task_supervisor} = Task.Supervisor.start_link()
+
+      params = %{
+        prompt: "Generate text",
+        auto_process: true
+      }
+
+      context = %{
+        llm_client: FakeLLMClient,
+        state: %{__task_supervisor_skill__: %{supervisor: task_supervisor}}
+      }
+
+      assert {:ok, result} = StartStream.run(params, context)
+      assert result.status == :streaming
+      assert is_binary(result.stream_id)
+    end
+
+    test "explicit task_supervisor parameter takes precedence over runtime context" do
+      {:ok, stale_supervisor} = Task.Supervisor.start_link()
+      :ok = GenServer.stop(stale_supervisor)
+
+      {:ok, override_supervisor} = Task.Supervisor.start_link()
+
+      params = %{
+        prompt: "Generate text",
+        auto_process: true,
+        task_supervisor: override_supervisor
+      }
+
+      context = %{
+        llm_client: FakeLLMClient,
+        state: %{__task_supervisor_skill__: %{supervisor: stale_supervisor}}
+      }
+
+      assert {:ok, result} = StartStream.run(params, context)
+      assert result.status == :streaming
+      assert is_binary(result.stream_id)
+    end
   end
 
   describe "model resolution" do
