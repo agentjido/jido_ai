@@ -286,31 +286,6 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     end
   end
 
-  # ============================================================================
-  # Helpers Integration
-  # ============================================================================
-
-  describe "helpers with response processing" do
-    test "classify_llm_response determines response type" do
-      tool_response = %{
-        message: %{content: nil, tool_calls: [%{id: "tc_1", name: "test", arguments: %{}}]},
-        finish_reason: :tool_calls
-      }
-
-      text_response = %{
-        message: %{content: "Hello", tool_calls: nil},
-        finish_reason: :stop
-      }
-
-      tool_result = Helpers.classify_llm_response(tool_response)
-      assert tool_result.type == :tool_calls
-
-      text_result = Helpers.classify_llm_response(text_response)
-      assert text_result.type == :final_answer
-      assert text_result.text == "Hello"
-    end
-  end
-
   describe "message building with ReqLLM.Context" do
     test "Context.normalize creates valid context" do
       {:ok, context} = Context.normalize("Hello")

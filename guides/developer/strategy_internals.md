@@ -69,4 +69,4 @@ Do not use this when:
 
 - [Architecture And Runtime Flow](architecture_and_runtime_flow.md)
 - [Directives Runtime Contract](directives_runtime_contract.md)
-- [LLM Client Boundary](llm_client_boundary.md)
+- [Configuration Reference](configuration_reference.md)

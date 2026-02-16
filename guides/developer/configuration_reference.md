@@ -12,13 +12,12 @@ config :jido_ai,
     capable: "anthropic:claude-sonnet-4-20250514",
     reasoning: "anthropic:claude-sonnet-4-20250514",
     planning: "anthropic:claude-sonnet-4-20250514"
-  },
-  llm_client: Jido.AI.LLMClient.ReqLLM
+  }
 ```
 
 ## Strategy/Macro Defaults
 
-- ReAct (`Jido.AI.ReActAgent`)
+- ReAct (`Jido.AI.Agent`)
   - `model`: `anthropic:claude-haiku-4-5`
   - `max_iterations`: `10`
   - `request_policy`: `:reject`
@@ -78,5 +77,4 @@ Fix:
 ## Next
 
 - [Getting Started](../user/getting_started.md)
-- [LLM Client Boundary](llm_client_boundary.md)
 - [Error Model And Recovery](error_model_and_recovery.md)

@@ -42,7 +42,7 @@ defmodule Jido.AI.Request do
 
   ```elixir
   defmodule MyAgent do
-    use Jido.AI.ReActAgent, ...
+    use Jido.AI.Agent, ...
 
     # ask/2 now returns {:ok, Handle.t()}
     def ask(pid, query, opts \\\\ []) do

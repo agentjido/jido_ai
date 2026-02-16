@@ -10,7 +10,7 @@
 - [x] Route `react.request.error` in ReAct strategy
 - [x] Correlate start with `request_id`
 - [x] Track active request in machine state
-- [x] Fail rejected requests immediately in `ReActAgent`
+- [x] Fail rejected requests immediately in `Agent`
 - [x] Harden `Request.await` normalization
 
 ## Phase 2

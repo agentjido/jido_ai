@@ -45,14 +45,14 @@ Symptom:
 
 Fix:
 - keep strategy pure and orchestration-focused
-- fix provider behavior in `Jido.AI.LLMClient*` boundary
+- fix provider behavior at the direct `ReqLLM` call-site
 - fix execution semantics in directive runtime path
 
 ## Defaults You Should Know
 
 - strategies store internal data in `agent.state.__strategy__`
 - request lifecycle signals are standardized under `ai.request.*`
-- canonical namespace helpers live in `Jido.AI.Namespaces`
+- canonical signal contracts are defined by `Jido.AI.Signal` and strategy routes
 
 ## Registry Lifecycle Guarantees
 

@@ -13,7 +13,7 @@ defmodule Jido.AI.CLI.Adapter do
 
   ## Built-in Adapters
 
-  - `Jido.AI.CLI.Adapters.ReAct` - For ReAct-style agents
+  - `Jido.AI.CLI.Adapters.ReAct` - For `Jido.AI.Agent` modules
   - `Jido.AI.CLI.Adapters.ToT` - For Tree-of-Thoughts agents
   - `Jido.AI.CLI.Adapters.CoT` - For Chain-of-Thought agents
   - `Jido.AI.CLI.Adapters.GoT` - For Graph-of-Thoughts agents
@@ -25,7 +25,7 @@ defmodule Jido.AI.CLI.Adapter do
   Agent modules can optionally implement `cli_adapter/0` to specify their adapter:
 
       defmodule MyApp.CustomAgent do
-        use Jido.AI.ReActAgent, ...
+        use Jido.AI.Agent, ...
 
         def cli_adapter, do: Jido.AI.CLI.Adapters.ReAct
       end

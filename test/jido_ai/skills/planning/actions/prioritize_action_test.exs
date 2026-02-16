@@ -1,11 +1,17 @@
 defmodule Jido.AI.Actions.Planning.PrioritizeTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.Actions.Planning.Prioritize
-  alias Jido.AI.TestSupport.FakeLLMClient
+  alias Jido.AI.TestSupport.FakeReqLLM
 
   @moduletag :unit
   @moduletag :capture_log
+
+  setup :set_mimic_from_context
+  setup :stub_req_llm
+
+  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   describe "schema" do
     test "has required fields" do
@@ -45,7 +51,7 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
         ]
       }
 
-      assert {:ok, result} = Prioritize.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Prioritize.run(params, %{})
       assert is_binary(result.prioritization)
       assert result.prioritization != ""
       assert is_list(result.ordered_tasks)
@@ -59,7 +65,7 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
         criteria: "Business impact and development effort"
       }
 
-      assert {:ok, result} = Prioritize.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Prioritize.run(params, %{})
       assert String.length(result.prioritization) > 0
       assert map_size(result.scores) > 0
     end
@@ -70,7 +76,7 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
         context: "Early-stage startup, need MVP quickly"
       }
 
-      assert {:ok, result} = Prioritize.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Prioritize.run(params, %{})
       refute Enum.empty?(result.ordered_tasks)
     end
 
@@ -79,7 +85,7 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
         tasks: ["Task 1", "Task 2", "Task 3", "Task 4", "Task 5"]
       }
 
-      assert {:ok, result} = Prioritize.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Prioritize.run(params, %{})
       refute Enum.empty?(result.ordered_tasks)
     end
   end

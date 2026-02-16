@@ -11,7 +11,7 @@ defmodule Jido.AI.Examples.Skills.Calculator do
 
       # Use with an agent
       defmodule MyAgent do
-        use Jido.AI.ReActAgent,
+        use Jido.AI.Agent,
           name: "my_agent",
           tools: [
             Jido.Tools.Arithmetic.Add,

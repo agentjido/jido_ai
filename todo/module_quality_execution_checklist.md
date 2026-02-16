@@ -91,9 +91,9 @@ Evidence:
 - [x] Add missing CoT/GoT/TRM/Adaptive macro tests
 - [x] Rewrite v2 migration integration test for strict 2.0-beta names
 Evidence:
-- `lib/jido_ai/llm_client.ex`
-- `lib/jido_ai/llm_client/req_llm.ex`
-- `test/support/fake_llm_client.ex`
+- `lib/jido_ai/actions/llm/chat.ex`
+- `lib/jido_ai/directive.ex`
+- `test/support/fake_req_llm.ex`
 - `test/jido_ai/cot_agent_test.exs`
 - `test/jido_ai/got_agent_test.exs`
 - `test/jido_ai/trm_agent_test.exs`

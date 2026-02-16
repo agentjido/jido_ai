@@ -1,6 +1,6 @@
 defmodule Jido.AI.Examples.TaskListAgent do
   @moduledoc """
-  ReAct agent for task list management and execution.
+  Agent for task list management and execution (`Jido.AI.Agent`, ReAct strategy implied).
 
   Demonstrates iterative task planning and execution:
   1. Receives a goal or objective from the user
@@ -48,7 +48,7 @@ defmodule Jido.AI.Examples.TaskListAgent do
 
   alias Jido.Memory.Agent, as: MemoryAgent
 
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "task_list_agent",
     description: "Task planning and execution agent that breaks goals into tasks and works through them",
     tools: [

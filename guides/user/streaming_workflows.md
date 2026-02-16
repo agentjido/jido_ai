@@ -72,5 +72,5 @@ Avoid streaming when:
 ## Next
 
 - [Observability Basics](observability_basics.md)
-- [LLM Client Boundary](../developer/llm_client_boundary.md)
+- [Configuration Reference](../developer/configuration_reference.md)
 - [Directives Runtime Contract](../developer/directives_runtime_contract.md)

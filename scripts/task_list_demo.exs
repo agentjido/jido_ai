@@ -1,6 +1,6 @@
 # Task List Agent Demo
 #
-# Demonstrates a ReAct agent that breaks goals into tasks,
+# Demonstrates a `Jido.AI.Agent` that breaks goals into tasks,
 # stores them in Memory's :tasks space, and works through
 # each one to completion.
 #

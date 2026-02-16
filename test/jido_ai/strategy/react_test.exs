@@ -363,6 +363,27 @@ defmodule Jido.AI.Strategies.ReActTest do
     end
   end
 
+  describe "map option normalization" do
+    test "normalizes AST map options for observability and tool_context" do
+      observability_ast = {:%{}, [], [emit_telemetry?: false, emit_llm_deltas?: false]}
+      tool_context_ast = {:%{}, [], [tenant: "acme"]}
+
+      agent =
+        create_agent(
+          tools: [TestCalculator],
+          observability: observability_ast,
+          tool_context: tool_context_ast
+        )
+
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.observability.emit_telemetry? == false
+      assert config.observability.emit_llm_deltas? == false
+      assert config.base_tool_context == %{tenant: "acme"}
+    end
+  end
+
   describe "set_tool_context action" do
     test "set_tool_context_action/0 returns correct atom" do
       assert ReAct.set_tool_context_action() == :ai_react_set_tool_context

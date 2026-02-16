@@ -1,6 +1,6 @@
 defmodule Jido.AI.Examples.WeatherAgent do
   @moduledoc """
-  ReAct agent for weather queries and travel advice.
+  Agent for weather queries and travel advice (`Jido.AI.Agent`, ReAct strategy implied).
 
   Demonstrates iterative tool-use for weather lookups:
   1. Interprets user location (city name → coordinates)
@@ -43,7 +43,7 @@ defmodule Jido.AI.Examples.WeatherAgent do
   Works best with US locations. For international locations, coordinates are needed.
   """
 
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "weather_agent",
     description: "Weather assistant with travel and activity advice",
     request_policy: :reject,

@@ -1,11 +1,17 @@
 defmodule Jido.AI.Actions.Streaming.StartStreamTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.Actions.Streaming.StartStream
-  alias Jido.AI.TestSupport.FakeLLMClient
+  alias Jido.AI.TestSupport.FakeReqLLM
 
   @moduletag :unit
   @moduletag :capture_log
+
+  setup :set_mimic_from_context
+  setup :stub_req_llm
+
+  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   describe "schema" do
     test "has required fields" do
@@ -38,7 +44,7 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
         auto_process: false
       }
 
-      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = StartStream.run(params, %{})
       assert is_binary(result.stream_id)
       assert String.length(result.stream_id) > 0
       assert result.status == :pending
@@ -51,7 +57,7 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
         auto_process: false
       }
 
-      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = StartStream.run(params, %{})
       assert is_binary(result.stream_id)
     end
 
@@ -62,7 +68,7 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
         auto_process: false
       }
 
-      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = StartStream.run(params, %{})
       assert result.buffered == true
     end
 
@@ -72,14 +78,14 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
         auto_process: false
       }
 
-      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = StartStream.run(params, %{})
       assert is_binary(result.stream_id)
       assert result.status == :pending
     end
 
     test "returns structured error when auto_process true and supervisor is missing" do
       params = %{prompt: "Generate text", auto_process: true}
-      assert {:error, :missing_task_supervisor} = StartStream.run(params, %{llm_client: FakeLLMClient})
+      assert {:error, :missing_task_supervisor} = StartStream.run(params, %{})
     end
 
     test "auto-processes when task supervisor is provided" do
@@ -91,7 +97,7 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
         task_supervisor: task_supervisor
       }
 
-      assert {:ok, result} = StartStream.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = StartStream.run(params, %{})
       assert result.status == :streaming
       assert is_binary(result.stream_id)
     end
@@ -105,7 +111,6 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
       }
 
       context = %{
-        llm_client: FakeLLMClient,
         state: %{__task_supervisor_skill__: %{supervisor: task_supervisor}}
       }
 
@@ -127,7 +132,6 @@ defmodule Jido.AI.Actions.Streaming.StartStreamTest do
       }
 
       context = %{
-        llm_client: FakeLLMClient,
         state: %{__task_supervisor_skill__: %{supervisor: stale_supervisor}}
       }
 

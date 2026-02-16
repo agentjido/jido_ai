@@ -27,26 +27,25 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokens do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.LLMClient
   alias Jido.AI.Streaming.Registry
 
   @impl Jido.Action
-  def run(params, context) do
+  def run(params, _context) do
     stream_id = params[:stream_id]
 
     with :ok <- validate_stream_id(stream_id),
          {:ok, entry} <- Registry.get(stream_id) do
-      maybe_process(entry, params, context)
+      maybe_process(entry, params)
     end
   end
 
-  defp maybe_process(%{status: status} = entry, _params, _context) when status in [:completed, :error] do
+  defp maybe_process(%{status: status} = entry, _params) when status in [:completed, :error] do
     {:ok, format_result(entry)}
   end
 
-  defp maybe_process(%{stream_response: nil}, _params, _context), do: {:error, :stream_not_processible}
+  defp maybe_process(%{stream_response: nil}, _params), do: {:error, :stream_not_processible}
 
-  defp maybe_process(entry, params, context) do
+  defp maybe_process(entry, params) do
     stream_id = entry.stream_id
     on_token = params[:on_token] || entry[:on_token]
     on_complete = params[:on_complete]
@@ -55,7 +54,7 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokens do
 
     with {:ok, _entry} <- Registry.mark_processing(stream_id),
          {:ok, response} <-
-           LLMClient.process_stream(context, entry.stream_response,
+           ReqLLM.StreamResponse.process_stream(entry.stream_response,
              on_result: fn chunk ->
                handle_chunk(stream_id, chunk, on_token, filter, transform)
              end

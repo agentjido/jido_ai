@@ -1,6 +1,6 @@
 defmodule Jido.AI.Examples.ApiSmokeTestAgent do
   @moduledoc """
-  ReAct agent for API endpoint testing and debugging.
+  Agent for API endpoint testing and debugging (`Jido.AI.Agent`, ReAct strategy implied).
 
   Demonstrates iterative HTTP debugging:
   1. Makes initial request to target endpoint
@@ -41,7 +41,7 @@ defmodule Jido.AI.Examples.ApiSmokeTestAgent do
   - https://httpbin.org/headers - Returns request headers
   - https://httpbin.org/delay/:seconds - Delayed response
   """
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     # Define HTTP test tools using ReqTool
     name: "api_smoke_test_agent",
     description: "API endpoint tester and debugger using ReAct reasoning",
