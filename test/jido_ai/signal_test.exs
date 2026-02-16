@@ -1,7 +1,6 @@
 defmodule Jido.AI.SignalTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Signal
   alias Jido.AI.Signal.{LLMDelta, LLMError, LLMResponse, Usage}
 
   describe "LLMResponse" do
@@ -279,7 +278,7 @@ defmodule Jido.AI.SignalTest do
           result: {:ok, %{type: :tool_calls, tool_calls: tool_calls, text: ""}}
         })
 
-      assert Signal.extract_tool_calls(signal) == tool_calls
+      assert LLMResponse.extract_tool_calls(signal) == tool_calls
     end
 
     test "extracts tool calls when type is not explicitly :tool_calls but list is present" do
@@ -291,7 +290,7 @@ defmodule Jido.AI.SignalTest do
           result: {:ok, %{tool_calls: tool_calls, text: "Some text"}}
         })
 
-      assert Signal.extract_tool_calls(signal) == tool_calls
+      assert LLMResponse.extract_tool_calls(signal) == tool_calls
     end
 
     test "returns empty list for final_answer type" do
@@ -301,7 +300,7 @@ defmodule Jido.AI.SignalTest do
           result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
         })
 
-      assert Signal.extract_tool_calls(signal) == []
+      assert LLMResponse.extract_tool_calls(signal) == []
     end
 
     test "returns empty list for error result" do
@@ -311,7 +310,7 @@ defmodule Jido.AI.SignalTest do
           result: {:error, %{reason: "timeout"}}
         })
 
-      assert Signal.extract_tool_calls(signal) == []
+      assert LLMResponse.extract_tool_calls(signal) == []
     end
 
     test "returns empty list for non-LLMResponse signals" do
@@ -323,7 +322,7 @@ defmodule Jido.AI.SignalTest do
           output_tokens: 5
         })
 
-      assert Signal.extract_tool_calls(signal) == []
+      assert LLMResponse.extract_tool_calls(signal) == []
     end
   end
 
@@ -335,7 +334,7 @@ defmodule Jido.AI.SignalTest do
           result: {:ok, %{type: :tool_calls, tool_calls: [%{id: "tc_1"}], text: ""}}
         })
 
-      assert Signal.tool_call?(signal) == true
+      assert LLMResponse.tool_call?(signal) == true
     end
 
     test "returns true when tool_calls list is non-empty" do
@@ -345,7 +344,7 @@ defmodule Jido.AI.SignalTest do
           result: {:ok, %{tool_calls: [%{id: "tc_1"}], text: "text"}}
         })
 
-      assert Signal.tool_call?(signal) == true
+      assert LLMResponse.tool_call?(signal) == true
     end
 
     test "returns false for final_answer type" do
@@ -355,7 +354,7 @@ defmodule Jido.AI.SignalTest do
           result: {:ok, %{type: :final_answer, text: "Hello", tool_calls: []}}
         })
 
-      assert Signal.tool_call?(signal) == false
+      assert LLMResponse.tool_call?(signal) == false
     end
 
     test "returns false for error result" do
@@ -365,7 +364,7 @@ defmodule Jido.AI.SignalTest do
           result: {:error, %{reason: "failed"}}
         })
 
-      assert Signal.tool_call?(signal) == false
+      assert LLMResponse.tool_call?(signal) == false
     end
 
     test "returns false for non-LLMResponse signals" do
@@ -376,7 +375,7 @@ defmodule Jido.AI.SignalTest do
           message: "Timeout"
         })
 
-      assert Signal.tool_call?(signal) == false
+      assert LLMResponse.tool_call?(signal) == false
     end
   end
 
@@ -387,7 +386,7 @@ defmodule Jido.AI.SignalTest do
         usage: %{input_tokens: 10, output_tokens: 5}
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_1")
+      {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_1")
 
       assert signal.type == "ai.llm.response"
       assert signal.data.call_id == "call_from_1"
@@ -404,7 +403,7 @@ defmodule Jido.AI.SignalTest do
         model: "anthropic:claude-haiku-4-5"
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_2")
+      {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_2")
 
       assert signal.data.model == "anthropic:claude-haiku-4-5"
     end
@@ -416,7 +415,7 @@ defmodule Jido.AI.SignalTest do
       }
 
       {:ok, signal} =
-        Signal.from_reqllm_response(response,
+        LLMResponse.from_reqllm_response(response,
           call_id: "call_from_3",
           model: "openai:gpt-4o"
         )
@@ -428,7 +427,7 @@ defmodule Jido.AI.SignalTest do
       response = %{message: %{content: "Test"}}
 
       {:ok, signal} =
-        Signal.from_reqllm_response(response,
+        LLMResponse.from_reqllm_response(response,
           call_id: "call_from_4",
           duration_ms: 1234
         )
@@ -446,7 +445,7 @@ defmodule Jido.AI.SignalTest do
         }
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_5")
+      {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_5")
 
       {:ok, result} = signal.data.result
       assert result.text == "First part. \nSecond part."
@@ -462,7 +461,7 @@ defmodule Jido.AI.SignalTest do
         }
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_6")
+      {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_6")
 
       assert signal.data.thinking_content == "Let me analyze this..."
       {:ok, result} = signal.data.result
@@ -479,7 +478,7 @@ defmodule Jido.AI.SignalTest do
         }
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_7")
+      {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_7")
 
       {:ok, result} = signal.data.result
       assert result.type == :tool_calls
@@ -496,7 +495,7 @@ defmodule Jido.AI.SignalTest do
         usage: %{"input_tokens" => 20, "output_tokens" => 10}
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_8")
+      {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_8")
 
       assert signal.data.usage == %{input_tokens: 20, output_tokens: 10}
     end
@@ -504,7 +503,7 @@ defmodule Jido.AI.SignalTest do
     test "handles response without usage" do
       response = %{message: %{content: "No usage"}}
 
-      {:ok, signal} = Signal.from_reqllm_response(response, call_id: "call_from_9")
+      {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_9")
 
       # usage key is not present when nil
       refute Map.has_key?(signal.data, :usage)
@@ -514,7 +513,7 @@ defmodule Jido.AI.SignalTest do
       response = %{message: %{content: "Test"}}
 
       assert_raise KeyError, fn ->
-        Signal.from_reqllm_response(response, [])
+        LLMResponse.from_reqllm_response(response, [])
       end
     end
   end

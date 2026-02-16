@@ -63,7 +63,7 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Text
+  alias Jido.AI.Turn
   alias ReqLLM.Context
 
   @prioritization_prompt """
@@ -200,7 +200,7 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
   end
 
   defp format_result(response, model) do
-    prioritization_text = Text.extract_text(response)
+    prioritization_text = Turn.extract_text(response)
 
     %{
       prioritization: prioritization_text,

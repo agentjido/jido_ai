@@ -12,7 +12,7 @@ defmodule Jido.AI.Turn do
   - Optional executed tool results
   """
 
-  alias Jido.AI.{Observe, Text, ToolAdapter}
+  alias Jido.AI.{Observe, ToolAdapter}
   alias Jido.Action.Error.TimeoutError
   alias Jido.Action.Tool, as: ActionTool
 
@@ -90,7 +90,7 @@ defmodule Jido.AI.Turn do
 
     %__MODULE__{
       type: classify_type(tool_calls, finish_reason),
-      text: Text.extract_from_content(content),
+      text: extract_from_content(content),
       thinking_content: extract_thinking_content(content),
       tool_calls: tool_calls,
       usage: normalize_usage(get_field(response, :usage)),
@@ -204,6 +204,66 @@ defmodule Jido.AI.Turn do
   def normalize_params(params, schema) when is_map(params) do
     ActionTool.convert_params_using_schema(params, schema)
   end
+
+  @doc """
+  Extracts text content from an LLM response or content value.
+
+  This supports the canonical response/content normalization shapes used
+  across actions and strategy flows.
+  """
+  @spec extract_text(term()) :: String.t()
+  def extract_text(content) when is_binary(content), do: content
+  def extract_text(nil), do: ""
+  def extract_text(%{message: %{content: content}}), do: extract_from_content(content)
+  def extract_text(%{choices: [%{message: %{content: content}} | _]}), do: extract_from_content(content)
+
+  def extract_text(%{} = map) do
+    cond do
+      content = get_in(map, [:message, :content]) ->
+        extract_from_content(content)
+
+      content = get_in(map, [:choices, Access.at(0), :message, :content]) ->
+        extract_from_content(content)
+
+      content = Map.get(map, :content) ->
+        extract_from_content(content)
+
+      true ->
+        ""
+    end
+  end
+
+  def extract_text(content) when is_list(content) do
+    if iodata_content?(content) do
+      IO.iodata_to_binary(content)
+    else
+      extract_from_content(content)
+    end
+  end
+
+  def extract_text(_), do: ""
+
+  @doc """
+  Extracts text from a content value (not wrapped in response structure).
+  """
+  @spec extract_from_content(term()) :: String.t()
+  def extract_from_content(nil), do: ""
+  def extract_from_content(content) when is_binary(content), do: content
+
+  def extract_from_content(content) when is_list(content) do
+    if iodata_content?(content) do
+      IO.iodata_to_binary(content)
+    else
+      content
+      |> Enum.filter(&text_content_block?/1)
+      |> Enum.map_join("\n", fn
+        %{text: text} when is_binary(text) -> text
+        _ -> ""
+      end)
+    end
+  end
+
+  def extract_from_content(_), do: ""
 
   @doc """
   Executes all requested tools for the turn and returns the updated turn.
@@ -604,6 +664,24 @@ defmodule Jido.AI.Turn do
 
   defp maybe_add_timeout(opts, nil), do: opts
   defp maybe_add_timeout(opts, timeout), do: Keyword.put(opts, :timeout, timeout)
+
+  defp text_content_block?(%{type: :text}), do: true
+  defp text_content_block?(%{type: "text"}), do: true
+  defp text_content_block?(_), do: false
+
+  defp iodata_content?(list), do: has_binary_content?(list) or printable_charlist?(list)
+
+  defp has_binary_content?([]), do: false
+  defp has_binary_content?([head | _tail]) when is_binary(head), do: true
+
+  defp has_binary_content?([head | tail]) when is_list(head) do
+    has_binary_content?(head) or has_binary_content?(tail)
+  end
+
+  defp has_binary_content?([_ | tail]), do: has_binary_content?(tail)
+
+  defp printable_charlist?(list) when is_list(list), do: :io_lib.printable_list(list)
+  defp printable_charlist?(_), do: false
 
   defp get_field(map, key, default \\ nil) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
