@@ -1,6 +1,17 @@
 defmodule Jido.AI.Streaming.Registry do
   @moduledoc """
   In-memory stream lifecycle registry used by streaming actions.
+
+  ## Lifecycle
+
+  `Jido.AI.Streaming.Registry` supports two startup modes:
+
+  1. **Explicit startup** via `start_link/1` under your supervisor tree.
+  2. **Lazy startup** via `ensure_started/0`, which is called automatically by
+     public API functions.
+
+  This mirrors the lifecycle behavior of `Jido.AI.Skill.Registry` so both
+  registries can be used without strict startup ordering.
   """
 
   @poll_interval_ms 25
@@ -8,9 +19,48 @@ defmodule Jido.AI.Streaming.Registry do
   @type stream_id :: String.t()
   @type entry :: map()
 
+  @doc """
+  Starts the registry process.
+  """
+  @spec start_link(keyword()) :: GenServer.on_start()
+  def start_link(opts \\ []) do
+    opts = Keyword.put_new(opts, :name, __MODULE__)
+    Agent.start_link(fn -> %{} end, opts)
+  end
+
+  @doc """
+  Child spec for supervised startup.
+  """
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  def child_spec(opts) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [opts]},
+      type: :worker
+    }
+  end
+
+  @doc """
+  Starts the registry unless it is already running.
+  """
+  @spec ensure_started() :: :ok | {:error, term()}
+  def ensure_started do
+    case Process.whereis(__MODULE__) do
+      nil ->
+        case start_link() do
+          {:ok, _pid} -> :ok
+          {:error, {:already_started, _pid}} -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      _pid ->
+        :ok
+    end
+  end
+
   @spec register(stream_id(), map()) :: {:ok, entry()}
   def register(stream_id, attrs \\ %{}) when is_binary(stream_id) and is_map(attrs) do
-    ensure_started()
+    ensure_started!()
     now = now_ms()
 
     entry =
@@ -35,14 +85,14 @@ defmodule Jido.AI.Streaming.Registry do
 
   @spec put(entry()) :: {:ok, entry()}
   def put(%{stream_id: stream_id} = entry) when is_binary(stream_id) do
-    ensure_started()
+    ensure_started!()
     Agent.update(__MODULE__, &Map.put(&1, stream_id, entry))
     {:ok, entry}
   end
 
   @spec get(stream_id()) :: {:ok, entry()} | {:error, :stream_not_found}
   def get(stream_id) when is_binary(stream_id) do
-    ensure_started()
+    ensure_started!()
 
     case Agent.get(__MODULE__, &Map.get(&1, stream_id)) do
       nil -> {:error, :stream_not_found}
@@ -52,7 +102,7 @@ defmodule Jido.AI.Streaming.Registry do
 
   @spec update(stream_id(), (entry() -> entry())) :: {:ok, entry()} | {:error, :stream_not_found}
   def update(stream_id, fun) when is_binary(stream_id) and is_function(fun, 1) do
-    ensure_started()
+    ensure_started!()
 
     Agent.get_and_update(__MODULE__, fn state ->
       case Map.fetch(state, stream_id) do
@@ -113,7 +163,7 @@ defmodule Jido.AI.Streaming.Registry do
 
   @spec delete(stream_id()) :: :ok
   def delete(stream_id) when is_binary(stream_id) do
-    ensure_started()
+    ensure_started!()
     Agent.update(__MODULE__, &Map.delete(&1, stream_id))
     :ok
   end
@@ -143,16 +193,13 @@ defmodule Jido.AI.Streaming.Registry do
     end
   end
 
-  defp ensure_started do
-    case Process.whereis(__MODULE__) do
-      nil ->
-        case Agent.start(fn -> %{} end, name: __MODULE__) do
-          {:ok, _pid} -> :ok
-          {:error, {:already_started, _pid}} -> :ok
-        end
-
-      _pid ->
+  defp ensure_started! do
+    case ensure_started() do
+      :ok ->
         :ok
+
+      {:error, reason} ->
+        raise "Failed to start #{inspect(__MODULE__)}: #{inspect(reason)}"
     end
   end
 
