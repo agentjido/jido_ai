@@ -52,14 +52,15 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   Executes the tool by name.
   """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
     tool_name = params[:tool_name]
     tool_params = params[:params] || %{}
     timeout = params[:timeout] || 30_000
+    tools = resolve_tools(context)
 
     with :ok <- validate_tool_name(tool_name),
          :ok <- validate_tool_params(tool_params),
-         {:ok, result} <- execute_tool(tool_name, tool_params, timeout) do
+         {:ok, result} <- execute_tool(tool_name, tool_params, timeout, tools) do
       {:ok,
        %{
          tool_name: tool_name,
@@ -79,15 +80,40 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   defp validate_tool_params(params) when is_map(params), do: :ok
   defp validate_tool_params(_), do: {:error, :invalid_params_format}
 
-  defp execute_tool(tool_name, params, timeout) do
-    case Executor.execute(tool_name, params, %{}, timeout: timeout) do
+  defp execute_tool(tool_name, params, timeout, tools) do
+    case Executor.execute(tool_name, params, %{}, timeout: timeout, tools: tools) do
       {:ok, result} ->
         {:ok, format_result(result)}
 
       {:error, error} when is_map(error) ->
         {:error, Map.get(error, :error, "Tool execution failed")}
+
+      {:error, error} ->
+        {:error, error}
     end
   end
+
+  defp resolve_tools(context) when is_map(context) do
+    context
+    |> find_tools()
+    |> normalize_tools()
+  end
+
+  defp resolve_tools(_), do: %{}
+
+  defp find_tools(context) do
+    context[:tools] ||
+      get_in(context, [:tool_calling, :tools]) ||
+      get_in(context, [:state, :tool_calling, :tools]) ||
+      get_in(context, [:agent, :state, :tool_calling, :tools]) ||
+      get_in(context, [:plugin_state, :tool_calling, :tools])
+  end
+
+  defp normalize_tools(nil), do: %{}
+  defp normalize_tools(tools) when is_map(tools), do: tools
+  defp normalize_tools(tools) when is_list(tools), do: Executor.build_tools_map(tools)
+  defp normalize_tools(module) when is_atom(module), do: Executor.build_tools_map(module)
+  defp normalize_tools(_), do: %{}
 
   defp format_result(result) when is_binary(result), do: %{text: result}
   defp format_result(result) when is_map(result), do: result
