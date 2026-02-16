@@ -86,7 +86,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Observe, Signal, Turn}
+  alias Jido.AI.{Observe, Signal, Turn}
+  alias Jido.AI.Directive.Helper
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -100,7 +101,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     } = directive
 
     # Resolve model from either model or model_alias
-    model = Helpers.resolve_directive_model(directive)
+    model = Helper.resolve_directive_model(directive)
     system_prompt = Map.get(directive, :system_prompt)
     timeout = Map.get(directive, :timeout)
     metadata = Map.get(directive, :metadata, %{})
@@ -120,7 +121,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     }
 
     agent_pid = self()
-    task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
+    task_supervisor = Helper.get_task_supervisor(state)
 
     stream_opts = %{
       call_id: call_id,
@@ -154,7 +155,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
                stream_with_callbacks(stream_opts)
              rescue
                e ->
-                 {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
+                 {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helper.classify_error(e)}}
              catch
                kind, reason ->
                  {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
@@ -218,13 +219,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
        }) do
     opts =
       []
-      |> Helpers.add_tools_opt(tools)
+      |> Helper.add_tools_opt(tools)
       |> Keyword.put(:tool_choice, tool_choice)
       |> Keyword.put(:max_tokens, max_tokens)
       |> Keyword.put(:temperature, temperature)
-      |> Helpers.add_timeout_opt(timeout)
+      |> Helper.add_timeout_opt(timeout)
 
-    messages = Helpers.build_directive_messages(context, system_prompt)
+    messages = Helper.build_directive_messages(context, system_prompt)
 
     case ReqLLM.stream_text(model, messages, opts) do
       {:ok, stream_response} ->
