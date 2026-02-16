@@ -4,6 +4,17 @@ defmodule Jido.AI.Skill.Registry do
 
   Stores skill specs in an ETS table for fast lookup by name.
   Supports loading skills from directories at startup.
+
+  ## Lifecycle
+
+  `Jido.AI.Skill.Registry` supports two startup modes:
+
+  1. **Explicit startup** via `start_link/1` under your supervisor tree.
+  2. **Lazy startup** via `ensure_started/0`, which is called automatically by
+     public API functions.
+
+  This matches `Jido.AI.Streaming.Registry` lifecycle semantics so both
+  registries work consistently regardless of startup ordering.
   """
 
   use GenServer
