@@ -232,6 +232,15 @@ Skills provide modular capabilities. Each skill:
 | `ToolCalling` | CallWithTools, ExecuteTool, ListTools |
 | `Streaming` | StartStream, ProcessTokens, EndStream |
 
+#### Registry Lifecycle Guarantees
+
+`Jido.AI.Streaming.Registry` and `Jido.AI.Skill.Registry` share the same
+lifecycle model:
+
+- Both can be started explicitly with `start_link/1` (for supervision trees).
+- Both auto-start lazily on first API use via `ensure_started/0`.
+- Both recover cleanly if called before explicit startup ordering is established.
+
 ## Data Flow
 
 ### ReAct Agent Flow
