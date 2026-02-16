@@ -1,3 +1,5 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
+
 defmodule Jido.AI.ReActAgent do
   @moduledoc """
   Base macro for ReAct-powered agents.

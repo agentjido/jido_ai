@@ -87,9 +87,6 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
 
       {:error, error} when is_map(error) ->
         {:error, Map.get(error, :error, "Tool execution failed")}
-
-      {:error, error} ->
-        {:error, error}
     end
   end
 

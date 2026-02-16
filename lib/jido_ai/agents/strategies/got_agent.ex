@@ -1,3 +1,5 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
+
 defmodule Jido.AI.GoTAgent do
   @moduledoc """
   Base macro for Graph-of-Thoughts-powered agents.

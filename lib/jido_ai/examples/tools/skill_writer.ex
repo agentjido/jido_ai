@@ -112,10 +112,7 @@ defmodule Jido.AI.Examples.Tools.WriteModuleSkill do
   end
 
   defp format_actions(actions) do
-    actions_str =
-      actions
-      |> Enum.map(&"      #{&1}")
-      |> Enum.join(",\n")
+    actions_str = Enum.map_join(actions, ",\n", &"      #{&1}")
 
     "actions: [\n#{actions_str}\n    ]"
   end
