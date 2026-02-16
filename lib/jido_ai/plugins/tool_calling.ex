@@ -73,7 +73,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
   `tools:` option directly, following the core design principle of Jido.AI.
 
   **Tool Integration**: Uses context-provided tool maps for discovery
-  and `Jido.AI.Executor` for execution.
+  and `Jido.AI.Turn` for execution.
 
   **Tool Format**: Tools are converted to ReqLLM format via
   `Jido.AI.ToolAdapter.from_actions/1`.

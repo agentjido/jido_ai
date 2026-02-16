@@ -8,11 +8,11 @@ defmodule Jido.AI.Directive.ToolExec do
   ## Execution Modes
 
   1. **Direct module execution** (preferred): When `action_module` is provided,
-     the module is executed directly via `Executor.execute_module/4`, bypassing
+     the module is executed directly via `Turn.execute_module/4`, bypassing
      name-based lookup. This is used by strategies that maintain their own tool lists.
 
   2. **Name lookup**: When `action_module` is nil, runtime resolves the tool name
-     against the current strategy/plugin tool map and executes via `Jido.AI.Executor`.
+     against the current strategy/plugin tool map and executes via `Jido.AI.Turn`.
 
   ## Argument Normalization
 
@@ -81,23 +81,23 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   1. Direct module execution when `action_module` is provided (bypasses Registry)
   2. Registry lookup by `tool_name` when `action_module` is nil
 
-  Uses `Jido.AI.Executor` for execution, which provides consistent error
+  Uses `Jido.AI.Turn` for execution, which provides consistent error
   handling, parameter normalization, and telemetry.
 
   ## Error Handling (Issue #2 Fix)
 
   The entire task body is wrapped in try/rescue/catch to ensure that a
   `tool_result` signal is always sent back to the agent, even if:
-  - The Executor raises an exception
+  - Tool execution raises an exception
   - Signal construction fails
   - Any other unexpected error occurs
 
   This prevents the Machine from deadlocking in `awaiting_tool` state.
   """
 
-  alias Jido.AI.Executor
   alias Jido.AI.Observe
   alias Jido.AI.Signal
+  alias Jido.AI.Turn
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -328,10 +328,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     try do
       case action_module do
         nil ->
-          Executor.execute(tool_name, arguments, context, tools: tools)
+          Turn.execute(tool_name, arguments, context, tools: tools)
 
         module when is_atom(module) ->
-          Executor.execute_module(module, arguments, context)
+          Turn.execute_module(module, arguments, context)
       end
     rescue
       e ->

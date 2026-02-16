@@ -2,7 +2,7 @@
 
 You want LLM tool calls backed by normal `Jido.Action` modules, with safe execution and clear boundaries.
 
-After this guide, you can adapt actions to tools, execute them with `Executor`, and manage runtime tool registration.
+After this guide, you can adapt actions to tools, execute them with `Turn`, and manage runtime tool registration.
 
 ## Define A Tool Action
 
@@ -28,10 +28,10 @@ tools = Jido.AI.ToolAdapter.from_actions([MyApp.Actions.Multiply], strict: true)
 ## Execute A Tool Safely
 
 ```elixir
-tools_map = Jido.AI.Executor.build_tools_map([MyApp.Actions.Multiply])
+tools_map = Jido.AI.Turn.build_tools_map([MyApp.Actions.Multiply])
 
 {:ok, result} =
-  Jido.AI.Executor.execute(
+  Jido.AI.Turn.execute(
     "multiply",
     %{"a" => "6", "b" => "7"},
     %{},
@@ -50,7 +50,7 @@ tools_map = Jido.AI.Executor.build_tools_map([MyApp.Actions.Multiply])
 ## Failure Mode: Tool Execution Returns `:not_found`
 
 Symptom:
-- `Executor.execute/4` returns tool not found
+- `Turn.execute/4` returns tool not found
 
 Fix:
 - pass `tools:` map built from your modules
@@ -58,7 +58,7 @@ Fix:
 
 ## Defaults You Should Know
 
-- `Executor` timeout default: `30_000ms`
+- `Turn` timeout default: `30_000ms`
 - `register_tool/3` call timeout default: `5_000ms`
 - `ToolAdapter` strict mode default: inferred by action `strict?/0` (else `false`)
 
