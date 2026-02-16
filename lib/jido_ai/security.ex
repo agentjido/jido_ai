@@ -365,7 +365,9 @@ defmodule Jido.AI.Security do
   ## Returns
 
   * `{:ok, wrapped_callback}` - If validation passes
-  * `{:error, reason}` - If validation fails
+  * `{:error, reason}` - If validation fails (`:invalid_callback_type`,
+    `:invalid_callback_arity`, `:invalid_task_supervisor`, or
+    `:missing_task_supervisor`)
   """
   @spec validate_and_wrap_callback(callback(), keyword()) ::
           {:ok, callback()} | {:error, atom()}
@@ -375,32 +377,54 @@ defmodule Jido.AI.Security do
     with :ok <- validate_callback(callback) do
       timeout = Keyword.get(opts, :timeout, @callback_timeout)
       task_supervisor = Keyword.get(opts, :task_supervisor, Jido.TaskSupervisor)
-      wrapped = wrap_with_timeout(callback, timeout, task_supervisor)
-      {:ok, wrapped}
+
+      with {:ok, resolved_supervisor} <- validate_task_supervisor(task_supervisor) do
+        wrapped = wrap_with_timeout(callback, timeout, resolved_supervisor)
+        {:ok, wrapped}
+      end
     end
   end
 
   def validate_and_wrap_callback(_callback, _opts), do: {:error, :invalid_callback_type}
 
+  defp validate_task_supervisor(supervisor) when is_pid(supervisor) do
+    if Process.alive?(supervisor), do: {:ok, supervisor}, else: {:error, :missing_task_supervisor}
+  end
+
+  defp validate_task_supervisor(supervisor) when is_atom(supervisor) and not is_nil(supervisor) do
+    if is_pid(Process.whereis(supervisor)), do: {:ok, supervisor}, else: {:error, :missing_task_supervisor}
+  end
+
+  defp validate_task_supervisor(_), do: {:error, :invalid_task_supervisor}
+
   @dialyzer {:nowarn_function, wrap_with_timeout: 3}
   defp wrap_with_timeout(callback, timeout, task_supervisor) do
     fn arg ->
-      # Use Task.Supervisor.async_nolink which returns a Task struct
-      task = Task.Supervisor.async_nolink(task_supervisor, fn -> callback.(arg) end)
-
-      result =
-        try do
-          case Task.yield(task, timeout) || Task.shutdown(task) do
-            {:ok, task_result} -> task_result
-            {:exit, _} -> {:error, :callback_timeout}
-            nil -> {:error, :callback_timeout}
+      case start_callback_task(task_supervisor, callback, arg) do
+        {:ok, task} ->
+          try do
+            case Task.yield(task, timeout) || Task.shutdown(task) do
+              {:ok, task_result} -> task_result
+              {:exit, _} -> {:error, :callback_timeout}
+              nil -> {:error, :callback_timeout}
+            end
+          after
+            # Ensure we dereference the task if still running
+            Process.demonitor(task.ref, [:flush])
           end
-        after
-          # Ensure we dereference the task if still running
-          Process.demonitor(task.ref, [:flush])
-        end
 
-      result
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+  end
+
+  defp start_callback_task(task_supervisor, callback, arg) do
+    try do
+      {:ok, Task.Supervisor.async_nolink(task_supervisor, fn -> callback.(arg) end)}
+    catch
+      :exit, {:noproc, _} -> {:error, :missing_task_supervisor}
+      :exit, _ -> {:error, :callback_execution_failed}
     end
   end
 
