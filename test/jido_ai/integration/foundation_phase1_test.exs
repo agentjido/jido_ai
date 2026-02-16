@@ -14,10 +14,8 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Directive.{LLMEmbed, LLMGenerate, LLMStream}
-  alias Jido.AI.Helpers
-  alias Jido.AI.Signal
-  alias Jido.AI.Signal.{EmbedResult, LLMError, ToolResult, Usage}
+  alias Jido.AI.Directive.{Helper, LLMEmbed, LLMGenerate, LLMStream}
+  alias Jido.AI.Signal.{EmbedResult, LLMError, LLMResponse, ToolResult, Usage}
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
   alias ReqLLM.Context
@@ -110,7 +108,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       }
 
       {:ok, signal} =
-        Signal.from_reqllm_response(mocked_response,
+        LLMResponse.from_reqllm_response(mocked_response,
           call_id: "call_123",
           duration_ms: 500
         )
@@ -139,7 +137,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
         usage: %{input_tokens: 20, output_tokens: 30}
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(mocked_response, call_id: "call_456")
+      {:ok, signal} = LLMResponse.from_reqllm_response(mocked_response, call_id: "call_456")
 
       {:ok, result} = signal.data.result
       assert result.type == :tool_calls
@@ -158,11 +156,11 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
         }
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(mocked_response, call_id: "call_789")
+      {:ok, signal} = LLMResponse.from_reqllm_response(mocked_response, call_id: "call_789")
 
       # Test helper functions
-      assert Signal.tool_call?(signal) == true
-      tool_calls = Signal.extract_tool_calls(signal)
+      assert LLMResponse.tool_call?(signal) == true
+      tool_calls = LLMResponse.extract_tool_calls(signal)
       assert length(tool_calls) == 1
       assert hd(tool_calls).name == "search"
     end
@@ -172,10 +170,10 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
         message: %{content: "The answer is 42."}
       }
 
-      {:ok, signal} = Signal.from_reqllm_response(mocked_response, call_id: "call_answer")
+      {:ok, signal} = LLMResponse.from_reqllm_response(mocked_response, call_id: "call_answer")
 
-      assert Signal.tool_call?(signal) == false
-      assert Signal.extract_tool_calls(signal) == []
+      assert LLMResponse.tool_call?(signal) == false
+      assert LLMResponse.extract_tool_calls(signal) == []
     end
   end
 
@@ -194,16 +192,13 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert error_signal.data.retry_after == 60
     end
 
-    test "Helpers.wrap_error creates proper Jido.AI.Error" do
+    test "directive helper classifies ReqLLM error shape" do
       reqllm_error = %ReqLLM.Error.API.Request{
         status: 429,
         reason: "Too many requests"
       }
 
-      {:error, jido_error} = Helpers.wrap_error(reqllm_error)
-
-      assert %Jido.AI.Error.API.RateLimit{} = jido_error
-      assert jido_error.message == "Too many requests"
+      assert Helper.classify_error(reqllm_error) == :rate_limit
     end
 
     test "error classification flows through helpers" do
@@ -217,7 +212,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       ]
 
       for {error, expected_type} <- errors_and_types do
-        assert Helpers.classify_error(error) == expected_type
+        assert Helper.classify_error(error) == expected_type
       end
     end
   end
@@ -407,7 +402,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
       # 4. Create signal from response
       {:ok, signal} =
-        Signal.from_reqllm_response(mocked_response,
+        LLMResponse.from_reqllm_response(mocked_response,
           call_id: directive.id,
           duration_ms: 250
         )
@@ -418,7 +413,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert signal.data.duration_ms == 250
 
       # 6. Verify signal has no tool calls
-      assert Signal.tool_call?(signal) == false
+      assert LLMResponse.tool_call?(signal) == false
     end
 
     test "complete tool call flow" do
@@ -440,11 +435,11 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       }
 
       # 3. Create signal
-      {:ok, signal} = Signal.from_reqllm_response(mocked_response, call_id: directive.id)
+      {:ok, signal} = LLMResponse.from_reqllm_response(mocked_response, call_id: directive.id)
 
       # 4. Verify tool call detection
-      assert Signal.tool_call?(signal) == true
-      tool_calls = Signal.extract_tool_calls(signal)
+      assert LLMResponse.tool_call?(signal) == true
+      tool_calls = LLMResponse.extract_tool_calls(signal)
       assert length(tool_calls) == 1
 
       [tc] = tool_calls
@@ -477,17 +472,9 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       }
 
       # 1. Classify error
-      assert Helpers.classify_error(reqllm_error) == :rate_limit
+      assert Helper.classify_error(reqllm_error) == :rate_limit
 
-      # 2. Extract retry-after
-      assert Helpers.extract_retry_after(reqllm_error) == 60
-
-      # 3. Wrap to Jido.AI.Error
-      {:error, jido_error} = Helpers.wrap_error(reqllm_error)
-      assert %Jido.AI.Error.API.RateLimit{} = jido_error
-      assert jido_error.retry_after == 60
-
-      # 4. Create error signal
+      # 2. Create error signal
       error_signal =
         LLMError.new!(%{
           call_id: "err_flow_1",
