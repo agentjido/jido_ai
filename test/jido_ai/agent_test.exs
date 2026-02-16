@@ -1,13 +1,13 @@
-defmodule Jido.AI.ReActAgentTest do
+defmodule Jido.AI.AgentTest do
   @moduledoc """
-  Tests for Jido.AI.ReActAgent macro and compile-time alias expansion.
+  Tests for Jido.AI.Agent macro and compile-time alias expansion.
   """
   use ExUnit.Case, async: true
   import ExUnit.CaptureIO
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Request
-  alias Jido.AI.ReActAgent
+  alias Jido.AI.Agent
   alias Jido.AI.Strategies.ReAct
 
   # ============================================================================
@@ -42,18 +42,18 @@ defmodule Jido.AI.ReActAgentTest do
   end
 
   # ============================================================================
-  # Test Agents Using ReActAgent Macro
+  # Test Agents Using Agent Macro
   # ============================================================================
 
   defmodule BasicAgent do
-    use Jido.AI.ReActAgent,
+    use Jido.AI.Agent,
       name: "basic_agent",
       description: "A basic test agent",
       tools: [TestCalculator, TestSearch]
   end
 
   defmodule AgentWithToolContext do
-    use Jido.AI.ReActAgent,
+    use Jido.AI.Agent,
       name: "agent_with_context",
       tools: [TestCalculator],
       tool_context: %{
@@ -64,7 +64,7 @@ defmodule Jido.AI.ReActAgentTest do
   end
 
   defmodule AgentWithPlainMapContext do
-    use Jido.AI.ReActAgent,
+    use Jido.AI.Agent,
       name: "agent_with_plain_map",
       tools: [TestCalculator],
       tool_context: %{tenant_id: "tenant_123", enabled: true}
@@ -83,7 +83,7 @@ defmodule Jido.AI.ReActAgentTest do
       env = __ENV__
 
       # The function should walk the AST and expand aliases
-      result = ReActAgent.expand_aliases_in_ast(ast, env)
+      result = Agent.expand_aliases_in_ast(ast, env)
 
       # The __aliases__ node should be expanded (in this case to SomeModule atom)
       assert is_tuple(result)
@@ -93,7 +93,7 @@ defmodule Jido.AI.ReActAgentTest do
       ast = {:%{}, [], [key: "string", num: 42, flag: true, atom_val: :test]}
       env = __ENV__
 
-      result = ReActAgent.expand_aliases_in_ast(ast, env)
+      result = Agent.expand_aliases_in_ast(ast, env)
 
       # Should preserve the structure
       assert is_tuple(result)
@@ -103,7 +103,7 @@ defmodule Jido.AI.ReActAgentTest do
       ast = {:%{}, [], [outer: {:%{}, [], [inner: "value"]}]}
       env = __ENV__
 
-      result = ReActAgent.expand_aliases_in_ast(ast, env)
+      result = Agent.expand_aliases_in_ast(ast, env)
 
       assert is_tuple(result)
     end
@@ -112,7 +112,7 @@ defmodule Jido.AI.ReActAgentTest do
       ast = {:%{}, [], [items: [1, 2, 3]]}
       env = __ENV__
 
-      result = ReActAgent.expand_aliases_in_ast(ast, env)
+      result = Agent.expand_aliases_in_ast(ast, env)
 
       assert is_tuple(result)
     end
@@ -123,16 +123,16 @@ defmodule Jido.AI.ReActAgentTest do
       env = __ENV__
 
       assert_raise CompileError, ~r/Unsafe construct.*function call/, fn ->
-        ReActAgent.expand_aliases_in_ast(ast, env)
+        Agent.expand_aliases_in_ast(ast, env)
       end
     end
   end
 
   # ============================================================================
-  # ReActAgent Macro Compilation Tests
+  # Agent Macro Compilation Tests
   # ============================================================================
 
-  describe "ReActAgent macro" do
+  describe "Agent macro" do
     test "compiles agent with basic options" do
       assert function_exported?(BasicAgent, :ask, 2)
       assert function_exported?(BasicAgent, :ask, 3)
@@ -151,7 +151,7 @@ defmodule Jido.AI.ReActAgentTest do
     end
 
     test "tool_context with module aliases resolves correctly" do
-      # When using ReActAgent, the strategy is auto-initialized via new()
+      # When using Agent, the strategy is auto-initialized via new()
       # The config is stored in agent.state.__strategy__.config
       agent = AgentWithToolContext.new()
       state = StratState.get(agent, %{})
@@ -189,7 +189,7 @@ defmodule Jido.AI.ReActAgentTest do
 
       source = """
       defmodule #{inspect(module_name)} do
-        use Jido.AI.ReActAgent,
+        use Jido.AI.Agent,
           name: "collision_agent",
           tools: [#{inspect(TestCalculator)}]
 
@@ -254,21 +254,21 @@ defmodule Jido.AI.ReActAgentTest do
     end
 
     test "extracts actions from skill modules" do
-      tools = ReActAgent.tools_from_skills([MockSkill])
+      tools = Agent.tools_from_skills([MockSkill])
 
       assert TestCalculator in tools
       assert TestSearch in tools
     end
 
     test "deduplicates actions from multiple skills" do
-      tools = ReActAgent.tools_from_skills([MockSkill, MockSkill2])
+      tools = Agent.tools_from_skills([MockSkill, MockSkill2])
 
       # Should have unique entries only
       assert length(Enum.filter(tools, &(&1 == TestSearch))) == 1
     end
 
     test "returns empty list for empty input" do
-      assert ReActAgent.tools_from_skills([]) == []
+      assert Agent.tools_from_skills([]) == []
     end
   end
 end

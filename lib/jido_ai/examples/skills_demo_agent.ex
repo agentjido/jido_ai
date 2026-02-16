@@ -25,7 +25,7 @@ defmodule Jido.AI.Examples.SkillsDemoAgent do
   @calculator_skill Jido.AI.Examples.Skills.Calculator
   @unit_converter_skill "unit-converter"
 
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "skills_demo_agent",
     description: "Demo agent showcasing module and file-based skills",
     tools: [

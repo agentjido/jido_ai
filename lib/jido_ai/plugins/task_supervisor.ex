@@ -21,7 +21,7 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
 
   ## Usage
 
-  This plugin is automatically included when using `Jido.AI.ReActAgent`. Manual
+  This plugin is automatically included when using `Jido.AI.Agent`. Manual
   inclusion is not typically needed.
 
   ## Implementation Notes

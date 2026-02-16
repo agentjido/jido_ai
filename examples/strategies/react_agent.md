@@ -2,7 +2,7 @@
 
 ```elixir
 defmodule MyApp.WeatherAgent do
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "weather_agent",
     model: :capable,
     tools: [Jido.Tools.Weather],

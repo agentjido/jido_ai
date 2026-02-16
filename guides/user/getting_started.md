@@ -2,7 +2,7 @@
 
 You want a working agent quickly, without guessing where strategy, requests, and model aliases fit.
 
-After this guide, you will have a ReAct agent running with one tool and a synchronous query path.
+After this guide, you will have a `Jido.AI.Agent` running with one tool and a synchronous query path.
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ Use `Jido.AI.resolve_model/1` when you need to confirm runtime resolution.
 
 ```elixir
 defmodule MyApp.WeatherAgent do
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "weather_agent",
     model: :fast,
     tools: [Jido.AI.Examples.Tools.ConvertTemperature],
@@ -54,7 +54,7 @@ end
 ```
 
 This path uses:
-- `Jido.AI.ReActAgent` macro for agent wiring
+- `Jido.AI.Agent` macro for agent wiring
 - `Jido.AI.Request` under the hood for request tracking
 - `Jido.AI` model alias resolution
 
@@ -89,5 +89,5 @@ Do not use this path when:
 ## Next
 
 - [Strategy Selection Playbook](strategy_selection_playbook.md)
-- [First ReAct Agent](first_react_agent.md)
+- [First Agent](first_react_agent.md)
 - [Configuration Reference](../developer/configuration_reference.md)

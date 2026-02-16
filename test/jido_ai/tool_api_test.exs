@@ -34,7 +34,7 @@ defmodule Jido.AI.ToolApiTest do
 
   # Test agent
   defmodule TestAgent do
-    use Jido.AI.ReActAgent,
+    use Jido.AI.Agent,
       name: "test_tool_api_agent",
       description: "Agent for testing tool API",
       tools: [Calculator, Search]

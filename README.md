@@ -7,9 +7,9 @@
 Jido.AI provides a comprehensive toolkit for building intelligent agents with LLMs. It implements proven reasoning strategies for tool use, multi-step reasoning, and complex planning - all designed to get better results from language models.
 
 ```elixir
-# Quick example: ReAct agent with tool use
+# Quick example: `Jido.AI.Agent` with tool use
 defmodule MyApp.Agent do
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "my_agent",
     tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
     model: :fast
@@ -65,9 +65,9 @@ Strategies are agent patterns that determine how an LLM approaches a problem. Th
 - **Adaptive** - When you need dynamic strategy selection based on the problem
 
 ```elixir
-# ReAct agent with tools
+# `Jido.AI.Agent` with tools
 defmodule MyApp.Agent do
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "my_agent",
     tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
     model: :fast
@@ -91,7 +91,7 @@ end
 ### Build With Jido.AI
 - [Getting Started](guides/user/getting_started.md) - First working agent in minutes
 - [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md) - Choose CoT/ReAct/ToT/GoT/TRM/Adaptive
-- [First ReAct Agent](guides/user/first_react_agent.md) - Tool-using ReAct with request handles
+- [First Agent](guides/user/first_react_agent.md) - Tool-using `Jido.AI.Agent` with request handles
 - [Request Lifecycle And Concurrency](guides/user/request_lifecycle_and_concurrency.md) - `ask/await` and concurrent safety
 - [Thread Context And Message Projection](guides/user/thread_context_and_message_projection.md) - Multi-turn context management
 - [Tool Calling With Actions](guides/user/tool_calling_with_actions.md) - Adapt `Jido.Action` modules as tools

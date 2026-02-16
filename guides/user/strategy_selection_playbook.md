@@ -9,7 +9,7 @@ After this guide, you can select CoT, ReAct, ToT, GoT, TRM, or Adaptive with exp
 | Strategy | Use It For | Avoid It For | Agent Macro |
 |---|---|---|---|
 | CoT | Linear reasoning, clear step decomposition | Heavy tool orchestration | `Jido.AI.CoTAgent` |
-| ReAct | Tool calls + reasoning loop | Purely static problems | `Jido.AI.ReActAgent` |
+| ReAct | Tool calls + reasoning loop | Purely static problems | `Jido.AI.Agent` |
 | ToT | Branching search and planning | Low-latency simple Q&A | `Jido.AI.ToTAgent` |
 | GoT | Multi-perspective synthesis | Small deterministic tasks | `Jido.AI.GoTAgent` |
 | TRM | Iterative improvement / recursive refinement | Fast one-pass answers | `Jido.AI.TRMAgent` |
@@ -64,6 +64,6 @@ Do not use this playbook when:
 
 ## Next
 
-- [First ReAct Agent](first_react_agent.md)
+- [First Agent](first_react_agent.md)
 - [CLI Workflows](cli_workflows.md)
 - [Strategy Internals](../developer/strategy_internals.md)

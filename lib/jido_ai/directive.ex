@@ -1375,7 +1375,7 @@ defmodule Jido.AI.Directive.Helper do
             create and store a per-instance supervisor in the agent state.
 
             Example:
-                use Jido.AI.ReActAgent,
+                use Jido.AI.Agent,
                   name: "my_agent",
                   tools: [MyApp.Tool1, MyApp.Tool2]
             """

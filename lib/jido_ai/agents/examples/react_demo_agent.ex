@@ -1,8 +1,8 @@
 defmodule Jido.AI.Examples.ReActDemoAgent do
   @moduledoc """
-  Demo ReAct agent using `Jido.AI.ReActAgent`.
+  Demo agent using `Jido.AI.Agent`.
 
-  Shows how to create a ReAct-powered agent with minimal boilerplate.
+  Shows how to create an agent with ReAct strategy implied and minimal boilerplate.
 
   ## Usage
 
@@ -15,9 +15,9 @@ defmodule Jido.AI.Examples.ReActDemoAgent do
       agent.state.last_answer # => "15 * 7 = 105"
   """
 
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "react_demo_agent",
-    description: "Demo ReAct agent with arithmetic and weather tools",
+    description: "Demo agent with arithmetic and weather tools",
     tools: [
       Jido.Tools.Arithmetic.Add,
       Jido.Tools.Arithmetic.Subtract,

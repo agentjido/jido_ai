@@ -1,6 +1,6 @@
 defmodule Jido.AI.Examples.IssueTriageAgent do
   @moduledoc """
-  ReAct agent for GitHub issue triage.
+  Agent for GitHub issue triage (`Jido.AI.Agent`, ReAct strategy implied).
 
   Demonstrates iterative tool-use reasoning with secure token handling:
   1. Reads GITHUB_TOKEN from environment to create authenticated client
@@ -50,7 +50,7 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
   This pattern keeps secrets out of LLM context while making them available to tools.
   """
 
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "issue_triage_agent",
     description: "GitHub issue triage assistant using ReAct reasoning",
     tools: [

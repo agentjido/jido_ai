@@ -2,7 +2,7 @@ defmodule Jido.AI.Examples.CalculatorAgent do
   @moduledoc """
   Example agent that uses the Calculator skill for arithmetic operations.
 
-  This demonstrates how to integrate skills with a ReAct agent:
+  This demonstrates how to integrate skills with a `Jido.AI.Agent`:
   - Skills provide prompt context via `Skill.Prompt.render/1`
   - Skills can filter tools via `Skill.Prompt.filter_tools/2`
   - The agent uses skill-specified tools for calculations
@@ -27,7 +27,7 @@ defmodule Jido.AI.Examples.CalculatorAgent do
   4. Results are combined and presented clearly
   """
 
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "calculator_agent",
     description: "A calculator agent that uses skills for arithmetic",
     tools: [

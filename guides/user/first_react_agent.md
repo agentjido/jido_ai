@@ -1,6 +1,6 @@
-# First ReAct Agent
+# First Agent
 
-You want a production-shaped ReAct agent with tools, request handles, and explicit runtime control.
+You want a production-shaped `Jido.AI.Agent` with tools, request handles, and explicit runtime control.
 
 After this guide, you will run a custom tool, submit async requests, and await specific request IDs.
 
@@ -21,7 +21,7 @@ end
 
 ```elixir
 defmodule MyApp.MathAgent do
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "math_agent",
     model: :fast,
     tools: [MyApp.Actions.AddNumbers],

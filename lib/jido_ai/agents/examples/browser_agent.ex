@@ -1,6 +1,6 @@
 defmodule Jido.AI.Examples.BrowserAgent do
   @moduledoc """
-  ReAct agent for browsing the web and answering questions about page content.
+  Agent for browsing the web and answering questions about page content (`Jido.AI.Agent`, ReAct strategy implied).
 
   Manages browser sessions internally per tool call, so the LLM simply
   requests a URL to read without worrying about session lifecycle.
@@ -21,7 +21,7 @@ defmodule Jido.AI.Examples.BrowserAgent do
 
   """
 
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "browser_agent",
     description: "Web browsing assistant that reads, searches, and summarizes web pages",
     tools: [
