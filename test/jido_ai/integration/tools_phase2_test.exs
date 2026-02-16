@@ -15,6 +15,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   alias Jido.AI.Executor
   alias Jido.AI.ToolAdapter
+  alias Jido.AI.Turn
 
   # ============================================================================
   # Test Actions
@@ -377,9 +378,9 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       assert {:ok, %{result: 56}} = result
 
-      # 4. Format result for LLM (would be added back to conversation)
-      formatted = Executor.format_result(elem(result, 1))
-      assert formatted == %{result: 56}
+      # 4. Format result for tool message content (would be added back to conversation)
+      formatted = Turn.format_tool_result_content(result)
+      assert formatted == "{\"result\":56}"
     end
 
     test "sequential tool calls maintain state correctly", %{tools: tools} do
