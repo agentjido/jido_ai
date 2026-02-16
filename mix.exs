@@ -96,7 +96,8 @@ defmodule JidoAi.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "docs.check",
-        "credo --min-priority higher",
+        "credo --min-priority high --all",
+        "quality.dialyzer_ignores",
         "doctor --summary --raise",
         "dialyzer"
       ],
