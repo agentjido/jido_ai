@@ -1,5 +1,8 @@
 import Config
 
+config :logger, :default_formatter,
+  metadata: [:jido_ai, :tool_name, :exception_message, :exception_type, :stacktrace, :reason]
+
 if config_env() == :dev do
   config :git_hooks,
     auto_install: true,
