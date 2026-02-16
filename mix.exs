@@ -94,6 +94,7 @@ defmodule JidoAi.MixProject do
       quality: [
         "format --check-formatted",
         "compile --warnings-as-errors",
+        "docs.check",
         "credo --min-priority higher",
         "dialyzer"
       ],

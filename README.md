@@ -30,17 +30,19 @@ def deps do
 end
 ```
 
-Configure your LLM provider (see [Configuration Guide](guides/developer/08_configuration.md)):
+Configure model aliases and LLM provider credentials (see [Configuration Guide](guides/developer/08_configuration.md)):
 
 ```elixir
 # config/config.exs
-config :jido_ai, :models,
-  anthropic: [
-    api_key: System.get_env("ANTHROPIC_API_KEY")
-  ],
-  openai: [
-    api_key: System.get_env("OPENAI_API_KEY")
-  ]
+config :jido_ai,
+  model_aliases: %{
+    fast: "anthropic:claude-haiku-4-5",
+    capable: "anthropic:claude-sonnet-4-20250514"
+  }
+
+config :req_llm,
+  anthropic_api_key: System.get_env("ANTHROPIC_API_KEY"),
+  openai_api_key: System.get_env("OPENAI_API_KEY")
 ```
 
 ## Reasoning Strategies

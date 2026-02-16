@@ -184,25 +184,23 @@ directive = Directive.LLMStream.new!(%{
 })
 ```
 
-### 5. Tool System (`Jido.AI.Tools.*`)
+### 5. Tool System (`Jido.AI.*`)
 
-The tool system bridges Jido.Actions and LLM tool calling.
+The tool system bridges Jido.Actions and LLM tool calling without a global registry.
 
 | Module | Purpose |
 |--------|---------|
-| `Registry` | Unified registry for Actions and Tools |
-| `Executor` | Consistent tool execution with normalization |
-| `ToolAdapter` | Converts Actions to ReqLLM.Tool format |
-| `Tool` | Behavior for custom tool implementations |
+| `Jido.AI.Actions.ToolCalling.*` | Tool-calling actions (`CallWithTools`, `ExecuteTool`, `ListTools`) |
+| `Jido.AI.Executor` | Consistent tool execution with normalization and timeout handling |
+| `Jido.AI.ToolAdapter` | Converts Action modules to ReqLLM tool definitions |
 
 ```elixir
-# Register tools
-Registry.register(MyApp.Actions.Calculator)
-Registry.register(MyApp.Tools.Search)
+tools = Jido.AI.Executor.build_tools_map([MyApp.Actions.Calculator, MyApp.Actions.Search])
 
-# Lookup and execute
-{:ok, {:action, module}} = Registry.get("calculator")
-{:ok, result} = Executor.execute("calculator", %{a: 1, b: 2, operation: "add"})
+{:ok, result} =
+  Jido.AI.Executor.execute("calculator", %{"a" => 1, "b" => 2, "operation" => "add"}, %{},
+    tools: tools
+  )
 ```
 
 ### 6. Signal Layer (`Jido.AI.Signal.*`)
@@ -218,7 +216,7 @@ Typed signals for event-driven communication.
 | `EmbedResult` | `ai.embed.result` | Embedding generated |
 | `Usage` | `ai.usage` | Token usage tracking |
 
-### 7. Skill Framework (`Jido.AI.Skills.*`)
+### 7. Plugin/Skill Framework (`Jido.AI.Plugins.*`, `Jido.AI.Skill.*`)
 
 Skills provide modular capabilities. Each skill:
 

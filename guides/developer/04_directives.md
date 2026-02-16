@@ -159,7 +159,7 @@ The directive implementation:
 
 ## ToolExec Directive
 
-Executes a Jido.Action or Jido.AI.Tools.Tool as a tool.
+Executes a `Jido.Action` module as a tool.
 
 ### Schema
 
