@@ -12,10 +12,19 @@ defmodule Jido.AI.Turn do
   - Optional executed tool results
   """
 
-  alias Jido.AI.{Executor, Text, ToolAdapter}
+  alias Jido.AI.{Observe, Text, ToolAdapter}
+  alias Jido.Action.Error.TimeoutError
+  alias Jido.Action.Tool, as: ActionTool
+
+  require Logger
 
   @type response_type :: :tool_calls | :final_answer
+  @type tools_map :: %{String.t() => module()}
+  @type execute_opts :: [timeout: pos_integer() | nil, tools: tools_map() | [module()] | module() | nil]
+  @type execute_result :: {:ok, term()} | {:error, map()}
   @type run_opts :: [timeout: pos_integer() | nil, tools: map() | [module()] | module() | nil]
+
+  @default_timeout 30_000
 
   @type tool_result :: %{
           id: String.t(),
@@ -137,6 +146,63 @@ defmodule Jido.AI.Turn do
   @spec with_tool_results(t(), [map()]) :: t()
   def with_tool_results(%__MODULE__{} = turn, tool_results) when is_list(tool_results) do
     %{turn | tool_results: normalize_tool_results(tool_results)}
+  end
+
+  @doc """
+  Builds a tools map from action modules.
+  """
+  @spec build_tools_map(module() | [module()]) :: tools_map()
+  def build_tools_map(module) when is_atom(module), do: ToolAdapter.to_action_map(module)
+  def build_tools_map(modules) when is_list(modules), do: ToolAdapter.to_action_map(modules)
+
+  @doc """
+  Executes a tool by name using a tools map and returns raw action output.
+  """
+  @spec execute(String.t(), map(), map(), execute_opts()) :: execute_result()
+  def execute(tool_name, params, context, opts \\ []) when is_binary(tool_name) do
+    context = normalize_context(context)
+    timeout = Keyword.get(opts, :timeout, @default_timeout)
+    tools = opts |> Keyword.get(:tools, %{}) |> ToolAdapter.to_action_map()
+    start_time = System.monotonic_time()
+
+    start_execute_telemetry(tool_name, params, context)
+
+    result =
+      case Map.fetch(tools, tool_name) do
+        {:ok, module} ->
+          execute_internal(module, tool_name, params, context, timeout)
+
+        :error ->
+          {:error, error_envelope(tool_name, :not_found, "Tool not found: #{tool_name}")}
+      end
+
+    finalize_execute_telemetry(tool_name, result, start_time, context)
+    result
+  end
+
+  @doc """
+  Executes an action module directly without registry lookup.
+  """
+  @spec execute_module(module(), map(), map(), execute_opts()) :: execute_result()
+  def execute_module(module, params, context, opts \\ []) do
+    context = normalize_context(context)
+    timeout = Keyword.get(opts, :timeout, @default_timeout)
+    tool_name = module.name()
+    start_time = System.monotonic_time()
+
+    start_execute_telemetry(tool_name, params, context)
+    result = execute_internal(module, tool_name, params, context, timeout)
+    finalize_execute_telemetry(tool_name, result, start_time, context)
+
+    result
+  end
+
+  @doc """
+  Normalizes parameters from LLM format to schema-compliant format.
+  """
+  @spec normalize_params(map(), keyword() | struct()) :: map()
+  def normalize_params(params, schema) when is_map(params) do
+    ActionTool.convert_params_using_schema(params, schema)
   end
 
   @doc """
@@ -328,6 +394,171 @@ defmodule Jido.AI.Turn do
 
   defp normalize_usage_value(_), do: 0
 
+  defp execute_internal(module, tool_name, params, context, timeout) do
+    schema = module.schema()
+    normalized_params = normalize_params(params, schema)
+
+    case Jido.Exec.run(module, normalized_params, context, timeout_opts(timeout)) do
+      {:ok, output} ->
+        {:ok, output}
+
+      {:ok, output, _directive} ->
+        {:ok, output}
+
+      {:error, reason} ->
+        {:error, format_error(tool_name, reason)}
+
+      {:error, reason, _directive} ->
+        {:error, format_error(tool_name, reason)}
+
+      other ->
+        {:error, error_envelope(tool_name, :execution_error, "Unexpected execution result", %{result: inspect(other)})}
+    end
+  rescue
+    e ->
+      {:error, format_exception(tool_name, e, __STACKTRACE__)}
+  catch
+    kind, reason ->
+      {:error, format_catch(tool_name, kind, reason)}
+  end
+
+  defp format_error(tool_name, %TimeoutError{} = reason) do
+    timeout_ms = reason.timeout || timeout_from_details(reason.details)
+    message = Exception.message(reason)
+
+    error_envelope(tool_name, :timeout, message, reason.details || %{})
+    |> Map.put(:timeout_ms, timeout_ms)
+  end
+
+  defp format_error(tool_name, reason) when is_exception(reason) do
+    message = Exception.message(reason)
+    error_envelope(tool_name, :execution_error, message, %{exception_type: reason.__struct__})
+  end
+
+  defp format_error(tool_name, reason) do
+    message = inspect(reason)
+    details = if is_map(reason), do: reason, else: nil
+    error_envelope(tool_name, :execution_error, message, details)
+  end
+
+  defp format_exception(tool_name, exception, stacktrace) do
+    Logger.error("Tool execution exception",
+      tool_name: tool_name,
+      exception_message: Exception.message(exception),
+      exception_type: exception.__struct__,
+      stacktrace: format_stacktrace_for_logging(stacktrace)
+    )
+
+    message = Exception.message(exception)
+
+    error_envelope(tool_name, :exception, message, %{exception_type: exception.__struct__})
+    |> Map.put(:exception_type, exception.__struct__)
+  end
+
+  defp format_catch(tool_name, kind, reason) do
+    message = "Caught #{kind}: #{inspect(reason)}"
+
+    error_envelope(tool_name, :caught, message, %{kind: kind})
+    |> Map.put(:kind, kind)
+  end
+
+  defp error_envelope(tool_name, type, message, details \\ nil) do
+    %{
+      error: message,
+      message: message,
+      tool_name: tool_name,
+      type: type,
+      details: details
+    }
+  end
+
+  defp timeout_from_details(%{} = details), do: get_field(details, :timeout)
+  defp timeout_from_details(_), do: nil
+
+  defp finalize_execute_telemetry(tool_name, {:error, %{type: :timeout}}, start_time, context) do
+    exception_execute_telemetry(tool_name, :timeout, start_time, context)
+  end
+
+  defp finalize_execute_telemetry(tool_name, result, start_time, context) do
+    stop_execute_telemetry(tool_name, result, start_time, context)
+  end
+
+  defp start_execute_telemetry(tool_name, params, context) do
+    obs_cfg = context[:observability] || %{}
+
+    metadata =
+      %{
+        tool_name: tool_name,
+        params: Observe.sanitize_sensitive(params),
+        call_id: context[:call_id],
+        agent_id: context[:agent_id],
+        iteration: context[:iteration]
+      }
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
+
+    Observe.emit(
+      obs_cfg,
+      Observe.tool_execute(:start),
+      %{system_time: System.system_time()},
+      metadata
+    )
+  end
+
+  defp stop_execute_telemetry(tool_name, result, start_time, context) do
+    obs_cfg = context[:observability] || %{}
+    duration = System.monotonic_time() - start_time
+
+    metadata =
+      %{
+        tool_name: tool_name,
+        result: result,
+        call_id: context[:call_id],
+        agent_id: context[:agent_id],
+        thread_id: context[:thread_id],
+        iteration: context[:iteration]
+      }
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
+
+    Observe.emit(
+      obs_cfg,
+      Observe.tool_execute(:stop),
+      %{duration: duration},
+      metadata
+    )
+  end
+
+  defp exception_execute_telemetry(tool_name, reason, start_time, context) do
+    obs_cfg = context[:observability] || %{}
+    duration = System.monotonic_time() - start_time
+
+    metadata =
+      %{
+        tool_name: tool_name,
+        reason: reason,
+        call_id: context[:call_id],
+        agent_id: context[:agent_id],
+        thread_id: context[:thread_id],
+        iteration: context[:iteration]
+      }
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
+
+    Observe.emit(
+      obs_cfg,
+      Observe.tool_execute(:exception),
+      %{duration: duration},
+      metadata
+    )
+  end
+
+  defp timeout_opts(timeout) when is_integer(timeout) and timeout > 0, do: [timeout: timeout]
+  defp timeout_opts(_), do: []
+
+  defp normalize_context(context) when is_map(context), do: context
+  defp normalize_context(_), do: %{}
+
   defp run_single_tool(tool_call, context, tools, timeout) do
     call_id = normalize_text(extract_tool_call_id(tool_call))
     tool_name = normalize_text(extract_tool_call_name(tool_call))
@@ -343,7 +574,7 @@ defmodule Jido.AI.Turn do
           {:error, %{type: :validation, message: "Missing tool name"}}
 
         _ ->
-          Executor.execute(tool_name, arguments, context, exec_opts)
+          execute(tool_name, arguments, context, exec_opts)
       end
 
     %{
@@ -376,6 +607,12 @@ defmodule Jido.AI.Turn do
 
   defp get_field(map, key, default \\ nil) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
+  end
+
+  defp format_stacktrace_for_logging(stacktrace) do
+    stacktrace
+    |> Enum.take(5)
+    |> Exception.format_stacktrace()
   end
 
   defp encode_or_inspect(value) do

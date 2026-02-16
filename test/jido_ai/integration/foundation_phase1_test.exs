@@ -15,11 +15,11 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Directive.{LLMEmbed, LLMGenerate, LLMStream}
-  alias Jido.AI.Executor
   alias Jido.AI.Helpers
   alias Jido.AI.Signal
   alias Jido.AI.Signal.{EmbedResult, LLMError, ToolResult, Usage}
   alias Jido.AI.ToolAdapter
+  alias Jido.AI.Turn
   alias ReqLLM.Context
 
   # ============================================================================
@@ -335,7 +335,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
     end
 
     test "build tools map and retrieve action" do
-      tools_map = Executor.build_tools_map([TestAction])
+      tools_map = Turn.build_tools_map([TestAction])
 
       assert Map.has_key?(tools_map, "test_action")
       assert tools_map["test_action"] == TestAction
