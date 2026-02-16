@@ -261,57 +261,12 @@ defmodule Jido.AI.ToolAdapter do
   end
 
   defp build_json_schema(schema) do
-    case ActionSchema.to_json_schema(schema) do
+    case ActionSchema.to_json_schema(schema, strict: true) do
       empty when empty == %{} ->
-        %{"type" => "object", "properties" => %{}, "required" => []}
+        %{"type" => "object", "properties" => %{}, "required" => [], "additionalProperties" => false}
 
       json_schema ->
-        disallow_additional_properties(json_schema)
-    end
-  end
-
-  # Recursively sets additionalProperties: false on all object types in the
-  # JSON schema. This is required for OpenAI/Anthropic strict mode tool calling.
-  #
-  # Jido.Action.Schema.to_json_schema/1 does not set this field, so the adapter
-  # must add it before passing schemas to ReqLLM.
-  #
-  # Handles both atom keys (defensive, for Zoi-generated schemas) and string
-  # keys (the standard output from NimbleOptions-based schemas).
-  defp disallow_additional_properties(%{type: :object} = schema) do
-    schema
-    |> Map.put(:additionalProperties, false)
-    |> update_nested_properties(&disallow_additional_properties/1)
-  end
-
-  defp disallow_additional_properties(%{"type" => "object"} = schema) do
-    schema
-    |> Map.put("additionalProperties", false)
-    |> update_nested_properties(&disallow_additional_properties/1)
-  end
-
-  defp disallow_additional_properties(schema) when is_map(schema) do
-    update_nested_properties(schema, &disallow_additional_properties/1)
-  end
-
-  defp disallow_additional_properties(schema), do: schema
-
-  defp update_nested_properties(schema, fun) do
-    schema
-    |> maybe_update_key(:properties, fn props ->
-      Map.new(props, fn {k, v} -> {k, fun.(v)} end)
-    end)
-    |> maybe_update_key("properties", fn props ->
-      Map.new(props, fn {k, v} -> {k, fun.(v)} end)
-    end)
-    |> maybe_update_key(:items, fun)
-    |> maybe_update_key("items", fun)
-  end
-
-  defp maybe_update_key(map, key, fun) do
-    case Map.fetch(map, key) do
-      {:ok, value} when is_map(value) -> Map.put(map, key, fun.(value))
-      _ -> map
+        json_schema
     end
   end
 

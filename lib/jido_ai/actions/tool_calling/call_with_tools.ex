@@ -62,7 +62,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{Security, ToolAdapter, ToolRunner, Turn}
+  alias Jido.AI.{Security, ToolAdapter, Turn}
   alias ReqLLM.Context
 
   @dialyzer [
@@ -218,7 +218,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   defp validate_system_prompt_if_needed(_params), do: {:ok, nil}
 
   defp execute_tools_and_continue(turn, messages, model, params, context, opts) do
-    with {:ok, turn_with_results} <- ToolRunner.run_turn(turn, context, timeout: params[:timeout]) do
+    with {:ok, turn_with_results} <- Turn.run_tools(turn, context, timeout: params[:timeout]) do
       updated_messages = messages ++ Turn.tool_messages(turn_with_results)
 
       # Preserve generation options across all turns

@@ -61,7 +61,8 @@ defmodule JidoAi.MixProject do
     [
       # Jido ecosystem
       {:jido, "~> 2.0.0-rc.4"},
-      {:req_llm, "~> 1.5"},
+      {:jido_action, github: "agentjido/jido_action", branch: "main", override: true},
+      {:req_llm, github: "agentjido/req_llm", branch: "main"},
       # Example-only browser tools (kept out of Hex runtime dependency graph)
       {:jido_browser, github: "agentjido/jido_browser", branch: "main", only: [:dev, :test], runtime: false},
 

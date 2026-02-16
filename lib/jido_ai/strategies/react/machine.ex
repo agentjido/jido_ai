@@ -50,8 +50,7 @@ defmodule Jido.AI.ReAct.Machine do
       "error" => ["awaiting_llm"]
     }
 
-  alias Jido.AI.Observe
-  alias Jido.AI.Thread
+  alias Jido.AI.{Observe, Thread, Turn}
 
   @typedoc "Internal machine status (string) - required by Fsmx library"
   @type internal_status :: String.t()
@@ -692,20 +691,13 @@ defmodule Jido.AI.ReAct.Machine do
     # Append all tool results to thread
     thread =
       Enum.reduce(machine.pending_tool_calls, machine.thread, fn tc, thread ->
-        content = format_tool_result_content(tc.result)
+        content = Turn.format_tool_result_content(tc.result)
         Thread.append_tool_result(thread, tc.id, tc.name, content)
       end)
 
     machine
     |> Map.put(:thread, thread)
     |> Map.put(:pending_tool_calls, [])
-  end
-
-  defp format_tool_result_content(result) do
-    case result do
-      {:ok, res} -> Jason.encode!(res)
-      {:error, reason} -> Jason.encode!(%{error: "Error: #{inspect(reason)}"})
-    end
   end
 
   defp inc_iteration(machine), do: Map.update!(machine, :iteration, &(&1 + 1))
