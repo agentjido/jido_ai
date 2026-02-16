@@ -63,7 +63,7 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Security
-  alias Jido.AI.Text
+  alias Jido.AI.Turn
   alias ReqLLM.Context
 
   @basic_prompt """
@@ -225,7 +225,7 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
 
   defp format_result(response, model, detail_level) do
     %{
-      result: Text.extract_text(response),
+      result: Turn.extract_text(response),
       detail_level: detail_level,
       model: model,
       usage: Helpers.extract_usage(response)

@@ -29,7 +29,7 @@ defmodule Jido.AI.Actions.Helpers do
   """
 
   alias Jido.AI.Security
-  alias Jido.AI.Text
+  alias Jido.AI.Turn
 
   @doc """
   Resolves a model parameter to a model spec.
@@ -98,7 +98,7 @@ defmodule Jido.AI.Actions.Helpers do
   @doc """
   Extracts text content from an LLM response.
 
-  Delegates to `Jido.AI.Text.extract_text/1` which handles
+  Delegates to `Jido.AI.Turn.extract_text/1` which handles
   multiple response shapes consistently.
 
   ## Parameters
@@ -117,7 +117,7 @@ defmodule Jido.AI.Actions.Helpers do
       iex> extract_text(%{message: %{content: [%{type: :text, text: "Hi"}]}})
       "Hi"
   """
-  defdelegate extract_text(response), to: Text
+  defdelegate extract_text(response), to: Turn
 
   @doc """
   Extracts usage information from an LLM response.

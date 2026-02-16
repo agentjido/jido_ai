@@ -64,7 +64,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Security
-  alias Jido.AI.Text
+  alias Jido.AI.Turn
   alias ReqLLM.Context
 
   @sentiment_prompt """
@@ -201,7 +201,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
 
   defp format_result(response, model, analysis_type) do
     %{
-      result: Text.extract_text(response),
+      result: Turn.extract_text(response),
       analysis_type: analysis_type,
       model: model,
       usage: Helpers.extract_usage(response)

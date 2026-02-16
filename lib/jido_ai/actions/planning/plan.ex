@@ -57,7 +57,7 @@ defmodule Jido.AI.Actions.Planning.Plan do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Text
+  alias Jido.AI.Turn
   alias ReqLLM.Context
 
   @planning_prompt """
@@ -184,7 +184,7 @@ defmodule Jido.AI.Actions.Planning.Plan do
   end
 
   defp format_result(response, model, goal) do
-    plan_text = Text.extract_text(response)
+    plan_text = Turn.extract_text(response)
 
     %{
       plan: plan_text,

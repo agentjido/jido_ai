@@ -92,7 +92,7 @@ defmodule Jido.AI.TestSupport.FakeReqLLM do
   defp extract_latest_user_prompt(_), do: ""
 
   defp normalize_content(content) when is_binary(content), do: content
-  defp normalize_content(content) when is_list(content), do: Jido.AI.Text.extract_from_content(content)
+  defp normalize_content(content) when is_list(content), do: Jido.AI.Turn.extract_from_content(content)
   defp normalize_content(_), do: ""
 
   defp tool_message?(%{role: role}) when role in [:tool, "tool"], do: true
