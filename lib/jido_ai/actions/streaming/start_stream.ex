@@ -110,7 +110,7 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
     if params[:auto_process] == false do
       :ok
     else
-      with {:ok, task_supervisor} <- resolve_task_supervisor(params[:task_supervisor]),
+      with {:ok, task_supervisor} <- resolve_task_supervisor(params[:task_supervisor], context),
            {:ok, _pid} <-
              Task.Supervisor.start_child(task_supervisor, fn ->
                _ = ProcessTokens.run(%{stream_id: stream_id}, context)
@@ -124,14 +124,34 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
     end
   end
 
-  defp resolve_task_supervisor(supervisor) when is_pid(supervisor), do: {:ok, supervisor}
+  defp resolve_task_supervisor(supervisor, _context) when is_pid(supervisor), do: {:ok, supervisor}
 
-  defp resolve_task_supervisor(nil) do
-    case Application.get_env(:jido_ai, :task_supervisor) do
-      supervisor when is_pid(supervisor) -> {:ok, supervisor}
+  defp resolve_task_supervisor(supervisor, _context) when is_atom(supervisor) and not is_nil(supervisor),
+    do: {:ok, supervisor}
+
+  defp resolve_task_supervisor(nil, context) do
+    case context_task_supervisor(context) do
+      supervisor when is_pid(supervisor) or (is_atom(supervisor) and not is_nil(supervisor)) -> {:ok, supervisor}
       _ -> {:error, :missing_task_supervisor}
     end
   end
+
+  defp resolve_task_supervisor(_supervisor, _context), do: {:error, :invalid_task_supervisor}
+
+  defp context_task_supervisor(%Jido.AgentServer.State{agent: %{state: state}}),
+    do: context_task_supervisor(state)
+
+  defp context_task_supervisor(%Jido.Agent{state: state}), do: context_task_supervisor(state)
+
+  defp context_task_supervisor(context) when is_map(context) do
+    context[:task_supervisor] ||
+      get_in(context, [:__task_supervisor_skill__, :supervisor]) ||
+      get_in(context, [:state, :__task_supervisor_skill__, :supervisor]) ||
+      get_in(context, [:agent, :state, :__task_supervisor_skill__, :supervisor]) ||
+      get_in(context, [:agent_state, :__task_supervisor_skill__, :supervisor])
+  end
+
+  defp context_task_supervisor(_), do: nil
 
   defp validate_and_sanitize_params(params) do
     with {:ok, _prompt} <-
