@@ -363,8 +363,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Signal}
-  alias Jido.Observe
+  alias Jido.AI.{Helpers, Observe, Signal}
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -423,9 +422,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
            if parent_trace_ctx, do: Process.put({:jido, :trace_context}, parent_trace_ctx)
 
            started_at = System.monotonic_time(:millisecond)
-           span_ctx = Observe.start_span([:jido, :ai, :llm, :span], event_meta)
+           span_ctx = Observe.start_span(obs_cfg, Observe.llm(:span), event_meta)
 
-           maybe_emit(obs_cfg, [:jido, :ai, :llm, :start], %{duration_ms: 0, queue_ms: 0}, event_meta)
+           maybe_emit(obs_cfg, Observe.llm(:start), %{duration_ms: 0, queue_ms: 0}, event_meta)
 
            result =
              try do
@@ -443,7 +442,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
            case result do
              {:ok, _} ->
                Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
-               maybe_emit(obs_cfg, [:jido, :ai, :llm, :complete], %{duration_ms: duration_ms}, event_meta)
+               maybe_emit(obs_cfg, Observe.llm(:complete), %{duration_ms: duration_ms}, event_meta)
 
              {:error, reason} ->
                Observe.finish_span_error(span_ctx, :error, reason, [])
@@ -456,7 +455,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
                maybe_emit(
                  obs_cfg,
-                 [:jido, :ai, :llm, :error],
+                 Observe.llm(:error),
                  %{duration_ms: duration_ms},
                  Map.put(event_meta, :error_type, error_type)
                )
@@ -516,7 +515,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
           Jido.AgentServer.cast(agent_pid, partial_signal)
 
-          maybe_emit_delta(obs_cfg, [:jido, :ai, :llm, :delta], %{duration_ms: 0}, event_meta)
+          maybe_emit_delta(obs_cfg, Observe.llm(:delta), %{duration_ms: 0}, event_meta)
         end
 
         on_thinking = fn text ->
@@ -529,7 +528,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
           Jido.AgentServer.cast(agent_pid, partial_signal)
 
-          maybe_emit_delta(obs_cfg, [:jido, :ai, :llm, :delta], %{duration_ms: 0}, event_meta)
+          maybe_emit_delta(obs_cfg, Observe.llm(:delta), %{duration_ms: 0}, event_meta)
         end
 
         case ReqLLM.StreamResponse.process_stream(stream_response,
@@ -581,15 +580,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
-    Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
+    Observe.emit(obs_cfg, event, measurements, metadata)
   end
 
   defp maybe_emit_delta(obs_cfg, event, measurements, metadata) do
-    if Map.get(obs_cfg, :emit_telemetry?, true) and Map.get(obs_cfg, :emit_llm_deltas?, true) do
-      Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
-    else
-      :ok
-    end
+    Observe.emit(obs_cfg, event, measurements, metadata, feature_gate: :llm_deltas)
   end
 end
 
@@ -696,8 +691,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   """
 
   alias Jido.AI.Executor
+  alias Jido.AI.Observe
   alias Jido.AI.Signal
-  alias Jido.Observe
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -746,11 +741,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
            }
 
            start_ms = System.monotonic_time(:millisecond)
-           span_ctx = Observe.start_span([:jido, :ai, :tool, :span], event_meta)
+           span_ctx = Observe.start_span(obs_cfg, Observe.tool(:span), event_meta)
 
            maybe_emit(
              obs_cfg,
-             [:jido, :ai, :tool, :start],
+             Observe.tool(:start),
              %{duration_ms: 0, queue_ms: 0, retry_count: 0},
              event_meta
            )
@@ -778,7 +773,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
 
                maybe_emit(
                  obs_cfg,
-                 [:jido, :ai, :tool, :complete],
+                 Observe.tool(:complete),
                  %{duration_ms: duration_ms, retry_count: retry_count},
                  event_meta
                )
@@ -790,14 +785,14 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
 
                maybe_emit(
                  obs_cfg,
-                 [:jido, :ai, :tool, :timeout],
+                 Observe.tool(:timeout),
                  %{duration_ms: duration_ms, retry_count: retry_count},
                  timeout_meta
                )
 
                maybe_emit(
                  obs_cfg,
-                 [:jido, :ai, :tool, :error],
+                 Observe.tool(:error),
                  %{duration_ms: duration_ms, retry_count: retry_count},
                  Map.put(timeout_meta, :termination_reason, :error)
                )
@@ -807,7 +802,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
 
                maybe_emit(
                  obs_cfg,
-                 [:jido, :ai, :tool, :error],
+                 Observe.tool(:error),
                  %{duration_ms: duration_ms, retry_count: retry_count},
                  Map.merge(event_meta, %{error_type: type, termination_reason: :error})
                )
@@ -817,7 +812,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
 
                maybe_emit(
                  obs_cfg,
-                 [:jido, :ai, :tool, :error],
+                 Observe.tool(:error),
                  %{duration_ms: duration_ms, retry_count: retry_count},
                  Map.merge(event_meta, %{error_type: :executor, termination_reason: :error})
                )
@@ -857,7 +852,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     0..max_retries
     |> Enum.reduce_while({{:error, error_envelope(:executor, "uninitialized error")}, 0}, fn attempt, _acc ->
       if attempt > 0 do
-        maybe_emit(obs_cfg, [:jido, :ai, :tool, :retry], %{duration_ms: 0, retry_count: attempt}, event_meta)
+        maybe_emit(obs_cfg, Observe.tool(:retry), %{duration_ms: 0, retry_count: attempt}, event_meta)
 
         if retry_backoff_ms > 0, do: Process.sleep(retry_backoff_ms)
       end
@@ -1012,7 +1007,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
-    Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
+    Observe.emit(obs_cfg, event, measurements, metadata)
   end
 
   # Sends tool result signal, with fallback for signal construction failures
@@ -1146,8 +1141,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   when an agent is created.
   """
 
-  alias Jido.AI.{Helpers, Signal}
-  alias Jido.Observe
+  alias Jido.AI.{Helpers, Observe, Signal}
 
   def exec(directive, _input_signal, state) do
     %{
@@ -1183,9 +1177,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
     case Task.Supervisor.start_child(task_supervisor, fn ->
            started_at = System.monotonic_time(:millisecond)
-           span_ctx = Observe.start_span([:jido, :ai, :llm, :span], event_meta)
+           span_ctx = Observe.start_span(obs_cfg, Observe.llm(:span), event_meta)
 
-           maybe_emit(obs_cfg, [:jido, :ai, :llm, :start], %{duration_ms: 0, queue_ms: 0}, event_meta)
+           maybe_emit(obs_cfg, Observe.llm(:start), %{duration_ms: 0, queue_ms: 0}, event_meta)
 
            result =
              try do
@@ -1214,7 +1208,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
            case result do
              {:ok, _} ->
                Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
-               maybe_emit(obs_cfg, [:jido, :ai, :llm, :complete], %{duration_ms: duration_ms}, event_meta)
+               maybe_emit(obs_cfg, Observe.llm(:complete), %{duration_ms: duration_ms}, event_meta)
 
              {:error, reason} ->
                Observe.finish_span_error(span_ctx, :error, reason, [])
@@ -1227,7 +1221,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
                maybe_emit(
                  obs_cfg,
-                 [:jido, :ai, :llm, :error],
+                 Observe.llm(:error),
                  %{duration_ms: duration_ms},
                  Map.put(event_meta, :error_type, error_type)
                )
@@ -1315,7 +1309,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
-    Jido.AI.Directive.Helper.emit_react_event(obs_cfg, event, measurements, metadata)
+    Observe.emit(obs_cfg, event, measurements, metadata)
   end
 end
 
@@ -1324,17 +1318,6 @@ defmodule Jido.AI.Directive.Helper do
   @moduledoc """
   Helper functions for DirectiveExec implementations.
   """
-  alias Jido.AI.Observability.Emitter
-  alias Jido.AI.Observability.Events
-
-  @doc """
-  Emits an AI telemetry event through upstream `Jido.Observe` with normalized schema.
-  """
-  @spec emit_react_event(map(), [atom()], map(), map()) :: :ok
-  def emit_react_event(obs_cfg, event, measurements, metadata) do
-    Emitter.emit(obs_cfg, event, measurements, metadata)
-  end
-
   @doc """
   Gets the task supervisor from agent state.
 
@@ -1384,21 +1367,5 @@ defmodule Jido.AI.Directive.Helper do
             supervisor
         end
     end
-  end
-
-  @doc """
-  Ensures required observability metadata keys are present.
-  """
-  @spec ensure_required_metadata(map()) :: map()
-  def ensure_required_metadata(metadata) when is_map(metadata) do
-    Events.ensure_required_metadata(metadata)
-  end
-
-  @doc """
-  Ensures required observability measurement keys are present.
-  """
-  @spec ensure_required_measurements(map()) :: map()
-  def ensure_required_measurements(measurements) when is_map(measurements) do
-    Events.ensure_required_measurements(measurements)
   end
 end
