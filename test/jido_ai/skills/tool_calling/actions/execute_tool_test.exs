@@ -3,6 +3,20 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteToolTest do
 
   alias Jido.AI.Actions.ToolCalling.ExecuteTool
 
+  defmodule AddAction do
+    use Jido.Action,
+      name: "add",
+      description: "Add two numbers",
+      schema:
+        Zoi.object(%{
+          a: Zoi.integer(),
+          b: Zoi.integer()
+        })
+
+    @impl Jido.Action
+    def run(%{a: a, b: b}, _context), do: {:ok, %{sum: a + b}}
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -45,15 +59,28 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteToolTest do
       assert {:error, _reason} = ExecuteTool.run(params, %{})
     end
 
-    test "returns success structure with valid tool_name" do
+    test "executes a tool from context tools map" do
       params = %{
-        tool_name: "test_tool",
-        params: %{}
+        tool_name: "add",
+        params: %{a: 1, b: 2}
       }
 
-      # Will fail with tool not found, but tests the structure
-      result = ExecuteTool.run(params, %{})
-      assert is_tuple(result)
+      context = %{tools: %{"add" => AddAction}}
+
+      assert {:ok, %{tool_name: "add", status: :success, result: %{sum: 3}}} =
+               ExecuteTool.run(params, context)
+    end
+
+    test "executes a tool from plugin state tools map fallback" do
+      params = %{
+        tool_name: "add",
+        params: %{a: 4, b: 7}
+      }
+
+      context = %{state: %{tool_calling: %{tools: %{"add" => AddAction}}}}
+
+      assert {:ok, %{tool_name: "add", status: :success, result: %{sum: 11}}} =
+               ExecuteTool.run(params, context)
     end
   end
 
