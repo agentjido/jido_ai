@@ -137,7 +137,7 @@ defmodule Jido.AI.Plugins.ToolCalling do
         |> Zoi.default(10),
       available_tools:
         Zoi.list(
-          Zoi.map(description: "Tool information with :name and :type keys"),
+          Zoi.string(description: "Registered tool name"),
           description: "List of available tools from registry"
         )
         |> Zoi.default([])
