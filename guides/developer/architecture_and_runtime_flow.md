@@ -54,6 +54,14 @@ Fix:
 - request lifecycle signals are standardized under `ai.request.*`
 - canonical namespace helpers live in `Jido.AI.Namespaces`
 
+## Registry Lifecycle Guarantees
+
+`Jido.AI.Streaming.Registry` and `Jido.AI.Skill.Registry` share the same startup semantics:
+
+- explicit supervised startup via `start_link/1`
+- lazy startup via `ensure_started/0` for call-site safety
+- startup-order independence for library consumers
+
 ## When To Use / Not Use
 
 Use this guide when:
