@@ -171,46 +171,58 @@ defmodule Jido.AI.SecurityTest do
   end
 
   describe "validate_and_wrap_callback/2" do
-    # These tests need the TaskSupervisor to be running
-    setup do
-      # Start the TaskSupervisor if not already started
-      case Process.whereis(Jido.TaskSupervisor) do
-        nil ->
-          {:ok, _pid} = Task.Supervisor.start_link(name: Jido.TaskSupervisor)
-
-        _pid ->
-          :already_started
-      end
-
-      :ok
-    end
-
     test "wraps valid callback with timeout" do
+      {:ok, task_supervisor} = Task.Supervisor.start_link()
       callback = fn x -> x end
-      assert {:ok, wrapped} = Security.validate_and_wrap_callback(callback)
+
+      assert {:ok, wrapped} =
+               Security.validate_and_wrap_callback(callback, task_supervisor: task_supervisor)
+
       assert is_function(wrapped, 1)
     end
 
     test "wrapped callback times out for long-running functions" do
+      {:ok, task_supervisor} = Task.Supervisor.start_link()
+
       slow_callback = fn _ ->
         Process.sleep(10_000)
         :never_returned
       end
 
       assert {:ok, wrapped} =
-               Security.validate_and_wrap_callback(slow_callback, timeout: 100)
+               Security.validate_and_wrap_callback(slow_callback, timeout: 100, task_supervisor: task_supervisor)
 
       # Should return error due to timeout
       assert {:error, :callback_timeout} = wrapped.("input")
     end
 
     test "wrapped callback executes normally for fast functions" do
+      {:ok, task_supervisor} = Task.Supervisor.start_link()
       fast_callback = fn x -> String.upcase(x) end
 
       assert {:ok, wrapped} =
-               Security.validate_and_wrap_callback(fast_callback, timeout: 1000)
+               Security.validate_and_wrap_callback(fast_callback, timeout: 1000, task_supervisor: task_supervisor)
 
       assert "HELLO" = wrapped.("hello")
+    end
+
+    test "returns error when task supervisor is missing" do
+      callback = fn x -> x end
+
+      assert {:error, :missing_task_supervisor} =
+               Security.validate_and_wrap_callback(callback, task_supervisor: :missing_task_supervisor)
+    end
+
+    test "wrapped callback returns safe error if supervisor terminates after wrapping" do
+      {:ok, task_supervisor} = Task.Supervisor.start_link()
+      callback = fn x -> x end
+
+      assert {:ok, wrapped} =
+               Security.validate_and_wrap_callback(callback, task_supervisor: task_supervisor)
+
+      :ok = GenServer.stop(task_supervisor)
+
+      assert {:error, :missing_task_supervisor} = wrapped.("input")
     end
 
     test "rejects invalid callbacks" do
