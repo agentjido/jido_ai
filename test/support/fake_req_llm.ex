@@ -1,48 +1,58 @@
-defmodule Jido.AI.TestSupport.FakeLLMClient do
+defmodule Jido.AI.TestSupport.FakeReqLLM do
   @moduledoc false
 
-  @behaviour Jido.AI.LLMClient
+  def setup_stubs(_context) do
+    Mimic.stub(ReqLLM.Generation, :generate_text, &generate_text/3)
+    Mimic.stub(ReqLLM, :stream_text, &stream_text/3)
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream/2)
+    :ok
+  end
 
-  @impl true
   def generate_text(model, messages, opts) do
     tools = Keyword.get(opts, :tools, [])
     prompt = extract_latest_user_prompt(messages)
     has_tool_result? = Enum.any?(messages, &tool_message?/1)
 
-    response =
+    result =
       cond do
+        Regex.match?(~r/\AGoal:\s*(?:\n|$)/, prompt) ->
+          {:error, :invalid_prompt}
+
+        Regex.match?(~r/\AGoal to decompose:\s*(?:\n|$)/, prompt) ->
+          {:error, :invalid_prompt}
+
         tools != [] and String.contains?(prompt, "loop tool") ->
-          tool_call_response(model)
+          {:ok, tool_call_response(model)}
 
         tools != [] and has_tool_result? ->
           max_tokens = Keyword.get(opts, :max_tokens)
           temperature = Keyword.get(opts, :temperature)
 
-          final_answer_response(
-            model,
-            "Tool execution complete: 8 (max_tokens=#{max_tokens}, temperature=#{temperature})"
-          )
+          {:ok,
+           final_answer_response(
+             model,
+             "Tool execution complete: 8 (max_tokens=#{max_tokens}, temperature=#{temperature})"
+           )}
 
         tools != [] and String.contains?(prompt, "Calculate") ->
-          tool_call_response(model)
+          {:ok, tool_call_response(model)}
 
         String.starts_with?(prompt, "Goal:") ->
-          plan_response(model)
+          {:ok, plan_response(model)}
 
         String.starts_with?(prompt, "Goal to decompose:") ->
-          decompose_response(model)
+          {:ok, decompose_response(model)}
 
         String.starts_with?(prompt, "Tasks to prioritize:") ->
-          prioritize_response(model)
+          {:ok, prioritize_response(model)}
 
         true ->
-          final_answer_response(model, "Stubbed response for: #{prompt}")
+          {:ok, final_answer_response(model, "Stubbed response for: #{prompt}")}
       end
 
-    {:ok, response}
+    result
   end
 
-  @impl true
   def stream_text(model, messages, _opts) do
     prompt = extract_latest_user_prompt(messages)
     chunks = ["Stubbed ", "stream ", "for ", prompt]
@@ -55,7 +65,6 @@ defmodule Jido.AI.TestSupport.FakeLLMClient do
      }}
   end
 
-  @impl true
   def process_stream(%{chunks: chunks, final: final}, opts) when is_list(chunks) do
     on_result = Keyword.get(opts, :on_result, fn _chunk -> :ok end)
 

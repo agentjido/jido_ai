@@ -1,12 +1,18 @@
 defmodule Jido.AI.Actions.Streaming.ProcessTokensTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.Actions.Streaming.ProcessTokens
   alias Jido.AI.Streaming.Registry
-  alias Jido.AI.TestSupport.FakeLLMClient
+  alias Jido.AI.TestSupport.FakeReqLLM
 
   @moduletag :unit
   @moduletag :capture_log
+
+  setup :set_mimic_from_context
+  setup :stub_req_llm
+
+  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   describe "schema" do
     test "has required fields" do
@@ -31,14 +37,14 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokensTest do
 
     test "returns error when stream is not found" do
       assert {:error, :stream_not_found} =
-               ProcessTokens.run(%{stream_id: "missing_stream"}, %{llm_client: FakeLLMClient})
+               ProcessTokens.run(%{stream_id: "missing_stream"}, %{})
     end
 
     test "processes tokens for a registered stream" do
       stream_id = unique_stream_id()
       register_stream(stream_id)
 
-      assert {:ok, result} = ProcessTokens.run(%{stream_id: stream_id}, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = ProcessTokens.run(%{stream_id: stream_id}, %{})
       assert result.stream_id == stream_id
       assert result.status == :completed
       assert result.token_count == 3
@@ -53,7 +59,7 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokensTest do
       callback = fn token -> send(self(), {:token, token}) end
 
       assert {:ok, result} =
-               ProcessTokens.run(%{stream_id: stream_id, on_token: callback}, %{llm_client: FakeLLMClient})
+               ProcessTokens.run(%{stream_id: stream_id, on_token: callback}, %{})
 
       assert result.stream_id == stream_id
       assert_received {:token, "a"}
@@ -68,7 +74,7 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokensTest do
       filter = fn token -> token != "b" end
 
       assert {:ok, result} =
-               ProcessTokens.run(%{stream_id: stream_id, filter: filter}, %{llm_client: FakeLLMClient})
+               ProcessTokens.run(%{stream_id: stream_id, filter: filter}, %{})
 
       assert result.stream_id == stream_id
       assert result.token_count == 2
@@ -82,7 +88,7 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokensTest do
       transform = fn token -> String.upcase(token) end
 
       assert {:ok, result} =
-               ProcessTokens.run(%{stream_id: stream_id, transform: transform}, %{llm_client: FakeLLMClient})
+               ProcessTokens.run(%{stream_id: stream_id, transform: transform}, %{})
 
       assert result.stream_id == stream_id
       assert result.text == "ABC"
@@ -97,7 +103,7 @@ defmodule Jido.AI.Actions.Streaming.ProcessTokensTest do
       callback = fn result -> send(self(), {:complete, result}) end
 
       assert {:ok, result} =
-               ProcessTokens.run(%{stream_id: stream_id, on_complete: callback}, %{llm_client: FakeLLMClient})
+               ProcessTokens.run(%{stream_id: stream_id, on_complete: callback}, %{})
 
       assert result.stream_id == stream_id
       assert_received {:complete, %{stream_id: ^stream_id, status: :completed}}

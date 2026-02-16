@@ -144,7 +144,6 @@ defmodule JidoAi.MixProject do
         "guides/developer/strategy_internals.md",
         "guides/developer/directives_runtime_contract.md",
         "guides/developer/signals_namespaces_contracts.md",
-        "guides/developer/llm_client_boundary.md",
         "guides/developer/plugins_and_actions_composition.md",
         "guides/developer/skills_system.md",
         "guides/developer/security_and_validation.md",
@@ -161,7 +160,7 @@ defmodule JidoAi.MixProject do
       groups_for_extras: [
         {"Build With Jido.AI", ~r/guides\/user/},
         {"Extend Jido.AI",
-         ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|llm_client_boundary|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
+         ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
         {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/},
         {"Examples - Strategies", ~r/examples\/strategies/}
       ],

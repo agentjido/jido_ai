@@ -1,11 +1,17 @@
 defmodule Jido.AI.Actions.Planning.PlanTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.Actions.Planning.Plan
-  alias Jido.AI.TestSupport.FakeLLMClient
+  alias Jido.AI.TestSupport.FakeReqLLM
 
   @moduletag :unit
   @moduletag :capture_log
+
+  setup :set_mimic_from_context
+  setup :stub_req_llm
+
+  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   describe "schema" do
     test "has required fields" do
@@ -32,7 +38,7 @@ defmodule Jido.AI.Actions.Planning.PlanTest do
         goal: "Build a simple todo app"
       }
 
-      assert {:ok, result} = Plan.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Plan.run(params, %{})
       assert result.goal == "Build a simple todo app"
       assert is_binary(result.plan)
       assert result.plan != ""
@@ -46,7 +52,7 @@ defmodule Jido.AI.Actions.Planning.PlanTest do
         constraints: ["Budget under $1000", "Must use open source"]
       }
 
-      assert {:ok, result} = Plan.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Plan.run(params, %{})
       assert result.goal == "Launch a website"
       assert String.length(result.plan) > 0
       refute Enum.empty?(result.steps)
@@ -58,7 +64,7 @@ defmodule Jido.AI.Actions.Planning.PlanTest do
         max_steps: 5
       }
 
-      assert {:ok, result} = Plan.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = Plan.run(params, %{})
       assert length(result.steps) <= 10
     end
   end

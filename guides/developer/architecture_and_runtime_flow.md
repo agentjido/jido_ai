@@ -45,7 +45,7 @@ Symptom:
 
 Fix:
 - keep strategy pure and orchestration-focused
-- fix provider behavior in `Jido.AI.LLMClient*` boundary
+- fix provider behavior at the direct `ReqLLM` call-site
 - fix execution semantics in directive runtime path
 
 ## Defaults You Should Know

@@ -1,8 +1,9 @@
 defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.Actions.ToolCalling.CallWithTools
-  alias Jido.AI.TestSupport.FakeLLMClient
+  alias Jido.AI.TestSupport.FakeReqLLM
 
   defmodule TestCalculator do
     use Jido.Action,
@@ -21,6 +22,11 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
 
   @moduletag :unit
   @moduletag :capture_log
+
+  setup :set_mimic_from_context
+  setup :stub_req_llm
+
+  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   describe "schema" do
     test "has required fields" do
@@ -51,7 +57,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
         prompt: "What is 2 + 2?"
       }
 
-      assert {:ok, result} = CallWithTools.run(params, %{llm_client: FakeLLMClient})
+      assert {:ok, result} = CallWithTools.run(params, %{})
       assert Map.has_key?(result, :type)
       assert Map.has_key?(result, :model)
     end
@@ -63,7 +69,6 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       }
 
       context = %{
-        llm_client: FakeLLMClient,
         tools: %{TestCalculator.name() => TestCalculator}
       }
 
@@ -81,7 +86,6 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       }
 
       context = %{
-        llm_client: FakeLLMClient,
         tools: %{TestCalculator.name() => TestCalculator}
       }
 
@@ -103,7 +107,6 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       }
 
       context = %{
-        llm_client: FakeLLMClient,
         tools: %{TestCalculator.name() => TestCalculator}
       }
 
