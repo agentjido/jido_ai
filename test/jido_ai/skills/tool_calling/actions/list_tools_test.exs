@@ -3,6 +3,32 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
 
   alias Jido.AI.Actions.ToolCalling.ListTools
 
+  defmodule LegacySchemaTool do
+    use Jido.Action,
+      name: "legacy_schema_tool",
+      schema: [
+        query: [type: :string, required: true, doc: "Search query"],
+        limit: [type: :integer, default: 10, doc: "Maximum result count"]
+      ]
+
+    @impl Jido.Action
+    def run(params, _context), do: {:ok, params}
+  end
+
+  defmodule ZoiSchemaTool do
+    use Jido.Action,
+      name: "zoi_schema_tool",
+      schema:
+        Zoi.object(%{
+          prompt: Zoi.string(description: "Prompt text"),
+          max_tokens: Zoi.integer(description: "Maximum output tokens") |> Zoi.default(256),
+          tags: Zoi.list(Zoi.string(), description: "Tags") |> Zoi.optional()
+        })
+
+    @impl Jido.Action
+    def run(params, _context), do: {:ok, params}
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -61,6 +87,30 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
         # Module is excluded for security - don't expose internal structure
         refute Map.has_key?(tool, :module)
       end)
+    end
+
+    test "serializes schema for both keyword-list and Zoi object tools" do
+      context = %{
+        tools: %{
+          "legacy_schema_tool" => LegacySchemaTool,
+          "zoi_schema_tool" => ZoiSchemaTool
+        }
+      }
+
+      assert {:ok, result} =
+               ListTools.run(%{include_schema: true, include_sensitive: true}, context)
+
+      legacy_tool = Enum.find(result.tools, &(&1.name == "legacy_schema_tool"))
+      zoi_tool = Enum.find(result.tools, &(&1.name == "zoi_schema_tool"))
+
+      refute is_nil(legacy_tool.schema)
+      assert is_list(legacy_tool.schema)
+      assert Enum.any?(legacy_tool.schema, &(&1.name == :query and &1.type == :string))
+
+      refute is_nil(zoi_tool.schema)
+      assert is_list(zoi_tool.schema)
+      assert Enum.any?(zoi_tool.schema, &(&1.name == :prompt and &1.type == "string"))
+      assert Enum.any?(zoi_tool.schema, &(&1.name == :max_tokens and &1.default == 256))
     end
   end
 
