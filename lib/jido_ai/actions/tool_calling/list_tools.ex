@@ -201,5 +201,66 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
 
   defp format_schema_list(_), do: nil
 
-  defp format_schema_map(_schema), do: nil
+  defp format_schema_map(schema) do
+    schema
+    |> extract_schema_fields()
+    |> Enum.map(fn {name, field_schema} ->
+      {inner_schema, default} = unwrap_default(field_schema)
+      doc = schema_description(field_schema, inner_schema)
+
+      %{
+        name: name,
+        type: schema_type(inner_schema),
+        required: schema_required?(field_schema, default),
+        default: default,
+        doc: doc
+      }
+    end)
+  end
+
+  defp extract_schema_fields(%{fields: fields}) when is_list(fields), do: fields
+  defp extract_schema_fields(%{fields: fields}) when is_map(fields), do: Map.to_list(fields)
+  defp extract_schema_fields(_), do: []
+
+  defp unwrap_default(%{__struct__: Zoi.Types.Default} = schema) do
+    schema_map = Map.from_struct(schema)
+    {schema_map.inner, schema_map.value}
+  end
+
+  defp unwrap_default(schema), do: {schema, nil}
+
+  defp schema_required?(_schema, default) when not is_nil(default), do: false
+
+  defp schema_required?(schema, _default) do
+    case schema_meta(schema, :required) do
+      true -> true
+      _ -> false
+    end
+  end
+
+  defp schema_description(schema, inner_schema) do
+    schema_meta(schema, :description) || schema_meta(inner_schema, :description)
+  end
+
+  defp schema_meta(%{meta: meta}, key) when is_map(meta), do: Map.get(meta, key)
+  defp schema_meta(_schema, _key), do: nil
+
+  defp schema_type(%{__struct__: Zoi.Types.Array} = schema) do
+    inner_type =
+      schema
+      |> Map.from_struct()
+      |> Map.get(:inner)
+      |> schema_type()
+
+    "array(#{inner_type})"
+  end
+
+  defp schema_type(%{__struct__: struct_module}) do
+    struct_module
+    |> Module.split()
+    |> List.last()
+    |> Macro.underscore()
+  end
+
+  defp schema_type(_), do: nil
 end
