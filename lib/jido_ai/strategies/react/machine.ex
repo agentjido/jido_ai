@@ -50,11 +50,8 @@ defmodule Jido.AI.ReAct.Machine do
       "error" => ["awaiting_llm"]
     }
 
+  alias Jido.AI.Observe
   alias Jido.AI.Thread
-  alias Jido.AI.Observability.Events
-
-  # Telemetry event names
-  @telemetry_prefix [:jido, :ai, :strategy, :react]
 
   @typedoc "Internal machine status (string) - required by Fsmx library"
   @type internal_status :: String.t()
@@ -167,12 +164,17 @@ defmodule Jido.AI.ReAct.Machine do
       when status in ["awaiting_llm", "awaiting_tool"] do
     case Map.get(env, :request_policy, :reject) do
       :reject ->
-        emit_request_event(:rejected, %{duration_ms: 0}, %{
-          request_id: request_id,
-          run_id: request_id,
-          termination_reason: :busy,
-          error_type: :busy
-        })
+        emit_request_event(
+          :rejected,
+          %{duration_ms: 0},
+          %{
+            request_id: request_id,
+            run_id: request_id,
+            termination_reason: :busy,
+            error_type: :busy
+          },
+          env
+        )
 
         {machine, [{:request_error, request_id, :busy, "Agent is busy (status: #{status})"}]}
 
@@ -223,17 +225,22 @@ defmodule Jido.AI.ReAct.Machine do
     end
   end
 
-  def update(%__MODULE__{status: status} = machine, {:cancel, request_id, reason}, _env)
+  def update(%__MODULE__{status: status} = machine, {:cancel, request_id, reason}, env)
       when status in ["awaiting_llm", "awaiting_tool"] do
     if is_nil(request_id) or request_id == machine.active_request_id do
       duration_ms = calculate_duration(machine)
 
-      emit_request_event(:cancelled, %{duration_ms: duration_ms}, %{
-        request_id: machine.active_request_id,
-        run_id: machine.active_request_id,
-        termination_reason: :cancelled,
-        error_type: reason
-      })
+      emit_request_event(
+        :cancelled,
+        %{duration_ms: duration_ms},
+        %{
+          request_id: machine.active_request_id,
+          run_id: machine.active_request_id,
+          termination_reason: :cancelled,
+          error_type: reason
+        },
+        env
+      )
 
       with_transition(machine, "error", fn m ->
         m =
@@ -289,12 +296,17 @@ defmodule Jido.AI.ReAct.Machine do
       env
     )
 
-    emit_request_event(:start, %{duration_ms: 0}, %{
-      request_id: request_id,
-      run_id: request_id,
-      termination_reason: nil,
-      error_type: nil
-    })
+    emit_request_event(
+      :start,
+      %{duration_ms: 0},
+      %{
+        request_id: request_id,
+        run_id: request_id,
+        termination_reason: nil,
+        error_type: nil
+      },
+      env
+    )
 
     with_transition(machine, "awaiting_llm", fn machine ->
       machine =
@@ -335,12 +347,17 @@ defmodule Jido.AI.ReAct.Machine do
       env
     )
 
-    emit_request_event(:complete, %{duration_ms: duration_ms}, %{
-      request_id: machine.active_request_id,
-      run_id: machine.active_request_id,
-      termination_reason: :max_iterations,
-      error_type: nil
-    })
+    emit_request_event(
+      :complete,
+      %{duration_ms: duration_ms},
+      %{
+        request_id: machine.active_request_id,
+        run_id: machine.active_request_id,
+        termination_reason: :max_iterations,
+        error_type: nil
+      },
+      env
+    )
 
     with_transition(machine, "completed", fn m ->
       m =
@@ -510,12 +527,17 @@ defmodule Jido.AI.ReAct.Machine do
       env
     )
 
-    emit_request_event(:failed, %{duration_ms: duration_ms}, %{
-      request_id: machine.active_request_id,
-      run_id: machine.active_request_id,
-      termination_reason: :error,
-      error_type: :llm_error
-    })
+    emit_request_event(
+      :failed,
+      %{duration_ms: duration_ms},
+      %{
+        request_id: machine.active_request_id,
+        run_id: machine.active_request_id,
+        termination_reason: :error,
+        error_type: :llm_error
+      },
+      env
+    )
 
     with_transition(machine, "error", fn machine ->
       machine =
@@ -630,12 +652,17 @@ defmodule Jido.AI.ReAct.Machine do
       env
     )
 
-    emit_request_event(:complete, %{duration_ms: duration_ms}, %{
-      request_id: machine.active_request_id,
-      run_id: machine.active_request_id,
-      termination_reason: :final_answer,
-      error_type: nil
-    })
+    emit_request_event(
+      :complete,
+      %{duration_ms: duration_ms},
+      %{
+        request_id: machine.active_request_id,
+        run_id: machine.active_request_id,
+        termination_reason: :final_answer,
+        error_type: nil
+      },
+      env
+    )
 
     with_transition(machine, "completed", fn machine ->
       thinking_opts = thinking_opts(machine)
@@ -718,6 +745,8 @@ defmodule Jido.AI.ReAct.Machine do
   # Telemetry helpers
 
   defp emit_telemetry(event, measurements, metadata, env) do
+    obs_cfg = Map.get(env, :observability, %{})
+
     telemetry_metadata =
       env
       |> Map.get(:telemetry_metadata, %{})
@@ -730,15 +759,12 @@ defmodule Jido.AI.ReAct.Machine do
       |> Enum.reject(fn {_key, value} -> is_nil(value) end)
       |> Map.new()
 
-    :telemetry.execute(@telemetry_prefix ++ [event], measurements, merged_metadata)
+    Observe.emit(obs_cfg, Observe.strategy(:react, event), measurements, merged_metadata)
   end
 
-  defp emit_request_event(event, measurements, metadata) do
-    :telemetry.execute(
-      Events.request(event),
-      ensure_required_measurements(measurements),
-      ensure_required_metadata(metadata)
-    )
+  defp emit_request_event(event, measurements, metadata, env) do
+    obs_cfg = Map.get(env, :observability, %{})
+    Observe.emit(obs_cfg, Observe.request(event), measurements, metadata)
   end
 
   defp thread_id(%{thread: %{id: id}}) when is_binary(id), do: id
@@ -748,13 +774,5 @@ defmodule Jido.AI.ReAct.Machine do
 
   defp calculate_duration(%{started_at: started_at}) do
     System.monotonic_time(:millisecond) - started_at
-  end
-
-  defp ensure_required_metadata(metadata) when is_map(metadata) do
-    Events.ensure_required_metadata(metadata)
-  end
-
-  defp ensure_required_measurements(measurements) when is_map(measurements) do
-    Events.ensure_required_measurements(measurements)
   end
 end

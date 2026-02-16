@@ -3,8 +3,8 @@ defmodule Jido.AI.Signal do
   Custom signal types for LLM-based agents.
 
   These signals are reusable across different LLM strategies (ReAct, Chain of Thought, etc.).
-  All signals follow a consistent `react.*` namespace convention to indicate ownership by the
-  ReAct machine lifecycle.
+  Signal types follow the `ai.*` namespace, with strategy-specific events nested under
+  sub-namespaces like `ai.react.*`.
 
   ## Signal Types
 

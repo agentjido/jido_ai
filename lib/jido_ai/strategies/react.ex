@@ -388,6 +388,7 @@ defmodule Jido.AI.Strategies.ReAct do
           system_prompt: config[:system_prompt],
           max_iterations: config[:max_iterations],
           request_policy: config[:request_policy],
+          observability: config[:observability] || %{},
           telemetry_metadata: %{
             agent_id: state[:agent_id] || Map.get(agent, :id),
             thread_id: thread_id_from_state(state)

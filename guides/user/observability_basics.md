@@ -6,30 +6,30 @@ After this guide, you can emit normalized events and subscribe to key paths.
 
 ## Event Namespaces
 
-`Jido.AI.Observability.Events` exposes canonical telemetry paths:
+`Jido.AI.Observe` exposes canonical telemetry paths:
 
-- `Events.llm(:start)` -> `[:jido, :ai, :llm, :start]`
-- `Events.tool(:stop)` -> `[:jido, :ai, :tool, :stop]`
-- `Events.request(:exception)` -> `[:jido, :ai, :request, :exception]`
-- `Events.strategy(:react, :step)` -> `[:jido, :ai, :strategy, :react, :step]`
+- `Observe.llm(:start)` -> `[:jido, :ai, :llm, :start]`
+- `Observe.tool(:complete)` -> `[:jido, :ai, :tool, :complete]`
+- `Observe.request(:failed)` -> `[:jido, :ai, :request, :failed]`
+- `Observe.strategy(:react, :step)` -> `[:jido, :ai, :strategy, :react, :step]`
 
 ## Emit With Normalization
 
 ```elixir
-alias Jido.AI.Observability.{Emitter, Events}
+alias Jido.AI.Observe
 
 obs_cfg = %{emit_telemetry?: true}
 
 :ok =
-  Emitter.emit(
+  Observe.emit(
     obs_cfg,
-    Events.request(:completed),
+    Observe.request(:complete),
     %{duration_ms: 18},
     %{agent_id: "weather_agent", request_id: "req-1"}
   )
 ```
 
-`Emitter` ensures required keys exist in metadata and measurements.
+`Observe` normalizes required metadata/measurement keys before emit.
 
 ## Subscribe Example
 
@@ -50,7 +50,7 @@ Symptom:
 - dashboards fail because events have inconsistent maps
 
 Fix:
-- emit via `Jido.AI.Observability.Emitter`
+- emit via `Jido.AI.Observe.emit/4`
 - keep custom keys additive; do not rely on ad-hoc required fields
 
 ## Defaults You Should Know
