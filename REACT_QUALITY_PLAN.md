@@ -17,7 +17,7 @@ This plan upgrades ReAct to a production-grade, decision-complete lifecycle with
 2. Out of scope: broad parity refactors for all non-ReAct strategies in this same pass.
 
 ## Public API and Interface Changes
-1. `Jido.AI.ReActAgent` options (additive):
+1. `Jido.AI.Agent` options (additive):
    - `request_policy: :reject`
    - `tool_timeout_ms: 15_000`
    - `tool_max_retries: 1`

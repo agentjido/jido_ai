@@ -1,6 +1,6 @@
 # Browser Agent Demo
 #
-# Demonstrates browsing the web with a ReAct agent that reads
+# Demonstrates browsing the web with a `Jido.AI.Agent` that reads
 # and summarizes web page content using jido_browser.
 #
 # Run with: mix run scripts/browser_demo.exs

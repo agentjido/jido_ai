@@ -37,11 +37,11 @@ schema = Zoi.object(%{name: Zoi.string(), age: Zoi.integer()})
   })
 ```
 
-## ReAct Agent Pattern
+## Agent Pattern (`Jido.AI.Agent`)
 
 ```elixir
 defmodule MyApp.Agent do
-  use Jido.AI.ReActAgent,
+  use Jido.AI.Agent,
     name: "my_agent",
     tools: [Jido.Tools.Arithmetic.Add],
     model: :fast,

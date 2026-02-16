@@ -1,6 +1,6 @@
 defmodule Jido.AI.Examples.Tools.TaskList do
   @moduledoc """
-  LLM tools for task list management in a ReAct agent.
+  LLM tools for task list management in a `Jido.AI.Agent`.
 
   These tools manage tasks stored in the agent's Memory `:tasks` space.
   The current task list is injected into `tool_context` by the agent's

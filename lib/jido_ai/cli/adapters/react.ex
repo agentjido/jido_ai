@@ -1,8 +1,8 @@
 defmodule Jido.AI.CLI.Adapters.ReAct do
   @moduledoc """
-  CLI adapter for ReAct-style agents.
+  CLI adapter for `Jido.AI.Agent` modules (ReAct strategy implied).
 
-  Handles the specifics of ReAct agent lifecycle:
+  Handles the specifics of the agent lifecycle:
   - Uses `ask/2` to submit queries
   - Polls `strategy_snapshot.done?` for completion
   - Extracts result from `snapshot.result`
@@ -63,9 +63,9 @@ defmodule Jido.AI.CLI.Adapters.ReAct do
     contents =
       if system_prompt do
         quote do
-          use Jido.AI.ReActAgent,
+          use Jido.AI.Agent,
             name: "cli_react_agent",
-            description: "CLI ephemeral ReAct agent",
+            description: "CLI ephemeral agent",
             tools: unquote(tools),
             model: unquote(model),
             max_iterations: unquote(max_iterations),
@@ -73,9 +73,9 @@ defmodule Jido.AI.CLI.Adapters.ReAct do
         end
       else
         quote do
-          use Jido.AI.ReActAgent,
+          use Jido.AI.Agent,
             name: "cli_react_agent",
-            description: "CLI ephemeral ReAct agent",
+            description: "CLI ephemeral agent",
             tools: unquote(tools),
             model: unquote(model),
             max_iterations: unquote(max_iterations)

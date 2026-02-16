@@ -17,7 +17,7 @@ config :jido_ai,
 
 ## Strategy/Macro Defaults
 
-- ReAct (`Jido.AI.ReActAgent`)
+- ReAct (`Jido.AI.Agent`)
   - `model`: `anthropic:claude-haiku-4-5`
   - `max_iterations`: `10`
   - `request_policy`: `:reject`
