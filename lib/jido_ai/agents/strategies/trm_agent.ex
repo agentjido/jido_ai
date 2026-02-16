@@ -1,3 +1,5 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
+
 defmodule Jido.AI.TRMAgent do
   @moduledoc """
   Base macro for TRM (Tiny-Recursive-Model) agents.

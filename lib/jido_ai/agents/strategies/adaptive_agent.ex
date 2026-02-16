@@ -1,3 +1,5 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
+
 defmodule Jido.AI.AdaptiveAgent do
   @moduledoc """
   Base macro for Adaptive strategy-powered agents.

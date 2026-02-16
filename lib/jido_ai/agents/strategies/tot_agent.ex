@@ -1,3 +1,5 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
+
 defmodule Jido.AI.ToTAgent do
   @moduledoc """
   Base macro for Tree-of-Thoughts-powered agents.

@@ -1,3 +1,5 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
+
 defmodule Jido.AI.CoTAgent do
   @moduledoc """
   Base macro for Chain-of-Thought-powered agents.

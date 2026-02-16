@@ -1,4 +1,6 @@
 [
+  # Reviewed metadata for each pattern lives in `.dialyzer_ignore_metadata.exs`.
+
   # Upstream Jido typing warnings (dependency code outside this repo).
   ~r/deps\/jido\/lib\/jido\/agent\.ex.*pattern_match/,
 
