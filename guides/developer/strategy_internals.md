@@ -6,12 +6,12 @@ After this guide, you can safely modify strategy adapters and preserve signal/di
 
 ## Strategy Modules
 
-- `Jido.AI.Strategies.ReAct`
-- `Jido.AI.Strategies.ChainOfThought`
-- `Jido.AI.Strategies.TreeOfThoughts`
-- `Jido.AI.Strategies.GraphOfThoughts`
-- `Jido.AI.Strategies.TRM`
-- `Jido.AI.Strategies.Adaptive`
+- `Jido.AI.Reasoning.ReAct.Strategy`
+- `Jido.AI.Reasoning.ChainOfThought.Strategy`
+- `Jido.AI.Reasoning.TreeOfThoughts.Strategy`
+- `Jido.AI.Reasoning.GraphOfThoughts.Strategy`
+- `Jido.AI.Reasoning.TRM.Strategy`
+- `Jido.AI.Reasoning.Adaptive.Strategy`
 
 Each strategy acts as a thin adapter around a state machine and implements:
 - `action_spec/1`

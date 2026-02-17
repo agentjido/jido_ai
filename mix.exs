@@ -31,7 +31,8 @@ defmodule JidoAi.MixProject do
 
       # Dialyzer
       dialyzer: [
-        plt_add_apps: [:mix]
+        plt_add_apps: [:mix],
+        ignore_warnings: ".dialyzer_ignore.exs"
       ]
     ]
   end

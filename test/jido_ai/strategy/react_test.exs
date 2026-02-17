@@ -1,10 +1,10 @@
-defmodule Jido.AI.Strategies.ReActTest do
+defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
-  alias Jido.AI.Strategies.ReAct
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
 
   defmodule TestCalculator do
     use Jido.Action,
@@ -57,7 +57,7 @@ defmodule Jido.AI.Strategies.ReActTest do
   end
 
   describe "signal_routes/1" do
-    test "routes delegated worker signals and removes machine-era internals" do
+    test "routes delegated worker signals and compatibility observability signals" do
       routes = ReAct.signal_routes(%{})
       route_map = Map.new(routes)
 
@@ -66,9 +66,9 @@ defmodule Jido.AI.Strategies.ReActTest do
       assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
 
-      refute Map.has_key?(route_map, "ai.llm.response")
-      refute Map.has_key?(route_map, "ai.tool.result")
-      refute Map.has_key?(route_map, "ai.llm.delta")
+      assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
+      assert route_map["ai.tool.result"] == Jido.Actions.Control.Noop
+      assert route_map["ai.llm.delta"] == Jido.Actions.Control.Noop
     end
   end
 
@@ -81,7 +81,7 @@ defmodule Jido.AI.Strategies.ReActTest do
 
       assert [%AgentDirective.SpawnAgent{} = spawn] = directives
       assert spawn.tag == :react_worker
-      assert spawn.agent == Jido.AI.Agents.Internal.ReActWorkerAgent
+      assert spawn.agent == Jido.AI.Reasoning.ReAct.Worker.Agent
 
       state = StratState.get(agent, %{})
       assert state.status == :awaiting_llm
@@ -102,7 +102,7 @@ defmodule Jido.AI.Strategies.ReActTest do
         instruction(:ai_react_worker_child_started, %{
           parent_id: "parent",
           child_id: "child",
-          child_module: Jido.AI.Agents.Internal.ReActWorkerAgent,
+          child_module: Jido.AI.Reasoning.ReAct.Worker.Agent,
           tag: :react_worker,
           pid: self(),
           meta: %{}

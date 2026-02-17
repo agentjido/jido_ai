@@ -13,7 +13,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
   alias Jido.Agent
   alias Jido.AI.Signal
   alias Jido.AI.Plugins.{LLM, Planning, Reasoning, Streaming, ToolCalling}
-  alias Jido.AI.Strategies.ReAct
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
 
   # Ensure all skill actions are compiled before tests run
   require Jido.AI.Actions.LLM.Chat
@@ -247,8 +247,8 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert Map.has_key?(route_map, "ai.react.worker.event")
       assert Map.has_key?(route_map, "jido.agent.child.started")
       assert Map.has_key?(route_map, "jido.agent.child.exit")
-      refute Map.has_key?(route_map, "ai.llm.response")
-      refute Map.has_key?(route_map, "ai.tool.result")
+      assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
+      assert route_map["ai.tool.result"] == Jido.Actions.Control.Noop
     end
   end
 

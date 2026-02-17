@@ -4,7 +4,7 @@ defmodule Jido.AI.GoTAgent do
   @moduledoc """
   Base macro for Graph-of-Thoughts-powered agents.
 
-  Wraps `use Jido.Agent` with `Jido.AI.Strategies.GraphOfThoughts` wired in,
+  Wraps `use Jido.Agent` with `Jido.AI.Reasoning.GraphOfThoughts.Strategy` wired in,
   plus standard state fields and helper functions.
 
   ## Usage
@@ -141,7 +141,7 @@ defmodule Jido.AI.GoTAgent do
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Strategies.GraphOfThoughts, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.GraphOfThoughts.Strategy, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
       unquote(Jido.AI.Agent.compatibility_overrides_ast())

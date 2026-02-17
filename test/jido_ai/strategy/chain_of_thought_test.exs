@@ -1,11 +1,11 @@
-defmodule Jido.AI.Strategies.ChainOfThoughtTest do
+defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.ChainOfThought.Machine
+  alias Jido.AI.Reasoning.ChainOfThought.Machine
   alias Jido.AI.Directive
-  alias Jido.AI.Strategies.ChainOfThought
+  alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
 
   defp create_agent(opts \\ []) do
     %Jido.Agent{
@@ -92,8 +92,11 @@ defmodule Jido.AI.Strategies.ChainOfThoughtTest do
       assert route_map["ai.cot.worker.event"] == {:strategy_cmd, :cot_worker_event}
       assert route_map["jido.agent.child.started"] == {:strategy_cmd, :cot_worker_child_started}
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :cot_worker_child_exit}
-      refute Map.has_key?(route_map, "ai.llm.response")
-      refute Map.has_key?(route_map, "ai.llm.delta")
+      assert route_map["ai.request.started"] == Jido.Actions.Control.Noop
+      assert route_map["ai.request.completed"] == Jido.Actions.Control.Noop
+      assert route_map["ai.request.failed"] == Jido.Actions.Control.Noop
+      assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
+      assert route_map["ai.llm.delta"] == Jido.Actions.Control.Noop
     end
   end
 
@@ -106,7 +109,7 @@ defmodule Jido.AI.Strategies.ChainOfThoughtTest do
 
       assert [%AgentDirective.SpawnAgent{} = spawn] = directives
       assert spawn.tag == :cot_worker
-      assert spawn.agent == Jido.AI.Agents.Internal.CoTWorkerAgent
+      assert spawn.agent == Jido.AI.Reasoning.ChainOfThought.Worker.Agent
 
       state = StratState.get(agent, %{})
       assert state[:status] == :reasoning
@@ -123,7 +126,7 @@ defmodule Jido.AI.Strategies.ChainOfThoughtTest do
         instruction(:cot_worker_child_started, %{
           parent_id: "parent",
           child_id: "child",
-          child_module: Jido.AI.Agents.Internal.CoTWorkerAgent,
+          child_module: Jido.AI.Reasoning.ChainOfThought.Worker.Agent,
           tag: :cot_worker,
           pid: self(),
           meta: %{}

@@ -1,8 +1,8 @@
-defmodule Jido.AI.Strategies.TreeOfThoughtsTest do
+defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategies.TreeOfThoughts
+  alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
 
   # Helper to create a mock agent
   defp create_agent(opts \\ []) do

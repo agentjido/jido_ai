@@ -7,7 +7,7 @@ After this guide, you can trace one request end-to-end and debug failures at the
 ## Runtime Flow
 
 1. Agent receives query signal (for example `ai.react.query`).
-2. Strategy (`Jido.AI.Strategies.*`) translates instruction into machine message.
+2. Strategy (`Jido.AI.Reasoning.*.Strategy`) translates instruction into machine message.
 3. Machine emits directives (`Jido.AI.Directive.*`).
 4. Runtime executes directives (LLM, tools, embedding, emits lifecycle signals).
 5. Signals (`Jido.AI.Signal.*`) route back into strategy commands.

@@ -1,7 +1,7 @@
-defmodule Jido.AI.TRM.MachineTest do
+defmodule Jido.AI.Reasoning.TRM.MachineTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.TRM.Machine
+  alias Jido.AI.Reasoning.TRM.Machine
 
   describe "new/0" do
     test "creates machine in idle state with default config" do

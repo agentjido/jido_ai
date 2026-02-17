@@ -1,14 +1,14 @@
-defmodule Jido.AI.Strategies.AdaptiveTest do
+defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategies.Adaptive
-  alias Jido.AI.Strategies.ChainOfThought
-  alias Jido.AI.Strategies.GraphOfThoughts
-  alias Jido.AI.Strategies.ReAct
-  alias Jido.AI.Strategies.TreeOfThoughts
-  alias Jido.AI.Strategies.TRM
+  alias Jido.AI.Reasoning.Adaptive.Strategy, as: Adaptive
+  alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
+  alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
+  alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
+  alias Jido.AI.Reasoning.TRM.Strategy, as: TRM
 
   @moduletag :unit
 
@@ -347,7 +347,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
         params: %{
           parent_id: "parent",
           child_id: "child",
-          child_module: Jido.AI.Agents.Internal.CoTWorkerAgent,
+          child_module: Jido.AI.Reasoning.ChainOfThought.Worker.Agent,
           tag: :cot_worker,
           pid: self(),
           meta: %{}

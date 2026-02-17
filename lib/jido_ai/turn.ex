@@ -557,6 +557,8 @@ defmodule Jido.AI.Turn do
         tool_name: tool_name,
         params: Observe.sanitize_sensitive(params),
         call_id: context[:call_id],
+        request_id: context[:request_id] || context[:run_id],
+        run_id: context[:run_id],
         agent_id: context[:agent_id],
         iteration: context[:iteration]
       }
@@ -580,6 +582,8 @@ defmodule Jido.AI.Turn do
         tool_name: tool_name,
         result: result,
         call_id: context[:call_id],
+        request_id: context[:request_id] || context[:run_id],
+        run_id: context[:run_id],
         agent_id: context[:agent_id],
         thread_id: context[:thread_id],
         iteration: context[:iteration]
@@ -604,6 +608,8 @@ defmodule Jido.AI.Turn do
         tool_name: tool_name,
         reason: reason,
         call_id: context[:call_id],
+        request_id: context[:request_id] || context[:run_id],
+        run_id: context[:run_id],
         agent_id: context[:agent_id],
         thread_id: context[:thread_id],
         iteration: context[:iteration]

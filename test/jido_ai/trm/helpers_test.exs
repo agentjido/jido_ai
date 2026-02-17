@@ -1,7 +1,7 @@
-defmodule Jido.AI.TRM.HelpersTest do
+defmodule Jido.AI.Reasoning.TRM.HelpersTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.TRM.Helpers
+  alias Jido.AI.Reasoning.TRM.Helpers
 
   describe "clamp/3" do
     test "returns value when within range" do

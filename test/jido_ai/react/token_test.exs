@@ -1,7 +1,8 @@
-defmodule Jido.AI.ReAct.TokenTest do
+defmodule Jido.AI.Reasoning.ReAct.TokenTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.ReAct.{Config, State, Token}
+  alias Jido.AI.Reasoning.ReAct.{Config, State, Token}
+  @legacy_insecure_secret "jido_ai_react_default_secret_change_me"
 
   test "issues and decodes checkpoint tokens" do
     config =
@@ -51,5 +52,20 @@ defmodule Jido.AI.ReAct.TokenTest do
     Process.sleep(10)
 
     assert {:error, :token_expired} = Token.decode(token, config)
+  end
+
+  test "rejects insecure legacy default token secret" do
+    assert_raise ArgumentError, ~r/insecure ReAct token secret rejected/, fn ->
+      Config.new(%{model: :capable, tools: %{}, token_secret: @legacy_insecure_secret})
+    end
+  end
+
+  test "uses stable ephemeral token secret when explicit secret is blank" do
+    config_a = Config.new(%{model: :capable, tools: %{}, token_secret: ""})
+    config_b = Config.new(%{model: :capable, tools: %{}, token_secret: ""})
+
+    assert is_binary(config_a.token.secret)
+    assert config_a.token.secret == config_b.token.secret
+    refute config_a.token.secret == @legacy_insecure_secret
   end
 end

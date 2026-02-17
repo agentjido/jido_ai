@@ -1,9 +1,9 @@
-defmodule Jido.AI.ReAct.RuntimeRunnerTest do
+defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.ReAct
-  alias Jido.AI.ReAct.Config
+  alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.Reasoning.ReAct.Config
 
   defmodule RetryTool do
     use Jido.Action,

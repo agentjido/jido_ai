@@ -1,4 +1,4 @@
-defmodule Jido.AI.ReActAgentTest do
+defmodule Jido.AI.AgentRuntimeAdapterTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
@@ -13,13 +13,13 @@ defmodule Jido.AI.ReActAgentTest do
   end
 
   defmodule RuntimeDefaultAgent do
-    use Jido.AI.ReActAgent,
+    use Jido.AI.Agent,
       name: "runtime_default_agent",
       tools: [EchoTool]
   end
 
   defmodule RuntimeOptOutAgent do
-    use Jido.AI.ReActAgent,
+    use Jido.AI.Agent,
       name: "runtime_opt_out_agent",
       tools: [EchoTool],
       runtime_adapter: false
