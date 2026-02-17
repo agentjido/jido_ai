@@ -16,6 +16,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
+  alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.Strategies.Adaptive
@@ -191,7 +192,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert state[:config][:tools] == [TestCalculator]
     end
 
-    test "ReAct strategy processes start with tools available" do
+    test "ReAct strategy processes start by delegating to worker" do
       defmodule TestSearch do
         use Jido.Action,
           name: "search",
@@ -218,9 +219,9 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.LLMStream{} = directive
-      # Verify tools are included in directive
-      refute Enum.empty?(directive.tools)
+      assert %AgentDirective.SpawnAgent{} = directive
+      assert directive.tag == :react_worker
+      assert directive.agent == Jido.AI.Agents.Internal.ReActWorkerAgent
     end
   end
 
@@ -259,15 +260,18 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert route_map["ai.llm.delta"] == {:strategy_cmd, :got_llm_partial}
     end
 
-    test "ReAct signal_routes includes tool result routing" do
+    test "ReAct signal_routes includes worker delegation routes" do
       {_agent, ctx} = create_agent(ReAct, tools: [])
       routes = ReAct.signal_routes(ctx)
 
       route_map = Map.new(routes)
       assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
-      assert route_map["ai.llm.response"] == {:strategy_cmd, :ai_react_llm_result}
-      assert route_map["ai.tool.result"] == {:strategy_cmd, :ai_react_tool_result}
-      assert route_map["ai.llm.delta"] == {:strategy_cmd, :ai_react_llm_partial}
+      assert route_map["ai.react.worker.event"] == {:strategy_cmd, :ai_react_worker_event}
+      assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
+      assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
+      refute Map.has_key?(route_map, "ai.llm.response")
+      refute Map.has_key?(route_map, "ai.tool.result")
+      refute Map.has_key?(route_map, "ai.llm.delta")
     end
 
     test "Adaptive signal_routes returns base routes before strategy selection" do
@@ -302,7 +306,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert directive.model == "anthropic:claude-sonnet-4-20250514"
     end
 
-    test "LLMStream directive has correct structure for ReAct with tools" do
+    test "ReAct start emits SpawnAgent directive in delegated mode" do
       defmodule DirectiveTestTool do
         use Jido.Action,
           name: "test_tool",
@@ -322,16 +326,11 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {_agent, [directive]} = ReAct.cmd(agent, [instruction], %{})
 
-      assert %Directive.LLMStream{} = directive
-      assert directive.tools != nil
-      assert length(directive.tools) == 1
-      # Tools are included in the directive
-      [tool] = directive.tools
-      # Tool is a ReqLLM.Tool struct
-      assert is_struct(tool)
+      assert %AgentDirective.SpawnAgent{} = directive
+      assert directive.tag == :react_worker
     end
 
-    test "ToolExec directive is emitted by ReAct when LLM requests tool call" do
+    test "ReAct flushes deferred worker start on child.started signal" do
       defmodule ToolExecTestTool do
         use Jido.Action,
           name: "exec_test",
@@ -344,47 +343,32 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {agent, _ctx} = create_agent(ReAct, tools: [ToolExecTestTool])
 
-      # Start ReAct
       start_instruction = %Instruction{
         action: ReAct.start_action(),
         params: %{query: "Execute the test"}
       }
 
-      {agent, [%Directive.LLMStream{id: call_id}]} =
-        ReAct.cmd(agent, [start_instruction], %{})
+      {agent, [%AgentDirective.SpawnAgent{}]} = ReAct.cmd(agent, [start_instruction], %{})
 
-      # Simulate LLM response with tool call using correct format
-      tool_call_result = %{
-        call_id: call_id,
-        result:
-          {:ok,
-           %{
-             type: :tool_calls,
-             tool_calls: [
-               %{
-                 id: "call_123",
-                 name: "exec_test",
-                 arguments: %{"value" => "test_value"}
-               }
-             ],
-             usage: %{input_tokens: 10, output_tokens: 20}
-           }}
+      child_started = %Instruction{
+        action: :ai_react_worker_child_started,
+        params: %{
+          parent_id: "parent",
+          child_id: "child",
+          child_module: Jido.AI.Agents.Internal.ReActWorkerAgent,
+          tag: :react_worker,
+          pid: self(),
+          meta: %{}
+        }
       }
 
-      llm_result_instruction = %Instruction{
-        action: ReAct.llm_result_action(),
-        params: tool_call_result
-      }
+      {_agent, directives} = ReAct.cmd(agent, [child_started], %{})
 
-      {_agent, directives} = ReAct.cmd(agent, [llm_result_instruction], %{})
-
-      # Should emit ToolExec directive
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ToolExec{} = directive
-      assert directive.id == "call_123"
-      assert directive.tool_name == "exec_test"
-      assert directive.arguments == %{"value" => "test_value"}
+      assert %AgentDirective.Emit{} = directive
+      assert directive.signal.type == "ai.react.worker.start"
+      assert directive.dispatch == {:pid, [target: self()]}
     end
   end
 

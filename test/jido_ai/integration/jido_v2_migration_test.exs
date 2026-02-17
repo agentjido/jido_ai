@@ -244,8 +244,11 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       route_map = Map.new(routes)
 
       assert Map.has_key?(route_map, "ai.react.query")
-      assert Map.has_key?(route_map, "ai.llm.response")
-      assert Map.has_key?(route_map, "ai.tool.result")
+      assert Map.has_key?(route_map, "ai.react.worker.event")
+      assert Map.has_key?(route_map, "jido.agent.child.started")
+      assert Map.has_key?(route_map, "jido.agent.child.exit")
+      refute Map.has_key?(route_map, "ai.llm.response")
+      refute Map.has_key?(route_map, "ai.tool.result")
     end
   end
 

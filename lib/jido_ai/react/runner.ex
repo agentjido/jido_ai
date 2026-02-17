@@ -54,7 +54,7 @@ defmodule Jido.AI.ReAct.Runner do
         monitor_ref = Process.monitor(pid)
 
         Stream.resource(
-          fn -> %{done?: false, down?: false, pid: pid, monitor_ref: monitor_ref, ref: ref} end,
+          fn -> %{done?: false, down?: false, cancel_sent?: false, pid: pid, monitor_ref: monitor_ref, ref: ref} end,
           &next_event(owner, &1),
           &cleanup(owner, &1)
         )
@@ -186,7 +186,9 @@ defmodule Jido.AI.ReAct.Runner do
           call_id: call_id,
           model: config.model,
           message_count: Thread.length(state.thread) + if(state.thread.system_prompt, do: 1, else: 0)
-        }, llm_call_id: call_id)
+        },
+        llm_call_id: call_id
+      )
 
     messages = Thread.to_messages(state.thread)
     llm_opts = Config.llm_opts(config)
@@ -210,7 +212,9 @@ defmodule Jido.AI.ReAct.Runner do
                   thinking_content: turn.thinking_content,
                   tool_calls: turn.tool_calls,
                   usage: turn.usage
-                }, llm_call_id: call_id)
+                },
+                llm_call_id: call_id
+              )
 
             state =
               Thread.append_assistant(
@@ -480,6 +484,9 @@ defmodule Jido.AI.ReAct.Runner do
 
   defp next_event(_owner, %{done?: false, down?: true, ref: ref} = state) do
     receive do
+      {:react_stream_cancel, _reason} ->
+        next_event(nil, state)
+
       {:react_runner, ^ref, :event, event} ->
         {[event], state}
 
@@ -493,6 +500,9 @@ defmodule Jido.AI.ReAct.Runner do
 
   defp next_event(_owner, %{ref: ref} = state) do
     receive do
+      {:react_stream_cancel, reason} ->
+        next_event(nil, request_stream_cancel(state, reason))
+
       {:react_runner, ^ref, :event, event} ->
         {[event], state}
 
@@ -583,6 +593,15 @@ defmodule Jido.AI.ReAct.Runner do
   end
 
   defp fetch_extra(_, _, default), do: default
+
+  defp request_stream_cancel(%{cancel_sent?: true} = state, _reason), do: state
+
+  defp request_stream_cancel(%{pid: pid, ref: ref} = state, reason) when is_pid(pid) do
+    if Process.alive?(pid), do: send(pid, {:react_cancel, ref, reason})
+    Map.put(state, :cancel_sent?, true)
+  end
+
+  defp request_stream_cancel(state, _reason), do: state
 
   defp now_ms, do: System.system_time(:millisecond)
 end

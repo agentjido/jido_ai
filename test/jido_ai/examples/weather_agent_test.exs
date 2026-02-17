@@ -12,6 +12,14 @@ defmodule Jido.AI.Examples.WeatherAgentTest do
       start_supervised!({Registry, keys: :unique, name: Jido.Registry})
     end
 
+    if is_nil(Process.whereis(Jido.AgentSupervisor)) do
+      start_supervised!({DynamicSupervisor, strategy: :one_for_one, name: Jido.AgentSupervisor})
+    end
+
+    if is_nil(Process.whereis(Jido.TaskSupervisor)) do
+      start_supervised!({Task.Supervisor, name: Jido.TaskSupervisor})
+    end
+
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       {:ok,
        %{
