@@ -87,7 +87,10 @@ defmodule Jido.AI.Strategies.ReAct do
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
+  alias Jido.AI.ReAct, as: ReActRuntime
+  alias Jido.AI.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.ReAct.Machine
+  alias Jido.AI.Signal
   alias Jido.AI.Strategy.StateOpsHelpers
   alias Jido.AI.ToolAdapter
   alias ReqLLM.Context
@@ -105,6 +108,7 @@ defmodule Jido.AI.Strategies.ReAct do
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
           observability: map(),
+          runtime_adapter: boolean(),
           agent_id: String.t() | nil
         }
 
@@ -126,6 +130,7 @@ defmodule Jido.AI.Strategies.ReAct do
   @register_tool :ai_react_register_tool
   @unregister_tool :ai_react_unregister_tool
   @set_tool_context :ai_react_set_tool_context
+  @runtime_event :ai_react_runtime_event
 
   @doc "Returns the action atom for starting a ReAct conversation."
   @spec start_action() :: :ai_react_start
@@ -162,6 +167,10 @@ defmodule Jido.AI.Strategies.ReAct do
   @doc "Returns the action atom for updating tool context."
   @spec set_tool_context_action() :: :ai_react_set_tool_context
   def set_tool_context_action, do: @set_tool_context
+
+  @doc "Returns the action atom for runtime stream events."
+  @spec runtime_event_action() :: :ai_react_runtime_event
+  def runtime_event_action, do: @runtime_event
 
   @action_specs %{
     @start => %{
@@ -227,6 +236,11 @@ defmodule Jido.AI.Strategies.ReAct do
       schema: Zoi.object(%{tool_context: Zoi.map()}),
       doc: "Update the tool context for subsequent tool executions",
       name: "ai.react.set_tool_context"
+    },
+    @runtime_event => %{
+      schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
+      doc: "Handle Task-based ReAct runtime event envelopes",
+      name: "ai.react.runtime_event"
     }
   }
 
@@ -245,6 +259,7 @@ defmodule Jido.AI.Strategies.ReAct do
       {"ai.react.register_tool", {:strategy_cmd, @register_tool}},
       {"ai.react.unregister_tool", {:strategy_cmd, @unregister_tool}},
       {"ai.react.set_tool_context", {:strategy_cmd, @set_tool_context}},
+      {"ai.react.event", {:strategy_cmd, @runtime_event}},
       {"ai.request.started", Jido.Actions.Control.Noop},
       {"ai.request.completed", Jido.Actions.Control.Noop},
       {"ai.request.failed", Jido.Actions.Control.Noop},
@@ -290,6 +305,7 @@ defmodule Jido.AI.Strategies.ReAct do
       model: config[:model],
       max_iterations: config[:max_iterations],
       request_policy: config[:request_policy],
+      runtime_adapter: config[:runtime_adapter],
       tool_timeout_ms: config[:tool_timeout_ms],
       tool_max_retries: config[:tool_max_retries],
       tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
@@ -364,13 +380,20 @@ defmodule Jido.AI.Strategies.ReAct do
       @request_error ->
         process_request_error(agent, params)
 
+      @runtime_event ->
+        process_runtime_event(agent, params)
+
       @start ->
         # Store per-request tool_context in run_tool_context (ephemeral, cleared on completion)
         # This does NOT mutate base_tool_context - prevents cross-request leakage
         run_context = Map.get(params, :tool_context) || %{}
         agent = set_run_tool_context(agent, run_context)
 
-        process_machine_message(agent, normalized_action, params)
+        if runtime_adapter_enabled?(agent) do
+          process_runtime_start(agent, params)
+        else
+          process_machine_message(agent, normalized_action, params)
+        end
 
       _ ->
         process_machine_message(agent, normalized_action, params)
@@ -479,6 +502,356 @@ defmodule Jido.AI.Strategies.ReAct do
     new_state = Map.put(state, :last_request_error, %{request_id: request_id, reason: reason, message: message})
     agent = StratState.put(agent, new_state)
     {agent, []}
+  end
+
+  defp process_runtime_start(agent, %{query: query} = params) when is_binary(query) do
+    state = StratState.get(agent, %{})
+    config = state[:config] || %{}
+
+    if state[:status] in [:awaiting_llm, :awaiting_tool] do
+      request_id = Map.get(params, :request_id, generate_call_id())
+
+      directive =
+        Directive.EmitRequestError.new!(%{
+          request_id: request_id,
+          reason: :busy,
+          message: "Agent is busy (status: #{state[:status]})"
+        })
+
+      {agent, [directive]}
+    else
+      request_id = Map.get(params, :request_id, generate_call_id())
+      run_id = request_id
+
+      runtime_config = runtime_config_from_strategy(config)
+
+      run_tool_context = Map.get(state, :run_tool_context, %{})
+      effective_tool_context = Map.merge(config[:base_tool_context] || %{}, run_tool_context)
+
+      stream_opts =
+        []
+        |> Keyword.put(:request_id, request_id)
+        |> Keyword.put(:run_id, run_id)
+        |> Keyword.put(
+          :context,
+          Map.merge(effective_tool_context, %{
+            request_id: request_id,
+            run_id: run_id,
+            agent_id: state[:agent_id] || Map.get(agent, :id),
+            observability: config[:observability] || %{}
+          })
+        )
+
+      stream_opts =
+        case config[:runtime_task_supervisor] do
+          supervisor when is_pid(supervisor) or is_atom(supervisor) ->
+            Keyword.put(stream_opts, :task_supervisor, supervisor)
+
+          _ ->
+            stream_opts
+        end
+
+      agent_pid = self()
+
+      spawn_result =
+        Task.start(fn ->
+          ReActRuntime.stream(query, runtime_config, stream_opts)
+          |> Enum.each(fn event ->
+            signal =
+              Signal.ReactEvent.new!(%{
+                request_id: request_id,
+                event: Map.from_struct(event)
+              })
+
+            Jido.AgentServer.cast(agent_pid, signal)
+          end)
+        end)
+
+      case spawn_result do
+        {:ok, pid} ->
+          new_state =
+            state
+            |> Map.put(:status, :awaiting_llm)
+            |> Map.put(:active_request_id, request_id)
+            |> Map.put(:current_llm_call_id, nil)
+            |> Map.put(:runtime_task, pid)
+            |> Map.put(:iteration, 1)
+            |> Map.put(:result, nil)
+            |> Map.put(:termination_reason, nil)
+            |> Map.put(:started_at, System.monotonic_time(:millisecond))
+
+          agent = StratState.put(agent, new_state)
+          {agent, []}
+
+        {:error, reason} ->
+          directive =
+            Directive.EmitRequestError.new!(%{
+              request_id: request_id,
+              reason: :runtime_start_failed,
+              message: "Failed to start ReAct runtime: #{inspect(reason)}"
+            })
+
+          {agent, [directive]}
+      end
+    end
+  end
+
+  defp process_runtime_start(agent, _params), do: {agent, []}
+
+  defp process_runtime_event(agent, %{event: event}) when is_map(event) do
+    state = StratState.get(agent, %{})
+    {new_state, signals} = apply_runtime_event(state, event)
+    Enum.each(signals, &Jido.AgentServer.cast(self(), &1))
+
+    agent = StratState.put(agent, new_state)
+    {agent, []}
+  end
+
+  defp process_runtime_event(agent, _params), do: {agent, []}
+
+  defp apply_runtime_event(state, event) do
+    kind = event_kind(event)
+    iteration = event_field(event, :iteration, state[:iteration] || 0)
+    request_id = event_field(event, :request_id, state[:active_request_id])
+    llm_call_id = event_field(event, :llm_call_id, state[:current_llm_call_id])
+    data = event_field(event, :data, %{})
+
+    base_state =
+      state
+      |> Map.put(:active_request_id, request_id)
+      |> Map.put(:iteration, iteration)
+      |> Map.put(:current_llm_call_id, llm_call_id)
+
+    case kind do
+      :request_started ->
+        query = event_field(data, :query, "")
+
+        started_state =
+          base_state
+          |> Map.put(:status, :awaiting_llm)
+          |> Map.put(:result, nil)
+          |> Map.put(:termination_reason, nil)
+          |> Map.put(:started_at, event_field(event, :at_ms, System.monotonic_time(:millisecond)))
+          |> Map.put(:streaming_text, "")
+          |> Map.put(:streaming_thinking, "")
+
+        signal = Signal.RequestStarted.new!(%{request_id: request_id, query: query, run_id: request_id})
+        {started_state, [signal]}
+
+      :llm_started ->
+        {Map.put(base_state, :status, :awaiting_llm), []}
+
+      :llm_delta ->
+        chunk_type = event_field(data, :chunk_type, :content)
+        delta = event_field(data, :delta, "")
+
+        updated =
+          case chunk_type do
+            :thinking ->
+              Map.update(base_state, :streaming_thinking, delta, &(&1 <> delta))
+
+            _ ->
+              Map.update(base_state, :streaming_text, delta, &(&1 <> delta))
+          end
+
+        signal = Signal.LLMDelta.new!(%{call_id: llm_call_id || "", delta: delta, chunk_type: chunk_type})
+        {updated, [signal]}
+
+      :llm_completed ->
+        turn_type = event_field(data, :turn_type, :final_answer)
+        text = event_field(data, :text, "")
+        thinking_content = event_field(data, :thinking_content)
+        tool_calls = event_field(data, :tool_calls, [])
+        usage = event_field(data, :usage, %{})
+
+        pending_tool_calls =
+          Enum.map(tool_calls, fn tc ->
+            %{id: tc.id, name: tc.name, arguments: tc.arguments, result: nil}
+          end)
+
+        updated =
+          base_state
+          |> Map.put(:status, if(turn_type == :tool_calls, do: :awaiting_tool, else: :completed))
+          |> Map.put(:pending_tool_calls, pending_tool_calls)
+          |> Map.update(:usage, usage || %{}, fn existing -> merge_usage(existing, usage || %{}) end)
+          |> maybe_append_thinking_trace(thinking_content)
+          |> maybe_put_result(turn_type, text)
+
+        llm_signal =
+          Signal.LLMResponse.new!(%{
+            call_id: llm_call_id || event_field(data, :call_id, ""),
+            result:
+              {:ok,
+               %{
+                 type: turn_type,
+                 text: text,
+                 thinking_content: thinking_content,
+                 tool_calls: tool_calls,
+                 usage: usage
+               }}
+          })
+
+        usage_signal = maybe_usage_signal(llm_call_id || event_field(data, :call_id, ""), config_model(state), usage)
+        {updated, Enum.reject([llm_signal, usage_signal], &is_nil/1)}
+
+      :tool_started ->
+        {Map.put(base_state, :status, :awaiting_tool), []}
+
+      :tool_completed ->
+        tool_call_id = event_field(data, :tool_call_id, event_field(event, :tool_call_id, ""))
+        tool_name = event_field(data, :tool_name, event_field(event, :tool_name, ""))
+        tool_result = event_field(data, :result, {:error, :unknown})
+
+        updated =
+          Map.update(base_state, :pending_tool_calls, [], fn pending ->
+            Enum.map(pending, fn tc -> if tc.id == tool_call_id, do: %{tc | result: tool_result}, else: tc end)
+          end)
+
+        signal = Signal.ToolResult.new!(%{call_id: tool_call_id, tool_name: tool_name, result: tool_result})
+        {updated, [signal]}
+
+      :request_completed ->
+        result = event_field(data, :result)
+        termination_reason = event_field(data, :termination_reason, :final_answer)
+        usage = event_field(data, :usage, %{})
+
+        updated =
+          base_state
+          |> Map.put(:status, :completed)
+          |> Map.put(:result, result)
+          |> Map.put(:termination_reason, termination_reason)
+          |> Map.put(:usage, usage || %{})
+          |> Map.delete(:runtime_task)
+          |> Map.delete(:run_tool_context)
+
+        signal = Signal.RequestCompleted.new!(%{request_id: request_id, result: result, run_id: request_id})
+        {updated, [signal]}
+
+      :request_failed ->
+        error = event_field(data, :error, :unknown_error)
+
+        updated =
+          base_state
+          |> Map.put(:status, :error)
+          |> Map.put(:result, inspect(error))
+          |> Map.put(:termination_reason, :error)
+          |> Map.delete(:runtime_task)
+          |> Map.delete(:run_tool_context)
+
+        signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
+        {updated, [signal]}
+
+      :request_cancelled ->
+        reason = event_field(data, :reason, :cancelled)
+        error = {:cancelled, reason}
+
+        updated =
+          base_state
+          |> Map.put(:status, :error)
+          |> Map.put(:result, inspect(error))
+          |> Map.put(:termination_reason, :cancelled)
+          |> Map.delete(:runtime_task)
+          |> Map.delete(:run_tool_context)
+
+        signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
+        {updated, [signal]}
+
+      :checkpoint ->
+        token = event_field(data, :token)
+        {Map.put(base_state, :checkpoint_token, token), []}
+
+      _ ->
+        {base_state, []}
+    end
+  end
+
+  defp maybe_append_thinking_trace(state, nil), do: state
+  defp maybe_append_thinking_trace(state, ""), do: state
+
+  defp maybe_append_thinking_trace(state, thinking_content) do
+    trace_entry = %{
+      call_id: state[:current_llm_call_id],
+      iteration: state[:iteration],
+      thinking: thinking_content
+    }
+
+    Map.update(state, :thinking_trace, [trace_entry], fn trace -> trace ++ [trace_entry] end)
+  end
+
+  defp maybe_put_result(state, :final_answer, result), do: Map.put(state, :result, result)
+  defp maybe_put_result(state, _turn_type, _result), do: state
+
+  defp maybe_usage_signal(_call_id, _model, usage) when usage in [%{}, nil], do: nil
+
+  defp maybe_usage_signal(call_id, model, usage) do
+    input_tokens = Map.get(usage, :input_tokens, 0)
+    output_tokens = Map.get(usage, :output_tokens, 0)
+
+    Signal.Usage.new!(%{
+      call_id: call_id,
+      model: model || "",
+      input_tokens: input_tokens,
+      output_tokens: output_tokens,
+      total_tokens: input_tokens + output_tokens
+    })
+  end
+
+  defp merge_usage(existing, incoming) do
+    Map.merge(existing || %{}, incoming || %{}, fn _k, left, right -> (left || 0) + (right || 0) end)
+  end
+
+  defp event_kind(event) do
+    case event_field(event, :kind) do
+      kind when is_atom(kind) -> kind
+      kind when is_binary(kind) -> runtime_kind_from_string(kind)
+      _ -> :unknown
+    end
+  end
+
+  defp runtime_kind_from_string("request_started"), do: :request_started
+  defp runtime_kind_from_string("llm_started"), do: :llm_started
+  defp runtime_kind_from_string("llm_delta"), do: :llm_delta
+  defp runtime_kind_from_string("llm_completed"), do: :llm_completed
+  defp runtime_kind_from_string("tool_started"), do: :tool_started
+  defp runtime_kind_from_string("tool_completed"), do: :tool_completed
+  defp runtime_kind_from_string("checkpoint"), do: :checkpoint
+  defp runtime_kind_from_string("request_completed"), do: :request_completed
+  defp runtime_kind_from_string("request_failed"), do: :request_failed
+  defp runtime_kind_from_string("request_cancelled"), do: :request_cancelled
+  defp runtime_kind_from_string(_), do: :unknown
+
+  defp event_field(map, key, default \\ nil) when is_map(map) do
+    Map.get(map, key, Map.get(map, Atom.to_string(key), default))
+  end
+
+  defp config_model(state) do
+    state
+    |> Map.get(:config, %{})
+    |> Map.get(:model)
+  end
+
+  defp runtime_config_from_strategy(config) do
+    runtime_opts = %{
+      model: config[:model],
+      system_prompt: config[:system_prompt],
+      tools: config[:actions_by_name] || %{},
+      max_iterations: config[:max_iterations],
+      tool_timeout_ms: config[:tool_timeout_ms],
+      tool_max_retries: config[:tool_max_retries],
+      tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
+      emit_telemetry?: get_in(config, [:observability, :emit_telemetry?]),
+      redact_tool_args?: get_in(config, [:observability, :redact_tool_args?]),
+      capture_deltas?: get_in(config, [:observability, :emit_llm_deltas?]),
+      runtime_task_supervisor: config[:runtime_task_supervisor]
+    }
+
+    ReActRuntimeConfig.new(runtime_opts)
+  end
+
+  defp runtime_adapter_enabled?(agent) do
+    state = StratState.get(agent, %{})
+    config = state[:config] || %{}
+    config[:runtime_adapter] == true
   end
 
   # Sets ephemeral per-request tool context (cleared on completion)
@@ -679,6 +1052,8 @@ defmodule Jido.AI.Strategies.ReAct do
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, 15_000),
       tool_max_retries: Keyword.get(opts, :tool_max_retries, 1),
       tool_retry_backoff_ms: Keyword.get(opts, :tool_retry_backoff_ms, 200),
+      runtime_adapter: Keyword.get(opts, :runtime_adapter, false),
+      runtime_task_supervisor: Keyword.get(opts, :runtime_task_supervisor),
       observability:
         Map.merge(
           %{
