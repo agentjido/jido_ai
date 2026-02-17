@@ -43,13 +43,6 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
     end)
   end
 
-  defp mock_llm_result(call_id, content) do
-    %{
-      call_id: call_id,
-      result: {:ok, %{text: content}}
-    }
-  end
-
   # ============================================================================
   # 4.6.1 Strategy Execution Integration Tests
   # ============================================================================
@@ -77,8 +70,9 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       # Verify directive emitted
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.LLMStream{} = directive
-      assert directive.model == "anthropic:claude-haiku-4-5"
+      assert %AgentDirective.SpawnAgent{} = directive
+      assert directive.tag == :cot_worker
+      assert directive.agent == Jido.AI.Agents.Internal.CoTWorkerAgent
     end
 
     test "CoT strategy produces step-by-step reasoning output" do
@@ -87,15 +81,28 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       # Start reasoning
       start_instruction = %Instruction{
         action: ChainOfThought.start_action(),
-        params: %{prompt: "What is 2 + 2?"}
+        params: %{prompt: "What is 2 + 2?", request_id: "req_cot_phase4"}
       }
 
       {agent, directives} = ChainOfThought.cmd(agent, [start_instruction], %{})
-      [%Directive.LLMStream{id: call_id}] = directives
+      [%AgentDirective.SpawnAgent{}] = directives
 
-      # Simulate LLM response with steps
-      llm_result =
-        mock_llm_result(call_id, """
+      # Simulate worker lifecycle + completion event
+      child_started = %Instruction{
+        action: :cot_worker_child_started,
+        params: %{
+          parent_id: "parent",
+          child_id: "child",
+          child_module: Jido.AI.Agents.Internal.CoTWorkerAgent,
+          tag: :cot_worker,
+          pid: self(),
+          meta: %{}
+        }
+      }
+
+      {agent, [%AgentDirective.Emit{}]} = ChainOfThought.cmd(agent, [child_started], %{})
+
+      completion_text = """
         Step 1: Identify the numbers to add
         We have 2 and 2.
 
@@ -103,12 +110,32 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         2 + 2 = 4
 
         Therefore, the answer is 4.
-        """)
+      """
 
-      result_instruction = %Instruction{
-        action: ChainOfThought.llm_result_action(),
-        params: llm_result
-      }
+      result_instruction =
+        %Instruction{
+          action: :cot_worker_event,
+          params: %{
+            request_id: "req_cot_phase4",
+            event: %{
+              id: "evt_done",
+              seq: 1,
+              at_ms: 1_700_000_000_000,
+              run_id: "req_cot_phase4",
+              request_id: "req_cot_phase4",
+              iteration: 1,
+              kind: :request_completed,
+              llm_call_id: "cot_call_req_cot_phase4",
+              tool_call_id: nil,
+              tool_name: nil,
+              data: %{
+                result: completion_text,
+                termination_reason: :success,
+                usage: %{input_tokens: 10, output_tokens: 5}
+              }
+            }
+          }
+        }
 
       {final_agent, _} = ChainOfThought.cmd(agent, [result_instruction], %{})
 
@@ -236,8 +263,11 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       route_map = Map.new(routes)
       assert route_map["ai.cot.query"] == {:strategy_cmd, :cot_start}
-      assert route_map["ai.llm.response"] == {:strategy_cmd, :cot_llm_result}
-      assert route_map["ai.llm.delta"] == {:strategy_cmd, :cot_llm_partial}
+      assert route_map["ai.cot.worker.event"] == {:strategy_cmd, :cot_worker_event}
+      assert route_map["jido.agent.child.started"] == {:strategy_cmd, :cot_worker_child_started}
+      assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :cot_worker_child_exit}
+      refute Map.has_key?(route_map, "ai.llm.response")
+      refute Map.has_key?(route_map, "ai.llm.delta")
     end
 
     test "ToT signal_routes returns correct mappings" do
@@ -290,7 +320,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   # ============================================================================
 
   describe "directive execution integration" do
-    test "LLMStream directive has correct structure for CoT" do
+    test "CoT start emits SpawnAgent directive in delegated mode" do
       {agent, _ctx} = create_agent(ChainOfThought, model: "anthropic:claude-sonnet-4-20250514")
 
       instruction = %Instruction{
@@ -300,10 +330,9 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {_agent, [directive]} = ChainOfThought.cmd(agent, [instruction], %{})
 
-      assert %Directive.LLMStream{} = directive
-      assert directive.id != nil
-      assert is_list(directive.context)
-      assert directive.model == "anthropic:claude-sonnet-4-20250514"
+      assert %AgentDirective.SpawnAgent{} = directive
+      assert directive.tag == :cot_worker
+      assert directive.agent == Jido.AI.Agents.Internal.CoTWorkerAgent
     end
 
     test "ReAct start emits SpawnAgent directive in delegated mode" do
@@ -462,23 +491,56 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       # Start with a prompt that selects CoT
       start_instruction = %Instruction{
         action: Adaptive.start_action(),
-        params: %{prompt: "What is the meaning of life?"}
+        params: %{prompt: "What is the meaning of life?", request_id: "req_adaptive_cot"}
       }
 
-      {agent, [%Directive.LLMStream{id: call_id}]} =
+      {agent, [%AgentDirective.SpawnAgent{}]} =
         Adaptive.cmd(agent, [start_instruction], %{})
 
       # Verify CoT was selected
       state = StratState.get(agent, %{})
       assert state[:strategy_type] == :cot
 
-      # Send LLM result - should be delegated to CoT
-      llm_result = mock_llm_result(call_id, "The meaning of life is subjective.")
-
-      result_instruction = %Instruction{
-        action: Adaptive.llm_result_action(),
-        params: llm_result
+      child_started = %Instruction{
+        action: :adaptive_child_started,
+        params: %{
+          parent_id: "parent",
+          child_id: "child",
+          child_module: Jido.AI.Agents.Internal.CoTWorkerAgent,
+          tag: :cot_worker,
+          pid: self(),
+          meta: %{}
+        }
       }
+
+      {agent, [%AgentDirective.Emit{}]} = Adaptive.cmd(agent, [child_started], %{})
+
+      completion_event = %{
+        id: "evt_adaptive_done",
+        seq: 1,
+        at_ms: 1_700_000_000_000,
+        run_id: "req_adaptive_cot",
+        request_id: "req_adaptive_cot",
+        iteration: 1,
+        kind: :request_completed,
+        llm_call_id: "cot_call_req_adaptive_cot",
+        tool_call_id: nil,
+        tool_name: nil,
+        data: %{
+          result: "Step 1: Reflect.\nConclusion: The meaning of life is subjective.",
+          termination_reason: :success,
+          usage: %{input_tokens: 12, output_tokens: 7}
+        }
+      }
+
+      result_instruction =
+        %Instruction{
+          action: :adaptive_cot_worker_event,
+          params: %{
+            request_id: "req_adaptive_cot",
+            event: completion_event
+          }
+        }
 
       {final_agent, _directives} = Adaptive.cmd(agent, [result_instruction], %{})
 

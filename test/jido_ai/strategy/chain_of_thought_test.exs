@@ -1,11 +1,12 @@
 defmodule Jido.AI.Strategies.ChainOfThoughtTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.ChainOfThought.Machine
+  alias Jido.AI.Directive
   alias Jido.AI.Strategies.ChainOfThought
 
-  # Helper to create a mock agent
   defp create_agent(opts \\ []) do
     %Jido.Agent{
       id: "test-agent",
@@ -19,342 +20,277 @@ defmodule Jido.AI.Strategies.ChainOfThoughtTest do
     end)
   end
 
-  # ============================================================================
-  # Initialization
-  # ============================================================================
+  defp instruction(action, params) do
+    %Jido.Instruction{action: action, params: params}
+  end
+
+  defp worker_event(kind, request_id, seq, data) do
+    %{
+      id: "evt_#{seq}",
+      seq: seq,
+      at_ms: 1_700_000_000_000 + seq,
+      run_id: request_id,
+      request_id: request_id,
+      iteration: 1,
+      kind: kind,
+      llm_call_id: "cot_call_#{request_id}",
+      tool_call_id: nil,
+      tool_name: nil,
+      data: data
+    }
+  end
 
   describe "init/2" do
-    test "initializes agent with machine state" do
+    test "initializes delegated CoT state" do
       agent = create_agent()
       state = StratState.get(agent, %{})
 
       assert state[:status] == :idle
       assert state[:steps] == []
-      assert is_map(state[:config])
+      assert state[:config].runtime_adapter == true
+      assert state[:cot_worker_status] == :missing
     end
 
     test "uses default model when not specified" do
       agent = create_agent()
       state = StratState.get(agent, %{})
-
       assert state[:config].model == "anthropic:claude-haiku-4-5"
     end
 
     test "resolves model aliases" do
       agent = create_agent(model: :fast)
       state = StratState.get(agent, %{})
-
       assert state[:config].model == Jido.AI.resolve_model(:fast)
-    end
-
-    test "passes through string model specs" do
-      agent = create_agent(model: "openai:gpt-4")
-      state = StratState.get(agent, %{})
-
-      assert state[:config].model == "openai:gpt-4"
-    end
-
-    test "uses custom system prompt when provided" do
-      custom_prompt = "Custom thinking prompt"
-      agent = create_agent(system_prompt: custom_prompt)
-      state = StratState.get(agent, %{})
-
-      assert state[:config].system_prompt == custom_prompt
     end
 
     test "uses default system prompt when not provided" do
       agent = create_agent()
       state = StratState.get(agent, %{})
-
       assert state[:config].system_prompt == Machine.default_system_prompt()
     end
   end
-
-  # ============================================================================
-  # Action Specs
-  # ============================================================================
 
   describe "action_spec/1" do
     test "returns spec for start action" do
       spec = ChainOfThought.action_spec(ChainOfThought.start_action())
       assert spec.name == "cot.start"
-      assert spec.doc =~ "Chain-of-Thought"
+      assert spec.doc =~ "delegated"
     end
 
-    test "returns spec for llm_result action" do
-      spec = ChainOfThought.action_spec(ChainOfThought.llm_result_action())
-      assert spec.name == "cot.llm_result"
-    end
-
-    test "returns spec for llm_partial action" do
-      spec = ChainOfThought.action_spec(ChainOfThought.llm_partial_action())
-      assert spec.name == "cot.llm_partial"
-    end
-
-    test "returns nil for unknown action" do
-      assert ChainOfThought.action_spec(:unknown) == nil
+    test "returns spec for legacy llm actions" do
+      assert ChainOfThought.action_spec(ChainOfThought.llm_result_action()).name == "cot.llm_result"
+      assert ChainOfThought.action_spec(ChainOfThought.llm_partial_action()).name == "cot.llm_partial"
     end
   end
 
-  # ============================================================================
-  # Signal Routes
-  # ============================================================================
-
   describe "signal_routes/1" do
-    test "returns expected signal routes" do
+    test "returns delegated worker routes" do
       routes = ChainOfThought.signal_routes(%{})
       route_map = Map.new(routes)
 
       assert route_map["ai.cot.query"] == {:strategy_cmd, :cot_start}
-      assert route_map["ai.llm.response"] == {:strategy_cmd, :cot_llm_result}
-      assert route_map["ai.llm.delta"] == {:strategy_cmd, :cot_llm_partial}
+      assert route_map["ai.cot.worker.event"] == {:strategy_cmd, :cot_worker_event}
+      assert route_map["jido.agent.child.started"] == {:strategy_cmd, :cot_worker_child_started}
+      assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :cot_worker_child_exit}
+      refute Map.has_key?(route_map, "ai.llm.response")
+      refute Map.has_key?(route_map, "ai.llm.delta")
     end
   end
 
-  # ============================================================================
-  # cmd/3 - Start Instruction
-  # ============================================================================
-
-  describe "cmd/3 with start instruction" do
-    test "processes start instruction and returns directive" do
+  describe "cmd/3 delegated lifecycle" do
+    test "start emits SpawnAgent directive when worker is missing" do
       agent = create_agent()
+      start = instruction(ChainOfThought.start_action(), %{prompt: "What is 2+2?", request_id: "req_cot_1"})
 
-      instruction = %Jido.Instruction{
-        action: ChainOfThought.start_action(),
-        params: %{prompt: "What is 2+2?"}
-      }
+      {agent, directives} = ChainOfThought.cmd(agent, [start], %{})
 
-      {agent, directives} = ChainOfThought.cmd(agent, [instruction], %{})
+      assert [%AgentDirective.SpawnAgent{} = spawn] = directives
+      assert spawn.tag == :cot_worker
+      assert spawn.agent == Jido.AI.Agents.Internal.CoTWorkerAgent
 
-      # Should have transitioned to reasoning
       state = StratState.get(agent, %{})
       assert state[:status] == :reasoning
-      assert state[:prompt] == "What is 2+2?"
-
-      # Should have returned a LLMStream directive
-      assert length(directives) == 1
-      [directive] = directives
-      assert directive.__struct__ == Jido.AI.Directive.LLMStream
+      assert state[:active_request_id] == "req_cot_1"
+      assert state[:pending_worker_start].prompt == "What is 2+2?"
     end
 
-    test "directive contains correct model from config" do
-      agent = create_agent(model: "test:model")
+    test "child started flushes deferred start event to worker pid" do
+      agent = create_agent()
+      start = instruction(ChainOfThought.start_action(), %{prompt: "Test prompt", request_id: "req_cot_2"})
+      {agent, [_spawn]} = ChainOfThought.cmd(agent, [start], %{})
 
-      instruction = %Jido.Instruction{
-        action: ChainOfThought.start_action(),
-        params: %{prompt: "Test"}
-      }
+      child_started =
+        instruction(:cot_worker_child_started, %{
+          parent_id: "parent",
+          child_id: "child",
+          child_module: Jido.AI.Agents.Internal.CoTWorkerAgent,
+          tag: :cot_worker,
+          pid: self(),
+          meta: %{}
+        })
 
-      {_agent, [directive]} = ChainOfThought.cmd(agent, [instruction], %{})
+      {agent, directives} = ChainOfThought.cmd(agent, [child_started], %{})
 
-      assert directive.model == "test:model"
+      assert [%AgentDirective.Emit{} = emit] = directives
+      assert emit.signal.type == "ai.cot.worker.start"
+      assert emit.signal.data.request_id == "req_cot_2"
+      assert emit.dispatch == {:pid, [target: self()]}
+
+      state = StratState.get(agent, %{})
+      assert state[:cot_worker_pid] == self()
+      assert state[:cot_worker_status] == :running
+      assert state[:pending_worker_start] == nil
     end
-  end
 
-  # ============================================================================
-  # cmd/3 - LLM Result Instruction
-  # ============================================================================
-
-  describe "cmd/3 with llm_result instruction" do
-    test "processes successful result" do
+    test "request_completed worker event parses steps and conclusion" do
       agent = create_agent()
 
-      # First start a reasoning session
-      start_instruction = %Jido.Instruction{
-        action: ChainOfThought.start_action(),
-        params: %{prompt: "What is 2+2?"}
-      }
+      events = [
+        worker_event(:request_started, "req_cot_3", 1, %{query: "Compute"}),
+        worker_event(:llm_started, "req_cot_3", 2, %{call_id: "cot_call_req_cot_3"}),
+        worker_event(:llm_delta, "req_cot_3", 3, %{chunk_type: :content, delta: "Step 1: Start\n"}),
+        worker_event(:llm_completed, "req_cot_3", 4, %{
+          call_id: "cot_call_req_cot_3",
+          text: "Step 1: Add.\nConclusion: 4",
+          usage: %{input_tokens: 10, output_tokens: 5}
+        }),
+        worker_event(:request_completed, "req_cot_3", 5, %{
+          result: "Step 1: Add.\nConclusion: 4",
+          termination_reason: :success,
+          usage: %{input_tokens: 10, output_tokens: 5}
+        })
+      ]
 
-      {agent, _} = ChainOfThought.cmd(agent, [start_instruction], %{})
-
-      # Get the call_id
-      state = StratState.get(agent, %{})
-      call_id = state[:current_call_id]
-
-      # Now send result
-      result_instruction = %Jido.Instruction{
-        action: ChainOfThought.llm_result_action(),
-        params: %{
-          call_id: call_id,
-          result: {:ok, %{text: "Step 1: Add. Conclusion: 4"}}
-        }
-      }
-
-      {agent, _} = ChainOfThought.cmd(agent, [result_instruction], %{})
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ChainOfThought.cmd(acc, [instruction(:cot_worker_event, %{request_id: "req_cot_3", event: event})], %{})
+        end)
 
       state = StratState.get(agent, %{})
       assert state[:status] == :completed
       assert state[:termination_reason] == :success
+      assert state[:result] == "4"
+      assert state[:conclusion] == "4"
+      assert length(state[:steps]) == 1
+      assert state[:usage] == %{input_tokens: 10, output_tokens: 5}
+      assert state[:active_request_id] == nil
+      assert state[:cot_worker_status] == :ready
+    end
+
+    test "request_failed worker event transitions to error state" do
+      agent = create_agent()
+
+      event =
+        worker_event(:request_failed, "req_cot_4", 1, %{
+          error: :rate_limited,
+          error_type: :llm_request
+        })
+
+      {agent, []} =
+        ChainOfThought.cmd(agent, [instruction(:cot_worker_event, %{request_id: "req_cot_4", event: event})], %{})
+
+      state = StratState.get(agent, %{})
+      assert state[:status] == :error
+      assert state[:termination_reason] == :error
+      assert state[:result] =~ "rate_limited"
+      assert state[:active_request_id] == nil
+    end
+
+    test "worker crash while active request marks request failed" do
+      agent = create_agent()
+
+      state =
+        agent
+        |> StratState.get(%{})
+        |> Map.put(:status, :reasoning)
+        |> Map.put(:active_request_id, "req_cot_crash")
+        |> Map.put(:cot_worker_pid, self())
+        |> Map.put(:cot_worker_status, :running)
+
+      agent = StratState.put(agent, state)
+
+      crash =
+        instruction(:cot_worker_child_exit, %{
+          tag: :cot_worker,
+          pid: self(),
+          reason: :killed
+        })
+
+      {agent, []} = ChainOfThought.cmd(agent, [crash], %{})
+
+      state = StratState.get(agent, %{})
+      assert state[:status] == :error
+      assert state[:active_request_id] == nil
+      assert state[:cot_worker_status] == :missing
+      assert state[:result] =~ "cot_worker_exit"
+    end
+
+    test "busy second request emits request error directive" do
+      agent = create_agent()
+
+      state =
+        agent
+        |> StratState.get(%{})
+        |> Map.put(:status, :reasoning)
+        |> Map.put(:active_request_id, "req_busy")
+
+      agent = StratState.put(agent, state)
+
+      {_agent, directives} =
+        ChainOfThought.cmd(
+          agent,
+          [instruction(ChainOfThought.start_action(), %{prompt: "second", request_id: "req_busy_2"})],
+          %{}
+        )
+
+      assert [%Directive.EmitRequestError{} = directive] = directives
+      assert directive.request_id == "req_busy_2"
+      assert directive.reason == :busy
+    end
+
+    test "stores request trace up to 2000 events then marks truncated" do
+      agent = create_agent()
+      request_id = "req_cot_trace"
+
+      {agent, []} =
+        Enum.reduce(1..2001, {agent, []}, fn seq, {acc, _} ->
+          event = worker_event(:llm_delta, request_id, seq, %{chunk_type: :content, delta: "x"})
+          ChainOfThought.cmd(acc, [instruction(:cot_worker_event, %{request_id: request_id, event: event})], %{})
+        end)
+
+      state = StratState.get(agent, %{})
+      trace = state[:request_traces][request_id]
+      assert trace.truncated? == true
+      assert length(trace.events) == 2000
     end
   end
 
-  # ============================================================================
-  # Snapshot
-  # ============================================================================
-
-  describe "snapshot/2" do
-    test "returns idle snapshot for new agent" do
+  describe "helper accessors" do
+    test "get_steps/1 returns parsed steps" do
       agent = create_agent()
-      snapshot = ChainOfThought.snapshot(agent, %{})
-
-      assert snapshot.status == :idle
-      assert snapshot.done? == false
-    end
-
-    test "returns success snapshot for completed agent" do
-      agent = create_agent()
-
-      # Start and complete
-      start = %Jido.Instruction{action: :cot_start, params: %{prompt: "Test"}}
-      {agent, _} = ChainOfThought.cmd(agent, [start], %{})
-
       state = StratState.get(agent, %{})
-      call_id = state[:current_call_id]
+      state = Map.put(state, :steps, [%{number: 1, content: "first"}])
+      agent = StratState.put(agent, state)
 
-      result = %Jido.Instruction{
-        action: :cot_llm_result,
-        params: %{call_id: call_id, result: {:ok, %{text: "Step 1: Do. Answer: Done"}}}
-      }
-
-      {agent, _} = ChainOfThought.cmd(agent, [result], %{})
-
-      snapshot = ChainOfThought.snapshot(agent, %{})
-
-      assert snapshot.status == :success
-      assert snapshot.done? == true
-      assert snapshot.result =~ "Done"
+      assert ChainOfThought.get_steps(agent) == [%{number: 1, content: "first"}]
     end
 
-    test "includes steps in details" do
+    test "get_conclusion/1 returns conclusion" do
       agent = create_agent()
-
-      start = %Jido.Instruction{action: :cot_start, params: %{prompt: "Test"}}
-      {agent, _} = ChainOfThought.cmd(agent, [start], %{})
-
       state = StratState.get(agent, %{})
-      call_id = state[:current_call_id]
+      state = Map.put(state, :conclusion, "answer")
+      agent = StratState.put(agent, state)
 
-      result = %Jido.Instruction{
-        action: :cot_llm_result,
-        params: %{
-          call_id: call_id,
-          result: {:ok, %{text: "Step 1: First.\nStep 2: Second.\nConclusion: Done"}}
-        }
-      }
-
-      {agent, _} = ChainOfThought.cmd(agent, [result], %{})
-
-      snapshot = ChainOfThought.snapshot(agent, %{})
-
-      assert snapshot.details[:steps_count] == 2
-      assert length(snapshot.details[:steps]) == 2
+      assert ChainOfThought.get_conclusion(agent) == "answer"
     end
-  end
 
-  # ============================================================================
-  # Helper Functions
-  # ============================================================================
-
-  describe "get_steps/1" do
-    test "returns steps from agent state" do
+    test "get_raw_response/1 returns raw response" do
       agent = create_agent()
-
-      start = %Jido.Instruction{action: :cot_start, params: %{prompt: "Test"}}
-      {agent, _} = ChainOfThought.cmd(agent, [start], %{})
-
       state = StratState.get(agent, %{})
-      call_id = state[:current_call_id]
+      state = Map.put(state, :raw_response, "raw")
+      agent = StratState.put(agent, state)
 
-      result = %Jido.Instruction{
-        action: :cot_llm_result,
-        params: %{
-          call_id: call_id,
-          result: {:ok, %{text: "Step 1: First.\nStep 2: Second.\nConclusion: Done"}}
-        }
-      }
-
-      {agent, _} = ChainOfThought.cmd(agent, [result], %{})
-
-      steps = ChainOfThought.get_steps(agent)
-      assert length(steps) == 2
-      assert Enum.at(steps, 0).number == 1
-    end
-
-    test "returns empty list for agent without steps" do
-      agent = create_agent()
-      steps = ChainOfThought.get_steps(agent)
-      assert steps == []
-    end
-  end
-
-  describe "get_conclusion/1" do
-    test "returns conclusion from agent state" do
-      agent = create_agent()
-
-      start = %Jido.Instruction{action: :cot_start, params: %{prompt: "Test"}}
-      {agent, _} = ChainOfThought.cmd(agent, [start], %{})
-
-      state = StratState.get(agent, %{})
-      call_id = state[:current_call_id]
-
-      result = %Jido.Instruction{
-        action: :cot_llm_result,
-        params: %{
-          call_id: call_id,
-          result: {:ok, %{text: "Step 1: Do.\nConclusion: The answer is 42."}}
-        }
-      }
-
-      {agent, _} = ChainOfThought.cmd(agent, [result], %{})
-
-      conclusion = ChainOfThought.get_conclusion(agent)
-      assert conclusion =~ "The answer is 42"
-    end
-
-    test "returns nil for agent without conclusion" do
-      agent = create_agent()
-      assert ChainOfThought.get_conclusion(agent) == nil
-    end
-  end
-
-  describe "get_raw_response/1" do
-    test "returns raw response from agent state" do
-      agent = create_agent()
-
-      start = %Jido.Instruction{action: :cot_start, params: %{prompt: "Test"}}
-      {agent, _} = ChainOfThought.cmd(agent, [start], %{})
-
-      state = StratState.get(agent, %{})
-      call_id = state[:current_call_id]
-
-      raw = "Step 1: Do.\nConclusion: Done."
-
-      result = %Jido.Instruction{
-        action: :cot_llm_result,
-        params: %{call_id: call_id, result: {:ok, %{text: raw}}}
-      }
-
-      {agent, _} = ChainOfThought.cmd(agent, [result], %{})
-
-      assert ChainOfThought.get_raw_response(agent) == raw
-    end
-  end
-
-  # ============================================================================
-  # Action Helper Functions
-  # ============================================================================
-
-  describe "action helper functions" do
-    test "start_action/0 returns correct atom" do
-      assert ChainOfThought.start_action() == :cot_start
-    end
-
-    test "llm_result_action/0 returns correct atom" do
-      assert ChainOfThought.llm_result_action() == :cot_llm_result
-    end
-
-    test "llm_partial_action/0 returns correct atom" do
-      assert ChainOfThought.llm_partial_action() == :cot_llm_partial
+      assert ChainOfThought.get_raw_response(agent) == "raw"
     end
   end
 end

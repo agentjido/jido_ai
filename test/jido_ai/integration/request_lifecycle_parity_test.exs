@@ -28,7 +28,8 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
         {agent, first_directives} = strategy.cmd(agent, [first_instruction], %{})
 
         assert Enum.any?(first_directives, fn directive ->
-                 Map.get(directive, :id) == "req_1"
+                 Map.get(directive, :id) == "req_1" or
+                   match?(%Jido.Agent.Directive.SpawnAgent{tag: :cot_worker}, directive)
                end)
 
         second_instruction = %Jido.Instruction{
