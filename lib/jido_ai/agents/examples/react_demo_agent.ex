@@ -18,6 +18,7 @@ defmodule Jido.AI.Examples.ReActDemoAgent do
   use Jido.AI.Agent,
     name: "react_demo_agent",
     description: "Demo agent with arithmetic and weather tools",
+    runtime_adapter: true,
     tools: [
       Jido.Tools.Arithmetic.Add,
       Jido.Tools.Arithmetic.Subtract,
