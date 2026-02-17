@@ -1,23 +1,23 @@
 defmodule Jido.AI.ReActAgent do
   @moduledoc """
-  Deprecated compatibility alias for `Jido.AI.Agent`.
+  Compatibility wrapper for defining ReAct agents.
 
-  New code should `use Jido.AI.Agent` directly.
+  This module delegates to `Jido.AI.Agent`, defaulting `:runtime_adapter` to
+  `true` so agents use the Task-based ReAct runtime by default.
   """
 
   @doc false
-  @deprecated "Use `Jido.AI.Agent` instead."
   defmacro __using__(opts) do
+    opts = Keyword.put_new(opts, :runtime_adapter, true)
+
     quote location: :keep do
       use Jido.AI.Agent, unquote(opts)
     end
   end
 
   @doc false
-  @deprecated "Use `Jido.AI.Agent.expand_aliases_in_ast/2` instead."
   defdelegate expand_aliases_in_ast(ast, caller_env), to: Jido.AI.Agent
 
   @doc false
-  @deprecated "Use `Jido.AI.Agent.tools_from_skills/1` instead."
   defdelegate tools_from_skills(skill_modules), to: Jido.AI.Agent
 end
