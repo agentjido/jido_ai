@@ -65,16 +65,6 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   alias Jido.AI.{Security, ToolAdapter, Turn}
   alias ReqLLM.Context
 
-  @dialyzer [
-    {:nowarn_function, run: 2},
-    {:nowarn_function, classify_and_format_response: 2},
-    {:nowarn_function, execute_tool_turns: 8},
-    {:nowarn_function, execute_tools_and_continue: 6},
-    {:nowarn_function, append_assistant_message: 2}
-  ]
-
-  @dialyzer {:nowarn_function, run: 2}
-
   @doc """
   Executes the call with tools action.
   """
@@ -245,16 +235,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
 
   defp append_assistant_message(messages, %Turn{} = turn), do: messages ++ [Turn.assistant_message(turn)]
 
-  defp append_assistant_message(messages, %{type: :tool_calls} = result) do
-    messages ++ [%{role: :assistant, content: result.text || "", tool_calls: result.tool_calls || []}]
-  end
-
-  defp append_assistant_message(messages, result) do
-    messages ++ [%{role: :assistant, content: Map.get(result, :text, "")}]
-  end
-
   defp public_result(%Turn{} = turn), do: Turn.to_result_map(turn)
-  defp public_result(result) when is_map(result), do: result
 
   defp merge_usage(first, second) do
     first_usage = normalize_usage(first)

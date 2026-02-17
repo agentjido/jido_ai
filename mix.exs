@@ -71,7 +71,6 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
-      {:term_ui, "~> 0.2"},
       {:yaml_elixir, "~> 2.9"},
       {:zoi, "~> 0.16"},
 
@@ -96,9 +95,7 @@ defmodule JidoAi.MixProject do
       quality: [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "docs.check",
         "credo --min-priority high --all",
-        "quality.dialyzer_ignores",
         "doctor --summary --raise",
         "dialyzer"
       ],

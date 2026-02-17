@@ -37,10 +37,10 @@ defmodule Jido.AI.Turn do
           type: response_type(),
           text: String.t(),
           thinking_content: String.t() | nil,
-          tool_calls: [term()],
+          tool_calls: list(term()),
           usage: map() | nil,
           model: String.t() | nil,
-          tool_results: [tool_result()]
+          tool_results: list(tool_result())
         }
 
   defstruct type: :final_answer,
@@ -121,24 +121,23 @@ defmodule Jido.AI.Turn do
   Returns true when the turn requests tool execution.
   """
   @spec needs_tools?(t()) :: boolean()
-  def needs_tools?(%__MODULE__{tool_calls: tool_calls}) when is_list(tool_calls) and tool_calls != [] do
-    tool_calls != []
-  end
-
   def needs_tools?(%__MODULE__{type: :tool_calls}), do: true
+  def needs_tools?(%__MODULE__{tool_calls: [_ | _]}), do: true
   def needs_tools?(%__MODULE__{}), do: false
 
   @doc """
   Projects the turn into an assistant message compatible with ReqLLM context.
   """
   @spec assistant_message(t()) :: map()
-  def assistant_message(%__MODULE__{} = turn) do
-    if needs_tools?(turn) do
-      %{role: :assistant, content: turn.text || "", tool_calls: turn.tool_calls || []}
-    else
-      %{role: :assistant, content: turn.text || ""}
-    end
+  def assistant_message(%__MODULE__{type: :tool_calls} = turn) do
+    %{role: :assistant, content: turn.text, tool_calls: turn.tool_calls}
   end
+
+  def assistant_message(%__MODULE__{tool_calls: tool_calls} = turn) when is_list(tool_calls) and tool_calls != [] do
+    %{role: :assistant, content: turn.text, tool_calls: tool_calls}
+  end
+
+  def assistant_message(%__MODULE__{} = turn), do: %{role: :assistant, content: turn.text}
 
   @doc """
   Returns a copy of the turn with normalized tool results attached.
@@ -269,15 +268,22 @@ defmodule Jido.AI.Turn do
   Executes all requested tools for the turn and returns the updated turn.
   """
   @spec run_tools(t(), map(), run_opts()) :: {:ok, t()} | {:error, term()}
-  def run_tools(%__MODULE__{} = turn, context, opts \\ []) do
-    if needs_tools?(turn) do
-      with {:ok, tool_results} <- run_tool_calls(turn.tool_calls, context, opts) do
-        {:ok, with_tool_results(turn, tool_results)}
-      end
-    else
-      {:ok, turn}
+  def run_tools(turn, context, opts \\ [])
+
+  def run_tools(%__MODULE__{type: :tool_calls} = turn, context, opts) do
+    with {:ok, tool_results} <- run_tool_calls(turn.tool_calls, context, opts) do
+      {:ok, with_tool_results(turn, tool_results)}
     end
   end
+
+  def run_tools(%__MODULE__{tool_calls: tool_calls} = turn, context, opts)
+      when is_list(tool_calls) and tool_calls != [] do
+    with {:ok, tool_results} <- run_tool_calls(tool_calls, context, opts) do
+      {:ok, with_tool_results(turn, tool_results)}
+    end
+  end
+
+  def run_tools(%__MODULE__{} = turn, _context, _opts), do: {:ok, turn}
 
   @doc """
   Executes normalized tool calls and returns normalized tool results.
@@ -470,9 +476,6 @@ defmodule Jido.AI.Turn do
 
       {:error, reason, _directive} ->
         {:error, format_error(tool_name, reason)}
-
-      other ->
-        {:error, error_envelope(tool_name, :execution_error, "Unexpected execution result", %{result: inspect(other)})}
     end
   rescue
     e ->
@@ -497,7 +500,7 @@ defmodule Jido.AI.Turn do
 
   defp format_error(tool_name, reason) do
     message = inspect(reason)
-    details = if is_map(reason), do: reason, else: nil
+    details = reason
     error_envelope(tool_name, :execution_error, message, details)
   end
 
@@ -646,7 +649,7 @@ defmodule Jido.AI.Turn do
   end
 
   defp resolve_tools(context, opts) do
-    context = if is_map(context), do: context, else: %{}
+    context = normalize_context(context)
 
     tools_input =
       Keyword.get(opts, :tools) ||

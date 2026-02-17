@@ -1,16 +1,12 @@
 defmodule Mix.Tasks.JidoAi do
-  @shortdoc "Run Jido AI from the command line (chat by default)"
+  @shortdoc "Run Jido AI from the command line (one-shot or stdin)"
 
   @moduledoc """
   Unified Jido AI CLI task.
 
-  Default behavior starts interactive TUI chat. Provide a query for one-shot
-  execution, or `--stdin` for batch mode.
+  Provide a query for one-shot execution, or `--stdin` for batch mode.
 
   ## Quick Start
-
-      # Interactive chat (default)
-      mix jido_ai
 
       # One-shot query
       mix jido_ai "Calculate 15 * 7 + 3"
@@ -20,7 +16,6 @@ defmodule Mix.Tasks.JidoAi do
 
   ## Modes
 
-  - Chat mode: no positional query args
   - One-shot mode: query args provided
   - Stdin mode: `--stdin`
 
@@ -47,8 +42,8 @@ defmodule Mix.Tasks.JidoAi do
 
   ## Examples
 
-      # Chat with a custom agent
-      mix jido_ai --agent MyApp.WeatherAgent
+      # One-shot with a custom agent
+      mix jido_ai --agent MyApp.WeatherAgent "Will it rain in Seattle?"
 
       # One-shot with specific model/tools
       mix jido_ai --model openai:gpt-4o --tools Jido.Tools.Arithmetic "15 * 23"
@@ -60,11 +55,8 @@ defmodule Mix.Tasks.JidoAi do
   use Mix.Task
 
   alias Jido.AI.CLI.Adapter
-  alias Jido.AI.CLI.TUI
 
   require Logger
-
-  @dialyzer {:nowarn_function, run: 1}
 
   @impl Mix.Task
   def run(argv) do
@@ -112,8 +104,10 @@ defmodule Mix.Tasks.JidoAi do
         run_non_interactive(args, config)
 
       Enum.empty?(args) ->
-        start_jido_instance(JidoAi.TuiJido)
-        run_chat(config)
+        output_fatal_error(
+          config,
+          "No query provided. Pass a prompt (mix jido_ai \"<prompt>\") or use --stdin for batch mode."
+        )
 
       true ->
         start_jido_instance(JidoAi.CliJido)
@@ -135,19 +129,6 @@ defmodule Mix.Tasks.JidoAi do
       stdin: opts[:stdin] || false,
       trace: opts[:trace] || false
     }
-  end
-
-  @spec run_chat(map()) :: no_return()
-  defp run_chat(config) do
-    if not supports_tui_terminal?() do
-      output_fatal_error(
-        config,
-        "Interactive TUI requires a terminal with raw mode support. Use one-shot mode: mix jido_ai \"<prompt>\""
-      )
-    end
-
-    {:error, reason} = TUI.run(config)
-    output_fatal_error(config, "Failed to start TUI: #{format_error(reason)}")
   end
 
   defp run_non_interactive(args, config) do
@@ -333,15 +314,6 @@ defmodule Mix.Tasks.JidoAi do
 
       module
     end)
-  end
-
-  defp supports_tui_terminal? do
-    case System.cmd("stty", ["-g"], stderr_to_stdout: true) do
-      {_output, 0} -> true
-      _ -> false
-    end
-  rescue
-    _ -> false
   end
 
   defp start_jido_instance(instance_name) do
