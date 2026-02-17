@@ -38,7 +38,7 @@ defmodule Jido.AI.ToTAgentTest do
 
   describe "strategy configuration" do
     test "uses TreeOfThoughts strategy" do
-      assert TestToTAgent.strategy() == Jido.AI.Strategies.TreeOfThoughts
+      assert TestToTAgent.strategy() == Jido.AI.Reasoning.TreeOfThoughts.Strategy
     end
 
     test "passes custom model to strategy" do
@@ -136,7 +136,7 @@ defmodule Jido.AI.ToTAgentTest do
     test "agent initializes with strategy state" do
       agent = TestToTAgent.new()
       ctx = %{strategy_opts: TestToTAgent.strategy_opts()}
-      {agent, _directives} = Jido.AI.Strategies.TreeOfThoughts.init(agent, ctx)
+      {agent, _directives} = Jido.AI.Reasoning.TreeOfThoughts.Strategy.init(agent, ctx)
 
       state = StratState.get(agent, %{})
       assert state[:status] == :idle

@@ -14,7 +14,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   alias Jido.Agent
   alias Jido.Agent.StateOp
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategies.ReAct
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias Jido.AI.Strategy.StateOpsHelpers
 
   # ============================================================================

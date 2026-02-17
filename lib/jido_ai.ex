@@ -189,7 +189,7 @@ defmodule Jido.AI do
   @spec list_tools(Jido.Agent.t() | GenServer.server()) ::
           [module()] | {:ok, [module()]} | {:error, term()}
   def list_tools(%Jido.Agent{} = agent) do
-    Jido.AI.Strategies.ReAct.list_tools(agent)
+    Jido.AI.Reasoning.ReAct.Strategy.list_tools(agent)
   end
 
   def list_tools(agent_server) do

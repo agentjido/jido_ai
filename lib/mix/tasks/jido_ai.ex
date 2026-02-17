@@ -210,6 +210,7 @@ defmodule Mix.Tasks.JidoAi do
             {:error, reason} -> {:error, reason}
           end
         after
+          maybe_stop_worker_child(pid, JidoAi.CliJido)
           adapter.stop(pid)
         end
 
@@ -280,6 +281,29 @@ defmodule Mix.Tasks.JidoAi do
     end
 
     System.halt(1)
+  end
+
+  defp maybe_stop_worker_child(parent_pid, jido_instance) when is_pid(parent_pid) do
+    with {:ok, status} <- Jido.AgentServer.status(parent_pid),
+         details when is_map(details) <- Map.get(status.snapshot, :details, %{}),
+         worker_pid when is_pid(worker_pid) <- extract_worker_pid(details),
+         true <- Process.alive?(worker_pid) do
+      supervisor = Jido.agent_supervisor_name(jido_instance)
+      _ = DynamicSupervisor.terminate_child(supervisor, worker_pid)
+      :ok
+    else
+      _ -> :ok
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp maybe_stop_worker_child(_parent_pid, _jido_instance), do: :ok
+
+  defp extract_worker_pid(details) do
+    Map.get(details, :worker_pid) ||
+      Map.get(details, :react_worker_pid) ||
+      Map.get(details, :cot_worker_pid)
   end
 
   defp format_error(:timeout), do: "Timeout waiting for agent completion"
@@ -380,16 +404,17 @@ defmodule Mix.Tasks.JidoAi do
   }
 
   defp attach_trace_handlers do
-    :telemetry.attach_many("jido-ai-cli-trace", @trace_events, &handle_trace_event/4, nil)
+    :telemetry.attach_many("jido-ai-cli-trace", @trace_events, &__MODULE__.handle_trace_event/4, nil)
   end
 
-  defp handle_trace_event([:jido, :agent, :cmd, :start], _measurements, metadata, _config) do
+  @doc false
+  def handle_trace_event([:jido, :agent, :cmd, :start], _measurements, metadata, _config) do
     action = metadata[:action] || "unknown"
     agent_module = metadata[:agent_module] || "?"
     IO.puts("#{@colors.green}▶ CMD START#{@colors.reset} #{agent_module} → #{inspect(action)}")
   end
 
-  defp handle_trace_event([:jido, :agent, :cmd, :stop], measurements, metadata, _config) do
+  def handle_trace_event([:jido, :agent, :cmd, :stop], measurements, metadata, _config) do
     duration_ms = div(measurements[:duration] || 0, 1_000_000)
     directive_count = metadata[:directive_count] || 0
 
@@ -398,7 +423,7 @@ defmodule Mix.Tasks.JidoAi do
     )
   end
 
-  defp handle_trace_event([:jido, :agent, :cmd, :exception], measurements, metadata, _config) do
+  def handle_trace_event([:jido, :agent, :cmd, :exception], measurements, metadata, _config) do
     duration_ms = div(measurements[:duration] || 0, 1_000_000)
     error = metadata[:error]
 
@@ -407,30 +432,30 @@ defmodule Mix.Tasks.JidoAi do
     )
   end
 
-  defp handle_trace_event([:jido, :agent_server, :signal, :start], _measurements, metadata, _cfg) do
+  def handle_trace_event([:jido, :agent_server, :signal, :start], _measurements, metadata, _cfg) do
     signal_type = metadata[:signal_type] || "unknown"
     IO.puts("  #{@colors.cyan}→ Signal#{@colors.reset} #{signal_type}")
   end
 
-  defp handle_trace_event([:jido, :agent_server, :signal, :stop], measurements, metadata, _cfg) do
+  def handle_trace_event([:jido, :agent_server, :signal, :stop], measurements, metadata, _cfg) do
     duration_ms = div(measurements[:duration] || 0, 1_000_000)
     signal_type = metadata[:signal_type] || "unknown"
 
     IO.puts("  #{@colors.cyan}← Signal#{@colors.reset} #{signal_type} #{@colors.dim}(#{duration_ms}ms)#{@colors.reset}")
   end
 
-  defp handle_trace_event([:jido, :agent_server, :signal, :exception], _m, metadata, _config) do
+  def handle_trace_event([:jido, :agent_server, :signal, :exception], _m, metadata, _config) do
     signal_type = metadata[:signal_type] || "unknown"
     error = metadata[:error]
     IO.puts("  #{@colors.red}✗ Signal ERROR#{@colors.reset} #{signal_type}: #{inspect(error)}")
   end
 
-  defp handle_trace_event([:jido, :agent_server, :directive, :start], _m, metadata, _config) do
+  def handle_trace_event([:jido, :agent_server, :directive, :start], _m, metadata, _config) do
     directive_type = metadata[:directive_type] || "unknown"
     IO.puts("    #{@colors.yellow}⚡ Directive#{@colors.reset} #{directive_type}")
   end
 
-  defp handle_trace_event([:jido, :agent_server, :directive, :stop], measurements, metadata, _c) do
+  def handle_trace_event([:jido, :agent_server, :directive, :stop], measurements, metadata, _c) do
     duration_ms = div(measurements[:duration] || 0, 1_000_000)
     directive_type = metadata[:directive_type] || "unknown"
 
@@ -439,19 +464,19 @@ defmodule Mix.Tasks.JidoAi do
     )
   end
 
-  defp handle_trace_event([:jido, :agent_server, :directive, :exception], _m, metadata, _config) do
+  def handle_trace_event([:jido, :agent_server, :directive, :exception], _m, metadata, _config) do
     directive_type = metadata[:directive_type] || "unknown"
     error = metadata[:error]
 
     IO.puts("    #{@colors.red}✗ Directive ERROR#{@colors.reset} #{directive_type}: #{inspect(error)}")
   end
 
-  defp handle_trace_event([:jido, :agent, :strategy, :cmd, :start], _m, metadata, _config) do
+  def handle_trace_event([:jido, :agent, :strategy, :cmd, :start], _m, metadata, _config) do
     strategy = metadata[:strategy] || "?"
     IO.puts("  #{@colors.magenta}▸ Strategy CMD#{@colors.reset} #{strategy}")
   end
 
-  defp handle_trace_event([:jido, :agent, :strategy, :cmd, :stop], measurements, metadata, _c) do
+  def handle_trace_event([:jido, :agent, :strategy, :cmd, :stop], measurements, metadata, _c) do
     duration_ms = div(measurements[:duration] || 0, 1_000_000)
     directive_count = metadata[:directive_count] || 0
 
@@ -460,24 +485,24 @@ defmodule Mix.Tasks.JidoAi do
     )
   end
 
-  defp handle_trace_event([:jido, :agent, :strategy, :cmd, :exception], _m, metadata, _config) do
+  def handle_trace_event([:jido, :agent, :strategy, :cmd, :exception], _m, metadata, _config) do
     strategy = metadata[:strategy] || "?"
     error = metadata[:error]
     IO.puts("  #{@colors.red}✗ Strategy ERROR#{@colors.reset} #{strategy}: #{inspect(error)}")
   end
 
-  defp handle_trace_event([:jido, :agent, :strategy, :tick, :start], _m, metadata, _config) do
+  def handle_trace_event([:jido, :agent, :strategy, :tick, :start], _m, metadata, _config) do
     strategy = metadata[:strategy] || "?"
     IO.puts("  #{@colors.blue}⟳ Strategy TICK#{@colors.reset} #{strategy}")
   end
 
-  defp handle_trace_event([:jido, :agent, :strategy, :tick, :stop], measurements, _metadata, _c) do
+  def handle_trace_event([:jido, :agent, :strategy, :tick, :stop], measurements, _metadata, _c) do
     duration_ms = div(measurements[:duration] || 0, 1_000_000)
     IO.puts("  #{@colors.blue}⟲ Strategy TICK#{@colors.reset} #{@colors.dim}(#{duration_ms}ms)#{@colors.reset}")
   end
 
-  defp handle_trace_event([:jido, :ai, :request, event], measurements, metadata, _config)
-       when event in [:start, :complete, :failed, :rejected, :cancelled] do
+  def handle_trace_event([:jido, :ai, :request, event], measurements, metadata, _config)
+      when event in [:start, :complete, :failed, :rejected, :cancelled] do
     req = metadata[:request_id] || "?"
     duration = measurements[:duration_ms] || 0
     reason = metadata[:termination_reason] || metadata[:error_type]
@@ -487,8 +512,8 @@ defmodule Mix.Tasks.JidoAi do
     )
   end
 
-  defp handle_trace_event([:jido, :ai, :llm, event], measurements, metadata, _config)
-       when event in [:start, :delta, :complete, :error] do
+  def handle_trace_event([:jido, :ai, :llm, event], measurements, metadata, _config)
+      when event in [:start, :delta, :complete, :error] do
     call_id = metadata[:llm_call_id] || "?"
     model = metadata[:model] || "?"
     duration = measurements[:duration_ms] || 0
@@ -498,8 +523,8 @@ defmodule Mix.Tasks.JidoAi do
     )
   end
 
-  defp handle_trace_event([:jido, :ai, :tool, event], measurements, metadata, _config)
-       when event in [:start, :retry, :complete, :error, :timeout] do
+  def handle_trace_event([:jido, :ai, :tool, event], measurements, metadata, _config)
+      when event in [:start, :retry, :complete, :error, :timeout] do
     tool = metadata[:tool_name] || "?"
     call_id = metadata[:tool_call_id] || "?"
     duration = measurements[:duration_ms] || 0
@@ -510,5 +535,5 @@ defmodule Mix.Tasks.JidoAi do
     )
   end
 
-  defp handle_trace_event(_event, _measurements, _metadata, _config), do: :ok
+  def handle_trace_event(_event, _measurements, _metadata, _config), do: :ok
 end

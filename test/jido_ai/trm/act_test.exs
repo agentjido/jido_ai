@@ -1,7 +1,7 @@
-defmodule Jido.AI.TRM.ACTTest do
+defmodule Jido.AI.Reasoning.TRM.ACTTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.TRM.ACT
+  alias Jido.AI.Reasoning.TRM.ACT
 
   describe "new/1" do
     test "creates default ACT state" do

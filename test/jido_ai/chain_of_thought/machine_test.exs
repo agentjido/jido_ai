@@ -1,7 +1,7 @@
-defmodule Jido.AI.ChainOfThought.MachineTest do
+defmodule Jido.AI.Reasoning.ChainOfThought.MachineTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.ChainOfThought.Machine
+  alias Jido.AI.Reasoning.ChainOfThought.Machine
 
   # ============================================================================
   # Machine Creation

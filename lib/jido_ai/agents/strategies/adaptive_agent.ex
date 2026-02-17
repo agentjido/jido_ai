@@ -4,7 +4,7 @@ defmodule Jido.AI.AdaptiveAgent do
   @moduledoc """
   Base macro for Adaptive strategy-powered agents.
 
-  Wraps `use Jido.Agent` with `Jido.AI.Strategies.Adaptive` wired in,
+  Wraps `use Jido.Agent` with `Jido.AI.Reasoning.Adaptive.Strategy` wired in,
   plus standard state fields and helper functions.
 
   ## Usage
@@ -141,7 +141,7 @@ defmodule Jido.AI.AdaptiveAgent do
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Strategies.Adaptive, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.Adaptive.Strategy, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
       unquote(Jido.AI.Agent.compatibility_overrides_ast())

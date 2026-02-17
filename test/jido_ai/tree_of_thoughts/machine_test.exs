@@ -1,7 +1,7 @@
-defmodule Jido.AI.TreeOfThoughts.MachineTest do
+defmodule Jido.AI.Reasoning.TreeOfThoughts.MachineTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.TreeOfThoughts.Machine
+  alias Jido.AI.Reasoning.TreeOfThoughts.Machine
 
   # ============================================================================
   # Machine Creation

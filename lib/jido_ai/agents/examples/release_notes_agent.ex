@@ -106,5 +106,5 @@ defmodule Jido.AI.Examples.ReleaseNotesAgent do
     - Highlight breaking changes prominently
     """
 
-  def cli_adapter, do: Jido.AI.CLI.Adapters.GoT
+  def cli_adapter, do: Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter
 end

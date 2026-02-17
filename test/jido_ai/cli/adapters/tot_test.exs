@@ -1,7 +1,7 @@
-defmodule Jido.AI.CLI.Adapters.ToTTest do
+defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.CLI.Adapters.ToT, as: ToTAdapter
+  alias Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter, as: ToTAdapter
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do

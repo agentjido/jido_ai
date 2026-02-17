@@ -1,7 +1,7 @@
-defmodule Jido.AI.CLI.Adapters.CoTTest do
+defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.CLI.Adapters.CoT, as: CoTAdapter
+  alias Jido.AI.Reasoning.ChainOfThought.CLIAdapter, as: CoTAdapter
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do

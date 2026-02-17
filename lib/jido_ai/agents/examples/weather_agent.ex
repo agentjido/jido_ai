@@ -41,6 +41,8 @@ defmodule Jido.AI.Examples.WeatherAgent do
 
   Uses the free National Weather Service API (no API key required).
   Works best with US locations. For international locations, coordinates are needed.
+  Internally this agent uses delegated ReAct worker orchestration with per-request
+  event traces capped at 2000 runtime events.
   """
 
   use Jido.AI.Agent,
@@ -86,6 +88,13 @@ defmodule Jido.AI.Examples.WeatherAgent do
          - Boston: 42.3601,-71.0589
     3. Fetch the appropriate forecast using the coordinates
     4. Provide practical advice based on conditions
+    5. Handle relative timeframes carefully:
+       - Do not assume what "today" is.
+       - If the user asks "this weekend", "tomorrow", etc., anchor to returned forecast periods.
+       - Prefer explicit weekdays/dates from tool output when available.
+       - Never relabel Saturday/Sunday as "today" unless the period is explicitly "Today"/"Tonight".
+       - Do not add your own parenthetical labels like "(Today)" or "(Tomorrow)".
+       - Use period names verbatim from tool output when possible.
 
     Always include:
     - Temperature range

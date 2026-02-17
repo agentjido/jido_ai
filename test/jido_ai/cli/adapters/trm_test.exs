@@ -1,7 +1,7 @@
-defmodule Jido.AI.CLI.Adapters.TRMTest do
+defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.CLI.Adapters.TRM, as: TRMAdapter
+  alias Jido.AI.Reasoning.TRM.CLIAdapter, as: TRMAdapter
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do

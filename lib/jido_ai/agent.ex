@@ -4,7 +4,7 @@ defmodule Jido.AI.Agent do
   @moduledoc """
   Base macro for Jido.AI agents with ReAct strategy implied.
 
-  Wraps `use Jido.Agent` with `Jido.AI.Strategies.ReAct` wired in,
+  Wraps `use Jido.Agent` with `Jido.AI.Reasoning.ReAct.Strategy` wired in,
   plus standard state fields and helper functions.
 
   ## Usage
@@ -258,7 +258,7 @@ defmodule Jido.AI.Agent do
         description: unquote(description),
         tags: unquote(tags),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.ReAct.Strategy, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
       unquote(__MODULE__.compatibility_overrides_ast())
@@ -358,7 +358,6 @@ defmodule Jido.AI.Agent do
 
         # Use RequestTracking to manage state
         agent = Request.start_request(agent, request_id, query)
-        emit_request_started_signal(agent, request_id, query)
 
         {:ok, agent, action}
       end
@@ -386,9 +385,10 @@ defmodule Jido.AI.Agent do
       @impl true
       def on_after_cmd(agent, {:ai_react_start, %{request_id: request_id}}, directives) do
         snap = strategy_snapshot(agent)
+        should_finalize? = request_pending?(agent, request_id) and snap.done?
 
         agent =
-          if snap.done? do
+          if should_finalize? do
             case snap.status do
               :success ->
                 agent =
@@ -440,9 +440,11 @@ defmodule Jido.AI.Agent do
       @impl true
       def on_after_cmd(agent, _action, directives) do
         snap = strategy_snapshot(agent)
+        request_id = agent.state[:last_request_id]
+        should_finalize? = is_binary(request_id) and request_pending?(agent, request_id) and snap.done?
 
         agent =
-          if snap.done? do
+          if should_finalize? do
             agent = %{
               agent
               | state:
@@ -452,33 +454,21 @@ defmodule Jido.AI.Agent do
                   })
             }
 
-            case agent.state[:last_request_id] do
-              nil ->
+            case snap.status do
+              :success ->
+                Request.complete_request(
+                  agent,
+                  request_id,
+                  snap.result,
+                  meta: jido_ai_agent_thinking_meta(snap)
+                )
+
+              :failure ->
+                reason = failure_reason(snap)
+                Request.fail_request(agent, request_id, reason)
+
+              _ ->
                 agent
-
-              request_id ->
-                case snap.status do
-                  :success ->
-                    agent =
-                      Request.complete_request(
-                        agent,
-                        request_id,
-                        snap.result,
-                        meta: jido_ai_agent_thinking_meta(snap)
-                      )
-
-                    emit_request_completed_signal(agent, request_id, snap.result)
-                    agent
-
-                  :failure ->
-                    reason = failure_reason(snap)
-                    agent = Request.fail_request(agent, request_id, reason)
-                    emit_request_failed_signal(agent, request_id, reason)
-                    agent
-
-                  _ ->
-                    agent
-                end
             end
           else
             agent
@@ -486,6 +476,15 @@ defmodule Jido.AI.Agent do
 
         {:ok, agent, directives}
       end
+
+      defp request_pending?(agent, request_id) when is_binary(request_id) do
+        case Request.get_request(agent, request_id) do
+          %{status: :pending} -> true
+          _ -> false
+        end
+      end
+
+      defp request_pending?(_agent, _request_id), do: false
 
       # Use a prefixed helper name to avoid collisions with user-defined functions
       # in modules that `use Jido.AI.Agent`.
@@ -519,21 +518,6 @@ defmodule Jido.AI.Agent do
           _ ->
             {:failed, :unknown, snap.result}
         end
-      end
-
-      defp emit_request_started_signal(agent, request_id, query) do
-        if lifecycle_signals_enabled?(agent) do
-          signal =
-            Signal.RequestStarted.new!(%{
-              request_id: request_id,
-              query: query,
-              run_id: request_id
-            })
-
-          Jido.AgentServer.cast(self(), signal)
-        end
-      rescue
-        _ -> :ok
       end
 
       defp emit_request_completed_signal(agent, request_id, result) do

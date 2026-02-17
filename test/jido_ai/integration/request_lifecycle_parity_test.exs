@@ -2,7 +2,11 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Directive
-  alias Jido.AI.Strategies.{Adaptive, ChainOfThought, GraphOfThoughts, TRM, TreeOfThoughts}
+  alias Jido.AI.Reasoning.Adaptive.Strategy, as: Adaptive
+  alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
+  alias Jido.AI.Reasoning.TRM.Strategy, as: TRM
+  alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
+  alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
 
   @strategies [
     {ChainOfThought, []},

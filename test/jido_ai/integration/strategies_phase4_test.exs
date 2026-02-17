@@ -19,11 +19,11 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
-  alias Jido.AI.Strategies.Adaptive
-  alias Jido.AI.Strategies.ChainOfThought
-  alias Jido.AI.Strategies.GraphOfThoughts
-  alias Jido.AI.Strategies.ReAct
-  alias Jido.AI.Strategies.TreeOfThoughts
+  alias Jido.AI.Reasoning.Adaptive.Strategy, as: Adaptive
+  alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
+  alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
+  alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
   alias Jido.Instruction
 
   # ============================================================================
@@ -72,7 +72,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       [directive] = directives
       assert %AgentDirective.SpawnAgent{} = directive
       assert directive.tag == :cot_worker
-      assert directive.agent == Jido.AI.Agents.Internal.CoTWorkerAgent
+      assert directive.agent == Jido.AI.Reasoning.ChainOfThought.Worker.Agent
     end
 
     test "CoT strategy produces step-by-step reasoning output" do
@@ -93,7 +93,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         params: %{
           parent_id: "parent",
           child_id: "child",
-          child_module: Jido.AI.Agents.Internal.CoTWorkerAgent,
+          child_module: Jido.AI.Reasoning.ChainOfThought.Worker.Agent,
           tag: :cot_worker,
           pid: self(),
           meta: %{}
@@ -248,7 +248,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       [directive] = directives
       assert %AgentDirective.SpawnAgent{} = directive
       assert directive.tag == :react_worker
-      assert directive.agent == Jido.AI.Agents.Internal.ReActWorkerAgent
+      assert directive.agent == Jido.AI.Reasoning.ReAct.Worker.Agent
     end
   end
 
@@ -266,8 +266,8 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert route_map["ai.cot.worker.event"] == {:strategy_cmd, :cot_worker_event}
       assert route_map["jido.agent.child.started"] == {:strategy_cmd, :cot_worker_child_started}
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :cot_worker_child_exit}
-      refute Map.has_key?(route_map, "ai.llm.response")
-      refute Map.has_key?(route_map, "ai.llm.delta")
+      assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
+      assert route_map["ai.llm.delta"] == Jido.Actions.Control.Noop
     end
 
     test "ToT signal_routes returns correct mappings" do
@@ -299,9 +299,9 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert route_map["ai.react.worker.event"] == {:strategy_cmd, :ai_react_worker_event}
       assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
-      refute Map.has_key?(route_map, "ai.llm.response")
-      refute Map.has_key?(route_map, "ai.tool.result")
-      refute Map.has_key?(route_map, "ai.llm.delta")
+      assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
+      assert route_map["ai.tool.result"] == Jido.Actions.Control.Noop
+      assert route_map["ai.llm.delta"] == Jido.Actions.Control.Noop
     end
 
     test "Adaptive signal_routes returns base routes before strategy selection" do
@@ -332,7 +332,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       assert %AgentDirective.SpawnAgent{} = directive
       assert directive.tag == :cot_worker
-      assert directive.agent == Jido.AI.Agents.Internal.CoTWorkerAgent
+      assert directive.agent == Jido.AI.Reasoning.ChainOfThought.Worker.Agent
     end
 
     test "ReAct start emits SpawnAgent directive in delegated mode" do
@@ -384,7 +384,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         params: %{
           parent_id: "parent",
           child_id: "child",
-          child_module: Jido.AI.Agents.Internal.ReActWorkerAgent,
+          child_module: Jido.AI.Reasoning.ReAct.Worker.Agent,
           tag: :react_worker,
           pid: self(),
           meta: %{}
@@ -506,7 +506,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         params: %{
           parent_id: "parent",
           child_id: "child",
-          child_module: Jido.AI.Agents.Internal.CoTWorkerAgent,
+          child_module: Jido.AI.Reasoning.ChainOfThought.Worker.Agent,
           tag: :cot_worker,
           pid: self(),
           meta: %{}
