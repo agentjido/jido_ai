@@ -397,7 +397,6 @@ defmodule Jido.AI.Security do
 
   defp validate_task_supervisor(_), do: {:error, :invalid_task_supervisor}
 
-  @dialyzer {:nowarn_function, wrap_with_timeout: 3}
   defp wrap_with_timeout(callback, timeout, task_supervisor) do
     fn arg ->
       case start_callback_task(task_supervisor, callback, arg) do

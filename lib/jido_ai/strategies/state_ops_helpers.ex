@@ -181,7 +181,6 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
   Note: This operation is meant for map-based pending_tool_calls.
   For list-based pending_tool_calls, use filter_pending_tools/1 instead.
   """
-  @dialyzer {:nowarn_function, remove_pending_tool: 1}
   @spec remove_pending_tool(String.t()) :: StateOp.DeletePath.t()
   def remove_pending_tool(tool_id) when is_binary(tool_id) do
     # Construct DeletePath struct directly to avoid dialyzer warning about
@@ -210,7 +209,6 @@ defmodule Jido.AI.Strategy.StateOpsHelpers do
       iex> StateOpsHelpers.clear_call_id()
       %Jido.Agent.StateOp.DeletePath{path: [:current_llm_call_id]}
   """
-  @dialyzer {:nowarn_function, clear_call_id: 0}
   @spec clear_call_id() :: StateOp.DeletePath.t()
   def clear_call_id do
     StateOp.delete_path([:current_llm_call_id])

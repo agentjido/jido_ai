@@ -57,10 +57,6 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
   alias Jido.AI.Turn
   alias ReqLLM.Context
 
-  @dialyzer [
-    {:nowarn_function, run: 2}
-  ]
-
   @inference_prompt """
   You are an expert logical reasoner. Your task is to draw valid inferences from given premises.
 

@@ -12,7 +12,7 @@ Thank you for your interest in contributing to Jido.AI!
 ## Pull Request Process
 
 1. Ensure all tests pass: `mix test`
-2. Run quality checks: `mix quality` (format, compile, docs checks, strict Credo, dialyzer review policy, doctor, dialyzer)
+2. Run quality checks: `mix quality` (format, compile, docs checks, strict Credo, doctor, dialyzer)
 3. Update documentation as needed
 4. Use conventional commit messages
 
@@ -51,13 +51,6 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 - Ensure existing tests pass
 - Use `test/support/` for shared test helpers
 - Tag flaky tests with `@tag :flaky`
-
-## Dialyzer Ignore Policy
-
-- Keep warning patterns in `.dialyzer_ignore.exs`
-- Track reviewed metadata in `.dialyzer_ignore_metadata.exs`
-- Every ignore must include `owner`, `rationale`, `cleanup_plan`, `reviewed_by`, and `reviewed_on` (ISO date)
-- `mix quality` fails when ignore entries and metadata are out of sync
 
 ## Questions?
 
