@@ -123,6 +123,9 @@ defmodule Jido.AI.Strategies.Adaptive do
   @llm_result :adaptive_llm_result
   @llm_partial :adaptive_llm_partial
   @request_error :adaptive_request_error
+  @react_worker_event :adaptive_react_worker_event
+  @child_started :adaptive_child_started
+  @child_exit :adaptive_child_exit
 
   @doc "Returns the action atom for starting an adaptive exploration."
   @spec start_action() :: :adaptive_start
@@ -170,6 +173,34 @@ defmodule Jido.AI.Strategies.Adaptive do
         }),
       doc: "Handle request lifecycle rejection (delegated to selected strategy)",
       name: "adaptive.request_error"
+    },
+    @react_worker_event => %{
+      schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
+      doc: "Handle delegated ReAct worker runtime event (ReAct only)",
+      name: "ai.react.worker.event"
+    },
+    @child_started => %{
+      schema:
+        Zoi.object(%{
+          parent_id: Zoi.string() |> Zoi.optional(),
+          child_id: Zoi.string() |> Zoi.optional(),
+          child_module: Zoi.any() |> Zoi.optional(),
+          tag: Zoi.any(),
+          pid: Zoi.any(),
+          meta: Zoi.map() |> Zoi.default(%{})
+        }),
+      doc: "Handle child started lifecycle signal (ReAct delegation)",
+      name: "jido.agent.child.started"
+    },
+    @child_exit => %{
+      schema:
+        Zoi.object(%{
+          tag: Zoi.any(),
+          pid: Zoi.any(),
+          reason: Zoi.any()
+        }),
+      doc: "Handle child exit lifecycle signal (ReAct delegation)",
+      name: "jido.agent.child.exit"
     }
   }
 
@@ -187,6 +218,9 @@ defmodule Jido.AI.Strategies.Adaptive do
       {"ai.llm.response", {:strategy_cmd, @llm_result}},
       {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
       {"ai.request.error", {:strategy_cmd, @request_error}},
+      {"ai.react.worker.event", {:strategy_cmd, @react_worker_event}},
+      {"jido.agent.child.started", {:strategy_cmd, @child_started}},
+      {"jido.agent.child.exit", {:strategy_cmd, @child_exit}},
       # Usage report is emitted for observability but doesn't need processing
       {"ai.usage", Jido.Actions.Control.Noop}
     ]
@@ -419,6 +453,9 @@ defmodule Jido.AI.Strategies.Adaptive do
           @llm_result -> llm_result_action_for(strategy_type)
           @llm_partial -> llm_partial_action_for(strategy_type)
           @request_error -> request_error_action_for(strategy_type)
+          @react_worker_event -> react_worker_event_action_for(strategy_type)
+          @child_started -> child_started_action_for(strategy_type)
+          @child_exit -> child_exit_action_for(strategy_type)
           other -> other
         end
 
@@ -471,6 +508,15 @@ defmodule Jido.AI.Strategies.Adaptive do
   defp request_error_action_for(:tot), do: :tot_request_error
   defp request_error_action_for(:got), do: :got_request_error
   defp request_error_action_for(:trm), do: :trm_request_error
+
+  defp react_worker_event_action_for(:react), do: :ai_react_worker_event
+  defp react_worker_event_action_for(_), do: @react_worker_event
+
+  defp child_started_action_for(:react), do: :ai_react_worker_child_started
+  defp child_started_action_for(_), do: @child_started
+
+  defp child_exit_action_for(:react), do: :ai_react_worker_child_exit
+  defp child_exit_action_for(_), do: @child_exit
 
   defp select_strategy_for_task(prompt, config) do
     # Check for manual override

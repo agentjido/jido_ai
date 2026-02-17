@@ -32,10 +32,10 @@ defmodule Jido.AI.ReActAgentTest do
     assert config.runtime_adapter == true
   end
 
-  test "allows runtime adapter opt-out" do
+  test "ignores runtime adapter opt-out and stays delegated" do
     agent = RuntimeOptOutAgent.new()
     config = agent |> StratState.get(%{}) |> Map.get(:config, %{})
 
-    assert config.runtime_adapter == false
+    assert config.runtime_adapter == true
   end
 end

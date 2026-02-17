@@ -30,8 +30,8 @@ defmodule Jido.AI.Agent do
   - `:tool_timeout_ms` - Per-attempt tool execution timeout in ms (default: 15_000)
   - `:tool_max_retries` - Number of retries for tool failures (default: 1)
   - `:tool_retry_backoff_ms` - Retry backoff in ms (default: 200)
-  - `:runtime_adapter` - Use Task-based ReAct runtime adapter (default: `false`)
-  - `:runtime_task_supervisor` - Optional Task.Supervisor used by runtime adapter
+  - `:runtime_adapter` - Deprecated compatibility flag (delegated ReAct runtime is always enabled)
+  - `:runtime_task_supervisor` - Optional Task.Supervisor used by delegated ReAct runtime
   - `:observability` - Observability options map
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`)
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
@@ -184,7 +184,9 @@ defmodule Jido.AI.Agent do
     tool_timeout_ms = Keyword.get(opts, :tool_timeout_ms, 15_000)
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
     tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
-    runtime_adapter = Keyword.get(opts, :runtime_adapter, false)
+    # ReAct delegation is always enabled; keep runtime_adapter option for compatibility only.
+    _runtime_adapter_opt = Keyword.get(opts, :runtime_adapter, true)
+    runtime_adapter = true
     runtime_task_supervisor = Keyword.get(opts, :runtime_task_supervisor)
     observability = Keyword.get(opts, :observability, %{})
     # Don't extract tool_context here - it contains AST with module aliases

@@ -50,7 +50,6 @@ defmodule Jido.AI.Examples.WeatherAgent do
     tool_timeout_ms: 15_000,
     tool_max_retries: 1,
     tool_retry_backoff_ms: 200,
-    runtime_adapter: true,
     observability: %{
       emit_telemetry?: true,
       emit_lifecycle_signals?: true,
