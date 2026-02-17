@@ -410,6 +410,8 @@ defmodule Jido.AI.Request do
         req ->
           %{req | status: :failed, error: error, completed_at: System.system_time(:millisecond)}
       end)
+      |> Map.put(:last_request_id, request_id)
+      |> Map.put(:last_answer, "")
       |> Map.put(:completed, true)
 
     %{agent | state: state}

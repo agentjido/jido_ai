@@ -47,7 +47,7 @@ defmodule Jido.AI.Actions.LLM.Complete do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Security
+  alias Jido.AI.Error.Sanitize
   alias Jido.AI.Actions.Helpers
   alias ReqLLM.Context
 
@@ -91,11 +91,11 @@ defmodule Jido.AI.Actions.LLM.Complete do
   end
 
   defp sanitize_error_for_user(error) when is_struct(error) do
-    Security.sanitize_error_message(error)
+    Sanitize.message(error)
   end
 
   defp sanitize_error_for_user(error) when is_atom(error) do
-    Security.sanitize_error_message(error)
+    Sanitize.message(error)
   end
 
   defp sanitize_error_for_user(_error), do: "An error occurred"

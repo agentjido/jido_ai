@@ -53,7 +53,7 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Security
+  alias Jido.AI.Validation
   alias Jido.AI.Turn
   alias ReqLLM.Context
 
@@ -132,9 +132,9 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
   # Validates and sanitizes input parameters to prevent security issues
   defp validate_and_sanitize_params(params) do
     with {:ok, _premises} <-
-           Security.validate_string(params[:premises], max_length: Security.max_input_length()),
+           Validation.validate_string(params[:premises], max_length: Validation.max_input_length()),
          {:ok, _question} <-
-           Security.validate_string(params[:question], max_length: Security.max_input_length()),
+           Validation.validate_string(params[:question], max_length: Validation.max_input_length()),
          {:ok, _validated} <- validate_context_if_needed(params) do
       {:ok, params}
     else
@@ -144,7 +144,7 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
   end
 
   defp validate_context_if_needed(%{context: context}) when is_binary(context) do
-    Security.validate_string(context, max_length: Security.max_input_length())
+    Validation.validate_string(context, max_length: Validation.max_input_length())
   end
 
   defp validate_context_if_needed(_params), do: {:ok, nil}

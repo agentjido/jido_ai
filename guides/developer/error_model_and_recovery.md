@@ -29,7 +29,7 @@ After this guide, you can classify failures and pick the right recovery path.
 err = %{file: "/srv/app/lib/secret.ex", line: 18}
 
 %{user_message: user_message, log_message: log_message} =
-  Jido.AI.Security.sanitize_error_for_display(err)
+  Jido.AI.Error.Sanitize.for_display(err)
 
 IO.puts(user_message)
 Logger.error(log_message)

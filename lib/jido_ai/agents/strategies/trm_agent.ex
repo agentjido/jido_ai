@@ -24,6 +24,7 @@ defmodule Jido.AI.TRMAgent do
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:max_supervision_steps` - Maximum supervision iterations before termination (default: 5)
   - `:act_threshold` - Confidence threshold for early stopping (default: 0.9)
+  - `:policy` - Policy plugin config (`true` by default, `false` to disable, or map/keyword overrides)
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
@@ -94,9 +95,14 @@ defmodule Jido.AI.TRMAgent do
     model = Keyword.get(opts, :model, @default_model)
     max_supervision_steps = Keyword.get(opts, :max_supervision_steps, @default_max_supervision_steps)
     act_threshold = Keyword.get(opts, :act_threshold, @default_act_threshold)
-    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    user_plugins =
+      opts
+      |> Keyword.get(:plugins, [])
+      |> Jido.AI.PluginStack.normalize_user_plugins(__CALLER__)
+
+    policy = Keyword.get(opts, :policy, true)
+    plugins = Jido.AI.PluginStack.build(user_plugins, policy)
 
     strategy_opts = [
       model: model,
@@ -127,7 +133,7 @@ defmodule Jido.AI.TRMAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        plugins: unquote(ai_plugins) ++ unquote(plugins),
+        plugins: unquote(Macro.escape(plugins)),
         strategy: {Jido.AI.Strategies.TRM, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

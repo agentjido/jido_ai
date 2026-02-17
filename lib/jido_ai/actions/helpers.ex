@@ -28,7 +28,8 @@ defmodule Jido.AI.Actions.Helpers do
       end
   """
 
-  alias Jido.AI.Security
+  alias Jido.AI.Validation
+  alias Jido.AI.Error.Sanitize
   alias Jido.AI.Turn
 
   @doc """
@@ -158,8 +159,8 @@ defmodule Jido.AI.Actions.Helpers do
   * `opts` - Validation options:
     * `:required_prompt` - Whether prompt is required (default: true)
     * `:required_system_prompt` - Whether system_prompt must be validated if present
-    * `:max_prompt_length` - Max length for prompt (default: Security.max_input_length())
-    * `:max_system_prompt_length` - Max length for system_prompt (default: Security.max_prompt_length())
+    * `:max_prompt_length` - Max length for prompt (default: Validation.max_input_length())
+    * `:max_system_prompt_length` - Max length for system_prompt (default: Validation.max_prompt_length())
 
   ## Returns
 
@@ -176,8 +177,8 @@ defmodule Jido.AI.Actions.Helpers do
   """
   def validate_and_sanitize_input(params, opts \\ []) do
     required_prompt = Keyword.get(opts, :required_prompt, true)
-    max_prompt_length = Keyword.get(opts, :max_prompt_length, Security.max_input_length())
-    max_system_prompt_length = Keyword.get(opts, :max_system_prompt_length, Security.max_prompt_length())
+    max_prompt_length = Keyword.get(opts, :max_prompt_length, Validation.max_input_length())
+    max_system_prompt_length = Keyword.get(opts, :max_system_prompt_length, Validation.max_prompt_length())
 
     with {:ok, _prompt} <- validate_prompt_if_required(params[:prompt], required_prompt, max_prompt_length),
          {:ok, _validated} <- validate_system_prompt_if_present(params, max_system_prompt_length) do
@@ -192,13 +193,13 @@ defmodule Jido.AI.Actions.Helpers do
   defp validate_prompt_if_required("", true, _max_length), do: {:error, :empty_string}
 
   defp validate_prompt_if_required(prompt, true, max_length) when is_binary(prompt) do
-    Security.validate_string(prompt, max_length: max_length)
+    Validation.validate_string(prompt, max_length: max_length)
   end
 
   defp validate_prompt_if_required(_, false, _max_length), do: {:ok, nil}
 
   defp validate_system_prompt_if_present(%{system_prompt: system_prompt}, max_length) when is_binary(system_prompt) do
-    Security.validate_string(system_prompt, max_length: max_length)
+    Validation.validate_string(system_prompt, max_length: max_length)
   end
 
   defp validate_system_prompt_if_present(_params, _max_length), do: {:ok, nil}
@@ -206,7 +207,7 @@ defmodule Jido.AI.Actions.Helpers do
   @doc """
   Sanitizes an error for user-facing display.
 
-  Uses Jido.AI.Security.sanitize_error_message/1 to convert
+  Uses `Jido.AI.Error.Sanitize.message/1` to convert
   detailed errors into generic user-safe messages.
 
   ## Parameters
@@ -226,7 +227,7 @@ defmodule Jido.AI.Actions.Helpers do
       "Request timed out"
   """
   def sanitize_error(error) do
-    Security.sanitize_error_message(error)
+    Sanitize.message(error)
   end
 
   @doc """

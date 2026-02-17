@@ -12,6 +12,7 @@ After this guide, you can choose plugin vs action extension points without coupl
 - `Jido.AI.Plugins.Planning`
 - `Jido.AI.Plugins.Streaming`
 - `Jido.AI.Plugins.TaskSupervisor`
+- `Jido.AI.Plugins.Policy` (default-on middleware for AI signal policy enforcement)
 
 ## Compose In Agent Definition
 

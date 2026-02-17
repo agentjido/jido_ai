@@ -22,6 +22,7 @@ defmodule Jido.AI.CoTAgent do
   - `:description` - Agent description (default: "CoT agent \#{name}")
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:system_prompt` - Custom system prompt for CoT reasoning
+  - `:policy` - Policy plugin config (`true` by default, `false` to disable, or map/keyword overrides)
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
@@ -81,9 +82,14 @@ defmodule Jido.AI.CoTAgent do
     description = Keyword.get(opts, :description, "CoT agent #{name}")
     model = Keyword.get(opts, :model, @default_model)
     system_prompt = Keyword.get(opts, :system_prompt)
-    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    user_plugins =
+      opts
+      |> Keyword.get(:plugins, [])
+      |> Jido.AI.PluginStack.normalize_user_plugins(__CALLER__)
+
+    policy = Keyword.get(opts, :policy, true)
+    plugins = Jido.AI.PluginStack.build(user_plugins, policy)
 
     strategy_opts =
       [model: model]
@@ -114,7 +120,7 @@ defmodule Jido.AI.CoTAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        plugins: unquote(ai_plugins) ++ unquote(plugins),
+        plugins: unquote(Macro.escape(plugins)),
         strategy: {Jido.AI.Strategies.ChainOfThought, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

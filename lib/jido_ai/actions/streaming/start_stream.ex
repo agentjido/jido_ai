@@ -45,7 +45,8 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Security
+  alias Jido.AI.Streaming.ID
+  alias Jido.AI.Validation
   alias Jido.AI.Actions.Streaming.ProcessTokens
   alias Jido.AI.Streaming.Registry
   alias ReqLLM.Context
@@ -55,7 +56,7 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
     with {:ok, validated_params} <- validate_and_sanitize_params(params),
          {:ok, model} <- resolve_model(validated_params[:model]),
          {:ok, req_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
-         {:ok, stream_id} <- Security.generate_stream_id() |> Security.validate_stream_id(),
+         {:ok, stream_id} <- ID.generate() |> ID.validate(),
          opts = build_opts(validated_params),
          {:ok, stream_response} <- ReqLLM.stream_text(model, req_context.messages, opts),
          {:ok, _entry} <- register_stream(stream_id, model, stream_response, validated_params),
@@ -155,7 +156,7 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
 
   defp validate_and_sanitize_params(params) do
     with {:ok, _prompt} <-
-           Security.validate_string(params[:prompt], max_length: Security.max_input_length()),
+           Validation.validate_string(params[:prompt], max_length: Validation.max_input_length()),
          {:ok, _validated} <- validate_system_prompt_if_needed(params),
          {:ok, on_token} <- validate_callback_if_needed(params[:on_token]) do
       {:ok, Map.put(params, :on_token, on_token)}
@@ -166,7 +167,7 @@ defmodule Jido.AI.Actions.Streaming.StartStream do
   end
 
   defp validate_system_prompt_if_needed(%{system_prompt: system_prompt}) when is_binary(system_prompt) do
-    Security.validate_string(system_prompt, max_length: Security.max_prompt_length())
+    Validation.validate_string(system_prompt, max_length: Validation.max_prompt_length())
   end
 
   defp validate_system_prompt_if_needed(_params), do: {:ok, nil}

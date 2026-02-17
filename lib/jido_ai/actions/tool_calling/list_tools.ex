@@ -41,7 +41,7 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Security
+  alias Jido.AI.Validation
 
   @doc """
   Executes the list tools action.
@@ -92,7 +92,7 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
   defp validate_filter_if_present(nil), do: {:ok, nil}
 
   defp validate_filter_if_present(filter) when is_binary(filter) do
-    Security.validate_string(filter, max_length: 1000, allow_empty: true)
+    Validation.validate_string(filter, max_length: 1000, allow_empty: true)
   end
 
   defp validate_filter_if_present(_), do: {:error, :invalid_filter}

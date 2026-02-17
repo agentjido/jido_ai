@@ -2,7 +2,8 @@
 
 You need defense-in-depth for prompts, callbacks, stream IDs, and user-visible errors.
 
-After this guide, you can apply `Jido.AI.Security` systematically.
+After this guide, you can apply `Jido.AI.Validation`, `Jido.AI.Error.Sanitize`,
+and `Jido.AI.Streaming.ID` systematically.
 
 ## Core Protections
 
@@ -10,14 +11,14 @@ After this guide, you can apply `Jido.AI.Security` systematically.
 - custom prompt hardening (`validate_custom_prompt/2`)
 - callback validation (`validate_callback/1`)
 - max turns capping (`validate_max_turns/1`)
-- error sanitization (`sanitize_error_message/2`)
-- stream ID generation/validation (`generate_stream_id/0`, `validate_stream_id/1`)
+- error sanitization (`Jido.AI.Error.Sanitize.message/2`)
+- stream ID generation/validation (`Jido.AI.Streaming.ID.generate/0`, `Jido.AI.Streaming.ID.validate/1`)
 
 ## Example
 
 ```elixir
-with {:ok, prompt} <- Jido.AI.Security.validate_and_sanitize_prompt(user_input),
-     {:ok, max_turns} <- Jido.AI.Security.validate_max_turns(requested_turns) do
+with {:ok, prompt} <- Jido.AI.Validation.validate_and_sanitize_prompt(user_input),
+     {:ok, max_turns} <- Jido.AI.Validation.validate_max_turns(requested_turns) do
   %{prompt: prompt, max_turns: max_turns}
 end
 ```

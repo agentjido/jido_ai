@@ -63,7 +63,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Security
+  alias Jido.AI.Validation
   alias Jido.AI.Turn
   alias ReqLLM.Context
 
@@ -160,7 +160,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
 
   defp build_analysis_system_prompt(:custom, custom) when is_binary(custom) do
     # Validate and sanitize custom prompt to prevent prompt injection
-    case Security.validate_custom_prompt(custom, max_length: Security.max_prompt_length()) do
+    case Validation.validate_custom_prompt(custom, max_length: Validation.max_prompt_length()) do
       {:ok, sanitized} -> sanitized
       {:error, _reason} -> "You are an expert analyst. Analyze the provided input."
     end
@@ -168,7 +168,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
 
   # Validates and sanitizes input parameters to prevent security issues
   defp validate_and_sanitize_params(params) do
-    with {:ok, _input} <- Security.validate_string(params[:input], max_length: Security.max_input_length()),
+    with {:ok, _input} <- Validation.validate_string(params[:input], max_length: Validation.max_input_length()),
          {:ok, _validated} <- validate_custom_prompt_if_needed(params) do
       {:ok, params}
     else
@@ -178,7 +178,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
   end
 
   defp validate_custom_prompt_if_needed(%{analysis_type: :custom, custom_prompt: custom}) do
-    Security.validate_custom_prompt(custom, max_length: Security.max_prompt_length())
+    Validation.validate_custom_prompt(custom, max_length: Validation.max_prompt_length())
   end
 
   defp validate_custom_prompt_if_needed(_params), do: {:ok, nil}

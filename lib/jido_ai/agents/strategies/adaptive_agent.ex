@@ -25,6 +25,7 @@ defmodule Jido.AI.AdaptiveAgent do
   - `:default_strategy` - Default strategy if analysis is inconclusive (default: `:react`)
   - `:available_strategies` - List of available strategies (default: `[:cot, :react, :tot, :got, :trm]`)
   - `:complexity_thresholds` - Map of thresholds for strategy selection
+  - `:policy` - Policy plugin config (`true` by default, `false` to disable, or map/keyword overrides)
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
@@ -103,9 +104,14 @@ defmodule Jido.AI.AdaptiveAgent do
     default_strategy = Keyword.get(opts, :default_strategy, @default_strategy)
     available_strategies = Keyword.get(opts, :available_strategies, @default_available_strategies)
     complexity_thresholds = Keyword.get(opts, :complexity_thresholds)
-    plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    user_plugins =
+      opts
+      |> Keyword.get(:plugins, [])
+      |> Jido.AI.PluginStack.normalize_user_plugins(__CALLER__)
+
+    policy = Keyword.get(opts, :policy, true)
+    plugins = Jido.AI.PluginStack.build(user_plugins, policy)
 
     strategy_opts =
       [
@@ -143,7 +149,7 @@ defmodule Jido.AI.AdaptiveAgent do
       use Jido.Agent,
         name: unquote(name),
         description: unquote(description),
-        plugins: unquote(ai_plugins) ++ unquote(plugins),
+        plugins: unquote(Macro.escape(plugins)),
         strategy: {Jido.AI.Strategies.Adaptive, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 

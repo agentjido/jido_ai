@@ -62,7 +62,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{Security, ToolAdapter, Turn}
+  alias Jido.AI.{ToolAdapter, Turn, Validation}
   alias ReqLLM.Context
 
   @dialyzer [
@@ -201,9 +201,9 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   # Validates and sanitizes input parameters to prevent security issues
   defp validate_and_sanitize_params(params) do
     with {:ok, _prompt} <-
-           Security.validate_string(params[:prompt], max_length: Security.max_input_length()),
+           Validation.validate_string(params[:prompt], max_length: Validation.max_input_length()),
          {:ok, _validated} <- validate_system_prompt_if_needed(params),
-         {:ok, max_turns} <- Security.validate_max_turns(params[:max_turns] || 10) do
+         {:ok, max_turns} <- Validation.validate_max_turns(params[:max_turns] || 10) do
       {:ok, Map.put(params, :max_turns, max_turns)}
     else
       {:error, :empty_string} -> {:error, :prompt_required}
@@ -212,7 +212,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   end
 
   defp validate_system_prompt_if_needed(%{system_prompt: system_prompt}) when is_binary(system_prompt) do
-    Security.validate_string(system_prompt, max_length: Security.max_prompt_length())
+    Validation.validate_string(system_prompt, max_length: Validation.max_prompt_length())
   end
 
   defp validate_system_prompt_if_needed(_params), do: {:ok, nil}

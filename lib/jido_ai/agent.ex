@@ -32,6 +32,7 @@ defmodule Jido.AI.Agent do
   - `:tool_retry_backoff_ms` - Retry backoff in ms (default: 200)
   - `:observability` - Observability options map
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`)
+  - `:policy` - Policy plugin config (`true` by default, `false` to disable, or map/keyword overrides)
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
@@ -185,10 +186,13 @@ defmodule Jido.AI.Agent do
     observability = Keyword.get(opts, :observability, %{})
     # Don't extract tool_context here - it contains AST with module aliases
     # that need to be evaluated in the calling module's context
-    plugins = Keyword.get(opts, :plugins, [])
+    user_plugins =
+      opts
+      |> Keyword.get(:plugins, [])
+      |> Jido.AI.PluginStack.normalize_user_plugins(__CALLER__)
 
-    # TaskSupervisorSkill is always included for per-instance task supervision
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    policy = Keyword.get(opts, :policy, true)
+    plugins = Jido.AI.PluginStack.build(user_plugins, policy)
 
     # Extract tool_context at macro expansion time
     # Use safe alias-only expansion instead of Code.eval_quoted
@@ -252,7 +256,7 @@ defmodule Jido.AI.Agent do
         name: unquote(name),
         description: unquote(description),
         tags: unquote(tags),
-        plugins: unquote(ai_plugins) ++ unquote(plugins),
+        plugins: unquote(Macro.escape(plugins)),
         strategy: {Jido.AI.Strategies.ReAct, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
