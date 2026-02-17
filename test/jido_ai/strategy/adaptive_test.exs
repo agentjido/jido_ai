@@ -1,6 +1,7 @@
 defmodule Jido.AI.Strategies.AdaptiveTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Strategies.Adaptive
   alias Jido.AI.Strategies.ChainOfThought
@@ -57,6 +58,8 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       assert {"ai.adaptive.query", {:strategy_cmd, :adaptive_start}} in routes
       assert {"ai.llm.response", {:strategy_cmd, :adaptive_llm_result}} in routes
       assert {"ai.llm.delta", {:strategy_cmd, :adaptive_llm_partial}} in routes
+      assert {"ai.cot.worker.event", {:strategy_cmd, :adaptive_cot_worker_event}} in routes
+      assert {"ai.react.worker.event", {:strategy_cmd, :adaptive_react_worker_event}} in routes
     end
   end
 
@@ -272,7 +275,7 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
       assert state[:selected_strategy] == TreeOfThoughts
     end
 
-    test "emits LLM directive after strategy selection" do
+    test "emits delegated directive after strategy selection" do
       {agent, ctx} = create_agent()
 
       instructions = [
@@ -281,9 +284,12 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
       {_agent, directives} = Adaptive.cmd(agent, instructions, ctx)
 
-      # Should have an LLM stream directive
+      # CoT now delegates via worker spawn; other strategies may still emit LLMStream
       assert directives != []
-      assert Enum.any?(directives, fn d -> match?(%Jido.AI.Directive.LLMStream{}, d) end)
+
+      assert Enum.any?(directives, fn d ->
+               match?(%Jido.AI.Directive.LLMStream{}, d) or match?(%AgentDirective.SpawnAgent{}, d)
+             end)
     end
   end
 
@@ -329,22 +335,53 @@ defmodule Jido.AI.Strategies.AdaptiveTest do
 
       # First, select a strategy
       start_instructions = [
-        %{action: :adaptive_start, params: %{prompt: "What is AI?"}}
+        %{action: :adaptive_start, params: %{prompt: "What is AI?", request_id: "req_adaptive_cot_1"}}
       ]
 
       {agent, directives} = Adaptive.cmd(agent, start_instructions, ctx)
+      [spawn | _] = directives
+      assert %AgentDirective.SpawnAgent{} = spawn
 
-      # Get the call_id from the directive
-      [directive | _] = directives
-      call_id = directive.id
+      child_started = %{
+        action: :adaptive_child_started,
+        params: %{
+          parent_id: "parent",
+          child_id: "child",
+          child_module: Jido.AI.Agents.Internal.CoTWorkerAgent,
+          tag: :cot_worker,
+          pid: self(),
+          meta: %{}
+        }
+      }
 
-      # Send LLM result back
+      {agent, [emit]} = Adaptive.cmd(agent, [child_started], ctx)
+      assert %AgentDirective.Emit{} = emit
+      assert emit.signal.type == "ai.cot.worker.start"
+
+      completion_event = %{
+        id: "evt_adaptive_cot_done",
+        seq: 1,
+        at_ms: 1_700_000_000_000,
+        run_id: "req_adaptive_cot_1",
+        request_id: "req_adaptive_cot_1",
+        iteration: 1,
+        kind: :request_completed,
+        llm_call_id: "cot_call_req_adaptive_cot_1",
+        tool_call_id: nil,
+        tool_name: nil,
+        data: %{
+          result: "Step 1: Think.\nConclusion: AI is artificial intelligence.",
+          termination_reason: :success,
+          usage: %{input_tokens: 10, output_tokens: 20}
+        }
+      }
+
       result_instructions = [
         %{
-          action: :adaptive_llm_result,
+          action: :adaptive_cot_worker_event,
           params: %{
-            call_id: call_id,
-            result: {:ok, %{text: "AI is artificial intelligence.", usage: %{input_tokens: 10, output_tokens: 20}}}
+            request_id: "req_adaptive_cot_1",
+            event: completion_event
           }
         }
       ]

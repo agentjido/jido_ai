@@ -123,6 +123,7 @@ defmodule Jido.AI.Strategies.Adaptive do
   @llm_result :adaptive_llm_result
   @llm_partial :adaptive_llm_partial
   @request_error :adaptive_request_error
+  @cot_worker_event :adaptive_cot_worker_event
   @react_worker_event :adaptive_react_worker_event
   @child_started :adaptive_child_started
   @child_exit :adaptive_child_exit
@@ -174,6 +175,11 @@ defmodule Jido.AI.Strategies.Adaptive do
       doc: "Handle request lifecycle rejection (delegated to selected strategy)",
       name: "adaptive.request_error"
     },
+    @cot_worker_event => %{
+      schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
+      doc: "Handle delegated CoT worker runtime event (CoT only)",
+      name: "ai.cot.worker.event"
+    },
     @react_worker_event => %{
       schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
       doc: "Handle delegated ReAct worker runtime event (ReAct only)",
@@ -218,6 +224,7 @@ defmodule Jido.AI.Strategies.Adaptive do
       {"ai.llm.response", {:strategy_cmd, @llm_result}},
       {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
       {"ai.request.error", {:strategy_cmd, @request_error}},
+      {"ai.cot.worker.event", {:strategy_cmd, @cot_worker_event}},
       {"ai.react.worker.event", {:strategy_cmd, @react_worker_event}},
       {"jido.agent.child.started", {:strategy_cmd, @child_started}},
       {"jido.agent.child.exit", {:strategy_cmd, @child_exit}},
@@ -453,6 +460,7 @@ defmodule Jido.AI.Strategies.Adaptive do
           @llm_result -> llm_result_action_for(strategy_type)
           @llm_partial -> llm_partial_action_for(strategy_type)
           @request_error -> request_error_action_for(strategy_type)
+          @cot_worker_event -> cot_worker_event_action_for(strategy_type)
           @react_worker_event -> react_worker_event_action_for(strategy_type)
           @child_started -> child_started_action_for(strategy_type)
           @child_exit -> child_exit_action_for(strategy_type)
@@ -509,12 +517,17 @@ defmodule Jido.AI.Strategies.Adaptive do
   defp request_error_action_for(:got), do: :got_request_error
   defp request_error_action_for(:trm), do: :trm_request_error
 
+  defp cot_worker_event_action_for(:cot), do: :cot_worker_event
+  defp cot_worker_event_action_for(_), do: @cot_worker_event
+
   defp react_worker_event_action_for(:react), do: :ai_react_worker_event
   defp react_worker_event_action_for(_), do: @react_worker_event
 
+  defp child_started_action_for(:cot), do: :cot_worker_child_started
   defp child_started_action_for(:react), do: :ai_react_worker_child_started
   defp child_started_action_for(_), do: @child_started
 
+  defp child_exit_action_for(:cot), do: :cot_worker_child_exit
   defp child_exit_action_for(:react), do: :ai_react_worker_child_exit
   defp child_exit_action_for(_), do: @child_exit
 
