@@ -1,14 +1,8 @@
 # CLI Workflows
 
-You want fast interactive chat, one-shot automation, or batch processing from shell workflows.
+You want fast one-shot automation or batch processing from shell workflows.
 
-After this guide, you can run `mix jido_ai` in chat, one-shot, and stdin modes.
-
-## Interactive Chat
-
-```bash
-mix jido_ai
-```
+After this guide, you can run `mix jido_ai` in one-shot and stdin modes.
 
 ## One-Shot Query
 
@@ -34,15 +28,6 @@ mix jido_ai --agent MyApp.WeatherAgent "Will it rain in Seattle?"
 mix jido_ai.skill list priv/skills
 mix jido_ai.skill validate priv/skills --strict
 ```
-
-## Failure Mode: TUI Cannot Start
-
-Symptom:
-- interactive mode errors in non-terminal environments
-
-Fix:
-- use one-shot mode (`mix jido_ai "..."`)
-- or stdin batch mode with `--stdin`
 
 ## Defaults You Should Know
 

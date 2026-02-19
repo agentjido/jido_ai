@@ -36,7 +36,7 @@ raw = [
 thread = Thread.new() |> Thread.append_messages(raw)
 ```
 
-Use `Jido.AI.Text.extract_text/1` when normalizing diverse provider response shapes.
+Use `Jido.AI.Turn.extract_text/1` when normalizing diverse provider response shapes.
 
 ## Failure Mode: Unexpected Missing Context
 

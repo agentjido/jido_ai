@@ -18,7 +18,7 @@ This guide is the quick inventory of built-in `Jido.AI.Actions.*` modules and wh
 - `Jido.AI.Actions.ToolCalling.CallWithTools`
   - LLM call with tool schema exposure and optional auto-execution loop.
 - `Jido.AI.Actions.ToolCalling.ExecuteTool`
-  - Execute a tool by name through `Jido.AI.Executor`.
+  - Execute a tool by name through `Jido.AI.Turn`.
 - `Jido.AI.Actions.ToolCalling.ListTools`
   - Enumerate available tools and optional schemas.
 

@@ -54,12 +54,8 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Security
-  alias Jido.AI.Text
+  alias Jido.AI.Turn
   alias ReqLLM.Context
-
-  @dialyzer [
-    {:nowarn_function, run: 2}
-  ]
 
   @inference_prompt """
   You are an expert logical reasoner. Your task is to draw valid inferences from given premises.
@@ -167,8 +163,8 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
 
   defp format_result(response, model) do
     %{
-      result: Text.extract_text(response),
-      reasoning: Text.extract_text(response),
+      result: Turn.extract_text(response),
+      reasoning: Turn.extract_text(response),
       model: model,
       usage: Helpers.extract_usage(response)
     }

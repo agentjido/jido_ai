@@ -4,7 +4,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   These tests verify that all Phase 2 components work together correctly:
   - Registry manages Actions
-  - Executor executes via Registry lookup
+  - Turn executes tools via Registry lookup
   - ReqLLM tool format generation
   - Error handling flows
 
@@ -13,8 +13,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Executor
   alias Jido.AI.ToolAdapter
+  alias Jido.AI.Turn
 
   # ============================================================================
   # Test Actions
@@ -121,7 +121,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   setup do
     tools_map =
-      Executor.build_tools_map([
+      Turn.build_tools_map([
         TestActions.Calculator,
         TestActions.ContextAware,
         TestActions.FailingAction,
@@ -134,18 +134,18 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   end
 
   # ============================================================================
-  # Section 2.5.1: Tools Map and Executor Integration
+  # Section 2.5.1: Tools Map and Turn Integration
   # ============================================================================
 
-  describe "2.5.1 Tools Map and Executor Integration" do
+  describe "2.5.1 Tools Map and Turn Integration" do
     test "build tools map → execute by name → get result", %{tools: tools} do
       # Verify tools map has calculator
       assert Map.has_key?(tools, "calculator")
       assert tools["calculator"] == TestActions.Calculator
 
-      # Execute via Executor with string keys (like LLM would provide)
+      # Execute via Turn with string keys (like LLM would provide)
       result =
-        Executor.execute("calculator", %{"operation" => "add", "a" => "5", "b" => "3"}, %{}, tools: tools)
+        Turn.execute("calculator", %{"operation" => "add", "a" => "5", "b" => "3"}, %{}, tools: tools)
 
       assert {:ok, %{result: 8}} = result
     end
@@ -155,8 +155,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert Map.has_key?(tools, "echo")
       assert tools["echo"] == TestActions.Echo
 
-      # Execute via Executor
-      result = Executor.execute("echo", %{"message" => "hello world"}, %{}, tools: tools)
+      # Execute via Turn
+      result = Turn.execute("echo", %{"message" => "hello world"}, %{}, tools: tools)
 
       assert {:ok, %{echoed: "hello world"}} = result
     end
@@ -167,7 +167,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       # Execute each action
       assert {:ok, %{result: 6}} =
-               Executor.execute(
+               Turn.execute(
                  "calculator",
                  %{"operation" => "multiply", "a" => "2", "b" => "3"},
                  %{},
@@ -175,22 +175,22 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
                )
 
       assert {:ok, %{echoed: "test"}} =
-               Executor.execute("echo", %{"message" => "test"}, %{}, tools: tools)
+               Turn.execute("echo", %{"message" => "test"}, %{}, tools: tools)
 
       assert {:ok, %{result: "HELLO"}} =
-               Executor.execute("uppercase", %{"text" => "hello"}, %{}, tools: tools)
+               Turn.execute("uppercase", %{"text" => "hello"}, %{}, tools: tools)
     end
 
-    test "executor handles context for actions", %{tools: tools} do
+    test "turn execution handles context for actions", %{tools: tools} do
       context = %{user_id: "user_123", role: "admin"}
-      result = Executor.execute("context_aware", %{"key" => "user_id"}, context, tools: tools)
+      result = Turn.execute("context_aware", %{"key" => "user_id"}, context, tools: tools)
 
       assert {:ok, %{key: "user_id", value: "user_123"}} = result
     end
 
-    test "executor handles context for context reader action", %{tools: tools} do
+    test "turn execution handles context for context reader action", %{tools: tools} do
       context = %{api_key: "secret_key", environment: "test"}
-      result = Executor.execute("context_reader", %{"key" => "environment"}, context, tools: tools)
+      result = Turn.execute("context_reader", %{"key" => "environment"}, context, tools: tools)
 
       assert {:ok, %{key: "environment", value: "test"}} = result
     end
@@ -273,7 +273,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   describe "2.5.3 End-to-End Tool Calling" do
     test "executor handles tool not found gracefully", %{tools: tools} do
-      result = Executor.execute("nonexistent_tool", %{}, %{}, tools: tools)
+      result = Turn.execute("nonexistent_tool", %{}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.type == :not_found
@@ -283,7 +283,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
     test "executor handles tool execution errors gracefully", %{tools: tools} do
       result =
-        Executor.execute("failing_action", %{"message" => "Something went wrong"}, %{}, tools: tools)
+        Turn.execute("failing_action", %{"message" => "Something went wrong"}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -293,7 +293,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
     test "executor handles validation errors for missing required params", %{tools: tools} do
       # Missing required parameters
-      result = Executor.execute("calculator", %{}, %{}, tools: tools)
+      result = Turn.execute("calculator", %{}, %{}, tools: tools)
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -303,7 +303,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     test "executor normalizes string keys to atom keys", %{tools: tools} do
       # LLM provides string keys
       result =
-        Executor.execute("calculator", %{"operation" => "add", "a" => 10, "b" => 20}, %{}, tools: tools)
+        Turn.execute("calculator", %{"operation" => "add", "a" => 10, "b" => 20}, %{}, tools: tools)
 
       assert {:ok, %{result: 30}} = result
     end
@@ -311,7 +311,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     test "executor parses string numbers to integers", %{tools: tools} do
       # LLM might provide numbers as strings
       result =
-        Executor.execute("calculator", %{"operation" => "add", "a" => "15", "b" => "25"}, %{}, tools: tools)
+        Turn.execute("calculator", %{"operation" => "add", "a" => "15", "b" => "25"}, %{}, tools: tools)
 
       assert {:ok, %{result: 40}} = result
     end
@@ -332,18 +332,18 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
         end
       end
 
-      slow_tools = Executor.build_tools_map([SlowAction])
+      slow_tools = Turn.build_tools_map([SlowAction])
 
       # Should complete within timeout
       assert {:ok, %{completed: true}} =
-               Executor.execute("slow_action", %{"delay" => "50"}, %{},
+               Turn.execute("slow_action", %{"delay" => "50"}, %{},
                  tools: slow_tools,
                  timeout: 1000
                )
 
       # Should timeout
       result =
-        Executor.execute("slow_action", %{"delay" => "500"}, %{}, tools: slow_tools, timeout: 100)
+        Turn.execute("slow_action", %{"delay" => "500"}, %{}, tools: slow_tools, timeout: 100)
 
       assert {:error, error} = result
       assert error.type == :timeout
@@ -368,7 +368,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       # 3. Execute the tool call
       result =
-        Executor.execute(
+        Turn.execute(
           simulated_tool_call.name,
           simulated_tool_call.arguments,
           %{},
@@ -377,15 +377,15 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       assert {:ok, %{result: 56}} = result
 
-      # 4. Format result for LLM (would be added back to conversation)
-      formatted = Executor.format_result(elem(result, 1))
-      assert formatted == %{result: 56}
+      # 4. Format result for tool message content (would be added back to conversation)
+      formatted = Turn.format_tool_result_content(result)
+      assert formatted == "{\"result\":56}"
     end
 
     test "sequential tool calls maintain state correctly", %{tools: tools} do
       # First tool call
       {:ok, result1} =
-        Executor.execute(
+        Turn.execute(
           "calculator",
           %{"operation" => "add", "a" => "10", "b" => "20"},
           %{},
@@ -396,7 +396,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       # Second tool call using previous result
       {:ok, result2} =
-        Executor.execute(
+        Turn.execute(
           "calculator",
           %{"operation" => "multiply", "a" => Integer.to_string(result1.result), "b" => "2"},
           %{},
@@ -409,7 +409,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     test "error during tool execution returns structured error", %{tools: tools} do
       # Division by zero
       result =
-        Executor.execute(
+        Turn.execute(
           "calculator",
           %{"operation" => "divide", "a" => "10", "b" => "0"},
           %{},
@@ -429,7 +429,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
   describe "tools map lifecycle" do
     test "build_tools_map creates map with correct entries" do
-      tools = Executor.build_tools_map([TestActions.Calculator, TestActions.Echo])
+      tools = Turn.build_tools_map([TestActions.Calculator, TestActions.Echo])
 
       assert map_size(tools) == 2
       assert Map.has_key?(tools, "calculator")
@@ -437,11 +437,11 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
 
     test "tools map can be modified by rebuilding" do
-      tools1 = Executor.build_tools_map([TestActions.Calculator, TestActions.Echo])
+      tools1 = Turn.build_tools_map([TestActions.Calculator, TestActions.Echo])
       assert map_size(tools1) == 2
 
       # Build new map without calculator
-      tools2 = Executor.build_tools_map([TestActions.Echo])
+      tools2 = Turn.build_tools_map([TestActions.Echo])
       assert map_size(tools2) == 1
       refute Map.has_key?(tools2, "calculator")
       assert Map.has_key?(tools2, "echo")
@@ -469,17 +469,17 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       end
 
       # Later entry wins in build_tools_map
-      tools = Executor.build_tools_map([CalculatorV1, CalculatorV2])
+      tools = Turn.build_tools_map([CalculatorV1, CalculatorV2])
       assert tools["calculator"] == CalculatorV2
 
       # Execute should use V2
-      {:ok, result} = Executor.execute("calculator", %{}, %{}, tools: tools)
+      {:ok, result} = Turn.execute("calculator", %{}, %{}, tools: tools)
       assert result.version == 2
     end
   end
 
   describe "telemetry integration" do
-    test "executor emits telemetry events for successful execution", %{tools: tools} do
+    test "turn execution emits telemetry events for successful execution", %{tools: tools} do
       test_pid = self()
 
       :telemetry.attach_many(
@@ -494,7 +494,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
         nil
       )
 
-      Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "1"}, %{}, tools: tools)
+      Turn.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "1"}, %{}, tools: tools)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _}, %{tool_name: "calculator"}}
 
@@ -503,7 +503,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       :telemetry.detach("integration-test-handler")
     end
 
-    test "executor emits stop telemetry for not_found errors", %{tools: tools} do
+    test "turn execution emits stop telemetry for not_found errors", %{tools: tools} do
       test_pid = self()
 
       :telemetry.attach(
@@ -516,7 +516,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       )
 
       # Execute nonexistent tool - this emits a stop event, not exception
-      Executor.execute("nonexistent", %{}, %{}, tools: tools)
+      Turn.execute("nonexistent", %{}, %{}, tools: tools)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _},
                       %{tool_name: "nonexistent", result: {:error, %{type: :not_found}}}}
