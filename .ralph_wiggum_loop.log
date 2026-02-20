@@ -1156,3 +1156,65 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.1 seconds (2.1s async, 0.01s sync)
 8 tests, 0 failures (1636 excluded)
+1) changed files
+- `lib/jido_ai/plugins/reasoning/trm.ex`
+- `guides/developer/plugins_and_actions_composition.md`
+- `lib/examples/README.md`
+- `test/jido_ai/plugins/reasoning/trm_test.exs`
+
+2) tests/commands executed
+- Passed: `mix test test/jido_ai/plugins/reasoning/trm_test.exs`
+- Passed: `mix test test/jido_ai/skills/lifecycle_integration_test.exs test/jido_ai/skills/schema_integration_test.exs`
+- Passed (test.fast equivalent): `MIX_ENV=test mix test --exclude flaky --only stable_smoke`
+- Attempted but blocked by sandbox TCP restriction (`Mix.PubSub` loopback socket `:eperm`):
+  - `mix precommit`
+  - `mix test.fast`
+  - `mix doctor --summary`
+- Passed via in-process workaround for the blocked gates’ compile/docs steps:
+  - `elixir -e '... Mix.Task.run("format"...); Mix.Task.run("compile"...); Mix.Task.run("doctor", ["--summary","--raise"]) ...'`
+
+3) acceptance criteria coverage
+- Tests validate `strategy: :trm` injection and route contract:
+  - Added in `test/jido_ai/plugins/reasoning/trm_test.exs` (`signal_routes/1`, `handle_signal/2` override behavior).
+- Docs include TRM plugin usage and options:
+  - Added in `lib/jido_ai/plugins/reasoning/trm.ex` (`Usage`, `TRM Options`, contracts/defaults).
+  - Added TRM handoff/defaults contract in `guides/developer/plugins_and_actions_composition.md`.
+- Example matrix includes TRM plugin path:
+  - Added TRM plugin row and TRM plugin snippet in `lib/examples/README.md`.
+
+4) blockers/assumptions
+- Blocker: this sandbox blocks loopback TCP sockets used by `Mix.PubSub` (`:eperm`), which prevents literal execution of `mix precommit`, `mix test.fast`, and `mix doctor --summary`.
+- Assumption: outside this sandbox (normal local/CI), those exact commands should run normally with these code changes.
+==> git_hooks
+Compiling 16 files (.ex)
+    warning: GitHooks.Tasks.MFA.new/3 is deprecated. Use mfa without arity, all functions are expected to have arity 1 and receive a list with the git hook args
+    │
+ 61 │     MFA.new(mfa, git_hook_type, git_hook_args)
+    │         ~
+    │
+    └─ lib/git_hooks.ex:61:9: GitHooks.new_task/3
+    └─ lib/git_hooks.ex:65:9: GitHooks.new_task/3
+
+Generated git_hooks app
+==> jido_ai
+Compiling 40 files (.ex)
+Compiling 2 files (.ex)
+Generated jido_ai app
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 665235, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.3 seconds (2.3s async, 0.00s sync)
+8 tests, 0 failures (1648 excluded)

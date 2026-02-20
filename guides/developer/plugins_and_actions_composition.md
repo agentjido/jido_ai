@@ -236,6 +236,41 @@ Execution handoff:
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 - GoT option keys include `max_nodes`, `max_depth`, `aggregation_strategy`, `generation_prompt`, `connection_prompt`, and `aggregation_prompt`.
 
+### TRM Plugin Handoff (`reasoning.trm.run`)
+
+```elixir
+defmodule MyApp.TRMPluginAgent do
+  use Jido.AI.Agent,
+    name: "trm_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.TRM,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{max_supervision_steps: 6, act_threshold: 0.92}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.trm.run",
+    %{
+      prompt: "Recursively improve this emergency plan and stop when confidence is high.",
+      strategy: :cot,
+      options: %{max_supervision_steps: 7, act_threshold: 0.95}
+    },
+    source: "/cli"
+  )
+```
+
+Execution handoff:
+
+- Route dispatch maps `reasoning.trm.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
+- `Jido.AI.Plugins.Reasoning.TRM.handle_signal/2` overrides payload strategy to `strategy: :trm`.
+- `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
+- TRM option keys include `max_supervision_steps` and `act_threshold`.
+
 ## Chat Plugin Defaults Contract
 
 `Jido.AI.Plugins.Chat` mounts the following defaults unless overridden in plugin config:
@@ -297,6 +332,15 @@ Action-specific fields remain action-owned:
 `Jido.AI.Plugins.Reasoning.GraphOfThoughts` mounts the following defaults unless overridden in plugin config:
 
 - `strategy: :got`
+- `default_model: :reasoning`
+- `timeout: 30_000`
+- `options: %{}`
+
+## Reasoning TRM Plugin Defaults Contract
+
+`Jido.AI.Plugins.Reasoning.TRM` mounts the following defaults unless overridden in plugin config:
+
+- `strategy: :trm`
 - `default_model: :reasoning`
 - `timeout: 30_000`
 - `options: %{}`

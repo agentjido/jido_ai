@@ -54,6 +54,7 @@ Canonical weather overview module:
 | Reasoning AoT plugin | Mount `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` and send `reasoning.aot.run` for fixed `:aot` strategy execution. |
 | Reasoning ToT plugin | Mount `Jido.AI.Plugins.Reasoning.TreeOfThoughts` and send `reasoning.tot.run` for fixed `:tot` strategy execution with ToT options (`branching_factor`, `max_depth`, `traversal_strategy`). |
 | Reasoning GoT plugin | Mount `Jido.AI.Plugins.Reasoning.GraphOfThoughts` and send `reasoning.got.run` for fixed `:got` strategy execution with GoT options (`max_nodes`, `max_depth`, `aggregation_strategy`). |
+| Reasoning TRM plugin | Mount `Jido.AI.Plugins.Reasoning.TRM` and send `reasoning.trm.run` for fixed `:trm` strategy execution with TRM options (`max_supervision_steps`, `act_threshold`). |
 
 ```elixir
 defmodule MyApp.ChatAgent do
@@ -215,6 +216,34 @@ signal =
   )
 
 # Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.GraphOfThoughts
+```
+
+```elixir
+defmodule MyApp.TRMPluginAgent do
+  use Jido.AI.Agent,
+    name: "reasoning_trm_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.TRM,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{max_supervision_steps: 6, act_threshold: 0.92}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.trm.run",
+    %{
+      prompt: "Recursively improve this answer and stop when confidence is high.",
+      strategy: :cot,
+      options: %{max_supervision_steps: 7, act_threshold: 0.95}
+    },
+    source: "/cli"
+  )
+
+# Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.TRM
 ```
 
 ## Script Index

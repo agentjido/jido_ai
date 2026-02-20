@@ -3,6 +3,50 @@ require Jido.AI.Actions.Reasoning.RunStrategy
 defmodule Jido.AI.Plugins.Reasoning.TRM do
   @moduledoc """
   Plugin capability for isolated TRM runs.
+
+  ## Signal Contracts
+
+  - `reasoning.trm.run` -> `Jido.AI.Actions.Reasoning.RunStrategy`
+
+  ## Plugin-To-Action Handoff
+
+  This plugin always overrides the runtime strategy identity to `:trm`.
+  On `reasoning.trm.run`, `handle_signal/2` returns:
+
+  - `{:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}`
+  - `params` always includes `strategy: :trm` (caller strategy input is ignored)
+
+  `Jido.AI.Actions.Reasoning.RunStrategy` consumes the normalized params
+  and applies plugin defaults from context when explicit params are omitted.
+
+  ## Usage
+
+  Mount in an agent with fixed TRM defaults:
+
+      plugins: [
+        {Jido.AI.Plugins.Reasoning.TRM,
+         %{
+           default_model: :reasoning,
+           timeout: 30_000,
+           options: %{max_supervision_steps: 6, act_threshold: 0.92}
+         }}
+      ]
+
+  Then send `reasoning.trm.run` with caller input; plugin enforces `strategy: :trm`.
+
+  ## TRM Options
+
+  Use `options` for default TRM controls consumed by `RunStrategy`:
+
+  - `max_supervision_steps`
+  - `act_threshold`
+
+  ## Mount State Defaults
+
+  - `strategy`: `:trm`
+  - `default_model`: `:reasoning`
+  - `timeout`: `30_000`
+  - `options`: `%{}`
   """
 
   use Jido.Plugin,
