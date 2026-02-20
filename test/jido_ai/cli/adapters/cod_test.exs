@@ -37,6 +37,15 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
       opts = module.strategy_opts()
       assert opts[:system_prompt] == "Draft minimally."
     end
+
+    test "uses default values when not specified" do
+      module = CoDAdapter.create_ephemeral_agent(%{})
+      opts = module.strategy_opts()
+
+      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert is_binary(opts[:system_prompt])
+      assert opts[:system_prompt] != ""
+    end
   end
 
   describe "behavior implementation" do

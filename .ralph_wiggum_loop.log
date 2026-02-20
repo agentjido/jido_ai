@@ -316,3 +316,62 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.0 seconds (2.0s async, 0.01s sync)
 8 tests, 0 failures (1497 excluded)
+1. changed files
+- `guides/user/cli_workflows.md:5`
+- `lib/jido_ai/cli/adapter.ex:38`
+- `lib/mix/tasks/jido_ai.ex:61`
+- `test/jido_ai/cli/adapters/cod_test.exs:41`
+- `test/jido_ai/cli/adapters/react_test.exs:1`
+- `test/jido_ai/cli/adapters/adapter_resolution_test.exs:1`
+- `test/jido_ai/cli/adapters/mix_task_contract_test.exs:1`
+- `test/jido_ai/cli/adapters/guide_workflows_test.exs:1`
+
+2. tests/commands executed
+- `mix format` ✅
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test test/jido_ai/cli/adapters` ✅ (66 tests, 0 failures)
+- `MIX_ENV=test mix test --exclude flaky --only stable_smoke` ✅ (equivalent underlying command for `mix test.fast`)
+- `mix test.fast` ❌ blocked in this sandbox (Mix PubSub socket `:eperm`)
+- `mix doctor --summary` ❌ blocked in this sandbox (Mix PubSub socket `:eperm`)
+- `mix precommit` ❌ blocked in this sandbox (fails at doctor/pubsub path)
+- Supplemental workaround check (non-Mix-task invocation) for doctor summary in dev code paths: passed (`DOCTOR_SUMMARY_DEV_PASSED=true`) ✅
+
+3. acceptance criteria coverage
+- CLI docs include one-shot, stdin, and agent-module coverage:
+  - `guides/user/cli_workflows.md` now explicitly documents all three modes.
+- Adapter tests cover default + custom config for each strategy type:
+  - Added ReAct adapter test with default/custom assertions (`test/jido_ai/cli/adapters/react_test.exs`).
+  - Strengthened CoD defaults (`test/jido_ai/cli/adapters/cod_test.exs`).
+  - Existing AoT/Adaptive/CoD/CoT/ToT/GoT/TRM tests retained.
+  - Added explicit type-to-adapter mapping tests for full supported set (`test/jido_ai/cli/adapters/adapter_resolution_test.exs`).
+- CLI task options and error formatting coverage:
+  - Exposed/tested `option_parser_config/0`, `build_config/1`, `format_error/1`, and supported type list in `Mix.Tasks.JidoAi`.
+  - Added contract tests in `test/jido_ai/cli/adapters/mix_task_contract_test.exs`.
+- No stale paths or unsupported flags in CLI guide:
+  - Added guide contract tests for link validity and flag allowlist (`test/jido_ai/cli/adapters/guide_workflows_test.exs`).
+- Example gate (`mix jido_ai --type <strategy>`) coverage:
+  - Added “Strategy Type Sweep” guide block in `guides/user/cli_workflows.md`.
+
+4. blockers/assumptions
+- Blocker: this sandbox denies the TCP socket Mix PubSub uses for certain task paths (`:eperm`), which prevents `mix doctor --summary`, `mix test.fast` alias path, and `mix precommit` from completing as-is.
+- Assumption/workaround used: executed equivalent underlying stable-smoke test command directly (`MIX_ENV=test mix test --exclude flaky --only stable_smoke`) and validated doctor summary logic via direct Elixir invocation with dev build paths.
+- No commit/push/PR was performed.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 745464, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 1.9 seconds (1.9s async, 0.00s sync)
+8 tests, 0 failures (1517 excluded)
