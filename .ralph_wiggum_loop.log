@@ -1,0 +1,50 @@
+1) changed files
+- `test/jido_ai/stable_smoke_test.exs:7`  
+Added ST-OPS-001 smoke coverage for:
+- required story-card section contract (`Goal`, `Scope`, `Acceptance Criteria`, `Stable Test Gate`, `Docs Gate`, `Example Gate`, `Dependencies`)
+- traceability matrix ID parity and duplicate prevention
+- `ralph_wiggum_loop.sh` usage/example path assertions
+- ST-OPS-001 repo-path reference assertions in `specs/stories/01_ops_examples_core.md`
+
+2) tests/commands executed
+- `mix format test/jido_ai/stable_smoke_test.exs` ✅
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test.fast` ❌  
+  Failed in this sandbox with `failed to open a TCP socket in Mix.Sync.PubSub.subscribe/1, reason: :eperm`.
+- `mix precommit` ❌  
+  Same `Mix.PubSub` TCP socket `:eperm` failure (after formatting step passed).
+- `rg -n '^### ST-[A-Z]+-[0-9]{3}' specs/stories/*.md` ✅  
+  Returned all expected story headings.
+- Static validation scripts ✅  
+  Verified `story_ids=36`, `matrix_ids=36`, `ids_match=true`, `matrix_duplicates=[]`, section contract valid, and loop usage path strings present.
+
+3) acceptance criteria coverage
+- `specs/stories/00_traceability_matrix.md` exists and includes every ST ID: covered by `backlog scaffold files exist` + new matrix parity test in `test/jido_ai/stable_smoke_test.exs:51`.
+- Story files `01` through `06` exist with required section headings: covered by existing file-existence test and new section-contract test in `test/jido_ai/stable_smoke_test.exs:33`.
+- `rg -n '^### ST-[A-Z]+-[0-9]{3}' specs/stories/*.md` returns all expected IDs: command executed and output verified; parity also enforced by test helpers in `test/jido_ai/stable_smoke_test.exs:131`.
+- Loop usage text references executable path in repo layout: covered by new assertions in `test/jido_ai/stable_smoke_test.exs:74`.
+- Story examples reference real repo paths: covered for ST-OPS-001 card paths in `test/jido_ai/stable_smoke_test.exs:83`.
+
+4) blockers/assumptions
+- Blocker: `mix test.fast` and full `mix precommit` cannot complete in this environment because Mix requires opening a local TCP socket for `Mix.PubSub`, which is denied (`:eperm`).
+- Assumption: ST-OPS-001 scaffolding docs/matrix were already present in-repo; implementation focused on enforcing that contract with stable smoke tests only (no other story scope changes).
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.4%
+
+Doctor validation has passed!
+Generated jido_ai app
+Running ExUnit with seed: 104310, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+.......
+Finished in 2.3 seconds (2.3s async, 0.01s sync)
+7 tests, 0 failures (1449 excluded)
