@@ -67,6 +67,30 @@ defmodule Jido.AI.Actions.Planning.PlanTest do
       assert {:ok, result} = Plan.run(params, %{})
       assert length(result.steps) <= 10
     end
+
+    test "uses plugin defaults when params are omitted" do
+      params = %{goal: "Ship a release"}
+
+      context = %{
+        provided_params: [:goal],
+        plugin_state: %{planning: %{default_model: :fast, default_max_tokens: 3333, default_temperature: 0.1}}
+      }
+
+      assert {:ok, result} = Plan.run(params, context)
+      assert result.model == Jido.AI.resolve_model(:fast)
+    end
+
+    test "explicit model overrides plugin default" do
+      params = %{goal: "Ship a release", model: "custom:model"}
+
+      context = %{
+        provided_params: [:goal, :model],
+        plugin_state: %{planning: %{default_model: :fast}}
+      }
+
+      assert {:ok, result} = Plan.run(params, context)
+      assert result.model == "custom:model"
+    end
   end
 
   describe "model resolution" do

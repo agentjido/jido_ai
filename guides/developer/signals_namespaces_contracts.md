@@ -8,7 +8,8 @@ After this guide, you can add signals without namespace drift.
 
 Signal names are stable string contracts:
 
-- strategy queries: `ai.react.query`, `ai.cot.query`, `ai.tot.query`, `ai.got.query`, `ai.trm.query`, `ai.adaptive.query`
+- strategy queries: `ai.react.query`, `ai.cod.query`, `ai.cot.query`, `ai.aot.query`, `ai.tot.query`, `ai.got.query`, `ai.trm.query`, `ai.adaptive.query`
+- plugin strategy runs: `reasoning.cod.run`, `reasoning.cot.run`, `reasoning.aot.run`, `reasoning.tot.run`, `reasoning.got.run`, `reasoning.trm.run`, `reasoning.adaptive.run`
 - lifecycle: `ai.request.started`, `ai.request.completed`, `ai.request.failed`, `ai.request.error`
 - llm/tool/embed: `ai.llm.*`, `ai.tool.*`, `ai.embed.*`
 

@@ -1,7 +1,7 @@
-defmodule Jido.AI.GraphOfThoughts.MachineTest do
+defmodule Jido.AI.Reasoning.GraphOfThoughts.MachineTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.GraphOfThoughts.Machine
+  alias Jido.AI.Reasoning.GraphOfThoughts.Machine
 
   describe "new/1" do
     test "creates machine with default values" do

@@ -1,7 +1,7 @@
 defmodule JidoAi.MixProject do
   use Mix.Project
 
-  @version "2.0.0"
+  @version "2.0.0-beta"
   @source_url "https://github.com/agentjido/jido_ai"
   @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
 
@@ -60,7 +60,7 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.0.0-rc.4"},
+      {:jido, "~> 2.0.0-rc.5"},
       {:jido_action, github: "agentjido/jido_action", branch: "main", override: true},
       {:req_llm, github: "agentjido/req_llm", branch: "main"},
       # Example-only browser tools (kept out of Hex runtime dependency graph)
@@ -128,13 +128,14 @@ defmodule JidoAi.MixProject do
         "CHANGELOG.md",
         "CONTRIBUTING.md",
         # Build With Jido.AI
+        "guides/user/package_overview.md",
+        "guides/user/migration_plugins_and_signals_v3.md",
         "guides/user/getting_started.md",
         "guides/user/strategy_selection_playbook.md",
         "guides/user/first_react_agent.md",
         "guides/user/request_lifecycle_and_concurrency.md",
         "guides/user/thread_context_and_message_projection.md",
         "guides/user/tool_calling_with_actions.md",
-        "guides/user/streaming_workflows.md",
         "guides/user/observability_basics.md",
         "guides/user/cli_workflows.md",
         # Extend Jido.AI
@@ -150,17 +151,20 @@ defmodule JidoAi.MixProject do
         "guides/developer/actions_catalog.md",
         "guides/developer/configuration_reference.md",
         # Examples
-        "examples/strategies/adaptive_strategy.md",
-        "examples/strategies/chain_of_thought.md",
-        "examples/strategies/react_agent.md",
-        "examples/strategies/tree_of_thoughts.md"
+        "lib/examples/README.md",
+        "examples/strategies/algorithm_of_thoughts.md",
+        "examples/strategies/chain_of_draft.md",
+        "lib/examples/strategies/adaptive_strategy.md",
+        "lib/examples/strategies/chain_of_thought.md",
+        "lib/examples/strategies/react_agent.md",
+        "lib/examples/strategies/tree_of_thoughts.md"
       ],
       groups_for_extras: [
         {"Build With Jido.AI", ~r/guides\/user/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
         {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/},
-        {"Examples - Strategies", ~r/examples\/strategies/}
+        {"Examples - Strategies", ~r/(lib\/examples\/(README|strategies)|examples\/strategies)/}
       ],
       groups_for_modules: [
         Core: [

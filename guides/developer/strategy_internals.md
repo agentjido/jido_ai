@@ -6,12 +6,13 @@ After this guide, you can safely modify strategy adapters and preserve signal/di
 
 ## Strategy Modules
 
-- `Jido.AI.Strategies.ReAct`
-- `Jido.AI.Strategies.ChainOfThought`
-- `Jido.AI.Strategies.TreeOfThoughts`
-- `Jido.AI.Strategies.GraphOfThoughts`
-- `Jido.AI.Strategies.TRM`
-- `Jido.AI.Strategies.Adaptive`
+- `Jido.AI.Reasoning.ReAct.Strategy`
+- `Jido.AI.Reasoning.ChainOfThought.Strategy`
+- `Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy`
+- `Jido.AI.Reasoning.TreeOfThoughts.Strategy`
+- `Jido.AI.Reasoning.GraphOfThoughts.Strategy`
+- `Jido.AI.Reasoning.TRM.Strategy`
+- `Jido.AI.Reasoning.Adaptive.Strategy`
 
 Each strategy acts as a thin adapter around a state machine and implements:
 - `action_spec/1`
@@ -56,6 +57,48 @@ Fix:
 - most strategies default model to `anthropic:claude-haiku-4-5`
 - request error routing is standardized via `ai.request.error`
 - Adaptive delegates to selected strategy and can re-evaluate on new prompts
+
+## Algorithm-of-Thoughts Specific Internals
+
+`Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy` is single-query by design:
+
+- one `Directive.LLMStream` call per request
+- machine flow is `idle -> exploring -> completed/error`
+- query signal is `ai.aot.query`
+- plugin run signal is `reasoning.aot.run`
+
+AoT result contract is structured:
+
+- `answer`
+- `found_solution?`
+- `first_operations_considered`
+- `backtracking_steps`
+- `raw_response`
+- `usage`
+- `termination` (`reason`, `status`, `duration_ms`)
+- `diagnostics`
+
+## Tree-of-Thoughts Specific Internals
+
+`Jido.AI.Reasoning.TreeOfThoughts.Strategy` now enforces a structured result contract from the machine:
+
+- `snapshot.result` is a map (best/candidates/termination/tree/usage/diagnostics)
+- CLI adapters should project `result.best.content` for human-readable answer text
+- full structured payload should be preserved in metadata (`tot_result`)
+
+ToT parser flow is JSON-first with regex fallback:
+
+1. Parse strict JSON for generation/evaluation outputs
+2. Fallback to regex parsing
+3. Retry once (configurable) with repair prompt
+4. Emit structured diagnostics on terminal parse failure
+
+ToT tool orchestration is strategy-managed:
+
+- `ai.tool.result` and `ai.tool.error` are routed back into the strategy
+- machine progression pauses during tool rounds
+- follow-up LLM calls are issued with assistant tool-call + tool messages
+- round trips are bounded by `max_tool_round_trips`
 
 ## When To Use / Not Use
 

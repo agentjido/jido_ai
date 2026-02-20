@@ -8,7 +8,7 @@ defmodule Jido.AI.AgentTest do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Request
   alias Jido.AI.Agent
-  alias Jido.AI.Strategies.ReAct
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
 
   # ============================================================================
   # Test Action Modules (simulating external modules like ash_jido)

@@ -14,8 +14,8 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   alias Jido.Agent
   alias Jido.Agent.StateOp
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Strategies.ReAct
-  alias Jido.AI.Strategy.StateOpsHelpers
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
+  alias Jido.AI.Reasoning.Helpers
 
   # ============================================================================
   # Test Fixtures
@@ -42,9 +42,9 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   # StateOps Helpers Tests
   # ============================================================================
 
-  describe "StateOpsHelpers" do
+  describe "Helpers" do
     test "update_strategy_state/1 creates SetState operation" do
-      op = StateOpsHelpers.update_strategy_state(%{status: :running, iteration: 1})
+      op = Helpers.update_strategy_state(%{status: :running, iteration: 1})
 
       assert %StateOp.SetState{} = op
       assert op.attrs.status == :running
@@ -52,7 +52,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "set_strategy_field/2 creates SetPath operation" do
-      op = StateOpsHelpers.set_strategy_field(:status, :running)
+      op = Helpers.set_strategy_field(:status, :running)
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:status]
@@ -60,7 +60,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "set_iteration_status/1 creates SetPath operation for status" do
-      op = StateOpsHelpers.set_iteration_status(:awaiting_llm)
+      op = Helpers.set_iteration_status(:awaiting_llm)
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:status]
@@ -68,7 +68,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "set_iteration/1 creates SetPath operation for iteration" do
-      op = StateOpsHelpers.set_iteration(5)
+      op = Helpers.set_iteration(5)
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:iteration]
@@ -77,7 +77,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
     test "append_conversation/1 creates SetState operation" do
       message = %{role: :user, content: "Hello"}
-      op = StateOpsHelpers.append_conversation([message])
+      op = Helpers.append_conversation([message])
 
       assert %StateOp.SetState{} = op
       assert op.attrs.conversation == [message]
@@ -85,21 +85,21 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
     test "set_pending_tools/1 creates SetState operation" do
       tools = [%{id: "call_1", name: "search"}]
-      op = StateOpsHelpers.set_pending_tools(tools)
+      op = Helpers.set_pending_tools(tools)
 
       assert %StateOp.SetState{} = op
       assert op.attrs.pending_tool_calls == tools
     end
 
     test "clear_pending_tools/0 creates SetState operation with empty list" do
-      op = StateOpsHelpers.clear_pending_tools()
+      op = Helpers.clear_pending_tools()
 
       assert %StateOp.SetState{} = op
       assert op.attrs.pending_tool_calls == []
     end
 
     test "set_call_id/1 creates SetPath operation" do
-      op = StateOpsHelpers.set_call_id("call_123")
+      op = Helpers.set_call_id("call_123")
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:current_llm_call_id]
@@ -107,7 +107,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "set_final_answer/1 creates SetPath operation" do
-      op = StateOpsHelpers.set_final_answer("42")
+      op = Helpers.set_final_answer("42")
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:final_answer]
@@ -116,21 +116,21 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
     test "set_usage/1 creates SetState operation" do
       usage = %{input_tokens: 10, output_tokens: 20}
-      op = StateOpsHelpers.set_usage(usage)
+      op = Helpers.set_usage(usage)
 
       assert %StateOp.SetState{} = op
       assert op.attrs.usage == usage
     end
 
     test "delete_keys/1 creates DeleteKeys operation" do
-      op = StateOpsHelpers.delete_keys([:temp, :cache])
+      op = Helpers.delete_keys([:temp, :cache])
 
       assert %StateOp.DeleteKeys{} = op
       assert op.keys == [:temp, :cache]
     end
 
     test "reset_strategy_state/0 creates ReplaceState operation" do
-      op = StateOpsHelpers.reset_strategy_state()
+      op = Helpers.reset_strategy_state()
 
       assert %StateOp.ReplaceState{} = op
       assert op.state.status == :idle
@@ -140,11 +140,11 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
     test "compose/1 returns list of state operations" do
       ops = [
-        StateOpsHelpers.set_iteration_status(:running),
-        StateOpsHelpers.set_iteration(1)
+        Helpers.set_iteration_status(:running),
+        Helpers.set_iteration(1)
       ]
 
-      result = StateOpsHelpers.compose(ops)
+      result = Helpers.compose(ops)
 
       assert is_list(result)
       assert length(result) == 2
@@ -159,7 +159,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
   describe "StateOp Structure" do
     test "SetState operation has required fields" do
-      op = StateOpsHelpers.update_strategy_state(%{field: "value"})
+      op = Helpers.update_strategy_state(%{field: "value"})
 
       assert Map.has_key?(op, :__struct__)
       assert Map.has_key?(op, :attrs)
@@ -167,7 +167,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "SetPath operation has required fields" do
-      op = StateOpsHelpers.set_strategy_field(:test, "value")
+      op = Helpers.set_strategy_field(:test, "value")
 
       assert Map.has_key?(op, :__struct__)
       assert Map.has_key?(op, :path)
@@ -176,7 +176,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "DeleteKeys operation has required fields" do
-      op = StateOpsHelpers.delete_keys([:temp])
+      op = Helpers.delete_keys([:temp])
 
       assert Map.has_key?(op, :__struct__)
       assert Map.has_key?(op, :keys)
@@ -184,7 +184,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "ReplaceState operation has required fields" do
-      op = StateOpsHelpers.reset_strategy_state()
+      op = Helpers.reset_strategy_state()
 
       assert Map.has_key?(op, :__struct__)
       assert Map.has_key?(op, :state)
@@ -247,9 +247,9 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   describe "StateOps Composition" do
     test "multiple state operations can be created" do
       ops = [
-        StateOpsHelpers.set_iteration(1),
-        StateOpsHelpers.set_iteration_status(:running),
-        StateOpsHelpers.set_final_answer("answer")
+        Helpers.set_iteration(1),
+        Helpers.set_iteration_status(:running),
+        Helpers.set_final_answer("answer")
       ]
 
       assert length(ops) == 3
@@ -262,10 +262,10 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
     test "different state op types can be composed" do
       ops = [
-        StateOpsHelpers.update_strategy_state(%{field1: "value1"}),
-        StateOpsHelpers.set_strategy_field(:field2, "value2"),
-        StateOpsHelpers.set_iteration(5),
-        StateOpsHelpers.delete_keys([:temp])
+        Helpers.update_strategy_state(%{field1: "value1"}),
+        Helpers.set_strategy_field(:field2, "value2"),
+        Helpers.set_iteration(5),
+        Helpers.delete_keys([:temp])
       ]
 
       assert length(ops) == 4
@@ -277,7 +277,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
     test "conversation state ops can be created" do
       ops = [
-        StateOpsHelpers.append_conversation([
+        Helpers.append_conversation([
           %{role: :user, content: "Hello"}
         ])
       ]
@@ -293,9 +293,9 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
   describe "StateOps Type Safety" do
     test "SetPath operations have correct value types" do
-      int_op = StateOpsHelpers.set_iteration(5)
-      atom_op = StateOpsHelpers.set_iteration_status(:running)
-      string_op = StateOpsHelpers.set_final_answer("answer")
+      int_op = Helpers.set_iteration(5)
+      atom_op = Helpers.set_iteration_status(:running)
+      string_op = Helpers.set_final_answer("answer")
 
       assert is_integer(int_op.value)
       assert is_atom(atom_op.value)
@@ -303,9 +303,9 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "SetState operations have map attrs" do
-      op1 = StateOpsHelpers.update_strategy_state(%{status: :running})
-      op2 = StateOpsHelpers.set_pending_tools([])
-      op3 = StateOpsHelpers.set_usage(%{input_tokens: 10})
+      op1 = Helpers.update_strategy_state(%{status: :running})
+      op2 = Helpers.set_pending_tools([])
+      op3 = Helpers.set_usage(%{input_tokens: 10})
 
       assert is_map(op1.attrs)
       assert is_map(op2.attrs)
@@ -313,14 +313,14 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "DeleteKeys operations have list of keys" do
-      op = StateOpsHelpers.delete_keys([:temp, :cache])
+      op = Helpers.delete_keys([:temp, :cache])
 
       assert is_list(op.keys)
       assert Enum.all?(op.keys, &is_atom/1)
     end
 
     test "ReplaceState operation has map state" do
-      op = StateOpsHelpers.reset_strategy_state()
+      op = Helpers.reset_strategy_state()
 
       assert is_map(op.state)
       assert is_map(op.state)
@@ -334,18 +334,18 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   # ============================================================================
 
   describe "Phase 9.1 Success Criteria" do
-    test "StateOpsHelpers module exists and is accessible" do
-      assert Code.ensure_loaded?(StateOpsHelpers)
-      assert function_exported?(StateOpsHelpers, :update_strategy_state, 1)
-      assert function_exported?(StateOpsHelpers, :set_strategy_field, 2)
-      assert function_exported?(StateOpsHelpers, :set_iteration_status, 1)
-      assert function_exported?(StateOpsHelpers, :set_iteration, 1)
+    test "Helpers module exists and is accessible" do
+      assert Code.ensure_loaded?(Helpers)
+      assert function_exported?(Helpers, :update_strategy_state, 1)
+      assert function_exported?(Helpers, :set_strategy_field, 2)
+      assert function_exported?(Helpers, :set_iteration_status, 1)
+      assert function_exported?(Helpers, :set_iteration, 1)
     end
 
     test "state ops can be composed" do
       ops = [
-        StateOpsHelpers.set_iteration(1),
-        StateOpsHelpers.set_iteration_status(:running)
+        Helpers.set_iteration(1),
+        Helpers.set_iteration_status(:running)
       ]
 
       assert length(ops) == 2
@@ -371,10 +371,10 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     end
 
     test "StateOps helpers create correct op types" do
-      assert %StateOp.SetState{} = StateOpsHelpers.update_strategy_state(%{})
-      assert %StateOp.SetPath{} = StateOpsHelpers.set_strategy_field(:test, "value")
-      assert %StateOp.DeleteKeys{} = StateOpsHelpers.delete_keys([])
-      assert %StateOp.ReplaceState{} = StateOpsHelpers.reset_strategy_state()
+      assert %StateOp.SetState{} = Helpers.update_strategy_state(%{})
+      assert %StateOp.SetPath{} = Helpers.set_strategy_field(:test, "value")
+      assert %StateOp.DeleteKeys{} = Helpers.delete_keys([])
+      assert %StateOp.ReplaceState{} = Helpers.reset_strategy_state()
     end
 
     test "ReAct strategy init returns agent and directives" do

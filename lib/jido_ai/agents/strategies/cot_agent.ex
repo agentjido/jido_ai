@@ -4,7 +4,7 @@ defmodule Jido.AI.CoTAgent do
   @moduledoc """
   Base macro for Chain-of-Thought-powered agents.
 
-  Wraps `use Jido.Agent` with `Jido.AI.Strategies.ChainOfThought` wired in,
+  Wraps `use Jido.Agent` with `Jido.AI.Reasoning.ChainOfThought.Strategy` wired in,
   plus standard state fields and helper functions.
 
   ## Usage
@@ -83,7 +83,7 @@ defmodule Jido.AI.CoTAgent do
     system_prompt = Keyword.get(opts, :system_prompt)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     strategy_opts =
       [model: model]
@@ -112,7 +112,7 @@ defmodule Jido.AI.CoTAgent do
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Strategies.ChainOfThought, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.ChainOfThought.Strategy, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
       unquote(Jido.AI.Agent.compatibility_overrides_ast())

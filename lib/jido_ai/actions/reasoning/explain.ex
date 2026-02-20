@@ -62,8 +62,8 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Security
   alias Jido.AI.Turn
+  alias Jido.AI.Validation
   alias ReqLLM.Context
 
   @basic_prompt """
@@ -192,7 +192,7 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
   # Validates and sanitizes input parameters to prevent security issues
   defp validate_and_sanitize_params(params) do
     with {:ok, _topic} <-
-           Security.validate_string(params[:topic], max_length: Security.max_input_length()),
+           Validation.validate_string(params[:topic], max_length: Validation.max_input_length()),
          {:ok, _validated} <- validate_audience_if_needed(params) do
       {:ok, params}
     else
@@ -202,7 +202,7 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
   end
 
   defp validate_audience_if_needed(%{audience: audience}) when is_binary(audience) do
-    Security.validate_string(audience, max_length: 1000)
+    Validation.validate_string(audience, max_length: 1000)
   end
 
   defp validate_audience_if_needed(_params), do: {:ok, nil}

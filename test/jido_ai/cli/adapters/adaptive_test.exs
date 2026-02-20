@@ -1,7 +1,7 @@
-defmodule Jido.AI.CLI.Adapters.AdaptiveTest do
+defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.CLI.Adapters.Adaptive, as: AdaptiveAdapter
+  alias Jido.AI.Reasoning.Adaptive.CLIAdapter, as: AdaptiveAdapter
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do
@@ -53,7 +53,7 @@ defmodule Jido.AI.CLI.Adapters.AdaptiveTest do
       opts = module.strategy_opts()
       assert opts[:model] == "anthropic:claude-haiku-4-5"
       assert opts[:default_strategy] == :react
-      assert opts[:available_strategies] == [:cot, :react, :tot, :got, :trm]
+      assert opts[:available_strategies] == [:cod, :cot, :react, :tot, :got, :trm]
     end
   end
 

@@ -1,8 +1,7 @@
 %Doctor.Config{
   ignore_modules: [],
   ignore_paths: [
-    ~r"lib/jido_ai/agents/examples/",
-    ~r"lib/jido_ai/examples/"
+    ~r"lib/examples/"
   ],
   min_module_doc_coverage: 60,
   min_module_spec_coverage: 0,

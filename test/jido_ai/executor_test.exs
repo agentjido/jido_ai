@@ -394,6 +394,36 @@ defmodule Jido.AI.TurnExecutionTest do
       :telemetry.detach("test-exception-handler")
     end
 
+    test "includes request_id in telemetry metadata when provided", %{tools: tools} do
+      test_pid = self()
+      request_id = "req_telemetry_123"
+
+      :telemetry.attach_many(
+        "test-request-id-handler",
+        [
+          [:jido, :ai, :tool, :execute, :start],
+          [:jido, :ai, :tool, :execute, :stop]
+        ],
+        fn event, _measurements, metadata, _config ->
+          send(test_pid, {:telemetry, event, metadata})
+        end,
+        nil
+      )
+
+      Turn.execute(
+        "calculator",
+        %{"operation" => "add", "a" => "2", "b" => "3"},
+        %{request_id: request_id},
+        tools: tools
+      )
+
+      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{request_id: ^request_id}}
+
+      assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{request_id: ^request_id}}
+
+      :telemetry.detach("test-request-id-handler")
+    end
+
     test "sanitizes sensitive parameters in telemetry", %{tools: tools} do
       test_pid = self()
 

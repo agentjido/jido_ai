@@ -1,7 +1,7 @@
-defmodule Jido.AI.TRM.SupervisionTest do
+defmodule Jido.AI.Reasoning.TRM.SupervisionTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.TRM.Supervision
+  alias Jido.AI.Reasoning.TRM.Supervision
 
   describe "build_supervision_prompt/1" do
     test "returns system and user prompts" do
