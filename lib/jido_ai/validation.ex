@@ -15,33 +15,6 @@ defmodule Jido.AI.Validation do
   @max_hard_turns 50
   @callback_timeout 5_000
 
-  @injection_patterns [
-    ~r/ignore\s+(the\s+)?(previous|above)\s+instructions/i,
-    ~r/ignore\s+all\s+(previous|above)?\s+instructions/i,
-    ~r/override\s+(your\s+)?system/i,
-    ~r/disregard\s+(the\s+)?(previous|above)\s+instructions/i,
-    ~r/disregard\s+all\s+(previous|above)?\s+instructions/i,
-    ~r/pay\s+no\s+attention\s+to\s+(the\s+)?(previous|above)/i,
-    ~r/forget\s+(everything|all\s+instructions)/i,
-    ~r/\n\n\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
-    ~r/###\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
-    ~r/---\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
-    ~r/you\s+are\s+now\s+a\s+(different|new)/i,
-    ~r/act\s+as\s+if\s+you\s+are/i,
-    ~r/pretend\s+(to\s+be|you\s+are)/i,
-    ~r/switch\s+roles?\s+with\s+me/i,
-    ~r/roleplay\s+as\s+(a\s+)?(different|new|dangerous)/i,
-    ~r/\{[^}]*"role"\s*:\s*"system"/i,
-    ~r/<[^>]*system[^>]*>/i,
-    ~r/dan\s+\d+\.?\d*/i,
-    ~r/(developer|admin|root)\s+mode/i,
-    ~r/unrestricted\s+mode/i,
-    ~r/bypass\s+(all\s+)?(safety|filters?|security)/i,
-    ~r/(print|output|display|say|echo)\s+(everything|all\s+the\s+(above|text|instructions))/i,
-    ~r/(repeat|return|show)\s+your\s+(system\s+)?prompt/i,
-    ~r/translate\s+(this|the\s+above)\s+to\s+(base64|binary|hex)/i
-  ]
-
   @dangerous_bytes [
     0,
     1,
@@ -257,7 +230,36 @@ defmodule Jido.AI.Validation do
   end
 
   defp contains_injection_pattern?(prompt) do
-    Enum.any?(@injection_patterns, fn pattern -> Regex.match?(pattern, prompt) end)
+    Enum.any?(injection_patterns(), fn pattern -> Regex.match?(pattern, prompt) end)
+  end
+
+  defp injection_patterns do
+    [
+      ~r/ignore\s+(the\s+)?(previous|above)\s+instructions/i,
+      ~r/ignore\s+all\s+(previous|above)?\s+instructions/i,
+      ~r/override\s+(your\s+)?system/i,
+      ~r/disregard\s+(the\s+)?(previous|above)\s+instructions/i,
+      ~r/disregard\s+all\s+(previous|above)?\s+instructions/i,
+      ~r/pay\s+no\s+attention\s+to\s+(the\s+)?(previous|above)/i,
+      ~r/forget\s+(everything|all\s+instructions)/i,
+      ~r/\n\n\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
+      ~r/###\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
+      ~r/---\s*(SYSTEM|ASSISTANT|AI|INSTRUCTION|HUMAN):\s*/i,
+      ~r/you\s+are\s+now\s+a\s+(different|new)/i,
+      ~r/act\s+as\s+if\s+you\s+are/i,
+      ~r/pretend\s+(to\s+be|you\s+are)/i,
+      ~r/switch\s+roles?\s+with\s+me/i,
+      ~r/roleplay\s+as\s+(a\s+)?(different|new|dangerous)/i,
+      ~r/\{[^}]*"role"\s*:\s*"system"/i,
+      ~r/<[^>]*system[^>]*>/i,
+      ~r/dan\s+\d+\.?\d*/i,
+      ~r/(developer|admin|root)\s+mode/i,
+      ~r/unrestricted\s+mode/i,
+      ~r/bypass\s+(all\s+)?(safety|filters?|security)/i,
+      ~r/(print|output|display|say|echo)\s+(everything|all\s+the\s+(above|text|instructions))/i,
+      ~r/(repeat|return|show)\s+your\s+(system\s+)?prompt/i,
+      ~r/translate\s+(this|the\s+above)\s+to\s+(base64|binary|hex)/i
+    ]
   end
 
   defp validate_custom_length(prompt, max_length) do
