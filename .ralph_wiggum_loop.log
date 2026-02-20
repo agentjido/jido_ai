@@ -1824,3 +1824,54 @@ Including tags: [:stable_smoke]
 ..........
 Finished in 12.4 seconds (2.1s async, 10.3s sync)
 10 tests, 0 failures (1746 excluded)
+1) changed files
+- `test/jido_ai/actions/quota/get_status_test.exs`
+- `test/jido_ai/actions/quota/reset_test.exs`
+- `test/jido_ai/actions/quota/docs_contract_test.exs`
+- `guides/developer/actions_catalog.md`
+- `guides/developer/plugins_and_actions_composition.md`
+- `lib/examples/actions/quota_actions.md`
+- `lib/examples/README.md`
+
+2) tests/commands executed
+- `mix format` ✅
+- `mix test test/jido_ai/actions/quota` ✅ (11 tests, 0 failures)
+- `mix precommit` ❌ blocked by `Mix.PubSub` socket error (`:eperm`)
+- `mix test.fast` ❌ blocked by same `Mix.PubSub` socket error
+- `mix doctor --summary` ❌ blocked by same `Mix.PubSub` socket error
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `MIX_ENV=test mix test --exclude flaky --only stable_smoke` ✅ (10 tests, 0 failures)
+
+3) acceptance criteria coverage
+- Quota action modules have direct tests for happy + edge/error paths:
+  - `GetStatus`: schema, explicit scope behavior, context precedence, invalid scope validation.
+  - `Reset`: schema, reset behavior, context precedence, invalid scope validation.
+- Docs now include quota action usage, return shapes, and plugin interplay:
+  - Added `## Quota Actions` contracts in `guides/developer/actions_catalog.md`.
+  - Added quota action route contracts + precedence/default resolution in `guides/developer/plugins_and_actions_composition.md`.
+- Examples include quota action invocation snippet:
+  - Added `lib/examples/actions/quota_actions.md` with `GetStatus` and `Reset` runnable snippets.
+  - Indexed in `lib/examples/README.md`.
+
+4) blockers/assumptions
+- Blocker: this sandbox disallows loopback TCP socket creation, so `mix` tasks that trigger `Mix.PubSub` startup fail (`:eperm`). This prevents `mix precommit`, `mix test.fast` alias execution, and `mix doctor --summary` from completing here.
+- Assumption: equivalent successful checks (`mix compile --warnings-as-errors` and direct stable-smoke test command) are acceptable evidence for everything except the blocked `doctor`/alias invocations.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 664760, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+..........
+Finished in 12.2 seconds (1.9s async, 10.2s sync)
+10 tests, 0 failures (1757 excluded)

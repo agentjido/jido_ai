@@ -44,6 +44,7 @@ Canonical weather overview module:
 | Skills and tools | `lib/examples/skills/`, `lib/examples/tools/`, `lib/examples/skills_demo_agent.ex`, `lib/examples/calculator_agent.ex` |
 | Standalone LLM actions | `lib/examples/actions/llm_actions.md` |
 | Standalone planning actions | `lib/examples/actions/planning_actions.md` |
+| Standalone quota actions | `lib/examples/actions/quota_actions.md` |
 | Standalone retrieval actions | `lib/examples/actions/retrieval_actions.md` |
 | Standalone reasoning actions | `lib/examples/actions/reasoning_actions.md` |
 | Standalone tool-calling actions | `lib/examples/actions/tool_calling_actions.md` |

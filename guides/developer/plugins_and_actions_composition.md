@@ -244,6 +244,31 @@ Quota state keys:
 - `max_total_tokens` sets per-window token budget (`nil` disables token cap)
 - `error_message` sets rejection message for blocked requests
 
+Quota action route contracts:
+
+- `quota.status` -> `Jido.AI.Actions.Quota.GetStatus`
+  - Required params: none
+  - Optional params: `scope`
+  - Returns `%{quota: %{scope, window_ms, usage, limits, remaining, over_budget?}}`
+- `quota.reset` -> `Jido.AI.Actions.Quota.Reset`
+  - Required params: none
+  - Optional params: `scope`
+  - Returns `%{quota: %{scope, reset}}`
+
+Scope resolution precedence for quota actions:
+
+1. Explicit action param (`scope`)
+2. `context[:plugin_state][:quota][:scope]`
+3. `context[:state][:quota][:scope]`
+4. `context[:agent][:id]`
+5. `"default"`
+
+`GetStatus` context defaults for limits/window:
+
+- `window_ms`: `context[:plugin_state][:quota][:window_ms]` -> `context[:state][:quota][:window_ms]` -> `60_000`
+- `max_requests`: `context[:plugin_state][:quota][:max_requests]` -> `context[:state][:quota][:max_requests]` -> `nil`
+- `max_total_tokens`: `context[:plugin_state][:quota][:max_total_tokens]` -> `context[:state][:quota][:max_total_tokens]` -> `nil`
+
 Usage accounting contract:
 
 - `ai.usage` increments counters for `requests` and `total_tokens`

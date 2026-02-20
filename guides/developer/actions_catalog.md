@@ -22,13 +22,16 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
    - `Jido.AI.Actions.Retrieval.UpsertMemory`
    - `Jido.AI.Actions.Retrieval.RecallMemory`
    - `Jido.AI.Actions.Retrieval.ClearMemory`
-5. Reasoning templates (optional):
+5. Quota operations:
+   - `Jido.AI.Actions.Quota.GetStatus`
+   - `Jido.AI.Actions.Quota.Reset`
+6. Reasoning templates (optional):
    - `Jido.AI.Actions.Reasoning.Analyze`
    - `Jido.AI.Actions.Reasoning.Infer`
    - `Jido.AI.Actions.Reasoning.Explain`
-6. Dedicated strategy orchestration:
+7. Dedicated strategy orchestration:
    - `Jido.AI.Actions.Reasoning.RunStrategy`
-7. Compatibility convenience:
+8. Compatibility convenience:
    - `Jido.AI.Actions.LLM.Complete`
 
 ## LLM Actions
@@ -90,6 +93,21 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
   - Output contract: `%{retrieval: %{namespace, cleared}}`.
   - Example snippet: [`lib/examples/actions/retrieval_actions.md#clearmemory-action`](../../lib/examples/actions/retrieval_actions.md#clearmemory-action)
 
+## Quota Actions
+
+- `Jido.AI.Actions.Quota.GetStatus`
+  - Use when you need the current rolling quota snapshot for one scope.
+  - Required params: none. Optional params: `scope`.
+  - Scope resolution when `scope` is omitted: `context[:plugin_state][:quota][:scope]` -> `context[:state][:quota][:scope]` -> `context[:agent][:id]` -> `"default"`.
+  - Output contract: `%{quota: %{scope, window_ms, usage, limits, remaining, over_budget?}}`.
+  - Example snippet: [`lib/examples/actions/quota_actions.md#getstatus-action`](../../lib/examples/actions/quota_actions.md#getstatus-action)
+- `Jido.AI.Actions.Quota.Reset`
+  - Use when you need to clear rolling quota counters for one scope.
+  - Required params: none. Optional params: `scope`.
+  - Scope resolution when `scope` is omitted: `context[:plugin_state][:quota][:scope]` -> `context[:state][:quota][:scope]` -> `context[:agent][:id]` -> `"default"`.
+  - Output contract: `%{quota: %{scope, reset}}`.
+  - Example snippet: [`lib/examples/actions/quota_actions.md#reset-action`](../../lib/examples/actions/quota_actions.md#reset-action)
+
 ## Reasoning Actions
 
 - `Jido.AI.Actions.Reasoning.Analyze`
@@ -132,6 +150,7 @@ These belong to strategy orchestration and are not app-level AI primitives.
 - Need model-directed tool use: use Tool Calling actions.
 - Need structured planning templates: use Planning actions.
 - Need in-process memory upsert/recall/clear primitives: use Retrieval actions.
+- Need rolling quota status or a quota counter reset operation: use Quota actions.
 - Need explicit reasoning strategy execution as a callable capability: use `RunStrategy`.
 
 ## Failure Mode: Action Used Outside Expected Context
