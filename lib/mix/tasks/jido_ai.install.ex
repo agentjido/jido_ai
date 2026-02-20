@@ -44,7 +44,7 @@ if Code.ensure_loaded?(Igniter) do
       %Igniter.Mix.Task.Info{
         group: :jido_ai,
         adds_deps: [],
-        installs: [],
+        installs: [{:jido, "~> 2.0"}],
         example: __MODULE__.Docs.example(),
         only: nil,
         positional: [],
