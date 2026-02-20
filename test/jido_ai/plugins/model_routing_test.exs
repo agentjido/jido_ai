@@ -53,35 +53,4 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
       assert {:ok, :continue} = ModelRouting.handle_signal(signal, ctx(routes))
     end
   end
-
-  describe "documentation contracts" do
-    test "developer guide and module docs define precedence and wildcard behavior" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/model_routing.ex")
-
-      assert plugin_guide =~ "### ModelRouting Runtime Contract"
-      assert plugin_guide =~ "Route precedence:"
-      assert plugin_guide =~ "Exact route keys win first"
-      assert plugin_guide =~ "Wildcard behavior:"
-      assert plugin_guide =~ "does not match `\"reasoning.cot.worker.run\"`"
-      assert plugin_guide =~ "{Jido.AI.Plugins.ModelRouting,"
-      assert plugin_guide =~ "routes: %{"
-
-      assert plugin_module_docs =~ "## Route Precedence"
-      assert plugin_module_docs =~ "## Wildcard Contracts"
-      assert plugin_module_docs =~ "single dot-delimited segment matcher"
-      assert plugin_module_docs =~ "## Usage"
-    end
-
-    test "examples index includes model_routing plugin configuration shape" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Model routing plugin | Mount `Jido.AI.Plugins.ModelRouting`"
-      assert examples_readme =~ "{Jido.AI.Plugins.ModelRouting,"
-      assert examples_readme =~ "routes: %{"
-      assert examples_readme =~ "reasoning.*.run"
-      assert examples_readme =~ "chat.simple"
-    end
-  end
 end

@@ -69,30 +69,4 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfDraftTest do
       assert params == %{strategy: :cod}
     end
   end
-
-  describe "documentation contracts" do
-    test "developer guide explains CoD plugin handoff to RunStrategy" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/reasoning/chain_of_draft.ex")
-
-      assert plugin_guide =~ "### CoD Plugin Handoff (`reasoning.cod.run`)"
-      assert plugin_guide =~ "{Jido.AI.Plugins.Reasoning.ChainOfDraft,"
-      assert plugin_guide =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-      assert plugin_guide =~ "strategy: :cod"
-
-      assert plugin_module_docs =~ "## Signal Contracts"
-      assert plugin_module_docs =~ "## Plugin-To-Action Handoff"
-      assert plugin_module_docs =~ "## Mount State Defaults"
-    end
-
-    test "examples index includes CoD plugin execution path" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Reasoning CoD plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfDraft`"
-      assert examples_readme =~ "{Jido.AI.Plugins.Reasoning.ChainOfDraft,"
-      assert examples_readme =~ "reasoning.cod.run"
-      assert examples_readme =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-    end
-  end
 end

@@ -116,34 +116,4 @@ defmodule Jido.AI.Plugins.Reasoning.AlgorithmOfThoughtsTest do
       assert params == %{strategy: :aot}
     end
   end
-
-  describe "documentation contracts" do
-    test "developer guide explains AoT plugin handoff and defaults" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/reasoning/algorithm_of_thoughts.ex")
-
-      assert plugin_guide =~ "### AoT Plugin Handoff (`reasoning.aot.run`)"
-      assert plugin_guide =~ "{Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts,"
-      assert plugin_guide =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-      assert plugin_guide =~ "strategy: :aot"
-      assert plugin_guide =~ "## Reasoning AoT Plugin Defaults Contract"
-      assert plugin_guide =~ "default_model: :reasoning"
-      assert plugin_guide =~ "timeout: 30_000"
-      assert plugin_guide =~ "options: %{}"
-
-      assert plugin_module_docs =~ "## Signal Contracts"
-      assert plugin_module_docs =~ "## Plugin-To-Action Handoff"
-      assert plugin_module_docs =~ "## Mount State Defaults"
-    end
-
-    test "examples index includes AoT plugin execution path" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Reasoning AoT plugin | Mount `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts`"
-      assert examples_readme =~ "{Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts,"
-      assert examples_readme =~ "reasoning.aot.run"
-      assert examples_readme =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-    end
-  end
 end

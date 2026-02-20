@@ -40,13 +40,6 @@ defmodule Jido.AI.Quality.Checkpoint do
   @traceability_row_pattern ~r/^\| (ST-[A-Z]+-[0-9]{3}) \|/m
   @story_commit_pattern ~r/^feat\(story\): (ST-[A-Z]+-[0-9]{3})\b/m
 
-  @example_spot_check_tests [
-    "test/jido_ai/skill/runtime_contracts_test.exs",
-    "test/jido_ai/examples/weather_strategy_suite_test.exs",
-    "test/jido_ai/plugins/chat_docs_contract_test.exs",
-    "test/jido_ai/skills/llm/actions/chat_action_test.exs"
-  ]
-
   @doc """
   Canonical fast gate command set.
   """
@@ -59,40 +52,16 @@ defmodule Jido.AI.Quality.Checkpoint do
 
   @doc """
   Canonical full gate command set.
-
-  Set `include_examples: false` to skip example spot-check command.
   """
-  @spec full_gate_commands(keyword()) :: [command_spec()]
-  def full_gate_commands(opts \\ []) do
-    include_examples? = Keyword.get(opts, :include_examples, true)
-
-    commands = [
+  @spec full_gate_commands() :: [command_spec()]
+  def full_gate_commands do
+    [
       %{gate: :full, label: "mix test --exclude flaky", cmd: "mix", args: ["test", "--exclude", "flaky"]},
       %{gate: :full, label: "mix doctor --summary", cmd: "mix", args: ["doctor", "--summary"]},
       %{gate: :full, label: "mix docs", cmd: "mix", args: ["docs"]},
       %{gate: :full, label: "mix coveralls", cmd: "mix", args: ["coveralls"]}
     ]
-
-    if include_examples? do
-      commands ++
-        [
-          %{
-            gate: :full,
-            label: "mix test (example spot checks)",
-            cmd: "mix",
-            args: ["test" | @example_spot_check_tests]
-          }
-        ]
-    else
-      commands
-    end
   end
-
-  @doc """
-  Returns the representative example test files used by full gate spot-checks.
-  """
-  @spec example_spot_check_tests() :: [String.t()]
-  def example_spot_check_tests, do: @example_spot_check_tests
 
   @doc """
   Runs each command in order and returns timing records.

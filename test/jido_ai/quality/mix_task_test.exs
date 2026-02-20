@@ -119,6 +119,16 @@ defmodule Mix.Tasks.JidoAi.QualityTest do
     end
   end
 
+  describe "option handling" do
+    test "rejects removed --skip-examples flag" do
+      flush_shell_messages()
+
+      assert_raise Mix.Error, ~r/Unknown options: --skip-examples/, fn ->
+        invoke_task(["--skip-examples"])
+      end
+    end
+  end
+
   defp run_task_with_output(args) do
     flush_shell_messages()
     invoke_task(args)
@@ -150,8 +160,6 @@ defmodule Mix.Tasks.JidoAi.QualityTest do
   end
 
   defp format_messages(messages) do
-    messages
-    |> Enum.map(fn {_level, text} -> text end)
-    |> Enum.join("\n")
+    Enum.map_join(messages, "\n", fn {_level, text} -> text end)
   end
 end

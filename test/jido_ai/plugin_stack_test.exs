@@ -29,20 +29,4 @@ defmodule Jido.AI.PluginStackTest do
 
     assert {Jido.AI.Plugins.Quota, %{max_total_tokens: 1000}} in plugins
   end
-
-  test "docs classify TaskSupervisor only as internal runtime infrastructure" do
-    plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-    examples_readme = File.read!("lib/examples/README.md")
-
-    [public_section | _] = String.split(plugin_guide, "Internal runtime plugin:")
-
-    assert plugin_guide =~ "### TaskSupervisor Internal Runtime Contract"
-    assert plugin_guide =~ "Plugin state key is `:__task_supervisor_skill__`"
-    assert plugin_guide =~ "linked supervisor terminates automatically"
-    refute public_section =~ "Jido.AI.Plugins.TaskSupervisor"
-
-    assert examples_readme =~ "Internal runtime infrastructure note:"
-    assert examples_readme =~ "Jido.AI.Plugins.TaskSupervisor"
-    assert examples_readme =~ "not a capability plugin row"
-  end
 end

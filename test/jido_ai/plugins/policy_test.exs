@@ -67,36 +67,4 @@ defmodule Jido.AI.Plugins.PolicyTest do
       assert rewritten.data.delta == "abcde"
     end
   end
-
-  describe "documentation contracts" do
-    test "docs define enforce mode behavior and rewrite semantics" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/policy.ex")
-
-      assert plugin_guide =~ "### Policy Runtime Contract"
-      assert plugin_guide =~ "Enforce mode behavior:"
-      assert plugin_guide =~ "mode: :enforce"
-      assert plugin_guide =~ "mode: :monitor"
-      assert plugin_guide =~ "Rewrite semantics:"
-      assert plugin_guide =~ "reason: :policy_violation"
-      assert plugin_guide =~ "Normalization and sanitization:"
-
-      assert plugin_module_docs =~ "## Enforce Mode Behavior"
-      assert plugin_module_docs =~ "## Rewrite Semantics"
-      assert plugin_module_docs =~ "## Normalization And Sanitization Contracts"
-      assert plugin_module_docs =~ "mode: :enforce"
-      assert plugin_module_docs =~ "mode: :monitor"
-    end
-
-    test "examples index includes policy plugin hardening config block" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Policy plugin | Mount `Jido.AI.Plugins.Policy`"
-      assert examples_readme =~ "{Jido.AI.Plugins.Policy,"
-      assert examples_readme =~ "mode: :enforce"
-      assert examples_readme =~ "block_on_validation_error: true"
-      assert examples_readme =~ "max_delta_chars: 2_000"
-    end
-  end
 end

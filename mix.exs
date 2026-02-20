@@ -61,18 +61,18 @@ defmodule JidoAi.MixProject do
     [
       # Jido ecosystem
       {:jido, "~> 2.0.0-rc.5"},
-      {:jido_action, github: "agentjido/jido_action", branch: "main", override: true},
-      {:req_llm, github: "agentjido/req_llm", branch: "main"},
+      {:jido_action, "~> 2.0.0-rc.5"},
+      {:req_llm, "~> 1.6"},
       # Example-only browser tools (kept out of Hex runtime dependency graph)
-      {:jido_browser, github: "agentjido/jido_browser", branch: "main", only: [:dev, :test], runtime: false},
+      {:jido_browser, "~> 0.8.1", only: [:dev, :test], runtime: false},
 
       # Runtime
       {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
-      {:yaml_elixir, "~> 2.9"},
-      {:zoi, "~> 0.16"},
+      {:yaml_elixir, "~> 2.12"},
+      {:zoi, "~> 0.17"},
 
       # Dev/Test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

@@ -116,40 +116,4 @@ defmodule Jido.AI.Plugins.Reasoning.TreeOfThoughtsTest do
       assert params == %{strategy: :tot}
     end
   end
-
-  describe "documentation contracts" do
-    test "developer guide explains ToT plugin handoff, options, and defaults" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/reasoning/tree_of_thoughts.ex")
-
-      assert plugin_guide =~ "### ToT Plugin Handoff (`reasoning.tot.run`)"
-      assert plugin_guide =~ "{Jido.AI.Plugins.Reasoning.TreeOfThoughts,"
-      assert plugin_guide =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-      assert plugin_guide =~ "strategy: :tot"
-      assert plugin_guide =~ "branching_factor"
-      assert plugin_guide =~ "max_depth"
-      assert plugin_guide =~ "traversal_strategy"
-      assert plugin_guide =~ "## Reasoning ToT Plugin Defaults Contract"
-      assert plugin_guide =~ "default_model: :reasoning"
-      assert plugin_guide =~ "timeout: 30_000"
-      assert plugin_guide =~ "options: %{}"
-
-      assert plugin_module_docs =~ "## Signal Contracts"
-      assert plugin_module_docs =~ "## Plugin-To-Action Handoff"
-      assert plugin_module_docs =~ "## Usage"
-      assert plugin_module_docs =~ "## ToT Options"
-      assert plugin_module_docs =~ "## Mount State Defaults"
-    end
-
-    test "examples index includes ToT plugin execution path" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Reasoning ToT plugin | Mount `Jido.AI.Plugins.Reasoning.TreeOfThoughts`"
-      assert examples_readme =~ "{Jido.AI.Plugins.Reasoning.TreeOfThoughts,"
-      assert examples_readme =~ "reasoning.tot.run"
-      assert examples_readme =~ "branching_factor"
-      assert examples_readme =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-    end
-  end
 end

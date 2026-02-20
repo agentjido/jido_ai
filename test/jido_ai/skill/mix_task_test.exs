@@ -174,9 +174,7 @@ defmodule Mix.Tasks.JidoAi.SkillTest do
   end
 
   defp format_messages(messages) do
-    messages
-    |> Enum.map(fn {_level, text} -> text end)
-    |> Enum.join("\n")
+    Enum.map_join(messages, "\n", fn {_level, text} -> text end)
   end
 
   defp first_info(messages) do

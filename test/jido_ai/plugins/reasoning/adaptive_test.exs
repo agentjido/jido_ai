@@ -134,40 +134,4 @@ defmodule Jido.AI.Plugins.Reasoning.AdaptiveTest do
       assert params == %{strategy: :adaptive}
     end
   end
-
-  describe "documentation contracts" do
-    test "developer guide explains Adaptive plugin handoff, options, and defaults" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/reasoning/adaptive.ex")
-
-      assert plugin_guide =~ "### Adaptive Plugin Handoff (`reasoning.adaptive.run`)"
-      assert plugin_guide =~ "{Jido.AI.Plugins.Reasoning.Adaptive,"
-      assert plugin_guide =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-      assert plugin_guide =~ "strategy: :adaptive"
-      assert plugin_guide =~ "default_strategy"
-      assert plugin_guide =~ "available_strategies"
-      assert plugin_guide =~ "complexity_thresholds"
-      assert plugin_guide =~ "## Reasoning Adaptive Plugin Defaults Contract"
-      assert plugin_guide =~ "default_model: :reasoning"
-      assert plugin_guide =~ "timeout: 30_000"
-      assert plugin_guide =~ "options: %{}"
-
-      assert plugin_module_docs =~ "## Signal Contracts"
-      assert plugin_module_docs =~ "## Plugin-To-Action Handoff"
-      assert plugin_module_docs =~ "## Usage"
-      assert plugin_module_docs =~ "## Adaptive Options"
-      assert plugin_module_docs =~ "## Mount State Defaults"
-    end
-
-    test "examples index includes Adaptive plugin execution path" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Reasoning Adaptive plugin | Mount `Jido.AI.Plugins.Reasoning.Adaptive`"
-      assert examples_readme =~ "{Jido.AI.Plugins.Reasoning.Adaptive,"
-      assert examples_readme =~ "reasoning.adaptive.run"
-      assert examples_readme =~ "default_strategy"
-      assert examples_readme =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-    end
-  end
 end

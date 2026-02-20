@@ -57,15 +57,14 @@ defmodule Jido.AI.Quality.CheckpointTest do
     end
   end
 
-  describe "full_gate_commands/1" do
-    test "includes docs, coverage, and example spot-check commands by default" do
+  describe "full_gate_commands/0" do
+    test "includes docs and coverage commands" do
       labels = Checkpoint.full_gate_commands() |> Enum.map(& &1.label)
 
       assert "mix test --exclude flaky" in labels
       assert "mix doctor --summary" in labels
       assert "mix docs" in labels
       assert "mix coveralls" in labels
-      assert "mix test (example spot checks)" in labels
     end
   end
 

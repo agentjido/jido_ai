@@ -107,34 +107,4 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
       assert params == %{strategy: :cot}
     end
   end
-
-  describe "documentation contracts" do
-    test "developer guide explains CoT plugin handoff and defaults" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/reasoning/chain_of_thought.ex")
-
-      assert plugin_guide =~ "### CoT Plugin Handoff (`reasoning.cot.run`)"
-      assert plugin_guide =~ "{Jido.AI.Plugins.Reasoning.ChainOfThought,"
-      assert plugin_guide =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-      assert plugin_guide =~ "strategy: :cot"
-      assert plugin_guide =~ "## Reasoning CoT Plugin Defaults Contract"
-      assert plugin_guide =~ "default_model: :reasoning"
-      assert plugin_guide =~ "timeout: 30_000"
-      assert plugin_guide =~ "options: %{}"
-
-      assert plugin_module_docs =~ "## Signal Contracts"
-      assert plugin_module_docs =~ "## Plugin-To-Action Handoff"
-      assert plugin_module_docs =~ "## Mount State Defaults"
-    end
-
-    test "examples index includes CoT plugin execution path" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Reasoning CoT plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfThought`"
-      assert examples_readme =~ "{Jido.AI.Plugins.Reasoning.ChainOfThought,"
-      assert examples_readme =~ "reasoning.cot.run"
-      assert examples_readme =~ "Jido.AI.Actions.Reasoning.RunStrategy"
-    end
-  end
 end

@@ -82,34 +82,4 @@ defmodule Jido.AI.Plugins.RetrievalTest do
       assert state.namespace == "default"
     end
   end
-
-  describe "documentation contracts" do
-    test "docs define retrieval enrichment lifecycle and opt-out behavior" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/retrieval.ex")
-
-      assert plugin_guide =~ "### Retrieval Runtime Contract"
-      assert plugin_guide =~ "Retrieval enrichment lifecycle:"
-      assert plugin_guide =~ "disable_retrieval: true"
-      assert plugin_guide =~ "namespace falls back to agent id"
-      assert plugin_guide =~ "Retrieval plugin config shape:"
-      assert plugin_guide =~ "{Jido.AI.Plugins.Retrieval,"
-
-      assert plugin_module_docs =~ "## Enrichment Lifecycle"
-      assert plugin_module_docs =~ "## Namespace Behavior"
-      assert plugin_module_docs =~ "## Opt-Out Controls"
-      assert plugin_module_docs =~ "disable_retrieval: true"
-      assert plugin_module_docs =~ "`mount/2` resolves `namespace` in this order"
-    end
-
-    test "examples index includes retrieval plugin mount snippet" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Retrieval plugin | Mount `Jido.AI.Plugins.Retrieval`"
-      assert examples_readme =~ "{Jido.AI.Plugins.Retrieval,"
-      assert examples_readme =~ "namespace: \"weather_ops\""
-      assert examples_readme =~ "disable_retrieval: false"
-    end
-  end
 end

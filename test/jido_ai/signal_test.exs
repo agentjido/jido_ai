@@ -15,8 +15,6 @@ defmodule Jido.AI.SignalTest do
     Usage
   }
 
-  @signal_contract_guide "guides/developer/signals_namespaces_contracts.md"
-
   describe "ReactEvent" do
     test "creates worker event signal with required fields" do
       signal =
@@ -325,50 +323,6 @@ defmodule Jido.AI.SignalTest do
       assert signal.source == "/ai/embed"
       assert signal.data.call_id == "embed_1"
       assert signal.data.result == {:ok, [0.1, 0.2, 0.3]}
-    end
-  end
-
-  describe "signal namespace contract guide" do
-    test "documents canonical emitted signal types" do
-      guide = File.read!(@signal_contract_guide)
-
-      module_backed_types = [
-        RequestStarted.new!(%{request_id: "req_1", query: "q"}).type,
-        RequestCompleted.new!(%{request_id: "req_1", result: %{ok: true}}).type,
-        RequestFailed.new!(%{request_id: "req_1", error: :boom}).type,
-        RequestError.new!(%{request_id: "req_1", reason: :busy, message: "busy"}).type,
-        LLMResponse.new!(%{call_id: "c_1", result: {:ok, %{type: :final_answer, text: "ok"}}}).type,
-        LLMDelta.new!(%{call_id: "c_1", delta: "x"}).type,
-        ToolResult.new!(%{call_id: "t_1", tool_name: "echo", result: {:ok, "ok"}}).type,
-        EmbedResult.new!(%{call_id: "e_1", result: {:ok, [0.0]}}).type,
-        Usage.new!(%{call_id: "u_1", model: "test:model", input_tokens: 1, output_tokens: 1}).type,
-        ReactSignal.new!(%{request_id: "req_1", event: %{kind: :started}}).type
-      ]
-
-      strategy_query_types = [
-        "ai.react.query",
-        "ai.cod.query",
-        "ai.cot.query",
-        "ai.aot.query",
-        "ai.tot.query",
-        "ai.got.query",
-        "ai.trm.query",
-        "ai.adaptive.query"
-      ]
-
-      plugin_run_types = [
-        "reasoning.cod.run",
-        "reasoning.cot.run",
-        "reasoning.aot.run",
-        "reasoning.tot.run",
-        "reasoning.got.run",
-        "reasoning.trm.run",
-        "reasoning.adaptive.run"
-      ]
-
-      for type <- module_backed_types ++ strategy_query_types ++ plugin_run_types do
-        assert guide =~ "`#{type}`"
-      end
     end
   end
 

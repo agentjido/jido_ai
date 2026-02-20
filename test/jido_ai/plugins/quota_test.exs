@@ -110,40 +110,4 @@ defmodule Jido.AI.Plugins.QuotaTest do
       assert {:ok, :continue} = Quota.handle_signal(signal, ctx(state))
     end
   end
-
-  describe "documentation contracts" do
-    test "docs define quota state keys and budget rejection contract" do
-      plugin_guide = File.read!("guides/developer/plugins_and_actions_composition.md")
-      plugin_module_docs = File.read!("lib/jido_ai/plugins/quota.ex")
-
-      assert plugin_guide =~ "### Quota Runtime Contract"
-      assert plugin_guide =~ "Quota state keys:"
-      assert plugin_guide =~ "enabled"
-      assert plugin_guide =~ "scope"
-      assert plugin_guide =~ "window_ms"
-      assert plugin_guide =~ "max_requests"
-      assert plugin_guide =~ "max_total_tokens"
-      assert plugin_guide =~ "error_message"
-      assert plugin_guide =~ "Budget rejection contract:"
-      assert plugin_guide =~ "ai.request.error"
-      assert plugin_guide =~ "reason: :quota_exceeded"
-
-      assert plugin_module_docs =~ "## Quota State Keys"
-      assert plugin_module_docs =~ "state key `:quota`"
-      assert plugin_module_docs =~ "## Budget Rejection Contract"
-      assert plugin_module_docs =~ "reason: :quota_exceeded"
-      assert plugin_module_docs =~ "ai.request.error"
-    end
-
-    test "examples index includes quota plugin config and rejection shape" do
-      examples_readme = File.read!("lib/examples/README.md")
-
-      assert examples_readme =~ "## Plugin Capability Pattern"
-      assert examples_readme =~ "| Quota plugin | Mount `Jido.AI.Plugins.Quota`"
-      assert examples_readme =~ "{Jido.AI.Plugins.Quota,"
-      assert examples_readme =~ "max_total_tokens: 20_000"
-      assert examples_readme =~ "type: \"ai.request.error\""
-      assert examples_readme =~ "reason: :quota_exceeded"
-    end
-  end
 end

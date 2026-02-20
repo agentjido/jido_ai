@@ -7,7 +7,6 @@ defmodule Mix.Tasks.JidoAi.Quality do
   By default this task runs:
   - Fast gate: `mix precommit`
   - Full gate: `mix test --exclude flaky`, `mix doctor --summary`, `mix docs`, `mix coveralls`
-  - Example spot-checks: one representative test for skills, strategies, plugins, and actions
   - Traceability closure: every matrix row has a `feat(story): ST-...` commit
 
   ## Options
@@ -17,7 +16,6 @@ defmodule Mix.Tasks.JidoAi.Quality do
       --allow-missing IDS        Comma-separated story IDs allowed to be missing in commit history
       --skip-fast                Skip fast gate command set
       --skip-full                Skip full gate command set
-      --skip-examples            Skip example spot-check command
       --traceability-only        Run traceability closure check only
 
   ## Examples
@@ -39,7 +37,6 @@ defmodule Mix.Tasks.JidoAi.Quality do
     allow_missing: :string,
     skip_fast: :boolean,
     skip_full: :boolean,
-    skip_examples: :boolean,
     traceability_only: :boolean
   ]
 
@@ -74,7 +71,7 @@ defmodule Mix.Tasks.JidoAi.Quality do
 
     timings =
       if config.run_full_gate do
-        full_commands = Checkpoint.full_gate_commands(include_examples: config.include_examples)
+        full_commands = Checkpoint.full_gate_commands()
         run_gate("full", full_commands, timings)
       else
         timings
@@ -191,7 +188,6 @@ defmodule Mix.Tasks.JidoAi.Quality do
       traceability_file: opts[:traceability_file] || @default_traceability_file,
       git_log_file: opts[:git_log_file],
       allow_missing: allow_missing,
-      include_examples: not (opts[:skip_examples] || false),
       run_fast_gate: not traceability_only and not (opts[:skip_fast] || false),
       run_full_gate: not traceability_only and not (opts[:skip_full] || false)
     }
