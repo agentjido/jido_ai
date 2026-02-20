@@ -3,7 +3,10 @@ defmodule Jido.AI.TestSupport.FakeReqLLM do
 
   def setup_stubs(_context) do
     Mimic.stub(ReqLLM.Generation, :generate_text, &generate_text/3)
+    Mimic.stub(ReqLLM.Generation, :generate_object, &generate_object/4)
+    Mimic.stub(ReqLLM.Generation, :stream_text, &stream_generation_text/3)
     Mimic.stub(ReqLLM, :stream_text, &stream_text/3)
+    Mimic.stub(ReqLLM.StreamResponse, :usage, &stream_usage/1)
     Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream/2)
     :ok
   end
@@ -76,6 +79,32 @@ defmodule Jido.AI.TestSupport.FakeReqLLM do
   end
 
   def process_stream(_other, _opts), do: {:error, :invalid_stream_response}
+
+  def stream_generation_text(model, messages, _opts) do
+    prompt = extract_latest_user_prompt(messages)
+
+    {:ok,
+     %{
+       stream: [ReqLLM.StreamChunk.text("Stubbed stream for: #{prompt}")],
+       model: model
+     }}
+  end
+
+  def stream_usage(_stream_response) do
+    %{input_tokens: 8, output_tokens: 13, total_tokens: 21}
+  end
+
+  def generate_object(model, _messages, _schema, _opts) do
+    {:ok,
+     %{
+       object: %{
+         name: "stubbed",
+         model: model
+       },
+       usage: %{input_tokens: 9, output_tokens: 11, total_tokens: 20},
+       model: model
+     }}
+  end
 
   defp extract_latest_user_prompt(messages) when is_list(messages) do
     messages

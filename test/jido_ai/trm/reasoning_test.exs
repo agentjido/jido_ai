@@ -1,7 +1,7 @@
-defmodule Jido.AI.TRM.ReasoningTest do
+defmodule Jido.AI.Reasoning.TRM.ReasoningTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.TRM.Reasoning
+  alias Jido.AI.Reasoning.TRM.Reasoning
 
   describe "build_reasoning_prompt/1" do
     test "returns system and user prompts for initial reasoning" do

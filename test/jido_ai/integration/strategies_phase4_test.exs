@@ -16,13 +16,14 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
+  alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
-  alias Jido.AI.Strategies.Adaptive
-  alias Jido.AI.Strategies.ChainOfThought
-  alias Jido.AI.Strategies.GraphOfThoughts
-  alias Jido.AI.Strategies.ReAct
-  alias Jido.AI.Strategies.TreeOfThoughts
+  alias Jido.AI.Reasoning.Adaptive.Strategy, as: Adaptive
+  alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
+  alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
+  alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
   alias Jido.Instruction
 
   # ============================================================================
@@ -40,13 +41,6 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, _directives} = strategy_module.init(agent, ctx)
       {agent, ctx}
     end)
-  end
-
-  defp mock_llm_result(call_id, content) do
-    %{
-      call_id: call_id,
-      result: {:ok, %{text: content}}
-    }
   end
 
   # ============================================================================
@@ -76,8 +70,9 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       # Verify directive emitted
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.LLMStream{} = directive
-      assert directive.model == "anthropic:claude-haiku-4-5"
+      assert %AgentDirective.SpawnAgent{} = directive
+      assert directive.tag == :cot_worker
+      assert directive.agent == Jido.AI.Reasoning.ChainOfThought.Worker.Agent
     end
 
     test "CoT strategy produces step-by-step reasoning output" do
@@ -86,15 +81,28 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       # Start reasoning
       start_instruction = %Instruction{
         action: ChainOfThought.start_action(),
-        params: %{prompt: "What is 2 + 2?"}
+        params: %{prompt: "What is 2 + 2?", request_id: "req_cot_phase4"}
       }
 
       {agent, directives} = ChainOfThought.cmd(agent, [start_instruction], %{})
-      [%Directive.LLMStream{id: call_id}] = directives
+      [%AgentDirective.SpawnAgent{}] = directives
 
-      # Simulate LLM response with steps
-      llm_result =
-        mock_llm_result(call_id, """
+      # Simulate worker lifecycle + completion event
+      child_started = %Instruction{
+        action: :cot_worker_child_started,
+        params: %{
+          parent_id: "parent",
+          child_id: "child",
+          child_module: Jido.AI.Reasoning.ChainOfThought.Worker.Agent,
+          tag: :cot_worker,
+          pid: self(),
+          meta: %{}
+        }
+      }
+
+      {agent, [%AgentDirective.Emit{}]} = ChainOfThought.cmd(agent, [child_started], %{})
+
+      completion_text = """
         Step 1: Identify the numbers to add
         We have 2 and 2.
 
@@ -102,12 +110,32 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         2 + 2 = 4
 
         Therefore, the answer is 4.
-        """)
+      """
 
-      result_instruction = %Instruction{
-        action: ChainOfThought.llm_result_action(),
-        params: llm_result
-      }
+      result_instruction =
+        %Instruction{
+          action: :cot_worker_event,
+          params: %{
+            request_id: "req_cot_phase4",
+            event: %{
+              id: "evt_done",
+              seq: 1,
+              at_ms: 1_700_000_000_000,
+              run_id: "req_cot_phase4",
+              request_id: "req_cot_phase4",
+              iteration: 1,
+              kind: :request_completed,
+              llm_call_id: "cot_call_req_cot_phase4",
+              tool_call_id: nil,
+              tool_name: nil,
+              data: %{
+                result: completion_text,
+                termination_reason: :success,
+                usage: %{input_tokens: 10, output_tokens: 5}
+              }
+            }
+          }
+        }
 
       {final_agent, _} = ChainOfThought.cmd(agent, [result_instruction], %{})
 
@@ -191,7 +219,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert state[:config][:tools] == [TestCalculator]
     end
 
-    test "ReAct strategy processes start with tools available" do
+    test "ReAct strategy processes start by delegating to worker" do
       defmodule TestSearch do
         use Jido.Action,
           name: "search",
@@ -218,9 +246,9 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.LLMStream{} = directive
-      # Verify tools are included in directive
-      refute Enum.empty?(directive.tools)
+      assert %AgentDirective.SpawnAgent{} = directive
+      assert directive.tag == :react_worker
+      assert directive.agent == Jido.AI.Reasoning.ReAct.Worker.Agent
     end
   end
 
@@ -235,8 +263,11 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       route_map = Map.new(routes)
       assert route_map["ai.cot.query"] == {:strategy_cmd, :cot_start}
-      assert route_map["ai.llm.response"] == {:strategy_cmd, :cot_llm_result}
-      assert route_map["ai.llm.delta"] == {:strategy_cmd, :cot_llm_partial}
+      assert route_map["ai.cot.worker.event"] == {:strategy_cmd, :cot_worker_event}
+      assert route_map["jido.agent.child.started"] == {:strategy_cmd, :cot_worker_child_started}
+      assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :cot_worker_child_exit}
+      assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
+      assert route_map["ai.llm.delta"] == Jido.Actions.Control.Noop
     end
 
     test "ToT signal_routes returns correct mappings" do
@@ -259,15 +290,18 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert route_map["ai.llm.delta"] == {:strategy_cmd, :got_llm_partial}
     end
 
-    test "ReAct signal_routes includes tool result routing" do
+    test "ReAct signal_routes includes worker delegation routes" do
       {_agent, ctx} = create_agent(ReAct, tools: [])
       routes = ReAct.signal_routes(ctx)
 
       route_map = Map.new(routes)
       assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
-      assert route_map["ai.llm.response"] == {:strategy_cmd, :ai_react_llm_result}
-      assert route_map["ai.tool.result"] == {:strategy_cmd, :ai_react_tool_result}
-      assert route_map["ai.llm.delta"] == {:strategy_cmd, :ai_react_llm_partial}
+      assert route_map["ai.react.worker.event"] == {:strategy_cmd, :ai_react_worker_event}
+      assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
+      assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
+      assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
+      assert route_map["ai.tool.result"] == Jido.Actions.Control.Noop
+      assert route_map["ai.llm.delta"] == Jido.Actions.Control.Noop
     end
 
     test "Adaptive signal_routes returns base routes before strategy selection" do
@@ -286,7 +320,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   # ============================================================================
 
   describe "directive execution integration" do
-    test "LLMStream directive has correct structure for CoT" do
+    test "CoT start emits SpawnAgent directive in delegated mode" do
       {agent, _ctx} = create_agent(ChainOfThought, model: "anthropic:claude-sonnet-4-20250514")
 
       instruction = %Instruction{
@@ -296,13 +330,12 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {_agent, [directive]} = ChainOfThought.cmd(agent, [instruction], %{})
 
-      assert %Directive.LLMStream{} = directive
-      assert directive.id != nil
-      assert is_list(directive.context)
-      assert directive.model == "anthropic:claude-sonnet-4-20250514"
+      assert %AgentDirective.SpawnAgent{} = directive
+      assert directive.tag == :cot_worker
+      assert directive.agent == Jido.AI.Reasoning.ChainOfThought.Worker.Agent
     end
 
-    test "LLMStream directive has correct structure for ReAct with tools" do
+    test "ReAct start emits SpawnAgent directive in delegated mode" do
       defmodule DirectiveTestTool do
         use Jido.Action,
           name: "test_tool",
@@ -322,16 +355,11 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {_agent, [directive]} = ReAct.cmd(agent, [instruction], %{})
 
-      assert %Directive.LLMStream{} = directive
-      assert directive.tools != nil
-      assert length(directive.tools) == 1
-      # Tools are included in the directive
-      [tool] = directive.tools
-      # Tool is a ReqLLM.Tool struct
-      assert is_struct(tool)
+      assert %AgentDirective.SpawnAgent{} = directive
+      assert directive.tag == :react_worker
     end
 
-    test "ToolExec directive is emitted by ReAct when LLM requests tool call" do
+    test "ReAct flushes deferred worker start on child.started signal" do
       defmodule ToolExecTestTool do
         use Jido.Action,
           name: "exec_test",
@@ -344,47 +372,32 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {agent, _ctx} = create_agent(ReAct, tools: [ToolExecTestTool])
 
-      # Start ReAct
       start_instruction = %Instruction{
         action: ReAct.start_action(),
         params: %{query: "Execute the test"}
       }
 
-      {agent, [%Directive.LLMStream{id: call_id}]} =
-        ReAct.cmd(agent, [start_instruction], %{})
+      {agent, [%AgentDirective.SpawnAgent{}]} = ReAct.cmd(agent, [start_instruction], %{})
 
-      # Simulate LLM response with tool call using correct format
-      tool_call_result = %{
-        call_id: call_id,
-        result:
-          {:ok,
-           %{
-             type: :tool_calls,
-             tool_calls: [
-               %{
-                 id: "call_123",
-                 name: "exec_test",
-                 arguments: %{"value" => "test_value"}
-               }
-             ],
-             usage: %{input_tokens: 10, output_tokens: 20}
-           }}
+      child_started = %Instruction{
+        action: :ai_react_worker_child_started,
+        params: %{
+          parent_id: "parent",
+          child_id: "child",
+          child_module: Jido.AI.Reasoning.ReAct.Worker.Agent,
+          tag: :react_worker,
+          pid: self(),
+          meta: %{}
+        }
       }
 
-      llm_result_instruction = %Instruction{
-        action: ReAct.llm_result_action(),
-        params: tool_call_result
-      }
+      {_agent, directives} = ReAct.cmd(agent, [child_started], %{})
 
-      {_agent, directives} = ReAct.cmd(agent, [llm_result_instruction], %{})
-
-      # Should emit ToolExec directive
       assert length(directives) == 1
       [directive] = directives
-      assert %Directive.ToolExec{} = directive
-      assert directive.id == "call_123"
-      assert directive.tool_name == "exec_test"
-      assert directive.arguments == %{"value" => "test_value"}
+      assert %AgentDirective.Emit{} = directive
+      assert directive.signal.type == "ai.react.worker.start"
+      assert directive.dispatch == {:pid, [target: self()]}
     end
   end
 
@@ -393,7 +406,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   # ============================================================================
 
   describe "adaptive selection integration" do
-    test "simple prompt selects CoT strategy" do
+    test "simple prompt selects CoD strategy" do
       {agent, _ctx} = create_agent(Adaptive)
 
       instruction = %Instruction{
@@ -404,7 +417,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {updated_agent, _directives} = Adaptive.cmd(agent, [instruction], %{})
 
       state = StratState.get(updated_agent, %{})
-      assert state[:strategy_type] == :cot
+      assert state[:strategy_type] == :cod
     end
 
     test "tool-requiring prompt selects ReAct strategy" do
@@ -475,39 +488,72 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
     test "adaptive delegates LLM result to selected strategy" do
       {agent, _ctx} = create_agent(Adaptive)
 
-      # Start with a prompt that selects CoT
+      # Start with a prompt that selects CoD
       start_instruction = %Instruction{
         action: Adaptive.start_action(),
-        params: %{prompt: "What is the meaning of life?"}
+        params: %{prompt: "What is the meaning of life?", request_id: "req_adaptive_cot"}
       }
 
-      {agent, [%Directive.LLMStream{id: call_id}]} =
+      {agent, [%AgentDirective.SpawnAgent{}]} =
         Adaptive.cmd(agent, [start_instruction], %{})
 
-      # Verify CoT was selected
+      # Verify CoD was selected
       state = StratState.get(agent, %{})
-      assert state[:strategy_type] == :cot
+      assert state[:strategy_type] == :cod
 
-      # Send LLM result - should be delegated to CoT
-      llm_result = mock_llm_result(call_id, "The meaning of life is subjective.")
-
-      result_instruction = %Instruction{
-        action: Adaptive.llm_result_action(),
-        params: llm_result
+      child_started = %Instruction{
+        action: :adaptive_child_started,
+        params: %{
+          parent_id: "parent",
+          child_id: "child",
+          child_module: Jido.AI.Reasoning.ChainOfThought.Worker.Agent,
+          tag: :cot_worker,
+          pid: self(),
+          meta: %{}
+        }
       }
+
+      {agent, [%AgentDirective.Emit{}]} = Adaptive.cmd(agent, [child_started], %{})
+
+      completion_event = %{
+        id: "evt_adaptive_done",
+        seq: 1,
+        at_ms: 1_700_000_000_000,
+        run_id: "req_adaptive_cot",
+        request_id: "req_adaptive_cot",
+        iteration: 1,
+        kind: :request_completed,
+        llm_call_id: "cot_call_req_adaptive_cot",
+        tool_call_id: nil,
+        tool_name: nil,
+        data: %{
+          result: "Step 1: Reflect.\nConclusion: The meaning of life is subjective.",
+          termination_reason: :success,
+          usage: %{input_tokens: 12, output_tokens: 7}
+        }
+      }
+
+      result_instruction =
+        %Instruction{
+          action: :adaptive_cot_worker_event,
+          params: %{
+            request_id: "req_adaptive_cot",
+            event: completion_event
+          }
+        }
 
       {final_agent, _directives} = Adaptive.cmd(agent, [result_instruction], %{})
 
       # Verify the delegated strategy completed
       final_state = StratState.get(final_agent, %{})
       # The selected strategy should have processed the result
-      assert final_state[:strategy_type] == :cot
+      assert final_state[:strategy_type] == :cod
     end
 
     test "analyze_prompt returns expected complexity and task type" do
       # Simple query
       {strategy, score, task_type} = Adaptive.analyze_prompt("What is AI?")
-      assert strategy == :cot
+      assert strategy == :cod
       assert score < 0.3
       assert task_type == :simple_query
 

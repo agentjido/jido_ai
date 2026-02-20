@@ -13,12 +13,14 @@ defmodule Jido.AI.CLI.Adapter do
 
   ## Built-in Adapters
 
-  - `Jido.AI.CLI.Adapters.ReAct` - For `Jido.AI.Agent` modules
-  - `Jido.AI.CLI.Adapters.ToT` - For Tree-of-Thoughts agents
-  - `Jido.AI.CLI.Adapters.CoT` - For Chain-of-Thought agents
-  - `Jido.AI.CLI.Adapters.GoT` - For Graph-of-Thoughts agents
-  - `Jido.AI.CLI.Adapters.TRM` - For TRM (Tiny-Recursive-Model) agents
-  - `Jido.AI.CLI.Adapters.Adaptive` - For Adaptive strategy agents (auto-selects reasoning approach)
+  - `Jido.AI.Reasoning.ReAct.CLIAdapter` - For `Jido.AI.Agent` modules
+  - `Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter` - For `Jido.AI.AoTAgent` agents
+  - `Jido.AI.Reasoning.ChainOfDraft.CLIAdapter` - For Chain-of-Draft agents
+  - `Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter` - For Tree-of-Thoughts agents
+  - `Jido.AI.Reasoning.ChainOfThought.CLIAdapter` - For Chain-of-Thought agents
+  - `Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter` - For Graph-of-Thoughts agents
+  - `Jido.AI.Reasoning.TRM.CLIAdapter` - For TRM (Tiny-Recursive-Model) agents
+  - `Jido.AI.Reasoning.Adaptive.CLIAdapter` - For Adaptive strategy agents (auto-selects reasoning approach)
 
   ## Custom Agents
 
@@ -27,7 +29,7 @@ defmodule Jido.AI.CLI.Adapter do
       defmodule MyApp.CustomAgent do
         use Jido.AI.Agent, ...
 
-        def cli_adapter, do: Jido.AI.CLI.Adapters.ReAct
+        def cli_adapter, do: Jido.AI.Reasoning.ReAct.CLIAdapter
       end
 
   If not implemented, the CLI will infer the adapter from `--type` or default to ReAct.
@@ -72,30 +74,45 @@ defmodule Jido.AI.CLI.Adapter do
   def resolve(type, agent_module) do
     cond do
       # If agent module provides its own adapter, use it
-      agent_module && function_exported?(agent_module, :cli_adapter, 0) ->
+      exports_cli_adapter?(agent_module) ->
         {:ok, agent_module.cli_adapter()}
 
       # Type explicitly specified
       type == "react" || type == nil ->
-        {:ok, Jido.AI.CLI.Adapters.ReAct}
+        {:ok, Jido.AI.Reasoning.ReAct.CLIAdapter}
+
+      type == "aot" ->
+        {:ok, Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter}
+
+      type == "cod" ->
+        {:ok, Jido.AI.Reasoning.ChainOfDraft.CLIAdapter}
 
       type == "tot" ->
-        {:ok, Jido.AI.CLI.Adapters.ToT}
+        {:ok, Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter}
 
       type == "cot" ->
-        {:ok, Jido.AI.CLI.Adapters.CoT}
+        {:ok, Jido.AI.Reasoning.ChainOfThought.CLIAdapter}
 
       type == "got" ->
-        {:ok, Jido.AI.CLI.Adapters.GoT}
+        {:ok, Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter}
 
       type == "trm" ->
-        {:ok, Jido.AI.CLI.Adapters.TRM}
+        {:ok, Jido.AI.Reasoning.TRM.CLIAdapter}
 
       type == "adaptive" ->
-        {:ok, Jido.AI.CLI.Adapters.Adaptive}
+        {:ok, Jido.AI.Reasoning.Adaptive.CLIAdapter}
 
       true ->
-        {:error, "Unknown agent type: #{type}. Supported: react, tot, cot, got, trm, adaptive"}
+        {:error, "Unknown agent type: #{type}. Supported: react, aot, cod, tot, cot, got, trm, adaptive"}
+    end
+  end
+
+  defp exports_cli_adapter?(nil), do: false
+
+  defp exports_cli_adapter?(agent_module) when is_atom(agent_module) do
+    case Code.ensure_loaded(agent_module) do
+      {:module, _} -> function_exported?(agent_module, :cli_adapter, 0)
+      {:error, _} -> false
     end
   end
 end

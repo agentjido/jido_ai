@@ -19,10 +19,10 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
-  alias Jido.AI.Strategies.Adaptive
-  alias Jido.AI.Strategies.TRM
-  alias Jido.AI.TRM.ACT
-  alias Jido.AI.TRM.Machine
+  alias Jido.AI.Reasoning.Adaptive.Strategy, as: Adaptive
+  alias Jido.AI.Reasoning.TRM.Strategy, as: TRM
+  alias Jido.AI.Reasoning.TRM.ACT
+  alias Jido.AI.Reasoning.TRM.Machine
   alias Jido.Instruction
 
   # ============================================================================

@@ -4,7 +4,7 @@ defmodule Jido.AI.TRMAgent do
   @moduledoc """
   Base macro for TRM (Tiny-Recursive-Model) agents.
 
-  Wraps `use Jido.Agent` with `Jido.AI.Strategies.TRM` wired in,
+  Wraps `use Jido.Agent` with `Jido.AI.Reasoning.TRM.Strategy` wired in,
   plus standard state fields and helper functions.
 
   ## Usage
@@ -96,7 +96,7 @@ defmodule Jido.AI.TRMAgent do
     act_threshold = Keyword.get(opts, :act_threshold, @default_act_threshold)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     strategy_opts = [
       model: model,
@@ -125,7 +125,7 @@ defmodule Jido.AI.TRMAgent do
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Strategies.TRM, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.TRM.Strategy, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
       unquote(Jido.AI.Agent.compatibility_overrides_ast())

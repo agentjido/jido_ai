@@ -13,8 +13,7 @@ defmodule Jido.AI.Skill.Registry do
   2. **Lazy startup** via `ensure_started/0`, which is called automatically by
      public API functions.
 
-  This matches `Jido.AI.Streaming.Registry` lifecycle semantics so both
-  registries work consistently regardless of startup ordering.
+  This ensures consistent startup behavior regardless of supervision order.
   """
 
   use GenServer

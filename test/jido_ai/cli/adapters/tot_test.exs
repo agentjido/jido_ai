@@ -1,7 +1,7 @@
-defmodule Jido.AI.CLI.Adapters.ToTTest do
+defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.CLI.Adapters.ToT, as: ToTAdapter
+  alias Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter, as: ToTAdapter
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do
@@ -63,6 +63,9 @@ defmodule Jido.AI.CLI.Adapters.ToTTest do
       assert opts[:branching_factor] == 3
       assert opts[:max_depth] == 3
       assert opts[:traversal_strategy] == :best_first
+      assert opts[:top_k] == 3
+      assert opts[:min_depth] == 2
+      assert opts[:max_nodes] == 100
     end
   end
 

@@ -4,7 +4,7 @@ defmodule Jido.AI.AdaptiveAgent do
   @moduledoc """
   Base macro for Adaptive strategy-powered agents.
 
-  Wraps `use Jido.Agent` with `Jido.AI.Strategies.Adaptive` wired in,
+  Wraps `use Jido.Agent` with `Jido.AI.Reasoning.Adaptive.Strategy` wired in,
   plus standard state fields and helper functions.
 
   ## Usage
@@ -14,7 +14,7 @@ defmodule Jido.AI.AdaptiveAgent do
           name: "smart_assistant",
           description: "Automatically selects the best reasoning approach",
           default_strategy: :react,
-          available_strategies: [:cot, :react, :tot, :got, :trm]
+          available_strategies: [:cod, :cot, :react, :tot, :got, :trm]
       end
 
   ## Options
@@ -23,7 +23,7 @@ defmodule Jido.AI.AdaptiveAgent do
   - `:description` - Agent description (default: "Adaptive agent \#{name}")
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:default_strategy` - Default strategy if analysis is inconclusive (default: `:react`)
-  - `:available_strategies` - List of available strategies (default: `[:cot, :react, :tot, :got, :trm]`)
+  - `:available_strategies` - List of available strategies (default: `[:cod, :cot, :react, :tot, :got, :trm]`)
   - `:complexity_thresholds` - Map of thresholds for strategy selection
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
@@ -85,16 +85,18 @@ defmodule Jido.AI.AdaptiveAgent do
 
   The Adaptive strategy automatically selects the best approach based on task analysis:
 
+  - **Algorithmic Exploration (opt-in)** → AoT (when `:aot` is included in `available_strategies`)
+  - Uses single-query algorithmic search formatting with explicit finalization
   - **Iterative Reasoning** → TRM (puzzles, step-by-step, recursive)
   - **Synthesis** → Graph-of-Thoughts (combine, merge, perspectives)
   - **Tool use** → ReAct (search, calculate, execute)
   - **Exploration** → Tree-of-Thoughts (analyze, compare, alternatives)
-  - **Simple tasks** → Chain-of-Thought (direct questions, factual queries)
+  - **Simple tasks** → Chain-of-Draft (direct questions, factual queries)
   """
 
   @default_model "anthropic:claude-haiku-4-5"
   @default_strategy :react
-  @default_available_strategies [:cot, :react, :tot, :got, :trm]
+  @default_available_strategies [:cod, :cot, :react, :tot, :got, :trm]
 
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
@@ -105,7 +107,7 @@ defmodule Jido.AI.AdaptiveAgent do
     complexity_thresholds = Keyword.get(opts, :complexity_thresholds)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     strategy_opts =
       [
@@ -141,7 +143,7 @@ defmodule Jido.AI.AdaptiveAgent do
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Strategies.Adaptive, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.Adaptive.Strategy, unquote(Macro.escape(strategy_opts))},
         schema: unquote(base_schema_ast)
 
       unquote(Jido.AI.Agent.compatibility_overrides_ast())

@@ -5,7 +5,7 @@ defmodule Jido.AI.ToolApiTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI
-  alias Jido.AI.Strategies.ReAct
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
 
   # Test action modules
   defmodule Calculator do

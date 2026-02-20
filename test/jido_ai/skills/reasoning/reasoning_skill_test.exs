@@ -1,44 +1,41 @@
 defmodule Jido.AI.Plugins.ReasoningTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Plugins.Reasoning
+  alias Jido.AI.Plugins.Reasoning.TreeOfThoughts, as: Reasoning
   alias Jido.AI.Actions.Reasoning.{Analyze, Explain, Infer}
 
   describe "plugin_spec/1" do
     test "returns valid skill specification" do
       spec = Reasoning.plugin_spec(%{})
 
-      assert spec.module == Jido.AI.Plugins.Reasoning
-      assert spec.name == "reasoning"
-      assert spec.state_key == :reasoning
-      assert spec.description == "Provides AI-powered analysis, inference, and explanation capabilities"
+      assert spec.module == Reasoning
+      assert spec.name == "reasoning_tree_of_thoughts"
+      assert spec.state_key == :reasoning_tot
+      assert spec.description == "Runs Tree-of-Thoughts reasoning as a plugin capability"
       assert spec.category == "ai"
-      assert spec.vsn == "1.0.0"
-      assert spec.tags == ["reasoning", "analysis", "inference", "explanation", "ai"]
+      assert spec.vsn == "2.0.0"
+      assert spec.tags == ["reasoning", "tot", "strategies"]
     end
 
-    test "includes all three actions" do
+    test "includes RunStrategy action" do
       spec = Reasoning.plugin_spec(%{})
 
-      assert Jido.AI.Actions.Reasoning.Analyze in spec.actions
-      assert Jido.AI.Actions.Reasoning.Infer in spec.actions
-      assert Jido.AI.Actions.Reasoning.Explain in spec.actions
+      assert spec.actions == [Jido.AI.Actions.Reasoning.RunStrategy]
     end
   end
 
   describe "mount/2" do
     test "initializes skill with defaults" do
       assert {:ok, state} = Reasoning.mount(nil, %{})
+      assert state.strategy == :tot
       assert state.default_model == :reasoning
-      assert state.default_max_tokens == 2048
-      assert state.default_temperature == 0.3
+      assert state.timeout == 30_000
     end
 
     test "accepts custom configuration" do
-      assert {:ok, state} = Reasoning.mount(nil, %{default_model: :capable, default_max_tokens: 4096})
+      assert {:ok, state} = Reasoning.mount(nil, %{default_model: :capable, timeout: 15_000})
       assert state.default_model == :capable
-      assert state.default_max_tokens == 4096
-      assert state.default_temperature == 0.3
+      assert state.timeout == 15_000
     end
   end
 

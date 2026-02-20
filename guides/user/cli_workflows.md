@@ -32,6 +32,7 @@ mix jido_ai.skill validate priv/skills --strict
 ## Defaults You Should Know
 
 - default type: `react`
+- supported types: `react | aot | cod | cot | tot | got | trm | adaptive`
 - default timeout: `60_000ms`
 - default output format: `text`
 

@@ -161,6 +161,7 @@ defmodule Jido.AI.Turn do
   def execute(tool_name, params, context, opts \\ []) when is_binary(tool_name) do
     context = normalize_context(context)
     timeout = Keyword.get(opts, :timeout, @default_timeout)
+    exec_opts = Keyword.delete(opts, :timeout)
     tools = opts |> Keyword.get(:tools, %{}) |> ToolAdapter.to_action_map()
     start_time = System.monotonic_time()
 
@@ -169,7 +170,7 @@ defmodule Jido.AI.Turn do
     result =
       case Map.fetch(tools, tool_name) do
         {:ok, module} ->
-          execute_internal(module, tool_name, params, context, timeout)
+          execute_internal(module, tool_name, params, context, timeout, exec_opts)
 
         :error ->
           {:error, error_envelope(tool_name, :not_found, "Tool not found: #{tool_name}")}
@@ -186,11 +187,12 @@ defmodule Jido.AI.Turn do
   def execute_module(module, params, context, opts \\ []) do
     context = normalize_context(context)
     timeout = Keyword.get(opts, :timeout, @default_timeout)
+    exec_opts = Keyword.delete(opts, :timeout)
     tool_name = module.name()
     start_time = System.monotonic_time()
 
     start_execute_telemetry(tool_name, params, context)
-    result = execute_internal(module, tool_name, params, context, timeout)
+    result = execute_internal(module, tool_name, params, context, timeout, exec_opts)
     finalize_execute_telemetry(tool_name, result, start_time, context)
 
     result
@@ -460,11 +462,12 @@ defmodule Jido.AI.Turn do
 
   defp normalize_usage_value(_), do: 0
 
-  defp execute_internal(module, tool_name, params, context, timeout) do
+  defp execute_internal(module, tool_name, params, context, timeout, exec_opts) do
     schema = module.schema()
     normalized_params = normalize_params(params, schema)
+    run_opts = timeout_opts(timeout) ++ exec_opts
 
-    case Jido.Exec.run(module, normalized_params, context, timeout_opts(timeout)) do
+    case Jido.Exec.run(module, normalized_params, context, run_opts) do
       {:ok, output} ->
         {:ok, output}
 
@@ -554,6 +557,8 @@ defmodule Jido.AI.Turn do
         tool_name: tool_name,
         params: Observe.sanitize_sensitive(params),
         call_id: context[:call_id],
+        request_id: context[:request_id] || context[:run_id],
+        run_id: context[:run_id],
         agent_id: context[:agent_id],
         iteration: context[:iteration]
       }
@@ -577,6 +582,8 @@ defmodule Jido.AI.Turn do
         tool_name: tool_name,
         result: result,
         call_id: context[:call_id],
+        request_id: context[:request_id] || context[:run_id],
+        run_id: context[:run_id],
         agent_id: context[:agent_id],
         thread_id: context[:thread_id],
         iteration: context[:iteration]
@@ -601,6 +608,8 @@ defmodule Jido.AI.Turn do
         tool_name: tool_name,
         reason: reason,
         call_id: context[:call_id],
+        request_id: context[:request_id] || context[:run_id],
+        run_id: context[:run_id],
         agent_id: context[:agent_id],
         thread_id: context[:thread_id],
         iteration: context[:iteration]

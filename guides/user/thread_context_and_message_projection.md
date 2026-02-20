@@ -65,6 +65,5 @@ Do not use this when:
 
 ## Next
 
-- [Streaming Workflows](streaming_workflows.md)
 - [First Agent](first_react_agent.md)
 - [Configuration Reference](../developer/configuration_reference.md)

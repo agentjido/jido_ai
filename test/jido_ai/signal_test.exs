@@ -1,7 +1,23 @@
 defmodule Jido.AI.SignalTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Signal.{LLMDelta, LLMError, LLMResponse, Usage}
+  alias Jido.AI.Reasoning.ReAct.Signal, as: ReactSignal
+  alias Jido.AI.Signal.{LLMDelta, LLMResponse, Usage}
+
+  describe "ReactEvent" do
+    test "creates worker event signal with required fields" do
+      signal =
+        ReactSignal.new!(%{
+          request_id: "req_123",
+          event: %{id: "evt_1", kind: :llm_started}
+        })
+
+      assert signal.type == "ai.react.worker.event"
+      assert signal.source == "/ai/react/worker"
+      assert signal.data.request_id == "req_123"
+      assert signal.data.event.kind == :llm_started
+    end
+  end
 
   describe "LLMResponse" do
     test "creates signal with required fields" do
@@ -144,64 +160,6 @@ defmodule Jido.AI.SignalTest do
 
       accumulated = signals |> Enum.map_join(& &1.data.delta)
       assert accumulated == "Hello, world!"
-    end
-  end
-
-  describe "LLMError" do
-    test "creates error signal with required fields" do
-      signal =
-        LLMError.new!(%{
-          call_id: "call_err_1",
-          error_type: :rate_limit,
-          message: "Rate limit exceeded"
-        })
-
-      assert signal.type == "ai.llm.error"
-      assert signal.data.call_id == "call_err_1"
-      assert signal.data.error_type == :rate_limit
-      assert signal.data.message == "Rate limit exceeded"
-      assert signal.data.details == %{}
-    end
-
-    test "creates error signal with retry_after" do
-      signal =
-        LLMError.new!(%{
-          call_id: "call_err_2",
-          error_type: :rate_limit,
-          message: "Too many requests",
-          retry_after: 60
-        })
-
-      assert signal.data.retry_after == 60
-    end
-
-    test "creates error signal with details" do
-      details = %{provider: "anthropic", error_code: "overloaded"}
-
-      signal =
-        LLMError.new!(%{
-          call_id: "call_err_3",
-          error_type: :provider_error,
-          message: "Provider is overloaded",
-          details: details
-        })
-
-      assert signal.data.details == details
-    end
-
-    test "supports all error types" do
-      error_types = [:rate_limit, :auth, :timeout, :provider_error, :validation, :network, :unknown]
-
-      for error_type <- error_types do
-        signal =
-          LLMError.new!(%{
-            call_id: "call_#{error_type}",
-            error_type: error_type,
-            message: "Error of type #{error_type}"
-          })
-
-        assert signal.data.error_type == error_type
-      end
     end
   end
 
@@ -369,10 +327,11 @@ defmodule Jido.AI.SignalTest do
 
     test "returns false for non-LLMResponse signals" do
       signal =
-        LLMError.new!(%{
-          call_id: "call_err",
-          error_type: :timeout,
-          message: "Timeout"
+        Usage.new!(%{
+          call_id: "call_usage",
+          model: "test:model",
+          input_tokens: 1,
+          output_tokens: 1
         })
 
       assert LLMResponse.tool_call?(signal) == false

@@ -25,7 +25,7 @@ end
 def deps do
   [
     {:jido, "~> 2.0"},
-    {:jido_ai, "~> 2.0"}
+    {:jido_ai, "~> 2.0.0-beta"}
   ]
 end
 ```
@@ -51,17 +51,23 @@ Strategies are agent patterns that determine how an LLM approaches a problem. Th
 
 | Strategy | Pattern | Best For |
 |----------|---------|----------|
+| **Chain-of-Draft** | Minimal intermediate drafts | Low-latency multi-step reasoning |
 | **ReAct** | Reason-Act loop | Tool-using agents |
 | **Chain-of-Thought** | Sequential reasoning | Multi-step problems |
+| **Algorithm-of-Thoughts** | Single-query algorithmic search | Structured exploration with explicit finalization |
 | **Tree-of-Thoughts** | Explore multiple paths | Complex planning |
 | **Graph-of-Thoughts** | Networked reasoning | Interconnected concepts |
+| **TRM** | Recursive self-supervision | Iterative refinement |
 | **Adaptive** | Strategy selection | Variable problem types |
 
 **When to use which strategy:**
+- **Chain-of-Draft** - For concise reasoning with lower token/latency overhead
 - **ReAct** - When your agent needs to use tools or APIs
 - **Chain-of-Thought** - For multi-step reasoning and math problems
+- **Algorithm-of-Thoughts** - For one-pass exploration with explicit `answer:` finalization
 - **Tree-of-Thoughts** - When exploring multiple solution paths is beneficial
 - **Graph-of-Thoughts** - For problems with interconnected concepts
+- **TRM** - For iterative improvement loops
 - **Adaptive** - When you need dynamic strategy selection based on the problem
 
 ```elixir
@@ -89,13 +95,14 @@ end
 ## Documentation
 
 ### Build With Jido.AI
+- [Package Overview (Production Map)](guides/user/package_overview.md) - Prioritized feature map and runtime architecture
+- [Migration Guide: Plugins And Signals (v2 -> v3)](guides/user/migration_plugins_and_signals_v3.md) - Breaking-change module/signal mapping
 - [Getting Started](guides/user/getting_started.md) - First working agent in minutes
-- [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md) - Choose CoT/ReAct/ToT/GoT/TRM/Adaptive
+- [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md) - Choose CoD/CoT/ReAct/AoT/ToT/GoT/TRM/Adaptive
 - [First Agent](guides/user/first_react_agent.md) - Tool-using `Jido.AI.Agent` with request handles
 - [Request Lifecycle And Concurrency](guides/user/request_lifecycle_and_concurrency.md) - `ask/await` and concurrent safety
 - [Thread Context And Message Projection](guides/user/thread_context_and_message_projection.md) - Multi-turn context management
 - [Tool Calling With Actions](guides/user/tool_calling_with_actions.md) - Adapt `Jido.Action` modules as tools
-- [Streaming Workflows](guides/user/streaming_workflows.md) - Token streaming with buffering and callbacks
 - [Observability Basics](guides/user/observability_basics.md) - Telemetry events and normalization
 - [CLI Workflows](guides/user/cli_workflows.md) - Interactive, one-shot, and batch CLI usage
 
@@ -114,16 +121,19 @@ end
 - [Configuration Reference](guides/developer/configuration_reference.md) - Defaults and config keys
 
 ### Examples
-- [`examples/strategies/react_agent.md`](examples/strategies/react_agent.md) - ReAct strategy example
-- [`examples/strategies/chain_of_thought.md`](examples/strategies/chain_of_thought.md) - Chain-of-Thought example
-- [`examples/strategies/tree_of_thoughts.md`](examples/strategies/tree_of_thoughts.md) - Tree-of-Thoughts example
-- [`examples/strategies/adaptive_strategy.md`](examples/strategies/adaptive_strategy.md) - Adaptive strategy example
+- [`lib/examples/README.md`](lib/examples/README.md) - Full examples index (agents, scripts, skills, strategies)
+- [`lib/examples/strategies/react_agent.md`](lib/examples/strategies/react_agent.md) - ReAct strategy example
+- [`examples/strategies/chain_of_draft.md`](examples/strategies/chain_of_draft.md) - Chain-of-Draft example
+- [`lib/examples/strategies/chain_of_thought.md`](lib/examples/strategies/chain_of_thought.md) - Chain-of-Thought example
+- [`examples/strategies/algorithm_of_thoughts.md`](examples/strategies/algorithm_of_thoughts.md) - Algorithm-of-Thoughts example
+- [`lib/examples/strategies/tree_of_thoughts.md`](lib/examples/strategies/tree_of_thoughts.md) - Tree-of-Thoughts example
+- [`lib/examples/strategies/adaptive_strategy.md`](lib/examples/strategies/adaptive_strategy.md) - Adaptive strategy example
 
 ## ReAct Production Defaults
 
 Use these references as the production baseline for ReAct:
-- [`lib/jido_ai/agents/examples/weather_agent.ex`](lib/jido_ai/agents/examples/weather_agent.ex)
-- [`examples/strategies/react_agent.md`](examples/strategies/react_agent.md)
+- [`lib/examples/agents/weather_agent.ex`](lib/examples/agents/weather_agent.ex)
+- [`lib/examples/strategies/react_agent.md`](lib/examples/strategies/react_agent.md)
 
 ## Quick Decision Guide
 
@@ -133,6 +143,10 @@ Not sure which technique to use? Start here:
 Building an agent?
 ├─ Need to use tools/APIs?
 │  └─ Use ReAct Strategy
+├─ Need concise multi-step reasoning?
+│  └─ Use Chain-of-Draft
+├─ Need one-pass algorithmic search output?
+│  └─ Use Algorithm-of-Thoughts
 ├─ Multi-step reasoning?
 │  └─ Use Chain-of-Thought
 └─ Complex planning?

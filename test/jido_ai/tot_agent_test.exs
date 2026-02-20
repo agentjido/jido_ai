@@ -10,7 +10,10 @@ defmodule Jido.AI.ToTAgentTest do
       model: "test:model",
       branching_factor: 2,
       max_depth: 2,
-      traversal_strategy: :bfs
+      traversal_strategy: :bfs,
+      top_k: 4,
+      min_depth: 1,
+      max_nodes: 50
   end
 
   defmodule DefaultToTAgent do
@@ -38,7 +41,7 @@ defmodule Jido.AI.ToTAgentTest do
 
   describe "strategy configuration" do
     test "uses TreeOfThoughts strategy" do
-      assert TestToTAgent.strategy() == Jido.AI.Strategies.TreeOfThoughts
+      assert TestToTAgent.strategy() == Jido.AI.Reasoning.TreeOfThoughts.Strategy
     end
 
     test "passes custom model to strategy" do
@@ -61,12 +64,22 @@ defmodule Jido.AI.ToTAgentTest do
       assert opts[:traversal_strategy] == :bfs
     end
 
+    test "passes structured ToT options to strategy" do
+      opts = TestToTAgent.strategy_opts()
+      assert opts[:top_k] == 4
+      assert opts[:min_depth] == 1
+      assert opts[:max_nodes] == 50
+    end
+
     test "uses default values when not specified" do
       opts = DefaultToTAgent.strategy_opts()
       assert opts[:model] == "anthropic:claude-haiku-4-5"
       assert opts[:branching_factor] == 3
       assert opts[:max_depth] == 3
       assert opts[:traversal_strategy] == :best_first
+      assert opts[:top_k] == 3
+      assert opts[:min_depth] == 2
+      assert opts[:max_nodes] == 100
     end
   end
 
@@ -85,7 +98,7 @@ defmodule Jido.AI.ToTAgentTest do
     test "includes last_result field" do
       agent = TestToTAgent.new()
       assert Map.has_key?(agent.state, :last_result)
-      assert agent.state.last_result == ""
+      assert agent.state.last_result == nil
     end
 
     test "includes completed field" do
@@ -118,7 +131,7 @@ defmodule Jido.AI.ToTAgentTest do
 
       assert updated_agent.state.last_prompt == "Test prompt"
       assert updated_agent.state.completed == false
-      assert updated_agent.state.last_result == ""
+      assert updated_agent.state.last_result == nil
     end
 
     test "passes through other actions unchanged" do
@@ -136,13 +149,34 @@ defmodule Jido.AI.ToTAgentTest do
     test "agent initializes with strategy state" do
       agent = TestToTAgent.new()
       ctx = %{strategy_opts: TestToTAgent.strategy_opts()}
-      {agent, _directives} = Jido.AI.Strategies.TreeOfThoughts.init(agent, ctx)
+      {agent, _directives} = Jido.AI.Reasoning.TreeOfThoughts.Strategy.init(agent, ctx)
 
       state = StratState.get(agent, %{})
       assert state[:status] == :idle
       assert state[:branching_factor] == 2
       assert state[:max_depth] == 2
       assert state[:traversal_strategy] == :bfs
+      assert state[:top_k] == 4
+      assert state[:min_depth] == 1
+      assert state[:max_nodes] == 50
+    end
+  end
+
+  describe "structured result helpers" do
+    test "best_answer/1 and top_candidates/2 extract data from structured result" do
+      result = %{
+        best: %{content: "Best option"},
+        candidates: [%{content: "Best option"}, %{content: "Fallback option"}],
+        termination: %{reason: :max_depth},
+        tree: %{node_count: 4}
+      }
+
+      assert TestToTAgent.best_answer(result) == "Best option"
+      assert length(TestToTAgent.top_candidates(result, 1)) == 1
+
+      summary = TestToTAgent.result_summary(result)
+      assert summary.best_answer == "Best option"
+      assert summary.termination.reason == :max_depth
     end
   end
 end
