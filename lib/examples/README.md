@@ -55,6 +55,7 @@ Canonical weather overview module:
 | Reasoning ToT plugin | Mount `Jido.AI.Plugins.Reasoning.TreeOfThoughts` and send `reasoning.tot.run` for fixed `:tot` strategy execution with ToT options (`branching_factor`, `max_depth`, `traversal_strategy`). |
 | Reasoning GoT plugin | Mount `Jido.AI.Plugins.Reasoning.GraphOfThoughts` and send `reasoning.got.run` for fixed `:got` strategy execution with GoT options (`max_nodes`, `max_depth`, `aggregation_strategy`). |
 | Reasoning TRM plugin | Mount `Jido.AI.Plugins.Reasoning.TRM` and send `reasoning.trm.run` for fixed `:trm` strategy execution with TRM options (`max_supervision_steps`, `act_threshold`). |
+| Reasoning Adaptive plugin | Mount `Jido.AI.Plugins.Reasoning.Adaptive` and send `reasoning.adaptive.run` for fixed `:adaptive` strategy execution with Adaptive options (`default_strategy`, `available_strategies`, `complexity_thresholds`). |
 
 ```elixir
 defmodule MyApp.ChatAgent do
@@ -244,6 +245,38 @@ signal =
   )
 
 # Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.TRM
+```
+
+```elixir
+defmodule MyApp.AdaptivePluginAgent do
+  use Jido.AI.Agent,
+    name: "reasoning_adaptive_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.Adaptive,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{
+           default_strategy: :react,
+           available_strategies: [:cod, :cot, :react, :tot, :got, :trm, :aot],
+           complexity_thresholds: %{simple: 0.3, complex: 0.7}
+         }
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.adaptive.run",
+    %{
+      prompt: "Choose the best strategy and propose a weather-safe plan with one backup.",
+      strategy: :cot,
+      options: %{default_strategy: :tot}
+    },
+    source: "/cli"
+  )
+
+# Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.Adaptive
 ```
 
 ## Script Index

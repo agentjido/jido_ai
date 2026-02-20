@@ -271,6 +271,45 @@ Execution handoff:
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 - TRM option keys include `max_supervision_steps` and `act_threshold`.
 
+### Adaptive Plugin Handoff (`reasoning.adaptive.run`)
+
+```elixir
+defmodule MyApp.AdaptivePluginAgent do
+  use Jido.AI.Agent,
+    name: "adaptive_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.Adaptive,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{
+           default_strategy: :react,
+           available_strategies: [:cod, :cot, :react, :tot, :got, :trm, :aot],
+           complexity_thresholds: %{simple: 0.3, complex: 0.7}
+         }
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.adaptive.run",
+    %{
+      prompt: "Pick the best strategy and produce a weather-safe commute with one backup.",
+      strategy: :cot,
+      options: %{default_strategy: :tot}
+    },
+    source: "/cli"
+  )
+```
+
+Execution handoff:
+
+- Route dispatch maps `reasoning.adaptive.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
+- `Jido.AI.Plugins.Reasoning.Adaptive.handle_signal/2` overrides payload strategy to `strategy: :adaptive`.
+- `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
+- Adaptive option keys include `default_strategy`, `available_strategies`, and `complexity_thresholds`.
+
 ## Chat Plugin Defaults Contract
 
 `Jido.AI.Plugins.Chat` mounts the following defaults unless overridden in plugin config:
@@ -341,6 +380,15 @@ Action-specific fields remain action-owned:
 `Jido.AI.Plugins.Reasoning.TRM` mounts the following defaults unless overridden in plugin config:
 
 - `strategy: :trm`
+- `default_model: :reasoning`
+- `timeout: 30_000`
+- `options: %{}`
+
+## Reasoning Adaptive Plugin Defaults Contract
+
+`Jido.AI.Plugins.Reasoning.Adaptive` mounts the following defaults unless overridden in plugin config:
+
+- `strategy: :adaptive`
 - `default_model: :reasoning`
 - `timeout: 30_000`
 - `options: %{}`

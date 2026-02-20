@@ -1218,3 +1218,60 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.3 seconds (2.3s async, 0.00s sync)
 8 tests, 0 failures (1648 excluded)
+1) changed files
+- `lib/jido_ai/plugins/reasoning/adaptive.ex:4`  
+  Expanded Adaptive plugin module docs with contract sections: signal route, strategy override handoff, usage, adaptive options, and mount defaults.
+- `test/jido_ai/plugins/reasoning/adaptive_test.exs:1`  
+  Added full Adaptive plugin E2E test suite (spec/mount/schema/actions/route/strategy injection/docs/example contracts).
+- `guides/developer/plugins_and_actions_composition.md:274`  
+  Added `Adaptive Plugin Handoff (reasoning.adaptive.run)` section and usage snippet.
+- `guides/developer/plugins_and_actions_composition.md:387`  
+  Added `Reasoning Adaptive Plugin Defaults Contract`.
+- `lib/examples/README.md:58`  
+  Added Adaptive row to the Plugin Capability Pattern matrix.
+- `lib/examples/README.md:251`  
+  Added Adaptive plugin code snippet showing `reasoning.adaptive.run` path.
+
+2) tests/commands executed
+- `mix format lib/jido_ai/plugins/reasoning/adaptive.ex guides/developer/plugins_and_actions_composition.md lib/examples/README.md test/jido_ai/plugins/reasoning/adaptive_test.exs` ✅
+- `mix test test/jido_ai/plugins/reasoning/adaptive_test.exs` ✅ (12 tests, 0 failures)
+- `mix test test/jido_ai/plugins/reasoning/adaptive_test.exs test/jido_ai/plugins/reasoning/trm_test.exs` ✅ (24 tests, 0 failures)
+- `mix test test/jido_ai/plugins/reasoning` ✅ (68 tests, 0 failures)
+- `mix test test/jido_ai/skills/lifecycle_integration_test.exs test/jido_ai/skills/schema_integration_test.exs` ✅ (28 tests, 0 failures)
+- `mix precommit` ❌ (`Mix.Sync.PubSub.subscribe/1` TCP socket `:eperm` in sandbox)
+- `mix test.fast` ❌ (same `Mix.PubSub` socket `:eperm`, via alias path)
+- `mix doctor --summary` ❌ (same `Mix.PubSub` socket `:eperm`)
+- Additional equivalent checks run:
+  - `mix format --check-formatted` ✅
+  - `mix compile --warnings-as-errors` ✅
+  - `mix test --exclude flaky --only stable_smoke` ✅ (8 tests, 0 failures)
+
+3) acceptance criteria coverage
+- Tests validate `strategy: :adaptive` injection and route contract:  
+  `test/jido_ai/plugins/reasoning/adaptive_test.exs:86`, `test/jido_ai/plugins/reasoning/adaptive_test.exs:95`
+- Docs include adaptive plugin usage and defaults:  
+  `lib/jido_ai/plugins/reasoning/adaptive.ex:7`, `guides/developer/plugins_and_actions_composition.md:274`, `guides/developer/plugins_and_actions_composition.md:387`
+- Example matrix includes adaptive plugin path:  
+  `lib/examples/README.md:58` and adaptive snippet at `lib/examples/README.md:251`
+
+4) blockers/assumptions
+- Blocker: this environment denies the TCP socket operation used by Mix PubSub for tasks that go through `deps.loadpaths`, so `mix doctor --summary` and `mix precommit` cannot complete here.
+- Assumption: non-doctor precommit components were validated via equivalent direct commands and all passed.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 257122, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.1 seconds (2.1s async, 0.01s sync)
+8 tests, 0 failures (1660 excluded)
