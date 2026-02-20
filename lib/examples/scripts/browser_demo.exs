@@ -3,7 +3,7 @@
 # Demonstrates browsing the web with a `Jido.AI.Agent` that reads
 # and summarizes web page content using jido_browser.
 #
-# Run with: mix run scripts/browser_demo.exs
+# Run with: mix run lib/examples/scripts/browser_demo.exs
 #
 # Requires BRAVE_SEARCH_API_KEY in .env (for search_web tool)
 #
@@ -11,6 +11,8 @@
 # - Turn 1: Read Elixir Enum docs and summarize
 # - Turn 2: List commonly used functions (from conversation context)
 # - Turn 3: Show usage examples (from conversation context)
+
+Logger.configure(level: :warning)
 
 if Code.ensure_loaded?(Dotenvy) do
   env_file = Path.join(File.cwd!(), ".env")

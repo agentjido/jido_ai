@@ -4,7 +4,7 @@
 # stores them in Memory's :tasks space, and works through
 # each one to completion.
 #
-# Run with: mix run scripts/task_list_demo.exs
+# Run with: mix run lib/examples/scripts/task_list_demo.exs
 #
 # Expected behavior:
 # - Turn 1: Agent decomposes goal into tasks, stores in memory, executes each

@@ -151,17 +151,18 @@ defmodule JidoAi.MixProject do
         "guides/developer/actions_catalog.md",
         "guides/developer/configuration_reference.md",
         # Examples
-        "examples/strategies/adaptive_strategy.md",
-        "examples/strategies/chain_of_thought.md",
-        "examples/strategies/react_agent.md",
-        "examples/strategies/tree_of_thoughts.md"
+        "lib/examples/README.md",
+        "lib/examples/strategies/adaptive_strategy.md",
+        "lib/examples/strategies/chain_of_thought.md",
+        "lib/examples/strategies/react_agent.md",
+        "lib/examples/strategies/tree_of_thoughts.md"
       ],
       groups_for_extras: [
         {"Build With Jido.AI", ~r/guides\/user/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
         {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/},
-        {"Examples - Strategies", ~r/examples\/strategies/}
+        {"Examples - Strategies", ~r/lib\/examples\/(README|strategies)/}
       ],
       groups_for_modules: [
         Core: [
