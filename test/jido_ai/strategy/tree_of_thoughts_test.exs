@@ -84,6 +84,44 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       assert state[:branching_factor] == 3
       assert state[:max_depth] == 3
       assert state[:traversal_strategy] == :best_first
+      assert state[:top_k] == 3
+      assert state[:min_depth] == 2
+      assert state[:max_nodes] == 100
+      assert state[:max_duration_ms] == nil
+      assert state[:beam_width] == nil
+      assert state[:config].max_tool_round_trips == 3
+      assert state[:config].tool_timeout_ms == 15_000
+      assert state[:config].tool_max_retries == 1
+      assert state[:config].tool_retry_backoff_ms == 200
+    end
+
+    test "uses custom structured controls when provided" do
+      agent =
+        create_agent(
+          top_k: 4,
+          min_depth: 1,
+          max_nodes: 55,
+          max_duration_ms: 1_500,
+          beam_width: 2,
+          early_success_threshold: 0.9,
+          convergence_window: 3,
+          min_score_improvement: 0.01,
+          max_parse_retries: 2,
+          max_tool_round_trips: 4
+        )
+
+      state = StratState.get(agent, %{})
+
+      assert state[:top_k] == 4
+      assert state[:min_depth] == 1
+      assert state[:max_nodes] == 55
+      assert state[:max_duration_ms] == 1_500
+      assert state[:beam_width] == 2
+      assert state[:config].early_success_threshold == 0.9
+      assert state[:config].convergence_window == 3
+      assert state[:config].min_score_improvement == 0.01
+      assert state[:config].max_parse_retries == 2
+      assert state[:config].max_tool_round_trips == 4
     end
   end
 
