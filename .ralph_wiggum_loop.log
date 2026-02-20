@@ -791,3 +791,55 @@ Including tags: [:stable_smoke]
 ........
 Finished in 1.9 seconds (1.9s async, 0.01s sync)
 8 tests, 0 failures (1576 excluded)
+1) changed files
+- `lib/jido_ai/plugins/chat.ex`
+- `test/jido_ai/skills/llm/llm_skill_test.exs`
+- `guides/developer/plugins_and_actions_composition.md`
+- `lib/examples/README.md`
+- `test/jido_ai/plugins/chat_docs_contract_test.exs`
+
+2) tests/commands executed
+- `mix format` ✅
+- `mix test test/jido_ai/skills/llm/llm_skill_test.exs test/jido_ai/plugins/chat_docs_contract_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` ✅
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test test/jido_ai/skills/llm/llm_skill_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` ✅
+- `mix test --exclude flaky --only stable_smoke` ✅ (functional equivalent of `mix test.fast`)
+- `mix precommit` ❌ (`Mix.PubSub` socket open failure: `:eperm`)
+- `mix test.fast` ❌ (`Mix.PubSub` socket open failure: `:eperm`, via alias `cmd env MIX_ENV=test ...`)
+- `mix doctor --summary` / `mix doctor --summary --raise` ❌ (`Mix.PubSub` socket open failure: `:eperm`)
+
+3) acceptance criteria coverage
+- Plugin docs clearly define chat signal contracts/defaults:
+  - Added explicit signal contract and mount default contract to `lib/jido_ai/plugins/chat.ex`.
+  - Added explicit Chat defaults contract and full chat signal list to `guides/developer/plugins_and_actions_composition.md`.
+  - Added docs contract assertions in `test/jido_ai/plugins/chat_docs_contract_test.exs`.
+- Tests cover spec/mount/routes/handle_signal/transform_result:
+  - Expanded `test/jido_ai/skills/llm/llm_skill_test.exs` to cover `plugin_spec/1`, `schema/0`, `mount/2`, `signal_routes/1`, `handle_signal/2`, and `transform_result/3`.
+  - Added route-to-action inventory cross-check for chat/tool-calling/LLM action wiring.
+- Example mapping includes chat plugin usage pattern:
+  - Added a “Plugin Capability Pattern” section with `Jido.AI.Plugins.Chat` + `chat.message` usage in `lib/examples/README.md`.
+  - Added test assertions for this mapping in `test/jido_ai/plugins/chat_docs_contract_test.exs`.
+
+4) blockers/assumptions
+- Blocker: in this sandbox, `mix precommit`, `mix test.fast`, and `mix doctor --summary` fail before execution due `Mix.PubSub` TCP socket permission error (`:eperm`).
+- Assumption: `mix test --exclude flaky --only stable_smoke` is accepted as the runtime-equivalent validation for `mix test.fast` when alias execution is blocked by sandbox networking constraints.
+- Scope kept to `ST-PLG-001` only; no commit/push/PR performed.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 710312, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 1.9 seconds (1.9s async, 0.01s sync)
+8 tests, 0 failures (1585 excluded)

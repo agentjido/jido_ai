@@ -43,6 +43,30 @@ Canonical weather overview module:
 | API + release workflows | `lib/examples/agents/api_smoke_test_agent.ex`, `lib/examples/agents/release_notes_agent.ex` |
 | Skills and tools | `lib/examples/skills/`, `lib/examples/tools/`, `lib/examples/skills_demo_agent.ex`, `lib/examples/calculator_agent.ex` |
 
+## Plugin Capability Pattern
+
+| Capability | Usage Pattern |
+| --- | --- |
+| Chat plugin | Mount `Jido.AI.Plugins.Chat` and send `chat.message` signals for tool-aware chat routing. |
+
+```elixir
+defmodule MyApp.ChatAgent do
+  use Jido.AI.Agent,
+    name: "chat_agent",
+    plugins: [
+      {Jido.AI.Plugins.Chat,
+       %{
+         default_model: :capable,
+         auto_execute: true,
+         tools: [MyApp.Actions.WeatherLookup]
+       }}
+    ]
+end
+
+signal = Jido.Signal.new!("chat.message", %{prompt: "Should I bike to work in Seattle tomorrow?"}, source: "/cli")
+# Routes to Jido.AI.Actions.ToolCalling.CallWithTools via Jido.AI.Plugins.Chat
+```
+
 ## Script Index
 
 Run scripts with `mix run lib/examples/scripts/<name>.exs`.

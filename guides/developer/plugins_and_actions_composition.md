@@ -50,6 +50,8 @@ end
   - `chat.complete` -> completion convenience path
   - `chat.embed` -> embedding generation
   - `chat.generate_object` -> schema-constrained structured output
+  - `chat.execute_tool` -> direct tool execution by tool name
+  - `chat.list_tools` -> tool inventory for the active chat capability
 - `Jido.AI.Plugins.Reasoning.*`
   - `reasoning.cod.run`
   - `reasoning.cot.run`
@@ -59,6 +61,20 @@ end
   - `reasoning.trm.run`
   - `reasoning.adaptive.run`
   - All route to `Jido.AI.Actions.Reasoning.RunStrategy` with fixed strategy identity.
+
+## Chat Plugin Defaults Contract
+
+`Jido.AI.Plugins.Chat` mounts the following defaults unless overridden in plugin config:
+
+- `default_model: :capable`
+- `default_max_tokens: 4096`
+- `default_temperature: 0.7`
+- `default_system_prompt: nil`
+- `auto_execute: true`
+- `max_turns: 10`
+- `tool_policy: :allow_all`
+- `tools: %{}` (normalized from configured tool modules)
+- `available_tools: []`
 
 ## Action Context Contract (Plugin -> Action)
 
