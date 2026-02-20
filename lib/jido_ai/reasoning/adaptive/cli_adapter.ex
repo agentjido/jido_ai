@@ -7,6 +7,8 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
   - Polls `strategy_snapshot.done?` for completion
   - Extracts result from `snapshot.result`
   - Reports selected strategy in metadata
+
+  AoT is supported when explicitly included in `available_strategies`.
   """
 
   @behaviour Jido.AI.CLI.Adapter

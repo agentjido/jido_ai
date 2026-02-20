@@ -29,6 +29,7 @@ defmodule Jido.AI.Plugins.Quota do
     "chat.complete",
     "chat.generate_object",
     "ai.react.query",
+    "ai.aot.query",
     "ai.cot.query",
     "ai.tot.query",
     "ai.got.query",

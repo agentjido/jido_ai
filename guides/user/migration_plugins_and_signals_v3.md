@@ -15,6 +15,7 @@ New public plugins:
 - `Jido.AI.Plugins.Chat`
 - `Jido.AI.Plugins.Planning`
 - `Jido.AI.Plugins.Reasoning.ChainOfThought`
+- `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts`
 - `Jido.AI.Plugins.Reasoning.TreeOfThoughts`
 - `Jido.AI.Plugins.Reasoning.GraphOfThoughts`
 - `Jido.AI.Plugins.Reasoning.TRM`
@@ -26,7 +27,7 @@ New public plugins:
 
 - `Jido.AI.Plugins.LLM` -> `Jido.AI.Plugins.Chat`
 - `Jido.AI.Plugins.ToolCalling` -> `Jido.AI.Plugins.Chat`
-- `Jido.AI.Plugins.Reasoning` -> Strategy plugins (`ChainOfThought`, `TreeOfThoughts`, `GraphOfThoughts`, `TRM`, `Adaptive`)
+- `Jido.AI.Plugins.Reasoning` -> Strategy plugins (`ChainOfThought`, `AlgorithmOfThoughts`, `TreeOfThoughts`, `GraphOfThoughts`, `TRM`, `Adaptive`)
 
 ## Signal Mapping
 
@@ -44,6 +45,7 @@ Legacy -> New:
 - `reasoning.infer` -> use `Jido.AI.Actions.Reasoning.Infer` directly
 - strategy execution (new):
   - `reasoning.cot.run`
+  - `reasoning.aot.run`
   - `reasoning.tot.run`
   - `reasoning.got.run`
   - `reasoning.trm.run`

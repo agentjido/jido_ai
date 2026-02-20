@@ -32,6 +32,7 @@ If your production workload needs reliable tool-calling agents, this is the defa
 `jido_ai` ships specialized agent macros for different reasoning patterns:
 
 - `Jido.AI.CoTAgent` -> `Jido.AI.Reasoning.ChainOfThought.Strategy`
+- `Jido.AI.AoTAgent` -> `Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy`
 - `Jido.AI.ToTAgent` -> `Jido.AI.Reasoning.TreeOfThoughts.Strategy`
 - `Jido.AI.GoTAgent` -> `Jido.AI.Reasoning.GraphOfThoughts.Strategy`
 - `Jido.AI.TRMAgent` -> `Jido.AI.Reasoning.TRM.Strategy`
@@ -41,6 +42,7 @@ Supported strategy family:
 
 - ReAct
 - Chain-of-Thought
+- Algorithm-of-Thoughts
 - Tree-of-Thoughts
 - Graph-of-Thoughts
 - TRM
@@ -91,6 +93,7 @@ Recommended plugin set (target production surface):
    - Structured planning, decomposition, and prioritization flows.
 3. Strategy invocation plugins (explicit reasoning as capabilities):
    - `Jido.AI.Plugins.Reasoning.ChainOfThought`
+   - `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts`
    - `Jido.AI.Plugins.Reasoning.TreeOfThoughts`
    - `Jido.AI.Plugins.Reasoning.GraphOfThoughts`
    - `Jido.AI.Plugins.Reasoning.TRM`
@@ -117,6 +120,7 @@ Signal namespace contract for this plugin surface:
 
 - `chat.message`
 - `reasoning.cot.run`
+- `reasoning.aot.run`
 - `reasoning.tot.run`
 - `reasoning.got.run`
 - `reasoning.trm.run`
@@ -145,14 +149,14 @@ Finalized standalone action set (recommended):
    - `Jido.AI.Actions.Reasoning.Infer`
    - `Jido.AI.Actions.Reasoning.Explain`
 5. Dedicated strategy orchestration
-   - `Jido.AI.Actions.Reasoning.RunStrategy` (isolated strategy execution for `:cot | :tot | :got | :trm | :adaptive`)
+   - `Jido.AI.Actions.Reasoning.RunStrategy` (isolated strategy execution for `:cot | :aot | :tot | :got | :trm | :adaptive`)
 6. Compatibility convenience
    - `Jido.AI.Actions.LLM.Complete` (simple completion path; overlaps with `Chat` and can remain as convenience)
 
 Not part of standalone action surface:
 
 - Strategy-internal command actions (`*_start`, `*_llm_result`, `*_llm_partial`, worker lifecycle events).
-- These are orchestration internals for ReAct/CoT/ToT/GoT/TRM/Adaptive strategies, not reusable app-level primitives.
+- These are orchestration internals for ReAct/CoT/AoT/ToT/GoT/TRM/Adaptive strategies, not reusable app-level primitives.
 
 Pragmatically:
 
@@ -164,7 +168,7 @@ Pragmatically:
 ```text
 User/App Query
   -> Agent Macro (Jido.AI.Agent or strategy-specific agent)
-  -> Strategy (ReAct/CoT/ToT/GoT/TRM/Adaptive)
+  -> Strategy (ReAct/CoT/AoT/ToT/GoT/TRM/Adaptive)
   -> Directives (LLM, tool, control intents)
   -> Runtime Execution (ReqLLM + tool execution)
   -> Signals (ai.request.*, ai.llm.*, ai.tool.*, ai.usage)
@@ -186,7 +190,7 @@ Observability is a core part of the package, not an add-on:
 When describing `jido_ai` for production, the concise version is:
 
 1. A ReAct-first AI agent framework (`Jido.AI.Agent`) with built-in tool calling.
-2. A multi-strategy reasoning platform (CoT, ToT, GoT, TRM, Adaptive, ReAct).
+2. A multi-strategy reasoning platform (CoT, AoT, ToT, GoT, TRM, Adaptive, ReAct).
 3. A reusable skills layer for domain behavior packaging.
 4. A plugin layer for mountable capability mixins and policy controls.
 5. A lower-level actions API for strategy-independent AI workflows.

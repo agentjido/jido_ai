@@ -9,7 +9,7 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
   alias Jido.AI.Actions.LLM.{Chat, Complete, Embed, GenerateObject}
   alias Jido.AI.Plugins.Planning
   alias Jido.AI.Actions.Planning.{Decompose, Plan, Prioritize}
-  alias Jido.AI.Plugins.Reasoning.{Adaptive, ChainOfThought, GraphOfThoughts, TRM, TreeOfThoughts}
+  alias Jido.AI.Plugins.Reasoning.{Adaptive, AlgorithmOfThoughts, ChainOfThought, GraphOfThoughts, TRM, TreeOfThoughts}
   alias Jido.AI.Actions.Reasoning.RunStrategy
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
@@ -18,6 +18,7 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
   require Jido.AI.Plugins.Planning
   require Jido.AI.Actions.Planning.{Plan, Decompose, Prioritize}
   require Jido.AI.Plugins.Reasoning.Adaptive
+  require Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts
   require Jido.AI.Plugins.Reasoning.ChainOfThought
   require Jido.AI.Plugins.Reasoning.GraphOfThoughts
   require Jido.AI.Plugins.Reasoning.TRM
@@ -118,7 +119,7 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
     end
 
     test "strategy plugins expose RunStrategy action" do
-      plugins = [ChainOfThought, TreeOfThoughts, GraphOfThoughts, TRM, Adaptive]
+      plugins = [ChainOfThought, AlgorithmOfThoughts, TreeOfThoughts, GraphOfThoughts, TRM, Adaptive]
 
       for plugin <- plugins do
         assert plugin.actions() == [RunStrategy]
@@ -130,6 +131,7 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
         ChatPlugin.actions() ++
           Planning.actions() ++
           ChainOfThought.actions() ++
+          AlgorithmOfThoughts.actions() ++
           TreeOfThoughts.actions() ++
           GraphOfThoughts.actions() ++
           TRM.actions() ++

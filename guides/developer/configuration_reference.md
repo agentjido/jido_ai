@@ -28,6 +28,14 @@ config :jido_ai,
 - CoT (`Jido.AI.CoTAgent`)
   - `model`: `anthropic:claude-haiku-4-5`
 
+- AoT (`Jido.AI.AoTAgent`)
+  - `model`: `anthropic:claude-haiku-4-5`
+  - `profile`: `:standard`
+  - `search_style`: `:dfs`
+  - `temperature`: `0.0`
+  - `max_tokens`: `2048`
+  - `require_explicit_answer`: `true`
+
 - ToT (`Jido.AI.ToTAgent`)
   - `model`: `anthropic:claude-haiku-4-5`
   - `branching_factor`: `3`
@@ -48,6 +56,7 @@ config :jido_ai,
 - Adaptive (`Jido.AI.AdaptiveAgent`)
   - `default_strategy`: `:react`
   - `available_strategies`: `[:cot, :react, :tot, :got, :trm]`
+  - add AoT explicitly when desired: `available_strategies: [:cot, :react, :aot, :tot, :got, :trm]`
 
 ## Request Defaults
 
@@ -62,6 +71,7 @@ config :jido_ai,
 ## CLI Defaults (`mix jido_ai`)
 
 - `--type`: `react`
+- supported types: `react | aot | cot | tot | got | trm | adaptive`
 - `--timeout`: `60_000`
 - `--format`: `text`
 

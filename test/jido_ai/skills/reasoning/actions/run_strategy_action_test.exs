@@ -70,6 +70,17 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
       assert_strategy_response(RunStrategy.run(params, %{}), :trm)
     end
 
+    test "executes Algorithm-of-Thoughts strategy" do
+      params = %{
+        strategy: :aot,
+        prompt: "Explore options and finalize explicitly",
+        timeout: 10_000,
+        options: %{profile: :short, search_style: :dfs}
+      }
+
+      assert_strategy_response(RunStrategy.run(params, %{}), :aot)
+    end
+
     test "executes Adaptive strategy" do
       params = %{
         strategy: :adaptive,

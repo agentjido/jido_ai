@@ -8,11 +8,12 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
   alias Jido.Agent
   alias Jido.AI.Plugins.Chat
   alias Jido.AI.Plugins.Planning
-  alias Jido.AI.Plugins.Reasoning.{Adaptive, ChainOfThought, GraphOfThoughts, TRM, TreeOfThoughts}
+  alias Jido.AI.Plugins.Reasoning.{Adaptive, AlgorithmOfThoughts, ChainOfThought, GraphOfThoughts, TRM, TreeOfThoughts}
 
   require Jido.AI.Plugins.Chat
   require Jido.AI.Plugins.Planning
   require Jido.AI.Plugins.Reasoning.Adaptive
+  require Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts
   require Jido.AI.Plugins.Reasoning.ChainOfThought
   require Jido.AI.Plugins.Reasoning.GraphOfThoughts
   require Jido.AI.Plugins.Reasoning.TRM
@@ -37,12 +38,14 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
     test "Reasoning strategy plugins mount with fixed strategy ids" do
       assert {:ok, cot} = ChainOfThought.mount(%Agent{}, %{})
+      assert {:ok, aot} = AlgorithmOfThoughts.mount(%Agent{}, %{})
       assert {:ok, tot} = TreeOfThoughts.mount(%Agent{}, %{})
       assert {:ok, got} = GraphOfThoughts.mount(%Agent{}, %{})
       assert {:ok, trm} = TRM.mount(%Agent{}, %{})
       assert {:ok, adaptive} = Adaptive.mount(%Agent{}, %{})
 
       assert cot.strategy == :cot
+      assert aot.strategy == :aot
       assert tot.strategy == :tot
       assert got.strategy == :got
       assert trm.strategy == :trm
@@ -52,7 +55,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
   describe "Plugin Schemas" do
     test "all public plugins define schema/0" do
-      plugins = [Chat, Planning, ChainOfThought, TreeOfThoughts, GraphOfThoughts, TRM, Adaptive]
+      plugins = [Chat, Planning, ChainOfThought, AlgorithmOfThoughts, TreeOfThoughts, GraphOfThoughts, TRM, Adaptive]
 
       for plugin <- plugins do
         assert function_exported?(plugin, :schema, 0)
@@ -75,6 +78,9 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
     test "Reasoning strategy plugins expose reasoning.*.run routes" do
       assert Map.new(ChainOfThought.signal_routes(%{}))["reasoning.cot.run"] ==
+               Jido.AI.Actions.Reasoning.RunStrategy
+
+      assert Map.new(AlgorithmOfThoughts.signal_routes(%{}))["reasoning.aot.run"] ==
                Jido.AI.Actions.Reasoning.RunStrategy
 
       assert Map.new(TreeOfThoughts.signal_routes(%{}))["reasoning.tot.run"] ==
@@ -122,6 +128,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     test "plugins expose signal_patterns/0" do
       assert "chat.message" in Chat.signal_patterns()
       assert "reasoning.cot.run" in ChainOfThought.signal_patterns()
+      assert "reasoning.aot.run" in AlgorithmOfThoughts.signal_patterns()
       assert "reasoning.tot.run" in TreeOfThoughts.signal_patterns()
       assert "reasoning.got.run" in GraphOfThoughts.signal_patterns()
       assert "reasoning.trm.run" in TRM.signal_patterns()

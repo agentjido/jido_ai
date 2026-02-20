@@ -2,7 +2,7 @@
 
 You need to choose a strategy before building agents at scale.
 
-After this guide, you can select CoT, ReAct, ToT, GoT, TRM, or Adaptive with explicit tradeoffs.
+After this guide, you can select CoT, ReAct, AoT, ToT, GoT, TRM, or Adaptive with explicit tradeoffs.
 
 ## Strategy Matrix
 
@@ -10,6 +10,7 @@ After this guide, you can select CoT, ReAct, ToT, GoT, TRM, or Adaptive with exp
 |---|---|---|---|
 | CoT | Linear reasoning, clear step decomposition | Heavy tool orchestration | `Jido.AI.CoTAgent` |
 | ReAct | Tool calls + reasoning loop | Purely static problems | `Jido.AI.Agent` |
+| AoT | One-pass algorithmic exploration with explicit final answer | Deep multi-round search orchestration | `Jido.AI.AoTAgent` |
 | ToT | Branching search and planning | Low-latency simple Q&A | `Jido.AI.ToTAgent` |
 | GoT | Multi-perspective synthesis | Small deterministic tasks | `Jido.AI.GoTAgent` |
 | TRM | Iterative improvement / recursive refinement | Fast one-pass answers | `Jido.AI.TRMAgent` |
@@ -19,6 +20,7 @@ After this guide, you can select CoT, ReAct, ToT, GoT, TRM, or Adaptive with exp
 
 - Start with `ReAct` if tools matter.
 - Start with `CoT` if reasoning is linear and tool-free.
+- Start with `AoT` when you want strict single-query reasoning with explicit `answer:` extraction.
 - Use `Adaptive` only when workload shape varies significantly.
 
 ## Runnable Baseline: Adaptive Agent
@@ -51,6 +53,8 @@ Fix:
 
 - `Adaptive` default strategy: `:react`
 - `Adaptive` default available strategies: `[:cot, :react, :tot, :got, :trm]`
+- `Adaptive` can include AoT only via opt-in list update: `available_strategies: [:cot, :react, :aot, :tot, :got, :trm]`
+- `AoT` defaults: `profile: :standard`, `search_style: :dfs`, `temperature: 0.0`, `max_tokens: 2048`, `require_explicit_answer: true`
 - `TRM` default `max_supervision_steps`: `5`
 - `ToT` defaults: `top_k: 3`, `min_depth: 2`, `max_nodes: 100`, `max_tool_round_trips: 3`
 

@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   Adaptive execution strategy that automatically selects the best reasoning approach.
 
   This strategy analyzes task characteristics and selects the most appropriate
-  strategy (CoT, ReAct, ToT, GoT) for the given task. The strategy is re-evaluated
+  strategy (CoT, ReAct, AoT, ToT, GoT) for the given task. The strategy is re-evaluated
   when the previous reasoning completes and a new prompt arrives.
 
   ## Overview
@@ -47,7 +47,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
           Jido.AI.Reasoning.Adaptive.Strategy,
           model: "anthropic:claude-sonnet-4-20250514",
           default_strategy: :react,
-          available_strategies: [:cot, :react, :tot, :got, :trm]
+          available_strategies: [:cot, :react, :tot, :got, :trm, :aot]
         }
 
   ### Options
@@ -72,6 +72,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy, as: AlgorithmOfThoughts
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
   alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
@@ -86,6 +87,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   @strategy_modules %{
     cot: ChainOfThought,
     react: ReAct,
+    aot: AlgorithmOfThoughts,
     tot: TreeOfThoughts,
     got: GraphOfThoughts,
     trm: TRM
@@ -109,7 +111,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   @puzzle_keywords ~w(puzzle iterate improve refine recursive riddle)
 
   @type complexity :: :simple | :moderate | :complex
-  @type strategy_type :: :cot | :react | :tot | :got | :trm
+  @type strategy_type :: :cot | :react | :aot | :tot | :got | :trm
 
   @type config :: %{
           optional(:model) => String.t(),
@@ -303,9 +305,15 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
     # Only re-evaluate if there's a new start instruction
     has_start =
       Enum.any?(instructions, fn
-        %{action: @start} -> true
-        %{action: action} when action in [:cot_start, :ai_react_start, :tot_start, :got_start, :trm_start] -> true
-        _ -> false
+        %{action: @start} ->
+          true
+
+        %{action: action}
+        when action in [:cot_start, :ai_react_start, :aot_start, :tot_start, :got_start, :trm_start] ->
+          true
+
+        _ ->
+          false
       end)
 
     if has_start do
@@ -393,9 +401,15 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
     # Find the start instruction
     start_instr =
       Enum.find(instructions, fn
-        %{action: @start} -> true
-        %{action: action} when action in [:cot_start, :ai_react_start, :tot_start, :got_start, :trm_start] -> true
-        _ -> false
+        %{action: @start} ->
+          true
+
+        %{action: action}
+        when action in [:cot_start, :ai_react_start, :aot_start, :tot_start, :got_start, :trm_start] ->
+          true
+
+        _ ->
+          false
       end)
 
     case start_instr do
@@ -526,24 +540,28 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
 
   defp start_action_for(:cot), do: :cot_start
   defp start_action_for(:react), do: :ai_react_start
+  defp start_action_for(:aot), do: :aot_start
   defp start_action_for(:tot), do: :tot_start
   defp start_action_for(:got), do: :got_start
   defp start_action_for(:trm), do: :trm_start
 
   defp llm_result_action_for(:cot), do: :cot_llm_result
   defp llm_result_action_for(:react), do: :ai_react_llm_result
+  defp llm_result_action_for(:aot), do: :aot_llm_result
   defp llm_result_action_for(:tot), do: :tot_llm_result
   defp llm_result_action_for(:got), do: :got_llm_result
   defp llm_result_action_for(:trm), do: :trm_llm_result
 
   defp llm_partial_action_for(:cot), do: :cot_llm_partial
   defp llm_partial_action_for(:react), do: :ai_react_llm_partial
+  defp llm_partial_action_for(:aot), do: :aot_llm_partial
   defp llm_partial_action_for(:tot), do: :tot_llm_partial
   defp llm_partial_action_for(:got), do: :got_llm_partial
   defp llm_partial_action_for(:trm), do: :trm_llm_partial
 
   defp request_error_action_for(:cot), do: :cot_request_error
   defp request_error_action_for(:react), do: :ai_react_request_error
+  defp request_error_action_for(:aot), do: :aot_request_error
   defp request_error_action_for(:tot), do: :tot_request_error
   defp request_error_action_for(:got), do: :got_request_error
   defp request_error_action_for(:trm), do: :trm_request_error
@@ -673,8 +691,8 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   end
 
   defp select_by_task_type(:exploration, available) do
-    # Exploration tasks prefer ToT for branching exploration
-    find_first_available([:tot, :got], available)
+    # Exploration tasks prefer AoT when available, then ToT/GoT.
+    find_first_available([:aot, :tot, :got], available)
   end
 
   defp select_by_task_type(:iterative_reasoning, available) do
@@ -690,7 +708,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
         find_first_available([:cot], available) || List.first(available)
 
       score > thresholds.complex ->
-        find_first_available([:tot, :got], available) || List.first(available)
+        find_first_available([:aot, :tot, :got], available) || List.first(available)
 
       true ->
         find_first_available([:react], available) || List.first(available)

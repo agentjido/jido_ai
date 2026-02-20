@@ -15,7 +15,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
     schema:
       Zoi.object(%{
         strategy:
-          Zoi.enum([:cot, :tot, :got, :trm, :adaptive],
+          Zoi.enum([:cot, :tot, :got, :trm, :aot, :adaptive],
             description: "Reasoning strategy identifier"
           ),
         prompt: Zoi.string(description: "Prompt to reason on"),
@@ -52,13 +52,28 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
         # TRM options
         max_supervision_steps: Zoi.integer(description: "TRM max supervision steps") |> Zoi.optional(),
         act_threshold: Zoi.float(description: "TRM ACT threshold") |> Zoi.optional(),
+        # AoT options
+        profile:
+          Zoi.enum([:short, :standard, :long], description: "AoT in-context profile")
+          |> Zoi.optional(),
+        search_style:
+          Zoi.enum([:dfs, :bfs], description: "AoT search style preference")
+          |> Zoi.optional(),
+        temperature: Zoi.float(description: "AoT temperature override") |> Zoi.optional(),
+        max_tokens: Zoi.integer(description: "AoT max generation tokens") |> Zoi.optional(),
+        examples:
+          Zoi.list(Zoi.string(description: "AoT algorithmic in-context example"), description: "AoT examples")
+          |> Zoi.optional(),
+        require_explicit_answer:
+          Zoi.boolean(description: "Require an explicit `answer:` line for AoT success")
+          |> Zoi.optional(),
         # Adaptive options
         default_strategy:
-          Zoi.enum([:cot, :react, :tot, :got, :trm], description: "Adaptive default strategy")
+          Zoi.enum([:cot, :react, :tot, :got, :trm, :aot], description: "Adaptive default strategy")
           |> Zoi.optional(),
         available_strategies:
           Zoi.list(
-            Zoi.enum([:cot, :react, :tot, :got, :trm], description: "Adaptive strategy id"),
+            Zoi.enum([:cot, :react, :tot, :got, :trm, :aot], description: "Adaptive strategy id"),
             description: "Adaptive available strategies"
           )
           |> Zoi.optional(),
@@ -72,6 +87,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
 
   alias Jido.AI.Actions.Reasoning.Runner.{
     AdaptiveAgent,
+    AlgorithmOfThoughtsAgent,
     ChainOfThoughtAgent,
     GraphOfThoughtsAgent,
     TreeOfThoughtsAgent,
@@ -83,6 +99,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
     tot: TreeOfThoughtsAgent,
     got: GraphOfThoughtsAgent,
     trm: TRMAgent,
+    aot: AlgorithmOfThoughtsAgent,
     adaptive: AdaptiveAgent
   }
 
@@ -99,6 +116,16 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
       :aggregation_prompt
     ],
     trm: [:model, :max_supervision_steps, :act_threshold],
+    aot: [
+      :model,
+      :profile,
+      :search_style,
+      :temperature,
+      :max_tokens,
+      :examples,
+      :require_explicit_answer,
+      :llm_timeout_ms
+    ],
     adaptive: [:model, :default_strategy, :available_strategies, :complexity_thresholds]
   }
   @runner_jido Jido.AI.InternalReasoningRunner
@@ -208,6 +235,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   defp invoke_runner(runner, :tot, pid, prompt, timeout), do: runner.explore_sync(pid, prompt, timeout: timeout)
   defp invoke_runner(runner, :got, pid, prompt, timeout), do: runner.explore_sync(pid, prompt, timeout: timeout)
   defp invoke_runner(runner, :trm, pid, prompt, timeout), do: runner.reason_sync(pid, prompt, timeout: timeout)
+  defp invoke_runner(runner, :aot, pid, prompt, timeout), do: runner.explore_sync(pid, prompt, timeout: timeout)
   defp invoke_runner(runner, :adaptive, pid, prompt, timeout), do: runner.ask_sync(pid, prompt, timeout: timeout)
 
   defp fetch_snapshot(runner, pid) do
@@ -380,6 +408,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   defp strategy_state_key(:tot), do: :reasoning_tot
   defp strategy_state_key(:got), do: :reasoning_got
   defp strategy_state_key(:trm), do: :reasoning_trm
+  defp strategy_state_key(:aot), do: :reasoning_aot
   defp strategy_state_key(:adaptive), do: :reasoning_adaptive
   defp strategy_state_key(_), do: nil
 
