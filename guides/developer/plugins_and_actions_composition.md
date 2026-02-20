@@ -104,6 +104,49 @@ defmodule MyApp.RoutedAssistant do
 end
 ```
 
+### Policy Runtime Contract
+
+`Jido.AI.Plugins.Policy` is a cross-cutting runtime plugin (enabled by default
+in `Jido.AI.Agent`) that hardens request/query inputs and normalizes outbound
+result/delta envelopes.
+
+Enforce mode behavior:
+
+- `mode: :enforce` rewrites violating request/query signals to `ai.request.error`
+- `mode: :monitor` keeps request/query signals unchanged while still observing
+- `block_on_validation_error: true` controls whether validation failures block
+
+Rewrite semantics:
+
+- Enforceable request/query signal types include `chat.*`, `ai.*.query`, and
+  `reasoning.*.run`
+- Prompt/query fields are validated via `Jido.AI.Validation.validate_prompt/1`
+- Violations rewrite to `ai.request.error` with `reason: :policy_violation`
+
+Normalization and sanitization:
+
+- `ai.llm.response` and `ai.tool.result` normalize malformed `data.result` to
+  `{:error, %{code: :malformed_result, ...}}`
+- `ai.llm.delta` strips control bytes from `data.delta` and truncates to
+  `max_delta_chars`
+
+Policy hardening config shape:
+
+```elixir
+defmodule MyApp.PolicyHardenedAssistant do
+  use Jido.AI.Agent,
+    name: "policy_hardened_assistant",
+    plugins: [
+      {Jido.AI.Plugins.Policy,
+       %{
+         mode: :enforce,
+         block_on_validation_error: true,
+         max_delta_chars: 2_000
+       }}
+    ]
+end
+```
+
 ### CoD Plugin Handoff (`reasoning.cod.run`)
 
 ```elixir
