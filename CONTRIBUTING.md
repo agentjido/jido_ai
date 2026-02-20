@@ -26,10 +26,17 @@ Full checkpoint gate (target runtime budget: under 10 minutes on a warm cache):
 mix test
 ```
 
+Final release-quality checkpoint (full suite + docs + coverage + traceability closure + timing summary):
+
+```bash
+mix quality.final
+```
+
 Notes:
 - `mix precommit` is repository-local and runs format/compile/doctor plus `mix test.fast`.
 - `mix test.fast` runs stable smoke coverage only (`--only stable_smoke`, excluding flaky tests).
 - `mix test` is the full stable suite (`--exclude flaky` via alias).
+- `mix quality.final` runs the final checkpoint task (`mix jido_ai.quality`).
 
 ## Pull Request Process
 

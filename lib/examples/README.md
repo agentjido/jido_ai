@@ -17,6 +17,12 @@ Full checkpoint gate command set (target runtime budget: under 10 minutes on a w
 mix test
 ```
 
+Final release-quality checkpoint command:
+
+```bash
+mix quality.final
+```
+
 ## Weather Strategy Matrix
 
 Canonical weather overview module:

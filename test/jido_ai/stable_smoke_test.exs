@@ -111,6 +111,8 @@ defmodule Jido.AI.StableSmokeTest do
     precommit_steps = Keyword.fetch!(aliases, :precommit)
     assert is_list(precommit_steps)
     assert "test.fast" in precommit_steps
+
+    assert Keyword.fetch!(aliases, :"quality.final") == "jido_ai.quality"
   end
 
   test "docs define dual gate behavior with runtime budgets and command sets" do
@@ -126,6 +128,7 @@ defmodule Jido.AI.StableSmokeTest do
     assert contributing =~ "mix precommit"
     assert contributing =~ "mix test.fast"
     assert contributing =~ "mix test"
+    assert contributing =~ "mix quality.final"
 
     assert examples_index =~ "Story Loop Gates"
     assert examples_index =~ "Fast per-story gate command set"
@@ -135,6 +138,7 @@ defmodule Jido.AI.StableSmokeTest do
     assert examples_index =~ "mix precommit"
     assert examples_index =~ "mix test.fast"
     assert examples_index =~ "mix test"
+    assert examples_index =~ "mix quality.final"
 
     assert ops_story =~ "Loop runtime budgets are explicit"
     assert ops_story =~ "under 90 seconds"

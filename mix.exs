@@ -98,6 +98,7 @@ defmodule JidoAi.MixProject do
         "doctor --summary --raise",
         "test.fast"
       ],
+      "quality.final": "jido_ai.quality",
       q: ["quality"],
       quality: [
         "format --check-formatted",
