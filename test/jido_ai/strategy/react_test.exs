@@ -62,6 +62,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       route_map = Map.new(routes)
 
       assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
+      assert route_map["ai.react.set_system_prompt"] == {:strategy_cmd, :ai_react_set_system_prompt}
       assert route_map["ai.react.worker.event"] == {:strategy_cmd, :ai_react_worker_event}
       assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
@@ -101,6 +102,30 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       state = StratState.get(agent, %{})
       assert state.pending_worker_start.config.streaming == false
+    end
+
+    test "start merges base and run req_http_options into runtime config" do
+      agent =
+        create_agent(
+          tools: [TestCalculator],
+          req_http_options: [plug: {Req.Test, []}]
+        )
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          req_http_options: [adapter: [recv_timeout: 1234]]
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+
+      assert state.pending_worker_start.config.llm.req_http_options == [
+               plug: {Req.Test, []},
+               adapter: [recv_timeout: 1234]
+             ]
     end
 
     test "child started flushes deferred start to worker pid" do
@@ -173,6 +198,40 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.result == "done"
       assert state.checkpoint_token == "tok_1"
       assert state.react_worker_status == :ready
+    end
+
+    test "request completion clears ephemeral req_http_options" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.start_action(), %{
+              query: "q",
+              request_id: "req_ephemeral",
+              req_http_options: [plug: {Req.Test, []}]
+            })
+          ],
+          %{}
+        )
+
+      event =
+        runtime_event(:request_completed, "req_ephemeral", 2, %{
+          result: "done",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_ephemeral", event: event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      refute Map.has_key?(state, :run_req_http_options)
     end
 
     test "cancel forwards worker cancel signal for active request" do
@@ -287,6 +346,20 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       state = StratState.get(agent, %{})
       assert state.config.base_tool_context == %{tenant: "b"}
+    end
+
+    test "set_system_prompt replaces base system prompt" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.set_system_prompt_action(), %{system_prompt: "Updated prompt"})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.config.system_prompt == "Updated prompt"
     end
 
     test "runtime_adapter flag remains true even when opt-out is requested" do

@@ -37,23 +37,27 @@ defmodule Jido.AI.Observe do
     :queue_ms
   ]
 
-  @sensitive_key_patterns [
-    ~r/^api_?key$/i,
-    ~r/^password$/i,
-    ~r/^secret$/i,
-    ~r/^token$/i,
-    ~r/^auth_?token$/i,
-    ~r/^private_?key$/i,
-    ~r/^access_?key$/i,
-    ~r/^bearer$/i,
-    ~r/^api_?secret$/i,
-    ~r/^client_?secret$/i,
-    ~r/secret_/i,
-    ~r/_secret$/i,
-    ~r/_key$/i,
-    ~r/_token$/i,
-    ~r/_password$/i
-  ]
+  @sensitive_exact_keys MapSet.new([
+                          "api_key",
+                          "apikey",
+                          "password",
+                          "secret",
+                          "token",
+                          "auth_token",
+                          "authtoken",
+                          "private_key",
+                          "privatekey",
+                          "access_key",
+                          "accesskey",
+                          "bearer",
+                          "api_secret",
+                          "apisecret",
+                          "client_secret",
+                          "clientsecret"
+                        ])
+
+  @sensitive_contains ["secret_"]
+  @sensitive_suffixes ["_secret", "_key", "_token", "_password"]
 
   @type obs_cfg :: map() | nil
   @type event_name :: [atom()]
@@ -245,6 +249,14 @@ defmodule Jido.AI.Observe do
   end
 
   defp sensitive_key?(key) when is_atom(key), do: key |> Atom.to_string() |> sensitive_key?()
-  defp sensitive_key?(key) when is_binary(key), do: Enum.any?(@sensitive_key_patterns, &Regex.match?(&1, key))
+
+  defp sensitive_key?(key) when is_binary(key) do
+    key = String.downcase(key)
+
+    MapSet.member?(@sensitive_exact_keys, key) or
+      Enum.any?(@sensitive_contains, &String.contains?(key, &1)) or
+      Enum.any?(@sensitive_suffixes, &String.ends_with?(key, &1))
+  end
+
   defp sensitive_key?(_key), do: false
 end

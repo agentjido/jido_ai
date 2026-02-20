@@ -331,6 +331,28 @@ defmodule Jido.AI do
   end
 
   @doc """
+  Updates the base ReAct system prompt for a running agent.
+
+  ## Options
+
+    * `:timeout` - Call timeout in milliseconds (default: 5000)
+
+  """
+  @spec set_system_prompt(GenServer.server(), String.t(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def set_system_prompt(agent_server, prompt, opts \\ []) when is_binary(prompt) do
+    timeout = Keyword.get(opts, :timeout, 5000)
+
+    signal =
+      Jido.Signal.new!("ai.react.set_system_prompt", %{system_prompt: prompt}, source: "/jido/ai")
+
+    case Jido.AgentServer.call(agent_server, signal, timeout) do
+      {:ok, agent} -> {:ok, agent}
+      {:error, _} = error -> error
+    end
+  end
+
+  @doc """
   Lists all currently registered tools for an agent.
 
   Can be called with either an agent struct or an agent server (PID/name).

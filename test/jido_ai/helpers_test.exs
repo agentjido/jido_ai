@@ -115,6 +115,23 @@ defmodule Jido.AI.Directive.HelperTest do
     end
   end
 
+  describe "add_req_http_options/2" do
+    test "adds req_http_options when provided" do
+      opts = [max_tokens: 1000]
+      req_http_options = [plug: {Req.Test, []}]
+      result = Helper.add_req_http_options(opts, req_http_options)
+
+      assert Keyword.get(result, :req_http_options) == req_http_options
+      assert Keyword.get(result, :max_tokens) == 1000
+    end
+
+    test "returns opts unchanged when req_http_options is nil or empty" do
+      opts = [max_tokens: 1000]
+      assert Helper.add_req_http_options(opts, nil) == opts
+      assert Helper.add_req_http_options(opts, []) == opts
+    end
+  end
+
   describe "add_tools_opt/2" do
     test "adds tools when list is not empty" do
       opts = [max_tokens: 1000]

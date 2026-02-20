@@ -63,6 +63,11 @@ defmodule Jido.AI.ToolApiTest do
       # The GenServer.call will exit because the process is dead
       assert catch_exit(AI.register_tool(fake_pid, NotATool, validate: false, timeout: 100))
     end
+
+    test "set_system_prompt forwards to AgentServer call" do
+      fake_pid = spawn(fn -> :ok end)
+      assert catch_exit(AI.set_system_prompt(fake_pid, "prompt", timeout: 100))
+    end
   end
 
   describe "list_tools/1 with agent struct" do

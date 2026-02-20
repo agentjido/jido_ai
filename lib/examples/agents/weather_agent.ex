@@ -60,23 +60,24 @@ defmodule Jido.AI.Examples.WeatherAgent do
     },
     tags: ["example"],
     tools: [
-      Jido.Tools.Weather,
-      Jido.Tools.Weather.ByLocation,
+      Jido.AI.Examples.Tools.Weather.ByLocation,
       Jido.Tools.Weather.Forecast,
       Jido.Tools.Weather.HourlyForecast,
       Jido.Tools.Weather.CurrentConditions,
-      Jido.Tools.Weather.Geocode
+      Jido.Tools.Weather.Geocode,
+      Jido.Tools.Weather.LocationToGrid
     ],
     system_prompt: """
     You are a helpful weather assistant. You help users understand weather
     conditions and plan their activities accordingly.
 
-    IMPORTANT: The weather tools ONLY accept "lat,lng" coordinates (e.g., "41.8781,-87.6298").
-    They do NOT accept city names, addresses, or zip codes directly.
+    IMPORTANT:
+    - weather_location_to_grid ONLY accepts "lat,lng" coordinates (e.g., "41.8781,-87.6298").
+    - weather_by_location can accept place names and will geocode when needed.
 
     When answering weather questions:
     1. Determine the location - ask for clarification if ambiguous
-    2. Convert the location to coordinates:
+    2. Convert the location to coordinates when needed:
        - Use weather_geocode to convert city/state/address to coordinates
        - Or use these common US city coordinates:
          - New York: 40.7128,-74.0060

@@ -41,6 +41,9 @@ defmodule Jido.AI.Directive.LLMStream do
               max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
               temperature: Zoi.number(description: "Sampling temperature (0.0–2.0)") |> Zoi.default(0.2),
               timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+              req_http_options:
+                Zoi.list(Zoi.any(), description: "Req HTTP client options passed through to ReqLLM")
+                |> Zoi.default([]),
               metadata: Zoi.map(description: "Arbitrary metadata for tracking") |> Zoi.default(%{})
             },
             coerce: true
@@ -104,6 +107,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     model = Helper.resolve_directive_model(directive)
     system_prompt = Map.get(directive, :system_prompt)
     timeout = Map.get(directive, :timeout)
+    req_http_options = Map.get(directive, :req_http_options, [])
     metadata = Map.get(directive, :metadata, %{})
     obs_cfg = metadata[:observability] || %{}
 
@@ -133,6 +137,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       max_tokens: max_tokens,
       temperature: temperature,
       timeout: timeout,
+      req_http_options: req_http_options,
       agent_pid: agent_pid,
       event_meta: event_meta,
       obs_cfg: obs_cfg
@@ -213,6 +218,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
          max_tokens: max_tokens,
          temperature: temperature,
          timeout: timeout,
+         req_http_options: req_http_options,
          agent_pid: agent_pid,
          event_meta: event_meta,
          obs_cfg: obs_cfg
@@ -224,6 +230,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       |> Keyword.put(:max_tokens, max_tokens)
       |> Keyword.put(:temperature, temperature)
       |> Helper.add_timeout_opt(timeout)
+      |> Helper.add_req_http_options(req_http_options)
 
     messages = Helper.build_directive_messages(context, system_prompt)
 
