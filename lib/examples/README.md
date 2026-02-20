@@ -15,6 +15,8 @@ All runnable examples now live under `lib/examples`.
 ## Strategy-Specific Weather Agents
 
 - `lib/examples/weather/react_agent.ex`
+- `lib/examples/weather/cod_agent.ex`
+- `lib/examples/weather/aot_agent.ex`
 - `lib/examples/weather/cot_agent.ex`
 - `lib/examples/weather/tot_agent.ex`
 - `lib/examples/weather/got_agent.ex`
@@ -33,17 +35,24 @@ All runnable examples now live under `lib/examples`.
 
 Run with `mix run lib/examples/scripts/<name>.exs`.
 
-- `browser_adapter_test.exs`
+Canonical demos:
 - `browser_demo.exs`
 - `multi_turn_demo.exs`
+- `task_list_demo.exs`
 - `skill_demo.exs`
 - `skills_demo.exs`
-- `task_list_demo.exs`
+
+Utility verification scripts:
+- `browser_adapter_test.exs`
 - `test_weather_agent.exs`
 
 ## Strategy Markdown Snippets
 
+- `lib/examples/strategies/algorithm_of_thoughts.md`
 - `lib/examples/strategies/adaptive_strategy.md`
+- `lib/examples/strategies/chain_of_draft.md`
 - `lib/examples/strategies/chain_of_thought.md`
+- `lib/examples/strategies/graph_of_thoughts.md`
 - `lib/examples/strategies/react_agent.md`
 - `lib/examples/strategies/tree_of_thoughts.md`
+- `lib/examples/strategies/trm_strategy.md`

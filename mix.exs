@@ -91,6 +91,13 @@ defmodule JidoAi.MixProject do
     [
       setup: ["deps.get", "git_hooks.install"],
       test: "test --exclude flaky",
+      "test.fast": "cmd env MIX_ENV=test mix test --exclude flaky --only stable_smoke",
+      precommit: [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "doctor --summary --raise",
+        "test.fast"
+      ],
       q: ["quality"],
       quality: [
         "format --check-formatted",
@@ -152,19 +159,21 @@ defmodule JidoAi.MixProject do
         "guides/developer/configuration_reference.md",
         # Examples
         "lib/examples/README.md",
-        "examples/strategies/algorithm_of_thoughts.md",
-        "examples/strategies/chain_of_draft.md",
+        "lib/examples/strategies/algorithm_of_thoughts.md",
+        "lib/examples/strategies/chain_of_draft.md",
         "lib/examples/strategies/adaptive_strategy.md",
         "lib/examples/strategies/chain_of_thought.md",
+        "lib/examples/strategies/graph_of_thoughts.md",
         "lib/examples/strategies/react_agent.md",
-        "lib/examples/strategies/tree_of_thoughts.md"
+        "lib/examples/strategies/tree_of_thoughts.md",
+        "lib/examples/strategies/trm_strategy.md"
       ],
       groups_for_extras: [
         {"Build With Jido.AI", ~r/guides\/user/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
         {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/},
-        {"Examples - Strategies", ~r/(lib\/examples\/(README|strategies)|examples\/strategies)/}
+        {"Examples - Strategies", ~r/lib\/examples\/(README|strategies)/}
       ],
       groups_for_modules: [
         Core: [

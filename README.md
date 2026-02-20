@@ -123,10 +123,12 @@ end
 ### Examples
 - [`lib/examples/README.md`](lib/examples/README.md) - Full examples index (agents, scripts, skills, strategies)
 - [`lib/examples/strategies/react_agent.md`](lib/examples/strategies/react_agent.md) - ReAct strategy example
-- [`examples/strategies/chain_of_draft.md`](examples/strategies/chain_of_draft.md) - Chain-of-Draft example
+- [`lib/examples/strategies/chain_of_draft.md`](lib/examples/strategies/chain_of_draft.md) - Chain-of-Draft example
 - [`lib/examples/strategies/chain_of_thought.md`](lib/examples/strategies/chain_of_thought.md) - Chain-of-Thought example
-- [`examples/strategies/algorithm_of_thoughts.md`](examples/strategies/algorithm_of_thoughts.md) - Algorithm-of-Thoughts example
+- [`lib/examples/strategies/algorithm_of_thoughts.md`](lib/examples/strategies/algorithm_of_thoughts.md) - Algorithm-of-Thoughts example
 - [`lib/examples/strategies/tree_of_thoughts.md`](lib/examples/strategies/tree_of_thoughts.md) - Tree-of-Thoughts example
+- [`lib/examples/strategies/graph_of_thoughts.md`](lib/examples/strategies/graph_of_thoughts.md) - Graph-of-Thoughts example
+- [`lib/examples/strategies/trm_strategy.md`](lib/examples/strategies/trm_strategy.md) - TRM strategy example
 - [`lib/examples/strategies/adaptive_strategy.md`](lib/examples/strategies/adaptive_strategy.md) - Adaptive strategy example
 
 ## ReAct Production Defaults
