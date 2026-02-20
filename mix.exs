@@ -159,14 +159,14 @@ defmodule JidoAi.MixProject do
         "guides/developer/configuration_reference.md",
         # Examples
         "lib/examples/README.md",
-        "lib/examples/strategies/algorithm_of_thoughts.md",
-        "lib/examples/strategies/chain_of_draft.md",
-        "lib/examples/strategies/adaptive_strategy.md",
-        "lib/examples/strategies/chain_of_thought.md",
-        "lib/examples/strategies/graph_of_thoughts.md",
-        "lib/examples/strategies/react_agent.md",
-        "lib/examples/strategies/tree_of_thoughts.md",
-        "lib/examples/strategies/trm_strategy.md"
+        "lib/examples/strategies/aot.md",
+        "lib/examples/strategies/cod.md",
+        "lib/examples/strategies/adaptive.md",
+        "lib/examples/strategies/cot.md",
+        "lib/examples/strategies/got.md",
+        "lib/examples/strategies/react.md",
+        "lib/examples/strategies/tot.md",
+        "lib/examples/strategies/trm.md"
       ],
       groups_for_extras: [
         {"Build With Jido.AI", ~r/guides\/user/},

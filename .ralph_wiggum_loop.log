@@ -92,3 +92,60 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.3 seconds (2.3s async, 0.00s sync)
 8 tests, 0 failures (1449 excluded)
+1) changed files
+- `README.md`
+- `lib/examples/README.md`
+- `mix.exs`
+- `test/jido_ai/examples/weather_strategy_suite_test.exs`
+- `lib/examples/strategies/chain_of_draft.md` -> `lib/examples/strategies/cod.md`
+- `lib/examples/strategies/algorithm_of_thoughts.md` -> `lib/examples/strategies/aot.md`
+- `lib/examples/strategies/chain_of_thought.md` -> `lib/examples/strategies/cot.md`
+- `lib/examples/strategies/react_agent.md` -> `lib/examples/strategies/react.md`
+- `lib/examples/strategies/tree_of_thoughts.md` -> `lib/examples/strategies/tot.md`
+- `lib/examples/strategies/graph_of_thoughts.md` -> `lib/examples/strategies/got.md`
+- `lib/examples/strategies/trm_strategy.md` -> `lib/examples/strategies/trm.md`
+- `lib/examples/strategies/adaptive_strategy.md` -> `lib/examples/strategies/adaptive.md`
+
+2) tests/commands executed
+- `mix format`
+- `mix precommit` (passed)
+- `mix test.fast` (passed)
+- `mix test test/jido_ai/examples/weather_strategy_suite_test.exs` (passed, 6 tests)
+- `mix docs` (passed; emitted warning: `index.html redirects to readme.html, which does not exist`)
+
+Note: due sandbox TCP restrictions, I ran the mix commands through a temporary local wrapper (`/tmp/mix_wrapper`) + temporary override beam (`/tmp/mix_sync_pubsub_override`) and `MIX_OS_CONCURRENCY_LOCK=0`. No repo files were added for this workaround.
+
+3) acceptance criteria coverage
+- Strategy markdown normalized under `lib/examples/strategies` for CoD/AoT/CoT/ReAct/ToT/GoT/TRM/Adaptive via canonical files: `cod.md`, `aot.md`, `cot.md`, `react.md`, `tot.md`, `got.md`, `trm.md`, `adaptive.md`.
+- Weather example index now has a single matrix in `lib/examples/README.md` including CoD parity with all other strategies.
+- Docs extras and README links updated to normalized paths:
+  - `mix.exs` `docs.extras` now points to normalized strategy markdown files.
+  - Root `README.md` and `lib/examples/README.md` now reference normalized strategy paths.
+- Added/updated tests in `test/jido_ai/examples/weather_strategy_suite_test.exs` to assert:
+  - normalized strategy docs exist and legacy paths are removed,
+  - weather matrix includes all strategy demos (including CoD),
+  - docs extras and README files use normalized paths,
+  - scripts index is categorized as canonical demo vs utility verification.
+
+4) blockers/assumptions
+- Blocker: direct `mix` execution in this sandbox fails on loopback TCP (`:eperm`) from Mix PubSub/lock internals.
+- Assumption: “normalized strategy markdown” means canonical short strategy IDs (`cod/aot/cot/react/tot/got/trm/adaptive`) under `lib/examples/strategies`.
+- No commit, no push, no PR were performed.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.4%
+
+Doctor validation has passed!
+Running ExUnit with seed: 285172, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.0 seconds (2.0s async, 0.00s sync)
+8 tests, 0 failures (1452 excluded)

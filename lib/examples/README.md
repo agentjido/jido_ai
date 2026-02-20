@@ -17,57 +17,42 @@ Full checkpoint gate command set (target runtime budget: under 10 minutes on a w
 mix test
 ```
 
-## Agents
+## Weather Strategy Matrix
 
-- `lib/examples/agents/weather_agent.ex` - ReAct weather assistant.
-- `lib/examples/agents/browser_agent.ex` - Web browsing/search assistant.
-- `lib/examples/agents/task_list_agent.ex` - Task decomposition + execution loop.
-- `lib/examples/agents/issue_triage_agent.ex` - GitHub issue triage workflow.
-- `lib/examples/agents/api_smoke_test_agent.ex` - HTTP endpoint smoke testing.
-- `lib/examples/agents/release_notes_agent.ex` - Graph-of-Thoughts release note synthesis.
-- `lib/examples/agents/react_demo_agent.ex` - Minimal ReAct agent.
-
-## Strategy-Specific Weather Agents
-
-- `lib/examples/weather/react_agent.ex`
-- `lib/examples/weather/cod_agent.ex`
-- `lib/examples/weather/aot_agent.ex`
-- `lib/examples/weather/cot_agent.ex`
-- `lib/examples/weather/tot_agent.ex`
-- `lib/examples/weather/got_agent.ex`
-- `lib/examples/weather/trm_agent.ex`
-- `lib/examples/weather/adaptive_agent.ex`
+Canonical weather overview module:
 - `lib/examples/weather/overview.ex`
 
-## Skills And Tools
+| Strategy | Weather Module | Strategy Markdown | CLI Demo |
+| --- | --- | --- | --- |
+| ReAct | `Jido.AI.Examples.Weather.ReActAgent` (`lib/examples/weather/react_agent.ex`) | `lib/examples/strategies/react.md` | `mix jido_ai --agent Jido.AI.Examples.Weather.ReActAgent "Do I need an umbrella in Seattle tomorrow morning?"` |
+| CoD | `Jido.AI.Examples.Weather.CoDAgent` (`lib/examples/weather/cod_agent.ex`) | `lib/examples/strategies/cod.md` | `mix jido_ai --agent Jido.AI.Examples.Weather.CoDAgent "Give me a fast weather-aware commute recommendation with one backup."` |
+| AoT | `Jido.AI.Examples.Weather.AoTAgent` (`lib/examples/weather/aot_agent.ex`) | `lib/examples/strategies/aot.md` | `mix jido_ai --agent Jido.AI.Examples.Weather.AoTAgent "Find the best weather-safe weekend option with one backup."` |
+| CoT | `Jido.AI.Examples.Weather.CoTAgent` (`lib/examples/weather/cot_agent.ex`) | `lib/examples/strategies/cot.md` | `mix jido_ai --agent Jido.AI.Examples.Weather.CoTAgent "How should I decide between biking and transit in rainy weather?"` |
+| ToT | `Jido.AI.Examples.Weather.ToTAgent` (`lib/examples/weather/tot_agent.ex`) | `lib/examples/strategies/tot.md` | `mix jido_ai --agent Jido.AI.Examples.Weather.ToTAgent "Plan three weekend options for Boston if weather is uncertain."` |
+| GoT | `Jido.AI.Examples.Weather.GoTAgent` (`lib/examples/weather/got_agent.ex`) | `lib/examples/strategies/got.md` | `mix jido_ai --agent Jido.AI.Examples.Weather.GoTAgent "Compare weather risks across NYC, Chicago, and Denver for a trip."` |
+| TRM | `Jido.AI.Examples.Weather.TRMAgent` (`lib/examples/weather/trm_agent.ex`) | `lib/examples/strategies/trm.md` | `mix jido_ai --agent Jido.AI.Examples.Weather.TRMAgent "Stress test this storm-prep plan and improve it."` |
+| Adaptive | `Jido.AI.Examples.Weather.AdaptiveAgent` (`lib/examples/weather/adaptive_agent.ex`) | `lib/examples/strategies/adaptive.md` | `mix jido_ai --agent Jido.AI.Examples.Weather.AdaptiveAgent "I need a weather-aware commute and backup plan for tomorrow."` |
 
-- `lib/examples/skills/` - Example skill modules.
-- `lib/examples/tools/` - Example action/tool modules.
-- `lib/examples/calculator_agent.ex`
-- `lib/examples/skills_demo_agent.ex`
+## Feature Family Map
 
-## Scripts
+| Feature Family | Runnable Examples |
+| --- | --- |
+| ReAct baseline agents | `lib/examples/agents/weather_agent.ex`, `lib/examples/agents/react_demo_agent.ex` |
+| Weather strategy suite | `lib/examples/weather/*.ex`, `lib/examples/strategies/*.md` |
+| Browser + task workflows | `lib/examples/agents/browser_agent.ex`, `lib/examples/agents/task_list_agent.ex`, `lib/examples/agents/issue_triage_agent.ex` |
+| API + release workflows | `lib/examples/agents/api_smoke_test_agent.ex`, `lib/examples/agents/release_notes_agent.ex` |
+| Skills and tools | `lib/examples/skills/`, `lib/examples/tools/`, `lib/examples/skills_demo_agent.ex`, `lib/examples/calculator_agent.ex` |
 
-Run with `mix run lib/examples/scripts/<name>.exs`.
+## Script Index
 
-Canonical demos:
-- `browser_demo.exs`
-- `multi_turn_demo.exs`
-- `task_list_demo.exs`
-- `skill_demo.exs`
-- `skills_demo.exs`
+Run scripts with `mix run lib/examples/scripts/<name>.exs`.
 
-Utility verification scripts:
-- `browser_adapter_test.exs`
-- `test_weather_agent.exs`
-
-## Strategy Markdown Snippets
-
-- `lib/examples/strategies/algorithm_of_thoughts.md`
-- `lib/examples/strategies/adaptive_strategy.md`
-- `lib/examples/strategies/chain_of_draft.md`
-- `lib/examples/strategies/chain_of_thought.md`
-- `lib/examples/strategies/graph_of_thoughts.md`
-- `lib/examples/strategies/react_agent.md`
-- `lib/examples/strategies/tree_of_thoughts.md`
-- `lib/examples/strategies/trm_strategy.md`
+| Script | Category | Purpose |
+| --- | --- | --- |
+| `browser_demo.exs` | Canonical demo | Interactive browser-assisted workflow. |
+| `multi_turn_demo.exs` | Canonical demo | Multi-turn agent request lifecycle walkthrough. |
+| `task_list_demo.exs` | Canonical demo | Task decomposition and execution loop. |
+| `skill_demo.exs` | Canonical demo | Single skill flow walkthrough. |
+| `skills_demo.exs` | Canonical demo | Multi-skill orchestration demo. |
+| `browser_adapter_test.exs` | Utility verification | Browser adapter sanity checks. |
+| `test_weather_agent.exs` | Utility verification | Weather agent smoke check script. |
