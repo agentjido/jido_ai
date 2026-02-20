@@ -71,14 +71,24 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 ## Reasoning Actions
 
 - `Jido.AI.Actions.Reasoning.Analyze`
-  - Structured analysis by analysis type.
+  - Use when you need structured analysis (`:sentiment | :topics | :entities | :summary | :custom`) over one input.
+  - Output contract: `%{result, analysis_type, model, usage}`.
+  - Example snippet: [`lib/examples/actions/reasoning_actions.md#analyze-action`](../../lib/examples/actions/reasoning_actions.md#analyze-action)
 - `Jido.AI.Actions.Reasoning.Infer`
-  - Logical inference from premises and question.
+  - Use when you have explicit premises and need an inference for a specific question.
+  - Output contract: `%{result, reasoning, model, usage}`.
+  - Example snippet: [`lib/examples/actions/reasoning_actions.md#infer-action`](../../lib/examples/actions/reasoning_actions.md#infer-action)
 - `Jido.AI.Actions.Reasoning.Explain`
-  - Explanations with detail-level targeting.
+  - Use when you need audience-aware explanation depth (`:basic | :intermediate | :advanced`).
+  - Output contract: `%{result, detail_level, model, usage}`.
+  - Example snippet: [`lib/examples/actions/reasoning_actions.md#explain-action`](../../lib/examples/actions/reasoning_actions.md#explain-action)
 - `Jido.AI.Actions.Reasoning.RunStrategy`
-  - Executes a dedicated reasoning strategy runner (`:cod | :cot | :aot | :tot | :got | :trm | :adaptive`) independent of host strategy.
-  - ToT strategy runs return structured payloads (best/candidates/termination/tree/usage/diagnostics).
+  - Use when you need explicit strategy execution independent of host agent strategy.
+  - Required parameters: `strategy` (`:cod | :cot | :tot | :got | :trm | :aot | :adaptive`) and `prompt`.
+  - Strategy tuning parameters can be passed at top-level or inside `options`; top-level keys win when both are set.
+  - Output contract: `%{strategy, status, output, usage, diagnostics}` where `diagnostics` includes timeout, options, snapshot status, and sanitized errors.
+  - Example snippet: [`lib/examples/actions/reasoning_actions.md#runstrategy-action`](../../lib/examples/actions/reasoning_actions.md#runstrategy-action)
+  - Coverage split guidance: fast-smoke subset lives in `test/jido_ai/skills/reasoning/actions/run_strategy_action_fast_test.exs`; full checkpoint matrix lives in `test/jido_ai/skills/reasoning/actions/run_strategy_action_test.exs`.
 
 ## Shared Helper
 
