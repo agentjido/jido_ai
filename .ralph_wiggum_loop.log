@@ -206,3 +206,54 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.1 seconds (2.1s async, 0.00s sync)
 8 tests, 0 failures (1466 excluded)
+1) changed files
+- `lib/jido_ai/request.ex`
+- `test/jido_ai/request_test.exs`
+- `test/jido_ai/integration/request_lifecycle_parity_test.exs`
+- `guides/user/request_lifecycle_and_concurrency.md`
+- `guides/developer/directives_runtime_contract.md`
+
+2) tests/commands executed
+- `MIX_NO_PUBSUB=1 mix format --check-formatted` ✅
+- `MIX_NO_PUBSUB=1 mix compile --warnings-as-errors` ✅
+- `MIX_NO_PUBSUB=1 mix test test/jido_ai/request_test.exs test/jido_ai/turn_test.exs test/jido_ai/thread_test.exs` ✅ (`70 tests, 0 failures`)
+- `MIX_NO_PUBSUB=1 mix test test/jido_ai/integration/request_lifecycle_parity_test.exs` ✅ (`12 tests, 0 failures`)
+- `MIX_NO_PUBSUB=1 mix test --exclude flaky --only stable_smoke` ✅ (`8 tests, 0 failures`; equivalent underlying command to `mix test.fast`)
+- `MIX_NO_PUBSUB=1 mix test.fast` ❌ (fails in this sandbox: Mix.PubSub TCP socket `:eperm` in nested alias command)
+- `MIX_NO_PUBSUB=1 mix doctor --summary` ❌ (same Mix.PubSub `:eperm`)
+- `MIX_NO_PUBSUB=1 mix precommit` ❌ (same Mix.PubSub `:eperm`)
+
+3) acceptance criteria coverage
+- Core runtime guides now map directly to modules and tests:
+  - Added runtime contract map and test map in `guides/user/request_lifecycle_and_concurrency.md`.
+  - Added directive-to-signal map and parity test map in `guides/developer/directives_runtime_contract.md`.
+- Tests now assert happy path, busy/rejection path, and lifecycle completion:
+  - `test/jido_ai/request_test.exs`: added end-to-end request contract tests for `create_and_send/3`, `await/2` success/failure/timeout normalization, and `await_many/2` concurrency order.
+  - `test/jido_ai/integration/request_lifecycle_parity_test.exs`: added happy-path acceptance checks across strategies, retained busy rejection checks, and added lifecycle completion/failure signal parity assertions (`ai.request.started`, `ai.request.completed`, `ai.request.failed`) for ChainOfThought.
+- Contract drift reduction:
+  - `lib/jido_ai/request.ex` now normalizes AgentServer timeout diagnostics to `{:error, :timeout}` to align runtime behavior with documented contract.
+  - Integration tests assert emitted signal types and request_id correlation.
+- Example gate:
+  - Added refreshed runtime-focused snippet in `guides/user/request_lifecycle_and_concurrency.md` using `Request` + `Thread` + `Turn`.
+
+4) blockers/assumptions
+- Blocker: `mix doctor --summary`, `mix test.fast` alias, and `mix precommit` are not runnable in this sandbox due Mix PubSub TCP socket permission errors (`:eperm`) in those execution paths.
+- Assumption: running the equivalent stable-smoke command and story-specific runtime test gates is acceptable proof for ST-RTC-001 under this environment limitation.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.4%
+
+Doctor validation has passed!
+Running ExUnit with seed: 549174, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.3 seconds (2.3s async, 0.00s sync)
+8 tests, 0 failures (1478 excluded)

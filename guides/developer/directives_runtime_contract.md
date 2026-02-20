@@ -13,6 +13,14 @@ After this guide, you can add directive behavior while preserving correlation, r
 - `Jido.AI.Directive.EmitToolError`
 - `Jido.AI.Directive.EmitRequestError`
 
+## Directive-To-Signal Contract Map
+
+- `LLMStream` / `LLMGenerate` -> `ai.llm.delta`, `ai.llm.response`, `ai.usage`
+- `LLMEmbed` -> `ai.embed.result`
+- `ToolExec` -> `ai.tool.result`
+- `EmitToolError` -> `ai.tool.result` (error payload)
+- `EmitRequestError` -> `ai.request.error`
+
 ## Contract Rules
 
 - Directives describe work; they do not own strategy state transitions.
@@ -43,6 +51,14 @@ Symptom:
 Fix:
 - ensure runtime always emits either `ai.tool.result` or `EmitToolError`
 - preserve `id` correlation from tool call to result signal
+
+## Contract Parity Tests
+
+- `test/jido_ai/directive_test.exs`
+- `test/jido_ai/directive/deadlock_prevention_test.exs`
+- `test/jido_ai/integration/request_lifecycle_parity_test.exs`
+
+If you change directive fields or emitted signal payloads, update these tests in the same change.
 
 ## Defaults You Should Know
 

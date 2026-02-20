@@ -16,6 +16,20 @@ After this guide, you will use request handles (`ask/await`) and collect multipl
 {:ok, r2} = MyApp.MathAgent.await(req2)
 ```
 
+## Runtime Contract Map
+
+- `Jido.AI.Request` (`lib/jido_ai/request.ex`): request handles, `await/2`, `await_many/2`, request state lifecycle.
+- `Jido.AI.Turn` (`lib/jido_ai/turn.ex`): normalized response shape and assistant/tool message projection.
+- `Jido.AI.Thread` (`lib/jido_ai/thread.ex`): thread accumulation and context projection for follow-up turns.
+- Directive runtime behavior (`lib/jido_ai/directive/*.ex`) is documented in [Directives Runtime Contract](../developer/directives_runtime_contract.md).
+
+Primary contract tests:
+
+- `test/jido_ai/request_test.exs`
+- `test/jido_ai/turn_test.exs`
+- `test/jido_ai/thread_test.exs`
+- `test/jido_ai/integration/request_lifecycle_parity_test.exs`
+
 ## Await Many
 
 ```elixir
@@ -25,6 +39,35 @@ handles =
 
 results = Jido.AI.Request.await_many(handles, timeout: 30_000)
 # [{:ok, ...}, {:ok, ...}, {:error, ...}]
+```
+
+## Runtime End-To-End Snippet
+
+```elixir
+alias Jido.AI.{Thread, Turn}
+
+{:ok, request} = MyApp.MathAgent.ask(pid, "What is 2 + 2?")
+
+thread =
+  Thread.new(system_prompt: "You are concise.")
+  |> Thread.append_user("What is 2 + 2?")
+
+case MyApp.MathAgent.await(request, timeout: 15_000) do
+  {:ok, result_text} ->
+    turn = Turn.from_result_map(%{type: :final_answer, text: result_text})
+
+    updated_thread =
+      thread
+      |> Thread.append_assistant(turn.text)
+
+    Thread.to_messages(updated_thread)
+
+  {:error, {:rejected, :busy, message}} ->
+    IO.puts("Request rejected: #{message}")
+
+  {:error, :timeout} ->
+    IO.puts("Request timed out")
+end
 ```
 
 ## Lifecycle States

@@ -4,6 +4,57 @@ defmodule JidoTest.AI.RequestTest do
   alias Jido.AI.Request
   alias Jido.AI.Request.Handle
 
+  defmodule FakeRuntimeServer do
+    use GenServer
+
+    def start_link(opts \\ []) do
+      GenServer.start_link(__MODULE__, opts)
+    end
+
+    def last_signal(pid) do
+      GenServer.call(pid, :last_signal)
+    end
+
+    @impl true
+    def init(opts) do
+      {:ok,
+       %{
+         await_result: Keyword.get(opts, :await_result, {:ok, %{status: :completed, result: "ok"}}),
+         await_delay_ms: Keyword.get(opts, :await_delay_ms, 0),
+         last_signal: nil
+       }}
+    end
+
+    @impl true
+    def handle_call(:last_signal, _from, state) do
+      {:reply, state.last_signal, state}
+    end
+
+    def handle_call({:await_completion, _opts}, _from, state) do
+      if state.await_delay_ms > 0, do: Process.sleep(state.await_delay_ms)
+      {:reply, state.await_result, state}
+    end
+
+    # Return a non-State tuple so AgentServer.status/1 falls back to {:error, :timeout}
+    # in Request.await timeout diagnostics.
+    def handle_call(:get_state, _from, state) do
+      {:reply, {:error, :unsupported}, state}
+    end
+
+    @impl true
+    def handle_cast({:signal, signal}, state) do
+      {:noreply, %{state | last_signal: signal}}
+    end
+
+    def handle_cast({:cancel_await_completion, _waiter_id}, state) do
+      {:noreply, state}
+    end
+
+    def handle_cast(_msg, state) do
+      {:noreply, state}
+    end
+  end
+
   describe "Handle struct" do
     test "new/3 creates a pending request with timestamp" do
       handle = Handle.new("req-123", self(), "What is 2+2?")
@@ -231,5 +282,78 @@ defmodule JidoTest.AI.RequestTest do
       assert agent.state.requests["req-a"].result == "Answer A"
       assert agent.state.requests["req-b"].result == "Answer B"
     end
+  end
+
+  describe "runtime await contracts" do
+    test "create_and_send/3 emits request-scoped signal payload and returns handle" do
+      server = start_runtime_server([])
+
+      assert {:ok, handle} =
+               Request.create_and_send(server, "What is 2+2?",
+                 signal_type: "ai.test.query",
+                 source: "/ai/test",
+                 request_id: "req_123",
+                 tool_context: %{actor: "user_1"}
+               )
+
+      assert handle.id == "req_123"
+      assert handle.server == server
+      assert handle.status == :pending
+
+      signal = FakeRuntimeServer.last_signal(server)
+      assert %Jido.Signal{} = signal
+      assert signal.type == "ai.test.query"
+      assert signal.source == "/ai/test"
+      assert signal.data.query == "What is 2+2?"
+      assert signal.data.prompt == "What is 2+2?"
+      assert signal.data.request_id == "req_123"
+      assert signal.data.tool_context == %{actor: "user_1"}
+    end
+
+    test "await/2 returns successful result for completed request payload" do
+      server =
+        start_runtime_server(await_result: {:ok, %{status: :completed, result: "The answer is 4"}})
+
+      handle = Handle.new("req_ok", server, "query")
+      assert {:ok, "The answer is 4"} = Request.await(handle, timeout: 100)
+    end
+
+    test "await/2 returns rejection reason for failed request payload" do
+      server =
+        start_runtime_server(await_result: {:ok, %{status: :failed, error: {:rejected, :busy, "Agent is busy"}}})
+
+      handle = Handle.new("req_busy", server, "query")
+      assert {:error, {:rejected, :busy, "Agent is busy"}} = Request.await(handle, timeout: 100)
+    end
+
+    test "await/2 normalizes AgentServer timeout diagnostics to :timeout" do
+      server =
+        start_runtime_server(await_result: {:ok, %{status: :completed, result: "too late"}}, await_delay_ms: 50)
+
+      handle = Handle.new("req_timeout", server, "query")
+      assert {:error, :timeout} = Request.await(handle, timeout: 5)
+    end
+
+    test "await_many/2 preserves input order under concurrent completion" do
+      slow_server =
+        start_runtime_server(await_result: {:ok, %{status: :completed, result: "slow"}}, await_delay_ms: 40)
+
+      fast_server =
+        start_runtime_server(await_result: {:ok, %{status: :completed, result: "fast"}}, await_delay_ms: 1)
+
+      requests = [
+        Handle.new("req_slow", slow_server, "slow"),
+        Handle.new("req_fast", fast_server, "fast")
+      ]
+
+      assert [{:ok, "slow"}, {:ok, "fast"}] = Request.await_many(requests, timeout: 150)
+    end
+  end
+
+  defp start_runtime_server(opts) do
+    start_supervised!(%{
+      id: make_ref(),
+      start: {FakeRuntimeServer, :start_link, [opts]}
+    })
   end
 end
