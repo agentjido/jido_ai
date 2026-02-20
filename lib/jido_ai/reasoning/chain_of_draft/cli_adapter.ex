@@ -1,21 +1,11 @@
-defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
+defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapter do
   @moduledoc """
-  CLI adapter for Adaptive strategy agents.
-
-  Handles the specifics of Adaptive agent lifecycle:
-  - Uses `ask/2` to submit prompts
-  - Polls `strategy_snapshot.done?` for completion
-  - Extracts result from `snapshot.result`
-  - Reports selected strategy in metadata
-
-  AoT is supported when explicitly included in `available_strategies`.
+  CLI adapter for Chain-of-Draft-style agents.
   """
 
   @behaviour Jido.AI.CLI.Adapter
 
   @default_model "anthropic:claude-haiku-4-5"
-  @default_strategy :react
-  @default_available_strategies [:cod, :cot, :react, :tot, :got, :trm]
 
   @impl true
   def start_agent(jido_instance, agent_module, _config) do
@@ -25,7 +15,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
   @impl true
   def submit(pid, query, config) do
     agent_module = config.agent_module
-    agent_module.ask(pid, query)
+    agent_module.draft(pid, query)
   end
 
   @impl true
@@ -50,20 +40,27 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
   @impl true
   def create_ephemeral_agent(config) do
     suffix = :erlang.unique_integer([:positive])
-    module_name = Module.concat([JidoAi, EphemeralAgent, :"Adaptive#{suffix}"])
+    module_name = Module.concat([JidoAi, EphemeralAgent, :"CoD#{suffix}"])
 
     model = config[:model] || @default_model
-    default_strategy = config[:default_strategy] || @default_strategy
-    available_strategies = config[:available_strategies] || @default_available_strategies
+    system_prompt = config[:system_prompt]
 
     contents =
-      quote do
-        use Jido.AI.AdaptiveAgent,
-          name: "cli_adaptive_agent",
-          description: "CLI ephemeral Adaptive agent",
-          model: unquote(model),
-          default_strategy: unquote(default_strategy),
-          available_strategies: unquote(available_strategies)
+      if system_prompt do
+        quote do
+          use Jido.AI.CoDAgent,
+            name: "cli_cod_agent",
+            description: "CLI ephemeral CoD agent",
+            model: unquote(model),
+            system_prompt: unquote(system_prompt)
+        end
+      else
+        quote do
+          use Jido.AI.CoDAgent,
+            name: "cli_cod_agent",
+            description: "CLI ephemeral CoD agent",
+            model: unquote(model)
+        end
       end
 
     Module.create(module_name, contents, Macro.Env.location(__ENV__))
@@ -100,14 +97,12 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
 
   defp extract_meta(status) do
     details = status.snapshot.details || %{}
-    strategy_state = Map.get(status.raw_state, :__strategy__, %{})
 
     %{
       status: status.snapshot.status,
-      selected_strategy: Map.get(strategy_state, :strategy_type),
-      complexity_score: Map.get(strategy_state, :complexity_score),
-      task_type: Map.get(strategy_state, :task_type),
-      available_strategies: Map.get(details, :available_strategies, [])
+      steps_count: Map.get(details, :steps_count, 0),
+      phase: Map.get(details, :phase),
+      duration_ms: Map.get(details, :duration_ms)
     }
   end
 end

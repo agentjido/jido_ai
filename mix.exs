@@ -153,6 +153,7 @@ defmodule JidoAi.MixProject do
         # Examples
         "lib/examples/README.md",
         "examples/strategies/algorithm_of_thoughts.md",
+        "examples/strategies/chain_of_draft.md",
         "lib/examples/strategies/adaptive_strategy.md",
         "lib/examples/strategies/chain_of_thought.md",
         "lib/examples/strategies/react_agent.md",

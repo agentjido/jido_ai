@@ -8,7 +8,17 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
   alias Jido.Agent
   alias Jido.AI.Plugins.Chat
   alias Jido.AI.Plugins.Planning
-  alias Jido.AI.Plugins.Reasoning.{Adaptive, AlgorithmOfThoughts, ChainOfThought, GraphOfThoughts, TRM, TreeOfThoughts}
+
+  alias Jido.AI.Plugins.Reasoning.{
+    Adaptive,
+    AlgorithmOfThoughts,
+    ChainOfDraft,
+    ChainOfThought,
+    GraphOfThoughts,
+    TRM,
+    TreeOfThoughts
+  }
+
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
 
   require Jido.AI.Actions.LLM.Chat
@@ -101,10 +111,12 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
     test "strategy plugins can be mounted" do
       agent = %Agent{id: "test-agent", name: "test", state: %{}}
 
+      assert {:ok, cod_state} = ChainOfDraft.mount(agent, %{})
       assert {:ok, cot_state} = ChainOfThought.mount(agent, %{})
       assert {:ok, aot_state} = AlgorithmOfThoughts.mount(agent, %{})
       assert {:ok, adaptive_state} = Adaptive.mount(agent, %{})
 
+      assert cod_state.strategy == :cod
       assert cot_state.strategy == :cot
       assert aot_state.strategy == :aot
       assert adaptive_state.strategy == :adaptive
@@ -126,6 +138,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       for plugin <- [
             Chat,
             Planning,
+            ChainOfDraft,
             ChainOfThought,
             AlgorithmOfThoughts,
             TreeOfThoughts,
@@ -168,6 +181,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert Map.has_key?(chat_routes, "chat.message")
       assert Map.has_key?(chat_routes, "chat.list_tools")
 
+      assert Map.has_key?(Map.new(ChainOfDraft.signal_routes(%{})), "reasoning.cod.run")
       assert Map.has_key?(Map.new(ChainOfThought.signal_routes(%{})), "reasoning.cot.run")
       assert Map.has_key?(Map.new(AlgorithmOfThoughts.signal_routes(%{})), "reasoning.aot.run")
       assert Map.has_key?(Map.new(TreeOfThoughts.signal_routes(%{})), "reasoning.tot.run")

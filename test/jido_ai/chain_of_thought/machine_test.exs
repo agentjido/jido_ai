@@ -256,6 +256,28 @@ defmodule Jido.AI.Reasoning.ChainOfThought.MachineTest do
       assert conclusion =~ "Complete"
     end
 
+    test "extracts #### delimiter conclusion for Chain-of-Draft outputs" do
+      text = "20 - x = 12; x = 8. #### 8"
+
+      {steps, conclusion} = Machine.extract_steps_and_conclusion(text)
+
+      assert conclusion == "8"
+      assert steps == []
+    end
+
+    test "extracts multiline #### delimiter conclusion while preserving steps" do
+      text = """
+      Step 1: Set up equation.
+      Step 2: Solve for x.
+      #### x = 8
+      """
+
+      {steps, conclusion} = Machine.extract_steps_and_conclusion(text)
+
+      assert length(steps) == 2
+      assert conclusion == "x = 8"
+    end
+
     test "handles various conclusion markers" do
       markers = ["Conclusion:", "Answer:", "Therefore:", "Final Answer:", "Thus:", "Hence:"]
 

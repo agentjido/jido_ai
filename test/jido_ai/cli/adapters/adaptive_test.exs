@@ -53,7 +53,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
       opts = module.strategy_opts()
       assert opts[:model] == "anthropic:claude-haiku-4-5"
       assert opts[:default_strategy] == :react
-      assert opts[:available_strategies] == [:cot, :react, :tot, :got, :trm]
+      assert opts[:available_strategies] == [:cod, :cot, :react, :tot, :got, :trm]
     end
   end
 

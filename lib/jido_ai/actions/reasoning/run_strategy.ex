@@ -15,7 +15,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
     schema:
       Zoi.object(%{
         strategy:
-          Zoi.enum([:cot, :tot, :got, :trm, :aot, :adaptive],
+          Zoi.enum([:cod, :cot, :tot, :got, :trm, :aot, :adaptive],
             description: "Reasoning strategy identifier"
           ),
         prompt: Zoi.string(description: "Prompt to reason on"),
@@ -69,11 +69,11 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
           |> Zoi.optional(),
         # Adaptive options
         default_strategy:
-          Zoi.enum([:cot, :react, :tot, :got, :trm, :aot], description: "Adaptive default strategy")
+          Zoi.enum([:cod, :cot, :react, :tot, :got, :trm, :aot], description: "Adaptive default strategy")
           |> Zoi.optional(),
         available_strategies:
           Zoi.list(
-            Zoi.enum([:cot, :react, :tot, :got, :trm, :aot], description: "Adaptive strategy id"),
+            Zoi.enum([:cod, :cot, :react, :tot, :got, :trm, :aot], description: "Adaptive strategy id"),
             description: "Adaptive available strategies"
           )
           |> Zoi.optional(),
@@ -88,6 +88,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   alias Jido.AI.Actions.Reasoning.Runner.{
     AdaptiveAgent,
     AlgorithmOfThoughtsAgent,
+    ChainOfDraftAgent,
     ChainOfThoughtAgent,
     GraphOfThoughtsAgent,
     TreeOfThoughtsAgent,
@@ -95,6 +96,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   }
 
   @strategy_runners %{
+    cod: ChainOfDraftAgent,
     cot: ChainOfThoughtAgent,
     tot: TreeOfThoughtsAgent,
     got: GraphOfThoughtsAgent,
@@ -104,6 +106,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   }
 
   @strategy_state_keys %{
+    cod: [:model, :system_prompt, :llm_timeout_ms, :request_policy],
     cot: [:model, :system_prompt, :llm_timeout_ms, :request_policy],
     tot: [:model, :branching_factor, :max_depth, :traversal_strategy, :generation_prompt, :evaluation_prompt],
     got: [
@@ -231,6 +234,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
     first_present([top_level, options_level])
   end
 
+  defp invoke_runner(runner, :cod, pid, prompt, timeout), do: runner.draft_sync(pid, prompt, timeout: timeout)
   defp invoke_runner(runner, :cot, pid, prompt, timeout), do: runner.think_sync(pid, prompt, timeout: timeout)
   defp invoke_runner(runner, :tot, pid, prompt, timeout), do: runner.explore_sync(pid, prompt, timeout: timeout)
   defp invoke_runner(runner, :got, pid, prompt, timeout), do: runner.explore_sync(pid, prompt, timeout: timeout)
@@ -405,6 +409,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   end
 
   defp strategy_state_key(:cot), do: :reasoning_cot
+  defp strategy_state_key(:cod), do: :reasoning_cod
   defp strategy_state_key(:tot), do: :reasoning_tot
   defp strategy_state_key(:got), do: :reasoning_got
   defp strategy_state_key(:trm), do: :reasoning_trm

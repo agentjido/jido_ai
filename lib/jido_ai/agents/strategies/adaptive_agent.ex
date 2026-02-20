@@ -14,7 +14,7 @@ defmodule Jido.AI.AdaptiveAgent do
           name: "smart_assistant",
           description: "Automatically selects the best reasoning approach",
           default_strategy: :react,
-          available_strategies: [:cot, :react, :tot, :got, :trm]
+          available_strategies: [:cod, :cot, :react, :tot, :got, :trm]
       end
 
   ## Options
@@ -23,7 +23,7 @@ defmodule Jido.AI.AdaptiveAgent do
   - `:description` - Agent description (default: "Adaptive agent \#{name}")
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
   - `:default_strategy` - Default strategy if analysis is inconclusive (default: `:react`)
-  - `:available_strategies` - List of available strategies (default: `[:cot, :react, :tot, :got, :trm]`)
+  - `:available_strategies` - List of available strategies (default: `[:cod, :cot, :react, :tot, :got, :trm]`)
   - `:complexity_thresholds` - Map of thresholds for strategy selection
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
@@ -91,12 +91,12 @@ defmodule Jido.AI.AdaptiveAgent do
   - **Synthesis** → Graph-of-Thoughts (combine, merge, perspectives)
   - **Tool use** → ReAct (search, calculate, execute)
   - **Exploration** → Tree-of-Thoughts (analyze, compare, alternatives)
-  - **Simple tasks** → Chain-of-Thought (direct questions, factual queries)
+  - **Simple tasks** → Chain-of-Draft (direct questions, factual queries)
   """
 
   @default_model "anthropic:claude-haiku-4-5"
   @default_strategy :react
-  @default_available_strategies [:cot, :react, :tot, :got, :trm]
+  @default_available_strategies [:cod, :cot, :react, :tot, :got, :trm]
 
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)

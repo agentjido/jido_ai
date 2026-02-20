@@ -13,13 +13,24 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
   alias Jido.AI.Plugins.Chat
   alias Jido.AI.Actions.LLM.Chat, as: ChatAction
   alias Jido.AI.Plugins.Planning
-  alias Jido.AI.Plugins.Reasoning.{Adaptive, AlgorithmOfThoughts, ChainOfThought, GraphOfThoughts, TRM, TreeOfThoughts}
+
+  alias Jido.AI.Plugins.Reasoning.{
+    Adaptive,
+    AlgorithmOfThoughts,
+    ChainOfDraft,
+    ChainOfThought,
+    GraphOfThoughts,
+    TRM,
+    TreeOfThoughts
+  }
+
   alias Jido.AI.Actions.Reasoning.RunStrategy
 
   describe "Plugin Composition" do
     test "public plugins expose stable names and state keys" do
       chat_spec = Chat.plugin_spec(%{})
       planning_spec = Planning.plugin_spec(%{})
+      cod_spec = ChainOfDraft.plugin_spec(%{})
       cot_spec = ChainOfThought.plugin_spec(%{})
       aot_spec = AlgorithmOfThoughts.plugin_spec(%{})
       tot_spec = TreeOfThoughts.plugin_spec(%{})
@@ -33,6 +44,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       assert planning_spec.name == "planning"
       assert planning_spec.state_key == :planning
 
+      assert cod_spec.state_key == :reasoning_cod
       assert cot_spec.state_key == :reasoning_cot
       assert aot_spec.state_key == :reasoning_aot
       assert tot_spec.state_key == :reasoning_tot
@@ -92,7 +104,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
   describe "Strategy Plugin Integration" do
     test "all strategy plugins expose RunStrategy action" do
-      plugins = [ChainOfThought, AlgorithmOfThoughts, TreeOfThoughts, GraphOfThoughts, TRM, Adaptive]
+      plugins = [ChainOfDraft, ChainOfThought, AlgorithmOfThoughts, TreeOfThoughts, GraphOfThoughts, TRM, Adaptive]
 
       for plugin <- plugins do
         assert plugin.actions() == [RunStrategy]
@@ -100,6 +112,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     end
 
     test "strategy plugin routes map to reasoning.*.run signals" do
+      assert Map.new(ChainOfDraft.signal_routes(%{}))["reasoning.cod.run"] == RunStrategy
       assert Map.new(ChainOfThought.signal_routes(%{}))["reasoning.cot.run"] == RunStrategy
       assert Map.new(AlgorithmOfThoughts.signal_routes(%{}))["reasoning.aot.run"] == RunStrategy
       assert Map.new(TreeOfThoughts.signal_routes(%{}))["reasoning.tot.run"] == RunStrategy
@@ -111,7 +124,17 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
   describe "End-to-End Surface Checks" do
     test "all public plugins provide plugin_spec/1, mount/2, actions/0" do
-      plugins = [Chat, Planning, ChainOfThought, AlgorithmOfThoughts, TreeOfThoughts, GraphOfThoughts, TRM, Adaptive]
+      plugins = [
+        Chat,
+        Planning,
+        ChainOfDraft,
+        ChainOfThought,
+        AlgorithmOfThoughts,
+        TreeOfThoughts,
+        GraphOfThoughts,
+        TRM,
+        Adaptive
+      ]
 
       for plugin <- plugins do
         assert function_exported?(plugin, :plugin_spec, 1)
@@ -124,6 +147,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       unique_actions =
         Chat.actions()
         |> Kernel.++(Planning.actions())
+        |> Kernel.++(ChainOfDraft.actions())
         |> Kernel.++(ChainOfThought.actions())
         |> Kernel.++(AlgorithmOfThoughts.actions())
         |> Kernel.++(TreeOfThoughts.actions())

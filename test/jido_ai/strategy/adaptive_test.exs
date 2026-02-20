@@ -4,7 +4,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.Adaptive.Strategy, as: Adaptive
-  alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
+  alias Jido.AI.Reasoning.ChainOfDraft.Strategy, as: ChainOfDraft
   alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
@@ -74,7 +74,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
 
       assert state[:config][:model] == "anthropic:claude-haiku-4-5"
       assert state[:config][:default_strategy] == :react
-      assert state[:config][:available_strategies] == [:cot, :react, :tot, :got, :trm]
+      assert state[:config][:available_strategies] == [:cod, :cot, :react, :tot, :got, :trm]
       assert is_nil(state[:selected_strategy])
       assert is_nil(state[:strategy_type])
     end
@@ -118,7 +118,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
     test "classifies simple prompts" do
       {strategy, score, task_type} = Adaptive.analyze_prompt("What is the capital of France?")
 
-      assert strategy == :cot
+      assert strategy == :cod
       assert score < 0.3
       assert task_type == :simple_query
     end
@@ -227,7 +227,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
   end
 
   describe "cmd/3 - strategy selection" do
-    test "selects CoT for simple prompts" do
+    test "selects CoD for simple prompts" do
       {agent, ctx} = create_agent()
 
       instructions = [
@@ -237,8 +237,8 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
       {agent, _directives} = Adaptive.cmd(agent, instructions, ctx)
       state = StratState.get(agent, %{})
 
-      assert state[:strategy_type] == :cot
-      assert state[:selected_strategy] == ChainOfThought
+      assert state[:strategy_type] == :cod
+      assert state[:selected_strategy] == ChainOfDraft
     end
 
     test "selects ReAct for tool-use prompts" do
@@ -413,7 +413,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
 
       {agent, _directives} = Adaptive.cmd(agent, instructions, ctx)
 
-      assert Adaptive.get_selected_strategy(agent) == :cot
+      assert Adaptive.get_selected_strategy(agent) == :cod
     end
   end
 
@@ -691,7 +691,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
     end
 
     test "selects TRM for iterative reasoning tasks" do
-      {agent, ctx} = create_agent(available_strategies: [:cot, :react, :tot, :got, :trm])
+      {agent, ctx} = create_agent(available_strategies: [:cod, :cot, :react, :tot, :got, :trm])
 
       instructions = [
         %{
