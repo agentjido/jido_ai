@@ -18,13 +18,17 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
    - `Jido.AI.Actions.Planning.Plan`
    - `Jido.AI.Actions.Planning.Decompose`
    - `Jido.AI.Actions.Planning.Prioritize`
-4. Reasoning templates (optional):
+4. Retrieval memory operations:
+   - `Jido.AI.Actions.Retrieval.UpsertMemory`
+   - `Jido.AI.Actions.Retrieval.RecallMemory`
+   - `Jido.AI.Actions.Retrieval.ClearMemory`
+5. Reasoning templates (optional):
    - `Jido.AI.Actions.Reasoning.Analyze`
    - `Jido.AI.Actions.Reasoning.Infer`
    - `Jido.AI.Actions.Reasoning.Explain`
-5. Dedicated strategy orchestration:
+6. Dedicated strategy orchestration:
    - `Jido.AI.Actions.Reasoning.RunStrategy`
-6. Compatibility convenience:
+7. Compatibility convenience:
    - `Jido.AI.Actions.LLM.Complete`
 
 ## LLM Actions
@@ -68,6 +72,24 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
   - Example snippet: [`lib/examples/actions/planning_actions.md#prioritize-action`](../../lib/examples/actions/planning_actions.md#prioritize-action)
   - Workflow snippet: [`lib/examples/actions/planning_actions.md#planning-workflow-with-task-decomposition`](../../lib/examples/actions/planning_actions.md#planning-workflow-with-task-decomposition)
 
+## Retrieval Actions
+
+- `Jido.AI.Actions.Retrieval.UpsertMemory`
+  - Use when you need to persist a memory snippet into the in-process retrieval namespace.
+  - Required params: `text`. Optional params: `id`, `metadata`, `namespace`.
+  - Output contract: `%{retrieval: %{namespace, last_upsert}}`.
+  - Example snippet: [`lib/examples/actions/retrieval_actions.md#upsertmemory-action`](../../lib/examples/actions/retrieval_actions.md#upsertmemory-action)
+- `Jido.AI.Actions.Retrieval.RecallMemory`
+  - Use when you need top-k memory recall for a query from a namespace.
+  - Required params: `query`. Optional params: `top_k` (default `3`), `namespace`.
+  - Output contract: `%{retrieval: %{namespace, query, memories, count}}`.
+  - Example snippet: [`lib/examples/actions/retrieval_actions.md#recallmemory-action`](../../lib/examples/actions/retrieval_actions.md#recallmemory-action)
+- `Jido.AI.Actions.Retrieval.ClearMemory`
+  - Use when you need to clear all in-process retrieval memory entries in one namespace.
+  - Required params: none. Optional params: `namespace`.
+  - Output contract: `%{retrieval: %{namespace, cleared}}`.
+  - Example snippet: [`lib/examples/actions/retrieval_actions.md#clearmemory-action`](../../lib/examples/actions/retrieval_actions.md#clearmemory-action)
+
 ## Reasoning Actions
 
 - `Jido.AI.Actions.Reasoning.Analyze`
@@ -109,6 +131,7 @@ These belong to strategy orchestration and are not app-level AI primitives.
 - Need chat/completion/embed/object output: use LLM actions.
 - Need model-directed tool use: use Tool Calling actions.
 - Need structured planning templates: use Planning actions.
+- Need in-process memory upsert/recall/clear primitives: use Retrieval actions.
 - Need explicit reasoning strategy execution as a callable capability: use `RunStrategy`.
 
 ## Failure Mode: Action Used Outside Expected Context

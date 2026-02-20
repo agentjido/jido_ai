@@ -190,6 +190,21 @@ Namespace behavior:
   (`retrieval.upsert`, `retrieval.recall`, `retrieval.clear`)
 - If omitted, namespace falls back to agent id, then `"default"`
 
+Retrieval action route contracts:
+
+- `retrieval.upsert` -> `Jido.AI.Actions.Retrieval.UpsertMemory`
+  - Required params: `text`
+  - Optional params: `id`, `metadata`, `namespace`
+  - Returns `%{retrieval: %{namespace, last_upsert}}`
+- `retrieval.recall` -> `Jido.AI.Actions.Retrieval.RecallMemory`
+  - Required params: `query`
+  - Optional params: `top_k` (default `3`), `namespace`
+  - Returns `%{retrieval: %{namespace, query, memories, count}}`
+- `retrieval.clear` -> `Jido.AI.Actions.Retrieval.ClearMemory`
+  - Required params: none
+  - Optional params: `namespace`
+  - Returns `%{retrieval: %{namespace, cleared}}`
+
 Retrieval plugin config shape:
 
 ```elixir
