@@ -197,6 +197,70 @@ signal =
   )
 ```
 
+### Quota Runtime Contract
+
+`Jido.AI.Plugins.Quota` is an optional cross-cutting runtime plugin that
+tracks rolling request/token usage and rejects over-budget requests.
+
+Quota state keys:
+
+- `enabled` toggles budget enforcement
+- `scope` selects the quota namespace
+- `window_ms` defines rolling budget window duration
+- `max_requests` sets per-window request budget (`nil` disables request cap)
+- `max_total_tokens` sets per-window token budget (`nil` disables token cap)
+- `error_message` sets rejection message for blocked requests
+
+Usage accounting contract:
+
+- `ai.usage` increments counters for `requests` and `total_tokens`
+- `total_tokens` is preferred, with fallback to `input_tokens + output_tokens`
+- Quota status snapshots expose `usage`, `limits`, `remaining`, and `over_budget?`
+
+Budget rejection contract:
+
+- Budgeted signal types include `chat.*`, `ai.*.query`, and `reasoning.*.run`
+- When quota is exceeded, requests rewrite to `ai.request.error`
+- Rejection payload uses `reason: :quota_exceeded`
+- `request_id` is resolved from request correlation fields when present
+
+Quota plugin config shape:
+
+```elixir
+defmodule MyApp.QuotaGuardedAssistant do
+  use Jido.AI.Agent,
+    name: "quota_guarded_assistant",
+    plugins: [
+      {Jido.AI.Plugins.Quota,
+       %{
+         enabled: true,
+         scope: "assistant_ops",
+         window_ms: 60_000,
+         max_requests: 50,
+         max_total_tokens: 20_000,
+         error_message: "quota exceeded for current window"
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "chat.message",
+    %{prompt: "Summarize this report in one paragraph.", call_id: "req_123"},
+    source: "/cli"
+  )
+
+# Expected rewrite shape when over budget:
+# %Jido.Signal{
+#   type: "ai.request.error",
+#   data: %{
+#     request_id: "req_123",
+#     reason: :quota_exceeded,
+#     message: "quota exceeded for current window"
+#   }
+# }
+```
+
 ### CoD Plugin Handoff (`reasoning.cod.run`)
 
 ```elixir

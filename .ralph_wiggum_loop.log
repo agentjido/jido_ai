@@ -1430,3 +1430,56 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.0 seconds (2.0s async, 0.00s sync)
 8 tests, 0 failures (1674 excluded)
+1) changed files
+- `lib/jido_ai/plugins/quota.ex:12`  
+  Added full quota runtime docs, including `:quota` state keys, usage accounting contract, and budget rejection contract.
+- `guides/developer/plugins_and_actions_composition.md:200`  
+  Added `### Quota Runtime Contract` with state keys, accounting behavior, config shape, and expected rejection shape.
+- `lib/examples/README.md:55`  
+  Added quota plugin row to Plugin Capability Pattern table.
+- `lib/examples/README.md:182`  
+  Added quota usage example snippet including expected `ai.request.error` rejection shape.
+- `test/jido_ai/plugins/quota_test.exs:38`  
+  Expanded tests for usage accounting, request rewrite behavior, and docs/examples contract assertions.
+
+2) tests/commands executed
+- `mix format` ✅
+- `mix test test/jido_ai/plugins/quota_test.exs` ✅ (`6 tests, 0 failures`)
+- `mix precommit` ❌ blocked by sandbox socket restriction (`Mix.Sync.PubSub.subscribe/1`, reason `:eperm`)
+- `mix test.fast` ❌ blocked by same `Mix.Sync.PubSub` socket restriction
+- `mix doctor --summary --raise` ❌ blocked by same `Mix.Sync.PubSub` socket restriction
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `MIX_ENV=test mix test --exclude flaky --only stable_smoke --no-compile` ✅ (`8 tests, 0 failures`)
+- Doctor summary equivalent (direct `elixir` runner using compiled Doctor modules, no Mix deps loadpaths) ✅  
+  Result: `Passed Modules: 164`, `Failed Modules: 0`, doc coverage/spec coverage pass.
+
+3) acceptance criteria coverage
+- Docs define quota state keys and budget rejection contract ✅  
+  Covered in `lib/jido_ai/plugins/quota.ex:12` and `guides/developer/plugins_and_actions_composition.md:200`, and asserted in `test/jido_ai/plugins/quota_test.exs:114`.
+- Tests cover usage accounting and request rewrite behavior ✅  
+  Covered in `test/jido_ai/plugins/quota_test.exs:38` (accounting) and `test/jido_ai/plugins/quota_test.exs:84` (rewrite behavior).
+- Example includes quota config snippet and expected rejection shape ✅  
+  Covered in `lib/examples/README.md:182` and asserted in `test/jido_ai/plugins/quota_test.exs:137`.
+
+4) blockers/assumptions
+- Blocker: this sandbox disallows opening local TCP sockets; `mix` tasks that load dependency task paths trigger `Mix.Sync.PubSub` and fail with `:eperm`. This prevents `mix precommit`, `mix test.fast`, and `mix doctor --summary` from completing exactly as requested in this environment.
+- Assumption: the executed fallback checks (`format --check-formatted`, `compile --warnings-as-errors`, stable smoke with `--no-compile`, targeted quota tests, and direct Doctor summary equivalent) are sufficient proxies for gate intent until run in a non-restricted environment.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 19717, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.1 seconds (2.1s async, 0.01s sync)
+8 tests, 0 failures (1679 excluded)

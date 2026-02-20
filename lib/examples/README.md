@@ -52,6 +52,7 @@ Canonical weather overview module:
 | Model routing plugin | Mount `Jido.AI.Plugins.ModelRouting` to route default model aliases by signal type while preserving explicit caller model overrides. |
 | Policy plugin | Mount `Jido.AI.Plugins.Policy` to enforce prompt/query guardrails and normalize malformed runtime envelopes. |
 | Retrieval plugin | Mount `Jido.AI.Plugins.Retrieval` to enrich `chat.message`/`reasoning.*.run` prompts from namespace memories, with per-request opt-out via `disable_retrieval: true`. |
+| Quota plugin | Mount `Jido.AI.Plugins.Quota` to track rolling usage and rewrite over-budget request/query signals to `ai.request.error`. |
 | Reasoning CoD plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfDraft` and send `reasoning.cod.run` for fixed `:cod` strategy execution. |
 | Reasoning CoT plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfThought` and send `reasoning.cot.run` for fixed `:cot` strategy execution. |
 | Reasoning AoT plugin | Mount `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` and send `reasoning.aot.run` for fixed `:aot` strategy execution. |
@@ -175,6 +176,38 @@ signal =
   )
 
 # Retrieval plugin injects matching memory snippets into the prompt before chat dispatch
+```
+
+```elixir
+defmodule MyApp.QuotaGuardedAgent do
+  use Jido.AI.Agent,
+    name: "quota_guarded_agent",
+    plugins: [
+      {Jido.AI.Plugins.Quota,
+       %{
+         enabled: true,
+         scope: "assistant_ops",
+         window_ms: 60_000,
+         max_requests: 50,
+         max_total_tokens: 20_000,
+         error_message: "quota exceeded for current window"
+       }},
+      {Jido.AI.Plugins.Chat, %{auto_execute: true}}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "chat.message",
+    %{prompt: "Summarize this report in one paragraph.", call_id: "req_123"},
+    source: "/cli"
+  )
+
+# Expected rejection shape once quota is exhausted:
+# %Jido.Signal{
+#   type: "ai.request.error",
+#   data: %{request_id: "req_123", reason: :quota_exceeded, message: "quota exceeded for current window"}
+# }
 ```
 
 ```elixir
