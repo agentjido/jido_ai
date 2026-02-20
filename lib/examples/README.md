@@ -49,6 +49,7 @@ Canonical weather overview module:
 | --- | --- |
 | Chat plugin | Mount `Jido.AI.Plugins.Chat` and send `chat.message` signals for tool-aware chat routing. |
 | Planning plugin | Mount `Jido.AI.Plugins.Planning` and send planning signals for plan/decompose/prioritize actions. |
+| Reasoning CoD plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfDraft` and send `reasoning.cod.run` for fixed `:cod` strategy execution. |
 
 ```elixir
 defmodule MyApp.ChatAgent do
@@ -92,6 +93,24 @@ signal = Jido.Signal.new!(
   source: "/cli"
 )
 # Routes to Jido.AI.Actions.Planning.Plan via Jido.AI.Plugins.Planning
+```
+
+```elixir
+defmodule MyApp.ReasoningPluginAgent do
+  use Jido.AI.Agent,
+    name: "reasoning_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.ChainOfDraft,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{llm_timeout_ms: 20_000}
+       }}
+    ]
+end
+
+signal = Jido.Signal.new!("reasoning.cod.run", %{prompt: "Summarize risks with one fallback plan."}, source: "/cli")
+# Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.ChainOfDraft
 ```
 
 ## Script Index

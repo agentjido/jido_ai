@@ -143,7 +143,14 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "Reasoning plugins inject fixed strategy ids" do
+      cod_signal = Jido.Signal.new!("reasoning.cod.run", %{prompt: "quick solve", strategy: :cot}, source: "/test")
       signal = Jido.Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, cod_params}}} =
+               ChainOfDraft.handle_signal(cod_signal, %{})
+
+      assert cod_params.strategy == :cod
+      assert cod_params.prompt == "quick solve"
 
       assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
                ChainOfThought.handle_signal(signal, %{})

@@ -3,6 +3,28 @@ require Jido.AI.Actions.Reasoning.RunStrategy
 defmodule Jido.AI.Plugins.Reasoning.ChainOfDraft do
   @moduledoc """
   Plugin capability for isolated Chain-of-Draft runs.
+
+  ## Signal Contracts
+
+  - `reasoning.cod.run` -> `Jido.AI.Actions.Reasoning.RunStrategy`
+
+  ## Plugin-To-Action Handoff
+
+  This plugin always overrides the runtime strategy identity to `:cod`.
+  On `reasoning.cod.run`, `handle_signal/2` returns:
+
+  - `{:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}`
+  - `params` always includes `strategy: :cod` (caller strategy input is ignored)
+
+  `Jido.AI.Actions.Reasoning.RunStrategy` then consumes the normalized params
+  and applies plugin defaults from context when explicit params are omitted.
+
+  ## Mount State Defaults
+
+  - `strategy`: `:cod`
+  - `default_model`: `:reasoning`
+  - `timeout`: `30_000`
+  - `options`: `%{}`
   """
 
   use Jido.Plugin,

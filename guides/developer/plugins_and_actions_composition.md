@@ -66,6 +66,39 @@ end
   - `reasoning.adaptive.run`
   - All route to `Jido.AI.Actions.Reasoning.RunStrategy` with fixed strategy identity.
 
+### CoD Plugin Handoff (`reasoning.cod.run`)
+
+```elixir
+defmodule MyApp.CoDPluginAgent do
+  use Jido.AI.Agent,
+    name: "cod_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.ChainOfDraft,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{llm_timeout_ms: 20_000}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.cod.run",
+    %{
+      prompt: "Give me a terse plan with one backup.",
+      strategy: :cot
+    },
+    source: "/cli"
+  )
+```
+
+Execution handoff:
+
+- Route dispatch maps `reasoning.cod.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
+- `Jido.AI.Plugins.Reasoning.ChainOfDraft.handle_signal/2` overrides payload strategy to `strategy: :cod`.
+- `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
+
 ## Chat Plugin Defaults Contract
 
 `Jido.AI.Plugins.Chat` mounts the following defaults unless overridden in plugin config:

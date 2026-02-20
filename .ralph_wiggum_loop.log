@@ -895,3 +895,54 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.0 seconds (2.0s async, 0.00s sync)
 8 tests, 0 failures (1591 excluded)
+1) changed files
+- `lib/jido_ai/plugins/reasoning/chain_of_draft.ex`
+- `test/jido_ai/plugins/reasoning/chain_of_draft_test.exs`
+- `test/jido_ai/skills/lifecycle_integration_test.exs`
+- `guides/developer/plugins_and_actions_composition.md`
+- `lib/examples/README.md`
+
+2) tests/commands executed
+- `mix format lib/jido_ai/plugins/reasoning/chain_of_draft.ex test/jido_ai/plugins/reasoning/chain_of_draft_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` (pass)
+- `mix test test/jido_ai/plugins/reasoning/chain_of_draft_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` (pass, 20 tests)
+- `mix format --check-formatted` (pass)
+- `mix compile --warnings-as-errors` (pass)
+- `mix doctor --summary` (fails in this environment; Mix PubSub TCP socket `:eperm`)
+- `mix test.fast` (fails in this environment; same Mix PubSub TCP socket `:eperm`)
+- `mix precommit` (fails in this environment; same Mix PubSub TCP socket `:eperm`)
+- Fallback verification for fast smoke tests:
+  - `MIX_ENV=test mix test --exclude flaky --only stable_smoke --no-compile --no-deps-check` (pass, 8 tests)
+
+3) acceptance criteria coverage
+- Tests validate `strategy: :cod` override behavior and signal route:
+  - Added `handle_signal/2` tests in `test/jido_ai/plugins/reasoning/chain_of_draft_test.exs` for forced `:cod` override (including caller-provided non-CoD strategy).
+  - Existing route assertion for `"reasoning.cod.run" -> RunStrategy` retained.
+  - Lifecycle integration now also asserts CoD fixed strategy injection in `test/jido_ai/skills/lifecycle_integration_test.exs`.
+- Docs include reasoning plugin usage for CoD:
+  - Added explicit CoD plugin handoff section with invocation snippet in `guides/developer/plugins_and_actions_composition.md`.
+  - Expanded CoD plugin module docs with signal contract and plugin-to-`RunStrategy` handoff in `lib/jido_ai/plugins/reasoning/chain_of_draft.ex`.
+- Example matrix includes plugin execution path:
+  - Added CoD plugin row and invocation snippet showing routing to `Jido.AI.Actions.Reasoning.RunStrategy` in `lib/examples/README.md`.
+  - Added docs contract assertions for this in `test/jido_ai/plugins/reasoning/chain_of_draft_test.exs`.
+
+4) blockers/assumptions
+- Blocker: this sandbox disallows loopback TCP sockets, and Mix 1.19 PubSub requires one for `deps.loadpaths`; this prevents `mix doctor --summary`, `mix test.fast`, and `mix precommit` from completing here.
+- Assumption: “example matrix includes plugin execution path” maps to the Plugin Capability matrix in `lib/examples/README.md`.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 519648, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.0 seconds (2.0s async, 0.00s sync)
+8 tests, 0 failures (1595 excluded)
