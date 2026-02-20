@@ -65,7 +65,7 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 - `Jido.AI.Actions.Reasoning.Explain`
   - Explanations with detail-level targeting.
 - `Jido.AI.Actions.Reasoning.RunStrategy`
-  - Executes a dedicated reasoning strategy runner (`:cot | :tot | :got | :trm | :adaptive`) independent of host strategy.
+  - Executes a dedicated reasoning strategy runner (`:cot | :aot | :tot | :got | :trm | :adaptive`) independent of host strategy.
   - ToT strategy runs return structured payloads (best/candidates/termination/tree/usage/diagnostics).
 
 ## Shared Helper
@@ -77,7 +77,7 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 
 Reasoning strategy command atoms and lifecycle/event handlers are intentionally not standalone actions:
 
-- `:ai_react_start`, `:cot_start`, `:tot_start`, `:got_start`, `:trm_start`, `:adaptive_start`
+- `:ai_react_start`, `:cot_start`, `:aot_start`, `:tot_start`, `:got_start`, `:trm_start`, `:adaptive_start`
 - `*_llm_result`, `*_llm_partial`, request error lifecycle handlers, worker event handlers
 
 These belong to strategy orchestration and are not app-level AI primitives.

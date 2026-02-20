@@ -85,6 +85,8 @@ defmodule Jido.AI.AdaptiveAgent do
 
   The Adaptive strategy automatically selects the best approach based on task analysis:
 
+  - **Algorithmic Exploration (opt-in)** → AoT (when `:aot` is included in `available_strategies`)
+  - Uses single-query algorithmic search formatting with explicit finalization
   - **Iterative Reasoning** → TRM (puzzles, step-by-step, recursive)
   - **Synthesis** → Graph-of-Thoughts (combine, merge, perspectives)
   - **Tool use** → ReAct (search, calculate, execute)

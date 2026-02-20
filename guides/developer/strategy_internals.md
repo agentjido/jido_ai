@@ -8,6 +8,7 @@ After this guide, you can safely modify strategy adapters and preserve signal/di
 
 - `Jido.AI.Reasoning.ReAct.Strategy`
 - `Jido.AI.Reasoning.ChainOfThought.Strategy`
+- `Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy`
 - `Jido.AI.Reasoning.TreeOfThoughts.Strategy`
 - `Jido.AI.Reasoning.GraphOfThoughts.Strategy`
 - `Jido.AI.Reasoning.TRM.Strategy`
@@ -56,6 +57,26 @@ Fix:
 - most strategies default model to `anthropic:claude-haiku-4-5`
 - request error routing is standardized via `ai.request.error`
 - Adaptive delegates to selected strategy and can re-evaluate on new prompts
+
+## Algorithm-of-Thoughts Specific Internals
+
+`Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy` is single-query by design:
+
+- one `Directive.LLMStream` call per request
+- machine flow is `idle -> exploring -> completed/error`
+- query signal is `ai.aot.query`
+- plugin run signal is `reasoning.aot.run`
+
+AoT result contract is structured:
+
+- `answer`
+- `found_solution?`
+- `first_operations_considered`
+- `backtracking_steps`
+- `raw_response`
+- `usage`
+- `termination` (`reason`, `status`, `duration_ms`)
+- `diagnostics`
 
 ## Tree-of-Thoughts Specific Internals
 
