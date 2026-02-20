@@ -90,6 +90,17 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert is_map(state.pending_worker_start)
       assert state.pending_worker_start.request_id == "req_1"
       assert state.pending_worker_start.query == "What is 2 + 2?"
+      assert state.pending_worker_start.config.streaming == true
+    end
+
+    test "start propagates streaming option into runtime config" do
+      agent = create_agent(tools: [TestCalculator], streaming: false)
+
+      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_1"})
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.pending_worker_start.config.streaming == false
     end
 
     test "child started flushes deferred start to worker pid" do

@@ -205,66 +205,93 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     messages = Thread.to_messages(state.thread)
     llm_opts = Config.llm_opts(config)
 
+    case request_turn(state, owner, ref, config, messages, llm_opts) do
+      {:ok, state, turn} ->
+        state = State.merge_usage(state, turn.usage)
+
+        {state, _} =
+          emit_event(
+            state,
+            owner,
+            ref,
+            :llm_completed,
+            %{
+              call_id: call_id,
+              turn_type: turn.type,
+              text: turn.text,
+              thinking_content: turn.thinking_content,
+              tool_calls: turn.tool_calls,
+              usage: turn.usage
+            },
+            llm_call_id: call_id
+          )
+
+        state =
+          Thread.append_assistant(
+            state.thread,
+            turn.text,
+            case turn.type do
+              :tool_calls -> turn.tool_calls
+              _ -> nil
+            end,
+            maybe_thinking_opt(turn.thinking_content)
+          )
+          |> then(&%{state | thread: &1})
+
+        {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
+
+        case Turn.needs_tools?(turn) do
+          true ->
+            {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
+
+          _ ->
+            completed =
+              state
+              |> State.put_status(:completed)
+              |> State.put_result(turn.text)
+
+            {completed, _} =
+              emit_event(completed, owner, ref, :request_completed, %{
+                result: turn.text,
+                termination_reason: :final_answer,
+                usage: completed.usage
+              })
+
+            {:final_answer, completed}
+        end
+
+      {:error, state, reason, error_type} ->
+        {:error, state, reason, error_type}
+    end
+  end
+
+  defp request_turn(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
+    case config.streaming do
+      false ->
+        request_turn_generate(state, config, messages, llm_opts)
+
+      _ ->
+        request_turn_stream(state, owner, ref, config, messages, llm_opts)
+    end
+  end
+
+  defp request_turn_stream(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
     case ReqLLM.Generation.stream_text(config.model, messages, llm_opts) do
       {:ok, stream_response} ->
         case consume_stream(state, owner, ref, config, stream_response) do
-          {:ok, state, turn} ->
-            state = State.merge_usage(state, turn.usage)
-
-            {state, _} =
-              emit_event(
-                state,
-                owner,
-                ref,
-                :llm_completed,
-                %{
-                  call_id: call_id,
-                  turn_type: turn.type,
-                  text: turn.text,
-                  thinking_content: turn.thinking_content,
-                  tool_calls: turn.tool_calls,
-                  usage: turn.usage
-                },
-                llm_call_id: call_id
-              )
-
-            state =
-              Thread.append_assistant(
-                state.thread,
-                turn.text,
-                case turn.type do
-                  :tool_calls -> turn.tool_calls
-                  _ -> nil
-                end,
-                maybe_thinking_opt(turn.thinking_content)
-              )
-              |> then(&%{state | thread: &1})
-
-            {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
-
-            case Turn.needs_tools?(turn) do
-              true ->
-                {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
-
-              _ ->
-                completed =
-                  state
-                  |> State.put_status(:completed)
-                  |> State.put_result(turn.text)
-
-                {completed, _} =
-                  emit_event(completed, owner, ref, :request_completed, %{
-                    result: turn.text,
-                    termination_reason: :final_answer,
-                    usage: completed.usage
-                  })
-
-                {:final_answer, completed}
-            end
-
-          {:error, state, reason} ->
-            {:error, state, reason, :llm_stream}
+          {:ok, updated_state, turn} -> {:ok, updated_state, turn}
+          {:error, updated_state, reason} -> {:error, updated_state, reason, :llm_stream}
         end
+
+      {:error, reason} ->
+        {:error, state, reason, :llm_request}
+    end
+  end
+
+  defp request_turn_generate(%State{} = state, %Config{} = config, messages, llm_opts) do
+    case ReqLLM.Generation.generate_text(config.model, messages, llm_opts) do
+      {:ok, response} ->
+        consume_generate(state, config, response)
 
       {:error, reason} ->
         {:error, state, reason, :llm_request}
@@ -307,6 +334,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   rescue
     e ->
       {:error, state, %{error: Exception.message(e), type: e.__struct__}}
+  end
+
+  defp consume_generate(%State{} = state, %Config{} = config, response) do
+    turn = Turn.from_response(response, model: config.model)
+    {:ok, state, turn}
+  rescue
+    e ->
+      {:error, state, %{error: Exception.message(e), type: e.__struct__}, :llm_response}
   end
 
   defp maybe_emit_chunk_delta(%State{} = state, owner, ref, %ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg)

@@ -52,6 +52,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               system_prompt: Zoi.string() |> Zoi.nullish(),
               tools: Zoi.map() |> Zoi.default(%{}),
               max_iterations: Zoi.integer() |> Zoi.default(@default_max_iterations),
+              streaming: Zoi.boolean() |> Zoi.default(true),
               llm: @llm_schema,
               tool_exec: @tool_exec_schema,
               observability: @observability_schema,
@@ -130,6 +131,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       tools: tools,
       max_iterations:
         normalize_pos_integer(get_opt(opts_map, :max_iterations, @default_max_iterations), @default_max_iterations),
+      streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
       llm: llm,
       tool_exec: tool_exec,
       observability: observability,
@@ -155,6 +157,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       config.model,
       config.system_prompt || "",
       Integer.to_string(config.max_iterations),
+      to_string(config.streaming),
       Integer.to_string(config.tool_exec.timeout_ms),
       Integer.to_string(config.tool_exec.max_retries),
       Integer.to_string(config.tool_exec.retry_backoff_ms),
@@ -177,7 +180,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   end
 
   @doc """
-  Convert config to generation options for `ReqLLM.Generation.stream_text/3`.
+  Convert config to generation options for `ReqLLM.Generation.stream_text/3`
+  and `ReqLLM.Generation.generate_text/3`.
   """
   @spec llm_opts(t()) :: keyword()
   def llm_opts(%__MODULE__{} = config) do

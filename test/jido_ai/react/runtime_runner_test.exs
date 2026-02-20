@@ -92,6 +92,41 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
   end
 
+  test "uses non-streaming generation when streaming is disabled" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      flunk("stream_text should not be called when ReAct streaming is disabled")
+    end)
+
+    Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
+      {:ok,
+       %{
+         message: %{content: "Hello from generate", tool_calls: nil},
+         finish_reason: :stop,
+         usage: %{input_tokens: 3, output_tokens: 2}
+       }}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, streaming: false})
+
+    events =
+      ReAct.stream("Say hello", config, request_id: "req_non_stream", run_id: "run_non_stream")
+      |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_started))
+    assert Enum.any?(events, &(&1.kind == :llm_started))
+    refute Enum.any?(events, &(&1.kind == :llm_delta))
+    assert Enum.any?(events, &(&1.kind == :llm_completed))
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+    assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+
+    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
+    assert llm_completed.data.text == "Hello from generate"
+    assert llm_completed.data.turn_type == :final_answer
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert request_completed.data.result == "Hello from generate"
+  end
+
   test "retries tool execution and reports attempts in tool_completed" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
