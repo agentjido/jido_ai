@@ -51,6 +51,7 @@ Canonical weather overview module:
 | Planning plugin | Mount `Jido.AI.Plugins.Planning` and send planning signals for plan/decompose/prioritize actions. |
 | Reasoning CoD plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfDraft` and send `reasoning.cod.run` for fixed `:cod` strategy execution. |
 | Reasoning CoT plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfThought` and send `reasoning.cot.run` for fixed `:cot` strategy execution. |
+| Reasoning AoT plugin | Mount `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` and send `reasoning.aot.run` for fixed `:aot` strategy execution. |
 
 ```elixir
 defmodule MyApp.ChatAgent do
@@ -130,6 +131,32 @@ end
 
 signal = Jido.Signal.new!("reasoning.cot.run", %{prompt: "Show your reasoning with one backup plan."}, source: "/cli")
 # Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.ChainOfThought
+```
+
+```elixir
+defmodule MyApp.AlgorithmOfThoughtsPluginAgent do
+  use Jido.AI.Agent,
+    name: "reasoning_aot_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{profile: :standard, search_style: :dfs, llm_timeout_ms: 20_000}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.aot.run",
+    %{
+      prompt: "Solve this in algorithmic steps and include one fallback."
+    },
+    source: "/cli"
+  )
+
+# Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts
 ```
 
 ## Script Index

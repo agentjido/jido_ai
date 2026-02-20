@@ -995,3 +995,55 @@ Including tags: [:stable_smoke]
 ........
 Finished in 1.9 seconds (1.9s async, 0.00s sync)
 8 tests, 0 failures (1600 excluded)
+1. **changed files**
+- `lib/jido_ai/plugins/reasoning/algorithm_of_thoughts.ex:4`  
+  Added AoT plugin contract docs: signal contract, fixed `strategy: :aot` handoff behavior, and mount defaults.
+- `guides/developer/plugins_and_actions_composition.md:135`  
+  Added `AoT Plugin Handoff (reasoning.aot.run)` usage section and AoT defaults contract section.
+- `lib/examples/README.md:54`  
+  Added AoT row to the Plugin Capability Pattern matrix and an AoT plugin snippet showing `reasoning.aot.run`.
+- `test/jido_ai/plugins/reasoning/algorithm_of_thoughts_test.exs:1`  
+  Added dedicated AoT plugin end-to-end contract tests (spec, mount/schema, route contract, forced strategy injection, AoT options handling, docs/examples contracts).
+
+2. **tests/commands executed**
+- `mix format` ✅
+- `mix test test/jido_ai/plugins/reasoning/algorithm_of_thoughts_test.exs` ✅
+- `mix test test/jido_ai/plugins/reasoning/algorithm_of_thoughts_test.exs test/jido_ai/plugins/reasoning/chain_of_draft_test.exs test/jido_ai/skills/tool_calling/tool_calling_skill_test.exs test/jido_ai/aot/docs_contract_test.exs` ✅
+- `mix test test/jido_ai/skills/lifecycle_integration_test.exs test/jido_ai/skills/schema_integration_test.exs` ✅
+- `mix test test/jido_ai/plugins/reasoning/algorithm_of_thoughts_test.exs test/jido_ai/skills/lifecycle_integration_test.exs test/jido_ai/skills/schema_integration_test.exs` ✅
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test --exclude flaky --only stable_smoke` ✅ (underlying `test.fast` test command)
+- `mix precommit` ❌ blocked by Mix PubSub socket permission error (`:eperm`)
+- `mix test.fast` ❌ blocked by Mix PubSub socket permission error (`:eperm`) in nested `mix` call
+- `mix doctor --summary` ❌ blocked by Mix PubSub socket permission error (`:eperm`)
+
+3. **acceptance criteria coverage**
+- Tests validate `strategy: :aot` injection and route contract.  
+  Covered in `test/jido_ai/plugins/reasoning/algorithm_of_thoughts_test.exs:76` and `test/jido_ai/plugins/reasoning/algorithm_of_thoughts_test.exs:85` (including AoT-specific options handling).
+- Docs include AoT plugin usage guidance.  
+  Added in `guides/developer/plugins_and_actions_composition.md:135` and `lib/jido_ai/plugins/reasoning/algorithm_of_thoughts.ex:4`.
+- Example matrix includes AoT plugin path.  
+  Added in `lib/examples/README.md:54` plus AoT plugin snippet at `lib/examples/README.md:136`.
+
+4. **blockers/assumptions**
+- Blocker: `mix precommit`, `mix test.fast`, and `mix doctor --summary` are not runnable to completion in this sandbox due an environment-level `Mix.Sync.PubSub.subscribe/1` TCP socket permission error (`:eperm`), even after retries.
+- Assumption: `mix test --exclude flaky --only stable_smoke` is the effective test workload behind `mix test.fast` (it passed), but the alias itself still fails because it shells out to nested `mix`.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 843570, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 1.9 seconds (1.9s async, 0.00s sync)
+8 tests, 0 failures (1612 excluded)

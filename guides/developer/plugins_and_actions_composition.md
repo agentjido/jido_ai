@@ -132,6 +132,40 @@ Execution handoff:
 - `Jido.AI.Plugins.Reasoning.ChainOfThought.handle_signal/2` overrides payload strategy to `strategy: :cot`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 
+### AoT Plugin Handoff (`reasoning.aot.run`)
+
+```elixir
+defmodule MyApp.AoTPluginAgent do
+  use Jido.AI.Agent,
+    name: "aot_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{profile: :standard, search_style: :dfs, llm_timeout_ms: 20_000}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.aot.run",
+    %{
+      prompt: "Solve this with algorithmic steps and one fallback.",
+      strategy: :cot,
+      options: %{profile: :long, require_explicit_answer: true}
+    },
+    source: "/cli"
+  )
+```
+
+Execution handoff:
+
+- Route dispatch maps `reasoning.aot.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
+- `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts.handle_signal/2` overrides payload strategy to `strategy: :aot`.
+- `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
+
 ## Chat Plugin Defaults Contract
 
 `Jido.AI.Plugins.Chat` mounts the following defaults unless overridden in plugin config:
@@ -166,6 +200,15 @@ Action-specific fields remain action-owned:
 `Jido.AI.Plugins.Reasoning.ChainOfThought` mounts the following defaults unless overridden in plugin config:
 
 - `strategy: :cot`
+- `default_model: :reasoning`
+- `timeout: 30_000`
+- `options: %{}`
+
+## Reasoning AoT Plugin Defaults Contract
+
+`Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` mounts the following defaults unless overridden in plugin config:
+
+- `strategy: :aot`
 - `default_model: :reasoning`
 - `timeout: 30_000`
 - `options: %{}`
