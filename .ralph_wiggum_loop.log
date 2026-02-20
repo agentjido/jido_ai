@@ -257,3 +257,62 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.3 seconds (2.3s async, 0.00s sync)
 8 tests, 0 failures (1478 excluded)
+1) changed files
+- `test/jido_ai/signal_test.exs`
+- `test/jido_ai/observe_test.exs`
+- `test/jido_ai/error/sanitize_test.exs`
+- `test/jido_ai/validation_test.exs`
+- `guides/developer/signals_namespaces_contracts.md`
+- `guides/user/observability_basics.md`
+- `guides/developer/security_and_validation.md`
+- `guides/developer/error_model_and_recovery.md`
+
+2) tests/commands executed
+- `mix format` (pass)
+- `mix test test/jido_ai/observe_test.exs test/jido_ai/signal_test.exs test/jido_ai/error/sanitize_test.exs test/jido_ai/validation_test.exs` (pass, 75 tests)
+- `mix test.fast` (fails in this sandbox: `Mix.PubSub` TCP socket `:eperm`)
+- `MIX_NO_SYNC=1 mix test.fast` (same failure)
+- `mix doctor --summary` (same `Mix.PubSub` `:eperm` failure)
+- `mix precommit` (same `Mix.PubSub` `:eperm` failure)
+- `mix format --check-formatted` (pass)
+- `mix compile --warnings-as-errors` (pass)
+- `mix test --exclude flaky --only stable_smoke` (pass; equivalent underlying test command for `mix test.fast`)
+
+3) acceptance criteria coverage
+- Signal namespace contract docs match emitted signal types:
+  - Updated `guides/developer/signals_namespaces_contracts.md` with explicit canonical signal strings and module-to-type mapping.
+  - Added contract parity test in `test/jido_ai/signal_test.exs` that asserts docs include canonical emitted types.
+- Security and sanitization tests cover sensitive/error edge cases:
+  - Added nested recursive redaction coverage in `test/jido_ai/observe_test.exs`.
+  - Added edge-case sanitization tests in `test/jido_ai/error/sanitize_test.exs` (tuple reasons, unknown reasons, verbose/include_code behavior, user/log split).
+  - Added validation hardening tests in `test/jido_ai/validation_test.exs` (dangerous bytes, allowlist override, invalid/missing supervisors, empty-string + control-byte handling).
+- Observability behavior has clear enable/disable and metadata contract docs:
+  - Updated `guides/user/observability_basics.md` with:
+    - valid telemetry event namespaces
+    - required metadata/measurement keys
+    - enable/disable semantics (`emit_telemetry?`, `emit_llm_deltas?`, span `:noop`)
+    - corrected telemetry subscribe example path.
+- Example gate:
+  - Added telemetry + signal snippet in `guides/user/observability_basics.md` using `Jido.AI.Signal.RequestStarted` + `Jido.AI.Observe.emit/5`.
+
+4) blockers/assumptions
+- Blocker: in this execution environment, `mix doctor --summary`, `mix precommit`, and alias `mix test.fast` cannot complete because `Mix.PubSub` cannot open loopback TCP sockets (`:eperm`).
+- Assumption: “signal namespace contract” refers to documented canonical/public runtime signal contracts plus explicit internal ReAct worker control signals (documented as separate internal namespace).
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.4%
+
+Doctor validation has passed!
+Running ExUnit with seed: 301807, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.0 seconds (2.0s async, 0.01s sync)
+8 tests, 0 failures (1497 excluded)

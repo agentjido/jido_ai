@@ -2,7 +2,20 @@ defmodule Jido.AI.SignalTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Reasoning.ReAct.Signal, as: ReactSignal
-  alias Jido.AI.Signal.{LLMDelta, LLMResponse, Usage}
+
+  alias Jido.AI.Signal.{
+    EmbedResult,
+    LLMDelta,
+    LLMResponse,
+    RequestCompleted,
+    RequestError,
+    RequestFailed,
+    RequestStarted,
+    ToolResult,
+    Usage
+  }
+
+  @signal_contract_guide "guides/developer/signals_namespaces_contracts.md"
 
   describe "ReactEvent" do
     test "creates worker event signal with required fields" do
@@ -220,6 +233,142 @@ defmodule Jido.AI.SignalTest do
         })
 
       assert signal.data.metadata == metadata
+    end
+  end
+
+  describe "request lifecycle signals" do
+    test "RequestStarted uses canonical lifecycle namespace" do
+      signal =
+        RequestStarted.new!(%{
+          request_id: "req_start_1",
+          query: "What is the weather?",
+          run_id: "run_1"
+        })
+
+      assert signal.type == "ai.request.started"
+      assert signal.source == "/ai/request"
+      assert signal.data.request_id == "req_start_1"
+      assert signal.data.query == "What is the weather?"
+      assert signal.data.run_id == "run_1"
+    end
+
+    test "RequestCompleted uses canonical lifecycle namespace" do
+      signal =
+        RequestCompleted.new!(%{
+          request_id: "req_complete_1",
+          result: %{answer: "Sunny"},
+          run_id: "run_2"
+        })
+
+      assert signal.type == "ai.request.completed"
+      assert signal.source == "/ai/request"
+      assert signal.data.request_id == "req_complete_1"
+      assert signal.data.result == %{answer: "Sunny"}
+      assert signal.data.run_id == "run_2"
+    end
+
+    test "RequestFailed uses canonical lifecycle namespace" do
+      signal =
+        RequestFailed.new!(%{
+          request_id: "req_failed_1",
+          error: {:error, :timeout},
+          run_id: "run_3"
+        })
+
+      assert signal.type == "ai.request.failed"
+      assert signal.source == "/ai/request"
+      assert signal.data.request_id == "req_failed_1"
+      assert signal.data.error == {:error, :timeout}
+      assert signal.data.run_id == "run_3"
+    end
+
+    test "RequestError uses canonical request rejection namespace" do
+      signal =
+        RequestError.new!(%{
+          request_id: "req_error_1",
+          reason: :busy,
+          message: "Agent is processing another request"
+        })
+
+      assert signal.type == "ai.request.error"
+      assert signal.source == "/ai/strategy"
+      assert signal.data.request_id == "req_error_1"
+      assert signal.data.reason == :busy
+      assert signal.data.message =~ "processing"
+    end
+  end
+
+  describe "tool/embed result signals" do
+    test "ToolResult uses canonical tool namespace" do
+      signal =
+        ToolResult.new!(%{
+          call_id: "tool_1",
+          tool_name: "calculator",
+          result: {:ok, %{value: 3}}
+        })
+
+      assert signal.type == "ai.tool.result"
+      assert signal.source == "/ai/tool"
+      assert signal.data.call_id == "tool_1"
+      assert signal.data.tool_name == "calculator"
+      assert signal.data.result == {:ok, %{value: 3}}
+    end
+
+    test "EmbedResult uses canonical embed namespace" do
+      signal =
+        EmbedResult.new!(%{
+          call_id: "embed_1",
+          result: {:ok, [0.1, 0.2, 0.3]}
+        })
+
+      assert signal.type == "ai.embed.result"
+      assert signal.source == "/ai/embed"
+      assert signal.data.call_id == "embed_1"
+      assert signal.data.result == {:ok, [0.1, 0.2, 0.3]}
+    end
+  end
+
+  describe "signal namespace contract guide" do
+    test "documents canonical emitted signal types" do
+      guide = File.read!(@signal_contract_guide)
+
+      module_backed_types = [
+        RequestStarted.new!(%{request_id: "req_1", query: "q"}).type,
+        RequestCompleted.new!(%{request_id: "req_1", result: %{ok: true}}).type,
+        RequestFailed.new!(%{request_id: "req_1", error: :boom}).type,
+        RequestError.new!(%{request_id: "req_1", reason: :busy, message: "busy"}).type,
+        LLMResponse.new!(%{call_id: "c_1", result: {:ok, %{type: :final_answer, text: "ok"}}}).type,
+        LLMDelta.new!(%{call_id: "c_1", delta: "x"}).type,
+        ToolResult.new!(%{call_id: "t_1", tool_name: "echo", result: {:ok, "ok"}}).type,
+        EmbedResult.new!(%{call_id: "e_1", result: {:ok, [0.0]}}).type,
+        Usage.new!(%{call_id: "u_1", model: "test:model", input_tokens: 1, output_tokens: 1}).type,
+        ReactSignal.new!(%{request_id: "req_1", event: %{kind: :started}}).type
+      ]
+
+      strategy_query_types = [
+        "ai.react.query",
+        "ai.cod.query",
+        "ai.cot.query",
+        "ai.aot.query",
+        "ai.tot.query",
+        "ai.got.query",
+        "ai.trm.query",
+        "ai.adaptive.query"
+      ]
+
+      plugin_run_types = [
+        "reasoning.cod.run",
+        "reasoning.cot.run",
+        "reasoning.aot.run",
+        "reasoning.tot.run",
+        "reasoning.got.run",
+        "reasoning.trm.run",
+        "reasoning.adaptive.run"
+      ]
+
+      for type <- module_backed_types ++ strategy_query_types ++ plugin_run_types do
+        assert guide =~ "`#{type}`"
+      end
     end
   end
 

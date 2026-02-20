@@ -49,6 +49,26 @@ defmodule Jido.AI.ObserveTest do
     assert sanitized["username"] == "alice"
   end
 
+  test "sanitize_sensitive redacts nested maps and lists recursively" do
+    payload = %{
+      profile: %{
+        display_name: "alice",
+        api_secret: "s1",
+        nested: [%{"session_token" => "s2"}, %{ok: true}]
+      },
+      notes: ["safe", %{private_key: "s3"}]
+    }
+
+    sanitized = Observe.sanitize_sensitive(payload)
+
+    assert sanitized.profile.display_name == "alice"
+    assert sanitized.profile.api_secret == "[REDACTED]"
+    assert Enum.at(sanitized.profile.nested, 0)["session_token"] == "[REDACTED]"
+    assert Enum.at(sanitized.profile.nested, 1).ok == true
+    assert Enum.at(sanitized.notes, 0) == "safe"
+    assert Enum.at(sanitized.notes, 1).private_key == "[REDACTED]"
+  end
+
   test "emit executes telemetry with normalized shape" do
     ref = make_ref()
     handler_id = "observe-test-emit-#{inspect(ref)}"
@@ -130,6 +150,40 @@ defmodule Jido.AI.ObserveTest do
       )
 
     refute_receive {:unexpected_delta, _, _, _}, 50
+  end
+
+  test "feature-gated llm deltas emit when enabled" do
+    ref = make_ref()
+    handler_id = "observe-test-delta-enabled-#{inspect(ref)}"
+
+    :telemetry.attach(
+      handler_id,
+      Observe.llm(:delta),
+      fn event, measurements, metadata, _ ->
+        send(self(), {:delta_seen, event, measurements, metadata})
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    :ok =
+      Observe.emit(
+        %{emit_telemetry?: true, emit_llm_deltas?: true},
+        Observe.llm(:delta),
+        %{duration_ms: 2},
+        %{request_id: "req_2", llm_call_id: "call_2"},
+        feature_gate: :llm_deltas
+      )
+
+    assert_receive {:delta_seen, event, measurements, metadata}
+    assert event == Observe.llm(:delta)
+    assert measurements.duration_ms == 2
+    assert measurements.input_tokens == 0
+    assert metadata.request_id == "req_2"
+    assert metadata.llm_call_id == "call_2"
+    assert Map.has_key?(metadata, :agent_id)
+    assert Map.has_key?(metadata, :run_id)
   end
 
   test "span wrappers are no-op when telemetry disabled" do
