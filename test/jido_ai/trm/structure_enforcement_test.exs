@@ -8,16 +8,18 @@ defmodule Jido.AI.Reasoning.TRM.StructureEnforcementTest do
     "lib/jido_ai/cli/adapters/trm.ex"
   ]
 
-  @legacy_namespace_patterns [
-    ~r/Jido\.AI\.Strategies\.TRM(\b|\.)/,
-    ~r/Jido\.AI\.Reasoning\.Strategies\.TRM(\b|\.)/,
-    ~r/Jido\.AI\.TRM\.Machine(\b|\.)/,
-    ~r/Jido\.AI\.TRM\.ACT(\b|\.)/,
-    ~r/Jido\.AI\.TRM\.Helpers(\b|\.)/,
-    ~r/Jido\.AI\.TRM\.Reasoning(\b|\.)/,
-    ~r/Jido\.AI\.TRM\.Supervision(\b|\.)/,
-    ~r/Jido\.AI\.CLI\.Adapters\.TRM(\b|\.)/
-  ]
+  defp legacy_namespace_patterns do
+    [
+      ~r/Jido\.AI\.Strategies\.TRM(\b|\.)/,
+      ~r/Jido\.AI\.Reasoning\.Strategies\.TRM(\b|\.)/,
+      ~r/Jido\.AI\.TRM\.Machine(\b|\.)/,
+      ~r/Jido\.AI\.TRM\.ACT(\b|\.)/,
+      ~r/Jido\.AI\.TRM\.Helpers(\b|\.)/,
+      ~r/Jido\.AI\.TRM\.Reasoning(\b|\.)/,
+      ~r/Jido\.AI\.TRM\.Supervision(\b|\.)/,
+      ~r/Jido\.AI\.CLI\.Adapters\.TRM(\b|\.)/
+    ]
+  end
 
   test "legacy TRM file locations are removed" do
     leftovers =
@@ -36,7 +38,7 @@ defmodule Jido.AI.Reasoning.TRM.StructureEnforcementTest do
       |> Path.wildcard()
       |> Enum.filter(fn file ->
         content = File.read!(file)
-        Enum.any?(@legacy_namespace_patterns, &Regex.match?(&1, content))
+        Enum.any?(legacy_namespace_patterns(), &Regex.match?(&1, content))
       end)
 
     assert offenders == [],

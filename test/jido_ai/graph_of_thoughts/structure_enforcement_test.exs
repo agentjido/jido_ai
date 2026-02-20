@@ -8,12 +8,14 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StructureEnforcementTest do
     "lib/jido_ai/cli/adapters/got.ex"
   ]
 
-  @legacy_namespace_patterns [
-    ~r/Jido\.AI\.Strategies\.GraphOfThoughts(\b|\.)/,
-    ~r/Jido\.AI\.Reasoning\.Strategies\.GraphOfThoughts(\b|\.)/,
-    ~r/Jido\.AI\.GraphOfThoughts\.Machine(\b|\.)/,
-    ~r/Jido\.AI\.CLI\.Adapters\.GoT(\b|\.)/
-  ]
+  defp legacy_namespace_patterns do
+    [
+      ~r/Jido\.AI\.Strategies\.GraphOfThoughts(\b|\.)/,
+      ~r/Jido\.AI\.Reasoning\.Strategies\.GraphOfThoughts(\b|\.)/,
+      ~r/Jido\.AI\.GraphOfThoughts\.Machine(\b|\.)/,
+      ~r/Jido\.AI\.CLI\.Adapters\.GoT(\b|\.)/
+    ]
+  end
 
   test "legacy GoT file locations are removed" do
     leftovers =
@@ -32,7 +34,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StructureEnforcementTest do
       |> Path.wildcard()
       |> Enum.filter(fn file ->
         content = File.read!(file)
-        Enum.any?(@legacy_namespace_patterns, &Regex.match?(&1, content))
+        Enum.any?(legacy_namespace_patterns(), &Regex.match?(&1, content))
       end)
 
     assert offenders == [],

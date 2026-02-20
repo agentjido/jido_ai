@@ -13,16 +13,18 @@ defmodule Jido.AI.Reasoning.ReAct.StructureEnforcementTest do
     "lib/jido_ai/reasoning/workers/react.ex"
   ]
 
-  @legacy_namespace_patterns [
-    ~r/Jido\.AI\.ReAct(\b|\.)/,
-    ~r/Jido\.AI\.Strategies\.ReAct(\b|\.)/,
-    ~r/Jido\.AI\.Actions\.ReAct(\b|\.)/,
-    ~r/Jido\.AI\.Signal\.ReactEvent(\b|\.)/,
-    ~r/Jido\.AI\.CLI\.Adapters\.ReAct(\b|\.)/,
-    ~r/Jido\.AI\.Agents\.Internal\.ReActWorkerAgent(\b|\.)/,
-    ~r/Jido\.AI\.Reasoning\.Strategies\.ReAct(\b|\.)/,
-    ~r/Jido\.AI\.Reasoning\.Workers\.ReAct(\b|\.)/
-  ]
+  defp legacy_namespace_patterns do
+    [
+      ~r/Jido\.AI\.ReAct(\b|\.)/,
+      ~r/Jido\.AI\.Strategies\.ReAct(\b|\.)/,
+      ~r/Jido\.AI\.Actions\.ReAct(\b|\.)/,
+      ~r/Jido\.AI\.Signal\.ReactEvent(\b|\.)/,
+      ~r/Jido\.AI\.CLI\.Adapters\.ReAct(\b|\.)/,
+      ~r/Jido\.AI\.Agents\.Internal\.ReActWorkerAgent(\b|\.)/,
+      ~r/Jido\.AI\.Reasoning\.Strategies\.ReAct(\b|\.)/,
+      ~r/Jido\.AI\.Reasoning\.Workers\.ReAct(\b|\.)/
+    ]
+  end
 
   test "legacy ReAct file locations are removed" do
     leftovers =
@@ -41,7 +43,7 @@ defmodule Jido.AI.Reasoning.ReAct.StructureEnforcementTest do
       |> Path.wildcard()
       |> Enum.filter(fn file ->
         content = File.read!(file)
-        Enum.any?(@legacy_namespace_patterns, &Regex.match?(&1, content))
+        Enum.any?(legacy_namespace_patterns(), &Regex.match?(&1, content))
       end)
 
     assert offenders == [],
