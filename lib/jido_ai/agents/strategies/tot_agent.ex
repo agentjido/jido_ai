@@ -23,9 +23,10 @@ defmodule Jido.AI.ToTAgent do
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "ToT agent \#{name}")
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
-  - `:branching_factor` - Number of thoughts to generate at each node (default: 3)
-  - `:max_depth` - Maximum depth of the tree (default: 3)
-  - `:traversal_strategy` - `:bfs`, `:dfs`, or `:best_first` (default: `:best_first`)
+  - `:branching_factor`, `:max_depth`, `:traversal_strategy` - Core tree exploration knobs
+  - `:top_k`, `:min_depth`, `:max_nodes`, `:max_duration_ms`, `:beam_width` - Search budget and shaping knobs
+  - `:early_success_threshold`, `:convergence_window`, `:min_score_improvement`, `:max_parse_retries` - Deterministic stopping/parser controls
+  - `:tools`, `:tool_context`, `:tool_timeout_ms`, `:tool_max_retries`, `:tool_retry_backoff_ms`, `:max_tool_round_trips` - Tool orchestration controls
   - `:generation_prompt` - Custom prompt for thought generation
   - `:evaluation_prompt` - Custom prompt for thought evaluation
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
@@ -37,6 +38,7 @@ defmodule Jido.AI.ToTAgent do
   - `explore_sync/2,3` - Sync convenience: sends prompt and waits for result
   - `on_before_cmd/2` - Captures request in state before processing
   - `on_after_cmd/3` - Updates request result when done
+  - `best_answer/1`, `top_candidates/2`, `result_summary/1` - Structured result helpers
 
   ## Request Tracking
 
@@ -59,6 +61,17 @@ defmodule Jido.AI.ToTAgent do
   - `:last_prompt` - The most recent prompt (backward compat)
   - `:last_result` - The final result from the last completed exploration (backward compat)
   - `:completed` - Boolean indicating if the last exploration is complete (backward compat)
+
+  ## Structured Result Contract
+
+  `explore_sync/3` (and awaited async requests) resolve to a structured map:
+
+  - `best` - best-ranked candidate
+  - `candidates` - ranked candidate list
+  - `termination` - reason/status/depth/node-count/duration metadata
+  - `tree` - search topology metadata
+  - `usage` - LLM usage metadata
+  - `diagnostics` - parser/tool-round/convergence diagnostics
 
   ## Task Supervisor
 

@@ -7,7 +7,7 @@ defmodule Jido.AI.Examples.Weather.GoTAgent do
   ## CLI Usage
 
       mix jido_ai --agent Jido.AI.Examples.Weather.GoTAgent \\
-        "Synthesize weather travel risk for NYC, Chicago, and Denver this weekend."
+        "Compare weather risks across NYC, Chicago, and Denver for a trip."
   """
 
   use Jido.AI.GoTAgent,

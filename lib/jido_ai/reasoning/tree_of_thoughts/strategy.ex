@@ -44,9 +44,10 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   ### Options
 
   - `:model` (optional) - Model identifier, defaults to "anthropic:claude-haiku-4-5"
-  - `:branching_factor` (optional) - Number of thoughts per node, defaults to 3
-  - `:max_depth` (optional) - Maximum tree depth, defaults to 3
-  - `:traversal_strategy` (optional) - `:bfs`, `:dfs`, or `:best_first`, defaults to `:best_first`
+  - `:branching_factor`, `:max_depth`, `:traversal_strategy` (optional) - Core tree search controls
+  - `:top_k`, `:min_depth`, `:max_nodes`, `:max_duration_ms`, `:beam_width` (optional) - Search budget and shaping controls
+  - `:early_success_threshold`, `:convergence_window`, `:min_score_improvement`, `:max_parse_retries` (optional) - Completion/parser controls
+  - `:tools`, `:tool_context`, `:tool_timeout_ms`, `:tool_max_retries`, `:tool_retry_backoff_ms`, `:max_tool_round_trips` (optional) - Tool execution controls
   - `:generation_prompt` (optional) - Custom prompt for thought generation
   - `:evaluation_prompt` (optional) - Custom prompt for thought evaluation
 

@@ -857,7 +857,19 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       :checkpoint ->
         token = event_field(data, :token)
-        {Map.put(base_state, :checkpoint_token, token), []}
+
+        updated =
+          base_state
+          |> Map.put(:checkpoint_token, token)
+          |> then(fn state_after_checkpoint ->
+            if state[:status] in [:completed, :error] and is_nil(state[:active_request_id]) do
+              Map.put(state_after_checkpoint, :active_request_id, nil)
+            else
+              state_after_checkpoint
+            end
+          end)
+
+        {updated, []}
 
       _ ->
         {base_state, []}

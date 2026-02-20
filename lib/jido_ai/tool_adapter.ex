@@ -261,7 +261,7 @@ defmodule Jido.AI.ToolAdapter do
   end
 
   defp build_json_schema(schema) do
-    case ActionSchema.to_json_schema(schema, strict: true) do
+    case schema |> action_schema_to_json_schema() |> enforce_no_additional_properties() do
       empty when empty == %{} ->
         %{"type" => "object", "properties" => %{}, "required" => [], "additionalProperties" => false}
 
@@ -269,6 +269,44 @@ defmodule Jido.AI.ToolAdapter do
         json_schema
     end
   end
+
+  # Support released jido_action API (`to_json_schema/1`) and
+  # newer branch API (`to_json_schema/2`) used by some dev setups.
+  defp action_schema_to_json_schema(schema) do
+    cond do
+      function_exported?(ActionSchema, :to_json_schema, 2) ->
+        apply(ActionSchema, :to_json_schema, [schema, [strict: true]])
+
+      function_exported?(ActionSchema, :to_json_schema, 1) ->
+        ActionSchema.to_json_schema(schema)
+
+      true ->
+        %{}
+    end
+  end
+
+  defp enforce_no_additional_properties(schema) when is_map(schema) do
+    schema
+    |> Enum.map(fn {key, value} -> {key, enforce_no_additional_properties(value)} end)
+    |> Map.new()
+    |> maybe_put_additional_properties_false()
+  end
+
+  defp enforce_no_additional_properties(schema) when is_list(schema) do
+    Enum.map(schema, &enforce_no_additional_properties/1)
+  end
+
+  defp enforce_no_additional_properties(schema), do: schema
+
+  defp maybe_put_additional_properties_false(%{"type" => "object"} = schema) do
+    Map.put_new(schema, "additionalProperties", false)
+  end
+
+  defp maybe_put_additional_properties_false(%{"properties" => _properties} = schema) do
+    Map.put_new(schema, "additionalProperties", false)
+  end
+
+  defp maybe_put_additional_properties_false(schema), do: schema
 
   # Infers whether an action should use strict mode for LLM tool calling.
   #

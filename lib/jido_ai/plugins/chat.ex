@@ -11,8 +11,32 @@ defmodule Jido.AI.Plugins.Chat do
   @moduledoc """
   Conversational capability plugin with built-in tool calling support.
 
-  `chat.message` routes to tool-aware execution and defaults to tool
-  auto-execution unless explicitly disabled.
+  ## Signal Contracts
+
+  - `chat.message` -> `Jido.AI.Actions.ToolCalling.CallWithTools`
+  - `chat.simple` -> `Jido.AI.Actions.LLM.Chat`
+  - `chat.complete` -> `Jido.AI.Actions.LLM.Complete`
+  - `chat.embed` -> `Jido.AI.Actions.LLM.Embed`
+  - `chat.generate_object` -> `Jido.AI.Actions.LLM.GenerateObject`
+  - `chat.execute_tool` -> `Jido.AI.Actions.ToolCalling.ExecuteTool`
+  - `chat.list_tools` -> `Jido.AI.Actions.ToolCalling.ListTools`
+
+  ## Mount State Defaults
+
+  - `default_model`: `:capable`
+  - `default_max_tokens`: `4096`
+  - `default_temperature`: `0.7`
+  - `default_system_prompt`: `nil`
+  - `auto_execute`: `true`
+  - `max_turns`: `10`
+  - `tool_policy`: `:allow_all`
+  - `tools`: `%{}` (normalized via `Jido.AI.ToolAdapter.to_action_map/1`)
+  - `available_tools`: `[]`
+
+  The plugin is pass-through for lifecycle callbacks:
+
+  - `handle_signal/2` returns `{:ok, :continue}`
+  - `transform_result/3` returns the action result unchanged
   """
 
   use Jido.Plugin,

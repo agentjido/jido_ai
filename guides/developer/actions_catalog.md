@@ -18,55 +18,117 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
    - `Jido.AI.Actions.Planning.Plan`
    - `Jido.AI.Actions.Planning.Decompose`
    - `Jido.AI.Actions.Planning.Prioritize`
-4. Reasoning templates (optional):
+4. Retrieval memory operations:
+   - `Jido.AI.Actions.Retrieval.UpsertMemory`
+   - `Jido.AI.Actions.Retrieval.RecallMemory`
+   - `Jido.AI.Actions.Retrieval.ClearMemory`
+5. Quota operations:
+   - `Jido.AI.Actions.Quota.GetStatus`
+   - `Jido.AI.Actions.Quota.Reset`
+6. Reasoning templates (optional):
    - `Jido.AI.Actions.Reasoning.Analyze`
    - `Jido.AI.Actions.Reasoning.Infer`
    - `Jido.AI.Actions.Reasoning.Explain`
-5. Dedicated strategy orchestration:
+7. Dedicated strategy orchestration:
    - `Jido.AI.Actions.Reasoning.RunStrategy`
-6. Compatibility convenience:
+8. Compatibility convenience:
    - `Jido.AI.Actions.LLM.Complete`
 
 ## LLM Actions
 
 - `Jido.AI.Actions.LLM.Chat`
-  - Chat-style generation with optional system prompt and context/plugin defaults.
+  - Use when you need single-turn conversational output with optional system prompt and chat/plugin defaults.
+  - Example snippet: [`lib/examples/actions/llm_actions.md#chat-action`](../../lib/examples/actions/llm_actions.md#chat-action)
 - `Jido.AI.Actions.LLM.Complete`
-  - Simple text completion convenience API.
+  - Use when you want compatibility-style prompt completion without object constraints.
+  - Example snippet: [`lib/examples/actions/llm_actions.md#complete-action`](../../lib/examples/actions/llm_actions.md#complete-action)
 - `Jido.AI.Actions.LLM.Embed`
-  - Embedding generation for one or many texts.
+  - Use when you need vector embeddings for retrieval, semantic search, or similarity tasks.
+  - Example snippet: [`lib/examples/actions/llm_actions.md#embed-action`](../../lib/examples/actions/llm_actions.md#embed-action)
 - `Jido.AI.Actions.LLM.GenerateObject`
-  - Structured object generation constrained by schema.
+  - Use when downstream code expects schema-constrained structured output.
+  - Example snippet: [`lib/examples/actions/llm_actions.md#generateobject-action`](../../lib/examples/actions/llm_actions.md#generateobject-action)
 
 ## Tool Calling Actions
 
 - `Jido.AI.Actions.ToolCalling.CallWithTools`
-  - LLM call with tool schema exposure and optional auto-execution loop.
+  - Use when the model should decide whether to call tools, with optional `auto_execute` loop continuation.
+  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#callwithtools-one-shot`](../../lib/examples/actions/tool_calling_actions.md#callwithtools-one-shot)
+  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#callwithtools-auto-execute`](../../lib/examples/actions/tool_calling_actions.md#callwithtools-auto-execute)
 - `Jido.AI.Actions.ToolCalling.ExecuteTool`
-  - Execute a tool by name through `Jido.AI.Turn`.
+  - Use when your app already selected the tool and arguments and needs deterministic direct execution.
+  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#executetool-direct`](../../lib/examples/actions/tool_calling_actions.md#executetool-direct)
 - `Jido.AI.Actions.ToolCalling.ListTools`
-  - Enumerate available tools and optional schemas.
+  - Use when you need tool discovery, optional schema projection, and sensitive-name filtering.
+  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#listtools-discovery-and-security-filtering`](../../lib/examples/actions/tool_calling_actions.md#listtools-discovery-and-security-filtering)
 
 ## Planning Actions
 
 - `Jido.AI.Actions.Planning.Plan`
-  - Goal-to-step plan generation.
+  - Use when you need a sequential execution plan from one goal.
+  - Example snippet: [`lib/examples/actions/planning_actions.md#plan-action`](../../lib/examples/actions/planning_actions.md#plan-action)
 - `Jido.AI.Actions.Planning.Decompose`
-  - Hierarchical goal decomposition.
+  - Use when the goal is too large and should be split into hierarchical sub-goals.
+  - Example snippet: [`lib/examples/actions/planning_actions.md#decompose-action`](../../lib/examples/actions/planning_actions.md#decompose-action)
 - `Jido.AI.Actions.Planning.Prioritize`
-  - Task prioritization under criteria/context.
+  - Use when you already have a task list and need ranked execution order.
+  - Example snippet: [`lib/examples/actions/planning_actions.md#prioritize-action`](../../lib/examples/actions/planning_actions.md#prioritize-action)
+  - Workflow snippet: [`lib/examples/actions/planning_actions.md#planning-workflow-with-task-decomposition`](../../lib/examples/actions/planning_actions.md#planning-workflow-with-task-decomposition)
+
+## Retrieval Actions
+
+- `Jido.AI.Actions.Retrieval.UpsertMemory`
+  - Use when you need to persist a memory snippet into the in-process retrieval namespace.
+  - Required params: `text`. Optional params: `id`, `metadata`, `namespace`.
+  - Output contract: `%{retrieval: %{namespace, last_upsert}}`.
+  - Example snippet: [`lib/examples/actions/retrieval_actions.md#upsertmemory-action`](../../lib/examples/actions/retrieval_actions.md#upsertmemory-action)
+- `Jido.AI.Actions.Retrieval.RecallMemory`
+  - Use when you need top-k memory recall for a query from a namespace.
+  - Required params: `query`. Optional params: `top_k` (default `3`), `namespace`.
+  - Output contract: `%{retrieval: %{namespace, query, memories, count}}`.
+  - Example snippet: [`lib/examples/actions/retrieval_actions.md#recallmemory-action`](../../lib/examples/actions/retrieval_actions.md#recallmemory-action)
+- `Jido.AI.Actions.Retrieval.ClearMemory`
+  - Use when you need to clear all in-process retrieval memory entries in one namespace.
+  - Required params: none. Optional params: `namespace`.
+  - Output contract: `%{retrieval: %{namespace, cleared}}`.
+  - Example snippet: [`lib/examples/actions/retrieval_actions.md#clearmemory-action`](../../lib/examples/actions/retrieval_actions.md#clearmemory-action)
+
+## Quota Actions
+
+- `Jido.AI.Actions.Quota.GetStatus`
+  - Use when you need the current rolling quota snapshot for one scope.
+  - Required params: none. Optional params: `scope`.
+  - Scope resolution when `scope` is omitted: `context[:plugin_state][:quota][:scope]` -> `context[:state][:quota][:scope]` -> `context[:agent][:id]` -> `"default"`.
+  - Output contract: `%{quota: %{scope, window_ms, usage, limits, remaining, over_budget?}}`.
+  - Example snippet: [`lib/examples/actions/quota_actions.md#getstatus-action`](../../lib/examples/actions/quota_actions.md#getstatus-action)
+- `Jido.AI.Actions.Quota.Reset`
+  - Use when you need to clear rolling quota counters for one scope.
+  - Required params: none. Optional params: `scope`.
+  - Scope resolution when `scope` is omitted: `context[:plugin_state][:quota][:scope]` -> `context[:state][:quota][:scope]` -> `context[:agent][:id]` -> `"default"`.
+  - Output contract: `%{quota: %{scope, reset}}`.
+  - Example snippet: [`lib/examples/actions/quota_actions.md#reset-action`](../../lib/examples/actions/quota_actions.md#reset-action)
 
 ## Reasoning Actions
 
 - `Jido.AI.Actions.Reasoning.Analyze`
-  - Structured analysis by analysis type.
+  - Use when you need structured analysis (`:sentiment | :topics | :entities | :summary | :custom`) over one input.
+  - Output contract: `%{result, analysis_type, model, usage}`.
+  - Example snippet: [`lib/examples/actions/reasoning_actions.md#analyze-action`](../../lib/examples/actions/reasoning_actions.md#analyze-action)
 - `Jido.AI.Actions.Reasoning.Infer`
-  - Logical inference from premises and question.
+  - Use when you have explicit premises and need an inference for a specific question.
+  - Output contract: `%{result, reasoning, model, usage}`.
+  - Example snippet: [`lib/examples/actions/reasoning_actions.md#infer-action`](../../lib/examples/actions/reasoning_actions.md#infer-action)
 - `Jido.AI.Actions.Reasoning.Explain`
-  - Explanations with detail-level targeting.
+  - Use when you need audience-aware explanation depth (`:basic | :intermediate | :advanced`).
+  - Output contract: `%{result, detail_level, model, usage}`.
+  - Example snippet: [`lib/examples/actions/reasoning_actions.md#explain-action`](../../lib/examples/actions/reasoning_actions.md#explain-action)
 - `Jido.AI.Actions.Reasoning.RunStrategy`
-  - Executes a dedicated reasoning strategy runner (`:cod | :cot | :aot | :tot | :got | :trm | :adaptive`) independent of host strategy.
-  - ToT strategy runs return structured payloads (best/candidates/termination/tree/usage/diagnostics).
+  - Use when you need explicit strategy execution independent of host agent strategy.
+  - Required parameters: `strategy` (`:cod | :cot | :tot | :got | :trm | :aot | :adaptive`) and `prompt`.
+  - Strategy tuning parameters can be passed at top-level or inside `options`; top-level keys win when both are set.
+  - Output contract: `%{strategy, status, output, usage, diagnostics}` where `diagnostics` includes timeout, options, snapshot status, and sanitized errors.
+  - Example snippet: [`lib/examples/actions/reasoning_actions.md#runstrategy-action`](../../lib/examples/actions/reasoning_actions.md#runstrategy-action)
+  - Coverage split guidance: fast-smoke subset lives in `test/jido_ai/skills/reasoning/actions/run_strategy_action_fast_test.exs`; full checkpoint matrix lives in `test/jido_ai/skills/reasoning/actions/run_strategy_action_test.exs`.
 
 ## Shared Helper
 
@@ -87,6 +149,8 @@ These belong to strategy orchestration and are not app-level AI primitives.
 - Need chat/completion/embed/object output: use LLM actions.
 - Need model-directed tool use: use Tool Calling actions.
 - Need structured planning templates: use Planning actions.
+- Need in-process memory upsert/recall/clear primitives: use Retrieval actions.
+- Need rolling quota status or a quota counter reset operation: use Quota actions.
 - Need explicit reasoning strategy execution as a callable capability: use `RunStrategy`.
 
 ## Failure Mode: Action Used Outside Expected Context

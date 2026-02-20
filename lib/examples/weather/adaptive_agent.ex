@@ -9,7 +9,7 @@ defmodule Jido.AI.Examples.Weather.AdaptiveAgent do
   ## CLI Usage
 
       mix jido_ai --agent Jido.AI.Examples.Weather.AdaptiveAgent \\
-        "I have flights through two cities this weekend. Give me a weather-aware plan."
+        "I need a weather-aware commute and backup plan for tomorrow."
   """
 
   use Jido.AI.AdaptiveAgent,

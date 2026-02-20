@@ -52,7 +52,9 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
           |> Zoi.optional(),
         topic: Zoi.string(description: "The topic to explain"),
         detail_level:
-          Zoi.atom(description: "Detail level: :basic, :intermediate, or :advanced")
+          Zoi.enum([:basic, :intermediate, :advanced],
+            description: "Detail level: :basic, :intermediate, or :advanced"
+          )
           |> Zoi.default(:intermediate),
         audience: Zoi.string(description: "Target audience description") |> Zoi.optional(),
         include_examples: Zoi.boolean(description: "Whether to include examples") |> Zoi.default(true),

@@ -7,12 +7,32 @@ defmodule Jido.AI.Plugins.Planning do
   @moduledoc """
   A Jido.Plugin providing AI-powered planning capabilities.
 
-  This plugin wraps ReqLLM functionality into composable actions that provide
-  higher-level planning operations. It provides three core actions:
+  This plugin exposes three planning actions:
 
   * `Plan` - Generate structured plans from goals with constraints and resources
   * `Decompose` - Break down complex goals into hierarchical sub-goals
   * `Prioritize` - Order tasks by priority based on given criteria
+
+  ## Signal Contracts
+
+  - `planning.plan` -> `Jido.AI.Actions.Planning.Plan`
+  - `planning.decompose` -> `Jido.AI.Actions.Planning.Decompose`
+  - `planning.prioritize` -> `Jido.AI.Actions.Planning.Prioritize`
+
+  ## Mount State Defaults
+
+  `mount/2` initializes shared defaults consumed by planning actions when caller
+  params omit those fields:
+
+  - `default_model`: `:planning`
+  - `default_max_tokens`: `4096`
+  - `default_temperature`: `0.7`
+
+  Action-specific inputs remain action-owned:
+
+  - `Plan`: `goal` + optional `constraints`, `resources`, `max_steps`
+  - `Decompose`: `goal` + optional `max_depth`, `context`
+  - `Prioritize`: `tasks` + optional `criteria`, `context`
 
   ## Usage
 
@@ -46,13 +66,9 @@ defmodule Jido.AI.Plugins.Planning do
 
   ## Architecture Notes
 
-  **Direct ReqLLM Calls**: This plugin calls ReqLLM functions directly without
-  any adapter layer, following the core design principle of Jido.AI.
-
-  **Specialized Prompts**: Each action uses a carefully crafted system prompt
-  tailored to its specific planning task.
-
-  **Stateless**: The plugin maintains no internal state.
+  **Direct ReqLLM Calls**: Planning actions call ReqLLM directly.
+  **Specialized Prompts**: Each action uses a task-specific system prompt.
+  **Lightweight State**: Plugin state only stores execution defaults.
   """
 
   use Jido.Plugin,

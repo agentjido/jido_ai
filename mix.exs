@@ -61,18 +61,18 @@ defmodule JidoAi.MixProject do
     [
       # Jido ecosystem
       {:jido, "~> 2.0.0-rc.5"},
-      {:jido_action, github: "agentjido/jido_action", branch: "main", override: true},
-      {:req_llm, github: "agentjido/req_llm", branch: "main"},
+      {:jido_action, "~> 2.0.0-rc.5"},
+      {:req_llm, "~> 1.6"},
       # Example-only browser tools (kept out of Hex runtime dependency graph)
-      {:jido_browser, github: "agentjido/jido_browser", branch: "main", only: [:dev, :test], runtime: false},
+      {:jido_browser, "~> 0.8.1", only: [:dev, :test], runtime: false},
 
       # Runtime
       {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
-      {:yaml_elixir, "~> 2.9"},
-      {:zoi, "~> 0.16"},
+      {:yaml_elixir, "~> 2.12"},
+      {:zoi, "~> 0.17"},
 
       # Dev/Test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
@@ -91,6 +91,14 @@ defmodule JidoAi.MixProject do
     [
       setup: ["deps.get", "git_hooks.install"],
       test: "test --exclude flaky",
+      "test.fast": "cmd env MIX_ENV=test mix test --exclude flaky --only stable_smoke",
+      precommit: [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "doctor --summary --raise",
+        "test.fast"
+      ],
+      "quality.final": "jido_ai.quality",
       q: ["quality"],
       quality: [
         "format --check-formatted",
@@ -152,19 +160,21 @@ defmodule JidoAi.MixProject do
         "guides/developer/configuration_reference.md",
         # Examples
         "lib/examples/README.md",
-        "examples/strategies/algorithm_of_thoughts.md",
-        "examples/strategies/chain_of_draft.md",
-        "lib/examples/strategies/adaptive_strategy.md",
-        "lib/examples/strategies/chain_of_thought.md",
-        "lib/examples/strategies/react_agent.md",
-        "lib/examples/strategies/tree_of_thoughts.md"
+        "lib/examples/strategies/aot.md",
+        "lib/examples/strategies/cod.md",
+        "lib/examples/strategies/adaptive.md",
+        "lib/examples/strategies/cot.md",
+        "lib/examples/strategies/got.md",
+        "lib/examples/strategies/react.md",
+        "lib/examples/strategies/tot.md",
+        "lib/examples/strategies/trm.md"
       ],
       groups_for_extras: [
         {"Build With Jido.AI", ~r/guides\/user/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
         {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/},
-        {"Examples - Strategies", ~r/(lib\/examples\/(README|strategies)|examples\/strategies)/}
+        {"Examples - Strategies", ~r/lib\/examples\/(README|strategies)/}
       ],
       groups_for_modules: [
         Core: [

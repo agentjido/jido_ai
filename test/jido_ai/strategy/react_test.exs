@@ -234,6 +234,34 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       refute Map.has_key?(state, :run_req_http_options)
     end
 
+    test "terminal checkpoint after request completion does not reopen active request" do
+      agent = create_agent(tools: [TestCalculator])
+
+      events = [
+        runtime_event(:request_started, "req_terminal_checkpoint", 1, %{query: "q"}),
+        runtime_event(:request_completed, "req_terminal_checkpoint", 2, %{
+          result: "done",
+          termination_reason: :final_answer,
+          usage: %{}
+        }),
+        runtime_event(:checkpoint, "req_terminal_checkpoint", 3, %{token: "tok_terminal", reason: :terminal})
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(
+            acc,
+            [instruction(:ai_react_worker_event, %{request_id: "req_terminal_checkpoint", event: event})],
+            %{}
+          )
+        end)
+
+      state = StratState.get(agent, %{})
+      assert state.status == :completed
+      assert state.checkpoint_token == "tok_terminal"
+      assert state.active_request_id == nil
+    end
+
     test "cancel forwards worker cancel signal for active request" do
       agent = create_agent(tools: [TestCalculator])
 

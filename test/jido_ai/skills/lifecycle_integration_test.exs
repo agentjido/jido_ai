@@ -6,8 +6,10 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
+  alias Jido.AI.Directive.Helper
   alias Jido.AI.Plugins.Chat
   alias Jido.AI.Plugins.Planning
+  alias Jido.AI.Plugins.TaskSupervisor
 
   alias Jido.AI.Plugins.Reasoning.{
     Adaptive,
@@ -44,6 +46,37 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       assert state.default_model == :planning
       assert state.default_max_tokens == 4096
       assert state.default_temperature == 0.7
+    end
+
+    test "TaskSupervisor plugin mount/2 stores a per-agent supervisor under internal state key" do
+      spec = TaskSupervisor.plugin_spec(%{})
+      assert spec.state_key == :__task_supervisor_skill__
+
+      assert {:ok, state} = TaskSupervisor.mount(%Agent{}, %{})
+      assert is_pid(state.supervisor)
+      assert Process.alive?(state.supervisor)
+
+      assert Helper.get_task_supervisor(%{__task_supervisor_skill__: state}) == state.supervisor
+    end
+
+    test "TaskSupervisor plugin supervisor lifecycle follows owning process lifecycle" do
+      parent = self()
+
+      {owner_pid, owner_ref} =
+        spawn_monitor(fn ->
+          assert {:ok, state} = TaskSupervisor.mount(%Agent{}, %{})
+          send(parent, {:task_supervisor_pid, state.supervisor})
+          Process.sleep(:infinity)
+        end)
+
+      assert_receive {:task_supervisor_pid, supervisor_pid}, 1_000
+      assert Process.alive?(supervisor_pid)
+
+      supervisor_ref = Process.monitor(supervisor_pid)
+      Process.exit(owner_pid, :kill)
+
+      assert_receive {:DOWN, ^owner_ref, :process, ^owner_pid, :killed}, 1_000
+      assert_receive {:DOWN, ^supervisor_ref, :process, ^supervisor_pid, :killed}, 1_000
     end
 
     test "Reasoning strategy plugins mount with fixed strategy ids" do
@@ -98,6 +131,15 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       assert route_map["chat.generate_object"] == Jido.AI.Actions.LLM.GenerateObject
     end
 
+    test "Planning plugin exposes planning namespace routes" do
+      routes = Planning.signal_routes(%{})
+      route_map = Map.new(routes)
+
+      assert route_map["planning.plan"] == Jido.AI.Actions.Planning.Plan
+      assert route_map["planning.decompose"] == Jido.AI.Actions.Planning.Decompose
+      assert route_map["planning.prioritize"] == Jido.AI.Actions.Planning.Prioritize
+    end
+
     test "Reasoning strategy plugins expose reasoning.*.run routes" do
       assert Map.new(ChainOfDraft.signal_routes(%{}))["reasoning.cod.run"] ==
                Jido.AI.Actions.Reasoning.RunStrategy
@@ -128,14 +170,40 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       assert {:ok, :continue} = Chat.handle_signal(signal, %{})
     end
 
+    test "Planning plugin passes through signals" do
+      signal = Jido.Signal.new!("planning.plan", %{goal: "Ship v1"}, source: "/test")
+      assert {:ok, :continue} = Planning.handle_signal(signal, %{})
+    end
+
     test "Reasoning plugins inject fixed strategy ids" do
-      signal = Jido.Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
+      cod_signal = Jido.Signal.new!("reasoning.cod.run", %{prompt: "quick solve", strategy: :cot}, source: "/test")
+      cot_signal = Jido.Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
+      tot_signal = Jido.Signal.new!("reasoning.tot.run", %{prompt: "explore options", strategy: :got}, source: "/test")
+      got_signal = Jido.Signal.new!("reasoning.got.run", %{prompt: "connect signals", strategy: :tot}, source: "/test")
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, cod_params}}} =
+               ChainOfDraft.handle_signal(cod_signal, %{})
+
+      assert cod_params.strategy == :cod
+      assert cod_params.prompt == "quick solve"
 
       assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
-               ChainOfThought.handle_signal(signal, %{})
+               ChainOfThought.handle_signal(cot_signal, %{})
 
       assert params.strategy == :cot
       assert params.prompt == "solve"
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, tot_params}}} =
+               TreeOfThoughts.handle_signal(tot_signal, %{})
+
+      assert tot_params.strategy == :tot
+      assert tot_params.prompt == "explore options"
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, got_params}}} =
+               GraphOfThoughts.handle_signal(got_signal, %{})
+
+      assert got_params.strategy == :got
+      assert got_params.prompt == "connect signals"
     end
   end
 
@@ -152,6 +220,9 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
   describe "Signal Patterns" do
     test "plugins expose signal_patterns/0" do
       assert "chat.message" in Chat.signal_patterns()
+      assert "planning.plan" in Planning.signal_patterns()
+      assert "planning.decompose" in Planning.signal_patterns()
+      assert "planning.prioritize" in Planning.signal_patterns()
       assert "reasoning.cod.run" in ChainOfDraft.signal_patterns()
       assert "reasoning.cot.run" in ChainOfThought.signal_patterns()
       assert "reasoning.aot.run" in AlgorithmOfThoughts.signal_patterns()

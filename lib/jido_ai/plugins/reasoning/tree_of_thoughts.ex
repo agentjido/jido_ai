@@ -3,6 +3,53 @@ require Jido.AI.Actions.Reasoning.RunStrategy
 defmodule Jido.AI.Plugins.Reasoning.TreeOfThoughts do
   @moduledoc """
   Plugin capability for isolated Tree-of-Thoughts runs.
+
+  ## Signal Contracts
+
+  - `reasoning.tot.run` -> `Jido.AI.Actions.Reasoning.RunStrategy`
+
+  ## Plugin-To-Action Handoff
+
+  This plugin always overrides the runtime strategy identity to `:tot`.
+  On `reasoning.tot.run`, `handle_signal/2` returns:
+
+  - `{:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}`
+  - `params` always includes `strategy: :tot` (caller strategy input is ignored)
+
+  `Jido.AI.Actions.Reasoning.RunStrategy` consumes the normalized params
+  and applies plugin defaults from context when explicit params are omitted.
+
+  ## Usage
+
+  Mount in an agent with fixed ToT defaults:
+
+      plugins: [
+        {Jido.AI.Plugins.Reasoning.TreeOfThoughts,
+         %{
+           default_model: :reasoning,
+           timeout: 30_000,
+           options: %{branching_factor: 3, max_depth: 4, traversal_strategy: :best_first}
+         }}
+      ]
+
+  Then send `reasoning.tot.run` with caller input; plugin enforces `strategy: :tot`.
+
+  ## ToT Options
+
+  Use `options` for default ToT controls consumed by `RunStrategy`:
+
+  - `branching_factor`
+  - `max_depth`
+  - `traversal_strategy`
+  - `generation_prompt`
+  - `evaluation_prompt`
+
+  ## Mount State Defaults
+
+  - `strategy`: `:tot`
+  - `default_model`: `:reasoning`
+  - `timeout`: `30_000`
+  - `options`: `%{}`
   """
 
   use Jido.Plugin,

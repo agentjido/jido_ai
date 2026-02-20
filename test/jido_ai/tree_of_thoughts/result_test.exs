@@ -36,4 +36,19 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.ResultTest do
     assert Result.best_answer(nil) == nil
     assert Result.top_candidates(nil, 3) == []
   end
+
+  test "best_answer/1 and top_candidates/2 extract from structured result payload" do
+    result = %{
+      best: %{content: "Take Option B"},
+      candidates: [
+        %{content: "Take Option B", score: 0.9},
+        %{content: "Take Option A", score: 0.7},
+        %{content: "Take Option C", score: 0.5}
+      ]
+    }
+
+    assert Result.best_answer(result) == "Take Option B"
+    assert Enum.map(Result.top_candidates(result, 2), & &1.content) == ["Take Option B", "Take Option A"]
+    assert length(Result.top_candidates(result, 10)) == 3
+  end
 end

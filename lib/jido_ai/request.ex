@@ -517,6 +517,10 @@ defmodule Jido.AI.Request do
     {:error, :timeout}
   end
 
+  defp normalize_await_result({:error, {:timeout, _diagnostic}}) do
+    {:error, :timeout}
+  end
+
   defp normalize_await_result({:ok, %{error: error}}) when not is_nil(error) do
     {:error, error}
   end

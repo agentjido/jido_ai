@@ -3,6 +3,54 @@ require Jido.AI.Actions.Reasoning.RunStrategy
 defmodule Jido.AI.Plugins.Reasoning.GraphOfThoughts do
   @moduledoc """
   Plugin capability for isolated Graph-of-Thoughts runs.
+
+  ## Signal Contracts
+
+  - `reasoning.got.run` -> `Jido.AI.Actions.Reasoning.RunStrategy`
+
+  ## Plugin-To-Action Handoff
+
+  This plugin always overrides the runtime strategy identity to `:got`.
+  On `reasoning.got.run`, `handle_signal/2` returns:
+
+  - `{:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}`
+  - `params` always includes `strategy: :got` (caller strategy input is ignored)
+
+  `Jido.AI.Actions.Reasoning.RunStrategy` consumes the normalized params
+  and applies plugin defaults from context when explicit params are omitted.
+
+  ## Usage
+
+  Mount in an agent with fixed GoT defaults:
+
+      plugins: [
+        {Jido.AI.Plugins.Reasoning.GraphOfThoughts,
+         %{
+           default_model: :reasoning,
+           timeout: 30_000,
+           options: %{max_nodes: 20, max_depth: 5, aggregation_strategy: :synthesis}
+         }}
+      ]
+
+  Then send `reasoning.got.run` with caller input; plugin enforces `strategy: :got`.
+
+  ## GoT Options
+
+  Use `options` for default GoT controls consumed by `RunStrategy`:
+
+  - `max_nodes`
+  - `max_depth`
+  - `aggregation_strategy`
+  - `generation_prompt`
+  - `connection_prompt`
+  - `aggregation_prompt`
+
+  ## Mount State Defaults
+
+  - `strategy`: `:got`
+  - `default_model`: `:reasoning`
+  - `timeout`: `30_000`
+  - `options`: `%{}`
   """
 
   use Jido.Plugin,

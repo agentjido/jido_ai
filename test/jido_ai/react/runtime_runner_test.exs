@@ -2,8 +2,10 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   use ExUnit.Case, async: false
   use Mimic
 
+  alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Config
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReActStrategy
 
   defmodule RetryTool do
     use Jido.Action,
@@ -292,5 +294,67 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     Process.sleep(20)
     refute_received {:react_runner, _, :event, _}
+  end
+
+  test "strategy consumes runtime runner event stream to terminal state" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      {:ok,
+       %{
+         stream: [ReqLLM.StreamChunk.text("Hello from runtime runner")],
+         usage: %{input_tokens: 3, output_tokens: 2}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    request_id = "req_strategy_runtime"
+
+    runtime_events =
+      ReAct.stream("Say hello", Config.new(%{model: :capable, tools: %{}}), request_id: request_id, run_id: request_id)
+      |> Enum.map(&Map.from_struct/1)
+
+    agent = create_strategy_agent(tools: [CalculatorTool])
+
+    {agent, [_spawn]} =
+      ReActStrategy.cmd(
+        agent,
+        [strategy_instruction(ReActStrategy.start_action(), %{query: "Say hello", request_id: request_id})],
+        %{}
+      )
+
+    {agent, []} =
+      Enum.reduce(runtime_events, {agent, []}, fn event, {acc_agent, _} ->
+        ReActStrategy.cmd(
+          acc_agent,
+          [strategy_instruction(:ai_react_worker_event, %{request_id: request_id, event: event})],
+          %{}
+        )
+      end)
+
+    state = StratState.get(agent, %{})
+    assert state.status == :completed
+    assert state.result == "Hello from runtime runner"
+    assert state.termination_reason == :final_answer
+    assert state.active_request_id == nil
+    assert state.react_worker_status == :ready
+  end
+
+  defp create_strategy_agent(opts) do
+    %Jido.Agent{
+      id: "react_strategy_test_agent",
+      name: "react_strategy_test_agent",
+      state: %{}
+    }
+    |> then(fn agent ->
+      {agent, []} = ReActStrategy.init(agent, %{strategy_opts: opts})
+      agent
+    end)
+  end
+
+  defp strategy_instruction(action, params) do
+    %Jido.Instruction{action: action, params: params}
   end
 end

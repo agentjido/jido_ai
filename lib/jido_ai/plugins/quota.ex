@@ -4,6 +4,60 @@ require Jido.AI.Actions.Quota.Reset
 defmodule Jido.AI.Plugins.Quota do
   @moduledoc """
   Cross-cutting quota and budget enforcement plugin.
+
+  Tracks rolling request/token usage from `ai.usage` signals and rewrites
+  budgeted request/query signals to `ai.request.error` when configured limits
+  are reached.
+
+  ## Quota State Keys
+
+  `mount/2` stores quota runtime state under state key `:quota` with:
+
+  - `enabled` - enable/disable quota enforcement
+  - `scope` - quota counter namespace in `Jido.AI.Quota.Store`
+  - `window_ms` - rolling quota window size in milliseconds
+  - `max_requests` - optional request budget for the window
+  - `max_total_tokens` - optional token budget for the window
+  - `error_message` - user-facing rejection message
+
+  These keys are used by `handle_signal/2` and quota action routes
+  (`quota.status`, `quota.reset`).
+
+  ## Usage Accounting
+
+  - `ai.usage` increments usage counters (`requests`, `total_tokens`) for the
+    active `scope`.
+  - Token accounting reads `total_tokens` first, then falls back to
+    `input_tokens + output_tokens`.
+  - Counters reset to zero when usage is outside the configured `window_ms`.
+
+  ## Budget Rejection Contract
+
+  When quota `enabled: true` and usage is at/over budget for either
+  `max_requests` or `max_total_tokens`, budgeted signals (`chat.*`,
+  `ai.*.query`, `reasoning.*.run`) are rewritten to `ai.request.error` with:
+
+  - `request_id` from request/call correlation fields when present
+  - `reason: :quota_exceeded`
+  - `message` from `error_message` (default: `"quota exceeded for current window"`)
+
+  ## Usage
+
+  ```elixir
+  use Jido.AI.Agent,
+    name: "quota_guarded_assistant",
+    plugins: [
+      {Jido.AI.Plugins.Quota,
+       %{
+         enabled: true,
+         scope: "assistant_ops",
+         window_ms: 60_000,
+         max_requests: 50,
+         max_total_tokens: 20_000,
+         error_message: "quota exceeded for current window"
+       }}
+    ]
+  ```
   """
 
   use Jido.Plugin,

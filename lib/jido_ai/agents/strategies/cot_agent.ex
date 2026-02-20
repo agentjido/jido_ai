@@ -44,6 +44,16 @@ defmodule Jido.AI.CoTAgent do
 
       {:ok, result} = MyAgent.think_sync(pid, "What is 15% of 340?")
 
+  ## Request Lifecycle Contract
+
+  - `think/3` emits `ai.cot.query` and returns a request handle immediately.
+  - `await/2` resolves the request handle to either `{:ok, result}` or `{:error, reason}`.
+  - `think_sync/3` wraps `think/3 + await/2`.
+  - Default request policy is `:reject`, so a concurrent in-flight request emits
+    `ai.request.error` with `reason: :busy`.
+  - Correlation is request-id based end-to-end via request handles, strategy state,
+    and delegated worker lifecycle envelopes.
+
   ## State Fields
 
   The agent state includes:
