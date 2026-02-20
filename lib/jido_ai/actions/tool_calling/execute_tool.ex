@@ -53,6 +53,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   """
   @impl Jido.Action
   def run(params, context) do
+    context = normalize_context(context)
     tool_name = params[:tool_name]
     tool_params = params[:params] || %{}
     timeout = params[:timeout] || 30_000
@@ -81,8 +82,9 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
 
   defp execute_tool(tool_name, params, timeout, context) do
     tool_call = %{id: "direct_tool_exec", name: tool_name, arguments: params}
+    tools = resolve_tools_input(context)
 
-    case Turn.run_tool_calls([tool_call], context, timeout: timeout) do
+    case Turn.run_tool_calls([tool_call], context, timeout: timeout, tools: tools) do
       {:ok, [%{raw_result: {:ok, result}}]} ->
         {:ok, format_result(result)}
 
@@ -96,6 +98,25 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
         {:error, "Tool execution failed"}
     end
   end
+
+  defp resolve_tools_input(context) do
+    first_present([
+      context[:tools],
+      get_in(context, [:tool_calling, :tools]),
+      get_in(context, [:chat, :tools]),
+      get_in(context, [:state, :tool_calling, :tools]),
+      get_in(context, [:state, :chat, :tools]),
+      get_in(context, [:agent, :state, :tool_calling, :tools]),
+      get_in(context, [:agent, :state, :chat, :tools]),
+      get_in(context, [:plugin_state, :tool_calling, :tools]),
+      get_in(context, [:plugin_state, :chat, :tools]),
+      %{}
+    ])
+  end
+
+  defp first_present(values), do: Enum.find(values, &(not is_nil(&1)))
+  defp normalize_context(context) when is_map(context), do: context
+  defp normalize_context(_), do: %{}
 
   defp format_result(result) when is_binary(result), do: %{text: result}
   defp format_result(result) when is_map(result), do: result

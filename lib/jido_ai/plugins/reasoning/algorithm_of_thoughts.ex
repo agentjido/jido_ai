@@ -3,6 +3,28 @@ require Jido.AI.Actions.Reasoning.RunStrategy
 defmodule Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts do
   @moduledoc """
   Plugin capability for isolated Algorithm-of-Thoughts runs.
+
+  ## Signal Contracts
+
+  - `reasoning.aot.run` -> `Jido.AI.Actions.Reasoning.RunStrategy`
+
+  ## Plugin-To-Action Handoff
+
+  This plugin always overrides the runtime strategy identity to `:aot`.
+  On `reasoning.aot.run`, `handle_signal/2` returns:
+
+  - `{:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}`
+  - `params` always includes `strategy: :aot` (caller strategy input is ignored)
+
+  `Jido.AI.Actions.Reasoning.RunStrategy` then consumes the normalized params
+  and applies plugin defaults from context when explicit params are omitted.
+
+  ## Mount State Defaults
+
+  - `strategy`: `:aot`
+  - `default_model`: `:reasoning`
+  - `timeout`: `30_000`
+  - `options`: `%{}`
   """
 
   use Jido.Plugin,

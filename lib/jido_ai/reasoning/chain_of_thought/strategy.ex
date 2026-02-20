@@ -12,6 +12,17 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   3. Parent emits `"ai.cot.worker.start"` to worker.
   4. Worker performs one CoT LLM turn and emits `"ai.cot.worker.event"` envelopes.
   5. Parent applies worker events to CoT state and preserves external API.
+
+  ## Request Lifecycle Contract
+
+  - Runtime worker events are normalized into lifecycle transitions:
+    `request_started`, `request_completed`, `request_failed`, `request_cancelled`.
+  - LLM stream events (`llm_started`, `llm_delta`, `llm_completed`) update snapshot fields
+    and emit canonical lifecycle signals (`ai.llm.delta`, `ai.llm.response`, `ai.usage`).
+  - Concurrency policy defaults to `request_policy: :reject`; concurrent requests emit
+    `ai.request.error` with `reason: :busy`.
+  - Request traces are retained in bounded in-memory state (cap: 2000
+    events per request, then marked truncated).
   """
 
   use Jido.Agent.Strategy

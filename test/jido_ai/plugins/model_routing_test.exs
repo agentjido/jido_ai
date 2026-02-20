@@ -11,26 +11,46 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
     }
   end
 
-  test "applies default model for chat.simple when no model override is provided" do
-    routes = %{"chat.simple" => :fast}
-    signal = Signal.new!("chat.simple", %{prompt: "hello"}, source: "/test")
+  describe "handle_signal/2 routing" do
+    test "applies built-in default route when plugin state is unavailable" do
+      signal = Signal.new!("chat.simple", %{prompt: "hello"}, source: "/test")
 
-    assert {:ok, {:continue, rewritten}} = ModelRouting.handle_signal(signal, ctx(routes))
-    assert rewritten.data.model == :fast
-  end
+      assert {:ok, {:continue, rewritten}} = ModelRouting.handle_signal(signal, %{})
+      assert rewritten.data.model == :fast
+    end
 
-  test "respects explicit model override" do
-    routes = %{"chat.simple" => :fast}
-    signal = Signal.new!("chat.simple", %{prompt: "hello", model: "custom:model"}, source: "/test")
+    test "respects explicit model override" do
+      routes = %{"chat.simple" => :fast}
+      signal = Signal.new!("chat.simple", %{prompt: "hello", model: "custom:model"}, source: "/test")
 
-    assert {:ok, :continue} = ModelRouting.handle_signal(signal, ctx(routes))
-  end
+      assert {:ok, :continue} = ModelRouting.handle_signal(signal, ctx(routes))
+    end
 
-  test "supports wildcard route matching for reasoning strategy runs" do
-    routes = %{"reasoning.*.run" => :reasoning}
-    signal = Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
+    test "prefers exact route match over wildcard route match" do
+      routes = %{
+        "reasoning.*.run" => :reasoning,
+        "reasoning.cot.run" => :capable
+      }
 
-    assert {:ok, {:continue, rewritten}} = ModelRouting.handle_signal(signal, ctx(routes))
-    assert rewritten.data.model == :reasoning
+      signal = Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
+
+      assert {:ok, {:continue, rewritten}} = ModelRouting.handle_signal(signal, ctx(routes))
+      assert rewritten.data.model == :capable
+    end
+
+    test "supports wildcard route matching for reasoning strategy runs" do
+      routes = %{"reasoning.*.run" => :reasoning}
+      signal = Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
+
+      assert {:ok, {:continue, rewritten}} = ModelRouting.handle_signal(signal, ctx(routes))
+      assert rewritten.data.model == :reasoning
+    end
+
+    test "does not match wildcard route across multiple dot segments" do
+      routes = %{"reasoning.*.run" => :reasoning}
+      signal = Signal.new!("reasoning.cot.worker.run", %{prompt: "solve"}, source: "/test")
+
+      assert {:ok, :continue} = ModelRouting.handle_signal(signal, ctx(routes))
+    end
   end
 end

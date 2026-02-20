@@ -1,4 +1,11 @@
 defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
+  @moduledoc """
+  Full-checkpoint coverage for `RunStrategy`.
+
+  This file keeps the comprehensive strategy matrix and plugin-default behavior.
+  Fast-smoke coverage lives in `run_strategy_action_fast_test.exs`.
+  """
+
   use ExUnit.Case, async: false
   use Mimic
 
@@ -6,6 +13,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
   alias Jido.AI.TestSupport.FakeReqLLM
 
   @moduletag :unit
+  @moduletag :full_checkpoint
   @moduletag :capture_log
 
   setup :set_mimic_from_context

@@ -80,6 +80,16 @@ defmodule Jido.AI.ToTAgentTest do
       assert opts[:top_k] == 3
       assert opts[:min_depth] == 2
       assert opts[:max_nodes] == 100
+      assert opts[:max_duration_ms] == nil
+      assert opts[:beam_width] == nil
+      assert opts[:early_success_threshold] == 1.0
+      assert opts[:convergence_window] == 2
+      assert opts[:min_score_improvement] == 0.02
+      assert opts[:max_parse_retries] == 1
+      assert opts[:tool_timeout_ms] == 15_000
+      assert opts[:tool_max_retries] == 1
+      assert opts[:tool_retry_backoff_ms] == 200
+      assert opts[:max_tool_round_trips] == 3
     end
   end
 
@@ -177,6 +187,15 @@ defmodule Jido.AI.ToTAgentTest do
       summary = TestToTAgent.result_summary(result)
       assert summary.best_answer == "Best option"
       assert summary.termination.reason == :max_depth
+    end
+
+    test "result_summary/1 is nil-safe and keeps stable shape" do
+      assert TestToTAgent.result_summary(nil) == %{
+               best_answer: nil,
+               top_candidates: [],
+               termination: %{},
+               tree: %{}
+             }
     end
   end
 end

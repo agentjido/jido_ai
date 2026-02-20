@@ -50,6 +50,17 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
     end
   end
 
+  describe "schema/0" do
+    test "applies default values for cot plugin state" do
+      assert {:ok, state} = Zoi.parse(ChainOfThought.schema(), %{})
+
+      assert state.strategy == :cot
+      assert state.default_model == :reasoning
+      assert state.timeout == 30_000
+      assert state.options == %{}
+    end
+  end
+
   describe "actions" do
     test "returns RunStrategy action" do
       actions = ChainOfThought.actions()
@@ -64,6 +75,36 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
       route_map = Map.new(routes)
 
       assert route_map["reasoning.cot.run"] == Jido.AI.Actions.Reasoning.RunStrategy
+    end
+  end
+
+  describe "handle_signal/2" do
+    test "forces strategy :cot and overrides caller strategy input" do
+      signal =
+        Jido.Signal.new!(
+          "reasoning.cot.run",
+          %{prompt: "reason through this", strategy: :cod, timeout: 45_000, options: %{depth: 2}},
+          source: "/test"
+        )
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
+               ChainOfThought.handle_signal(signal, %{})
+
+      assert params.strategy == :cot
+      assert params.prompt == "reason through this"
+      assert params.timeout == 45_000
+      assert params.options == %{depth: 2}
+    end
+
+    test "normalizes non-map payload data and still injects strategy" do
+      signal =
+        Jido.Signal.new!("reasoning.cot.run", %{prompt: "placeholder"}, source: "/test")
+        |> Map.put(:data, :not_a_map)
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
+               ChainOfThought.handle_signal(signal, %{})
+
+      assert params == %{strategy: :cot}
     end
   end
 end

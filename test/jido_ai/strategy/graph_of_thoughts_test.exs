@@ -2,6 +2,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Directive
   alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
 
   # Helper to create a mock agent
@@ -33,6 +34,24 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
 
     test "llm_partial_action/0 returns :got_llm_partial" do
       assert GraphOfThoughts.llm_partial_action() == :got_llm_partial
+    end
+
+    test "request_error_action/0 returns :got_request_error" do
+      assert GraphOfThoughts.request_error_action() == :got_request_error
+    end
+  end
+
+  # ============================================================================
+  # Action Specs
+  # ============================================================================
+
+  describe "action_spec/1" do
+    test "returns specs for strategy actions" do
+      assert GraphOfThoughts.action_spec(:got_start).name == "got.start"
+      assert GraphOfThoughts.action_spec(:got_llm_result).name == "got.llm_result"
+      assert GraphOfThoughts.action_spec(:got_llm_partial).name == "got.llm_partial"
+      assert GraphOfThoughts.action_spec(:got_request_error).name == "got.request_error"
+      assert is_nil(GraphOfThoughts.action_spec(:unknown))
     end
   end
 
@@ -100,11 +119,12 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
 
   describe "signal_routes/1" do
     test "returns correct signal routes" do
-      routes = GraphOfThoughts.signal_routes(%{})
+      routes = Map.new(GraphOfThoughts.signal_routes(%{}))
 
-      assert {"ai.got.query", {:strategy_cmd, :got_start}} in routes
-      assert {"ai.llm.response", {:strategy_cmd, :got_llm_result}} in routes
-      assert {"ai.llm.delta", {:strategy_cmd, :got_llm_partial}} in routes
+      assert routes["ai.got.query"] == {:strategy_cmd, :got_start}
+      assert routes["ai.llm.response"] == {:strategy_cmd, :got_llm_result}
+      assert routes["ai.llm.delta"] == {:strategy_cmd, :got_llm_partial}
+      assert routes["ai.request.error"] == {:strategy_cmd, :got_request_error}
     end
   end
 
@@ -151,6 +171,52 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
       state = StratState.get(updated_agent, %{})
       assert map_size(state[:nodes]) == 1
       assert state[:root_id] != nil
+    end
+
+    test "busy second start emits request error directive with request id correlation" do
+      agent = create_agent()
+
+      {agent, _first_directives} =
+        GraphOfThoughts.cmd(
+          agent,
+          [%Jido.Instruction{action: :got_start, params: %{prompt: "first", request_id: "req_got_1"}}],
+          %{}
+        )
+
+      {_agent, second_directives} =
+        GraphOfThoughts.cmd(
+          agent,
+          [%Jido.Instruction{action: :got_start, params: %{prompt: "second", request_id: "req_got_2"}}],
+          %{}
+        )
+
+      assert [%Directive.EmitRequestError{} = directive] = second_directives
+      assert directive.request_id == "req_got_2"
+      assert directive.reason == :busy
+    end
+  end
+
+  # ============================================================================
+  # cmd/3 with request_error instruction
+  # ============================================================================
+
+  describe "cmd/3 with request_error instruction" do
+    test "stores lifecycle rejection metadata in strategy state" do
+      agent = create_agent()
+
+      request_error_instruction = %Jido.Instruction{
+        action: :got_request_error,
+        params: %{request_id: "req_got_busy", reason: :busy, message: "Agent is busy"}
+      }
+
+      {agent, []} = GraphOfThoughts.cmd(agent, [request_error_instruction], %{})
+      state = StratState.get(agent, %{})
+
+      assert state[:last_request_error] == %{
+               request_id: "req_got_busy",
+               reason: :busy,
+               message: "Agent is busy"
+             }
     end
   end
 

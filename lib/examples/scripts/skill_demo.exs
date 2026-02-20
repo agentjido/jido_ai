@@ -2,6 +2,13 @@
 
 # Skill System Demo
 # Run with: mix run lib/examples/scripts/skill_demo.exs
+#
+# Prerequisites:
+# - Run from the project root
+# - `priv/skills/code-review/SKILL.md` available for runtime-loading section
+#
+# Skip path:
+# - If the runtime skill file is missing, the demo prints guidance and continues
 
 IO.puts("""
 #{IO.ANSI.bright()}#{IO.ANSI.cyan()}
@@ -123,8 +130,8 @@ IO.puts("")
 
 IO.puts("#{IO.ANSI.bright()}4. Skill Registry#{IO.ANSI.reset()}\n")
 
-# Start the registry
-{:ok, _pid} = Registry.start_link()
+# Start or reuse the registry process
+:ok = Registry.ensure_started()
 
 # Register the module skill's spec
 Registry.register(spec)
@@ -221,8 +228,6 @@ IO.puts("")
 # Show tool filtering
 IO.puts("  Tool filtering based on skill allowed_tools:")
 IO.puts("")
-
-mock_tools = [MockAdd, MockSubtract, MockMultiply, MockDivide, MockWeather]
 
 defmodule MockAdd do
   def name, do: "add"

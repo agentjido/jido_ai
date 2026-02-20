@@ -2,6 +2,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Directive
   alias Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy, as: AlgorithmOfThoughts
 
   defp create_agent(opts \\ []) do
@@ -70,7 +71,50 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
       assert state[:status] == :exploring
       assert state[:prompt] == "Solve this"
       assert length(directives) == 1
-      assert hd(directives).__struct__ == Jido.AI.Directive.LLMStream
+      assert [%Directive.LLMStream{} = llm_stream] = directives
+      assert llm_stream.id == state[:current_call_id]
+      assert String.starts_with?(llm_stream.id, "aot_")
+    end
+
+    test "busy second start emits request error directive with request id correlation" do
+      agent = create_agent()
+
+      {agent, _first_directives} =
+        AlgorithmOfThoughts.cmd(
+          agent,
+          [%Jido.Instruction{action: :aot_start, params: %{prompt: "first", request_id: "req_aot_1"}}],
+          %{}
+        )
+
+      {_agent, second_directives} =
+        AlgorithmOfThoughts.cmd(
+          agent,
+          [%Jido.Instruction{action: :aot_start, params: %{prompt: "second", request_id: "req_aot_2"}}],
+          %{}
+        )
+
+      assert [%Directive.EmitRequestError{} = directive] = second_directives
+      assert directive.request_id == "req_aot_2"
+      assert directive.reason == :busy
+    end
+
+    test "request_error instruction stores lifecycle rejection metadata" do
+      agent = create_agent()
+
+      request_error =
+        %Jido.Instruction{
+          action: :aot_request_error,
+          params: %{request_id: "req_aot_busy", reason: :busy, message: "Agent is busy"}
+        }
+
+      {agent, []} = AlgorithmOfThoughts.cmd(agent, [request_error], %{})
+      state = StratState.get(agent, %{})
+
+      assert state[:last_request_error] == %{
+               request_id: "req_aot_busy",
+               reason: :busy,
+               message: "Agent is busy"
+             }
     end
 
     test "llm result instruction transitions to completed with parsed output" do

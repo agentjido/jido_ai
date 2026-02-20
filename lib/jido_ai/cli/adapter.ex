@@ -35,6 +35,18 @@ defmodule Jido.AI.CLI.Adapter do
   If not implemented, the CLI will infer the adapter from `--type` or default to ReAct.
   """
 
+  @supported_types ~w(react aot cod cot tot got trm adaptive)
+  @type_to_adapter %{
+    "react" => Jido.AI.Reasoning.ReAct.CLIAdapter,
+    "aot" => Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter,
+    "cod" => Jido.AI.Reasoning.ChainOfDraft.CLIAdapter,
+    "cot" => Jido.AI.Reasoning.ChainOfThought.CLIAdapter,
+    "tot" => Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter,
+    "got" => Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter,
+    "trm" => Jido.AI.Reasoning.TRM.CLIAdapter,
+    "adaptive" => Jido.AI.Reasoning.Adaptive.CLIAdapter
+  }
+
   @type config :: map()
   @type result :: %{answer: String.t(), meta: map()}
 
@@ -77,33 +89,22 @@ defmodule Jido.AI.CLI.Adapter do
       exports_cli_adapter?(agent_module) ->
         {:ok, agent_module.cli_adapter()}
 
-      # Type explicitly specified
-      type == "react" || type == nil ->
-        {:ok, Jido.AI.Reasoning.ReAct.CLIAdapter}
-
-      type == "aot" ->
-        {:ok, Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter}
-
-      type == "cod" ->
-        {:ok, Jido.AI.Reasoning.ChainOfDraft.CLIAdapter}
-
-      type == "tot" ->
-        {:ok, Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter}
-
-      type == "cot" ->
-        {:ok, Jido.AI.Reasoning.ChainOfThought.CLIAdapter}
-
-      type == "got" ->
-        {:ok, Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter}
-
-      type == "trm" ->
-        {:ok, Jido.AI.Reasoning.TRM.CLIAdapter}
-
-      type == "adaptive" ->
-        {:ok, Jido.AI.Reasoning.Adaptive.CLIAdapter}
-
       true ->
-        {:error, "Unknown agent type: #{type}. Supported: react, aot, cod, tot, cot, got, trm, adaptive"}
+        resolve_type(type || "react")
+    end
+  end
+
+  @doc false
+  @spec supported_types() :: [String.t()]
+  def supported_types, do: @supported_types
+
+  defp resolve_type(type) do
+    case Map.fetch(@type_to_adapter, type) do
+      {:ok, adapter} ->
+        {:ok, adapter}
+
+      :error ->
+        {:error, "Unknown agent type: #{type}. Supported: #{Enum.join(@supported_types, ", ")}"}
     end
   end
 

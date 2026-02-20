@@ -1,6 +1,7 @@
 defmodule Jido.AI.Plugins.PlanningTest do
   use ExUnit.Case, async: true
 
+  alias Jido.AI.Actions.Planning.{Decompose, Plan, Prioritize}
   alias Jido.AI.Plugins.Planning
 
   describe "plugin_spec/1" do
@@ -47,9 +48,33 @@ defmodule Jido.AI.Plugins.PlanningTest do
       actions = Planning.actions()
 
       assert length(actions) == 3
-      assert Jido.AI.Actions.Planning.Plan in actions
-      assert Jido.AI.Actions.Planning.Decompose in actions
-      assert Jido.AI.Actions.Planning.Prioritize in actions
+      assert Plan in actions
+      assert Decompose in actions
+      assert Prioritize in actions
+    end
+  end
+
+  describe "signal_routes/1" do
+    test "routes planning signals to planning actions" do
+      route_map = Planning.signal_routes(%{}) |> Map.new()
+
+      assert route_map["planning.plan"] == Plan
+      assert route_map["planning.decompose"] == Decompose
+      assert route_map["planning.prioritize"] == Prioritize
+      assert map_size(route_map) == 3
+    end
+
+    test "route targets are part of plugin action inventory" do
+      route_targets =
+        Planning.signal_routes(%{})
+        |> Enum.map(fn {_signal, action} -> action end)
+        |> Enum.uniq()
+        |> MapSet.new()
+
+      actions = Planning.actions() |> MapSet.new()
+
+      assert MapSet.subset?(route_targets, actions)
+      assert route_targets == actions
     end
   end
 end

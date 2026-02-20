@@ -20,6 +20,21 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
     def run(_params, _context), do: {:error, :unsupported_operation}
   end
 
+  defmodule OffsetCalculator do
+    use Jido.Action,
+      name: "calculator",
+      description: "Fallback calculator that offsets result",
+      schema:
+        Zoi.object(%{
+          operation: Zoi.string(),
+          a: Zoi.integer(),
+          b: Zoi.integer()
+        })
+
+    def run(%{operation: "add", a: a, b: b}, _context), do: {:ok, %{result: a + b + 100}}
+    def run(_params, _context), do: {:error, :unsupported_operation}
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -27,6 +42,14 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
   setup :stub_req_llm
 
   defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
+
+  defp tool_message_content(messages) when is_list(messages) do
+    messages
+    |> Enum.find_value(fn
+      %{role: role, content: content} when role in [:tool, "tool"] -> content
+      _ -> nil
+    end)
+  end
 
   describe "schema" do
     test "has required fields" do
@@ -50,6 +73,11 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
 
     test "returns error when prompt is empty string" do
       assert {:error, _} = CallWithTools.run(%{prompt: ""}, %{})
+    end
+
+    test "returns error for invalid max_turns format" do
+      assert {:error, :invalid_max_turns} =
+               CallWithTools.run(%{prompt: "hello", max_turns: "many"}, %{})
     end
 
     test "returns result with valid prompt" do
@@ -95,6 +123,49 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       assert {:ok, result} = CallWithTools.run(params, context)
       assert result.type == :final_answer
       assert result.text =~ "Tool execution complete"
+      assert tool_message_content(result.messages) =~ "\"result\":8"
+    end
+
+    test "uses state.chat tools fallback for auto execution" do
+      params = %{
+        prompt: "Calculate 5 + 3",
+        tools: ["calculator"],
+        auto_execute: true
+      }
+
+      context = %{
+        state: %{
+          chat: %{
+            tools: %{TestCalculator.name() => TestCalculator}
+          }
+        }
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+      assert result.type == :final_answer
+      assert tool_message_content(result.messages) =~ "\"result\":8"
+    end
+
+    test "prefers top-level tools over plugin_state chat tools" do
+      params = %{
+        prompt: "Calculate 5 + 3",
+        tools: ["calculator"],
+        auto_execute: true
+      }
+
+      context = %{
+        tools: %{TestCalculator.name() => TestCalculator},
+        plugin_state: %{
+          chat: %{
+            tools: %{OffsetCalculator.name() => OffsetCalculator}
+          }
+        }
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+      assert result.type == :final_answer
+      assert tool_message_content(result.messages) =~ "\"result\":8"
+      refute tool_message_content(result.messages) =~ "\"result\":108"
     end
 
     test "explicit auto_execute=false overrides plugin-state default" do

@@ -58,35 +58,38 @@ defmodule Mix.Tasks.JidoAi do
 
   require Logger
 
+  @supported_types ~w(react aot cod cot tot got trm adaptive)
+
+  @option_strict [
+    type: :string,
+    agent: :string,
+    model: :string,
+    tools: :string,
+    system: :string,
+    max_iterations: :integer,
+    stdin: :boolean,
+    format: :string,
+    quiet: :boolean,
+    timeout: :integer,
+    trace: :boolean
+  ]
+
+  @option_aliases [
+    t: :type,
+    a: :agent,
+    m: :model,
+    s: :system,
+    f: :format,
+    q: :quiet
+  ]
+
   @impl Mix.Task
   def run(argv) do
     Mix.Task.rerun("app.start")
     load_dotenv()
 
     {opts, args, _invalid} =
-      OptionParser.parse(argv,
-        strict: [
-          type: :string,
-          agent: :string,
-          model: :string,
-          tools: :string,
-          system: :string,
-          max_iterations: :integer,
-          stdin: :boolean,
-          format: :string,
-          quiet: :boolean,
-          timeout: :integer,
-          trace: :boolean
-        ],
-        aliases: [
-          t: :type,
-          a: :agent,
-          m: :model,
-          s: :system,
-          f: :format,
-          q: :quiet
-        ]
-      )
+      OptionParser.parse(argv, option_parser_config())
 
     config = build_config(opts)
 
@@ -115,7 +118,19 @@ defmodule Mix.Tasks.JidoAi do
     end
   end
 
-  defp build_config(opts) do
+  @doc false
+  @spec supported_types() :: [String.t()]
+  def supported_types, do: @supported_types
+
+  @doc false
+  @spec option_parser_config() :: keyword()
+  def option_parser_config do
+    [strict: @option_strict, aliases: @option_aliases]
+  end
+
+  @doc false
+  @spec build_config(keyword()) :: map()
+  def build_config(opts) do
     %{
       type: opts[:type],
       user_agent_module: parse_module(opts[:agent]),
@@ -306,10 +321,12 @@ defmodule Mix.Tasks.JidoAi do
       Map.get(details, :cot_worker_pid)
   end
 
-  defp format_error(:timeout), do: "Timeout waiting for agent completion"
-  defp format_error(:not_found), do: "Agent process not found"
-  defp format_error(reason) when is_binary(reason), do: reason
-  defp format_error(reason), do: inspect(reason)
+  @doc false
+  @spec format_error(term()) :: String.t()
+  def format_error(:timeout), do: "Timeout waiting for agent completion"
+  def format_error(:not_found), do: "Agent process not found"
+  def format_error(reason) when is_binary(reason), do: reason
+  def format_error(reason), do: inspect(reason)
 
   defp parse_module(nil), do: nil
 

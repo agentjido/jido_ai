@@ -4,6 +4,44 @@ defmodule Jido.AI.Plugins.ModelRouting do
 
   Applies default model aliases by signal intent while respecting explicit
   request-level model overrides.
+
+  ## Route Precedence
+
+  Route selection follows deterministic precedence:
+
+  1. Exact signal type route (for example, `"chat.message"`)
+  2. Wildcard pattern route (for example, `"reasoning.*.run"`)
+
+  If the inbound payload already includes `:model` (or `"model"`), the plugin
+  bypasses routing and preserves the explicit model choice.
+
+  ## Wildcard Contracts
+
+  Wildcard routes use `*` as a single dot-delimited segment matcher.
+
+  - `"reasoning.*.run"` matches `"reasoning.cot.run"` and `"reasoning.tot.run"`
+  - `"reasoning.*.run"` does not match `"reasoning.cot.worker.run"`
+
+  ## Usage
+
+  `Jido.AI.Agent` includes this plugin in its default runtime stack. To apply
+  production-specific routing, provide an explicit plugin config:
+
+  ```elixir
+  use Jido.AI.Agent,
+    name: "assistant",
+    plugins: [
+      {Jido.AI.Plugins.ModelRouting,
+       %{
+         routes: %{
+           "chat.message" => :capable,
+           "chat.simple" => :fast,
+           "chat.generate_object" => :thinking,
+           "reasoning.*.run" => :reasoning
+         }
+       }}
+    ]
+  ```
   """
 
   use Jido.Plugin,

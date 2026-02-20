@@ -1,6 +1,34 @@
 defmodule Jido.AI.Plugins.Policy do
   @moduledoc """
   Cross-cutting policy enforcement plugin for inbound AI/runtime signals.
+
+  ## Enforce Mode Behavior
+
+  `mode` controls whether policy violations rewrite request/query signals:
+
+  - `mode: :enforce` rewrites violating request/query signals to `ai.request.error`.
+  - `mode: :monitor` allows request/query signals to continue unchanged.
+
+  Rewrite behavior only applies when `block_on_validation_error: true`.
+
+  ## Rewrite Semantics
+
+  For enforceable signal types (`chat.*`, `ai.*.query`, and
+  `reasoning.*.run`), the plugin validates prompt/query text with
+  `Jido.AI.Validation.validate_prompt/1`.
+
+  Validation failures are rewritten to `ai.request.error` with:
+
+  - `reason: :policy_violation`
+  - `message: "request blocked by policy"`
+  - `request_id` resolved from request/call correlation data when present
+
+  ## Normalization And Sanitization Contracts
+
+  - `ai.llm.response` and `ai.tool.result` normalize `data.result` into
+    `{:ok, result}` or `{:error, envelope}` tuples.
+  - `ai.llm.delta` sanitizes `data.delta` by removing control bytes and
+    truncating to `max_delta_chars` (default `4_000`).
   """
 
   use Jido.Plugin,
