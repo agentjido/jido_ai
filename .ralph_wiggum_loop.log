@@ -1387,3 +1387,46 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.3 seconds (2.3s async, 0.01s sync)
 8 tests, 0 failures (1668 excluded)
+1) changed files
+- `lib/jido_ai/plugins/retrieval.ex`: expanded moduledoc with enrichment lifecycle, opt-out controls, namespace behavior, usage; fixed `mount/2` namespace fallback to safely read agent id (`Map.get`) without `KeyError`.
+- `test/jido_ai/plugins/retrieval_test.exs`: expanded coverage for enrichment path, skip path (atom/string disable flags), namespace config behavior (`mount/2`), and docs/example contract assertions.
+- `guides/developer/plugins_and_actions_composition.md`: added `### Retrieval Runtime Contract` section covering lifecycle, opt-out behavior, namespace config, and config snippet.
+- `lib/examples/README.md`: added retrieval row to plugin capability map and one retrieval plugin mount usage snippet.
+
+2) tests/commands executed
+- `mix format lib/jido_ai/plugins/retrieval.ex test/jido_ai/plugins/retrieval_test.exs` ✅
+- `mix test test/jido_ai/plugins/retrieval_test.exs` ✅ (8 tests, 0 failures)
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `MIX_ENV=test mix test --exclude flaky --only stable_smoke` ✅ (equivalent body of `test.fast`)
+- `mix test.fast` ❌ (`Mix.PubSub` TCP socket `:eperm` in this sandbox)
+- `mix doctor --summary` ❌ (`Mix.PubSub` TCP socket `:eperm`)
+- `mix precommit` ❌ (`Mix.PubSub` TCP socket `:eperm`)
+
+3) acceptance criteria coverage
+- Docs define retrieval enrichment lifecycle and opt-out behavior: implemented in `lib/jido_ai/plugins/retrieval.ex` and `guides/developer/plugins_and_actions_composition.md`.
+- Tests cover enrichment path and skip path: implemented in `test/jido_ai/plugins/retrieval_test.exs`.
+- Scope includes namespace config: documented and tested (`mount/2` configured namespace, agent-id fallback, default fallback).
+- Example includes retrieval plugin mount snippet: implemented in `lib/examples/README.md`.
+
+4) blockers/assumptions
+- Blocker: `mix precommit`, `mix test.fast`, and `mix doctor --summary` cannot complete in this execution environment due `Mix.Sync.PubSub` failing to open a local TCP socket (`:eperm`).
+- Assumption: running the equivalent stable-smoke test command (`MIX_ENV=test mix test --exclude flaky --only stable_smoke`) is acceptable evidence for `test.fast` behavior under this sandbox limitation.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 59538, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.0 seconds (2.0s async, 0.00s sync)
+8 tests, 0 failures (1674 excluded)

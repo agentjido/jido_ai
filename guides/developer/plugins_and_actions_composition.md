@@ -147,6 +147,56 @@ defmodule MyApp.PolicyHardenedAssistant do
 end
 ```
 
+### Retrieval Runtime Contract
+
+`Jido.AI.Plugins.Retrieval` is an optional cross-cutting runtime plugin that
+enriches `chat.message` and `reasoning.*.run` prompts with in-process memory.
+
+Retrieval enrichment lifecycle:
+
+- Read mounted retrieval state (`enabled`, `namespace`, `top_k`, `max_snippet_chars`)
+- Skip enrichment when plugin `enabled: false`
+- Skip enrichment when payload sets `disable_retrieval: true`
+- Resolve query text from `prompt` or `query`
+- Recall top-k snippets from namespace memory
+- Rewrite prompt with relevant memory block and attach `data.retrieval` metadata
+
+Opt-out behavior:
+
+- Global opt-out: mount plugin with `enabled: false`
+- Per-request opt-out: set `disable_retrieval: true` in signal payload
+
+Namespace behavior:
+
+- `namespace` config is used for both enrichment and retrieval action routes
+  (`retrieval.upsert`, `retrieval.recall`, `retrieval.clear`)
+- If omitted, namespace falls back to agent id, then `"default"`
+
+Retrieval plugin config shape:
+
+```elixir
+defmodule MyApp.RetrievalEnabledAssistant do
+  use Jido.AI.Agent,
+    name: "retrieval_enabled_assistant",
+    plugins: [
+      {Jido.AI.Plugins.Retrieval,
+       %{
+         enabled: true,
+         namespace: "weather_ops",
+         top_k: 3,
+         max_snippet_chars: 280
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "chat.message",
+    %{prompt: "Should I bike to work in Seattle tomorrow?", disable_retrieval: true},
+    source: "/cli"
+  )
+```
+
 ### CoD Plugin Handoff (`reasoning.cod.run`)
 
 ```elixir

@@ -51,6 +51,7 @@ Canonical weather overview module:
 | Planning plugin | Mount `Jido.AI.Plugins.Planning` and send planning signals for plan/decompose/prioritize actions. |
 | Model routing plugin | Mount `Jido.AI.Plugins.ModelRouting` to route default model aliases by signal type while preserving explicit caller model overrides. |
 | Policy plugin | Mount `Jido.AI.Plugins.Policy` to enforce prompt/query guardrails and normalize malformed runtime envelopes. |
+| Retrieval plugin | Mount `Jido.AI.Plugins.Retrieval` to enrich `chat.message`/`reasoning.*.run` prompts from namespace memories, with per-request opt-out via `disable_retrieval: true`. |
 | Reasoning CoD plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfDraft` and send `reasoning.cod.run` for fixed `:cod` strategy execution. |
 | Reasoning CoT plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfThought` and send `reasoning.cot.run` for fixed `:cot` strategy execution. |
 | Reasoning AoT plugin | Mount `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` and send `reasoning.aot.run` for fixed `:aot` strategy execution. |
@@ -148,6 +149,32 @@ signal =
   )
 
 # Policy plugin rewrites violating request/query payloads to ai.request.error
+```
+
+```elixir
+defmodule MyApp.RetrievalEnabledAgent do
+  use Jido.AI.Agent,
+    name: "retrieval_enabled_agent",
+    plugins: [
+      {Jido.AI.Plugins.Retrieval,
+       %{
+         enabled: true,
+         namespace: "weather_ops",
+         top_k: 3,
+         max_snippet_chars: 280
+       }},
+      {Jido.AI.Plugins.Chat, %{auto_execute: true}}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "chat.message",
+    %{prompt: "What changed in Seattle weather patterns this week?", disable_retrieval: false},
+    source: "/cli"
+  )
+
+# Retrieval plugin injects matching memory snippets into the prompt before chat dispatch
 ```
 
 ```elixir
