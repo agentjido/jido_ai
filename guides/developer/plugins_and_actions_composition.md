@@ -66,6 +66,44 @@ end
   - `reasoning.adaptive.run`
   - All route to `Jido.AI.Actions.Reasoning.RunStrategy` with fixed strategy identity.
 
+### ModelRouting Runtime Contract
+
+`Jido.AI.Plugins.ModelRouting` is a cross-cutting runtime plugin (enabled by
+default in `Jido.AI.Agent`) that assigns model aliases by signal type when the
+caller does not explicitly provide one.
+
+Route precedence:
+
+- Exact route keys win first (`"chat.simple"`)
+- Wildcard route keys are fallback (`"reasoning.*.run"`)
+- Explicit payload model (`:model` or `"model"`) bypasses plugin routing
+
+Wildcard behavior:
+
+- `*` matches exactly one dot-delimited segment
+- `"reasoning.*.run"` matches `"reasoning.cot.run"`
+- `"reasoning.*.run"` does not match `"reasoning.cot.worker.run"`
+
+Production-style config shape:
+
+```elixir
+defmodule MyApp.RoutedAssistant do
+  use Jido.AI.Agent,
+    name: "routed_assistant",
+    plugins: [
+      {Jido.AI.Plugins.ModelRouting,
+       %{
+         routes: %{
+           "chat.message" => :capable,
+           "chat.simple" => :fast,
+           "chat.generate_object" => :thinking,
+           "reasoning.*.run" => :reasoning
+         }
+       }}
+    ]
+end
+```
+
 ### CoD Plugin Handoff (`reasoning.cod.run`)
 
 ```elixir
@@ -338,6 +376,21 @@ Action-specific fields remain action-owned:
 - `Plan` owns `goal`, optional `constraints`/`resources`, and `max_steps`
 - `Decompose` owns `goal`, optional `max_depth`, and optional `context`
 - `Prioritize` owns `tasks`, optional `criteria`, and optional `context`
+
+## Model Routing Plugin Defaults Contract
+
+`Jido.AI.Plugins.ModelRouting` mounts default routes unless overridden by plugin
+config:
+
+- `"chat.message" => :capable`
+- `"chat.simple" => :fast`
+- `"chat.complete" => :fast`
+- `"chat.embed" => :embedding`
+- `"chat.generate_object" => :thinking`
+- `"reasoning.*.run" => :reasoning`
+
+Exact routes take precedence over wildcard routes. Wildcards use a
+single-segment `*` matcher between dots.
 
 ## Reasoning CoT Plugin Defaults Contract
 

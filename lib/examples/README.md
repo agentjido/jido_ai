@@ -49,6 +49,7 @@ Canonical weather overview module:
 | --- | --- |
 | Chat plugin | Mount `Jido.AI.Plugins.Chat` and send `chat.message` signals for tool-aware chat routing. |
 | Planning plugin | Mount `Jido.AI.Plugins.Planning` and send planning signals for plan/decompose/prioritize actions. |
+| Model routing plugin | Mount `Jido.AI.Plugins.ModelRouting` to route default model aliases by signal type while preserving explicit caller model overrides. |
 | Reasoning CoD plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfDraft` and send `reasoning.cod.run` for fixed `:cod` strategy execution. |
 | Reasoning CoT plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfThought` and send `reasoning.cot.run` for fixed `:cot` strategy execution. |
 | Reasoning AoT plugin | Mount `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` and send `reasoning.aot.run` for fixed `:aot` strategy execution. |
@@ -99,6 +100,28 @@ signal = Jido.Signal.new!(
   source: "/cli"
 )
 # Routes to Jido.AI.Actions.Planning.Plan via Jido.AI.Plugins.Planning
+```
+
+```elixir
+defmodule MyApp.RoutedChatAgent do
+  use Jido.AI.Agent,
+    name: "routed_chat_agent",
+    plugins: [
+      {Jido.AI.Plugins.ModelRouting,
+       %{
+         routes: %{
+           "chat.message" => :capable,
+           "chat.simple" => :fast,
+           "chat.generate_object" => :thinking,
+           "reasoning.*.run" => :reasoning
+         }
+       }},
+      {Jido.AI.Plugins.Chat, %{auto_execute: true}}
+    ]
+end
+
+signal = Jido.Signal.new!("chat.simple", %{prompt: "Give me a quick weather summary."}, source: "/cli")
+# Routes model selection through Jido.AI.Plugins.ModelRouting before Chat action dispatch
 ```
 
 ```elixir
