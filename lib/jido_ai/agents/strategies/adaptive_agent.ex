@@ -22,6 +22,7 @@ defmodule Jido.AI.AdaptiveAgent do
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "Adaptive agent \#{name}")
   - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:tools` - Tool modules used when Adaptive selects ReAct
   - `:default_strategy` - Default strategy if analysis is inconclusive (default: `:react`)
   - `:available_strategies` - List of available strategies (default: `[:cod, :cot, :react, :tot, :got, :trm]`)
   - `:complexity_thresholds` - Map of thresholds for strategy selection
@@ -102,6 +103,15 @@ defmodule Jido.AI.AdaptiveAgent do
     name = Keyword.fetch!(opts, :name)
     description = Keyword.get(opts, :description, "Adaptive agent #{name}")
     model = Keyword.get(opts, :model, @default_model)
+    has_tools_opt? = Keyword.has_key?(opts, :tools)
+    tools_ast = Keyword.get(opts, :tools, [])
+
+    tools =
+      Enum.map(tools_ast, fn
+        {:__aliases__, _, _} = alias_ast -> Macro.expand(alias_ast, __CALLER__)
+        mod when is_atom(mod) -> mod
+      end)
+
     default_strategy = Keyword.get(opts, :default_strategy, @default_strategy)
     available_strategies = Keyword.get(opts, :available_strategies, @default_available_strategies)
     complexity_thresholds = Keyword.get(opts, :complexity_thresholds)
@@ -119,6 +129,9 @@ defmodule Jido.AI.AdaptiveAgent do
         if complexity_thresholds,
           do: Keyword.put(o, :complexity_thresholds, complexity_thresholds),
           else: o
+      end)
+      |> then(fn o ->
+        if has_tools_opt?, do: Keyword.put(o, :tools, tools), else: o
       end)
 
     # Includes request tracking fields for concurrent request isolation

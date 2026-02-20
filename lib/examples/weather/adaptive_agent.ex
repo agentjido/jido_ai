@@ -12,11 +12,20 @@ defmodule Jido.AI.Examples.Weather.AdaptiveAgent do
         "I need a weather-aware commute and backup plan for tomorrow."
   """
 
+  alias Jido.AI.Examples.Weather.LiveContext
+
   use Jido.AI.AdaptiveAgent,
     name: "weather_adaptive_agent",
     description: "Adaptive weather assistant across all reasoning modes",
-    default_strategy: :react,
-    available_strategies: [:react, :cot, :tot, :got, :trm]
+    tools: [
+      Jido.Tools.Weather.Geocode,
+      Jido.Tools.Weather.Forecast,
+      Jido.Tools.Weather.HourlyForecast,
+      Jido.Tools.Weather.CurrentConditions,
+      Jido.Tools.Weather.LocationToGrid
+    ],
+    default_strategy: :cot,
+    available_strategies: [:cot, :tot, :got, :trm]
 
   @doc "Returns the CLI adapter used by `mix jido_ai` for this example."
   @spec cli_adapter() :: module()
@@ -33,4 +42,15 @@ defmodule Jido.AI.Examples.Weather.AdaptiveAgent do
       opts
     )
   end
+
+  @impl true
+  def on_before_cmd(agent, {:adaptive_start, %{prompt: prompt} = params}) do
+    case LiveContext.enrich_prompt(prompt) do
+      {:ok, enriched_prompt} -> super(agent, {:adaptive_start, %{params | prompt: enriched_prompt}})
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @impl true
+  def on_before_cmd(agent, action), do: super(agent, action)
 end

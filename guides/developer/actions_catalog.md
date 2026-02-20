@@ -38,42 +38,40 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 
 - `Jido.AI.Actions.LLM.Chat`
   - Use when you need single-turn conversational output with optional system prompt and chat/plugin defaults.
-  - Example snippet: [`lib/examples/actions/llm_actions.md#chat-action`](../../lib/examples/actions/llm_actions.md#chat-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_llm_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_llm_runtime_demo.exs)
 - `Jido.AI.Actions.LLM.Complete`
   - Use when you want compatibility-style prompt completion without object constraints.
-  - Example snippet: [`lib/examples/actions/llm_actions.md#complete-action`](../../lib/examples/actions/llm_actions.md#complete-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_llm_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_llm_runtime_demo.exs)
 - `Jido.AI.Actions.LLM.Embed`
   - Use when you need vector embeddings for retrieval, semantic search, or similarity tasks.
-  - Example snippet: [`lib/examples/actions/llm_actions.md#embed-action`](../../lib/examples/actions/llm_actions.md#embed-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_llm_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_llm_runtime_demo.exs)
 - `Jido.AI.Actions.LLM.GenerateObject`
   - Use when downstream code expects schema-constrained structured output.
-  - Example snippet: [`lib/examples/actions/llm_actions.md#generateobject-action`](../../lib/examples/actions/llm_actions.md#generateobject-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_llm_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_llm_runtime_demo.exs)
 
 ## Tool Calling Actions
 
 - `Jido.AI.Actions.ToolCalling.CallWithTools`
   - Use when the model should decide whether to call tools, with optional `auto_execute` loop continuation.
-  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#callwithtools-one-shot`](../../lib/examples/actions/tool_calling_actions.md#callwithtools-one-shot)
-  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#callwithtools-auto-execute`](../../lib/examples/actions/tool_calling_actions.md#callwithtools-auto-execute)
+  - Runnable example: [`lib/examples/scripts/demo/actions_tool_calling_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_tool_calling_runtime_demo.exs)
 - `Jido.AI.Actions.ToolCalling.ExecuteTool`
   - Use when your app already selected the tool and arguments and needs deterministic direct execution.
-  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#executetool-direct`](../../lib/examples/actions/tool_calling_actions.md#executetool-direct)
+  - Runnable example: [`lib/examples/scripts/demo/actions_tool_calling_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_tool_calling_runtime_demo.exs)
 - `Jido.AI.Actions.ToolCalling.ListTools`
   - Use when you need tool discovery, optional schema projection, and sensitive-name filtering.
-  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#listtools-discovery-and-security-filtering`](../../lib/examples/actions/tool_calling_actions.md#listtools-discovery-and-security-filtering)
+  - Runnable example: [`lib/examples/scripts/demo/actions_tool_calling_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_tool_calling_runtime_demo.exs)
 
 ## Planning Actions
 
 - `Jido.AI.Actions.Planning.Plan`
   - Use when you need a sequential execution plan from one goal.
-  - Example snippet: [`lib/examples/actions/planning_actions.md#plan-action`](../../lib/examples/actions/planning_actions.md#plan-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_planning_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_planning_runtime_demo.exs)
 - `Jido.AI.Actions.Planning.Decompose`
   - Use when the goal is too large and should be split into hierarchical sub-goals.
-  - Example snippet: [`lib/examples/actions/planning_actions.md#decompose-action`](../../lib/examples/actions/planning_actions.md#decompose-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_planning_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_planning_runtime_demo.exs)
 - `Jido.AI.Actions.Planning.Prioritize`
   - Use when you already have a task list and need ranked execution order.
-  - Example snippet: [`lib/examples/actions/planning_actions.md#prioritize-action`](../../lib/examples/actions/planning_actions.md#prioritize-action)
-  - Workflow snippet: [`lib/examples/actions/planning_actions.md#planning-workflow-with-task-decomposition`](../../lib/examples/actions/planning_actions.md#planning-workflow-with-task-decomposition)
+  - Runnable example: [`lib/examples/scripts/demo/actions_planning_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_planning_runtime_demo.exs)
 
 ## Retrieval Actions
 
@@ -81,17 +79,17 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
   - Use when you need to persist a memory snippet into the in-process retrieval namespace.
   - Required params: `text`. Optional params: `id`, `metadata`, `namespace`.
   - Output contract: `%{retrieval: %{namespace, last_upsert}}`.
-  - Example snippet: [`lib/examples/actions/retrieval_actions.md#upsertmemory-action`](../../lib/examples/actions/retrieval_actions.md#upsertmemory-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_retrieval_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_retrieval_runtime_demo.exs)
 - `Jido.AI.Actions.Retrieval.RecallMemory`
   - Use when you need top-k memory recall for a query from a namespace.
   - Required params: `query`. Optional params: `top_k` (default `3`), `namespace`.
   - Output contract: `%{retrieval: %{namespace, query, memories, count}}`.
-  - Example snippet: [`lib/examples/actions/retrieval_actions.md#recallmemory-action`](../../lib/examples/actions/retrieval_actions.md#recallmemory-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_retrieval_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_retrieval_runtime_demo.exs)
 - `Jido.AI.Actions.Retrieval.ClearMemory`
   - Use when you need to clear all in-process retrieval memory entries in one namespace.
   - Required params: none. Optional params: `namespace`.
   - Output contract: `%{retrieval: %{namespace, cleared}}`.
-  - Example snippet: [`lib/examples/actions/retrieval_actions.md#clearmemory-action`](../../lib/examples/actions/retrieval_actions.md#clearmemory-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_retrieval_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_retrieval_runtime_demo.exs)
 
 ## Quota Actions
 
@@ -100,34 +98,34 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
   - Required params: none. Optional params: `scope`.
   - Scope resolution when `scope` is omitted: `context[:plugin_state][:quota][:scope]` -> `context[:state][:quota][:scope]` -> `context[:agent][:id]` -> `"default"`.
   - Output contract: `%{quota: %{scope, window_ms, usage, limits, remaining, over_budget?}}`.
-  - Example snippet: [`lib/examples/actions/quota_actions.md#getstatus-action`](../../lib/examples/actions/quota_actions.md#getstatus-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_quota_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_quota_runtime_demo.exs)
 - `Jido.AI.Actions.Quota.Reset`
   - Use when you need to clear rolling quota counters for one scope.
   - Required params: none. Optional params: `scope`.
   - Scope resolution when `scope` is omitted: `context[:plugin_state][:quota][:scope]` -> `context[:state][:quota][:scope]` -> `context[:agent][:id]` -> `"default"`.
   - Output contract: `%{quota: %{scope, reset}}`.
-  - Example snippet: [`lib/examples/actions/quota_actions.md#reset-action`](../../lib/examples/actions/quota_actions.md#reset-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_quota_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_quota_runtime_demo.exs)
 
 ## Reasoning Actions
 
 - `Jido.AI.Actions.Reasoning.Analyze`
   - Use when you need structured analysis (`:sentiment | :topics | :entities | :summary | :custom`) over one input.
   - Output contract: `%{result, analysis_type, model, usage}`.
-  - Example snippet: [`lib/examples/actions/reasoning_actions.md#analyze-action`](../../lib/examples/actions/reasoning_actions.md#analyze-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs)
 - `Jido.AI.Actions.Reasoning.Infer`
   - Use when you have explicit premises and need an inference for a specific question.
   - Output contract: `%{result, reasoning, model, usage}`.
-  - Example snippet: [`lib/examples/actions/reasoning_actions.md#infer-action`](../../lib/examples/actions/reasoning_actions.md#infer-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs)
 - `Jido.AI.Actions.Reasoning.Explain`
   - Use when you need audience-aware explanation depth (`:basic | :intermediate | :advanced`).
   - Output contract: `%{result, detail_level, model, usage}`.
-  - Example snippet: [`lib/examples/actions/reasoning_actions.md#explain-action`](../../lib/examples/actions/reasoning_actions.md#explain-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs)
 - `Jido.AI.Actions.Reasoning.RunStrategy`
   - Use when you need explicit strategy execution independent of host agent strategy.
   - Required parameters: `strategy` (`:cod | :cot | :tot | :got | :trm | :aot | :adaptive`) and `prompt`.
   - Strategy tuning parameters can be passed at top-level or inside `options`; top-level keys win when both are set.
   - Output contract: `%{strategy, status, output, usage, diagnostics}` where `diagnostics` includes timeout, options, snapshot status, and sanitized errors.
-  - Example snippet: [`lib/examples/actions/reasoning_actions.md#runstrategy-action`](../../lib/examples/actions/reasoning_actions.md#runstrategy-action)
+  - Runnable example: [`lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs)
   - Coverage split guidance: fast-smoke subset lives in `test/jido_ai/skills/reasoning/actions/run_strategy_action_fast_test.exs`; full checkpoint matrix lives in `test/jido_ai/skills/reasoning/actions/run_strategy_action_test.exs`.
 
 ## Shared Helper
