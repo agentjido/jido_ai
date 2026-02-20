@@ -429,3 +429,59 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.3 seconds (2.3s async, 0.00s sync)
 8 tests, 0 failures (1523 excluded)
+1) changed files
+- `test/jido_ai/strategy/chain_of_draft_test.exs:52`  
+Added explicit CoD error-path coverage and routing assertion:
+  - `ai.request.error` route assertion
+  - `request_failed` worker event -> error state
+  - busy second request -> `EmitRequestError` directive
+- `test/jido_ai/cli/adapters/cod_test.exs:4`  
+Added adapter wiring coverage:
+  - `submit/3` delegates to configured agent `draft/2`
+  - `await/3` timeout error path
+  - weather CoD example resolves to `Jido.AI.Reasoning.ChainOfDraft.CLIAdapter`
+- `lib/examples/strategies/cod.md:5`  
+Added CoD runtime flow + explicit CLI adapter alignment section for `CoDAgent.cli_adapter/0`.
+
+2) tests/commands executed
+- `mix format test/jido_ai/strategy/chain_of_draft_test.exs test/jido_ai/cli/adapters/cod_test.exs` ✅
+- `mix test test/jido_ai/strategy/chain_of_draft_test.exs test/jido_ai/cli/adapters/cod_test.exs` ✅ (15 tests, 0 failures)
+- `mix test --exclude flaky --only stable_smoke` ✅ (8 tests, 0 failures)
+- `mix test test/jido_ai/examples/weather_strategy_suite_test.exs` ✅ (6 tests, 0 failures)
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test.fast` ❌ blocked by Mix PubSub TCP socket `:eperm`
+- `mix doctor --summary` ❌ blocked by Mix PubSub TCP socket `:eperm`
+- `mix precommit` ❌ blocked by Mix PubSub TCP socket `:eperm`
+
+3) acceptance criteria coverage
+- CoD weather example exists and appears in overview map: already present; validated by weather suite/stable smoke tests.
+- CoD docs/tests cover happy path, error path, adapter wiring:
+  - happy path already covered (`request_completed` extraction test)
+  - error path now explicitly covered in `chain_of_draft_test.exs`
+  - adapter wiring now explicitly covered in `cod_test.exs`
+  - docs now include runtime flow + CLI adapter alignment in `lib/examples/strategies/cod.md`
+- Strategy markdown under normalized path: `lib/examples/strategies/cod.md` retained and validated by existing weather strategy suite checks.
+- Weather matrix includes CoD command/module reference: validated by existing `weather_strategy_suite_test.exs`.
+
+4) blockers/assumptions
+- Blocker: this sandbox disallows Mix PubSub TCP listen (`Mix.Sync.PubSub.subscribe/1` -> `:eperm`), so `mix doctor --summary`, `mix test.fast`, and `mix precommit` cannot complete here.
+- Assumption: existing `Jido.AI.Examples.Weather.CoDAgent` + `lib/examples/weather/overview.ex` wiring was already correct for ST-STR-002 and did not require functional changes.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 293839, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.2 seconds (2.2s async, 0.00s sync)
+8 tests, 0 failures (1528 excluded)
