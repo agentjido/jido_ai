@@ -15,6 +15,7 @@ defmodule Jido.AI.CLI.Adapter do
 
   - `Jido.AI.Reasoning.ReAct.CLIAdapter` - For `Jido.AI.Agent` modules
   - `Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter` - For `Jido.AI.AoTAgent` agents
+  - `Jido.AI.Reasoning.ChainOfDraft.CLIAdapter` - For Chain-of-Draft agents
   - `Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter` - For Tree-of-Thoughts agents
   - `Jido.AI.Reasoning.ChainOfThought.CLIAdapter` - For Chain-of-Thought agents
   - `Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter` - For Graph-of-Thoughts agents
@@ -83,6 +84,9 @@ defmodule Jido.AI.CLI.Adapter do
       type == "aot" ->
         {:ok, Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter}
 
+      type == "cod" ->
+        {:ok, Jido.AI.Reasoning.ChainOfDraft.CLIAdapter}
+
       type == "tot" ->
         {:ok, Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter}
 
@@ -99,7 +103,7 @@ defmodule Jido.AI.CLI.Adapter do
         {:ok, Jido.AI.Reasoning.Adaptive.CLIAdapter}
 
       true ->
-        {:error, "Unknown agent type: #{type}. Supported: react, aot, tot, cot, got, trm, adaptive"}
+        {:error, "Unknown agent type: #{type}. Supported: react, aot, cod, tot, cot, got, trm, adaptive"}
     end
   end
 

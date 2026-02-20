@@ -352,19 +352,35 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Machine do
   """
   @spec extract_steps_and_conclusion(String.t()) :: {[step()], String.t() | nil}
   def extract_steps_and_conclusion(text) when is_binary(text) do
-    # Split into lines for processing
-    lines = String.split(text, ~r/\r?\n/, trim: false)
+    case extract_hash_conclusion(text) do
+      {content_text, conclusion} ->
+        {extract_steps(content_text), conclusion}
 
-    # Try to find conclusion first
-    {content_lines, conclusion} = extract_conclusion(lines)
-
-    # Extract steps from the content
-    steps = extract_steps(Enum.join(content_lines, "\n"))
-
-    {steps, conclusion}
+      :none ->
+        lines = String.split(text, ~r/\r?\n/, trim: false)
+        {content_lines, conclusion} = extract_conclusion(lines)
+        steps = extract_steps(Enum.join(content_lines, "\n"))
+        {steps, conclusion}
+    end
   end
 
   def extract_steps_and_conclusion(_), do: {[], nil}
+
+  defp extract_hash_conclusion(text) when is_binary(text) do
+    case String.split(text, "####", parts: 2) do
+      [content, conclusion] ->
+        conclusion = String.trim(conclusion)
+
+        if conclusion == "" do
+          :none
+        else
+          {String.trim(content), conclusion}
+        end
+
+      _ ->
+        :none
+    end
+  end
 
   # Extract conclusion from lines
   defp extract_conclusion(lines) do

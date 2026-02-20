@@ -10,7 +10,9 @@ Public capability plugins:
 
 - `Jido.AI.Plugins.Chat`
 - `Jido.AI.Plugins.Planning`
+- `Jido.AI.Plugins.Reasoning.ChainOfDraft`
 - `Jido.AI.Plugins.Reasoning.ChainOfThought`
+- `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts`
 - `Jido.AI.Plugins.Reasoning.TreeOfThoughts`
 - `Jido.AI.Plugins.Reasoning.GraphOfThoughts`
 - `Jido.AI.Plugins.Reasoning.TRM`
@@ -49,7 +51,9 @@ end
   - `chat.embed` -> embedding generation
   - `chat.generate_object` -> schema-constrained structured output
 - `Jido.AI.Plugins.Reasoning.*`
+  - `reasoning.cod.run`
   - `reasoning.cot.run`
+  - `reasoning.aot.run`
   - `reasoning.tot.run`
   - `reasoning.got.run`
   - `reasoning.trm.run`

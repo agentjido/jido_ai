@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   Adaptive execution strategy that automatically selects the best reasoning approach.
 
   This strategy analyzes task characteristics and selects the most appropriate
-  strategy (CoT, ReAct, AoT, ToT, GoT) for the given task. The strategy is re-evaluated
+  strategy (CoD, CoT, ReAct, AoT, ToT, GoT) for the given task. The strategy is re-evaluated
   when the previous reasoning completes and a new prompt arrives.
 
   ## Overview
@@ -30,7 +30,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
     - Keywords: analyze, explore, compare, evaluate, alternatives
 
   ### Complexity-based Selection (fallback)
-  - **Simple tasks** (score < 0.3) → Chain-of-Thought (CoT)
+  - **Simple tasks** (score < 0.3) → Chain-of-Draft (CoD)
     - Direct questions, simple calculations, factual queries
   - **Moderate tasks** (0.3-0.7) → ReAct
     - Tasks requiring tool use, multi-step operations
@@ -47,7 +47,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
           Jido.AI.Reasoning.Adaptive.Strategy,
           model: "anthropic:claude-sonnet-4-20250514",
           default_strategy: :react,
-          available_strategies: [:cot, :react, :tot, :got, :trm, :aot]
+          available_strategies: [:cod, :cot, :react, :tot, :got, :trm]
         }
 
   ### Options
@@ -55,7 +55,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   - `:model` (optional) - Model identifier passed to selected strategy
   - `:default_strategy` (optional) - Default strategy if analysis is inconclusive, defaults to `:react`
   - `:strategy` (optional) - Manual override to force a specific strategy
-  - `:available_strategies` (optional) - List of available strategies, defaults to [:cot, :react, :tot]
+  - `:available_strategies` (optional) - List of available strategies, defaults to [:cod, :cot, :react, :tot, :got, :trm]
   - `:complexity_thresholds` (optional) - Map of thresholds for strategy selection
 
   ## Signal Routing
@@ -73,6 +73,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy, as: AlgorithmOfThoughts
+  alias Jido.AI.Reasoning.ChainOfDraft.Strategy, as: ChainOfDraft
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
   alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
@@ -85,6 +86,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
 
   # Strategy module mapping
   @strategy_modules %{
+    cod: ChainOfDraft,
     cot: ChainOfThought,
     react: ReAct,
     aot: AlgorithmOfThoughts,
@@ -111,7 +113,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   @puzzle_keywords ~w(puzzle iterate improve refine recursive riddle)
 
   @type complexity :: :simple | :moderate | :complex
-  @type strategy_type :: :cot | :react | :aot | :tot | :got | :trm
+  @type strategy_type :: :cod | :cot | :react | :aot | :tot | :got | :trm
 
   @type config :: %{
           optional(:model) => String.t(),
@@ -180,7 +182,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
     },
     @cot_worker_event => %{
       schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
-      doc: "Handle delegated CoT worker runtime event (CoT only)",
+      doc: "Handle delegated CoT/CoD worker runtime event",
       name: "ai.cot.worker.event"
     },
     @react_worker_event => %{
@@ -309,7 +311,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
           true
 
         %{action: action}
-        when action in [:cot_start, :ai_react_start, :aot_start, :tot_start, :got_start, :trm_start] ->
+        when action in [:cod_start, :cot_start, :ai_react_start, :aot_start, :tot_start, :got_start, :trm_start] ->
           true
 
         _ ->
@@ -332,7 +334,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   """
   def analyze_prompt(prompt, config \\ %{}) do
     thresholds = Map.get(config, :complexity_thresholds, @default_thresholds)
-    available = Map.get(config, :available_strategies, [:cot, :react, :tot, :got, :trm])
+    available = Map.get(config, :available_strategies, [:cod, :cot, :react, :tot, :got, :trm])
 
     # Calculate complexity score
     complexity_score = calculate_complexity(prompt)
@@ -380,7 +382,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
         Map.get(
           agent.state,
           :available_strategies,
-          Keyword.get(opts, :available_strategies, [:cot, :react, :tot, :got, :trm])
+          Keyword.get(opts, :available_strategies, [:cod, :cot, :react, :tot, :got, :trm])
         ),
       complexity_thresholds:
         Map.get(agent.state, :complexity_thresholds, Keyword.get(opts, :complexity_thresholds, @default_thresholds)),
@@ -405,7 +407,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
           true
 
         %{action: action}
-        when action in [:cot_start, :ai_react_start, :aot_start, :tot_start, :got_start, :trm_start] ->
+        when action in [:cod_start, :cot_start, :ai_react_start, :aot_start, :tot_start, :got_start, :trm_start] ->
           true
 
         _ ->
@@ -538,6 +540,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
     %{action: action, params: %{}}
   end
 
+  defp start_action_for(:cod), do: :cod_start
   defp start_action_for(:cot), do: :cot_start
   defp start_action_for(:react), do: :ai_react_start
   defp start_action_for(:aot), do: :aot_start
@@ -545,6 +548,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   defp start_action_for(:got), do: :got_start
   defp start_action_for(:trm), do: :trm_start
 
+  defp llm_result_action_for(:cod), do: :cod_llm_result
   defp llm_result_action_for(:cot), do: :cot_llm_result
   defp llm_result_action_for(:react), do: :ai_react_llm_result
   defp llm_result_action_for(:aot), do: :aot_llm_result
@@ -552,6 +556,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   defp llm_result_action_for(:got), do: :got_llm_result
   defp llm_result_action_for(:trm), do: :trm_llm_result
 
+  defp llm_partial_action_for(:cod), do: :cod_llm_partial
   defp llm_partial_action_for(:cot), do: :cot_llm_partial
   defp llm_partial_action_for(:react), do: :ai_react_llm_partial
   defp llm_partial_action_for(:aot), do: :aot_llm_partial
@@ -559,6 +564,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   defp llm_partial_action_for(:got), do: :got_llm_partial
   defp llm_partial_action_for(:trm), do: :trm_llm_partial
 
+  defp request_error_action_for(:cod), do: :cod_request_error
   defp request_error_action_for(:cot), do: :cot_request_error
   defp request_error_action_for(:react), do: :ai_react_request_error
   defp request_error_action_for(:aot), do: :aot_request_error
@@ -566,16 +572,19 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   defp request_error_action_for(:got), do: :got_request_error
   defp request_error_action_for(:trm), do: :trm_request_error
 
+  defp cot_worker_event_action_for(:cod), do: :cod_worker_event
   defp cot_worker_event_action_for(:cot), do: :cot_worker_event
   defp cot_worker_event_action_for(_), do: @cot_worker_event
 
   defp react_worker_event_action_for(:react), do: :ai_react_worker_event
   defp react_worker_event_action_for(_), do: @react_worker_event
 
+  defp child_started_action_for(:cod), do: :cod_worker_child_started
   defp child_started_action_for(:cot), do: :cot_worker_child_started
   defp child_started_action_for(:react), do: :ai_react_worker_child_started
   defp child_started_action_for(_), do: @child_started
 
+  defp child_exit_action_for(:cod), do: :cod_worker_child_exit
   defp child_exit_action_for(:cot), do: :cot_worker_child_exit
   defp child_exit_action_for(:react), do: :ai_react_worker_child_exit
   defp child_exit_action_for(_), do: @child_exit
@@ -705,7 +714,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   defp select_by_complexity(score, thresholds, available) do
     cond do
       score < thresholds.simple ->
-        find_first_available([:cot], available) || List.first(available)
+        find_first_available([:cod, :cot], available) || List.first(available)
 
       score > thresholds.complex ->
         find_first_available([:aot, :tot, :got], available) || List.first(available)

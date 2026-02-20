@@ -406,7 +406,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   # ============================================================================
 
   describe "adaptive selection integration" do
-    test "simple prompt selects CoT strategy" do
+    test "simple prompt selects CoD strategy" do
       {agent, _ctx} = create_agent(Adaptive)
 
       instruction = %Instruction{
@@ -417,7 +417,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {updated_agent, _directives} = Adaptive.cmd(agent, [instruction], %{})
 
       state = StratState.get(updated_agent, %{})
-      assert state[:strategy_type] == :cot
+      assert state[:strategy_type] == :cod
     end
 
     test "tool-requiring prompt selects ReAct strategy" do
@@ -488,7 +488,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
     test "adaptive delegates LLM result to selected strategy" do
       {agent, _ctx} = create_agent(Adaptive)
 
-      # Start with a prompt that selects CoT
+      # Start with a prompt that selects CoD
       start_instruction = %Instruction{
         action: Adaptive.start_action(),
         params: %{prompt: "What is the meaning of life?", request_id: "req_adaptive_cot"}
@@ -497,9 +497,9 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, [%AgentDirective.SpawnAgent{}]} =
         Adaptive.cmd(agent, [start_instruction], %{})
 
-      # Verify CoT was selected
+      # Verify CoD was selected
       state = StratState.get(agent, %{})
-      assert state[:strategy_type] == :cot
+      assert state[:strategy_type] == :cod
 
       child_started = %Instruction{
         action: :adaptive_child_started,
@@ -547,13 +547,13 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       # Verify the delegated strategy completed
       final_state = StratState.get(final_agent, %{})
       # The selected strategy should have processed the result
-      assert final_state[:strategy_type] == :cot
+      assert final_state[:strategy_type] == :cod
     end
 
     test "analyze_prompt returns expected complexity and task type" do
       # Simple query
       {strategy, score, task_type} = Adaptive.analyze_prompt("What is AI?")
-      assert strategy == :cot
+      assert strategy == :cod
       assert score < 0.3
       assert task_type == :simple_query
 

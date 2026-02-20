@@ -23,7 +23,7 @@ defmodule Mix.Tasks.JidoAi do
 
   ### Agent Configuration
       --agent MODULE       Use existing agent module (ignores --model/--tools/--system)
-      --type TYPE          Agent type: react (default), aot, cot, tot, got, trm, adaptive
+      --type TYPE          Agent type: react (default), aot, cod, cot, tot, got, trm, adaptive
       --model MODEL        LLM model (default: anthropic:claude-haiku-4-5)
       --tools MODULES      Comma-separated tool modules
       --system PROMPT      System prompt
