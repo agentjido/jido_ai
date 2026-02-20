@@ -946,3 +946,52 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.0 seconds (2.0s async, 0.00s sync)
 8 tests, 0 failures (1595 excluded)
+1) changed files
+- `lib/jido_ai/plugins/reasoning/chain_of_thought.ex`: expanded CoT plugin moduledoc with signal contract, fixed handoff behavior, and mount defaults (`strategy: :cot`, route + defaults docs).
+- `test/jido_ai/skills/tool_calling/tool_calling_skill_test.exs`: added CoT schema-default test, `handle_signal/2` strategy injection override tests, non-map payload normalization test, and docs/examples contract assertions.
+- `guides/developer/plugins_and_actions_composition.md`: added CoT plugin handoff section and CoT defaults contract section.
+- `lib/examples/README.md`: added CoT plugin row to plugin capability matrix and CoT plugin snippet/path using `reasoning.cot.run`.
+
+2) tests/commands executed
+- `mix format lib/jido_ai/plugins/reasoning/chain_of_thought.ex guides/developer/plugins_and_actions_composition.md lib/examples/README.md test/jido_ai/skills/tool_calling/tool_calling_skill_test.exs` ✅
+- `mix test test/jido_ai/skills/tool_calling/tool_calling_skill_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` ✅ (24 tests, 0 failures)
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test --exclude flaky --only stable_smoke --no-deps-check` ✅ (8 tests, 0 failures)
+- `mix doctor --summary` ❌ (`Mix.PubSub` TCP socket `:eperm` in sandbox)
+- `mix test.fast` ❌ (same `Mix.PubSub` `:eperm`)
+- `mix precommit` ❌ (same `Mix.PubSub` `:eperm`)
+
+3) acceptance criteria coverage
+- Tests validate `strategy: :cot` injection and route contract:
+  - route contract: `test/jido_ai/skills/tool_calling/tool_calling_skill_test.exs:72`
+  - forced `:cot` injection/override: `test/jido_ai/skills/tool_calling/tool_calling_skill_test.exs:81`
+  - schema/default behavior: `test/jido_ai/skills/tool_calling/tool_calling_skill_test.exs:53`
+- Docs include CoT plugin usage and defaults:
+  - plugin docs: `lib/jido_ai/plugins/reasoning/chain_of_thought.ex:4`
+  - developer guide handoff/defaults: `guides/developer/plugins_and_actions_composition.md:102`, `guides/developer/plugins_and_actions_composition.md:164`
+- Example matrix includes CoT plugin path:
+  - matrix row + snippet: `lib/examples/README.md:53`, `lib/examples/README.md:117`
+
+4) blockers/assumptions
+- Blocker: this sandbox denies loopback TCP socket creation (`:gen_tcp.listen` returns `:eperm`), which breaks Mix tasks that start `Mix.PubSub` (`mix doctor`, `mix test.fast`, `mix precommit`).
+- Assumption: in a normal local/dev environment with socket permissions, `mix doctor --summary` and `mix precommit` should be runnable; core compile/format/targeted/story tests already pass.
+- No commit/push/PR was performed.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 878874, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 1.9 seconds (1.9s async, 0.00s sync)
+8 tests, 0 failures (1600 excluded)

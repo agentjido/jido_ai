@@ -99,6 +99,39 @@ Execution handoff:
 - `Jido.AI.Plugins.Reasoning.ChainOfDraft.handle_signal/2` overrides payload strategy to `strategy: :cod`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 
+### CoT Plugin Handoff (`reasoning.cot.run`)
+
+```elixir
+defmodule MyApp.CoTPluginAgent do
+  use Jido.AI.Agent,
+    name: "cot_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.ChainOfThought,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{llm_timeout_ms: 20_000}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.cot.run",
+    %{
+      prompt: "Lay out the reasoning steps and one fallback.",
+      strategy: :cod
+    },
+    source: "/cli"
+  )
+```
+
+Execution handoff:
+
+- Route dispatch maps `reasoning.cot.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
+- `Jido.AI.Plugins.Reasoning.ChainOfThought.handle_signal/2` overrides payload strategy to `strategy: :cot`.
+- `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
+
 ## Chat Plugin Defaults Contract
 
 `Jido.AI.Plugins.Chat` mounts the following defaults unless overridden in plugin config:
@@ -127,6 +160,15 @@ Action-specific fields remain action-owned:
 - `Plan` owns `goal`, optional `constraints`/`resources`, and `max_steps`
 - `Decompose` owns `goal`, optional `max_depth`, and optional `context`
 - `Prioritize` owns `tasks`, optional `criteria`, and optional `context`
+
+## Reasoning CoT Plugin Defaults Contract
+
+`Jido.AI.Plugins.Reasoning.ChainOfThought` mounts the following defaults unless overridden in plugin config:
+
+- `strategy: :cot`
+- `default_model: :reasoning`
+- `timeout: 30_000`
+- `options: %{}`
 
 ## Action Context Contract (Plugin -> Action)
 
