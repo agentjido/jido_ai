@@ -57,8 +57,8 @@ defmodule Jido.AI.Actions.LLM.Chat do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Security
   alias Jido.AI.Actions.Helpers
+  alias Jido.AI.Error.Sanitize
   alias ReqLLM.Context
 
   @doc """
@@ -82,7 +82,9 @@ defmodule Jido.AI.Actions.LLM.Chat do
       }
   """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
+    params = apply_context_defaults(params, context)
+
     with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
          {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
          {:ok, req_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
@@ -97,11 +99,11 @@ defmodule Jido.AI.Actions.LLM.Chat do
   # Private Functions
 
   defp sanitize_error_for_user(error) when is_struct(error) do
-    Security.sanitize_error_message(error)
+    Sanitize.sanitize_error_message(error)
   end
 
   defp sanitize_error_for_user(error) when is_atom(error) do
-    Security.sanitize_error_message(error)
+    Sanitize.sanitize_error_message(error)
   end
 
   defp sanitize_error_for_user(_error), do: "An error occurred"
@@ -113,6 +115,86 @@ defmodule Jido.AI.Actions.LLM.Chat do
   defp build_messages(prompt, system_prompt) when is_binary(system_prompt) do
     Context.normalize(prompt, system_prompt: system_prompt)
   end
+
+  defp apply_context_defaults(params, context) when is_map(params) do
+    context = normalize_context(context)
+    provided = provided_params(context)
+
+    model_default =
+      first_present([
+        context[:default_model],
+        context[:model],
+        plugin_default(context, :default_model)
+      ])
+
+    system_prompt_default =
+      first_present([
+        context[:default_system_prompt],
+        plugin_default(context, :default_system_prompt),
+        plugin_default(context, :system_prompt)
+      ])
+
+    max_tokens_default =
+      first_present([
+        context[:default_max_tokens],
+        plugin_default(context, :default_max_tokens)
+      ])
+
+    temperature_default =
+      first_present([
+        context[:default_temperature],
+        plugin_default(context, :default_temperature)
+      ])
+
+    params
+    |> put_default_param(:model, model_default, provided)
+    |> put_default_param(:system_prompt, system_prompt_default, provided)
+    |> put_default_param(:max_tokens, max_tokens_default, provided)
+    |> put_default_param(:temperature, temperature_default, provided)
+  end
+
+  defp apply_context_defaults(params, _context), do: params
+
+  defp put_default_param(params, _key, nil, _provided), do: params
+
+  defp put_default_param(params, key, default, :unknown) do
+    if Map.get(params, key) in [nil, ""] do
+      Map.put(params, key, default)
+    else
+      params
+    end
+  end
+
+  defp put_default_param(params, key, default, provided) do
+    if provided_param?(provided, key) do
+      params
+    else
+      Map.put(params, key, default)
+    end
+  end
+
+  defp provided_params(%{provided_params: provided}) when is_list(provided), do: provided
+  defp provided_params(_), do: :unknown
+
+  defp provided_param?(provided, key) when is_list(provided) do
+    key_str = Atom.to_string(key)
+    Enum.any?(provided, fn k -> k == key or k == key_str end)
+  end
+
+  defp plugin_default(context, key) do
+    first_present([
+      get_in(context, [:plugin_state, :chat, key]),
+      get_in(context, [:plugin_state, :llm, key]),
+      get_in(context, [:state, :chat, key]),
+      get_in(context, [:state, :llm, key]),
+      get_in(context, [:agent, :state, :chat, key]),
+      get_in(context, [:agent, :state, :llm, key])
+    ])
+  end
+
+  defp first_present(values), do: Enum.find(values, &(not is_nil(&1)))
+  defp normalize_context(context) when is_map(context), do: context
+  defp normalize_context(_), do: %{}
 
   defp format_result(response, model) do
     %{

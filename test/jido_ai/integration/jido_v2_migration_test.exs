@@ -1,40 +1,27 @@
 defmodule Jido.AI.Integration.JidoV2MigrationTest do
   @moduledoc """
-  2.0-beta contract integration tests.
-
-  These tests verify that:
-  - Core strategy and skill surfaces remain coherent
-  - Public APIs are available for 2.0 usage
-  - Strict breaking contract is enforced (no legacy 1.x namespace aliases)
+  Contract integration tests for the current public plugin and strategy surface.
   """
 
   use ExUnit.Case, async: false
 
   alias Jido.Agent
-  alias Jido.AI.Signal
-  alias Jido.AI.Plugins.{LLM, Planning, Reasoning, Streaming, ToolCalling}
+  alias Jido.AI.Plugins.Chat
+  alias Jido.AI.Plugins.Planning
+  alias Jido.AI.Plugins.Reasoning.{Adaptive, ChainOfThought, GraphOfThoughts, TRM, TreeOfThoughts}
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
 
-  # Ensure all skill actions are compiled before tests run
   require Jido.AI.Actions.LLM.Chat
   require Jido.AI.Actions.LLM.Complete
   require Jido.AI.Actions.LLM.Embed
+  require Jido.AI.Actions.LLM.GenerateObject
   require Jido.AI.Actions.Planning.Decompose
   require Jido.AI.Actions.Planning.Plan
   require Jido.AI.Actions.Planning.Prioritize
-  require Jido.AI.Actions.Reasoning.Analyze
-  require Jido.AI.Actions.Reasoning.Explain
-  require Jido.AI.Actions.Reasoning.Infer
-  require Jido.AI.Actions.Streaming.EndStream
-  require Jido.AI.Actions.Streaming.ProcessTokens
-  require Jido.AI.Actions.Streaming.StartStream
+  require Jido.AI.Actions.Reasoning.RunStrategy
   require Jido.AI.Actions.ToolCalling.CallWithTools
   require Jido.AI.Actions.ToolCalling.ExecuteTool
   require Jido.AI.Actions.ToolCalling.ListTools
-
-  # ============================================================================
-  # Test Fixtures
-  # ============================================================================
 
   defmodule TestCalculator do
     use Jido.Action,
@@ -46,28 +33,15 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
     def run(%{operation: "subtract", a: a, b: b}, _context), do: {:ok, %{result: a - b}}
   end
 
-  defmodule TestSearch do
+  defmodule PluginFallbackAction do
     use Jido.Action,
-      name: "search",
-      description: "A search action for testing"
+      name: "plugin_fallback_action",
+      description: "sets a marker in state"
 
-    def run(%{query: query}, _context), do: {:ok, %{results: ["Result for: #{query}"]}}
+    def run(_params, _context), do: {:ok, %{plugin_fallback_executed: true}}
   end
 
-  # ============================================================================
-  # Strategy Configuration Tests
-  # ============================================================================
-
   describe "Strategy Configuration" do
-    test "ReAct strategy initializes with empty config" do
-      # ReAct requires tools option, so this test now expects an error
-      agent = %Agent{id: "test-agent", name: "test", state: %{}}
-
-      assert_raise ArgumentError, ~r/requires :tools option/, fn ->
-        ReAct.init(agent, %{})
-      end
-    end
-
     test "ReAct strategy initializes with tools" do
       agent = %Agent{id: "test-agent", name: "test", state: %{}}
 
@@ -79,158 +53,86 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       agent = %Agent{id: "test-agent", name: "test", state: %{}}
 
       assert {agent, []} = ReAct.init(agent, %{strategy_opts: [model: :fast, tools: [TestCalculator]]})
-
-      # Strategy state should be set
       assert is_map(agent.state)
     end
 
-    test "ReAct strategy initializes with direct model spec" do
+    test "ReAct strategy executes plugin-routed module actions through fallback" do
       agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      {agent, _} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
 
-      assert {agent, []} = ReAct.init(agent, %{strategy_opts: [model: "openai:gpt-4", tools: [TestCalculator]]})
+      instruction = %Jido.Instruction{action: PluginFallbackAction, params: %{}}
 
-      assert is_map(agent.state)
+      {updated_agent, directives} =
+        ReAct.cmd(agent, [instruction], %{agent_module: __MODULE__, strategy_opts: [tools: [TestCalculator]]})
+
+      assert updated_agent.state.plugin_fallback_executed == true
+      assert is_list(directives)
     end
   end
 
-  # ============================================================================
-  # Direct Action Execution Tests
-  # ============================================================================
-
   describe "Direct Action Execution" do
-    test "LLM Chat action can be executed directly" do
-      _params = %{
-        prompt: "What is 2+2?",
-        model: :fast,
-        max_tokens: 100
-      }
-
-      # Verify action exists and has schema
+    test "Chat action is available" do
       action = Jido.AI.Actions.LLM.Chat
       assert function_exported?(action, :schema, 0)
       assert function_exported?(action, :run, 2)
     end
 
-    test "Reasoning Analyze action can be executed directly" do
-      action = Jido.AI.Actions.Reasoning.Analyze
+    test "RunStrategy action is available" do
+      action = Jido.AI.Actions.Reasoning.RunStrategy
       assert function_exported?(action, :schema, 0)
       assert function_exported?(action, :run, 2)
     end
 
-    test "Planning Plan action can be executed directly" do
-      action = Jido.AI.Actions.Planning.Plan
-      assert function_exported?(action, :schema, 0)
-      assert function_exported?(action, :run, 2)
-    end
-
-    test "Streaming StartStream action can be executed directly" do
-      action = Jido.AI.Actions.Streaming.StartStream
-      assert function_exported?(action, :schema, 0)
-      assert function_exported?(action, :run, 2)
-    end
-
-    test "ToolCalling ExecuteTool action can be executed directly" do
-      action = Jido.AI.Actions.ToolCalling.ExecuteTool
-      assert function_exported?(action, :schema, 0)
-      assert function_exported?(action, :run, 2)
-    end
-
-    test "custom actions can be executed" do
-      assert {:ok, result} = TestCalculator.run(%{operation: "add", a: 5, b: 3}, %{})
-      assert result.result == 8
+    test "Planning and tool actions are available" do
+      assert function_exported?(Jido.AI.Actions.Planning.Plan, :run, 2)
+      assert function_exported?(Jido.AI.Actions.ToolCalling.ExecuteTool, :run, 2)
     end
   end
 
-  # ============================================================================
-  # Skill Mounting Tests
-  # ============================================================================
-
-  describe "Skill Mounting" do
-    test "LLM skill can be mounted to agent" do
+  describe "Plugin Mounting" do
+    test "Chat plugin can be mounted" do
       agent = %Agent{id: "test-agent", name: "test", state: %{}}
 
-      assert {:ok, skill_state} = LLM.mount(agent, %{})
-      assert is_map(skill_state)
-      assert skill_state.default_model == :fast
+      assert {:ok, plugin_state} = Chat.mount(agent, %{})
+      assert is_map(plugin_state)
+      assert plugin_state.default_model == :capable
     end
 
-    test "multiple skills can be mounted to same agent" do
+    test "strategy plugins can be mounted" do
       agent = %Agent{id: "test-agent", name: "test", state: %{}}
 
-      assert {:ok, llm_state} = LLM.mount(agent, %{})
-      assert {:ok, reasoning_state} = Reasoning.mount(agent, %{})
-      assert {:ok, planning_state} = Planning.mount(agent, %{})
+      assert {:ok, cot_state} = ChainOfThought.mount(agent, %{})
+      assert {:ok, adaptive_state} = Adaptive.mount(agent, %{})
 
-      # Each skill should have independent state
-      assert llm_state.default_model == :fast
-      assert reasoning_state.default_model == :reasoning
-      assert planning_state.default_model == :planning
+      assert cot_state.strategy == :cot
+      assert adaptive_state.strategy == :adaptive
     end
 
-    test "skill states are independent" do
+    test "plugin states are independent" do
       agent = %Agent{id: "test-agent", name: "test", state: %{}}
 
-      {:ok, llm_state} = LLM.mount(agent, %{default_max_tokens: 2048})
-      {:ok, reasoning_state} = Reasoning.mount(agent, %{default_max_tokens: 4096})
+      {:ok, chat_state} = Chat.mount(agent, %{default_max_tokens: 2048})
+      {:ok, planning_state} = Planning.mount(agent, %{default_max_tokens: 4096})
 
-      assert llm_state.default_max_tokens == 2048
-      assert reasoning_state.default_max_tokens == 4096
+      assert chat_state.default_max_tokens == 2048
+      assert planning_state.default_max_tokens == 4096
     end
   end
-
-  # ============================================================================
-  # Public API Stability Tests
-  # ============================================================================
 
   describe "Public API Stability" do
-    test "LLM.plugin_spec/1 is available" do
-      assert function_exported?(LLM, :plugin_spec, 1)
-      spec = LLM.plugin_spec(%{})
-      assert spec.module == LLM
-    end
-
-    test "Reasoning.plugin_spec/1 is available" do
-      assert function_exported?(Reasoning, :plugin_spec, 1)
-      spec = Reasoning.plugin_spec(%{})
-      assert spec.module == Reasoning
-    end
-
-    test "Planning.plugin_spec/1 is available" do
-      assert function_exported?(Planning, :plugin_spec, 1)
-      spec = Planning.plugin_spec(%{})
-      assert spec.module == Planning
-    end
-
-    test "Streaming.plugin_spec/1 is available" do
-      assert function_exported?(Streaming, :plugin_spec, 1)
-      spec = Streaming.plugin_spec(%{})
-      assert spec.module == Streaming
-    end
-
-    test "ToolCalling.plugin_spec/1 is available" do
-      assert function_exported?(ToolCalling, :plugin_spec, 1)
-      spec = ToolCalling.plugin_spec(%{})
-      assert spec.module == ToolCalling
+    test "plugin_spec/1 is available for public plugins" do
+      for plugin <- [Chat, Planning, ChainOfThought, TreeOfThoughts, GraphOfThoughts, TRM, Adaptive] do
+        assert function_exported?(plugin, :plugin_spec, 1)
+        spec = plugin.plugin_spec(%{})
+        assert spec.module == plugin
+      end
     end
 
     test "ReAct.start_action/0 is available" do
       assert function_exported?(ReAct, :start_action, 0)
       assert ReAct.start_action() == :ai_react_start
     end
-
-    test "ReAct.list_tools/1 is available" do
-      assert function_exported?(ReAct, :list_tools, 1)
-    end
-
-    test "ReAct.register_tool_action/0 is available" do
-      assert function_exported?(ReAct, :register_tool_action, 0)
-      assert ReAct.register_tool_action() == :ai_react_register_tool
-    end
   end
-
-  # ============================================================================
-  # Signal Routes Tests
-  # ============================================================================
 
   describe "Signal Routes" do
     test "ReAct signal_routes/1 is available" do
@@ -239,20 +141,37 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert is_list(routes)
     end
 
-    test "signal routes include expected patterns" do
+    test "ReAct routes include expected patterns" do
       routes = ReAct.signal_routes(%{})
       route_map = Map.new(routes)
 
       assert Map.has_key?(route_map, "ai.react.query")
       assert Map.has_key?(route_map, "ai.react.worker.event")
-      assert Map.has_key?(route_map, "jido.agent.child.started")
-      assert Map.has_key?(route_map, "jido.agent.child.exit")
       assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
       assert route_map["ai.tool.result"] == Jido.Actions.Control.Noop
+    end
+
+    test "chat and reasoning plugin routes include expected patterns" do
+      chat_routes = Map.new(Chat.signal_routes(%{}))
+
+      assert Map.has_key?(chat_routes, "chat.message")
+      assert Map.has_key?(chat_routes, "chat.list_tools")
+
+      assert Map.has_key?(Map.new(ChainOfThought.signal_routes(%{})), "reasoning.cot.run")
+      assert Map.has_key?(Map.new(TreeOfThoughts.signal_routes(%{})), "reasoning.tot.run")
+      assert Map.has_key?(Map.new(GraphOfThoughts.signal_routes(%{})), "reasoning.got.run")
+      assert Map.has_key?(Map.new(TRM.signal_routes(%{})), "reasoning.trm.run")
+      assert Map.has_key?(Map.new(Adaptive.signal_routes(%{})), "reasoning.adaptive.run")
     end
   end
 
   describe "Strict Break Contracts" do
+    test "legacy plugin modules are not part of the public surface" do
+      refute Code.ensure_loaded?(Jido.AI.Plugins.LLM)
+      refute Code.ensure_loaded?(Jido.AI.Plugins.ToolCalling)
+      refute Code.ensure_loaded?(Jido.AI.Plugins.Reasoning)
+    end
+
     test "legacy react.* signal names are not routed" do
       route_map = ReAct.signal_routes(%{}) |> Map.new()
 
@@ -262,221 +181,19 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       refute Map.has_key?(route_map, "react.tool.result")
       refute Map.has_key?(route_map, "react.request.error")
     end
-
-    test "RequestError requires request_id payload key" do
-      assert {:error, _} =
-               Signal.RequestError.new(%{
-                 call_id: "legacy_call",
-                 reason: :busy,
-                 message: "legacy payload"
-               })
-
-      assert {:ok, signal} =
-               Signal.RequestError.new(%{
-                 request_id: "req_1",
-                 reason: :busy,
-                 message: "busy"
-               })
-
-      assert signal.type == "ai.request.error"
-      assert signal.data.request_id == "req_1"
-    end
   end
 
-  # ============================================================================
-  # Skill Action Lists Tests
-  # ============================================================================
-
-  describe "Skill Action Lists" do
-    test "LLM.actions/0 returns action list" do
-      assert function_exported?(LLM, :actions, 0)
-      actions = LLM.actions()
-      assert is_list(actions)
-      assert length(actions) == 4
+  describe "Helpers Availability" do
+    test "Helpers module is available" do
+      assert Code.ensure_loaded?(Jido.AI.Reasoning.Helpers)
     end
 
-    test "Reasoning.actions/0 returns action list" do
-      assert function_exported?(Reasoning, :actions, 0)
-      actions = Reasoning.actions()
-      assert is_list(actions)
-      assert length(actions) == 3
-    end
+    test "Helpers has expected runtime fallback functions" do
+      helpers = Jido.AI.Reasoning.Helpers
 
-    test "Planning.actions/0 returns action list" do
-      assert function_exported?(Planning, :actions, 0)
-      actions = Planning.actions()
-      assert is_list(actions)
-      assert length(actions) == 3
-    end
-
-    test "Streaming.actions/0 returns action list" do
-      assert function_exported?(Streaming, :actions, 0)
-      actions = Streaming.actions()
-      assert is_list(actions)
-      assert length(actions) == 3
-    end
-
-    test "ToolCalling.actions/0 returns action list" do
-      assert function_exported?(ToolCalling, :actions, 0)
-      actions = ToolCalling.actions()
-      assert is_list(actions)
-      assert length(actions) == 3
-    end
-  end
-
-  # ============================================================================
-  # Skill Router Tests
-  # ============================================================================
-
-  describe "Skill Signal Routes" do
-    test "LLM signal_routes returns expected routes" do
-      routes = LLM.signal_routes(%{})
-      assert is_list(routes)
-      assert length(routes) == 4
-    end
-
-    test "Reasoning signal_routes returns expected routes" do
-      routes = Reasoning.signal_routes(%{})
-      assert is_list(routes)
-      assert length(routes) == 3
-    end
-
-    test "Planning signal_routes returns expected routes" do
-      routes = Planning.signal_routes(%{})
-      assert is_list(routes)
-      assert length(routes) == 3
-    end
-
-    test "Streaming signal_routes returns expected routes" do
-      routes = Streaming.signal_routes(%{})
-      assert is_list(routes)
-      assert length(routes) == 3
-    end
-
-    test "ToolCalling signal_routes returns expected routes" do
-      routes = ToolCalling.signal_routes(%{})
-      assert is_list(routes)
-      assert length(routes) == 3
-    end
-  end
-
-  # ============================================================================
-  # StateOps Helpers Tests
-  # ============================================================================
-
-  describe "StateOps Helpers Availability" do
-    test "StateOpsHelpers module is available" do
-      assert Code.ensure_loaded?(Jido.AI.Strategy.StateOpsHelpers)
-    end
-
-    test "StateOpsHelpers has expected functions" do
-      helpers = Jido.AI.Strategy.StateOpsHelpers
-
-      assert function_exported?(helpers, :update_strategy_state, 1)
-      assert function_exported?(helpers, :set_strategy_field, 2)
-      assert function_exported?(helpers, :set_iteration_status, 1)
-      assert function_exported?(helpers, :set_iteration, 1)
-      assert function_exported?(helpers, :append_conversation, 1)
-      assert function_exported?(helpers, :set_pending_tools, 1)
-      assert function_exported?(helpers, :clear_pending_tools, 0)
-    end
-  end
-
-  # ============================================================================
-  # Breaking Changes Detection
-  # ============================================================================
-
-  describe "Breaking Changes Detection" do
-    test "agent struct still has id field" do
-      agent = %Agent{id: "test", name: "test", state: %{}}
-      assert agent.id == "test"
-    end
-
-    test "agent struct still has name field" do
-      agent = %Agent{id: "test", name: "test", state: %{}}
-      assert agent.name == "test"
-    end
-
-    test "agent struct still has state field" do
-      agent = %Agent{id: "test", name: "test", state: %{}}
-      assert is_map(agent.state)
-    end
-
-    test "ReAct.init/2 still returns {agent, directives} tuple" do
-      agent = %Agent{id: "test", name: "test", state: %{}}
-
-      assert {updated_agent, directives} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
-      assert %Agent{} = updated_agent
-      assert is_list(directives)
-    end
-
-    test "ReAct.cmd/3 still returns {agent, directives} tuple" do
-      agent = %Agent{id: "test", name: "test", state: %{}}
-      {agent, _} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
-
-      instruction = %Jido.Instruction{
-        action: ReAct.start_action(),
-        params: %{query: "test"}
-      }
-
-      assert {updated_agent, directives} = ReAct.cmd(agent, [instruction], %{})
-      assert %Agent{} = updated_agent
-      assert is_list(directives)
-    end
-  end
-
-  # ============================================================================
-  # Phase 9 Success Criteria
-  # ============================================================================
-
-  describe "Phase 9 Success Criteria" do
-    test "all 5 skills are available" do
-      assert Code.ensure_loaded?(LLM)
-      assert Code.ensure_loaded?(Reasoning)
-      assert Code.ensure_loaded?(Planning)
-      assert Code.ensure_loaded?(Streaming)
-      assert Code.ensure_loaded?(ToolCalling)
-    end
-
-    test "all skills have plugin_spec/1" do
-      assert function_exported?(LLM, :plugin_spec, 1)
-      assert function_exported?(Reasoning, :plugin_spec, 1)
-      assert function_exported?(Planning, :plugin_spec, 1)
-      assert function_exported?(Streaming, :plugin_spec, 1)
-      assert function_exported?(ToolCalling, :plugin_spec, 1)
-    end
-
-    test "all skills have mount/2" do
-      assert function_exported?(LLM, :mount, 2)
-      assert function_exported?(Reasoning, :mount, 2)
-      assert function_exported?(Planning, :mount, 2)
-      assert function_exported?(Streaming, :mount, 2)
-      assert function_exported?(ToolCalling, :mount, 2)
-    end
-
-    test "all skills have signal_routes/1" do
-      assert function_exported?(LLM, :signal_routes, 1)
-      assert function_exported?(Reasoning, :signal_routes, 1)
-      assert function_exported?(Planning, :signal_routes, 1)
-      assert function_exported?(Streaming, :signal_routes, 1)
-      assert function_exported?(ToolCalling, :signal_routes, 1)
-    end
-
-    test "StateOpsHelpers is available" do
-      assert Code.ensure_loaded?(Jido.AI.Strategy.StateOpsHelpers)
-    end
-
-    test "no breaking changes in core APIs" do
-      # Agent struct unchanged
-      agent = %Agent{id: "test", name: "test", state: %{}}
-      assert Map.has_key?(agent, :id)
-      assert Map.has_key?(agent, :name)
-      assert Map.has_key?(agent, :state)
-
-      # ReAct strategy APIs unchanged
-      assert function_exported?(ReAct, :init, 2)
-      assert function_exported?(ReAct, :cmd, 3)
-      assert function_exported?(ReAct, :signal_routes, 1)
+      assert function_exported?(helpers, :maybe_execute_action_instruction, 3)
+      assert function_exported?(helpers, :execute_action_instruction, 3)
+      assert function_exported?(helpers, :action_context, 2)
     end
   end
 end

@@ -56,7 +56,7 @@ Fix:
 
 ## Registry Lifecycle Guarantees
 
-`Jido.AI.Streaming.Registry` and `Jido.AI.Skill.Registry` share the same startup semantics:
+`Jido.AI.Skill.Registry` supports:
 
 - explicit supervised startup via `start_link/1`
 - lazy startup via `ensure_started/0` for call-site safety

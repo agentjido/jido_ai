@@ -71,7 +71,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.Reasoning.GraphOfThoughts.Machine
-  alias Jido.AI.Strategy.StateOpsHelpers
+  alias Jido.AI.Reasoning.Helpers
   alias ReqLLM.Context
 
   @default_model "anthropic:claude-haiku-4-5"
@@ -203,17 +203,17 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     state =
       machine
       |> Machine.to_map()
-      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+      |> Helpers.apply_to_state([Helpers.update_config(config)])
 
     agent = StratState.put(agent, state)
     {agent, []}
   end
 
   @impl true
-  def cmd(%Agent{} = agent, instructions, _ctx) do
+  def cmd(%Agent{} = agent, instructions, ctx) do
     {agent, dirs_rev} =
       Enum.reduce(instructions, {agent, []}, fn instr, {acc_agent, acc_dirs} ->
-        case process_instruction(acc_agent, instr) do
+        case process_instruction(acc_agent, instr, ctx) do
           {new_agent, new_dirs} ->
             {new_agent, Enum.reverse(new_dirs, acc_dirs)}
 
@@ -289,17 +289,33 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     opts = ctx[:strategy_opts] || []
 
     # Resolve model
-    raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
+    raw_model = Map.get(agent.state, :model, Keyword.get(opts, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
 
     %{
       model: resolved_model,
-      max_nodes: Keyword.get(opts, :max_nodes, 20),
-      max_depth: Keyword.get(opts, :max_depth, 5),
-      aggregation_strategy: Keyword.get(opts, :aggregation_strategy, :synthesis),
-      generation_prompt: Keyword.get(opts, :generation_prompt, Machine.default_generation_prompt()),
-      connection_prompt: Keyword.get(opts, :connection_prompt, Machine.default_connection_prompt()),
-      aggregation_prompt: Keyword.get(opts, :aggregation_prompt, Machine.default_aggregation_prompt())
+      max_nodes: Map.get(agent.state, :max_nodes, Keyword.get(opts, :max_nodes, 20)),
+      max_depth: Map.get(agent.state, :max_depth, Keyword.get(opts, :max_depth, 5)),
+      aggregation_strategy:
+        Map.get(agent.state, :aggregation_strategy, Keyword.get(opts, :aggregation_strategy, :synthesis)),
+      generation_prompt:
+        Map.get(
+          agent.state,
+          :generation_prompt,
+          Keyword.get(opts, :generation_prompt, Machine.default_generation_prompt())
+        ),
+      connection_prompt:
+        Map.get(
+          agent.state,
+          :connection_prompt,
+          Keyword.get(opts, :connection_prompt, Machine.default_connection_prompt())
+        ),
+      aggregation_prompt:
+        Map.get(
+          agent.state,
+          :aggregation_prompt,
+          Keyword.get(opts, :aggregation_prompt, Machine.default_aggregation_prompt())
+        )
     }
   end
 
@@ -311,7 +327,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     model
   end
 
-  defp process_instruction(agent, %{action: @start, params: params}) do
+  defp process_instruction(agent, %{action: @start, params: params}, _ctx) do
     state = StratState.get(agent, %{})
     machine = Machine.from_map(state)
 
@@ -324,13 +340,13 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     updated_state =
       updated_machine
       |> Machine.to_map()
-      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(state[:config])])
+      |> Helpers.apply_to_state([Helpers.update_config(state[:config])])
 
     updated_agent = StratState.put(agent, updated_state)
     {updated_agent, lifted}
   end
 
-  defp process_instruction(agent, %{action: @llm_result, params: params}) do
+  defp process_instruction(agent, %{action: @llm_result, params: params}, _ctx) do
     state = StratState.get(agent, %{})
     machine = Machine.from_map(state)
 
@@ -343,13 +359,13 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     updated_state =
       updated_machine
       |> Machine.to_map()
-      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(state[:config])])
+      |> Helpers.apply_to_state([Helpers.update_config(state[:config])])
 
     updated_agent = StratState.put(agent, updated_state)
     {updated_agent, lifted}
   end
 
-  defp process_instruction(agent, %{action: @llm_partial, params: params}) do
+  defp process_instruction(agent, %{action: @llm_partial, params: params}, _ctx) do
     state = StratState.get(agent, %{})
     machine = Machine.from_map(state)
 
@@ -365,13 +381,13 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     updated_state =
       updated_machine
       |> Machine.to_map()
-      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(state[:config])])
+      |> Helpers.apply_to_state([Helpers.update_config(state[:config])])
 
     updated_agent = StratState.put(agent, updated_state)
     {updated_agent, lifted}
   end
 
-  defp process_instruction(agent, %{action: @request_error, params: params}) do
+  defp process_instruction(agent, %{action: @request_error, params: params}, _ctx) do
     request_id = Map.get(params, :request_id) || Map.get(params, "request_id")
     reason = Map.get(params, :reason) || Map.get(params, "reason")
     message = Map.get(params, :message) || Map.get(params, "message")
@@ -385,7 +401,11 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     end
   end
 
-  defp process_instruction(_agent, _instruction), do: :noop
+  defp process_instruction(agent, %Jido.Instruction{} = instruction, ctx) do
+    Helpers.maybe_execute_action_instruction(agent, instruction, ctx)
+  end
+
+  defp process_instruction(_agent, _instruction, _ctx), do: :noop
 
   defp lift_directives(directives, state) do
     config = Map.get(state, :config, %{})

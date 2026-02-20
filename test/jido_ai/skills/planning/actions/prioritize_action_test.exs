@@ -88,6 +88,30 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
       assert {:ok, result} = Prioritize.run(params, %{})
       refute Enum.empty?(result.ordered_tasks)
     end
+
+    test "uses plugin defaults when params are omitted" do
+      params = %{tasks: ["Task A", "Task B"]}
+
+      context = %{
+        provided_params: [:tasks],
+        plugin_state: %{planning: %{default_model: :fast, default_max_tokens: 1111, default_temperature: 0.3}}
+      }
+
+      assert {:ok, result} = Prioritize.run(params, context)
+      assert result.model == Jido.AI.resolve_model(:fast)
+    end
+
+    test "explicit model overrides plugin default" do
+      params = %{tasks: ["Task A", "Task B"], model: "custom:model"}
+
+      context = %{
+        provided_params: [:tasks, :model],
+        plugin_state: %{planning: %{default_model: :fast}}
+      }
+
+      assert {:ok, result} = Prioritize.run(params, context)
+      assert result.model == "custom:model"
+    end
   end
 
   describe "model resolution" do

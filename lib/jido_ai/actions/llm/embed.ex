@@ -63,7 +63,8 @@ defmodule Jido.AI.Actions.LLM.Embed do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
-  alias Jido.AI.Security
+  alias Jido.AI.Error.Sanitize
+  alias Jido.AI.Validation
 
   @doc """
   Executes the embedding action.
@@ -89,7 +90,7 @@ defmodule Jido.AI.Actions.LLM.Embed do
   # Private Functions
 
   defp validate_and_sanitize_params(params) do
-    with {:ok, _model} <- Security.validate_string(params[:model], max_length: 1000),
+    with {:ok, _model} <- Validation.validate_string(params[:model], max_length: 1000),
          {:ok, _validated} <- validate_texts(params) do
       {:ok, params}
     else
@@ -99,12 +100,12 @@ defmodule Jido.AI.Actions.LLM.Embed do
   end
 
   defp validate_texts(%{texts: text}) when is_binary(text),
-    do: Security.validate_string(text, max_length: Security.max_input_length())
+    do: Validation.validate_string(text, max_length: Validation.max_input_length())
 
   defp validate_texts(%{texts_list: texts_list}) when is_list(texts_list) do
     # Validate each text in the list
     Enum.reduce_while(texts_list, {:ok, nil}, fn text, _acc ->
-      case Security.validate_string(text, max_length: Security.max_input_length()) do
+      case Validation.validate_string(text, max_length: Validation.max_input_length()) do
         {:ok, _} -> {:cont, {:ok, nil}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
@@ -114,11 +115,11 @@ defmodule Jido.AI.Actions.LLM.Embed do
   defp validate_texts(_params), do: {:error, :texts_required}
 
   defp sanitize_error_for_user(error) when is_struct(error) do
-    Security.sanitize_error_message(error)
+    Sanitize.sanitize_error_message(error)
   end
 
   defp sanitize_error_for_user(error) when is_atom(error) do
-    Security.sanitize_error_message(error)
+    Sanitize.sanitize_error_message(error)
   end
 
   defp sanitize_error_for_user(_error), do: "An error occurred"

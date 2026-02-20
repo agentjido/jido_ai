@@ -45,10 +45,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
       |> maybe_put(:run_id, params[:run_id])
       |> maybe_put(:task_supervisor, resolve_task_supervisor(params, context))
 
-    runtime_context =
-      context
-      |> normalize_context()
-      |> Map.merge(params[:runtime_context] || %{})
+    runtime_context = Map.merge(context, params[:runtime_context] || %{})
 
     Keyword.put(opts, :context, runtime_context)
   end
@@ -75,9 +72,6 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
   end
 
   defp context_task_supervisor(_), do: nil
-
-  defp normalize_context(%{} = context), do: context
-  defp normalize_context(_), do: %{}
 
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)

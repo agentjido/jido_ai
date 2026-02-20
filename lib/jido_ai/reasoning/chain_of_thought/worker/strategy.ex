@@ -124,7 +124,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
       seq: 0
     }
 
-    {StratState.put(agent, state), []}
+    {put_strategy_state(agent, state), []}
   end
 
   @impl true
@@ -193,7 +193,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
             |> Map.put(:last_error, nil)
             |> Map.put(:seq, 0)
 
-          {StratState.put(agent, new_state), []}
+          {put_strategy_state(agent, new_state), []}
 
         {:error, reason} ->
           event =
@@ -211,7 +211,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
             |> Map.put(:last_error, reason)
 
           directives = List.wrap(emit_parent_event(agent, request_id, event))
-          {StratState.put(agent, new_state), directives}
+          {put_strategy_state(agent, new_state), directives}
       end
     end
   end
@@ -246,7 +246,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
       |> maybe_finish_run(kind)
 
     directives = List.wrap(emit_parent_event(agent, request_id, event))
-    {StratState.put(agent, new_state), directives}
+    {put_strategy_state(agent, new_state), directives}
   end
 
   defp process_runtime_event(agent, _params), do: {agent, []}
@@ -261,7 +261,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
         state
       end
 
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_runtime_done(agent, _params), do: {agent, []}
@@ -285,7 +285,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
         |> Map.put(:last_error, error)
 
       directives = List.wrap(emit_parent_event(agent, request_id, event))
-      {StratState.put(agent, new_state), directives}
+      {put_strategy_state(agent, new_state), directives}
     else
       {agent, []}
     end
@@ -353,7 +353,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
 
         chunks = Enum.reverse(chunks)
         summary = ReqLLM.Response.Stream.summarize(chunks)
-        text = summary.text || ""
+        text = summary.text
         usage = ReqLLM.StreamResponse.usage(stream_response) || summary.usage || %{}
 
         {seq, _event} =
@@ -620,6 +620,10 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
       data: data
     })
     |> Map.from_struct()
+  end
+
+  defp put_strategy_state(%Agent{} = agent, state) when is_map(state) do
+    %{agent | state: Map.put(agent.state, StratState.key(), state)}
   end
 
   defp start_task(fun, task_supervisor) when is_pid(task_supervisor) do

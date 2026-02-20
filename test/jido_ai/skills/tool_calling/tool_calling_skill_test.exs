@@ -1,23 +1,23 @@
-defmodule Jido.AI.Plugins.ToolCallingTest do
+defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Plugins.ToolCalling
+  alias Jido.AI.Plugins.Reasoning.ChainOfThought
 
   describe "plugin_spec/1" do
-    test "returns valid skill spec with empty config" do
-      spec = ToolCalling.plugin_spec(%{})
+    test "returns valid plugin spec" do
+      spec = ChainOfThought.plugin_spec(%{})
 
-      assert spec.module == ToolCalling
-      assert spec.name == "tool_calling"
-      assert spec.state_key == :tool_calling
+      assert spec.module == ChainOfThought
+      assert spec.name == "reasoning_chain_of_thought"
+      assert spec.state_key == :reasoning_cot
       assert spec.category == "ai"
       assert is_list(spec.actions)
-      assert length(spec.actions) == 3
+      assert spec.actions == [Jido.AI.Actions.Reasoning.RunStrategy]
     end
 
-    test "includes config in skill spec" do
-      config = %{auto_execute: true, max_turns: 5}
-      spec = ToolCalling.plugin_spec(config)
+    test "includes config in plugin spec" do
+      config = %{default_model: :capable, timeout: 15_000}
+      spec = ChainOfThought.plugin_spec(config)
 
       assert spec.config == config
     end
@@ -25,41 +25,45 @@ defmodule Jido.AI.Plugins.ToolCallingTest do
 
   describe "mount/2" do
     test "initializes state with defaults" do
-      {:ok, state} = ToolCalling.mount(%Jido.Agent{}, %{})
+      {:ok, state} = ChainOfThought.mount(%Jido.Agent{}, %{})
 
-      assert state.default_model == :capable
-      assert state.default_max_tokens == 4096
-      assert state.default_temperature == 0.7
-      assert state.auto_execute == false
-      assert state.max_turns == 10
-      assert is_list(state.available_tools)
+      assert state.strategy == :cot
+      assert state.default_model == :reasoning
+      assert state.timeout == 30_000
+      assert state.options == %{}
     end
 
     test "merges custom config into initial state" do
       {:ok, state} =
-        ToolCalling.mount(%Jido.Agent{}, %{auto_execute: true, max_turns: 5})
+        ChainOfThought.mount(%Jido.Agent{}, %{default_model: :fast, timeout: 5000, options: %{llm_timeout_ms: 2000}})
 
-      assert state.auto_execute == true
-      assert state.max_turns == 5
-      assert state.default_model == :capable
+      assert state.strategy == :cot
+      assert state.default_model == :fast
+      assert state.timeout == 5000
+      assert state.options == %{llm_timeout_ms: 2000}
     end
 
     test "mounted state validates against plugin schema" do
-      {:ok, state} =
-        ToolCalling.mount(%Jido.Agent{}, %{tools: [Jido.AI.Actions.ToolCalling.ExecuteTool]})
+      {:ok, state} = ChainOfThought.mount(%Jido.Agent{}, %{})
 
-      assert {:ok, _parsed_state} = Zoi.parse(ToolCalling.schema(), state)
+      assert {:ok, _parsed_state} = Zoi.parse(ChainOfThought.schema(), state)
     end
   end
 
   describe "actions" do
-    test "returns all three actions" do
-      actions = ToolCalling.actions()
+    test "returns RunStrategy action" do
+      actions = ChainOfThought.actions()
 
-      assert length(actions) == 3
-      assert Jido.AI.Actions.ToolCalling.CallWithTools in actions
-      assert Jido.AI.Actions.ToolCalling.ExecuteTool in actions
-      assert Jido.AI.Actions.ToolCalling.ListTools in actions
+      assert actions == [Jido.AI.Actions.Reasoning.RunStrategy]
+    end
+  end
+
+  describe "signal routing" do
+    test "routes reasoning.cot.run to RunStrategy" do
+      routes = ChainOfThought.signal_routes(%{})
+      route_map = Map.new(routes)
+
+      assert route_map["reasoning.cot.run"] == Jido.AI.Actions.Reasoning.RunStrategy
     end
   end
 end

@@ -123,7 +123,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
       seq: 0
     }
 
-    {StratState.put(agent, state), []}
+    {put_strategy_state(agent, state), []}
   end
 
   @impl true
@@ -199,7 +199,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
             |> Map.put(:last_error, nil)
             |> Map.put(:seq, 0)
 
-          {StratState.put(agent, new_state), []}
+          {put_strategy_state(agent, new_state), []}
 
         {:error, reason} ->
           event =
@@ -217,7 +217,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
             |> Map.put(:last_error, reason)
 
           directives = List.wrap(emit_parent_event(agent, request_id, event))
-          {StratState.put(agent, new_state), directives}
+          {put_strategy_state(agent, new_state), directives}
       end
     end
   end
@@ -255,7 +255,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
       |> maybe_finish_run(kind)
 
     directives = List.wrap(emit_parent_event(agent, request_id, event))
-    {StratState.put(agent, new_state), directives}
+    {put_strategy_state(agent, new_state), directives}
   end
 
   defp process_runtime_event(agent, _params), do: {agent, []}
@@ -270,7 +270,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
         state
       end
 
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_runtime_done(agent, _params), do: {agent, []}
@@ -294,7 +294,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
         |> Map.put(:last_error, error)
 
       directives = List.wrap(emit_parent_event(agent, request_id, event))
-      {StratState.put(agent, new_state), directives}
+      {put_strategy_state(agent, new_state), directives}
     else
       {agent, []}
     end
@@ -424,6 +424,10 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
 
   defp maybe_put_task_supervisor(opts, nil), do: opts
   defp maybe_put_task_supervisor(opts, task_supervisor), do: Keyword.put(opts, :task_supervisor, task_supervisor)
+
+  defp put_strategy_state(%Agent{} = agent, state) when is_map(state) do
+    %{agent | state: Map.put(agent.state, StratState.key(), state)}
+  end
 
   defp start_task(fun, task_supervisor) when is_pid(task_supervisor) do
     Task.Supervisor.start_child(task_supervisor, fun)

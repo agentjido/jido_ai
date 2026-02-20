@@ -8,6 +8,8 @@ defmodule Jido.AI do
   ## Features
 
   - Model aliases for semantic model references
+  - Lightweight app-configured LLM defaults
+  - Thin ReqLLM generation facades
   - Action-based AI workflows
   - Splode-based error handling
 
@@ -26,9 +28,29 @@ defmodule Jido.AI do
           capable: "anthropic:claude-sonnet-4-20250514"
         }
 
+  A broad list of provider/model IDs is available at: https://llmdb.xyz
+
+  ## LLM Defaults
+
+  Configure small, role-based defaults for top-level generation helpers:
+
+      config :jido_ai,
+        llm_defaults: %{
+          text: %{model: :fast, temperature: 0.2, max_tokens: 1024},
+          object: %{model: :thinking, temperature: 0.0, max_tokens: 1024},
+          stream: %{model: :fast, temperature: 0.2, max_tokens: 1024}
+        }
+
+  Then call the facade directly:
+
+      {:ok, response} = Jido.AI.generate_text("Summarize this in one sentence.")
+      {:ok, json} = Jido.AI.generate_object("Extract fields", schema)
+      {:ok, stream} = Jido.AI.stream_text("Stream this response")
+
   ## Runtime Tool Management
 
   Register and unregister tools dynamically with running agents:
+  k
 
       # Register a new tool
       {:ok, agent} = Jido.AI.register_tool(agent_pid, MyApp.Tools.Calculator)
@@ -46,14 +68,50 @@ defmodule Jido.AI do
 
   """
 
-  @type model_alias :: :fast | :capable | :reasoning | :planning | atom()
+  alias Jido.AI.Turn
+  alias ReqLLM.Context
+
+  @type model_alias ::
+          :fast | :capable | :thinking | :reasoning | :planning | :image | :embedding | atom()
   @type model_spec :: String.t()
+  @type llm_kind :: :text | :object | :stream
+  @type llm_generation_opts :: %{
+          optional(:model) => model_alias() | model_spec(),
+          optional(:system_prompt) => String.t(),
+          optional(:max_tokens) => non_neg_integer(),
+          optional(:temperature) => number(),
+          optional(:timeout) => pos_integer()
+        }
 
   @default_aliases %{
     fast: "anthropic:claude-haiku-4-5",
     capable: "anthropic:claude-sonnet-4-20250514",
+    thinking: "anthropic:claude-sonnet-4-20250514",
     reasoning: "anthropic:claude-sonnet-4-20250514",
-    planning: "anthropic:claude-sonnet-4-20250514"
+    planning: "anthropic:claude-sonnet-4-20250514",
+    image: "openai:gpt-image-1",
+    embedding: "openai:text-embedding-3-small"
+  }
+
+  @default_llm_defaults %{
+    text: %{
+      model: :fast,
+      temperature: 0.2,
+      max_tokens: 1024,
+      timeout: 30_000
+    },
+    object: %{
+      model: :thinking,
+      temperature: 0.0,
+      max_tokens: 1024,
+      timeout: 30_000
+    },
+    stream: %{
+      model: :fast,
+      temperature: 0.2,
+      max_tokens: 1024,
+      timeout: 30_000
+    }
   }
 
   @doc """
@@ -69,6 +127,38 @@ defmodule Jido.AI do
   def model_aliases do
     configured = Application.get_env(:jido_ai, :model_aliases, %{})
     Map.merge(@default_aliases, configured)
+  end
+
+  @doc """
+  Returns configured LLM generation defaults merged with built-in defaults.
+
+  Configure under `config :jido_ai, :llm_defaults`.
+  """
+  @spec llm_defaults() :: %{llm_kind() => llm_generation_opts()}
+  def llm_defaults do
+    configured = Application.get_env(:jido_ai, :llm_defaults, %{})
+
+    Map.merge(@default_llm_defaults, configured, fn _kind, default_opts, configured_opts ->
+      if is_map(configured_opts) do
+        Map.merge(default_opts, configured_opts)
+      else
+        default_opts
+      end
+    end)
+  end
+
+  @doc """
+  Returns defaults for a specific generation kind: `:text`, `:object`, or `:stream`.
+  """
+  @spec llm_defaults(llm_kind()) :: llm_generation_opts()
+  def llm_defaults(kind) when kind in [:text, :object, :stream] do
+    Map.fetch!(llm_defaults(), kind)
+  end
+
+  def llm_defaults(kind) do
+    raise ArgumentError,
+          "Unknown LLM defaults kind: #{inspect(kind)}. " <>
+            "Expected one of: :text, :object, :stream"
   end
 
   @doc """
@@ -111,6 +201,74 @@ defmodule Jido.AI do
 
       spec ->
         spec
+    end
+  end
+
+  @doc """
+  Thin facade for `ReqLLM.Generation.generate_text/3`.
+
+  `opts` supports:
+
+  - `:model` - model alias or direct model spec
+  - `:system_prompt` - optional system prompt
+  - `:max_tokens`, `:temperature`, `:timeout`
+  - Any other ReqLLM options (e.g. `:tools`, `:tool_choice`) as pass-through options
+  """
+  @spec generate_text(term(), keyword()) :: {:ok, term()} | {:error, term()}
+  def generate_text(input, opts \\ []) when is_list(opts) do
+    defaults = llm_defaults(:text)
+    model = resolve_generation_model(opts, defaults)
+    system_prompt = Keyword.get(opts, :system_prompt, defaults[:system_prompt])
+
+    with {:ok, req_context} <- normalize_context(input, system_prompt) do
+      ReqLLM.Generation.generate_text(model, req_context.messages, build_reqllm_opts(opts, defaults))
+    end
+  end
+
+  @doc """
+  Thin facade for `ReqLLM.Generation.generate_object/4`.
+
+  `opts` has the same behavior as `generate_text/2`.
+  """
+  @spec generate_object(term(), term(), keyword()) :: {:ok, term()} | {:error, term()}
+  def generate_object(input, object_schema, opts \\ []) when is_list(opts) do
+    defaults = llm_defaults(:object)
+    model = resolve_generation_model(opts, defaults)
+    system_prompt = Keyword.get(opts, :system_prompt, defaults[:system_prompt])
+
+    with {:ok, req_context} <- normalize_context(input, system_prompt) do
+      ReqLLM.Generation.generate_object(
+        model,
+        req_context.messages,
+        object_schema,
+        build_reqllm_opts(opts, defaults)
+      )
+    end
+  end
+
+  @doc """
+  Thin facade for `ReqLLM.stream_text/3`.
+
+  Returns ReqLLM stream response directly.
+  """
+  @spec stream_text(term(), keyword()) :: {:ok, term()} | {:error, term()}
+  def stream_text(input, opts \\ []) when is_list(opts) do
+    defaults = llm_defaults(:stream)
+    model = resolve_generation_model(opts, defaults)
+    system_prompt = Keyword.get(opts, :system_prompt, defaults[:system_prompt])
+
+    with {:ok, req_context} <- normalize_context(input, system_prompt) do
+      ReqLLM.stream_text(model, req_context.messages, build_reqllm_opts(opts, defaults))
+    end
+  end
+
+  @doc """
+  Convenience helper that returns extracted response text.
+  """
+  @spec ask(term(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def ask(input, opts \\ []) when is_list(opts) do
+    with {:ok, response} <- generate_text(input, opts) do
+      {:ok, Turn.extract_text(response)}
     end
   end
 
@@ -259,4 +417,44 @@ defmodule Jido.AI do
         :ok
     end
   end
+
+  # Private helpers for top-level LLM facades
+
+  defp resolve_generation_model(opts, defaults) do
+    opts
+    |> Keyword.get(:model, defaults[:model] || :fast)
+    |> resolve_model()
+  end
+
+  defp normalize_context(input, system_prompt) when system_prompt in [nil, ""] do
+    Context.normalize(input)
+  end
+
+  defp normalize_context(input, system_prompt) when is_binary(system_prompt) do
+    Context.normalize(input, system_prompt: system_prompt)
+  end
+
+  defp build_reqllm_opts(opts, defaults) do
+    req_opts =
+      []
+      |> put_opt(:max_tokens, Keyword.get(opts, :max_tokens, defaults[:max_tokens]))
+      |> put_opt(:temperature, Keyword.get(opts, :temperature, defaults[:temperature]))
+      |> put_timeout_opt(Keyword.get(opts, :timeout, defaults[:timeout]))
+
+    passthrough_opts = Keyword.drop(opts, [:model, :system_prompt, :max_tokens, :temperature, :timeout, :opts])
+    extra_opts = Keyword.get(opts, :opts, [])
+
+    req_opts
+    |> Keyword.merge(passthrough_opts)
+    |> merge_extra_opts(extra_opts)
+  end
+
+  defp put_opt(opts, _key, nil), do: opts
+  defp put_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp put_timeout_opt(opts, nil), do: opts
+  defp put_timeout_opt(opts, timeout), do: Keyword.put(opts, :receive_timeout, timeout)
+
+  defp merge_extra_opts(opts, extra_opts) when is_list(extra_opts), do: Keyword.merge(opts, extra_opts)
+  defp merge_extra_opts(opts, _), do: opts
 end

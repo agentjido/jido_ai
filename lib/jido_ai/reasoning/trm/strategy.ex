@@ -65,7 +65,7 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
-  alias Jido.AI.Strategy.StateOpsHelpers
+  alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Reasoning.TRM.Machine
   alias Jido.AI.Reasoning.TRM.Reasoning
   alias Jido.AI.Reasoning.TRM.Supervision
@@ -211,17 +211,17 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
     state =
       machine
       |> Machine.to_map()
-      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+      |> Helpers.apply_to_state([Helpers.update_config(config)])
 
     agent = StratState.put(agent, state)
     {agent, []}
   end
 
   @impl true
-  def cmd(%Agent{} = agent, instructions, _ctx) do
+  def cmd(%Agent{} = agent, instructions, ctx) do
     {agent, dirs_rev} =
       Enum.reduce(instructions, {agent, []}, fn instr, {acc_agent, acc_dirs} ->
-        case process_instruction(acc_agent, instr) do
+        case process_instruction(acc_agent, instr, ctx) do
           {new_agent, new_dirs} ->
             {new_agent, Enum.reverse(new_dirs, acc_dirs)}
 
@@ -296,13 +296,18 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
     opts = ctx[:strategy_opts] || []
 
     # Resolve model
-    raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
+    raw_model = Map.get(agent.state, :model, Keyword.get(opts, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
 
     %{
       model: resolved_model,
-      max_supervision_steps: Keyword.get(opts, :max_supervision_steps, @default_max_supervision_steps),
-      act_threshold: Keyword.get(opts, :act_threshold, @default_act_threshold)
+      max_supervision_steps:
+        Map.get(
+          agent.state,
+          :max_supervision_steps,
+          Keyword.get(opts, :max_supervision_steps, @default_max_supervision_steps)
+        ),
+      act_threshold: Map.get(agent.state, :act_threshold, Keyword.get(opts, :act_threshold, @default_act_threshold))
     }
   end
 
@@ -314,17 +319,17 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
     model
   end
 
-  defp process_instruction(agent, %Jido.Instruction{action: action, params: params}) do
+  defp process_instruction(agent, %Jido.Instruction{action: action, params: params} = instruction, ctx) do
     normalized_action = normalize_action(action)
+    state = StratState.get(agent, %{})
 
     case normalized_action do
       @request_error ->
         process_request_error(agent, params)
 
       _ ->
-        case to_machine_msg(normalized_action, params) do
+        case to_machine_msg(normalized_action, params, state[:status]) do
           msg when not is_nil(msg) ->
-            state = StratState.get(agent, %{})
             config = state[:config]
             machine = Machine.from_map(state)
 
@@ -333,13 +338,13 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
             new_state =
               machine
               |> Machine.to_map()
-              |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+              |> Helpers.apply_to_state([Helpers.update_config(config)])
 
             agent = StratState.put(agent, new_state)
             {agent, lift_directives(directives, config)}
 
           _ ->
-            :noop
+            Helpers.maybe_execute_action_instruction(agent, instruction, ctx)
         end
     end
   end
@@ -347,16 +352,16 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
   defp normalize_action(action), do: action
 
-  defp to_machine_msg(@start, params) do
+  defp to_machine_msg(@start, params, _status) do
     prompt = Map.get(params, :prompt) || Map.get(params, "prompt")
     request_id = Map.get(params, :request_id) || Map.get(params, "request_id") || Machine.generate_call_id()
     {:start, prompt, request_id}
   end
 
-  defp to_machine_msg(@llm_result, params) do
+  defp to_machine_msg(@llm_result, params, status) do
     call_id = Map.get(params, :call_id) || Map.get(params, "call_id")
     result = Map.get(params, :result) || Map.get(params, "result")
-    phase = Map.get(params, :phase) || Map.get(params, "phase") || :reasoning
+    phase = resolve_result_phase(params, result, status)
 
     # Convert to appropriate machine message based on phase
     case phase do
@@ -367,14 +372,53 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
     end
   end
 
-  defp to_machine_msg(@llm_partial, params) do
+  defp to_machine_msg(@llm_partial, params, _status) do
     call_id = Map.get(params, :call_id) || Map.get(params, "call_id")
     delta = Map.get(params, :delta) || Map.get(params, "delta")
     chunk_type = Map.get(params, :chunk_type) || Map.get(params, "chunk_type") || :content
     {:llm_partial, call_id, delta, chunk_type}
   end
 
-  defp to_machine_msg(_, _), do: nil
+  defp to_machine_msg(_, _, _), do: nil
+
+  defp resolve_result_phase(params, result, status) do
+    phase =
+      extract_phase_from_params(params) ||
+        extract_phase_from_result(result) ||
+        phase_from_status(status)
+
+    normalize_phase(phase) || :reasoning
+  end
+
+  defp extract_phase_from_params(params) when is_map(params) do
+    Map.get(params, :phase) ||
+      Map.get(params, "phase") ||
+      (params[:metadata] && extract_phase_from_metadata(params[:metadata])) ||
+      (params["metadata"] && extract_phase_from_metadata(params["metadata"]))
+  end
+
+  defp extract_phase_from_result({:ok, result}) when is_map(result) do
+    extract_phase_from_metadata(Map.get(result, :metadata) || Map.get(result, "metadata"))
+  end
+
+  defp extract_phase_from_result(_), do: nil
+
+  defp extract_phase_from_metadata(metadata) when is_map(metadata) do
+    Map.get(metadata, :phase) || Map.get(metadata, "phase")
+  end
+
+  defp extract_phase_from_metadata(_), do: nil
+
+  defp phase_from_status(:reasoning), do: :reasoning
+  defp phase_from_status(:supervising), do: :supervising
+  defp phase_from_status(:improving), do: :improving
+  defp phase_from_status(_), do: :reasoning
+
+  defp normalize_phase(phase) when phase in [:reasoning, :supervising, :improving], do: phase
+  defp normalize_phase("reasoning"), do: :reasoning
+  defp normalize_phase("supervising"), do: :supervising
+  defp normalize_phase("improving"), do: :improving
+  defp normalize_phase(_), do: nil
 
   defp process_request_error(agent, params) do
     request_id = Map.get(params, :request_id) || Map.get(params, "request_id")

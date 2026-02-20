@@ -52,6 +52,26 @@ Fix:
 - `Adaptive` default strategy: `:react`
 - `Adaptive` default available strategies: `[:cot, :react, :tot, :got, :trm]`
 - `TRM` default `max_supervision_steps`: `5`
+- `ToT` defaults: `top_k: 3`, `min_depth: 2`, `max_nodes: 100`, `max_tool_round_trips: 3`
+
+## ToT Flexible Config (SDK)
+
+```elixir
+defmodule MyApp.PlanningAgent do
+  use Jido.AI.ToTAgent,
+    name: "planning_agent",
+    branching_factor: 3,
+    max_depth: 4,
+    top_k: 3,
+    min_depth: 2,
+    max_nodes: 120,
+    max_duration_ms: 20_000,
+    convergence_window: 2,
+    min_score_improvement: 0.02,
+    tools: [MyApp.Actions.WeatherLookup],
+    max_tool_round_trips: 3
+end
+```
 
 ## When To Use / Not Use
 

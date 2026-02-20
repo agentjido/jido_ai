@@ -83,7 +83,7 @@ defmodule Jido.AI.CoTAgent do
     system_prompt = Keyword.get(opts, :system_prompt)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     strategy_opts =
       [model: model]

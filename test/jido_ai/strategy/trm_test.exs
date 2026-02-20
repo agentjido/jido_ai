@@ -315,6 +315,40 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
         assert directives == []
       end
     end
+
+    test "infers phase from current status when llm response phase is omitted", %{agent: agent, ctx: ctx} do
+      start_instr = %Jido.Instruction{
+        action: :trm_start,
+        params: %{prompt: "What is 2+2?"}
+      }
+
+      {agent, [reason_dir]} = TRM.cmd(agent, [start_instr], ctx)
+      assert reason_dir.metadata.phase == :reasoning
+
+      reasoning_instr = %Jido.Instruction{
+        action: :trm_llm_result,
+        params: %{
+          call_id: reason_dir.id,
+          result: {:ok, %{text: "The answer is 4"}}
+        }
+      }
+
+      {agent, [supervise_dir]} = TRM.cmd(agent, [reasoning_instr], ctx)
+      assert supervise_dir.metadata.phase == :supervising
+      assert State.get(agent, %{})[:status] == :supervising
+
+      supervision_instr = %Jido.Instruction{
+        action: :trm_llm_result,
+        params: %{
+          call_id: supervise_dir.id,
+          result: {:ok, %{text: "Score: 0.6. Needs more detail."}}
+        }
+      }
+
+      {agent, [improve_dir]} = TRM.cmd(agent, [supervision_instr], ctx)
+      assert improve_dir.metadata.phase == :improving
+      assert State.get(agent, %{})[:status] == :improving
+    end
   end
 
   describe "snapshot/2" do

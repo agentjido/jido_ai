@@ -4,6 +4,8 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Agent do
   use Jido.Agent,
     name: "react_worker_agent",
     description: "Internal delegated ReAct runtime worker",
+    default_plugins: false,
+    plugins: [],
     strategy: {Jido.AI.Reasoning.ReAct.Worker.Strategy, []},
     schema:
       Zoi.object(%{

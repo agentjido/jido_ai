@@ -89,6 +89,14 @@ defmodule Jido.AI.ToTAgent do
   @default_branching_factor 3
   @default_max_depth 3
   @default_traversal_strategy :best_first
+  @default_top_k 3
+  @default_min_depth 2
+  @default_max_nodes 100
+  @default_early_success_threshold 1.0
+  @default_convergence_window 2
+  @default_min_score_improvement 0.02
+  @default_max_parse_retries 1
+  @default_max_tool_round_trips 3
 
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
@@ -99,16 +107,46 @@ defmodule Jido.AI.ToTAgent do
     traversal_strategy = Keyword.get(opts, :traversal_strategy, @default_traversal_strategy)
     generation_prompt = Keyword.get(opts, :generation_prompt)
     evaluation_prompt = Keyword.get(opts, :evaluation_prompt)
+    top_k = Keyword.get(opts, :top_k, @default_top_k)
+    min_depth = Keyword.get(opts, :min_depth, @default_min_depth)
+    max_nodes = Keyword.get(opts, :max_nodes, @default_max_nodes)
+    max_duration_ms = Keyword.get(opts, :max_duration_ms)
+    beam_width = Keyword.get(opts, :beam_width)
+    early_success_threshold = Keyword.get(opts, :early_success_threshold, @default_early_success_threshold)
+    convergence_window = Keyword.get(opts, :convergence_window, @default_convergence_window)
+    min_score_improvement = Keyword.get(opts, :min_score_improvement, @default_min_score_improvement)
+    max_parse_retries = Keyword.get(opts, :max_parse_retries, @default_max_parse_retries)
+    tools = Keyword.get(opts, :tools, [])
+    tool_context = Keyword.get(opts, :tool_context, %{})
+    tool_timeout_ms = Keyword.get(opts, :tool_timeout_ms, 15_000)
+    tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
+    tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
+    max_tool_round_trips = Keyword.get(opts, :max_tool_round_trips, @default_max_tool_round_trips)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     strategy_opts =
       [
         model: model,
         branching_factor: branching_factor,
         max_depth: max_depth,
-        traversal_strategy: traversal_strategy
+        traversal_strategy: traversal_strategy,
+        top_k: top_k,
+        min_depth: min_depth,
+        max_nodes: max_nodes,
+        max_duration_ms: max_duration_ms,
+        beam_width: beam_width,
+        early_success_threshold: early_success_threshold,
+        convergence_window: convergence_window,
+        min_score_improvement: min_score_improvement,
+        max_parse_retries: max_parse_retries,
+        tools: tools,
+        tool_context: tool_context,
+        tool_timeout_ms: tool_timeout_ms,
+        tool_max_retries: tool_max_retries,
+        tool_retry_backoff_ms: tool_retry_backoff_ms,
+        max_tool_round_trips: max_tool_round_trips
       ]
       |> then(fn o ->
         if generation_prompt, do: Keyword.put(o, :generation_prompt, generation_prompt), else: o
@@ -128,7 +166,7 @@ defmodule Jido.AI.ToTAgent do
           last_request_id: Zoi.string() |> Zoi.optional(),
           # Backward compatibility fields (convenience pointers to most recent)
           last_prompt: Zoi.string() |> Zoi.default(""),
-          last_result: Zoi.string() |> Zoi.default(""),
+          last_result: Zoi.any() |> Zoi.default(nil),
           completed: Zoi.boolean() |> Zoi.default(false)
         })
       end
@@ -144,6 +182,7 @@ defmodule Jido.AI.ToTAgent do
       unquote(Jido.AI.Agent.compatibility_overrides_ast())
 
       alias Jido.AI.Request
+      alias Jido.AI.Reasoning.TreeOfThoughts.Result
 
       @doc """
       Start a Tree-of-Thoughts exploration asynchronously.
@@ -214,6 +253,33 @@ defmodule Jido.AI.ToTAgent do
         )
       end
 
+      @doc """
+      Returns the best answer string from a structured ToT result.
+      """
+      @spec best_answer(map() | nil) :: String.t() | nil
+      def best_answer(result), do: Result.best_answer(result)
+
+      @doc """
+      Returns the top ranked candidates from a structured ToT result.
+      """
+      @spec top_candidates(map() | nil, pos_integer()) :: [map()]
+      def top_candidates(result, limit \\ 3), do: Result.top_candidates(result, limit)
+
+      @doc """
+      Returns a compact summary of a structured ToT result.
+      """
+      @spec result_summary(map() | nil) :: map()
+      def result_summary(%{} = result) do
+        %{
+          best_answer: best_answer(result),
+          top_candidates: top_candidates(result, 3),
+          termination: Map.get(result, :termination, %{}),
+          tree: Map.get(result, :tree, %{})
+        }
+      end
+
+      def result_summary(_), do: %{best_answer: nil, top_candidates: [], termination: %{}, tree: %{}}
+
       @impl true
       def on_before_cmd(agent, {:tot_start, %{prompt: prompt} = params} = action) do
         # Ensure we have a request_id for tracking
@@ -223,7 +289,11 @@ defmodule Jido.AI.ToTAgent do
         # Use RequestTracking to manage state (with prompt aliased as query)
         agent = Request.start_request(agent, request_id, prompt)
         # Also set last_prompt for ToT-specific backward compat
-        agent = put_in(agent.state[:last_prompt], prompt)
+        agent =
+          agent
+          |> put_in([Access.key(:state), Access.key(:last_prompt)], prompt)
+          |> put_in([Access.key(:state), Access.key(:last_result)], nil)
+          |> put_in([Access.key(:state), Access.key(:completed)], false)
 
         {:ok, agent, action}
       end
@@ -248,7 +318,9 @@ defmodule Jido.AI.ToTAgent do
           if snap.done? do
             agent = Request.complete_request(agent, request_id, snap.result)
             # Also set last_result for ToT-specific backward compat
-            put_in(agent.state[:last_result], snap.result || "")
+            agent
+            |> put_in([Access.key(:state), Access.key(:last_result)], snap.result)
+            |> put_in([Access.key(:state), Access.key(:completed)], true)
           else
             agent
           end
@@ -272,7 +344,7 @@ defmodule Jido.AI.ToTAgent do
               agent
               | state:
                   Map.merge(agent.state, %{
-                    last_result: snap.result || "",
+                    last_result: snap.result,
                     completed: true
                   })
             }

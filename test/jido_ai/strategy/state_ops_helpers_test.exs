@@ -1,18 +1,18 @@
-defmodule Jido.AI.Strategy.StateOpsHelpersTest do
+defmodule Jido.AI.Reasoning.HelpersTest do
   @moduledoc """
-  Unit tests for StateOpsHelpers.
+  Unit tests for Helpers.
   """
 
   use ExUnit.Case, async: true
 
   alias Jido.Agent.StateOp
-  alias Jido.AI.Strategy.StateOpsHelpers
+  alias Jido.AI.Reasoning.Helpers
 
-  doctest StateOpsHelpers
+  doctest Helpers
 
   describe "update_strategy_state/1" do
     test "creates SetState operation with given attributes" do
-      op = StateOpsHelpers.update_strategy_state(%{status: :running, iteration: 1})
+      op = Helpers.update_strategy_state(%{status: :running, iteration: 1})
 
       assert %StateOp.SetState{} = op
       assert op.attrs == %{status: :running, iteration: 1}
@@ -21,7 +21,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "set_strategy_field/2" do
     test "creates SetPath operation for a single field" do
-      op = StateOpsHelpers.set_strategy_field(:status, :running)
+      op = Helpers.set_strategy_field(:status, :running)
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:status]
@@ -31,7 +31,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "set_iteration_status/1" do
     test "creates SetPath operation for status" do
-      op = StateOpsHelpers.set_iteration_status(:awaiting_llm)
+      op = Helpers.set_iteration_status(:awaiting_llm)
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:status]
@@ -41,7 +41,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "set_iteration/1" do
     test "creates SetPath operation for iteration counter" do
-      op = StateOpsHelpers.set_iteration(5)
+      op = Helpers.set_iteration(5)
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:iteration]
@@ -49,7 +49,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
     end
 
     test "accepts zero as valid iteration" do
-      op = StateOpsHelpers.set_iteration(0)
+      op = Helpers.set_iteration(0)
 
       assert %StateOp.SetPath{} = op
       assert op.value == 0
@@ -59,7 +59,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
   describe "append_conversation/1" do
     test "creates SetState operation for conversation list" do
       messages = [%{role: :user, content: "Hello"}]
-      op = StateOpsHelpers.append_conversation(messages)
+      op = Helpers.append_conversation(messages)
 
       assert %StateOp.SetState{} = op
       assert op.attrs == %{conversation: messages}
@@ -70,7 +70,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
     test "creates SetState operation with message prepended" do
       message = %{role: :user, content: "Hello"}
       existing = [%{role: :assistant, content: "Hi"}]
-      op = StateOpsHelpers.prepend_conversation(message, existing)
+      op = Helpers.prepend_conversation(message, existing)
 
       assert %StateOp.SetState{} = op
       assert op.attrs.conversation == [message | existing]
@@ -78,7 +78,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
     test "works with empty existing conversation" do
       message = %{role: :user, content: "Hello"}
-      op = StateOpsHelpers.prepend_conversation(message, [])
+      op = Helpers.prepend_conversation(message, [])
 
       assert %StateOp.SetState{} = op
       assert op.attrs.conversation == [message]
@@ -92,7 +92,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
         %{role: :assistant, content: "Hi"}
       ]
 
-      op = StateOpsHelpers.set_conversation(messages)
+      op = Helpers.set_conversation(messages)
 
       assert %StateOp.SetState{} = op
       assert op.attrs == %{conversation: messages}
@@ -102,7 +102,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
   describe "set_pending_tools/1" do
     test "creates SetState operation for pending tools" do
       tools = [%{id: "call_1", name: "search", arguments: %{query: "test"}}]
-      op = StateOpsHelpers.set_pending_tools(tools)
+      op = Helpers.set_pending_tools(tools)
 
       assert %StateOp.SetState{} = op
       assert op.attrs == %{pending_tool_calls: tools}
@@ -112,7 +112,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
   describe "add_pending_tool/1" do
     test "creates SetState operation for single tool" do
       tool = %{id: "call_1", name: "search", arguments: %{query: "test"}}
-      op = StateOpsHelpers.add_pending_tool(tool)
+      op = Helpers.add_pending_tool(tool)
 
       assert %StateOp.SetState{} = op
       assert op.attrs.pending_tool_calls == [tool]
@@ -121,7 +121,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "clear_pending_tools/0" do
     test "creates SetState operation to clear tools" do
-      op = StateOpsHelpers.clear_pending_tools()
+      op = Helpers.clear_pending_tools()
 
       assert %StateOp.SetState{} = op
       assert op.attrs == %{pending_tool_calls: []}
@@ -130,7 +130,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "remove_pending_tool/1" do
     test "creates DeletePath operation for tool ID" do
-      op = StateOpsHelpers.remove_pending_tool("call_1")
+      op = Helpers.remove_pending_tool("call_1")
 
       assert %StateOp.DeletePath{} = op
       assert op.path == [:pending_tool_calls, "call_1"]
@@ -139,7 +139,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "set_call_id/1" do
     test "creates SetPath operation for call ID" do
-      op = StateOpsHelpers.set_call_id("call_123")
+      op = Helpers.set_call_id("call_123")
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:current_llm_call_id]
@@ -149,7 +149,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "clear_call_id/0" do
     test "creates DeletePath operation for call ID" do
-      op = StateOpsHelpers.clear_call_id()
+      op = Helpers.clear_call_id()
 
       assert %StateOp.DeletePath{} = op
       assert op.path == [:current_llm_call_id]
@@ -158,7 +158,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "set_final_answer/1" do
     test "creates SetPath operation for final answer" do
-      op = StateOpsHelpers.set_final_answer("42")
+      op = Helpers.set_final_answer("42")
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:final_answer]
@@ -168,7 +168,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "set_termination_reason/1" do
     test "creates SetPath operation for termination reason" do
-      op = StateOpsHelpers.set_termination_reason(:final_answer)
+      op = Helpers.set_termination_reason(:final_answer)
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:termination_reason]
@@ -178,7 +178,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "set_streaming_text/1" do
     test "creates SetPath operation for streaming text" do
-      op = StateOpsHelpers.set_streaming_text("Hello")
+      op = Helpers.set_streaming_text("Hello")
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:streaming_text]
@@ -188,7 +188,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "append_streaming_text/1" do
     test "creates SetPath operation to append streaming text" do
-      op = StateOpsHelpers.append_streaming_text(" world")
+      op = Helpers.append_streaming_text(" world")
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:streaming_text]
@@ -199,7 +199,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
   describe "set_usage/1" do
     test "creates SetState operation for usage metadata" do
       usage = %{input_tokens: 10, output_tokens: 20}
-      op = StateOpsHelpers.set_usage(usage)
+      op = Helpers.set_usage(usage)
 
       assert %StateOp.SetState{} = op
       assert op.attrs == %{usage: usage}
@@ -208,7 +208,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "delete_temp_keys/0" do
     test "creates DeleteKeys operation for temp keys" do
-      op = StateOpsHelpers.delete_temp_keys()
+      op = Helpers.delete_temp_keys()
 
       assert %StateOp.DeleteKeys{} = op
       assert op.keys == [:temp, :cache, :ephemeral]
@@ -217,7 +217,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "delete_keys/1" do
     test "creates DeleteKeys operation for specified keys" do
-      op = StateOpsHelpers.delete_keys([:temp1, :temp2])
+      op = Helpers.delete_keys([:temp1, :temp2])
 
       assert %StateOp.DeleteKeys{} = op
       assert op.keys == [:temp1, :temp2]
@@ -226,7 +226,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "reset_strategy_state/0" do
     test "creates ReplaceState operation with initial values" do
-      op = StateOpsHelpers.reset_strategy_state()
+      op = Helpers.reset_strategy_state()
 
       assert %StateOp.ReplaceState{} = op
       assert op.state.status == :idle
@@ -242,18 +242,18 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
   describe "compose/1" do
     test "returns list of state operations unchanged" do
       ops = [
-        StateOpsHelpers.set_iteration_status(:running),
-        StateOpsHelpers.set_iteration(1)
+        Helpers.set_iteration_status(:running),
+        Helpers.set_iteration(1)
       ]
 
-      result = StateOpsHelpers.compose(ops)
+      result = Helpers.compose(ops)
 
       assert result == ops
       assert length(result) == 2
     end
 
     test "handles empty list" do
-      result = StateOpsHelpers.compose([])
+      result = Helpers.compose([])
 
       assert result == []
     end
@@ -262,7 +262,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
   describe "update_config/1" do
     test "creates SetState operation for config" do
       config = %{tools: [], model: "test"}
-      op = StateOpsHelpers.update_config(config)
+      op = Helpers.update_config(config)
 
       assert %StateOp.SetState{} = op
       assert op.attrs == %{config: config}
@@ -275,7 +275,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
         reqllm_tools: [%{name: "action"}]
       }
 
-      op = StateOpsHelpers.update_config(config)
+      op = Helpers.update_config(config)
 
       assert %StateOp.SetState{} = op
       assert op.attrs.config.tools == [SomeAction]
@@ -285,7 +285,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "set_config_field/2" do
     test "creates SetPath operation for nested config field" do
-      op = StateOpsHelpers.set_config_field(:tools, [SomeAction])
+      op = Helpers.set_config_field(:tools, [SomeAction])
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:config, :tools]
@@ -293,7 +293,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
     end
 
     test "creates SetPath operation for model field" do
-      op = StateOpsHelpers.set_config_field(:model, "openai:gpt-4")
+      op = Helpers.set_config_field(:model, "openai:gpt-4")
 
       assert %StateOp.SetPath{} = op
       assert op.path == [:config, :model]
@@ -304,7 +304,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
   describe "update_config_fields/1" do
     test "creates multiple SetPath operations" do
       fields = %{tools: [], model: "test"}
-      ops = StateOpsHelpers.update_config_fields(fields)
+      ops = Helpers.update_config_fields(fields)
 
       assert length(ops) == 2
 
@@ -318,13 +318,13 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
     end
 
     test "handles empty map" do
-      ops = StateOpsHelpers.update_config_fields(%{})
+      ops = Helpers.update_config_fields(%{})
       assert ops == []
     end
 
     test "creates SetPath operations in field order" do
       fields = %{model: "gpt-4", tools: [], max_tokens: 4096}
-      ops = StateOpsHelpers.update_config_fields(fields)
+      ops = Helpers.update_config_fields(fields)
 
       assert length(ops) == 3
 
@@ -342,7 +342,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
       actions_by_name = %{"action" => SomeAction}
       reqllm_tools = [%{name: "action"}]
 
-      ops = StateOpsHelpers.update_tools_config(tools, actions_by_name, reqllm_tools)
+      ops = Helpers.update_tools_config(tools, actions_by_name, reqllm_tools)
 
       assert length(ops) == 3
 
@@ -359,7 +359,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
     end
 
     test "handles empty tools list" do
-      ops = StateOpsHelpers.update_tools_config([], %{}, [])
+      ops = Helpers.update_tools_config([], %{}, [])
 
       assert length(ops) == 3
 
@@ -378,7 +378,7 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
       actions_by_name = %{"action1" => Action1, "action2" => Action2}
       reqllm_tools = [%{name: "action1"}, %{name: "action2"}]
 
-      ops = StateOpsHelpers.update_tools_config(tools, actions_by_name, reqllm_tools)
+      ops = Helpers.update_tools_config(tools, actions_by_name, reqllm_tools)
 
       # Verify order: tools, actions_by_name, reqllm_tools
       assert hd(ops).path == [:config, :tools]
@@ -389,23 +389,23 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
   describe "apply_to_state/2" do
     test "applies SetState operation" do
-      ops = [StateOpsHelpers.update_strategy_state(%{status: :running})]
-      result = StateOpsHelpers.apply_to_state(%{iteration: 1}, ops)
+      ops = [Helpers.update_strategy_state(%{status: :running})]
+      result = Helpers.apply_to_state(%{iteration: 1}, ops)
 
       assert result.status == :running
       assert result.iteration == 1
     end
 
     test "applies SetPath operation for nested key" do
-      ops = [StateOpsHelpers.set_config_field(:tools, [SomeAction])]
-      result = StateOpsHelpers.apply_to_state(%{}, ops)
+      ops = [Helpers.set_config_field(:tools, [SomeAction])]
+      result = Helpers.apply_to_state(%{}, ops)
 
       assert result.config.tools == [SomeAction]
     end
 
     test "applies multiple SetPath operations" do
-      ops = StateOpsHelpers.update_tools_config([SomeAction], %{"action" => SomeAction}, [%{name: "action"}])
-      result = StateOpsHelpers.apply_to_state(%{other: "value"}, ops)
+      ops = Helpers.update_tools_config([SomeAction], %{"action" => SomeAction}, [%{name: "action"}])
+      result = Helpers.apply_to_state(%{other: "value"}, ops)
 
       assert result.config.tools == [SomeAction]
       assert result.config.actions_by_name == %{"action" => SomeAction}
@@ -414,15 +414,15 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
     end
 
     test "applies DeleteKeys operation" do
-      ops = [StateOpsHelpers.delete_keys([:temp, :cache])]
-      result = StateOpsHelpers.apply_to_state(%{temp: "data", cache: "data", keep: "this"}, ops)
+      ops = [Helpers.delete_keys([:temp, :cache])]
+      result = Helpers.apply_to_state(%{temp: "data", cache: "data", keep: "this"}, ops)
 
       assert result == %{keep: "this"}
     end
 
     test "applies ReplaceState operation" do
-      ops = [StateOpsHelpers.reset_strategy_state()]
-      result = StateOpsHelpers.apply_to_state(%{old: "data", more: "stuff"}, ops)
+      ops = [Helpers.reset_strategy_state()]
+      result = Helpers.apply_to_state(%{old: "data", more: "stuff"}, ops)
 
       assert result.status == :idle
       assert result.iteration == 0
@@ -432,19 +432,19 @@ defmodule Jido.AI.Strategy.StateOpsHelpersTest do
 
     test "applies operations in order" do
       ops = [
-        StateOpsHelpers.set_strategy_field(:status, :running),
-        StateOpsHelpers.set_strategy_field(:count, 5)
+        Helpers.set_strategy_field(:status, :running),
+        Helpers.set_strategy_field(:count, 5)
       ]
 
-      result = StateOpsHelpers.apply_to_state(%{}, ops)
+      result = Helpers.apply_to_state(%{}, ops)
 
       assert result.status == :running
       assert result.count == 5
     end
 
     test "deep merges nested maps with SetState" do
-      ops = [StateOpsHelpers.update_strategy_state(%{config: %{model: "gpt-4"}})]
-      result = StateOpsHelpers.apply_to_state(%{config: %{tools: []}}, ops)
+      ops = [Helpers.update_strategy_state(%{config: %{model: "gpt-4"}})]
+      result = Helpers.apply_to_state(%{config: %{tools: []}}, ops)
 
       assert result.config.tools == []
       assert result.config.model == "gpt-4"

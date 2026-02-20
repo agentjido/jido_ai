@@ -105,7 +105,7 @@ defmodule Jido.AI.AdaptiveAgent do
     complexity_thresholds = Keyword.get(opts, :complexity_thresholds)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     strategy_opts =
       [

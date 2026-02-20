@@ -63,6 +63,9 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
       assert opts[:branching_factor] == 3
       assert opts[:max_depth] == 3
       assert opts[:traversal_strategy] == :best_first
+      assert opts[:top_k] == 3
+      assert opts[:min_depth] == 2
+      assert opts[:max_nodes] == 100
     end
   end
 

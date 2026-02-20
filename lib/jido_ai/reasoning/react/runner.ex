@@ -42,10 +42,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     query = Keyword.get(opts, :query)
 
     state =
-      if is_binary(query) and query != "" do
-        append_query(state, query)
-      else
-        state
+      case query do
+        q when is_binary(q) and q != "" -> append_query(state, q)
+        _ -> state
       end
 
     build_stream(state, config, opts, emit_start?: false)
@@ -76,16 +75,18 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     context = Keyword.get(opts, :context, %{})
 
     state =
-      if stream_opts[:emit_start?] do
-        {state, _} =
-          emit_event(state, owner, ref, :request_started, %{
-            query: latest_query(state),
-            config_fingerprint: Config.fingerprint(config)
-          })
+      case stream_opts[:emit_start?] do
+        true ->
+          {state, _} =
+            emit_event(state, owner, ref, :request_started, %{
+              query: latest_query(state),
+              config_fingerprint: Config.fingerprint(config)
+            })
 
-        state
-      else
-        state
+          state
+
+        _ ->
+          state
       end
 
     try do
@@ -191,7 +192,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         %{
           call_id: call_id,
           model: config.model,
-          message_count: Thread.length(state.thread) + if(state.thread.system_prompt, do: 1, else: 0)
+          message_count:
+            Thread.length(state.thread) +
+              case state.thread.system_prompt do
+                nil -> 0
+                _ -> 1
+              end
         },
         llm_call_id: call_id
       )
@@ -226,29 +232,34 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               Thread.append_assistant(
                 state.thread,
                 turn.text,
-                if(turn.type == :tool_calls, do: turn.tool_calls, else: nil),
+                case turn.type do
+                  :tool_calls -> turn.tool_calls
+                  _ -> nil
+                end,
                 maybe_thinking_opt(turn.thinking_content)
               )
               |> then(&%{state | thread: &1})
 
             {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
 
-            if Turn.needs_tools?(turn) do
-              {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
-            else
-              completed =
-                state
-                |> State.put_status(:completed)
-                |> State.put_result(turn.text)
+            case Turn.needs_tools?(turn) do
+              true ->
+                {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
 
-              {completed, _} =
-                emit_event(completed, owner, ref, :request_completed, %{
-                  result: turn.text,
-                  termination_reason: :final_answer,
-                  usage: completed.usage
-                })
+              _ ->
+                completed =
+                  state
+                  |> State.put_status(:completed)
+                  |> State.put_result(turn.text)
 
-              {:final_answer, completed}
+                {completed, _} =
+                  emit_event(completed, owner, ref, :request_completed, %{
+                    result: turn.text,
+                    termination_reason: :final_answer,
+                    usage: completed.usage
+                  })
+
+                {:final_answer, completed}
             end
 
           {:error, state, reason} ->
@@ -277,10 +288,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     summary = ReqLLM.Response.Stream.summarize(chunks)
 
     turn_type =
-      if is_list(summary.tool_calls) and summary.tool_calls != [] do
-        :tool_calls
-      else
-        :final_answer
+      case summary.tool_calls do
+        tool_calls when is_list(tool_calls) and tool_calls != [] -> :tool_calls
+        _ -> :final_answer
       end
 
     turn =
@@ -301,21 +311,25 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp maybe_emit_chunk_delta(%State{} = state, owner, ref, %ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg)
        when is_binary(text) and text != "" do
-    if trace_cfg[:capture_deltas?] do
-      {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :content, delta: text})
-      state
-    else
-      state
+    case trace_cfg[:capture_deltas?] do
+      true ->
+        {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :content, delta: text})
+        state
+
+      _ ->
+        state
     end
   end
 
   defp maybe_emit_chunk_delta(%State{} = state, owner, ref, %ReqLLM.StreamChunk{type: :thinking, text: text}, trace_cfg)
        when is_binary(text) and text != "" do
-    if trace_cfg[:capture_deltas?] do
-      {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :thinking, delta: text})
-      state
-    else
-      state
+    case trace_cfg[:capture_deltas?] do
+      true ->
+        {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :thinking, delta: text})
+        state
+
+      _ ->
+        state
     end
   end
 
@@ -415,29 +429,40 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp execute_tool_with_retries(%PendingToolCall{} = pending_call, %Config{} = config, context) do
     module = Map.get(config.tools, pending_call.name)
 
-    if is_nil(module) do
-      {pending_call, {:error, %{type: :unknown_tool, message: "Tool '#{pending_call.name}' not found"}}, 1, 0}
-    else
-      do_execute_tool_with_retries(pending_call, module, config, context, 1)
+    case is_atom(module) and function_exported?(module, :name, 0) and function_exported?(module, :run, 2) do
+      true ->
+        do_execute_tool_with_retries(pending_call, module, config, context, 1)
+
+      _ ->
+        {pending_call, {:error, %{type: :unknown_tool, message: "Tool '#{pending_call.name}' not found"}}, 1, 0}
     end
   end
 
   defp do_execute_tool_with_retries(%PendingToolCall{} = pending_call, module, %Config{} = config, context, attempt) do
     start_ms = System.monotonic_time(:millisecond)
+    timeout_ms = normalize_timeout(config.tool_exec[:timeout_ms])
 
     result =
-      Turn.execute_module(module, pending_call.arguments, context,
-        timeout: config.tool_exec.timeout_ms,
+      safe_execute_module(module, pending_call.arguments, context,
+        timeout: timeout_ms,
         max_retries: 0
       )
 
     duration_ms = max(System.monotonic_time(:millisecond) - start_ms, 0)
+    max_retries = normalize_retry_count(config.tool_exec[:max_retries])
+    backoff_ms = normalize_backoff(config.tool_exec[:retry_backoff_ms])
 
-    if retryable?(result) and attempt <= config.tool_exec.max_retries do
-      if config.tool_exec.retry_backoff_ms > 0, do: Process.sleep(config.tool_exec.retry_backoff_ms)
-      do_execute_tool_with_retries(pending_call, module, config, context, attempt + 1)
-    else
-      {pending_call, result, attempt, duration_ms}
+    case retryable?(result) and attempt <= max_retries do
+      true ->
+        case backoff_ms > 0 do
+          true -> Process.sleep(backoff_ms)
+          _ -> :ok
+        end
+
+        do_execute_tool_with_retries(pending_call, module, config, context, attempt + 1)
+
+      _ ->
+        {pending_call, result, attempt, duration_ms}
     end
   end
 
@@ -447,7 +472,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp retryable?({:error, %{type: :exception}}), do: true
   defp retryable?({:error, %{type: :execution_error}}), do: true
   defp retryable?({:error, _}), do: false
-  defp retryable?(_), do: false
 
   defp finalize(%State{} = state, owner, ref, %Config{} = config) do
     {state, _token} = emit_checkpoint(state, owner, ref, config, :terminal)
@@ -524,9 +548,13 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp cleanup(_owner, %{pid: pid, ref: ref}) when is_pid(pid) do
-    if Process.alive?(pid) do
-      send(pid, {:react_cancel, ref, :stream_halted})
-      Process.exit(pid, :kill)
+    case Process.alive?(pid) do
+      true ->
+        send(pid, {:react_cancel, ref, :stream_halted})
+        Process.exit(pid, :kill)
+
+      _ ->
+        :ok
     end
 
     :ok
@@ -538,10 +566,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         Task.Supervisor.start_child(task_sup, fun)
 
       task_sup when is_atom(task_sup) and not is_nil(task_sup) ->
-        if Process.whereis(task_sup) do
-          Task.Supervisor.start_child(task_sup, fun)
-        else
-          Task.start(fun)
+        case Process.whereis(task_sup) do
+          pid when is_pid(pid) ->
+            Task.Supervisor.start_child(task_sup, fun)
+
+          _ ->
+            Task.start(fun)
         end
 
       _ ->
@@ -573,10 +603,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp normalize_blank(value), do: value
 
   defp maybe_redact_args(arguments, %Config{} = config) do
-    if config.observability[:redact_tool_args?] do
-      Jido.AI.Observe.sanitize_sensitive(arguments)
-    else
-      arguments
+    case config.observability[:redact_tool_args?] do
+      true -> Jido.AI.Observe.sanitize_sensitive(arguments)
+      _ -> arguments
     end
   end
 
@@ -598,16 +627,37 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     Keyword.get(extra, key, default)
   end
 
-  defp fetch_extra(_, _, default), do: default
-
   defp request_stream_cancel(%{cancel_sent?: true} = state, _reason), do: state
 
   defp request_stream_cancel(%{pid: pid, ref: ref} = state, reason) when is_pid(pid) do
-    if Process.alive?(pid), do: send(pid, {:react_cancel, ref, reason})
+    case Process.alive?(pid) do
+      true -> send(pid, {:react_cancel, ref, reason})
+      _ -> :ok
+    end
+
     Map.put(state, :cancel_sent?, true)
   end
 
   defp request_stream_cancel(state, _reason), do: state
+
+  defp safe_execute_module(module, params, context, opts) do
+    Turn.execute_module(module, params, context, opts)
+  rescue
+    error ->
+      {:error, %{type: :exception, error: Exception.message(error), exception_type: error.__struct__}}
+  catch
+    kind, reason ->
+      {:error, %{type: :caught, kind: kind, error: inspect(reason)}}
+  end
+
+  defp normalize_timeout(value) when is_integer(value) and value > 0, do: value
+  defp normalize_timeout(_), do: 15_000
+
+  defp normalize_retry_count(value) when is_integer(value) and value >= 0, do: value
+  defp normalize_retry_count(_), do: 0
+
+  defp normalize_backoff(value) when is_integer(value) and value >= 0, do: value
+  defp normalize_backoff(_), do: 0
 
   defp now_ms, do: System.system_time(:millisecond)
 end

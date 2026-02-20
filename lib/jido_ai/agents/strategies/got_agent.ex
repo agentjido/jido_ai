@@ -104,7 +104,7 @@ defmodule Jido.AI.GoTAgent do
     aggregation_prompt = Keyword.get(opts, :aggregation_prompt)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     strategy_opts =
       [

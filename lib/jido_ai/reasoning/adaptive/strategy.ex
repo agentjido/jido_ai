@@ -72,6 +72,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
 
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
   alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
@@ -223,7 +224,11 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
       {"ai.adaptive.query", {:strategy_cmd, @start}},
       {"ai.llm.response", {:strategy_cmd, @llm_result}},
       {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
+      {"ai.tool.result", Jido.Actions.Control.Noop},
       {"ai.request.error", {:strategy_cmd, @request_error}},
+      {"ai.request.started", Jido.Actions.Control.Noop},
+      {"ai.request.completed", Jido.Actions.Control.Noop},
+      {"ai.request.failed", Jido.Actions.Control.Noop},
       {"ai.cot.worker.event", {:strategy_cmd, @cot_worker_event}},
       {"ai.react.worker.event", {:strategy_cmd, @react_worker_event}},
       {"jido.agent.child.started", {:strategy_cmd, @child_started}},
@@ -257,7 +262,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
 
   @impl true
   def init(%Agent{} = agent, ctx) do
-    config = build_config(ctx)
+    config = build_config(agent, ctx)
 
     state = %{
       config: config,
@@ -353,18 +358,25 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
 
   # Private Helpers
 
-  defp build_config(ctx) do
+  defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []
 
-    raw_model = Keyword.get(opts, :model, @default_model)
+    raw_model = Map.get(agent.state, :model, Keyword.get(opts, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
 
     %{
       model: resolved_model,
-      default_strategy: Keyword.get(opts, :default_strategy, @default_strategy),
-      available_strategies: Keyword.get(opts, :available_strategies, [:cot, :react, :tot, :got, :trm]),
-      complexity_thresholds: Keyword.get(opts, :complexity_thresholds, @default_thresholds),
-      strategy_override: Keyword.get(opts, :strategy),
+      default_strategy:
+        Map.get(agent.state, :default_strategy, Keyword.get(opts, :default_strategy, @default_strategy)),
+      available_strategies:
+        Map.get(
+          agent.state,
+          :available_strategies,
+          Keyword.get(opts, :available_strategies, [:cot, :react, :tot, :got, :trm])
+        ),
+      complexity_thresholds:
+        Map.get(agent.state, :complexity_thresholds, Keyword.get(opts, :complexity_thresholds, @default_thresholds)),
+      strategy_override: Map.get(agent.state, :strategy_override, Keyword.get(opts, :strategy)),
       strategy_opts: opts
     }
   end
@@ -388,8 +400,8 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
 
     case start_instr do
       nil ->
-        # No start instruction, return unchanged
-        {agent, []}
+        # No strategy start command - run any executable action modules directly.
+        execute_action_instructions(agent, instructions, ctx)
 
       %{params: params} ->
         prompt = Map.get(params, :prompt) || Map.get(params, "prompt") || ""
@@ -414,6 +426,25 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
 
         {agent, directives}
     end
+  end
+
+  defp execute_action_instructions(agent, instructions, ctx) do
+    {agent, dirs_rev} =
+      Enum.reduce(instructions, {agent, []}, fn
+        %Jido.Instruction{} = instruction, {acc_agent, acc_dirs} ->
+          case Helpers.maybe_execute_action_instruction(acc_agent, instruction, ctx) do
+            {new_agent, new_dirs} ->
+              {new_agent, Enum.reverse(new_dirs, acc_dirs)}
+
+            :noop ->
+              {acc_agent, acc_dirs}
+          end
+
+        _other, acc ->
+          acc
+      end)
+
+    {agent, Enum.reverse(dirs_rev)}
   end
 
   defp delegate_cmd(agent, instructions, ctx, strategy_module, state) do

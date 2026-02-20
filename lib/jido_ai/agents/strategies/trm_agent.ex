@@ -96,7 +96,7 @@ defmodule Jido.AI.TRMAgent do
     act_threshold = Keyword.get(opts, :act_threshold, @default_act_threshold)
     plugins = Keyword.get(opts, :plugins, [])
 
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     strategy_opts = [
       model: model,

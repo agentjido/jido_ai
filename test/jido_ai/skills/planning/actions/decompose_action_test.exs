@@ -75,6 +75,30 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
       assert {:ok, result} = Decompose.run(params, %{})
       assert result.depth <= 5
     end
+
+    test "uses plugin defaults when params are omitted" do
+      params = %{goal: "Break down roadmap"}
+
+      context = %{
+        provided_params: [:goal],
+        plugin_state: %{planning: %{default_model: :fast, default_max_tokens: 2222, default_temperature: 0.2}}
+      }
+
+      assert {:ok, result} = Decompose.run(params, context)
+      assert result.model == Jido.AI.resolve_model(:fast)
+    end
+
+    test "explicit model overrides plugin default" do
+      params = %{goal: "Break down roadmap", model: "custom:model"}
+
+      context = %{
+        provided_params: [:goal, :model],
+        plugin_state: %{planning: %{default_model: :fast}}
+      }
+
+      assert {:ok, result} = Decompose.run(params, context)
+      assert result.model == "custom:model"
+    end
   end
 
   describe "model resolution" do
