@@ -24,6 +24,7 @@ defmodule Jido.AI.Examples.BrowserAgent do
   use Jido.AI.Agent,
     name: "browser_agent",
     description: "Web browsing assistant that reads, searches, and summarizes web pages",
+    tool_timeout_ms: 60_000,
     tools: [
       JidoBrowser.Actions.ReadPage,
       JidoBrowser.Actions.SearchWeb,

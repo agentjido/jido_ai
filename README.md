@@ -115,16 +115,17 @@ end
 - [Configuration Reference](guides/developer/configuration_reference.md) - Defaults and config keys
 
 ### Examples
-- [`examples/strategies/react_agent.md`](examples/strategies/react_agent.md) - ReAct strategy example
-- [`examples/strategies/chain_of_thought.md`](examples/strategies/chain_of_thought.md) - Chain-of-Thought example
-- [`examples/strategies/tree_of_thoughts.md`](examples/strategies/tree_of_thoughts.md) - Tree-of-Thoughts example
-- [`examples/strategies/adaptive_strategy.md`](examples/strategies/adaptive_strategy.md) - Adaptive strategy example
+- [`lib/examples/README.md`](lib/examples/README.md) - Full examples index (agents, scripts, skills, strategies)
+- [`lib/examples/strategies/react_agent.md`](lib/examples/strategies/react_agent.md) - ReAct strategy example
+- [`lib/examples/strategies/chain_of_thought.md`](lib/examples/strategies/chain_of_thought.md) - Chain-of-Thought example
+- [`lib/examples/strategies/tree_of_thoughts.md`](lib/examples/strategies/tree_of_thoughts.md) - Tree-of-Thoughts example
+- [`lib/examples/strategies/adaptive_strategy.md`](lib/examples/strategies/adaptive_strategy.md) - Adaptive strategy example
 
 ## ReAct Production Defaults
 
 Use these references as the production baseline for ReAct:
-- [`lib/jido_ai/agents/examples/weather_agent.ex`](lib/jido_ai/agents/examples/weather_agent.ex)
-- [`examples/strategies/react_agent.md`](examples/strategies/react_agent.md)
+- [`lib/examples/agents/weather_agent.ex`](lib/examples/agents/weather_agent.ex)
+- [`lib/examples/strategies/react_agent.md`](lib/examples/strategies/react_agent.md)
 
 ## Quick Decision Guide
 

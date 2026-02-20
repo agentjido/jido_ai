@@ -1,5 +1,5 @@
 # Test script for WeatherAgent
-# Run with: mix run scripts/test_weather_agent.exs
+# Run with: mix run lib/examples/scripts/test_weather_agent.exs
 #
 # This demonstrates:
 # 1. Using Jido.start/0 for easy script startup
@@ -26,6 +26,7 @@ end
         if delta = get_in(metadata, [:signal, :data, :delta]) do
           IO.write(delta)
         end
+
       _ ->
         :ok
     end
@@ -52,6 +53,7 @@ IO.puts("")
 case WeatherAgent.get_conditions(pid, "Denver", timeout: 120_000) do
   {:ok, _conditions} ->
     IO.puts("\n" <> Colors.green("✓ get_conditions completed"))
+
   {:error, reason} ->
     IO.puts("\n✗ get_conditions failed: #{inspect(reason)}")
 end
@@ -64,6 +66,7 @@ IO.puts("")
 case WeatherAgent.need_umbrella?(pid, "Seattle", timeout: 120_000) do
   {:ok, _advice} ->
     IO.puts("\n" <> Colors.green("✓ need_umbrella? completed"))
+
   {:error, reason} ->
     IO.puts("\n✗ need_umbrella? failed: #{inspect(reason)}")
 end

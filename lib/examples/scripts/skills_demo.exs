@@ -4,11 +4,13 @@
 # 1. Module-based skill (Calculator) - defined with `use Jido.AI.Skill`
 # 2. File-based skill (Unit Converter) - loaded from YAML SKILL.md
 #
-# Run with: mix run scripts/skills_demo.exs
+# Run with: mix run lib/examples/scripts/skills_demo.exs
 #
 # Prerequisites:
 # - ANTHROPIC_API_KEY environment variable set
 # - priv/skills/unit-converter/SKILL.md exists
+
+Logger.configure(level: :warning)
 
 alias Jido.AI.Skill
 alias Jido.AI.Skill.{Registry, Loader, Prompt}
@@ -88,7 +90,8 @@ if System.get_env("ANTHROPIC_API_KEY") do
     # Unit converter skill
     {"Unit Converter", "Convert 98.6 degrees Fahrenheit to Celsius"},
     # Combined reasoning
-    {"Combined", "If I run a 5K (5 kilometers), how many miles is that? And if I burn 100 calories per mile, how many total calories?"}
+    {"Combined",
+     "If I run a 5K (5 kilometers), how many miles is that? And if I burn 100 calories per mile, how many total calories?"}
   ]
 
   for {skill_name, question} <- questions do

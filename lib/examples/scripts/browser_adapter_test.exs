@@ -3,7 +3,7 @@
 # Verifies both adapters work with extract_content after the --markdown fix,
 # and tests the new composite actions (ReadPage, SnapshotUrl, SearchWeb).
 #
-# Run with: mix run scripts/browser_adapter_test.exs
+# Run with: mix run lib/examples/scripts/browser_adapter_test.exs
 
 url = "https://example.com"
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env elixir
 
 # Skill System Demo
-# Run with: mix run scripts/skill_demo.exs
+# Run with: mix run lib/examples/scripts/skill_demo.exs
 
 IO.puts("""
 #{IO.ANSI.bright()}#{IO.ANSI.cyan()}
@@ -107,8 +107,14 @@ IO.puts("  Skill.allowed_tools(Demo.Skills.Calculator) # => [\"add\", ...]")
 IO.puts("")
 
 # Demonstrate with module
-IO.puts("  #{IO.ANSI.faint()}Skill.manifest(Demo.Skills.Calculator).name => #{IO.ANSI.reset()}#{Skill.manifest(Demo.Skills.Calculator).name}")
-IO.puts("  #{IO.ANSI.faint()}Skill.allowed_tools(Demo.Skills.Calculator) => #{IO.ANSI.reset()}#{inspect(Skill.allowed_tools(Demo.Skills.Calculator))}")
+IO.puts(
+  "  #{IO.ANSI.faint()}Skill.manifest(Demo.Skills.Calculator).name => #{IO.ANSI.reset()}#{Skill.manifest(Demo.Skills.Calculator).name}"
+)
+
+IO.puts(
+  "  #{IO.ANSI.faint()}Skill.allowed_tools(Demo.Skills.Calculator) => #{IO.ANSI.reset()}#{inspect(Skill.allowed_tools(Demo.Skills.Calculator))}"
+)
+
 IO.puts("")
 
 # ============================================================================
@@ -242,7 +248,10 @@ allowed = Prompt.collect_allowed_tools([Demo.Skills.Calculator])
 IO.puts("  #{IO.ANSI.faint()}Allowed tools from Calculator skill:#{IO.ANSI.reset()} #{inspect(allowed)}")
 
 filtered = Prompt.filter_tools([MockAdd, MockSubtract, MockMultiply, MockDivide, MockWeather], [Demo.Skills.Calculator])
-IO.puts("  #{IO.ANSI.faint()}Filtered tools (5 -> #{length(filtered)}):#{IO.ANSI.reset()} #{inspect(Enum.map(filtered, & &1.name()))}")
+
+IO.puts(
+  "  #{IO.ANSI.faint()}Filtered tools (5 -> #{length(filtered)}):#{IO.ANSI.reset()} #{inspect(Enum.map(filtered, & &1.name()))}"
+)
 
 IO.puts("")
 
