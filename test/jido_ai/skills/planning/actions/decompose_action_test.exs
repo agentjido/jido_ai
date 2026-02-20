@@ -32,6 +32,10 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
       assert {:error, _} = Decompose.run(%{}, %{})
     end
 
+    test "returns error when goal is empty string" do
+      assert {:error, _} = Decompose.run(%{goal: ""}, %{})
+    end
+
     test "generates decomposition with valid goal" do
       params = %{
         goal: "Build a mobile application"
@@ -84,17 +88,38 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
         plugin_state: %{planning: %{default_model: :fast, default_max_tokens: 2222, default_temperature: 0.2}}
       }
 
+      expect(ReqLLM.Generation, :generate_text, fn model, _messages, opts ->
+        assert model == Jido.AI.resolve_model(:fast)
+        assert opts[:max_tokens] == 2222
+        assert opts[:temperature] == 0.2
+
+        {:ok, %{message: %{content: "1.1. Scope work"}, usage: %{input_tokens: 1, output_tokens: 1}}}
+      end)
+
       assert {:ok, result} = Decompose.run(params, context)
       assert result.model == Jido.AI.resolve_model(:fast)
     end
 
-    test "explicit model overrides plugin default" do
-      params = %{goal: "Break down roadmap", model: "custom:model"}
+    test "explicit params override plugin defaults" do
+      params = %{
+        goal: "Break down roadmap",
+        model: "custom:model",
+        max_tokens: 777,
+        temperature: 0.45
+      }
 
       context = %{
-        provided_params: [:goal, :model],
-        plugin_state: %{planning: %{default_model: :fast}}
+        provided_params: [:goal, :model, :max_tokens, :temperature],
+        plugin_state: %{planning: %{default_model: :fast, default_max_tokens: 2222, default_temperature: 0.2}}
       }
+
+      expect(ReqLLM.Generation, :generate_text, fn model, _messages, opts ->
+        assert model == "custom:model"
+        assert opts[:max_tokens] == 777
+        assert opts[:temperature] == 0.45
+
+        {:ok, %{message: %{content: "1.1. Custom depth path"}, usage: %{input_tokens: 1, output_tokens: 1}}}
+      end)
 
       assert {:ok, result} = Decompose.run(params, context)
       assert result.model == "custom:model"

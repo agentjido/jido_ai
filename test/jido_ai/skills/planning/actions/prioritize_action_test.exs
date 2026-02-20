@@ -38,6 +38,10 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
       assert {:error, _} = Prioritize.run(%{}, %{})
     end
 
+    test "returns error when tasks is invalid format" do
+      assert {:error, _} = Prioritize.run(%{tasks: "Task A"}, %{})
+    end
+
     test "returns error when tasks is empty list" do
       assert {:error, _} = Prioritize.run(%{tasks: []}, %{})
     end
@@ -97,17 +101,38 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
         plugin_state: %{planning: %{default_model: :fast, default_max_tokens: 1111, default_temperature: 0.3}}
       }
 
+      expect(ReqLLM.Generation, :generate_text, fn model, _messages, opts ->
+        assert model == Jido.AI.resolve_model(:fast)
+        assert opts[:max_tokens] == 1111
+        assert opts[:temperature] == 0.3
+
+        {:ok, %{message: %{content: "1. **Task A** - Score: 9"}, usage: %{input_tokens: 1, output_tokens: 1}}}
+      end)
+
       assert {:ok, result} = Prioritize.run(params, context)
       assert result.model == Jido.AI.resolve_model(:fast)
     end
 
-    test "explicit model overrides plugin default" do
-      params = %{tasks: ["Task A", "Task B"], model: "custom:model"}
+    test "explicit params override plugin defaults" do
+      params = %{
+        tasks: ["Task A", "Task B"],
+        model: "custom:model",
+        max_tokens: 444,
+        temperature: 0.9
+      }
 
       context = %{
-        provided_params: [:tasks, :model],
-        plugin_state: %{planning: %{default_model: :fast}}
+        provided_params: [:tasks, :model, :max_tokens, :temperature],
+        plugin_state: %{planning: %{default_model: :fast, default_max_tokens: 1111, default_temperature: 0.3}}
       }
+
+      expect(ReqLLM.Generation, :generate_text, fn model, _messages, opts ->
+        assert model == "custom:model"
+        assert opts[:max_tokens] == 444
+        assert opts[:temperature] == 0.9
+
+        {:ok, %{message: %{content: "1. **Task B** - Score: 8"}, usage: %{input_tokens: 1, output_tokens: 1}}}
+      end)
 
       assert {:ok, result} = Prioritize.run(params, context)
       assert result.model == "custom:model"

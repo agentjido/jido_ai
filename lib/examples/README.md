@@ -43,6 +43,7 @@ Canonical weather overview module:
 | API + release workflows | `lib/examples/agents/api_smoke_test_agent.ex`, `lib/examples/agents/release_notes_agent.ex` |
 | Skills and tools | `lib/examples/skills/`, `lib/examples/tools/`, `lib/examples/skills_demo_agent.ex`, `lib/examples/calculator_agent.ex` |
 | Standalone LLM actions | `lib/examples/actions/llm_actions.md` |
+| Standalone planning actions | `lib/examples/actions/planning_actions.md` |
 | Standalone tool-calling actions | `lib/examples/actions/tool_calling_actions.md` |
 
 ## Plugin Capability Pattern

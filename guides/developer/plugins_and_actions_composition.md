@@ -570,9 +570,15 @@ First non-`nil` tool map wins. This keeps direct `Jido.Exec` action calls and pl
 Planning actions consume these plugin defaults when the caller omits those params.
 Action-specific fields remain action-owned:
 
-- `Plan` owns `goal`, optional `constraints`/`resources`, and `max_steps`
-- `Decompose` owns `goal`, optional `max_depth`, and optional `context`
-- `Prioritize` owns `tasks`, optional `criteria`, and optional `context`
+- `Plan`: `goal`, optional `constraints`/`resources`, optional `max_steps`
+- `Decompose`: `goal`, optional `max_depth`, optional `context`
+- `Prioritize`: `tasks`, optional `criteria`, optional `context`
+
+Planning selection guidance:
+
+- Use `Plan` when you need a sequential execution plan from one goal.
+- Use `Decompose` when the goal is too large and should be split into hierarchical sub-goals.
+- Use `Prioritize` when you already have a task list and need ranked execution order.
 
 ## Model Routing Plugin Defaults Contract
 

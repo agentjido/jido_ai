@@ -58,11 +58,15 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 ## Planning Actions
 
 - `Jido.AI.Actions.Planning.Plan`
-  - Goal-to-step plan generation.
+  - Use when you need a sequential execution plan from one goal.
+  - Example snippet: [`lib/examples/actions/planning_actions.md#plan-action`](../../lib/examples/actions/planning_actions.md#plan-action)
 - `Jido.AI.Actions.Planning.Decompose`
-  - Hierarchical goal decomposition.
+  - Use when the goal is too large and should be split into hierarchical sub-goals.
+  - Example snippet: [`lib/examples/actions/planning_actions.md#decompose-action`](../../lib/examples/actions/planning_actions.md#decompose-action)
 - `Jido.AI.Actions.Planning.Prioritize`
-  - Task prioritization under criteria/context.
+  - Use when you already have a task list and need ranked execution order.
+  - Example snippet: [`lib/examples/actions/planning_actions.md#prioritize-action`](../../lib/examples/actions/planning_actions.md#prioritize-action)
+  - Workflow snippet: [`lib/examples/actions/planning_actions.md#planning-workflow-with-task-decomposition`](../../lib/examples/actions/planning_actions.md#planning-workflow-with-task-decomposition)
 
 ## Reasoning Actions
 
