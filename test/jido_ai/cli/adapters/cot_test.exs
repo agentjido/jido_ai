@@ -1,7 +1,15 @@
 defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
   use ExUnit.Case, async: true
 
+  alias Jido.AI.CLI.Adapter
   alias Jido.AI.Reasoning.ChainOfThought.CLIAdapter, as: CoTAdapter
+
+  defmodule StubCoTAgent do
+    def think(pid, query) do
+      send(self(), {:cot_submit_called, pid, query})
+      {:ok, :submitted}
+    end
+  end
 
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config" do
@@ -36,6 +44,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
 
       opts = module.strategy_opts()
       assert opts[:model] == "anthropic:claude-haiku-4-5"
+      refute Keyword.has_key?(opts, :system_prompt)
     end
 
     test "uses custom system_prompt from config" do
@@ -55,6 +64,22 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
       assert function_exported?(CoTAdapter, :await, 3)
       assert function_exported?(CoTAdapter, :stop, 1)
       assert function_exported?(CoTAdapter, :create_ephemeral_agent, 1)
+    end
+  end
+
+  describe "adapter wiring" do
+    test "submit delegates to configured CoT agent think/2 function" do
+      assert {:ok, :submitted} = CoTAdapter.submit(self(), "Reason it out", %{agent_module: StubCoTAgent})
+      assert_received {:cot_submit_called, pid, "Reason it out"}
+      assert pid == self()
+    end
+
+    test "await returns timeout error when timeout budget is exhausted" do
+      assert {:error, :timeout} = CoTAdapter.await(self(), 0, %{})
+    end
+
+    test "weather CoT example resolves to CoT adapter" do
+      assert {:ok, CoTAdapter} = Adapter.resolve(nil, Jido.AI.Examples.Weather.CoTAgent)
     end
   end
 end

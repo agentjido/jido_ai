@@ -199,6 +199,49 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       assert state[:active_request_id] == nil
     end
 
+    test "request_cancelled worker event transitions to error state with cancellation reason" do
+      agent = create_agent()
+
+      event =
+        worker_event(:request_cancelled, "req_cot_cancelled", 1, %{
+          reason: :user_cancelled
+        })
+
+      {agent, []} =
+        ChainOfThought.cmd(
+          agent,
+          [instruction(:cot_worker_event, %{request_id: "req_cot_cancelled", event: event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state[:status] == :error
+      assert state[:termination_reason] == :error
+      assert state[:result] =~ "cancelled"
+      assert state[:result] =~ "user_cancelled"
+      assert state[:active_request_id] == nil
+    end
+
+    test "request_error instruction stores rejection metadata on strategy state" do
+      agent = create_agent()
+
+      request_error =
+        instruction(ChainOfThought.request_error_action(), %{
+          request_id: "req_cot_busy",
+          reason: :busy,
+          message: "Agent is busy"
+        })
+
+      {agent, []} = ChainOfThought.cmd(agent, [request_error], %{})
+      state = StratState.get(agent, %{})
+
+      assert state[:last_request_error] == %{
+               request_id: "req_cot_busy",
+               reason: :busy,
+               message: "Agent is busy"
+             }
+    end
+
     test "worker crash while active request marks request failed" do
       agent = create_agent()
 

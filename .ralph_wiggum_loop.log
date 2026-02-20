@@ -485,3 +485,57 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.2 seconds (2.2s async, 0.00s sync)
 8 tests, 0 failures (1528 excluded)
+1) changed files
+- `lib/examples/strategies/cot.md`
+- `lib/jido_ai/agents/strategies/cot_agent.ex`
+- `lib/jido_ai/reasoning/chain_of_thought/strategy.ex`
+- `test/jido_ai/strategy/chain_of_thought_test.exs`
+- `test/jido_ai/cot_agent_test.exs`
+- `test/jido_ai/cli/adapters/cot_test.exs`
+- `test/jido_ai/cot/docs_contract_test.exs` (new)
+
+2) tests/commands executed
+- `mix format` ✅
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test test/jido_ai/strategy/chain_of_thought_test.exs test/jido_ai/cot_agent_test.exs test/jido_ai/cli/adapters/cot_test.exs` ✅ (34 tests, 0 failures)
+- `mix test test/jido_ai/strategy/chain_of_thought_test.exs test/jido_ai/cot_agent_test.exs test/jido_ai/cli/adapters/cot_test.exs test/jido_ai/cot/docs_contract_test.exs` ✅ (36 tests, 0 failures)
+- `mix test --exclude flaky --only stable_smoke` ✅ (8 tests, 0 failures)
+- `mix precommit` ❌ blocked by `Mix.PubSub` TCP socket permission error (`:eperm`)
+- `mix test.fast` ❌ blocked by same `Mix.PubSub` socket error
+- `mix doctor --summary` ❌ blocked by same `Mix.PubSub` socket error
+
+3) acceptance criteria coverage
+- CoT docs/tests align with request lifecycle behavior:
+  - Expanded CoT strategy doc flow + lifecycle contract in `lib/examples/strategies/cot.md`.
+  - Added explicit lifecycle contract sections in CoT macro and strategy moduledocs.
+  - Added lifecycle edge tests for `request_cancelled` and stored rejection metadata in `test/jido_ai/strategy/chain_of_thought_test.exs`.
+  - Added CoT docs contract test in `test/jido_ai/cot/docs_contract_test.exs`.
+  - Added macro docs contract + strategy option/default coverage in `test/jido_ai/cot_agent_test.exs`.
+- Weather CoT example remains canonical and linked in strategy matrix:
+  - `lib/examples/strategies/cot.md` references canonical module and CLI command.
+  - `test/jido_ai/cot/docs_contract_test.exs` asserts matrix row/module/doc/command in `lib/examples/README.md`.
+- CLI adapter tests cover default/custom options:
+  - Extended `test/jido_ai/cli/adapters/cot_test.exs` for default model/no system prompt, custom model, custom system prompt, submit delegation, timeout behavior, and weather adapter resolution.
+
+4) blockers/assumptions
+- Blocker: this sandbox denies loopback TCP socket creation for Mix PubSub (`Mix.Sync.PubSub.subscribe/1`, `:eperm`), which prevents `mix precommit`, `mix test.fast`, and `mix doctor --summary` from running here.
+- Assumption: weather strategy matrix source of truth is `lib/examples/README.md` (validated by new docs-contract test).
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 990822, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.3 seconds (2.3s async, 0.01s sync)
+8 tests, 0 failures (1540 excluded)
