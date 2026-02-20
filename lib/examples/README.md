@@ -52,6 +52,7 @@ Canonical weather overview module:
 | Reasoning CoD plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfDraft` and send `reasoning.cod.run` for fixed `:cod` strategy execution. |
 | Reasoning CoT plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfThought` and send `reasoning.cot.run` for fixed `:cot` strategy execution. |
 | Reasoning AoT plugin | Mount `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` and send `reasoning.aot.run` for fixed `:aot` strategy execution. |
+| Reasoning ToT plugin | Mount `Jido.AI.Plugins.Reasoning.TreeOfThoughts` and send `reasoning.tot.run` for fixed `:tot` strategy execution with ToT options (`branching_factor`, `max_depth`, `traversal_strategy`). |
 
 ```elixir
 defmodule MyApp.ChatAgent do
@@ -157,6 +158,34 @@ signal =
   )
 
 # Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts
+```
+
+```elixir
+defmodule MyApp.TreeOfThoughtsPluginAgent do
+  use Jido.AI.Agent,
+    name: "reasoning_tot_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.TreeOfThoughts,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{branching_factor: 3, max_depth: 4, traversal_strategy: :best_first}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.tot.run",
+    %{
+      prompt: "Plan three weekend options with weather uncertainty.",
+      strategy: :cot,
+      options: %{branching_factor: 4, max_depth: 5}
+    },
+    source: "/cli"
+  )
+
+# Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.TreeOfThoughts
 ```
 
 ## Script Index

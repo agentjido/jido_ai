@@ -166,6 +166,41 @@ Execution handoff:
 - `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts.handle_signal/2` overrides payload strategy to `strategy: :aot`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 
+### ToT Plugin Handoff (`reasoning.tot.run`)
+
+```elixir
+defmodule MyApp.ToTPluginAgent do
+  use Jido.AI.Agent,
+    name: "tot_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.TreeOfThoughts,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{branching_factor: 3, max_depth: 4, traversal_strategy: :best_first}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.tot.run",
+    %{
+      prompt: "Explore three weather-safe plans with tradeoffs.",
+      strategy: :cot,
+      options: %{branching_factor: 4, max_depth: 5}
+    },
+    source: "/cli"
+  )
+```
+
+Execution handoff:
+
+- Route dispatch maps `reasoning.tot.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
+- `Jido.AI.Plugins.Reasoning.TreeOfThoughts.handle_signal/2` overrides payload strategy to `strategy: :tot`.
+- `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
+- ToT option keys include `branching_factor`, `max_depth`, `traversal_strategy`, `generation_prompt`, and `evaluation_prompt`.
+
 ## Chat Plugin Defaults Contract
 
 `Jido.AI.Plugins.Chat` mounts the following defaults unless overridden in plugin config:
@@ -209,6 +244,15 @@ Action-specific fields remain action-owned:
 `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` mounts the following defaults unless overridden in plugin config:
 
 - `strategy: :aot`
+- `default_model: :reasoning`
+- `timeout: 30_000`
+- `options: %{}`
+
+## Reasoning ToT Plugin Defaults Contract
+
+`Jido.AI.Plugins.Reasoning.TreeOfThoughts` mounts the following defaults unless overridden in plugin config:
+
+- `strategy: :tot`
 - `default_model: :reasoning`
 - `timeout: 30_000`
 - `options: %{}`
