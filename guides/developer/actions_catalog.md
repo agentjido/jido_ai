@@ -30,13 +30,17 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 ## LLM Actions
 
 - `Jido.AI.Actions.LLM.Chat`
-  - Chat-style generation with optional system prompt and context/plugin defaults.
+  - Use when you need single-turn conversational output with optional system prompt and chat/plugin defaults.
+  - Example snippet: [`lib/examples/actions/llm_actions.md#chat-action`](../../lib/examples/actions/llm_actions.md#chat-action)
 - `Jido.AI.Actions.LLM.Complete`
-  - Simple text completion convenience API.
+  - Use when you want compatibility-style prompt completion without object constraints.
+  - Example snippet: [`lib/examples/actions/llm_actions.md#complete-action`](../../lib/examples/actions/llm_actions.md#complete-action)
 - `Jido.AI.Actions.LLM.Embed`
-  - Embedding generation for one or many texts.
+  - Use when you need vector embeddings for retrieval, semantic search, or similarity tasks.
+  - Example snippet: [`lib/examples/actions/llm_actions.md#embed-action`](../../lib/examples/actions/llm_actions.md#embed-action)
 - `Jido.AI.Actions.LLM.GenerateObject`
-  - Structured object generation constrained by schema.
+  - Use when downstream code expects schema-constrained structured output.
+  - Example snippet: [`lib/examples/actions/llm_actions.md#generateobject-action`](../../lib/examples/actions/llm_actions.md#generateobject-action)
 
 ## Tool Calling Actions
 

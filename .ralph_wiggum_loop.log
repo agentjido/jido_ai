@@ -1530,3 +1530,60 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.1 seconds (2.1s async, 0.00s sync)
 8 tests, 0 failures (1683 excluded)
+1) changed files
+- `lib/jido_ai/actions/llm/complete.ex`
+- `lib/jido_ai/actions/llm/embed.ex`
+- `test/test_helper.exs`
+- `test/jido_ai/skills/llm/actions/chat_action_test.exs`
+- `test/jido_ai/skills/llm/actions/complete_action_test.exs`
+- `test/jido_ai/skills/llm/actions/embed_action_test.exs`
+- `test/jido_ai/skills/llm/actions/generate_object_action_test.exs`
+- `test/jido_ai/skills/llm/actions/docs_contract_test.exs` (new)
+- `guides/developer/actions_catalog.md`
+- `lib/examples/README.md`
+- `lib/examples/actions/llm_actions.md` (new)
+
+2) tests/commands executed
+- `mix format` ✅
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test test/jido_ai/skills/llm/actions` ✅ (40 tests, 0 failures)
+- `mix test test/jido_ai/plugins/chat_docs_contract_test.exs test/jido_ai/plugins/model_routing_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` ✅
+- `MIX_ENV=test mix test --exclude flaky --only stable_smoke` ✅ (8 tests, 0 failures)
+- `mix test.fast` ❌ (environment `Mix.PubSub` TCP socket `:eperm` in `mix cmd` alias path)
+- `mix precommit` ❌ (same `Mix.PubSub` TCP socket `:eperm`)
+- `mix doctor --summary` ❌ (same `Mix.PubSub` TCP socket `:eperm`)
+
+3) acceptance criteria coverage
+- Tests cover happy path, validation failures, and explicit override behavior:
+  - Expanded action tests for `Chat`, `Complete`, `Embed`, `GenerateObject`.
+  - Added schema/default assertions, model resolution checks, context default behavior, explicit override behavior, and error sanitization checks.
+- Docs identify when to use each LLM action:
+  - Updated `guides/developer/actions_catalog.md` LLM section with explicit “Use when…” guidance per action.
+- Examples include at least one runnable pattern per action class:
+  - Added `lib/examples/actions/llm_actions.md` with runnable `mix run -e` snippets for all four LLM actions.
+- Action catalog entries reference concrete example snippets:
+  - Added per-action links from catalog to snippet anchors.
+  - Added docs contract test `test/jido_ai/skills/llm/actions/docs_contract_test.exs`.
+
+4) blockers/assumptions
+- Blocker: this environment intermittently blocks Mix pubsub TCP socket creation (`Mix.Sync.PubSub.subscribe/1`, reason `:eperm`) for `mix doctor`, `mix precommit`, and `mix test.fast` alias execution.
+- Assumption used for verification: `MIX_ENV=test mix test --exclude flaky --only stable_smoke` is the functional equivalent of `mix test.fast` and passed.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 229510, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.3 seconds (2.3s async, 0.00s sync)
+8 tests, 0 failures (1701 excluded)

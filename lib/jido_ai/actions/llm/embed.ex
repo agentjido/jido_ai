@@ -8,28 +8,29 @@ defmodule Jido.AI.Actions.LLM.Embed do
 
   ## Parameters
 
-  * `model` (required) - Embedding model spec (e.g., `"openai:text-embedding-3-small"`)
-  * `texts` (required) - Single text string or list of texts to embed
+  * `model` (optional) - Model alias (e.g., `:embedding`) or direct model spec (default: `:embedding`)
+  * `texts` (optional) - Single text string to embed
+  * `texts_list` (optional) - List of texts to embed
   * `dimensions` (optional) - Output dimensions for models that support it
   * `timeout` (optional) - Request timeout in milliseconds
+
+  Provide either `texts` or `texts_list`.
 
   ## Examples
 
       # Single text embedding
       {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Embed, %{
-        model: "openai:text-embedding-3-small",
         texts: "Hello world"
       })
 
       # Batch embeddings
       {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Embed, %{
-        model: "openai:text-embedding-3-small",
-        texts: ["Hello world", "Elixir is great"]
+        texts_list: ["Hello world", "Elixir is great"]
       })
 
       # With dimensions
       {:ok, result} = Jido.Exec.run(Jido.AI.Actions.LLM.Embed, %{
-        model: "openai:text-embedding-3-small",
+        model: :embedding,
         texts: "Semantic search",
         dimensions: 1536
       })
@@ -52,7 +53,9 @@ defmodule Jido.AI.Actions.LLM.Embed do
     vsn: "1.0.0",
     schema:
       Zoi.object(%{
-        model: Zoi.string(description: "Embedding model spec (e.g., 'openai:text-embedding-3-small')"),
+        model:
+          Zoi.any(description: "Model alias (e.g., :embedding) or direct model spec string")
+          |> Zoi.optional(),
         texts: Zoi.string(description: "Single text to embed") |> Zoi.optional(),
         texts_list:
           Zoi.list(Zoi.string(), description: "List of texts to embed (alternative to single text)")
@@ -63,6 +66,7 @@ defmodule Jido.AI.Actions.LLM.Embed do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
+  alias Jido.AI.Actions.Helpers
   alias Jido.AI.Error.Sanitize
   alias Jido.AI.Validation
 
@@ -75,9 +79,11 @@ defmodule Jido.AI.Actions.LLM.Embed do
   * `{:error, reason}` - Error from ReqLLM or validation
   """
   @impl Jido.Action
-  def run(params, _context) do
+  def run(params, context) do
+    params = apply_context_defaults(params, context)
+
     with {:ok, _validated} <- validate_and_sanitize_params(params),
-         model = params[:model],
+         {:ok, model} <- Helpers.resolve_model(params[:model], :embedding),
          texts = normalize_texts(params[:texts], params[:texts_list]),
          opts = build_opts(params),
          {:ok, response} <- ReqLLM.Embedding.embed(model, texts, opts) do
@@ -90,11 +96,9 @@ defmodule Jido.AI.Actions.LLM.Embed do
   # Private Functions
 
   defp validate_and_sanitize_params(params) do
-    with {:ok, _model} <- Validation.validate_string(params[:model], max_length: 1000),
-         {:ok, _validated} <- validate_texts(params) do
+    with {:ok, _validated} <- validate_texts(params) do
       {:ok, params}
     else
-      {:error, :empty_string} -> {:error, :model_required}
       {:error, reason} -> {:error, reason}
     end
   end
@@ -123,6 +127,63 @@ defmodule Jido.AI.Actions.LLM.Embed do
   end
 
   defp sanitize_error_for_user(_error), do: "An error occurred"
+
+  defp apply_context_defaults(params, context) when is_map(params) do
+    context = normalize_context(context)
+    provided = provided_params(context)
+
+    model_default =
+      first_present([
+        context[:default_model],
+        context[:model],
+        plugin_default(context, :default_model)
+      ])
+
+    put_default_param(params, :model, model_default, provided)
+  end
+
+  defp apply_context_defaults(params, _context), do: params
+
+  defp put_default_param(params, _key, nil, _provided), do: params
+
+  defp put_default_param(params, key, default, :unknown) do
+    if Map.get(params, key) in [nil, ""] do
+      Map.put(params, key, default)
+    else
+      params
+    end
+  end
+
+  defp put_default_param(params, key, default, provided) do
+    if provided_param?(provided, key) do
+      params
+    else
+      Map.put(params, key, default)
+    end
+  end
+
+  defp provided_params(%{provided_params: provided}) when is_list(provided), do: provided
+  defp provided_params(_), do: :unknown
+
+  defp provided_param?(provided, key) when is_list(provided) do
+    key_str = Atom.to_string(key)
+    Enum.any?(provided, fn k -> k == key or k == key_str end)
+  end
+
+  defp plugin_default(context, key) do
+    first_present([
+      get_in(context, [:plugin_state, :chat, key]),
+      get_in(context, [:plugin_state, :llm, key]),
+      get_in(context, [:state, :chat, key]),
+      get_in(context, [:state, :llm, key]),
+      get_in(context, [:agent, :state, :chat, key]),
+      get_in(context, [:agent, :state, :llm, key])
+    ])
+  end
+
+  defp first_present(values), do: Enum.find(values, &(not is_nil(&1)))
+  defp normalize_context(context) when is_map(context), do: context
+  defp normalize_context(_), do: %{}
 
   defp normalize_texts(text, nil) when is_binary(text), do: [text]
   defp normalize_texts(nil, texts_list) when is_list(texts_list), do: texts_list
