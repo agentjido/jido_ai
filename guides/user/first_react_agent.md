@@ -51,6 +51,12 @@ signal = Jido.Signal.new!(
 :ok = Jido.AgentServer.cast(pid, signal)
 ```
 
+## Optional: Set System Prompt At Runtime
+
+```elixir
+{:ok, _agent} = Jido.AI.set_system_prompt(pid, "You are a concise support specialist.")
+```
+
 ## Failure Mode: Tool Not Registered / Not Valid
 
 Symptom:

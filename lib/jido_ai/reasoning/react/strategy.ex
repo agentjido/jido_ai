@@ -51,6 +51,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           max_iterations: pos_integer(),
           streaming: boolean(),
           base_tool_context: map(),
+          base_req_http_options: list(),
           request_policy: :reject,
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
@@ -83,6 +84,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @register_tool :ai_react_register_tool
   @unregister_tool :ai_react_unregister_tool
   @set_tool_context :ai_react_set_tool_context
+  @set_system_prompt :ai_react_set_system_prompt
   @runtime_event :ai_react_runtime_event
   @worker_event :ai_react_worker_event
   @worker_child_started :ai_react_worker_child_started
@@ -124,6 +126,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @spec set_tool_context_action() :: :ai_react_set_tool_context
   def set_tool_context_action, do: @set_tool_context
 
+  @doc "Returns the action atom for updating the base system prompt."
+  @spec set_system_prompt_action() :: :ai_react_set_system_prompt
+  def set_system_prompt_action, do: @set_system_prompt
+
   @doc "Returns the legacy action atom for direct runtime stream events (no-op in delegated mode)."
   @spec runtime_event_action() :: :ai_react_runtime_event
   def runtime_event_action, do: @runtime_event
@@ -134,7 +140,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         Zoi.object(%{
           query: Zoi.string(),
           request_id: Zoi.string() |> Zoi.optional(),
-          tool_context: Zoi.map() |> Zoi.optional()
+          tool_context: Zoi.map() |> Zoi.optional(),
+          req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional()
         }),
       doc: "Start a delegated ReAct conversation with a user query",
       name: "ai.react.start"
@@ -172,6 +179,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       schema: Zoi.object(%{tool_context: Zoi.map()}),
       doc: "Update the persistent base tool context",
       name: "ai.react.set_tool_context"
+    },
+    @set_system_prompt => %{
+      schema: Zoi.object(%{system_prompt: Zoi.string()}),
+      doc: "Update the persistent base system prompt",
+      name: "ai.react.set_system_prompt"
     },
     @worker_event => %{
       schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
@@ -241,6 +253,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       {"ai.react.register_tool", {:strategy_cmd, @register_tool}},
       {"ai.react.unregister_tool", {:strategy_cmd, @unregister_tool}},
       {"ai.react.set_tool_context", {:strategy_cmd, @set_tool_context}},
+      {"ai.react.set_system_prompt", {:strategy_cmd, @set_system_prompt}},
       {"ai.react.worker.event", {:strategy_cmd, @worker_event}},
       {"jido.agent.child.started", {:strategy_cmd, @worker_child_started}},
       {"jido.agent.child.exit", {:strategy_cmd, @worker_child_exit}},
@@ -345,6 +358,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         current_llm_call_id: nil,
         termination_reason: nil,
         run_tool_context: %{},
+        run_req_http_options: [],
         active_request_id: nil,
         cancel_reason: nil,
         usage: %{},
@@ -385,7 +399,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     case normalize_action(action) do
       @start ->
         run_context = Map.get(params, :tool_context) || %{}
-        process_start(set_run_tool_context(agent, run_context), params)
+        run_req_http_options = params |> Map.get(:req_http_options, []) |> normalize_req_http_options()
+
+        agent
+        |> set_run_tool_context(run_context)
+        |> set_run_req_http_options(run_req_http_options)
+        |> process_start(params)
 
       @cancel ->
         process_cancel(agent, params)
@@ -401,6 +420,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       @set_tool_context ->
         process_set_tool_context(agent, params)
+
+      @set_system_prompt ->
+        process_set_system_prompt(agent, params)
 
       @worker_event ->
         process_worker_event(agent, params)
@@ -436,10 +458,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       {agent, [directive]}
     else
-      runtime_config = runtime_config_from_strategy(config)
-
       run_tool_context = Map.get(state, :run_tool_context, %{})
       effective_tool_context = Map.merge(config[:base_tool_context] || %{}, run_tool_context)
+      run_req_http_options = Map.get(state, :run_req_http_options, [])
+      base_req_http_options = normalize_req_http_options(config[:base_req_http_options])
+      effective_req_http_options = base_req_http_options ++ run_req_http_options
+      runtime_config = runtime_config_from_strategy(config, req_http_options: effective_req_http_options)
 
       worker_start_payload = %{
         request_id: request_id,
@@ -565,6 +589,19 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp process_set_tool_context(agent, _params), do: {agent, []}
 
+  defp process_set_system_prompt(agent, %{system_prompt: prompt}) when is_binary(prompt) do
+    state = StratState.get(agent, %{})
+
+    new_state =
+      Helpers.apply_to_state(state, [
+        Helpers.set_config_field(:system_prompt, prompt)
+      ])
+
+    {put_strategy_state(agent, new_state), []}
+  end
+
+  defp process_set_system_prompt(agent, _params), do: {agent, []}
+
   defp process_worker_child_started(agent, %{tag: tag, pid: pid}) when is_pid(pid) do
     state = StratState.get(agent, %{})
 
@@ -629,6 +666,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             |> Map.put(:result, inspect(error))
             |> Map.put(:active_request_id, nil)
             |> Map.delete(:run_tool_context)
+            |> Map.delete(:run_req_http_options)
 
           {put_strategy_state(agent, failed_state), []}
         else
@@ -780,6 +818,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:usage, usage || %{})
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
+          |> Map.delete(:run_req_http_options)
 
         signal = Signal.RequestCompleted.new!(%{request_id: request_id, result: result, run_id: request_id})
         {updated, [signal]}
@@ -794,6 +833,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:termination_reason, :error)
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
+          |> Map.delete(:run_req_http_options)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}
@@ -810,6 +850,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:cancel_reason, reason)
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
+          |> Map.delete(:run_req_http_options)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}
@@ -890,13 +931,19 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     |> Map.get(:model)
   end
 
-  defp runtime_config_from_strategy(config) do
+  defp runtime_config_from_strategy(config, opts) do
+    req_http_options =
+      opts
+      |> Keyword.get(:req_http_options, config[:base_req_http_options] || [])
+      |> normalize_req_http_options()
+
     runtime_opts = %{
       model: config[:model],
       system_prompt: config[:system_prompt],
       tools: config[:actions_by_name] || %{},
       max_iterations: config[:max_iterations],
       streaming: config[:streaming],
+      req_http_options: req_http_options,
       tool_timeout_ms: config[:tool_timeout_ms],
       tool_max_retries: config[:tool_max_retries],
       tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
@@ -912,6 +959,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp set_run_tool_context(agent, context) when is_map(context) do
     state = StratState.get(agent, %{})
     put_strategy_state(agent, Map.put(state, :run_tool_context, context))
+  end
+
+  defp set_run_req_http_options(agent, req_http_options) when is_list(req_http_options) do
+    state = StratState.get(agent, %{})
+    put_strategy_state(agent, Map.put(state, :run_req_http_options, req_http_options))
   end
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
@@ -1045,7 +1097,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           observability_overrides
         ),
       agent_id: agent.id,
-      base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt
+      base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt,
+      base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options()
     }
   end
 
@@ -1055,6 +1108,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_map_opt(%{} = value), do: value
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
+
+  defp normalize_req_http_options(req_http_options) when is_list(req_http_options), do: req_http_options
+  defp normalize_req_http_options(_), do: []
 
   defp generate_call_id, do: "req_#{Jido.Util.generate_id()}"
 

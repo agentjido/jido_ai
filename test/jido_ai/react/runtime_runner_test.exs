@@ -127,6 +127,54 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == "Hello from generate"
   end
 
+  test "passes req_http_options to streaming requests" do
+    req_http_options = [plug: {Req.Test, []}]
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+      assert opts[:req_http_options] == req_http_options
+
+      {:ok,
+       %{
+         stream: [ReqLLM.StreamChunk.text("Hello with req_http_options")],
+         usage: %{input_tokens: 2, output_tokens: 2}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, req_http_options: req_http_options})
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "passes req_http_options to non-streaming requests" do
+    req_http_options = [plug: {Req.Test, []}]
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      flunk("stream_text should not be called when ReAct streaming is disabled")
+    end)
+
+    Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, _messages, opts ->
+      assert opts[:req_http_options] == req_http_options
+
+      {:ok,
+       %{
+         message: %{content: "Hello from generate", tool_calls: nil},
+         finish_reason: :stop,
+         usage: %{input_tokens: 1, output_tokens: 1}
+       }}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, streaming: false, req_http_options: req_http_options})
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
   test "retries tool execution and reports attempts in tool_completed" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1

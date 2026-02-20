@@ -20,6 +20,7 @@ defmodule Jido.AI.DirectiveTest do
       assert directive.tool_choice == :auto
       assert directive.max_tokens == 1024
       assert directive.temperature == 0.2
+      assert directive.req_http_options == []
     end
 
     test "creates directive with model_alias" do
@@ -56,6 +57,20 @@ defmodule Jido.AI.DirectiveTest do
         })
 
       assert directive.timeout == 30_000
+    end
+
+    test "creates directive with req_http_options" do
+      req_http_options = [plug: {Req.Test, []}]
+
+      directive =
+        LLMStream.new!(%{
+          id: "call_req_http",
+          model: "anthropic:claude-haiku-4-5",
+          context: [%{role: :user, content: "Hello"}],
+          req_http_options: req_http_options
+        })
+
+      assert directive.req_http_options == req_http_options
     end
 
     test "creates directive with all optional fields" do
@@ -108,6 +123,7 @@ defmodule Jido.AI.DirectiveTest do
       assert directive.tool_choice == :auto
       assert directive.max_tokens == 1024
       assert directive.temperature == 0.2
+      assert directive.req_http_options == []
     end
 
     test "creates directive with model_alias" do
@@ -134,6 +150,20 @@ defmodule Jido.AI.DirectiveTest do
 
       assert directive.system_prompt == "You are an expert."
       assert directive.timeout == 45_000
+    end
+
+    test "creates directive with req_http_options" do
+      req_http_options = [plug: {Req.Test, []}]
+
+      directive =
+        LLMGenerate.new!(%{
+          id: "gen_req_http",
+          model: "openai:gpt-4o",
+          context: [%{role: :user, content: "Hello"}],
+          req_http_options: req_http_options
+        })
+
+      assert directive.req_http_options == req_http_options
     end
 
     test "raises on missing required fields" do

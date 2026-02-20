@@ -110,6 +110,17 @@ defmodule Jido.AI.Directive.Helper do
   end
 
   @doc """
+  Adds req_http_options option to a keyword list if options are specified.
+  """
+  @spec add_req_http_options(keyword(), list() | nil) :: keyword()
+  def add_req_http_options(opts, nil), do: opts
+  def add_req_http_options(opts, []), do: opts
+
+  def add_req_http_options(opts, req_http_options) when is_list(req_http_options) do
+    Keyword.put(opts, :req_http_options, req_http_options)
+  end
+
+  @doc """
   Adds tools option to a keyword list if tools are specified.
   """
   @spec add_tools_opt(keyword(), list()) :: keyword()

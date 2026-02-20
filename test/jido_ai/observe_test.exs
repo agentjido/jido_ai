@@ -25,6 +25,30 @@ defmodule Jido.AI.ObserveTest do
     assert measurements.queue_ms == 0
   end
 
+  test "sanitize_sensitive redacts sensitive key variants" do
+    payload = %{
+      "api_key" => "k1",
+      "apikey" => "k2",
+      "clientsecret" => "k3",
+      "secret_value" => "k4",
+      "session_token" => "k5",
+      "PASSWORD" => "k6",
+      :access_key => "k7",
+      "username" => "alice"
+    }
+
+    sanitized = Observe.sanitize_sensitive(payload)
+
+    assert sanitized["api_key"] == "[REDACTED]"
+    assert sanitized["apikey"] == "[REDACTED]"
+    assert sanitized["clientsecret"] == "[REDACTED]"
+    assert sanitized["secret_value"] == "[REDACTED]"
+    assert sanitized["session_token"] == "[REDACTED]"
+    assert sanitized["PASSWORD"] == "[REDACTED]"
+    assert sanitized[:access_key] == "[REDACTED]"
+    assert sanitized["username"] == "alice"
+  end
+
   test "emit executes telemetry with normalized shape" do
     ref = make_ref()
     handler_id = "observe-test-emit-#{inspect(ref)}"

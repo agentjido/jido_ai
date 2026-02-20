@@ -21,6 +21,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
         max_tokens: Zoi.integer() |> Zoi.default(1024),
         temperature: Zoi.float() |> Zoi.default(0.2),
         llm_timeout_ms: Zoi.integer() |> Zoi.optional(),
+        req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
         tool_timeout_ms: Zoi.integer() |> Zoi.default(15_000),
         tool_max_retries: Zoi.integer() |> Zoi.default(1),
         tool_retry_backoff_ms: Zoi.integer() |> Zoi.default(200),

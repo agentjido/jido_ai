@@ -16,6 +16,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
       max_tokens: params[:max_tokens],
       temperature: params[:temperature],
       llm_timeout_ms: params[:llm_timeout_ms] || params[:timeout_ms],
+      req_http_options: params[:req_http_options],
       tool_timeout_ms: params[:tool_timeout_ms],
       tool_max_retries: params[:tool_max_retries],
       tool_retry_backoff_ms: params[:tool_retry_backoff_ms],
