@@ -53,6 +53,7 @@ Canonical weather overview module:
 | Reasoning CoT plugin | Mount `Jido.AI.Plugins.Reasoning.ChainOfThought` and send `reasoning.cot.run` for fixed `:cot` strategy execution. |
 | Reasoning AoT plugin | Mount `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` and send `reasoning.aot.run` for fixed `:aot` strategy execution. |
 | Reasoning ToT plugin | Mount `Jido.AI.Plugins.Reasoning.TreeOfThoughts` and send `reasoning.tot.run` for fixed `:tot` strategy execution with ToT options (`branching_factor`, `max_depth`, `traversal_strategy`). |
+| Reasoning GoT plugin | Mount `Jido.AI.Plugins.Reasoning.GraphOfThoughts` and send `reasoning.got.run` for fixed `:got` strategy execution with GoT options (`max_nodes`, `max_depth`, `aggregation_strategy`). |
 
 ```elixir
 defmodule MyApp.ChatAgent do
@@ -186,6 +187,34 @@ signal =
   )
 
 # Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.TreeOfThoughts
+```
+
+```elixir
+defmodule MyApp.GraphOfThoughtsPluginAgent do
+  use Jido.AI.Agent,
+    name: "reasoning_got_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.GraphOfThoughts,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{max_nodes: 20, max_depth: 5, aggregation_strategy: :synthesis}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.got.run",
+    %{
+      prompt: "Compare weather risks across three cities and synthesize one recommendation.",
+      strategy: :cot,
+      options: %{max_nodes: 24, aggregation_strategy: :weighted}
+    },
+    source: "/cli"
+  )
+
+# Routes to Jido.AI.Actions.Reasoning.RunStrategy via Jido.AI.Plugins.Reasoning.GraphOfThoughts
 ```
 
 ## Script Index

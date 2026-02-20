@@ -201,6 +201,41 @@ Execution handoff:
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 - ToT option keys include `branching_factor`, `max_depth`, `traversal_strategy`, `generation_prompt`, and `evaluation_prompt`.
 
+### GoT Plugin Handoff (`reasoning.got.run`)
+
+```elixir
+defmodule MyApp.GoTPluginAgent do
+  use Jido.AI.Agent,
+    name: "got_plugin_agent",
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.GraphOfThoughts,
+       %{
+         default_model: :reasoning,
+         timeout: 30_000,
+         options: %{max_nodes: 20, max_depth: 5, aggregation_strategy: :synthesis}
+       }}
+    ]
+end
+
+signal =
+  Jido.Signal.new!(
+    "reasoning.got.run",
+    %{
+      prompt: "Compare three weather scenarios and synthesize one recommendation.",
+      strategy: :cot,
+      options: %{max_nodes: 25, aggregation_strategy: :weighted}
+    },
+    source: "/cli"
+  )
+```
+
+Execution handoff:
+
+- Route dispatch maps `reasoning.got.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
+- `Jido.AI.Plugins.Reasoning.GraphOfThoughts.handle_signal/2` overrides payload strategy to `strategy: :got`.
+- `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
+- GoT option keys include `max_nodes`, `max_depth`, `aggregation_strategy`, `generation_prompt`, `connection_prompt`, and `aggregation_prompt`.
+
 ## Chat Plugin Defaults Contract
 
 `Jido.AI.Plugins.Chat` mounts the following defaults unless overridden in plugin config:
@@ -253,6 +288,15 @@ Action-specific fields remain action-owned:
 `Jido.AI.Plugins.Reasoning.TreeOfThoughts` mounts the following defaults unless overridden in plugin config:
 
 - `strategy: :tot`
+- `default_model: :reasoning`
+- `timeout: 30_000`
+- `options: %{}`
+
+## Reasoning GoT Plugin Defaults Contract
+
+`Jido.AI.Plugins.Reasoning.GraphOfThoughts` mounts the following defaults unless overridden in plugin config:
+
+- `strategy: :got`
 - `default_model: :reasoning`
 - `timeout: 30_000`
 - `options: %{}`

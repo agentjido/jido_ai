@@ -146,6 +146,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       cod_signal = Jido.Signal.new!("reasoning.cod.run", %{prompt: "quick solve", strategy: :cot}, source: "/test")
       cot_signal = Jido.Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
       tot_signal = Jido.Signal.new!("reasoning.tot.run", %{prompt: "explore options", strategy: :got}, source: "/test")
+      got_signal = Jido.Signal.new!("reasoning.got.run", %{prompt: "connect signals", strategy: :tot}, source: "/test")
 
       assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, cod_params}}} =
                ChainOfDraft.handle_signal(cod_signal, %{})
@@ -164,6 +165,12 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
       assert tot_params.strategy == :tot
       assert tot_params.prompt == "explore options"
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, got_params}}} =
+               GraphOfThoughts.handle_signal(got_signal, %{})
+
+      assert got_params.strategy == :got
+      assert got_params.prompt == "connect signals"
     end
   end
 
