@@ -537,6 +537,28 @@ Execution handoff:
 - `tools: %{}` (normalized from configured tool modules)
 - `available_tools: []`
 
+## Tool Registry Precedence Contract
+
+Tool-calling actions (`CallWithTools`, `ExecuteTool`, `ListTools`) resolve tool maps with this precedence:
+
+1. `context[:tools]`
+2. `context[:tool_calling][:tools]`
+3. `context[:chat][:tools]`
+4. `context[:state][:tool_calling][:tools]`
+5. `context[:state][:chat][:tools]`
+6. `context[:agent][:state][:tool_calling][:tools]`
+7. `context[:agent][:state][:chat][:tools]`
+8. `context[:plugin_state][:tool_calling][:tools]`
+9. `context[:plugin_state][:chat][:tools]`
+
+First non-`nil` tool map wins. This keeps direct `Jido.Exec` action calls and plugin-routed calls deterministic.
+
+`ListTools` security filtering defaults:
+
+- sensitive names are excluded by default
+- `include_sensitive: true` disables sensitive-name filtering
+- `allowed_tools: [...]` applies an allowlist after sensitive filtering unless `include_sensitive: true` is set
+
 ## Planning Plugin Defaults Contract
 
 `Jido.AI.Plugins.Planning` mounts the following defaults unless overridden in plugin config:

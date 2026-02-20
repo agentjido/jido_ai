@@ -45,11 +45,15 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 ## Tool Calling Actions
 
 - `Jido.AI.Actions.ToolCalling.CallWithTools`
-  - LLM call with tool schema exposure and optional auto-execution loop.
+  - Use when the model should decide whether to call tools, with optional `auto_execute` loop continuation.
+  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#callwithtools-one-shot`](../../lib/examples/actions/tool_calling_actions.md#callwithtools-one-shot)
+  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#callwithtools-auto-execute`](../../lib/examples/actions/tool_calling_actions.md#callwithtools-auto-execute)
 - `Jido.AI.Actions.ToolCalling.ExecuteTool`
-  - Execute a tool by name through `Jido.AI.Turn`.
+  - Use when your app already selected the tool and arguments and needs deterministic direct execution.
+  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#executetool-direct`](../../lib/examples/actions/tool_calling_actions.md#executetool-direct)
 - `Jido.AI.Actions.ToolCalling.ListTools`
-  - Enumerate available tools and optional schemas.
+  - Use when you need tool discovery, optional schema projection, and sensitive-name filtering.
+  - Example snippet: [`lib/examples/actions/tool_calling_actions.md#listtools-discovery-and-security-filtering`](../../lib/examples/actions/tool_calling_actions.md#listtools-discovery-and-security-filtering)
 
 ## Planning Actions
 

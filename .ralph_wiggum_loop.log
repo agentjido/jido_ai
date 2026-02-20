@@ -1587,3 +1587,68 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.3 seconds (2.3s async, 0.00s sync)
 8 tests, 0 failures (1701 excluded)
+1) changed files
+- `lib/jido_ai/actions/tool_calling/call_with_tools.ex`
+- `lib/jido_ai/actions/tool_calling/execute_tool.ex`
+- `test/jido_ai/skills/tool_calling/actions/call_with_tools_test.exs`
+- `test/jido_ai/skills/tool_calling/actions/execute_tool_test.exs`
+- `test/jido_ai/skills/tool_calling/actions/list_tools_test.exs`
+- `test/jido_ai/skills/tool_calling/actions/docs_contract_test.exs`
+- `guides/user/tool_calling_with_actions.md`
+- `guides/developer/actions_catalog.md`
+- `guides/developer/plugins_and_actions_composition.md`
+- `lib/examples/actions/tool_calling_actions.md`
+- `lib/examples/README.md`
+
+2) tests/commands executed
+- `mix format` (pass)
+- `mix format --check-formatted` (pass)
+- `mix test test/jido_ai/skills/tool_calling/actions` (pass earlier in session)
+- `mix test test/jido_ai/skills/tool_calling/actions --no-compile --no-deps-check --no-archives-check` (pass)
+- `mix test --exclude flaky --only stable_smoke --no-compile --no-deps-check --no-archives-check` (pass)
+- `mix precommit` (failed: `Mix.PubSub` TCP socket `:eperm` in sandbox)
+- `mix test.fast` (failed: same `Mix.PubSub` `:eperm`)
+- `mix doctor --summary` (failed: same `Mix.PubSub` `:eperm`)
+
+3) acceptance criteria coverage
+- Tests cover happy path, validation errors, and fallback context paths:
+  - Added/strengthened happy-path and fallback-path tests in all three action test files.
+  - Added validation-error coverage for `CallWithTools` (`max_turns` type), `ListTools` (`filter`, `allowed_tools`).
+  - Added precedence/fallback tests for `context`, `state.chat`, `agent.state.chat`, and `plugin_state.chat`.
+- Schemas/defaults/auto-execute loop/deterministic terminal shapes:
+  - Existing schema/default tests remain.
+  - Auto-execute loop behavior now verifies real tool execution in fallback contexts.
+  - Deterministic terminal-shape test for max-turn termination remains and passes.
+- Docs define tool map/context/plugin-state precedence:
+  - Added explicit precedence contract in `guides/user/tool_calling_with_actions.md`.
+  - Added matching developer contract in `guides/developer/plugins_and_actions_composition.md`.
+- Docs explain security filtering and tool registry behavior:
+  - Expanded `ListTools` filtering docs and behavior details in user/developer guides.
+- Examples show one-shot and auto-execute workflows:
+  - Added `lib/examples/actions/tool_calling_actions.md` with one-shot + auto-execute walkthroughs, plus `ExecuteTool` and `ListTools`.
+  - Added examples index row in `lib/examples/README.md`.
+- Code behavior alignment:
+  - `CallWithTools` now uses the same resolved execution tool map for auto-execute turns.
+  - `ExecuteTool` now resolves tools with the full tool-calling/chat fallback precedence.
+
+4) blockers/assumptions
+- Blocker: this environment intermittently blocks loopback TCP socket creation used by `Mix.PubSub` (`failed to open a TCP socket ... reason: :eperm`), preventing reliable execution of `mix precommit`, `mix test.fast`, and `mix doctor --summary`.
+- Assumption: story-level validation is demonstrated via passing tool-calling action suite and stable-smoke tests with `--no-compile --no-deps-check --no-archives-check` where needed in this sandbox.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 968912, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 1.9 seconds (1.9s async, 0.01s sync)
+8 tests, 0 failures (1714 excluded)
