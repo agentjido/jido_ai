@@ -149,3 +149,60 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.0 seconds (2.0s async, 0.00s sync)
 8 tests, 0 failures (1452 excluded)
+1) changed files
+- `test/jido_ai/skill/mix_task_test.exs`
+- `test/jido_ai/skill/runtime_contracts_test.exs`
+- `guides/developer/skills_system.md`
+- `guides/user/cli_workflows.md`
+- `lib/examples/README.md`
+- `lib/examples/scripts/skill_demo.exs`
+
+2) tests/commands executed
+- `mix format` ✅
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test test/jido_ai/skill/mix_task_test.exs` ✅
+- `mix test test/jido_ai/skill/runtime_contracts_test.exs` ✅
+- `mix test test/jido_ai/skill` ✅
+- `mix test test/jido_ai/skills` ✅
+- `MIX_ENV=test mix test --exclude flaky --only stable_smoke` ✅ (direct equivalent of `mix test.fast` test target)
+- `mix test.fast` ❌ blocked by `Mix.PubSub` socket error (`:eperm`)
+- `mix precommit` ❌ blocked by `Mix.PubSub` socket error (`:eperm`)
+- `mix doctor --summary` ❌ blocked by `Mix.PubSub` socket error (`:eperm`)
+- `mix docs` ❌ blocked by `Mix.PubSub` socket error (`:eperm`)
+- `mix run lib/examples/scripts/skill_demo.exs` ❌ blocked by `Mix.PubSub` socket error (`:eperm`)
+
+3) acceptance criteria coverage
+- Skills docs include lifecycle and failure-mode guidance:
+  - Expanded lifecycle, CLI surface, and failure-mode sections in `guides/developer/skills_system.md`.
+  - Added user-facing skill CLI error handling notes in `guides/user/cli_workflows.md`.
+- Skills runtime tests include happy path, validation failure, and registry lifecycle:
+  - Added `test/jido_ai/skill/runtime_contracts_test.exs` with explicit cases for all three.
+  - Added shipped `priv/skills/**/SKILL.md` validation coverage in the same test file.
+- `mix jido_ai.skill` command surface and error handling covered:
+  - Added `test/jido_ai/skill/mix_task_test.exs` covering `list/show/validate`, JSON output, usage errors, strict-mode failure, and unknown command handling.
+- Skill demos/scripts current and prerequisites clear:
+  - Added explicit prerequisites/skip-path notes in `lib/examples/scripts/skill_demo.exs`.
+  - Added prerequisites/skip behavior documentation for skill scripts in `lib/examples/README.md`.
+
+4) blockers/assumptions
+- Blocker: this sandbox denies local TCP socket creation for some Mix task paths, causing `Mix.PubSub` startup failures (`failed to open a TCP socket ... reason: :eperm`). This prevented completing `mix precommit`, `mix test.fast` alias, docs gate, and example gate commands exactly as requested.
+- Assumption: `MIX_ENV=test mix test --exclude flaky --only stable_smoke` is a valid execution of the `test.fast` test target semantics (the alias itself failed due environment-level `Mix.PubSub` restrictions, not project code).
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.4%
+
+Doctor validation has passed!
+Running ExUnit with seed: 521196, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.1 seconds (2.1s async, 0.00s sync)
+8 tests, 0 failures (1466 excluded)

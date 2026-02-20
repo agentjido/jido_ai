@@ -26,8 +26,15 @@ mix jido_ai --agent MyApp.WeatherAgent "Will it rain in Seattle?"
 
 ```bash
 mix jido_ai.skill list priv/skills
+mix jido_ai.skill show priv/skills/code-review/SKILL.md --body
 mix jido_ai.skill validate priv/skills --strict
+mix jido_ai.skill validate priv/skills --json
 ```
+
+Skill CLI error handling:
+- `mix jido_ai.skill list` with no paths prints usage
+- `mix jido_ai.skill validate` with no paths prints usage
+- `--strict` exits non-zero if any skill fails validation
 
 ## Defaults You Should Know
 
