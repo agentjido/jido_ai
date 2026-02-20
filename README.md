@@ -21,6 +21,23 @@ end
 
 ## Installation
 
+### Igniter Installation (Recommended)
+
+The fastest way to get started is with [Igniter](https://hex.pm/packages/igniter):
+
+```bash
+mix igniter.install jido_ai
+```
+
+This automatically:
+- Adds `jido_ai` to your dependencies
+- Configures default model aliases
+- Reminds you to set up API keys
+
+### Manual Installation
+
+Add `jido_ai` to your list of dependencies in `mix.exs`:
+
 ```elixir
 def deps do
   [
