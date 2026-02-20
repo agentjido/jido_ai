@@ -8,12 +8,14 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StructureEnforcementTest do
     "lib/jido_ai/cli/adapters/tot.ex"
   ]
 
-  @legacy_namespace_patterns [
-    ~r/Jido\.AI\.Strategies\.TreeOfThoughts(\b|\.)/,
-    ~r/Jido\.AI\.Reasoning\.Strategies\.TreeOfThoughts(\b|\.)/,
-    ~r/Jido\.AI\.TreeOfThoughts\.Machine(\b|\.)/,
-    ~r/Jido\.AI\.CLI\.Adapters\.ToT(\b|\.)/
-  ]
+  defp legacy_namespace_patterns do
+    [
+      ~r/Jido\.AI\.Strategies\.TreeOfThoughts(\b|\.)/,
+      ~r/Jido\.AI\.Reasoning\.Strategies\.TreeOfThoughts(\b|\.)/,
+      ~r/Jido\.AI\.TreeOfThoughts\.Machine(\b|\.)/,
+      ~r/Jido\.AI\.CLI\.Adapters\.ToT(\b|\.)/
+    ]
+  end
 
   test "legacy ToT file locations are removed" do
     leftovers =
@@ -32,7 +34,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StructureEnforcementTest do
       |> Path.wildcard()
       |> Enum.filter(fn file ->
         content = File.read!(file)
-        Enum.any?(@legacy_namespace_patterns, &Regex.match?(&1, content))
+        Enum.any?(legacy_namespace_patterns(), &Regex.match?(&1, content))
       end)
 
     assert offenders == [],

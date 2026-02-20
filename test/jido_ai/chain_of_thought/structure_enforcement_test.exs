@@ -11,15 +11,17 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StructureEnforcementTest do
     "lib/jido_ai/cli/adapters/cot.ex"
   ]
 
-  @legacy_namespace_patterns [
-    ~r/Jido\.AI\.Strategies\.ChainOfThought(\b|\.)/,
-    ~r/Jido\.AI\.Strategies\.CoTWorker(\b|\.)/,
-    ~r/Jido\.AI\.Reasoning\.Strategies\.ChainOfThought(\b|\.)/,
-    ~r/Jido\.AI\.Reasoning\.Workers\.CoT(\b|\.)/,
-    ~r/Jido\.AI\.Agents\.Internal\.CoTWorkerAgent(\b|\.)/,
-    ~r/Jido\.AI\.ChainOfThought\.Machine(\b|\.)/,
-    ~r/Jido\.AI\.CLI\.Adapters\.CoT(\b|\.)/
-  ]
+  defp legacy_namespace_patterns do
+    [
+      ~r/Jido\.AI\.Strategies\.ChainOfThought(\b|\.)/,
+      ~r/Jido\.AI\.Strategies\.CoTWorker(\b|\.)/,
+      ~r/Jido\.AI\.Reasoning\.Strategies\.ChainOfThought(\b|\.)/,
+      ~r/Jido\.AI\.Reasoning\.Workers\.CoT(\b|\.)/,
+      ~r/Jido\.AI\.Agents\.Internal\.CoTWorkerAgent(\b|\.)/,
+      ~r/Jido\.AI\.ChainOfThought\.Machine(\b|\.)/,
+      ~r/Jido\.AI\.CLI\.Adapters\.CoT(\b|\.)/
+    ]
+  end
 
   test "legacy CoT file locations are removed" do
     leftovers =
@@ -38,7 +40,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StructureEnforcementTest do
       |> Path.wildcard()
       |> Enum.filter(fn file ->
         content = File.read!(file)
-        Enum.any?(@legacy_namespace_patterns, &Regex.match?(&1, content))
+        Enum.any?(legacy_namespace_patterns(), &Regex.match?(&1, content))
       end)
 
     assert offenders == [],
