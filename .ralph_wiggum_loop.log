@@ -648,3 +648,50 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.2 seconds (2.2s async, 0.01s sync)
 8 tests, 0 failures (1550 excluded)
+1) **Changed files**
+- `lib/examples/strategies/got.md`
+- `lib/examples/weather/got_agent.ex`
+- `test/jido_ai/strategy/graph_of_thoughts_test.exs`
+- `test/jido_ai/got_agent_test.exs`
+- `test/jido_ai/got/docs_contract_test.exs`
+
+2) **Tests/commands executed**
+- `mix format` ✅
+- `mix test test/jido_ai/strategy/graph_of_thoughts_test.exs test/jido_ai/got_agent_test.exs test/jido_ai/cli/adapters/got_test.exs test/jido_ai/graph_of_thoughts test/jido_ai/got/docs_contract_test.exs` ✅ (87 tests, 0 failures)
+- `mix test test/jido_ai/strategy/graph_of_thoughts_test.exs test/jido_ai/got_agent_test.exs test/jido_ai/cli/adapters/got_test.exs test/jido_ai/graph_of_thoughts` ✅ (84 tests, 0 failures)
+- `MIX_ENV=test mix test --exclude flaky --only stable_smoke` ✅ (8 tests, 0 failures; equivalent of `mix test.fast`)
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix precommit` ❌ (`Mix.PubSub` socket `:eperm` in sandbox)
+- `mix test.fast` ❌ (same `Mix.PubSub` socket `:eperm` through alias path)
+- `mix doctor --summary` / `mix doctor --summary --raise` ❌ (same `Mix.PubSub` socket `:eperm`)
+
+3) **Acceptance criteria coverage**
+- GoT markdown in normalized location: completed via `lib/examples/strategies/got.md` (expanded end-to-end strategy docs content).
+- GoT docs extras wiring: covered by new test `test/jido_ai/got/docs_contract_test.exs` asserting `Mix.Project.config()[:docs][:extras]` includes `lib/examples/strategies/got.md`.
+- Tests for strategy behavior + macro lifecycle/error hooks:
+  - Strategy behavior/error routing added in `test/jido_ai/strategy/graph_of_thoughts_test.exs` (action specs, `ai.request.error` route, busy-start rejection directive, request-error state storage).
+  - Macro lifecycle/error hooks expanded in `test/jido_ai/got_agent_test.exs` (`on_before_cmd` start tracking, request-error failure tracking, `on_after_cmd` completion and pass-through behavior).
+- Weather GoT example parity: aligned GoT command text in docs/module and asserted matrix command presence in `test/jido_ai/got/docs_contract_test.exs`.
+
+4) **Blockers/assumptions**
+- Blocker: this environment denies TCP socket creation for Mix sync pubsub (`Mix.Sync.PubSub.subscribe/1`, `:eperm`), which prevents `mix precommit`, `mix test.fast` alias execution path, and `mix doctor --summary` from completing here.
+- Assumption: running those exact commands outside this sandbox (normal local dev shell) should work; code/test changes for ST-STR-006 are in place and targeted GoT suites pass.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 462819, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.3 seconds (2.3s async, 0.01s sync)
+8 tests, 0 failures (1563 excluded)
