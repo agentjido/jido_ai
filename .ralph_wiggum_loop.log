@@ -695,3 +695,52 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.3 seconds (2.3s async, 0.01s sync)
 8 tests, 0 failures (1563 excluded)
+1) **Changed files**
+- `lib/examples/strategies/trm.md`: expanded TRM strategy doc with:
+  - recursive reasoning/supervision/improvement loop
+  - request lifecycle contract (`reason/3`, `await/2`, `reason_sync/3`)
+  - TRM module contracts (`Machine`, `Reasoning`, `Supervision`, `ACT`)
+  - stopping controls (`max_supervision_steps`, `act_threshold`, termination paths)
+  - CLI adapter alignment for weather parity
+- `test/jido_ai/trm/docs_contract_test.exs`: new docs-contract coverage for:
+  - TRM recursion loop + stopping controls documentation
+  - weather matrix TRM row and canonical run command
+  - normalized docs wiring (`lib/examples/strategies/trm.md` in docs extras/readme)
+
+2) **Tests/commands executed**
+- `mix test test/jido_ai/trm/docs_contract_test.exs` ✅
+- `mix test test/jido_ai/strategy/trm_test.exs test/jido_ai/trm_agent_test.exs test/jido_ai/cli/adapters/trm_test.exs test/jido_ai/trm` ✅
+- `mix test --exclude flaky --only stable_smoke` ✅ (equivalent smoke gate behind `mix test.fast`)
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test.fast` ❌ (`Mix.Sync.PubSub.subscribe/1` socket `:eperm`)
+- `mix doctor --summary` ❌ (`Mix.Sync.PubSub.subscribe/1` socket `:eperm`)
+- `mix precommit` ❌ (`Mix.Sync.PubSub.subscribe/1` socket `:eperm`)
+
+3) **Acceptance criteria coverage**
+- TRM strategy markdown exists in normalized location: `lib/examples/strategies/trm.md` ✅
+- TRM docs explain recursion loop and stopping controls ✅ (`lib/examples/strategies/trm.md`)
+- Tests cover TRM machine/reasoning/act/supervision contracts ✅ (existing `test/jido_ai/trm/*` suite, re-run and passing)
+- Strategy matrix includes TRM weather run command ✅ (`lib/examples/README.md`, asserted by new test)
+
+4) **Blockers/assumptions**
+- Blocker: this sandbox denies TCP socket creation, which breaks Mix PubSub in `mix test.fast`, `mix doctor --summary`, and `mix precommit` with `:eperm`.
+- Assumption: story implementation is complete despite that environment-level gate blocker; all TRM-specific and stable smoke tests passed.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 107334, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.1 seconds (2.1s async, 0.00s sync)
+8 tests, 0 failures (1566 excluded)
