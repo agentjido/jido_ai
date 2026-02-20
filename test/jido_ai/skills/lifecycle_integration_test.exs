@@ -98,6 +98,15 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       assert route_map["chat.generate_object"] == Jido.AI.Actions.LLM.GenerateObject
     end
 
+    test "Planning plugin exposes planning namespace routes" do
+      routes = Planning.signal_routes(%{})
+      route_map = Map.new(routes)
+
+      assert route_map["planning.plan"] == Jido.AI.Actions.Planning.Plan
+      assert route_map["planning.decompose"] == Jido.AI.Actions.Planning.Decompose
+      assert route_map["planning.prioritize"] == Jido.AI.Actions.Planning.Prioritize
+    end
+
     test "Reasoning strategy plugins expose reasoning.*.run routes" do
       assert Map.new(ChainOfDraft.signal_routes(%{}))["reasoning.cod.run"] ==
                Jido.AI.Actions.Reasoning.RunStrategy
@@ -128,6 +137,11 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       assert {:ok, :continue} = Chat.handle_signal(signal, %{})
     end
 
+    test "Planning plugin passes through signals" do
+      signal = Jido.Signal.new!("planning.plan", %{goal: "Ship v1"}, source: "/test")
+      assert {:ok, :continue} = Planning.handle_signal(signal, %{})
+    end
+
     test "Reasoning plugins inject fixed strategy ids" do
       signal = Jido.Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
 
@@ -152,6 +166,9 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
   describe "Signal Patterns" do
     test "plugins expose signal_patterns/0" do
       assert "chat.message" in Chat.signal_patterns()
+      assert "planning.plan" in Planning.signal_patterns()
+      assert "planning.decompose" in Planning.signal_patterns()
+      assert "planning.prioritize" in Planning.signal_patterns()
       assert "reasoning.cod.run" in ChainOfDraft.signal_patterns()
       assert "reasoning.cot.run" in ChainOfThought.signal_patterns()
       assert "reasoning.aot.run" in AlgorithmOfThoughts.signal_patterns()

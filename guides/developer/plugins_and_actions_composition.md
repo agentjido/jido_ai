@@ -52,6 +52,10 @@ end
   - `chat.generate_object` -> schema-constrained structured output
   - `chat.execute_tool` -> direct tool execution by tool name
   - `chat.list_tools` -> tool inventory for the active chat capability
+- `Jido.AI.Plugins.Planning`
+  - `planning.plan` -> structured plan generation (`Jido.AI.Actions.Planning.Plan`)
+  - `planning.decompose` -> goal decomposition (`Jido.AI.Actions.Planning.Decompose`)
+  - `planning.prioritize` -> task ordering (`Jido.AI.Actions.Planning.Prioritize`)
 - `Jido.AI.Plugins.Reasoning.*`
   - `reasoning.cod.run`
   - `reasoning.cot.run`
@@ -75,6 +79,21 @@ end
 - `tool_policy: :allow_all`
 - `tools: %{}` (normalized from configured tool modules)
 - `available_tools: []`
+
+## Planning Plugin Defaults Contract
+
+`Jido.AI.Plugins.Planning` mounts the following defaults unless overridden in plugin config:
+
+- `default_model: :planning`
+- `default_max_tokens: 4096`
+- `default_temperature: 0.7`
+
+Planning actions consume these plugin defaults when the caller omits those params.
+Action-specific fields remain action-owned:
+
+- `Plan` owns `goal`, optional `constraints`/`resources`, and `max_steps`
+- `Decompose` owns `goal`, optional `max_depth`, and optional `context`
+- `Prioritize` owns `tasks`, optional `criteria`, and optional `context`
 
 ## Action Context Contract (Plugin -> Action)
 

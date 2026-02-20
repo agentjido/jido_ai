@@ -843,3 +843,55 @@ Including tags: [:stable_smoke]
 ........
 Finished in 1.9 seconds (1.9s async, 0.01s sync)
 8 tests, 0 failures (1585 excluded)
+1) changed files
+- `lib/jido_ai/plugins/planning.ex`
+- `guides/developer/plugins_and_actions_composition.md`
+- `lib/examples/README.md`
+- `test/jido_ai/skills/planning/planning_skill_test.exs`
+- `test/jido_ai/skills/lifecycle_integration_test.exs`
+- `test/jido_ai/plugins/planning_docs_contract_test.exs`
+
+2) tests/commands executed
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test test/jido_ai/skills/planning/planning_skill_test.exs test/jido_ai/skills/lifecycle_integration_test.exs test/jido_ai/plugins/planning_docs_contract_test.exs` ✅ (21 tests, 0 failures)
+- `mix test test/jido_ai/skills/planning/planning_skill_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` ✅ (19 tests, 0 failures)
+- `mix test.fast` ❌ (`Mix.PubSub` socket `:eperm` in this sandbox)
+- `MIX_ENV=test mix test --exclude flaky --only stable_smoke` ✅ (8 tests, 0 failures; same underlying command as alias body in `mix.exs`)
+- `mix doctor --summary` ❌ (`Mix.PubSub` socket `:eperm`)
+- `mix precommit` ❌ (`Mix.PubSub` socket `:eperm`)
+
+3) acceptance criteria coverage
+- Plugin docs include route/defaults contract:
+  - Added `## Signal Contracts` and `## Mount State Defaults` to `lib/jido_ai/plugins/planning.ex`.
+  - Added planning route/defaults sections to `guides/developer/plugins_and_actions_composition.md`.
+  - Added docs contract test in `test/jido_ai/plugins/planning_docs_contract_test.exs`.
+- Tests cover spec/mount/actions and lifecycle integration:
+  - Expanded `test/jido_ai/skills/planning/planning_skill_test.exs` with planning route coverage and route-to-actions inventory checks.
+  - Expanded `test/jido_ai/skills/lifecycle_integration_test.exs` with planning route, pass-through lifecycle, and signal pattern assertions.
+- Example index maps planning plugin to demo usage:
+  - Added planning plugin row and snippet in `lib/examples/README.md`.
+  - Verified by `test/jido_ai/plugins/planning_docs_contract_test.exs`.
+
+4) blockers/assumptions
+- Blocker: this environment disallows local TCP sockets used by `Mix.Sync.PubSub`, so `mix precommit`, `mix test.fast` (alias via `mix cmd`), and `mix doctor --summary` cannot complete here.
+- Assumption: `MIX_ENV=test mix test --exclude flaky --only stable_smoke` is accepted as the functional equivalent of `mix test.fast` (it is exactly the alias body in `mix.exs`).
+- No commit/push/PR was performed.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 757152, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.0 seconds (2.0s async, 0.00s sync)
+8 tests, 0 failures (1591 excluded)

@@ -48,6 +48,7 @@ Canonical weather overview module:
 | Capability | Usage Pattern |
 | --- | --- |
 | Chat plugin | Mount `Jido.AI.Plugins.Chat` and send `chat.message` signals for tool-aware chat routing. |
+| Planning plugin | Mount `Jido.AI.Plugins.Planning` and send planning signals for plan/decompose/prioritize actions. |
 
 ```elixir
 defmodule MyApp.ChatAgent do
@@ -65,6 +66,32 @@ end
 
 signal = Jido.Signal.new!("chat.message", %{prompt: "Should I bike to work in Seattle tomorrow?"}, source: "/cli")
 # Routes to Jido.AI.Actions.ToolCalling.CallWithTools via Jido.AI.Plugins.Chat
+```
+
+```elixir
+defmodule MyApp.PlanningAgent do
+  use Jido.AI.Agent,
+    name: "planning_agent",
+    plugins: [
+      {Jido.AI.Plugins.Planning,
+       %{
+         default_model: :planning,
+         default_max_tokens: 4096,
+         default_temperature: 0.7
+       }}
+    ]
+end
+
+signal = Jido.Signal.new!(
+  "planning.plan",
+  %{
+    goal: "Ship v1 of a note-taking app",
+    constraints: ["Team of 2 engineers", "8 week timeline"],
+    resources: ["Existing auth service", "Hosted Postgres"]
+  },
+  source: "/cli"
+)
+# Routes to Jido.AI.Actions.Planning.Plan via Jido.AI.Plugins.Planning
 ```
 
 ## Script Index
