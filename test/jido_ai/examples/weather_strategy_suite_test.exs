@@ -27,6 +27,7 @@ defmodule Jido.AI.Examples.WeatherStrategySuiteTest do
   ]
 
   @legacy_strategy_docs [
+    "examples/strategies/algorithm_of_thoughts.md",
     "lib/examples/strategies/algorithm_of_thoughts.md",
     "lib/examples/strategies/adaptive_strategy.md",
     "lib/examples/strategies/chain_of_draft.md",
@@ -89,6 +90,9 @@ defmodule Jido.AI.Examples.WeatherStrategySuiteTest do
       end)
 
       assert examples_readme =~ "| CoD | `Jido.AI.Examples.Weather.CoDAgent`"
+      assert examples_readme =~ "| AoT | `Jido.AI.Examples.Weather.AoTAgent` (`lib/examples/weather/aot_agent.ex`) |"
+      assert examples_readme =~ "mix jido_ai --agent Jido.AI.Examples.Weather.AoTAgent"
+      assert examples_readme =~ "Find the best weather-safe weekend option with one backup."
       assert examples_readme =~ "## Script Index"
       assert examples_readme =~ "| `browser_demo.exs` | Canonical demo |"
       assert examples_readme =~ "| `test_weather_agent.exs` | Utility verification |"

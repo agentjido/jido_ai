@@ -539,3 +539,54 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.3 seconds (2.3s async, 0.01s sync)
 8 tests, 0 failures (1540 excluded)
+1) changed files
+- `lib/examples/strategies/aot.md`
+- `test/jido_ai/strategy/algorithm_of_thoughts_test.exs`
+- `test/jido_ai/examples/weather_strategy_suite_test.exs`
+- `test/jido_ai/aot/docs_contract_test.exs` (new)
+- `examples/strategies/algorithm_of_thoughts.md` (deleted)
+
+2) tests/commands executed
+- `mix format test/jido_ai/aot/docs_contract_test.exs test/jido_ai/strategy/algorithm_of_thoughts_test.exs test/jido_ai/examples/weather_strategy_suite_test.exs` ✅
+- `mix format --check-formatted` ✅
+- `mix compile --warnings-as-errors` ✅
+- `mix test test/jido_ai/aot/docs_contract_test.exs test/jido_ai/examples/weather_strategy_suite_test.exs test/jido_ai/strategy/algorithm_of_thoughts_test.exs test/jido_ai/aot_agent_test.exs test/jido_ai/cli/adapters/aot_test.exs` ✅ (31 tests, 0 failures)
+- `mix test test/jido_ai/strategy/algorithm_of_thoughts_test.exs test/jido_ai/aot_agent_test.exs test/jido_ai/cli/adapters/aot_test.exs` ✅ (22 tests, 0 failures)
+- `mix test.fast` ❌ blocked by sandbox (`Mix.PubSub` TCP socket `:eperm`)
+- fallback equivalent: `MIX_ENV=test mix test --exclude flaky --only stable_smoke` ✅ (8 tests, 0 failures)
+- `mix doctor --summary` ❌ blocked by sandbox (`Mix.PubSub` TCP socket `:eperm`)
+- `mix precommit` ❌ blocked by sandbox (`Mix.PubSub` TCP socket `:eperm`)
+
+3) acceptance criteria coverage
+- AoT tests cover options/defaults/request lifecycle behavior:
+  - Expanded `test/jido_ai/strategy/algorithm_of_thoughts_test.exs` with request-id correlation on start, busy second-request rejection directive checks, and `aot_request_error` lifecycle metadata persistence.
+  - Existing `test/jido_ai/aot_agent_test.exs` and `test/jido_ai/cli/adapters/aot_test.exs` already validate defaults/custom options.
+- AoT example path normalized and linked consistently:
+  - Deleted legacy path `examples/strategies/algorithm_of_thoughts.md`.
+  - Added assertions in `test/jido_ai/examples/weather_strategy_suite_test.exs` and new `test/jido_ai/aot/docs_contract_test.exs` to enforce normalized `lib/examples/strategies/aot.md` usage.
+- Weather example module validated in suite tests:
+  - Strengthened `test/jido_ai/examples/weather_strategy_suite_test.exs` with explicit AoT matrix row and canonical AoT weather command checks.
+- Strategy matrix includes AoT weather run command:
+  - Enforced by `test/jido_ai/examples/weather_strategy_suite_test.exs` and `test/jido_ai/aot/docs_contract_test.exs`.
+
+4) blockers/assumptions
+- Blocker: this sandbox denies loopback TCP sockets, and Mix tasks that start `Mix.PubSub` fail with `:eperm`; this prevented `mix precommit`, `mix test.fast` alias, and `mix doctor --summary` from completing here.
+- Assumption: running those three commands in a normal local environment (without this socket restriction) is required to fully satisfy the gate exactly as written.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 496561, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.0 seconds (2.0s async, 0.00s sync)
+8 tests, 0 failures (1545 excluded)
