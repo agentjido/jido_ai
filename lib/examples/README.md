@@ -61,6 +61,10 @@ Canonical weather overview module:
 | Reasoning TRM plugin | Mount `Jido.AI.Plugins.Reasoning.TRM` and send `reasoning.trm.run` for fixed `:trm` strategy execution with TRM options (`max_supervision_steps`, `act_threshold`). |
 | Reasoning Adaptive plugin | Mount `Jido.AI.Plugins.Reasoning.Adaptive` and send `reasoning.adaptive.run` for fixed `:adaptive` strategy execution with Adaptive options (`default_strategy`, `available_strategies`, `complexity_thresholds`). |
 
+Internal runtime infrastructure note:
+- `Jido.AI.Plugins.TaskSupervisor` is auto-mounted by agent macros for per-agent async task isolation.
+- It is not a capability plugin row in this matrix.
+
 ```elixir
 defmodule MyApp.ChatAgent do
   use Jido.AI.Agent,

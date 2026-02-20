@@ -1483,3 +1483,50 @@ Including tags: [:stable_smoke]
 ........
 Finished in 2.1 seconds (2.1s async, 0.01s sync)
 8 tests, 0 failures (1679 excluded)
+1) changed files
+- `guides/developer/plugins_and_actions_composition.md:69`  
+Added `### TaskSupervisor Internal Runtime Contract` with explicit state key, mount behavior, and cleanup lifecycle expectations.
+- `lib/examples/README.md:64`  
+Added an internal-runtime note clarifying `Jido.AI.Plugins.TaskSupervisor` is infrastructure-only (not a capability row).
+- `test/jido_ai/plugin_stack_test.exs:21`  
+Added runtime-stack ordering assertion (`TaskSupervisor` first) and docs classification assertions (internal/runtime only).
+- `test/jido_ai/skills/lifecycle_integration_test.exs:51`  
+Added TaskSupervisor lifecycle tests: state key contract, supervisor PID presence, helper resolution from `__task_supervisor_skill__`, and linked cleanup on owner process exit.
+
+2) tests/commands executed
+- `mix format guides/developer/plugins_and_actions_composition.md lib/examples/README.md test/jido_ai/plugin_stack_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` (pass)
+- `mix test test/jido_ai/plugin_stack_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` (pass)
+- `mix format --check-formatted && mix compile --warnings-as-errors && mix test --no-deps-check --exclude flaky --only stable_smoke && mix test test/jido_ai/plugin_stack_test.exs test/jido_ai/skills/lifecycle_integration_test.exs` (pass)
+- `mix test.fast` (failed in this environment)
+- `mix doctor --summary` (failed in this environment)
+- `mix precommit` (failed in this environment)
+
+Failure reason for the last three: `failed to open a TCP socket in Mix.Sync.PubSub.subscribe/1, reason: :eperm`.
+
+3) acceptance criteria coverage
+- Internal plugin contract documented in developer guide: covered in `guides/developer/plugins_and_actions_composition.md`.
+- Tests assert plugin presence and runtime lifecycle expectations: covered by new assertions in `test/jido_ai/plugin_stack_test.exs` and `test/jido_ai/skills/lifecycle_integration_test.exs`.
+- No public capability docs classify TaskSupervisor as end-user feature: enforced by new docs-contract assertions and by examples note in `lib/examples/README.md` stating runtime-only infrastructure.
+- Example docs mention TaskSupervisor only as runtime infrastructure: covered in `lib/examples/README.md`.
+
+4) blockers/assumptions
+- Blocker: this sandbox blocks Mix PubSub TCP socket creation (`:eperm`), so `mix precommit`, `mix test.fast` (alias), and `mix doctor --summary` cannot complete here.
+- Assumption: in a non-restricted environment, those commands should run normally; story-specific code/docs/tests are implemented and targeted/stable-smoke checks pass.
+Doctor file found. Loading configuration.
+---------------------------------------------
+Summary:
+
+Passed Modules: 164
+Failed Modules: 0
+Total Doc Coverage: 96.3%
+Total Moduledoc Coverage: 100.0%
+Total Spec Coverage: 91.5%
+
+Doctor validation has passed!
+Running ExUnit with seed: 751219, max_cases: 20
+Excluding tags: [:test, :flaky]
+Including tags: [:stable_smoke]
+
+........
+Finished in 2.1 seconds (2.1s async, 0.00s sync)
+8 tests, 0 failures (1683 excluded)

@@ -6,8 +6,10 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
+  alias Jido.AI.Directive.Helper
   alias Jido.AI.Plugins.Chat
   alias Jido.AI.Plugins.Planning
+  alias Jido.AI.Plugins.TaskSupervisor
 
   alias Jido.AI.Plugins.Reasoning.{
     Adaptive,
@@ -44,6 +46,37 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       assert state.default_model == :planning
       assert state.default_max_tokens == 4096
       assert state.default_temperature == 0.7
+    end
+
+    test "TaskSupervisor plugin mount/2 stores a per-agent supervisor under internal state key" do
+      spec = TaskSupervisor.plugin_spec(%{})
+      assert spec.state_key == :__task_supervisor_skill__
+
+      assert {:ok, state} = TaskSupervisor.mount(%Agent{}, %{})
+      assert is_pid(state.supervisor)
+      assert Process.alive?(state.supervisor)
+
+      assert Helper.get_task_supervisor(%{__task_supervisor_skill__: state}) == state.supervisor
+    end
+
+    test "TaskSupervisor plugin supervisor lifecycle follows owning process lifecycle" do
+      parent = self()
+
+      {owner_pid, owner_ref} =
+        spawn_monitor(fn ->
+          assert {:ok, state} = TaskSupervisor.mount(%Agent{}, %{})
+          send(parent, {:task_supervisor_pid, state.supervisor})
+          Process.sleep(:infinity)
+        end)
+
+      assert_receive {:task_supervisor_pid, supervisor_pid}, 1_000
+      assert Process.alive?(supervisor_pid)
+
+      supervisor_ref = Process.monitor(supervisor_pid)
+      Process.exit(owner_pid, :kill)
+
+      assert_receive {:DOWN, ^owner_ref, :process, ^owner_pid, :killed}, 1_000
+      assert_receive {:DOWN, ^supervisor_ref, :process, ^supervisor_pid, :killed}, 1_000
     end
 
     test "Reasoning strategy plugins mount with fixed strategy ids" do

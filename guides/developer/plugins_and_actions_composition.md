@@ -66,6 +66,24 @@ end
   - `reasoning.adaptive.run`
   - All route to `Jido.AI.Actions.Reasoning.RunStrategy` with fixed strategy identity.
 
+### TaskSupervisor Internal Runtime Contract
+
+`Jido.AI.Plugins.TaskSupervisor` is internal runtime infrastructure enabled by
+default via `Jido.AI.PluginStack.default_plugins/1`. It is not part of the
+public capability plugin surface.
+
+State key contract:
+
+- Plugin state key is `:__task_supervisor_skill__`
+- `mount/2` stores `%{supervisor: pid}` under `agent.state.__task_supervisor_skill__`
+- Runtime directives resolve this supervisor via `Jido.AI.Directive.Helper.get_task_supervisor/1`
+
+Lifecycle and cleanup contract:
+
+- `mount/2` starts an anonymous `Task.Supervisor` linked to the mounting agent process
+- Each agent instance receives its own supervisor PID
+- When the owning agent process terminates, the linked supervisor terminates automatically
+
 ### ModelRouting Runtime Contract
 
 `Jido.AI.Plugins.ModelRouting` is a cross-cutting runtime plugin (enabled by
