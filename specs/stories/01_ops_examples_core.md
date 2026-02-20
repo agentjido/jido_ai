@@ -33,13 +33,15 @@ Add a repository-local precommit command and fast stable gate suitable for one-s
 - `mix precommit` exists and succeeds on a clean tree.
 - `mix test.fast` exists and runs only fast stable smoke coverage.
 - Full stable suite remains available via `mix test` (`--exclude flaky`).
+- Loop runtime budgets are explicit: fast per-story gate under 90 seconds, full checkpoint gate under 10 minutes (warm cache targets).
 #### Stable Test Gate
-- `mix precommit`
-- `mix test.fast`
+- Fast per-story gate: `mix precommit` and `mix test.fast` (target under 90 seconds on warm cache).
+- Full checkpoint gate: `mix test` (target under 10 minutes on warm cache).
 #### Docs Gate
-- Any changed docs mention dual-gate behavior and expected runtime budgets.
+- Any changed docs mention dual-gate behavior, command sets, and expected runtime budgets.
 #### Example Gate
-- Examples include one command set for fast per-story gate and one for full checkpoint gate.
+- Fast per-story command set: `mix precommit` and `mix test.fast`.
+- Full checkpoint command set: `mix test`.
 #### Dependencies
 - ST-OPS-001
 

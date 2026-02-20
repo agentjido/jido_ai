@@ -2,6 +2,21 @@
 
 All runnable examples now live under `lib/examples`.
 
+## Story Loop Gates
+
+Fast per-story gate command set (target runtime budget: under 90 seconds on a warm cache):
+
+```bash
+mix precommit
+mix test.fast
+```
+
+Full checkpoint gate command set (target runtime budget: under 10 minutes on a warm cache):
+
+```bash
+mix test
+```
+
 ## Agents
 
 - `lib/examples/agents/weather_agent.ex` - ReAct weather assistant.

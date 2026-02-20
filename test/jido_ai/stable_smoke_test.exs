@@ -100,11 +100,50 @@ defmodule Jido.AI.StableSmokeTest do
     assert map_size(agents) == 8
   end
 
-  test "mix aliases expose precommit and fast test gate" do
+  test "mix aliases expose the dual stable gate contract" do
     aliases = Mix.Project.config()[:aliases] || []
 
-    assert Keyword.has_key?(aliases, :precommit)
-    assert Keyword.has_key?(aliases, :"test.fast")
+    assert Keyword.fetch!(aliases, :test) == "test --exclude flaky"
+
+    assert Keyword.fetch!(aliases, :"test.fast") ==
+             "cmd env MIX_ENV=test mix test --exclude flaky --only stable_smoke"
+
+    precommit_steps = Keyword.fetch!(aliases, :precommit)
+    assert is_list(precommit_steps)
+    assert "test.fast" in precommit_steps
+  end
+
+  test "docs define dual gate behavior with runtime budgets and command sets" do
+    contributing = File.read!("CONTRIBUTING.md")
+    examples_index = File.read!("lib/examples/README.md")
+    ops_story = File.read!("specs/stories/01_ops_examples_core.md")
+
+    assert contributing =~ "Dual Stable Gates (One-Story Loop)"
+    assert contributing =~ "Fast per-story gate"
+    assert contributing =~ "Full checkpoint gate"
+    assert contributing =~ "under 90 seconds"
+    assert contributing =~ "under 10 minutes"
+    assert contributing =~ "mix precommit"
+    assert contributing =~ "mix test.fast"
+    assert contributing =~ "mix test"
+
+    assert examples_index =~ "Story Loop Gates"
+    assert examples_index =~ "Fast per-story gate command set"
+    assert examples_index =~ "Full checkpoint gate command set"
+    assert examples_index =~ "under 90 seconds"
+    assert examples_index =~ "under 10 minutes"
+    assert examples_index =~ "mix precommit"
+    assert examples_index =~ "mix test.fast"
+    assert examples_index =~ "mix test"
+
+    assert ops_story =~ "Loop runtime budgets are explicit"
+    assert ops_story =~ "under 90 seconds"
+    assert ops_story =~ "under 10 minutes"
+    assert ops_story =~ "Fast per-story command set"
+    assert ops_story =~ "mix precommit"
+    assert ops_story =~ "mix test.fast"
+    assert ops_story =~ "Full checkpoint command set"
+    assert ops_story =~ "mix test"
   end
 
   defp parse_story_cards(markdown) do
