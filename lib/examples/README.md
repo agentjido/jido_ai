@@ -55,4 +55,4 @@ Run scripts with `mix run lib/examples/scripts/<name>.exs`.
 | `skill_demo.exs` | Canonical demo | Single skill flow walkthrough. | Project root; if `priv/skills/code-review/SKILL.md` is missing, script prints skip guidance and continues. |
 | `skills_demo.exs` | Canonical demo | Multi-skill orchestration demo. | Requires `priv/skills/unit-converter/SKILL.md`; if `ANTHROPIC_API_KEY` is not set, agent interaction section is skipped. |
 | `browser_adapter_test.exs` | Utility verification | Browser adapter sanity checks. | Project root; browser deps available. |
-| `test_weather_agent.exs` | Utility verification | Weather agent smoke check script. | Project root. |
+| `test_weather_agent.exs` | Utility verification | Weather agent smoke check script. | Project root; requires live provider credentials and runtime network access, otherwise use documented skip path in `lib/examples/strategies/react.md`. |

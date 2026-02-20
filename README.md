@@ -134,7 +134,8 @@ end
 ## ReAct Production Defaults
 
 Use these references as the production baseline for ReAct:
-- [`lib/examples/agents/weather_agent.ex`](lib/examples/agents/weather_agent.ex)
+- [`lib/examples/weather/react_agent.ex`](lib/examples/weather/react_agent.ex)
+- [`lib/examples/weather/overview.ex`](lib/examples/weather/overview.ex)
 - [`lib/examples/strategies/react.md`](lib/examples/strategies/react.md)
 
 ## Quick Decision Guide

@@ -2,6 +2,8 @@ defmodule Jido.AI.AgentRuntimeAdapterTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Examples.Weather.{Overview, ReActAgent}
+  alias Jido.AI.Reasoning.ReAct.CLIAdapter, as: ReActCLIAdapter
 
   defmodule EchoTool do
     use Jido.Action,
@@ -37,5 +39,13 @@ defmodule Jido.AI.AgentRuntimeAdapterTest do
     config = agent |> StratState.get(%{}) |> Map.get(:config, %{})
 
     assert config.runtime_adapter == true
+  end
+
+  test "weather react example uses the React CLI adapter" do
+    assert ReActAgent.cli_adapter() == ReActCLIAdapter
+  end
+
+  test "weather overview maps :react to ReAct weather module" do
+    assert Overview.agents().react == ReActAgent
   end
 end
