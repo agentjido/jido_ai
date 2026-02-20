@@ -62,7 +62,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{Security, ToolAdapter, Turn}
+  alias Jido.AI.{ToolAdapter, Turn, Validation}
   alias ReqLLM.Context
 
   @doc """
@@ -70,6 +70,8 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   """
   @impl Jido.Action
   def run(params, context) do
+    params = apply_context_defaults(params, context)
+
     with {:ok, validated_params} <- validate_and_sanitize_params(params),
          {:ok, model} <- resolve_model(validated_params[:model]),
          {:ok, llm_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
@@ -103,7 +105,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   end
 
   defp get_tools(nil, context) do
-    tools_input = context[:tools] || []
+    tools_input = resolve_tools_input(context)
     convert_to_reqllm_tools(tools_input)
   end
 
@@ -191,9 +193,9 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   # Validates and sanitizes input parameters to prevent security issues
   defp validate_and_sanitize_params(params) do
     with {:ok, _prompt} <-
-           Security.validate_string(params[:prompt], max_length: Security.max_input_length()),
+           Validation.validate_string(params[:prompt], max_length: Validation.max_input_length()),
          {:ok, _validated} <- validate_system_prompt_if_needed(params),
-         {:ok, max_turns} <- Security.validate_max_turns(params[:max_turns] || 10) do
+         {:ok, max_turns} <- Validation.validate_max_turns(params[:max_turns] || 10) do
       {:ok, Map.put(params, :max_turns, max_turns)}
     else
       {:error, :empty_string} -> {:error, :prompt_required}
@@ -202,7 +204,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   end
 
   defp validate_system_prompt_if_needed(%{system_prompt: system_prompt}) when is_binary(system_prompt) do
-    Security.validate_string(system_prompt, max_length: Security.max_prompt_length())
+    Validation.validate_string(system_prompt, max_length: Validation.max_prompt_length())
   end
 
   defp validate_system_prompt_if_needed(_params), do: {:ok, nil}
@@ -260,4 +262,113 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
 
     %{input_tokens: input_tokens, output_tokens: output_tokens, total_tokens: total_tokens}
   end
+
+  defp apply_context_defaults(params, context) when is_map(params) do
+    context = normalize_context(context)
+    provided = provided_params(context)
+
+    model_default =
+      first_present([
+        context[:default_model],
+        context[:model],
+        plugin_default(context, :default_model)
+      ])
+
+    system_prompt_default =
+      first_present([
+        context[:default_system_prompt],
+        plugin_default(context, :default_system_prompt),
+        plugin_default(context, :system_prompt)
+      ])
+
+    max_tokens_default =
+      first_present([
+        context[:default_max_tokens],
+        plugin_default(context, :default_max_tokens)
+      ])
+
+    temperature_default =
+      first_present([
+        context[:default_temperature],
+        plugin_default(context, :default_temperature)
+      ])
+
+    auto_execute_default =
+      first_present([
+        context[:auto_execute],
+        plugin_default(context, :auto_execute)
+      ])
+
+    max_turns_default =
+      first_present([
+        context[:max_turns],
+        plugin_default(context, :max_turns)
+      ])
+
+    params
+    |> put_default_param(:model, model_default, provided)
+    |> put_default_param(:system_prompt, system_prompt_default, provided)
+    |> put_default_param(:max_tokens, max_tokens_default, provided)
+    |> put_default_param(:temperature, temperature_default, provided)
+    |> put_default_param(:auto_execute, auto_execute_default, provided)
+    |> put_default_param(:max_turns, max_turns_default, provided)
+  end
+
+  defp apply_context_defaults(params, _context), do: params
+
+  defp put_default_param(params, _key, nil, _provided), do: params
+
+  defp put_default_param(params, key, default, :unknown) do
+    if Map.get(params, key) in [nil, ""] do
+      Map.put(params, key, default)
+    else
+      params
+    end
+  end
+
+  defp put_default_param(params, key, default, provided) do
+    if provided_param?(provided, key) do
+      params
+    else
+      Map.put(params, key, default)
+    end
+  end
+
+  defp provided_params(%{provided_params: provided}) when is_list(provided), do: provided
+  defp provided_params(_), do: :unknown
+
+  defp provided_param?(provided, key) when is_list(provided) do
+    key_str = Atom.to_string(key)
+    Enum.any?(provided, fn k -> k == key or k == key_str end)
+  end
+
+  defp resolve_tools_input(context) do
+    first_present([
+      context[:tools],
+      get_in(context, [:tool_calling, :tools]),
+      get_in(context, [:chat, :tools]),
+      get_in(context, [:state, :tool_calling, :tools]),
+      get_in(context, [:state, :chat, :tools]),
+      get_in(context, [:agent, :state, :tool_calling, :tools]),
+      get_in(context, [:agent, :state, :chat, :tools]),
+      get_in(context, [:plugin_state, :tool_calling, :tools]),
+      get_in(context, [:plugin_state, :chat, :tools]),
+      []
+    ])
+  end
+
+  defp plugin_default(context, key) do
+    first_present([
+      get_in(context, [:plugin_state, :chat, key]),
+      get_in(context, [:plugin_state, :tool_calling, key]),
+      get_in(context, [:state, :chat, key]),
+      get_in(context, [:state, :tool_calling, key]),
+      get_in(context, [:agent, :state, :chat, key]),
+      get_in(context, [:agent, :state, :tool_calling, key])
+    ])
+  end
+
+  defp first_present(values), do: Enum.find(values, &(not is_nil(&1)))
+  defp normalize_context(context) when is_map(context), do: context
+  defp normalize_context(_), do: %{}
 end

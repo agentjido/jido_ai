@@ -1,7 +1,14 @@
 defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.Actions.LLM.GenerateObject
+  alias Jido.AI.TestSupport.FakeReqLLM
+
+  setup :set_mimic_from_context
+  setup :stub_req_llm
+
+  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   describe "GenerateObject action" do
     test "has correct metadata" do
@@ -65,6 +72,30 @@ defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
       }
 
       assert params.object_schema == schema
+    end
+
+    test "uses context defaults when model parameters are omitted" do
+      schema = Zoi.object(%{name: Zoi.string()})
+
+      params = %{
+        prompt: "Generate a person",
+        object_schema: schema
+      }
+
+      context = %{
+        provided_params: [:prompt, :object_schema],
+        plugin_state: %{
+          chat: %{
+            default_model: :fast,
+            default_max_tokens: 600,
+            default_temperature: 0.1
+          }
+        }
+      }
+
+      assert {:ok, result} = GenerateObject.run(params, context)
+      assert result.model == Jido.AI.resolve_model(:fast)
+      assert is_map(result.object)
     end
   end
 end

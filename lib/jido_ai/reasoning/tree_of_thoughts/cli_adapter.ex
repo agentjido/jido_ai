@@ -14,6 +14,9 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
   @default_branching_factor 3
   @default_max_depth 3
   @default_traversal_strategy :best_first
+  @default_top_k 3
+  @default_min_depth 2
+  @default_max_nodes 100
 
   @impl true
   def start_agent(jido_instance, agent_module, _config) do
@@ -54,6 +57,10 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
     branching_factor = config[:branching_factor] || @default_branching_factor
     max_depth = config[:max_depth] || @default_max_depth
     traversal_strategy = config[:traversal_strategy] || @default_traversal_strategy
+    top_k = config[:top_k] || @default_top_k
+    min_depth = config[:min_depth] || @default_min_depth
+    max_nodes = config[:max_nodes] || @default_max_nodes
+    tools = config[:tools] || []
 
     contents =
       quote do
@@ -63,7 +70,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
           model: unquote(model),
           branching_factor: unquote(branching_factor),
           max_depth: unquote(max_depth),
-          traversal_strategy: unquote(traversal_strategy)
+          traversal_strategy: unquote(traversal_strategy),
+          top_k: unquote(top_k),
+          min_depth: unquote(min_depth),
+          max_nodes: unquote(max_nodes),
+          tools: unquote(tools)
       end
 
     Module.create(module_name, contents, Macro.Env.location(__ENV__))
@@ -79,12 +90,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
       case Jido.AgentServer.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_result, "")
-                "" -> Map.get(status.raw_state, :last_result, "")
-                result -> result
-              end
+            answer = extract_answer(status.snapshot.result, status.raw_state)
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
           else
@@ -100,12 +106,27 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
 
   defp extract_meta(status) do
     details = status.snapshot.details || %{}
+    result = status.snapshot.result
 
     %{
       status: status.snapshot.status,
       node_count: Map.get(details, :node_count, 0),
       traversal_strategy: Map.get(details, :traversal_strategy),
-      solution_path_length: length(Map.get(details, :solution_path, []))
+      solution_path_length: length(Map.get(details, :solution_path, [])),
+      usage: Map.get(details, :usage) || if(is_map(result), do: Map.get(result, :usage), else: nil),
+      tot_result: if(is_map(result), do: result, else: nil)
     }
+  end
+
+  defp extract_answer(%{best: %{content: content}}, _raw_state) when is_binary(content), do: content
+  defp extract_answer(%{best: _best}, _raw_state), do: ""
+  defp extract_answer(result, _raw_state) when is_binary(result), do: result
+
+  defp extract_answer(_result, raw_state) do
+    case Map.get(raw_state, :last_result) do
+      %{best: %{content: content}} when is_binary(content) -> content
+      value when is_binary(value) -> value
+      _ -> ""
+    end
   end
 end

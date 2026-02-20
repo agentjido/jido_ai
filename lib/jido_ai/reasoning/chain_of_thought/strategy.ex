@@ -22,7 +22,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   alias Jido.AI.Reasoning.ChainOfThought.Machine
   alias Jido.AI.Directive
   alias Jido.AI.Signal
-  alias Jido.AI.Strategy.StateOpsHelpers
+  alias Jido.AI.Reasoning.Helpers
 
   @type config :: %{
           system_prompt: String.t(),
@@ -222,17 +222,17 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
         pending_worker_start: nil,
         request_traces: %{}
       }
-      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+      |> Helpers.apply_to_state([Helpers.update_config(config)])
 
-    agent = StratState.put(agent, state)
+    agent = put_strategy_state(agent, state)
     {agent, []}
   end
 
   @impl true
-  def cmd(%Agent{} = agent, instructions, _ctx) do
+  def cmd(%Agent{} = agent, instructions, ctx) do
     {agent, dirs_rev} =
       Enum.reduce(instructions, {agent, []}, fn instr, {acc_agent, acc_dirs} ->
-        case process_instruction(acc_agent, instr) do
+        case process_instruction(acc_agent, instr, ctx) do
           {new_agent, new_dirs} ->
             {new_agent, Enum.reverse(new_dirs, acc_dirs)}
 
@@ -244,7 +244,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
     {agent, Enum.reverse(dirs_rev)}
   end
 
-  defp process_instruction(agent, %Jido.Instruction{action: action, params: params}) do
+  defp process_instruction(agent, %Jido.Instruction{action: action, params: params} = instruction, ctx) do
     normalized_action = normalize_action(action)
 
     case normalized_action do
@@ -267,7 +267,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
         {agent, []}
 
       _ ->
-        :noop
+        Helpers.maybe_execute_action_instruction(agent, instruction, ctx)
     end
   end
 
@@ -319,7 +319,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
         |> Map.put(:active_request_id, request_id)
         |> ensure_request_trace(request_id)
 
-      {StratState.put(agent, new_state), directives}
+      {put_strategy_state(agent, new_state), directives}
     end
   end
 
@@ -328,7 +328,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   defp process_request_error(agent, %{request_id: request_id, reason: reason, message: message}) do
     state = StratState.get(agent, %{})
     new_state = Map.put(state, :last_request_error, %{request_id: request_id, reason: reason, message: message})
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_request_error(agent, _params), do: {agent, []}
@@ -344,7 +344,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
 
     kind = event_kind(event)
     new_state = maybe_mark_worker_ready(new_state, kind)
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_worker_event(agent, _params), do: {agent, []}
@@ -368,9 +368,9 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
           |> Map.put(:pending_worker_start, nil)
           |> Map.put(:cot_worker_status, :running)
 
-        {StratState.put(agent, new_state), [directive]}
+        {put_strategy_state(agent, new_state), [directive]}
       else
-        {StratState.put(agent, base_state), []}
+        {put_strategy_state(agent, base_state), []}
       end
     else
       {agent, []}
@@ -413,9 +413,9 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
             |> Map.put(:result, "Error: #{inspect(error)}")
             |> Map.put(:active_request_id, nil)
 
-          {StratState.put(agent, failed_state), []}
+          {put_strategy_state(agent, failed_state), []}
         else
-          {StratState.put(agent, base_state), []}
+          {put_strategy_state(agent, base_state), []}
         end
       else
         {agent, []}
@@ -684,16 +684,19 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []
 
-    raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
+    raw_model = Map.get(agent.state, :model, Keyword.get(opts, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
-    system_prompt = Keyword.get(opts, :system_prompt, Machine.default_system_prompt())
+
+    system_prompt =
+      Map.get(agent.state, :system_prompt, Keyword.get(opts, :system_prompt, Machine.default_system_prompt()))
 
     %{
       system_prompt: system_prompt,
       model: resolved_model,
-      request_policy: :reject,
-      llm_timeout_ms: Keyword.get(opts, :llm_timeout_ms),
-      runtime_task_supervisor: Keyword.get(opts, :runtime_task_supervisor),
+      request_policy: Map.get(agent.state, :request_policy, Keyword.get(opts, :request_policy, :reject)),
+      llm_timeout_ms: Map.get(agent.state, :llm_timeout_ms, Keyword.get(opts, :llm_timeout_ms)),
+      runtime_task_supervisor:
+        Map.get(agent.state, :runtime_task_supervisor, Keyword.get(opts, :runtime_task_supervisor)),
       runtime_adapter: true,
       observability:
         Map.merge(
@@ -701,7 +704,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
             emit_telemetry?: true,
             emit_llm_deltas?: true
           },
-          opts |> Keyword.get(:observability, %{}) |> normalize_map_opt()
+          Map.get(agent.state, :observability, opts |> Keyword.get(:observability, %{})) |> normalize_map_opt()
         )
     }
   end
@@ -714,6 +717,10 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   defp resolve_model_spec(model) when is_binary(model), do: model
 
   defp generate_call_id, do: Machine.generate_call_id()
+
+  defp put_strategy_state(%Agent{} = agent, state) when is_map(state) do
+    %{agent | state: Map.put(agent.state, StratState.key(), state)}
+  end
 
   @doc """
   Returns the extracted reasoning steps from the agent's current state.

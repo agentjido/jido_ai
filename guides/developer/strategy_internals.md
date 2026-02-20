@@ -57,6 +57,28 @@ Fix:
 - request error routing is standardized via `ai.request.error`
 - Adaptive delegates to selected strategy and can re-evaluate on new prompts
 
+## Tree-of-Thoughts Specific Internals
+
+`Jido.AI.Reasoning.TreeOfThoughts.Strategy` now enforces a structured result contract from the machine:
+
+- `snapshot.result` is a map (best/candidates/termination/tree/usage/diagnostics)
+- CLI adapters should project `result.best.content` for human-readable answer text
+- full structured payload should be preserved in metadata (`tot_result`)
+
+ToT parser flow is JSON-first with regex fallback:
+
+1. Parse strict JSON for generation/evaluation outputs
+2. Fallback to regex parsing
+3. Retry once (configurable) with repair prompt
+4. Emit structured diagnostics on terminal parse failure
+
+ToT tool orchestration is strategy-managed:
+
+- `ai.tool.result` and `ai.tool.error` are routed back into the strategy
+- machine progression pauses during tool rounds
+- follow-up LLM calls are issued with assistant tool-call + tool messages
+- round trips are bounded by `max_tool_round_trips`
+
 ## When To Use / Not Use
 
 Use this when:

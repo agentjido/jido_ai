@@ -40,11 +40,11 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
 
   alias Jido.AI.Reasoning.ReAct.Actions.Helpers
   alias Jido.AI.Reasoning.ReAct
-  alias Jido.AI.Security
+  alias Jido.AI.Validation
 
   @impl Jido.Action
   def run(params, context) do
-    with {:ok, _} <- Security.validate_string(params[:query], max_length: Security.max_input_length()) do
+    with {:ok, _} <- Validation.validate_string(params[:query], max_length: Validation.max_input_length()) do
       config = Helpers.build_config(params, context)
       opts = Helpers.build_runner_opts(params, context)
       request_id = params[:request_id] || "req_#{Jido.Util.generate_id()}"

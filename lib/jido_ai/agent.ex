@@ -193,8 +193,7 @@ defmodule Jido.AI.Agent do
     # that need to be evaluated in the calling module's context
     plugins = Keyword.get(opts, :plugins, [])
 
-    # TaskSupervisorSkill is always included for per-instance task supervision
-    ai_plugins = [Jido.AI.Plugins.TaskSupervisor]
+    ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     # Extract tool_context at macro expansion time
     # Use safe alias-only expansion instead of Code.eval_quoted

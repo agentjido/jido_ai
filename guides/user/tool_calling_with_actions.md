@@ -73,6 +73,5 @@ Do not use this approach when:
 
 ## Next
 
-- [Streaming Workflows](streaming_workflows.md)
 - [Plugins And Actions Composition](../developer/plugins_and_actions_composition.md)
 - [Actions Catalog](../developer/actions_catalog.md)

@@ -39,7 +39,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Directive
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.Signal
-  alias Jido.AI.Strategy.StateOpsHelpers
+  alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.ToolAdapter
 
   @type config :: %{
@@ -357,17 +357,17 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         pending_worker_start: nil,
         agent_id: Map.get(agent, :id)
       }
-      |> StateOpsHelpers.apply_to_state([StateOpsHelpers.update_config(config)])
+      |> Helpers.apply_to_state([Helpers.update_config(config)])
 
-    agent = StratState.put(agent, state)
+    agent = put_strategy_state(agent, state)
     {agent, []}
   end
 
   @impl true
-  def cmd(%Agent{} = agent, instructions, _ctx) do
+  def cmd(%Agent{} = agent, instructions, ctx) do
     {agent, directives_rev} =
       Enum.reduce(instructions, {agent, []}, fn instruction, {acc_agent, acc_directives} ->
-        case process_instruction(acc_agent, instruction) do
+        case process_instruction(acc_agent, instruction, ctx) do
           {new_agent, new_directives} ->
             {new_agent, Enum.reverse(new_directives, acc_directives)}
 
@@ -379,7 +379,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     {agent, Enum.reverse(directives_rev)}
   end
 
-  defp process_instruction(agent, %Jido.Instruction{action: action, params: params}) do
+  defp process_instruction(agent, %Jido.Instruction{action: action, params: params} = instruction, ctx) do
     case normalize_action(action) do
       @start ->
         run_context = Map.get(params, :tool_context) || %{}
@@ -414,7 +414,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         {agent, []}
 
       _ ->
-        :noop
+        Helpers.maybe_execute_action_instruction(agent, instruction, ctx)
     end
   end
 
@@ -472,7 +472,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         |> Map.put(:checkpoint_token, nil)
         |> ensure_request_trace(request_id)
 
-      {StratState.put(agent, new_state), directives}
+      {put_strategy_state(agent, new_state), directives}
     end
   end
 
@@ -501,13 +501,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         state
       end
 
-    {StratState.put(agent, new_state), directives}
+    {put_strategy_state(agent, new_state), directives}
   end
 
   defp process_request_error(agent, %{request_id: request_id, reason: reason, message: message}) do
     state = StratState.get(agent, %{})
     new_state = Map.put(state, :last_request_error, %{request_id: request_id, reason: reason, message: message})
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_request_error(agent, _params), do: {agent, []}
@@ -521,12 +521,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     new_reqllm_tools = ToolAdapter.from_actions(new_tools)
 
     new_state =
-      StateOpsHelpers.apply_to_state(
+      Helpers.apply_to_state(
         state,
-        StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools)
+        Helpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools)
       )
 
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_register_tool(agent, _params), do: {agent, []}
@@ -540,12 +540,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     new_reqllm_tools = ToolAdapter.from_actions(new_tools)
 
     new_state =
-      StateOpsHelpers.apply_to_state(
+      Helpers.apply_to_state(
         state,
-        StateOpsHelpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools)
+        Helpers.update_tools_config(new_tools, new_actions_by_name, new_reqllm_tools)
       )
 
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_unregister_tool(agent, _params), do: {agent, []}
@@ -554,11 +554,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     state = StratState.get(agent, %{})
 
     new_state =
-      StateOpsHelpers.apply_to_state(state, [
-        StateOpsHelpers.set_config_field(:base_tool_context, new_context)
+      Helpers.apply_to_state(state, [
+        Helpers.set_config_field(:base_tool_context, new_context)
       ])
 
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_set_tool_context(agent, _params), do: {agent, []}
@@ -582,9 +582,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:pending_worker_start, nil)
           |> Map.put(:react_worker_status, :running)
 
-        {StratState.put(agent, new_state), [directive]}
+        {put_strategy_state(agent, new_state), [directive]}
       else
-        {StratState.put(agent, base_state), []}
+        {put_strategy_state(agent, base_state), []}
       end
     else
       {agent, []}
@@ -628,9 +628,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             |> Map.put(:active_request_id, nil)
             |> Map.delete(:run_tool_context)
 
-          {StratState.put(agent, failed_state), []}
+          {put_strategy_state(agent, failed_state), []}
         else
-          {StratState.put(agent, base_state), []}
+          {put_strategy_state(agent, base_state), []}
         end
       else
         {agent, []}
@@ -652,7 +652,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     kind = event_kind(event)
     new_state = maybe_mark_worker_ready(new_state, kind)
 
-    {StratState.put(agent, new_state), []}
+    {put_strategy_state(agent, new_state), []}
   end
 
   defp process_worker_event(agent, _params), do: {agent, []}
@@ -908,7 +908,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp set_run_tool_context(agent, context) when is_map(context) do
     state = StratState.get(agent, %{})
-    StratState.put(agent, Map.put(state, :run_tool_context, context))
+    put_strategy_state(agent, Map.put(state, :run_tool_context, context))
   end
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
@@ -1053,6 +1053,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_map_opt(_), do: %{}
 
   defp generate_call_id, do: "req_#{Jido.Util.generate_id()}"
+
+  defp put_strategy_state(%Agent{} = agent, state) when is_map(state) do
+    %{agent | state: Map.put(agent.state, StratState.key(), state)}
+  end
 
   @doc """
   Returns the list of currently registered tools for the given agent.

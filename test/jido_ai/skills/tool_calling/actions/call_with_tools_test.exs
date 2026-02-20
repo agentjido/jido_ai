@@ -76,6 +76,48 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       assert Map.has_key?(result, :type)
     end
 
+    test "uses plugin-state defaults for auto_execute and tool registry" do
+      params = %{
+        prompt: "Calculate 5 + 3",
+        tools: ["calculator"]
+      }
+
+      context = %{
+        plugin_state: %{
+          chat: %{
+            auto_execute: true,
+            max_turns: 3,
+            tools: %{TestCalculator.name() => TestCalculator}
+          }
+        }
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+      assert result.type == :final_answer
+      assert result.text =~ "Tool execution complete"
+    end
+
+    test "explicit auto_execute=false overrides plugin-state default" do
+      params = %{
+        prompt: "Calculate 5 + 3",
+        tools: ["calculator"],
+        auto_execute: false
+      }
+
+      context = %{
+        plugin_state: %{
+          chat: %{
+            auto_execute: true,
+            tools: %{TestCalculator.name() => TestCalculator}
+          }
+        }
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+      assert result.type == :tool_calls
+      assert is_list(result.tool_calls)
+    end
+
     test "preserves generation opts across multi-turn auto_execute" do
       params = %{
         prompt: "Calculate 5 + 3",

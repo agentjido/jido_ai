@@ -41,16 +41,18 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Security
+  alias Jido.AI.Validation
 
   @doc """
   Executes the list tools action.
   """
   @impl Jido.Action
   def run(params, context) do
+    context = normalize_context(context)
+
     with {:ok, validated_params} <- validate_and_sanitize_params(params) do
-      # Get tools from context - expects %{tools: %{name => module}} or list
-      tools_input = context[:tools] || %{}
+      # Get tools from context, state, or plugin state fallback.
+      tools_input = resolve_tools_input(context)
       all_tools = normalize_tools_to_list(tools_input)
 
       tools =
@@ -80,6 +82,21 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
 
   defp normalize_tools_to_list(_), do: []
 
+  defp resolve_tools_input(context) do
+    first_present([
+      context[:tools],
+      get_in(context, [:tool_calling, :tools]),
+      get_in(context, [:chat, :tools]),
+      get_in(context, [:state, :tool_calling, :tools]),
+      get_in(context, [:state, :chat, :tools]),
+      get_in(context, [:agent, :state, :tool_calling, :tools]),
+      get_in(context, [:agent, :state, :chat, :tools]),
+      get_in(context, [:plugin_state, :tool_calling, :tools]),
+      get_in(context, [:plugin_state, :chat, :tools]),
+      %{}
+    ])
+  end
+
   # Private Functions
 
   defp validate_and_sanitize_params(params) do
@@ -92,7 +109,7 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
   defp validate_filter_if_present(nil), do: {:ok, nil}
 
   defp validate_filter_if_present(filter) when is_binary(filter) do
-    Security.validate_string(filter, max_length: 1000, allow_empty: true)
+    Validation.validate_string(filter, max_length: 1000, allow_empty: true)
   end
 
   defp validate_filter_if_present(_), do: {:error, :invalid_filter}
@@ -217,6 +234,10 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
       }
     end)
   end
+
+  defp first_present(values), do: Enum.find(values, &(not is_nil(&1)))
+  defp normalize_context(context) when is_map(context), do: context
+  defp normalize_context(_), do: %{}
 
   defp extract_schema_fields(%{fields: fields}) when is_list(fields), do: fields
   defp extract_schema_fields(%{fields: fields}) when is_map(fields), do: Map.to_list(fields)

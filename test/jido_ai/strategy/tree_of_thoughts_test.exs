@@ -125,6 +125,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       assert route_map["ai.tot.query"] == {:strategy_cmd, :tot_start}
       assert route_map["ai.llm.response"] == {:strategy_cmd, :tot_llm_result}
       assert route_map["ai.llm.delta"] == {:strategy_cmd, :tot_llm_partial}
+      assert route_map["ai.tool.result"] == {:strategy_cmd, :tot_tool_result}
+      assert route_map["ai.request.error"] == {:strategy_cmd, :tot_request_error}
     end
   end
 
@@ -319,6 +321,10 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
 
     test "llm_partial_action/0 returns correct atom" do
       assert TreeOfThoughts.llm_partial_action() == :tot_llm_partial
+    end
+
+    test "tool action helpers return correct atoms" do
+      assert TreeOfThoughts.tool_result_action() == :tot_tool_result
     end
   end
 

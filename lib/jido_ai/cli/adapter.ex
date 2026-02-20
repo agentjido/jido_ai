@@ -72,7 +72,7 @@ defmodule Jido.AI.CLI.Adapter do
   def resolve(type, agent_module) do
     cond do
       # If agent module provides its own adapter, use it
-      agent_module && function_exported?(agent_module, :cli_adapter, 0) ->
+      exports_cli_adapter?(agent_module) ->
         {:ok, agent_module.cli_adapter()}
 
       # Type explicitly specified
@@ -96,6 +96,15 @@ defmodule Jido.AI.CLI.Adapter do
 
       true ->
         {:error, "Unknown agent type: #{type}. Supported: react, tot, cot, got, trm, adaptive"}
+    end
+  end
+
+  defp exports_cli_adapter?(nil), do: false
+
+  defp exports_cli_adapter?(agent_module) when is_atom(agent_module) do
+    case Code.ensure_loaded(agent_module) do
+      {:module, _} -> function_exported?(agent_module, :cli_adapter, 0)
+      {:error, _} -> false
     end
   end
 end

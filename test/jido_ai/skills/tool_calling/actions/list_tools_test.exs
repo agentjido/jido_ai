@@ -112,6 +112,25 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
       assert Enum.any?(zoi_tool.schema, &(&1.name == :prompt and &1.type == "string"))
       assert Enum.any?(zoi_tool.schema, &(&1.name == :max_tokens and &1.default == 256))
     end
+
+    test "reads tools from plugin_state fallback when context.tools is absent" do
+      context = %{
+        plugin_state: %{
+          chat: %{
+            tools: %{
+              "legacy_schema_tool" => LegacySchemaTool,
+              "zoi_schema_tool" => ZoiSchemaTool
+            }
+          }
+        }
+      }
+
+      assert {:ok, result} = ListTools.run(%{include_sensitive: true}, context)
+      tool_names = Enum.map(result.tools, & &1.name)
+
+      assert "legacy_schema_tool" in tool_names
+      assert "zoi_schema_tool" in tool_names
+    end
   end
 
   describe "security features" do

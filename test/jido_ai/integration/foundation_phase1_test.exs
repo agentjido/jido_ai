@@ -5,7 +5,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   These tests verify that all Phase 1 components work together correctly:
   - Configuration (model aliases, defaults, provider config)
   - Directives (LLMStream, LLMGenerate, LLMEmbed)
-  - Signals (LLMResponse, LLMError, Usage, ToolResult, EmbedResult)
+  - Signals (LLMResponse, RequestFailed, Usage, ToolResult, EmbedResult)
   - Helpers (message building, response processing, error handling)
   - Tool Adapter (action registry, tool conversion)
 
@@ -15,7 +15,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Directive.{Helper, LLMEmbed, LLMGenerate, LLMStream}
-  alias Jido.AI.Signal.{EmbedResult, LLMError, LLMResponse, ToolResult, Usage}
+  alias Jido.AI.Signal.{EmbedResult, LLMResponse, RequestFailed, ToolResult, Usage}
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
   alias ReqLLM.Context
@@ -178,18 +178,18 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   end
 
   describe "error signal integration" do
-    test "LLMError signal creation" do
+    test "RequestFailed signal creation" do
       error_signal =
-        LLMError.new!(%{
-          call_id: "call_err_1",
-          error_type: :rate_limit,
-          message: "Rate limit exceeded",
-          retry_after: 60
+        RequestFailed.new!(%{
+          request_id: "req_err_1",
+          error: %{type: :rate_limit, message: "Rate limit exceeded"},
+          run_id: "run_err_1"
         })
 
-      assert error_signal.type == "ai.llm.error"
-      assert error_signal.data.error_type == :rate_limit
-      assert error_signal.data.retry_after == 60
+      assert error_signal.type == "ai.request.failed"
+      assert error_signal.data.request_id == "req_err_1"
+      assert error_signal.data.error.type == :rate_limit
+      assert error_signal.data.run_id == "run_err_1"
     end
 
     test "directive helper classifies ReqLLM error shape" do
@@ -476,14 +476,13 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
       # 2. Create error signal
       error_signal =
-        LLMError.new!(%{
-          call_id: "err_flow_1",
-          error_type: :rate_limit,
-          message: "Rate limit exceeded",
-          retry_after: 60
+        RequestFailed.new!(%{
+          request_id: "req_err_flow_1",
+          error: %{type: :rate_limit, message: "Rate limit exceeded"},
+          run_id: "run_err_flow_1"
         })
 
-      assert error_signal.data.error_type == :rate_limit
+      assert error_signal.data.error.type == :rate_limit
     end
   end
 end

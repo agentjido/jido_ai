@@ -58,6 +58,10 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
       assert {"ai.adaptive.query", {:strategy_cmd, :adaptive_start}} in routes
       assert {"ai.llm.response", {:strategy_cmd, :adaptive_llm_result}} in routes
       assert {"ai.llm.delta", {:strategy_cmd, :adaptive_llm_partial}} in routes
+      assert {"ai.request.started", Jido.Actions.Control.Noop} in routes
+      assert {"ai.request.completed", Jido.Actions.Control.Noop} in routes
+      assert {"ai.request.failed", Jido.Actions.Control.Noop} in routes
+      assert {"ai.tool.result", Jido.Actions.Control.Noop} in routes
       assert {"ai.cot.worker.event", {:strategy_cmd, :adaptive_cot_worker_event}} in routes
       assert {"ai.react.worker.event", {:strategy_cmd, :adaptive_react_worker_event}} in routes
     end
