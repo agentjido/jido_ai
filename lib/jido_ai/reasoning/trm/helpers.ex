@@ -136,22 +136,6 @@ defmodule Jido.AI.Reasoning.TRM.Helpers do
 
   # Private helpers for sanitization
 
-  @injection_patterns [
-    # Common prompt injection patterns
-    ~r/ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
-    ~r/disregard\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
-    ~r/forget\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
-    ~r/override\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
-    # System prompt extraction attempts
-    ~r/reveal\s+(your\s+)?(system\s+)?prompt/i,
-    ~r/show\s+(your\s+)?(system\s+)?prompt/i,
-    ~r/what\s+(is|are)\s+(your\s+)?(system\s+)?(prompt|instructions?)/i,
-    # Role switching attempts
-    ~r/you\s+are\s+now\s+a/i,
-    ~r/act\s+as\s+(if\s+you\s+are\s+)?a/i,
-    ~r/pretend\s+(to\s+be|you\s+are)/i
-  ]
-
   @instruction_markers [
     {"SYSTEM:", "[SYS]:"},
     {"USER:", "[USR]:"},
@@ -161,9 +145,27 @@ defmodule Jido.AI.Reasoning.TRM.Helpers do
   ]
 
   defp filter_injection_patterns(text) do
-    Enum.reduce(@injection_patterns, text, fn pattern, acc ->
+    Enum.reduce(injection_patterns(), text, fn pattern, acc ->
       Regex.replace(pattern, acc, "[FILTERED]")
     end)
+  end
+
+  defp injection_patterns do
+    [
+      # Common prompt injection patterns
+      ~r/ignore\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
+      ~r/disregard\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
+      ~r/forget\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
+      ~r/override\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)/i,
+      # System prompt extraction attempts
+      ~r/reveal\s+(your\s+)?(system\s+)?prompt/i,
+      ~r/show\s+(your\s+)?(system\s+)?prompt/i,
+      ~r/what\s+(is|are)\s+(your\s+)?(system\s+)?(prompt|instructions?)/i,
+      # Role switching attempts
+      ~r/you\s+are\s+now\s+a/i,
+      ~r/act\s+as\s+(if\s+you\s+are\s+)?a/i,
+      ~r/pretend\s+(to\s+be|you\s+are)/i
+    ]
   end
 
   defp escape_instruction_markers(text) do
