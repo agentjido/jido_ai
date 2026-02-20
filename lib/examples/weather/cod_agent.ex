@@ -10,6 +10,8 @@ defmodule Jido.AI.Examples.Weather.CoDAgent do
         "Give me a fast weather-aware commute recommendation for tomorrow morning."
   """
 
+  alias Jido.AI.Examples.Weather.LiveContext
+
   use Jido.AI.CoDAgent,
     name: "weather_cod_agent",
     description: "Concise weather advisor using Chain-of-Draft"
@@ -27,4 +29,15 @@ defmodule Jido.AI.Examples.Weather.CoDAgent do
       opts
     )
   end
+
+  @impl true
+  def on_before_cmd(agent, {:cod_start, %{prompt: prompt} = params}) do
+    case LiveContext.enrich_prompt(prompt) do
+      {:ok, enriched_prompt} -> super(agent, {:cod_start, %{params | prompt: enriched_prompt}})
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @impl true
+  def on_before_cmd(agent, action), do: super(agent, action)
 end

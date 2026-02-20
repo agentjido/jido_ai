@@ -121,22 +121,18 @@ end
 - [Configuration Reference](guides/developer/configuration_reference.md) - Defaults and config keys
 
 ### Examples
-- [`lib/examples/README.md`](lib/examples/README.md) - Full examples index (agents, scripts, skills, strategies)
-- [`lib/examples/strategies/react.md`](lib/examples/strategies/react.md) - ReAct strategy example
-- [`lib/examples/strategies/cod.md`](lib/examples/strategies/cod.md) - Chain-of-Draft example
-- [`lib/examples/strategies/cot.md`](lib/examples/strategies/cot.md) - Chain-of-Thought example
-- [`lib/examples/strategies/aot.md`](lib/examples/strategies/aot.md) - Algorithm-of-Thoughts example
-- [`lib/examples/strategies/tot.md`](lib/examples/strategies/tot.md) - Tree-of-Thoughts example
-- [`lib/examples/strategies/got.md`](lib/examples/strategies/got.md) - Graph-of-Thoughts example
-- [`lib/examples/strategies/trm.md`](lib/examples/strategies/trm.md) - TRM strategy example
-- [`lib/examples/strategies/adaptive.md`](lib/examples/strategies/adaptive.md) - Adaptive strategy example
+- [`lib/examples/scripts/demo/`](lib/examples/scripts/demo/) - Runnable example demos
+- [`lib/examples/scripts/smoke/`](lib/examples/scripts/smoke/) - Smoke checks for example flows
+- [`lib/examples/weather/`](lib/examples/weather/) - Weather strategy agent modules
+- [`lib/examples/agents/`](lib/examples/agents/) - ReAct-first agent examples
+- [`lib/examples/tools/`](lib/examples/tools/) - Example tool implementations
 
 ## ReAct Production Defaults
 
 Use these references as the production baseline for ReAct:
 - [`lib/examples/weather/react_agent.ex`](lib/examples/weather/react_agent.ex)
 - [`lib/examples/weather/overview.ex`](lib/examples/weather/overview.ex)
-- [`lib/examples/strategies/react.md`](lib/examples/strategies/react.md)
+- [`lib/examples/agents/weather_agent.ex`](lib/examples/agents/weather_agent.ex)
 
 ## Quick Decision Guide
 

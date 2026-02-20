@@ -81,7 +81,7 @@ Fix:
 Run the end-to-end demo script:
 
 ```bash
-mix run lib/examples/scripts/skill_demo.exs
+mix run lib/examples/scripts/demo/skills_runtime_foundations_demo.exs
 ```
 
 Prerequisites:

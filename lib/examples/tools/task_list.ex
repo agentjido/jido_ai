@@ -31,17 +31,7 @@ defmodule Jido.AI.Examples.Tools.TaskList.AddTasks do
       "Add new tasks to the task list. Each task needs a title and optional description. Returns the created tasks with generated IDs.",
     schema:
       Zoi.object(%{
-        tasks:
-          Zoi.list(
-            Zoi.object(%{
-              title: Zoi.string(description: "Short title for the task"),
-              description: Zoi.string(description: "Detailed description of the task") |> Zoi.optional(),
-              priority:
-                Zoi.integer(description: "Priority number, lower is higher priority (1-100)")
-                |> Zoi.optional()
-            }),
-            description: "List of tasks to add. Each must have a title, optional description and priority."
-          )
+        tasks: Zoi.list(Zoi.map(), description: "List of raw task maps from the model/tool caller.")
       })
 
   @impl true
@@ -49,9 +39,11 @@ defmodule Jido.AI.Examples.Tools.TaskList.AddTasks do
     now = DateTime.utc_now() |> DateTime.to_iso8601()
 
     created_tasks =
-      Enum.map(tasks, fn task ->
-        title = Map.get(task, :title) || Map.get(task, "title", "Untitled")
-        desc = Map.get(task, :description) || Map.get(task, "description")
+      tasks
+      |> Enum.with_index(1)
+      |> Enum.map(fn {task, index} ->
+        title = extract_title(task, index)
+        desc = extract_description(task)
         pri = Map.get(task, :priority) || Map.get(task, "priority", 100)
 
         %{
@@ -78,6 +70,38 @@ defmodule Jido.AI.Examples.Tools.TaskList.AddTasks do
 
   defp generate_id do
     :crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false)
+  end
+
+  defp extract_title(task, index) do
+    candidates = [
+      Map.get(task, :title),
+      Map.get(task, "title"),
+      Map.get(task, :name),
+      Map.get(task, "name"),
+      Map.get(task, :task),
+      Map.get(task, "task"),
+      Map.get(task, :summary),
+      Map.get(task, "summary")
+    ]
+
+    case Enum.find(candidates, &is_binary/1) do
+      title when is_binary(title) and title != "" ->
+        title
+
+      _ ->
+        "Task #{index}"
+    end
+  end
+
+  defp extract_description(task) do
+    candidates = [
+      Map.get(task, :description),
+      Map.get(task, "description"),
+      Map.get(task, :details),
+      Map.get(task, "details")
+    ]
+
+    Enum.find(candidates, &is_binary/1)
   end
 end
 

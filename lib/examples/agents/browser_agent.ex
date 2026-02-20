@@ -26,9 +26,9 @@ defmodule Jido.AI.Examples.BrowserAgent do
     description: "Web browsing assistant that reads, searches, and summarizes web pages",
     tool_timeout_ms: 60_000,
     tools: [
-      JidoBrowser.Actions.ReadPage,
-      JidoBrowser.Actions.SearchWeb,
-      JidoBrowser.Actions.SnapshotUrl
+      Jido.AI.Examples.Tools.Browser.ReadPage,
+      Jido.AI.Examples.Tools.Browser.SearchWeb,
+      Jido.AI.Examples.Tools.Browser.SnapshotUrl
     ],
     system_prompt: """
     You are a helpful web browsing assistant. You can search the web, read

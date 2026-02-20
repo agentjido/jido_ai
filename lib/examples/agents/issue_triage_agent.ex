@@ -4,7 +4,8 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
 
   Demonstrates iterative tool-use reasoning with secure token handling:
   1. Reads GITHUB_TOKEN from environment to create authenticated client
-  2. Injects client into tool_context for all tool calls
+  2. Requires target repo env (`JIDO_AI_EXAMPLES_GITHUB_OWNER` + `JIDO_AI_EXAMPLES_GITHUB_REPO`)
+  3. Injects client into tool_context for all tool calls
   3. Fetches issues from a repository
   4. Analyzes content to suggest labels/assignments
 
@@ -21,6 +22,8 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
 
       # Ensure GITHUB_TOKEN is set
       export GITHUB_TOKEN="ghp_your_token_here"
+      export JIDO_AI_EXAMPLES_GITHUB_OWNER="agentjido"
+      export JIDO_AI_EXAMPLES_GITHUB_REPO="jido"
 
       # Start the agent
       {:ok, pid} = Jido.start_agent(MyApp.Jido, Jido.AI.Examples.IssueTriageAgent)
@@ -37,6 +40,10 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
 
       GITHUB_TOKEN=ghp_xxx mix jido_ai --agent Jido.AI.Examples.IssueTriageAgent \\
         "List the 5 most recent issues in agentjido/jido and categorize them"
+
+      # Optional write mode (disabled by default)
+      JIDO_AI_EXAMPLES_ALLOW_GITHUB_WRITES=true mix jido_ai --agent Jido.AI.Examples.IssueTriageAgent \\
+        "Apply labels to issue #123 in agentjido/jido"
 
   ## How Token Injection Works
 
@@ -57,7 +64,7 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
       Jido.Tools.Github.Issues.List,
       Jido.Tools.Github.Issues.Filter,
       Jido.Tools.Github.Issues.Find,
-      Jido.Tools.Github.Issues.Update
+      Jido.AI.Examples.Tools.Github.SafeUpdateIssue
     ],
     system_prompt: """
     You are a GitHub issue triage assistant. Your job is to help organize and
@@ -83,46 +90,59 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
     """,
     max_iterations: 15
 
+  def ask(pid, query, opts) when is_binary(query) do
+    with :ok <- validate_required_env() do
+      super(pid, query, opts)
+    end
+  end
+
+  def ask_sync(pid, query, opts) when is_binary(query) do
+    with :ok <- validate_required_env() do
+      super(pid, query, opts)
+    end
+  end
+
   @impl true
   def on_before_cmd(agent, {:ai_react_start, %{query: query} = params} = _action) do
-    # Read token from environment
-    case System.get_env("GITHUB_TOKEN") do
-      nil ->
-        # No token - update agent state with error and let it proceed
-        # The agent will explain that a token is needed
-        agent = %{
-          agent
-          | state:
-              agent.state
-              |> Map.put(:last_query, query)
-              |> Map.put(:completed, false)
-              |> Map.put(:last_answer, "")
-              |> Map.put(:github_token_present, false)
-        }
+    token = System.get_env("GITHUB_TOKEN")
+    owner = System.get_env("JIDO_AI_EXAMPLES_GITHUB_OWNER")
+    repo = System.get_env("JIDO_AI_EXAMPLES_GITHUB_REPO")
 
-        {:ok, agent, {:ai_react_start, params}}
+    missing =
+      [{"GITHUB_TOKEN", token}, {"JIDO_AI_EXAMPLES_GITHUB_OWNER", owner}, {"JIDO_AI_EXAMPLES_GITHUB_REPO", repo}]
+      |> Enum.filter(fn {_name, value} -> is_nil(value) or value == "" end)
+      |> Enum.map(&elem(&1, 0))
 
-      token when is_binary(token) and byte_size(token) > 0 ->
-        # Create Tentacat client with token
-        client = Tentacat.Client.new(%{access_token: token})
+    if missing != [] do
+      {:error, "Missing required environment variables: #{Enum.join(missing, ", ")}"}
+    else
+      client = Tentacat.Client.new(%{access_token: token})
+      allow_writes = System.get_env("JIDO_AI_EXAMPLES_ALLOW_GITHUB_WRITES") == "true"
 
-        # Merge client into tool_context
-        existing_context = Map.get(params, :tool_context, %{})
-        new_context = Map.put(existing_context, :client, client)
-        updated_params = Map.put(params, :tool_context, new_context)
+      existing_context = Map.get(params, :tool_context, %{})
 
-        # Update agent state
-        agent = %{
-          agent
-          | state:
-              agent.state
-              |> Map.put(:last_query, query)
-              |> Map.put(:completed, false)
-              |> Map.put(:last_answer, "")
-              |> Map.put(:github_token_present, true)
-        }
+      new_context =
+        existing_context
+        |> Map.put(:client, client)
+        |> Map.put(:repo_owner, owner)
+        |> Map.put(:repo_name, repo)
+        |> Map.put(:allow_github_writes, allow_writes)
 
-        {:ok, agent, {:ai_react_start, updated_params}}
+      updated_params = Map.put(params, :tool_context, new_context)
+
+      agent = %{
+        agent
+        | state:
+            agent.state
+            |> Map.put(:last_query, query)
+            |> Map.put(:completed, false)
+            |> Map.put(:last_answer, "")
+            |> Map.put(:github_token_present, true)
+            |> Map.put(:github_target, "#{owner}/#{repo}")
+            |> Map.put(:github_write_enabled, allow_writes)
+      }
+
+      {:ok, agent, {:ai_react_start, updated_params}}
     end
   end
 
@@ -148,5 +168,22 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
       end
 
     {:ok, agent, directives}
+  end
+
+  defp validate_required_env do
+    token = System.get_env("GITHUB_TOKEN")
+    owner = System.get_env("JIDO_AI_EXAMPLES_GITHUB_OWNER")
+    repo = System.get_env("JIDO_AI_EXAMPLES_GITHUB_REPO")
+
+    missing =
+      [{"GITHUB_TOKEN", token}, {"JIDO_AI_EXAMPLES_GITHUB_OWNER", owner}, {"JIDO_AI_EXAMPLES_GITHUB_REPO", repo}]
+      |> Enum.filter(fn {_name, value} -> is_nil(value) or value == "" end)
+      |> Enum.map(&elem(&1, 0))
+
+    if missing == [] do
+      :ok
+    else
+      {:error, "Missing required environment variables: #{Enum.join(missing, ", ")}"}
+    end
   end
 end

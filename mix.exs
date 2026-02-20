@@ -78,6 +78,7 @@ defmodule JidoAi.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.22", only: [:dev], runtime: false},
+      {:dotenvy, "~> 1.1"},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18", only: [:dev, :test]},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
@@ -157,24 +158,13 @@ defmodule JidoAi.MixProject do
         "guides/developer/error_model_and_recovery.md",
         # Reference
         "guides/developer/actions_catalog.md",
-        "guides/developer/configuration_reference.md",
-        # Examples
-        "lib/examples/README.md",
-        "lib/examples/strategies/aot.md",
-        "lib/examples/strategies/cod.md",
-        "lib/examples/strategies/adaptive.md",
-        "lib/examples/strategies/cot.md",
-        "lib/examples/strategies/got.md",
-        "lib/examples/strategies/react.md",
-        "lib/examples/strategies/tot.md",
-        "lib/examples/strategies/trm.md"
+        "guides/developer/configuration_reference.md"
       ],
       groups_for_extras: [
         {"Build With Jido.AI", ~r/guides\/user/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
-        {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/},
-        {"Examples - Strategies", ~r/lib\/examples\/(README|strategies)/}
+        {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/}
       ],
       groups_for_modules: [
         Core: [

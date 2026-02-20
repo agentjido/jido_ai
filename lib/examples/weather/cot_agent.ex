@@ -11,6 +11,8 @@ defmodule Jido.AI.Examples.Weather.CoTAgent do
         "How should I decide between running outdoors or at the gym if rain is likely?"
   """
 
+  alias Jido.AI.Examples.Weather.LiveContext
+
   use Jido.AI.CoTAgent,
     name: "weather_cot_agent",
     description: "Step-by-step weather decision advisor",
@@ -46,4 +48,15 @@ defmodule Jido.AI.Examples.Weather.CoTAgent do
 
     think_sync(pid, prompt, opts)
   end
+
+  @impl true
+  def on_before_cmd(agent, {:cot_start, %{prompt: prompt} = params}) do
+    case LiveContext.enrich_prompt(prompt) do
+      {:ok, enriched_prompt} -> super(agent, {:cot_start, %{params | prompt: enriched_prompt}})
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @impl true
+  def on_before_cmd(agent, action), do: super(agent, action)
 end

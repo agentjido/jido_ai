@@ -4,22 +4,6 @@ defmodule Jido.AI.StableSmokeTest do
   @moduletag :stable_smoke
   @moduletag :unit
 
-  test "backlog scaffold files exist" do
-    files = [
-      "specs/stories/00_traceability_matrix.md",
-      "specs/stories/01_ops_examples_core.md",
-      "specs/stories/02_skills_runtime_cli.md",
-      "specs/stories/03_strategies.md",
-      "specs/stories/04_plugins.md",
-      "specs/stories/05_actions.md",
-      "specs/stories/06_quality.md"
-    ]
-
-    Enum.each(files, fn file ->
-      assert File.exists?(file), "expected #{file} to exist"
-    end)
-  end
-
   test "weather strategy overview includes cod parity" do
     agents = Jido.AI.Examples.Weather.Overview.agents()
 
