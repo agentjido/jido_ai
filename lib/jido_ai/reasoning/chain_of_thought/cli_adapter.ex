@@ -10,7 +10,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapter do
 
   @behaviour Jido.AI.CLI.Adapter
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
 
   @impl true
   def start_agent(jido_instance, agent_module, _config) do

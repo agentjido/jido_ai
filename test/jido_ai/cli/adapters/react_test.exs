@@ -54,7 +54,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
       state = module.new() |> StratState.get(%{})
       config = state[:config]
 
-      assert config.model == "anthropic:claude-haiku-4-5"
+      assert config.model == Jido.AI.resolve_model(:fast)
       assert config.max_iterations == 10
 
       assert config.tools == [

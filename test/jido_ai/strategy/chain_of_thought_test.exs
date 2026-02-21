@@ -54,7 +54,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     test "uses default model when not specified" do
       agent = create_agent()
       state = StratState.get(agent, %{})
-      assert state[:config].model == "anthropic:claude-haiku-4-5"
+      assert state[:config].model == Jido.AI.resolve_model(:fast)
     end
 
     test "resolves model aliases" do

@@ -50,7 +50,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
       module = CoDAdapter.create_ephemeral_agent(%{})
       opts = module.strategy_opts()
 
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert is_binary(opts[:system_prompt])
       assert opts[:system_prompt] != ""
     end

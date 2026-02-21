@@ -10,7 +10,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
 
   @behaviour Jido.AI.CLI.Adapter
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_iterations 10
   @default_tools [
     Jido.Tools.Arithmetic.Add,

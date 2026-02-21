@@ -54,7 +54,7 @@ Fix:
 
 ## Defaults You Should Know
 
-- most strategies default model to `anthropic:claude-haiku-4-5`
+- most strategies default model alias to `:fast` (resolved via `Jido.AI.resolve_model/1`)
 - request error routing is standardized via `ai.request.error`
 - Adaptive delegates to selected strategy and can re-evaluate on new prompts
 

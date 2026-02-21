@@ -10,7 +10,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter do
 
   @behaviour Jido.AI.CLI.Adapter
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_nodes 20
   @default_max_depth 5
   @default_aggregation_strategy :synthesis

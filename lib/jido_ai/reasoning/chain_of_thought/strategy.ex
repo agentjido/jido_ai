@@ -45,7 +45,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
           runtime_adapter: true
         }
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @worker_tag :cot_worker
   @request_trace_cap 2000
   @source "/ai/cot/strategy"

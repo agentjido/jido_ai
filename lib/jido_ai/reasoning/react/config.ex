@@ -6,7 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   alias Jido.AI.ToolAdapter
   require Logger
 
-  @default_model :capable
+  @default_model :fast
   @default_max_iterations 10
   @legacy_insecure_token_secret "jido_ai_react_default_secret_change_me"
   @ephemeral_secret_key {:jido_ai, __MODULE__, :ephemeral_token_secret}

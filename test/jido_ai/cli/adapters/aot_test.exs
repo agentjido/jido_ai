@@ -44,7 +44,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
       module = AoTAdapter.create_ephemeral_agent(%{})
       opts = module.strategy_opts()
 
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:profile] == :standard
       assert opts[:search_style] == :dfs
       assert opts[:temperature] == 0.0

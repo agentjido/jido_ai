@@ -8,7 +8,7 @@ defmodule Jido.AI.AoTAgent do
   and provides request-oriented helper APIs.
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_profile :standard
   @default_search_style :dfs
   @default_temperature 0.0
@@ -42,7 +42,7 @@ defmodule Jido.AI.AoTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
           last_prompt: Zoi.string() |> Zoi.default(""),

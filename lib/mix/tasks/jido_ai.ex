@@ -24,7 +24,7 @@ defmodule Mix.Tasks.JidoAi do
   ### Agent Configuration
       --agent MODULE       Use existing agent module (ignores --model/--tools/--system)
       --type TYPE          Agent type: react (default), aot, cod, cot, tot, got, trm, adaptive
-      --model MODEL        LLM model (default: anthropic:claude-haiku-4-5)
+      --model MODEL        LLM model alias/spec (default: :fast via Jido.AI.resolve_model/1)
       --tools MODULES      Comma-separated tool modules
       --system PROMPT      System prompt
       --max-iterations N   Max reasoning iterations (default: 10)

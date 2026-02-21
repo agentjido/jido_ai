@@ -20,7 +20,7 @@ defmodule Jido.AI.CoTAgent do
 
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "CoT agent \#{name}")
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:system_prompt` - Custom system prompt for CoT reasoning
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
@@ -84,7 +84,7 @@ defmodule Jido.AI.CoTAgent do
       {:ok, result} = MyApp.Reasoner.think_sync(pid, "What is 15% of 340?")
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
 
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
@@ -106,7 +106,7 @@ defmodule Jido.AI.CoTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),

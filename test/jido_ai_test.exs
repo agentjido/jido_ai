@@ -5,6 +5,32 @@ defmodule Jido.AITest do
 
   doctest Jido.AI
 
+  describe "model_aliases/0 and resolve_model/1" do
+    test "loads built-in defaults" do
+      assert is_binary(AI.resolve_model(:fast))
+    end
+
+    test "merges configured aliases over defaults" do
+      original = Application.get_env(:jido_ai, :model_aliases)
+
+      Application.put_env(:jido_ai, :model_aliases, %{
+        fast: "test:fast",
+        custom: "test:custom"
+      })
+
+      on_exit(fn ->
+        if is_nil(original) do
+          Application.delete_env(:jido_ai, :model_aliases)
+        else
+          Application.put_env(:jido_ai, :model_aliases, original)
+        end
+      end)
+
+      assert AI.resolve_model(:fast) == "test:fast"
+      assert AI.resolve_model(:custom) == "test:custom"
+    end
+  end
+
   describe "llm_defaults/0 and llm_defaults/1" do
     test "returns built-in defaults for text/object/stream" do
       defaults = AI.llm_defaults()

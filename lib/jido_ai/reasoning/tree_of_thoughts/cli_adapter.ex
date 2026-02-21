@@ -10,7 +10,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
 
   @behaviour Jido.AI.CLI.Adapter
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_branching_factor 3
   @default_max_depth 3
   @default_traversal_strategy :best_first

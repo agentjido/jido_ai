@@ -22,7 +22,7 @@ defmodule Jido.AI.GoTAgent do
 
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "GoT agent \#{name}")
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:max_nodes` - Maximum number of nodes in the graph (default: 20)
   - `:max_depth` - Maximum depth of the graph (default: 5)
   - `:aggregation_strategy` - `:voting`, `:weighted`, or `:synthesis` (default: `:synthesis`)
@@ -87,7 +87,7 @@ defmodule Jido.AI.GoTAgent do
   - `:synthesis` - Synthesizes all thoughts into a coherent conclusion (default)
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_nodes 20
   @default_max_depth 5
   @default_aggregation_strategy :synthesis
@@ -127,7 +127,7 @@ defmodule Jido.AI.GoTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
           last_prompt: Zoi.string() |> Zoi.default(""),

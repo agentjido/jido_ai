@@ -8,7 +8,7 @@ defmodule Jido.AI.CoDAgent do
   plus standard state fields and helper functions.
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
 
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
@@ -25,7 +25,7 @@ defmodule Jido.AI.CoDAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
           last_prompt: Zoi.string() |> Zoi.default(""),

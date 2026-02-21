@@ -72,7 +72,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
       {agent, _ctx} = create_agent()
       state = StratState.get(agent, %{})
 
-      assert state[:config][:model] == "anthropic:claude-haiku-4-5"
+      assert state[:config][:model] == Jido.AI.resolve_model(:fast)
       assert state[:config][:default_strategy] == :react
       assert state[:config][:available_strategies] == [:cod, :cot, :react, :tot, :got, :trm]
       assert is_nil(state[:selected_strategy])

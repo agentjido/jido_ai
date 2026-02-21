@@ -51,7 +51,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
       module = AdaptiveAdapter.create_ephemeral_agent(config)
 
       opts = module.strategy_opts()
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:default_strategy] == :react
       assert opts[:available_strategies] == [:cod, :cot, :react, :tot, :got, :trm]
     end

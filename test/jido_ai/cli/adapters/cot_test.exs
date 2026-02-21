@@ -43,7 +43,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
       module = CoTAdapter.create_ephemeral_agent(config)
 
       opts = module.strategy_opts()
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       refute Keyword.has_key?(opts, :system_prompt)
     end
 

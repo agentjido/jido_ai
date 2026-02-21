@@ -35,7 +35,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
     test "uses expected defaults when not provided" do
       opts = DefaultAdaptiveAgent.strategy_opts()
 
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:default_strategy] == :react
       assert opts[:available_strategies] == [:cod, :cot, :react, :tot, :got, :trm]
       refute Keyword.has_key?(opts, :complexity_thresholds)

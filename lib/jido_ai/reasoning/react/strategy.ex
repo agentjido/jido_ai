@@ -62,7 +62,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           agent_id: String.t() | nil
         }
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_iterations 10
   @request_trace_cap 2000
   @worker_tag :react_worker

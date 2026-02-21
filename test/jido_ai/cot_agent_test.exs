@@ -39,7 +39,7 @@ defmodule Jido.AI.CoTAgentTest do
     test "uses expected defaults when not provided" do
       opts = DefaultCoTAgent.strategy_opts()
 
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       refute Keyword.has_key?(opts, :system_prompt)
     end
 

@@ -13,7 +13,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
 
   @behaviour Jido.AI.CLI.Adapter
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_strategy :react
   @default_available_strategies [:cod, :cot, :react, :tot, :got, :trm]
 

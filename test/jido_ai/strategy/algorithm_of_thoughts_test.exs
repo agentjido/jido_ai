@@ -20,7 +20,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
       state = StratState.get(agent, %{})
 
       assert state[:status] == :idle
-      assert state[:config].model == "anthropic:claude-haiku-4-5"
+      assert state[:config].model == Jido.AI.resolve_model(:fast)
       assert state[:config].profile == :standard
       assert state[:config].search_style == :dfs
       assert state[:config].temperature == 0.0

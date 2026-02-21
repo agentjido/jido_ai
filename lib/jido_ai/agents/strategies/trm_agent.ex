@@ -21,7 +21,7 @@ defmodule Jido.AI.TRMAgent do
 
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "TRM agent \#{name}")
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:max_supervision_steps` - Maximum supervision iterations before termination (default: 5)
   - `:act_threshold` - Confidence threshold for early stopping (default: 0.9)
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
@@ -84,7 +84,7 @@ defmodule Jido.AI.TRMAgent do
   4. Repeat until confidence threshold is met or max steps reached
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_supervision_steps 5
   @default_act_threshold 0.9
 
@@ -109,7 +109,7 @@ defmodule Jido.AI.TRMAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),

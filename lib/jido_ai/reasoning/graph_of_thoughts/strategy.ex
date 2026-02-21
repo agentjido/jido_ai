@@ -43,7 +43,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
 
   ### Options
 
-  - `:model` (optional) - Model identifier, defaults to "anthropic:claude-haiku-4-5"
+  - `:model` (optional) - Model alias or direct model spec, defaults to :fast (resolved via Jido.AI.resolve_model/1)
   - `:max_nodes` (optional) - Maximum number of nodes, defaults to 20
   - `:max_depth` (optional) - Maximum graph depth, defaults to 5
   - `:aggregation_strategy` (optional) - `:voting`, `:weighted`, or `:synthesis`, defaults to `:synthesis`
@@ -74,7 +74,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
   alias Jido.AI.Reasoning.Helpers
   alias ReqLLM.Context
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
 
   @start :got_start
   @llm_result :got_llm_result

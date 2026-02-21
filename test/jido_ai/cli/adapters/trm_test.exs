@@ -51,7 +51,7 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
       module = TRMAdapter.create_ephemeral_agent(config)
 
       opts = module.strategy_opts()
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:max_supervision_steps] == 5
       assert opts[:act_threshold] == 0.9
     end

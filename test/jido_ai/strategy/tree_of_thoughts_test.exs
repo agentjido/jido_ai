@@ -36,7 +36,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       agent = create_agent()
       state = StratState.get(agent, %{})
 
-      assert state[:config].model == "anthropic:claude-haiku-4-5"
+      assert state[:config].model == Jido.AI.resolve_model(:fast)
     end
 
     test "resolves model aliases" do

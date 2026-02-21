@@ -4,7 +4,6 @@ defmodule JidoAi.MixProject do
   @version "2.0.0-beta"
   @source_url "https://github.com/agentjido/jido_ai"
   @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
-
   def project do
     [
       app: :jido_ai,
@@ -114,7 +113,16 @@ defmodule JidoAi.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE.md", "CHANGELOG.md", "usage-rules.md", "guides", "examples"],
+      files: [
+        "lib",
+        "mix.exs",
+        "README.md",
+        "LICENSE.md",
+        "CHANGELOG.md",
+        "usage-rules.md",
+        "guides",
+        "examples"
+      ],
       maintainers: ["Mike Hostetler <mike.hostetler@gmail.com>", "Pascal Charbon <pcharbon70@gmail.com>"],
       licenses: ["Apache-2.0"],
       links: %{

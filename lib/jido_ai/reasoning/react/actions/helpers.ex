@@ -9,7 +9,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
   @spec build_config(map(), map()) :: Config.t()
   def build_config(params, context) do
     opts = %{
-      model: params[:model] || context[:model] || :capable,
+      model: params[:model] || context[:model] || :fast,
       system_prompt: params[:system_prompt],
       tools: params[:tools] || context[:tools] || get_in(context, [:plugin_state, :tool_calling, :tools]) || %{},
       max_iterations: params[:max_iterations],
