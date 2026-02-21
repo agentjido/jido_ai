@@ -349,7 +349,7 @@ signal =
 Execution handoff:
 
 - Route dispatch maps `reasoning.cod.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
-- `Jido.AI.Plugins.Reasoning.ChainOfDraft.handle_signal/2` overrides payload strategy to `strategy: :cod`.
+- `Jido.AI.Plugins.Reasoning.ChainOfDraft` overrides payload strategy to `strategy: :cod`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 
 ### CoT Plugin Handoff (`reasoning.cot.run`)
@@ -382,7 +382,7 @@ signal =
 Execution handoff:
 
 - Route dispatch maps `reasoning.cot.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
-- `Jido.AI.Plugins.Reasoning.ChainOfThought.handle_signal/2` overrides payload strategy to `strategy: :cot`.
+- `Jido.AI.Plugins.Reasoning.ChainOfThought` overrides payload strategy to `strategy: :cot`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 
 ### AoT Plugin Handoff (`reasoning.aot.run`)
@@ -416,7 +416,7 @@ signal =
 Execution handoff:
 
 - Route dispatch maps `reasoning.aot.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
-- `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts.handle_signal/2` overrides payload strategy to `strategy: :aot`.
+- `Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts` overrides payload strategy to `strategy: :aot`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 
 ### ToT Plugin Handoff (`reasoning.tot.run`)
@@ -450,7 +450,7 @@ signal =
 Execution handoff:
 
 - Route dispatch maps `reasoning.tot.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
-- `Jido.AI.Plugins.Reasoning.TreeOfThoughts.handle_signal/2` overrides payload strategy to `strategy: :tot`.
+- `Jido.AI.Plugins.Reasoning.TreeOfThoughts` overrides payload strategy to `strategy: :tot`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 - ToT option keys include `branching_factor`, `max_depth`, `traversal_strategy`, `generation_prompt`, and `evaluation_prompt`.
 
@@ -485,7 +485,7 @@ signal =
 Execution handoff:
 
 - Route dispatch maps `reasoning.got.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
-- `Jido.AI.Plugins.Reasoning.GraphOfThoughts.handle_signal/2` overrides payload strategy to `strategy: :got`.
+- `Jido.AI.Plugins.Reasoning.GraphOfThoughts` overrides payload strategy to `strategy: :got`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 - GoT option keys include `max_nodes`, `max_depth`, `aggregation_strategy`, `generation_prompt`, `connection_prompt`, and `aggregation_prompt`.
 
@@ -520,7 +520,7 @@ signal =
 Execution handoff:
 
 - Route dispatch maps `reasoning.trm.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
-- `Jido.AI.Plugins.Reasoning.TRM.handle_signal/2` overrides payload strategy to `strategy: :trm`.
+- `Jido.AI.Plugins.Reasoning.TRM` overrides payload strategy to `strategy: :trm`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 - TRM option keys include `max_supervision_steps` and `act_threshold`.
 
@@ -559,7 +559,7 @@ signal =
 Execution handoff:
 
 - Route dispatch maps `reasoning.adaptive.run` to `Jido.AI.Actions.Reasoning.RunStrategy`.
-- `Jido.AI.Plugins.Reasoning.Adaptive.handle_signal/2` overrides payload strategy to `strategy: :adaptive`.
+- `Jido.AI.Plugins.Reasoning.Adaptive` overrides payload strategy to `strategy: :adaptive`.
 - `RunStrategy` applies plugin defaults (`default_model`, `timeout`, `options`) from plugin state when omitted by caller params.
 - Adaptive option keys include `default_strategy`, `available_strategies`, and `complexity_thresholds`.
 

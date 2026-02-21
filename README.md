@@ -121,11 +121,11 @@ end
 - [Configuration Reference](guides/developer/configuration_reference.md) - Defaults and config keys
 
 ### Examples
-- [`lib/examples/scripts/demo/`](lib/examples/scripts/demo/) - Runnable example demos
-- [`lib/examples/scripts/smoke/`](lib/examples/scripts/smoke/) - Smoke checks for example flows
-- [`lib/examples/weather/`](lib/examples/weather/) - Weather strategy agent modules
-- [`lib/examples/agents/`](lib/examples/agents/) - ReAct-first agent examples
-- [`lib/examples/tools/`](lib/examples/tools/) - Example tool implementations
+- [`lib/examples/scripts/demo/actions_llm_runtime_demo.exs`](lib/examples/scripts/demo/actions_llm_runtime_demo.exs) - Runnable demo script entrypoint
+- [`lib/examples/scripts/smoke/weather_agent_live_runtime_demo.exs`](lib/examples/scripts/smoke/weather_agent_live_runtime_demo.exs) - Smoke-check script entrypoint
+- [`lib/examples/weather/overview.ex`](lib/examples/weather/overview.ex) - Weather strategy overview module
+- [`lib/examples/agents/weather_agent.ex`](lib/examples/agents/weather_agent.ex) - ReAct-first agent example
+- [`lib/examples/tools/weather_by_location.ex`](lib/examples/tools/weather_by_location.ex) - Example tool implementation
 
 ## ReAct Production Defaults
 

@@ -98,7 +98,6 @@ defmodule JidoAi.MixProject do
         "doctor --summary --raise",
         "test.fast"
       ],
-      "quality.final": "jido_ai.quality",
       q: ["quality"],
       quality: [
         "format --check-formatted",
@@ -120,8 +119,7 @@ defmodule JidoAi.MixProject do
         "LICENSE.md",
         "CHANGELOG.md",
         "usage-rules.md",
-        "guides",
-        "examples"
+        "guides"
       ],
       maintainers: ["Mike Hostetler <mike.hostetler@gmail.com>", "Pascal Charbon <pcharbon70@gmail.com>"],
       licenses: ["Apache-2.0"],
@@ -186,7 +184,7 @@ defmodule JidoAi.MixProject do
           Jido.AI.ToolAdapter,
           Jido.AI.PluginStack
         ],
-        "Errors": [
+        Errors: [
           Jido.AI.Error,
           ~r/Jido\.AI\.Error\..*/
         ],

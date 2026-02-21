@@ -12,7 +12,7 @@ defmodule Jido.AI.StableSmokeTest do
     assert map_size(agents) == 8
   end
 
-  test "mix aliases expose the dual stable gate contract" do
+  test "mix aliases expose the stable gate contract" do
     aliases = Mix.Project.config()[:aliases] || []
 
     assert Keyword.fetch!(aliases, :test) == "test --exclude flaky"
@@ -24,6 +24,8 @@ defmodule Jido.AI.StableSmokeTest do
     assert is_list(precommit_steps)
     assert "test.fast" in precommit_steps
 
-    assert Keyword.fetch!(aliases, :"quality.final") == "jido_ai.quality"
+    quality_steps = Keyword.fetch!(aliases, :quality)
+    assert is_list(quality_steps)
+    assert "dialyzer" in quality_steps
   end
 end
