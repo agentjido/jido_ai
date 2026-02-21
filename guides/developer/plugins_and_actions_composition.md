@@ -76,7 +76,7 @@ State key contract:
 
 - Plugin state key is `:__task_supervisor_skill__`
 - `mount/2` stores `%{supervisor: pid}` under `agent.state.__task_supervisor_skill__`
-- Runtime directives resolve this supervisor via `Jido.AI.Directive.Helper.get_task_supervisor/1`
+- Runtime directives resolve this supervisor via `Jido.AI.Directive.Helpers.get_task_supervisor/1`
 
 Lifecycle and cleanup contract:
 

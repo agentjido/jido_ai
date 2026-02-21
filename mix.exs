@@ -177,7 +177,80 @@ defmodule JidoAi.MixProject do
       groups_for_modules: [
         Core: [
           Jido.AI,
-          Jido.AI.Error
+          Jido.AI.Agent,
+          Jido.AI.Request,
+          Jido.AI.Thread,
+          Jido.AI.Turn,
+          Jido.AI.Observe,
+          Jido.AI.Validation,
+          Jido.AI.ToolAdapter,
+          Jido.AI.PluginStack
+        ],
+        "Errors": [
+          Jido.AI.Error,
+          ~r/Jido\.AI\.Error\..*/
+        ],
+        "Actions — LLM": [
+          Jido.AI.Actions.Helpers,
+          ~r/Jido\.AI\.Actions\.LLM\..*/
+        ],
+        "Actions — Planning": [
+          ~r/Jido\.AI\.Actions\.Planning\..*/
+        ],
+        "Actions — Reasoning": [
+          ~r/Jido\.AI\.Actions\.Reasoning\..*/
+        ],
+        "Actions — Retrieval": [
+          ~r/Jido\.AI\.Actions\.Retrieval\..*/
+        ],
+        "Actions — Tool Calling": [
+          ~r/Jido\.AI\.Actions\.ToolCalling\..*/
+        ],
+        "Actions — Quota": [
+          ~r/Jido\.AI\.Actions\.Quota\..*/
+        ],
+        "Reasoning Strategies": [
+          Jido.AI.Reasoning.Helpers,
+          ~r/Jido\.AI\.Reasoning\..*/
+        ],
+        "Convenience Agents": [
+          Jido.AI.AdaptiveAgent,
+          Jido.AI.AoTAgent,
+          Jido.AI.CoDAgent,
+          Jido.AI.CoTAgent,
+          Jido.AI.GoTAgent,
+          Jido.AI.ToTAgent,
+          Jido.AI.TRMAgent
+        ],
+        Plugins: [
+          ~r/Jido\.AI\.Plugins\..*/
+        ],
+        Signals: [
+          Jido.AI.Signal.Helpers,
+          ~r/Jido\.AI\.Signal\..*/
+        ],
+        Directives: [
+          ~r/Jido\.AI\.Directive\..*/
+        ],
+        Skills: [
+          Jido.AI.Skill,
+          ~r/Jido\.AI\.Skill\..*/
+        ],
+        Streaming: [
+          Jido.AI.Streaming.ID
+        ],
+        "Quality & Quota": [
+          Jido.AI.Quality.Checkpoint,
+          Jido.AI.Quota.Store
+        ],
+        CLI: [
+          Jido.AI.CLI.Adapter
+        ],
+        "Mix Tasks": [
+          ~r/Mix\.Tasks\..*/
+        ],
+        Examples: [
+          ~r/Jido\.AI\.Examples\..*/
         ]
       ]
     ]

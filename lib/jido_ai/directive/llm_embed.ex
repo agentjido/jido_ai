@@ -50,7 +50,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
   """
 
   alias Jido.AI.Signal
-  alias Jido.AI.Directive.Helper
+  alias Jido.AI.Directive.Helpers
 
   def exec(directive, _input_signal, state) do
     %{
@@ -63,7 +63,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
     timeout = Map.get(directive, :timeout)
 
     agent_pid = self()
-    task_supervisor = Helper.get_task_supervisor(state)
+    task_supervisor = Helpers.get_task_supervisor(state)
 
     case Task.Supervisor.start_child(task_supervisor, fn ->
            result =
@@ -71,7 +71,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
                generate_embeddings(model, texts, dimensions, timeout)
              rescue
                e ->
-                 {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helper.classify_error(e)}}
+                 {:error, %{exception: Exception.message(e), type: e.__struct__, error_type: Helpers.classify_error(e)}}
              catch
                kind, reason ->
                  {:error, %{caught: kind, reason: inspect(reason), error_type: :unknown}}
@@ -99,7 +99,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
     opts =
       []
       |> add_dimensions_opt(dimensions)
-      |> Helper.add_timeout_opt(timeout)
+      |> Helpers.add_timeout_opt(timeout)
 
     case ReqLLM.Embedding.embed(model, texts, opts) do
       {:ok, embeddings} ->

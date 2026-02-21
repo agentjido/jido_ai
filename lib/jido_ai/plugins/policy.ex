@@ -41,7 +41,7 @@ defmodule Jido.AI.Plugins.Policy do
     vsn: "1.0.0"
 
   alias Jido.AI.Signal
-  alias Jido.AI.Signals.Helpers, as: SignalHelpers
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Validation
   alias Jido.Signal, as: BaseSignal
 

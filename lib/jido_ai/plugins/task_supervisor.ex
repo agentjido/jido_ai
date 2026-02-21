@@ -12,7 +12,7 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
   ## Supervisor Storage
 
   The supervisor PID is stored in `agent.state.__task_supervisor_skill__` (the plugin's
-  internal state) and is accessed by directives via `Directive.Helper.get_task_supervisor/1`.
+  internal state) and is accessed by directives via `Directive.Helpers.get_task_supervisor/1`.
 
   ## Lifecycle
 

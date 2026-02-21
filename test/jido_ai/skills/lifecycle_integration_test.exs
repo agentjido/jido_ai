@@ -6,7 +6,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
   use ExUnit.Case, async: false
 
   alias Jido.Agent
-  alias Jido.AI.Directive.Helper
+  alias Jido.AI.Directive.Helpers
   alias Jido.AI.Plugins.Chat
   alias Jido.AI.Plugins.Planning
   alias Jido.AI.Plugins.TaskSupervisor
@@ -56,7 +56,7 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       assert is_pid(state.supervisor)
       assert Process.alive?(state.supervisor)
 
-      assert Helper.get_task_supervisor(%{__task_supervisor_skill__: state}) == state.supervisor
+      assert Helpers.get_task_supervisor(%{__task_supervisor_skill__: state}) == state.supervisor
     end
 
     test "TaskSupervisor plugin supervisor lifecycle follows owning process lifecycle" do

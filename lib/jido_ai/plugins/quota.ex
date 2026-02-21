@@ -74,7 +74,7 @@ defmodule Jido.AI.Plugins.Quota do
 
   alias Jido.AI.Quota.Store
   alias Jido.AI.Signal
-  alias Jido.AI.Signals.Helpers, as: SignalHelpers
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Signal, as: BaseSignal
 
   @budgeted_signals [
