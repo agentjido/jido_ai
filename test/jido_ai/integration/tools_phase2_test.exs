@@ -115,6 +115,41 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
   end
 
+  defmodule TestActions.SlowAction do
+    use Jido.Action,
+      name: "slow_action",
+      description: "A slow action for testing timeouts",
+      schema: [
+        delay: [type: :integer, required: true, doc: "Delay in milliseconds"]
+      ]
+
+    @impl true
+    def run(params, _context) do
+      Process.sleep(params.delay)
+      {:ok, %{completed: true}}
+    end
+  end
+
+  defmodule TestActions.CalculatorV1 do
+    use Jido.Action,
+      name: "calculator",
+      description: "Version 1",
+      schema: []
+
+    @impl true
+    def run(_params, _context), do: {:ok, %{version: 1}}
+  end
+
+  defmodule TestActions.CalculatorV2 do
+    use Jido.Action,
+      name: "calculator",
+      description: "Version 2",
+      schema: []
+
+    @impl true
+    def run(_params, _context), do: {:ok, %{version: 2}}
+  end
+
   # ============================================================================
   # Setup - Build tools map for each test
   # ============================================================================
@@ -283,7 +318,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
     test "executor handles tool execution errors gracefully", %{tools: tools} do
       result =
-        Turn.execute("failing_action", %{"message" => "Something went wrong"}, %{}, tools: tools)
+        Turn.execute("failing_action", %{"message" => "Something went wrong"}, %{}, tools: tools, timeout: 50)
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -317,33 +352,18 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
 
     test "executor respects timeout configuration" do
-      defmodule SlowAction do
-        use Jido.Action,
-          name: "slow_action",
-          description: "A slow action for testing timeouts",
-          schema: [
-            delay: [type: :integer, required: true, doc: "Delay in milliseconds"]
-          ]
-
-        @impl true
-        def run(params, _context) do
-          Process.sleep(params.delay)
-          {:ok, %{completed: true}}
-        end
-      end
-
-      slow_tools = Turn.build_tools_map([SlowAction])
+      slow_tools = Turn.build_tools_map([TestActions.SlowAction])
 
       # Should complete within timeout
       assert {:ok, %{completed: true}} =
-               Turn.execute("slow_action", %{"delay" => "50"}, %{},
+               Turn.execute("slow_action", %{"delay" => "20"}, %{},
                  tools: slow_tools,
-                 timeout: 1000
+                 timeout: 200
                )
 
       # Should timeout
       result =
-        Turn.execute("slow_action", %{"delay" => "500"}, %{}, tools: slow_tools, timeout: 100)
+        Turn.execute("slow_action", %{"delay" => "120"}, %{}, tools: slow_tools, timeout: 30)
 
       assert {:error, error} = result
       assert error.type == :timeout
@@ -413,7 +433,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
           "calculator",
           %{"operation" => "divide", "a" => "10", "b" => "0"},
           %{},
-          tools: tools
+          tools: tools,
+          timeout: 50
         )
 
       assert {:error, error} = result
@@ -448,29 +469,9 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     end
 
     test "later module with same name overwrites in tools map" do
-      defmodule CalculatorV1 do
-        use Jido.Action,
-          name: "calculator",
-          description: "Version 1",
-          schema: []
-
-        @impl true
-        def run(_params, _context), do: {:ok, %{version: 1}}
-      end
-
-      defmodule CalculatorV2 do
-        use Jido.Action,
-          name: "calculator",
-          description: "Version 2",
-          schema: []
-
-        @impl true
-        def run(_params, _context), do: {:ok, %{version: 2}}
-      end
-
       # Later entry wins in build_tools_map
-      tools = Turn.build_tools_map([CalculatorV1, CalculatorV2])
-      assert tools["calculator"] == CalculatorV2
+      tools = Turn.build_tools_map([TestActions.CalculatorV1, TestActions.CalculatorV2])
+      assert tools["calculator"] == TestActions.CalculatorV2
 
       # Execute should use V2
       {:ok, result} = Turn.execute("calculator", %{}, %{}, tools: tools)

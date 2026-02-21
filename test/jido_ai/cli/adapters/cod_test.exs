@@ -1,8 +1,12 @@
 defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.CLI.Adapter
   alias Jido.AI.Reasoning.ChainOfDraft.CLIAdapter, as: CoDAdapter
+  alias Jido.AI.TestSupport.CLIAdapter, as: AdapterTestSupport
+
+  setup :set_mimic_from_context
 
   defmodule StubCoDAgent do
     def draft(pid, query) do
@@ -11,11 +15,15 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
     end
   end
 
-  describe "create_ephemeral_agent/1" do
-    test "creates ephemeral agent module with default config" do
-      config = %{}
-      module = CoDAdapter.create_ephemeral_agent(config)
+  setup_all do
+    {:ok,
+     default_module: CoDAdapter.create_ephemeral_agent(%{}),
+     model_module: CoDAdapter.create_ephemeral_agent(%{model: "openai:gpt-4"}),
+     prompt_module: CoDAdapter.create_ephemeral_agent(%{system_prompt: "Draft minimally."})}
+  end
 
+  describe "create_ephemeral_agent/1" do
+    test "creates ephemeral agent module with default config", %{default_module: module} do
       assert is_atom(module)
       assert function_exported?(module, :draft, 2)
       assert function_exported?(module, :name, 0)
@@ -30,24 +38,17 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
       assert module1 != module2
     end
 
-    test "uses custom model from config" do
-      config = %{model: "openai:gpt-4"}
-      module = CoDAdapter.create_ephemeral_agent(config)
-
+    test "uses custom model from config", %{model_module: module} do
       opts = module.strategy_opts()
       assert opts[:model] == "openai:gpt-4"
     end
 
-    test "uses custom system_prompt from config" do
-      config = %{system_prompt: "Draft minimally."}
-      module = CoDAdapter.create_ephemeral_agent(config)
-
+    test "uses custom system_prompt from config", %{prompt_module: module} do
       opts = module.strategy_opts()
       assert opts[:system_prompt] == "Draft minimally."
     end
 
-    test "uses default values when not specified" do
-      module = CoDAdapter.create_ephemeral_agent(%{})
+    test "uses default values when not specified", %{default_module: module} do
       opts = module.strategy_opts()
 
       assert opts[:model] == :fast
@@ -76,6 +77,28 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
 
     test "await returns timeout error when timeout budget is exhausted" do
       assert {:error, :timeout} = CoDAdapter.await(self(), 0, %{})
+    end
+
+    test "await propagates status errors" do
+      expect(Jido.AgentServer, :status, fn _pid -> {:error, :not_found} end)
+      assert {:error, :not_found} = CoDAdapter.await(self(), 100, %{})
+    end
+
+    test "await returns completed result with CoD metadata" do
+      status =
+        AdapterTestSupport.status(
+          result: nil,
+          details: %{steps_count: 2, phase: :complete, duration_ms: 45},
+          raw_state: %{last_result: "CoD answer"}
+        )
+
+      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+
+      assert {:ok, %{answer: "CoD answer", meta: meta}} = CoDAdapter.await(self(), 100, %{})
+      assert meta.status == :success
+      assert meta.steps_count == 2
+      assert meta.phase == :complete
+      assert meta.duration_ms == 45
     end
 
     test "weather CoD example resolves to CoD adapter" do

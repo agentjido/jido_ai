@@ -286,14 +286,20 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       _ -> nil
     end)
 
+    {:ok, task_supervisor} = Task.Supervisor.start_link()
+    on_exit(fn -> if Process.alive?(task_supervisor), do: Process.exit(task_supervisor, :shutdown) end)
+
     config = Config.new(%{model: :capable, tools: %{}})
 
-    _first =
-      ReAct.stream("cancel me", config)
+    [first_event] =
+      ReAct.stream("cancel me", config, task_supervisor: task_supervisor)
       |> Enum.take(1)
 
-    Process.sleep(20)
-    refute_received {:react_runner, _, :event, _}
+    assert first_event.kind == :request_started
+
+    assert wait_until(fn ->
+             Task.Supervisor.children(task_supervisor) == []
+           end)
   end
 
   test "strategy consumes runtime runner event stream to terminal state" do
@@ -356,5 +362,23 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   defp strategy_instruction(action, params) do
     %Jido.Instruction{action: action, params: params}
+  end
+
+  defp wait_until(fun, timeout_ms \\ 500) when is_function(fun, 0) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    wait_until_loop(fun, deadline)
+  end
+
+  defp wait_until_loop(fun, deadline) do
+    if fun.() do
+      true
+    else
+      if System.monotonic_time(:millisecond) >= deadline do
+        false
+      else
+        Process.sleep(5)
+        wait_until_loop(fun, deadline)
+      end
+    end
   end
 end

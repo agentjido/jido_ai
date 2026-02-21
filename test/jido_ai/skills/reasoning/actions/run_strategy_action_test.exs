@@ -23,9 +23,10 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
 
   defp assert_strategy_response({:ok, payload}, strategy) do
     assert payload.strategy == strategy
-    assert payload.status in [:success, :running, :idle, :failure]
+    assert payload.status in [:success, :failure]
     assert is_map(payload.usage)
     assert is_map(payload.diagnostics)
+    refute Map.has_key?(payload.diagnostics, :recovered_error)
     payload
   end
 
@@ -40,13 +41,13 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
 
   describe "run/2" do
     test "executes Chain-of-Draft strategy" do
-      params = %{strategy: :cod, prompt: "Answer tersely with drafts", timeout: 10_000}
+      params = %{strategy: :cod, prompt: "Answer tersely with drafts", timeout: 750}
       payload = assert_strategy_response(RunStrategy.run(params, %{}), :cod)
       assert not is_nil(payload.output)
     end
 
     test "executes Chain-of-Thought strategy" do
-      params = %{strategy: :cot, prompt: "Explain 2+2", timeout: 10_000}
+      params = %{strategy: :cot, prompt: "Explain 2+2", timeout: 750}
       payload = assert_strategy_response(RunStrategy.run(params, %{}), :cot)
       assert not is_nil(payload.output)
     end
@@ -55,7 +56,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
       params = %{
         strategy: :tot,
         prompt: "Explore solution paths",
-        timeout: 10_000,
+        timeout: 750,
         options: %{branching_factor: 1, max_depth: 1}
       }
 
@@ -66,7 +67,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
       params = %{
         strategy: :got,
         prompt: "Synthesize multiple viewpoints",
-        timeout: 10_000,
+        timeout: 750,
         options: %{max_nodes: 2, max_depth: 1}
       }
 
@@ -77,7 +78,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
       params = %{
         strategy: :trm,
         prompt: "Iteratively improve this answer",
-        timeout: 10_000,
+        timeout: 750,
         options: %{max_supervision_steps: 1}
       }
 
@@ -88,7 +89,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
       params = %{
         strategy: :aot,
         prompt: "Explore options and finalize explicitly",
-        timeout: 10_000,
+        timeout: 750,
         options: %{profile: :short, search_style: :dfs}
       }
 
@@ -99,7 +100,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
       params = %{
         strategy: :adaptive,
         prompt: "Choose the best reasoning approach",
-        timeout: 10_000,
+        timeout: 750,
         options: %{default_strategy: :cot, available_strategies: [:cot]}
       }
 
@@ -114,14 +115,14 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
         plugin_state: %{
           reasoning_cot: %{
             default_model: :fast,
-            timeout: 4_000,
+            timeout: 400,
             options: %{system_prompt: "Reason carefully"}
           }
         }
       }
 
       payload = assert_strategy_response(RunStrategy.run(params, context), :cot)
-      assert payload.diagnostics.timeout == 4_000
+      assert payload.diagnostics.timeout == 400
       assert payload.diagnostics.options[:system_prompt] == "Reason carefully"
     end
 

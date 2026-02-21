@@ -1,5 +1,6 @@
 defmodule Jido.AI.Integration.RequestAwaitRejectionTest do
   use ExUnit.Case, async: false
+  use Mimic
 
   defmodule CoTAwaitAgent do
     use Jido.AI.CoTAgent, name: "cot_await_agent", model: "test:model"
@@ -25,6 +26,8 @@ defmodule Jido.AI.Integration.RequestAwaitRejectionTest do
       available_strategies: [:cot]
   end
 
+  setup :set_mimic_from_context
+
   setup do
     if is_nil(Process.whereis(Jido.Registry)) do
       start_supervised!({Registry, keys: :unique, name: Jido.Registry})
@@ -37,6 +40,29 @@ defmodule Jido.AI.Integration.RequestAwaitRejectionTest do
     if is_nil(Process.whereis(Jido.TaskSupervisor)) do
       start_supervised!({Task.Supervisor, name: Jido.TaskSupervisor})
     end
+
+    # Keep first request active long enough so the second request reliably hits
+    # the strategy busy-rejection path before completion.
+    Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
+      Process.sleep(150)
+
+      {:ok,
+       %{
+         message: %{content: "ok", tool_calls: nil},
+         finish_reason: :stop,
+         usage: %{input_tokens: 1, output_tokens: 1}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      Process.sleep(150)
+      {:ok, %{stream: [ReqLLM.StreamChunk.text("ok")], usage: %{input_tokens: 1, output_tokens: 1}}}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
 
     :ok
   end

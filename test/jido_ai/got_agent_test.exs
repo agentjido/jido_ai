@@ -86,6 +86,26 @@ defmodule Jido.AI.GoTAgentTest do
       assert agent.state.completed == true
     end
 
+    test "on_after_cmd finalizes pending request for delegated worker events" do
+      agent =
+        TestGoTAgent.new()
+        |> Request.start_request("req_worker", "query")
+        |> with_completed_strategy("worker synthesis")
+
+      {:ok, updated_agent, directives} =
+        TestGoTAgent.on_after_cmd(
+          agent,
+          {:got_worker_event, %{request_id: "req_worker", event: %{request_id: "req_worker"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_worker", :status]) == :completed
+      assert get_in(updated_agent.state, [:requests, "req_worker", :result]) == "worker synthesis"
+      assert updated_agent.state.last_result == "worker synthesis"
+      assert updated_agent.state.completed == true
+    end
+
     test "on_after_cmd passes through got_request_error action unchanged" do
       agent = TestGoTAgent.new()
 

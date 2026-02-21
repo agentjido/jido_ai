@@ -33,6 +33,25 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
         EmitToolError.new!(%{id: "tc_123"})
       end
     end
+
+    test "exec emits ai.tool.result cast and returns unchanged state" do
+      directive =
+        EmitToolError.new!(%{
+          id: "tc_123",
+          tool_name: "unknown_tool",
+          error: {:unknown_tool, "Tool 'unknown_tool' not found"}
+        })
+
+      state = %{request_count: 1}
+
+      assert {:ok, ^state} = Jido.AgentServer.DirectiveExec.exec(directive, nil, state)
+
+      assert_receive {:"$gen_cast", {:signal, signal}}
+      assert signal.type == "ai.tool.result"
+      assert signal.data.call_id == "tc_123"
+      assert signal.data.tool_name == "unknown_tool"
+      assert signal.data.result == {:error, {:unknown_tool, "Tool 'unknown_tool' not found"}}
+    end
   end
 
   # ============================================================================
@@ -57,6 +76,25 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
       assert_raise RuntimeError, ~r/Invalid EmitRequestError/, fn ->
         EmitRequestError.new!(%{request_id: "req_123"})
       end
+    end
+
+    test "exec emits ai.request.error cast and returns unchanged state" do
+      directive =
+        EmitRequestError.new!(%{
+          request_id: "req_456",
+          reason: :busy,
+          message: "Agent is busy"
+        })
+
+      state = %{request_count: 1}
+
+      assert {:ok, ^state} = Jido.AgentServer.DirectiveExec.exec(directive, nil, state)
+
+      assert_receive {:"$gen_cast", {:signal, signal}}
+      assert signal.type == "ai.request.error"
+      assert signal.data.request_id == "req_456"
+      assert signal.data.reason == :busy
+      assert signal.data.message == "Agent is busy"
     end
   end
 
