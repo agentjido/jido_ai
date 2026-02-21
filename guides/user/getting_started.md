@@ -6,7 +6,7 @@ After this guide, you will have a `Jido.AI.Agent` running with one tool and a sy
 
 ## Prerequisites
 
-- Elixir `~> 1.17`
+- Elixir `~> 1.18`
 - API key configured for your provider
 
 ## 1. Add Dependencies
@@ -15,8 +15,8 @@ After this guide, you will have a `Jido.AI.Agent` running with one tool and a sy
 # mix.exs
 defp deps do
   [
-    {:jido, "~> 2.0"},
-    {:jido_ai, "~> 2.0"}
+    {:jido, "~> 2.0.0-rc.5"},
+    {:jido_ai, "~> 2.0.0-beta"}
   ]
 end
 ```

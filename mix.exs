@@ -141,18 +141,22 @@ defmodule JidoAi.MixProject do
         "README.md",
         "LICENSE.md",
         "CHANGELOG.md",
-        "CONTRIBUTING.md",
         # Build With Jido.AI
         "guides/user/package_overview.md",
-        "guides/user/migration_plugins_and_signals_v3.md",
         "guides/user/getting_started.md",
-        "guides/user/strategy_selection_playbook.md",
         "guides/user/first_react_agent.md",
+        "guides/user/strategy_selection_playbook.md",
+        "guides/user/strategy_recipes.md",
         "guides/user/request_lifecycle_and_concurrency.md",
         "guides/user/thread_context_and_message_projection.md",
         "guides/user/tool_calling_with_actions.md",
+        "guides/user/llm_facade_quickstart.md",
+        "guides/user/model_routing_and_policy.md",
+        "guides/user/retrieval_and_quota.md",
         "guides/user/observability_basics.md",
         "guides/user/cli_workflows.md",
+        # Upgrading
+        "guides/user/migration_plugins_and_signals_v3.md",
         # Extend Jido.AI
         "guides/developer/architecture_and_runtime_flow.md",
         "guides/developer/strategy_internals.md",
@@ -167,7 +171,9 @@ defmodule JidoAi.MixProject do
         "guides/developer/configuration_reference.md"
       ],
       groups_for_extras: [
-        {"Build With Jido.AI", ~r/guides\/user/},
+        {"Build With Jido.AI",
+         ~r/guides\/user\/(package_overview|getting_started|first_react_agent|strategy_selection_playbook|strategy_recipes|request_lifecycle_and_concurrency|thread_context_and_message_projection|tool_calling_with_actions|llm_facade_quickstart|model_routing_and_policy|retrieval_and_quota|observability_basics|cli_workflows)\.md/},
+        {"Upgrading", ~r/guides\/user\/migration_plugins_and_signals_v3\.md/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
         {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/}
@@ -177,7 +183,9 @@ defmodule JidoAi.MixProject do
           Jido.AI,
           Jido.AI.Agent,
           Jido.AI.Request,
+          Jido.AI.Request.Handle,
           Jido.AI.Thread,
+          Jido.AI.Thread.Entry,
           Jido.AI.Turn,
           Jido.AI.Observe,
           Jido.AI.Validation,
@@ -199,6 +207,7 @@ defmodule JidoAi.MixProject do
           ~r/Jido\.AI\.Actions\.Reasoning\..*/
         ],
         "Actions — Retrieval": [
+          Jido.AI.Retrieval.Store,
           ~r/Jido\.AI\.Actions\.Retrieval\..*/
         ],
         "Actions — Tool Calling": [
@@ -233,9 +242,6 @@ defmodule JidoAi.MixProject do
         Skills: [
           Jido.AI.Skill,
           ~r/Jido\.AI\.Skill\..*/
-        ],
-        Streaming: [
-          Jido.AI.Streaming.ID
         ],
         "Quality & Quota": [
           Jido.AI.Quality.Checkpoint,

@@ -8,10 +8,19 @@ Jido.AI provides a comprehensive toolkit for building intelligent agents with LL
 
 ```elixir
 # Quick example: `Jido.AI.Agent` with tool use
+defmodule MyApp.Actions.Multiply do
+  use Jido.Action,
+    name: "multiply",
+    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+
+  @impl true
+  def run(%{a: a, b: b}, _context), do: {:ok, %{product: a * b}}
+end
+
 defmodule MyApp.Agent do
   use Jido.AI.Agent,
     name: "my_agent",
-    tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
+    tools: [MyApp.Actions.Multiply],
     model: :fast
 end
 
@@ -24,7 +33,7 @@ end
 ```elixir
 def deps do
   [
-    {:jido, "~> 2.0"},
+    {:jido, "~> 2.0.0-rc.5"},
     {:jido_ai, "~> 2.0.0-beta"}
   ]
 end
@@ -75,7 +84,7 @@ Strategies are agent patterns that determine how an LLM approaches a problem. Th
 defmodule MyApp.Agent do
   use Jido.AI.Agent,
     name: "my_agent",
-    tools: [MyApp.Actions.Calculator, MyApp.Actions.Search],
+    tools: [MyApp.Actions.Multiply],
     model: :fast
 end
 
@@ -96,15 +105,21 @@ end
 
 ### Build With Jido.AI
 - [Package Overview (Production Map)](guides/user/package_overview.md) - Prioritized feature map and runtime architecture
-- [Migration Guide: Plugins And Signals (v2 -> v3)](guides/user/migration_plugins_and_signals_v3.md) - Breaking-change module/signal mapping
 - [Getting Started](guides/user/getting_started.md) - First working agent in minutes
-- [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md) - Choose CoD/CoT/ReAct/AoT/ToT/GoT/TRM/Adaptive
 - [First Agent](guides/user/first_react_agent.md) - Tool-using `Jido.AI.Agent` with request handles
+- [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md) - Choose CoD/CoT/ReAct/AoT/ToT/GoT/TRM/Adaptive
+- [Strategy Recipes](guides/user/strategy_recipes.md) - TODO coverage for all strategy families
 - [Request Lifecycle And Concurrency](guides/user/request_lifecycle_and_concurrency.md) - `ask/await` and concurrent safety
 - [Thread Context And Message Projection](guides/user/thread_context_and_message_projection.md) - Multi-turn context management
 - [Tool Calling With Actions](guides/user/tool_calling_with_actions.md) - Adapt `Jido.Action` modules as tools
+- [LLM Facade Quickstart](guides/user/llm_facade_quickstart.md) - TODO coverage for `Jido.AI` generation helpers
+- [Model Routing And Policy](guides/user/model_routing_and_policy.md) - TODO coverage for routing and guardrail plugins
+- [Retrieval And Quota](guides/user/retrieval_and_quota.md) - TODO coverage for memory and budget controls
 - [Observability Basics](guides/user/observability_basics.md) - Telemetry events and normalization
 - [CLI Workflows](guides/user/cli_workflows.md) - Interactive, one-shot, and batch CLI usage
+
+### Upgrading
+- [Migration Guide: Plugins And Signals (v2 -> v3)](guides/user/migration_plugins_and_signals_v3.md) - Breaking-change module/signal mapping
 
 ### Extend Jido.AI
 - [Architecture And Runtime Flow](guides/developer/architecture_and_runtime_flow.md) - Query to runtime lifecycle
@@ -121,18 +136,18 @@ end
 - [Configuration Reference](guides/developer/configuration_reference.md) - Defaults and config keys
 
 ### Examples
-- [`lib/examples/scripts/demo/actions_llm_runtime_demo.exs`](lib/examples/scripts/demo/actions_llm_runtime_demo.exs) - Runnable demo script entrypoint
-- [`lib/examples/scripts/smoke/weather_agent_live_runtime_demo.exs`](lib/examples/scripts/smoke/weather_agent_live_runtime_demo.exs) - Smoke-check script entrypoint
-- [`lib/examples/weather/overview.ex`](lib/examples/weather/overview.ex) - Weather strategy overview module
-- [`lib/examples/agents/weather_agent.ex`](lib/examples/agents/weather_agent.ex) - ReAct-first agent example
-- [`lib/examples/tools/weather_by_location.ex`](lib/examples/tools/weather_by_location.ex) - Example tool implementation
+- [`lib/examples/scripts/demo/actions_llm_runtime_demo.exs`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/scripts/demo/actions_llm_runtime_demo.exs) - Runnable demo script entrypoint
+- [`lib/examples/scripts/smoke/weather_agent_live_runtime_demo.exs`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/scripts/smoke/weather_agent_live_runtime_demo.exs) - Smoke-check script entrypoint
+- [`lib/examples/weather/overview.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/weather/overview.ex) - Weather strategy overview module
+- [`lib/examples/agents/weather_agent.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/agents/weather_agent.ex) - ReAct-first agent example
+- [`lib/examples/tools/weather_by_location.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/tools/weather_by_location.ex) - Example tool implementation
 
 ## ReAct Production Defaults
 
 Use these references as the production baseline for ReAct:
-- [`lib/examples/weather/react_agent.ex`](lib/examples/weather/react_agent.ex)
-- [`lib/examples/weather/overview.ex`](lib/examples/weather/overview.ex)
-- [`lib/examples/agents/weather_agent.ex`](lib/examples/agents/weather_agent.ex)
+- [`lib/examples/weather/react_agent.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/weather/react_agent.ex)
+- [`lib/examples/weather/overview.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/weather/overview.ex)
+- [`lib/examples/agents/weather_agent.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/agents/weather_agent.ex)
 
 ## Quick Decision Guide
 
@@ -154,7 +169,7 @@ Building an agent?
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/agentjido/jido_ai/blob/main/CONTRIBUTING.md) for guidelines.
 
 ## License
 
@@ -167,9 +182,3 @@ Apache-2.0 - See [LICENSE.md](LICENSE.md) for details.
 ## Package Purpose
 
 `jido_ai` provides reusable AI-agent primitives (strategies, tool orchestration, and model-facing abstractions) for the broader Jido ecosystem.
-
-## Testing Paths
-
-- Fast local suite: `mix test`
-- Full quality gate: `mix quality`
-- Coverage run: `mix test --cover`
