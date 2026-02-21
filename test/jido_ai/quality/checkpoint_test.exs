@@ -68,6 +68,104 @@ defmodule Jido.AI.Quality.CheckpointTest do
     end
   end
 
+  describe "fast_gate_commands/0" do
+    test "includes mix precommit command" do
+      assert [%{gate: :fast, label: "mix precommit", cmd: "mix", args: ["precommit"]}] =
+               Checkpoint.fast_gate_commands()
+    end
+  end
+
+  describe "run_command/2" do
+    test "returns timing on success" do
+      command = %{gate: :fast, label: "ok", cmd: "sh", args: ["-c", "exit 0"]}
+
+      assert {:ok, %{gate: :fast, label: "ok", elapsed_ms: elapsed_ms}} =
+               Checkpoint.run_command(command)
+
+      assert is_integer(elapsed_ms)
+      assert elapsed_ms >= 0
+    end
+
+    test "returns failure details on non-zero exit" do
+      command = %{gate: :full, label: "fail", cmd: "sh", args: ["-c", "exit 7"]}
+
+      assert {:error, failure} = Checkpoint.run_command(command)
+      assert failure.gate == :full
+      assert failure.label == "fail"
+      assert failure.cmd == "sh"
+      assert failure.args == ["-c", "exit 7"]
+      assert failure.status == 7
+      assert is_integer(failure.elapsed_ms)
+    end
+  end
+
+  describe "run_commands/2" do
+    test "returns timings in command order when all commands pass" do
+      commands = [
+        %{gate: :fast, label: "first", cmd: "sh", args: ["-c", "exit 0"]},
+        %{gate: :full, label: "second", cmd: "sh", args: ["-c", "exit 0"]}
+      ]
+
+      assert {:ok, [first, second]} = Checkpoint.run_commands(commands)
+      assert first.label == "first"
+      assert second.label == "second"
+    end
+
+    test "halts and returns first failure" do
+      commands = [
+        %{gate: :fast, label: "pass", cmd: "sh", args: ["-c", "exit 0"]},
+        %{gate: :full, label: "fail", cmd: "sh", args: ["-c", "exit 3"]},
+        %{gate: :full, label: "not-run", cmd: "sh", args: ["-c", "exit 0"]}
+      ]
+
+      assert {:error, failure} = Checkpoint.run_commands(commands)
+      assert failure.label == "fail"
+      assert failure.status == 3
+    end
+  end
+
+  describe "read_traceability_story_ids/1" do
+    test "reads IDs from a matrix file" do
+      path = Path.join(System.tmp_dir!(), "traceability-#{System.unique_integer([:positive])}.md")
+
+      File.write!(
+        path,
+        """
+        | Story ID | Theme |
+        | --- | --- |
+        | ST-OPS-001 | Ops |
+        | ST-QAL-001 | Quality |
+        """
+      )
+
+      on_exit(fn -> File.rm(path) end)
+
+      assert {:ok, ["ST-OPS-001", "ST-QAL-001"]} = Checkpoint.read_traceability_story_ids(path)
+    end
+
+    test "returns file read error for missing file" do
+      path = Path.join(System.tmp_dir!(), "missing-#{System.unique_integer([:positive])}.md")
+      assert {:error, :enoent} = Checkpoint.read_traceability_story_ids(path)
+    end
+  end
+
+  describe "read_story_commit_ids/1" do
+    test "reads commit subjects from current repository" do
+      assert {:ok, ids} = Checkpoint.read_story_commit_ids(".")
+      assert is_list(ids)
+    end
+
+    test "returns structured error when git log fails" do
+      tmp_repo = Path.join(System.tmp_dir!(), "non-git-repo-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(tmp_repo)
+      on_exit(fn -> File.rmdir(tmp_repo) end)
+
+      assert {:error, {:git_log_failed, status, _output}} = Checkpoint.read_story_commit_ids(tmp_repo)
+      assert is_integer(status)
+      assert status != 0
+    end
+  end
+
   describe "gate_totals/1" do
     test "sums elapsed times by gate" do
       timings = [

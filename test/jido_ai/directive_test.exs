@@ -5,6 +5,12 @@ defmodule Jido.AI.DirectiveTest do
   alias Jido.AI.Signal.EmbedResult
 
   describe "LLMStream" do
+    test "schema/0 returns directive schema" do
+      schema = LLMStream.schema()
+      assert is_map(schema)
+      assert Map.get(schema, :module) == LLMStream
+    end
+
     test "creates directive with required fields" do
       directive =
         LLMStream.new!(%{

@@ -1,6 +1,8 @@
 defmodule Jido.AI.ThreadTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO
+
   alias Jido.AI.Thread
   alias Jido.AI.Thread.Entry
 
@@ -274,6 +276,38 @@ defmodule Jido.AI.ThreadTest do
       assert message.role == :assistant
       assert message.content == "Just text"
     end
+
+    test "falls back to full history for invalid limit option" do
+      thread =
+        Thread.new()
+        |> Thread.append_user("One")
+        |> Thread.append_assistant("Two")
+
+      messages = Thread.to_messages(thread, limit: :all)
+
+      assert Enum.map(messages, & &1.content) == ["One", "Two"]
+    end
+
+    test "projects explicit system entries without dropping their role" do
+      thread =
+        Thread.new()
+        |> Thread.append(%Entry{role: :system, content: "System entry"})
+
+      assert [%{role: :system, content: "System entry"}] = Thread.to_messages(thread)
+    end
+
+    test "projects assistant tool_calls with empty thinking as plain text content" do
+      tool_calls = [%{id: "tc_1", name: "calculator"}]
+
+      thread =
+        Thread.new()
+        |> Thread.append_assistant("42", tool_calls, thinking: "")
+
+      [message] = Thread.to_messages(thread)
+      assert message.role == :assistant
+      assert message.content == "42"
+      assert message.tool_calls == tool_calls
+    end
   end
 
   # ============================================================================
@@ -426,6 +460,23 @@ defmodule Jido.AI.ThreadTest do
       assert second.role == :function
     end
 
+    test "handles alternate extended role encodings" do
+      messages = [
+        %{role: :developer, content: "Dev role atom"},
+        %{role: "function", content: "Function role string"},
+        %{role: :system, content: "System atom role"},
+        %{role: "system", content: "System string role"}
+      ]
+
+      thread = Thread.new() |> Thread.append_messages(messages)
+      [fourth, third, second, first] = thread.entries
+
+      assert first.role == :developer
+      assert second.role == :function
+      assert third.role == :system
+      assert fourth.role == :system
+    end
+
     test "passes through unknown roles as-is" do
       messages = [
         %{role: "custom_role", content: "Custom message"},
@@ -508,6 +559,25 @@ defmodule Jido.AI.ThreadTest do
       assert entry.thinking == "Some reasoning"
     end
 
+    test "ignores malformed thinking and text blocks" do
+      messages = [
+        %{
+          role: :assistant,
+          content: [
+            %{type: :thinking, thinking: 123},
+            %{type: :thinking, text: nil},
+            %{type: :text, text: 456}
+          ]
+        }
+      ]
+
+      thread = Thread.new() |> Thread.append_messages(messages)
+      [entry] = thread.entries
+
+      assert entry.content == ""
+      assert entry.thinking == nil
+    end
+
     test "handles plain string content without thinking" do
       messages = [
         %{role: :assistant, content: "Just a plain message"}
@@ -552,6 +622,79 @@ defmodule Jido.AI.ThreadTest do
       # Compare
       assert Thread.length(rebuilt) == Thread.length(original)
       assert Thread.to_messages(rebuilt) == Thread.to_messages(original)
+    end
+  end
+
+  describe "debug_view/2" do
+    test "returns truncated content and formatted tool call names" do
+      thread =
+        Thread.new(system_prompt: "This system prompt is intentionally long")
+        |> Thread.append(%Entry{role: :assistant, content: nil, tool_calls: [%{name: "calc"}, %{"name" => "wx"}, %{}]})
+        |> Thread.append(%Entry{role: :tool, name: "calc", content: String.duplicate("x", 40), tool_call_id: "tc_1"})
+        |> Thread.append(%Entry{role: :other_role, content: "custom"})
+
+      view = Thread.debug_view(thread, truncate: 12, last: 3)
+
+      assert view.id == thread.id
+      assert view.length == 3
+      assert view.system_prompt == "This system ..."
+      assert length(view.entries) == 3
+      assert Enum.at(view.entries, 0).tool_calls == ["calc", "wx", "unknown"]
+      assert Enum.at(view.entries, 1).tool_call_id == "tc_1"
+      assert String.ends_with?(Enum.at(view.entries, 1).content, "...")
+    end
+
+    test "returns full chronological entries when :last is invalid" do
+      thread =
+        Thread.new()
+        |> Thread.append_user("A")
+        |> Thread.append_assistant("B")
+
+      view = Thread.debug_view(thread, last: 0)
+      assert Enum.map(view.entries, & &1.content) == ["A", "B"]
+    end
+  end
+
+  describe "pp/1" do
+    test "pretty-prints known role formats and truncates long content" do
+      thread =
+        Thread.new(system_prompt: String.duplicate("s", 80))
+        |> Thread.append_user("hello")
+        |> Thread.append_assistant("plain reply")
+        |> Thread.append_assistant(nil, [%{name: "calc"}, %{"name" => "wx"}, %{}])
+        |> Thread.append_tool_result("tc_1", "calc", String.duplicate("x", 80))
+        |> Thread.append(%Entry{role: :system, content: "inline system entry"})
+        |> Thread.append(%Entry{role: :custom_role, content: "custom content"})
+
+      output =
+        capture_io(fn ->
+          assert :ok = Thread.pp(thread)
+        end)
+
+      assert output =~ "[system] " <> String.duplicate("s", 60) <> "..."
+      assert output =~ "[user]   hello"
+      assert output =~ "[asst]   plain reply"
+      assert output =~ "[asst]   <tool: calc, wx, ?>"
+      assert output =~ "[tool]   calc: " <> String.duplicate("x", 60) <> "..."
+      assert output =~ "[system] inline system entry"
+      assert output =~ "[custom_role] custom content"
+    end
+  end
+
+  describe "Inspect protocol" do
+    test "shows compact representation for empty thread" do
+      assert inspect(Thread.new()) == "#Thread<0 entries>"
+    end
+
+    test "includes recent roles for non-empty thread" do
+      thread =
+        Thread.new()
+        |> Thread.append_user("Hello")
+        |> Thread.append_assistant("Hi")
+
+      inspected = inspect(thread)
+      assert inspected =~ "#Thread<2 entries"
+      assert inspected =~ "last: "
     end
   end
 end
