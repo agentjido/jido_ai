@@ -26,6 +26,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
           run_id: Zoi.string(),
           query: Zoi.string(),
           config: Zoi.any(),
+          state: Zoi.any() |> Zoi.optional(),
           context: Zoi.map() |> Zoi.default(%{}),
           task_supervisor: Zoi.any() |> Zoi.optional()
         }),
@@ -177,6 +178,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
     else
       config = ReAct.build_config(config_input)
       context = Map.get(params, :context, %{}) || %{}
+      runtime_state = Map.get(params, :state)
       task_supervisor = Map.get(params, :task_supervisor)
       worker_pid = self()
 
@@ -185,6 +187,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
         |> Keyword.put(:request_id, request_id)
         |> Keyword.put(:run_id, run_id)
         |> Keyword.put(:context, context)
+        |> maybe_put_runtime_state(runtime_state)
         |> maybe_put_task_supervisor(task_supervisor)
 
       case start_task(fn -> run_stream(worker_pid, request_id, query, config, stream_opts) end, task_supervisor) do
@@ -424,6 +427,9 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
 
   defp maybe_put_task_supervisor(opts, nil), do: opts
   defp maybe_put_task_supervisor(opts, task_supervisor), do: Keyword.put(opts, :task_supervisor, task_supervisor)
+
+  defp maybe_put_runtime_state(opts, nil), do: opts
+  defp maybe_put_runtime_state(opts, runtime_state), do: Keyword.put(opts, :state, runtime_state)
 
   defp put_strategy_state(%Agent{} = agent, state) when is_map(state) do
     %{agent | state: Map.put(agent.state, StratState.key(), state)}

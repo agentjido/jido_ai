@@ -4,19 +4,41 @@ alias Jido.AI.Examples.Scripts.Bootstrap
 alias Jido.AI.Examples.WeatherAgent
 
 defmodule WeatherMultiTurnContextDemo.Helpers do
-  def ask_with_retry(pid, message, timeout \\ 60_000) do
-    case WeatherAgent.ask_sync(pid, message, timeout: timeout) do
-      {:error, {:failed, :error, reason}} = result ->
-        if is_binary(reason) and String.contains?(reason, "{:busy,") do
-          Process.sleep(300)
-          WeatherAgent.ask_sync(pid, message, timeout: timeout)
-        else
-          result
-        end
+  @max_attempts 6
+  @base_backoff_ms 200
+  @max_backoff_ms 2_000
 
-      result ->
-        result
+  def ask_with_retry(pid, message, timeout \\ 60_000) do
+    do_ask_with_retry(pid, message, timeout, 1)
+  end
+
+  defp do_ask_with_retry(pid, message, timeout, attempt) do
+    result = WeatherAgent.ask_sync(pid, message, timeout: timeout)
+
+    if busy_error?(result) and attempt < @max_attempts do
+      backoff_ms = backoff_ms(attempt)
+
+      IO.puts("Agent busy; retrying in #{backoff_ms}ms (attempt #{attempt + 1}/#{@max_attempts})")
+
+      Process.sleep(backoff_ms)
+      do_ask_with_retry(pid, message, timeout, attempt + 1)
+    else
+      result
     end
+  end
+
+  defp busy_error?({:error, {:rejected, :busy, _message}}), do: true
+  defp busy_error?({:error, {:failed, :busy, _reason}}), do: true
+
+  defp busy_error?({:error, {:failed, :error, reason}})
+       when is_binary(reason),
+       do: String.contains?(reason, "{:busy,")
+
+  defp busy_error?(_), do: false
+
+  defp backoff_ms(attempt) when is_integer(attempt) and attempt > 0 do
+    trunc(@base_backoff_ms * :math.pow(2, attempt - 1))
+    |> min(@max_backoff_ms)
   end
 end
 

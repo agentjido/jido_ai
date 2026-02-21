@@ -37,10 +37,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
+  alias Jido.AI.Reasoning.ReAct.State, as: ReActState
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.Signal
   alias Jido.AI.Reasoning.Helpers
+  alias Jido.AI.Thread
   alias Jido.AI.ToolAdapter
+  alias Jido.AI.Turn
 
   @type config :: %{
           tools: [module()],
@@ -287,6 +290,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp snapshot_status(_), do: :running
 
   defp build_snapshot_details(state, config) do
+    conversation = state |> snapshot_thread(config) |> Thread.to_messages()
+
     trace_summary =
       state
       |> Map.get(:request_traces, %{})
@@ -320,7 +325,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       tool_timeout_ms: config[:tool_timeout_ms],
       tool_max_retries: config[:tool_max_retries],
       tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
-      available_tools: Enum.map(Map.get(config, :tools, []), & &1.name())
+      available_tools: Enum.map(Map.get(config, :tools, []), & &1.name()),
+      conversation: conversation
     }
     |> Enum.reject(fn {_k, v} -> is_nil(v) or v == "" or v == %{} or v == [] end)
     |> Map.new()
@@ -351,7 +357,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       %{
         status: :idle,
         iteration: 0,
-        conversation: [],
+        thread: Thread.new(system_prompt: config[:system_prompt]),
+        run_thread: nil,
         pending_tool_calls: [],
         final_answer: nil,
         result: nil,
@@ -464,12 +471,16 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       base_req_http_options = normalize_req_http_options(config[:base_req_http_options])
       effective_req_http_options = base_req_http_options ++ run_req_http_options
       runtime_config = runtime_config_from_strategy(config, req_http_options: effective_req_http_options)
+      base_thread = strategy_thread(state, config)
+      run_thread = Thread.append_user(base_thread, query)
+      runtime_state = runtime_state_from_thread(run_thread, query, request_id, run_id)
 
       worker_start_payload = %{
         request_id: request_id,
         run_id: run_id,
         query: query,
         config: runtime_config,
+        state: runtime_state,
         task_supervisor: config[:runtime_task_supervisor],
         context:
           Map.merge(effective_tool_context, %{
@@ -496,6 +507,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         |> Map.put(:pending_tool_calls, [])
         |> Map.put(:cancel_reason, nil)
         |> Map.put(:checkpoint_token, nil)
+        |> Map.put(:run_thread, run_thread)
         |> ensure_request_trace(request_id)
 
       {put_strategy_state(agent, new_state), directives}
@@ -591,11 +603,21 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp process_set_system_prompt(agent, %{system_prompt: prompt}) when is_binary(prompt) do
     state = StratState.get(agent, %{})
+    run_thread = Map.get(state, :run_thread)
+    base_thread = strategy_thread(state, state[:config] || %{})
 
     new_state =
       Helpers.apply_to_state(state, [
         Helpers.set_config_field(:system_prompt, prompt)
       ])
+      |> Map.put(:thread, %{base_thread | system_prompt: prompt})
+      |> then(fn updated ->
+        if match?(%Thread{}, run_thread) do
+          Map.put(updated, :run_thread, %{run_thread | system_prompt: prompt})
+        else
+          updated
+        end
+      end)
 
     {put_strategy_state(agent, new_state), []}
   end
@@ -665,6 +687,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             |> Map.put(:termination_reason, :error)
             |> Map.put(:result, inspect(error))
             |> Map.put(:active_request_id, nil)
+            |> Map.put(:run_thread, nil)
             |> Map.delete(:run_tool_context)
             |> Map.delete(:run_req_http_options)
 
@@ -768,6 +791,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           base_state
           |> Map.put(:status, if(turn_type == :tool_calls, do: :awaiting_tool, else: :completed))
           |> Map.put(:pending_tool_calls, pending_tool_calls)
+          |> append_assistant_to_run_thread(turn_type, text, tool_calls, thinking_content)
           |> Map.update(:usage, usage || %{}, fn existing -> merge_usage(existing, usage || %{}) end)
           |> maybe_append_thinking_trace(thinking_content)
           |> maybe_put_result(turn_type, text)
@@ -798,9 +822,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_result = event_field(data, :result, {:error, :unknown})
 
         updated =
-          Map.update(base_state, :pending_tool_calls, [], fn pending ->
+          base_state
+          |> Map.update(:pending_tool_calls, [], fn pending ->
             Enum.map(pending, fn tc -> if tc.id == tool_call_id, do: %{tc | result: tool_result}, else: tc end)
           end)
+          |> append_tool_result_to_run_thread(tool_call_id, tool_name, tool_result)
 
         signal = Signal.ToolResult.new!(%{call_id: tool_call_id, tool_name: tool_name, result: tool_result})
         {updated, [signal]}
@@ -816,6 +842,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:result, result)
           |> Map.put(:termination_reason, termination_reason)
           |> Map.put(:usage, usage || %{})
+          |> commit_run_thread()
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
@@ -831,6 +858,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:status, :error)
           |> Map.put(:result, inspect(error))
           |> Map.put(:termination_reason, :error)
+          |> Map.put(:run_thread, nil)
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
@@ -848,6 +876,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:result, inspect(error))
           |> Map.put(:termination_reason, :cancelled)
           |> Map.put(:cancel_reason, reason)
+          |> Map.put(:run_thread, nil)
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
@@ -1027,6 +1056,69 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp maybe_mark_worker_ready(state, _kind), do: state
+
+  defp runtime_state_from_thread(%Thread{} = thread, query, request_id, run_id)
+       when is_binary(query) and is_binary(request_id) and is_binary(run_id) do
+    ReActState.new(query, thread.system_prompt, request_id: request_id, run_id: run_id)
+    |> Map.put(:thread, thread)
+  end
+
+  defp strategy_thread(state, config) do
+    case Map.get(state, :thread) do
+      %Thread{} = thread ->
+        thread
+
+      _ ->
+        Thread.new(system_prompt: config[:system_prompt])
+    end
+  end
+
+  defp snapshot_thread(state, config) do
+    case Map.get(state, :run_thread) do
+      %Thread{} = thread -> thread
+      _ -> strategy_thread(state, config)
+    end
+  end
+
+  defp append_assistant_to_run_thread(state, turn_type, text, tool_calls, thinking_content) do
+    thread = Map.get(state, :run_thread) || Map.get(state, :thread)
+
+    case thread do
+      %Thread{} = thread ->
+        assistant_tool_calls = if turn_type == :tool_calls, do: tool_calls, else: nil
+
+        thinking_opts =
+          case thinking_content do
+            thinking when is_binary(thinking) and thinking != "" -> [thinking: thinking]
+            _ -> []
+          end
+
+        Map.put(state, :run_thread, Thread.append_assistant(thread, text, assistant_tool_calls, thinking_opts))
+
+      _ ->
+        state
+    end
+  end
+
+  defp append_tool_result_to_run_thread(state, tool_call_id, tool_name, tool_result) do
+    thread = Map.get(state, :run_thread) || Map.get(state, :thread)
+
+    case thread do
+      %Thread{} = thread when is_binary(tool_call_id) and is_binary(tool_name) ->
+        content = Turn.format_tool_result_content(tool_result)
+        Map.put(state, :run_thread, Thread.append_tool_result(thread, tool_call_id, tool_name, content))
+
+      _ ->
+        state
+    end
+  end
+
+  defp commit_run_thread(state) do
+    case Map.get(state, :run_thread) do
+      %Thread{} = thread -> state |> Map.put(:thread, thread) |> Map.put(:run_thread, nil)
+      _ -> state
+    end
+  end
 
   defp ensure_request_trace(state, request_id) when is_binary(request_id) do
     traces = Map.get(state, :request_traces, %{})
