@@ -120,7 +120,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     agent_id = metadata[:agent_id] || context[:agent_id]
 
     agent_pid = self()
-    task_supervisor = Jido.AI.Directive.Helper.get_task_supervisor(state)
+    task_supervisor = Jido.AI.Directive.Helpers.get_task_supervisor(state)
 
     # Get tools from state (agent's registered actions from skill or strategy)
     tools = get_tools_from_state(state)

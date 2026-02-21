@@ -78,7 +78,7 @@ defmodule Jido.AI.Agent do
   - Other async operations within the agent's lifecycle
 
   The supervisor is stored in the skill's internal state (`agent.state.__task_supervisor_skill__`)
-  and is accessible via `Jido.AI.Directive.Helper.get_task_supervisor/1`. It is automatically
+  and is accessible via `Jido.AI.Directive.Helpers.get_task_supervisor/1`. It is automatically
   cleaned up when the agent terminates.
 
   ## Example

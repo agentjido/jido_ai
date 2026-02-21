@@ -1,4 +1,4 @@
-defmodule Jido.AI.Directive.Helper do
+defmodule Jido.AI.Directive.Helpers do
   @moduledoc """
   Helper functions for DirectiveExec implementations.
 
@@ -19,11 +19,11 @@ defmodule Jido.AI.Directive.Helper do
   ## Examples
 
       iex> state = %{__task_supervisor_skill__: %{supervisor: supervisor_pid}}
-      iex> Jido.AI.Directive.Helper.get_task_supervisor(state)
+      iex> Jido.AI.Directive.Helpers.get_task_supervisor(state)
       supervisor_pid
 
       iex> state = %{task_supervisor: supervisor_pid}
-      iex> Jido.AI.Directive.Helper.get_task_supervisor(state)
+      iex> Jido.AI.Directive.Helpers.get_task_supervisor(state)
       supervisor_pid
 
   """

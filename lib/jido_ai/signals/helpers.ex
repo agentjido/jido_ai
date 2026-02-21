@@ -1,4 +1,4 @@
-defmodule Jido.AI.Signals.Helpers do
+defmodule Jido.AI.Signal.Helpers do
   @moduledoc """
   Shared helpers for signal correlation and standardized error envelopes.
   """
