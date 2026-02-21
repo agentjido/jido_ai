@@ -14,7 +14,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Directive.{Helper, LLMEmbed, LLMGenerate, LLMStream}
+  alias Jido.AI.Directive.{Helpers, LLMEmbed, LLMGenerate, LLMStream}
   alias Jido.AI.Signal.{EmbedResult, LLMResponse, RequestFailed, ToolResult, Usage}
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
@@ -198,7 +198,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
         reason: "Too many requests"
       }
 
-      assert Helper.classify_error(reqllm_error) == :rate_limit
+      assert Helpers.classify_error(reqllm_error) == :rate_limit
     end
 
     test "error classification flows through helpers" do
@@ -212,7 +212,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       ]
 
       for {error, expected_type} <- errors_and_types do
-        assert Helper.classify_error(error) == expected_type
+        assert Helpers.classify_error(error) == expected_type
       end
     end
   end
@@ -472,7 +472,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       }
 
       # 1. Classify error
-      assert Helper.classify_error(reqllm_error) == :rate_limit
+      assert Helpers.classify_error(reqllm_error) == :rate_limit
 
       # 2. Create error signal
       error_signal =

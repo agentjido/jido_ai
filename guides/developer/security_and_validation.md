@@ -12,8 +12,8 @@ After this guide, you can apply the runtime security modules consistently.
   user-safe error messages (`sanitize_error_message/2`) and split user/log payloads (`sanitize_error_for_display/1`).
 - `Jido.AI.Observe`:
   telemetry payload key redaction via `sanitize_sensitive/1` before external metadata emission.
-- `Jido.AI.Streaming.ID`:
-  stream ID generation/validation (`generate_stream_id/0`, `validate_stream_id/1`).
+- `Jido.Signal.ID`:
+  UUIDv7 ID generation/validation (`generate!/0`, `valid?/1`).
 
 ## Example
 
