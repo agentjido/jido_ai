@@ -54,11 +54,7 @@ Fix:
 
 ## Contract Parity Tests
 
-- `test/jido_ai/directive_test.exs`
-- `test/jido_ai/directive/deadlock_prevention_test.exs`
-- `test/jido_ai/integration/request_lifecycle_parity_test.exs`
-
-If you change directive fields or emitted signal payloads, update these tests in the same change.
+If you change directive fields or emitted signal payloads, update directive/runtime parity tests in the same change.
 
 ## Defaults You Should Know
 

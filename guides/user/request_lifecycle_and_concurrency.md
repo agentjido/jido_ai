@@ -18,17 +18,10 @@ After this guide, you will use request handles (`ask/await`) and collect multipl
 
 ## Runtime Contract Map
 
-- `Jido.AI.Request` (`lib/jido_ai/request.ex`): request handles, `await/2`, `await_many/2`, request state lifecycle.
-- `Jido.AI.Turn` (`lib/jido_ai/turn.ex`): normalized response shape and assistant/tool message projection.
-- `Jido.AI.Thread` (`lib/jido_ai/thread.ex`): thread accumulation and context projection for follow-up turns.
-- Directive runtime behavior (`lib/jido_ai/directive/*.ex`) is documented in [Directives Runtime Contract](../developer/directives_runtime_contract.md).
-
-Primary contract tests:
-
-- `test/jido_ai/request_test.exs`
-- `test/jido_ai/turn_test.exs`
-- `test/jido_ai/thread_test.exs`
-- `test/jido_ai/integration/request_lifecycle_parity_test.exs`
+- `Jido.AI.Request`: request handles, `await/2`, `await_many/2`, request state lifecycle.
+- `Jido.AI.Turn`: normalized response shape and assistant/tool message projection.
+- `Jido.AI.Thread`: thread accumulation and context projection for follow-up turns.
+- Directive runtime behavior is documented in [Directives Runtime Contract](../developer/directives_runtime_contract.md).
 
 ## Await Many
 
