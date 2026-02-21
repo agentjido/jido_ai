@@ -414,7 +414,7 @@ defmodule Jido.AI.ToTAgent do
       defp request_id_from_action(_action, fallback), do: fallback
 
       defp failure_reason(snap) do
-        details = snap.details || %{}
+        details = Map.get(snap, :details, %{})
 
         case details[:termination_reason] do
           :cancelled -> {:cancelled, details[:cancel_reason] || :cancelled}
