@@ -200,6 +200,87 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.react_worker_status == :ready
     end
 
+    test "completed request history is reused for the next turn" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Who am I?", request_id: "req_turn_1"})], %{})
+
+      first_turn_events = [
+        runtime_event(:request_started, "req_turn_1", 1, %{query: "Who am I?"}),
+        runtime_event(:llm_completed, "req_turn_1", 2, %{
+          turn_type: :final_answer,
+          text: "You asked who you are.",
+          thinking_content: nil,
+          tool_calls: [],
+          usage: %{}
+        }),
+        runtime_event(:request_completed, "req_turn_1", 3, %{
+          result: "You asked who you are.",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(first_turn_events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_turn_1", event: event})], %{})
+        end)
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "What did I just ask?", request_id: "req_turn_2"})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      history = Jido.AI.Thread.to_messages(state.pending_worker_start.state.thread)
+      history = Enum.reject(history, &(&1.role == :system))
+
+      assert history == [
+               %{role: :user, content: "Who am I?"},
+               %{role: :assistant, content: "You asked who you are."},
+               %{role: :user, content: "What did I just ask?"}
+             ]
+    end
+
+    test "snapshot exposes conversation projected from thread state" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Track this", request_id: "req_snap"})], %{})
+
+      events = [
+        runtime_event(:request_started, "req_snap", 1, %{query: "Track this"}),
+        runtime_event(:llm_completed, "req_snap", 2, %{
+          turn_type: :final_answer,
+          text: "Tracked",
+          thinking_content: nil,
+          tool_calls: [],
+          usage: %{}
+        }),
+        runtime_event(:request_completed, "req_snap", 3, %{
+          result: "Tracked",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_snap", event: event})], %{})
+        end)
+
+      snapshot = ReAct.snapshot(agent, %{})
+      conversation = Enum.reject(snapshot.details.conversation, &(&1.role == :system))
+
+      assert conversation == [
+               %{role: :user, content: "Track this"},
+               %{role: :assistant, content: "Tracked"}
+             ]
+    end
+
     test "request completion clears ephemeral req_http_options" do
       agent = create_agent(tools: [TestCalculator])
 
