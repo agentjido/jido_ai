@@ -21,14 +21,15 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyFastTest do
   defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   test "executes representative strategy path for fast gate" do
-    params = %{strategy: :cot, prompt: "Explain 2+2", timeout: 10_000}
+    params = %{strategy: :cot, prompt: "Explain 2+2", timeout: 750}
 
     assert {:ok, payload} = RunStrategy.run(params, %{})
     assert payload.strategy == :cot
-    assert payload.status in [:success, :running, :idle, :failure]
+    assert payload.status == :success
     assert not is_nil(payload.output)
     assert is_map(payload.usage)
     assert is_map(payload.diagnostics)
+    refute Map.has_key?(payload.diagnostics, :recovered_error)
   end
 
   test "rejects invalid strategy request in fast gate" do

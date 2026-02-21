@@ -73,5 +73,30 @@ defmodule Jido.AI.AoTAgentTest do
       assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
       assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}
     end
+
+    test "on_after_cmd finalizes pending request on delegated worker completion" do
+      agent =
+        TestAoTAgent.new()
+        |> Request.start_request("req_done", "query")
+        |> with_completed_strategy(%{answer: "resolved"})
+
+      {:ok, updated_agent, directives} =
+        TestAoTAgent.on_after_cmd(
+          agent,
+          {:aot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_done", :status]) == :completed
+      assert get_in(updated_agent.state, [:requests, "req_done", :result]) == %{answer: "resolved"}
+      assert updated_agent.state.last_result == %{answer: "resolved"}
+      assert updated_agent.state.completed == true
+    end
+  end
+
+  defp with_completed_strategy(agent, result) do
+    strategy_state = %{status: :completed, result: result}
+    put_in(agent.state[:__strategy__], strategy_state)
   end
 end

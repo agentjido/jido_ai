@@ -65,6 +65,43 @@ defmodule Jido.AI.CoTAgentTest do
       assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
       assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}
     end
+
+    test "on_after_cmd finalizes pending request on terminal delegated worker event" do
+      agent =
+        TestCoTAgent.new()
+        |> Request.start_request("req_done", "query")
+        |> with_completed_strategy("final reasoning")
+
+      {:ok, updated_agent, directives} =
+        TestCoTAgent.on_after_cmd(
+          agent,
+          {:cot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_done", :status]) == :completed
+      assert get_in(updated_agent.state, [:requests, "req_done", :result]) == "final reasoning"
+      assert updated_agent.state.last_result == "final reasoning"
+      assert updated_agent.state.completed == true
+    end
+
+    test "on_after_cmd marks pending request failed on terminal failure snapshot" do
+      agent =
+        TestCoTAgent.new()
+        |> Request.start_request("req_failed", "query")
+        |> with_failed_strategy("provider overloaded")
+
+      {:ok, updated_agent, directives} =
+        TestCoTAgent.on_after_cmd(
+          agent,
+          {:cot_worker_event, %{request_id: "req_failed", event: %{request_id: "req_failed"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_failed", :status]) == :failed
+    end
   end
 
   describe "macro docs contract" do
@@ -88,5 +125,15 @@ defmodule Jido.AI.CoTAgentTest do
       %{"en" => doc} when is_binary(doc) -> doc
       doc when is_binary(doc) -> doc
     end
+  end
+
+  defp with_completed_strategy(agent, result) do
+    strategy_state = %{status: :completed, result: result, steps: []}
+    put_in(agent.state[:__strategy__], strategy_state)
+  end
+
+  defp with_failed_strategy(agent, result) do
+    strategy_state = %{status: :error, result: result, termination_reason: :provider_error}
+    put_in(agent.state[:__strategy__], strategy_state)
   end
 end

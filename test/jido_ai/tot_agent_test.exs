@@ -155,6 +155,28 @@ defmodule Jido.AI.ToTAgentTest do
     end
   end
 
+  describe "on_after_cmd/3" do
+    test "finalizes pending request on terminal delegated worker event" do
+      agent =
+        TestToTAgent.new()
+        |> Jido.AI.Request.start_request("req_done", "query")
+        |> with_completed_strategy("best path")
+
+      {:ok, updated_agent, directives} =
+        TestToTAgent.on_after_cmd(
+          agent,
+          {:tot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_done", :status]) == :completed
+      assert get_in(updated_agent.state, [:requests, "req_done", :result]) == "best path"
+      assert updated_agent.state.completed == true
+      assert updated_agent.state.last_result == "best path"
+    end
+  end
+
   describe "strategy state" do
     test "agent initializes with strategy state" do
       agent = TestToTAgent.new()
@@ -197,5 +219,10 @@ defmodule Jido.AI.ToTAgentTest do
                tree: %{}
              }
     end
+  end
+
+  defp with_completed_strategy(agent, result) do
+    strategy_state = %{status: :completed, result: result}
+    put_in(agent.state[:__strategy__], strategy_state)
   end
 end

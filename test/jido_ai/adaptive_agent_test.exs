@@ -85,6 +85,26 @@ defmodule Jido.AI.AdaptiveAgentTest do
       assert updated_agent.state.selected_strategy == :cod
     end
 
+    test "on_after_cmd finalizes pending request for delegated worker events" do
+      agent =
+        TestAdaptiveAgent.new()
+        |> Request.start_request("req_worker", "query")
+        |> with_completed_strategy("worker recommendation")
+
+      {:ok, updated_agent, directives} =
+        TestAdaptiveAgent.on_after_cmd(
+          agent,
+          {:adaptive_worker_event, %{request_id: "req_worker", event: %{request_id: "req_worker"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_worker", :status]) == :completed
+      assert get_in(updated_agent.state, [:requests, "req_worker", :result]) == "worker recommendation"
+      assert updated_agent.state.selected_strategy == :cod
+      assert updated_agent.state.completed == true
+    end
+
     test "on_after_cmd preserves pending request when strategy is still running" do
       agent =
         TestAdaptiveAgent.new()

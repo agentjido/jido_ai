@@ -278,13 +278,9 @@ defmodule Jido.AI.AdaptiveAgent do
         selected_strategy = Map.get(strategy_state, :strategy_type)
 
         agent =
-          if snap.done? do
-            agent = Request.complete_request(agent, request_id, snap.result)
-            # Also set selected_strategy for adaptive-specific backward compat
-            put_in(agent.state[:selected_strategy], selected_strategy)
-          else
-            put_in(agent.state[:selected_strategy], selected_strategy)
-          end
+          agent
+          |> maybe_finalize_request(request_id, snap)
+          |> maybe_mark_completed(snap, selected_strategy)
 
         {:ok, agent, directives}
       end
@@ -295,33 +291,84 @@ defmodule Jido.AI.AdaptiveAgent do
       end
 
       @impl true
-      def on_after_cmd(agent, _action, directives) do
+      def on_after_cmd(agent, action, directives) do
         # Fallback for actions without request_id (backward compat)
         snap = strategy_snapshot(agent)
+        request_id = request_id_from_action(action, agent.state[:last_request_id])
 
         # Extract selected strategy from strategy state
         strategy_state = Map.get(agent.state, :__strategy__, %{})
         selected_strategy = Map.get(strategy_state, :strategy_type)
 
         agent =
-          if snap.done? do
-            %{
-              agent
-              | state:
-                  Map.merge(agent.state, %{
-                    last_result: snap.result || "",
-                    completed: true,
-                    selected_strategy: selected_strategy
-                  })
-            }
-          else
-            %{
-              agent
-              | state: Map.put(agent.state, :selected_strategy, selected_strategy)
-            }
-          end
+          agent
+          |> maybe_finalize_request(request_id, snap)
+          |> maybe_mark_completed(snap, selected_strategy)
 
         {:ok, agent, directives}
+      end
+
+      defp maybe_finalize_request(agent, request_id, snap) do
+        if request_pending?(agent, request_id) and snap.done? do
+          case snap.status do
+            :success ->
+              Request.complete_request(agent, request_id, snap.result)
+
+            :failure ->
+              Request.fail_request(agent, request_id, failure_reason(snap))
+
+            _ ->
+              agent
+          end
+        else
+          agent
+        end
+      end
+
+      defp request_pending?(agent, request_id) when is_binary(request_id) do
+        case Request.get_request(agent, request_id) do
+          %{status: :pending} -> true
+          _ -> false
+        end
+      end
+
+      defp request_pending?(_agent, _request_id), do: false
+
+      defp maybe_mark_completed(agent, snap, selected_strategy) do
+        if snap.done? do
+          %{
+            agent
+            | state:
+                Map.merge(agent.state, %{
+                  last_result: snap.result || "",
+                  completed: true,
+                  selected_strategy: selected_strategy
+                })
+          }
+        else
+          %{
+            agent
+            | state: Map.put(agent.state, :selected_strategy, selected_strategy)
+          }
+        end
+      end
+
+      defp request_id_from_action({_, params}, fallback) when is_map(params) do
+        params[:request_id] ||
+          get_in(params, [:event, :request_id]) ||
+          fallback
+      end
+
+      defp request_id_from_action(_action, fallback), do: fallback
+
+      defp failure_reason(snap) do
+        details = snap.details || %{}
+
+        case details[:termination_reason] do
+          :cancelled -> {:cancelled, details[:cancel_reason] || :cancelled}
+          nil -> {:failed, :unknown, snap.result}
+          reason -> {:failed, reason, snap.result}
+        end
       end
 
       defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3

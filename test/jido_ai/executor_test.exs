@@ -164,7 +164,11 @@ defmodule Jido.AI.TurnExecutionTest do
     end
 
     test "returns error from action", %{tools: tools} do
-      result = Turn.execute("calculator", %{"operation" => "divide", "a" => "10", "b" => "0"}, %{}, tools: tools)
+      result =
+        Turn.execute("calculator", %{"operation" => "divide", "a" => "10", "b" => "0"}, %{},
+          tools: tools,
+          timeout: 50
+        )
 
       assert {:error, error} = result
       assert error.error == "Division by zero"
@@ -200,13 +204,13 @@ defmodule Jido.AI.TurnExecutionTest do
 
   describe "execute/4 with timeout" do
     test "completes within timeout", %{tools: tools} do
-      result = Turn.execute("slow_action", %{"delay_ms" => "50"}, %{}, tools: tools, timeout: 1000)
+      result = Turn.execute("slow_action", %{"delay_ms" => "20"}, %{}, tools: tools, timeout: 200)
 
-      assert {:ok, %{completed: true, delay: 50}} = result
+      assert {:ok, %{completed: true, delay: 20}} = result
     end
 
     test "times out for slow operations", %{tools: tools} do
-      result = Turn.execute("slow_action", %{"delay_ms" => "500"}, %{}, tools: tools, timeout: 100)
+      result = Turn.execute("slow_action", %{"delay_ms" => "120"}, %{}, tools: tools, timeout: 30)
 
       assert {:error, error} = result
       assert error.type == :timeout
@@ -217,7 +221,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
   describe "error handling" do
     test "returns structured error from action", %{tools: tools} do
-      result = Turn.execute("error_action", %{"message" => "test error"}, %{}, tools: tools)
+      result = Turn.execute("error_action", %{"message" => "test error"}, %{}, tools: tools, timeout: 50)
 
       assert {:error, error} = result
       assert error.type == :execution_error
@@ -339,9 +343,9 @@ defmodule Jido.AI.TurnExecutionTest do
       result =
         Turn.execute_module(
           TestActions.SlowAction,
-          %{"delay_ms" => "500"},
+          %{"delay_ms" => "120"},
           %{},
-          timeout: 100
+          timeout: 30
         )
 
       assert {:error, error} = result
@@ -385,7 +389,7 @@ defmodule Jido.AI.TurnExecutionTest do
         nil
       )
 
-      Turn.execute("slow_action", %{"delay_ms" => "500"}, %{}, tools: tools, timeout: 50)
+      Turn.execute("slow_action", %{"delay_ms" => "120"}, %{}, tools: tools, timeout: 20)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :exception], %{duration: _},
                       %{tool_name: "slow_action", reason: :timeout}},
@@ -505,7 +509,8 @@ defmodule Jido.AI.TurnExecutionTest do
       import ExUnit.CaptureLog
 
       capture_log(fn ->
-        result = Turn.execute("exception_action2", %{"message" => "test exception"}, %{}, tools: tools)
+        result =
+          Turn.execute("exception_action2", %{"message" => "test exception"}, %{}, tools: tools, timeout: 50)
 
         assert {:error, error} = result
         assert error.type == :execution_error
@@ -520,7 +525,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
       log =
         capture_log([level: :error], fn ->
-          Turn.execute("exception_action2", %{"message" => "logged exception"}, %{}, tools: tools)
+          Turn.execute("exception_action2", %{"message" => "logged exception"}, %{}, tools: tools, timeout: 50)
         end)
 
       assert log =~ "logged exception" or log =~ "ArgumentError"
