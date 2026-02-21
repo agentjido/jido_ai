@@ -128,7 +128,7 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
   - Runnable example: [`lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs`](../../lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs)
   - Coverage split guidance: fast-smoke subset lives in `test/jido_ai/skills/reasoning/actions/run_strategy_action_fast_test.exs`; full checkpoint matrix lives in `test/jido_ai/skills/reasoning/actions/run_strategy_action_test.exs`.
 
-## Shared Helper
+## Shared Helpers
 
 - `Jido.AI.Actions.Helpers`
   - model resolution, security/input checks, response text/usage extraction.
