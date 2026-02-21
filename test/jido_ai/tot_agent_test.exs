@@ -73,7 +73,7 @@ defmodule Jido.AI.ToTAgentTest do
 
     test "uses default values when not specified" do
       opts = DefaultToTAgent.strategy_opts()
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:branching_factor] == 3
       assert opts[:max_depth] == 3
       assert opts[:traversal_strategy] == :best_first

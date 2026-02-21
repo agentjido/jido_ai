@@ -59,7 +59,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
       module = GoTAdapter.create_ephemeral_agent(config)
 
       opts = module.strategy_opts()
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:max_nodes] == 20
       assert opts[:max_depth] == 5
       assert opts[:aggregation_strategy] == :synthesis

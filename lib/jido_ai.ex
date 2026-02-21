@@ -17,15 +17,15 @@ defmodule Jido.AI do
 
   Use semantic model aliases instead of hardcoded model strings:
 
-      Jido.AI.resolve_model(:fast)      # => "anthropic:claude-haiku-4-5"
-      Jido.AI.resolve_model(:capable)   # => "anthropic:claude-sonnet-4-20250514"
+      Jido.AI.resolve_model(:fast)      # => "provider:fast-model"
+      Jido.AI.resolve_model(:capable)   # => "provider:capable-model"
 
   Configure custom aliases in your config:
 
       config :jido_ai,
         model_aliases: %{
-          fast: "anthropic:claude-haiku-4-5",
-          capable: "anthropic:claude-sonnet-4-20250514"
+          fast: "provider:your-fast-model",
+          capable: "provider:your-capable-model"
         }
 
   A broad list of provider/model IDs is available at: https://llmdb.xyz
@@ -50,7 +50,6 @@ defmodule Jido.AI do
   ## Runtime Tool Management
 
   Register and unregister tools dynamically with running agents:
-  k
 
       # Register a new tool
       {:ok, agent} = Jido.AI.register_tool(agent_pid, MyApp.Tools.Calculator)
@@ -117,15 +116,17 @@ defmodule Jido.AI do
   @doc """
   Returns all configured model aliases merged with defaults.
 
+  User overrides from `config :jido_ai, :model_aliases` are merged on top of built-in defaults.
+
   ## Examples
 
       iex> aliases = Jido.AI.model_aliases()
-      iex> aliases[:fast]
-      "anthropic:claude-haiku-4-5"
+      iex> is_binary(aliases[:fast])
+      true
   """
   @spec model_aliases() :: %{model_alias() => model_spec()}
   def model_aliases do
-    configured = Application.get_env(:jido_ai, :model_aliases, %{})
+    configured = Application.get_env(:jido_ai, :model_aliases, %{}) |> normalize_model_aliases()
     Map.merge(@default_aliases, configured)
   end
 
@@ -178,8 +179,8 @@ defmodule Jido.AI do
 
   ## Examples
 
-      iex> Jido.AI.resolve_model(:fast)
-      "anthropic:claude-haiku-4-5"
+      iex> String.contains?(Jido.AI.resolve_model(:fast), ":")
+      true
 
       iex> Jido.AI.resolve_model("openai:gpt-4")
       "openai:gpt-4"
@@ -441,6 +442,9 @@ defmodule Jido.AI do
   end
 
   # Private helpers for top-level LLM facades
+
+  defp normalize_model_aliases(aliases) when is_map(aliases), do: aliases
+  defp normalize_model_aliases(_), do: %{}
 
   defp resolve_generation_model(opts, defaults) do
     opts

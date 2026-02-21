@@ -31,8 +31,8 @@ mix deps.get
 # config/config.exs
 config :jido_ai,
   model_aliases: %{
-    fast: "anthropic:claude-haiku-4-5",
-    capable: "anthropic:claude-sonnet-4-20250514"
+    fast: "provider:fast-model",
+    capable: "provider:capable-model"
   }
 ```
 
@@ -68,11 +68,11 @@ Symptom:
 
 Fix:
 - Add the alias under `config :jido_ai, model_aliases: ...`
-- Or pass a direct model string like `"anthropic:claude-haiku-4-5"`
+- Or pass a direct model string like `"provider:exact-model-id"`
 
 ## Defaults You Should Know
 
-- ReAct model default: `anthropic:claude-haiku-4-5`
+- ReAct model default alias: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
 - ReAct max iterations default: `10`
 - Request await timeout default: `30_000ms`
 

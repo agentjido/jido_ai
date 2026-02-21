@@ -4,6 +4,12 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
   alias Jido.AI.Reasoning.ReAct.{Config, State, Token}
   @legacy_insecure_secret "jido_ai_react_default_secret_change_me"
 
+  test "defaults omitted model to resolved :fast alias" do
+    config = Config.new(%{tools: %{}})
+
+    assert config.model == Jido.AI.resolve_model(:fast)
+  end
+
   test "issues and decodes checkpoint tokens" do
     config =
       Config.new(%{

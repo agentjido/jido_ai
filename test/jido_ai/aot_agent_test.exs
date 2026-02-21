@@ -50,7 +50,7 @@ defmodule Jido.AI.AoTAgentTest do
     test "uses expected defaults when not provided" do
       opts = DefaultAoTAgent.strategy_opts()
 
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:profile] == :standard
       assert opts[:search_style] == :dfs
       assert opts[:temperature] == 0.0

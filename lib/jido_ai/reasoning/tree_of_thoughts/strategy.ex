@@ -43,7 +43,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
 
   ### Options
 
-  - `:model` (optional) - Model identifier, defaults to "anthropic:claude-haiku-4-5"
+  - `:model` (optional) - Model alias or direct model spec, defaults to :fast (resolved via Jido.AI.resolve_model/1)
   - `:branching_factor`, `:max_depth`, `:traversal_strategy` (optional) - Core tree search controls
   - `:top_k`, `:min_depth`, `:max_nodes`, `:max_duration_ms`, `:beam_width` (optional) - Search budget and shaping controls
   - `:early_success_threshold`, `:convergence_window`, `:min_score_improvement`, `:max_parse_retries` (optional) - Completion/parser controls
@@ -102,7 +102,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
           max_tool_round_trips: pos_integer()
         }
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_top_k 3
   @default_min_depth 2
   @default_max_nodes 100

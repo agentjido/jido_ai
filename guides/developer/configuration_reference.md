@@ -8,17 +8,19 @@ This is the copy-paste reference for common `jido_ai` configuration and defaults
 # config/config.exs
 config :jido_ai,
   model_aliases: %{
-    fast: "anthropic:claude-haiku-4-5",
-    capable: "anthropic:claude-sonnet-4-20250514",
-    reasoning: "anthropic:claude-sonnet-4-20250514",
-    planning: "anthropic:claude-sonnet-4-20250514"
+    fast: "provider:fast-model",
+    capable: "provider:capable-model",
+    reasoning: "provider:reasoning-model",
+    planning: "provider:planning-model"
   }
 ```
+
+Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for overrides.
 
 ## Strategy/Macro Defaults
 
 - ReAct (`Jido.AI.Agent`)
-  - `model`: `anthropic:claude-haiku-4-5`
+  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
   - `max_iterations`: `10`
   - `request_policy`: `:reject`
   - `tool_timeout_ms`: `15_000`
@@ -26,14 +28,14 @@ config :jido_ai,
   - `tool_retry_backoff_ms`: `200`
 
 - CoT (`Jido.AI.CoTAgent`)
-  - `model`: `anthropic:claude-haiku-4-5`
+  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
 
 - CoD (`Jido.AI.CoDAgent`)
-  - `model`: `anthropic:claude-haiku-4-5`
+  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
   - default system prompt encourages concise drafts and final answer after `####`
 
 - AoT (`Jido.AI.AoTAgent`)
-  - `model`: `anthropic:claude-haiku-4-5`
+  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
   - `profile`: `:standard`
   - `search_style`: `:dfs`
   - `temperature`: `0.0`
@@ -41,19 +43,19 @@ config :jido_ai,
   - `require_explicit_answer`: `true`
 
 - ToT (`Jido.AI.ToTAgent`)
-  - `model`: `anthropic:claude-haiku-4-5`
+  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
   - `branching_factor`: `3`
   - `max_depth`: `3`
   - `traversal_strategy`: `:best_first`
 
 - GoT (`Jido.AI.GoTAgent`)
-  - `model`: `anthropic:claude-haiku-4-5`
+  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
   - `max_nodes`: `20`
   - `max_depth`: `5`
   - `aggregation_strategy`: `:synthesis`
 
 - TRM (`Jido.AI.TRMAgent`)
-  - `model`: `anthropic:claude-haiku-4-5`
+  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
   - `max_supervision_steps`: `5`
   - `act_threshold`: `0.9`
 

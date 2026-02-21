@@ -24,7 +24,7 @@ defmodule Jido.AI.Agent do
   - `:description` - Agent description (default: "AI agent \#{name}")
   - `:tags` - Agent tags for discovery/classification (default: `[]`)
   - `:system_prompt` - Custom system prompt for the LLM
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
   - `:request_policy` - Request concurrency policy (default: `:reject`)
   - `:tool_timeout_ms` - Per-attempt tool execution timeout in ms (default: 15_000)
@@ -100,7 +100,7 @@ defmodule Jido.AI.Agent do
         tool_context: %{actor: current_user, tenant_id: "acme"})
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_iterations 10
 
   @doc false
@@ -240,7 +240,7 @@ defmodule Jido.AI.Agent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),

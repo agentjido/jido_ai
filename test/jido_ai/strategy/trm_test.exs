@@ -124,7 +124,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       state = State.get(agent, %{})
       config = state[:config]
 
-      assert config.model == "anthropic:claude-haiku-4-5"
+      assert config.model == Jido.AI.resolve_model(:fast)
       assert config.max_supervision_steps == 5
       assert config.act_threshold == 0.9
     end
@@ -158,7 +158,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       directive = hd(directives)
 
       assert %Directive.LLMStream{} = directive
-      assert directive.model == "anthropic:claude-haiku-4-5"
+      assert directive.model == Jido.AI.resolve_model(:fast)
       assert directive.metadata.phase == :reasoning
     end
 
@@ -636,7 +636,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       {_agent, [directive]} = TRM.cmd(agent, [instruction], ctx)
 
       # Check directive has proper structure
-      assert directive.model == "anthropic:claude-haiku-4-5"
+      assert directive.model == Jido.AI.resolve_model(:fast)
       assert length(directive.context) >= 2
 
       # Find user message

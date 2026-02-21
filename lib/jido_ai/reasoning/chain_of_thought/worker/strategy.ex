@@ -9,7 +9,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
   alias Jido.AI.Reasoning.ChainOfThought.Machine
   alias Jido.AI.Reasoning.ReAct.Event
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
 
   @start :cot_worker_start
   @cancel :cot_worker_cancel
@@ -517,8 +517,10 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
   defp maybe_put_timeout(opts, _), do: opts
 
   defp normalize_config(%{} = config_input) do
+    raw_model = fetch_field(config_input, :model, @default_model)
+
     %{
-      model: fetch_field(config_input, :model, @default_model),
+      model: resolve_model_spec(raw_model),
       system_prompt: fetch_field(config_input, :system_prompt, Machine.default_system_prompt()),
       llm_timeout_ms: fetch_field(config_input, :llm_timeout_ms),
       capture_deltas?: fetch_field(config_input, :capture_deltas?, true)
@@ -527,7 +529,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
 
   defp normalize_config(_config_input) do
     %{
-      model: @default_model,
+      model: resolve_model_spec(@default_model),
       system_prompt: Machine.default_system_prompt(),
       llm_timeout_ms: nil,
       capture_deltas?: true
@@ -537,6 +539,10 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
   defp fetch_field(map, key, default \\ nil) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
   end
+
+  defp resolve_model_spec(model) when is_atom(model), do: Jido.AI.resolve_model(model)
+  defp resolve_model_spec(model) when is_binary(model), do: model
+  defp resolve_model_spec(_), do: Jido.AI.resolve_model(@default_model)
 
   defp normalize_blank(""), do: nil
   defp normalize_blank(value), do: value

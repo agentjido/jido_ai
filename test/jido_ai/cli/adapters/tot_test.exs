@@ -59,7 +59,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
       module = ToTAdapter.create_ephemeral_agent(config)
 
       opts = module.strategy_opts()
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:branching_factor] == 3
       assert opts[:max_depth] == 3
       assert opts[:traversal_strategy] == :best_first

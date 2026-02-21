@@ -22,7 +22,7 @@ defmodule Jido.AI.ToTAgent do
 
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "ToT agent \#{name}")
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:branching_factor`, `:max_depth`, `:traversal_strategy` - Core tree exploration knobs
   - `:top_k`, `:min_depth`, `:max_nodes`, `:max_duration_ms`, `:beam_width` - Search budget and shaping knobs
   - `:early_success_threshold`, `:convergence_window`, `:min_score_improvement`, `:max_parse_retries` - Deterministic stopping/parser controls
@@ -98,7 +98,7 @@ defmodule Jido.AI.ToTAgent do
   - `:best_first` - Explores highest-scored nodes first (default)
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_branching_factor 3
   @default_max_depth 3
   @default_traversal_strategy :best_first
@@ -173,7 +173,7 @@ defmodule Jido.AI.ToTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
