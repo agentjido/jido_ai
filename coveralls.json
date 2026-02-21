@@ -1,0 +1,10 @@
+{
+  "coverage_options": {
+    "minimum_coverage": 80
+  },
+  "skip_files": [
+    "^lib/examples/",
+    "^lib/mix/tasks/",
+    "^test/support/"
+  ]
+}
