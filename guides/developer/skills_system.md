@@ -63,7 +63,7 @@ Fix:
 ### Lookup failure after registration workflow
 
 Symptom:
-- `Jido.AI.Skill.resolve/1` or `Registry.lookup/1` returns `NotFound`
+- `Jido.AI.Skill.resolve/1` or `Jido.AI.Skill.Registry.lookup/1` returns `NotFound`
 
 Fix:
 - ensure skills were registered into the current runtime registry instance

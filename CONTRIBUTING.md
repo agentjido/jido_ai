@@ -8,10 +8,11 @@ Thank you for your interest in contributing to Jido.AI!
 2. Install dependencies: `mix deps.get`
 3. Run the fast stable gate: `mix precommit`
 4. Run full stable tests: `mix test`
+5. Run the full quality gate: `mix quality`
 
-## Dual Stable Gates (One-Story Loop)
+## Local Quality Gates
 
-Use two local gates during backlog execution:
+Use these gates during development:
 
 Fast per-story gate (target runtime budget: under 90 seconds on a warm cache):
 
@@ -26,24 +27,25 @@ Full checkpoint gate (target runtime budget: under 10 minutes on a warm cache):
 mix test
 ```
 
-Final release-quality checkpoint (full suite + docs + coverage + traceability closure + timing summary):
+Static quality gate:
 
 ```bash
-mix quality.final
+mix quality
 ```
 
 Notes:
 - `mix precommit` is repository-local and runs format/compile/doctor plus `mix test.fast`.
 - `mix test.fast` runs stable smoke coverage only (`--only stable_smoke`, excluding flaky tests).
 - `mix test` is the full stable suite (`--exclude flaky` via alias).
-- `mix quality.final` runs the final checkpoint task (`mix jido_ai.quality`).
+- `mix quality` runs format, compile with warnings-as-errors, Credo, Doctor, and Dialyzer.
 
 ## Pull Request Process
 
 1. Ensure all tests pass: `mix test`
-2. Run quality checks: `mix quality` (format, compile, docs checks, strict Credo, doctor, dialyzer)
-3. Update documentation as needed
-4. Use conventional commit messages
+2. Run quality checks: `mix quality` (format, compile, strict Credo, Doctor, Dialyzer)
+3. If docs changed, verify docs build: `mix docs`
+4. Update documentation as needed
+5. Use conventional commit messages
 
 ## Commit Message Format
 
