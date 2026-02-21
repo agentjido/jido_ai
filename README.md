@@ -163,3 +163,13 @@ Apache-2.0 - See [LICENSE.md](LICENSE.md) for details.
 ---
 
 **[Jido.AI Homepage](https://agentjido.xyz)** | **[GitHub](https://github.com/agentjido/jido_ai)** | **[Discord](https://agentjido.xyz/discord)**
+
+## Package Purpose
+
+`jido_ai` provides reusable AI-agent primitives (strategies, tool orchestration, and model-facing abstractions) for the broader Jido ecosystem.
+
+## Testing Paths
+
+- Fast local suite: `mix test`
+- Full quality gate: `mix quality`
+- Coverage run: `mix test --cover`
