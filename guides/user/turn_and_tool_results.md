@@ -31,8 +31,8 @@ end
 ```elixir
 alias Jido.AI.Turn
 
-# From a ReqLLM response returned by Jido.AI.chat/2
-{:ok, response} = Jido.AI.chat(messages: messages, model: "anthropic:claude-sonnet-4-20250514")
+# From a ReqLLM response returned by Jido.AI.generate_text/2
+{:ok, response} = Jido.AI.generate_text(messages, model: "anthropic:claude-sonnet-4-20250514")
 turn = Turn.from_response(response)
 
 # Override the model field
@@ -121,8 +121,8 @@ defmodule MyApp.ToolLoop do
   defp loop(messages, tools_map, iteration) do
     # 1. Call the LLM
     {:ok, response} =
-      Jido.AI.chat(
-        messages: messages,
+      Jido.AI.generate_text(
+        messages,
         model: "anthropic:claude-sonnet-4-20250514",
         tools: Map.keys(tools_map)
       )
@@ -268,7 +268,7 @@ Use `Jido.AI.Turn` when:
 
 Do not use `Jido.AI.Turn` when:
 - `CallWithTools` with `auto_execute: true` already handles your loop — use that instead
-- you only need text from a response — `Jido.AI.chat/2` returns it directly
+- you only need text from a response — `Jido.AI.ask/2` returns it directly
 
 ## Next
 
