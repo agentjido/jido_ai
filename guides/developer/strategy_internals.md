@@ -95,7 +95,7 @@ ToT parser flow is JSON-first with regex fallback:
 
 ToT tool orchestration is strategy-managed:
 
-- `ai.tool.result` and `ai.tool.error` are routed back into the strategy
+- `ai.tool.result` signals (including error envelopes) are routed back into the strategy
 - machine progression pauses during tool rounds
 - follow-up LLM calls are issued with assistant tool-call + tool messages
 - round trips are bounded by `max_tool_round_trips`

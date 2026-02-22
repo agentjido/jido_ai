@@ -70,6 +70,32 @@ Fix:
 - Add the alias under `config :jido_ai, model_aliases: ...`
 - Or pass a direct model string like `"provider:exact-model-id"`
 
+## Failure Mode: CompileError In tool_context
+
+Symptom:
+
+```elixir
+** (CompileError) Unsafe construct in tool_context or tools: function call ...
+```
+
+Fix:
+- `tool_context` must be literal data: module aliases, atoms, strings, numbers, lists, and maps
+- Function calls, module attributes (`@my_attr`), and pinned variables (`^var`) are rejected at compile time
+
+```elixir
+# BAD — function call in tool_context
+use Jido.AI.Agent,
+  name: "my_agent",
+  tools: [MyTool],
+  tool_context: %{timestamp: DateTime.utc_now()}
+
+# GOOD — literal data only
+use Jido.AI.Agent,
+  name: "my_agent",
+  tools: [MyTool],
+  tool_context: %{domain: MyApp.Domain, env: :production}
+```
+
 ## Defaults You Should Know
 
 - ReAct model default alias: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)

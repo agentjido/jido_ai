@@ -1,32 +1,49 @@
 # Jido.AI
 
-**AI integration layer for the Jido ecosystem** - LLM orchestration and reasoning strategies for building intelligent agents in Elixir.
+[![Hex.pm](https://img.shields.io/hexpm/v/jido_ai.svg)](https://hex.pm/packages/jido_ai)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/jido_ai/)
+[![CI](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml)
+[![License](https://img.shields.io/hexpm/l/jido_ai.svg)](https://github.com/agentjido/jido_ai/blob/main/LICENSE.md)
+[![Coverage Status](https://coveralls.io/repos/github/agentjido/jido_ai/badge.svg?branch=main)](https://coveralls.io/github/agentjido/jido_ai?branch=main)
 
-## Overview
+Build tool-using Elixir agents with explicit reasoning strategies and production-ready request orchestration.
 
-Jido.AI provides a comprehensive toolkit for building intelligent agents with LLMs. It implements proven reasoning strategies for tool use, multi-step reasoning, and complex planning - all designed to get better results from language models.
+[Hex](https://hex.pm/packages/jido_ai) | [HexDocs](https://hexdocs.pm/jido_ai) | [Jido Ecosystem](https://agentjido.xyz) | [Discord](https://agentjido.xyz/discord)
+
+`jido_ai` is the AI runtime layer for Jido. You define tools and agents as Elixir modules, then run synchronous or asynchronous requests with built-in model routing, retries, and observability.
 
 ```elixir
-# Quick example: `Jido.AI.Agent` with tool use
-defmodule MyApp.Actions.Multiply do
+defmodule MyApp.Actions.AddNumbers do
   use Jido.Action,
-    name: "multiply",
+    name: "add_numbers",
     schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
 
   @impl true
-  def run(%{a: a, b: b}, _context), do: {:ok, %{product: a * b}}
+  def run(%{a: a, b: b}, _context), do: {:ok, %{sum: a + b}}
 end
 
-defmodule MyApp.Agent do
+defmodule MyApp.MathAgent do
   use Jido.AI.Agent,
-    name: "my_agent",
-    tools: [MyApp.Actions.Multiply],
-    model: :fast
+    name: "math_agent",
+    model: :fast,
+    tools: [MyApp.Actions.AddNumbers],
+    system_prompt: "Solve accurately. Use tools for arithmetic."
 end
 
-{:ok, pid} = Jido.AgentServer.start(agent: MyApp.Agent)
-{:ok, response} = MyApp.Agent.ask_sync(pid, "What is 15 * 23?")
+{:ok, pid} = Jido.AgentServer.start(agent: MyApp.MathAgent)
+{:ok, answer} = MyApp.MathAgent.ask_sync(pid, "What is 19 + 23?")
 ```
+
+## Where This Package Fits
+
+`jido_ai` is a **core package** in the Jido ecosystem:
+
+- [jido](https://hex.pm/packages/jido): agent runtime, process model, and signal lifecycle
+- [jido_action](https://hex.pm/packages/jido_action): typed tool/action contract used by `jido_ai`
+- [req_llm](https://hex.pm/packages/req_llm): provider abstraction for Anthropic, OpenAI, Google, and others
+
+Use `jido_ai` when you need long-lived agents, tool-calling loops, or explicit reasoning strategies. You can also use it without a running agent process via `Jido.AI.generate_text/2`, `Jido.AI.ask/2`, or `Jido.Exec.run/3` with any action module.  
+For cross-package tutorials (for example `jido` + `jido_ai` + app packages), see [agentjido.xyz](https://agentjido.xyz).
 
 ## Installation
 
@@ -39,14 +56,18 @@ def deps do
 end
 ```
 
-Configure model aliases and LLM provider credentials (see [Configuration Reference](guides/developer/configuration_reference.md)):
+```bash
+mix deps.get
+```
+
+Configure model aliases and at least one provider credential:
 
 ```elixir
 # config/config.exs
 config :jido_ai,
   model_aliases: %{
-    fast: "anthropic:claude-haiku-4-5",
-    capable: "anthropic:claude-sonnet-4-20250514"
+    fast: "provider:fast-model",
+    capable: "provider:capable-model"
   }
 
 config :req_llm,
@@ -54,131 +75,143 @@ config :req_llm,
   openai_api_key: System.get_env("OPENAI_API_KEY")
 ```
 
-## Reasoning Strategies
+## Quick Start
 
-Strategies are agent patterns that determine how an LLM approaches a problem. They are the foundation of building intelligent agents with Jido.AI.
-
-| Strategy | Pattern | Best For |
-|----------|---------|----------|
-| **Chain-of-Draft** | Minimal intermediate drafts | Low-latency multi-step reasoning |
-| **ReAct** | Reason-Act loop | Tool-using agents |
-| **Chain-of-Thought** | Sequential reasoning | Multi-step problems |
-| **Algorithm-of-Thoughts** | Single-query algorithmic search | Structured exploration with explicit finalization |
-| **Tree-of-Thoughts** | Explore multiple paths | Complex planning |
-| **Graph-of-Thoughts** | Networked reasoning | Interconnected concepts |
-| **TRM** | Recursive self-supervision | Iterative refinement |
-| **Adaptive** | Strategy selection | Variable problem types |
-
-**When to use which strategy:**
-- **Chain-of-Draft** - For concise reasoning with lower token/latency overhead
-- **ReAct** - When your agent needs to use tools or APIs
-- **Chain-of-Thought** - For multi-step reasoning and math problems
-- **Algorithm-of-Thoughts** - For one-pass exploration with explicit `answer:` finalization
-- **Tree-of-Thoughts** - When exploring multiple solution paths is beneficial
-- **Graph-of-Thoughts** - For problems with interconnected concepts
-- **TRM** - For iterative improvement loops
-- **Adaptive** - When you need dynamic strategy selection based on the problem
+1. Define one `Jido.Action` tool.
+2. Define one `Jido.AI.Agent` with that tool.
+3. Start the agent and call `ask_sync/3` or `ask/3` + `await/2`.
 
 ```elixir
-# `Jido.AI.Agent` with tools
+defmodule MyApp.Actions.Multiply do
+  use Jido.Action,
+    name: "multiply",
+    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+
+  @impl true
+  def run(%{a: a, b: b}, _context), do: {:ok, %{product: a * b}}
+end
+
 defmodule MyApp.Agent do
   use Jido.AI.Agent,
     name: "my_agent",
-    tools: [MyApp.Actions.Multiply],
-    model: :fast
+    model: :fast,
+    tools: [MyApp.Actions.Multiply]
 end
 
-# Chain-of-Thought agent for step-by-step reasoning
-defmodule MyApp.Reasoner do
-  use Jido.AI.CoTAgent,
-    name: "reasoner",
-    model: :fast
-end
+{:ok, pid} = Jido.AgentServer.start(agent: MyApp.Agent)
 
-{:ok, pid} = Jido.AgentServer.start(agent: MyApp.Reasoner)
-{:ok, result} = MyApp.Reasoner.think_sync(pid, "Solve: 3 cats catch 3 mice in 3 minutes...")
+# Sync convenience path
+{:ok, result} = MyApp.Agent.ask_sync(pid, "What is 15 * 23?")
+
+# Async path with explicit request handle
+{:ok, request} = MyApp.Agent.ask(pid, "What is 144 * 12?")
+{:ok, result2} = MyApp.Agent.await(request, timeout: 15_000)
 ```
 
----
+Need one-shot text generation without an agent process?
+
+```elixir
+{:ok, text} = Jido.AI.ask("Summarize Phoenix PubSub in one paragraph.", model: :fast)
+```
+
+## Choose Your Integration Surface
+
+| If you need | Use | Why |
+|---|---|---|
+| Tool-using agent loops | `Jido.AI.Agent` | ReAct strategy with request tracking and tool orchestration |
+| Fixed reasoning strategy | `Jido.AI.CoDAgent`, `Jido.AI.CoTAgent`, `Jido.AI.AoTAgent`, `Jido.AI.ToTAgent`, `Jido.AI.GoTAgent`, `Jido.AI.TRMAgent`, `Jido.AI.AdaptiveAgent` | Strategy-specific control over reasoning behavior |
+| AI inside existing workflows/jobs | `Jido.AI.Actions.*` | Run via `Jido.Exec.run/3` without defining an agent module |
+| Streaming + checkpoint/resume | `Jido.AI.Reasoning.ReAct` | Standalone ReAct runtime with event streams and checkpoint tokens |
+| Thin model facade helpers | `Jido.AI.generate_text/2`, `generate_object/3`, `stream_text/2`, `ask/2` | Fast path for direct LLM calls with alias/default support |
+
+## Strategy Quick Pick
+
+- **ReAct (`Jido.AI.Agent`)**: default for tool/API calls.
+- **CoD (`Jido.AI.CoDAgent`)**: concise reasoning with lower latency/cost.
+- **Chain-of-Thought (CoT) (`Jido.AI.CoTAgent`)**: asks the model to reason through a problem in explicit intermediate steps before the final answer; useful for math, logic, and other multi-step tasks.
+- **AoT (`Jido.AI.AoTAgent`)**: one-pass algorithmic exploration with explicit final answer extraction.
+- **ToT / GoT (`Jido.AI.ToTAgent`, `Jido.AI.GoTAgent`)**: branching or graph-style exploration for complex tasks.
+- **TRM (`Jido.AI.TRMAgent`)**: iterative recursive refinement.
+- **Adaptive (`Jido.AI.AdaptiveAgent`)**: mixed workloads where strategy selection varies per task.
+
+Full tradeoff matrix: [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md)
+
+## Common First-Run Errors
+
+**`Unknown model alias: :my_model`**
+- Add the alias under `config :jido_ai, model_aliases: ...`
+- Or pass a direct model string (for example `"provider:exact-model-id"`)
+
+**`{:error, :not_a_tool}` when registering or calling tools**
+- Ensure your tool module implements `name/0`, `schema/0`, and `run/2`
+- Validate with `Jido.AI.register_tool(pid, MyToolModule)`
 
 ## Documentation
 
-### Build With Jido.AI
-- [Package Overview (Production Map)](guides/user/package_overview.md) - Prioritized feature map and runtime architecture
-- [Getting Started](guides/user/getting_started.md) - First working agent in minutes
-- [First Agent](guides/user/first_react_agent.md) - Tool-using `Jido.AI.Agent` with request handles
-- [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md) - Choose CoD/CoT/ReAct/AoT/ToT/GoT/TRM/Adaptive
-- [Strategy Recipes](guides/user/strategy_recipes.md) - TODO coverage for all strategy families
-- [Request Lifecycle And Concurrency](guides/user/request_lifecycle_and_concurrency.md) - `ask/await` and concurrent safety
-- [Thread Context And Message Projection](guides/user/thread_context_and_message_projection.md) - Multi-turn context management
-- [Tool Calling With Actions](guides/user/tool_calling_with_actions.md) - Adapt `Jido.Action` modules as tools
-- [LLM Facade Quickstart](guides/user/llm_facade_quickstart.md) - TODO coverage for `Jido.AI` generation helpers
-- [Model Routing And Policy](guides/user/model_routing_and_policy.md) - TODO coverage for routing and guardrail plugins
-- [Retrieval And Quota](guides/user/retrieval_and_quota.md) - TODO coverage for memory and budget controls
-- [Observability Basics](guides/user/observability_basics.md) - Telemetry events and normalization
-- [CLI Workflows](guides/user/cli_workflows.md) - Interactive, one-shot, and batch CLI usage
+- [HexDocs](https://hexdocs.pm/jido_ai) — Full API reference and guides
+- [agentjido.xyz](https://agentjido.xyz) — Ecosystem overview and cross-package tutorials
 
-### Upgrading
-- [Migration Guide: Plugins And Signals (v2 -> v3)](guides/user/migration_plugins_and_signals_v3.md) - Breaking-change module/signal mapping
+### Documentation Map
 
-### Extend Jido.AI
-- [Architecture And Runtime Flow](guides/developer/architecture_and_runtime_flow.md) - Query to runtime lifecycle
-- [Strategy Internals](guides/developer/strategy_internals.md) - Extending strategy adapters safely
-- [Directives Runtime Contract](guides/developer/directives_runtime_contract.md) - Runtime side-effect semantics
-- [Signals, Namespaces, Contracts](guides/developer/signals_namespaces_contracts.md) - Canonical event contracts
-- [Plugins And Actions Composition](guides/developer/plugins_and_actions_composition.md) - Lifecycle and action composition
-- [Skills System](guides/developer/skills_system.md) - Load/register/use skills
-- [Security And Validation](guides/developer/security_and_validation.md) - Input and error hardening
-- [Error Model And Recovery](guides/developer/error_model_and_recovery.md) - Retry and failure policy
+Start here:
+- [Package Overview](guides/user/package_overview.md)
+- [Getting Started](guides/user/getting_started.md)
+- [First Agent](guides/user/first_react_agent.md)
 
-### Reference
-- [Actions Catalog](guides/developer/actions_catalog.md) - Built-in action inventory
-- [Configuration Reference](guides/developer/configuration_reference.md) - Defaults and config keys
+Strategy guides:
+- [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md)
+- [Strategy Recipes](guides/user/strategy_recipes.md)
+- [Model Routing And Policy](guides/user/model_routing_and_policy.md)
 
-### Examples
-- [`lib/examples/scripts/demo/actions_llm_runtime_demo.exs`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/scripts/demo/actions_llm_runtime_demo.exs) - Runnable demo script entrypoint
-- [`lib/examples/scripts/smoke/weather_agent_live_runtime_demo.exs`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/scripts/smoke/weather_agent_live_runtime_demo.exs) - Smoke-check script entrypoint
-- [`lib/examples/weather/overview.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/weather/overview.ex) - Weather strategy overview module
-- [`lib/examples/agents/weather_agent.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/agents/weather_agent.ex) - ReAct-first agent example
-- [`lib/examples/tools/weather_by_location.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/tools/weather_by_location.ex) - Example tool implementation
+Integration and runtime guides:
+- [LLM Facade Quickstart](guides/user/llm_facade_quickstart.md)
+- [Tool Calling With Actions](guides/user/tool_calling_with_actions.md)
+- [Thread Context And Message Projection](guides/user/thread_context_and_message_projection.md)
+- [Turn And Tool Results](guides/user/turn_and_tool_results.md)
+- [Request Lifecycle And Concurrency](guides/user/request_lifecycle_and_concurrency.md)
+- [Retrieval And Quota](guides/user/retrieval_and_quota.md)
+- [Observability Basics](guides/user/observability_basics.md)
+- [Standalone ReAct Runtime](guides/user/standalone_react_runtime.md)
+- [CLI Workflows](guides/user/cli_workflows.md)
 
-## ReAct Production Defaults
+Upgrading:
+- [Migration: Plugins And Signals v3](guides/user/migration_plugins_and_signals_v3.md)
 
-Use these references as the production baseline for ReAct:
-- [`lib/examples/weather/react_agent.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/weather/react_agent.ex)
-- [`lib/examples/weather/overview.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/weather/overview.ex)
-- [`lib/examples/agents/weather_agent.ex`](https://github.com/agentjido/jido_ai/blob/v2.0.0-beta/lib/examples/agents/weather_agent.ex)
+Deep reference:
+- [Actions Catalog](guides/developer/actions_catalog.md)
+- [Configuration Reference](guides/developer/configuration_reference.md)
+- [Architecture And Runtime Flow](guides/developer/architecture_and_runtime_flow.md)
+- [HexDocs](https://hexdocs.pm/jido_ai)
 
-## Quick Decision Guide
+## Runnable Examples
 
-Not sure which technique to use? Start here:
+Run local demos from the repository root:
 
+```bash
+mix run lib/examples/scripts/demo/actions_llm_runtime_demo.exs
+mix run lib/examples/scripts/demo/actions_tool_calling_runtime_demo.exs
+mix run lib/examples/scripts/demo/actions_reasoning_runtime_demo.exs
+mix run lib/examples/scripts/demo/weather_multi_turn_context_demo.exs
 ```
-Building an agent?
-├─ Need to use tools/APIs?
-│  └─ Use ReAct Strategy
-├─ Need concise multi-step reasoning?
-│  └─ Use Chain-of-Draft
-├─ Need one-pass algorithmic search output?
-│  └─ Use Algorithm-of-Thoughts
-├─ Multi-step reasoning?
-│  └─ Use Chain-of-Thought
-└─ Complex planning?
-   └─ Use Tree-of-Thoughts
-```
+
+Additional examples:
+- [`lib/examples/agents/weather_agent.ex`](https://github.com/agentjido/jido_ai/blob/main/lib/examples/agents/weather_agent.ex)
+- [`lib/examples/agents/react_demo_agent.ex`](https://github.com/agentjido/jido_ai/blob/main/lib/examples/agents/react_demo_agent.ex)
+- [`lib/examples/tools/weather_by_location.ex`](https://github.com/agentjido/jido_ai/blob/main/lib/examples/tools/weather_by_location.ex)
+
+## Why Jido.AI
+
+- ReAct-first agent runtime with explicit request handles — `ask/await` prevents concurrent result overwrites
+- Eight built-in reasoning strategy families (ReAct, CoD, CoT, AoT, ToT, GoT, TRM, Adaptive)
+- Unified tool contract via `Jido.Action` modules with compile-time safety
+- Strategy-independent `Actions` API for direct integration with `Jido.Exec`
+- Stable telemetry event names via `Jido.AI.Observe` for production dashboards
+- Policy and quota plugins rewrite unsafe or over-budget requests deterministically
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/agentjido/jido_ai/blob/main/CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](https://github.com/agentjido/jido_ai/blob/main/CONTRIBUTING.md).
 
 ## License
 
-Apache-2.0 - See [LICENSE.md](LICENSE.md) for details.
-
----
-
-**[Jido.AI Homepage](https://agentjido.xyz)** | **[GitHub](https://github.com/agentjido/jido_ai)** | **[Discord](https://agentjido.xyz/discord)**
-
-## Package Purpose
-
-`jido_ai` provides reusable AI-agent primitives (strategies, tool orchestration, and model-facing abstractions) for the broader Jido ecosystem.
+Apache-2.0. See [LICENSE.md](LICENSE.md).

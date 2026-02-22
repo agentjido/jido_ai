@@ -27,9 +27,9 @@ After this guide, you can trace one request end-to-end and debug failures at the
   "jido-ai-trace",
   [
     [:jido, :ai, :llm, :start],
-    [:jido, :ai, :llm, :stop],
+    [:jido, :ai, :llm, :complete],
     [:jido, :ai, :tool, :start],
-    [:jido, :ai, :tool, :stop]
+    [:jido, :ai, :tool, :complete]
   ],
   fn event, measurements, metadata, _ ->
     IO.inspect({event, measurements, metadata})

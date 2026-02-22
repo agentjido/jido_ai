@@ -33,7 +33,9 @@ defmodule Jido.AI.Agent do
   - `:runtime_adapter` - Deprecated compatibility flag (delegated ReAct runtime is always enabled)
   - `:runtime_task_supervisor` - Optional Task.Supervisor used by delegated ReAct runtime
   - `:observability` - Observability options map
-  - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`)
+  - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`).
+    Must be literal data only — module aliases, atoms, strings, numbers, lists, and maps are permitted.
+    Function calls, module attributes (`@attr`), and pinned variables (`^var`) raise `CompileError`.
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
