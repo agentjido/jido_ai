@@ -50,8 +50,8 @@ For cross-package tutorials (for example `jido` + `jido_ai` + app packages), see
 ```elixir
 def deps do
   [
-    {:jido, "~> 2.0.0-rc.5"},
-    {:jido_ai, "~> 2.0.0-beta"}
+    {:jido, "~> 2.0"},
+    {:jido_ai, "~> 2.0.0-rc.0"}
   ]
 end
 ```

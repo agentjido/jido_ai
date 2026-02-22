@@ -1,7 +1,7 @@
 defmodule JidoAi.MixProject do
   use Mix.Project
 
-  @version "2.0.0-beta"
+  @version "2.0.0-rc.0"
   @source_url "https://github.com/agentjido/jido_ai"
   @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
   def project do
@@ -59,11 +59,11 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.0.0-rc.5"},
-      {:jido_action, "~> 2.0.0-rc.5"},
+      {:jido, "~> 2.0"},
+      {:jido_action, "~> 2.0"},
       {:req_llm, "~> 1.6"},
       # Example-only browser tools (kept out of Hex runtime dependency graph)
-      {:jido_browser, "~> 0.8.1", only: [:dev, :test], runtime: false},
+      {:jido_browser, "~> 1.0", only: [:dev, :test], runtime: false},
 
       # Runtime
       {:fsmx, "~> 0.5"},
