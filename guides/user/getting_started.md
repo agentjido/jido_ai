@@ -16,7 +16,7 @@ After this guide, you will have a `Jido.AI.Agent` running with one tool and a sy
 defp deps do
   [
     {:jido, "~> 2.0.0-rc.5"},
-    {:jido_ai, "~> 2.0.0-beta"}
+    {:jido_ai, "~> 2.0.0-rc.0"}
   ]
 end
 ```
