@@ -199,6 +199,18 @@ defmodule JidoTest.AI.RequestTest do
       assert agent.state.completed == true
     end
 
+    test "fail_request/3 does not overwrite completed requests" do
+      agent = %MockAgent{state: Request.init_state(%{})}
+      agent = Request.start_request(agent, "req-1", "query")
+      agent = Request.complete_request(agent, "req-1", "done")
+      agent = Request.fail_request(agent, "req-1", {:cancelled, :user_cancelled})
+
+      request = agent.state.requests["req-1"]
+      assert request.status == :completed
+      assert request.result == "done"
+      assert request.error == nil
+    end
+
     test "get_request/2 retrieves request by id" do
       agent = %MockAgent{state: Request.init_state(%{})}
       agent = Request.start_request(agent, "req-1", "query")

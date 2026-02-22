@@ -95,9 +95,10 @@ defmodule Jido.AI.Directive.Helpers do
 
   @doc false
   @spec normalize_directive_messages(term()) :: list()
-  def normalize_directive_messages(%{messages: msgs}), do: msgs
+  def normalize_directive_messages(%{messages: msgs}) when is_list(msgs), do: msgs
+  def normalize_directive_messages(%{"messages" => msgs}) when is_list(msgs), do: msgs
   def normalize_directive_messages(msgs) when is_list(msgs), do: msgs
-  def normalize_directive_messages(context), do: context
+  def normalize_directive_messages(_context), do: []
 
   @doc """
   Adds timeout option to a keyword list if timeout is specified.

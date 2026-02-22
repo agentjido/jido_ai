@@ -407,6 +407,9 @@ defmodule Jido.AI.Request do
         nil ->
           %{status: :failed, error: error, completed_at: System.system_time(:millisecond)}
 
+        %{status: :completed} = req ->
+          req
+
         req ->
           %{req | status: :failed, error: error, completed_at: System.system_time(:millisecond)}
       end)

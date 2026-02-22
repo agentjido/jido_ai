@@ -308,6 +308,22 @@ defmodule Jido.AI.ThreadTest do
       assert message.content == "42"
       assert message.tool_calls == tool_calls
     end
+
+    test "projects imported extended and custom roles without crashing" do
+      thread =
+        Thread.new()
+        |> Thread.append_messages([
+          %{role: "developer", content: "dev note"},
+          %{role: :function, content: "function result", name: "legacy_fn"},
+          %{role: "custom_role", content: "custom content"}
+        ])
+
+      assert [
+               %{role: :developer, content: "dev note"},
+               %{role: :function, content: "function result", name: "legacy_fn"},
+               %{role: "custom_role", content: "custom content"}
+             ] = Thread.to_messages(thread)
+    end
   end
 
   # ============================================================================
@@ -695,6 +711,7 @@ defmodule Jido.AI.ThreadTest do
       inspected = inspect(thread)
       assert inspected =~ "#Thread<2 entries"
       assert inspected =~ "last: "
+      assert inspected =~ "last: [:user, :assistant]"
     end
   end
 end

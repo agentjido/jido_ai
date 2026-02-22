@@ -162,7 +162,7 @@ defmodule Jido.AI.ToolAdapter do
 
   def to_action_map(%{} = tools) do
     cond do
-      Enum.all?(tools, fn {name, mod} -> is_binary(name) and is_atom(mod) end) ->
+      Enum.all?(tools, fn {name, mod} -> is_binary(name) and valid_action_module?(mod) end) ->
         tools
 
       true ->
@@ -174,12 +174,16 @@ defmodule Jido.AI.ToolAdapter do
 
   def to_action_map(modules) when is_list(modules) do
     modules
-    |> Enum.filter(&is_atom/1)
+    |> Enum.filter(&valid_action_module?/1)
     |> Map.new(fn module -> {module.name(), module} end)
   end
 
   def to_action_map(module) when is_atom(module) do
-    %{module.name() => module}
+    if valid_action_module?(module) do
+      %{module.name() => module}
+    else
+      %{}
+    end
   end
 
   def to_action_map(_), do: %{}
@@ -249,6 +253,12 @@ defmodule Jido.AI.ToolAdapter do
       true -> :ok
     end
   end
+
+  defp valid_action_module?(module) when is_atom(module) do
+    Code.ensure_loaded?(module) and function_exported?(module, :name, 0)
+  end
+
+  defp valid_action_module?(_), do: false
 
   # ============================================================================
   # Private Functions - Schema and Filtering

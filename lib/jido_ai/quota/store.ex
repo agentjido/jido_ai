@@ -4,6 +4,7 @@ defmodule Jido.AI.Quota.Store do
   """
 
   @table :jido_ai_quota_store
+  @heir_name :jido_ai_quota_store_heir
 
   @type usage :: %{
           required(:window_started_at_ms) => non_neg_integer(),
@@ -19,23 +20,24 @@ defmodule Jido.AI.Quota.Store do
     ensure_table!()
 
     now = System.system_time(:millisecond)
-    current = get(scope)
+    normalize_legacy_row!(scope)
+    maybe_roll_window!(scope, now, window_ms)
 
-    base =
-      if expired?(current, now, window_ms) do
-        %{window_started_at_ms: now, requests: 0, total_tokens: 0}
-      else
-        current
+    [requests, total_tokens] =
+      :ets.update_counter(
+        @table,
+        scope,
+        [{3, 1}, {4, tokens}],
+        {scope, now, 0, 0}
+      )
+
+    window_started_at_ms =
+      case :ets.lookup(@table, scope) do
+        [{^scope, started_at, _req, _tok}] when is_integer(started_at) -> started_at
+        _ -> now
       end
 
-    updated = %{
-      window_started_at_ms: base.window_started_at_ms,
-      requests: base.requests + 1,
-      total_tokens: base.total_tokens + tokens
-    }
-
-    :ets.insert(@table, {scope, updated})
-    updated
+    %{window_started_at_ms: window_started_at_ms, requests: requests, total_tokens: total_tokens}
   end
 
   @doc """
@@ -46,8 +48,15 @@ defmodule Jido.AI.Quota.Store do
     ensure_table!()
 
     case :ets.lookup(@table, scope) do
-      [{^scope, usage}] -> usage
-      _ -> %{window_started_at_ms: System.system_time(:millisecond), requests: 0, total_tokens: 0}
+      [{^scope, started_at, requests, total_tokens}]
+      when is_integer(started_at) and is_integer(requests) and is_integer(total_tokens) ->
+        %{window_started_at_ms: started_at, requests: requests, total_tokens: total_tokens}
+
+      [{^scope, %{} = usage}] ->
+        usage
+
+      _ ->
+        %{window_started_at_ms: System.system_time(:millisecond), requests: 0, total_tokens: 0}
     end
   end
 
@@ -105,8 +114,7 @@ defmodule Jido.AI.Quota.Store do
   def ensure_table! do
     case :ets.whereis(@table) do
       :undefined ->
-        :ets.new(@table, [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
-        :ok
+        create_table!()
 
       _tid ->
         :ok
@@ -121,4 +129,81 @@ defmodule Jido.AI.Quota.Store do
   end
 
   defp expired?(_usage, _now, _window_ms), do: false
+
+  defp create_table! do
+    heir = ensure_heir!()
+
+    :ets.new(@table, [
+      :set,
+      :public,
+      :named_table,
+      {:read_concurrency, true},
+      {:write_concurrency, true},
+      {:heir, heir, :ok}
+    ])
+
+    :ok
+  rescue
+    ArgumentError ->
+      # Another process may have created the table concurrently.
+      :ok
+  end
+
+  defp normalize_legacy_row!(scope) do
+    case :ets.lookup(@table, scope) do
+      [{^scope, %{window_started_at_ms: started_at, requests: requests, total_tokens: total_tokens}}] ->
+        :ets.insert(@table, {scope, started_at, requests, total_tokens})
+        :ok
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp maybe_roll_window!(scope, now, window_ms) when is_integer(window_ms) and window_ms > 0 do
+    case :ets.lookup(@table, scope) do
+      [{^scope, started_at, _requests, _total_tokens}] when is_integer(started_at) and now - started_at >= window_ms ->
+        # Only replace if the row still matches the expired window we observed.
+        :ets.select_replace(
+          @table,
+          [{{scope, started_at, :"$1", :"$2"}, [], [{{scope, now, 0, 0}}]}]
+        )
+
+        :ok
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp maybe_roll_window!(_scope, _now, _window_ms), do: :ok
+
+  defp ensure_heir! do
+    case Process.whereis(@heir_name) do
+      nil ->
+        pid = spawn(fn -> heir_loop() end)
+
+        try do
+          Process.register(pid, @heir_name)
+          pid
+        rescue
+          ArgumentError ->
+            Process.exit(pid, :normal)
+            Process.whereis(@heir_name) || pid
+        end
+
+      pid ->
+        pid
+    end
+  end
+
+  defp heir_loop do
+    receive do
+      {:"ETS-TRANSFER", _table, _from, _heir_data} ->
+        heir_loop()
+
+      _ ->
+        heir_loop()
+    end
+  end
 end

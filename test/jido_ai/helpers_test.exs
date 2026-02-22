@@ -98,6 +98,12 @@ defmodule Jido.AI.Directive.HelpersTest do
 
       assert [%{role: :user, content: "Hello"}] = result
     end
+
+    test "returns empty list for invalid message context shapes" do
+      assert Helpers.build_directive_messages(%{foo: :bar}, nil) == []
+      assert Helpers.build_directive_messages(%{messages: %{role: :user}}, nil) == []
+      assert Helpers.build_directive_messages("not-a-list", nil) == []
+    end
   end
 
   describe "add_timeout_opt/2" do

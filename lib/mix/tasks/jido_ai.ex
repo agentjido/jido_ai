@@ -59,6 +59,7 @@ defmodule Mix.Tasks.JidoAi do
   require Logger
 
   @supported_types ~w(react aot cod cot tot got trm adaptive)
+  @supported_formats ~w(text json)
 
   @option_strict [
     type: :string,
@@ -92,6 +93,14 @@ defmodule Mix.Tasks.JidoAi do
       OptionParser.parse(argv, option_parser_config())
 
     config = build_config(opts)
+
+    case validate_format(config.format) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        output_fatal_error(%{config | format: "text"}, reason)
+    end
 
     if config.quiet do
       Logger.configure(level: :warning)
@@ -144,6 +153,14 @@ defmodule Mix.Tasks.JidoAi do
       stdin: opts[:stdin] || false,
       trace: opts[:trace] || false
     }
+  end
+
+  @doc false
+  @spec validate_format(term()) :: :ok | {:error, String.t()}
+  def validate_format(format) when format in @supported_formats, do: :ok
+
+  def validate_format(format) do
+    {:error, "Unsupported --format #{inspect(format)}. Supported formats: text, json"}
   end
 
   defp run_non_interactive(args, config) do
@@ -243,6 +260,11 @@ defmodule Mix.Tasks.JidoAi do
         if !config.quiet, do: IO.puts("\n--- Answer ---")
         IO.puts(result.answer)
         if !config.quiet, do: IO.puts("\n#{format_stats(result)}")
+
+      _ ->
+        if !config.quiet, do: IO.puts("\n--- Answer ---")
+        IO.puts(result.answer)
+        if !config.quiet, do: IO.puts("\n#{format_stats(result)}")
     end
   end
 
@@ -280,6 +302,9 @@ defmodule Mix.Tasks.JidoAi do
 
       "text" ->
         IO.puts(:stderr, "Error: #{result.error}")
+
+      _ ->
+        IO.puts(:stderr, "Error: #{result.error}")
     end
 
     System.halt(1)
@@ -292,6 +317,9 @@ defmodule Mix.Tasks.JidoAi do
         IO.puts(Jason.encode!(%{ok: false, error: format_error(reason)}))
 
       "text" ->
+        IO.puts(:stderr, "Fatal: #{format_error(reason)}")
+
+      _ ->
         IO.puts(:stderr, "Fatal: #{format_error(reason)}")
     end
 

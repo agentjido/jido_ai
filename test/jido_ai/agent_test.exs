@@ -238,6 +238,23 @@ defmodule Jido.AI.AgentTest do
       assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
       assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}
     end
+
+    test "on_after_cmd cancel does not overwrite completed request" do
+      agent = BasicAgent.new()
+      agent = Request.start_request(agent, "req_1", "query")
+      agent = Request.complete_request(agent, "req_1", "done")
+
+      {:ok, agent, _directives} =
+        BasicAgent.on_after_cmd(
+          agent,
+          {:ai_react_cancel, %{request_id: "req_1", reason: :user_cancelled}},
+          []
+        )
+
+      assert get_in(agent.state, [:requests, "req_1", :status]) == :completed
+      assert get_in(agent.state, [:requests, "req_1", :result]) == "done"
+      assert get_in(agent.state, [:requests, "req_1", :error]) == nil
+    end
   end
 
   # ============================================================================

@@ -24,7 +24,7 @@ defmodule Jido.AI.Signal.LLMResponse do
   Extracts tool calls from an LLMResponse signal.
   """
   @spec extract_tool_calls(Jido.Signal.t()) :: [map()]
-  def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) do
+  def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) when is_map(result) do
     result
     |> Turn.from_result_map()
     |> Map.get(:tool_calls, [])
@@ -36,7 +36,7 @@ defmodule Jido.AI.Signal.LLMResponse do
   Checks if an LLMResponse signal contains tool calls.
   """
   @spec tool_call?(Jido.Signal.t()) :: boolean()
-  def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) do
+  def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) when is_map(result) do
     result
     |> Turn.from_result_map()
     |> Turn.needs_tools?()

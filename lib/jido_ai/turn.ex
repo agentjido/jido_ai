@@ -575,7 +575,7 @@ defmodule Jido.AI.Turn do
 
   defp stop_execute_telemetry(tool_name, result, start_time, context) do
     obs_cfg = context[:observability] || %{}
-    duration = System.monotonic_time() - start_time
+    duration_native = System.monotonic_time() - start_time
 
     metadata =
       %{
@@ -594,14 +594,14 @@ defmodule Jido.AI.Turn do
     Observe.emit(
       obs_cfg,
       Observe.tool_execute(:stop),
-      %{duration: duration},
+      duration_measurements(duration_native),
       metadata
     )
   end
 
   defp exception_execute_telemetry(tool_name, reason, start_time, context) do
     obs_cfg = context[:observability] || %{}
-    duration = System.monotonic_time() - start_time
+    duration_native = System.monotonic_time() - start_time
 
     metadata =
       %{
@@ -620,9 +620,13 @@ defmodule Jido.AI.Turn do
     Observe.emit(
       obs_cfg,
       Observe.tool_execute(:exception),
-      %{duration: duration},
+      duration_measurements(duration_native),
       metadata
     )
+  end
+
+  defp duration_measurements(duration_native) do
+    %{duration_ms: System.convert_time_unit(duration_native, :native, :millisecond), duration: duration_native}
   end
 
   defp timeout_opts(timeout) when is_integer(timeout) and timeout > 0, do: [timeout: timeout]
