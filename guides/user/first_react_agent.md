@@ -57,6 +57,11 @@ signal = Jido.Signal.new!(
 {:ok, _agent} = Jido.AI.set_system_prompt(pid, "You are a concise support specialist.")
 ```
 
+## Note: Retrieval And ReAct
+
+If you enable the retrieval plugin, auto-enrichment does **not** run on `ai.react.query` signals.
+Recall memory explicitly and prepend it to your prompt. See [Retrieval And Quota](retrieval_and_quota.md) for details.
+
 ## Failure Mode: Tool Not Registered / Not Valid
 
 Symptom:

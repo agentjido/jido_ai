@@ -4,6 +4,78 @@ You need a reliable way to compose mountable capabilities (plugins) with executa
 
 After this guide, you can choose the right extension surface for each requirement.
 
+## Pick Your Extension Surface
+
+Jido AI gives you three extension surfaces — **plugins**, **actions**, and **strategies**. Each solves a different problem. Start with the scenario that matches yours.
+
+### Scenario A: You're building a reusable chat capability
+
+You want any agent in your system to gain chat powers by adding one line to its plugin list.
+
+**Reach for a Plugin.**
+
+```elixir
+defmodule MyApp.Assistant do
+  use Jido.Agent,
+    name: "assistant",
+    plugins: [
+      {Jido.AI.Plugins.Chat, %{default_model: :capable, auto_execute: true}}
+    ]
+end
+```
+
+Plugins give you lifecycle hooks (`mount/2`), capability-level defaults, and stable signal contracts (`chat.message`, `chat.simple`, etc.) that the rest of your app can rely on. When you need the same capability across many agents, plugins are the answer.
+
+### Scenario B: You're adding LLM calls to a background job
+
+You have an Oban worker or a one-off Mix task that needs to call an LLM. You don't need an agent, lifecycle hooks, or signal routing — you just need to run an action and get a result.
+
+**Use an Action directly via `Jido.Exec`.**
+
+```elixir
+{:ok, result} =
+  Jido.Exec.run(Jido.AI.Actions.Chat.SimpleChat, %{
+    model: :fast,
+    prompt: "Summarize this support ticket."
+  })
+```
+
+Actions are the lowest-level primitive. They validate params, call the LLM, and return `{:ok, result}` or `{:error, reason}`. No plugin state, no agent process required.
+
+### Scenario C: You want a custom multi-step reasoning approach
+
+You need chain-of-thought, tree-of-thoughts, or your own bespoke reasoning loop that orchestrates multiple LLM calls with intermediate evaluation.
+
+**Configure a Strategy (and optionally wrap it in a Reasoning plugin).**
+
+```elixir
+defmodule MyApp.Analyst do
+  use Jido.AI.Agent,
+    name: "analyst",
+    strategy: {Jido.AI.Reasoning.ReAct.Strategy, [tools: [MyApp.Tools.Search], model: :reasoning]},
+    plugins: [
+      {Jido.AI.Plugins.Reasoning.ChainOfThought, %{default_model: :reasoning}}
+    ]
+end
+```
+
+Strategies own the multi-step execution loop. Reasoning plugins provide signal routing and defaults on top of strategies so you can trigger them via `reasoning.cot.run` and friends.
+
+### Decision Table
+
+| You need to…                                  | Use a…       | Example                                    |
+| --------------------------------------------- | ------------ | ------------------------------------------ |
+| Add a reusable capability to multiple agents   | **Plugin**   | `Jido.AI.Plugins.Chat`                     |
+| Make a single LLM call in a script or job      | **Action**   | `Jido.Exec.run(SimpleChat, params)`        |
+| Orchestrate multi-step reasoning               | **Strategy** | `Jido.AI.Reasoning.ReAct.Strategy`         |
+| Expose a capability via stable signal contract | **Plugin**   | `chat.message`, `reasoning.cot.run`        |
+| Compose actions without agent lifecycle        | **Action**   | Chain actions with `Jido.Exec`             |
+| Customize reasoning defaults per agent         | **Plugin**   | `Jido.AI.Plugins.Reasoning.ChainOfThought` |
+
+---
+
+The rest of this guide covers the contracts and defaults for each surface.
+
 ## Public Plugin Surface (v3)
 
 Public capability plugins:
@@ -102,12 +174,14 @@ Wildcard behavior:
 - `"reasoning.*.run"` matches `"reasoning.cot.run"`
 - `"reasoning.*.run"` does not match `"reasoning.cot.worker.run"`
 
-Production-style config shape:
+Production-style config shape (using `Jido.Agent` so you can mount/configure
+this plugin directly):
 
 ```elixir
 defmodule MyApp.RoutedAssistant do
-  use Jido.AI.Agent,
+  use Jido.Agent,
     name: "routed_assistant",
+    strategy: {Jido.AI.Reasoning.ReAct.Strategy, [tools: [MyApp.Tools.Search], model: :fast]},
     plugins: [
       {Jido.AI.Plugins.ModelRouting,
        %{
@@ -121,6 +195,10 @@ defmodule MyApp.RoutedAssistant do
     ]
 end
 ```
+
+If you are using `Jido.AI.Agent`, `ModelRouting` is already mounted by default.
+Do not add a second `ModelRouting` plugin instance (duplicate state key). Use
+`Jido.Agent` when you need custom `ModelRouting` plugin config.
 
 ### Policy Runtime Contract
 
@@ -148,12 +226,14 @@ Normalization and sanitization:
 - `ai.llm.delta` strips control bytes from `data.delta` and truncates to
   `max_delta_chars`
 
-Policy hardening config shape:
+Policy hardening config shape (using `Jido.Agent` so you can mount/configure
+this plugin directly):
 
 ```elixir
 defmodule MyApp.PolicyHardenedAssistant do
-  use Jido.AI.Agent,
+  use Jido.Agent,
     name: "policy_hardened_assistant",
+    strategy: {Jido.AI.Reasoning.ReAct.Strategy, [tools: [MyApp.Tools.Search], model: :fast]},
     plugins: [
       {Jido.AI.Plugins.Policy,
        %{
@@ -164,6 +244,10 @@ defmodule MyApp.PolicyHardenedAssistant do
     ]
 end
 ```
+
+If you are using `Jido.AI.Agent`, `Policy` is already mounted by default. Do
+not add a second `Policy` plugin instance (duplicate state key). Use
+`Jido.Agent` when you need custom `Policy` plugin config.
 
 ### Retrieval Runtime Contract
 

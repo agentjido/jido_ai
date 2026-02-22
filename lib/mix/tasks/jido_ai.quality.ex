@@ -2,6 +2,8 @@ defmodule Mix.Tasks.JidoAi.Quality do
   @shortdoc "Run final stable quality checkpoint and traceability closure validation"
 
   @moduledoc """
+  **Maintainers only.**
+
   Runs the final stable quality checkpoint for backlog closure.
 
   By default this task runs:
