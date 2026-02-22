@@ -201,6 +201,16 @@ defmodule Jido.AI.ToolAdapterTest do
       tools = %{ParamAction.name() => ParamAction}
       assert ToolAdapter.to_action_map(tools) == tools
     end
+
+    test "ignores invalid non-module atoms in module lists" do
+      assert ToolAdapter.to_action_map([ParamAction, :not_a_module]) == %{
+               ParamAction.name() => ParamAction
+             }
+    end
+
+    test "returns empty map for invalid single atom input" do
+      assert ToolAdapter.to_action_map(:not_a_module) == %{}
+    end
   end
 
   describe "duplicate detection" do

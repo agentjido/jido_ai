@@ -357,6 +357,14 @@ defmodule Jido.AI.Thread do
     %{role: :system, content: content}
   end
 
+  # Preserve non-canonical roles from imported histories instead of crashing.
+  defp entry_to_message(%Entry{} = entry) do
+    %{role: entry.role, content: entry.content}
+    |> maybe_add(:name, entry.name)
+    |> maybe_add(:tool_call_id, entry.tool_call_id)
+    |> maybe_add(:tool_calls, entry.tool_calls)
+  end
+
   defp build_assistant_content(content, nil), do: content
   defp build_assistant_content(content, ""), do: content
 
@@ -444,7 +452,7 @@ end
 defimpl Inspect, for: Jido.AI.Thread do
   def inspect(thread, _opts) do
     len = Kernel.length(thread.entries)
-    last_roles = thread.entries |> Enum.take(-2) |> Enum.map(& &1.role)
+    last_roles = thread.entries |> Enum.reverse() |> Enum.take(-2) |> Enum.map(& &1.role)
 
     suffix = if len > 0, do: ", last: #{Kernel.inspect(last_roles)}", else: ""
     "#Thread<#{len} entries#{suffix}>"

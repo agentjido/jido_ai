@@ -96,4 +96,17 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
       assert JidoAiTask.supported_types() == ~w(react aot cod cot tot got trm adaptive)
     end
   end
+
+  describe "validate_format/1" do
+    test "accepts supported formats" do
+      assert :ok = JidoAiTask.validate_format("text")
+      assert :ok = JidoAiTask.validate_format("json")
+    end
+
+    test "rejects unsupported formats" do
+      assert {:error, message} = JidoAiTask.validate_format("yaml")
+      assert message =~ "Unsupported --format"
+      assert message =~ "text, json"
+    end
+  end
 end

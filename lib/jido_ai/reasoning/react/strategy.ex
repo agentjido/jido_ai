@@ -1170,11 +1170,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
 
-    request_policy =
-      case Keyword.get(opts, :request_policy, :reject) do
-        :reject -> :reject
-        _ -> :reject
-      end
+    request_policy = validate_request_policy!(Keyword.get(opts, :request_policy, :reject))
 
     %{
       tools: tools_modules,
@@ -1208,6 +1204,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp resolve_model_spec(model) when is_atom(model), do: Jido.AI.resolve_model(model)
   defp resolve_model_spec(model) when is_binary(model), do: model
+
+  defp validate_request_policy!(:reject), do: :reject
+
+  defp validate_request_policy!(other) do
+    raise ArgumentError,
+          "unsupported request_policy #{inspect(other)} for ReAct; supported values: [:reject]"
+  end
 
   defp normalize_map_opt(%{} = value), do: value
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)

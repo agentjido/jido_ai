@@ -4,6 +4,7 @@ defmodule Jido.AI.Retrieval.Store do
   """
 
   @table :jido_ai_retrieval_store
+  @heir_name :jido_ai_retrieval_store_heir
 
   @type memory :: %{
           required(:id) => String.t(),
@@ -106,8 +107,7 @@ defmodule Jido.AI.Retrieval.Store do
   def ensure_table! do
     case :ets.whereis(@table) do
       :undefined ->
-        :ets.new(@table, [:set, :public, :named_table, read_concurrency: true, write_concurrency: true])
-        :ok
+        create_table!()
 
       _tid ->
         :ok
@@ -133,5 +133,53 @@ defmodule Jido.AI.Retrieval.Store do
     |> String.replace(~r/[^a-z0-9\s]/u, " ")
     |> String.split(~r/\s+/, trim: true)
     |> MapSet.new()
+  end
+
+  defp create_table! do
+    heir = ensure_heir!()
+
+    :ets.new(@table, [
+      :set,
+      :public,
+      :named_table,
+      {:read_concurrency, true},
+      {:write_concurrency, true},
+      {:heir, heir, :ok}
+    ])
+
+    :ok
+  rescue
+    ArgumentError ->
+      # Another process may have created the table concurrently.
+      :ok
+  end
+
+  defp ensure_heir! do
+    case Process.whereis(@heir_name) do
+      nil ->
+        pid = spawn(fn -> heir_loop() end)
+
+        try do
+          Process.register(pid, @heir_name)
+          pid
+        rescue
+          ArgumentError ->
+            Process.exit(pid, :normal)
+            Process.whereis(@heir_name) || pid
+        end
+
+      pid ->
+        pid
+    end
+  end
+
+  defp heir_loop do
+    receive do
+      {:"ETS-TRANSFER", _table, _from, _heir_data} ->
+        heir_loop()
+
+      _ ->
+        heir_loop()
+    end
   end
 end

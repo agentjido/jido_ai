@@ -420,7 +420,7 @@ defmodule Jido.AI.Agent do
       @impl true
       def on_after_cmd(agent, {:ai_react_cancel, %{request_id: request_id, reason: reason}}, directives) do
         agent =
-          if is_binary(request_id) do
+          if is_binary(request_id) and request_pending?(agent, request_id) do
             failure = {:cancelled, reason}
             emit_request_failed_signal(agent, request_id, failure)
             Request.fail_request(agent, request_id, failure)

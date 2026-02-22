@@ -374,6 +374,16 @@ defmodule Jido.AI.SignalTest do
       assert LLMResponse.extract_tool_calls(signal) == []
     end
 
+    test "returns empty list for non-map ok result payloads" do
+      signal =
+        LLMResponse.new!(%{
+          call_id: "call_tc_5",
+          result: {:ok, "plain text payload"}
+        })
+
+      assert LLMResponse.extract_tool_calls(signal) == []
+    end
+
     test "returns empty list for non-LLMResponse signals" do
       signal =
         Usage.new!(%{
@@ -423,6 +433,16 @@ defmodule Jido.AI.SignalTest do
         LLMResponse.new!(%{
           call_id: "call_is_tc_4",
           result: {:error, %{reason: "failed"}}
+        })
+
+      assert LLMResponse.tool_call?(signal) == false
+    end
+
+    test "returns false for non-map ok result payloads" do
+      signal =
+        LLMResponse.new!(%{
+          call_id: "call_is_tc_5",
+          result: {:ok, "plain text payload"}
         })
 
       assert LLMResponse.tool_call?(signal) == false

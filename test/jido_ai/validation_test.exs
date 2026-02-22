@@ -46,10 +46,10 @@ defmodule Jido.AI.ValidationTest do
   end
 
   describe "callback validation" do
-    test "validate_callback/1 accepts 1-3 arity functions only" do
+    test "validate_callback/1 accepts arity-1 functions only" do
       assert :ok = Validation.validate_callback(fn x -> x end)
-      assert :ok = Validation.validate_callback(fn x, y -> x + y end)
-      assert :ok = Validation.validate_callback(fn x, y, z -> x + y + z end)
+      assert {:error, :invalid_callback_arity} = Validation.validate_callback(fn x, y -> x + y end)
+      assert {:error, :invalid_callback_arity} = Validation.validate_callback(fn x, y, z -> x + y + z end)
       assert {:error, :invalid_callback_arity} = Validation.validate_callback(fn -> :ok end)
     end
 
@@ -75,6 +75,26 @@ defmodule Jido.AI.ValidationTest do
                )
 
       assert {:error, :callback_timeout} = slow_wrapped.("x")
+    end
+
+    test "validate_and_wrap_callback/2 rejects non-arity-1 callbacks" do
+      assert {:error, :invalid_callback_arity} =
+               Validation.validate_and_wrap_callback(fn _x, _y -> :ok end)
+    end
+
+    test "wrapped callbacks report callback execution failure for crashed tasks" do
+      {:ok, task_supervisor} = Task.Supervisor.start_link()
+
+      assert {:ok, wrapped} =
+               Validation.validate_and_wrap_callback(
+                 fn _ ->
+                   raise "boom"
+                 end,
+                 timeout: 1_000,
+                 task_supervisor: task_supervisor
+               )
+
+      assert {:error, :callback_execution_failed} = wrapped.("x")
     end
 
     test "validate_and_wrap_callback/2 returns errors for invalid supervisors" do

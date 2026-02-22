@@ -56,6 +56,14 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     }
   end
 
+  describe "init validation" do
+    test "raises for unsupported request_policy values" do
+      assert_raise ArgumentError, ~r/unsupported request_policy/, fn ->
+        create_agent(tools: [TestCalculator], request_policy: :queue)
+      end
+    end
+  end
+
   describe "signal_routes/1" do
     test "routes delegated worker signals and compatibility observability signals" do
       routes = ReAct.signal_routes(%{})
