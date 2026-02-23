@@ -20,6 +20,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
         max_iterations: Zoi.integer() |> Zoi.default(10),
         max_tokens: Zoi.integer() |> Zoi.default(1024),
         temperature: Zoi.float() |> Zoi.default(0.2),
+        llm_opts: Zoi.any() |> Zoi.optional(),
         llm_timeout_ms: Zoi.integer() |> Zoi.optional(),
         req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
         tool_timeout_ms: Zoi.integer() |> Zoi.default(15_000),

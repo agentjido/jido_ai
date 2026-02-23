@@ -136,6 +136,57 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
              ]
     end
 
+    test "start merges base and run llm_opts into runtime config" do
+      agent =
+        create_agent(
+          tools: [TestCalculator],
+          llm_opts: [thinking: %{type: :enabled, budget_tokens: 1_024}, reasoning_effort: :low]
+        )
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          llm_opts: [reasoning_effort: :high]
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+
+      assert state.pending_worker_start.config.llm.llm_opts == [
+               thinking: %{type: :enabled, budget_tokens: 1_024},
+               reasoning_effort: :high
+             ]
+    end
+
+    test "start accepts string-key llm_opts maps and normalizes known keys" do
+      agent =
+        create_agent(
+          tools: [TestCalculator],
+          llm_opts: %{
+            "thinking" => %{type: :enabled, budget_tokens: 1_024},
+            "reasoning_effort" => :low
+          }
+        )
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          llm_opts: %{"reasoning_effort" => :high, "unknown_provider_flag" => true}
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      llm_opts = state.pending_worker_start.config.llm.llm_opts
+
+      assert Keyword.get(llm_opts, :thinking) == %{type: :enabled, budget_tokens: 1_024}
+      assert Keyword.get(llm_opts, :reasoning_effort) == :high
+      refute Keyword.has_key?(llm_opts, :unknown_provider_flag)
+    end
+
     test "child started flushes deferred start to worker pid" do
       agent = create_agent(tools: [TestCalculator])
 
@@ -299,7 +350,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
             instruction(ReAct.start_action(), %{
               query: "q",
               request_id: "req_ephemeral",
-              req_http_options: [plug: {Req.Test, []}]
+              req_http_options: [plug: {Req.Test, []}],
+              llm_opts: [thinking: %{type: :enabled, budget_tokens: 256}]
             })
           ],
           %{}
@@ -321,6 +373,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       state = StratState.get(agent, %{})
       refute Map.has_key?(state, :run_req_http_options)
+      refute Map.has_key?(state, :run_llm_opts)
     end
 
     test "terminal checkpoint after request completion does not reopen active request" do

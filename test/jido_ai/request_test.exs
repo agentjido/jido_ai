@@ -305,7 +305,9 @@ defmodule JidoTest.AI.RequestTest do
                  signal_type: "ai.test.query",
                  source: "/ai/test",
                  request_id: "req_123",
-                 tool_context: %{actor: "user_1"}
+                 tool_context: %{actor: "user_1"},
+                 req_http_options: [plug: {Req.Test, []}],
+                 llm_opts: [thinking: "enabled", reasoning_effort: :high]
                )
 
       assert handle.id == "req_123"
@@ -320,6 +322,8 @@ defmodule JidoTest.AI.RequestTest do
       assert signal.data.prompt == "What is 2+2?"
       assert signal.data.request_id == "req_123"
       assert signal.data.tool_context == %{actor: "user_1"}
+      assert signal.data.req_http_options == [plug: {Req.Test, []}]
+      assert signal.data.llm_opts == [thinking: "enabled", reasoning_effort: :high]
     end
 
     test "await/2 returns successful result for completed request payload" do

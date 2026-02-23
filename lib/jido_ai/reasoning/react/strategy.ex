@@ -55,6 +55,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           streaming: boolean(),
           base_tool_context: map(),
           base_req_http_options: list(),
+          base_llm_opts: keyword(),
           request_policy: :reject,
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
@@ -70,6 +71,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @request_trace_cap 2000
   @worker_tag :react_worker
   @source "/ai/react/strategy"
+  @string_llm_opt_keys %{"thinking" => :thinking, "reasoning_effort" => :reasoning_effort}
 
   @default_system_prompt """
   You are a helpful AI assistant using the ReAct (Reason-Act) pattern.
@@ -144,7 +146,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           query: Zoi.string(),
           request_id: Zoi.string() |> Zoi.optional(),
           tool_context: Zoi.map() |> Zoi.optional(),
-          req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional()
+          req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
+          llm_opts: Zoi.any() |> Zoi.optional()
         }),
       doc: "Start a delegated ReAct conversation with a user query",
       name: "ai.react.start"
@@ -366,6 +369,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         termination_reason: nil,
         run_tool_context: %{},
         run_req_http_options: [],
+        run_llm_opts: [],
         active_request_id: nil,
         cancel_reason: nil,
         usage: %{},
@@ -407,10 +411,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       @start ->
         run_context = Map.get(params, :tool_context) || %{}
         run_req_http_options = params |> Map.get(:req_http_options, []) |> normalize_req_http_options()
+        run_llm_opts = params |> Map.get(:llm_opts, []) |> normalize_llm_opts()
 
         agent
         |> set_run_tool_context(run_context)
         |> set_run_req_http_options(run_req_http_options)
+        |> set_run_llm_opts(run_llm_opts)
         |> process_start(params)
 
       @cancel ->
@@ -470,7 +476,16 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       run_req_http_options = Map.get(state, :run_req_http_options, [])
       base_req_http_options = normalize_req_http_options(config[:base_req_http_options])
       effective_req_http_options = base_req_http_options ++ run_req_http_options
-      runtime_config = runtime_config_from_strategy(config, req_http_options: effective_req_http_options)
+      run_llm_opts = Map.get(state, :run_llm_opts, [])
+      base_llm_opts = normalize_llm_opts(config[:base_llm_opts])
+      effective_llm_opts = Keyword.merge(base_llm_opts, run_llm_opts)
+
+      runtime_config =
+        runtime_config_from_strategy(config,
+          req_http_options: effective_req_http_options,
+          llm_opts: effective_llm_opts
+        )
+
       base_thread = strategy_thread(state, config)
       run_thread = Thread.append_user(base_thread, query)
       runtime_state = runtime_state_from_thread(run_thread, query, request_id, run_id)
@@ -690,6 +705,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             |> Map.put(:run_thread, nil)
             |> Map.delete(:run_tool_context)
             |> Map.delete(:run_req_http_options)
+            |> Map.delete(:run_llm_opts)
 
           {put_strategy_state(agent, failed_state), []}
         else
@@ -846,6 +862,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
+          |> Map.delete(:run_llm_opts)
 
         signal = Signal.RequestCompleted.new!(%{request_id: request_id, result: result, run_id: request_id})
         {updated, [signal]}
@@ -862,6 +879,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
+          |> Map.delete(:run_llm_opts)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}
@@ -880,6 +898,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
+          |> Map.delete(:run_llm_opts)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}
@@ -978,6 +997,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       |> Keyword.get(:req_http_options, config[:base_req_http_options] || [])
       |> normalize_req_http_options()
 
+    llm_opts =
+      opts
+      |> Keyword.get(:llm_opts, config[:base_llm_opts] || [])
+      |> normalize_llm_opts()
+
     runtime_opts = %{
       model: config[:model],
       system_prompt: config[:system_prompt],
@@ -985,6 +1009,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       max_iterations: config[:max_iterations],
       streaming: config[:streaming],
       req_http_options: req_http_options,
+      llm_opts: llm_opts,
       tool_timeout_ms: config[:tool_timeout_ms],
       tool_max_retries: config[:tool_max_retries],
       tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
@@ -1005,6 +1030,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp set_run_req_http_options(agent, req_http_options) when is_list(req_http_options) do
     state = StratState.get(agent, %{})
     put_strategy_state(agent, Map.put(state, :run_req_http_options, req_http_options))
+  end
+
+  defp set_run_llm_opts(agent, llm_opts) when is_list(llm_opts) do
+    state = StratState.get(agent, %{})
+    put_strategy_state(agent, Map.put(state, :run_llm_opts, llm_opts))
   end
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
@@ -1198,7 +1228,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         ),
       agent_id: agent.id,
       base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt,
-      base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options()
+      base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options(),
+      base_llm_opts: opts |> Keyword.get(:llm_opts, []) |> normalize_llm_opts()
     }
   end
 
@@ -1218,6 +1249,36 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp normalize_req_http_options(req_http_options) when is_list(req_http_options), do: req_http_options
   defp normalize_req_http_options(_), do: []
+
+  defp normalize_llm_opts(llm_opts) when is_list(llm_opts), do: normalize_llm_opt_pairs(llm_opts)
+
+  defp normalize_llm_opts(llm_opts) when is_map(llm_opts) do
+    llm_opts
+    |> Enum.map(fn {key, value} -> {normalize_llm_opt_key(key), value} end)
+    |> normalize_llm_opt_pairs()
+  end
+
+  defp normalize_llm_opts(_), do: []
+
+  defp normalize_llm_opt_pairs(pairs) when is_list(pairs) do
+    pairs
+    |> Enum.reduce([], fn
+      {key, value}, acc when is_atom(key) ->
+        [{key, value} | acc]
+
+      _other, acc ->
+        acc
+    end)
+    |> Enum.reverse()
+  end
+
+  defp normalize_llm_opt_key(key) when is_atom(key), do: key
+
+  defp normalize_llm_opt_key(key) when is_binary(key) do
+    Map.get(@string_llm_opt_keys, key)
+  end
+
+  defp normalize_llm_opt_key(_), do: nil
 
   defp generate_call_id, do: "req_#{Jido.Util.generate_id()}"
 

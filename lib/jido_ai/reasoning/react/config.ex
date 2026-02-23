@@ -11,13 +11,15 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @legacy_insecure_token_secret "jido_ai_react_default_secret_change_me"
   @ephemeral_secret_key {:jido_ai, __MODULE__, :ephemeral_token_secret}
   @ephemeral_secret_warned_key {:jido_ai, __MODULE__, :ephemeral_token_secret_warned}
+  @string_llm_opt_keys %{"thinking" => :thinking, "reasoning_effort" => :reasoning_effort}
 
   @llm_schema Zoi.object(%{
                 max_tokens: Zoi.integer() |> Zoi.default(1_024),
                 temperature: Zoi.number() |> Zoi.default(0.2),
                 timeout_ms: Zoi.integer() |> Zoi.nullish(),
                 tool_choice: Zoi.any() |> Zoi.default(:auto),
-                req_http_options: Zoi.list(Zoi.any()) |> Zoi.default([])
+                req_http_options: Zoi.list(Zoi.any()) |> Zoi.default([]),
+                llm_opts: Zoi.any() |> Zoi.default([])
               })
 
   @tool_exec_schema Zoi.object(%{
@@ -90,7 +92,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       temperature: normalize_float(get_opt(opts_map, :temperature, 0.2), 0.2),
       timeout_ms: normalize_optional_pos_integer(llm_timeout),
       tool_choice: get_opt(opts_map, :tool_choice, :auto),
-      req_http_options: normalize_req_http_options(get_opt(opts_map, :req_http_options, []))
+      req_http_options: normalize_req_http_options(get_opt(opts_map, :req_http_options, [])),
+      llm_opts: normalize_llm_opts(get_opt(opts_map, :llm_opts, []))
     }
 
     tool_exec = %{
@@ -194,6 +197,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       tools: reqllm_tools(config)
     ]
 
+    opts = maybe_merge_llm_opts(opts, config.llm.llm_opts)
     opts = maybe_put_req_http_options(opts, config.llm.req_http_options)
 
     if is_integer(config.llm.timeout_ms) do
@@ -270,6 +274,46 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
   defp normalize_req_http_options(value) when is_list(value), do: value
   defp normalize_req_http_options(_), do: []
+
+  defp normalize_llm_opts(value) when is_list(value), do: normalize_llm_opt_pairs(value)
+
+  defp normalize_llm_opts(value) when is_map(value) do
+    value
+    |> Enum.map(fn {key, entry_value} -> {normalize_llm_opt_key(key), entry_value} end)
+    |> normalize_llm_opt_pairs()
+  end
+
+  defp normalize_llm_opts(_), do: []
+
+  defp normalize_llm_opt_pairs(pairs) when is_list(pairs) do
+    pairs
+    |> Enum.reduce([], fn
+      {key, entry_value}, acc when is_atom(key) ->
+        [{key, entry_value} | acc]
+
+      _other, acc ->
+        acc
+    end)
+    |> Enum.reverse()
+  end
+
+  defp normalize_llm_opt_key(key) when is_atom(key), do: key
+
+  defp normalize_llm_opt_key(key) when is_binary(key) do
+    Map.get(@string_llm_opt_keys, key)
+  end
+
+  defp normalize_llm_opt_key(_), do: nil
+
+  defp maybe_merge_llm_opts(opts, llm_opts) when is_list(llm_opts) do
+    if llm_opts == [] do
+      opts
+    else
+      Keyword.merge(opts, llm_opts)
+    end
+  end
+
+  defp maybe_merge_llm_opts(opts, _), do: opts
 
   defp maybe_put_req_http_options(opts, req_http_options) when is_list(req_http_options) do
     if req_http_options == [] do

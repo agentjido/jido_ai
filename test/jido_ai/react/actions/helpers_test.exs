@@ -30,6 +30,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
         tools: [ToolA],
         max_iterations: 4,
         llm_timeout_ms: 1_234,
+        llm_opts: [thinking: %{type: :enabled, budget_tokens: 512}],
         tool_timeout_ms: 300,
         token_secret: "test-secret"
       }
@@ -40,6 +41,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
       assert config.model == Jido.AI.resolve_model(:capable)
       assert config.max_iterations == 4
       assert config.llm.timeout_ms == 1_234
+      assert config.llm.llm_opts == [thinking: %{type: :enabled, budget_tokens: 512}]
       assert config.tool_exec.timeout_ms == 300
       assert config.tools == %{ToolA.name() => ToolA}
       assert config.token.secret == "test-secret"
@@ -66,6 +68,24 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
     test "respects legacy timeout_ms fallback into llm timeout" do
       config = Helpers.build_config(%{timeout_ms: 999}, %{})
       assert config.llm.timeout_ms == 999
+    end
+
+    test "normalizes known string-key llm_opts map entries" do
+      config =
+        Helpers.build_config(
+          %{
+            llm_opts: %{
+              "thinking" => %{type: :enabled, budget_tokens: 256},
+              "reasoning_effort" => :high,
+              "unknown_provider_flag" => true
+            }
+          },
+          %{}
+        )
+
+      assert Keyword.get(config.llm.llm_opts, :thinking) == %{type: :enabled, budget_tokens: 256}
+      assert Keyword.get(config.llm.llm_opts, :reasoning_effort) == :high
+      refute Keyword.has_key?(config.llm.llm_opts, :unknown_provider_flag)
     end
   end
 

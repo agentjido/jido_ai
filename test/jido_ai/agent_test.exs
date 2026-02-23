@@ -70,6 +70,14 @@ defmodule Jido.AI.AgentTest do
       tool_context: %{tenant_id: "tenant_123", enabled: true}
   end
 
+  defmodule AgentWithLlmOpts do
+    use Jido.AI.Agent,
+      name: "agent_with_llm_opts",
+      tools: [TestCalculator],
+      llm_opts: [thinking: %{type: :enabled, budget_tokens: 800}, reasoning_effort: :high],
+      req_http_options: [adapter: [recv_timeout: 2_000]]
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -172,6 +180,15 @@ defmodule Jido.AI.AgentTest do
       # Now stored as base_tool_context (persistent)
       assert config.base_tool_context[:tenant_id] == "tenant_123"
       assert config.base_tool_context[:enabled] == true
+    end
+
+    test "llm_opts and req_http_options are forwarded into strategy config" do
+      agent = AgentWithLlmOpts.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.base_llm_opts == [thinking: %{type: :enabled, budget_tokens: 800}, reasoning_effort: :high]
+      assert config.base_req_http_options == [adapter: [recv_timeout: 2_000]]
     end
 
     test "tools list resolves module aliases" do

@@ -26,7 +26,8 @@ defmodule MyApp.MathAgent do
     model: :fast,
     tools: [MyApp.Actions.AddNumbers],
     max_iterations: 8,
-    system_prompt: "Solve accurately. Use tools for arithmetic."
+    system_prompt: "Solve accurately. Use tools for arithmetic.",
+    llm_opts: [thinking: %{type: :enabled, budget_tokens: 2048}, reasoning_effort: :high]
 end
 ```
 
@@ -37,6 +38,12 @@ end
 
 {:ok, req} = MyApp.MathAgent.ask(pid, "What is 19 + 23?")
 {:ok, result} = MyApp.MathAgent.await(req, timeout: 15_000)
+
+# Per-request overrides
+{:ok, req2} =
+  MyApp.MathAgent.ask(pid, "Explain how you solved that",
+    llm_opts: [reasoning_effort: :medium]
+  )
 ```
 
 ## Optional: Set Tool Context At Runtime
