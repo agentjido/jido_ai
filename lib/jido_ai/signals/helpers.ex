@@ -27,16 +27,24 @@ defmodule Jido.AI.Signal.Helpers do
   end
 
   @doc """
-  Ensures result payloads use `{:ok, term}` or `{:error, envelope}` tuples.
+  Ensures result payloads use `{:ok, term, effects}` or `{:error, reason, effects}` tuples.
   """
-  @spec normalize_result(term(), atom(), String.t()) :: {:ok, term()} | {:error, error_envelope()}
+  @spec normalize_result(term(), atom(), String.t()) ::
+          {:ok, term(), [term()]} | {:error, term(), [term()]}
   def normalize_result(result, fallback_code \\ :invalid_result, fallback_message \\ "Invalid result envelope")
 
-  def normalize_result({:ok, _} = result, _fallback_code, _fallback_message), do: result
-  def normalize_result({:error, _} = result, _fallback_code, _fallback_message), do: result
+  def normalize_result({:ok, value, effects}, _fallback_code, _fallback_message),
+    do: {:ok, value, List.wrap(effects)}
+
+  def normalize_result({:ok, value}, _fallback_code, _fallback_message), do: {:ok, value, []}
+
+  def normalize_result({:error, reason, effects}, _fallback_code, _fallback_message),
+    do: {:error, reason, List.wrap(effects)}
+
+  def normalize_result({:error, reason}, _fallback_code, _fallback_message), do: {:error, reason, []}
 
   def normalize_result(result, fallback_code, fallback_message) do
-    {:error, error_envelope(fallback_code, fallback_message, %{result: inspect(result)})}
+    {:error, error_envelope(fallback_code, fallback_message, %{result: inspect(result)}), []}
   end
 
   @doc """

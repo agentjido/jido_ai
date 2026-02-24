@@ -85,8 +85,14 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
     tools = resolve_tools_input(context)
 
     case Turn.run_tool_calls([tool_call], context, timeout: timeout, tools: tools) do
+      {:ok, [%{raw_result: {:ok, result, _effects}}]} ->
+        {:ok, format_result(result)}
+
       {:ok, [%{raw_result: {:ok, result}}]} ->
         {:ok, format_result(result)}
+
+      {:ok, [%{content: content, raw_result: {:error, _reason, _effects}}]} when is_binary(content) ->
+        {:error, content}
 
       {:ok, [%{content: content, raw_result: {:error, _reason}}]} when is_binary(content) ->
         {:error, content}

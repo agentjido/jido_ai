@@ -30,6 +30,8 @@ defmodule Jido.AI.Agent do
   - `:tool_timeout_ms` - Per-attempt tool execution timeout in ms (default: 15_000)
   - `:tool_max_retries` - Number of retries for tool failures (default: 1)
   - `:tool_retry_backoff_ms` - Retry backoff in ms (default: 200)
+  - `:effect_policy` - Agent-level effect policy (default allow-list)
+  - `:strategy_effect_policy` - Optional strategy-level narrowing policy (cannot broaden agent policy)
   - `:runtime_adapter` - Deprecated compatibility flag (delegated ReAct runtime is always enabled)
   - `:runtime_task_supervisor` - Optional Task.Supervisor used by delegated ReAct runtime
   - `:observability` - Observability options map
@@ -167,37 +169,29 @@ defmodule Jido.AI.Agent do
   end
 
   @doc false
-  def expand_and_eval_literal_option(value, caller_env) do
-    case value do
-      nil ->
-        nil
-
-      value when is_map(value) ->
-        value
-
-      value when is_list(value) ->
-        value
-        |> expand_aliases_in_ast(caller_env)
-        |> Code.eval_quoted([], caller_env)
-        |> elem(0)
-
-      {:%{}, _, _} = map_ast ->
-        map_ast
-        |> expand_aliases_in_ast(caller_env)
-        |> Code.eval_quoted([], caller_env)
-        |> elem(0)
-
-      {:%, _, _} = struct_ast ->
-        struct_ast
-        |> expand_aliases_in_ast(caller_env)
-        |> Code.eval_quoted([], caller_env)
-        |> elem(0)
-
-      other ->
-        other
+  def expand_and_eval_literal_option(option_ast, caller_env) do
+    if contains_quoted_ast?(option_ast) do
+      expanded_ast = expand_aliases_in_ast(option_ast, caller_env)
+      {evaluated, _binding} = Code.eval_quoted(expanded_ast, [], caller_env)
+      evaluated
+    else
+      option_ast
     end
   end
 
+  defp contains_quoted_ast?({_, meta, args}) when is_list(meta) and is_list(args), do: true
+  defp contains_quoted_ast?(list) when is_list(list), do: Enum.any?(list, &contains_quoted_ast?/1)
+
+  defp contains_quoted_ast?(map) when is_map(map) do
+    Enum.any?(map, fn {key, value} ->
+      contains_quoted_ast?(key) or contains_quoted_ast?(value)
+    end)
+  end
+
+  defp contains_quoted_ast?(tuple) when is_tuple(tuple),
+    do: tuple |> Tuple.to_list() |> Enum.any?(&contains_quoted_ast?/1)
+
+  defp contains_quoted_ast?(_), do: false
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
@@ -234,6 +228,15 @@ defmodule Jido.AI.Agent do
     llm_opts =
       opts
       |> Keyword.get(:llm_opts, [])
+
+    agent_effect_policy =
+      opts
+      |> Keyword.get(:effect_policy, %{})
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
+    strategy_effect_policy =
+      opts
+      |> Keyword.get(:strategy_effect_policy, %{})
       |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
 
     # Don't extract tool_context here - it contains AST with module aliases
@@ -279,6 +282,8 @@ defmodule Jido.AI.Agent do
         observability: observability,
         req_http_options: req_http_options,
         llm_opts: llm_opts,
+        agent_effect_policy: agent_effect_policy,
+        strategy_effect_policy: strategy_effect_policy,
         tool_context: tool_context
       ]
       |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)

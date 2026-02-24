@@ -290,7 +290,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
     refute is_nil(tool_completed)
     assert tool_completed.data.attempts == 2
-    assert match?({:ok, _}, tool_completed.data.result)
+    assert match?({:ok, _, _}, tool_completed.data.result)
   end
 
   test "resumes from after_llm checkpoint token" do

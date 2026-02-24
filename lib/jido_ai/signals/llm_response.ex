@@ -13,7 +13,7 @@ defmodule Jido.AI.Signal.LLMResponse do
     default_source: "/ai/llm",
     schema: [
       call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
-      result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"],
+      result: [type: :any, required: true, doc: "{:ok, result, effects} | {:error, reason, effects}"],
       usage: [type: :map, doc: "Token usage: %{input_tokens: N, output_tokens: M}"],
       model: [type: :string, doc: "Actual model used for the request"],
       duration_ms: [type: :integer, doc: "Request duration in milliseconds"],
@@ -30,6 +30,12 @@ defmodule Jido.AI.Signal.LLMResponse do
     |> Map.get(:tool_calls, [])
   end
 
+  def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result, _effects}}}) when is_map(result) do
+    result
+    |> Turn.from_result_map()
+    |> Map.get(:tool_calls, [])
+  end
+
   def extract_tool_calls(_signal), do: []
 
   @doc """
@@ -37,6 +43,12 @@ defmodule Jido.AI.Signal.LLMResponse do
   """
   @spec tool_call?(Jido.Signal.t()) :: boolean()
   def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) when is_map(result) do
+    result
+    |> Turn.from_result_map()
+    |> Turn.needs_tools?()
+  end
+
+  def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result, _effects}}}) when is_map(result) do
     result
     |> Turn.from_result_map()
     |> Turn.needs_tools?()
@@ -58,7 +70,7 @@ defmodule Jido.AI.Signal.LLMResponse do
 
     signal_data = %{
       call_id: call_id,
-      result: {:ok, turn}
+      result: {:ok, turn, []}
     }
 
     signal_data = if turn.usage, do: Map.put(signal_data, :usage, turn.usage), else: signal_data

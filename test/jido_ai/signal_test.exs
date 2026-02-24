@@ -472,7 +472,7 @@ defmodule Jido.AI.SignalTest do
 
       assert signal.type == "ai.llm.response"
       assert signal.data.call_id == "call_from_1"
-      assert {:ok, result} = signal.data.result
+      assert {:ok, result, []} = signal.data.result
       assert result.type == :final_answer
       assert result.text == "Hello, world!"
       assert result.tool_calls == []
@@ -529,7 +529,7 @@ defmodule Jido.AI.SignalTest do
 
       {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_5")
 
-      {:ok, result} = signal.data.result
+      {:ok, result, []} = signal.data.result
       assert result.text == "First part. \nSecond part."
     end
 
@@ -546,7 +546,7 @@ defmodule Jido.AI.SignalTest do
       {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_6")
 
       assert signal.data.thinking_content == "Let me analyze this..."
-      {:ok, result} = signal.data.result
+      {:ok, result, []} = signal.data.result
       assert result.text == "Here is my answer."
     end
 
@@ -562,7 +562,7 @@ defmodule Jido.AI.SignalTest do
 
       {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_7")
 
-      {:ok, result} = signal.data.result
+      {:ok, result, []} = signal.data.result
       assert result.type == :tool_calls
       assert length(result.tool_calls) == 1
       [tc] = result.tool_calls

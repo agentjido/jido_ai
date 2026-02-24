@@ -48,6 +48,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   - `:top_k`, `:min_depth`, `:max_nodes`, `:max_duration_ms`, `:beam_width` (optional) - Search budget and shaping controls
   - `:early_success_threshold`, `:convergence_window`, `:min_score_improvement`, `:max_parse_retries` (optional) - Completion/parser controls
   - `:tools`, `:tool_context`, `:tool_timeout_ms`, `:tool_max_retries`, `:tool_retry_backoff_ms`, `:max_tool_round_trips` (optional) - Tool execution controls
+  - `:effect_policy`, `:agent_effect_policy`, `:strategy_effect_policy` (optional) - Effect policy controls
   - `:generation_prompt` (optional) - Custom prompt for thought generation
   - `:evaluation_prompt` (optional) - Custom prompt for thought evaluation
 
@@ -70,6 +71,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
+  alias Jido.AI.Effects
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Reasoning.TreeOfThoughts.Machine
   alias Jido.AI.ToolAdapter
@@ -99,7 +101,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
-          max_tool_round_trips: pos_integer()
+          max_tool_round_trips: pos_integer(),
+          effect_policy: map()
         }
 
   @default_model :fast
@@ -400,25 +403,32 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   defp process_tool_result(agent, %{call_id: tool_call_id} = params, config) when is_binary(tool_call_id) do
     state = StratState.get(agent, %{})
     pending_calls = state[:pending_tool_calls] || %{}
+    policy = config[:effect_policy] || Effects.default_policy()
 
     case Map.fetch(pending_calls, tool_call_id) do
       :error ->
         {agent, []}
 
       {:ok, _pending} ->
+        result = normalize_tool_result(params[:result])
+
         pending_results =
           Map.put(
             state[:pending_tool_results] || %{},
             tool_call_id,
-            %{result: params[:result], tool_name: params[:tool_name]}
+            %{result: result, tool_name: params[:tool_name]}
           )
 
         state = Map.put(state, :pending_tool_results, pending_results)
+        agent = StratState.put(agent, state)
+        {agent, effect_directives, _stats, _filtered_result} = Effects.apply_result(agent, result, policy)
+        state = StratState.get(agent, %{})
 
         if pending_tool_round_complete?(state) do
-          resume_after_tool_round(agent, state, config)
+          {agent, resume_directives} = resume_after_tool_round(agent, state, config)
+          {agent, effect_directives ++ resume_directives}
         else
-          {StratState.put(agent, state), []}
+          {agent, effect_directives}
         end
     end
   end
@@ -528,7 +538,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
                     Map.merge(config[:tool_context] || %{}, %{
                       agent_id: agent.id,
                       request_id: request_id,
-                      iteration: iteration
+                      iteration: iteration,
+                      effect_policy: config[:effect_policy] || Effects.default_policy()
                     }),
                   timeout_ms: config[:tool_timeout_ms],
                   max_retries: config[:tool_max_retries],
@@ -749,6 +760,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []
     tool_context_opt = normalize_map_opt(Keyword.get(opts, :tool_context, %{}))
+    agent_effect_policy = Keyword.get(opts, :agent_effect_policy, Keyword.get(opts, :effect_policy, %{}))
+    strategy_effect_policy = Keyword.get(opts, :strategy_effect_policy, %{})
     tools_modules = normalize_tools_modules(Keyword.get(opts, :tools, []))
     actions_by_name = ToolAdapter.to_action_map(tools_modules)
     reqllm_tools = ToolAdapter.from_actions(Map.values(actions_by_name))
@@ -756,6 +769,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     # Resolve model
     raw_model = Map.get(agent.state, :model, Keyword.get(opts, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
+    effect_policy = Effects.intersect_policies(agent_effect_policy, strategy_effect_policy)
 
     %{
       model: resolved_model,
@@ -807,7 +821,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, @default_tool_timeout_ms),
       tool_max_retries: Keyword.get(opts, :tool_max_retries, @default_tool_max_retries),
       tool_retry_backoff_ms: Keyword.get(opts, :tool_retry_backoff_ms, @default_tool_retry_backoff_ms),
-      max_tool_round_trips: Keyword.get(opts, :max_tool_round_trips, @default_max_tool_round_trips)
+      max_tool_round_trips: Keyword.get(opts, :max_tool_round_trips, @default_max_tool_round_trips),
+      effect_policy: effect_policy
     }
   end
 
@@ -831,6 +846,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   defp normalize_map_opt(%{} = value), do: value
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
+
+  defp normalize_tool_result(result), do: Effects.normalize_result(result)
 
   defp generate_call_id, do: Machine.generate_call_id()
 

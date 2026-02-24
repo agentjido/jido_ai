@@ -102,7 +102,7 @@ defmodule Jido.AI.TurnTest do
           tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}]
         }
         |> Turn.with_tool_results([
-          %{id: "tc_1", name: "calculator", content: "{\"result\":8}", raw_result: {:ok, %{result: 8}}}
+          %{id: "tc_1", name: "calculator", content: "{\"result\":8}", raw_result: {:ok, %{result: 8}, []}}
         ])
 
       assert Turn.assistant_message(turn) == %{
@@ -144,7 +144,7 @@ defmodule Jido.AI.TurnTest do
       assert tool_result.id == "tc_1"
       assert tool_result.name == "calculator"
       assert tool_result.content == "{\"result\":8}"
-      assert tool_result.raw_result == {:ok, %{result: 8}}
+      assert tool_result.raw_result == {:ok, %{result: 8}, []}
     end
 
     test "returns original turn when no tool calls are requested" do
@@ -170,7 +170,7 @@ defmodule Jido.AI.TurnTest do
 
       on_exit(fn -> :telemetry.detach(handler_id) end)
 
-      assert {:ok, _result} =
+      assert {:ok, _result, _effects} =
                Turn.execute_module(
                  Calculator,
                  %{operation: "add", a: 1, b: 2},

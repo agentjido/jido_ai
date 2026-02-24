@@ -12,7 +12,7 @@ defmodule Jido.AI.Turn do
   - Optional executed tool results
   """
 
-  alias Jido.AI.{Observe, ToolAdapter}
+  alias Jido.AI.{Effects, Observe, ToolAdapter}
   alias Jido.Action.Error.TimeoutError
   alias Jido.Action.Tool, as: ActionTool
 
@@ -21,7 +21,7 @@ defmodule Jido.AI.Turn do
   @type response_type :: :tool_calls | :final_answer
   @type tools_map :: %{String.t() => module()}
   @type execute_opts :: [timeout: pos_integer() | nil, tools: tools_map() | [module()] | module() | nil]
-  @type execute_result :: {:ok, term()} | {:error, map()}
+  @type execute_result :: {:ok, term(), [term()]} | {:error, term(), [term()]}
   @type run_opts :: [timeout: pos_integer() | nil, tools: map() | [module()] | module() | nil]
 
   @default_timeout 30_000
@@ -30,7 +30,7 @@ defmodule Jido.AI.Turn do
           id: String.t(),
           name: String.t(),
           content: String.t(),
-          raw_result: {:ok, term()} | {:error, term()}
+          raw_result: execute_result()
         }
 
   @type t :: %__MODULE__{
@@ -173,7 +173,7 @@ defmodule Jido.AI.Turn do
           execute_internal(module, tool_name, params, context, timeout, exec_opts)
 
         :error ->
-          {:error, error_envelope(tool_name, :not_found, "Tool not found: #{tool_name}")}
+          {:error, error_envelope(tool_name, :not_found, "Tool not found: #{tool_name}"), []}
       end
 
     finalize_execute_telemetry(tool_name, result, start_time, context)
@@ -325,7 +325,10 @@ defmodule Jido.AI.Turn do
   @doc """
   Formats a raw tool execution result to string content suitable for tool messages.
   """
-  @spec format_tool_result_content({:ok, term()} | {:error, term()}) :: String.t()
+  @spec format_tool_result_content(execute_result() | {:ok, term()} | {:error, term()}) :: String.t()
+  def format_tool_result_content({:ok, result, _effects}), do: format_tool_result_content({:ok, result})
+  def format_tool_result_content({:error, error, _effects}), do: format_tool_result_content({:error, error})
+
   def format_tool_result_content({:ok, result}) when is_binary(result), do: result
   def format_tool_result_content({:ok, result}) when is_map(result) or is_list(result), do: encode_or_inspect(result)
   def format_tool_result_content({:ok, result}), do: inspect(result)
@@ -335,6 +338,7 @@ defmodule Jido.AI.Turn do
   end
 
   def format_tool_result_content({:error, error}), do: inspect(error)
+  def format_tool_result_content(other), do: inspect(other)
 
   @doc """
   Converts a turn to a plain result map for public action/plugin outputs.
@@ -406,7 +410,7 @@ defmodule Jido.AI.Turn do
   defp normalize_tool_results(_), do: []
 
   defp normalize_tool_result(%{} = result) do
-    raw_result = get_field(result, :raw_result, {:ok, get_field(result, :result)})
+    raw_result = get_field(result, :raw_result, {:ok, get_field(result, :result), []}) |> normalize_raw_result()
     content = normalize_tool_result_content(get_field(result, :content), raw_result)
 
     %{
@@ -422,7 +426,7 @@ defmodule Jido.AI.Turn do
       id: "",
       name: "",
       content: inspect(other),
-      raw_result: {:ok, other}
+      raw_result: {:ok, other, []}
     }
   end
 
@@ -467,25 +471,31 @@ defmodule Jido.AI.Turn do
     normalized_params = normalize_params(params, schema)
     run_opts = timeout_opts(timeout) ++ exec_opts
 
-    case Jido.Exec.run(module, normalized_params, context, run_opts) do
-      {:ok, output} ->
-        {:ok, output}
+    result =
+      case Jido.Exec.run(module, normalized_params, context, run_opts) do
+        {:ok, output} ->
+          {:ok, output, []}
 
-      {:ok, output, _directive} ->
-        {:ok, output}
+        {:ok, output, effects} ->
+          {:ok, output, List.wrap(effects)}
 
-      {:error, reason} ->
-        {:error, format_error(tool_name, reason)}
+        {:error, reason} ->
+          {:error, format_error(tool_name, reason), []}
 
-      {:error, reason, _directive} ->
-        {:error, format_error(tool_name, reason)}
-    end
+        {:error, reason, effects} ->
+          {:error, format_error(tool_name, reason), List.wrap(effects)}
+
+        other ->
+          {:error, error_envelope(tool_name, :execution_error, "Unexpected execution result", %{result: other}), []}
+      end
+
+    apply_effect_policy(result, context)
   rescue
     e ->
-      {:error, format_exception(tool_name, e, __STACKTRACE__)}
+      {:error, format_exception(tool_name, e, __STACKTRACE__), []}
   catch
     kind, reason ->
-      {:error, format_catch(tool_name, kind, reason)}
+      {:error, format_catch(tool_name, kind, reason), []}
   end
 
   defp format_error(tool_name, %TimeoutError{} = reason) do
@@ -541,7 +551,7 @@ defmodule Jido.AI.Turn do
   defp timeout_from_details(%{} = details), do: get_field(details, :timeout)
   defp timeout_from_details(_), do: nil
 
-  defp finalize_execute_telemetry(tool_name, {:error, %{type: :timeout}}, start_time, context) do
+  defp finalize_execute_telemetry(tool_name, {:error, %{type: :timeout}, _effects}, start_time, context) do
     exception_execute_telemetry(tool_name, :timeout, start_time, context)
   end
 
@@ -647,7 +657,7 @@ defmodule Jido.AI.Turn do
     raw_result =
       case tool_name do
         "" ->
-          {:error, %{type: :validation, message: "Missing tool name"}}
+          {:error, %{type: :validation, message: "Missing tool name"}, []}
 
         _ ->
           execute(tool_name, arguments, context, exec_opts)
@@ -718,6 +728,22 @@ defmodule Jido.AI.Turn do
   defp normalize_tool_result_content(content, _raw_result) when is_binary(content), do: content
   defp normalize_tool_result_content(nil, raw_result), do: format_tool_result_content(raw_result)
   defp normalize_tool_result_content(_content, raw_result), do: format_tool_result_content(raw_result)
+
+  defp normalize_raw_result(raw_result), do: Effects.normalize_result(raw_result)
+
+  defp apply_effect_policy(result, context) do
+    policy = Effects.policy_from_context(context, Effects.default_policy())
+    {filtered_result, stats} = Effects.filter_result(result, policy)
+
+    if stats.dropped_count > 0 do
+      Logger.debug("Dropped disallowed tool effects",
+        dropped_count: stats.dropped_count,
+        tool_result_status: elem(filtered_result, 0)
+      )
+    end
+
+    filtered_result
+  end
 
   defp extract_tool_call_id(%{} = tool_call) do
     get_field(tool_call, :id, "")

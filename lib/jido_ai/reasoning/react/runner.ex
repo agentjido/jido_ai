@@ -469,7 +469,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         do_execute_tool_with_retries(pending_call, module, config, context, 1)
 
       _ ->
-        {pending_call, {:error, %{type: :unknown_tool, message: "Tool '#{pending_call.name}' not found"}}, 1, 0}
+        {pending_call, {:error, %{type: :unknown_tool, message: "Tool '#{pending_call.name}' not found"}, []}, 1, 0}
     end
   end
 
@@ -501,11 +501,16 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
+  defp retryable?({:ok, _, _}), do: false
   defp retryable?({:ok, _}), do: false
 
+  defp retryable?({:error, %{type: :timeout}, _}), do: true
+  defp retryable?({:error, %{type: :exception}, _}), do: true
+  defp retryable?({:error, %{type: :execution_error}, _}), do: true
   defp retryable?({:error, %{type: :timeout}}), do: true
   defp retryable?({:error, %{type: :exception}}), do: true
   defp retryable?({:error, %{type: :execution_error}}), do: true
+  defp retryable?({:error, _, _}), do: false
   defp retryable?({:error, _}), do: false
 
   defp finalize(%State{} = state, owner, ref, %Config{} = config) do
@@ -679,10 +684,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     Turn.execute_module(module, params, context, opts)
   rescue
     error ->
-      {:error, %{type: :exception, error: Exception.message(error), exception_type: error.__struct__}}
+      {:error, %{type: :exception, error: Exception.message(error), exception_type: error.__struct__}, []}
   catch
     kind, reason ->
-      {:error, %{type: :caught, kind: kind, error: inspect(reason)}}
+      {:error, %{type: :caught, kind: kind, error: inspect(reason)}, []}
   end
 
   defp normalize_timeout(value) when is_integer(value) and value > 0, do: value
