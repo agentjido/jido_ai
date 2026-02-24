@@ -736,10 +736,7 @@ defmodule Jido.AI.Turn do
     {filtered_result, stats} = Effects.filter_result(result, policy)
 
     if stats.dropped_count > 0 do
-      Logger.debug("Dropped disallowed tool effects",
-        dropped_count: stats.dropped_count,
-        tool_result_status: elem(filtered_result, 0)
-      )
+      Logger.debug("Dropped disallowed tool effects count=#{stats.dropped_count} status=#{elem(filtered_result, 0)}")
     end
 
     filtered_result

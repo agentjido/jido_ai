@@ -281,14 +281,14 @@ defmodule Jido.AI.Effects.Policy do
     type_allowed? =
       case allowed_types do
         nil -> true
-        [] -> true
+        [] -> false
         allowed -> is_binary(signal_type) and signal_type in allowed
       end
 
     prefix_allowed? =
       case allowed_prefixes do
         nil -> true
-        [] -> true
+        [] -> false
         prefixes -> is_binary(signal_type) and Enum.any?(prefixes, &String.starts_with?(signal_type, &1))
       end
 
@@ -303,34 +303,39 @@ defmodule Jido.AI.Effects.Policy do
         true
 
       [] ->
-        true
+        false
 
       allowed ->
         dispatch
         |> dispatch_adapters()
-        |> Enum.all?(&(&1 in allowed))
+        |> Enum.map(&normalize_dispatch/1)
+        |> Enum.all?(fn adapter -> not is_nil(adapter) and adapter in allowed end)
     end
   end
 
   defp normalize_dispatches(nil), do: nil
 
   defp normalize_dispatches(dispatches) when is_list(dispatches) do
-    Enum.map(dispatches, &normalize_dispatch/1)
+    dispatches
+    |> Enum.map(&normalize_dispatch/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
   end
 
-  defp normalize_dispatches(dispatch), do: [normalize_dispatch(dispatch)]
+  defp normalize_dispatches(dispatch), do: normalize_dispatches([dispatch])
 
-  defp normalize_dispatch(dispatch) when is_atom(dispatch), do: dispatch
+  defp normalize_dispatch(dispatch) when is_atom(dispatch), do: Atom.to_string(dispatch)
 
   defp normalize_dispatch(dispatch) when is_binary(dispatch) do
     dispatch
     |> String.trim()
-    |> String.to_atom()
-  rescue
-    _ -> :unknown
+    |> case do
+      "" -> nil
+      value -> value
+    end
   end
 
-  defp normalize_dispatch(_), do: :unknown
+  defp normalize_dispatch(_), do: nil
 
   defp dispatch_adapters(nil), do: [:default]
   defp dispatch_adapters({adapter, _opts}) when is_atom(adapter), do: [adapter]

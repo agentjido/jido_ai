@@ -9,6 +9,10 @@ defmodule Jido.AI.Signal.ToolResult do
     schema: [
       call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
       tool_name: [type: :string, required: true, doc: "Name of the executed tool"],
-      result: [type: :any, required: true, doc: "{:ok, result, effects} | {:error, reason, effects}"]
+      result: [
+        type: :any,
+        required: true,
+        doc: "{:ok, result} | {:ok, result, effects} | {:error, reason} | {:error, reason, effects}"
+      ]
     ]
 end

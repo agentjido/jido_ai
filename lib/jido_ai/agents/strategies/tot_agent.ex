@@ -136,8 +136,17 @@ defmodule Jido.AI.ToTAgent do
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
     tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
     max_tool_round_trips = Keyword.get(opts, :max_tool_round_trips, @default_max_tool_round_trips)
-    agent_effect_policy = Keyword.get(opts, :effect_policy, %{})
-    strategy_effect_policy = Keyword.get(opts, :strategy_effect_policy, %{})
+
+    agent_effect_policy =
+      opts
+      |> Keyword.get(:effect_policy, %{})
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
+    strategy_effect_policy =
+      opts
+      |> Keyword.get(:strategy_effect_policy, %{})
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
     plugins = Keyword.get(opts, :plugins, [])
 
     ai_plugins = Jido.AI.PluginStack.default_plugins(opts)

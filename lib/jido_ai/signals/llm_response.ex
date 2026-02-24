@@ -13,7 +13,11 @@ defmodule Jido.AI.Signal.LLMResponse do
     default_source: "/ai/llm",
     schema: [
       call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
-      result: [type: :any, required: true, doc: "{:ok, result, effects} | {:error, reason, effects}"],
+      result: [
+        type: :any,
+        required: true,
+        doc: "{:ok, result} | {:ok, result, effects} | {:error, reason} | {:error, reason, effects}"
+      ],
       usage: [type: :map, doc: "Token usage: %{input_tokens: N, output_tokens: M}"],
       model: [type: :string, doc: "Actual model used for the request"],
       duration_ms: [type: :integer, doc: "Request duration in milliseconds"],
