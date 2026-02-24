@@ -8,7 +8,7 @@ defmodule Jido.AI.Effects.Policy do
 
   @type mode :: :deny_all | :allow_all | :allow_list
   @type matcher :: module()
-  @type matcher_set :: MapSet.t(matcher())
+  @type matcher_set :: term()
   @type constraints :: map()
 
   @type t :: %__MODULE__{
@@ -204,10 +204,6 @@ defmodule Jido.AI.Effects.Policy do
     |> maybe_put_constraint(:emit, emit)
     |> maybe_put_constraint(:schedule, schedule)
   end
-
-  defp merge_constraints(agent, _strategy) when is_map(agent), do: agent
-  defp merge_constraints(_agent, strategy) when is_map(strategy), do: strategy
-  defp merge_constraints(_, _), do: %{}
 
   defp maybe_put_constraint(map, _key, nil), do: map
   defp maybe_put_constraint(map, key, value), do: Map.put(map, key, value)

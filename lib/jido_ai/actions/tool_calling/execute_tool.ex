@@ -88,13 +88,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
       {:ok, [%{raw_result: {:ok, result, _effects}}]} ->
         {:ok, format_result(result)}
 
-      {:ok, [%{raw_result: {:ok, result}}]} ->
-        {:ok, format_result(result)}
-
       {:ok, [%{content: content, raw_result: {:error, _reason, _effects}}]} when is_binary(content) ->
-        {:error, content}
-
-      {:ok, [%{content: content, raw_result: {:error, _reason}}]} when is_binary(content) ->
         {:error, content}
 
       {:ok, [_]} ->

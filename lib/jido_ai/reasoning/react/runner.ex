@@ -502,16 +502,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp retryable?({:ok, _, _}), do: false
-  defp retryable?({:ok, _}), do: false
 
   defp retryable?({:error, %{type: :timeout}, _}), do: true
   defp retryable?({:error, %{type: :exception}, _}), do: true
   defp retryable?({:error, %{type: :execution_error}, _}), do: true
-  defp retryable?({:error, %{type: :timeout}}), do: true
-  defp retryable?({:error, %{type: :exception}}), do: true
-  defp retryable?({:error, %{type: :execution_error}}), do: true
   defp retryable?({:error, _, _}), do: false
-  defp retryable?({:error, _}), do: false
 
   defp finalize(%State{} = state, owner, ref, %Config{} = config) do
     {state, _token} = emit_checkpoint(state, owner, ref, config, :terminal)

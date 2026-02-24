@@ -1282,13 +1282,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
 
-  defp effect_policy_from_state(state) when is_map(state) do
+  defp effect_policy_from_state(state) do
     state
+    |> normalize_map_opt()
     |> Map.get(:config, %{})
+    |> normalize_map_opt()
     |> Map.get(:effect_policy, Effects.default_policy())
   end
-
-  defp effect_policy_from_state(_), do: Effects.default_policy()
 
   defp normalize_tool_result(result), do: Effects.normalize_result(result)
 

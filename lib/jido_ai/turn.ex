@@ -484,9 +484,6 @@ defmodule Jido.AI.Turn do
 
         {:error, reason, effects} ->
           {:error, format_error(tool_name, reason), List.wrap(effects)}
-
-        other ->
-          {:error, error_envelope(tool_name, :execution_error, "Unexpected execution result", %{result: other}), []}
       end
 
     apply_effect_policy(result, context)
