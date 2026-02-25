@@ -1359,8 +1359,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp provider_opt_keys_by_string(_model_spec), do: %{}
-
   defp generate_call_id, do: "req_#{Jido.Util.generate_id()}"
 
   defp put_strategy_state(%Agent{} = agent, state) when is_map(state) do

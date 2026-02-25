@@ -374,8 +374,6 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     end
   end
 
-  defp provider_opt_keys_by_string(_), do: %{}
-
   defp maybe_merge_llm_opts(opts, llm_opts) when is_list(llm_opts) do
     if llm_opts == [] do
       opts
