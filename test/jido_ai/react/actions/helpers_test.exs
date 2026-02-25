@@ -70,13 +70,14 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
       assert config.llm.timeout_ms == 999
     end
 
-    test "normalizes known string-key llm_opts map entries" do
+    test "normalizes string-key llm_opts map entries into runtime options" do
       config =
         Helpers.build_config(
           %{
             llm_opts: %{
               "thinking" => %{type: :enabled, budget_tokens: 256},
               "reasoning_effort" => :high,
+              "top_p" => 0.8,
               "unknown_provider_flag" => true
             }
           },
@@ -85,7 +86,61 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
 
       assert Keyword.get(config.llm.llm_opts, :thinking) == %{type: :enabled, budget_tokens: 256}
       assert Keyword.get(config.llm.llm_opts, :reasoning_effort) == :high
-      refute Keyword.has_key?(config.llm.llm_opts, :unknown_provider_flag)
+      assert Keyword.get(config.llm.llm_opts, :top_p) == 0.8
+      refute Keyword.has_key?(config.llm.llm_opts, nil)
+    end
+
+    test "maps string keys to existing atoms for provider-specific options" do
+      existing_key = :custom_provider_flag
+
+      config =
+        Helpers.build_config(
+          %{
+            llm_opts: %{
+              Atom.to_string(existing_key) => true
+            }
+          },
+          %{}
+        )
+
+      assert config.llm.llm_opts == [custom_provider_flag: true]
+    end
+
+    test "normalizes provider_options maps in llm_opts using provider schema keys" do
+      config =
+        Helpers.build_config(
+          %{
+            model: "openai:gpt-4o",
+            llm_opts: %{
+              "provider_options" => %{
+                "verbosity" => "high",
+                "__jido_ai_nonexistent_provider_option__" => true
+              }
+            }
+          },
+          %{}
+        )
+
+      provider_options = Keyword.get(config.llm.llm_opts, :provider_options)
+      assert provider_options == [verbosity: "high"]
+      refute Keyword.has_key?(provider_options, nil)
+    end
+
+    test "drops non-existing string keys and nil keys from llm_opts" do
+      config_from_map =
+        Helpers.build_config(
+          %{
+            llm_opts: %{
+              "__jido_ai_nonexistent_llm_opt_key__" => true
+            }
+          },
+          %{}
+        )
+
+      config_from_list = Helpers.build_config(%{llm_opts: [{nil, :bad}, {:top_p, 0.6}]}, %{})
+
+      assert config_from_map.llm.llm_opts == []
+      assert config_from_list.llm.llm_opts == [top_p: 0.6]
     end
   end
 

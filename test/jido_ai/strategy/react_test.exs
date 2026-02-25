@@ -160,13 +160,14 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
              ]
     end
 
-    test "start accepts string-key llm_opts maps and normalizes known keys" do
+    test "start accepts string-key llm_opts maps and normalizes ReqLLM options" do
       agent =
         create_agent(
           tools: [TestCalculator],
           llm_opts: %{
             "thinking" => %{type: :enabled, budget_tokens: 1_024},
-            "reasoning_effort" => :low
+            "reasoning_effort" => :low,
+            "top_p" => 0.7
           }
         )
 
@@ -174,7 +175,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         instruction(ReAct.start_action(), %{
           query: "What is 2 + 2?",
           request_id: "req_1",
-          llm_opts: %{"reasoning_effort" => :high, "unknown_provider_flag" => true}
+          llm_opts: %{"reasoning_effort" => :high, "top_p" => 0.9, "unknown_provider_flag" => true}
         })
 
       {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
@@ -184,7 +185,73 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert Keyword.get(llm_opts, :thinking) == %{type: :enabled, budget_tokens: 1_024}
       assert Keyword.get(llm_opts, :reasoning_effort) == :high
-      refute Keyword.has_key?(llm_opts, :unknown_provider_flag)
+      assert Keyword.get(llm_opts, :top_p) == 0.9
+      refute Keyword.has_key?(llm_opts, nil)
+    end
+
+    test "start maps existing-atom string llm_opts keys for provider options" do
+      existing_key = :custom_provider_flag
+      existing_key_string = Atom.to_string(existing_key)
+
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          llm_opts: %{existing_key_string => true}
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      llm_opts = state.pending_worker_start.config.llm.llm_opts
+
+      assert Keyword.get(llm_opts, existing_key) == true
+    end
+
+    test "start drops non-existing string llm_opts keys and filters nil keys" do
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          llm_opts: %{"__jido_ai_nonexistent_llm_opt_key__" => true}
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      llm_opts = state.pending_worker_start.config.llm.llm_opts
+
+      assert llm_opts == []
+      refute Keyword.has_key?(llm_opts, nil)
+    end
+
+    test "start normalizes provider_options maps in llm_opts using provider schema keys" do
+      agent = create_agent(tools: [TestCalculator], model: "openai:gpt-4o")
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          llm_opts: %{
+            "provider_options" => %{
+              "verbosity" => "high",
+              "__jido_ai_nonexistent_provider_option__" => true
+            }
+          }
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      llm_opts = state.pending_worker_start.config.llm.llm_opts
+      provider_options = Keyword.get(llm_opts, :provider_options)
+
+      assert provider_options == [verbosity: "high"]
+      refute Keyword.has_key?(provider_options, nil)
     end
 
     test "child started flushes deferred start to worker pid" do

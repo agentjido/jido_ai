@@ -191,17 +191,19 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_completed))
   end
 
-  test "normalizes string-key llm_opts maps and forwards known options" do
+  test "normalizes string-key llm_opts maps and forwards ReqLLM options" do
     llm_opts = %{
       "thinking" => %{type: :enabled, budget_tokens: 768},
       "reasoning_effort" => :medium,
+      "top_p" => 0.75,
       "unknown_provider_flag" => true
     }
 
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
       assert opts[:thinking] == %{type: :enabled, budget_tokens: 768}
       assert opts[:reasoning_effort] == :medium
-      refute Keyword.has_key?(opts, :unknown_provider_flag)
+      assert opts[:top_p] == 0.75
+      refute Keyword.has_key?(opts, nil)
 
       {:ok,
        %{
@@ -216,6 +218,35 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end)
 
     config = Config.new(%{model: :capable, tools: %{}, llm_opts: llm_opts})
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "normalizes provider_options maps in llm_opts before forwarding to ReqLLM" do
+    llm_opts = %{
+      "provider_options" => %{
+        "verbosity" => "high",
+        "__jido_ai_nonexistent_provider_option__" => true
+      }
+    }
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+      assert opts[:provider_options] == [verbosity: "high"]
+
+      {:ok,
+       %{
+         stream: [ReqLLM.StreamChunk.text("Provider options normalized")],
+         usage: %{input_tokens: 2, output_tokens: 2}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config = Config.new(%{model: "openai:gpt-4o", tools: %{}, llm_opts: llm_opts})
     events = ReAct.stream("Say hello", config) |> Enum.to_list()
 
     assert Enum.any?(events, &(&1.kind == :request_completed))
