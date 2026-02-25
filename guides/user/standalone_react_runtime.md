@@ -49,6 +49,8 @@ config = Jido.AI.Reasoning.ReAct.build_config(%{
   max_tokens: 1_024,
   temperature: 0.2,
   tool_choice: :auto,
+  llm_opts: [thinking: %{type: :enabled, budget_tokens: 2048}, reasoning_effort: :high],
+  req_http_options: [receive_timeout: 60_000],
 
   # Tool execution
   tool_timeout_ms: 15_000,
@@ -253,6 +255,8 @@ Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
 - `max_tokens` default: `1_024`
 - `temperature` default: `0.2`
 - `tool_choice` default: `:auto`
+- `llm_opts` default: `[]`
+- `req_http_options` default: `[]`
 - `tool_timeout_ms` default: `15_000`
 - `tool_max_retries` default: `1`
 - `tool_retry_backoff_ms` default: `200`

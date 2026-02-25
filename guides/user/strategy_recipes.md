@@ -34,7 +34,8 @@ defmodule MyApp.ReActAgent do
   use Jido.AI.Agent,
     name: "react_agent",
     model: :fast,
-    tools: [MyApp.Actions.Multiply]
+    tools: [MyApp.Actions.Multiply],
+    llm_opts: [thinking: %{type: :enabled, budget_tokens: 1024}, reasoning_effort: :high]
 end
 
 {:ok, pid} = Jido.AgentServer.start(agent: MyApp.ReActAgent)

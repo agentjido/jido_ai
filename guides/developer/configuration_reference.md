@@ -26,6 +26,8 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
   - `tool_timeout_ms`: `15_000`
   - `tool_max_retries`: `1`
   - `tool_retry_backoff_ms`: `200`
+  - `req_http_options`: `[]`
+  - `llm_opts`: `[]`
 
 - CoT (`Jido.AI.CoTAgent`)
   - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)

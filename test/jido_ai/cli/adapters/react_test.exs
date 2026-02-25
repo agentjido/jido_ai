@@ -13,6 +13,11 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
       send(self(), {:react_submit_called, pid, query})
       {:ok, :submitted}
     end
+
+    def ask(pid, query, opts) do
+      send(self(), {:react_submit_called_with_opts, pid, query, opts})
+      {:ok, :submitted_with_opts}
+    end
   end
 
   defmodule TestCalculator do
@@ -33,7 +38,9 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
          model: "openai:gpt-4.1",
          tools: [TestCalculator],
          max_iterations: 4,
-         system_prompt: "Think step by step, then call tools."
+         system_prompt: "Think step by step, then call tools.",
+         req_http_options: [plug: {Req.Test, []}],
+         llm_opts: [thinking: %{type: :enabled, budget_tokens: 512}, reasoning_effort: :high]
        })}
   end
 
@@ -60,6 +67,8 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
       assert config.tools == [TestCalculator]
       assert config.max_iterations == 4
       assert config.system_prompt == "Think step by step, then call tools."
+      assert config.base_req_http_options == [plug: {Req.Test, []}]
+      assert config.base_llm_opts == [thinking: %{type: :enabled, budget_tokens: 512}, reasoning_effort: :high]
     end
 
     test "uses default values when options are omitted", %{default_module: module} do
@@ -98,6 +107,20 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
       assert {:ok, :submitted} = ReActAdapter.submit(self(), "Use tools", %{agent_module: StubReActAgent})
       assert_received {:react_submit_called, pid, "Use tools"}
       assert pid == self()
+    end
+
+    test "submit uses ask/3 with forwarded request options when provided" do
+      config = %{
+        agent_module: StubReActAgent,
+        req_http_options: [plug: {Req.Test, []}],
+        llm_opts: [reasoning_effort: :high]
+      }
+
+      assert {:ok, :submitted_with_opts} = ReActAdapter.submit(self(), "Use tools", config)
+      assert_received {:react_submit_called_with_opts, pid, "Use tools", opts}
+      assert pid == self()
+      assert opts[:req_http_options] == [plug: {Req.Test, []}]
+      assert opts[:llm_opts] == [reasoning_effort: :high]
     end
 
     test "await returns timeout error when timeout budget is exhausted" do
