@@ -131,9 +131,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   test "passes req_http_options to streaming requests" do
     req_http_options = [plug: {Req.Test, []}]
+    llm_opts = [thinking: %{type: :enabled, budget_tokens: 1_024}, reasoning_effort: :high]
 
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
       assert opts[:req_http_options] == req_http_options
+      assert opts[:thinking] == %{type: :enabled, budget_tokens: 1_024}
+      assert opts[:reasoning_effort] == :high
 
       {:ok,
        %{
@@ -147,7 +150,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       _ -> nil
     end)
 
-    config = Config.new(%{model: :capable, tools: %{}, req_http_options: req_http_options})
+    config = Config.new(%{model: :capable, tools: %{}, req_http_options: req_http_options, llm_opts: llm_opts})
     events = ReAct.stream("Say hello", config) |> Enum.to_list()
 
     assert Enum.any?(events, &(&1.kind == :request_completed))
@@ -155,6 +158,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   test "passes req_http_options to non-streaming requests" do
     req_http_options = [plug: {Req.Test, []}]
+    llm_opts = [thinking: %{type: :enabled, budget_tokens: 2_048}, reasoning_effort: :low]
 
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       flunk("stream_text should not be called when ReAct streaming is disabled")
@@ -162,6 +166,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, _messages, opts ->
       assert opts[:req_http_options] == req_http_options
+      assert opts[:thinking] == %{type: :enabled, budget_tokens: 2_048}
+      assert opts[:reasoning_effort] == :low
 
       {:ok,
        %{
@@ -171,7 +177,76 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
        }}
     end)
 
-    config = Config.new(%{model: :capable, tools: %{}, streaming: false, req_http_options: req_http_options})
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        streaming: false,
+        req_http_options: req_http_options,
+        llm_opts: llm_opts
+      })
+
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "normalizes string-key llm_opts maps and forwards ReqLLM options" do
+    llm_opts = %{
+      "thinking" => %{type: :enabled, budget_tokens: 768},
+      "reasoning_effort" => :medium,
+      "top_p" => 0.75,
+      "unknown_provider_flag" => true
+    }
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+      assert opts[:thinking] == %{type: :enabled, budget_tokens: 768}
+      assert opts[:reasoning_effort] == :medium
+      assert opts[:top_p] == 0.75
+      refute Keyword.has_key?(opts, nil)
+
+      {:ok,
+       %{
+         stream: [ReqLLM.StreamChunk.text("String-key llm opts normalized")],
+         usage: %{input_tokens: 2, output_tokens: 2}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, llm_opts: llm_opts})
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "normalizes provider_options maps in llm_opts before forwarding to ReqLLM" do
+    llm_opts = %{
+      "provider_options" => %{
+        "verbosity" => "high",
+        "__jido_ai_nonexistent_provider_option__" => true
+      }
+    }
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+      assert opts[:provider_options] == [verbosity: "high"]
+
+      {:ok,
+       %{
+         stream: [ReqLLM.StreamChunk.text("Provider options normalized")],
+         usage: %{input_tokens: 2, output_tokens: 2}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config = Config.new(%{model: "openai:gpt-4o", tools: %{}, llm_opts: llm_opts})
     events = ReAct.stream("Say hello", config) |> Enum.to_list()
 
     assert Enum.any?(events, &(&1.kind == :request_completed))

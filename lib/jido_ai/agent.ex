@@ -33,6 +33,8 @@ defmodule Jido.AI.Agent do
   - `:runtime_adapter` - Deprecated compatibility flag (delegated ReAct runtime is always enabled)
   - `:runtime_task_supervisor` - Optional Task.Supervisor used by delegated ReAct runtime
   - `:observability` - Observability options map
+  - `:req_http_options` - Base Req HTTP options passed through to ReqLLM calls
+  - `:llm_opts` - Additional ReqLLM generation options merged into ReAct LLM calls
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`).
     Must be literal data only — module aliases, atoms, strings, numbers, lists, and maps are permitted.
     Function calls, module attributes (`@attr`), and pinned variables (`^var`) raise `CompileError`.
@@ -164,6 +166,38 @@ defmodule Jido.AI.Agent do
     end)
   end
 
+  @doc false
+  def expand_and_eval_literal_option(value, caller_env) do
+    case value do
+      nil ->
+        nil
+
+      value when is_map(value) ->
+        value
+
+      value when is_list(value) ->
+        value
+        |> expand_aliases_in_ast(caller_env)
+        |> Code.eval_quoted([], caller_env)
+        |> elem(0)
+
+      {:%{}, _, _} = map_ast ->
+        map_ast
+        |> expand_aliases_in_ast(caller_env)
+        |> Code.eval_quoted([], caller_env)
+        |> elem(0)
+
+      {:%, _, _} = struct_ast ->
+        struct_ast
+        |> expand_aliases_in_ast(caller_env)
+        |> Code.eval_quoted([], caller_env)
+        |> elem(0)
+
+      other ->
+        other
+    end
+  end
+
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
@@ -191,6 +225,17 @@ defmodule Jido.AI.Agent do
     runtime_adapter = true
     runtime_task_supervisor = Keyword.get(opts, :runtime_task_supervisor)
     observability = Keyword.get(opts, :observability, %{})
+
+    req_http_options =
+      opts
+      |> Keyword.get(:req_http_options, [])
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
+    llm_opts =
+      opts
+      |> Keyword.get(:llm_opts, [])
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
     # Don't extract tool_context here - it contains AST with module aliases
     # that need to be evaluated in the calling module's context
     plugins = Keyword.get(opts, :plugins, [])
@@ -232,6 +277,8 @@ defmodule Jido.AI.Agent do
         runtime_adapter: runtime_adapter,
         runtime_task_supervisor: runtime_task_supervisor,
         observability: observability,
+        req_http_options: req_http_options,
+        llm_opts: llm_opts,
         tool_context: tool_context
       ]
       |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
@@ -276,6 +323,8 @@ defmodule Jido.AI.Agent do
       ## Options
 
       - `:tool_context` - Additional context map merged with agent's tool_context
+      - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
+      - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:timeout` - Timeout for the underlying cast (default: no timeout)
 
       ## Examples
@@ -331,6 +380,8 @@ defmodule Jido.AI.Agent do
       ## Options
 
       - `:tool_context` - Additional context map merged with agent's tool_context
+      - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
+      - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:timeout` - How long to wait in milliseconds (default: 30_000)
 
       ## Examples

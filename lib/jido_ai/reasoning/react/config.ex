@@ -11,13 +11,17 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @legacy_insecure_token_secret "jido_ai_react_default_secret_change_me"
   @ephemeral_secret_key {:jido_ai, __MODULE__, :ephemeral_token_secret}
   @ephemeral_secret_warned_key {:jido_ai, __MODULE__, :ephemeral_token_secret_warned}
+  @reqllm_generation_opt_keys_by_string ReqLLM.Provider.Options.all_generation_keys()
+                                        |> Enum.map(&{Atom.to_string(&1), &1})
+                                        |> Map.new()
 
   @llm_schema Zoi.object(%{
                 max_tokens: Zoi.integer() |> Zoi.default(1_024),
                 temperature: Zoi.number() |> Zoi.default(0.2),
                 timeout_ms: Zoi.integer() |> Zoi.nullish(),
                 tool_choice: Zoi.any() |> Zoi.default(:auto),
-                req_http_options: Zoi.list(Zoi.any()) |> Zoi.default([])
+                req_http_options: Zoi.list(Zoi.any()) |> Zoi.default([]),
+                llm_opts: Zoi.any() |> Zoi.default([])
               })
 
   @tool_exec_schema Zoi.object(%{
@@ -77,6 +81,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @spec new(map() | keyword()) :: t()
   def new(opts \\ %{}) do
     opts_map = normalize_opts(opts)
+    resolved_model = opts_map |> get_opt(:model, @default_model) |> resolve_model()
+    provider_opt_keys_by_string = provider_opt_keys_by_string(resolved_model)
 
     tools =
       opts_map
@@ -90,7 +96,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       temperature: normalize_float(get_opt(opts_map, :temperature, 0.2), 0.2),
       timeout_ms: normalize_optional_pos_integer(llm_timeout),
       tool_choice: get_opt(opts_map, :tool_choice, :auto),
-      req_http_options: normalize_req_http_options(get_opt(opts_map, :req_http_options, []))
+      req_http_options: normalize_req_http_options(get_opt(opts_map, :req_http_options, [])),
+      llm_opts: normalize_llm_opts(get_opt(opts_map, :llm_opts, []), provider_opt_keys_by_string)
     }
 
     tool_exec = %{
@@ -125,10 +132,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
     attrs = %{
       version: 1,
-      model:
-        opts_map
-        |> get_opt(:model, @default_model)
-        |> resolve_model(),
+      model: resolved_model,
       system_prompt: normalize_optional_binary(get_opt(opts_map, :system_prompt, nil)),
       tools: tools,
       max_iterations:
@@ -194,6 +198,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       tools: reqllm_tools(config)
     ]
 
+    opts = maybe_merge_llm_opts(opts, config.llm.llm_opts)
     opts = maybe_put_req_http_options(opts, config.llm.req_http_options)
 
     if is_integer(config.llm.timeout_ms) do
@@ -270,6 +275,114 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
   defp normalize_req_http_options(value) when is_list(value), do: value
   defp normalize_req_http_options(_), do: []
+
+  defp normalize_llm_opts(value, provider_opt_keys_by_string) when is_list(value) do
+    normalize_llm_opt_pairs(value, provider_opt_keys_by_string)
+  end
+
+  defp normalize_llm_opts(value, provider_opt_keys_by_string) when is_map(value) do
+    value
+    |> Enum.map(fn {key, entry_value} ->
+      normalized_key = normalize_llm_opt_key(key)
+      normalized_value = normalize_llm_opt_value(normalized_key, entry_value, provider_opt_keys_by_string)
+      {normalized_key, normalized_value}
+    end)
+    |> normalize_llm_opt_pairs(provider_opt_keys_by_string)
+  end
+
+  defp normalize_llm_opts(_value, _provider_opt_keys_by_string), do: []
+
+  defp normalize_llm_opt_pairs(pairs, provider_opt_keys_by_string) when is_list(pairs) do
+    pairs
+    |> Enum.reduce([], fn
+      {key, entry_value}, acc when is_atom(key) and not is_nil(key) ->
+        normalized_value = normalize_llm_opt_value(key, entry_value, provider_opt_keys_by_string)
+        [{key, normalized_value} | acc]
+
+      _other, acc ->
+        acc
+    end)
+    |> Enum.reverse()
+  end
+
+  defp normalize_llm_opt_key(key) when is_atom(key), do: key
+
+  defp normalize_llm_opt_key(key) when is_binary(key) do
+    Map.get(@reqllm_generation_opt_keys_by_string, key) || maybe_to_existing_atom(key)
+  end
+
+  defp normalize_llm_opt_key(_), do: nil
+
+  defp normalize_llm_opt_value(:provider_options, value, provider_opt_keys_by_string) do
+    normalize_provider_options(value, provider_opt_keys_by_string)
+  end
+
+  defp normalize_llm_opt_value(_key, value, _provider_opt_keys_by_string), do: value
+
+  defp normalize_provider_options(value, provider_opt_keys_by_string) when is_list(value) do
+    normalize_provider_option_pairs(value, provider_opt_keys_by_string)
+  end
+
+  defp normalize_provider_options(value, provider_opt_keys_by_string) when is_map(value) do
+    value
+    |> Enum.map(fn {key, entry_value} ->
+      {normalize_provider_opt_key(key, provider_opt_keys_by_string), entry_value}
+    end)
+    |> normalize_provider_option_pairs(provider_opt_keys_by_string)
+  end
+
+  defp normalize_provider_options(value, _provider_opt_keys_by_string), do: value
+
+  defp normalize_provider_option_pairs(pairs, _provider_opt_keys_by_string) do
+    pairs
+    |> Enum.reduce([], fn
+      {key, value}, acc when is_atom(key) and not is_nil(key) ->
+        [{key, value} | acc]
+
+      _other, acc ->
+        acc
+    end)
+    |> Enum.reverse()
+  end
+
+  defp normalize_provider_opt_key(key, _provider_opt_keys_by_string) when is_atom(key), do: key
+
+  defp normalize_provider_opt_key(key, provider_opt_keys_by_string) when is_binary(key) do
+    Map.get(provider_opt_keys_by_string, key) || maybe_to_existing_atom(key)
+  end
+
+  defp normalize_provider_opt_key(_key, _provider_opt_keys_by_string), do: nil
+
+  defp maybe_to_existing_atom(key) when is_binary(key) do
+    try do
+      String.to_existing_atom(key)
+    rescue
+      ArgumentError -> nil
+    end
+  end
+
+  defp provider_opt_keys_by_string(model_spec) when is_binary(model_spec) do
+    with {:ok, model} <- ReqLLM.model(model_spec),
+         {:ok, provider_mod} <- ReqLLM.provider(model.provider),
+         true <- function_exported?(provider_mod, :provider_schema, 0) do
+      provider_mod.provider_schema().schema
+      |> Keyword.keys()
+      |> Enum.map(&{Atom.to_string(&1), &1})
+      |> Map.new()
+    else
+      _ -> %{}
+    end
+  end
+
+  defp maybe_merge_llm_opts(opts, llm_opts) when is_list(llm_opts) do
+    if llm_opts == [] do
+      opts
+    else
+      Keyword.merge(opts, llm_opts)
+    end
+  end
+
+  defp maybe_merge_llm_opts(opts, _), do: opts
 
   defp maybe_put_req_http_options(opts, req_http_options) when is_list(req_http_options) do
     if req_http_options == [] do

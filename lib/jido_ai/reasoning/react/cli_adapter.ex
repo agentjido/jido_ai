@@ -28,7 +28,18 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
   @impl true
   def submit(pid, query, config) do
     agent_module = config.agent_module
-    agent_module.ask(pid, query)
+
+    ask_opts =
+      []
+      |> maybe_put_opt(:tool_context, config[:tool_context])
+      |> maybe_put_opt(:req_http_options, config[:req_http_options])
+      |> maybe_put_opt(:llm_opts, config[:llm_opts])
+
+    if ask_opts == [] or not function_exported?(agent_module, :ask, 3) do
+      agent_module.ask(pid, query)
+    else
+      agent_module.ask(pid, query, ask_opts)
+    end
   end
 
   @impl true
@@ -59,6 +70,10 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
     model = config[:model] || @default_model
     max_iterations = config[:max_iterations] || @default_max_iterations
     system_prompt = config[:system_prompt]
+    req_http_options = config[:req_http_options] || []
+    llm_opts = config[:llm_opts] || []
+    escaped_req_http_options = Macro.escape(req_http_options)
+    escaped_llm_opts = Macro.escape(llm_opts)
 
     contents =
       if system_prompt do
@@ -69,7 +84,9 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
             tools: unquote(tools),
             model: unquote(model),
             max_iterations: unquote(max_iterations),
-            system_prompt: unquote(system_prompt)
+            system_prompt: unquote(system_prompt),
+            req_http_options: unquote(escaped_req_http_options),
+            llm_opts: unquote(escaped_llm_opts)
         end
       else
         quote do
@@ -78,13 +95,19 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
             description: "CLI ephemeral agent",
             tools: unquote(tools),
             model: unquote(model),
-            max_iterations: unquote(max_iterations)
+            max_iterations: unquote(max_iterations),
+            req_http_options: unquote(escaped_req_http_options),
+            llm_opts: unquote(escaped_llm_opts)
         end
       end
 
     Module.create(module_name, contents, Macro.Env.location(__ENV__))
     module_name
   end
+
+  defp maybe_put_opt(opts, _key, nil), do: opts
+  defp maybe_put_opt(opts, _key, []), do: opts
+  defp maybe_put_opt(opts, key, value), do: Keyword.put(opts, key, value)
 
   # Private helpers
 

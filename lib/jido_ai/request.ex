@@ -153,6 +153,8 @@ defmodule Jido.AI.Request do
   ## Options
 
   - `:tool_context` - Additional context merged with agent's tool_context
+  - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
+  - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
   - `:request_id` - Custom request ID (auto-generated if not provided)
 
   ## Signal Options (required)
@@ -174,6 +176,8 @@ defmodule Jido.AI.Request do
     signal_type = Keyword.fetch!(opts, :signal_type)
     source = Keyword.fetch!(opts, :source)
     tool_context = Keyword.get(opts, :tool_context, %{})
+    req_http_options = Keyword.get(opts, :req_http_options, [])
+    llm_opts = Keyword.get(opts, :llm_opts, [])
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
 
     # Build payload with request_id for correlation.
@@ -181,6 +185,8 @@ defmodule Jido.AI.Request do
     payload =
       %{query: query, prompt: query, request_id: request_id}
       |> maybe_add_tool_context(tool_context)
+      |> maybe_add_req_http_options(req_http_options)
+      |> maybe_add_llm_opts(llm_opts)
 
     signal = Signal.new!(signal_type, payload, source: source)
 
@@ -507,6 +513,23 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_tool_context(payload, _), do: payload
+
+  defp maybe_add_req_http_options(payload, req_http_options)
+       when is_list(req_http_options) and req_http_options != [] do
+    Map.put(payload, :req_http_options, req_http_options)
+  end
+
+  defp maybe_add_req_http_options(payload, _), do: payload
+
+  defp maybe_add_llm_opts(payload, llm_opts) when is_list(llm_opts) and llm_opts != [] do
+    Map.put(payload, :llm_opts, llm_opts)
+  end
+
+  defp maybe_add_llm_opts(payload, llm_opts) when is_map(llm_opts) and map_size(llm_opts) > 0 do
+    Map.put(payload, :llm_opts, llm_opts)
+  end
+
+  defp maybe_add_llm_opts(payload, _), do: payload
 
   defp normalize_await_result({:ok, %{status: :completed, result: result}}) do
     {:ok, result}

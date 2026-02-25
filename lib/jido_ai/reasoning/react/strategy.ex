@@ -55,6 +55,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           streaming: boolean(),
           base_tool_context: map(),
           base_req_http_options: list(),
+          base_llm_opts: keyword(),
+          provider_opt_keys_by_string: %{optional(String.t()) => atom()},
           request_policy: :reject,
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
@@ -70,6 +72,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @request_trace_cap 2000
   @worker_tag :react_worker
   @source "/ai/react/strategy"
+  @reqllm_generation_opt_keys_by_string ReqLLM.Provider.Options.all_generation_keys()
+                                        |> Enum.map(&{Atom.to_string(&1), &1})
+                                        |> Map.new()
 
   @default_system_prompt """
   You are a helpful AI assistant using the ReAct (Reason-Act) pattern.
@@ -144,7 +149,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           query: Zoi.string(),
           request_id: Zoi.string() |> Zoi.optional(),
           tool_context: Zoi.map() |> Zoi.optional(),
-          req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional()
+          req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
+          llm_opts: Zoi.any() |> Zoi.optional()
         }),
       doc: "Start a delegated ReAct conversation with a user query",
       name: "ai.react.start"
@@ -366,6 +372,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         termination_reason: nil,
         run_tool_context: %{},
         run_req_http_options: [],
+        run_llm_opts: [],
         active_request_id: nil,
         cancel_reason: nil,
         usage: %{},
@@ -405,12 +412,17 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp process_instruction(agent, %Jido.Instruction{action: action, params: params} = instruction, ctx) do
     case normalize_action(action) do
       @start ->
+        state = StratState.get(agent, %{})
+        config = state[:config] || %{}
+        provider_opt_keys_by_string = config[:provider_opt_keys_by_string] || %{}
         run_context = Map.get(params, :tool_context) || %{}
         run_req_http_options = params |> Map.get(:req_http_options, []) |> normalize_req_http_options()
+        run_llm_opts = params |> Map.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string)
 
         agent
         |> set_run_tool_context(run_context)
         |> set_run_req_http_options(run_req_http_options)
+        |> set_run_llm_opts(run_llm_opts)
         |> process_start(params)
 
       @cancel ->
@@ -470,7 +482,17 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       run_req_http_options = Map.get(state, :run_req_http_options, [])
       base_req_http_options = normalize_req_http_options(config[:base_req_http_options])
       effective_req_http_options = base_req_http_options ++ run_req_http_options
-      runtime_config = runtime_config_from_strategy(config, req_http_options: effective_req_http_options)
+      run_llm_opts = Map.get(state, :run_llm_opts, [])
+      provider_opt_keys_by_string = config[:provider_opt_keys_by_string] || %{}
+      base_llm_opts = normalize_llm_opts(config[:base_llm_opts], provider_opt_keys_by_string)
+      effective_llm_opts = Keyword.merge(base_llm_opts, run_llm_opts)
+
+      runtime_config =
+        runtime_config_from_strategy(config,
+          req_http_options: effective_req_http_options,
+          llm_opts: effective_llm_opts
+        )
+
       base_thread = strategy_thread(state, config)
       run_thread = Thread.append_user(base_thread, query)
       runtime_state = runtime_state_from_thread(run_thread, query, request_id, run_id)
@@ -690,6 +712,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             |> Map.put(:run_thread, nil)
             |> Map.delete(:run_tool_context)
             |> Map.delete(:run_req_http_options)
+            |> Map.delete(:run_llm_opts)
 
           {put_strategy_state(agent, failed_state), []}
         else
@@ -846,6 +869,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
+          |> Map.delete(:run_llm_opts)
 
         signal = Signal.RequestCompleted.new!(%{request_id: request_id, result: result, run_id: request_id})
         {updated, [signal]}
@@ -862,6 +886,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
+          |> Map.delete(:run_llm_opts)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}
@@ -880,6 +905,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
+          |> Map.delete(:run_llm_opts)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}
@@ -973,10 +999,17 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp runtime_config_from_strategy(config, opts) do
+    provider_opt_keys_by_string = config[:provider_opt_keys_by_string] || %{}
+
     req_http_options =
       opts
       |> Keyword.get(:req_http_options, config[:base_req_http_options] || [])
       |> normalize_req_http_options()
+
+    llm_opts =
+      opts
+      |> Keyword.get(:llm_opts, config[:base_llm_opts] || [])
+      |> normalize_llm_opts(provider_opt_keys_by_string)
 
     runtime_opts = %{
       model: config[:model],
@@ -985,6 +1018,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       max_iterations: config[:max_iterations],
       streaming: config[:streaming],
       req_http_options: req_http_options,
+      llm_opts: llm_opts,
       tool_timeout_ms: config[:tool_timeout_ms],
       tool_max_retries: config[:tool_max_retries],
       tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
@@ -1005,6 +1039,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp set_run_req_http_options(agent, req_http_options) when is_list(req_http_options) do
     state = StratState.get(agent, %{})
     put_strategy_state(agent, Map.put(state, :run_req_http_options, req_http_options))
+  end
+
+  defp set_run_llm_opts(agent, llm_opts) when is_list(llm_opts) do
+    state = StratState.get(agent, %{})
+    put_strategy_state(agent, Map.put(state, :run_llm_opts, llm_opts))
   end
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
@@ -1169,6 +1208,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
     raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
+    provider_opt_keys_by_string = provider_opt_keys_by_string(resolved_model)
 
     request_policy = validate_request_policy!(Keyword.get(opts, :request_policy, :reject))
 
@@ -1198,7 +1238,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         ),
       agent_id: agent.id,
       base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt,
-      base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options()
+      base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options(),
+      base_llm_opts: opts |> Keyword.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string),
+      provider_opt_keys_by_string: provider_opt_keys_by_string
     }
   end
 
@@ -1218,6 +1260,104 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp normalize_req_http_options(req_http_options) when is_list(req_http_options), do: req_http_options
   defp normalize_req_http_options(_), do: []
+
+  defp normalize_llm_opts(llm_opts, provider_opt_keys_by_string) when is_list(llm_opts) do
+    normalize_llm_opt_pairs(llm_opts, provider_opt_keys_by_string)
+  end
+
+  defp normalize_llm_opts(llm_opts, provider_opt_keys_by_string) when is_map(llm_opts) do
+    llm_opts
+    |> Enum.map(fn {key, value} ->
+      normalized_key = normalize_llm_opt_key(key)
+      normalized_value = normalize_llm_opt_value(normalized_key, value, provider_opt_keys_by_string)
+      {normalized_key, normalized_value}
+    end)
+    |> normalize_llm_opt_pairs(provider_opt_keys_by_string)
+  end
+
+  defp normalize_llm_opts(_llm_opts, _provider_opt_keys_by_string), do: []
+
+  defp normalize_llm_opt_pairs(pairs, provider_opt_keys_by_string) when is_list(pairs) do
+    pairs
+    |> Enum.reduce([], fn
+      {key, value}, acc when is_atom(key) and not is_nil(key) ->
+        normalized_value = normalize_llm_opt_value(key, value, provider_opt_keys_by_string)
+        [{key, normalized_value} | acc]
+
+      _other, acc ->
+        acc
+    end)
+    |> Enum.reverse()
+  end
+
+  defp normalize_llm_opt_key(key) when is_atom(key), do: key
+
+  defp normalize_llm_opt_key(key) when is_binary(key) do
+    Map.get(@reqllm_generation_opt_keys_by_string, key) || maybe_to_existing_atom(key)
+  end
+
+  defp normalize_llm_opt_key(_), do: nil
+
+  defp normalize_llm_opt_value(:provider_options, value, provider_opt_keys_by_string) do
+    normalize_provider_options(value, provider_opt_keys_by_string)
+  end
+
+  defp normalize_llm_opt_value(_key, value, _provider_opt_keys_by_string), do: value
+
+  defp normalize_provider_options(value, provider_opt_keys_by_string) when is_list(value) do
+    normalize_provider_option_pairs(value, provider_opt_keys_by_string)
+  end
+
+  defp normalize_provider_options(value, provider_opt_keys_by_string) when is_map(value) do
+    value
+    |> Enum.map(fn {key, entry_value} ->
+      {normalize_provider_opt_key(key, provider_opt_keys_by_string), entry_value}
+    end)
+    |> normalize_provider_option_pairs(provider_opt_keys_by_string)
+  end
+
+  defp normalize_provider_options(value, _provider_opt_keys_by_string), do: value
+
+  defp normalize_provider_option_pairs(pairs, _provider_opt_keys_by_string) do
+    pairs
+    |> Enum.reduce([], fn
+      {key, value}, acc when is_atom(key) and not is_nil(key) ->
+        [{key, value} | acc]
+
+      _other, acc ->
+        acc
+    end)
+    |> Enum.reverse()
+  end
+
+  defp normalize_provider_opt_key(key, _provider_opt_keys_by_string) when is_atom(key), do: key
+
+  defp normalize_provider_opt_key(key, provider_opt_keys_by_string) when is_binary(key) do
+    Map.get(provider_opt_keys_by_string, key) || maybe_to_existing_atom(key)
+  end
+
+  defp normalize_provider_opt_key(_key, _provider_opt_keys_by_string), do: nil
+
+  defp maybe_to_existing_atom(key) when is_binary(key) do
+    try do
+      String.to_existing_atom(key)
+    rescue
+      ArgumentError -> nil
+    end
+  end
+
+  defp provider_opt_keys_by_string(model_spec) when is_binary(model_spec) do
+    with {:ok, model} <- ReqLLM.model(model_spec),
+         {:ok, provider_mod} <- ReqLLM.provider(model.provider),
+         true <- function_exported?(provider_mod, :provider_schema, 0) do
+      provider_mod.provider_schema().schema
+      |> Keyword.keys()
+      |> Enum.map(&{Atom.to_string(&1), &1})
+      |> Map.new()
+    else
+      _ -> %{}
+    end
+  end
 
   defp generate_call_id, do: "req_#{Jido.Util.generate_id()}"
 

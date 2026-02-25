@@ -35,15 +35,24 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RuntimeActionsTest do
   end
 
   describe "Continue action" do
-    test "continues runtime from checkpoint token and forwards query when provided" do
+    test "continues runtime from checkpoint token and forwards query/options when provided" do
       Mimic.stub(ReAct, :continue, fn token, config, opts ->
         assert token == "token_1"
         assert %Config{} = config
         assert opts[:query] == "follow up"
+        assert config.llm.req_http_options == [plug: {Req.Test, []}]
+        assert config.llm.llm_opts == [thinking: %{type: :enabled, budget_tokens: 512}]
         {:ok, %{events: [:continued]}}
       end)
 
-      params = %{checkpoint_token: "token_1", query: "follow up", model: :fast}
+      params = %{
+        checkpoint_token: "token_1",
+        query: "follow up",
+        model: :fast,
+        req_http_options: [plug: {Req.Test, []}],
+        llm_opts: [thinking: %{type: :enabled, budget_tokens: 512}]
+      }
+
       assert {:ok, %{events: [:continued]}} = Continue.run(params, %{})
     end
   end
@@ -67,10 +76,20 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RuntimeActionsTest do
         assert opts[:run_until_terminal?] == false
         assert opts[:query] == "resume"
         assert opts[:task_supervisor] == self()
+        assert config.llm.req_http_options == [plug: {Req.Test, []}]
+        assert config.llm.llm_opts == [reasoning_effort: :high]
         {:ok, %{result: "from_checkpoint"}}
       end)
 
-      params = %{checkpoint_token: "token_2", run_until_terminal?: false, query: "resume", model: :fast}
+      params = %{
+        checkpoint_token: "token_2",
+        run_until_terminal?: false,
+        query: "resume",
+        model: :fast,
+        req_http_options: [plug: {Req.Test, []}],
+        llm_opts: [reasoning_effort: :high]
+      }
+
       context = %{task_supervisor: self()}
 
       assert {:ok, %{result: "from_checkpoint"}} = Collect.run(params, context)
