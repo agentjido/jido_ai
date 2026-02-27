@@ -671,14 +671,12 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     _ -> pending_tool_calls_map(state) |> Map.keys() |> Enum.sort()
   end
 
-  defp pending_tool_calls_map(state) when is_map(state) do
+  defp pending_tool_calls_map(state) do
     case state[:pending_tool_calls] do
       map when is_map(map) -> map
       _ -> %{}
     end
   end
-
-  defp pending_tool_calls_map(_), do: %{}
 
   defp normalize_tool_calls(tool_calls) when is_list(tool_calls) do
     Enum.map(tool_calls, fn tool_call ->
