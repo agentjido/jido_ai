@@ -248,6 +248,31 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
       # Should have created new node
       assert map_size(updated_state[:nodes]) >= 2
     end
+
+    test "processes canonical success triple envelope" do
+      agent = create_agent()
+      start_instruction = %{action: :got_start, params: %{prompt: "Problem"}}
+
+      {agent, _} = GraphOfThoughts.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      call_id = state[:current_call_id]
+
+      result_instruction = %{
+        action: :got_llm_result,
+        params: %{
+          call_id: call_id,
+          result: {:ok, %{text: "Here is my analysis...", usage: %{input_tokens: 3, output_tokens: 2}}, []}
+        }
+      }
+
+      {updated_agent, _} = GraphOfThoughts.cmd(agent, [result_instruction], %{})
+      updated_state = StratState.get(updated_agent, %{})
+
+      assert map_size(updated_state[:nodes]) >= 2
+      assert updated_state[:usage][:input_tokens] == 3
+      assert updated_state[:usage][:output_tokens] == 2
+    end
   end
 
   # ============================================================================

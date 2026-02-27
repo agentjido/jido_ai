@@ -53,6 +53,8 @@ defmodule MyApp.SafeMathAgent do
 end
 ```
 
+`strategy_effect_policy.constraints` accepts atom keys, string keys, or keyword lists (including nested `emit` and `schedule` maps). Inputs are normalized before policy enforcement.
+
 ## Run Async + Await
 
 ```elixir

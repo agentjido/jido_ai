@@ -272,6 +272,14 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Machine do
     end
   end
 
+  defp handle_llm_response(machine, {:error, reason, _effects}) do
+    handle_llm_response(machine, {:error, reason})
+  end
+
+  defp handle_llm_response(machine, {:ok, result, _effects}) do
+    handle_llm_response(machine, {:ok, result})
+  end
+
   defp handle_llm_response(machine, {:error, reason}) do
     duration_ms = calculate_duration(machine)
 

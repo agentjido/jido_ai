@@ -79,6 +79,8 @@ config = Jido.AI.Reasoning.ReAct.build_config(%{
 })
 ```
 
+`effect_policy` (and nested `constraints`, when provided) accepts atom keys, string keys, or keyword lists. Runtime policy normalization handles all three shapes.
+
 You can also set the token secret globally:
 
 ```elixir
