@@ -222,7 +222,7 @@ Rewrite semantics:
 Normalization and sanitization:
 
 - `ai.llm.response` and `ai.tool.result` normalize malformed `data.result` to
-  `{:error, %{code: :malformed_result, ...}}`
+  `{:error, %{code: :malformed_result, ...}, []}`
 - `ai.llm.delta` strips control bytes from `data.delta` and truncates to
   `max_delta_chars`
 

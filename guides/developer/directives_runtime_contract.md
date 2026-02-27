@@ -21,6 +21,15 @@ After this guide, you can add directive behavior while preserving correlation, r
 - `EmitToolError` -> `ai.tool.result` (error payload)
 - `EmitRequestError` -> `ai.request.error`
 
+## Result Envelope Contract
+
+For `ai.llm.response` and `ai.tool.result`, `data.result` should be treated as a canonical triple:
+
+- `{:ok, payload, effects}`
+- `{:error, reason, effects}`
+
+Legacy 2-tuples may appear at boundaries but are normalized by runtime/policy helpers.
+
 ## Contract Rules
 
 - Directives describe work; they do not own strategy state transitions.

@@ -12,7 +12,8 @@ defmodule Jido.AI.Signal.ToolResult do
       result: [
         type: :any,
         required: true,
-        doc: "{:ok, result} | {:ok, result, effects} | {:error, reason} | {:error, reason, effects}"
+        doc:
+          "Canonical: {:ok, result, effects} | {:error, reason, effects} (legacy 2-tuples are normalized at boundaries)"
       ]
     ]
 end

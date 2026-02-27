@@ -42,6 +42,40 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     def run(%{a: a, b: b}, _context), do: {:ok, %{result: a + b}}
   end
 
+  defmodule SlowOrderTool do
+    use Jido.Action,
+      name: "slow_order_tool",
+      description: "completes after fast tool",
+      schema: Zoi.object(%{})
+
+    def run(_params, _context) do
+      Process.sleep(40)
+
+      {:ok, %{marker: :slow},
+       [
+         %Jido.Agent.StateOp.SetState{
+           attrs: %{react_order_marker: :slow}
+         }
+       ]}
+    end
+  end
+
+  defmodule FastOrderTool do
+    use Jido.Action,
+      name: "fast_order_tool",
+      description: "completes before slow tool",
+      schema: Zoi.object(%{})
+
+    def run(_params, _context) do
+      {:ok, %{marker: :fast},
+       [
+         %Jido.Agent.StateOp.SetState{
+           attrs: %{react_order_marker: :fast}
+         }
+       ]}
+    end
+  end
+
   setup :set_mimic_from_context
 
   setup do
@@ -293,6 +327,76 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert match?({:ok, _, _}, tool_completed.data.result)
   end
 
+  test "emits tool_completed events in original tool call order for parallel tools" do
+    stub_parallel_order_run()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SlowOrderTool.name() => SlowOrderTool, FastOrderTool.name() => FastOrderTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events = ReAct.stream("Run tools in order", config) |> Enum.to_list()
+
+    tool_completed_ids =
+      events
+      |> Enum.filter(&(&1.kind == :tool_completed))
+      |> Enum.map(& &1.data.tool_call_id)
+
+    assert tool_completed_ids == ["tc_slow", "tc_fast"]
+  end
+
+  test "strategy applies tool effects in deterministic call order" do
+    stub_parallel_order_run()
+    request_id = "req_strategy_ordering"
+
+    runtime_events =
+      ReAct.stream(
+        "Run tools in order",
+        Config.new(%{
+          model: :capable,
+          tools: %{SlowOrderTool.name() => SlowOrderTool, FastOrderTool.name() => FastOrderTool},
+          tool_max_retries: 0,
+          tool_retry_backoff_ms: 0
+        }),
+        request_id: request_id,
+        run_id: request_id
+      )
+      |> Enum.map(&Map.from_struct/1)
+
+    tool_completed_ids =
+      runtime_events
+      |> Enum.filter(&(&1.kind == :tool_completed))
+      |> Enum.map(&get_in(&1, [:data, :tool_call_id]))
+
+    assert tool_completed_ids == ["tc_slow", "tc_fast"]
+
+    agent = create_strategy_agent(tools: [SlowOrderTool, FastOrderTool])
+
+    {agent, [_spawn]} =
+      ReActStrategy.cmd(
+        agent,
+        [strategy_instruction(ReActStrategy.start_action(), %{query: "Run tools in order", request_id: request_id})],
+        %{}
+      )
+
+    {agent, []} =
+      Enum.reduce(runtime_events, {agent, []}, fn event, {acc_agent, _} ->
+        ReActStrategy.cmd(
+          acc_agent,
+          [strategy_instruction(:ai_react_worker_event, %{request_id: request_id, event: event})],
+          %{}
+        )
+      end)
+
+    state = StratState.get(agent, %{})
+    assert state.status == :completed
+    assert state.termination_reason == :final_answer
+    assert agent.state.react_order_marker == :fast
+  end
+
   test "resumes from after_llm checkpoint token" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
@@ -437,6 +541,35 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   defp strategy_instruction(action, params) do
     %Jido.Instruction{action: action, params: params}
+  end
+
+  defp stub_parallel_order_run do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      if count == 1 do
+        {:ok,
+         %{
+           stream: [
+             ReqLLM.StreamChunk.tool_call("slow_order_tool", %{}, %{id: "tc_slow"}),
+             ReqLLM.StreamChunk.tool_call("fast_order_tool", %{}, %{id: "tc_fast"})
+           ],
+           usage: %{input_tokens: 6, output_tokens: 3}
+         }}
+      else
+        {:ok,
+         %{
+           stream: [ReqLLM.StreamChunk.text("Tool round complete")],
+           usage: %{input_tokens: 2, output_tokens: 1}
+         }}
+      end
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
   end
 
   defp wait_until(fun, timeout_ms \\ 500) when is_function(fun, 0) do

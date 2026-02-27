@@ -16,7 +16,8 @@ defmodule Jido.AI.Signal.LLMResponse do
       result: [
         type: :any,
         required: true,
-        doc: "{:ok, result} | {:ok, result, effects} | {:error, reason} | {:error, reason, effects}"
+        doc:
+          "Canonical: {:ok, result, effects} | {:error, reason, effects} (legacy 2-tuples are normalized at boundaries)"
       ],
       usage: [type: :map, doc: "Token usage: %{input_tokens: N, output_tokens: M}"],
       model: [type: :string, doc: "Actual model used for the request"],

@@ -396,7 +396,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       pending
       |> Task.async_stream(
         fn call -> execute_tool_with_retries(call, config, context) end,
-        ordered: false,
+        # Preserve deterministic tool completion/event ordering by original call order.
+        ordered: true,
         max_concurrency: config.tool_exec.concurrency,
         timeout: config.tool_exec.timeout_ms + 50
       )

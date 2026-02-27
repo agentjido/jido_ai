@@ -77,7 +77,12 @@ context = %{tools: tools}
 {:ok, updated_turn} = Turn.run_tools(turn, context)
 
 # Each tool result has this shape:
-# %{id: "call_abc", name: "multiply", content: "{\"product\":42}", raw_result: {:ok, %{product: 42}}}
+# %{
+#   id: "call_abc",
+#   name: "multiply",
+#   content: "{\"product\":42}",
+#   raw_result: {:ok, %{product: 42}, []}
+# }
 ```
 
 You can also pass tools via opts:
@@ -168,18 +173,36 @@ Use `execute/4` when you know the tool name and want to call it outside an LLM l
 ```elixir
 tools = Turn.build_tools_map([MyApp.Actions.Multiply])
 
-{:ok, result} = Turn.execute("multiply", %{"a" => 6, "b" => 7}, %{}, tools: tools)
+{:ok, result, effects} = Turn.execute("multiply", %{"a" => 6, "b" => 7}, %{}, tools: tools)
 # result == %{product: 42}
+# effects == []
 ```
 
 Use `execute_module/4` when you have the module reference directly:
 
 ```elixir
-{:ok, result} = Turn.execute_module(MyApp.Actions.Multiply, %{a: 6, b: 7}, %{})
+{:ok, result, effects} = Turn.execute_module(MyApp.Actions.Multiply, %{a: 6, b: 7}, %{})
 # result == %{product: 42}
+# effects == []
 ```
 
 Both functions normalize parameters against the action schema automatically, so string-keyed maps from LLM JSON output work without manual conversion.
+
+## Result Envelope Contract
+
+Tool execution envelopes are canonical triples:
+
+- `{:ok, result, effects}`
+- `{:error, reason, effects}`
+
+Legacy 2-tuples (`{:ok, result}` / `{:error, reason}`) are normalized at runtime boundaries.
+Use triple pattern-matching in new code.
+
+## Effect Policy And Ordering
+
+- `Turn.execute/4` and `Turn.execute_module/4` filter tool-emitted effects through `context[:effect_policy]` when provided.
+- Disallowed effects are dropped; allowed effects remain in the returned `effects` list.
+- Tool call execution order in `run_tools/3` follows the order of `turn.tool_calls`.
 
 ## Text Extraction
 
@@ -258,6 +281,7 @@ Fix:
 - `tool_results` starts as `[]` — populated only after `run_tools/3` or `with_tool_results/2`
 - `run_tools/3` on a turn with no tool calls returns `{:ok, turn}` unchanged
 - `needs_tools?/1` checks both `type == :tool_calls` and non-empty `tool_calls` list
+- tool execution result envelopes always include an effects list (`{:ok|:error, payload, effects}`)
 
 ## When To Use / Not Use
 

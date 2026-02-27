@@ -57,6 +57,10 @@ config = Jido.AI.Reasoning.ReAct.build_config(%{
   tool_max_retries: 1,
   tool_retry_backoff_ms: 200,
   tool_concurrency: 4,
+  effect_policy: %{
+    mode: :allow_list,
+    allow: [Jido.Agent.StateOp.SetState, Jido.Agent.Directive.Emit]
+  },
 
   # Observability
   emit_signals?: true,
@@ -81,6 +85,15 @@ You can also set the token secret globally:
 # config/runtime.exs
 config :jido_ai, :react_token_secret, System.fetch_env!("REACT_TOKEN_SECRET")
 ```
+
+## Parallel Tool Ordering
+
+ReAct may execute tool calls concurrently (`tool_concurrency > 1`), but runtime output remains deterministic:
+
+- `:tool_completed` events are emitted in the original LLM tool-call order
+- tool result messages appended to thread context preserve that same order
+
+This means completion timing differences between tools do not reorder the observable runtime contract.
 
 ## Run To Completion
 

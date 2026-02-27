@@ -31,6 +31,28 @@ defmodule MyApp.MathAgent do
 end
 ```
 
+## Optional: Configure Tool Effect Policy
+
+Use `effect_policy` to bound which tool-emitted effects are allowed at runtime.
+
+```elixir
+defmodule MyApp.SafeMathAgent do
+  use Jido.AI.Agent,
+    name: "safe_math_agent",
+    model: :fast,
+    tools: [MyApp.Actions.AddNumbers],
+    effect_policy: %{
+      mode: :allow_list,
+      allow: [Jido.Agent.StateOp.SetState, Jido.Agent.Directive.Emit]
+    },
+    strategy_effect_policy: %{
+      constraints: %{
+        emit: %{allowed_signal_prefixes: ["app.math."]}
+      }
+    }
+end
+```
+
 ## Run Async + Await
 
 ```elixir

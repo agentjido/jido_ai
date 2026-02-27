@@ -294,6 +294,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
       |> Map.merge(%{
         tool_rounds: %{},
         pending_tool_calls: %{},
+        pending_tool_call_order: [],
         pending_tool_results: %{},
         llm_call_aliases: %{},
         pending_tool_phase: nil,
@@ -421,14 +422,14 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
 
         state = Map.put(state, :pending_tool_results, pending_results)
         agent = StratState.put(agent, state)
-        {agent, effect_directives, _stats, _filtered_result} = Effects.apply_result(agent, result, policy)
-        state = StratState.get(agent, %{})
 
         if pending_tool_round_complete?(state) do
+          {agent, effect_directives} = apply_pending_tool_effects(agent, state, policy)
+          state = StratState.get(agent, %{})
           {agent, resume_directives} = resume_after_tool_round(agent, state, config)
           {agent, effect_directives ++ resume_directives}
         else
-          {agent, effect_directives}
+          {agent, []}
         end
     end
   end
@@ -465,6 +466,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     Map.take(state, [
       :tool_rounds,
       :pending_tool_calls,
+      :pending_tool_call_order,
       :pending_tool_results,
       :llm_call_aliases,
       :pending_tool_phase,
@@ -551,10 +553,12 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
           end)
 
         pending_tool_calls = Map.new(normalized_calls, fn call -> {call.call_id, call} end)
+        pending_tool_call_order = Enum.map(normalized_calls, & &1.call_id)
 
         new_state =
           state
           |> Map.put(:pending_tool_calls, pending_tool_calls)
+          |> Map.put(:pending_tool_call_order, pending_tool_call_order)
           |> Map.put(:pending_tool_results, %{})
           |> Map.put(:pending_tool_call_id, llm_call_id)
           |> Map.put(:pending_tool_turn, turn)
@@ -575,7 +579,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   end
 
   defp pending_tool_round_complete?(state) do
-    pending_calls = Map.keys(state[:pending_tool_calls] || %{})
+    pending_calls = pending_tool_call_order(state)
     completed = Map.keys(state[:pending_tool_results] || %{})
     pending_calls != [] and Enum.all?(pending_calls, &(&1 in completed))
   end
@@ -584,18 +588,19 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     llm_call_id = state[:pending_tool_call_id]
     turn = state[:pending_tool_turn] |> then(&(&1 || %{})) |> Turn.from_result_map()
     pending_calls = state[:pending_tool_calls] || %{}
+    pending_call_order = pending_tool_call_order(state)
     pending_results = state[:pending_tool_results] || %{}
     base_context = get_in(state, [:llm_call_aliases, llm_call_id]) || []
 
     tool_results =
-      pending_calls
-      |> Map.values()
-      |> Enum.map(fn call ->
-        result_entry = pending_results[call.call_id] || %{}
+      Enum.map(pending_call_order, fn call_id ->
+        call = pending_calls[call_id] || %{}
+        result_entry = pending_results[call_id] || %{}
+        tool_name = call[:tool_name] || result_entry[:tool_name] || ""
 
         %{
-          id: call.call_id,
-          name: call.tool_name,
+          id: call_id,
+          name: tool_name,
           raw_result: result_entry[:result] || {:error, :missing_tool_result}
         }
       end)
@@ -618,6 +623,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     new_state =
       state
       |> Map.put(:pending_tool_calls, %{})
+      |> Map.put(:pending_tool_call_order, [])
       |> Map.put(:pending_tool_results, %{})
       |> Map.put(:pending_tool_phase, nil)
       |> Map.put(:pending_tool_call_id, nil)
@@ -626,6 +632,53 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
 
     {StratState.put(agent, new_state), [directive]}
   end
+
+  defp apply_pending_tool_effects(agent, state, policy) do
+    pending_results = state[:pending_tool_results] || %{}
+
+    state
+    |> pending_tool_call_order()
+    |> Enum.reduce({agent, []}, fn call_id, {acc_agent, acc_directives} ->
+      result =
+        pending_results
+        |> Map.get(call_id, %{})
+        |> Map.get(:result, {:error, :missing_tool_result, []})
+
+      {updated_agent, directives, _stats, _filtered_result} = Effects.apply_result(acc_agent, result, policy)
+      {updated_agent, acc_directives ++ directives}
+    end)
+  end
+
+  defp pending_tool_call_order(state) do
+    pending_calls = pending_tool_calls_map(state)
+
+    case state[:pending_tool_call_order] do
+      [_ | _] = order ->
+        order
+
+      _ ->
+        fallback_from_turn =
+          state[:pending_tool_turn]
+          |> then(&(&1 || %{}))
+          |> Turn.from_result_map()
+          |> Map.get(:tool_calls, [])
+          |> Enum.map(&extract_tool_call_id/1)
+          |> Enum.filter(&is_binary/1)
+
+        if fallback_from_turn != [], do: fallback_from_turn, else: pending_calls |> Map.keys() |> Enum.sort()
+    end
+  rescue
+    _ -> pending_tool_calls_map(state) |> Map.keys() |> Enum.sort()
+  end
+
+  defp pending_tool_calls_map(state) when is_map(state) do
+    case state[:pending_tool_calls] do
+      map when is_map(map) -> map
+      _ -> %{}
+    end
+  end
+
+  defp pending_tool_calls_map(_), do: %{}
 
   defp normalize_tool_calls(tool_calls) when is_list(tool_calls) do
     Enum.map(tool_calls, fn tool_call ->
