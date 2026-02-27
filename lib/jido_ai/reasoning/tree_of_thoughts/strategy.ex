@@ -638,23 +638,30 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
 
     state
     |> pending_tool_call_order()
-    |> Enum.reduce({agent, []}, fn call_id, {acc_agent, acc_directives} ->
+    |> Enum.reduce({agent, []}, fn call_id, {acc_agent, acc_directives_rev} ->
       result =
         pending_results
         |> Map.get(call_id, %{})
         |> Map.get(:result, {:error, :missing_tool_result, []})
 
       {updated_agent, directives, _stats, _filtered_result} = Effects.apply_result(acc_agent, result, policy)
-      {updated_agent, acc_directives ++ directives}
+      {updated_agent, Enum.reverse(directives, acc_directives_rev)}
     end)
+    |> then(fn {updated_agent, directives_rev} -> {updated_agent, Enum.reverse(directives_rev)} end)
   end
 
   defp pending_tool_call_order(state) do
     pending_calls = pending_tool_calls_map(state)
+    default_order = pending_calls |> Map.keys() |> Enum.sort()
 
     case state[:pending_tool_call_order] do
       [_ | _] = order ->
-        order
+        filtered_order =
+          order
+          |> Enum.filter(&Map.has_key?(pending_calls, &1))
+          |> Enum.uniq()
+
+        if filtered_order != [], do: filtered_order, else: default_order
 
       _ ->
         fallback_from_turn =
@@ -664,8 +671,10 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
           |> Map.get(:tool_calls, [])
           |> Enum.map(&extract_tool_call_id/1)
           |> Enum.filter(&is_binary/1)
+          |> Enum.filter(&Map.has_key?(pending_calls, &1))
+          |> Enum.uniq()
 
-        if fallback_from_turn != [], do: fallback_from_turn, else: pending_calls |> Map.keys() |> Enum.sort()
+        if fallback_from_turn != [], do: fallback_from_turn, else: default_order
     end
   rescue
     _ -> pending_tool_calls_map(state) |> Map.keys() |> Enum.sort()

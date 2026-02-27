@@ -170,8 +170,56 @@ defmodule Jido.AI.Effects.Policy do
 
   defp normalize_matcher(_), do: nil
 
-  defp normalize_constraints(%{} = constraints), do: constraints
+  defp normalize_constraints(constraints) when is_list(constraints) do
+    constraints
+    |> Enum.into(%{})
+    |> normalize_constraints()
+  end
+
+  defp normalize_constraints(%{} = constraints) do
+    %{}
+    |> maybe_put_constraint(:emit, normalize_emit_constraints(fetch(constraints, :emit, nil)))
+    |> maybe_put_constraint(:schedule, normalize_schedule_constraints(fetch(constraints, :schedule, nil)))
+  end
+
   defp normalize_constraints(_), do: %{}
+
+  defp normalize_emit_constraints(nil), do: nil
+
+  defp normalize_emit_constraints(constraints) when is_list(constraints) do
+    constraints
+    |> Enum.into(%{})
+    |> normalize_emit_constraints()
+  end
+
+  defp normalize_emit_constraints(%{} = constraints) do
+    %{}
+    |> maybe_put_constraint(:allowed_signal_prefixes, normalize_list(fetch(constraints, :allowed_signal_prefixes, nil)))
+    |> maybe_put_constraint(:allowed_signal_types, normalize_list(fetch(constraints, :allowed_signal_types, nil)))
+    |> maybe_put_constraint(:allowed_dispatches, normalize_list(fetch(constraints, :allowed_dispatches, nil)))
+  end
+
+  defp normalize_emit_constraints(_), do: nil
+
+  defp normalize_schedule_constraints(nil), do: nil
+
+  defp normalize_schedule_constraints(constraints) when is_list(constraints) do
+    constraints
+    |> Enum.into(%{})
+    |> normalize_schedule_constraints()
+  end
+
+  defp normalize_schedule_constraints(%{} = constraints) do
+    case fetch(constraints, :max_delay_ms, nil) do
+      max_delay_ms when is_integer(max_delay_ms) and max_delay_ms >= 0 ->
+        %{max_delay_ms: max_delay_ms}
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp normalize_schedule_constraints(_), do: nil
 
   defp intersect_mode(:deny_all, _), do: :deny_all
   defp intersect_mode(_, :deny_all), do: :deny_all
@@ -196,8 +244,8 @@ defmodule Jido.AI.Effects.Policy do
     do: MapSet.intersection(left, right)
 
   defp merge_constraints(%{} = agent, %{} = strategy) do
-    emit = merge_emit_constraints(agent[:emit], strategy[:emit])
-    schedule = merge_schedule_constraints(agent[:schedule], strategy[:schedule])
+    emit = merge_emit_constraints(fetch(agent, :emit, nil), fetch(strategy, :emit, nil))
+    schedule = merge_schedule_constraints(fetch(agent, :schedule, nil), fetch(strategy, :schedule, nil))
 
     agent
     |> Map.merge(strategy)
@@ -220,8 +268,8 @@ defmodule Jido.AI.Effects.Policy do
   end
 
   defp put_intersection(acc, key, left, right) do
-    l = normalize_list(left[key])
-    r = normalize_list(right[key])
+    l = normalize_list(fetch(left, key, nil))
+    r = normalize_list(fetch(right, key, nil))
 
     value =
       cond do
@@ -239,8 +287,8 @@ defmodule Jido.AI.Effects.Policy do
   defp merge_schedule_constraints(left, nil) when is_map(left), do: left
 
   defp merge_schedule_constraints(left, right) when is_map(left) and is_map(right) do
-    left_max = left[:max_delay_ms]
-    right_max = right[:max_delay_ms]
+    left_max = fetch(left, :max_delay_ms, nil)
+    right_max = fetch(right, :max_delay_ms, nil)
 
     max_delay_ms =
       cond do
@@ -258,20 +306,20 @@ defmodule Jido.AI.Effects.Policy do
   defp normalize_list(value), do: List.wrap(value)
 
   defp constrained_allowed?(constraints, %Directive.Emit{} = emit) when is_map(constraints) do
-    emit_constraints = Map.get(constraints, :emit, %{})
+    emit_constraints = fetch(constraints, :emit, %{})
     emit_type_allowed?(emit, emit_constraints) and emit_dispatch_allowed?(emit, emit_constraints)
   end
 
   defp constrained_allowed?(constraints, %Directive.Schedule{} = schedule) when is_map(constraints) do
-    schedule_constraints = Map.get(constraints, :schedule, %{})
+    schedule_constraints = fetch(constraints, :schedule, %{})
     schedule_delay_allowed?(schedule, schedule_constraints)
   end
 
   defp constrained_allowed?(_constraints, _effect), do: true
 
   defp emit_type_allowed?(%Directive.Emit{signal: signal}, constraints) do
-    allowed_types = normalize_list(constraints[:allowed_signal_types])
-    allowed_prefixes = normalize_list(constraints[:allowed_signal_prefixes])
+    allowed_types = normalize_list(fetch(constraints, :allowed_signal_types, nil))
+    allowed_prefixes = normalize_list(fetch(constraints, :allowed_signal_prefixes, nil))
     signal_type = extract_signal_type(signal)
 
     type_allowed? =
@@ -292,7 +340,7 @@ defmodule Jido.AI.Effects.Policy do
   end
 
   defp emit_dispatch_allowed?(%Directive.Emit{dispatch: dispatch}, constraints) do
-    allowed_dispatches = normalize_dispatches(constraints[:allowed_dispatches])
+    allowed_dispatches = normalize_dispatches(fetch(constraints, :allowed_dispatches, nil))
 
     case allowed_dispatches do
       nil ->
@@ -340,7 +388,7 @@ defmodule Jido.AI.Effects.Policy do
   defp dispatch_adapters(_), do: [:unknown]
 
   defp schedule_delay_allowed?(%Directive.Schedule{delay_ms: delay_ms}, constraints) do
-    case constraints[:max_delay_ms] do
+    case fetch(constraints, :max_delay_ms, nil) do
       max when is_integer(max) and max >= 0 ->
         is_integer(delay_ms) and delay_ms >= 0 and delay_ms <= max
 

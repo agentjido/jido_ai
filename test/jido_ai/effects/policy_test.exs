@@ -26,6 +26,42 @@ defmodule Jido.AI.Effects.PolicyTest do
     refute Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.test"}, dispatch: :bus})
   end
 
+  test "accepts keyword constraints and enforces them" do
+    policy =
+      Policy.new(
+        mode: :allow_list,
+        allow: [Directive.Emit],
+        constraints: [
+          emit: [
+            allowed_signal_prefixes: ["ai."],
+            allowed_dispatches: [:pid]
+          ]
+        ]
+      )
+
+    assert Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.ok"}, dispatch: :pid})
+    refute Policy.allowed?(policy, %Directive.Emit{signal: %{type: "foo.ok"}, dispatch: :pid})
+    refute Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.ok"}, dispatch: :pubsub})
+  end
+
+  test "accepts string-keyed constraints and enforces them" do
+    policy =
+      Policy.new(%{
+        "mode" => "allow_list",
+        "allow" => [Directive.Emit],
+        "constraints" => %{
+          "emit" => %{
+            "allowed_signal_prefixes" => ["ai."],
+            "allowed_dispatches" => ["pid"]
+          }
+        }
+      })
+
+    assert Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.ok"}, dispatch: :pid})
+    refute Policy.allowed?(policy, %Directive.Emit{signal: %{type: "foo.ok"}, dispatch: :pid})
+    refute Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.ok"}, dispatch: :pubsub})
+  end
+
   test "empty emit allow-lists deny all emit types, prefixes, and dispatches" do
     emit = %Directive.Emit{signal: %{type: "ai.test"}, dispatch: :pid}
 
