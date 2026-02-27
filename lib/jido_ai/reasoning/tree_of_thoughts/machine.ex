@@ -676,6 +676,18 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
     end)
   end
 
+  defp handle_llm_result(machine, {:error, reason, _effects}, env) do
+    handle_llm_result(machine, {:error, reason}, env)
+  end
+
+  defp handle_llm_result(%__MODULE__{status: "generating"} = machine, {:ok, result, _effects}, env) do
+    handle_llm_result(machine, {:ok, result}, env)
+  end
+
+  defp handle_llm_result(%__MODULE__{status: "evaluating"} = machine, {:ok, result, _effects}, env) do
+    handle_llm_result(machine, {:ok, result}, env)
+  end
+
   defp handle_llm_result(%__MODULE__{status: "generating"} = machine, {:ok, result}, _env) do
     # Accumulate usage
     machine = accumulate_usage(machine, result)

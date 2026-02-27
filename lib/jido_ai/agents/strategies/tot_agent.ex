@@ -27,6 +27,7 @@ defmodule Jido.AI.ToTAgent do
   - `:top_k`, `:min_depth`, `:max_nodes`, `:max_duration_ms`, `:beam_width` - Search budget and shaping knobs
   - `:early_success_threshold`, `:convergence_window`, `:min_score_improvement`, `:max_parse_retries` - Deterministic stopping/parser controls
   - `:tools`, `:tool_context`, `:tool_timeout_ms`, `:tool_max_retries`, `:tool_retry_backoff_ms`, `:max_tool_round_trips` - Tool orchestration controls
+  - `:effect_policy`, `:strategy_effect_policy` - Effect policy controls (strategy may only narrow)
   - `:generation_prompt` - Custom prompt for thought generation
   - `:evaluation_prompt` - Custom prompt for thought evaluation
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
@@ -135,6 +136,17 @@ defmodule Jido.AI.ToTAgent do
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
     tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
     max_tool_round_trips = Keyword.get(opts, :max_tool_round_trips, @default_max_tool_round_trips)
+
+    agent_effect_policy =
+      opts
+      |> Keyword.get(:effect_policy, %{})
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
+    strategy_effect_policy =
+      opts
+      |> Keyword.get(:strategy_effect_policy, %{})
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
     plugins = Keyword.get(opts, :plugins, [])
 
     ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
@@ -159,7 +171,9 @@ defmodule Jido.AI.ToTAgent do
         tool_timeout_ms: tool_timeout_ms,
         tool_max_retries: tool_max_retries,
         tool_retry_backoff_ms: tool_retry_backoff_ms,
-        max_tool_round_trips: max_tool_round_trips
+        max_tool_round_trips: max_tool_round_trips,
+        agent_effect_policy: agent_effect_policy,
+        strategy_effect_policy: strategy_effect_policy
       ]
       |> then(fn o ->
         if generation_prompt, do: Keyword.put(o, :generation_prompt, generation_prompt), else: o

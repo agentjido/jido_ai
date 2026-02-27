@@ -21,6 +21,27 @@ defmodule Jido.AI.ToTAgentTest do
       name: "default_tot_agent"
   end
 
+  defmodule EffectPolicyToTAgent do
+    use Jido.AI.ToTAgent,
+      name: "effect_policy_tot_agent",
+      effect_policy: %{
+        mode: :allow_list,
+        allow: [Jido.Agent.StateOp.SetState, Jido.Agent.Directive.Emit],
+        constraints: %{
+          emit: %{
+            allowed_dispatches: [:pid, "pubsub"]
+          }
+        }
+      },
+      strategy_effect_policy: %{
+        constraints: %{
+          emit: %{
+            allowed_signal_prefixes: ["ai."]
+          }
+        }
+      }
+  end
+
   describe "module creation" do
     test "creates agent module with expected name" do
       assert TestToTAgent.name() == "test_tot_agent"
@@ -90,6 +111,19 @@ defmodule Jido.AI.ToTAgentTest do
       assert opts[:tool_max_retries] == 1
       assert opts[:tool_retry_backoff_ms] == 200
       assert opts[:max_tool_round_trips] == 3
+    end
+
+    test "evaluates effect policy literals into runtime data" do
+      opts = EffectPolicyToTAgent.strategy_opts()
+
+      assert is_map(opts[:agent_effect_policy])
+      assert is_map(opts[:strategy_effect_policy])
+      refute match?({:%{}, _, _}, opts[:agent_effect_policy])
+      refute match?({:%{}, _, _}, opts[:strategy_effect_policy])
+
+      assert opts[:agent_effect_policy][:allow] == [Jido.Agent.StateOp.SetState, Jido.Agent.Directive.Emit]
+      assert opts[:agent_effect_policy][:constraints][:emit][:allowed_dispatches] == [:pid, "pubsub"]
+      assert opts[:strategy_effect_policy][:constraints][:emit][:allowed_signal_prefixes] == ["ai."]
     end
   end
 
@@ -191,6 +225,21 @@ defmodule Jido.AI.ToTAgentTest do
       assert state[:top_k] == 4
       assert state[:min_depth] == 1
       assert state[:max_nodes] == 50
+    end
+
+    test "strategy receives intersected effect policy from macro options" do
+      agent = EffectPolicyToTAgent.new()
+      ctx = %{strategy_opts: EffectPolicyToTAgent.strategy_opts()}
+      {agent, _directives} = Jido.AI.Reasoning.TreeOfThoughts.Strategy.init(agent, ctx)
+
+      state = StratState.get(agent, %{})
+      policy = state[:config][:effect_policy]
+
+      assert policy.mode == :allow_list
+      assert MapSet.member?(policy.allow, Jido.Agent.StateOp.SetState)
+      assert MapSet.member?(policy.allow, Jido.Agent.Directive.Emit)
+      assert policy.constraints[:emit][:allowed_dispatches] == [:pid, "pubsub"]
+      assert policy.constraints[:emit][:allowed_signal_prefixes] == ["ai."]
     end
   end
 

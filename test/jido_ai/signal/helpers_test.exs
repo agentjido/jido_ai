@@ -5,10 +5,10 @@ defmodule Jido.AI.Signal.HelpersTest do
 
   describe "normalize_result/3" do
     test "passes through ok and error tuples and wraps invalid values" do
-      assert Helpers.normalize_result({:ok, 1}) == {:ok, 1}
-      assert Helpers.normalize_result({:error, %{code: :x}}) == {:error, %{code: :x}}
+      assert Helpers.normalize_result({:ok, 1}) == {:ok, 1, []}
+      assert Helpers.normalize_result({:error, %{code: :x}}) == {:error, %{code: :x}, []}
 
-      assert {:error, envelope} = Helpers.normalize_result(:bad, :invalid_result, "Bad result")
+      assert {:error, envelope, []} = Helpers.normalize_result(:bad, :invalid_result, "Bad result")
       assert envelope.code == :invalid_result
       assert envelope.retryable == false
     end

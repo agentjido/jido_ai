@@ -300,6 +300,14 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Machine do
 
   def extract_answer(_), do: nil
 
+  defp handle_llm_result(machine, {:error, reason, _effects}) do
+    handle_llm_result(machine, {:error, reason})
+  end
+
+  defp handle_llm_result(machine, {:ok, result, _effects}) do
+    handle_llm_result(machine, {:ok, result})
+  end
+
   defp handle_llm_result(machine, {:error, reason}) do
     with_transition(machine, "error", fn machine ->
       machine =

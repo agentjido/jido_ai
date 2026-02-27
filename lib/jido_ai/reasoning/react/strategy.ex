@@ -37,6 +37,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
+  alias Jido.AI.Effects
   alias Jido.AI.Reasoning.ReAct.State, as: ReActState
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.Signal
@@ -61,6 +62,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
+          effect_policy: map(),
           observability: map(),
           runtime_adapter: true,
           runtime_task_supervisor: pid() | atom() | nil,
@@ -509,7 +511,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             request_id: request_id,
             run_id: run_id,
             agent_id: state[:agent_id] || Map.get(agent, :id),
-            observability: config[:observability] || %{}
+            observability: config[:observability] || %{},
+            effect_policy: config[:effect_policy] || Effects.default_policy()
           })
       }
 
@@ -737,8 +740,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
     kind = event_kind(event)
     new_state = maybe_mark_worker_ready(new_state, kind)
+    agent = put_strategy_state(agent, new_state)
+    {agent, directives} = maybe_apply_runtime_effects(agent, event, new_state)
 
-    {put_strategy_state(agent, new_state), []}
+    {agent, directives}
   end
 
   defp process_worker_event(agent, _params), do: {agent, []}
@@ -830,7 +835,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
                  thinking_content: thinking_content,
                  tool_calls: tool_calls,
                  usage: usage
-               }}
+               }, []}
           })
 
         usage_signal = maybe_usage_signal(call_id, config_model(state), usage)
@@ -842,7 +847,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       :tool_completed ->
         tool_call_id = event_field(data, :tool_call_id, event_field(event, :tool_call_id, ""))
         tool_name = event_field(data, :tool_name, event_field(event, :tool_name, ""))
-        tool_result = event_field(data, :result, {:error, :unknown})
+        tool_result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
 
         updated =
           base_state
@@ -1025,7 +1030,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       emit_telemetry?: get_in(config, [:observability, :emit_telemetry?]),
       redact_tool_args?: get_in(config, [:observability, :redact_tool_args?]),
       capture_deltas?: get_in(config, [:observability, :emit_llm_deltas?]),
-      runtime_task_supervisor: config[:runtime_task_supervisor]
+      runtime_task_supervisor: config[:runtime_task_supervisor],
+      effect_policy: config[:effect_policy]
     }
 
     ReActRuntimeConfig.new(runtime_opts)
@@ -1095,6 +1101,20 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp maybe_mark_worker_ready(state, _kind), do: state
+
+  defp maybe_apply_runtime_effects(agent, event, state) do
+    case event_kind(event) do
+      :tool_completed ->
+        data = event_field(event, :data, %{})
+        result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
+        policy = effect_policy_from_state(state)
+        {agent, directives, _stats, _filtered_result} = Effects.apply_result(agent, result, policy)
+        {agent, directives}
+
+      _ ->
+        {agent, []}
+    end
+  end
 
   defp runtime_state_from_thread(%Thread{} = thread, query, request_id, run_id)
        when is_binary(query) and is_binary(request_id) and is_binary(run_id) do
@@ -1192,6 +1212,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     opts = ctx[:strategy_opts] || []
     observability_overrides = opts |> Keyword.get(:observability, %{}) |> normalize_map_opt()
     tool_context_opt = opts |> Keyword.get(:tool_context, %{}) |> normalize_map_opt()
+    agent_effect_policy = Keyword.get(opts, :agent_effect_policy, Keyword.get(opts, :effect_policy, %{}))
+    strategy_effect_policy = Keyword.get(opts, :strategy_effect_policy, %{})
 
     tools_modules =
       case Keyword.fetch(opts, :tools) do
@@ -1211,6 +1233,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     provider_opt_keys_by_string = provider_opt_keys_by_string(resolved_model)
 
     request_policy = validate_request_policy!(Keyword.get(opts, :request_policy, :reject))
+    effect_policy = Effects.intersect_policies(agent_effect_policy, strategy_effect_policy)
 
     %{
       tools: tools_modules,
@@ -1224,6 +1247,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, 15_000),
       tool_max_retries: Keyword.get(opts, :tool_max_retries, 1),
       tool_retry_backoff_ms: Keyword.get(opts, :tool_retry_backoff_ms, 200),
+      effect_policy: effect_policy,
       runtime_adapter: true,
       runtime_task_supervisor: Keyword.get(opts, :runtime_task_supervisor),
       observability:
@@ -1257,6 +1281,16 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_map_opt(%{} = value), do: value
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
+
+  defp effect_policy_from_state(state) do
+    state
+    |> normalize_map_opt()
+    |> Map.get(:config, %{})
+    |> normalize_map_opt()
+    |> Map.get(:effect_policy, Effects.default_policy())
+  end
+
+  defp normalize_tool_result(result), do: Effects.normalize_result(result)
 
   defp normalize_req_http_options(req_http_options) when is_list(req_http_options), do: req_http_options
   defp normalize_req_http_options(_), do: []
