@@ -26,7 +26,7 @@ defmodule Jido.AI.Plugins.Policy do
   ## Normalization And Sanitization Contracts
 
   - `ai.llm.response` and `ai.tool.result` normalize `data.result` into
-    `{:ok, result}` or `{:error, envelope}` tuples.
+    `{:ok, result, effects}` or `{:error, reason, effects}` tuples.
   - `ai.llm.delta` sanitizes `data.delta` by removing control bytes and
     truncating to `max_delta_chars` (default `4_000`).
   """

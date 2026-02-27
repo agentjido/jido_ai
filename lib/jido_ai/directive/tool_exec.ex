@@ -173,7 +173,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
            duration_ms = System.monotonic_time(:millisecond) - start_ms
 
            case result do
-             {:ok, _res} ->
+             {:ok, _res, _effects} ->
                Observe.finish_span(span_ctx, %{duration_ms: duration_ms, retry_count: retry_count})
 
                maybe_emit(
@@ -183,7 +183,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
                  event_meta
                )
 
-             {:error, %{type: :timeout} = error} ->
+             {:error, %{type: :timeout} = error, _effects} ->
                Observe.finish_span_error(span_ctx, :error, error, [])
 
                timeout_meta = Map.merge(event_meta, %{error_type: :timeout})
@@ -202,7 +202,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
                  Map.put(timeout_meta, :termination_reason, :error)
                )
 
-             {:error, %{type: type}} ->
+             {:error, %{type: type}, _effects} ->
                Observe.finish_span_error(span_ctx, :error, %{type: type}, [])
 
                maybe_emit(
@@ -212,7 +212,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
                  Map.merge(event_meta, %{error_type: type, termination_reason: :error})
                )
 
-             {:error, _other} ->
+             {:error, _other, _effects} ->
                Observe.finish_span_error(span_ctx, :error, %{type: :executor}, [])
 
                maybe_emit(
@@ -234,7 +234,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           agent_pid,
           call_id,
           tool_name,
-          {:error, error_envelope(:supervisor, "Failed to start tool execution task", %{reason: inspect(reason)}, true)}
+          {:error, error_envelope(:supervisor, "Failed to start tool execution task", %{reason: inspect(reason)}, true),
+           []}
         )
 
         {:ok, state}
@@ -255,7 +256,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
          obs_cfg
        ) do
     0..max_retries
-    |> Enum.reduce_while({{:error, error_envelope(:executor, "uninitialized error")}, 0}, fn attempt, _acc ->
+    |> Enum.reduce_while({{:error, error_envelope(:executor, "uninitialized error"), []}, 0}, fn attempt, _acc ->
       if attempt > 0 do
         maybe_emit(obs_cfg, Observe.tool(:retry), %{duration_ms: 0, retry_count: attempt}, event_meta)
 
@@ -274,10 +275,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
         )
 
       case result do
-        {:ok, _} = ok ->
+        {:ok, _, _} = ok ->
           {:halt, {ok, attempt}}
 
-        {:error, error} ->
+        {:error, error, _effects} ->
           retryable? = retryable_error?(error)
 
           if retryable? and attempt < max_retries do
@@ -310,10 +311,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
             normalize_result(result, tool_name)
 
           {:exit, _reason} ->
-            {:error, error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true)}
+            {:error, error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
 
           nil ->
-            {:error, error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true)}
+            {:error, error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
         end
       after
         Process.demonitor(task.ref, [:flush])
@@ -341,7 +342,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
            Exception.message(e),
            %{tool_name: tool_name, exception_type: inspect(e.__struct__)},
            false
-         )}
+         ), []}
     catch
       kind, reason ->
         {:error,
@@ -350,14 +351,19 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
            "Caught #{kind}: #{inspect(reason)}",
            %{tool_name: tool_name},
            false
-         )}
+         ), []}
     end
   end
 
-  defp normalize_result({:ok, _} = result, _tool_name), do: result
+  defp normalize_result({:ok, result, effects}, _tool_name), do: {:ok, result, List.wrap(effects)}
+  defp normalize_result({:ok, result}, _tool_name), do: {:ok, result, []}
+
+  defp normalize_result({:error, reason, effects}, tool_name) do
+    {:error, normalize_error(reason, tool_name), List.wrap(effects)}
+  end
 
   defp normalize_result({:error, reason}, tool_name) do
-    {:error, normalize_error(reason, tool_name)}
+    {:error, normalize_error(reason, tool_name), []}
   end
 
   defp normalize_result(other, tool_name) do
@@ -367,7 +373,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
        "Unexpected tool execution result: #{inspect(other)}",
        %{tool_name: tool_name},
        false
-     )}
+     ), []}
   end
 
   defp normalize_error(%{type: type, message: message} = error, _tool_name)
@@ -437,7 +443,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
              %{
                error: "Signal construction failed: #{Exception.message(e)}",
                type: :internal_error
-             }}
+             }, []}
         })
 
       Jido.AgentServer.cast(agent_pid, fallback_signal)

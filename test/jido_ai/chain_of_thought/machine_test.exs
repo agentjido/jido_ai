@@ -94,6 +94,22 @@ defmodule Jido.AI.Reasoning.ChainOfThought.MachineTest do
       assert machine.termination_reason == :success
     end
 
+    test "accepts canonical success triple envelope" do
+      machine = %Machine{
+        status: "reasoning",
+        current_call_id: "cot_123",
+        started_at: System.monotonic_time(:millisecond)
+      }
+
+      result = {:ok, %{text: "Answer: 4", usage: %{input_tokens: 9, output_tokens: 4}}, []}
+
+      {machine, _directives} = Machine.update(machine, {:llm_result, "cot_123", result}, %{})
+
+      assert machine.status == "completed"
+      assert machine.termination_reason == :success
+      assert machine.usage == %{input_tokens: 9, output_tokens: 4}
+    end
+
     test "extracts steps and conclusion from response" do
       machine = %Machine{
         status: "reasoning",

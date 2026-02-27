@@ -97,7 +97,9 @@ ToT tool orchestration is strategy-managed:
 
 - `ai.tool.result` signals (including error envelopes) are routed back into the strategy
 - machine progression pauses during tool rounds
+- tool effects are applied in original tool-call order after the round is complete
 - follow-up LLM calls are issued with assistant tool-call + tool messages
+- follow-up tool messages preserve original tool-call order
 - round trips are bounded by `max_tool_round_trips`
 
 ## When To Use / Not Use

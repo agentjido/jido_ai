@@ -131,7 +131,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
 
       embed_signal = DirectiveSupport.assert_signal_cast("ai.embed.result")
       assert embed_signal.data.call_id == "embed_ok"
-      assert {:ok, %{count: 2}} = embed_signal.data.result
+      assert {:ok, %{count: 2, embeddings: _embeddings}} = embed_signal.data.result
     end
 
     test "returns sync ok with supervisor error envelope when task cannot start" do
@@ -392,7 +392,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
       assert signal.data.call_id == "tool_ok"
       assert signal.data.tool_name == "dummy"
-      assert signal.data.result == {:ok, %{value: 8}}
+      assert signal.data.result == {:ok, %{value: 8}, []}
     end
 
     test "emits timeout error when execution exceeds timeout_ms" do
@@ -416,7 +416,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
-      assert {:error, %{type: :timeout, retryable?: true}} = signal.data.result
+      assert {:error, %{type: :timeout, retryable?: true}, []} = signal.data.result
     end
 
     test "retries retryable errors and succeeds on a later attempt" do
@@ -432,7 +432,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
         :persistent_term.put(key, attempt)
 
         if attempt == 1 do
-          {:error, %{type: :timeout, message: "timeout", retryable?: true, details: %{}}}
+          {:error, %{type: :timeout, message: "timeout", retryable?: true, details: %{}}, []}
         else
           {:ok, %{attempt: attempt}}
         end
@@ -450,7 +450,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
-      assert signal.data.result == {:ok, %{attempt: 2}}
+      assert signal.data.result == {:ok, %{attempt: 2}, []}
       assert :persistent_term.get(key) == 2
     end
 
@@ -466,7 +466,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
         attempt = :persistent_term.get(key, 0) + 1
         :persistent_term.put(key, attempt)
 
-        {:error, %{type: :validation, message: "bad args", retryable?: false, details: %{}}}
+        {:error, %{type: :validation, message: "bad args", retryable?: false, details: %{}}, []}
       end)
 
       directive =
@@ -481,7 +481,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
-      assert {:error, %{type: :validation}} = signal.data.result
+      assert {:error, %{type: :validation}, []} = signal.data.result
       assert :persistent_term.get(key) == 1
     end
 
@@ -503,7 +503,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:ok, ^state} = DirectiveExec.exec(directive, nil, state)
 
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
-      assert {:error, %{type: :supervisor}} = signal.data.result
+      assert {:error, %{type: :supervisor}, []} = signal.data.result
     end
 
     test "falls back to internal_error signal when tool result signal construction fails" do
@@ -538,7 +538,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
-      assert {:error, %{type: :internal_error}} = signal.data.result
+      assert {:error, %{type: :internal_error}, []} = signal.data.result
     end
   end
 end

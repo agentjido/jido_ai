@@ -58,6 +58,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               tools: Zoi.map() |> Zoi.default(%{}),
               max_iterations: Zoi.integer() |> Zoi.default(@default_max_iterations),
               streaming: Zoi.boolean() |> Zoi.default(true),
+              effect_policy: Zoi.any() |> Zoi.default(%{}),
               llm: @llm_schema,
               tool_exec: @tool_exec_schema,
               observability: @observability_schema,
@@ -138,6 +139,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       max_iterations:
         normalize_pos_integer(get_opt(opts_map, :max_iterations, @default_max_iterations), @default_max_iterations),
       streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
+      effect_policy: get_opt(opts_map, :effect_policy, %{}),
       llm: llm,
       tool_exec: tool_exec,
       observability: observability,

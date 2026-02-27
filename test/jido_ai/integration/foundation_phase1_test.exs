@@ -119,7 +119,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       assert signal.data.model == "anthropic:claude-haiku-4-5"
       assert signal.data.usage == %{input_tokens: 10, output_tokens: 15}
 
-      {:ok, result} = signal.data.result
+      {:ok, result, []} = signal.data.result
       assert result.type == :final_answer
       assert result.text == "Hello, I'm an AI assistant!"
       assert result.tool_calls == []
@@ -139,7 +139,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
       {:ok, signal} = LLMResponse.from_reqllm_response(mocked_response, call_id: "call_456")
 
-      {:ok, result} = signal.data.result
+      {:ok, result, []} = signal.data.result
       assert result.type == :tool_calls
       assert length(result.tool_calls) == 2
 
