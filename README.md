@@ -16,7 +16,8 @@ Build tool-using Elixir agents with explicit reasoning strategies and production
 defmodule MyApp.Actions.AddNumbers do
   use Jido.Action,
     name: "add_numbers",
-    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()}),
+    description: "Add two numbers."
 
   @impl true
   def run(%{a: a, b: b}, _context), do: {:ok, %{sum: a + b}}
@@ -42,7 +43,7 @@ end
 - [jido_action](https://hex.pm/packages/jido_action): typed tool/action contract used by `jido_ai`
 - [req_llm](https://hex.pm/packages/req_llm): provider abstraction for Anthropic, OpenAI, Google, and others
 
-Use `jido_ai` when you need long-lived agents, tool-calling loops, or explicit reasoning strategies. You can also use it without a running agent process via `Jido.AI.generate_text/2`, `Jido.AI.ask/2`, or `Jido.Exec.run/3` with any action module.  
+Use `jido_ai` when you need long-lived agents, tool-calling loops, or explicit reasoning strategies. You can also use it without a running agent process via `Jido.AI.generate_text/2`, `Jido.AI.ask/2`, or `Jido.Exec.run/3` with any action module.
 For cross-package tutorials (for example `jido` + `jido_ai` + app packages), see [agentjido.xyz](https://agentjido.xyz).
 
 ## Installation
