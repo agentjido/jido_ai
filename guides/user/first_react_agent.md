@@ -10,7 +10,8 @@ After this guide, you will run a custom tool, submit async requests, and await s
 defmodule MyApp.Actions.AddNumbers do
   use Jido.Action,
     name: "add_numbers",
-    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()}),
+    description: "Add two numbers."
 
   @impl true
   def run(%{a: a, b: b}, _context), do: {:ok, %{sum: a + b}}
