@@ -451,10 +451,22 @@ end
 
 defimpl Inspect, for: Jido.AI.Thread do
   def inspect(thread, _opts) do
-    len = Kernel.length(thread.entries)
-    last_roles = thread.entries |> Enum.reverse() |> Enum.take(-2) |> Enum.map(& &1.role)
+    case thread.entries do
+      entries when is_list(entries) ->
+        len = Kernel.length(entries)
+        last_roles = entries |> Enum.reverse() |> Enum.take(-2) |> Enum.map(&entry_role/1)
+        suffix = if len > 0, do: ", last: #{Kernel.inspect(last_roles)}", else: ""
+        "#Thread<#{len} entries#{suffix}>"
 
-    suffix = if len > 0, do: ", last: #{Kernel.inspect(last_roles)}", else: ""
-    "#Thread<#{len} entries#{suffix}>"
+      %{type: :list, size: size} when is_integer(size) and size >= 0 ->
+        "#Thread<#{size} entries, truncated>"
+
+      _ ->
+        "#Thread<unknown entries>"
+    end
   end
+
+  defp entry_role(%{role: role}), do: role
+  defp entry_role(%{"role" => role}), do: role
+  defp entry_role(_), do: :unknown
 end
