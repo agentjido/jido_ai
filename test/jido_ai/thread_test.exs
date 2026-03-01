@@ -713,5 +713,31 @@ defmodule Jido.AI.ThreadTest do
       assert inspected =~ "last: "
       assert inspected =~ "last: [:user, :assistant]"
     end
+
+    test "handles telemetry-truncated entries without crashing" do
+      thread = Thread.new(system_prompt: "You are a helpful assistant.")
+
+      sanitized = %{
+        __struct__: Jido.AI.Thread,
+        id: thread.id,
+        entries: %{type: :list, size: 0, __truncated_depth__: 4},
+        system_prompt: thread.system_prompt
+      }
+
+      assert inspect(sanitized) == "#Thread<0 entries, truncated>"
+    end
+
+    test "handles malformed entries shape without crashing" do
+      thread = Thread.new(system_prompt: "You are a helpful assistant.")
+
+      malformed = %{
+        __struct__: Jido.AI.Thread,
+        id: thread.id,
+        entries: %{unexpected: :shape},
+        system_prompt: thread.system_prompt
+      }
+
+      assert inspect(malformed) == "#Thread<unknown entries>"
+    end
   end
 end
