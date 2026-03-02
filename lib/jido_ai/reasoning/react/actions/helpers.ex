@@ -69,8 +69,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
     context[:task_supervisor] ||
       get_in(context, [:__task_supervisor_skill__, :supervisor]) ||
       get_in(context, [:state, :__task_supervisor_skill__, :supervisor]) ||
-      get_in(context, [:agent, :state, :__task_supervisor_skill__, :supervisor]) ||
-      get_in(context, [:agent_state, :__task_supervisor_skill__, :supervisor])
+      get_in(context, [:agent, :state, :__task_supervisor_skill__, :supervisor])
   end
 
   defp context_task_supervisor(_), do: nil

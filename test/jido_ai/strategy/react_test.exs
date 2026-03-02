@@ -102,6 +102,27 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.pending_worker_start.config.streaming == true
     end
 
+    test "start payload context includes state snapshot key" do
+      agent =
+        create_agent(
+          tools: [TestCalculator],
+          tool_context: %{state: %{override: true}, tenant: "acme"}
+        )
+        |> then(fn agent -> %{agent | state: Map.put(agent.state, :custom_counter, 7)} end)
+
+      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_ctx"})
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      context = state.pending_worker_start.context
+
+      assert is_map(context.state)
+      assert context.state.custom_counter == 7
+      assert context.state.__strategy__.status == :idle
+      assert context.tenant == "acme"
+      refute Map.has_key?(context.state, :override)
+    end
+
     test "start propagates streaming option into runtime config" do
       agent = create_agent(tools: [TestCalculator], streaming: false)
 

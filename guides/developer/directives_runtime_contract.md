@@ -52,6 +52,12 @@ Legacy 2-tuples may appear at boundaries but are normalized by runtime/policy he
 }
 ```
 
+`ToolExec.context` reserves one runtime-managed snapshot key for action execution:
+
+- `:state` (canonical, core Jido-compatible)
+
+This key is populated by strategy/runtime orchestration and overrides same-named values from user tool context.
+
 ## Failure Mode: Deadlock Waiting For Tool Result
 
 Symptom:

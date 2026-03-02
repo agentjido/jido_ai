@@ -519,6 +519,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
       true ->
         request_id = state[:last_request_id]
         iteration = state[:iteration] || 0
+        state_snapshot = normalize_map_opt(Map.get(agent, :state, %{}))
 
         directives =
           Enum.map(normalized_calls, fn call ->
@@ -538,6 +539,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
                   arguments: call.arguments,
                   context:
                     Map.merge(config[:tool_context] || %{}, %{
+                      state: state_snapshot,
                       agent_id: agent.id,
                       request_id: request_id,
                       iteration: iteration,
