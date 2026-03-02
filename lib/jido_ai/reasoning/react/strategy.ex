@@ -38,6 +38,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.Effects
+  alias Jido.AI.ModelAliases
   alias Jido.AI.Reasoning.ReAct.State, as: ReActState
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.Signal
@@ -1270,7 +1271,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     }
   end
 
-  defp resolve_model_spec(model) when is_atom(model), do: Jido.AI.resolve_model(model)
+  defp resolve_model_spec(model) when is_atom(model), do: ModelAliases.resolve_model(model)
   defp resolve_model_spec(model) when is_binary(model), do: model
 
   defp validate_request_policy!(:reject), do: :reject
