@@ -102,6 +102,20 @@ ToT tool orchestration is strategy-managed:
 - follow-up tool messages preserve original tool-call order
 - round trips are bounded by `max_tool_round_trips`
 
+## Tool Context State Snapshot Contract
+
+For tool-executing strategy paths, action context includes a state snapshot under:
+
+- `:state` (canonical, core Jido-compatible)
+
+Current behavior by strategy:
+
+- ReAct: snapshot is injected at request start and refreshed between tool rounds after applying allowed `StateOp` effects in deterministic tool-call order.
+- ToT: snapshot is injected into each `Directive.ToolExec` context when the tool round is started.
+- Adaptive: inherits this behavior when delegating to ReAct/ToT.
+
+This key is runtime-managed and overrides same-named entries from user `tool_context`.
+
 ## When To Use / Not Use
 
 Use this when:

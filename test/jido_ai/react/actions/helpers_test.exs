@@ -156,7 +156,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
 
     test "resolves supervisor from nested context variants" do
       nested_sup = self()
-      context = %{agent_state: %{__task_supervisor_skill__: %{supervisor: nested_sup}}}
+      context = %{state: %{__task_supervisor_skill__: %{supervisor: nested_sup}}}
 
       assert Helpers.resolve_task_supervisor(%{}, context) == nested_sup
     end

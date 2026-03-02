@@ -76,6 +76,33 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule SnapshotStateTool do
+    use Jido.Action,
+      name: "snapshot_state_tool",
+      description: "reads agent state snapshot and appends to sums",
+      schema:
+        Zoi.object(%{
+          step: Zoi.integer()
+        })
+
+    def run(%{step: step}, context) do
+      snapshot = context[:state] || %{}
+      seen = Map.get(snapshot, :sums, [])
+
+      {:ok,
+       %{
+         seen: seen,
+         step: step,
+         has_state: is_map(context[:state])
+       },
+       [
+         %Jido.Agent.StateOp.SetState{
+           attrs: %{sums: seen ++ [step]}
+         }
+       ]}
+    end
+  end
+
   setup :set_mimic_from_context
 
   setup do
@@ -397,6 +424,88 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert agent.state.react_order_marker == :fast
   end
 
+  test "refreshes tool context state snapshot between rounds when state effects are allowed" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{state: %{sums: []}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+    second_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_2"))
+
+    assert {:ok, %{seen: [], step: 1}, _effects} = first_tool_completed.data.result
+    assert {:ok, %{seen: [1], step: 2}, _effects} = second_tool_completed.data.result
+  end
+
+  test "does not refresh tool context state snapshot when policy removes state effects" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0,
+        effect_policy: %{mode: :deny_all}
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{state: %{sums: []}, effect_policy: %{mode: :deny_all}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+    second_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_2"))
+
+    assert {:ok, %{seen: [], step: 1}, _effects} = first_tool_completed.data.result
+    assert {:ok, %{seen: [], step: 2}, _effects} = second_tool_completed.data.result
+  end
+
+  test "uses runtime config effect_policy with standalone state snapshot context" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0,
+        effect_policy: %{mode: :deny_all}
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{state: %{sums: []}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+    second_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_2"))
+
+    assert {:ok, %{seen: [], step: 1, has_state: true}, _effects} =
+             first_tool_completed.data.result
+
+    assert {:ok, %{seen: [], step: 2}, _effects} = second_tool_completed.data.result
+  end
+
   test "resumes from after_llm checkpoint token" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
@@ -563,6 +672,41 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
            stream: [ReqLLM.StreamChunk.text("Tool round complete")],
            usage: %{input_tokens: 2, output_tokens: 1}
          }}
+      end
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+  end
+
+  defp stub_state_snapshot_round_trip do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.tool_call("snapshot_state_tool", %{"step" => 1}, %{id: "tc_step_1"})],
+             usage: %{input_tokens: 4, output_tokens: 2}
+           }}
+
+        2 ->
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.tool_call("snapshot_state_tool", %{"step" => 2}, %{id: "tc_step_2"})],
+             usage: %{input_tokens: 3, output_tokens: 2}
+           }}
+
+        _ ->
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.text("Done")],
+             usage: %{input_tokens: 2, output_tokens: 1}
+           }}
       end
     end)
 

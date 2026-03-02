@@ -7,7 +7,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   """
 
   alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token}
+  alias Jido.AI.Effects
   alias Jido.AI.{Thread, Turn}
+  alias Jido.Agent.State, as: AgentState
 
   require Logger
 
@@ -72,7 +74,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp coordinator(owner, ref, state, config, opts, stream_opts) do
-    context = Keyword.get(opts, :context, %{})
+    context = build_runtime_context(Keyword.get(opts, :context, %{}), state, config)
 
     state =
       case stream_opts[:emit_start?] do
@@ -131,9 +133,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         state
 
       state.status == :awaiting_tools and state.pending_tool_calls != [] ->
-        state
-        |> run_pending_tool_round(owner, ref, config, context)
-        |> run_loop(owner, ref, config, context)
+        {state, context} = run_pending_tool_round(state, owner, ref, config, context)
+        run_loop(state, owner, ref, config, context)
 
       state.iteration > config.max_iterations ->
         state
@@ -156,9 +157,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             state
 
           {:tool_calls, state, tool_calls} ->
-            state
-            |> run_tool_round(owner, ref, config, context, tool_calls)
-            |> run_loop(owner, ref, config, context)
+            {state, context} = run_tool_round(state, owner, ref, config, context, tool_calls)
+            run_loop(state, owner, ref, config, context)
 
           {:error, state, reason, error_type} ->
             state
@@ -445,7 +445,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       |> Map.put(:thread, thread)
 
     {state, _token} = emit_checkpoint(state, owner, ref, config, :after_tools)
-    state
+    {state, evolve_context_state_snapshot(context, results)}
   end
 
   defp run_pending_tool_round(%State{} = state, owner, ref, %Config{} = config, context) do
@@ -461,6 +461,103 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       end)
     )
   end
+
+  defp evolve_context_state_snapshot(context, results) when is_map(context) and is_list(results) do
+    case current_state_snapshot(context) do
+      {:ok, snapshot} ->
+        updated_snapshot =
+          Enum.reduce(results, snapshot, fn
+            {_pending_call, result, _attempts, _duration_ms}, acc ->
+              apply_state_effects(acc, result)
+
+            {:error, _reason}, acc ->
+              acc
+
+            _other, acc ->
+              acc
+          end)
+
+        Map.put(context, :state, updated_snapshot)
+
+      :error ->
+        context
+    end
+  end
+
+  defp evolve_context_state_snapshot(context, _results), do: context
+
+  defp current_state_snapshot(context) when is_map(context) do
+    case context[:state] do
+      %{} = snapshot -> {:ok, snapshot}
+      _ -> :error
+    end
+  end
+
+  defp build_runtime_context(context, %State{} = state, %Config{} = config) when is_map(context) do
+    context
+    |> Map.put_new(:request_id, state.request_id)
+    |> Map.put_new(:run_id, state.run_id)
+    |> Map.put_new(:effect_policy, config.effect_policy)
+    |> Map.put_new(:observability, config.observability)
+  end
+
+  defp build_runtime_context(_context, %State{} = state, %Config{} = config) do
+    build_runtime_context(%{}, state, config)
+  end
+
+  defp apply_state_effects(snapshot, result) when is_map(snapshot) do
+    {_status, _payload, effects} = Effects.normalize_result(result)
+
+    Enum.reduce(effects, snapshot, fn
+      %Jido.Agent.StateOp.SetState{attrs: attrs}, acc when is_map(attrs) ->
+        AgentState.merge(acc, attrs)
+
+      %Jido.Agent.StateOp.ReplaceState{state: new_state}, _acc when is_map(new_state) ->
+        new_state
+
+      %Jido.Agent.StateOp.DeleteKeys{keys: keys}, acc when is_list(keys) ->
+        Map.drop(acc, keys)
+
+      %Jido.Agent.StateOp.SetPath{path: path, value: value}, acc when is_list(path) ->
+        put_in_path(acc, path, value)
+
+      %Jido.Agent.StateOp.DeletePath{path: path}, acc when is_list(path) ->
+        delete_in_path(acc, path)
+
+      _other, acc ->
+        acc
+    end)
+  end
+
+  defp apply_state_effects(snapshot, _result), do: snapshot
+
+  defp put_in_path(map, [key], value) when is_map(map), do: Map.put(map, key, value)
+
+  defp put_in_path(map, [key | rest], value) when is_map(map) do
+    nested =
+      case Map.get(map, key) do
+        %{} = current -> current
+        _ -> %{}
+      end
+
+    Map.put(map, key, put_in_path(nested, rest, value))
+  end
+
+  defp put_in_path(map, _path, _value), do: map
+
+  defp delete_in_path(map, [key]) when is_map(map), do: Map.delete(map, key)
+
+  defp delete_in_path(map, [key | rest]) when is_map(map) do
+    case Map.get(map, key) do
+      %{} = nested ->
+        Map.put(map, key, delete_in_path(nested, rest))
+
+      _ ->
+        map
+    end
+  end
+
+  defp delete_in_path(map, _path), do: map
 
   defp execute_tool_with_retries(%PendingToolCall{} = pending_call, %Config{} = config, context) do
     module = Map.get(config.tools, pending_call.name)
