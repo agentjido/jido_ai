@@ -412,7 +412,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
       {agent, ctx} =
         create_agent(
           tools: [AdaptiveSnapshotTool],
-          tool_context: %{agent_state: %{override: true}, state: %{override: true}, tenant: "acme"}
+          tool_context: %{state: %{override: true}, tenant: "acme"}
         )
 
       agent = %{agent | state: Map.put(agent.state, :adaptive_counter, 5)}
@@ -435,10 +435,9 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
       assert state[:strategy_type] == :react
 
       context = state[:pending_worker_start][:context]
-      assert context[:agent_state] == context[:state]
-      assert context[:agent_state][:adaptive_counter] == 5
+      assert context[:state][:adaptive_counter] == 5
       assert context[:tenant] == "acme"
-      refute Map.has_key?(context[:agent_state], :override)
+      refute Map.has_key?(context[:state], :override)
     end
 
     test "tot delegation includes state snapshot in tool directives" do
@@ -446,7 +445,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
         create_agent(
           available_strategies: [:tot],
           tools: [AdaptiveSnapshotTool],
-          tool_context: %{agent_state: %{override: true}, state: %{override: true}, tenant: "acme"}
+          tool_context: %{state: %{override: true}, tenant: "acme"}
         )
 
       agent = %{agent | state: Map.put(agent.state, :adaptive_tot_counter, 11)}
@@ -484,10 +483,9 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
       assert %Jido.AI.Directive.ToolExec{} = directive
 
       context = directive.context
-      assert context.agent_state == context.state
-      assert context.agent_state.adaptive_tot_counter == 11
+      assert context.state.adaptive_tot_counter == 11
       assert context.tenant == "acme"
-      refute Map.has_key?(context.agent_state, :override)
+      refute Map.has_key?(context.state, :override)
 
       state = StratState.get(agent, %{})
       assert state[:pending_tool_call_id] == call_id

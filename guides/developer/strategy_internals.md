@@ -104,10 +104,9 @@ ToT tool orchestration is strategy-managed:
 
 ## Tool Context State Snapshot Contract
 
-For tool-executing strategy paths, action context includes state snapshots under both keys:
+For tool-executing strategy paths, action context includes a state snapshot under:
 
 - `:state` (canonical, core Jido-compatible)
-- `:agent_state` (compatibility alias)
 
 Current behavior by strategy:
 
@@ -115,8 +114,7 @@ Current behavior by strategy:
 - ToT: snapshot is injected into each `Directive.ToolExec` context when the tool round is started.
 - Adaptive: inherits this behavior when delegating to ReAct/ToT.
 
-These keys are runtime-managed and override same-named entries from user `tool_context`.
-Prefer `:state` in new action code.
+This key is runtime-managed and overrides same-named entries from user `tool_context`.
 
 ## When To Use / Not Use
 

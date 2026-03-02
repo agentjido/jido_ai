@@ -288,11 +288,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
   end
 
   describe "tool execution context" do
-    test "tool directives include agent state snapshot keys" do
+    test "tool directives include state snapshot key" do
       agent =
         create_agent(
           tools: [OrderingSlowTool],
-          tool_context: %{agent_state: %{override: true}, state: %{override: true}, tenant: "acme"}
+          tool_context: %{state: %{override: true}, tenant: "acme"}
         )
         |> then(fn agent -> %{agent | state: Map.put(agent.state, :tot_counter, 9)} end)
 
@@ -325,11 +325,10 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       assert %Jido.AI.Directive.ToolExec{} = directive
 
       context = directive.context
-      assert is_map(context.agent_state)
-      assert context.agent_state == context.state
-      assert context.agent_state.tot_counter == 9
+      assert is_map(context.state)
+      assert context.state.tot_counter == 9
       assert context.tenant == "acme"
-      refute Map.has_key?(context.agent_state, :override)
+      refute Map.has_key?(context.state, :override)
 
       state = StratState.get(agent, %{})
       assert state[:pending_tool_call_id] == call_id

@@ -203,9 +203,8 @@ Use triple pattern-matching in new code.
 - `Turn.execute/4` and `Turn.execute_module/4` filter tool-emitted effects through `context[:effect_policy]` when provided.
 - Disallowed effects are dropped; allowed effects remain in the returned `effects` list.
 - Tool call execution order in `run_tools/3` follows the order of `turn.tool_calls`.
-- Tool actions may read runtime state snapshots from `context[:state]` (canonical, core-aligned) and
-  `context[:agent_state]` (compatibility alias).
-- ReAct/ToT strategy orchestration injects these snapshot keys automatically; user-provided values for those keys are overridden.
+- Tool actions may read runtime state snapshots from `context[:state]` (canonical, core-aligned).
+- ReAct/ToT strategy orchestration injects this snapshot key automatically; user-provided values for this key are overridden.
 
 ## Text Extraction
 

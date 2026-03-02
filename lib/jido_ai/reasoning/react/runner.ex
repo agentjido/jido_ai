@@ -477,9 +477,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               acc
           end)
 
-        context
-        |> Map.put(:agent_state, updated_snapshot)
-        |> Map.put(:state, updated_snapshot)
+        Map.put(context, :state, updated_snapshot)
 
       :error ->
         context
@@ -489,16 +487,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp evolve_context_state_snapshot(context, _results), do: context
 
   defp current_state_snapshot(context) when is_map(context) do
-    cond do
-      is_map(context[:state]) -> {:ok, context[:state]}
-      is_map(context[:agent_state]) -> {:ok, context[:agent_state]}
-      true -> :error
+    case context[:state] do
+      %{} = snapshot -> {:ok, snapshot}
+      _ -> :error
     end
   end
 
   defp build_runtime_context(context, %State{} = state, %Config{} = config) when is_map(context) do
     context
-    |> ensure_state_snapshot_aliases()
     |> Map.put_new(:request_id, state.request_id)
     |> Map.put_new(:run_id, state.run_id)
     |> Map.put_new(:effect_policy, config.effect_policy)
@@ -507,22 +503,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp build_runtime_context(_context, %State{} = state, %Config{} = config) do
     build_runtime_context(%{}, state, config)
-  end
-
-  defp ensure_state_snapshot_aliases(context) when is_map(context) do
-    cond do
-      is_map(context[:state]) and is_map(context[:agent_state]) ->
-        Map.put(context, :agent_state, context[:state])
-
-      is_map(context[:state]) ->
-        Map.put(context, :agent_state, context[:state])
-
-      is_map(context[:agent_state]) ->
-        Map.put(context, :state, context[:agent_state])
-
-      true ->
-        context
-    end
   end
 
   defp apply_state_effects(snapshot, result) when is_map(snapshot) do

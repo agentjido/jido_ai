@@ -488,7 +488,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       provider_opt_keys_by_string = config[:provider_opt_keys_by_string] || %{}
       base_llm_opts = normalize_llm_opts(config[:base_llm_opts], provider_opt_keys_by_string)
       effective_llm_opts = Keyword.merge(base_llm_opts, run_llm_opts)
-      agent_state_snapshot = normalize_map_opt(Map.get(agent, :state, %{}))
+      state_snapshot = normalize_map_opt(Map.get(agent, :state, %{}))
 
       runtime_config =
         runtime_config_from_strategy(config,
@@ -509,8 +509,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         task_supervisor: config[:runtime_task_supervisor],
         context:
           Map.merge(effective_tool_context, %{
-            agent_state: agent_state_snapshot,
-            state: agent_state_snapshot,
+            state: state_snapshot,
             request_id: request_id,
             run_id: run_id,
             agent_id: state[:agent_id] || Map.get(agent, :id),
