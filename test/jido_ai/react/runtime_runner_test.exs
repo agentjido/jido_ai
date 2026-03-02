@@ -89,7 +89,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       snapshot = context[:agent_state] || context[:state] || %{}
       seen = Map.get(snapshot, :sums, [])
 
-      {:ok, %{seen: seen, step: step},
+      {:ok,
+       %{
+         seen: seen,
+         step: step,
+         has_agent_state: is_map(context[:agent_state]),
+         has_state: is_map(context[:state])
+       },
        [
          %Jido.Agent.StateOp.SetState{
            attrs: %{sums: seen ++ [step]}
@@ -445,6 +451,34 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert {:ok, %{seen: [1], step: 2}, _effects} = second_tool_completed.data.result
   end
 
+  test "normalizes conflicting snapshot aliases with state precedence" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{agent_state: %{sums: []}, state: %{sums: [100]}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+    second_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_2"))
+
+    assert {:ok, %{seen: [100], step: 1, has_agent_state: true, has_state: true}, _effects} =
+             first_tool_completed.data.result
+
+    assert {:ok, %{seen: [100, 1], step: 2}, _effects} = second_tool_completed.data.result
+  end
+
   test "does not refresh tool context state snapshot when policy removes state effects" do
     stub_state_snapshot_round_trip()
 
@@ -470,6 +504,60 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     assert {:ok, %{seen: [], step: 1}, _effects} = first_tool_completed.data.result
     assert {:ok, %{seen: [], step: 2}, _effects} = second_tool_completed.data.result
+  end
+
+  test "uses runtime config effect_policy and mirrors missing snapshot aliases in standalone context" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0,
+        effect_policy: %{mode: :deny_all}
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{state: %{sums: []}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+    second_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_2"))
+
+    assert {:ok, %{seen: [], step: 1, has_agent_state: true, has_state: true}, _effects} =
+             first_tool_completed.data.result
+
+    assert {:ok, %{seen: [], step: 2}, _effects} = second_tool_completed.data.result
+  end
+
+  test "mirrors standalone agent_state snapshots into state alias" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{agent_state: %{sums: []}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+
+    assert {:ok, %{seen: [], step: 1, has_agent_state: true, has_state: true}, _effects} =
+             first_tool_completed.data.result
   end
 
   test "resumes from after_llm checkpoint token" do

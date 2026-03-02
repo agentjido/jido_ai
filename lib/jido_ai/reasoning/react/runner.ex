@@ -74,7 +74,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp coordinator(owner, ref, state, config, opts, stream_opts) do
-    context = Keyword.get(opts, :context, %{})
+    context = build_runtime_context(Keyword.get(opts, :context, %{}), state, config)
 
     state =
       case stream_opts[:emit_start?] do
@@ -490,13 +490,42 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp current_state_snapshot(context) when is_map(context) do
     cond do
-      is_map(context[:agent_state]) -> {:ok, context[:agent_state]}
       is_map(context[:state]) -> {:ok, context[:state]}
+      is_map(context[:agent_state]) -> {:ok, context[:agent_state]}
       true -> :error
     end
   end
 
   defp current_state_snapshot(_), do: :error
+
+  defp build_runtime_context(context, %State{} = state, %Config{} = config) when is_map(context) do
+    context
+    |> ensure_state_snapshot_aliases()
+    |> Map.put_new(:request_id, state.request_id)
+    |> Map.put_new(:run_id, state.run_id)
+    |> Map.put_new(:effect_policy, config.effect_policy)
+    |> Map.put_new(:observability, config.observability)
+  end
+
+  defp build_runtime_context(_context, %State{} = state, %Config{} = config) do
+    build_runtime_context(%{}, state, config)
+  end
+
+  defp ensure_state_snapshot_aliases(context) when is_map(context) do
+    cond do
+      is_map(context[:state]) and is_map(context[:agent_state]) ->
+        Map.put(context, :agent_state, context[:state])
+
+      is_map(context[:state]) ->
+        Map.put(context, :agent_state, context[:state])
+
+      is_map(context[:agent_state]) ->
+        Map.put(context, :state, context[:agent_state])
+
+      true ->
+        context
+    end
+  end
 
   defp apply_state_effects(snapshot, result) when is_map(snapshot) do
     {_status, _payload, effects} = Effects.normalize_result(result)
