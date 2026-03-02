@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   Canonical configuration for the Task-based ReAct runtime.
   """
 
+  alias Jido.AI.ModelAliases
   alias Jido.AI.ToolAdapter
   require Logger
 
@@ -211,8 +212,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   end
 
   defp resolve_model(model) when is_binary(model), do: model
-  defp resolve_model(model) when is_atom(model), do: Jido.AI.resolve_model(model)
-  defp resolve_model(_), do: Jido.AI.resolve_model(@default_model)
+  defp resolve_model(model) when is_atom(model), do: ModelAliases.resolve_model(model)
+  defp resolve_model(_), do: ModelAliases.resolve_model(@default_model)
 
   defp normalize_opts(opts) when is_list(opts), do: Map.new(opts)
   defp normalize_opts(opts) when is_map(opts), do: opts

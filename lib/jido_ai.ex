@@ -67,6 +67,8 @@ defmodule Jido.AI do
 
   """
 
+  alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.ModelAliases
   alias Jido.AI.Turn
   alias ReqLLM.Context
 
@@ -81,16 +83,6 @@ defmodule Jido.AI do
           optional(:temperature) => number(),
           optional(:timeout) => pos_integer()
         }
-
-  @default_aliases %{
-    fast: "anthropic:claude-haiku-4-5",
-    capable: "anthropic:claude-sonnet-4-20250514",
-    thinking: "anthropic:claude-sonnet-4-20250514",
-    reasoning: "anthropic:claude-sonnet-4-20250514",
-    planning: "anthropic:claude-sonnet-4-20250514",
-    image: "openai:gpt-image-1",
-    embedding: "openai:text-embedding-3-small"
-  }
 
   @default_llm_defaults %{
     text: %{
@@ -125,10 +117,7 @@ defmodule Jido.AI do
       true
   """
   @spec model_aliases() :: %{model_alias() => model_spec()}
-  def model_aliases do
-    configured = Application.get_env(:jido_ai, :model_aliases, %{}) |> normalize_model_aliases()
-    Map.merge(@default_aliases, configured)
-  end
+  def model_aliases, do: ModelAliases.model_aliases()
 
   @doc """
   Returns configured LLM generation defaults merged with built-in defaults.
@@ -189,21 +178,7 @@ defmodule Jido.AI do
       # raises ArgumentError with unknown alias message
   """
   @spec resolve_model(model_alias() | model_spec()) :: model_spec()
-  def resolve_model(model) when is_binary(model), do: model
-
-  def resolve_model(model) when is_atom(model) do
-    aliases = model_aliases()
-
-    case Map.get(aliases, model) do
-      nil ->
-        raise ArgumentError,
-              "Unknown model alias: #{inspect(model)}. " <>
-                "Available aliases: #{inspect(Map.keys(aliases))}"
-
-      spec ->
-        spec
-    end
-  end
+  def resolve_model(model), do: ModelAliases.resolve_model(model)
 
   @doc """
   Thin facade for `ReqLLM.Generation.generate_text/3`.
@@ -370,7 +345,7 @@ defmodule Jido.AI do
   @spec list_tools(Jido.Agent.t() | GenServer.server()) ::
           [module()] | {:ok, [module()]} | {:error, term()}
   def list_tools(%Jido.Agent{} = agent) do
-    Jido.AI.Reasoning.ReAct.Strategy.list_tools(agent)
+    list_tools_from_agent(agent)
   end
 
   def list_tools(agent_server) do
@@ -443,13 +418,16 @@ defmodule Jido.AI do
 
   # Private helpers for top-level LLM facades
 
-  defp normalize_model_aliases(aliases) when is_map(aliases), do: aliases
-  defp normalize_model_aliases(_), do: %{}
-
   defp resolve_generation_model(opts, defaults) do
     opts
     |> Keyword.get(:model, defaults[:model] || :fast)
     |> resolve_model()
+  end
+
+  defp list_tools_from_agent(%Jido.Agent{} = agent) do
+    state = StratState.get(agent, %{})
+    config = state[:config] || %{}
+    config[:tools] || []
   end
 
   defp normalize_context(input, system_prompt) when system_prompt in [nil, ""] do
