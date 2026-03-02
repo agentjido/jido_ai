@@ -40,8 +40,9 @@ defmodule Jido.AI.Agent do
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`).
     Must be literal data only — module aliases, atoms, strings, numbers, lists, and maps are permitted.
     Function calls, module attributes (`@attr`), and pinned variables (`^var`) raise `CompileError`.
-    Runtime reserves `:agent_state` and `:state` keys for tool execution snapshots; user-provided values for
-    those keys are overwritten per request.
+    Runtime reserves `:state` (core Jido-compatible) for tool execution snapshots and also mirrors the same
+    snapshot under `:agent_state` as a compatibility alias. User-provided values for those keys are overwritten
+    per request. Prefer `:state` in new actions.
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
@@ -107,8 +108,9 @@ defmodule Jido.AI.Agent do
       {:ok, request} = MyApp.WeatherAgent.ask(pid, "Get my preferences",
         tool_context: %{actor: current_user, tenant_id: "acme"})
 
-  ReAct and ToT tool execution contexts also include runtime-managed `:agent_state` and `:state` snapshots.
-  These snapshot keys are reserved and override same-named keys from `tool_context`.
+  ReAct and ToT tool execution contexts also include runtime-managed snapshots at `:state`
+  (canonical, core-aligned) and `:agent_state` (compatibility alias).
+  These keys are reserved and override same-named keys from `tool_context`.
   """
 
   @default_model :fast

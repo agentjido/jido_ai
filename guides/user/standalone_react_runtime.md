@@ -101,13 +101,14 @@ This means completion timing differences between tools do not reorder the observ
 
 Tool actions can read state snapshots from context keys:
 
-- `:agent_state`
-- `:state` (compat alias)
+- `:state` (canonical, core Jido-compatible)
+- `:agent_state` (compatibility alias)
 
 When ReAct is used through `Jido.AI.Agent`, these keys are injected automatically. In standalone runtime usage,
 you can pass them through `stream/3` or `start/3` opts (`context: %{agent_state: ..., state: ...}`).
 
 If these keys are present, ReAct refreshes them between tool rounds using allowed `StateOp` effects in tool-call order.
+Prefer `:state` in new actions.
 
 ## Run To Completion
 

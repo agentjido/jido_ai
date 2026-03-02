@@ -106,8 +106,8 @@ ToT tool orchestration is strategy-managed:
 
 For tool-executing strategy paths, action context includes state snapshots under both keys:
 
-- `:agent_state`
-- `:state` (compat alias)
+- `:state` (canonical, core Jido-compatible)
+- `:agent_state` (compatibility alias)
 
 Current behavior by strategy:
 
@@ -116,6 +116,7 @@ Current behavior by strategy:
 - Adaptive: inherits this behavior when delegating to ReAct/ToT.
 
 These keys are runtime-managed and override same-named entries from user `tool_context`.
+Prefer `:state` in new action code.
 
 ## When To Use / Not Use
 
