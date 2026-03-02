@@ -6,9 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Reasoning.ReAct
-  alias Jido.AI.Reasoning.ReAct.Event
-  alias Jido.AI.Reasoning.ReAct.Signal
+  alias Jido.AI.Reasoning.ReAct.{Config, Event, Runner, Signal}
 
   @start :react_worker_start
   @cancel :react_worker_cancel
@@ -176,7 +174,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
       directives = List.wrap(emit_parent_event(agent, request_id, event))
       {agent, directives}
     else
-      config = ReAct.build_config(config_input)
+      config = build_runtime_config(config_input)
       context = Map.get(params, :context, %{}) || %{}
       runtime_state = Map.get(params, :state)
       task_supervisor = Map.get(params, :task_supervisor)
@@ -306,7 +304,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   defp process_runtime_failed(agent, _params), do: {agent, []}
 
   defp run_stream(worker_pid, request_id, query, config, stream_opts) do
-    ReAct.stream(query, config, stream_opts)
+    Runner.stream(query, config, stream_opts)
     |> Enum.each(fn event ->
       signal =
         Jido.Signal.new!(
@@ -352,6 +350,9 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
 
       Jido.AgentServer.cast(worker_pid, fail_signal)
   end
+
+  defp build_runtime_config(%Config{} = config), do: config
+  defp build_runtime_config(config), do: Config.new(config)
 
   defp maybe_finish_run(state, kind) when kind in [:request_completed, :request_failed, :request_cancelled],
     do: finish_state(state)

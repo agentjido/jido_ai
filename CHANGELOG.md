@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Broke the compile-connected ReAct dependency cycle reported by `mix xref` by:
+  - extracting shared model alias resolution into `Jido.AI.ModelAliases`
+  - removing `Jido.AI` tool introspection dependency on `Jido.AI.Reasoning.ReAct.Strategy`
+  - decoupling delegated ReAct worker strategy from the `Jido.AI.Reasoning.ReAct` facade module
+
+### Documentation
+
+- Added a developer note in `guides/developer/architecture_and_runtime_flow.md` for investigating compile cycles with `mix xref`.
+
 ## [2.0.0-rc.0] - 2026-02-22
 
 ### Added
