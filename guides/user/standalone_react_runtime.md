@@ -103,7 +103,7 @@ Tool actions can read state snapshots from context keys:
 
 - `:state` (canonical, core Jido-compatible)
 
-When ReAct is used through `Jido.AI.Agent`, these keys are injected automatically. In standalone runtime usage,
+When ReAct is used through `Jido.AI.Agent`, this key is injected automatically. In standalone runtime usage,
 you can pass it through `stream/3` or `start/3` opts (`context: %{state: ...}`).
 
 If this key is present, ReAct refreshes it between tool rounds using allowed `StateOp` effects in tool-call order.
