@@ -496,8 +496,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp current_state_snapshot(_), do: :error
-
   defp build_runtime_context(context, %State{} = state, %Config{} = config) when is_map(context) do
     context
     |> ensure_state_snapshot_aliases()
