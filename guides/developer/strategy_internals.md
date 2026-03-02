@@ -102,6 +102,21 @@ ToT tool orchestration is strategy-managed:
 - follow-up tool messages preserve original tool-call order
 - round trips are bounded by `max_tool_round_trips`
 
+## Tool Context State Snapshot Contract
+
+For tool-executing strategy paths, action context includes state snapshots under both keys:
+
+- `:agent_state`
+- `:state` (compat alias)
+
+Current behavior by strategy:
+
+- ReAct: snapshot is injected at request start and refreshed between tool rounds after applying allowed `StateOp` effects in deterministic tool-call order.
+- ToT: snapshot is injected into each `Directive.ToolExec` context when the tool round is started.
+- Adaptive: inherits this behavior when delegating to ReAct/ToT.
+
+These keys are runtime-managed and override same-named entries from user `tool_context`.
+
 ## When To Use / Not Use
 
 Use this when:

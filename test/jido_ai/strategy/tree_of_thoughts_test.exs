@@ -287,6 +287,55 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     end
   end
 
+  describe "tool execution context" do
+    test "tool directives include agent state snapshot keys" do
+      agent =
+        create_agent(
+          tools: [OrderingSlowTool],
+          tool_context: %{agent_state: %{override: true}, state: %{override: true}, tenant: "acme"}
+        )
+        |> then(fn agent -> %{agent | state: Map.put(agent.state, :tot_counter, 9)} end)
+
+      start_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.start_action(),
+        params: %{prompt: "Use a tool"}
+      }
+
+      {agent, _start_directives} = TreeOfThoughts.cmd(agent, [start_instruction], %{})
+      state = StratState.get(agent, %{})
+      call_id = state[:current_call_id]
+      agent = StratState.put(agent, Map.put(state, :last_request_id, "req_tot_ctx"))
+
+      llm_result_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.llm_result_action(),
+        params: %{
+          call_id: call_id,
+          result: %{
+            type: :tool_calls,
+            text: "Calling tool",
+            tool_calls: [
+              %{id: "call_snapshot", name: OrderingSlowTool.name(), arguments: %{}}
+            ],
+            usage: %{}
+          }
+        }
+      }
+
+      {agent, [directive]} = TreeOfThoughts.cmd(agent, [llm_result_instruction], %{})
+      assert %Jido.AI.Directive.ToolExec{} = directive
+
+      context = directive.context
+      assert is_map(context.agent_state)
+      assert context.agent_state == context.state
+      assert context.agent_state.tot_counter == 9
+      assert context.tenant == "acme"
+      refute Map.has_key?(context.agent_state, :override)
+
+      state = StratState.get(agent, %{})
+      assert state[:pending_tool_call_id] == call_id
+    end
+  end
+
   describe "tool round ordering" do
     test "applies effects and builds follow-up tool messages in original call order" do
       agent = create_agent(tools: [OrderingSlowTool, OrderingFastTool])

@@ -97,6 +97,18 @@ ReAct may execute tool calls concurrently (`tool_concurrency > 1`), but runtime 
 
 This means completion timing differences between tools do not reorder the observable runtime contract.
 
+## Tool Context State Snapshots
+
+Tool actions can read state snapshots from context keys:
+
+- `:agent_state`
+- `:state` (compat alias)
+
+When ReAct is used through `Jido.AI.Agent`, these keys are injected automatically. In standalone runtime usage,
+you can pass them through `stream/3` or `start/3` opts (`context: %{agent_state: ..., state: ...}`).
+
+If these keys are present, ReAct refreshes them between tool rounds using allowed `StateOp` effects in tool-call order.
+
 ## Run To Completion
 
 `run/3` streams internally and returns the aggregated result map. Simplest path when you do not need the event stream.
