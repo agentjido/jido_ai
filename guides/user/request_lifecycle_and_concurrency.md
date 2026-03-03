@@ -87,6 +87,8 @@ Fix:
 
 - Default await timeout: `30_000ms`
 - Default tracked request retention: `100` (evicts older entries)
+- `Jido.AI.set_thread/3` while a request is active is deferred until terminal
+  state; if called multiple times during one active run, latest replacement wins.
 
 ## When To Use / Not Use
 

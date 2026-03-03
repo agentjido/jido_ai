@@ -345,6 +345,14 @@ defmodule Jido.AI do
 
       Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{thread: thread})
 
+  Semantics note:
+
+    * Init-time restore (`initial_state`) backfills nil thread system prompts from
+      agent config during strategy init.
+    * Runtime restore (`set_thread/3`) preserves nil thread system prompts.
+    * If called multiple times during one active run, latest deferred
+      replacement wins.
+
   ## Options
 
     * `:timeout` - Call timeout in milliseconds (default: 5000)

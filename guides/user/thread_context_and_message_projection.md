@@ -38,6 +38,30 @@ thread = Thread.new() |> Thread.append_messages(raw)
 
 Use `Jido.AI.Turn.extract_text/1` when normalizing diverse provider response shapes.
 
+## Restore Snapshot Conversation Safely
+
+When restoring from `snapshot.details.conversation`, split out one leading
+system message first. Otherwise, that system message becomes a normal thread
+entry and may be duplicated during projection.
+
+```elixir
+saved_messages = snapshot.details.conversation
+
+{system_prompt, conversation_messages} =
+  case saved_messages do
+    [%{role: role, content: content} | rest]
+    when role in [:system, "system"] and is_binary(content) ->
+      {content, rest}
+
+    _ ->
+      {nil, saved_messages}
+  end
+
+thread =
+  Thread.new(system_prompt: system_prompt)
+  |> Thread.append_messages(conversation_messages)
+```
+
 ## Failure Mode: Unexpected Missing Context
 
 Symptom:

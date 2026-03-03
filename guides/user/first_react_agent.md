@@ -95,11 +95,24 @@ If you persist the conversation history (e.g. from `snapshot.details.conversatio
 you can restore it on restart so the agent resumes where it left off.
 
 ```elixir
+saved_messages = snapshot.details.conversation
+
+# Split out one leading system message (if present) so it does not become
+# a duplicate thread entry.
+{saved_system_prompt, conversation_messages} =
+  case saved_messages do
+    [%{role: role, content: content} | rest]
+    when role in [:system, "system"] and is_binary(content) ->
+      {content, rest}
+
+    _ ->
+      {nil, saved_messages}
+  end
+
 # At start time — pass the saved thread via initial_state:
 thread =
-  # snapshot.details.conversation already includes a system message when present
-  Jido.AI.Thread.new()
-  |> Jido.AI.Thread.append_messages(saved_messages)
+  Jido.AI.Thread.new(system_prompt: saved_system_prompt)
+  |> Jido.AI.Thread.append_messages(conversation_messages)
 
 Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{thread: thread})
 
@@ -113,6 +126,12 @@ and applied after that request reaches a terminal state.
 If the thread carries a non-nil `system_prompt`, the agent's config prompt is
 synchronized automatically. If `thread.system_prompt` is `nil`, the `nil` is
 preserved and config prompt stays unchanged.
+
+Init-time note: when restoring with `initial_state: %{thread: thread}`, a nil
+`thread.system_prompt` is backfilled from the agent's configured prompt.
+
+Runtime note: when restoring with `Jido.AI.set_thread/3`, a nil
+`thread.system_prompt` stays nil.
 
 ## Note: Retrieval And ReAct
 
