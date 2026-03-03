@@ -664,9 +664,154 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
           %{}
         )
 
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "next turn", request_id: "req_nil_prompt"})],
+          %{}
+        )
+
       state = StratState.get(agent, %{})
       assert state.thread == thread
       assert state.config.system_prompt == "Keep me"
+      assert state.pending_worker_start.state.thread.system_prompt == nil
+    end
+
+    test "set_thread while active run is deferred and applied after request completion" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_deferred_complete"})],
+          %{}
+        )
+
+      replacement =
+        Jido.AI.Thread.new(system_prompt: "Restored prompt")
+        |> Jido.AI.Thread.append_messages([
+          %{role: :user, content: "Restored user"},
+          %{role: :assistant, content: "Restored assistant"}
+        ])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.set_thread_action(), %{thread: replacement})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.pending_thread_replacement == replacement
+      assert state.config.system_prompt == "Original prompt"
+
+      completion_events = [
+        runtime_event(:llm_completed, "req_deferred_complete", 2, %{
+          turn_type: :final_answer,
+          text: "A1",
+          thinking_content: nil,
+          tool_calls: [],
+          usage: %{}
+        }),
+        runtime_event(:request_completed, "req_deferred_complete", 3, %{
+          result: "A1",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(completion_events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(
+            acc,
+            [instruction(:ai_react_worker_event, %{request_id: "req_deferred_complete", event: event})],
+            %{}
+          )
+        end)
+
+      state = StratState.get(agent, %{})
+      assert state.thread == replacement
+      assert state.pending_thread_replacement == nil
+      assert state.config.system_prompt == "Restored prompt"
+    end
+
+    test "set_thread while active run is deferred and applied after request failure" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_deferred_failed"})],
+          %{}
+        )
+
+      replacement =
+        Jido.AI.Thread.new(system_prompt: "Recovered prompt")
+        |> Jido.AI.Thread.append_messages([%{role: :user, content: "Recovered history"}])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.set_thread_action(), %{thread: replacement})],
+          %{}
+        )
+
+      failed_event =
+        runtime_event(:request_failed, "req_deferred_failed", 2, %{
+          error: {:runtime, :boom}
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_deferred_failed", event: failed_event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.thread == replacement
+      assert state.pending_thread_replacement == nil
+      assert state.config.system_prompt == "Recovered prompt"
+    end
+
+    test "set_thread while active run is deferred and applied after worker crash terminalization" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      active_state =
+        agent
+        |> StratState.get(%{})
+        |> Map.put(:status, :awaiting_tool)
+        |> Map.put(:active_request_id, "req_deferred_crash")
+        |> Map.put(:react_worker_pid, self())
+        |> Map.put(:react_worker_status, :running)
+
+      agent = StratState.put(agent, active_state)
+
+      replacement =
+        Jido.AI.Thread.new(system_prompt: "Crash replacement")
+        |> Jido.AI.Thread.append_messages([%{role: :user, content: "Recovered after crash"}])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.set_thread_action(), %{thread: replacement})],
+          %{}
+        )
+
+      crash_instruction =
+        instruction(:ai_react_worker_child_exit, %{
+          tag: :react_worker,
+          pid: self(),
+          reason: :killed
+        })
+
+      {agent, []} = ReAct.cmd(agent, [crash_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.status == :error
+      assert state.thread == replacement
+      assert state.pending_thread_replacement == nil
+      assert state.config.system_prompt == "Crash replacement"
     end
 
     test "set_thread with invalid params is a no-op" do

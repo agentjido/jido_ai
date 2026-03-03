@@ -395,6 +395,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         streaming_thinking: "",
         thinking_trace: [],
         checkpoint_token: nil,
+        pending_thread_replacement: nil,
         request_traces: %{},
         react_worker_pid: nil,
         react_worker_status: :missing,
@@ -670,16 +671,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     state = StratState.get(agent, %{})
 
     new_state =
-      case thread.system_prompt do
-        prompt when is_binary(prompt) ->
-          Helpers.apply_to_state(state, [
-            Helpers.set_config_field(:system_prompt, prompt)
-          ])
-
-        _ ->
-          state
-      end
-      |> Map.put(:thread, thread)
+      if active_run?(state),
+        do: Map.put(state, :pending_thread_replacement, thread),
+        else: apply_thread_replacement(state, thread)
 
     {put_strategy_state(agent, new_state), []}
   end
@@ -696,6 +690,32 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       _ ->
         Thread.new(system_prompt: config[:system_prompt])
+    end
+  end
+
+  defp active_run?(state) do
+    is_binary(state[:active_request_id]) and state[:status] in [:awaiting_llm, :awaiting_tool]
+  end
+
+  defp apply_thread_replacement(state, %Thread{} = thread) do
+    state
+    |> maybe_sync_config_prompt(thread)
+    |> Map.put(:thread, thread)
+    |> Map.put(:pending_thread_replacement, nil)
+  end
+
+  defp maybe_sync_config_prompt(state, %Thread{system_prompt: prompt}) when is_binary(prompt) do
+    Helpers.apply_to_state(state, [
+      Helpers.set_config_field(:system_prompt, prompt)
+    ])
+  end
+
+  defp maybe_sync_config_prompt(state, _thread), do: state
+
+  defp maybe_apply_pending_thread_replacement(state) do
+    case Map.get(state, :pending_thread_replacement) do
+      %Thread{} = thread -> apply_thread_replacement(state, thread)
+      _ -> state
     end
   end
 
@@ -766,6 +786,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             |> Map.delete(:run_tool_context)
             |> Map.delete(:run_req_http_options)
             |> Map.delete(:run_llm_opts)
+            |> maybe_apply_pending_thread_replacement()
 
           {put_strategy_state(agent, failed_state), []}
         else
@@ -925,6 +946,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
+          |> maybe_apply_pending_thread_replacement()
 
         signal = Signal.RequestCompleted.new!(%{request_id: request_id, result: result, run_id: request_id})
         {updated, [signal]}
@@ -942,6 +964,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
+          |> maybe_apply_pending_thread_replacement()
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}
@@ -961,6 +984,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
+          |> maybe_apply_pending_thread_replacement()
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}

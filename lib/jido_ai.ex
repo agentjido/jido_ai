@@ -334,8 +334,12 @@ defmodule Jido.AI do
   Use this to restore a previously saved conversation thread, enabling
   multi-turn session resumption after an agent restart.
 
-  The thread takes effect on the next query. If the thread carries a
-  non-nil system_prompt, the agent's config system_prompt is synchronized.
+  If called while a request is active, replacement is deferred and applied
+  after the request reaches a terminal state.
+
+  If the thread carries a non-nil system_prompt, the agent's config
+  system_prompt is synchronized. If the thread system_prompt is nil,
+  nil is preserved and config system_prompt remains unchanged.
 
   A thread can also be provided at agent start time via:
 

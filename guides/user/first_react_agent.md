@@ -97,7 +97,8 @@ you can restore it on restart so the agent resumes where it left off.
 ```elixir
 # At start time — pass the saved thread via initial_state:
 thread =
-  Jido.AI.Thread.new(system_prompt: "You are a helpful assistant.")
+  # snapshot.details.conversation already includes a system message when present
+  Jido.AI.Thread.new()
   |> Jido.AI.Thread.append_messages(saved_messages)
 
 Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{thread: thread})
@@ -106,8 +107,12 @@ Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{thread: thread})
 {:ok, _agent} = Jido.AI.set_thread(pid, thread)
 ```
 
-The new thread takes effect on the next query. If the thread carries a
-non-nil `system_prompt`, the agent's config prompt is synchronized automatically.
+If `set_thread` is called while a request is active, replacement is deferred
+and applied after that request reaches a terminal state.
+
+If the thread carries a non-nil `system_prompt`, the agent's config prompt is
+synchronized automatically. If `thread.system_prompt` is `nil`, the `nil` is
+preserved and config prompt stays unchanged.
 
 ## Note: Retrieval And ReAct
 
