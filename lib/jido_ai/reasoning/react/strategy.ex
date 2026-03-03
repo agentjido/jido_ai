@@ -32,7 +32,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   """
 
   use Jido.Agent.Strategy
-  require Logger
 
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
@@ -98,7 +97,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @set_tool_context :ai_react_set_tool_context
   @set_system_prompt :ai_react_set_system_prompt
   @set_context :ai_react_set_context
-  @set_thread :ai_react_set_thread
   @runtime_event :ai_react_runtime_event
   @worker_event :ai_react_worker_event
   @worker_child_started :ai_react_worker_child_started
@@ -147,11 +145,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @doc "Returns the action atom for replacing the conversation context."
   @spec set_context_action() :: :ai_react_set_context
   def set_context_action, do: @set_context
-
-  @doc "Returns the action atom for replacing the conversation thread."
-  @deprecated "Use set_context_action/0"
-  @spec set_thread_action() :: :ai_react_set_thread
-  def set_thread_action, do: @set_thread
 
   @doc "Returns the legacy action atom for direct runtime stream events (no-op in delegated mode)."
   @spec runtime_event_action() :: :ai_react_runtime_event
@@ -213,11 +206,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       schema: Zoi.object(%{context: Zoi.any()}),
       doc: "Replace the base conversation context",
       name: "ai.react.set_context"
-    },
-    @set_thread => %{
-      schema: Zoi.object(%{thread: Zoi.any()}),
-      doc: "Legacy alias for replacing the base conversation context",
-      name: "ai.react.set_thread"
     },
     @worker_event => %{
       schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
@@ -289,7 +277,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       {"ai.react.set_tool_context", {:strategy_cmd, @set_tool_context}},
       {"ai.react.set_system_prompt", {:strategy_cmd, @set_system_prompt}},
       {"ai.react.set_context", {:strategy_cmd, @set_context}},
-      {"ai.react.set_thread", {:strategy_cmd, @set_thread}},
       {"ai.react.worker.event", {:strategy_cmd, @worker_event}},
       {"jido.agent.child.started", {:strategy_cmd, @worker_child_started}},
       {"jido.agent.child.exit", {:strategy_cmd, @worker_child_exit}},
@@ -408,7 +395,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         streaming_thinking: "",
         thinking_trace: [],
         checkpoint_token: nil,
-        pending_thread_replacement: nil,
+        pending_context_replacement: nil,
         request_traces: %{},
         react_worker_pid: nil,
         react_worker_status: :missing,
@@ -472,10 +459,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         process_set_system_prompt(agent, params)
 
       @set_context ->
-        process_set_context(agent, params)
-
-      @set_thread ->
-        Logger.warning("DEPRECATION: ai.react.set_thread is deprecated; use ai.react.set_context.")
         process_set_context(agent, params)
 
       @worker_event ->
@@ -686,14 +669,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp process_set_context(agent, params) do
     state = StratState.get(agent, %{})
-    payload = Map.get(params, :context) || Map.get(params, :thread)
+    payload = Map.get(params, :context)
 
     case AIContext.coerce(payload) do
       {:ok, context} ->
         new_state =
           if active_run?(state),
-            do: Map.put(state, :pending_thread_replacement, context),
-            else: apply_thread_replacement(state, context)
+            do: Map.put(state, :pending_context_replacement, context),
+            else: apply_context_replacement(state, context)
 
         {put_strategy_state(agent, new_state), []}
 
@@ -721,11 +704,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     is_binary(state[:active_request_id]) and state[:status] in [:awaiting_llm, :awaiting_tool]
   end
 
-  defp apply_thread_replacement(state, %AIContext{} = thread) do
+  defp apply_context_replacement(state, %AIContext{} = context) do
     state
-    |> maybe_sync_config_prompt(thread)
-    |> Map.put(:thread, thread)
-    |> Map.put(:pending_thread_replacement, nil)
+    |> maybe_sync_config_prompt(context)
+    |> Map.put(:thread, context)
+    |> Map.put(:pending_context_replacement, nil)
   end
 
   defp maybe_sync_config_prompt(state, %AIContext{system_prompt: prompt}) when is_binary(prompt) do
@@ -736,9 +719,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp maybe_sync_config_prompt(state, _thread), do: state
 
-  defp maybe_apply_pending_thread_replacement(state) do
-    case Map.get(state, :pending_thread_replacement) do
-      %AIContext{} = thread -> apply_thread_replacement(state, thread)
+  defp maybe_apply_pending_context_replacement(state) do
+    case Map.get(state, :pending_context_replacement) do
+      %AIContext{} = context -> apply_context_replacement(state, context)
       _ -> state
     end
   end
@@ -810,7 +793,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             |> Map.delete(:run_tool_context)
             |> Map.delete(:run_req_http_options)
             |> Map.delete(:run_llm_opts)
-            |> maybe_apply_pending_thread_replacement()
+            |> maybe_apply_pending_context_replacement()
 
           {put_strategy_state(agent, failed_state), []}
         else
@@ -970,7 +953,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
-          |> maybe_apply_pending_thread_replacement()
+          |> maybe_apply_pending_context_replacement()
 
         signal = Signal.RequestCompleted.new!(%{request_id: request_id, result: result, run_id: request_id})
         {updated, [signal]}
@@ -988,7 +971,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
-          |> maybe_apply_pending_thread_replacement()
+          |> maybe_apply_pending_context_replacement()
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}
@@ -1008,7 +991,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_tool_context)
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
-          |> maybe_apply_pending_thread_replacement()
+          |> maybe_apply_pending_context_replacement()
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
         {updated, [signal]}

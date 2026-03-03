@@ -72,7 +72,6 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
       assert route_map["ai.react.set_system_prompt"] == {:strategy_cmd, :ai_react_set_system_prompt}
       assert route_map["ai.react.set_context"] == {:strategy_cmd, :ai_react_set_context}
-      assert route_map["ai.react.set_thread"] == {:strategy_cmd, :ai_react_set_thread}
       assert route_map["ai.react.worker.event"] == {:strategy_cmd, :ai_react_worker_event}
       assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
@@ -679,25 +678,6 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.pending_worker_start.state.thread.system_prompt == nil
     end
 
-    test "legacy set_thread action still applies context replacement" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      context =
-        Jido.AI.Context.new(system_prompt: "Restored via legacy action")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "legacy path"}])
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.set_thread_action(), %{thread: context})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.thread == context
-      assert state.config.system_prompt == "Restored via legacy action"
-    end
-
     test "set_context while active run is deferred and applied after request completion" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
 
@@ -723,7 +703,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         )
 
       state = StratState.get(agent, %{})
-      assert state.pending_thread_replacement == replacement
+      assert state.pending_context_replacement == replacement
       assert state.config.system_prompt == "Original prompt"
 
       completion_events = [
@@ -752,7 +732,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       state = StratState.get(agent, %{})
       assert state.thread == replacement
-      assert state.pending_thread_replacement == nil
+      assert state.pending_context_replacement == nil
       assert state.config.system_prompt == "Restored prompt"
     end
 
@@ -791,7 +771,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       state = StratState.get(agent, %{})
       assert state.thread == replacement
-      assert state.pending_thread_replacement == nil
+      assert state.pending_context_replacement == nil
       assert state.config.system_prompt == "Recovered prompt"
     end
 
@@ -831,7 +811,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       state = StratState.get(agent, %{})
       assert state.status == :error
       assert state.thread == replacement
-      assert state.pending_thread_replacement == nil
+      assert state.pending_context_replacement == nil
       assert state.config.system_prompt == "Crash replacement"
     end
 
@@ -841,7 +821,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       {agent, []} =
         ReAct.cmd(
           agent,
-          [instruction(ReAct.set_context_action(), %{context: "not a thread"})],
+          [instruction(ReAct.set_context_action(), %{context: "not a context"})],
           %{}
         )
 

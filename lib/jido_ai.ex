@@ -67,8 +67,6 @@ defmodule Jido.AI do
 
   """
 
-  require Logger
-
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.ModelAliases
@@ -351,7 +349,6 @@ defmodule Jido.AI do
   Legacy compatibility:
 
     * `initial_state: %{thread: ...}` is still accepted.
-    * `set_thread/3` remains as a deprecated alias for `set_context/3`.
 
   Semantics note:
 
@@ -380,20 +377,6 @@ defmodule Jido.AI do
     else
       _ -> {:error, :invalid_context}
     end
-  end
-
-  @doc """
-  Legacy alias for `set_context/3`.
-
-  `set_thread/3` is deprecated and will be removed in a future major release.
-  """
-  @deprecated "Use set_context/3"
-  @spec set_thread(GenServer.server(), AIContext.t() | Jido.AI.Thread.t(), keyword()) ::
-          {:ok, Jido.Agent.t()} | {:error, term()}
-  def set_thread(agent_server, context, opts \\ []) do
-    Logger.warning("DEPRECATION: Jido.AI.set_thread/3 is deprecated; use Jido.AI.set_context/3.")
-
-    set_context(agent_server, context, opts)
   end
 
   @doc """

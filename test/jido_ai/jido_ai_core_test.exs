@@ -2,8 +2,6 @@ defmodule Jido.AI.CoreTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  import ExUnit.CaptureLog
-
   alias Jido.AI
   alias Jido.Agent.Strategy.State, as: StratState
 
@@ -192,25 +190,6 @@ defmodule Jido.AI.CoreTest do
       end)
 
       assert {:ok, :context_set} = AI.set_context(self(), context)
-    end
-
-    test "set_thread warns and delegates to set_context" do
-      context = Jido.AI.Context.new(system_prompt: "Restored")
-
-      Mimic.stub(Jido.AgentServer, :call, fn _server, signal, timeout ->
-        assert signal.type == "ai.react.set_context"
-        assert %Jido.AI.Context{} = signal.data.context
-        assert signal.data.context.system_prompt == "Restored"
-        assert timeout == 5_000
-        {:ok, :context_set}
-      end)
-
-      log =
-        capture_log(fn ->
-          assert {:ok, :context_set} = AI.set_thread(self(), context)
-        end)
-
-      assert log =~ "DEPRECATION: Jido.AI.set_thread/3 is deprecated; use Jido.AI.set_context/3."
     end
 
     test "list_tools and has_tool work for agent struct and server wrappers" do
