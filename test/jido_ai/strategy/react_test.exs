@@ -71,6 +71,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
       assert route_map["ai.react.set_system_prompt"] == {:strategy_cmd, :ai_react_set_system_prompt}
+      assert route_map["ai.react.set_context"] == {:strategy_cmd, :ai_react_set_context}
+      assert route_map["ai.react.set_thread"] == {:strategy_cmd, :ai_react_set_thread}
       assert route_map["ai.react.worker.event"] == {:strategy_cmd, :ai_react_worker_event}
       assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
@@ -382,7 +384,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         )
 
       state = StratState.get(agent, %{})
-      history = Jido.AI.Thread.to_messages(state.pending_worker_start.state.thread)
+      history = Jido.AI.Context.to_messages(state.pending_worker_start.state.thread)
       history = Enum.reject(history, &(&1.role == :system))
 
       assert history == [
@@ -620,12 +622,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.config.system_prompt == "Updated prompt"
     end
 
-    test "set_thread replaces base conversation thread" do
+    test "set_context replaces base conversation context" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
 
-      thread =
-        Jido.AI.Thread.new(system_prompt: "Restored prompt")
-        |> Jido.AI.Thread.append_messages([
+      context =
+        Jido.AI.Context.new(system_prompt: "Restored prompt")
+        |> Jido.AI.Context.append_messages([
           %{role: :user, content: "Hello"},
           %{role: :assistant, content: "Hi there"}
         ])
@@ -633,15 +635,15 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       {agent, []} =
         ReAct.cmd(
           agent,
-          [instruction(ReAct.set_thread_action(), %{thread: thread})],
+          [instruction(ReAct.set_context_action(), %{context: context})],
           %{}
         )
 
       state = StratState.get(agent, %{})
-      assert state.thread == thread
+      assert state.thread == context
       assert state.config.system_prompt == "Restored prompt"
 
-      messages = Jido.AI.Thread.to_messages(state.thread)
+      messages = Jido.AI.Context.to_messages(state.thread)
       non_system = Enum.reject(messages, &(&1.role == :system))
 
       assert non_system == [
@@ -650,17 +652,17 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
              ]
     end
 
-    test "set_thread with nil system_prompt preserves existing config prompt" do
+    test "set_context with nil system_prompt preserves existing config prompt" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Keep me")
 
-      thread =
-        Jido.AI.Thread.new()
-        |> Jido.AI.Thread.append_messages([%{role: :user, content: "test"}])
+      context =
+        Jido.AI.Context.new()
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "test"}])
 
       {agent, []} =
         ReAct.cmd(
           agent,
-          [instruction(ReAct.set_thread_action(), %{thread: thread})],
+          [instruction(ReAct.set_context_action(), %{context: context})],
           %{}
         )
 
@@ -672,12 +674,31 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         )
 
       state = StratState.get(agent, %{})
-      assert state.thread == thread
+      assert state.thread == context
       assert state.config.system_prompt == "Keep me"
       assert state.pending_worker_start.state.thread.system_prompt == nil
     end
 
-    test "set_thread while active run is deferred and applied after request completion" do
+    test "legacy set_thread action still applies context replacement" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      context =
+        Jido.AI.Context.new(system_prompt: "Restored via legacy action")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "legacy path"}])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.set_thread_action(), %{thread: context})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.thread == context
+      assert state.config.system_prompt == "Restored via legacy action"
+    end
+
+    test "set_context while active run is deferred and applied after request completion" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
 
       {agent, [_spawn]} =
@@ -688,8 +709,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         )
 
       replacement =
-        Jido.AI.Thread.new(system_prompt: "Restored prompt")
-        |> Jido.AI.Thread.append_messages([
+        Jido.AI.Context.new(system_prompt: "Restored prompt")
+        |> Jido.AI.Context.append_messages([
           %{role: :user, content: "Restored user"},
           %{role: :assistant, content: "Restored assistant"}
         ])
@@ -697,7 +718,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       {agent, []} =
         ReAct.cmd(
           agent,
-          [instruction(ReAct.set_thread_action(), %{thread: replacement})],
+          [instruction(ReAct.set_context_action(), %{context: replacement})],
           %{}
         )
 
@@ -735,7 +756,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.config.system_prompt == "Restored prompt"
     end
 
-    test "set_thread while active run is deferred and applied after request failure" do
+    test "set_context while active run is deferred and applied after request failure" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
 
       {agent, [_spawn]} =
@@ -746,13 +767,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         )
 
       replacement =
-        Jido.AI.Thread.new(system_prompt: "Recovered prompt")
-        |> Jido.AI.Thread.append_messages([%{role: :user, content: "Recovered history"}])
+        Jido.AI.Context.new(system_prompt: "Recovered prompt")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "Recovered history"}])
 
       {agent, []} =
         ReAct.cmd(
           agent,
-          [instruction(ReAct.set_thread_action(), %{thread: replacement})],
+          [instruction(ReAct.set_context_action(), %{context: replacement})],
           %{}
         )
 
@@ -774,7 +795,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.config.system_prompt == "Recovered prompt"
     end
 
-    test "set_thread while active run is deferred and applied after worker crash terminalization" do
+    test "set_context while active run is deferred and applied after worker crash terminalization" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
 
       active_state =
@@ -788,13 +809,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       agent = StratState.put(agent, active_state)
 
       replacement =
-        Jido.AI.Thread.new(system_prompt: "Crash replacement")
-        |> Jido.AI.Thread.append_messages([%{role: :user, content: "Recovered after crash"}])
+        Jido.AI.Context.new(system_prompt: "Crash replacement")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "Recovered after crash"}])
 
       {agent, []} =
         ReAct.cmd(
           agent,
-          [instruction(ReAct.set_thread_action(), %{thread: replacement})],
+          [instruction(ReAct.set_context_action(), %{context: replacement})],
           %{}
         )
 
@@ -814,25 +835,25 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.config.system_prompt == "Crash replacement"
     end
 
-    test "set_thread with invalid params is a no-op" do
+    test "set_context with invalid params is a no-op" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Original")
 
       {agent, []} =
         ReAct.cmd(
           agent,
-          [instruction(ReAct.set_thread_action(), %{thread: "not a thread"})],
+          [instruction(ReAct.set_context_action(), %{context: "not a thread"})],
           %{}
         )
 
       state = StratState.get(agent, %{})
       assert state.config.system_prompt == "Original"
-      assert %Jido.AI.Thread{} = state.thread
+      assert %Jido.AI.Context{} = state.thread
     end
 
-    test "init with initial thread from agent.state" do
-      initial_thread =
-        Jido.AI.Thread.new(system_prompt: "Restored")
-        |> Jido.AI.Thread.append_messages([
+    test "init with initial context from agent.state" do
+      initial_context =
+        Jido.AI.Context.new(system_prompt: "Restored")
+        |> Jido.AI.Context.append_messages([
           %{role: :user, content: "Previous question"},
           %{role: :assistant, content: "Previous answer"}
         ])
@@ -841,7 +862,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         %Jido.Agent{
           id: "test-agent",
           name: "test",
-          state: %{thread: initial_thread}
+          state: %{context: initial_context}
         }
         |> then(fn agent ->
           ctx = %{strategy_opts: [tools: [TestCalculator]]}
@@ -850,9 +871,9 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         end)
 
       state = StratState.get(agent, %{})
-      assert state.thread == initial_thread
+      assert state.thread == initial_context
 
-      messages = Jido.AI.Thread.to_messages(state.thread)
+      messages = Jido.AI.Context.to_messages(state.thread)
       non_system = Enum.reject(messages, &(&1.role == :system))
 
       assert non_system == [
@@ -861,21 +882,21 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
              ]
     end
 
-    test "init with initial thread without system_prompt gets config prompt" do
-      initial_thread =
-        Jido.AI.Thread.new()
-        |> Jido.AI.Thread.append_messages([
+    test "init with initial context without system_prompt gets config prompt" do
+      initial_context =
+        Jido.AI.Context.new()
+        |> Jido.AI.Context.append_messages([
           %{role: :user, content: "Previous question"},
           %{role: :assistant, content: "Previous answer"}
         ])
 
-      assert initial_thread.system_prompt == nil
+      assert initial_context.system_prompt == nil
 
       agent =
         %Jido.Agent{
           id: "test-agent",
           name: "test",
-          state: %{thread: initial_thread}
+          state: %{context: initial_context}
         }
         |> then(fn agent ->
           ctx = %{strategy_opts: [tools: [TestCalculator], system_prompt: "Config prompt"]}
@@ -886,13 +907,34 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       state = StratState.get(agent, %{})
       assert state.thread.system_prompt == "Config prompt"
 
-      messages = Jido.AI.Thread.to_messages(state.thread)
+      messages = Jido.AI.Context.to_messages(state.thread)
       non_system = Enum.reject(messages, &(&1.role == :system))
 
       assert non_system == [
                %{role: :user, content: "Previous question"},
                %{role: :assistant, content: "Previous answer"}
              ]
+    end
+
+    test "init accepts legacy :thread key for compatibility" do
+      legacy_context =
+        Jido.AI.Context.new(system_prompt: "Legacy key")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "legacy"}])
+
+      agent =
+        %Jido.Agent{
+          id: "test-agent",
+          name: "test",
+          state: %{thread: legacy_context}
+        }
+        |> then(fn agent ->
+          ctx = %{strategy_opts: [tools: [TestCalculator]]}
+          {agent, []} = ReAct.init(agent, ctx)
+          agent
+        end)
+
+      state = StratState.get(agent, %{})
+      assert state.thread == legacy_context
     end
 
     test "runtime_adapter flag remains true even when opt-out is requested" do

@@ -1,35 +1,18 @@
 defmodule Jido.AI.Thread do
   @moduledoc """
-  Simple conversation thread that accumulates messages for LLM context projection.
+  Deprecated compatibility shim for the legacy ReAct thread API.
 
-  A minimal thread implementation that stores conversation history and projects it
-  directly to ReqLLM message format. No policies, no windowing, no snapshots - just
-  append and project.
-
-  ## Design Principle
-
-  **Thread = List of Messages. Projection = Thread + System Prompt.**
-
-  ## Usage
-
-      # Create a new thread
-      thread = Thread.new(system_prompt: "You are helpful.")
-
-      # Accumulate messages
-      thread = thread
-        |> Thread.append_user("Hello!")
-        |> Thread.append_assistant("Hi there!")
-
-      # Project to ReqLLM format
-      messages = Thread.to_messages(thread)
-
-  ## Multi-turn Conversations
-
-  The thread accumulates the full conversation history, enabling multi-turn
-  conversations where the LLM has access to prior context.
+  `Jido.AI.Thread` is deprecated. Use `Jido.AI.Context` for all new code.
+  This module keeps backwards compatibility and delegates behavior to
+  `Jido.AI.Context`.
   """
 
+  require Logger
+
+  alias Jido.AI.Context
   alias __MODULE__.Entry
+
+  @warning_prefix "DEPRECATION: Jido.AI.Thread is deprecated; use Jido.AI.Context"
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -40,9 +23,7 @@ defmodule Jido.AI.Thread do
   defstruct [:id, entries: [], system_prompt: nil]
 
   defmodule Entry do
-    @moduledoc """
-    A single entry in a conversation thread.
-    """
+    @moduledoc false
 
     @type t :: %__MODULE__{
             role: :user | :assistant | :tool | :system,
@@ -57,395 +38,246 @@ defmodule Jido.AI.Thread do
     defstruct [:role, :content, :thinking, :tool_calls, :tool_call_id, :name, :timestamp]
   end
 
-  @doc """
-  Create a new thread.
-
-  ## Options
-
-  - `:id` - Thread ID (auto-generated if not provided)
-  - `:system_prompt` - System prompt to prepend to projected messages
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.new/1`."
+  @deprecated "Use Jido.AI.Context.new/1"
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
-    %__MODULE__{
-      id: Keyword.get(opts, :id, generate_id()),
-      system_prompt: Keyword.get(opts, :system_prompt)
-    }
+    warn_deprecated("new/1")
+
+    opts
+    |> Context.new()
+    |> from_context()
   end
 
-  @doc """
-  Append an entry to the thread.
-
-  If the entry already has a timestamp, it is preserved. Otherwise, the current
-  UTC time is set.
-
-  Note: Entries are stored in reverse order internally for O(1) append performance.
-  They are reversed to chronological order when projected via `to_messages/2`.
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.append/2`."
+  @deprecated "Use Jido.AI.Context.append/2"
   @spec append(t(), Entry.t()) :: t()
-  def append(%__MODULE__{} = thread, %Entry{} = entry) do
-    entry = if entry.timestamp, do: entry, else: %{entry | timestamp: DateTime.utc_now()}
-    %{thread | entries: [entry | thread.entries]}
+  def append(%__MODULE__{} = thread, entry) do
+    warn_deprecated("append/2")
+
+    thread
+    |> to_context()
+    |> Context.append(entry_to_context_entry(entry))
+    |> from_context()
   end
 
-  @doc """
-  Append a user message to the thread.
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.append_user/2`."
+  @deprecated "Use Jido.AI.Context.append_user/2"
   @spec append_user(t(), String.t()) :: t()
-  def append_user(thread, content) when is_binary(content) do
-    append(thread, %Entry{role: :user, content: content})
+  def append_user(%__MODULE__{} = thread, content) when is_binary(content) do
+    warn_deprecated("append_user/2")
+
+    thread
+    |> to_context()
+    |> Context.append_user(content)
+    |> from_context()
   end
 
-  @doc """
-  Append an assistant message to the thread, optionally with tool calls and thinking content.
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.append_assistant/4`."
+  @deprecated "Use Jido.AI.Context.append_assistant/4"
   @spec append_assistant(t(), String.t() | nil, list() | nil, keyword()) :: t()
-  def append_assistant(thread, content, tool_calls \\ nil, opts \\ []) do
-    thinking = Keyword.get(opts, :thinking)
-    append(thread, %Entry{role: :assistant, content: content, tool_calls: tool_calls, thinking: thinking})
+  def append_assistant(%__MODULE__{} = thread, content, tool_calls \\ nil, opts \\ []) do
+    warn_deprecated("append_assistant/4")
+
+    thread
+    |> to_context()
+    |> Context.append_assistant(content, tool_calls, opts)
+    |> from_context()
   end
 
-  @doc """
-  Append a tool result to the thread.
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.append_tool_result/4`."
+  @deprecated "Use Jido.AI.Context.append_tool_result/4"
   @spec append_tool_result(t(), String.t(), String.t(), String.t()) :: t()
-  def append_tool_result(thread, tool_call_id, name, content) do
-    append(thread, %Entry{role: :tool, tool_call_id: tool_call_id, name: name, content: content})
+  def append_tool_result(%__MODULE__{} = thread, tool_call_id, name, content) do
+    warn_deprecated("append_tool_result/4")
+
+    thread
+    |> to_context()
+    |> Context.append_tool_result(tool_call_id, name, content)
+    |> from_context()
   end
 
-  @doc """
-  Project thread to ReqLLM message format.
-
-  Returns a list of message maps suitable for passing to ReqLLM.
-
-  ## Options
-
-  - `:limit` - Maximum number of entries to include (takes last N, preserves system prompt)
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.to_messages/2`."
+  @deprecated "Use Jido.AI.Context.to_messages/2"
   @spec to_messages(t(), keyword()) :: [map()]
   def to_messages(%__MODULE__{} = thread, opts \\ []) do
-    limit = Keyword.get(opts, :limit)
+    warn_deprecated("to_messages/2")
 
-    # Entries are stored in reverse order, so reverse to get chronological order
-    chronological = Enum.reverse(thread.entries)
-
-    entries =
-      case limit do
-        nil -> chronological
-        0 -> []
-        n when is_integer(n) and n > 0 -> Enum.take(chronological, -n)
-        _ -> chronological
-      end
-
-    messages = Enum.map(entries, &entry_to_message/1)
-
-    case thread.system_prompt do
-      nil -> messages
-      prompt when is_binary(prompt) -> [%{role: :system, content: prompt} | messages]
-    end
+    thread
+    |> to_context()
+    |> Context.to_messages(opts)
   end
 
-  @doc """
-  Convert a list of raw message maps to thread entries and append them.
-
-  Useful for importing existing conversation history.
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.append_messages/2`."
+  @deprecated "Use Jido.AI.Context.append_messages/2"
   @spec append_messages(t(), [map()]) :: t()
-  def append_messages(thread, messages) when is_list(messages) do
-    Enum.reduce(messages, thread, fn msg, acc ->
-      entry = message_to_entry(msg)
-      append(acc, entry)
-    end)
+  def append_messages(%__MODULE__{} = thread, messages) when is_list(messages) do
+    warn_deprecated("append_messages/2")
+
+    thread
+    |> to_context()
+    |> Context.append_messages(messages)
+    |> from_context()
   end
 
-  @doc """
-  Count of entries in the thread.
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.length/1`."
+  @deprecated "Use Jido.AI.Context.length/1"
   @spec length(t()) :: non_neg_integer()
-  def length(%__MODULE__{entries: entries}), do: Kernel.length(entries)
+  def length(%__MODULE__{} = thread) do
+    warn_deprecated("length/1")
 
-  @doc """
-  Check if the thread is empty (no entries).
-  """
+    thread
+    |> to_context()
+    |> Context.length()
+  end
+
+  @doc "Deprecated shim for `Jido.AI.Context.empty?/1`."
+  @deprecated "Use Jido.AI.Context.empty?/1"
   @spec empty?(t()) :: boolean()
-  def empty?(%__MODULE__{entries: []}), do: true
-  def empty?(%__MODULE__{}), do: false
+  def empty?(%__MODULE__{} = thread) do
+    warn_deprecated("empty?/1")
 
-  @doc """
-  Clear all entries from the thread (keeps system prompt and ID).
-  """
+    thread
+    |> to_context()
+    |> Context.empty?()
+  end
+
+  @doc "Deprecated shim for `Jido.AI.Context.clear/1`."
+  @deprecated "Use Jido.AI.Context.clear/1"
   @spec clear(t()) :: t()
   def clear(%__MODULE__{} = thread) do
-    %{thread | entries: []}
+    warn_deprecated("clear/1")
+
+    thread
+    |> to_context()
+    |> Context.clear()
+    |> from_context()
   end
 
-  @doc """
-  Get the last entry in the thread.
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.last_entry/1`."
+  @deprecated "Use Jido.AI.Context.last_entry/1"
   @spec last_entry(t()) :: Entry.t() | nil
-  def last_entry(%__MODULE__{entries: []}), do: nil
-  def last_entry(%__MODULE__{entries: [last | _]}), do: last
+  def last_entry(%__MODULE__{} = thread) do
+    warn_deprecated("last_entry/1")
 
-  @doc """
-  Get the last assistant response content.
-  """
-  @spec last_assistant_content(t()) :: String.t() | nil
-  def last_assistant_content(%__MODULE__{entries: entries}) do
-    # Entries are stored in reverse order, so first match is most recent
-    entries
-    |> Enum.find(&(&1.role == :assistant))
-    |> case do
-      nil -> nil
-      entry -> entry.content
-    end
+    thread
+    |> to_context()
+    |> Context.last_entry()
+    |> context_entry_to_thread_entry()
   end
 
-  @doc """
-  Returns a debug-friendly view of the thread contents.
+  @doc "Deprecated shim for `Jido.AI.Context.last_assistant_content/1`."
+  @deprecated "Use Jido.AI.Context.last_assistant_content/1"
+  @spec last_assistant_content(t()) :: String.t() | nil
+  def last_assistant_content(%__MODULE__{} = thread) do
+    warn_deprecated("last_assistant_content/1")
 
-  ## Options
+    thread
+    |> to_context()
+    |> Context.last_assistant_content()
+  end
 
-  - `:last` - Number of entries to include (default: all)
-  - `:truncate` - Max content length before truncation (default: 200)
-
-  ## Example
-
-      Thread.debug_view(thread, last: 5, truncate: 100)
-      # %{
-      #   id: "abc123",
-      #   length: 12,
-      #   system_prompt: "You are a weather...",
-      #   entries: [...]
-      # }
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.debug_view/2`."
+  @deprecated "Use Jido.AI.Context.debug_view/2"
   @spec debug_view(t(), keyword()) :: map()
   def debug_view(%__MODULE__{} = thread, opts \\ []) do
-    last = Keyword.get(opts, :last)
-    truncate = Keyword.get(opts, :truncate, 200)
+    warn_deprecated("debug_view/2")
 
-    # Entries are stored in reverse order, so reverse to get chronological order
-    chronological = Enum.reverse(thread.entries)
-
-    entries =
-      case last do
-        nil -> chronological
-        n when is_integer(n) and n > 0 -> Enum.take(chronological, -n)
-        _ -> chronological
-      end
-
-    %{
-      id: thread.id,
-      length: Kernel.length(thread.entries),
-      system_prompt: truncate_string(thread.system_prompt, truncate),
-      entries: Enum.map(entries, &entry_to_debug_map(&1, truncate))
-    }
+    thread
+    |> to_context()
+    |> Context.debug_view(opts)
   end
 
-  @doc """
-  Pretty-prints the thread to the console for IEx debugging.
-
-  Prints each message with its role and content in a readable format.
-
-  ## Example
-
-      Thread.pp(thread)
-      # [system] You are a weather assistant...
-      # [user]   What's the weather in Seattle?
-      # [asst]   <tool: get_weather>
-      # [tool]   {"temp": 62, "conditions": "cloudy"}
-      # [asst]   The weather is 62°F and cloudy.
-  """
+  @doc "Deprecated shim for `Jido.AI.Context.pp/1`."
+  @deprecated "Use Jido.AI.Context.pp/1"
   @spec pp(t()) :: :ok
   def pp(%__MODULE__{} = thread) do
-    if thread.system_prompt do
-      IO.puts("[system] #{truncate_string(thread.system_prompt, 60)}")
-    end
+    warn_deprecated("pp/1")
 
-    # Entries are stored in reverse order, so reverse for display
-    thread.entries
-    |> Enum.reverse()
-    |> Enum.each(fn entry ->
-      IO.puts(format_entry_for_pp(entry))
-    end)
-
-    :ok
+    thread
+    |> to_context()
+    |> Context.pp()
   end
 
-  defp entry_to_debug_map(entry, truncate) do
-    base = %{role: entry.role}
-
-    base
-    |> maybe_add(:content, truncate_string(entry.content, truncate))
-    |> maybe_add(:tool_calls, format_tool_calls_for_debug(entry.tool_calls))
-    |> maybe_add(:name, entry.name)
-    |> maybe_add(:tool_call_id, entry.tool_call_id)
-  end
-
-  defp maybe_add(map, _key, nil), do: map
-  defp maybe_add(map, key, value), do: Map.put(map, key, value)
-
-  defp format_tool_calls_for_debug(nil), do: nil
-  defp format_tool_calls_for_debug([]), do: nil
-
-  defp format_tool_calls_for_debug(tool_calls) do
-    Enum.map(tool_calls, fn tc ->
-      case tc do
-        %{name: name} -> name
-        %{"name" => name} -> name
-        _ -> "unknown"
-      end
-    end)
-  end
-
-  defp truncate_string(nil, _max), do: nil
-  defp truncate_string(str, max) when byte_size(str) <= max, do: str
-  defp truncate_string(str, max), do: String.slice(str, 0, max) <> "..."
-
-  defp format_entry_for_pp(%Entry{role: :user, content: content}) do
-    "[user]   #{content}"
-  end
-
-  defp format_entry_for_pp(%Entry{role: :assistant, content: content, tool_calls: nil}) do
-    "[asst]   #{content}"
-  end
-
-  defp format_entry_for_pp(%Entry{role: :assistant, tool_calls: tool_calls}) when is_list(tool_calls) do
-    names =
-      Enum.map_join(tool_calls, ", ", fn tc ->
-        case tc do
-          %{name: name} -> name
-          %{"name" => name} -> name
-          _ -> "?"
-        end
-      end)
-
-    "[asst]   <tool: #{names}>"
-  end
-
-  defp format_entry_for_pp(%Entry{role: :tool, name: name, content: content}) do
-    truncated = truncate_string(content, 60)
-    "[tool]   #{name}: #{truncated}"
-  end
-
-  defp format_entry_for_pp(%Entry{role: :system, content: content}) do
-    "[system] #{content}"
-  end
-
-  defp format_entry_for_pp(%Entry{role: role, content: content}) do
-    "[#{role}] #{content}"
-  end
-
-  # Private helpers
-
-  defp entry_to_message(%Entry{role: :user, content: content}) do
-    %{role: :user, content: content}
-  end
-
-  defp entry_to_message(%Entry{role: :assistant, content: content, thinking: thinking, tool_calls: nil}) do
-    %{role: :assistant, content: build_assistant_content(content, thinking)}
-  end
-
-  defp entry_to_message(%Entry{role: :assistant, content: content, thinking: thinking, tool_calls: tool_calls}) do
-    %{role: :assistant, content: build_assistant_content(content || "", thinking), tool_calls: tool_calls}
-  end
-
-  defp entry_to_message(%Entry{role: :tool, tool_call_id: id, name: name, content: content}) do
-    %{role: :tool, tool_call_id: id, name: name, content: content}
-  end
-
-  defp entry_to_message(%Entry{role: :system, content: content}) do
-    %{role: :system, content: content}
-  end
-
-  # Preserve non-canonical roles from imported histories instead of crashing.
-  defp entry_to_message(%Entry{} = entry) do
-    %{role: entry.role, content: entry.content}
-    |> maybe_add(:name, entry.name)
-    |> maybe_add(:tool_call_id, entry.tool_call_id)
-    |> maybe_add(:tool_calls, entry.tool_calls)
-  end
-
-  defp build_assistant_content(content, nil), do: content
-  defp build_assistant_content(content, ""), do: content
-
-  defp build_assistant_content(content, thinking) when is_binary(thinking) do
-    [
-      %{type: :thinking, thinking: thinking},
-      %{type: :text, text: content || ""}
-    ]
-  end
-
-  defp message_to_entry(msg) when is_map(msg) do
-    role = get_field(msg, :role, "role")
-    content = get_field(msg, :content, "content")
-    {text_content, thinking} = extract_entry_thinking(content)
-
-    %Entry{
-      role: normalize_role(role),
-      content: text_content,
-      thinking: thinking,
-      tool_calls: get_field(msg, :tool_calls, "tool_calls"),
-      tool_call_id: get_field(msg, :tool_call_id, "tool_call_id"),
-      name: get_field(msg, :name, "name")
+  @doc "Deprecated conversion helper. Converts a legacy thread to `Jido.AI.Context`."
+  @spec to_context(t()) :: Context.t()
+  def to_context(%__MODULE__{} = thread) do
+    %Context{
+      id: thread.id,
+      system_prompt: thread.system_prompt,
+      entries: Enum.map(thread.entries, &entry_to_context_entry/1)
     }
   end
 
-  defp extract_entry_thinking(content) when is_list(content) do
-    thinking =
-      content
-      |> Enum.filter(fn
-        %{type: :thinking} -> true
-        %{type: "thinking"} -> true
-        _ -> false
-      end)
-      |> Enum.map_join("", fn
-        %{thinking: t} when is_binary(t) -> t
-        %{text: t} when is_binary(t) -> t
-        _ -> ""
-      end)
-
-    text =
-      content
-      |> Enum.filter(fn
-        %{type: :text} -> true
-        %{type: "text"} -> true
-        _ -> false
-      end)
-      |> Enum.map_join("", fn
-        %{text: t} when is_binary(t) -> t
-        _ -> ""
-      end)
-
-    thinking = if thinking == "", do: nil, else: thinking
-    {text, thinking}
+  @doc "Deprecated conversion helper. Converts `Jido.AI.Context` to a legacy thread."
+  @spec from_context(Context.t()) :: t()
+  def from_context(%Context{} = context) do
+    %__MODULE__{
+      id: context.id,
+      system_prompt: context.system_prompt,
+      entries: Enum.map(context.entries, &context_entry_to_thread_entry/1)
+    }
   end
 
-  defp extract_entry_thinking(content), do: {content, nil}
+  defp entry_to_context_entry(%Context.Entry{} = entry), do: entry
 
-  # Helper to get a field from either atom or string key
-  defp get_field(map, atom_key, string_key) do
-    Map.get(map, atom_key) || Map.get(map, string_key)
+  defp entry_to_context_entry(%Entry{} = entry) do
+    %Context.Entry{
+      role: entry.role,
+      content: entry.content,
+      thinking: entry.thinking,
+      tool_calls: entry.tool_calls,
+      tool_call_id: entry.tool_call_id,
+      name: entry.name,
+      timestamp: entry.timestamp
+    }
   end
 
-  # Known roles - normalize to atoms
-  defp normalize_role(:user), do: :user
-  defp normalize_role(:assistant), do: :assistant
-  defp normalize_role(:tool), do: :tool
-  defp normalize_role(:system), do: :system
-  defp normalize_role("user"), do: :user
-  defp normalize_role("assistant"), do: :assistant
-  defp normalize_role("tool"), do: :tool
-  defp normalize_role("system"), do: :system
-  # OpenAI-specific roles
-  defp normalize_role(:developer), do: :developer
-  defp normalize_role("developer"), do: :developer
-  defp normalize_role(:function), do: :function
-  defp normalize_role("function"), do: :function
-  # Pass through unknown roles as-is (atoms stay atoms, strings stay strings)
-  defp normalize_role(role), do: role
+  defp entry_to_context_entry(%{} = entry) do
+    %Context.Entry{
+      role: get_field(entry, :role),
+      content: get_field(entry, :content),
+      thinking: get_field(entry, :thinking),
+      tool_calls: get_field(entry, :tool_calls),
+      tool_call_id: get_field(entry, :tool_call_id),
+      name: get_field(entry, :name),
+      timestamp: get_field(entry, :timestamp)
+    }
+  end
 
-  defp generate_id do
-    :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+  defp context_entry_to_thread_entry(nil), do: nil
+  defp context_entry_to_thread_entry(%Entry{} = entry), do: entry
+
+  defp context_entry_to_thread_entry(%Context.Entry{} = entry) do
+    %Entry{
+      role: entry.role,
+      content: entry.content,
+      thinking: entry.thinking,
+      tool_calls: entry.tool_calls,
+      tool_call_id: entry.tool_call_id,
+      name: entry.name,
+      timestamp: entry.timestamp
+    }
+  end
+
+  defp context_entry_to_thread_entry(%{} = entry) do
+    %Entry{
+      role: get_field(entry, :role),
+      content: get_field(entry, :content),
+      thinking: get_field(entry, :thinking),
+      tool_calls: get_field(entry, :tool_calls),
+      tool_call_id: get_field(entry, :tool_call_id),
+      name: get_field(entry, :name),
+      timestamp: get_field(entry, :timestamp)
+    }
+  end
+
+  defp warn_deprecated(function_name) do
+    Logger.warning("#{@warning_prefix}. Called #{function_name}.")
+  end
+
+  defp get_field(map, key) do
+    Map.get(map, key, Map.get(map, Atom.to_string(key)))
   end
 end
 

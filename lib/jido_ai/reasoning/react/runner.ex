@@ -8,7 +8,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token}
   alias Jido.AI.Effects
-  alias Jido.AI.{Thread, Turn}
+  alias Jido.AI.Context, as: AIContext
+  alias Jido.AI.Turn
   alias Jido.Agent.State, as: AgentState
 
   require Logger
@@ -193,7 +194,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           call_id: call_id,
           model: config.model,
           message_count:
-            Thread.length(state.thread) +
+            AIContext.length(state.thread) +
               case state.thread.system_prompt do
                 nil -> 0
                 _ -> 1
@@ -202,7 +203,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         llm_call_id: call_id
       )
 
-    messages = Thread.to_messages(state.thread)
+    messages = AIContext.to_messages(state.thread)
     llm_opts = Config.llm_opts(config)
 
     case request_turn(state, owner, ref, config, messages, llm_opts) do
@@ -227,7 +228,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           )
 
         state =
-          Thread.append_assistant(
+          AIContext.append_assistant(
             state.thread,
             turn.text,
             case turn.type do
@@ -429,7 +430,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             )
 
           content = Turn.format_tool_result_content(result)
-          thread_acc = Thread.append_tool_result(thread_acc, completed.id, completed.name, content)
+          thread_acc = AIContext.append_tool_result(thread_acc, completed.id, completed.name, content)
           {acc, thread_acc}
 
         {:error, reason}, {acc, thread_acc} ->
@@ -718,14 +719,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp latest_query(%State{} = state) do
-    case Thread.last_entry(state.thread) do
+    case AIContext.last_entry(state.thread) do
       %{role: :user, content: content} when is_binary(content) -> content
       _ -> ""
     end
   end
 
   defp append_query(%State{} = state, query) when is_binary(query) do
-    %{state | thread: Thread.append_user(state.thread, query), status: :running, updated_at_ms: now_ms()}
+    %{state | thread: AIContext.append_user(state.thread, query), status: :running, updated_at_ms: now_ms()}
   end
 
   defp maybe_thinking_opt(nil), do: []

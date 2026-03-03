@@ -32,6 +32,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   """
 
   use Jido.Agent.Strategy
+  require Logger
 
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
@@ -43,7 +44,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.Signal
   alias Jido.AI.Reasoning.Helpers
-  alias Jido.AI.Thread
+  alias Jido.AI.Context, as: AIContext
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
 
@@ -96,6 +97,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @unregister_tool :ai_react_unregister_tool
   @set_tool_context :ai_react_set_tool_context
   @set_system_prompt :ai_react_set_system_prompt
+  @set_context :ai_react_set_context
   @set_thread :ai_react_set_thread
   @runtime_event :ai_react_runtime_event
   @worker_event :ai_react_worker_event
@@ -142,7 +144,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @spec set_system_prompt_action() :: :ai_react_set_system_prompt
   def set_system_prompt_action, do: @set_system_prompt
 
+  @doc "Returns the action atom for replacing the conversation context."
+  @spec set_context_action() :: :ai_react_set_context
+  def set_context_action, do: @set_context
+
   @doc "Returns the action atom for replacing the conversation thread."
+  @deprecated "Use set_context_action/0"
   @spec set_thread_action() :: :ai_react_set_thread
   def set_thread_action, do: @set_thread
 
@@ -202,9 +209,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       doc: "Update the persistent base system prompt",
       name: "ai.react.set_system_prompt"
     },
+    @set_context => %{
+      schema: Zoi.object(%{context: Zoi.any()}),
+      doc: "Replace the base conversation context",
+      name: "ai.react.set_context"
+    },
     @set_thread => %{
       schema: Zoi.object(%{thread: Zoi.any()}),
-      doc: "Replace the base conversation thread",
+      doc: "Legacy alias for replacing the base conversation context",
       name: "ai.react.set_thread"
     },
     @worker_event => %{
@@ -276,6 +288,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       {"ai.react.unregister_tool", {:strategy_cmd, @unregister_tool}},
       {"ai.react.set_tool_context", {:strategy_cmd, @set_tool_context}},
       {"ai.react.set_system_prompt", {:strategy_cmd, @set_system_prompt}},
+      {"ai.react.set_context", {:strategy_cmd, @set_context}},
       {"ai.react.set_thread", {:strategy_cmd, @set_thread}},
       {"ai.react.worker.event", {:strategy_cmd, @worker_event}},
       {"jido.agent.child.started", {:strategy_cmd, @worker_child_started}},
@@ -310,7 +323,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp snapshot_status(_), do: :running
 
   defp build_snapshot_details(state, config) do
-    conversation = state |> snapshot_thread(config) |> Thread.to_messages()
+    conversation = state |> snapshot_thread(config) |> AIContext.to_messages()
 
     trace_summary =
       state
@@ -377,7 +390,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       %{
         status: :idle,
         iteration: 0,
-        thread: initial_thread(agent, config),
+        thread: initial_context(agent, config),
         run_thread: nil,
         pending_tool_calls: [],
         final_answer: nil,
@@ -458,8 +471,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       @set_system_prompt ->
         process_set_system_prompt(agent, params)
 
+      @set_context ->
+        process_set_context(agent, params)
+
       @set_thread ->
-        process_set_thread(agent, params)
+        Logger.warning("DEPRECATION: ai.react.set_thread is deprecated; use ai.react.set_context.")
+        process_set_context(agent, params)
 
       @worker_event ->
         process_worker_event(agent, params)
@@ -513,7 +530,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         )
 
       base_thread = strategy_thread(state, config)
-      run_thread = Thread.append_user(base_thread, query)
+      run_thread = AIContext.append_user(base_thread, query)
       runtime_state = runtime_state_from_thread(run_thread, query, request_id, run_id)
 
       worker_start_payload = %{
@@ -655,7 +672,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       ])
       |> Map.put(:thread, %{base_thread | system_prompt: prompt})
       |> then(fn updated ->
-        if match?(%Thread{}, run_thread) do
+        if match?(%AIContext{}, run_thread) do
           Map.put(updated, :run_thread, %{run_thread | system_prompt: prompt})
         else
           updated
@@ -667,29 +684,36 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp process_set_system_prompt(agent, _params), do: {agent, []}
 
-  defp process_set_thread(agent, %{thread: %Thread{} = thread}) do
+  defp process_set_context(agent, params) do
     state = StratState.get(agent, %{})
+    payload = Map.get(params, :context) || Map.get(params, :thread)
 
-    new_state =
-      if active_run?(state),
-        do: Map.put(state, :pending_thread_replacement, thread),
-        else: apply_thread_replacement(state, thread)
+    case AIContext.coerce(payload) do
+      {:ok, context} ->
+        new_state =
+          if active_run?(state),
+            do: Map.put(state, :pending_thread_replacement, context),
+            else: apply_thread_replacement(state, context)
 
-    {put_strategy_state(agent, new_state), []}
+        {put_strategy_state(agent, new_state), []}
+
+      :error ->
+        {agent, []}
+    end
   end
 
-  defp process_set_thread(agent, _params), do: {agent, []}
+  defp initial_context(%Agent{} = agent, config) do
+    source_context = Map.get(agent.state, :context) || Map.get(agent.state, :thread)
 
-  defp initial_thread(%Agent{} = agent, config) do
-    case Map.get(agent.state, :thread) do
-      %Thread{system_prompt: nil} = thread ->
-        %{thread | system_prompt: config[:system_prompt]}
+    case AIContext.coerce(source_context) do
+      {:ok, %AIContext{system_prompt: nil} = context} ->
+        %{context | system_prompt: config[:system_prompt]}
 
-      %Thread{} = thread ->
-        thread
+      {:ok, %AIContext{} = context} ->
+        context
 
-      _ ->
-        Thread.new(system_prompt: config[:system_prompt])
+      :error ->
+        AIContext.new(system_prompt: config[:system_prompt])
     end
   end
 
@@ -697,14 +721,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     is_binary(state[:active_request_id]) and state[:status] in [:awaiting_llm, :awaiting_tool]
   end
 
-  defp apply_thread_replacement(state, %Thread{} = thread) do
+  defp apply_thread_replacement(state, %AIContext{} = thread) do
     state
     |> maybe_sync_config_prompt(thread)
     |> Map.put(:thread, thread)
     |> Map.put(:pending_thread_replacement, nil)
   end
 
-  defp maybe_sync_config_prompt(state, %Thread{system_prompt: prompt}) when is_binary(prompt) do
+  defp maybe_sync_config_prompt(state, %AIContext{system_prompt: prompt}) when is_binary(prompt) do
     Helpers.apply_to_state(state, [
       Helpers.set_config_field(:system_prompt, prompt)
     ])
@@ -714,7 +738,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp maybe_apply_pending_thread_replacement(state) do
     case Map.get(state, :pending_thread_replacement) do
-      %Thread{} = thread -> apply_thread_replacement(state, thread)
+      %AIContext{} = thread -> apply_thread_replacement(state, thread)
       _ -> state
     end
   end
@@ -1190,7 +1214,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp runtime_state_from_thread(%Thread{} = thread, query, request_id, run_id)
+  defp runtime_state_from_thread(%AIContext{} = thread, query, request_id, run_id)
        when is_binary(query) and is_binary(request_id) and is_binary(run_id) do
     ReActState.new(query, thread.system_prompt, request_id: request_id, run_id: run_id)
     |> Map.put(:thread, thread)
@@ -1198,17 +1222,17 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp strategy_thread(state, config) do
     case Map.get(state, :thread) do
-      %Thread{} = thread ->
+      %AIContext{} = thread ->
         thread
 
       _ ->
-        Thread.new(system_prompt: config[:system_prompt])
+        AIContext.new(system_prompt: config[:system_prompt])
     end
   end
 
   defp snapshot_thread(state, config) do
     case Map.get(state, :run_thread) do
-      %Thread{} = thread -> thread
+      %AIContext{} = thread -> thread
       _ -> strategy_thread(state, config)
     end
   end
@@ -1217,7 +1241,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     thread = Map.get(state, :run_thread) || Map.get(state, :thread)
 
     case thread do
-      %Thread{} = thread ->
+      %AIContext{} = thread ->
         assistant_tool_calls = if turn_type == :tool_calls, do: tool_calls, else: nil
 
         thinking_opts =
@@ -1226,7 +1250,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             _ -> []
           end
 
-        Map.put(state, :run_thread, Thread.append_assistant(thread, text, assistant_tool_calls, thinking_opts))
+        Map.put(state, :run_thread, AIContext.append_assistant(thread, text, assistant_tool_calls, thinking_opts))
 
       _ ->
         state
@@ -1237,9 +1261,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     thread = Map.get(state, :run_thread) || Map.get(state, :thread)
 
     case thread do
-      %Thread{} = thread when is_binary(tool_call_id) and is_binary(tool_name) ->
+      %AIContext{} = thread when is_binary(tool_call_id) and is_binary(tool_name) ->
         content = Turn.format_tool_result_content(tool_result)
-        Map.put(state, :run_thread, Thread.append_tool_result(thread, tool_call_id, tool_name, content))
+        Map.put(state, :run_thread, AIContext.append_tool_result(thread, tool_call_id, tool_name, content))
 
       _ ->
         state
@@ -1248,7 +1272,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp commit_run_thread(state) do
     case Map.get(state, :run_thread) do
-      %Thread{} = thread -> state |> Map.put(:thread, thread) |> Map.put(:run_thread, nil)
+      %AIContext{} = thread -> state |> Map.put(:thread, thread) |> Map.put(:run_thread, nil)
       _ -> state
     end
   end

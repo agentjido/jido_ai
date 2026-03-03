@@ -4,7 +4,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   """
 
   alias Jido.AI.Reasoning.ReAct.PendingToolCall
-  alias Jido.AI.Thread
+  alias Jido.AI.Context, as: AIContext
 
   @status_values [:running, :awaiting_tools, :completed, :failed, :cancelled]
 
@@ -51,8 +51,8 @@ defmodule Jido.AI.Reasoning.ReAct.State do
     run_id = Keyword.get(opts, :run_id, "run_#{Jido.Util.generate_id()}")
 
     thread =
-      Thread.new(system_prompt: system_prompt)
-      |> Thread.append_user(query)
+      AIContext.new(system_prompt: system_prompt)
+      |> AIContext.append_user(query)
 
     attrs = %{
       run_id: run_id,
@@ -255,9 +255,12 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   end
 
   defp fetch_thread(map) do
-    case Map.get(map, :thread, Map.get(map, "thread")) do
-      %Thread{} = thread -> {:ok, thread}
-      _ -> {:error, :invalid_thread}
+    map
+    |> Map.get(:thread, Map.get(map, "thread"))
+    |> AIContext.coerce()
+    |> case do
+      {:ok, context} -> {:ok, context}
+      :error -> {:error, :invalid_thread}
     end
   end
 

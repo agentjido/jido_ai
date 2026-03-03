@@ -89,7 +89,7 @@ signal = Jido.Signal.new!(
 {:ok, _agent} = Jido.AI.set_system_prompt(pid, "You are a concise support specialist.")
 ```
 
-## Optional: Restore A Conversation Thread
+## Optional: Restore Conversation Context
 
 If you persist the conversation history (e.g. from `snapshot.details.conversation`),
 you can restore it on restart so the agent resumes where it left off.
@@ -98,7 +98,7 @@ you can restore it on restart so the agent resumes where it left off.
 saved_messages = snapshot.details.conversation
 
 # Split out one leading system message (if present) so it does not become
-# a duplicate thread entry.
+# a duplicate context entry.
 {saved_system_prompt, conversation_messages} =
   case saved_messages do
     [%{role: role, content: content} | rest]
@@ -109,29 +109,29 @@ saved_messages = snapshot.details.conversation
       {nil, saved_messages}
   end
 
-# At start time — pass the saved thread via initial_state:
-thread =
-  Jido.AI.Thread.new(system_prompt: saved_system_prompt)
-  |> Jido.AI.Thread.append_messages(conversation_messages)
+# At start time — pass the saved context via initial_state:
+context =
+  Jido.AI.Context.new(system_prompt: saved_system_prompt)
+  |> Jido.AI.Context.append_messages(conversation_messages)
 
-Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{thread: thread})
+Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
 
 # Or at runtime on an already-running agent:
-{:ok, _agent} = Jido.AI.set_thread(pid, thread)
+{:ok, _agent} = Jido.AI.set_context(pid, context)
 ```
 
-If `set_thread` is called while a request is active, replacement is deferred
+If `set_context` is called while a request is active, replacement is deferred
 and applied after that request reaches a terminal state.
 
-If the thread carries a non-nil `system_prompt`, the agent's config prompt is
-synchronized automatically. If `thread.system_prompt` is `nil`, the `nil` is
+If the context carries a non-nil `system_prompt`, the agent's config prompt is
+synchronized automatically. If `context.system_prompt` is `nil`, the `nil` is
 preserved and config prompt stays unchanged.
 
-Init-time note: when restoring with `initial_state: %{thread: thread}`, a nil
-`thread.system_prompt` is backfilled from the agent's configured prompt.
+Init-time note: when restoring with `initial_state: %{context: context}`, a nil
+`context.system_prompt` is backfilled from the agent's configured prompt.
 
-Runtime note: when restoring with `Jido.AI.set_thread/3`, a nil
-`thread.system_prompt` stays nil.
+Runtime note: when restoring with `Jido.AI.set_context/3`, a nil
+`context.system_prompt` stays nil.
 
 ## Note: Retrieval And ReAct
 

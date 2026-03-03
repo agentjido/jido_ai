@@ -167,7 +167,7 @@ Strategy guides:
 Integration and runtime guides:
 - [LLM Facade Quickstart](guides/user/llm_facade_quickstart.md)
 - [Tool Calling With Actions](guides/user/tool_calling_with_actions.md)
-- [Thread Context And Message Projection](guides/user/thread_context_and_message_projection.md)
+- [Context And Message Projection](guides/user/thread_context_and_message_projection.md)
 - [Turn And Tool Results](guides/user/turn_and_tool_results.md)
 - [Request Lifecycle And Concurrency](guides/user/request_lifecycle_and_concurrency.md)
 - [Retrieval And Quota](guides/user/retrieval_and_quota.md)

@@ -67,7 +67,10 @@ defmodule Jido.AI do
 
   """
 
+  require Logger
+
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Context, as: AIContext
   alias Jido.AI.ModelAliases
   alias Jido.AI.Turn
   alias ReqLLM.Context
@@ -329,27 +332,32 @@ defmodule Jido.AI do
   end
 
   @doc """
-  Replaces the base conversation thread for a running agent.
+  Replaces the base conversation context for a running agent.
 
-  Use this to restore a previously saved conversation thread, enabling
+  Use this to restore a previously saved conversation context, enabling
   multi-turn session resumption after an agent restart.
 
   If called while a request is active, replacement is deferred and applied
   after the request reaches a terminal state.
 
-  If the thread carries a non-nil system_prompt, the agent's config
-  system_prompt is synchronized. If the thread system_prompt is nil,
+  If the context carries a non-nil system_prompt, the agent's config
+  system_prompt is synchronized. If the context system_prompt is nil,
   nil is preserved and config system_prompt remains unchanged.
 
-  A thread can also be provided at agent start time via:
+  A context can also be provided at agent start time via:
 
-      Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{thread: thread})
+      Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
+
+  Legacy compatibility:
+
+    * `initial_state: %{thread: ...}` is still accepted.
+    * `set_thread/3` remains as a deprecated alias for `set_context/3`.
 
   Semantics note:
 
-    * Init-time restore (`initial_state`) backfills nil thread system prompts from
+    * Init-time restore (`initial_state`) backfills nil context system prompts from
       agent config during strategy init.
-    * Runtime restore (`set_thread/3`) preserves nil thread system prompts.
+    * Runtime restore (`set_context/3`) preserves nil context system prompts.
     * If called multiple times during one active run, latest deferred
       replacement wins.
 
@@ -358,16 +366,34 @@ defmodule Jido.AI do
     * `:timeout` - Call timeout in milliseconds (default: 5000)
 
   """
-  @spec set_thread(GenServer.server(), Jido.AI.Thread.t(), keyword()) ::
+  @spec set_context(GenServer.server(), AIContext.t() | Jido.AI.Thread.t(), keyword()) ::
           {:ok, Jido.Agent.t()} | {:error, term()}
-  def set_thread(agent_server, %Jido.AI.Thread{} = thread, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, 5000)
-    signal = Jido.Signal.new!("ai.react.set_thread", %{thread: thread}, source: "/jido/ai")
+  def set_context(agent_server, context, opts \\ []) do
+    with {:ok, %AIContext{} = context} <- AIContext.coerce(context) do
+      timeout = Keyword.get(opts, :timeout, 5000)
+      signal = Jido.Signal.new!("ai.react.set_context", %{context: context}, source: "/jido/ai")
 
-    case Jido.AgentServer.call(agent_server, signal, timeout) do
-      {:ok, agent} -> {:ok, agent}
-      {:error, _} = error -> error
+      case Jido.AgentServer.call(agent_server, signal, timeout) do
+        {:ok, agent} -> {:ok, agent}
+        {:error, _} = error -> error
+      end
+    else
+      _ -> {:error, :invalid_context}
     end
+  end
+
+  @doc """
+  Legacy alias for `set_context/3`.
+
+  `set_thread/3` is deprecated and will be removed in a future major release.
+  """
+  @deprecated "Use set_context/3"
+  @spec set_thread(GenServer.server(), AIContext.t() | Jido.AI.Thread.t(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def set_thread(agent_server, context, opts \\ []) do
+    Logger.warning("DEPRECATION: Jido.AI.set_thread/3 is deprecated; use Jido.AI.set_context/3.")
+
+    set_context(agent_server, context, opts)
   end
 
   @doc """
