@@ -346,10 +346,6 @@ defmodule Jido.AI do
 
       Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
 
-  Legacy compatibility:
-
-    * `initial_state: %{thread: ...}` is still accepted.
-
   Semantics note:
 
     * Init-time restore (`initial_state`) backfills nil context system prompts from
@@ -363,7 +359,7 @@ defmodule Jido.AI do
     * `:timeout` - Call timeout in milliseconds (default: 5000)
 
   """
-  @spec set_context(GenServer.server(), AIContext.t() | Jido.AI.Thread.t(), keyword()) ::
+  @spec set_context(GenServer.server(), AIContext.t(), keyword()) ::
           {:ok, Jido.Agent.t()} | {:error, term()}
   def set_context(agent_server, context, opts \\ []) do
     with {:ok, %AIContext{} = context} <- AIContext.coerce(context) do

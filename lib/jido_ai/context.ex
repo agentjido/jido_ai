@@ -31,11 +31,7 @@ defmodule Jido.AI.Context do
   conversations where the LLM has access to prior context.
   """
 
-  require Logger
-
   alias __MODULE__.Entry
-
-  @thread_warning "DEPRECATION: Jido.AI.Thread is deprecated; use Jido.AI.Context"
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -281,18 +277,24 @@ defmodule Jido.AI.Context do
   @spec coerce(term()) :: {:ok, t()} | :error
   def coerce(%__MODULE__{} = context), do: {:ok, context}
 
-  def coerce(%{__struct__: module, id: id, entries: entries} = value)
-      when is_binary(id) and is_list(entries) do
-    if module == Jido.AI.Thread do
-      Logger.warning("#{@thread_warning}. Pass Jido.AI.Context to runtime APIs.")
-    end
+  def coerce(value) when is_map(value) do
+    if Map.has_key?(value, :__struct__) do
+      :error
+    else
+      id = get_field(value, :id)
+      entries = get_field(value, :entries)
 
-    {:ok,
-     %__MODULE__{
-       id: id,
-       entries: Enum.map(entries, &coerce_entry/1),
-       system_prompt: get_field(value, :system_prompt)
-     }}
+      if is_binary(id) and is_list(entries) do
+        {:ok,
+         %__MODULE__{
+           id: id,
+           entries: Enum.map(entries, &coerce_entry/1),
+           system_prompt: get_field(value, :system_prompt)
+         }}
+      else
+        :error
+      end
+    end
   rescue
     _ -> :error
   end

@@ -896,25 +896,29 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
              ]
     end
 
-    test "init accepts legacy :thread key for compatibility" do
+    test "init rejects legacy :thread context payloads" do
       legacy_context =
         Jido.AI.Context.new(system_prompt: "Legacy key")
         |> Jido.AI.Context.append_messages([%{role: :user, content: "legacy"}])
 
-      agent =
-        %Jido.Agent{
-          id: "test-agent",
-          name: "test",
-          state: %{thread: legacy_context}
-        }
-        |> then(fn agent ->
-          ctx = %{strategy_opts: [tools: [TestCalculator]]}
-          {agent, []} = ReAct.init(agent, ctx)
-          agent
-        end)
+      agent = %Jido.Agent{id: "test-agent", name: "test", state: %{thread: legacy_context}}
+      ctx = %{strategy_opts: [tools: [TestCalculator]]}
 
+      assert_raise ArgumentError,
+                   ~r/initial_state\[:thread\] is no longer supported for AI context/,
+                   fn ->
+                     ReAct.init(agent, ctx)
+                   end
+    end
+
+    test "init ignores non-context :thread state from core thread plugins" do
+      agent = %Jido.Agent{id: "test-agent", name: "test", state: %{thread: %{id: "thread_1", rev: 2}}}
+
+      {agent, []} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
       state = StratState.get(agent, %{})
-      assert state.thread == legacy_context
+
+      assert %Jido.AI.Context{} = state.thread
+      assert state.thread.id != "thread_1"
     end
 
     test "runtime_adapter flag remains true even when opt-out is requested" do

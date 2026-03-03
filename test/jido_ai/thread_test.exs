@@ -641,6 +641,26 @@ defmodule Jido.AI.ContextTest do
     end
   end
 
+  describe "coerce/1" do
+    test "accepts raw context maps without struct metadata" do
+      context = AIContext.new(system_prompt: "hello") |> AIContext.append_user("q")
+
+      raw = %{
+        id: context.id,
+        entries: context.entries,
+        system_prompt: context.system_prompt
+      }
+
+      assert {:ok, %AIContext{} = coerced} = AIContext.coerce(raw)
+      assert AIContext.to_messages(coerced) == AIContext.to_messages(context)
+    end
+
+    test "rejects Jido.Thread structs" do
+      core_thread = Jido.Thread.new()
+      assert :error == AIContext.coerce(core_thread)
+    end
+  end
+
   describe "debug_view/2" do
     test "returns truncated content and formatted tool call names" do
       thread =

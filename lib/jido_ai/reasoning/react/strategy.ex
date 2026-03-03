@@ -686,19 +686,42 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp initial_context(%Agent{} = agent, config) do
-    source_context = Map.get(agent.state, :context) || Map.get(agent.state, :thread)
+    state = agent.state || %{}
 
-    case AIContext.coerce(source_context) do
-      {:ok, %AIContext{system_prompt: nil} = context} ->
-        %{context | system_prompt: config[:system_prompt]}
+    case Map.fetch(state, :context) do
+      {:ok, nil} ->
+        AIContext.new(system_prompt: config[:system_prompt])
 
-      {:ok, %AIContext{} = context} ->
-        context
+      {:ok, source_context} ->
+        case AIContext.coerce(source_context) do
+          {:ok, %AIContext{system_prompt: nil} = context} ->
+            %{context | system_prompt: config[:system_prompt]}
+
+          {:ok, %AIContext{} = context} ->
+            context
+
+          :error ->
+            raise ArgumentError,
+                  "invalid initial_state[:context]; expected Jido.AI.Context"
+        end
 
       :error ->
-        AIContext.new(system_prompt: config[:system_prompt])
+        if legacy_thread_context?(Map.get(state, :thread)) do
+          raise ArgumentError,
+                "initial_state[:thread] is no longer supported for AI context; use initial_state[:context] with Jido.AI.Context"
+        else
+          AIContext.new(system_prompt: config[:system_prompt])
+        end
     end
   end
+
+  defp legacy_thread_context?(%{} = value) do
+    has_entries_key? = Map.has_key?(value, :entries) or Map.has_key?(value, "entries")
+    has_system_prompt_key? = Map.has_key?(value, :system_prompt) or Map.has_key?(value, "system_prompt")
+    has_entries_key? and has_system_prompt_key?
+  end
+
+  defp legacy_thread_context?(_), do: false
 
   defp active_run?(state) do
     is_binary(state[:active_request_id]) and state[:status] in [:awaiting_llm, :awaiting_tool]

@@ -87,10 +87,11 @@ Use this when:
 Do not use this when:
 - strategy internals already manage conversation state for your use case
 
-## Legacy Compatibility
+## Breaking Change
 
-`Jido.AI.Thread` remains available as a deprecated shim. It logs
-`Logger.warning` deprecation messages and delegates to `Jido.AI.Context`.
+`Jido.AI.Thread` has been removed. Use `Jido.AI.Context` directly.
+If you previously restored state with `initial_state: %{thread: ...}`,
+switch to `initial_state: %{context: ...}`.
 
 ## Next
 
