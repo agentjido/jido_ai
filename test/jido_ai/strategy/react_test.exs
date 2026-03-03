@@ -620,6 +620,136 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.config.system_prompt == "Updated prompt"
     end
 
+    test "set_thread replaces base conversation thread" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      thread =
+        Jido.AI.Thread.new(system_prompt: "Restored prompt")
+        |> Jido.AI.Thread.append_messages([
+          %{role: :user, content: "Hello"},
+          %{role: :assistant, content: "Hi there"}
+        ])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.set_thread_action(), %{thread: thread})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.thread == thread
+      assert state.config.system_prompt == "Restored prompt"
+
+      messages = Jido.AI.Thread.to_messages(state.thread)
+      non_system = Enum.reject(messages, &(&1.role == :system))
+
+      assert non_system == [
+               %{role: :user, content: "Hello"},
+               %{role: :assistant, content: "Hi there"}
+             ]
+    end
+
+    test "set_thread with nil system_prompt preserves existing config prompt" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Keep me")
+
+      thread =
+        Jido.AI.Thread.new()
+        |> Jido.AI.Thread.append_messages([%{role: :user, content: "test"}])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.set_thread_action(), %{thread: thread})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.thread == thread
+      assert state.config.system_prompt == "Keep me"
+    end
+
+    test "set_thread with invalid params is a no-op" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original")
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.set_thread_action(), %{thread: "not a thread"})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.config.system_prompt == "Original"
+      assert %Jido.AI.Thread{} = state.thread
+    end
+
+    test "init with initial thread from agent.state" do
+      initial_thread =
+        Jido.AI.Thread.new(system_prompt: "Restored")
+        |> Jido.AI.Thread.append_messages([
+          %{role: :user, content: "Previous question"},
+          %{role: :assistant, content: "Previous answer"}
+        ])
+
+      agent =
+        %Jido.Agent{
+          id: "test-agent",
+          name: "test",
+          state: %{thread: initial_thread}
+        }
+        |> then(fn agent ->
+          ctx = %{strategy_opts: [tools: [TestCalculator]]}
+          {agent, []} = ReAct.init(agent, ctx)
+          agent
+        end)
+
+      state = StratState.get(agent, %{})
+      assert state.thread == initial_thread
+
+      messages = Jido.AI.Thread.to_messages(state.thread)
+      non_system = Enum.reject(messages, &(&1.role == :system))
+
+      assert non_system == [
+               %{role: :user, content: "Previous question"},
+               %{role: :assistant, content: "Previous answer"}
+             ]
+    end
+
+    test "init with initial thread without system_prompt gets config prompt" do
+      initial_thread =
+        Jido.AI.Thread.new()
+        |> Jido.AI.Thread.append_messages([
+          %{role: :user, content: "Previous question"},
+          %{role: :assistant, content: "Previous answer"}
+        ])
+
+      assert initial_thread.system_prompt == nil
+
+      agent =
+        %Jido.Agent{
+          id: "test-agent",
+          name: "test",
+          state: %{thread: initial_thread}
+        }
+        |> then(fn agent ->
+          ctx = %{strategy_opts: [tools: [TestCalculator], system_prompt: "Config prompt"]}
+          {agent, []} = ReAct.init(agent, ctx)
+          agent
+        end)
+
+      state = StratState.get(agent, %{})
+      assert state.thread.system_prompt == "Config prompt"
+
+      messages = Jido.AI.Thread.to_messages(state.thread)
+      non_system = Enum.reject(messages, &(&1.role == :system))
+
+      assert non_system == [
+               %{role: :user, content: "Previous question"},
+               %{role: :assistant, content: "Previous answer"}
+             ]
+    end
+
     test "runtime_adapter flag remains true even when opt-out is requested" do
       agent = create_agent(tools: [TestCalculator], runtime_adapter: false)
       state = StratState.get(agent, %{})

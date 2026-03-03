@@ -89,6 +89,26 @@ signal = Jido.Signal.new!(
 {:ok, _agent} = Jido.AI.set_system_prompt(pid, "You are a concise support specialist.")
 ```
 
+## Optional: Restore A Conversation Thread
+
+If you persist the conversation history (e.g. from `snapshot.details.conversation`),
+you can restore it on restart so the agent resumes where it left off.
+
+```elixir
+# At start time — pass the saved thread via initial_state:
+thread =
+  Jido.AI.Thread.new(system_prompt: "You are a helpful assistant.")
+  |> Jido.AI.Thread.append_messages(saved_messages)
+
+Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{thread: thread})
+
+# Or at runtime on an already-running agent:
+{:ok, _agent} = Jido.AI.set_thread(pid, thread)
+```
+
+The new thread takes effect on the next query. If the thread carries a
+non-nil `system_prompt`, the agent's config prompt is synchronized automatically.
+
 ## Note: Retrieval And ReAct
 
 If you enable the retrieval plugin, auto-enrichment does **not** run on `ai.react.query` signals.

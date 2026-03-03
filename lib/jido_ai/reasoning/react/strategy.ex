@@ -96,6 +96,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @unregister_tool :ai_react_unregister_tool
   @set_tool_context :ai_react_set_tool_context
   @set_system_prompt :ai_react_set_system_prompt
+  @set_thread :ai_react_set_thread
   @runtime_event :ai_react_runtime_event
   @worker_event :ai_react_worker_event
   @worker_child_started :ai_react_worker_child_started
@@ -140,6 +141,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   @doc "Returns the action atom for updating the base system prompt."
   @spec set_system_prompt_action() :: :ai_react_set_system_prompt
   def set_system_prompt_action, do: @set_system_prompt
+
+  @doc "Returns the action atom for replacing the conversation thread."
+  @spec set_thread_action() :: :ai_react_set_thread
+  def set_thread_action, do: @set_thread
 
   @doc "Returns the legacy action atom for direct runtime stream events (no-op in delegated mode)."
   @spec runtime_event_action() :: :ai_react_runtime_event
@@ -196,6 +201,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       schema: Zoi.object(%{system_prompt: Zoi.string()}),
       doc: "Update the persistent base system prompt",
       name: "ai.react.set_system_prompt"
+    },
+    @set_thread => %{
+      schema: Zoi.object(%{thread: Zoi.any()}),
+      doc: "Replace the base conversation thread",
+      name: "ai.react.set_thread"
     },
     @worker_event => %{
       schema: Zoi.object(%{request_id: Zoi.string(), event: Zoi.map()}),
@@ -266,6 +276,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       {"ai.react.unregister_tool", {:strategy_cmd, @unregister_tool}},
       {"ai.react.set_tool_context", {:strategy_cmd, @set_tool_context}},
       {"ai.react.set_system_prompt", {:strategy_cmd, @set_system_prompt}},
+      {"ai.react.set_thread", {:strategy_cmd, @set_thread}},
       {"ai.react.worker.event", {:strategy_cmd, @worker_event}},
       {"jido.agent.child.started", {:strategy_cmd, @worker_child_started}},
       {"jido.agent.child.exit", {:strategy_cmd, @worker_child_exit}},
@@ -366,7 +377,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       %{
         status: :idle,
         iteration: 0,
-        thread: Thread.new(system_prompt: config[:system_prompt]),
+        thread: initial_thread(agent, config),
         run_thread: nil,
         pending_tool_calls: [],
         final_answer: nil,
@@ -445,6 +456,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       @set_system_prompt ->
         process_set_system_prompt(agent, params)
+
+      @set_thread ->
+        process_set_thread(agent, params)
 
       @worker_event ->
         process_worker_event(agent, params)
@@ -651,6 +665,39 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp process_set_system_prompt(agent, _params), do: {agent, []}
+
+  defp process_set_thread(agent, %{thread: %Thread{} = thread}) do
+    state = StratState.get(agent, %{})
+
+    new_state =
+      case thread.system_prompt do
+        prompt when is_binary(prompt) ->
+          Helpers.apply_to_state(state, [
+            Helpers.set_config_field(:system_prompt, prompt)
+          ])
+
+        _ ->
+          state
+      end
+      |> Map.put(:thread, thread)
+
+    {put_strategy_state(agent, new_state), []}
+  end
+
+  defp process_set_thread(agent, _params), do: {agent, []}
+
+  defp initial_thread(%Agent{} = agent, config) do
+    case Map.get(agent.state, :thread) do
+      %Thread{system_prompt: nil} = thread ->
+        %{thread | system_prompt: config[:system_prompt]}
+
+      %Thread{} = thread ->
+        thread
+
+      _ ->
+        Thread.new(system_prompt: config[:system_prompt])
+    end
+  end
 
   defp process_worker_child_started(agent, %{tag: tag, pid: pid}) when is_pid(pid) do
     state = StratState.get(agent, %{})

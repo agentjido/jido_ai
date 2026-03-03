@@ -178,6 +178,20 @@ defmodule Jido.AI.CoreTest do
       assert {:ok, :prompt_set} = AI.set_system_prompt(self(), "Be concise")
     end
 
+    test "set_thread wraps signal and delegates call" do
+      thread = Jido.AI.Thread.new(system_prompt: "Restored")
+
+      Mimic.stub(Jido.AgentServer, :call, fn _server, signal, timeout ->
+        assert signal.type == "ai.react.set_thread"
+        assert %Jido.AI.Thread{} = signal.data.thread
+        assert signal.data.thread.system_prompt == "Restored"
+        assert timeout == 5_000
+        {:ok, :thread_set}
+      end)
+
+      assert {:ok, :thread_set} = AI.set_thread(self(), thread)
+    end
+
     test "list_tools and has_tool work for agent struct and server wrappers" do
       agent = %Jido.Agent{state: %{StratState.key() => %{config: %{tools: [ValidTool]}}}}
 

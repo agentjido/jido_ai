@@ -329,6 +329,36 @@ defmodule Jido.AI do
   end
 
   @doc """
+  Replaces the base conversation thread for a running agent.
+
+  Use this to restore a previously saved conversation thread, enabling
+  multi-turn session resumption after an agent restart.
+
+  The thread takes effect on the next query. If the thread carries a
+  non-nil system_prompt, the agent's config system_prompt is synchronized.
+
+  A thread can also be provided at agent start time via:
+
+      Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{thread: thread})
+
+  ## Options
+
+    * `:timeout` - Call timeout in milliseconds (default: 5000)
+
+  """
+  @spec set_thread(GenServer.server(), Jido.AI.Thread.t(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def set_thread(agent_server, %Jido.AI.Thread{} = thread, opts \\ []) do
+    timeout = Keyword.get(opts, :timeout, 5000)
+    signal = Jido.Signal.new!("ai.react.set_thread", %{thread: thread}, source: "/jido/ai")
+
+    case Jido.AgentServer.call(agent_server, signal, timeout) do
+      {:ok, agent} -> {:ok, agent}
+      {:error, _} = error -> error
+    end
+  end
+
+  @doc """
   Lists all currently registered tools for an agent.
 
   Can be called with either an agent struct or an agent server (PID/name).
