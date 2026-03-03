@@ -115,23 +115,10 @@ context =
   |> Jido.AI.Context.append_messages(conversation_messages)
 
 Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
-
-# Or at runtime on an already-running agent:
-{:ok, _agent} = Jido.AI.set_context(pid, context)
 ```
 
-If `set_context` is called while a request is active, replacement is deferred
-and applied after that request reaches a terminal state.
-
-If the context carries a non-nil `system_prompt`, the agent's config prompt is
-synchronized automatically. If `context.system_prompt` is `nil`, the `nil` is
-preserved and config prompt stays unchanged.
-
-Init-time note: when restoring with `initial_state: %{context: context}`, a nil
+When restoring with `initial_state: %{context: context}`, a nil
 `context.system_prompt` is backfilled from the agent's configured prompt.
-
-Runtime note: when restoring with `Jido.AI.set_context/3`, a nil
-`context.system_prompt` stays nil.
 
 ## Note: Retrieval And ReAct
 

@@ -68,7 +68,6 @@ defmodule Jido.AI do
   """
 
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Context, as: AIContext
   alias Jido.AI.ModelAliases
   alias Jido.AI.Turn
   alias ReqLLM.Context
@@ -326,52 +325,6 @@ defmodule Jido.AI do
     case Jido.AgentServer.call(agent_server, signal, timeout) do
       {:ok, agent} -> {:ok, agent}
       {:error, _} = error -> error
-    end
-  end
-
-  @doc """
-  Replaces the base conversation context for a running agent.
-
-  Use this to restore a previously saved conversation context, enabling
-  multi-turn session resumption after an agent restart.
-
-  If called while a request is active, replacement is deferred and applied
-  after the request reaches a terminal state.
-
-  If the context carries a non-nil system_prompt, the agent's config
-  system_prompt is synchronized. If the context system_prompt is nil,
-  nil is preserved and config system_prompt remains unchanged.
-
-  A context can also be provided at agent start time via:
-
-      Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
-
-  Semantics note:
-
-    * Init-time restore (`initial_state`) backfills nil context system prompts from
-      agent config during strategy init.
-    * Runtime restore (`set_context/3`) preserves nil context system prompts.
-    * If called multiple times during one active run, latest deferred
-      replacement wins.
-
-  ## Options
-
-    * `:timeout` - Call timeout in milliseconds (default: 5000)
-
-  """
-  @spec set_context(GenServer.server(), AIContext.t(), keyword()) ::
-          {:ok, Jido.Agent.t()} | {:error, term()}
-  def set_context(agent_server, context, opts \\ []) do
-    with {:ok, %AIContext{} = context} <- AIContext.coerce(context) do
-      timeout = Keyword.get(opts, :timeout, 5000)
-      signal = Jido.Signal.new!("ai.react.set_context", %{context: context}, source: "/jido/ai")
-
-      case Jido.AgentServer.call(agent_server, signal, timeout) do
-        {:ok, agent} -> {:ok, agent}
-        {:error, _} = error -> error
-      end
-    else
-      _ -> {:error, :invalid_context}
     end
   end
 
