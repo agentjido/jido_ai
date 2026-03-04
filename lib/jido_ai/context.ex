@@ -1,31 +1,33 @@
-defmodule Jido.AI.Thread do
+defmodule Jido.AI.Context do
   @moduledoc """
-  Simple conversation thread that accumulates messages for LLM context projection.
+  Conversation context that accumulates messages for LLM projection.
 
-  A minimal thread implementation that stores conversation history and projects it
+  A minimal context implementation that stores conversation history and projects it
   directly to ReqLLM message format. No policies, no windowing, no snapshots - just
   append and project.
 
   ## Design Principle
 
-  **Thread = List of Messages. Projection = Thread + System Prompt.**
+  **Context = List of Messages. Projection = Context + System Prompt.**
 
   ## Usage
 
-      # Create a new thread
-      thread = Thread.new(system_prompt: "You are helpful.")
+      alias Jido.AI.Context
+
+      # Create a new context
+      context = Context.new(system_prompt: "You are helpful.")
 
       # Accumulate messages
-      thread = thread
-        |> Thread.append_user("Hello!")
-        |> Thread.append_assistant("Hi there!")
+      context = context
+        |> Context.append_user("Hello!")
+        |> Context.append_assistant("Hi there!")
 
       # Project to ReqLLM format
-      messages = Thread.to_messages(thread)
+      messages = Context.to_messages(context)
 
   ## Multi-turn Conversations
 
-  The thread accumulates the full conversation history, enabling multi-turn
+  The context accumulates the full conversation history, enabling multi-turn
   conversations where the LLM has access to prior context.
   """
 
@@ -271,6 +273,34 @@ defmodule Jido.AI.Thread do
     :ok
   end
 
+  @doc false
+  @spec coerce(term()) :: {:ok, t()} | :error
+  def coerce(%__MODULE__{} = context), do: {:ok, context}
+
+  def coerce(value) when is_map(value) do
+    if Map.has_key?(value, :__struct__) do
+      :error
+    else
+      id = get_field(value, :id)
+      entries = get_field(value, :entries)
+
+      if is_binary(id) and is_list(entries) do
+        {:ok,
+         %__MODULE__{
+           id: id,
+           entries: Enum.map(entries, &coerce_entry/1),
+           system_prompt: get_field(value, :system_prompt)
+         }}
+      else
+        :error
+      end
+    end
+  rescue
+    _ -> :error
+  end
+
+  def coerce(_), do: :error
+
   defp entry_to_debug_map(entry, truncate) do
     base = %{role: entry.role}
 
@@ -423,6 +453,10 @@ defmodule Jido.AI.Thread do
   defp extract_entry_thinking(content), do: {content, nil}
 
   # Helper to get a field from either atom or string key
+  defp get_field(map, key) do
+    Map.get(map, key, Map.get(map, Atom.to_string(key)))
+  end
+
   defp get_field(map, atom_key, string_key) do
     Map.get(map, atom_key) || Map.get(map, string_key)
   end
@@ -444,25 +478,39 @@ defmodule Jido.AI.Thread do
   # Pass through unknown roles as-is (atoms stay atoms, strings stay strings)
   defp normalize_role(role), do: role
 
+  defp coerce_entry(%Entry{} = entry), do: entry
+
+  defp coerce_entry(%{} = entry) do
+    %Entry{
+      role: get_field(entry, :role),
+      content: get_field(entry, :content),
+      thinking: get_field(entry, :thinking),
+      tool_calls: get_field(entry, :tool_calls),
+      tool_call_id: get_field(entry, :tool_call_id),
+      name: get_field(entry, :name),
+      timestamp: get_field(entry, :timestamp)
+    }
+  end
+
   defp generate_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
   end
 end
 
-defimpl Inspect, for: Jido.AI.Thread do
+defimpl Inspect, for: Jido.AI.Context do
   def inspect(thread, _opts) do
     case thread.entries do
       entries when is_list(entries) ->
         len = Kernel.length(entries)
         last_roles = entries |> Enum.reverse() |> Enum.take(-2) |> Enum.map(&entry_role/1)
         suffix = if len > 0, do: ", last: #{Kernel.inspect(last_roles)}", else: ""
-        "#Thread<#{len} entries#{suffix}>"
+        "#Context<#{len} entries#{suffix}>"
 
       %{type: :list, size: size} when is_integer(size) and size >= 0 ->
-        "#Thread<#{size} entries, truncated>"
+        "#Context<#{size} entries, truncated>"
 
       _ ->
-        "#Thread<unknown entries>"
+        "#Context<unknown entries>"
     end
   end
 

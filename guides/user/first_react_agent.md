@@ -89,6 +89,37 @@ signal = Jido.Signal.new!(
 {:ok, _agent} = Jido.AI.set_system_prompt(pid, "You are a concise support specialist.")
 ```
 
+## Optional: Restore Conversation Context
+
+If you persist the conversation history (e.g. from `snapshot.details.conversation`),
+you can restore it on restart so the agent resumes where it left off.
+
+```elixir
+saved_messages = snapshot.details.conversation
+
+# Split out one leading system message (if present) so it does not become
+# a duplicate context entry.
+{saved_system_prompt, conversation_messages} =
+  case saved_messages do
+    [%{role: role, content: content} | rest]
+    when role in [:system, "system"] and is_binary(content) ->
+      {content, rest}
+
+    _ ->
+      {nil, saved_messages}
+  end
+
+# At start time — pass the saved context via initial_state:
+context =
+  Jido.AI.Context.new(system_prompt: saved_system_prompt)
+  |> Jido.AI.Context.append_messages(conversation_messages)
+
+Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
+```
+
+When restoring with `initial_state: %{context: context}`, a nil
+`context.system_prompt` is backfilled from the agent's configured prompt.
+
 ## Note: Retrieval And ReAct
 
 If you enable the retrieval plugin, auto-enrichment does **not** run on `ai.react.query` signals.

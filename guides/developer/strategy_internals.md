@@ -116,6 +116,34 @@ Current behavior by strategy:
 
 This key is runtime-managed and overrides same-named entries from user `tool_context`.
 
+## ReAct Context Projection Internals
+
+ReAct now uses explicit separation between core event log and LLM projection:
+
+- Core append-only log: `agent.state[:__thread__]` (`Jido.Thread`)
+- ReAct materialized view: `agent.state[:__strategy__].context` (`Jido.AI.Context`)
+
+Canonical ReAct control surface:
+
+- `ai.react.context.modify`
+
+Core thread entries emitted by ReAct:
+
+- `:ai_message` for user/assistant/tool message lifecycle
+- `:ai_context_operation` for context operations (`replace`, `switch`)
+
+Deferred semantics:
+
+- If a run is active, context operations are stored as `pending_context_op`
+- Deferred op is applied after terminal event (`completed`, `failed`, `cancelled`, worker-exit failure)
+
+Projection semantics:
+
+- ReAct projects lane-specific context using `context_ref`
+- Projection starts from latest `replace` anchor and folds subsequent `ai_message` entries
+
+See full model: [Thread-Context Projection Model](thread_context_projection_model.md)
+
 ## When To Use / Not Use
 
 Use this when:

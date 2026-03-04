@@ -1,28 +1,38 @@
-# Thread Context And Message Projection
+# Context And Message Projection
 
 You need deterministic conversation state and explicit message projection to LLM input format.
 
-After this guide, you can build and inspect thread history using `Jido.AI.Thread`.
+After this guide, you can build and inspect history using `Jido.AI.Context`.
 
-## Build A Thread
+## Core Thread vs ReAct Context
+
+Two different data structures now coexist by design:
+
+- `agent.state[:__thread__]` (`Jido.Thread`): append-only, canonical event log.
+- `agent.state[:__strategy__].context` (`Jido.AI.Context`): materialized LLM projection view.
+
+In ReAct, message and context lifecycle changes are represented as thread events,
+and the strategy context is projected from those events.
+
+## Build Context
 
 ```elixir
-alias Jido.AI.Thread
+alias Jido.AI.Context
 
-thread =
-  Thread.new(system_prompt: "You are concise.")
-  |> Thread.append_user("Hello")
-  |> Thread.append_assistant("Hi")
-  |> Thread.append_user("Summarize this chat")
+context =
+  Context.new(system_prompt: "You are concise.")
+  |> Context.append_user("Hello")
+  |> Context.append_assistant("Hi")
+  |> Context.append_user("Summarize this chat")
 ```
 
 ## Project To Messages
 
 ```elixir
-messages = Thread.to_messages(thread)
+messages = Context.to_messages(context)
 # [%{role: :system, ...}, %{role: :user, ...}, ...]
 
-recent_messages = Thread.to_messages(thread, limit: 2)
+recent_messages = Context.to_messages(context, limit: 2)
 ```
 
 ## Import Existing Messages
@@ -33,10 +43,62 @@ raw = [
   %{role: "assistant", content: "Answer"}
 ]
 
-thread = Thread.new() |> Thread.append_messages(raw)
+context = Context.new() |> Context.append_messages(raw)
 ```
 
 Use `Jido.AI.Turn.extract_text/1` when normalizing diverse provider response shapes.
+
+## Restore Snapshot Conversation Safely
+
+When restoring from `snapshot.details.conversation`, split out one leading
+system message first. Otherwise, that system message becomes a normal context
+entry and may be duplicated during projection.
+
+```elixir
+saved_messages = snapshot.details.conversation
+
+{system_prompt, conversation_messages} =
+  case saved_messages do
+    [%{role: role, content: content} | rest]
+    when role in [:system, "system"] and is_binary(content) ->
+      {content, rest}
+
+    _ ->
+      {nil, saved_messages}
+  end
+
+context =
+  Context.new(system_prompt: system_prompt)
+  |> Context.append_messages(conversation_messages)
+```
+
+## ReAct Context Operations
+
+Canonical strategy signal for context lifecycle:
+
+- `ai.react.context.modify`
+
+Busy semantics in ReAct:
+
+- if idle, context operation applies immediately
+- if a request is active, operation is deferred and applied after terminal state
+
+## Compaction Is Replace
+
+Compaction is represented as a standard context replace operation with reason metadata:
+
+```elixir
+%{
+  op_id: "op_123",
+  context_ref: "default",
+  operation: %{
+    type: :replace,
+    reason: :compaction,
+    result_context: compacted_context,
+    meta: %{from_seq: 1, to_seq: 100}
+  }
+}
+```
 
 ## Failure Mode: Unexpected Missing Context
 
@@ -46,12 +108,12 @@ Symptom:
 Fix:
 - verify you append both user and assistant/tool entries
 - avoid too-small `limit` values during projection
-- inspect with `Thread.debug_view/2` or `Thread.pp/1`
+- inspect with `Context.debug_view/2` or `Context.pp/1`
 
 ## Defaults You Should Know
 
 - Entries are stored reversed internally for append speed
-- `Thread.to_messages/2` reorders to chronological output
+- `Context.to_messages/2` reorders to chronological output
 - `limit: nil` includes full thread
 
 ## When To Use / Not Use
@@ -62,6 +124,12 @@ Use this when:
 
 Do not use this when:
 - strategy internals already manage conversation state for your use case
+
+## Breaking Change
+
+`Jido.AI.Thread` has been removed. Use `Jido.AI.Context` directly.
+If you previously restored state with `initial_state: %{thread: ...}`,
+switch to `initial_state: %{context: ...}`.
 
 ## Next
 
