@@ -878,9 +878,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       :switch ->
         {:ok, put_in(base, [:operation, :result_context], nil)}
-
-      _ ->
-        :error
     end
   end
 
@@ -1160,10 +1157,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp fetch_map_value(%{} = map, key) when is_atom(key) do
     Map.get(map, key, Map.get(map, Atom.to_string(key)))
-  end
-
-  defp fetch_map_value(%{} = map, key) when is_binary(key) do
-    Map.get(map, key, Map.get(map, maybe_to_existing_atom(key)))
   end
 
   defp fetch_map_value(_map, _key), do: nil
