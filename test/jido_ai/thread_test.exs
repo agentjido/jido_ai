@@ -1,10 +1,10 @@
-defmodule Jido.AI.ThreadTest do
+defmodule Jido.AI.ContextTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureIO
 
-  alias Jido.AI.Thread
-  alias Jido.AI.Thread.Entry
+  alias Jido.AI.Context, as: AIContext
+  alias Jido.AI.Context.Entry
 
   # ============================================================================
   # Thread Creation
@@ -12,19 +12,19 @@ defmodule Jido.AI.ThreadTest do
 
   describe "new/1" do
     test "creates empty thread with generated ID" do
-      thread = Thread.new()
+      thread = AIContext.new()
       assert is_binary(thread.id)
       assert thread.entries == []
       assert thread.system_prompt == nil
     end
 
     test "creates thread with custom ID" do
-      thread = Thread.new(id: "custom-123")
+      thread = AIContext.new(id: "custom-123")
       assert thread.id == "custom-123"
     end
 
     test "creates thread with system prompt" do
-      thread = Thread.new(system_prompt: "You are helpful.")
+      thread = AIContext.new(system_prompt: "You are helpful.")
       assert thread.system_prompt == "You are helpful."
     end
   end
@@ -36,10 +36,10 @@ defmodule Jido.AI.ThreadTest do
   describe "append_user/2" do
     test "appends user message" do
       thread =
-        Thread.new()
-        |> Thread.append_user("Hello!")
+        AIContext.new()
+        |> AIContext.append_user("Hello!")
 
-      assert Thread.length(thread) == 1
+      assert AIContext.length(thread) == 1
       [entry] = thread.entries
       assert entry.role == :user
       assert entry.content == "Hello!"
@@ -48,11 +48,11 @@ defmodule Jido.AI.ThreadTest do
 
     test "appends multiple user messages" do
       thread =
-        Thread.new()
-        |> Thread.append_user("First")
-        |> Thread.append_user("Second")
+        AIContext.new()
+        |> AIContext.append_user("First")
+        |> AIContext.append_user("Second")
 
-      assert Thread.length(thread) == 2
+      assert AIContext.length(thread) == 2
       # Entries are stored in reverse order internally
       [second, first] = thread.entries
       assert first.content == "First"
@@ -63,10 +63,10 @@ defmodule Jido.AI.ThreadTest do
   describe "append_assistant/3" do
     test "appends assistant message without tool calls" do
       thread =
-        Thread.new()
-        |> Thread.append_assistant("Hello, I'm here to help!")
+        AIContext.new()
+        |> AIContext.append_assistant("Hello, I'm here to help!")
 
-      assert Thread.length(thread) == 1
+      assert AIContext.length(thread) == 1
       [entry] = thread.entries
       assert entry.role == :assistant
       assert entry.content == "Hello, I'm here to help!"
@@ -79,10 +79,10 @@ defmodule Jido.AI.ThreadTest do
       ]
 
       thread =
-        Thread.new()
-        |> Thread.append_assistant("", tool_calls)
+        AIContext.new()
+        |> AIContext.append_assistant("", tool_calls)
 
-      assert Thread.length(thread) == 1
+      assert AIContext.length(thread) == 1
       [entry] = thread.entries
       assert entry.role == :assistant
       assert entry.content == ""
@@ -93,8 +93,8 @@ defmodule Jido.AI.ThreadTest do
   describe "append_assistant/4 with thinking" do
     test "appends assistant message with thinking content" do
       thread =
-        Thread.new()
-        |> Thread.append_assistant("The answer is 4.", nil, thinking: "Let me work through this step by step...")
+        AIContext.new()
+        |> AIContext.append_assistant("The answer is 4.", nil, thinking: "Let me work through this step by step...")
 
       [entry] = thread.entries
       assert entry.role == :assistant
@@ -105,8 +105,8 @@ defmodule Jido.AI.ThreadTest do
 
     test "thinking defaults to nil when not provided" do
       thread =
-        Thread.new()
-        |> Thread.append_assistant("Hello!")
+        AIContext.new()
+        |> AIContext.append_assistant("Hello!")
 
       [entry] = thread.entries
       assert entry.thinking == nil
@@ -116,8 +116,8 @@ defmodule Jido.AI.ThreadTest do
       tool_calls = [%{id: "tc_1", name: "calc", arguments: %{x: 1}}]
 
       thread =
-        Thread.new()
-        |> Thread.append_assistant("", tool_calls, thinking: "I need to calculate this")
+        AIContext.new()
+        |> AIContext.append_assistant("", tool_calls, thinking: "I need to calculate this")
 
       [entry] = thread.entries
       assert entry.thinking == "I need to calculate this"
@@ -128,10 +128,10 @@ defmodule Jido.AI.ThreadTest do
   describe "append_tool_result/4" do
     test "appends tool result" do
       thread =
-        Thread.new()
-        |> Thread.append_tool_result("tc_1", "calculator", ~s({"result": 3}))
+        AIContext.new()
+        |> AIContext.append_tool_result("tc_1", "calculator", ~s({"result": 3}))
 
-      assert Thread.length(thread) == 1
+      assert AIContext.length(thread) == 1
       [entry] = thread.entries
       assert entry.role == :tool
       assert entry.tool_call_id == "tc_1"
@@ -143,7 +143,7 @@ defmodule Jido.AI.ThreadTest do
   describe "append/2" do
     test "appends arbitrary entry with timestamp" do
       entry = %Entry{role: :user, content: "Test"}
-      thread = Thread.new() |> Thread.append(entry)
+      thread = AIContext.new() |> AIContext.append(entry)
 
       [appended] = thread.entries
       assert appended.content == "Test"
@@ -153,7 +153,7 @@ defmodule Jido.AI.ThreadTest do
     test "preserves existing timestamp when provided" do
       original_time = ~U[2024-01-15 10:30:00Z]
       entry = %Entry{role: :user, content: "Test", timestamp: original_time}
-      thread = Thread.new() |> Thread.append(entry)
+      thread = AIContext.new() |> AIContext.append(entry)
 
       [appended] = thread.entries
       assert appended.timestamp == original_time
@@ -166,23 +166,23 @@ defmodule Jido.AI.ThreadTest do
 
   describe "to_messages/2" do
     test "returns empty list for empty thread" do
-      thread = Thread.new()
-      assert Thread.to_messages(thread) == []
+      thread = AIContext.new()
+      assert AIContext.to_messages(thread) == []
     end
 
     test "projects user message" do
-      thread = Thread.new() |> Thread.append_user("Hello")
-      messages = Thread.to_messages(thread)
+      thread = AIContext.new() |> AIContext.append_user("Hello")
+      messages = AIContext.to_messages(thread)
 
       assert [%{role: :user, content: "Hello"}] = messages
     end
 
     test "prepends system prompt when present" do
       thread =
-        Thread.new(system_prompt: "Be helpful")
-        |> Thread.append_user("Hello")
+        AIContext.new(system_prompt: "Be helpful")
+        |> AIContext.append_user("Hello")
 
-      messages = Thread.to_messages(thread)
+      messages = AIContext.to_messages(thread)
 
       assert [
                %{role: :system, content: "Be helpful"},
@@ -192,15 +192,15 @@ defmodule Jido.AI.ThreadTest do
 
     test "projects full conversation" do
       thread =
-        Thread.new(system_prompt: "You are helpful.")
-        |> Thread.append_user("Hello")
-        |> Thread.append_assistant("Hi there!")
-        |> Thread.append_user("What is 2+2?")
-        |> Thread.append_assistant("", [%{id: "tc_1", name: "calc", arguments: %{}}])
-        |> Thread.append_tool_result("tc_1", "calc", "4")
-        |> Thread.append_assistant("The answer is 4.")
+        AIContext.new(system_prompt: "You are helpful.")
+        |> AIContext.append_user("Hello")
+        |> AIContext.append_assistant("Hi there!")
+        |> AIContext.append_user("What is 2+2?")
+        |> AIContext.append_assistant("", [%{id: "tc_1", name: "calc", arguments: %{}}])
+        |> AIContext.append_tool_result("tc_1", "calc", "4")
+        |> AIContext.append_assistant("The answer is 4.")
 
-      messages = Thread.to_messages(thread)
+      messages = AIContext.to_messages(thread)
 
       assert length(messages) == 7
       assert Enum.at(messages, 0).role == :system
@@ -214,14 +214,14 @@ defmodule Jido.AI.ThreadTest do
 
     test "respects limit option" do
       thread =
-        Thread.new(system_prompt: "System")
-        |> Thread.append_user("First")
-        |> Thread.append_assistant("Reply 1")
-        |> Thread.append_user("Second")
-        |> Thread.append_assistant("Reply 2")
+        AIContext.new(system_prompt: "System")
+        |> AIContext.append_user("First")
+        |> AIContext.append_assistant("Reply 1")
+        |> AIContext.append_user("Second")
+        |> AIContext.append_assistant("Reply 2")
 
       # Limit to last 2 entries
-      messages = Thread.to_messages(thread, limit: 2)
+      messages = AIContext.to_messages(thread, limit: 2)
 
       # System prompt + last 2 entries
       assert length(messages) == 3
@@ -232,11 +232,11 @@ defmodule Jido.AI.ThreadTest do
 
     test "limit: 0 returns only system prompt" do
       thread =
-        Thread.new(system_prompt: "System")
-        |> Thread.append_user("First")
-        |> Thread.append_assistant("Reply")
+        AIContext.new(system_prompt: "System")
+        |> AIContext.append_user("First")
+        |> AIContext.append_assistant("Reply")
 
-      messages = Thread.to_messages(thread, limit: 0)
+      messages = AIContext.to_messages(thread, limit: 0)
 
       assert length(messages) == 1
       assert Enum.at(messages, 0).role == :system
@@ -244,20 +244,20 @@ defmodule Jido.AI.ThreadTest do
 
     test "limit: 0 returns empty list when no system prompt" do
       thread =
-        Thread.new()
-        |> Thread.append_user("First")
+        AIContext.new()
+        |> AIContext.append_user("First")
 
-      messages = Thread.to_messages(thread, limit: 0)
+      messages = AIContext.to_messages(thread, limit: 0)
 
       assert messages == []
     end
 
     test "projects assistant message with thinking as content blocks" do
       thread =
-        Thread.new()
-        |> Thread.append_assistant("The answer is 42.", nil, thinking: "Let me reason about this...")
+        AIContext.new()
+        |> AIContext.append_assistant("The answer is 42.", nil, thinking: "Let me reason about this...")
 
-      [message] = Thread.to_messages(thread)
+      [message] = AIContext.to_messages(thread)
 
       assert message.role == :assistant
       assert is_list(message.content)
@@ -268,10 +268,10 @@ defmodule Jido.AI.ThreadTest do
 
     test "projects assistant message without thinking as plain string" do
       thread =
-        Thread.new()
-        |> Thread.append_assistant("Just text")
+        AIContext.new()
+        |> AIContext.append_assistant("Just text")
 
-      [message] = Thread.to_messages(thread)
+      [message] = AIContext.to_messages(thread)
 
       assert message.role == :assistant
       assert message.content == "Just text"
@@ -279,31 +279,31 @@ defmodule Jido.AI.ThreadTest do
 
     test "falls back to full history for invalid limit option" do
       thread =
-        Thread.new()
-        |> Thread.append_user("One")
-        |> Thread.append_assistant("Two")
+        AIContext.new()
+        |> AIContext.append_user("One")
+        |> AIContext.append_assistant("Two")
 
-      messages = Thread.to_messages(thread, limit: :all)
+      messages = AIContext.to_messages(thread, limit: :all)
 
       assert Enum.map(messages, & &1.content) == ["One", "Two"]
     end
 
     test "projects explicit system entries without dropping their role" do
       thread =
-        Thread.new()
-        |> Thread.append(%Entry{role: :system, content: "System entry"})
+        AIContext.new()
+        |> AIContext.append(%Entry{role: :system, content: "System entry"})
 
-      assert [%{role: :system, content: "System entry"}] = Thread.to_messages(thread)
+      assert [%{role: :system, content: "System entry"}] = AIContext.to_messages(thread)
     end
 
     test "projects assistant tool_calls with empty thinking as plain text content" do
       tool_calls = [%{id: "tc_1", name: "calculator"}]
 
       thread =
-        Thread.new()
-        |> Thread.append_assistant("42", tool_calls, thinking: "")
+        AIContext.new()
+        |> AIContext.append_assistant("42", tool_calls, thinking: "")
 
-      [message] = Thread.to_messages(thread)
+      [message] = AIContext.to_messages(thread)
       assert message.role == :assistant
       assert message.content == "42"
       assert message.tool_calls == tool_calls
@@ -311,8 +311,8 @@ defmodule Jido.AI.ThreadTest do
 
     test "projects imported extended and custom roles without crashing" do
       thread =
-        Thread.new()
-        |> Thread.append_messages([
+        AIContext.new()
+        |> AIContext.append_messages([
           %{role: "developer", content: "dev note"},
           %{role: :function, content: "function result", name: "legacy_fn"},
           %{role: "custom_role", content: "custom content"}
@@ -322,7 +322,7 @@ defmodule Jido.AI.ThreadTest do
                %{role: :developer, content: "dev note"},
                %{role: :function, content: "function result", name: "legacy_fn"},
                %{role: "custom_role", content: "custom content"}
-             ] = Thread.to_messages(thread)
+             ] = AIContext.to_messages(thread)
     end
   end
 
@@ -332,55 +332,55 @@ defmodule Jido.AI.ThreadTest do
 
   describe "length/1" do
     test "returns 0 for empty thread" do
-      assert Thread.length(Thread.new()) == 0
+      assert AIContext.length(AIContext.new()) == 0
     end
 
     test "returns entry count" do
       thread =
-        Thread.new()
-        |> Thread.append_user("One")
-        |> Thread.append_assistant("Two")
+        AIContext.new()
+        |> AIContext.append_user("One")
+        |> AIContext.append_assistant("Two")
 
-      assert Thread.length(thread) == 2
+      assert AIContext.length(thread) == 2
     end
   end
 
   describe "empty?/1" do
     test "returns true for empty thread" do
-      assert Thread.empty?(Thread.new()) == true
+      assert AIContext.empty?(AIContext.new()) == true
     end
 
     test "returns false for non-empty thread" do
-      thread = Thread.new() |> Thread.append_user("Hello")
-      assert Thread.empty?(thread) == false
+      thread = AIContext.new() |> AIContext.append_user("Hello")
+      assert AIContext.empty?(thread) == false
     end
   end
 
   describe "clear/1" do
     test "removes all entries but keeps system prompt" do
       thread =
-        Thread.new(system_prompt: "Be helpful")
-        |> Thread.append_user("Hello")
-        |> Thread.append_assistant("Hi!")
-        |> Thread.clear()
+        AIContext.new(system_prompt: "Be helpful")
+        |> AIContext.append_user("Hello")
+        |> AIContext.append_assistant("Hi!")
+        |> AIContext.clear()
 
-      assert Thread.empty?(thread) == true
+      assert AIContext.empty?(thread) == true
       assert thread.system_prompt == "Be helpful"
     end
   end
 
   describe "last_entry/1" do
     test "returns nil for empty thread" do
-      assert Thread.last_entry(Thread.new()) == nil
+      assert AIContext.last_entry(AIContext.new()) == nil
     end
 
     test "returns last entry" do
       thread =
-        Thread.new()
-        |> Thread.append_user("First")
-        |> Thread.append_assistant("Second")
+        AIContext.new()
+        |> AIContext.append_user("First")
+        |> AIContext.append_assistant("Second")
 
-      entry = Thread.last_entry(thread)
+      entry = AIContext.last_entry(thread)
       assert entry.role == :assistant
       assert entry.content == "Second"
     end
@@ -388,23 +388,23 @@ defmodule Jido.AI.ThreadTest do
 
   describe "last_assistant_content/1" do
     test "returns nil for empty thread" do
-      assert Thread.last_assistant_content(Thread.new()) == nil
+      assert AIContext.last_assistant_content(AIContext.new()) == nil
     end
 
     test "returns nil when no assistant messages" do
-      thread = Thread.new() |> Thread.append_user("Hello")
-      assert Thread.last_assistant_content(thread) == nil
+      thread = AIContext.new() |> AIContext.append_user("Hello")
+      assert AIContext.last_assistant_content(thread) == nil
     end
 
     test "returns last assistant content" do
       thread =
-        Thread.new()
-        |> Thread.append_user("Hello")
-        |> Thread.append_assistant("First reply")
-        |> Thread.append_user("Another question")
-        |> Thread.append_assistant("Second reply")
+        AIContext.new()
+        |> AIContext.append_user("Hello")
+        |> AIContext.append_assistant("First reply")
+        |> AIContext.append_user("Another question")
+        |> AIContext.append_assistant("Second reply")
 
-      assert Thread.last_assistant_content(thread) == "Second reply"
+      assert AIContext.last_assistant_content(thread) == "Second reply"
     end
   end
 
@@ -415,9 +415,9 @@ defmodule Jido.AI.ThreadTest do
         %{role: :assistant, content: "Hi!"}
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
-      assert Thread.length(thread) == 2
+      assert AIContext.length(thread) == 2
       # Entries are stored in reverse order internally
       [second, first] = thread.entries
       assert first.role == :user
@@ -432,7 +432,7 @@ defmodule Jido.AI.ThreadTest do
         %{role: "assistant", content: "Hi!"}
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
       # Entries are stored in reverse order internally
       [second, first] = thread.entries
@@ -447,9 +447,9 @@ defmodule Jido.AI.ThreadTest do
         %{"role" => "tool", "tool_call_id" => "tc_1", "name" => "calc", "content" => "42"}
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
-      assert Thread.length(thread) == 3
+      assert AIContext.length(thread) == 3
       # Entries are stored in reverse order internally
       [tool, assistant, user] = thread.entries
       assert user.role == :user
@@ -467,9 +467,9 @@ defmodule Jido.AI.ThreadTest do
         %{role: :function, content: "Some function result"}
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
-      assert Thread.length(thread) == 2
+      assert AIContext.length(thread) == 2
       # Entries are stored in reverse order internally
       [second, first] = thread.entries
       assert first.role == :developer
@@ -484,7 +484,7 @@ defmodule Jido.AI.ThreadTest do
         %{role: "system", content: "System string role"}
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
       [fourth, third, second, first] = thread.entries
 
       assert first.role == :developer
@@ -499,7 +499,7 @@ defmodule Jido.AI.ThreadTest do
         %{role: :other_role, content: "Other message"}
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
       # Entries are stored in reverse order internally
       [second, first] = thread.entries
@@ -514,7 +514,7 @@ defmodule Jido.AI.ThreadTest do
         %{role: :tool, tool_call_id: "tc_1", name: "calc", content: "42"}
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
       # Entries are stored in reverse order internally
       [tool, assistant] = thread.entries
@@ -540,14 +540,14 @@ defmodule Jido.AI.ThreadTest do
         }
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
       [entry] = thread.entries
       assert entry.role == :assistant
       assert entry.content == "Here is my answer"
       assert entry.thinking == "Step 1: analyze the problem"
 
-      projected = Thread.to_messages(thread)
+      projected = AIContext.to_messages(thread)
       [msg] = projected
       assert is_list(msg.content)
 
@@ -568,7 +568,7 @@ defmodule Jido.AI.ThreadTest do
         }
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
       [entry] = thread.entries
       assert entry.content == "The result"
@@ -587,7 +587,7 @@ defmodule Jido.AI.ThreadTest do
         }
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
       [entry] = thread.entries
 
       assert entry.content == ""
@@ -599,7 +599,7 @@ defmodule Jido.AI.ThreadTest do
         %{role: :assistant, content: "Just a plain message"}
       ]
 
-      thread = Thread.new() |> Thread.append_messages(messages)
+      thread = AIContext.new() |> AIContext.append_messages(messages)
 
       [entry] = thread.entries
       assert entry.content == "Just a plain message"
@@ -614,9 +614,9 @@ defmodule Jido.AI.ThreadTest do
   describe "round-trip" do
     test "conversation survives to_messages -> append_messages" do
       original =
-        Thread.new(system_prompt: "System prompt")
-        |> Thread.append_user("Hello")
-        |> Thread.append_assistant("Hi there!")
+        AIContext.new(system_prompt: "System prompt")
+        |> AIContext.append_user("Hello")
+        |> AIContext.append_assistant("Hi there!")
 
       # Project to messages (excluding system since it's in thread.system_prompt)
       # Entries are stored in reverse order, so reverse to get chronological
@@ -632,24 +632,48 @@ defmodule Jido.AI.ThreadTest do
 
       # Rebuild
       rebuilt =
-        Thread.new(system_prompt: "System prompt")
-        |> Thread.append_messages(messages)
+        AIContext.new(system_prompt: "System prompt")
+        |> AIContext.append_messages(messages)
 
       # Compare
-      assert Thread.length(rebuilt) == Thread.length(original)
-      assert Thread.to_messages(rebuilt) == Thread.to_messages(original)
+      assert AIContext.length(rebuilt) == AIContext.length(original)
+      assert AIContext.to_messages(rebuilt) == AIContext.to_messages(original)
+    end
+  end
+
+  describe "coerce/1" do
+    test "accepts raw context maps without struct metadata" do
+      context = AIContext.new(system_prompt: "hello") |> AIContext.append_user("q")
+
+      raw = %{
+        id: context.id,
+        entries: context.entries,
+        system_prompt: context.system_prompt
+      }
+
+      assert {:ok, %AIContext{} = coerced} = AIContext.coerce(raw)
+      assert AIContext.to_messages(coerced) == AIContext.to_messages(context)
+    end
+
+    test "rejects Jido.Thread structs" do
+      core_thread = Jido.Thread.new()
+      assert :error == AIContext.coerce(core_thread)
     end
   end
 
   describe "debug_view/2" do
     test "returns truncated content and formatted tool call names" do
       thread =
-        Thread.new(system_prompt: "This system prompt is intentionally long")
-        |> Thread.append(%Entry{role: :assistant, content: nil, tool_calls: [%{name: "calc"}, %{"name" => "wx"}, %{}]})
-        |> Thread.append(%Entry{role: :tool, name: "calc", content: String.duplicate("x", 40), tool_call_id: "tc_1"})
-        |> Thread.append(%Entry{role: :other_role, content: "custom"})
+        AIContext.new(system_prompt: "This system prompt is intentionally long")
+        |> AIContext.append(%Entry{
+          role: :assistant,
+          content: nil,
+          tool_calls: [%{name: "calc"}, %{"name" => "wx"}, %{}]
+        })
+        |> AIContext.append(%Entry{role: :tool, name: "calc", content: String.duplicate("x", 40), tool_call_id: "tc_1"})
+        |> AIContext.append(%Entry{role: :other_role, content: "custom"})
 
-      view = Thread.debug_view(thread, truncate: 12, last: 3)
+      view = AIContext.debug_view(thread, truncate: 12, last: 3)
 
       assert view.id == thread.id
       assert view.length == 3
@@ -662,11 +686,11 @@ defmodule Jido.AI.ThreadTest do
 
     test "returns full chronological entries when :last is invalid" do
       thread =
-        Thread.new()
-        |> Thread.append_user("A")
-        |> Thread.append_assistant("B")
+        AIContext.new()
+        |> AIContext.append_user("A")
+        |> AIContext.append_assistant("B")
 
-      view = Thread.debug_view(thread, last: 0)
+      view = AIContext.debug_view(thread, last: 0)
       assert Enum.map(view.entries, & &1.content) == ["A", "B"]
     end
   end
@@ -674,17 +698,17 @@ defmodule Jido.AI.ThreadTest do
   describe "pp/1" do
     test "pretty-prints known role formats and truncates long content" do
       thread =
-        Thread.new(system_prompt: String.duplicate("s", 80))
-        |> Thread.append_user("hello")
-        |> Thread.append_assistant("plain reply")
-        |> Thread.append_assistant(nil, [%{name: "calc"}, %{"name" => "wx"}, %{}])
-        |> Thread.append_tool_result("tc_1", "calc", String.duplicate("x", 80))
-        |> Thread.append(%Entry{role: :system, content: "inline system entry"})
-        |> Thread.append(%Entry{role: :custom_role, content: "custom content"})
+        AIContext.new(system_prompt: String.duplicate("s", 80))
+        |> AIContext.append_user("hello")
+        |> AIContext.append_assistant("plain reply")
+        |> AIContext.append_assistant(nil, [%{name: "calc"}, %{"name" => "wx"}, %{}])
+        |> AIContext.append_tool_result("tc_1", "calc", String.duplicate("x", 80))
+        |> AIContext.append(%Entry{role: :system, content: "inline system entry"})
+        |> AIContext.append(%Entry{role: :custom_role, content: "custom content"})
 
       output =
         capture_io(fn ->
-          assert :ok = Thread.pp(thread)
+          assert :ok = AIContext.pp(thread)
         end)
 
       assert output =~ "[system] " <> String.duplicate("s", 60) <> "..."
@@ -699,45 +723,45 @@ defmodule Jido.AI.ThreadTest do
 
   describe "Inspect protocol" do
     test "shows compact representation for empty thread" do
-      assert inspect(Thread.new()) == "#Thread<0 entries>"
+      assert inspect(AIContext.new()) == "#Context<0 entries>"
     end
 
     test "includes recent roles for non-empty thread" do
       thread =
-        Thread.new()
-        |> Thread.append_user("Hello")
-        |> Thread.append_assistant("Hi")
+        AIContext.new()
+        |> AIContext.append_user("Hello")
+        |> AIContext.append_assistant("Hi")
 
       inspected = inspect(thread)
-      assert inspected =~ "#Thread<2 entries"
+      assert inspected =~ "#Context<2 entries"
       assert inspected =~ "last: "
       assert inspected =~ "last: [:user, :assistant]"
     end
 
     test "handles telemetry-truncated entries without crashing" do
-      thread = Thread.new(system_prompt: "You are a helpful assistant.")
+      thread = AIContext.new(system_prompt: "You are a helpful assistant.")
 
       sanitized = %{
-        __struct__: Jido.AI.Thread,
+        __struct__: Jido.AI.Context,
         id: thread.id,
         entries: %{type: :list, size: 0, __truncated_depth__: 4},
         system_prompt: thread.system_prompt
       }
 
-      assert inspect(sanitized) == "#Thread<0 entries, truncated>"
+      assert inspect(sanitized) == "#Context<0 entries, truncated>"
     end
 
     test "handles malformed entries shape without crashing" do
-      thread = Thread.new(system_prompt: "You are a helpful assistant.")
+      thread = AIContext.new(system_prompt: "You are a helpful assistant.")
 
       malformed = %{
-        __struct__: Jido.AI.Thread,
+        __struct__: Jido.AI.Context,
         id: thread.id,
         entries: %{unexpected: :shape},
         system_prompt: thread.system_prompt
       }
 
-      assert inspect(malformed) == "#Thread<unknown entries>"
+      assert inspect(malformed) == "#Context<unknown entries>"
     end
   end
 end

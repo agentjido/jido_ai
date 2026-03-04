@@ -299,5 +299,5 @@ Do not use `Jido.AI.Turn` when:
 ## Next
 
 - [Tool Calling With Actions](tool_calling_with_actions.md)
-- [Thread Context And Message Projection](thread_context_and_message_projection.md)
+- [Context And Message Projection](thread_context_and_message_projection.md)
 - [Observability Basics](observability_basics.md)

@@ -5,6 +5,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
+  alias Jido.Thread
+  alias Jido.Thread.Agent, as: ThreadAgent
 
   defmodule TestCalculator do
     use Jido.Action,
@@ -40,6 +42,21 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     %Jido.Instruction{action: action, params: params}
   end
 
+  defp context_replace_instruction(context, opts \\ []) do
+    instruction(
+      ReAct.context_modify_action(),
+      %{
+        op_id: Keyword.get(opts, :op_id, "op_#{Jido.Util.generate_id()}"),
+        context_ref: Keyword.get(opts, :context_ref, "default"),
+        operation: %{
+          type: :replace,
+          reason: Keyword.get(opts, :reason, :manual),
+          result_context: context
+        }
+      }
+    )
+  end
+
   defp runtime_event(kind, request_id, seq, data) do
     %{
       id: "evt_#{seq}",
@@ -71,6 +88,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
       assert route_map["ai.react.set_system_prompt"] == {:strategy_cmd, :ai_react_set_system_prompt}
+      refute Map.has_key?(route_map, "ai.react.set_context")
+      assert route_map["ai.react.context.modify"] == {:strategy_cmd, :ai_react_context_modify}
       assert route_map["ai.react.worker.event"] == {:strategy_cmd, :ai_react_worker_event}
       assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
@@ -382,7 +401,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         )
 
       state = StratState.get(agent, %{})
-      history = Jido.AI.Thread.to_messages(state.pending_worker_start.state.thread)
+      history = Jido.AI.Context.to_messages(state.pending_worker_start.state.context)
       history = Enum.reject(history, &(&1.role == :system))
 
       assert history == [
@@ -618,6 +637,463 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       state = StratState.get(agent, %{})
       assert state.config.system_prompt == "Updated prompt"
+    end
+
+    test "context.modify replace updates base conversation context" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      context =
+        Jido.AI.Context.new(system_prompt: "Restored prompt")
+        |> Jido.AI.Context.append_messages([
+          %{role: :user, content: "Hello"},
+          %{role: :assistant, content: "Hi there"}
+        ])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [context_replace_instruction(context)],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.context == context
+      assert state.config.system_prompt == "Restored prompt"
+
+      messages = Jido.AI.Context.to_messages(state.context)
+      non_system = Enum.reject(messages, &(&1.role == :system))
+
+      assert non_system == [
+               %{role: :user, content: "Hello"},
+               %{role: :assistant, content: "Hi there"}
+             ]
+    end
+
+    test "context.modify replace with nil system_prompt preserves existing config prompt" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Keep me")
+
+      context =
+        Jido.AI.Context.new()
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "test"}])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [context_replace_instruction(context)],
+          %{}
+        )
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "next turn", request_id: "req_nil_prompt"})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.context == context
+      assert state.config.system_prompt == "Keep me"
+      assert state.pending_worker_start.state.context.system_prompt == nil
+    end
+
+    test "context.modify replace while active run is deferred and applied after request completion" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_deferred_complete"})],
+          %{}
+        )
+
+      replacement =
+        Jido.AI.Context.new(system_prompt: "Restored prompt")
+        |> Jido.AI.Context.append_messages([
+          %{role: :user, content: "Restored user"},
+          %{role: :assistant, content: "Restored assistant"}
+        ])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [context_replace_instruction(replacement)],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.pending_context_op.operation.type == :replace
+      assert state.pending_context_op.operation.result_context == replacement
+      assert state.config.system_prompt == "Original prompt"
+
+      completion_events = [
+        runtime_event(:llm_completed, "req_deferred_complete", 2, %{
+          turn_type: :final_answer,
+          text: "A1",
+          thinking_content: nil,
+          tool_calls: [],
+          usage: %{}
+        }),
+        runtime_event(:request_completed, "req_deferred_complete", 3, %{
+          result: "A1",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(completion_events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(
+            acc,
+            [instruction(:ai_react_worker_event, %{request_id: "req_deferred_complete", event: event})],
+            %{}
+          )
+        end)
+
+      state = StratState.get(agent, %{})
+      assert state.context == replacement
+      assert state.pending_context_op == nil
+      assert state.config.system_prompt == "Restored prompt"
+
+      core_thread = ThreadAgent.get(agent)
+      ai_entries = Thread.filter_by_kind(core_thread, [:ai_message, :ai_context_operation])
+      last_entry = List.last(ai_entries)
+      assert last_entry.kind == :ai_context_operation
+      assert last_entry.payload.operation.type == :replace
+      assert last_entry.payload.operation.reason == :manual
+    end
+
+    test "context.modify replace while active run is deferred and applied after request failure" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_deferred_failed"})],
+          %{}
+        )
+
+      replacement =
+        Jido.AI.Context.new(system_prompt: "Recovered prompt")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "Recovered history"}])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [context_replace_instruction(replacement)],
+          %{}
+        )
+
+      failed_event =
+        runtime_event(:request_failed, "req_deferred_failed", 2, %{
+          error: {:runtime, :boom}
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_deferred_failed", event: failed_event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.context == replacement
+      assert state.pending_context_op == nil
+      assert state.config.system_prompt == "Recovered prompt"
+    end
+
+    test "context.modify replace while active run is deferred and applied after worker crash terminalization" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      active_state =
+        agent
+        |> StratState.get(%{})
+        |> Map.put(:status, :awaiting_tool)
+        |> Map.put(:active_request_id, "req_deferred_crash")
+        |> Map.put(:react_worker_pid, self())
+        |> Map.put(:react_worker_status, :running)
+
+      agent = StratState.put(agent, active_state)
+
+      replacement =
+        Jido.AI.Context.new(system_prompt: "Crash replacement")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "Recovered after crash"}])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [context_replace_instruction(replacement)],
+          %{}
+        )
+
+      crash_instruction =
+        instruction(:ai_react_worker_child_exit, %{
+          tag: :react_worker,
+          pid: self(),
+          reason: :killed
+        })
+
+      {agent, []} = ReAct.cmd(agent, [crash_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.status == :error
+      assert state.context == replacement
+      assert state.pending_context_op == nil
+      assert state.config.system_prompt == "Crash replacement"
+    end
+
+    test "context.modify replace with invalid params is a no-op" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original")
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [context_replace_instruction("not a context")],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.config.system_prompt == "Original"
+      assert %Jido.AI.Context{} = state.context
+    end
+
+    test "context.modify replace applies immediately while idle and appends core thread operation event" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      replacement =
+        Jido.AI.Context.new(system_prompt: "Compacted prompt")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "summary"}])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.context_modify_action(), %{
+              op_id: "op_compact",
+              context_ref: "default",
+              operation: %{
+                type: :replace,
+                reason: :compaction,
+                result_context: replacement,
+                meta: %{window: %{from: 1, to: 100}}
+              }
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.context == replacement
+      assert state.active_context_ref == "default"
+      assert "op_compact" in state.applied_context_ops
+      assert is_integer(state.projection_cursor_seq)
+
+      core_thread = ThreadAgent.get(agent)
+      [entry] = Thread.filter_by_kind(core_thread, :ai_context_operation)
+
+      assert entry.payload.op_id == "op_compact"
+      assert entry.payload.context_ref == "default"
+      assert entry.payload.operation.type == :replace
+      assert entry.payload.operation.reason == :compaction
+    end
+
+    test "context.modify deduplicates duplicate op_id" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      replacement_a =
+        Jido.AI.Context.new(system_prompt: "A")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "A"}])
+
+      replacement_b =
+        Jido.AI.Context.new(system_prompt: "B")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "B"}])
+
+      modify = fn context ->
+        instruction(ReAct.context_modify_action(), %{
+          op_id: "op_dup",
+          operation: %{type: :replace, reason: :manual, result_context: context}
+        })
+      end
+
+      {agent, []} = ReAct.cmd(agent, [modify.(replacement_a)], %{})
+      {agent, []} = ReAct.cmd(agent, [modify.(replacement_b)], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.context == replacement_a
+
+      core_thread = ThreadAgent.get(agent)
+      assert length(Thread.filter_by_kind(core_thread, :ai_context_operation)) == 1
+    end
+
+    test "context.modify switch projects lane-specific context by context_ref" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      alpha_context =
+        Jido.AI.Context.new(system_prompt: "Alpha")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "alpha"}])
+
+      beta_context =
+        Jido.AI.Context.new(system_prompt: "Beta")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "beta"}])
+
+      replace = fn ref, id, context ->
+        instruction(ReAct.context_modify_action(), %{
+          op_id: id,
+          context_ref: ref,
+          operation: %{type: :replace, reason: :manual, result_context: context}
+        })
+      end
+
+      switch = fn ref, id ->
+        instruction(ReAct.context_modify_action(), %{
+          op_id: id,
+          context_ref: ref,
+          operation: %{type: :switch, reason: :manual}
+        })
+      end
+
+      {agent, []} = ReAct.cmd(agent, [replace.("alpha", "op_alpha_replace", alpha_context)], %{})
+      {agent, []} = ReAct.cmd(agent, [replace.("beta", "op_beta_replace", beta_context)], %{})
+      {agent, []} = ReAct.cmd(agent, [switch.("alpha", "op_alpha_switch")], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.active_context_ref == "alpha"
+      assert state.context == alpha_context
+
+      core_thread = ThreadAgent.get(agent)
+      assert length(Thread.filter_by_kind(core_thread, :ai_context_operation)) == 3
+    end
+
+    test "core thread appends ai_message entries for user assistant and tool turns" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "calculate", request_id: "req_ai_message"})],
+          %{}
+        )
+
+      events = [
+        runtime_event(:llm_completed, "req_ai_message", 2, %{
+          turn_type: :tool_calls,
+          text: "",
+          thinking_content: nil,
+          tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{operation: "add", a: 1, b: 2}}],
+          usage: %{}
+        }),
+        runtime_event(:tool_completed, "req_ai_message", 3, %{
+          tool_call_id: "tc_1",
+          tool_name: "calculator",
+          result: {:ok, %{result: 3}, []}
+        }),
+        runtime_event(:request_completed, "req_ai_message", 4, %{
+          result: "3",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_ai_message", event: event})], %{})
+        end)
+
+      core_thread = ThreadAgent.get(agent)
+      ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
+
+      assert Enum.map(ai_messages, fn entry -> entry.payload.role end) == [:user, :assistant, :tool]
+      assert Enum.all?(ai_messages, fn entry -> entry.payload.context_ref == "default" end)
+    end
+
+    test "init with initial context from agent.state" do
+      initial_context =
+        Jido.AI.Context.new(system_prompt: "Restored")
+        |> Jido.AI.Context.append_messages([
+          %{role: :user, content: "Previous question"},
+          %{role: :assistant, content: "Previous answer"}
+        ])
+
+      agent =
+        %Jido.Agent{
+          id: "test-agent",
+          name: "test",
+          state: %{context: initial_context}
+        }
+        |> then(fn agent ->
+          ctx = %{strategy_opts: [tools: [TestCalculator]]}
+          {agent, []} = ReAct.init(agent, ctx)
+          agent
+        end)
+
+      state = StratState.get(agent, %{})
+      assert state.context == initial_context
+
+      messages = Jido.AI.Context.to_messages(state.context)
+      non_system = Enum.reject(messages, &(&1.role == :system))
+
+      assert non_system == [
+               %{role: :user, content: "Previous question"},
+               %{role: :assistant, content: "Previous answer"}
+             ]
+    end
+
+    test "init with initial context without system_prompt gets config prompt" do
+      initial_context =
+        Jido.AI.Context.new()
+        |> Jido.AI.Context.append_messages([
+          %{role: :user, content: "Previous question"},
+          %{role: :assistant, content: "Previous answer"}
+        ])
+
+      assert initial_context.system_prompt == nil
+
+      agent =
+        %Jido.Agent{
+          id: "test-agent",
+          name: "test",
+          state: %{context: initial_context}
+        }
+        |> then(fn agent ->
+          ctx = %{strategy_opts: [tools: [TestCalculator], system_prompt: "Config prompt"]}
+          {agent, []} = ReAct.init(agent, ctx)
+          agent
+        end)
+
+      state = StratState.get(agent, %{})
+      assert state.context.system_prompt == "Config prompt"
+
+      messages = Jido.AI.Context.to_messages(state.context)
+      non_system = Enum.reject(messages, &(&1.role == :system))
+
+      assert non_system == [
+               %{role: :user, content: "Previous question"},
+               %{role: :assistant, content: "Previous answer"}
+             ]
+    end
+
+    test "init rejects legacy :thread context payloads" do
+      legacy_context =
+        Jido.AI.Context.new(system_prompt: "Legacy key")
+        |> Jido.AI.Context.append_messages([%{role: :user, content: "legacy"}])
+
+      agent = %Jido.Agent{id: "test-agent", name: "test", state: %{thread: legacy_context}}
+      ctx = %{strategy_opts: [tools: [TestCalculator]]}
+
+      assert_raise ArgumentError,
+                   ~r/initial_state\[:thread\] is no longer supported for AI context/,
+                   fn ->
+                     ReAct.init(agent, ctx)
+                   end
+    end
+
+    test "init ignores non-context :thread state from core thread plugins" do
+      agent = %Jido.Agent{id: "test-agent", name: "test", state: %{thread: %{id: "thread_1", rev: 2}}}
+
+      {agent, []} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
+      state = StratState.get(agent, %{})
+
+      assert %Jido.AI.Context{} = state.context
+      assert state.context.id != "thread_1"
     end
 
     test "runtime_adapter flag remains true even when opt-out is requested" do

@@ -129,7 +129,7 @@ result = ReAct.run("What is 19 + 23?", config)
 #   result: "19 + 23 = 42",
 #   termination_reason: :final_answer,
 #   usage: %{input_tokens: 120, output_tokens: 45},
-#   final_token: "rt1.eyJhbGci...",
+#   final_token: "rt2.eyJhbGci...",
 #   trace: [%Jido.AI.Reasoning.ReAct.Event{...}, ...]
 # }
 ```
@@ -256,7 +256,7 @@ Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
 | `:llm_completed` | LLM call finished | result, usage |
 | `:tool_started` | Tool execution begins | tool args |
 | `:tool_completed` | Tool execution finished | tool result |
-| `:checkpoint` | Checkpoint token issued | `%{token: "rt1..."}` |
+| `:checkpoint` | Checkpoint token issued | `%{token: "rt2..."}` |
 | `:request_completed` | Run finished successfully | `%{result: ..., termination_reason: ..., usage: ...}` |
 | `:request_failed` | Run failed | `%{error: ...}` |
 | `:request_cancelled` | Run was cancelled | — |
@@ -268,7 +268,7 @@ Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
   result: "...",
   termination_reason: :final_answer | :failed | :cancelled,
   usage: %{input_tokens: ..., output_tokens: ...},
-  final_token: "rt1...",
+  final_token: "rt2...",
   trace: [%Event{}, ...]
 }
 ```
@@ -289,6 +289,7 @@ Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
 - `tool_concurrency` default: `4`
 - `token_ttl_ms` default: `nil` (no expiry)
 - `token_compress?` default: `false`
+- Checkpoint token format is `rt2.` (`v2` payload); legacy `rt1`/`thread` payloads are rejected
 - Observability flags (`emit_signals?`, `emit_telemetry?`, `redact_tool_args?`) default: `true`
 - Trace flags (`capture_deltas?`, `capture_thinking?`, `capture_messages?`) default: `true`
 

@@ -4,20 +4,21 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   """
 
   alias Jido.AI.Reasoning.ReAct.PendingToolCall
-  alias Jido.AI.Thread
+  alias Jido.AI.Context, as: AIContext
 
   @status_values [:running, :awaiting_tools, :completed, :failed, :cancelled]
+  @version 2
 
   @schema Zoi.struct(
             __MODULE__,
             %{
-              version: Zoi.integer() |> Zoi.default(1),
+              version: Zoi.integer() |> Zoi.default(@version),
               run_id: Zoi.string(),
               request_id: Zoi.string(),
               status: Zoi.atom() |> Zoi.default(:running),
               iteration: Zoi.integer() |> Zoi.default(1),
               llm_call_id: Zoi.string() |> Zoi.nullish(),
-              thread: Zoi.any(),
+              context: Zoi.any(),
               pending_tool_calls: Zoi.list(PendingToolCall.schema()) |> Zoi.default([]),
               usage: Zoi.map() |> Zoi.default(%{}),
               result: Zoi.any() |> Zoi.nullish(),
@@ -50,16 +51,16 @@ defmodule Jido.AI.Reasoning.ReAct.State do
     request_id = Keyword.get(opts, :request_id, "req_#{Jido.Util.generate_id()}")
     run_id = Keyword.get(opts, :run_id, "run_#{Jido.Util.generate_id()}")
 
-    thread =
-      Thread.new(system_prompt: system_prompt)
-      |> Thread.append_user(query)
+    context =
+      AIContext.new(system_prompt: system_prompt)
+      |> AIContext.append_user(query)
 
     attrs = %{
       run_id: run_id,
       request_id: request_id,
       status: :running,
       iteration: 1,
-      thread: thread,
+      context: context,
       pending_tool_calls: [],
       usage: %{},
       started_at_ms: now,
@@ -74,19 +75,23 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   Restores state from a minimal checkpoint map.
   """
   @spec from_checkpoint_map(map()) :: {:ok, t()} | {:error, term()}
+  def from_checkpoint_map(%{} = map) when is_map_key(map, :thread) or is_map_key(map, "thread") do
+    {:error, :legacy_thread_checkpoint}
+  end
+
   def from_checkpoint_map(%{} = map) do
     with {:ok, run_id} <- fetch_binary(map, :run_id),
          {:ok, request_id} <- fetch_binary(map, :request_id),
          {:ok, status} <- fetch_status(map),
-         {:ok, thread} <- fetch_thread(map) do
+         {:ok, context} <- fetch_context(map) do
       attrs = %{
-        version: Map.get(map, :version, Map.get(map, "version", 1)),
+        version: Map.get(map, :version, Map.get(map, "version", @version)),
         run_id: run_id,
         request_id: request_id,
         status: status,
         iteration: Map.get(map, :iteration, Map.get(map, "iteration", 1)),
         llm_call_id: Map.get(map, :llm_call_id, Map.get(map, "llm_call_id")),
-        thread: thread,
+        context: context,
         pending_tool_calls: restore_pending(Map.get(map, :pending_tool_calls, Map.get(map, "pending_tool_calls", []))),
         usage: Map.get(map, :usage, Map.get(map, "usage", %{})) || %{},
         result: Map.get(map, :result, Map.get(map, "result")),
@@ -117,7 +122,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       status: state.status,
       iteration: state.iteration,
       llm_call_id: state.llm_call_id,
-      thread: state.thread,
+      context: state.context,
       pending_tool_calls: state.pending_tool_calls,
       usage: state.usage,
       result: state.result,
@@ -254,10 +259,13 @@ defmodule Jido.AI.Reasoning.ReAct.State do
     end
   end
 
-  defp fetch_thread(map) do
-    case Map.get(map, :thread, Map.get(map, "thread")) do
-      %Thread{} = thread -> {:ok, thread}
-      _ -> {:error, :invalid_thread}
+  defp fetch_context(map) do
+    map
+    |> Map.get(:context, Map.get(map, "context"))
+    |> AIContext.coerce()
+    |> case do
+      {:ok, context} -> {:ok, context}
+      :error -> {:error, :invalid_context}
     end
   end
 

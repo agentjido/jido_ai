@@ -7,9 +7,9 @@ defmodule Jido.AI.Reasoning.ReAct.Token do
 
   alias Jido.AI.Reasoning.ReAct.{Config, State}
 
-  @prefix "rt1."
+  @prefix "rt2."
   @issuer "jido_ai/react"
-  @version 1
+  @version 2
 
   @type payload :: %{
           required(:v) => pos_integer(),
@@ -137,6 +137,12 @@ defmodule Jido.AI.Reasoning.ReAct.Token do
 
       not is_map(payload[:state]) ->
         {:error, :invalid_token_state}
+
+      not (Map.has_key?(payload[:state], :context) or Map.has_key?(payload[:state], "context")) ->
+        {:error, :invalid_token_state}
+
+      Map.has_key?(payload[:state], :thread) or Map.has_key?(payload[:state], "thread") ->
+        {:error, :legacy_token_state}
 
       true ->
         :ok
