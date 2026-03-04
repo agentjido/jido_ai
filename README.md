@@ -182,6 +182,7 @@ Deep reference:
 - [Actions Catalog](guides/developer/actions_catalog.md)
 - [Configuration Reference](guides/developer/configuration_reference.md)
 - [Architecture And Runtime Flow](guides/developer/architecture_and_runtime_flow.md)
+- [Thread-Context Projection Model](guides/developer/thread_context_projection_model.md)
 - [HexDocs](https://hexdocs.pm/jido_ai)
 
 ## Runnable Examples

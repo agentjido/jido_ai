@@ -4,6 +4,16 @@ You need deterministic conversation state and explicit message projection to LLM
 
 After this guide, you can build and inspect history using `Jido.AI.Context`.
 
+## Core Thread vs ReAct Context
+
+Two different data structures now coexist by design:
+
+- `agent.state[:__thread__]` (`Jido.Thread`): append-only, canonical event log.
+- `agent.state[:__strategy__].context` (`Jido.AI.Context`): materialized LLM projection view.
+
+In ReAct, message and context lifecycle changes are represented as thread events,
+and the strategy context is projected from those events.
+
 ## Build Context
 
 ```elixir
@@ -60,6 +70,34 @@ saved_messages = snapshot.details.conversation
 context =
   Context.new(system_prompt: system_prompt)
   |> Context.append_messages(conversation_messages)
+```
+
+## ReAct Context Operations
+
+Canonical strategy signal for context lifecycle:
+
+- `ai.react.context.modify`
+
+Busy semantics in ReAct:
+
+- if idle, context operation applies immediately
+- if a request is active, operation is deferred and applied after terminal state
+
+## Compaction Is Replace
+
+Compaction is represented as a standard context replace operation with reason metadata:
+
+```elixir
+%{
+  op_id: "op_123",
+  context_ref: "default",
+  operation: %{
+    type: :replace,
+    reason: :compaction,
+    result_context: compacted_context,
+    meta: %{from_seq: 1, to_seq: 100}
+  }
+}
 ```
 
 ## Failure Mode: Unexpected Missing Context

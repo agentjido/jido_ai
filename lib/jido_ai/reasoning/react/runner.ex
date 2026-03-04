@@ -194,8 +194,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           call_id: call_id,
           model: config.model,
           message_count:
-            AIContext.length(state.thread) +
-              case state.thread.system_prompt do
+            AIContext.length(state.context) +
+              case state.context.system_prompt do
                 nil -> 0
                 _ -> 1
               end
@@ -203,7 +203,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         llm_call_id: call_id
       )
 
-    messages = AIContext.to_messages(state.thread)
+    messages = AIContext.to_messages(state.context)
     llm_opts = Config.llm_opts(config)
 
     case request_turn(state, owner, ref, config, messages, llm_opts) do
@@ -229,7 +229,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
         state =
           AIContext.append_assistant(
-            state.thread,
+            state.context,
             turn.text,
             case turn.type do
               :tool_calls -> turn.tool_calls
@@ -237,7 +237,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             end,
             maybe_thinking_opt(turn.thinking_content)
           )
-          |> then(&%{state | thread: &1})
+          |> then(&%{state | context: &1})
 
         {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
 
@@ -407,9 +407,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
       end)
 
-    {state, thread} =
-      Enum.reduce(results, {state, state.thread}, fn
-        {pending_call, result, attempts, duration_ms}, {acc, thread_acc} ->
+    {state, updated_context} =
+      Enum.reduce(results, {state, state.context}, fn
+        {pending_call, result, attempts, duration_ms}, {acc, context_acc} ->
           completed = PendingToolCall.complete(pending_call, result, attempts, duration_ms)
 
           {acc, _} =
@@ -430,12 +430,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             )
 
           content = Turn.format_tool_result_content(result)
-          thread_acc = AIContext.append_tool_result(thread_acc, completed.id, completed.name, content)
-          {acc, thread_acc}
+          context_acc = AIContext.append_tool_result(context_acc, completed.id, completed.name, content)
+          {acc, context_acc}
 
-        {:error, reason}, {acc, thread_acc} ->
+        {:error, reason}, {acc, context_acc} ->
           Logger.error("tool task failure", reason: inspect(reason))
-          {acc, thread_acc}
+          {acc, context_acc}
       end)
 
     state =
@@ -443,7 +443,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       |> State.put_status(:running)
       |> State.clear_pending_tools()
       |> State.inc_iteration()
-      |> Map.put(:thread, thread)
+      |> Map.put(:context, updated_context)
 
     {state, _token} = emit_checkpoint(state, owner, ref, config, :after_tools)
     {state, evolve_context_state_snapshot(context, results)}
@@ -719,14 +719,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp latest_query(%State{} = state) do
-    case AIContext.last_entry(state.thread) do
+    case AIContext.last_entry(state.context) do
       %{role: :user, content: content} when is_binary(content) -> content
       _ -> ""
     end
   end
 
   defp append_query(%State{} = state, query) when is_binary(query) do
-    %{state | thread: AIContext.append_user(state.thread, query), status: :running, updated_at_ms: now_ms()}
+    %{state | context: AIContext.append_user(state.context, query), status: :running, updated_at_ms: now_ms()}
   end
 
   defp maybe_thinking_opt(nil), do: []
