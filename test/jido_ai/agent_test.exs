@@ -78,6 +78,13 @@ defmodule Jido.AI.AgentTest do
       req_http_options: [adapter: [recv_timeout: 2_000]]
   end
 
+  defmodule AgentWithStreamingDisabled do
+    use Jido.AI.Agent,
+      name: "agent_no_streaming",
+      tools: [TestCalculator],
+      streaming: false
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -189,6 +196,14 @@ defmodule Jido.AI.AgentTest do
 
       assert config.base_llm_opts == [thinking: %{type: :enabled, budget_tokens: 800}, reasoning_effort: :high]
       assert config.base_req_http_options == [adapter: [recv_timeout: 2_000]]
+    end
+
+    test "streaming: false is forwarded into strategy config" do
+      agent = AgentWithStreamingDisabled.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.streaming == false
     end
 
     test "tools list resolves module aliases" do

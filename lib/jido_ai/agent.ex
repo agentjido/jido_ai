@@ -224,6 +224,7 @@ defmodule Jido.AI.Agent do
     system_prompt = Keyword.get(opts, :system_prompt)
     model = Keyword.get(opts, :model, @default_model)
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
+    streaming = Keyword.get(opts, :streaming, true)
     request_policy = Keyword.get(opts, :request_policy, :reject)
     tool_timeout_ms = Keyword.get(opts, :tool_timeout_ms, 15_000)
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
@@ -287,6 +288,7 @@ defmodule Jido.AI.Agent do
       [
         tools: tools,
         model: model,
+        streaming: streaming,
         max_iterations: max_iterations,
         request_policy: request_policy,
         tool_timeout_ms: tool_timeout_ms,
