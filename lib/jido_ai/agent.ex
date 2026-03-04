@@ -26,6 +26,7 @@ defmodule Jido.AI.Agent do
   - `:system_prompt` - Custom system prompt for the LLM
   - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
+  - `:streaming` - Whether to stream LLM responses (default: `true`)
   - `:request_policy` - Request concurrency policy (default: `:reject`)
   - `:tool_timeout_ms` - Per-attempt tool execution timeout in ms (default: 15_000)
   - `:tool_max_retries` - Number of retries for tool failures (default: 1)
