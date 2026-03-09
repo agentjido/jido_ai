@@ -22,6 +22,7 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
 - ReAct (`Jido.AI.Agent`)
   - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
   - `max_iterations`: `10`
+  - `max_tokens`: `1024`
   - `request_policy`: `:reject`
   - `tool_timeout_ms`: `15_000`
   - `tool_max_retries`: `1`
@@ -79,6 +80,7 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
 ## CLI Defaults (`mix jido_ai`)
 
 - `--type`: `react`
+- `--max-tokens`: `1024` for ephemeral ReAct agents
 - supported types: `react | aot | cod | cot | tot | got | trm | adaptive`
 - `--timeout`: `60_000`
 - `--format`: `text`

@@ -38,6 +38,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
          model: "openai:gpt-4.1",
          tools: [TestCalculator],
          max_iterations: 4,
+         max_tokens: 4_096,
          system_prompt: "Think step by step, then call tools.",
          req_http_options: [plug: {Req.Test, []}],
          llm_opts: [thinking: %{type: :enabled, budget_tokens: 512}, reasoning_effort: :high]
@@ -66,6 +67,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
       assert config.model == "openai:gpt-4.1"
       assert config.tools == [TestCalculator]
       assert config.max_iterations == 4
+      assert config.max_tokens == 4_096
       assert config.system_prompt == "Think step by step, then call tools."
       assert config.base_req_http_options == [plug: {Req.Test, []}]
       assert config.base_llm_opts == [thinking: %{type: :enabled, budget_tokens: 512}, reasoning_effort: :high]
@@ -77,6 +79,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
 
       assert config.model == Jido.AI.resolve_model(:fast)
       assert config.max_iterations == 10
+      assert config.max_tokens == 1_024
 
       assert config.tools == [
                Jido.Tools.Arithmetic.Add,

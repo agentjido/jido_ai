@@ -12,6 +12,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
 
   @default_model :fast
   @default_max_iterations 10
+  @default_max_tokens 1_024
   @default_tools [
     Jido.Tools.Arithmetic.Add,
     Jido.Tools.Arithmetic.Subtract,
@@ -69,6 +70,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
     tools = config[:tools] || @default_tools
     model = config[:model] || @default_model
     max_iterations = config[:max_iterations] || @default_max_iterations
+    max_tokens = config[:max_tokens] || @default_max_tokens
     system_prompt = config[:system_prompt]
     req_http_options = config[:req_http_options] || []
     llm_opts = config[:llm_opts] || []
@@ -84,6 +86,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
             tools: unquote(tools),
             model: unquote(model),
             max_iterations: unquote(max_iterations),
+            max_tokens: unquote(max_tokens),
             system_prompt: unquote(system_prompt),
             req_http_options: unquote(escaped_req_http_options),
             llm_opts: unquote(escaped_llm_opts)
@@ -96,6 +99,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
             tools: unquote(tools),
             model: unquote(model),
             max_iterations: unquote(max_iterations),
+            max_tokens: unquote(max_tokens),
             req_http_options: unquote(escaped_req_http_options),
             llm_opts: unquote(escaped_llm_opts)
         end
