@@ -963,6 +963,65 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert length(Thread.filter_by_kind(core_thread, :ai_context_operation)) == 3
     end
 
+    test "context.modify switch to a fresh lane does not inherit previous lane history" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_switch_fresh_lane"})],
+          %{}
+        )
+
+      events = [
+        runtime_event(:llm_completed, "req_switch_fresh_lane", 2, %{
+          turn_type: :final_answer,
+          text: "A1",
+          thinking_content: nil,
+          tool_calls: [],
+          usage: %{}
+        }),
+        runtime_event(:request_completed, "req_switch_fresh_lane", 3, %{
+          result: "A1",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(
+            acc,
+            [instruction(:ai_react_worker_event, %{request_id: "req_switch_fresh_lane", event: event})],
+            %{}
+          )
+        end)
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.context_modify_action(), %{
+              op_id: "op_switch_alpha",
+              context_ref: "alpha",
+              operation: %{type: :switch, reason: :manual}
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.active_context_ref == "alpha"
+      assert state.context.system_prompt == "Original prompt"
+
+      projected_messages =
+        state.context
+        |> Jido.AI.Context.to_messages()
+        |> Enum.reject(&(&1.role == :system))
+
+      assert projected_messages == []
+    end
+
     test "core thread appends ai_message entries for user assistant and tool turns" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
 

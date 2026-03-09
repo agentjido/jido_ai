@@ -825,6 +825,4 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     |> Enum.sort()
     |> Enum.join("|")
   end
-
-  defp tool_call_signature(_), do: nil
 end

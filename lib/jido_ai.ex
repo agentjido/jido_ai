@@ -426,29 +426,46 @@ defmodule Jido.AI do
   end
 
   @doc """
-  Returns the context (conversation history) from the strategy state.
+  Returns the active context (conversation history) from the strategy state.
 
-  Checks both `:context` and `:run_context` keys. Returns nil if neither exists.
+  Prefers `:run_context` while a request is in flight, otherwise falls back to
+  materialized `:context`. Returns nil if neither exists.
   """
   @spec get_strategy_context(Jido.Agent.t()) :: map() | nil
   def get_strategy_context(%Jido.Agent{} = agent) do
     strat_state = StratState.get(agent, %{})
-    Map.get(strat_state, :context) || Map.get(strat_state, :run_context)
+
+    case active_context_key(strat_state) do
+      nil -> nil
+      key -> Map.get(strat_state, key)
+    end
   end
 
   @doc """
-  Updates the context entries (conversation messages) in the strategy state.
+  Updates the active context entries (conversation messages) in the strategy state.
 
-  Updates whichever context key(s) exist (`:context`, `:run_context`).
+  If `:run_context` exists, it is treated as authoritative for the in-flight
+  turn and updated in isolation. Otherwise, updates materialized `:context`.
   """
   @spec update_context_entries(Jido.Agent.t(), list()) :: Jido.Agent.t()
   def update_context_entries(%Jido.Agent{} = agent, entries) when is_list(entries) do
     StratState.update(agent, fn strat_state ->
-      strat_state
-      |> update_context_field(:context, :entries, entries)
-      |> update_context_field(:run_context, :entries, entries)
+      case active_context_key(strat_state) do
+        nil -> strat_state
+        ctx_key -> update_context_field(strat_state, ctx_key, :entries, entries)
+      end
     end)
   end
+
+  defp active_context_key(strat_state) when is_map(strat_state) do
+    cond do
+      is_map(Map.get(strat_state, :run_context)) -> :run_context
+      is_map(Map.get(strat_state, :context)) -> :context
+      true -> nil
+    end
+  end
+
+  defp active_context_key(_), do: nil
 
   # Private: update system_prompt in a context struct if it exists
   defp update_context_system_prompt(strat_state, key, prompt) do
