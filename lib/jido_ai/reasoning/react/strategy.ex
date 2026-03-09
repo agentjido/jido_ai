@@ -794,7 +794,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
          operation: %{type: :switch} = operation
        }) do
     projected_context =
-      project_context_from_core_thread(agent, context_ref, strategy_context(state, state[:config] || %{}))
+      project_context_from_core_thread(agent, context_ref, fresh_projection_context(state[:config] || %{}))
 
     state =
       state
@@ -1660,6 +1660,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         AIContext.new(system_prompt: config[:system_prompt])
     end
   end
+
+  defp fresh_projection_context(config) when is_map(config) do
+    AIContext.new(system_prompt: config[:system_prompt])
+  end
+
+  defp fresh_projection_context(_), do: AIContext.new()
 
   defp snapshot_context(state, config) do
     case Map.get(state, :run_context) do
