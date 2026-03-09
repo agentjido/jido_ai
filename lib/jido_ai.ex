@@ -383,6 +383,95 @@ defmodule Jido.AI do
     end
   end
 
+  # ============================================================================
+  # Pure-Function (Struct-Level) API
+  #
+  # These functions operate directly on a %Jido.Agent{} struct without going
+  # through GenServer signals. Use these from within the agent process (e.g.,
+  # in on_before_cmd / on_after_cmd hooks) where a GenServer.call to self()
+  # would deadlock.
+  # ============================================================================
+
+  @doc """
+  Sets the system prompt directly on the agent's strategy config.
+
+  This is the struct-level equivalent of `set_system_prompt/3` — safe to call
+  from within the agent process (e.g., `on_before_cmd`).
+
+  Also updates the system prompt in `:context` and `:run_context` if they
+  exist, so resumed conversations pick up the new prompt.
+  """
+  @spec set_system_prompt_direct(Jido.Agent.t(), String.t()) :: Jido.Agent.t()
+  def set_system_prompt_direct(%Jido.Agent{} = agent, prompt) when is_binary(prompt) do
+    StratState.update(agent, fn strat_state ->
+      config = Map.get(strat_state, :config, %{})
+      updated = Map.put(config, :system_prompt, prompt)
+
+      strat_state
+      |> Map.put(:config, updated)
+      |> update_context_system_prompt(:context, prompt)
+      |> update_context_system_prompt(:run_context, prompt)
+    end)
+  end
+
+  @doc """
+  Returns the strategy config from an agent struct.
+
+  Convenience for reading strategy config without reaching into internal state.
+  """
+  @spec get_strategy_config(Jido.Agent.t()) :: map()
+  def get_strategy_config(%Jido.Agent{} = agent) do
+    strat_state = StratState.get(agent, %{})
+    Map.get(strat_state, :config, %{})
+  end
+
+  @doc """
+  Returns the context (conversation history) from the strategy state.
+
+  Checks both `:context` and `:run_context` keys. Returns nil if neither exists.
+  """
+  @spec get_strategy_context(Jido.Agent.t()) :: map() | nil
+  def get_strategy_context(%Jido.Agent{} = agent) do
+    strat_state = StratState.get(agent, %{})
+    Map.get(strat_state, :context) || Map.get(strat_state, :run_context)
+  end
+
+  @doc """
+  Updates the context entries (conversation messages) in the strategy state.
+
+  Updates whichever context key(s) exist (`:context`, `:run_context`).
+  """
+  @spec update_context_entries(Jido.Agent.t(), list()) :: Jido.Agent.t()
+  def update_context_entries(%Jido.Agent{} = agent, entries) when is_list(entries) do
+    StratState.update(agent, fn strat_state ->
+      strat_state
+      |> update_context_field(:context, :entries, entries)
+      |> update_context_field(:run_context, :entries, entries)
+    end)
+  end
+
+  # Private: update system_prompt in a context struct if it exists
+  defp update_context_system_prompt(strat_state, key, prompt) do
+    case Map.get(strat_state, key) do
+      %{system_prompt: _} = context ->
+        Map.put(strat_state, key, %{context | system_prompt: prompt})
+
+      _ ->
+        strat_state
+    end
+  end
+
+  # Private: update a field in a context struct if the context key exists
+  defp update_context_field(strat_state, ctx_key, field, value) do
+    case Map.get(strat_state, ctx_key) do
+      ctx when is_map(ctx) ->
+        Map.put(strat_state, ctx_key, Map.put(ctx, field, value))
+
+      _ ->
+        strat_state
+    end
+  end
+
   # Private helpers for tool management
 
   defp do_register_tool(agent_server, tool_module, opts) do
