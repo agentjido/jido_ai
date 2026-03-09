@@ -10,7 +10,8 @@ After this guide, you will run a custom tool, submit async requests, and await s
 defmodule MyApp.Actions.AddNumbers do
   use Jido.Action,
     name: "add_numbers",
-    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()}),
+    description: "Add two numbers."
 
   @impl true
   def run(%{a: a, b: b}, _context), do: {:ok, %{sum: a + b}}
@@ -26,9 +27,34 @@ defmodule MyApp.MathAgent do
     model: :fast,
     tools: [MyApp.Actions.AddNumbers],
     max_iterations: 8,
-    system_prompt: "Solve accurately. Use tools for arithmetic."
+    system_prompt: "Solve accurately. Use tools for arithmetic.",
+    llm_opts: [thinking: %{type: :enabled, budget_tokens: 2048}, reasoning_effort: :high]
 end
 ```
+
+## Optional: Configure Tool Effect Policy
+
+Use `effect_policy` to bound which tool-emitted effects are allowed at runtime.
+
+```elixir
+defmodule MyApp.SafeMathAgent do
+  use Jido.AI.Agent,
+    name: "safe_math_agent",
+    model: :fast,
+    tools: [MyApp.Actions.AddNumbers],
+    effect_policy: %{
+      mode: :allow_list,
+      allow: [Jido.Agent.StateOp.SetState, Jido.Agent.Directive.Emit]
+    },
+    strategy_effect_policy: %{
+      constraints: %{
+        emit: %{allowed_signal_prefixes: ["app.math."]}
+      }
+    }
+end
+```
+
+`strategy_effect_policy.constraints` accepts atom keys, string keys, or keyword lists (including nested `emit` and `schedule` maps). Inputs are normalized before policy enforcement.
 
 ## Run Async + Await
 
@@ -37,6 +63,12 @@ end
 
 {:ok, req} = MyApp.MathAgent.ask(pid, "What is 19 + 23?")
 {:ok, result} = MyApp.MathAgent.await(req, timeout: 15_000)
+
+# Per-request overrides
+{:ok, req2} =
+  MyApp.MathAgent.ask(pid, "Explain how you solved that",
+    llm_opts: [reasoning_effort: :medium]
+  )
 ```
 
 ## Optional: Set Tool Context At Runtime
@@ -56,6 +88,42 @@ signal = Jido.Signal.new!(
 ```elixir
 {:ok, _agent} = Jido.AI.set_system_prompt(pid, "You are a concise support specialist.")
 ```
+
+## Optional: Restore Conversation Context
+
+If you persist the conversation history (e.g. from `snapshot.details.conversation`),
+you can restore it on restart so the agent resumes where it left off.
+
+```elixir
+saved_messages = snapshot.details.conversation
+
+# Split out one leading system message (if present) so it does not become
+# a duplicate context entry.
+{saved_system_prompt, conversation_messages} =
+  case saved_messages do
+    [%{role: role, content: content} | rest]
+    when role in [:system, "system"] and is_binary(content) ->
+      {content, rest}
+
+    _ ->
+      {nil, saved_messages}
+  end
+
+# At start time — pass the saved context via initial_state:
+context =
+  Jido.AI.Context.new(system_prompt: saved_system_prompt)
+  |> Jido.AI.Context.append_messages(conversation_messages)
+
+Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
+```
+
+When restoring with `initial_state: %{context: context}`, a nil
+`context.system_prompt` is backfilled from the agent's configured prompt.
+
+## Note: Retrieval And ReAct
+
+If you enable the retrieval plugin, auto-enrichment does **not** run on `ai.react.query` signals.
+Recall memory explicitly and prepend it to your prompt. See [Retrieval And Quota](retrieval_and_quota.md) for details.
 
 ## Failure Mode: Tool Not Registered / Not Valid
 

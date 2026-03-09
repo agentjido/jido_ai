@@ -4,6 +4,12 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
   alias Jido.AI.Reasoning.ReAct.{Config, State, Token}
   @legacy_insecure_secret "jido_ai_react_default_secret_change_me"
 
+  test "defaults omitted model to resolved :fast alias" do
+    config = Config.new(%{tools: %{}})
+
+    assert config.model == Jido.AI.resolve_model(:fast)
+  end
+
   test "issues and decodes checkpoint tokens" do
     config =
       Config.new(%{
@@ -16,10 +22,10 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
 
     token = Token.issue(state, config)
     assert is_binary(token)
-    assert String.starts_with?(token, "rt1.")
+    assert String.starts_with?(token, "rt2.")
 
     assert {:ok, payload} = Token.decode(token, config)
-    assert payload.v == 1
+    assert payload.v == 2
     assert payload.iss == "jido_ai/react"
     assert payload.run_id == "run_1"
     assert payload.request_id == "req_1"
@@ -67,5 +73,50 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
     assert is_binary(config_a.token.secret)
     assert config_a.token.secret == config_b.token.secret
     refute config_a.token.secret == @legacy_insecure_secret
+  end
+
+  test "rejects legacy token state payloads that still include thread key" do
+    config = Config.new(%{model: :capable, tools: %{}, token_secret: "secret-a"})
+    state = State.new("hello", nil, request_id: "req_legacy", run_id: "run_legacy")
+    now = System.system_time(:millisecond)
+
+    payload = %{
+      v: 2,
+      iss: "jido_ai/react",
+      run_id: state.run_id,
+      request_id: state.request_id,
+      iat_ms: now,
+      exp_ms: nil,
+      config_fingerprint: Config.fingerprint(config),
+      state: %{
+        context: state.context,
+        thread: state.context
+      }
+    }
+
+    token = forge_token(payload, config.token.secret)
+    assert {:error, :legacy_token_state} = Token.decode(token, config)
+  end
+
+  test "state checkpoint restore hard-fails for legacy thread shape" do
+    context = Jido.AI.Context.new() |> Jido.AI.Context.append_user("hello")
+
+    assert {:error, :legacy_thread_checkpoint} =
+             State.from_checkpoint_map(%{
+               run_id: "run_legacy",
+               request_id: "req_legacy",
+               status: :running,
+               thread: context
+             })
+  end
+
+  defp forge_token(payload, secret) do
+    payload_bin = :erlang.term_to_binary(payload)
+    signature = :crypto.mac(:hmac, :sha256, secret, payload_bin)
+
+    "rt2." <>
+      Base.url_encode64(payload_bin, padding: false) <>
+      "." <>
+      Base.url_encode64(signature, padding: false)
   end
 end

@@ -29,6 +29,24 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
     def run(params, _context), do: {:ok, params}
   end
 
+  defmodule SafeTool do
+    use Jido.Action,
+      name: "safe_tool",
+      schema: []
+
+    @impl Jido.Action
+    def run(params, _context), do: {:ok, params}
+  end
+
+  defmodule AdminDeleteTool do
+    use Jido.Action,
+      name: "admin_delete_tool",
+      schema: []
+
+    @impl Jido.Action
+    def run(params, _context), do: {:ok, params}
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -59,6 +77,15 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
       assert {:ok, result} = ListTools.run(%{filter: "nonexistent_xyz"}, %{})
       # Should return empty list or filtered results
       assert is_list(result.tools)
+    end
+
+    test "returns error for invalid filter type" do
+      assert {:error, :invalid_filter} = ListTools.run(%{filter: 123}, %{})
+    end
+
+    test "returns error for invalid allowed_tools values" do
+      assert {:error, :invalid_allowed_tools} =
+               ListTools.run(%{allowed_tools: ["safe_tool", 123]}, %{})
     end
 
     test "respects include_schema false" do
@@ -131,22 +158,52 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
       assert "legacy_schema_tool" in tool_names
       assert "zoi_schema_tool" in tool_names
     end
+
+    test "reads tools from state.chat fallback when higher precedence sources are absent" do
+      context = %{
+        state: %{
+          chat: %{
+            tools: %{
+              "legacy_schema_tool" => LegacySchemaTool
+            }
+          }
+        }
+      }
+
+      assert {:ok, result} = ListTools.run(%{include_sensitive: true}, context)
+      assert Enum.map(result.tools, & &1.name) == ["legacy_schema_tool"]
+    end
+
+    test "prefers context.tools over plugin_state fallback registries" do
+      context = %{
+        tools: %{
+          "legacy_schema_tool" => LegacySchemaTool
+        },
+        plugin_state: %{
+          chat: %{
+            tools: %{
+              "zoi_schema_tool" => ZoiSchemaTool
+            }
+          }
+        }
+      }
+
+      assert {:ok, result} = ListTools.run(%{include_sensitive: true}, context)
+      assert Enum.map(result.tools, & &1.name) == ["legacy_schema_tool"]
+    end
   end
 
   describe "security features" do
     test "excludes sensitive tools by default" do
-      assert {:ok, result} = ListTools.run(%{}, %{})
+      context = %{
+        tools: %{
+          "safe_tool" => SafeTool,
+          "admin_delete_tool" => AdminDeleteTool
+        }
+      }
 
-      # Tools with sensitive keywords should be filtered out
-      tool_names = Enum.map(result.tools, fn tool -> String.downcase(tool.name) end)
-
-      # Check that no sensitive tool names are present
-      refute Enum.any?(tool_names, fn name ->
-               Enum.any?(
-                 ["system", "admin", "config", "registry", "shell", "delete", "secret", "password", "token", "auth"],
-                 fn keyword -> String.contains?(name, keyword) end
-               )
-             end)
+      assert {:ok, result} = ListTools.run(%{}, context)
+      assert Enum.map(result.tools, & &1.name) == ["safe_tool"]
     end
 
     test "includes sensitive_excluded flag in result" do
@@ -156,17 +213,29 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
     end
 
     test "allows including sensitive tools when explicitly requested" do
-      assert {:ok, result} = ListTools.run(%{include_sensitive: true}, %{})
+      context = %{
+        tools: %{
+          "safe_tool" => SafeTool,
+          "admin_delete_tool" => AdminDeleteTool
+        }
+      }
+
+      assert {:ok, result} = ListTools.run(%{include_sensitive: true}, context)
       assert result.sensitive_excluded == false
+      assert Enum.sort(Enum.map(result.tools, & &1.name)) == ["admin_delete_tool", "safe_tool"]
     end
 
     test "respects allowed_tools allowlist" do
-      # When allowlist is provided, only those tools should be returned
-      assert {:ok, result} = ListTools.run(%{allowed_tools: ["test_tool"]}, %{})
+      context = %{
+        tools: %{
+          "safe_tool" => SafeTool,
+          "zoi_schema_tool" => ZoiSchemaTool
+        }
+      }
 
-      Enum.each(result.tools, fn tool ->
-        assert tool.name == "test_tool"
-      end)
+      assert {:ok, result} = ListTools.run(%{allowed_tools: ["safe_tool"]}, context)
+
+      assert Enum.map(result.tools, & &1.name) == ["safe_tool"]
     end
   end
 end

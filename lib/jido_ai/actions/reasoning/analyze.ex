@@ -50,7 +50,9 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
           |> Zoi.optional(),
         input: Zoi.string(description: "The text or data to analyze"),
         analysis_type:
-          Zoi.atom(description: "Type of analysis to perform (:sentiment, :topics, :entities, :summary, :custom)")
+          Zoi.enum([:sentiment, :topics, :entities, :summary, :custom],
+            description: "Type of analysis to perform (:sentiment, :topics, :entities, :summary, :custom)"
+          )
           |> Zoi.default(:summary),
         custom_prompt:
           Zoi.string(description: "Custom analysis instructions (when analysis_type: :custom)")

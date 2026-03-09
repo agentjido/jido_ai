@@ -43,10 +43,12 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
 
   ### Options
 
-  - `:model` (optional) - Model identifier, defaults to "anthropic:claude-haiku-4-5"
-  - `:branching_factor` (optional) - Number of thoughts per node, defaults to 3
-  - `:max_depth` (optional) - Maximum tree depth, defaults to 3
-  - `:traversal_strategy` (optional) - `:bfs`, `:dfs`, or `:best_first`, defaults to `:best_first`
+  - `:model` (optional) - Model alias or direct model spec, defaults to :fast (resolved via Jido.AI.resolve_model/1)
+  - `:branching_factor`, `:max_depth`, `:traversal_strategy` (optional) - Core tree search controls
+  - `:top_k`, `:min_depth`, `:max_nodes`, `:max_duration_ms`, `:beam_width` (optional) - Search budget and shaping controls
+  - `:early_success_threshold`, `:convergence_window`, `:min_score_improvement`, `:max_parse_retries` (optional) - Completion/parser controls
+  - `:tools`, `:tool_context`, `:tool_timeout_ms`, `:tool_max_retries`, `:tool_retry_backoff_ms`, `:max_tool_round_trips` (optional) - Tool execution controls
+  - `:effect_policy`, `:agent_effect_policy`, `:strategy_effect_policy` (optional) - Effect policy controls
   - `:generation_prompt` (optional) - Custom prompt for thought generation
   - `:evaluation_prompt` (optional) - Custom prompt for thought evaluation
 
@@ -69,6 +71,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
+  alias Jido.AI.Effects
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Reasoning.TreeOfThoughts.Machine
   alias Jido.AI.ToolAdapter
@@ -98,10 +101,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
-          max_tool_round_trips: pos_integer()
+          max_tool_round_trips: pos_integer(),
+          effect_policy: map()
         }
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_top_k 3
   @default_min_depth 2
   @default_max_nodes 100
@@ -290,6 +294,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
       |> Map.merge(%{
         tool_rounds: %{},
         pending_tool_calls: %{},
+        pending_tool_call_order: [],
         pending_tool_results: %{},
         llm_call_aliases: %{},
         pending_tool_phase: nil,
@@ -399,25 +404,32 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   defp process_tool_result(agent, %{call_id: tool_call_id} = params, config) when is_binary(tool_call_id) do
     state = StratState.get(agent, %{})
     pending_calls = state[:pending_tool_calls] || %{}
+    policy = config[:effect_policy] || Effects.default_policy()
 
     case Map.fetch(pending_calls, tool_call_id) do
       :error ->
         {agent, []}
 
       {:ok, _pending} ->
+        result = normalize_tool_result(params[:result])
+
         pending_results =
           Map.put(
             state[:pending_tool_results] || %{},
             tool_call_id,
-            %{result: params[:result], tool_name: params[:tool_name]}
+            %{result: result, tool_name: params[:tool_name]}
           )
 
         state = Map.put(state, :pending_tool_results, pending_results)
+        agent = StratState.put(agent, state)
 
         if pending_tool_round_complete?(state) do
-          resume_after_tool_round(agent, state, config)
+          {agent, effect_directives} = apply_pending_tool_effects(agent, state, policy)
+          state = StratState.get(agent, %{})
+          {agent, resume_directives} = resume_after_tool_round(agent, state, config)
+          {agent, effect_directives ++ resume_directives}
         else
-          {StratState.put(agent, state), []}
+          {agent, []}
         end
     end
   end
@@ -454,6 +466,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     Map.take(state, [
       :tool_rounds,
       :pending_tool_calls,
+      :pending_tool_call_order,
       :pending_tool_results,
       :llm_call_aliases,
       :pending_tool_phase,
@@ -506,6 +519,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
       true ->
         request_id = state[:last_request_id]
         iteration = state[:iteration] || 0
+        state_snapshot = normalize_map_opt(Map.get(agent, :state, %{}))
 
         directives =
           Enum.map(normalized_calls, fn call ->
@@ -525,9 +539,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
                   arguments: call.arguments,
                   context:
                     Map.merge(config[:tool_context] || %{}, %{
+                      state: state_snapshot,
                       agent_id: agent.id,
                       request_id: request_id,
-                      iteration: iteration
+                      iteration: iteration,
+                      effect_policy: config[:effect_policy] || Effects.default_policy()
                     }),
                   timeout_ms: config[:tool_timeout_ms],
                   max_retries: config[:tool_max_retries],
@@ -539,10 +555,12 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
           end)
 
         pending_tool_calls = Map.new(normalized_calls, fn call -> {call.call_id, call} end)
+        pending_tool_call_order = Enum.map(normalized_calls, & &1.call_id)
 
         new_state =
           state
           |> Map.put(:pending_tool_calls, pending_tool_calls)
+          |> Map.put(:pending_tool_call_order, pending_tool_call_order)
           |> Map.put(:pending_tool_results, %{})
           |> Map.put(:pending_tool_call_id, llm_call_id)
           |> Map.put(:pending_tool_turn, turn)
@@ -563,7 +581,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   end
 
   defp pending_tool_round_complete?(state) do
-    pending_calls = Map.keys(state[:pending_tool_calls] || %{})
+    pending_calls = pending_tool_call_order(state)
     completed = Map.keys(state[:pending_tool_results] || %{})
     pending_calls != [] and Enum.all?(pending_calls, &(&1 in completed))
   end
@@ -572,18 +590,19 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     llm_call_id = state[:pending_tool_call_id]
     turn = state[:pending_tool_turn] |> then(&(&1 || %{})) |> Turn.from_result_map()
     pending_calls = state[:pending_tool_calls] || %{}
+    pending_call_order = pending_tool_call_order(state)
     pending_results = state[:pending_tool_results] || %{}
     base_context = get_in(state, [:llm_call_aliases, llm_call_id]) || []
 
     tool_results =
-      pending_calls
-      |> Map.values()
-      |> Enum.map(fn call ->
-        result_entry = pending_results[call.call_id] || %{}
+      Enum.map(pending_call_order, fn call_id ->
+        call = pending_calls[call_id] || %{}
+        result_entry = pending_results[call_id] || %{}
+        tool_name = call[:tool_name] || result_entry[:tool_name] || ""
 
         %{
-          id: call.call_id,
-          name: call.tool_name,
+          id: call_id,
+          name: tool_name,
           raw_result: result_entry[:result] || {:error, :missing_tool_result}
         }
       end)
@@ -606,6 +625,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     new_state =
       state
       |> Map.put(:pending_tool_calls, %{})
+      |> Map.put(:pending_tool_call_order, [])
       |> Map.put(:pending_tool_results, %{})
       |> Map.put(:pending_tool_phase, nil)
       |> Map.put(:pending_tool_call_id, nil)
@@ -613,6 +633,60 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
       |> Map.update(:llm_call_aliases, %{}, &Map.put(&1, llm_call_id, followup_context))
 
     {StratState.put(agent, new_state), [directive]}
+  end
+
+  defp apply_pending_tool_effects(agent, state, policy) do
+    pending_results = state[:pending_tool_results] || %{}
+
+    state
+    |> pending_tool_call_order()
+    |> Enum.reduce({agent, []}, fn call_id, {acc_agent, acc_directives_rev} ->
+      result =
+        pending_results
+        |> Map.get(call_id, %{})
+        |> Map.get(:result, {:error, :missing_tool_result, []})
+
+      {updated_agent, directives, _stats, _filtered_result} = Effects.apply_result(acc_agent, result, policy)
+      {updated_agent, Enum.reverse(directives, acc_directives_rev)}
+    end)
+    |> then(fn {updated_agent, directives_rev} -> {updated_agent, Enum.reverse(directives_rev)} end)
+  end
+
+  defp pending_tool_call_order(state) do
+    pending_calls = pending_tool_calls_map(state)
+    default_order = pending_calls |> Map.keys() |> Enum.sort()
+
+    case state[:pending_tool_call_order] do
+      [_ | _] = order ->
+        filtered_order =
+          order
+          |> Enum.filter(&Map.has_key?(pending_calls, &1))
+          |> Enum.uniq()
+
+        if filtered_order != [], do: filtered_order, else: default_order
+
+      _ ->
+        fallback_from_turn =
+          state[:pending_tool_turn]
+          |> then(&(&1 || %{}))
+          |> Turn.from_result_map()
+          |> Map.get(:tool_calls, [])
+          |> Enum.map(&extract_tool_call_id/1)
+          |> Enum.filter(&is_binary/1)
+          |> Enum.filter(&Map.has_key?(pending_calls, &1))
+          |> Enum.uniq()
+
+        if fallback_from_turn != [], do: fallback_from_turn, else: default_order
+    end
+  rescue
+    _ -> pending_tool_calls_map(state) |> Map.keys() |> Enum.sort()
+  end
+
+  defp pending_tool_calls_map(state) do
+    case state[:pending_tool_calls] do
+      map when is_map(map) -> map
+      _ -> %{}
+    end
   end
 
   defp normalize_tool_calls(tool_calls) when is_list(tool_calls) do
@@ -748,6 +822,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []
     tool_context_opt = normalize_map_opt(Keyword.get(opts, :tool_context, %{}))
+    agent_effect_policy = Keyword.get(opts, :agent_effect_policy, Keyword.get(opts, :effect_policy, %{}))
+    strategy_effect_policy = Keyword.get(opts, :strategy_effect_policy, %{})
     tools_modules = normalize_tools_modules(Keyword.get(opts, :tools, []))
     actions_by_name = ToolAdapter.to_action_map(tools_modules)
     reqllm_tools = ToolAdapter.from_actions(Map.values(actions_by_name))
@@ -755,6 +831,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     # Resolve model
     raw_model = Map.get(agent.state, :model, Keyword.get(opts, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
+    effect_policy = Effects.intersect_policies(agent_effect_policy, strategy_effect_policy)
 
     %{
       model: resolved_model,
@@ -806,7 +883,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, @default_tool_timeout_ms),
       tool_max_retries: Keyword.get(opts, :tool_max_retries, @default_tool_max_retries),
       tool_retry_backoff_ms: Keyword.get(opts, :tool_retry_backoff_ms, @default_tool_retry_backoff_ms),
-      max_tool_round_trips: Keyword.get(opts, :max_tool_round_trips, @default_max_tool_round_trips)
+      max_tool_round_trips: Keyword.get(opts, :max_tool_round_trips, @default_max_tool_round_trips),
+      effect_policy: effect_policy
     }
   end
 
@@ -830,6 +908,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   defp normalize_map_opt(%{} = value), do: value
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
+
+  defp normalize_tool_result(result), do: Effects.normalize_result(result)
 
   defp generate_call_id, do: Machine.generate_call_id()
 

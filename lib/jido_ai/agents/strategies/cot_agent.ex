@@ -20,7 +20,7 @@ defmodule Jido.AI.CoTAgent do
 
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "CoT agent \#{name}")
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:system_prompt` - Custom system prompt for CoT reasoning
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
@@ -43,6 +43,16 @@ defmodule Jido.AI.CoTAgent do
   Or use the synchronous convenience wrapper:
 
       {:ok, result} = MyAgent.think_sync(pid, "What is 15% of 340?")
+
+  ## Request Lifecycle Contract
+
+  - `think/3` emits `ai.cot.query` and returns a request handle immediately.
+  - `await/2` resolves the request handle to either `{:ok, result}` or `{:error, reason}`.
+  - `think_sync/3` wraps `think/3 + await/2`.
+  - Default request policy is `:reject`, so a concurrent in-flight request emits
+    `ai.request.error` with `reason: :busy`.
+  - Correlation is request-id based end-to-end via request handles, strategy state,
+    and delegated worker lifecycle envelopes.
 
   ## State Fields
 
@@ -74,7 +84,7 @@ defmodule Jido.AI.CoTAgent do
       {:ok, result} = MyApp.Reasoner.think_sync(pid, "What is 15% of 340?")
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
 
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
@@ -96,7 +106,7 @@ defmodule Jido.AI.CoTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
@@ -226,13 +236,9 @@ defmodule Jido.AI.CoTAgent do
         snap = strategy_snapshot(agent)
 
         agent =
-          if snap.done? do
-            agent = Request.complete_request(agent, request_id, snap.result)
-            # Also set last_result for CoT-specific backward compat
-            put_in(agent.state[:last_result], snap.result || "")
-          else
-            agent
-          end
+          agent
+          |> maybe_finalize_request(request_id, snap)
+          |> maybe_put_last_result(snap)
 
         {:ok, agent, directives}
       end
@@ -243,25 +249,84 @@ defmodule Jido.AI.CoTAgent do
       end
 
       @impl true
-      def on_after_cmd(agent, _action, directives) do
+      def on_after_cmd(agent, action, directives) do
         # Fallback for actions without request_id (backward compat)
         snap = strategy_snapshot(agent)
+        request_id = request_id_from_action(action, agent.state[:last_request_id])
 
         agent =
-          if snap.done? do
-            %{
-              agent
-              | state:
-                  Map.merge(agent.state, %{
-                    last_result: snap.result || "",
-                    completed: true
-                  })
-            }
-          else
-            agent
-          end
+          agent
+          |> maybe_finalize_request(request_id, snap)
+          |> maybe_mark_completed(snap)
 
         {:ok, agent, directives}
+      end
+
+      defp maybe_finalize_request(agent, request_id, snap) do
+        if request_pending?(agent, request_id) and snap.done? do
+          case snap.status do
+            :success ->
+              Request.complete_request(agent, request_id, snap.result)
+
+            :failure ->
+              Request.fail_request(agent, request_id, failure_reason(snap))
+
+            _ ->
+              agent
+          end
+        else
+          agent
+        end
+      end
+
+      defp request_pending?(agent, request_id) when is_binary(request_id) do
+        case Request.get_request(agent, request_id) do
+          %{status: :pending} -> true
+          _ -> false
+        end
+      end
+
+      defp request_pending?(_agent, _request_id), do: false
+
+      defp maybe_put_last_result(agent, snap) do
+        if snap.done? do
+          put_in(agent.state[:last_result], snap.result || "")
+        else
+          agent
+        end
+      end
+
+      defp maybe_mark_completed(agent, snap) do
+        if snap.done? do
+          %{
+            agent
+            | state:
+                Map.merge(agent.state, %{
+                  last_result: snap.result || "",
+                  completed: true
+                })
+          }
+        else
+          agent
+        end
+      end
+
+      defp request_id_from_action({_, params}, fallback) when is_map(params) do
+        params[:request_id] ||
+          get_in(params, [:event, :request_id]) ||
+          fallback
+      end
+
+      defp request_id_from_action(_action, fallback), do: fallback
+
+      defp failure_reason(snap) do
+        details = Map.get(snap, :details, %{})
+
+        case details[:termination_reason] do
+          :cancelled -> {:cancelled, details[:cancel_reason] || :cancelled}
+          nil -> {:failed, :unknown, snap.result}
+          reason -> {:failed, reason, snap.result}
+        end
       end
 
       defoverridable on_before_cmd: 2, on_after_cmd: 3, think: 3, await: 2, think_sync: 3

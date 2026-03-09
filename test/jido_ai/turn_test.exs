@@ -102,7 +102,7 @@ defmodule Jido.AI.TurnTest do
           tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}]
         }
         |> Turn.with_tool_results([
-          %{id: "tc_1", name: "calculator", content: "{\"result\":8}", raw_result: {:ok, %{result: 8}}}
+          %{id: "tc_1", name: "calculator", content: "{\"result\":8}", raw_result: {:ok, %{result: 8}, []}}
         ])
 
       assert Turn.assistant_message(turn) == %{
@@ -144,12 +144,43 @@ defmodule Jido.AI.TurnTest do
       assert tool_result.id == "tc_1"
       assert tool_result.name == "calculator"
       assert tool_result.content == "{\"result\":8}"
-      assert tool_result.raw_result == {:ok, %{result: 8}}
+      assert tool_result.raw_result == {:ok, %{result: 8}, []}
     end
 
     test "returns original turn when no tool calls are requested" do
       turn = %Turn{type: :final_answer, text: "done", tool_calls: []}
       assert {:ok, ^turn} = Turn.run_tools(turn, %{})
+    end
+  end
+
+  describe "tool execution telemetry" do
+    test "execute_module emits duration_ms measurement on stop events" do
+      test_pid = self()
+      handler_id = "turn-stop-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, measurements, _metadata, _config ->
+            send(test_pid, {:stop_measurements, measurements})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      assert {:ok, _result, _effects} =
+               Turn.execute_module(
+                 Calculator,
+                 %{operation: "add", a: 1, b: 2},
+                 %{observability: %{emit_telemetry?: true}}
+               )
+
+      assert_receive {:stop_measurements, measurements}
+      assert is_integer(measurements.duration_ms)
+      assert measurements.duration_ms >= 0
+      assert is_integer(measurements.duration)
     end
   end
 end

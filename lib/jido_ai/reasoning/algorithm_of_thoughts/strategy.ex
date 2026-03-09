@@ -29,7 +29,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
           llm_timeout_ms: pos_integer() | nil
         }
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
 
   @start :aot_start
   @llm_result :aot_llm_result
@@ -235,7 +235,11 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
   end
 
   defp lift_directives(directives, config) do
-    model = config[:model] || @default_model
+    model =
+      config
+      |> Map.get(:model)
+      |> Kernel.||(@default_model)
+      |> resolve_model_spec()
 
     Enum.flat_map(directives, fn
       {:call_llm_stream, id, conversation} ->
@@ -327,6 +331,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
 
   defp resolve_model_spec(model) when is_atom(model), do: Jido.AI.resolve_model(model)
   defp resolve_model_spec(model) when is_binary(model), do: model
+  defp resolve_model_spec(_), do: Jido.AI.resolve_model(@default_model)
 
   defp normalize_temperature(temp) when is_number(temp), do: temp * 1.0
   defp normalize_temperature(_), do: 0.0

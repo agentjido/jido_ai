@@ -1,56 +1,97 @@
 defmodule Jido.AI.Actions.Reasoning.InferTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias Jido.AI.Actions.Reasoning.Infer
+  alias Jido.AI.TestSupport.FakeReqLLM
 
-  describe "Infer action" do
-    test "has correct metadata" do
-      metadata = Infer.__action_metadata__()
-      assert metadata.name == "reasoning_infer"
-      assert metadata.category == "ai"
-      assert metadata.vsn == "1.0.0"
+  @moduletag :unit
+  @moduletag :capture_log
+
+  setup :set_mimic_from_context
+  setup :stub_req_llm
+
+  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
+
+  describe "schema" do
+    test "defines required fields and defaults" do
+      assert Infer.schema().fields[:premises].meta.required == true
+      assert Infer.schema().fields[:question].meta.required == true
+      refute Infer.schema().fields[:model].meta.required
+      refute Infer.schema().fields[:context].meta.required
+      assert Infer.schema().fields[:max_tokens].value == 2048
+      assert Infer.schema().fields[:temperature].value == 0.3
     end
+  end
 
-    test "requires premises parameter" do
-      assert {:error, _} = Jido.Exec.run(Infer, %{question: "Test"}, %{})
-    end
-
-    test "requires question parameter" do
-      assert {:error, _} = Jido.Exec.run(Infer, %{premises: "Test"}, %{})
-    end
-
-    test "accepts valid parameters with defaults" do
+  describe "run/2 happy path" do
+    test "returns structured inference payload" do
       params = %{
-        premises: "All cats are mammals.",
-        question: "What are cats?"
+        premises: "All cats are mammals. Fluffy is a cat.",
+        question: "Is Fluffy a mammal?"
       }
 
-      assert params.premises == "All cats are mammals."
-      assert params.question == "What are cats?"
+      assert {:ok, result} = Infer.run(params, %{})
+
+      assert result.model == Jido.AI.resolve_model(:reasoning)
+      assert result.result =~ "Premises:"
+      assert result.reasoning == result.result
+      assert_usage(result.usage)
     end
 
-    test "accepts optional context" do
+    test "includes optional context in inference prompt" do
       params = %{
-        premises: "Test premises",
-        question: "Test question",
-        context: "Additional background"
+        premises: "If a service is down, alerts are triggered.",
+        question: "What can we infer if alerts fired?",
+        context: "Alerting can also fire during scheduled drills."
       }
 
-      assert params.context == "Additional background"
+      assert {:ok, result} = Infer.run(params, %{})
+      assert result.result =~ "Additional Context:"
+      assert_usage(result.usage)
+    end
+  end
+
+  describe "validation and security" do
+    test "returns error when premises are missing" do
+      assert {:error, :premises_and_question_required} = Infer.run(%{question: "Test"}, %{})
     end
 
-    test "accepts optional parameters" do
+    test "returns error when question is missing" do
+      assert {:error, :premises_and_question_required} = Infer.run(%{premises: "Test"}, %{})
+    end
+
+    test "rejects dangerous characters in premises" do
+      assert {:error, {:dangerous_character, _char}} =
+               Infer.run(%{premises: "All cats" <> <<1>>, question: "Is Fluffy a cat?"}, %{})
+    end
+
+    test "rejects dangerous characters in context" do
       params = %{
-        premises: "Test",
-        question: "Test",
-        model: "anthropic:claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        temperature: 0.2
+        premises: "All cats are mammals",
+        question: "Is Fluffy a mammal?",
+        context: "Consider" <> <<0>> <> "other possibilities"
       }
 
-      assert params.model == "anthropic:claude-sonnet-4-20250514"
-      assert params.max_tokens == 4096
-      assert params.temperature == 0.2
+      assert {:error, {:dangerous_character, _char}} = Infer.run(params, %{})
     end
+  end
+
+  describe "schema-enforced errors via Jido.Exec" do
+    test "rejects invalid context type" do
+      params = %{
+        premises: "All cats are mammals",
+        question: "Is Fluffy a mammal?",
+        context: 123
+      }
+
+      assert {:error, _} = Jido.Exec.run(Infer, params, %{})
+    end
+  end
+
+  defp assert_usage(usage) do
+    assert usage.input_tokens > 0
+    assert usage.output_tokens > 0
+    assert usage.total_tokens == usage.input_tokens + usage.output_tokens
   end
 end

@@ -1,82 +1,35 @@
-# Jido.AI Usage Rules
+# Jido AI Usage Rules
 
-Jido.AI is an AI integration layer for Jido agents. Prefer action modules and strategy agents over ad-hoc facade calls.
+## Intent
+Implement tool-using AI behavior with explicit model policy, bounded execution, and observable request flow.
 
-## Core Usage
+## Core Contracts
+- Prefer `Jido.AI.Actions.*` and `Jido.AI.Agent` over ad-hoc raw facade calls.
+- Keep model alias, timeout, retry, and request policy explicit.
+- Use **Zoi-first** schemas for structured inputs/outputs and tool contracts.
+- Treat `ask`/`await` request handles as the safe concurrency boundary.
+- Keep provider-specific logic behind ReqLLM integration points.
 
-### Model Selection
+## Library Author Patterns
+- Define tools as `Jido.Action` modules with small, deterministic behavior.
+- Compose strategy agents (`ReAct`, `CoD`, `CoT`, `AoT`, etc.) by workload profile.
+- Route AI outputs into domain actions instead of embedding domain mutation in prompts.
+- Add telemetry hooks for request, LLM, and tool lifecycle events.
 
-```elixir
-Jido.AI.resolve_model(:fast)
-#=> "anthropic:claude-haiku-4-5"
-```
+## QA Patterns
+- Cover tool-call loops, request cancellation/timeouts, and fallback behavior.
+- Keep a stable smoke subset (`mix test.fast`) plus full `mix quality` before release.
+- Validate public examples when strategy/runtime behavior changes.
 
-### Text Generation via Actions
+## Avoid
+- Prompt-only pipelines with no schema validation or execution policy.
+- Hidden model/provider defaults in production-critical paths.
+- Unbounded tool retries/timeouts.
 
-```elixir
-{:ok, result} =
-  Jido.Exec.run(Jido.AI.Actions.LLM.Chat, %{
-    model: "anthropic:claude-haiku-4-5",
-    prompt: "Explain recursion",
-    temperature: 0.3
-  })
-
-result.text
-```
-
-### Structured Output via Actions
-
-```elixir
-schema = Zoi.object(%{name: Zoi.string(), age: Zoi.integer()})
-
-{:ok, result} =
-  Jido.Exec.run(Jido.AI.Actions.LLM.GenerateObject, %{
-    model: "openai:gpt-4o-mini",
-    prompt: "Generate a person object",
-    schema: schema
-  })
-```
-
-## Agent Pattern (`Jido.AI.Agent`)
-
-```elixir
-defmodule MyApp.Agent do
-  use Jido.AI.Agent,
-    name: "my_agent",
-    tools: [Jido.Tools.Arithmetic.Add],
-    model: :fast,
-    request_policy: :reject,
-    tool_timeout_ms: 15_000,
-    tool_max_retries: 1,
-    tool_retry_backoff_ms: 200
-end
-
-{:ok, pid} = Jido.AgentServer.start(agent: MyApp.Agent)
-{:ok, request} = MyApp.Agent.ask(pid, "What is 2 + 2?")
-{:ok, answer} = MyApp.Agent.await(request, timeout: 30_000)
-```
-
-## Error Handling
-
-```elixir
-case MyApp.Agent.ask_sync(pid, "Run a complex task", timeout: 10_000) do
-  {:ok, result} -> {:ok, result}
-  {:error, {:rejected, :busy, _msg}} -> {:error, :agent_busy}
-  {:error, {:cancelled, reason}} -> {:error, {:cancelled, reason}}
-  {:error, :timeout} -> {:error, :timeout}
-  {:error, reason} -> {:error, reason}
-end
-```
-
-## Observability
-
-Attach telemetry to ReAct lifecycle/tool/LLM events. Start with:
-
-- `[:jido, :ai, :react, :request, :start]`
-- `[:jido, :ai, :react, :request, :complete]`
-- `[:jido, :ai, :react, :request, :failed]`
-- `[:jido, :ai, :react, :llm, :start]`
-- `[:jido, :ai, :react, :llm, :complete]`
-- `[:jido, :ai, :react, :tool, :start]`
-- `[:jido, :ai, :react, :tool, :complete]`
-- `[:jido, :ai, :react, :tool, :error]`
+## References
+- `README.md`
+- `guides/`
+- `AGENTS.md`
+- https://hexdocs.pm/jido_ai
+- https://hexdocs.pm/req_llm
+- https://hexdocs.pm/usage_rules/readme.html#usage-rules

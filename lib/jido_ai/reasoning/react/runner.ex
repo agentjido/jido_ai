@@ -7,11 +7,18 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   """
 
   alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token}
-  alias Jido.AI.{Thread, Turn}
+  alias Jido.AI.Effects
+  alias Jido.AI.Context, as: AIContext
+  alias Jido.AI.Turn
+  alias Jido.Agent.State, as: AgentState
 
   require Logger
 
   @receive_timeout 30_000
+
+  # Injected as a user message when the agent repeats the exact same tool
+  # calls with identical arguments on consecutive iterations.
+  @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
 
   @type stream_opt ::
           {:request_id, String.t()}
@@ -72,7 +79,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp coordinator(owner, ref, state, config, opts, stream_opts) do
-    context = Keyword.get(opts, :context, %{})
+    context = build_runtime_context(Keyword.get(opts, :context, %{}), state, config)
 
     state =
       case stream_opts[:emit_start?] do
@@ -131,9 +138,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         state
 
       state.status == :awaiting_tools and state.pending_tool_calls != [] ->
-        state
-        |> run_pending_tool_round(owner, ref, config, context)
-        |> run_loop(owner, ref, config, context)
+        {state, context} = run_pending_tool_round(state, owner, ref, config, context)
+        run_loop(state, owner, ref, config, context)
 
       state.iteration > config.max_iterations ->
         state
@@ -156,9 +162,22 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             state
 
           {:tool_calls, state, tool_calls} ->
-            state
-            |> run_tool_round(owner, ref, config, context, tool_calls)
-            |> run_loop(owner, ref, config, context)
+            prev_signature = Map.get(state, :__prev_tool_signature__)
+            current_signature = tool_call_signature(tool_calls)
+
+            {state, context} = run_tool_round(state, owner, ref, config, context, tool_calls)
+
+            state = Map.put(state, :__prev_tool_signature__, current_signature)
+
+            state =
+              if prev_signature == current_signature and prev_signature != nil do
+                corrected_context = AIContext.append_user(state.context, @cycle_warning)
+                %{state | context: corrected_context}
+              else
+                state
+              end
+
+            run_loop(state, owner, ref, config, context)
 
           {:error, state, reason, error_type} ->
             state
@@ -193,8 +212,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           call_id: call_id,
           model: config.model,
           message_count:
-            Thread.length(state.thread) +
-              case state.thread.system_prompt do
+            AIContext.length(state.context) +
+              case state.context.system_prompt do
                 nil -> 0
                 _ -> 1
               end
@@ -202,7 +221,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         llm_call_id: call_id
       )
 
-    messages = Thread.to_messages(state.thread)
+    messages = AIContext.to_messages(state.context)
     llm_opts = Config.llm_opts(config)
 
     case request_turn(state, owner, ref, config, messages, llm_opts) do
@@ -227,8 +246,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           )
 
         state =
-          Thread.append_assistant(
-            state.thread,
+          AIContext.append_assistant(
+            state.context,
             turn.text,
             case turn.type do
               :tool_calls -> turn.tool_calls
@@ -236,7 +255,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             end,
             maybe_thinking_opt(turn.thinking_content)
           )
-          |> then(&%{state | thread: &1})
+          |> then(&%{state | context: &1})
 
         {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
 
@@ -396,7 +415,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       pending
       |> Task.async_stream(
         fn call -> execute_tool_with_retries(call, config, context) end,
-        ordered: false,
+        # Preserve deterministic tool completion/event ordering by original call order.
+        ordered: true,
         max_concurrency: config.tool_exec.concurrency,
         timeout: config.tool_exec.timeout_ms + 50
       )
@@ -405,9 +425,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
       end)
 
-    {state, thread} =
-      Enum.reduce(results, {state, state.thread}, fn
-        {pending_call, result, attempts, duration_ms}, {acc, thread_acc} ->
+    {state, updated_context} =
+      Enum.reduce(results, {state, state.context}, fn
+        {pending_call, result, attempts, duration_ms}, {acc, context_acc} ->
           completed = PendingToolCall.complete(pending_call, result, attempts, duration_ms)
 
           {acc, _} =
@@ -428,12 +448,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             )
 
           content = Turn.format_tool_result_content(result)
-          thread_acc = Thread.append_tool_result(thread_acc, completed.id, completed.name, content)
-          {acc, thread_acc}
+          context_acc = AIContext.append_tool_result(context_acc, completed.id, completed.name, content)
+          {acc, context_acc}
 
-        {:error, reason}, {acc, thread_acc} ->
+        {:error, reason}, {acc, context_acc} ->
           Logger.error("tool task failure", reason: inspect(reason))
-          {acc, thread_acc}
+          {acc, context_acc}
       end)
 
     state =
@@ -441,10 +461,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       |> State.put_status(:running)
       |> State.clear_pending_tools()
       |> State.inc_iteration()
-      |> Map.put(:thread, thread)
+      |> Map.put(:context, updated_context)
 
     {state, _token} = emit_checkpoint(state, owner, ref, config, :after_tools)
-    state
+    {state, evolve_context_state_snapshot(context, results)}
   end
 
   defp run_pending_tool_round(%State{} = state, owner, ref, %Config{} = config, context) do
@@ -461,6 +481,103 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     )
   end
 
+  defp evolve_context_state_snapshot(context, results) when is_map(context) and is_list(results) do
+    case current_state_snapshot(context) do
+      {:ok, snapshot} ->
+        updated_snapshot =
+          Enum.reduce(results, snapshot, fn
+            {_pending_call, result, _attempts, _duration_ms}, acc ->
+              apply_state_effects(acc, result)
+
+            {:error, _reason}, acc ->
+              acc
+
+            _other, acc ->
+              acc
+          end)
+
+        Map.put(context, :state, updated_snapshot)
+
+      :error ->
+        context
+    end
+  end
+
+  defp evolve_context_state_snapshot(context, _results), do: context
+
+  defp current_state_snapshot(context) when is_map(context) do
+    case context[:state] do
+      %{} = snapshot -> {:ok, snapshot}
+      _ -> :error
+    end
+  end
+
+  defp build_runtime_context(context, %State{} = state, %Config{} = config) when is_map(context) do
+    context
+    |> Map.put_new(:request_id, state.request_id)
+    |> Map.put_new(:run_id, state.run_id)
+    |> Map.put_new(:effect_policy, config.effect_policy)
+    |> Map.put_new(:observability, config.observability)
+  end
+
+  defp build_runtime_context(_context, %State{} = state, %Config{} = config) do
+    build_runtime_context(%{}, state, config)
+  end
+
+  defp apply_state_effects(snapshot, result) when is_map(snapshot) do
+    {_status, _payload, effects} = Effects.normalize_result(result)
+
+    Enum.reduce(effects, snapshot, fn
+      %Jido.Agent.StateOp.SetState{attrs: attrs}, acc when is_map(attrs) ->
+        AgentState.merge(acc, attrs)
+
+      %Jido.Agent.StateOp.ReplaceState{state: new_state}, _acc when is_map(new_state) ->
+        new_state
+
+      %Jido.Agent.StateOp.DeleteKeys{keys: keys}, acc when is_list(keys) ->
+        Map.drop(acc, keys)
+
+      %Jido.Agent.StateOp.SetPath{path: path, value: value}, acc when is_list(path) ->
+        put_in_path(acc, path, value)
+
+      %Jido.Agent.StateOp.DeletePath{path: path}, acc when is_list(path) ->
+        delete_in_path(acc, path)
+
+      _other, acc ->
+        acc
+    end)
+  end
+
+  defp apply_state_effects(snapshot, _result), do: snapshot
+
+  defp put_in_path(map, [key], value) when is_map(map), do: Map.put(map, key, value)
+
+  defp put_in_path(map, [key | rest], value) when is_map(map) do
+    nested =
+      case Map.get(map, key) do
+        %{} = current -> current
+        _ -> %{}
+      end
+
+    Map.put(map, key, put_in_path(nested, rest, value))
+  end
+
+  defp put_in_path(map, _path, _value), do: map
+
+  defp delete_in_path(map, [key]) when is_map(map), do: Map.delete(map, key)
+
+  defp delete_in_path(map, [key | rest]) when is_map(map) do
+    case Map.get(map, key) do
+      %{} = nested ->
+        Map.put(map, key, delete_in_path(nested, rest))
+
+      _ ->
+        map
+    end
+  end
+
+  defp delete_in_path(map, _path), do: map
+
   defp execute_tool_with_retries(%PendingToolCall{} = pending_call, %Config{} = config, context) do
     module = Map.get(config.tools, pending_call.name)
 
@@ -469,7 +586,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         do_execute_tool_with_retries(pending_call, module, config, context, 1)
 
       _ ->
-        {pending_call, {:error, %{type: :unknown_tool, message: "Tool '#{pending_call.name}' not found"}}, 1, 0}
+        {pending_call, {:error, %{type: :unknown_tool, message: "Tool '#{pending_call.name}' not found"}, []}, 1, 0}
     end
   end
 
@@ -501,12 +618,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp retryable?({:ok, _}), do: false
+  defp retryable?({:ok, _, _}), do: false
 
-  defp retryable?({:error, %{type: :timeout}}), do: true
-  defp retryable?({:error, %{type: :exception}}), do: true
-  defp retryable?({:error, %{type: :execution_error}}), do: true
-  defp retryable?({:error, _}), do: false
+  defp retryable?({:error, %{type: :timeout}, _}), do: true
+  defp retryable?({:error, %{type: :exception}, _}), do: true
+  defp retryable?({:error, %{type: :execution_error}, _}), do: true
+  defp retryable?({:error, _, _}), do: false
 
   defp finalize(%State{} = state, owner, ref, %Config{} = config) do
     {state, _token} = emit_checkpoint(state, owner, ref, config, :terminal)
@@ -620,14 +737,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp latest_query(%State{} = state) do
-    case Thread.last_entry(state.thread) do
+    case AIContext.last_entry(state.context) do
       %{role: :user, content: content} when is_binary(content) -> content
       _ -> ""
     end
   end
 
   defp append_query(%State{} = state, query) when is_binary(query) do
-    %{state | thread: Thread.append_user(state.thread, query), status: :running, updated_at_ms: now_ms()}
+    %{state | context: AIContext.append_user(state.context, query), status: :running, updated_at_ms: now_ms()}
   end
 
   defp maybe_thinking_opt(nil), do: []
@@ -679,10 +796,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     Turn.execute_module(module, params, context, opts)
   rescue
     error ->
-      {:error, %{type: :exception, error: Exception.message(error), exception_type: error.__struct__}}
+      {:error, %{type: :exception, error: Exception.message(error), exception_type: error.__struct__}, []}
   catch
     kind, reason ->
-      {:error, %{type: :caught, kind: kind, error: inspect(reason)}}
+      {:error, %{type: :caught, kind: kind, error: inspect(reason)}, []}
   end
 
   defp normalize_timeout(value) when is_integer(value) and value > 0, do: value
@@ -695,4 +812,17 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp normalize_backoff(_), do: 0
 
   defp now_ms, do: System.system_time(:millisecond)
+
+  # Tool call maps may arrive with atom or string keys depending on the
+  # provider adapter, so we check both.
+  defp tool_call_signature(tool_calls) when is_list(tool_calls) do
+    tool_calls
+    |> Enum.map(fn tc ->
+      name = Map.get(tc, :name) || Map.get(tc, "name") || ""
+      args = Map.get(tc, :arguments) || Map.get(tc, "arguments") || ""
+      "#{name}:#{inspect(args)}"
+    end)
+    |> Enum.sort()
+    |> Enum.join("|")
+  end
 end

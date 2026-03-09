@@ -6,7 +6,7 @@ After this guide, you will have a `Jido.AI.Agent` running with one tool and a sy
 
 ## Prerequisites
 
-- Elixir `~> 1.17`
+- Elixir `~> 1.18`
 - API key configured for your provider
 
 ## 1. Add Dependencies
@@ -15,8 +15,8 @@ After this guide, you will have a `Jido.AI.Agent` running with one tool and a sy
 # mix.exs
 defp deps do
   [
-    {:jido, "~> 2.0"},
-    {:jido_ai, "~> 2.0"}
+    {:jido, "~> 2.0.0-rc.5"},
+    {:jido_ai, "~> 2.0.0-rc.0"}
   ]
 end
 ```
@@ -31,8 +31,8 @@ mix deps.get
 # config/config.exs
 config :jido_ai,
   model_aliases: %{
-    fast: "anthropic:claude-haiku-4-5",
-    capable: "anthropic:claude-sonnet-4-20250514"
+    fast: "provider:fast-model",
+    capable: "provider:capable-model"
   }
 ```
 
@@ -68,11 +68,37 @@ Symptom:
 
 Fix:
 - Add the alias under `config :jido_ai, model_aliases: ...`
-- Or pass a direct model string like `"anthropic:claude-haiku-4-5"`
+- Or pass a direct model string like `"provider:exact-model-id"`
+
+## Failure Mode: CompileError In tool_context
+
+Symptom:
+
+```elixir
+** (CompileError) Unsafe construct in tool_context or tools: function call ...
+```
+
+Fix:
+- `tool_context` must be literal data: module aliases, atoms, strings, numbers, lists, and maps
+- Function calls, module attributes (`@my_attr`), and pinned variables (`^var`) are rejected at compile time
+
+```elixir
+# BAD — function call in tool_context
+use Jido.AI.Agent,
+  name: "my_agent",
+  tools: [MyTool],
+  tool_context: %{timestamp: DateTime.utc_now()}
+
+# GOOD — literal data only
+use Jido.AI.Agent,
+  name: "my_agent",
+  tools: [MyTool],
+  tool_context: %{domain: MyApp.Domain, env: :production}
+```
 
 ## Defaults You Should Know
 
-- ReAct model default: `anthropic:claude-haiku-4-5`
+- ReAct model default alias: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
 - ReAct max iterations default: `10`
 - Request await timeout default: `30_000ms`
 

@@ -70,6 +70,21 @@ defmodule Jido.AI.AgentTest do
       tool_context: %{tenant_id: "tenant_123", enabled: true}
   end
 
+  defmodule AgentWithLlmOpts do
+    use Jido.AI.Agent,
+      name: "agent_with_llm_opts",
+      tools: [TestCalculator],
+      llm_opts: [thinking: %{type: :enabled, budget_tokens: 800}, reasoning_effort: :high],
+      req_http_options: [adapter: [recv_timeout: 2_000]]
+  end
+
+  defmodule AgentWithStreamingDisabled do
+    use Jido.AI.Agent,
+      name: "agent_no_streaming",
+      tools: [TestCalculator],
+      streaming: false
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -174,6 +189,23 @@ defmodule Jido.AI.AgentTest do
       assert config.base_tool_context[:enabled] == true
     end
 
+    test "llm_opts and req_http_options are forwarded into strategy config" do
+      agent = AgentWithLlmOpts.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.base_llm_opts == [thinking: %{type: :enabled, budget_tokens: 800}, reasoning_effort: :high]
+      assert config.base_req_http_options == [adapter: [recv_timeout: 2_000]]
+    end
+
+    test "streaming: false is forwarded into strategy config" do
+      agent = AgentWithStreamingDisabled.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.streaming == false
+    end
+
     test "tools list resolves module aliases" do
       agent = BasicAgent.new()
       tools = ReAct.list_tools(agent)
@@ -237,6 +269,23 @@ defmodule Jido.AI.AgentTest do
 
       assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
       assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}
+    end
+
+    test "on_after_cmd cancel does not overwrite completed request" do
+      agent = BasicAgent.new()
+      agent = Request.start_request(agent, "req_1", "query")
+      agent = Request.complete_request(agent, "req_1", "done")
+
+      {:ok, agent, _directives} =
+        BasicAgent.on_after_cmd(
+          agent,
+          {:ai_react_cancel, %{request_id: "req_1", reason: :user_cancelled}},
+          []
+        )
+
+      assert get_in(agent.state, [:requests, "req_1", :status]) == :completed
+      assert get_in(agent.state, [:requests, "req_1", :result]) == "done"
+      assert get_in(agent.state, [:requests, "req_1", :error]) == nil
     end
   end
 

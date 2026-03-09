@@ -2,7 +2,18 @@ defmodule Jido.AI.SignalTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Reasoning.ReAct.Signal, as: ReactSignal
-  alias Jido.AI.Signal.{LLMDelta, LLMResponse, Usage}
+
+  alias Jido.AI.Signal.{
+    EmbedResult,
+    LLMDelta,
+    LLMResponse,
+    RequestCompleted,
+    RequestError,
+    RequestFailed,
+    RequestStarted,
+    ToolResult,
+    Usage
+  }
 
   describe "ReactEvent" do
     test "creates worker event signal with required fields" do
@@ -223,6 +234,98 @@ defmodule Jido.AI.SignalTest do
     end
   end
 
+  describe "request lifecycle signals" do
+    test "RequestStarted uses canonical lifecycle namespace" do
+      signal =
+        RequestStarted.new!(%{
+          request_id: "req_start_1",
+          query: "What is the weather?",
+          run_id: "run_1"
+        })
+
+      assert signal.type == "ai.request.started"
+      assert signal.source == "/ai/request"
+      assert signal.data.request_id == "req_start_1"
+      assert signal.data.query == "What is the weather?"
+      assert signal.data.run_id == "run_1"
+    end
+
+    test "RequestCompleted uses canonical lifecycle namespace" do
+      signal =
+        RequestCompleted.new!(%{
+          request_id: "req_complete_1",
+          result: %{answer: "Sunny"},
+          run_id: "run_2"
+        })
+
+      assert signal.type == "ai.request.completed"
+      assert signal.source == "/ai/request"
+      assert signal.data.request_id == "req_complete_1"
+      assert signal.data.result == %{answer: "Sunny"}
+      assert signal.data.run_id == "run_2"
+    end
+
+    test "RequestFailed uses canonical lifecycle namespace" do
+      signal =
+        RequestFailed.new!(%{
+          request_id: "req_failed_1",
+          error: {:error, :timeout},
+          run_id: "run_3"
+        })
+
+      assert signal.type == "ai.request.failed"
+      assert signal.source == "/ai/request"
+      assert signal.data.request_id == "req_failed_1"
+      assert signal.data.error == {:error, :timeout}
+      assert signal.data.run_id == "run_3"
+    end
+
+    test "RequestError uses canonical request rejection namespace" do
+      signal =
+        RequestError.new!(%{
+          request_id: "req_error_1",
+          reason: :busy,
+          message: "Agent is processing another request"
+        })
+
+      assert signal.type == "ai.request.error"
+      assert signal.source == "/ai/strategy"
+      assert signal.data.request_id == "req_error_1"
+      assert signal.data.reason == :busy
+      assert signal.data.message =~ "processing"
+    end
+  end
+
+  describe "tool/embed result signals" do
+    test "ToolResult uses canonical tool namespace" do
+      signal =
+        ToolResult.new!(%{
+          call_id: "tool_1",
+          tool_name: "calculator",
+          result: {:ok, %{value: 3}}
+        })
+
+      assert signal.type == "ai.tool.result"
+      assert signal.source == "/ai/tool"
+      assert signal.data.call_id == "tool_1"
+      assert signal.data.tool_name == "calculator"
+      assert signal.data.result == {:ok, %{value: 3}}
+    end
+
+    test "EmbedResult uses canonical embed namespace" do
+      signal =
+        EmbedResult.new!(%{
+          call_id: "embed_1",
+          result: {:ok, [0.1, 0.2, 0.3]}
+        })
+
+      assert signal.type == "ai.embed.result"
+      assert signal.source == "/ai/embed"
+      assert signal.data.call_id == "embed_1"
+      assert signal.data.result == {:ok, [0.1, 0.2, 0.3]}
+    end
+  end
+
   describe "extract_tool_calls/1" do
     test "extracts tool calls from successful result with tool_calls type" do
       tool_calls = [
@@ -266,6 +369,16 @@ defmodule Jido.AI.SignalTest do
         LLMResponse.new!(%{
           call_id: "call_tc_4",
           result: {:error, %{reason: "timeout"}}
+        })
+
+      assert LLMResponse.extract_tool_calls(signal) == []
+    end
+
+    test "returns empty list for non-map ok result payloads" do
+      signal =
+        LLMResponse.new!(%{
+          call_id: "call_tc_5",
+          result: {:ok, "plain text payload"}
         })
 
       assert LLMResponse.extract_tool_calls(signal) == []
@@ -325,6 +438,16 @@ defmodule Jido.AI.SignalTest do
       assert LLMResponse.tool_call?(signal) == false
     end
 
+    test "returns false for non-map ok result payloads" do
+      signal =
+        LLMResponse.new!(%{
+          call_id: "call_is_tc_5",
+          result: {:ok, "plain text payload"}
+        })
+
+      assert LLMResponse.tool_call?(signal) == false
+    end
+
     test "returns false for non-LLMResponse signals" do
       signal =
         Usage.new!(%{
@@ -349,7 +472,7 @@ defmodule Jido.AI.SignalTest do
 
       assert signal.type == "ai.llm.response"
       assert signal.data.call_id == "call_from_1"
-      assert {:ok, result} = signal.data.result
+      assert {:ok, result, []} = signal.data.result
       assert result.type == :final_answer
       assert result.text == "Hello, world!"
       assert result.tool_calls == []
@@ -406,7 +529,7 @@ defmodule Jido.AI.SignalTest do
 
       {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_5")
 
-      {:ok, result} = signal.data.result
+      {:ok, result, []} = signal.data.result
       assert result.text == "First part. \nSecond part."
     end
 
@@ -423,7 +546,7 @@ defmodule Jido.AI.SignalTest do
       {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_6")
 
       assert signal.data.thinking_content == "Let me analyze this..."
-      {:ok, result} = signal.data.result
+      {:ok, result, []} = signal.data.result
       assert result.text == "Here is my answer."
     end
 
@@ -439,7 +562,7 @@ defmodule Jido.AI.SignalTest do
 
       {:ok, signal} = LLMResponse.from_reqllm_response(response, call_id: "call_from_7")
 
-      {:ok, result} = signal.data.result
+      {:ok, result, []} = signal.data.result
       assert result.type == :tool_calls
       assert length(result.tool_calls) == 1
       [tc] = result.tool_calls

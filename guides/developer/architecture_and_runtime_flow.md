@@ -27,9 +27,9 @@ After this guide, you can trace one request end-to-end and debug failures at the
   "jido-ai-trace",
   [
     [:jido, :ai, :llm, :start],
-    [:jido, :ai, :llm, :stop],
+    [:jido, :ai, :llm, :complete],
     [:jido, :ai, :tool, :start],
-    [:jido, :ai, :tool, :stop]
+    [:jido, :ai, :tool, :complete]
   ],
   fn event, measurements, metadata, _ ->
     IO.inspect({event, measurements, metadata})
@@ -53,6 +53,31 @@ Fix:
 - strategies store internal data in `agent.state.__strategy__`
 - request lifecycle signals are standardized under `ai.request.*`
 - canonical signal contracts are defined by `Jido.AI.Signal` and strategy routes
+
+## Compile-Cycle Triage With `mix xref`
+
+Use `mix xref` whenever recompilation feels wider than expected:
+
+```bash
+# Show compile-connected strongly connected components (SCCs)
+mix xref graph --format cycles --label compile-connected
+
+# Show cycle counts and graph stats
+mix xref graph --format stats --label compile-connected
+
+# Trace a dependency path between files
+mix xref graph --source lib/path_a.ex --sink lib/path_b.ex
+
+# Show direct compile edges from one file
+mix xref graph --label compile --source lib/path_a.ex
+```
+
+Interpretation:
+
+- `compile` edges have the highest recompilation impact.
+- `export` edges recompile dependents when a module public API changes.
+- `runtime` edges have the lowest compile-time impact.
+- Prioritize removing SCCs that include at least one `compile` edge.
 
 ## Registry Lifecycle Guarantees
 

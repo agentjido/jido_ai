@@ -1,83 +1,44 @@
-# AGENTS.md - Jido AI Development Guide
+# AGENTS.md - Jido.AI Guide
 
-## Build/Test/Lint Commands
+## Intent
+Build tool-using AI agents with explicit strategy, runtime policy, and reliable request orchestration.
 
-- `mix test` - Run tests (excludes flaky tests)
-- `mix test path/to/specific_test.exs` - Run a single test file
-- `mix test --include flaky` - Run all tests including flaky ones
-- `mix quality` or `mix q` - Run full quality check (format, compile, dialyzer, credo)
-- `mix format` - Auto-format code
-- `mix dialyzer` - Type checking
-- `mix credo` - Code analysis
-- `mix coveralls` - Test coverage report
-- `mix docs` - Generate documentation
+## Runtime Baseline
+- Elixir `~> 1.18`
+- OTP `27+` (release QA baseline)
 
-## Architecture
+## Commands
+- `mix test` (default alias excludes `:flaky`)
+- `mix test.fast` (stable smoke suite)
+- `mix precommit` (`format`, `compile --warnings-as-errors`, `doctor --summary --raise`, `test.fast`)
+- `mix q` or `mix quality` (`format`, `compile`, `credo`, `doctor`, `dialyzer`)
+- `mix docs`
 
-Jido.AI is the **AI integration layer** for the Jido ecosystem, providing:
+## Architecture Snapshot
+- `Jido.AI.Agent` + strategy agents (`CoD`, `CoT`, `AoT`, `ToT`, `GoT`, `TRM`, `Adaptive`)
+- `Jido.AI.Actions.*`: reusable runtime actions for chat/tool/structured flows
+- ReqLLM integration for provider abstraction and model routing
+- Policy/observability modules for retries, quotas, telemetry, and traceability
 
-- **Jido.AI** - Core module for AI interactions via ReqLLM
-- **Jido.AI.Actions** - Pre-built actions for common AI operations
-- **Jido.AI.Error** - Splode-based error handling
+## Standards
+- Keep model selection, timeout, retry, and tool policy explicit
+- Use **Zoi-first** schemas for tool inputs and structured outputs
+- Keep provider-specific behavior behind ReqLLM integration boundaries
+- Preserve tagged tuple and structured error contracts
+- Prefer deterministic fallback behavior over ad-hoc prompt pipelines
 
-### Dependencies
+## Testing and QA
+- Cover strategy behavior, tool-call loops, and error/fallback handling
+- Keep flaky tests isolated behind tags; maintain a stable smoke subset (`mix test.fast`)
+- Validate public examples/scripts when runtime behavior changes
 
-- **jido_action** - Composable action framework
-- **jido_signal** - Event/signal handling
-- **jido** - Agent framework
-- **req_llm** - LLM provider abstraction (Anthropic, OpenAI, Google, etc.)
-- **zoi** - Schema validation with transformations
-- **splode** - Structured error handling
+## Release Hygiene
+- Keep semver ranges stable (`~> 2.0` ecosystem peers; package currently `2.0.0-rc.0`)
+- Use Conventional Commits
+- Update `CHANGELOG.md`, guides, and migration notes for behavior/API changes
 
-## Code Style Guidelines
-
-- Use `@moduledoc` for module documentation following existing patterns
-- TypeSpecs: Define `@type` for custom types, use strict typing throughout
-- Use Zoi schemas for parameter validation in actions
-- Error handling: Return `{:ok, result}` or `{:error, reason}` tuples consistently
-- Module organization: Actions in `lib/jido_ai/actions/`, core in `lib/jido_ai/`
-- Testing: Use ExUnit, test parameter validation and execution separately
-- Naming: Snake_case for functions/variables, PascalCase for modules
-
-### Zoi Schema Patterns
-
-**Prefer Zoi schemas** for validation and transformations:
-
-```elixir
-use Jido.Action,
-  schema: Zoi.object(%{
-    model: Zoi.string() |> Zoi.trim(),
-    prompt: Zoi.string() |> Zoi.min_length(1),
-    temperature: Zoi.float() |> Zoi.optional() |> Zoi.default(0.7)
-  })
-```
-
-## Git Commit Guidelines
-
-Use **Conventional Commits** format for all commit messages:
-
-```
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-**Types:**
-- `feat` - New feature
-- `fix` - Bug fix
-- `docs` - Documentation only
-- `style` - Formatting, no code change
-- `refactor` - Code change that neither fixes a bug nor adds a feature
-- `test` - Adding or updating tests
-- `chore` - Maintenance tasks, dependency updates
-
-**Examples:**
-```
-feat(actions): add structured output generation action
-fix(llm): handle rate limit errors gracefully
-docs: update getting started guide
-test(actions): add tests for chat completion action
-chore(deps): bump req_llm to 1.2.0
-```
+## References
+- `README.md`
+- `usage-rules.md`
+- `guides/`
+- https://hexdocs.pm/jido_ai

@@ -162,7 +162,7 @@ defmodule Jido.AI.ToolAdapter do
 
   def to_action_map(%{} = tools) do
     cond do
-      Enum.all?(tools, fn {name, mod} -> is_binary(name) and is_atom(mod) end) ->
+      Enum.all?(tools, fn {name, mod} -> is_binary(name) and valid_action_module?(mod) end) ->
         tools
 
       true ->
@@ -174,12 +174,16 @@ defmodule Jido.AI.ToolAdapter do
 
   def to_action_map(modules) when is_list(modules) do
     modules
-    |> Enum.filter(&is_atom/1)
+    |> Enum.filter(&valid_action_module?/1)
     |> Map.new(fn module -> {module.name(), module} end)
   end
 
   def to_action_map(module) when is_atom(module) do
-    %{module.name() => module}
+    if valid_action_module?(module) do
+      %{module.name() => module}
+    else
+      %{}
+    end
   end
 
   def to_action_map(_), do: %{}
@@ -250,6 +254,12 @@ defmodule Jido.AI.ToolAdapter do
     end
   end
 
+  defp valid_action_module?(module) when is_atom(module) do
+    Code.ensure_loaded?(module) and function_exported?(module, :name, 0)
+  end
+
+  defp valid_action_module?(_), do: false
+
   # ============================================================================
   # Private Functions - Schema and Filtering
   # ============================================================================
@@ -261,7 +271,7 @@ defmodule Jido.AI.ToolAdapter do
   end
 
   defp build_json_schema(schema) do
-    case ActionSchema.to_json_schema(schema, strict: true) do
+    case schema |> action_schema_to_json_schema() |> enforce_no_additional_properties() do
       empty when empty == %{} ->
         %{"type" => "object", "properties" => %{}, "required" => [], "additionalProperties" => false}
 
@@ -269,6 +279,44 @@ defmodule Jido.AI.ToolAdapter do
         json_schema
     end
   end
+
+  # Support released jido_action API (`to_json_schema/1`) and
+  # newer branch API (`to_json_schema/2`) used by some dev setups.
+  defp action_schema_to_json_schema(schema) do
+    cond do
+      function_exported?(ActionSchema, :to_json_schema, 2) ->
+        apply(ActionSchema, :to_json_schema, [schema, [strict: true]])
+
+      function_exported?(ActionSchema, :to_json_schema, 1) ->
+        ActionSchema.to_json_schema(schema)
+
+      true ->
+        %{}
+    end
+  end
+
+  defp enforce_no_additional_properties(schema) when is_map(schema) do
+    schema
+    |> Enum.map(fn {key, value} -> {key, enforce_no_additional_properties(value)} end)
+    |> Map.new()
+    |> maybe_put_additional_properties_false()
+  end
+
+  defp enforce_no_additional_properties(schema) when is_list(schema) do
+    Enum.map(schema, &enforce_no_additional_properties/1)
+  end
+
+  defp enforce_no_additional_properties(schema), do: schema
+
+  defp maybe_put_additional_properties_false(%{"type" => "object"} = schema) do
+    Map.put_new(schema, "additionalProperties", false)
+  end
+
+  defp maybe_put_additional_properties_false(%{"properties" => _properties} = schema) do
+    Map.put_new(schema, "additionalProperties", false)
+  end
+
+  defp maybe_put_additional_properties_false(schema), do: schema
 
   # Infers whether an action should use strict mode for LLM tool calling.
   #

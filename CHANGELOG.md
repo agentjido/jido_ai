@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0-beta] - Unreleased
+## [2.0.0-rc.0] - 2026-02-22
 
 ### Added
 
@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Published the first 2.0.0 release-candidate line for Hex (`2.0.0-rc.0`)
+- Aligned ecosystem dependency ranges to stable releases: `jido ~> 2.0`, `jido_action ~> 2.0`
+- Updated dev/test smoke dependency to `jido_browser ~> 1.0`
 - Strategy runtimes now execute plugin-routed `Jido.Action` module instructions instead of no-oping unknown module actions.
 - Plugin-routed action context is standardized to include `state`, `agent`, and `plugin_state`.
 - LLM/tool-calling actions now consistently read mounted defaults from context/plugin state.

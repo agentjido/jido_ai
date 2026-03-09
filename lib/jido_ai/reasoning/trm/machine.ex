@@ -335,6 +335,14 @@ defmodule Jido.AI.Reasoning.TRM.Machine do
   end
 
   # Handle reasoning LLM response
+  defp handle_reasoning_result(machine, {:error, reason, _effects}) do
+    handle_reasoning_result(machine, {:error, reason})
+  end
+
+  defp handle_reasoning_result(machine, {:ok, result, _effects}) do
+    handle_reasoning_result(machine, {:ok, result})
+  end
+
   defp handle_reasoning_result(machine, {:error, reason}) do
     handle_error(machine, reason)
   end
@@ -371,6 +379,14 @@ defmodule Jido.AI.Reasoning.TRM.Machine do
   end
 
   # Handle supervision LLM response
+  defp handle_supervision_result(machine, {:error, reason, _effects}) do
+    handle_supervision_result(machine, {:error, reason})
+  end
+
+  defp handle_supervision_result(machine, {:ok, result, _effects}) do
+    handle_supervision_result(machine, {:ok, result})
+  end
+
   defp handle_supervision_result(machine, {:error, reason}) do
     handle_error(machine, reason)
   end
@@ -429,6 +445,14 @@ defmodule Jido.AI.Reasoning.TRM.Machine do
   end
 
   # Handle improvement LLM response
+  defp handle_improvement_result(machine, {:error, reason, _effects}) do
+    handle_improvement_result(machine, {:error, reason})
+  end
+
+  defp handle_improvement_result(machine, {:ok, result, _effects}) do
+    handle_improvement_result(machine, {:ok, result})
+  end
+
   defp handle_improvement_result(machine, {:error, reason}) do
     handle_error(machine, reason)
   end

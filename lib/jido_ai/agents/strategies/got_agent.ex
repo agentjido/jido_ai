@@ -22,7 +22,7 @@ defmodule Jido.AI.GoTAgent do
 
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "GoT agent \#{name}")
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:max_nodes` - Maximum number of nodes in the graph (default: 20)
   - `:max_depth` - Maximum depth of the graph (default: 5)
   - `:aggregation_strategy` - `:voting`, `:weighted`, or `:synthesis` (default: `:synthesis`)
@@ -87,7 +87,7 @@ defmodule Jido.AI.GoTAgent do
   - `:synthesis` - Synthesizes all thoughts into a coherent conclusion (default)
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_nodes 20
   @default_max_depth 5
   @default_aggregation_strategy :synthesis
@@ -127,7 +127,7 @@ defmodule Jido.AI.GoTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
           last_prompt: Zoi.string() |> Zoi.default(""),
@@ -251,12 +251,9 @@ defmodule Jido.AI.GoTAgent do
         snap = strategy_snapshot(agent)
 
         agent =
-          if snap.done? do
-            agent = Request.complete_request(agent, request_id, snap.result)
-            put_in(agent.state[:last_result], snap.result || "")
-          else
-            agent
-          end
+          agent
+          |> maybe_finalize_request(request_id, snap)
+          |> maybe_put_last_result(snap)
 
         {:ok, agent, directives}
       end
@@ -267,24 +264,83 @@ defmodule Jido.AI.GoTAgent do
       end
 
       @impl true
-      def on_after_cmd(agent, _action, directives) do
+      def on_after_cmd(agent, action, directives) do
         snap = strategy_snapshot(agent)
+        request_id = request_id_from_action(action, agent.state[:last_request_id])
 
         agent =
-          if snap.done? do
-            %{
-              agent
-              | state:
-                  Map.merge(agent.state, %{
-                    last_result: snap.result || "",
-                    completed: true
-                  })
-            }
-          else
-            agent
-          end
+          agent
+          |> maybe_finalize_request(request_id, snap)
+          |> maybe_mark_completed(snap)
 
         {:ok, agent, directives}
+      end
+
+      defp maybe_finalize_request(agent, request_id, snap) do
+        if request_pending?(agent, request_id) and snap.done? do
+          case snap.status do
+            :success ->
+              Request.complete_request(agent, request_id, snap.result)
+
+            :failure ->
+              Request.fail_request(agent, request_id, failure_reason(snap))
+
+            _ ->
+              agent
+          end
+        else
+          agent
+        end
+      end
+
+      defp request_pending?(agent, request_id) when is_binary(request_id) do
+        case Request.get_request(agent, request_id) do
+          %{status: :pending} -> true
+          _ -> false
+        end
+      end
+
+      defp request_pending?(_agent, _request_id), do: false
+
+      defp maybe_put_last_result(agent, snap) do
+        if snap.done? do
+          put_in(agent.state[:last_result], snap.result || "")
+        else
+          agent
+        end
+      end
+
+      defp maybe_mark_completed(agent, snap) do
+        if snap.done? do
+          %{
+            agent
+            | state:
+                Map.merge(agent.state, %{
+                  last_result: snap.result || "",
+                  completed: true
+                })
+          }
+        else
+          agent
+        end
+      end
+
+      defp request_id_from_action({_, params}, fallback) when is_map(params) do
+        params[:request_id] ||
+          get_in(params, [:event, :request_id]) ||
+          fallback
+      end
+
+      defp request_id_from_action(_action, fallback), do: fallback
+
+      defp failure_reason(snap) do
+        details = Map.get(snap, :details, %{})
+
+        case details[:termination_reason] do
+          :cancelled -> {:cancelled, details[:cancel_reason] || :cancelled}
+          nil -> {:failed, :unknown, snap.result}
+          reason -> {:failed, reason, snap.result}
+        end
       end
 
       defoverridable on_before_cmd: 2, on_after_cmd: 3, explore: 3, await: 2, explore_sync: 3

@@ -81,7 +81,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
   alias Jido.AI.Reasoning.TRM.Strategy, as: TRM
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_strategy :react
 
   # Strategy module mapping

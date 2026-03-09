@@ -6,9 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Reasoning.ReAct
-  alias Jido.AI.Reasoning.ReAct.Event
-  alias Jido.AI.Reasoning.ReAct.Signal
+  alias Jido.AI.Reasoning.ReAct.{Config, Event, Runner, Signal}
 
   @start :react_worker_start
   @cancel :react_worker_cancel
@@ -26,6 +24,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
           run_id: Zoi.string(),
           query: Zoi.string(),
           config: Zoi.any(),
+          state: Zoi.any() |> Zoi.optional(),
           context: Zoi.map() |> Zoi.default(%{}),
           task_supervisor: Zoi.any() |> Zoi.optional()
         }),
@@ -175,8 +174,9 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
       directives = List.wrap(emit_parent_event(agent, request_id, event))
       {agent, directives}
     else
-      config = ReAct.build_config(config_input)
+      config = build_runtime_config(config_input)
       context = Map.get(params, :context, %{}) || %{}
+      runtime_state = Map.get(params, :state)
       task_supervisor = Map.get(params, :task_supervisor)
       worker_pid = self()
 
@@ -185,6 +185,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
         |> Keyword.put(:request_id, request_id)
         |> Keyword.put(:run_id, run_id)
         |> Keyword.put(:context, context)
+        |> maybe_put_runtime_state(runtime_state)
         |> maybe_put_task_supervisor(task_supervisor)
 
       case start_task(fn -> run_stream(worker_pid, request_id, query, config, stream_opts) end, task_supervisor) do
@@ -303,7 +304,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   defp process_runtime_failed(agent, _params), do: {agent, []}
 
   defp run_stream(worker_pid, request_id, query, config, stream_opts) do
-    ReAct.stream(query, config, stream_opts)
+    Runner.stream(query, config, stream_opts)
     |> Enum.each(fn event ->
       signal =
         Jido.Signal.new!(
@@ -349,6 +350,9 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
 
       Jido.AgentServer.cast(worker_pid, fail_signal)
   end
+
+  defp build_runtime_config(%Config{} = config), do: config
+  defp build_runtime_config(config), do: Config.new(config)
 
   defp maybe_finish_run(state, kind) when kind in [:request_completed, :request_failed, :request_cancelled],
     do: finish_state(state)
@@ -424,6 +428,9 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
 
   defp maybe_put_task_supervisor(opts, nil), do: opts
   defp maybe_put_task_supervisor(opts, task_supervisor), do: Keyword.put(opts, :task_supervisor, task_supervisor)
+
+  defp maybe_put_runtime_state(opts, nil), do: opts
+  defp maybe_put_runtime_state(opts, runtime_state), do: Keyword.put(opts, :state, runtime_state)
 
   defp put_strategy_state(%Agent{} = agent, state) when is_map(state) do
     %{agent | state: Map.put(agent.state, StratState.key(), state)}

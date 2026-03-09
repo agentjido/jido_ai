@@ -2,6 +2,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.Agent.StateOp
   alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
 
   # Helper to create a mock agent
@@ -16,6 +17,24 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       {agent, []} = TreeOfThoughts.init(agent, ctx)
       agent
     end)
+  end
+
+  defmodule OrderingSlowTool do
+    use Jido.Action,
+      name: "ordering_slow_tool",
+      description: "Ordering test slow tool",
+      schema: Zoi.object(%{})
+
+    def run(_params, _context), do: {:ok, %{tool: :slow}}
+  end
+
+  defmodule OrderingFastTool do
+    use Jido.Action,
+      name: "ordering_fast_tool",
+      description: "Ordering test fast tool",
+      schema: Zoi.object(%{})
+
+    def run(_params, _context), do: {:ok, %{tool: :fast}}
   end
 
   # ============================================================================
@@ -36,7 +55,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       agent = create_agent()
       state = StratState.get(agent, %{})
 
-      assert state[:config].model == "anthropic:claude-haiku-4-5"
+      assert state[:config].model == Jido.AI.resolve_model(:fast)
     end
 
     test "resolves model aliases" do
@@ -84,6 +103,44 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       assert state[:branching_factor] == 3
       assert state[:max_depth] == 3
       assert state[:traversal_strategy] == :best_first
+      assert state[:top_k] == 3
+      assert state[:min_depth] == 2
+      assert state[:max_nodes] == 100
+      assert state[:max_duration_ms] == nil
+      assert state[:beam_width] == nil
+      assert state[:config].max_tool_round_trips == 3
+      assert state[:config].tool_timeout_ms == 15_000
+      assert state[:config].tool_max_retries == 1
+      assert state[:config].tool_retry_backoff_ms == 200
+    end
+
+    test "uses custom structured controls when provided" do
+      agent =
+        create_agent(
+          top_k: 4,
+          min_depth: 1,
+          max_nodes: 55,
+          max_duration_ms: 1_500,
+          beam_width: 2,
+          early_success_threshold: 0.9,
+          convergence_window: 3,
+          min_score_improvement: 0.01,
+          max_parse_retries: 2,
+          max_tool_round_trips: 4
+        )
+
+      state = StratState.get(agent, %{})
+
+      assert state[:top_k] == 4
+      assert state[:min_depth] == 1
+      assert state[:max_nodes] == 55
+      assert state[:max_duration_ms] == 1_500
+      assert state[:beam_width] == 2
+      assert state[:config].early_success_threshold == 0.9
+      assert state[:config].convergence_window == 3
+      assert state[:config].min_score_improvement == 0.01
+      assert state[:config].max_parse_retries == 2
+      assert state[:config].max_tool_round_trips == 4
     end
   end
 
@@ -230,6 +287,186 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     end
   end
 
+  describe "tool execution context" do
+    test "tool directives include state snapshot key" do
+      agent =
+        create_agent(
+          tools: [OrderingSlowTool],
+          tool_context: %{state: %{override: true}, tenant: "acme"}
+        )
+        |> then(fn agent -> %{agent | state: Map.put(agent.state, :tot_counter, 9)} end)
+
+      start_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.start_action(),
+        params: %{prompt: "Use a tool"}
+      }
+
+      {agent, _start_directives} = TreeOfThoughts.cmd(agent, [start_instruction], %{})
+      state = StratState.get(agent, %{})
+      call_id = state[:current_call_id]
+      agent = StratState.put(agent, Map.put(state, :last_request_id, "req_tot_ctx"))
+
+      llm_result_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.llm_result_action(),
+        params: %{
+          call_id: call_id,
+          result: %{
+            type: :tool_calls,
+            text: "Calling tool",
+            tool_calls: [
+              %{id: "call_snapshot", name: OrderingSlowTool.name(), arguments: %{}}
+            ],
+            usage: %{}
+          }
+        }
+      }
+
+      {agent, [directive]} = TreeOfThoughts.cmd(agent, [llm_result_instruction], %{})
+      assert %Jido.AI.Directive.ToolExec{} = directive
+
+      context = directive.context
+      assert is_map(context.state)
+      assert context.state.tot_counter == 9
+      assert context.tenant == "acme"
+      refute Map.has_key?(context.state, :override)
+
+      state = StratState.get(agent, %{})
+      assert state[:pending_tool_call_id] == call_id
+    end
+  end
+
+  describe "tool round ordering" do
+    test "applies effects and builds follow-up tool messages in original call order" do
+      agent = create_agent(tools: [OrderingSlowTool, OrderingFastTool])
+
+      turn =
+        Jido.AI.Turn.from_result_map(%{
+          type: :tool_calls,
+          text: "Tool round",
+          tool_calls: [
+            %{id: "call_1", name: OrderingSlowTool.name(), arguments: %{}},
+            %{id: "call_2", name: OrderingFastTool.name(), arguments: %{}}
+          ],
+          usage: %{}
+        })
+
+      state = StratState.get(agent, %{})
+
+      configured_state =
+        state
+        |> Map.put(:pending_tool_calls, %{
+          "call_1" => %{call_id: "call_1", tool_name: OrderingSlowTool.name(), arguments: %{}},
+          "call_2" => %{call_id: "call_2", tool_name: OrderingFastTool.name(), arguments: %{}}
+        })
+        |> Map.put(:pending_tool_call_order, ["call_1", "call_2"])
+        |> Map.put(:pending_tool_results, %{})
+        |> Map.put(:pending_tool_call_id, "llm_order_1")
+        |> Map.put(:pending_tool_turn, turn)
+        |> Map.put(:llm_call_aliases, %{
+          "llm_order_1" => [
+            %{role: :user, content: "Order test"}
+          ]
+        })
+        |> Map.put(:config, Map.merge(state[:config] || %{}, %{model: "test:model"}))
+
+      agent = StratState.put(agent, configured_state)
+
+      second_result_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.tool_result_action(),
+        params: %{
+          call_id: "call_2",
+          tool_name: OrderingFastTool.name(),
+          result: {:ok, %{tool: :fast}, [%StateOp.SetState{attrs: %{tot_order_marker: 2}}]}
+        }
+      }
+
+      {agent, directives} = TreeOfThoughts.cmd(agent, [second_result_instruction], %{})
+      assert directives == []
+      refute Map.has_key?(agent.state, :tot_order_marker)
+
+      first_result_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.tool_result_action(),
+        params: %{
+          call_id: "call_1",
+          tool_name: OrderingSlowTool.name(),
+          result: {:ok, %{tool: :slow}, [%StateOp.SetState{attrs: %{tot_order_marker: 1}}]}
+        }
+      }
+
+      {agent, [followup_directive]} = TreeOfThoughts.cmd(agent, [first_result_instruction], %{})
+      assert %Jido.AI.Directive.LLMStream{} = followup_directive
+      assert agent.state.tot_order_marker == 2
+
+      assert tool_message_ids(followup_directive.context) == ["call_1", "call_2"]
+    end
+
+    test "fallback order ignores non-pending turn ids and completes tool round" do
+      agent = create_agent(tools: [OrderingSlowTool, OrderingFastTool])
+
+      turn =
+        Jido.AI.Turn.from_result_map(%{
+          type: :tool_calls,
+          text: "Tool round",
+          tool_calls: [
+            %{id: "call_1", name: OrderingSlowTool.name(), arguments: %{}},
+            %{id: "call_2", name: OrderingFastTool.name(), arguments: %{}},
+            %{id: "call_3", arguments: %{}}
+          ],
+          usage: %{}
+        })
+
+      state = StratState.get(agent, %{})
+
+      configured_state =
+        state
+        |> Map.put(:pending_tool_calls, %{
+          "call_1" => %{call_id: "call_1", tool_name: OrderingSlowTool.name(), arguments: %{}},
+          "call_2" => %{call_id: "call_2", tool_name: OrderingFastTool.name(), arguments: %{}}
+        })
+        |> Map.delete(:pending_tool_call_order)
+        |> Map.put(:pending_tool_results, %{})
+        |> Map.put(:pending_tool_call_id, "llm_order_2")
+        |> Map.put(:pending_tool_turn, turn)
+        |> Map.put(:llm_call_aliases, %{
+          "llm_order_2" => [
+            %{role: :user, content: "Order test fallback"}
+          ]
+        })
+        |> Map.put(:config, Map.merge(state[:config] || %{}, %{model: "test:model"}))
+
+      agent = StratState.put(agent, configured_state)
+
+      second_result_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.tool_result_action(),
+        params: %{
+          call_id: "call_2",
+          tool_name: OrderingFastTool.name(),
+          result: {:ok, %{tool: :fast}, []}
+        }
+      }
+
+      {agent, directives} = TreeOfThoughts.cmd(agent, [second_result_instruction], %{})
+      assert directives == []
+
+      first_result_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.tool_result_action(),
+        params: %{
+          call_id: "call_1",
+          tool_name: OrderingSlowTool.name(),
+          result: {:ok, %{tool: :slow}, []}
+        }
+      }
+
+      {agent, [followup_directive]} = TreeOfThoughts.cmd(agent, [first_result_instruction], %{})
+      assert %Jido.AI.Directive.LLMStream{} = followup_directive
+      assert tool_message_ids(followup_directive.context) == ["call_1", "call_2"]
+
+      state = StratState.get(agent, %{})
+      assert state[:pending_tool_calls] == %{}
+      assert state[:pending_tool_results] == %{}
+    end
+  end
+
   # ============================================================================
   # Snapshot
   # ============================================================================
@@ -353,5 +590,16 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
 
       assert state[:traversal_strategy] == :best_first
     end
+  end
+
+  defp tool_message_ids(context) when is_list(context) do
+    context
+    |> Enum.filter(fn message ->
+      role = Map.get(message, :role, Map.get(message, "role"))
+      role in [:tool, "tool"]
+    end)
+    |> Enum.map(fn message ->
+      Map.get(message, :tool_call_id, Map.get(message, "tool_call_id"))
+    end)
   end
 end

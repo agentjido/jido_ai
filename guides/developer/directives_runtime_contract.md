@@ -13,6 +13,23 @@ After this guide, you can add directive behavior while preserving correlation, r
 - `Jido.AI.Directive.EmitToolError`
 - `Jido.AI.Directive.EmitRequestError`
 
+## Directive-To-Signal Contract Map
+
+- `LLMStream` / `LLMGenerate` -> `ai.llm.delta`, `ai.llm.response`, `ai.usage`
+- `LLMEmbed` -> `ai.embed.result`
+- `ToolExec` -> `ai.tool.result`
+- `EmitToolError` -> `ai.tool.result` (error payload)
+- `EmitRequestError` -> `ai.request.error`
+
+## Result Envelope Contract
+
+For `ai.llm.response` and `ai.tool.result`, `data.result` should be treated as a canonical triple:
+
+- `{:ok, payload, effects}`
+- `{:error, reason, effects}`
+
+Legacy 2-tuples may appear at boundaries but are normalized by runtime/policy helpers.
+
 ## Contract Rules
 
 - Directives describe work; they do not own strategy state transitions.
@@ -35,6 +52,12 @@ After this guide, you can add directive behavior while preserving correlation, r
 }
 ```
 
+`ToolExec.context` reserves one runtime-managed snapshot key for action execution:
+
+- `:state` (canonical, core Jido-compatible)
+
+This key is populated by strategy/runtime orchestration and overrides same-named values from user tool context.
+
 ## Failure Mode: Deadlock Waiting For Tool Result
 
 Symptom:
@@ -43,6 +66,10 @@ Symptom:
 Fix:
 - ensure runtime always emits either `ai.tool.result` or `EmitToolError`
 - preserve `id` correlation from tool call to result signal
+
+## Contract Parity Tests
+
+If you change directive fields or emitted signal payloads, update directive/runtime parity tests in the same change.
 
 ## Defaults You Should Know
 

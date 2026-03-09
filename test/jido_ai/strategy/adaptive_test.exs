@@ -10,6 +10,15 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
   alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
   alias Jido.AI.Reasoning.TRM.Strategy, as: TRM
 
+  defmodule AdaptiveSnapshotTool do
+    use Jido.Action,
+      name: "adaptive_snapshot_tool",
+      description: "tool used to verify adaptive delegation context",
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.optional()})
+
+    def run(params, _context), do: {:ok, params}
+  end
+
   @moduletag :unit
 
   # Helper to create an initialized agent
@@ -72,7 +81,7 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
       {agent, _ctx} = create_agent()
       state = StratState.get(agent, %{})
 
-      assert state[:config][:model] == "anthropic:claude-haiku-4-5"
+      assert state[:config][:model] == Jido.AI.resolve_model(:fast)
       assert state[:config][:default_strategy] == :react
       assert state[:config][:available_strategies] == [:cod, :cot, :react, :tot, :got, :trm]
       assert is_nil(state[:selected_strategy])
@@ -395,6 +404,91 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
       # The strategy should have processed the result
       state = StratState.get(agent, %{})
       assert state[:selected_strategy] != nil
+    end
+  end
+
+  describe "delegated tool context snapshots" do
+    test "react delegation includes state snapshot in worker start context" do
+      {agent, ctx} =
+        create_agent(
+          tools: [AdaptiveSnapshotTool],
+          tool_context: %{state: %{override: true}, tenant: "acme"}
+        )
+
+      agent = %{agent | state: Map.put(agent.state, :adaptive_counter, 5)}
+
+      instructions = [
+        %{
+          action: :adaptive_start,
+          params: %{
+            prompt: "Search for data and fetch details",
+            query: "Search for data and fetch details",
+            request_id: "req_adaptive_react_ctx"
+          }
+        }
+      ]
+
+      {agent, directives} = Adaptive.cmd(agent, instructions, ctx)
+      assert Enum.any?(directives, &match?(%AgentDirective.SpawnAgent{}, &1))
+
+      state = StratState.get(agent, %{})
+      assert state[:strategy_type] == :react
+
+      context = state[:pending_worker_start][:context]
+      assert context[:state][:adaptive_counter] == 5
+      assert context[:tenant] == "acme"
+      refute Map.has_key?(context[:state], :override)
+    end
+
+    test "tot delegation includes state snapshot in tool directives" do
+      {agent, ctx} =
+        create_agent(
+          available_strategies: [:tot],
+          tools: [AdaptiveSnapshotTool],
+          tool_context: %{state: %{override: true}, tenant: "acme"}
+        )
+
+      agent = %{agent | state: Map.put(agent.state, :adaptive_tot_counter, 11)}
+
+      start_instructions = [
+        %{
+          action: :adaptive_start,
+          params: %{prompt: "Explore options"}
+        }
+      ]
+
+      {agent, _directives} = Adaptive.cmd(agent, start_instructions, ctx)
+
+      state = StratState.get(agent, %{})
+      assert state[:strategy_type] == :tot
+      call_id = state[:current_call_id]
+      agent = StratState.put(agent, Map.put(state, :last_request_id, "req_adaptive_tot_ctx"))
+
+      llm_result_instructions = [
+        %{
+          action: :adaptive_llm_result,
+          params: %{
+            call_id: call_id,
+            result: %{
+              type: :tool_calls,
+              text: "Call tool",
+              tool_calls: [%{id: "tot_call_ctx_1", name: AdaptiveSnapshotTool.name(), arguments: %{}}],
+              usage: %{}
+            }
+          }
+        }
+      ]
+
+      {agent, [directive]} = Adaptive.cmd(agent, llm_result_instructions, ctx)
+      assert %Jido.AI.Directive.ToolExec{} = directive
+
+      context = directive.context
+      assert context.state.adaptive_tot_counter == 11
+      assert context.tenant == "acme"
+      refute Map.has_key?(context.state, :override)
+
+      state = StratState.get(agent, %{})
+      assert state[:pending_tool_call_id] == call_id
     end
   end
 

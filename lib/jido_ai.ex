@@ -17,15 +17,15 @@ defmodule Jido.AI do
 
   Use semantic model aliases instead of hardcoded model strings:
 
-      Jido.AI.resolve_model(:fast)      # => "anthropic:claude-haiku-4-5"
-      Jido.AI.resolve_model(:capable)   # => "anthropic:claude-sonnet-4-20250514"
+      Jido.AI.resolve_model(:fast)      # => "provider:fast-model"
+      Jido.AI.resolve_model(:capable)   # => "provider:capable-model"
 
   Configure custom aliases in your config:
 
       config :jido_ai,
         model_aliases: %{
-          fast: "anthropic:claude-haiku-4-5",
-          capable: "anthropic:claude-sonnet-4-20250514"
+          fast: "provider:your-fast-model",
+          capable: "provider:your-capable-model"
         }
 
   A broad list of provider/model IDs is available at: https://llmdb.xyz
@@ -50,7 +50,6 @@ defmodule Jido.AI do
   ## Runtime Tool Management
 
   Register and unregister tools dynamically with running agents:
-  k
 
       # Register a new tool
       {:ok, agent} = Jido.AI.register_tool(agent_pid, MyApp.Tools.Calculator)
@@ -68,6 +67,8 @@ defmodule Jido.AI do
 
   """
 
+  alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.ModelAliases
   alias Jido.AI.Turn
   alias ReqLLM.Context
 
@@ -82,16 +83,6 @@ defmodule Jido.AI do
           optional(:temperature) => number(),
           optional(:timeout) => pos_integer()
         }
-
-  @default_aliases %{
-    fast: "anthropic:claude-haiku-4-5",
-    capable: "anthropic:claude-sonnet-4-20250514",
-    thinking: "anthropic:claude-sonnet-4-20250514",
-    reasoning: "anthropic:claude-sonnet-4-20250514",
-    planning: "anthropic:claude-sonnet-4-20250514",
-    image: "openai:gpt-image-1",
-    embedding: "openai:text-embedding-3-small"
-  }
 
   @default_llm_defaults %{
     text: %{
@@ -117,17 +108,16 @@ defmodule Jido.AI do
   @doc """
   Returns all configured model aliases merged with defaults.
 
+  User overrides from `config :jido_ai, :model_aliases` are merged on top of built-in defaults.
+
   ## Examples
 
       iex> aliases = Jido.AI.model_aliases()
-      iex> aliases[:fast]
-      "anthropic:claude-haiku-4-5"
+      iex> is_binary(aliases[:fast])
+      true
   """
   @spec model_aliases() :: %{model_alias() => model_spec()}
-  def model_aliases do
-    configured = Application.get_env(:jido_ai, :model_aliases, %{})
-    Map.merge(@default_aliases, configured)
-  end
+  def model_aliases, do: ModelAliases.model_aliases()
 
   @doc """
   Returns configured LLM generation defaults merged with built-in defaults.
@@ -178,8 +168,8 @@ defmodule Jido.AI do
 
   ## Examples
 
-      iex> Jido.AI.resolve_model(:fast)
-      "anthropic:claude-haiku-4-5"
+      iex> String.contains?(Jido.AI.resolve_model(:fast), ":")
+      true
 
       iex> Jido.AI.resolve_model("openai:gpt-4")
       "openai:gpt-4"
@@ -188,21 +178,7 @@ defmodule Jido.AI do
       # raises ArgumentError with unknown alias message
   """
   @spec resolve_model(model_alias() | model_spec()) :: model_spec()
-  def resolve_model(model) when is_binary(model), do: model
-
-  def resolve_model(model) when is_atom(model) do
-    aliases = model_aliases()
-
-    case Map.get(aliases, model) do
-      nil ->
-        raise ArgumentError,
-              "Unknown model alias: #{inspect(model)}. " <>
-                "Available aliases: #{inspect(Map.keys(aliases))}"
-
-      spec ->
-        spec
-    end
-  end
+  def resolve_model(model), do: ModelAliases.resolve_model(model)
 
   @doc """
   Thin facade for `ReqLLM.Generation.generate_text/3`.
@@ -369,7 +345,7 @@ defmodule Jido.AI do
   @spec list_tools(Jido.Agent.t() | GenServer.server()) ::
           [module()] | {:ok, [module()]} | {:error, term()}
   def list_tools(%Jido.Agent{} = agent) do
-    Jido.AI.Reasoning.ReAct.Strategy.list_tools(agent)
+    list_tools_from_agent(agent)
   end
 
   def list_tools(agent_server) do
@@ -404,6 +380,112 @@ defmodule Jido.AI do
     case list_tools(agent_server) do
       {:ok, tools} -> {:ok, Enum.any?(tools, fn mod -> mod.name() == tool_name end)}
       {:error, _} = error -> error
+    end
+  end
+
+  # ============================================================================
+  # Pure-Function (Struct-Level) API
+  #
+  # These functions operate directly on a %Jido.Agent{} struct without going
+  # through GenServer signals. Use these from within the agent process (e.g.,
+  # in on_before_cmd / on_after_cmd hooks) where a GenServer.call to self()
+  # would deadlock.
+  # ============================================================================
+
+  @doc """
+  Sets the system prompt directly on the agent's strategy config.
+
+  This is the struct-level equivalent of `set_system_prompt/3` — safe to call
+  from within the agent process (e.g., `on_before_cmd`).
+
+  Also updates the system prompt in `:context` and `:run_context` if they
+  exist, so resumed conversations pick up the new prompt.
+  """
+  @spec set_system_prompt_direct(Jido.Agent.t(), String.t()) :: Jido.Agent.t()
+  def set_system_prompt_direct(%Jido.Agent{} = agent, prompt) when is_binary(prompt) do
+    StratState.update(agent, fn strat_state ->
+      config = Map.get(strat_state, :config, %{})
+      updated = Map.put(config, :system_prompt, prompt)
+
+      strat_state
+      |> Map.put(:config, updated)
+      |> update_context_system_prompt(:context, prompt)
+      |> update_context_system_prompt(:run_context, prompt)
+    end)
+  end
+
+  @doc """
+  Returns the strategy config from an agent struct.
+
+  Convenience for reading strategy config without reaching into internal state.
+  """
+  @spec get_strategy_config(Jido.Agent.t()) :: map()
+  def get_strategy_config(%Jido.Agent{} = agent) do
+    strat_state = StratState.get(agent, %{})
+    Map.get(strat_state, :config, %{})
+  end
+
+  @doc """
+  Returns the active context (conversation history) from the strategy state.
+
+  Prefers `:run_context` while a request is in flight, otherwise falls back to
+  materialized `:context`. Returns nil if neither exists.
+  """
+  @spec get_strategy_context(Jido.Agent.t()) :: map() | nil
+  def get_strategy_context(%Jido.Agent{} = agent) do
+    strat_state = StratState.get(agent, %{})
+
+    case active_context_key(strat_state) do
+      nil -> nil
+      key -> Map.get(strat_state, key)
+    end
+  end
+
+  @doc """
+  Updates the active context entries (conversation messages) in the strategy state.
+
+  If `:run_context` exists, it is treated as authoritative for the in-flight
+  turn and updated in isolation. Otherwise, updates materialized `:context`.
+  """
+  @spec update_context_entries(Jido.Agent.t(), list()) :: Jido.Agent.t()
+  def update_context_entries(%Jido.Agent{} = agent, entries) when is_list(entries) do
+    StratState.update(agent, fn strat_state ->
+      case active_context_key(strat_state) do
+        nil -> strat_state
+        ctx_key -> update_context_field(strat_state, ctx_key, :entries, entries)
+      end
+    end)
+  end
+
+  defp active_context_key(strat_state) when is_map(strat_state) do
+    cond do
+      is_map(Map.get(strat_state, :run_context)) -> :run_context
+      is_map(Map.get(strat_state, :context)) -> :context
+      true -> nil
+    end
+  end
+
+  defp active_context_key(_), do: nil
+
+  # Private: update system_prompt in a context struct if it exists
+  defp update_context_system_prompt(strat_state, key, prompt) do
+    case Map.get(strat_state, key) do
+      %{system_prompt: _} = context ->
+        Map.put(strat_state, key, %{context | system_prompt: prompt})
+
+      _ ->
+        strat_state
+    end
+  end
+
+  # Private: update a field in a context struct if the context key exists
+  defp update_context_field(strat_state, ctx_key, field, value) do
+    case Map.get(strat_state, ctx_key) do
+      ctx when is_map(ctx) ->
+        Map.put(strat_state, ctx_key, Map.put(ctx, field, value))
+
+      _ ->
+        strat_state
     end
   end
 
@@ -446,6 +528,12 @@ defmodule Jido.AI do
     opts
     |> Keyword.get(:model, defaults[:model] || :fast)
     |> resolve_model()
+  end
+
+  defp list_tools_from_agent(%Jido.Agent{} = agent) do
+    state = StratState.get(agent, %{})
+    config = state[:config] || %{}
+    config[:tools] || []
   end
 
   defp normalize_context(input, system_prompt) when system_prompt in [nil, ""] do

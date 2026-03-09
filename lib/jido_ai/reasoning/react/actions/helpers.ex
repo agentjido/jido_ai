@@ -9,12 +9,13 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
   @spec build_config(map(), map()) :: Config.t()
   def build_config(params, context) do
     opts = %{
-      model: params[:model] || context[:model] || :capable,
+      model: params[:model] || context[:model] || :fast,
       system_prompt: params[:system_prompt],
       tools: params[:tools] || context[:tools] || get_in(context, [:plugin_state, :tool_calling, :tools]) || %{},
       max_iterations: params[:max_iterations],
       max_tokens: params[:max_tokens],
       temperature: params[:temperature],
+      llm_opts: params[:llm_opts],
       llm_timeout_ms: params[:llm_timeout_ms] || params[:timeout_ms],
       req_http_options: params[:req_http_options],
       tool_timeout_ms: params[:tool_timeout_ms],
@@ -68,8 +69,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
     context[:task_supervisor] ||
       get_in(context, [:__task_supervisor_skill__, :supervisor]) ||
       get_in(context, [:state, :__task_supervisor_skill__, :supervisor]) ||
-      get_in(context, [:agent, :state, :__task_supervisor_skill__, :supervisor]) ||
-      get_in(context, [:agent_state, :__task_supervisor_skill__, :supervisor])
+      get_in(context, [:agent, :state, :__task_supervisor_skill__, :supervisor])
   end
 
   defp context_task_supervisor(_), do: nil

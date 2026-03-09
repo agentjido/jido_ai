@@ -89,6 +89,14 @@ defmodule Jido.AI.Examples.TaskListAgent do
     - Use lower priority numbers (1-10) for prerequisite tasks
     - Use medium priority (11-50) for core work
     - Use higher priority (51-100) for polish/optional tasks
+
+    REQUIRED ARGUMENT SHAPES:
+    - tasklist_add_tasks expects:
+      {"tasks":[{"title":"...", "description":"...", "priority":10}]}
+    - tasklist_start_task expects:
+      {"task_id":"<id>"}
+    - tasklist_complete_task expects:
+      {"task_id":"<id>", "result":"what was accomplished"}
     """,
     max_iterations: 25
 

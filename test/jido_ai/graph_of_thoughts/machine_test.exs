@@ -123,12 +123,34 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.MachineTest do
       assert updated.usage.total_tokens == 30
     end
 
+    test "accepts canonical success triple envelope", %{machine: machine} do
+      result = {:ok, %{text: "Response", usage: %{input_tokens: 7, output_tokens: 3}}, []}
+      {updated, _} = Machine.update(machine, {:llm_result, "call_1", result}, %{})
+
+      assert updated.usage.input_tokens == 7
+      assert updated.usage.output_tokens == 3
+      assert updated.usage.total_tokens == 10
+    end
+
     test "ignores stale call_id", %{machine: machine} do
       result = {:ok, %{text: "Response"}}
       {updated, _directives} = Machine.update(machine, {:llm_result, "wrong_call_id", result}, %{})
 
       # Should not change
       assert updated.status == machine.status
+    end
+  end
+
+  describe "update/3 with :llm_result error envelope" do
+    test "handles canonical error triple envelope" do
+      machine = Machine.new()
+      {machine, _} = Machine.update(machine, {:start, "Problem", "call_1"}, %{})
+
+      {updated, _} = Machine.update(machine, {:llm_result, "call_1", {:error, :rate_limited, []}}, %{})
+
+      assert updated.status == "error"
+      assert updated.termination_reason == :error
+      assert updated.result == {:error, :rate_limited}
     end
   end
 

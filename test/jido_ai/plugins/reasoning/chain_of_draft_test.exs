@@ -39,4 +39,34 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfDraftTest do
       assert route_map["reasoning.cod.run"] == Jido.AI.Actions.Reasoning.RunStrategy
     end
   end
+
+  describe "handle_signal/2" do
+    test "forces strategy :cod and overrides caller strategy input" do
+      signal =
+        Jido.Signal.new!(
+          "reasoning.cod.run",
+          %{prompt: "solve this quickly", strategy: :cot, timeout: 45_000, options: %{depth: 2}},
+          source: "/test"
+        )
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
+               ChainOfDraft.handle_signal(signal, %{})
+
+      assert params.strategy == :cod
+      assert params.prompt == "solve this quickly"
+      assert params.timeout == 45_000
+      assert params.options == %{depth: 2}
+    end
+
+    test "normalizes non-map payload data and still injects strategy" do
+      signal =
+        Jido.Signal.new!("reasoning.cod.run", %{prompt: "placeholder"}, source: "/test")
+        |> Map.put(:data, :not_a_map)
+
+      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
+               ChainOfDraft.handle_signal(signal, %{})
+
+      assert params == %{strategy: :cod}
+    end
+  end
 end

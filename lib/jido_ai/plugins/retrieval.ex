@@ -6,8 +6,56 @@ defmodule Jido.AI.Plugins.Retrieval do
   @moduledoc """
   Cross-cutting retrieval and memory enrichment plugin.
 
-  Provides in-process memory operations plus optional prompt enrichment for
+  Provides in-process memory operations (`retrieval.upsert`,
+  `retrieval.recall`, `retrieval.clear`) plus optional prompt enrichment for
   `chat.message` and `reasoning.*.run` signals.
+
+  ## Enrichment Lifecycle
+
+  For enrichable signals, `handle_signal/2` runs this lifecycle:
+
+  1. Read plugin state (`enabled`, `namespace`, `top_k`, `max_snippet_chars`).
+  2. Skip when plugin-level `enabled: false`.
+  3. Skip when request payload includes `disable_retrieval: true` (atom or string key).
+  4. Extract query text from `prompt`/`query` fields.
+  5. Recall top-k memories from `Jido.AI.Retrieval.Store` for the active namespace.
+  6. If memories are found, rewrite payload `:prompt` with a "Relevant memory"
+     block and attach retrieval metadata under `:retrieval`.
+
+  Signals without a query, and signals with no matching memories, continue
+  unchanged.
+
+  ## Namespace Behavior
+
+  `mount/2` resolves `namespace` in this order:
+
+  1. Explicit plugin config (`:namespace`)
+  2. Agent id (when available)
+  3. `"default"`
+
+  The resulting namespace is shared by enrichment and retrieval actions unless
+  callers override `namespace` in action params.
+
+  ## Opt-Out Controls
+
+  - `enabled: false` disables enrichment for all requests on the mounted plugin.
+  - `disable_retrieval: true` disables enrichment for one request while keeping
+    retrieval routes available.
+
+  ## Usage
+
+  ```elixir
+  use Jido.AI.Agent,
+    name: "retrieval_enabled_assistant",
+    plugins: [
+      {Jido.AI.Plugins.Retrieval,
+       %{
+         namespace: "weather_ops",
+         top_k: 3,
+         max_snippet_chars: 280
+       }}
+    ]
+  ```
   """
 
   use Jido.Plugin,
@@ -30,9 +78,11 @@ defmodule Jido.AI.Plugins.Retrieval do
 
   @impl true
   def mount(agent, config) do
+    agent_id = if is_map(agent), do: Map.get(agent, :id), else: nil
+
     namespace =
       Map.get(config, :namespace) ||
-        if(is_map(agent) and is_binary(agent.id), do: agent.id, else: "default")
+        if(is_binary(agent_id), do: agent_id, else: "default")
 
     {:ok,
      %{

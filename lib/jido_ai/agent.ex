@@ -24,16 +24,25 @@ defmodule Jido.AI.Agent do
   - `:description` - Agent description (default: "AI agent \#{name}")
   - `:tags` - Agent tags for discovery/classification (default: `[]`)
   - `:system_prompt` - Custom system prompt for the LLM
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
+  - `:streaming` - Whether to stream LLM responses (default: `true`)
   - `:request_policy` - Request concurrency policy (default: `:reject`)
   - `:tool_timeout_ms` - Per-attempt tool execution timeout in ms (default: 15_000)
   - `:tool_max_retries` - Number of retries for tool failures (default: 1)
   - `:tool_retry_backoff_ms` - Retry backoff in ms (default: 200)
+  - `:effect_policy` - Agent-level effect policy (default allow-list)
+  - `:strategy_effect_policy` - Optional strategy-level narrowing policy (cannot broaden agent policy)
   - `:runtime_adapter` - Deprecated compatibility flag (delegated ReAct runtime is always enabled)
   - `:runtime_task_supervisor` - Optional Task.Supervisor used by delegated ReAct runtime
   - `:observability` - Observability options map
-  - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`)
+  - `:req_http_options` - Base Req HTTP options passed through to ReqLLM calls
+  - `:llm_opts` - Additional ReqLLM generation options merged into ReAct LLM calls
+  - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`).
+    Must be literal data only — module aliases, atoms, strings, numbers, lists, and maps are permitted.
+    Function calls, module attributes (`@attr`), and pinned variables (`^var`) raise `CompileError`.
+    Runtime reserves `:state` (core Jido-compatible) for tool execution snapshots.
+    User-provided values for that key are overwritten per request.
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
 
   ## Generated Functions
@@ -78,7 +87,7 @@ defmodule Jido.AI.Agent do
   - Other async operations within the agent's lifecycle
 
   The supervisor is stored in the skill's internal state (`agent.state.__task_supervisor_skill__`)
-  and is accessible via `Jido.AI.Directive.Helper.get_task_supervisor/1`. It is automatically
+  and is accessible via `Jido.AI.Directive.Helpers.get_task_supervisor/1`. It is automatically
   cleaned up when the agent terminates.
 
   ## Example
@@ -98,9 +107,13 @@ defmodule Jido.AI.Agent do
 
       {:ok, request} = MyApp.WeatherAgent.ask(pid, "Get my preferences",
         tool_context: %{actor: current_user, tenant_id: "acme"})
+
+  ReAct and ToT tool execution contexts include a runtime-managed snapshot at `:state`
+  (canonical, core-aligned). This key is reserved and overrides same-named values
+  from `tool_context`.
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_iterations 10
 
   @doc false
@@ -162,6 +175,38 @@ defmodule Jido.AI.Agent do
     end)
   end
 
+  @doc false
+  def expand_and_eval_literal_option(value, caller_env) do
+    case value do
+      nil ->
+        nil
+
+      value when is_map(value) ->
+        value
+
+      value when is_list(value) ->
+        value
+        |> expand_aliases_in_ast(caller_env)
+        |> Code.eval_quoted([], caller_env)
+        |> elem(0)
+
+      {:%{}, _, _} = map_ast ->
+        map_ast
+        |> expand_aliases_in_ast(caller_env)
+        |> Code.eval_quoted([], caller_env)
+        |> elem(0)
+
+      {:%, _, _} = struct_ast ->
+        struct_ast
+        |> expand_aliases_in_ast(caller_env)
+        |> Code.eval_quoted([], caller_env)
+        |> elem(0)
+
+      other ->
+        other
+    end
+  end
+
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
@@ -180,6 +225,7 @@ defmodule Jido.AI.Agent do
     system_prompt = Keyword.get(opts, :system_prompt)
     model = Keyword.get(opts, :model, @default_model)
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
+    streaming = Keyword.get(opts, :streaming, true)
     request_policy = Keyword.get(opts, :request_policy, :reject)
     tool_timeout_ms = Keyword.get(opts, :tool_timeout_ms, 15_000)
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
@@ -189,6 +235,27 @@ defmodule Jido.AI.Agent do
     runtime_adapter = true
     runtime_task_supervisor = Keyword.get(opts, :runtime_task_supervisor)
     observability = Keyword.get(opts, :observability, %{})
+
+    req_http_options =
+      opts
+      |> Keyword.get(:req_http_options, [])
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
+    llm_opts =
+      opts
+      |> Keyword.get(:llm_opts, [])
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
+    agent_effect_policy =
+      opts
+      |> Keyword.get(:effect_policy, %{})
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
+    strategy_effect_policy =
+      opts
+      |> Keyword.get(:strategy_effect_policy, %{})
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
     # Don't extract tool_context here - it contains AST with module aliases
     # that need to be evaluated in the calling module's context
     plugins = Keyword.get(opts, :plugins, [])
@@ -222,6 +289,7 @@ defmodule Jido.AI.Agent do
       [
         tools: tools,
         model: model,
+        streaming: streaming,
         max_iterations: max_iterations,
         request_policy: request_policy,
         tool_timeout_ms: tool_timeout_ms,
@@ -230,6 +298,10 @@ defmodule Jido.AI.Agent do
         runtime_adapter: runtime_adapter,
         runtime_task_supervisor: runtime_task_supervisor,
         observability: observability,
+        req_http_options: req_http_options,
+        llm_opts: llm_opts,
+        agent_effect_policy: agent_effect_policy,
+        strategy_effect_policy: strategy_effect_policy,
         tool_context: tool_context
       ]
       |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
@@ -240,7 +312,7 @@ defmodule Jido.AI.Agent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
@@ -274,6 +346,8 @@ defmodule Jido.AI.Agent do
       ## Options
 
       - `:tool_context` - Additional context map merged with agent's tool_context
+      - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
+      - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:timeout` - Timeout for the underlying cast (default: no timeout)
 
       ## Examples
@@ -329,6 +403,8 @@ defmodule Jido.AI.Agent do
       ## Options
 
       - `:tool_context` - Additional context map merged with agent's tool_context
+      - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
+      - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:timeout` - How long to wait in milliseconds (default: 30_000)
 
       ## Examples
@@ -420,7 +496,7 @@ defmodule Jido.AI.Agent do
       @impl true
       def on_after_cmd(agent, {:ai_react_cancel, %{request_id: request_id, reason: reason}}, directives) do
         agent =
-          if is_binary(request_id) do
+          if is_binary(request_id) and request_pending?(agent, request_id) do
             failure = {:cancelled, reason}
             emit_request_failed_signal(agent, request_id, failure)
             Request.fail_request(agent, request_id, failure)

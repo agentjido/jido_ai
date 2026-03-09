@@ -10,6 +10,8 @@ defmodule Jido.AI.Examples.Weather.AoTAgent do
         "Find the best weather-safe weekend option with a fallback plan."
   """
 
+  alias Jido.AI.Examples.Weather.LiveContext
+
   use Jido.AI.AoTAgent,
     name: "weather_aot_agent",
     description: "Weather assistant using Algorithm-of-Thoughts search",
@@ -30,4 +32,15 @@ defmodule Jido.AI.Examples.Weather.AoTAgent do
       opts
     )
   end
+
+  @impl true
+  def on_before_cmd(agent, {:aot_start, %{prompt: prompt} = params}) do
+    case LiveContext.enrich_prompt(prompt) do
+      {:ok, enriched_prompt} -> super(agent, {:aot_start, %{params | prompt: enriched_prompt}})
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @impl true
+  def on_before_cmd(agent, action), do: super(agent, action)
 end

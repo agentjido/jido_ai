@@ -42,7 +42,7 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
 
   ### Options
 
-  - `:model` (optional) - Model identifier, defaults to "anthropic:claude-haiku-4-5"
+  - `:model` (optional) - Model alias or direct model spec, defaults to :fast (resolved via Jido.AI.resolve_model/1)
   - `:max_supervision_steps` (optional) - Maximum iterations before termination, defaults to 5
   - `:act_threshold` (optional) - Confidence threshold for early stopping, defaults to 0.9
 
@@ -77,7 +77,7 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
           act_threshold: float()
         }
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_max_supervision_steps 5
   @default_act_threshold 0.9
 

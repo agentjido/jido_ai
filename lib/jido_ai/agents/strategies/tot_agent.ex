@@ -22,10 +22,12 @@ defmodule Jido.AI.ToTAgent do
 
   - `:name` (required) - Agent name
   - `:description` - Agent description (default: "ToT agent \#{name}")
-  - `:model` - Model identifier (default: "anthropic:claude-haiku-4-5")
-  - `:branching_factor` - Number of thoughts to generate at each node (default: 3)
-  - `:max_depth` - Maximum depth of the tree (default: 3)
-  - `:traversal_strategy` - `:bfs`, `:dfs`, or `:best_first` (default: `:best_first`)
+  - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
+  - `:branching_factor`, `:max_depth`, `:traversal_strategy` - Core tree exploration knobs
+  - `:top_k`, `:min_depth`, `:max_nodes`, `:max_duration_ms`, `:beam_width` - Search budget and shaping knobs
+  - `:early_success_threshold`, `:convergence_window`, `:min_score_improvement`, `:max_parse_retries` - Deterministic stopping/parser controls
+  - `:tools`, `:tool_context`, `:tool_timeout_ms`, `:tool_max_retries`, `:tool_retry_backoff_ms`, `:max_tool_round_trips` - Tool orchestration controls
+  - `:effect_policy`, `:strategy_effect_policy` - Effect policy controls (strategy may only narrow)
   - `:generation_prompt` - Custom prompt for thought generation
   - `:evaluation_prompt` - Custom prompt for thought evaluation
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
@@ -37,6 +39,7 @@ defmodule Jido.AI.ToTAgent do
   - `explore_sync/2,3` - Sync convenience: sends prompt and waits for result
   - `on_before_cmd/2` - Captures request in state before processing
   - `on_after_cmd/3` - Updates request result when done
+  - `best_answer/1`, `top_candidates/2`, `result_summary/1` - Structured result helpers
 
   ## Request Tracking
 
@@ -59,6 +62,17 @@ defmodule Jido.AI.ToTAgent do
   - `:last_prompt` - The most recent prompt (backward compat)
   - `:last_result` - The final result from the last completed exploration (backward compat)
   - `:completed` - Boolean indicating if the last exploration is complete (backward compat)
+
+  ## Structured Result Contract
+
+  `explore_sync/3` (and awaited async requests) resolve to a structured map:
+
+  - `best` - best-ranked candidate
+  - `candidates` - ranked candidate list
+  - `termination` - reason/status/depth/node-count/duration metadata
+  - `tree` - search topology metadata
+  - `usage` - LLM usage metadata
+  - `diagnostics` - parser/tool-round/convergence diagnostics
 
   ## Task Supervisor
 
@@ -85,7 +99,7 @@ defmodule Jido.AI.ToTAgent do
   - `:best_first` - Explores highest-scored nodes first (default)
   """
 
-  @default_model "anthropic:claude-haiku-4-5"
+  @default_model :fast
   @default_branching_factor 3
   @default_max_depth 3
   @default_traversal_strategy :best_first
@@ -122,6 +136,17 @@ defmodule Jido.AI.ToTAgent do
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
     tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
     max_tool_round_trips = Keyword.get(opts, :max_tool_round_trips, @default_max_tool_round_trips)
+
+    agent_effect_policy =
+      opts
+      |> Keyword.get(:effect_policy, %{})
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
+    strategy_effect_policy =
+      opts
+      |> Keyword.get(:strategy_effect_policy, %{})
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
     plugins = Keyword.get(opts, :plugins, [])
 
     ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
@@ -146,7 +171,9 @@ defmodule Jido.AI.ToTAgent do
         tool_timeout_ms: tool_timeout_ms,
         tool_max_retries: tool_max_retries,
         tool_retry_backoff_ms: tool_retry_backoff_ms,
-        max_tool_round_trips: max_tool_round_trips
+        max_tool_round_trips: max_tool_round_trips,
+        agent_effect_policy: agent_effect_policy,
+        strategy_effect_policy: strategy_effect_policy
       ]
       |> then(fn o ->
         if generation_prompt, do: Keyword.put(o, :generation_prompt, generation_prompt), else: o
@@ -160,7 +187,7 @@ defmodule Jido.AI.ToTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.string() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(model)),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
@@ -315,15 +342,9 @@ defmodule Jido.AI.ToTAgent do
         snap = strategy_snapshot(agent)
 
         agent =
-          if snap.done? do
-            agent = Request.complete_request(agent, request_id, snap.result)
-            # Also set last_result for ToT-specific backward compat
-            agent
-            |> put_in([Access.key(:state), Access.key(:last_result)], snap.result)
-            |> put_in([Access.key(:state), Access.key(:completed)], true)
-          else
-            agent
-          end
+          agent
+          |> maybe_finalize_request(request_id, snap)
+          |> maybe_put_last_result(snap)
 
         {:ok, agent, directives}
       end
@@ -334,25 +355,86 @@ defmodule Jido.AI.ToTAgent do
       end
 
       @impl true
-      def on_after_cmd(agent, _action, directives) do
+      def on_after_cmd(agent, action, directives) do
         # Fallback for actions without request_id (backward compat)
         snap = strategy_snapshot(agent)
+        request_id = request_id_from_action(action, agent.state[:last_request_id])
 
         agent =
-          if snap.done? do
-            %{
-              agent
-              | state:
-                  Map.merge(agent.state, %{
-                    last_result: snap.result,
-                    completed: true
-                  })
-            }
-          else
-            agent
-          end
+          agent
+          |> maybe_finalize_request(request_id, snap)
+          |> maybe_mark_completed(snap)
 
         {:ok, agent, directives}
+      end
+
+      defp maybe_finalize_request(agent, request_id, snap) do
+        if request_pending?(agent, request_id) and snap.done? do
+          case snap.status do
+            :success ->
+              Request.complete_request(agent, request_id, snap.result)
+
+            :failure ->
+              Request.fail_request(agent, request_id, failure_reason(snap))
+
+            _ ->
+              agent
+          end
+        else
+          agent
+        end
+      end
+
+      defp request_pending?(agent, request_id) when is_binary(request_id) do
+        case Request.get_request(agent, request_id) do
+          %{status: :pending} -> true
+          _ -> false
+        end
+      end
+
+      defp request_pending?(_agent, _request_id), do: false
+
+      defp maybe_put_last_result(agent, snap) do
+        if snap.done? do
+          agent
+          |> put_in([Access.key(:state), Access.key(:last_result)], snap.result)
+          |> put_in([Access.key(:state), Access.key(:completed)], true)
+        else
+          agent
+        end
+      end
+
+      defp maybe_mark_completed(agent, snap) do
+        if snap.done? do
+          %{
+            agent
+            | state:
+                Map.merge(agent.state, %{
+                  last_result: snap.result,
+                  completed: true
+                })
+          }
+        else
+          agent
+        end
+      end
+
+      defp request_id_from_action({_, params}, fallback) when is_map(params) do
+        params[:request_id] ||
+          get_in(params, [:event, :request_id]) ||
+          fallback
+      end
+
+      defp request_id_from_action(_action, fallback), do: fallback
+
+      defp failure_reason(snap) do
+        details = Map.get(snap, :details, %{})
+
+        case details[:termination_reason] do
+          :cancelled -> {:cancelled, details[:cancel_reason] || :cancelled}
+          nil -> {:failed, :unknown, snap.result}
+          reason -> {:failed, reason, snap.result}
+        end
       end
 
       defoverridable on_before_cmd: 2, on_after_cmd: 3, explore: 3, await: 2, explore_sync: 3

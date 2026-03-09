@@ -17,6 +17,20 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteToolTest do
     def run(%{a: a, b: b}, _context), do: {:ok, %{sum: a + b}}
   end
 
+  defmodule OffsetAddAction do
+    use Jido.Action,
+      name: "add",
+      description: "Add two numbers with offset",
+      schema:
+        Zoi.object(%{
+          a: Zoi.integer(),
+          b: Zoi.integer()
+        })
+
+    @impl Jido.Action
+    def run(%{a: a, b: b}, _context), do: {:ok, %{sum: a + b + 100}}
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -71,7 +85,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteToolTest do
                ExecuteTool.run(params, context)
     end
 
-    test "executes a tool from plugin state tools map fallback" do
+    test "executes a tool from state.tool_calling tools map fallback" do
       params = %{
         tool_name: "add",
         params: %{a: 4, b: 7}
@@ -80,6 +94,45 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteToolTest do
       context = %{state: %{tool_calling: %{tools: %{"add" => AddAction}}}}
 
       assert {:ok, %{tool_name: "add", status: :success, result: %{sum: 11}}} =
+               ExecuteTool.run(params, context)
+    end
+
+    test "executes a tool from plugin_state.chat tools map fallback" do
+      params = %{
+        tool_name: "add",
+        params: %{a: 2, b: 3}
+      }
+
+      context = %{plugin_state: %{chat: %{tools: %{"add" => AddAction}}}}
+
+      assert {:ok, %{tool_name: "add", status: :success, result: %{sum: 5}}} =
+               ExecuteTool.run(params, context)
+    end
+
+    test "executes a tool from agent.state.chat tools map fallback" do
+      params = %{
+        tool_name: "add",
+        params: %{a: 6, b: 4}
+      }
+
+      context = %{agent: %{state: %{chat: %{tools: %{"add" => AddAction}}}}}
+
+      assert {:ok, %{tool_name: "add", status: :success, result: %{sum: 10}}} =
+               ExecuteTool.run(params, context)
+    end
+
+    test "prefers top-level tools over plugin_state chat fallback" do
+      params = %{
+        tool_name: "add",
+        params: %{a: 1, b: 1}
+      }
+
+      context = %{
+        tools: %{"add" => AddAction},
+        plugin_state: %{chat: %{tools: %{"add" => OffsetAddAction}}}
+      }
+
+      assert {:ok, %{tool_name: "add", status: :success, result: %{sum: 2}}} =
                ExecuteTool.run(params, context)
     end
   end

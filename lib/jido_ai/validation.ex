@@ -99,11 +99,12 @@ defmodule Jido.AI.Validation do
 
   @doc """
   Validates callback arity and type.
+
+  Wrapped callbacks are invoked with a single argument, so only arity-1
+  callbacks are valid.
   """
   @spec validate_callback(callback()) :: validation_result()
   def validate_callback(callback) when is_function(callback, 1), do: :ok
-  def validate_callback(callback) when is_function(callback, 2), do: :ok
-  def validate_callback(callback) when is_function(callback, 3), do: :ok
   def validate_callback(callback) when is_function(callback), do: {:error, :invalid_callback_arity}
   def validate_callback(_), do: {:error, :invalid_callback_type}
 
@@ -296,10 +297,16 @@ defmodule Jido.AI.Validation do
       case start_callback_task(task_supervisor, callback, arg) do
         {:ok, task} ->
           try do
-            case Task.yield(task, timeout) || Task.shutdown(task) do
-              {:ok, task_result} -> task_result
-              {:exit, _} -> {:error, :callback_timeout}
-              nil -> {:error, :callback_timeout}
+            case Task.yield(task, timeout) do
+              {:ok, task_result} ->
+                task_result
+
+              {:exit, _reason} ->
+                {:error, :callback_execution_failed}
+
+              nil ->
+                Task.shutdown(task, :brutal_kill)
+                {:error, :callback_timeout}
             end
           after
             Process.demonitor(task.ref, [:flush])

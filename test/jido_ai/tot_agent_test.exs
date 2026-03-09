@@ -21,6 +21,27 @@ defmodule Jido.AI.ToTAgentTest do
       name: "default_tot_agent"
   end
 
+  defmodule EffectPolicyToTAgent do
+    use Jido.AI.ToTAgent,
+      name: "effect_policy_tot_agent",
+      effect_policy: %{
+        mode: :allow_list,
+        allow: [Jido.Agent.StateOp.SetState, Jido.Agent.Directive.Emit],
+        constraints: %{
+          emit: %{
+            allowed_dispatches: [:pid, "pubsub"]
+          }
+        }
+      },
+      strategy_effect_policy: %{
+        constraints: %{
+          emit: %{
+            allowed_signal_prefixes: ["ai."]
+          }
+        }
+      }
+  end
+
   describe "module creation" do
     test "creates agent module with expected name" do
       assert TestToTAgent.name() == "test_tot_agent"
@@ -73,13 +94,36 @@ defmodule Jido.AI.ToTAgentTest do
 
     test "uses default values when not specified" do
       opts = DefaultToTAgent.strategy_opts()
-      assert opts[:model] == "anthropic:claude-haiku-4-5"
+      assert opts[:model] == :fast
       assert opts[:branching_factor] == 3
       assert opts[:max_depth] == 3
       assert opts[:traversal_strategy] == :best_first
       assert opts[:top_k] == 3
       assert opts[:min_depth] == 2
       assert opts[:max_nodes] == 100
+      assert opts[:max_duration_ms] == nil
+      assert opts[:beam_width] == nil
+      assert opts[:early_success_threshold] == 1.0
+      assert opts[:convergence_window] == 2
+      assert opts[:min_score_improvement] == 0.02
+      assert opts[:max_parse_retries] == 1
+      assert opts[:tool_timeout_ms] == 15_000
+      assert opts[:tool_max_retries] == 1
+      assert opts[:tool_retry_backoff_ms] == 200
+      assert opts[:max_tool_round_trips] == 3
+    end
+
+    test "evaluates effect policy literals into runtime data" do
+      opts = EffectPolicyToTAgent.strategy_opts()
+
+      assert is_map(opts[:agent_effect_policy])
+      assert is_map(opts[:strategy_effect_policy])
+      refute match?({:%{}, _, _}, opts[:agent_effect_policy])
+      refute match?({:%{}, _, _}, opts[:strategy_effect_policy])
+
+      assert opts[:agent_effect_policy][:allow] == [Jido.Agent.StateOp.SetState, Jido.Agent.Directive.Emit]
+      assert opts[:agent_effect_policy][:constraints][:emit][:allowed_dispatches] == [:pid, "pubsub"]
+      assert opts[:strategy_effect_policy][:constraints][:emit][:allowed_signal_prefixes] == ["ai."]
     end
   end
 
@@ -145,6 +189,28 @@ defmodule Jido.AI.ToTAgentTest do
     end
   end
 
+  describe "on_after_cmd/3" do
+    test "finalizes pending request on terminal delegated worker event" do
+      agent =
+        TestToTAgent.new()
+        |> Jido.AI.Request.start_request("req_done", "query")
+        |> with_completed_strategy("best path")
+
+      {:ok, updated_agent, directives} =
+        TestToTAgent.on_after_cmd(
+          agent,
+          {:tot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_done", :status]) == :completed
+      assert get_in(updated_agent.state, [:requests, "req_done", :result]) == "best path"
+      assert updated_agent.state.completed == true
+      assert updated_agent.state.last_result == "best path"
+    end
+  end
+
   describe "strategy state" do
     test "agent initializes with strategy state" do
       agent = TestToTAgent.new()
@@ -159,6 +225,21 @@ defmodule Jido.AI.ToTAgentTest do
       assert state[:top_k] == 4
       assert state[:min_depth] == 1
       assert state[:max_nodes] == 50
+    end
+
+    test "strategy receives intersected effect policy from macro options" do
+      agent = EffectPolicyToTAgent.new()
+      ctx = %{strategy_opts: EffectPolicyToTAgent.strategy_opts()}
+      {agent, _directives} = Jido.AI.Reasoning.TreeOfThoughts.Strategy.init(agent, ctx)
+
+      state = StratState.get(agent, %{})
+      policy = state[:config][:effect_policy]
+
+      assert policy.mode == :allow_list
+      assert MapSet.member?(policy.allow, Jido.Agent.StateOp.SetState)
+      assert MapSet.member?(policy.allow, Jido.Agent.Directive.Emit)
+      assert policy.constraints[:emit][:allowed_dispatches] == [:pid, "pubsub"]
+      assert policy.constraints[:emit][:allowed_signal_prefixes] == ["ai."]
     end
   end
 
@@ -178,5 +259,19 @@ defmodule Jido.AI.ToTAgentTest do
       assert summary.best_answer == "Best option"
       assert summary.termination.reason == :max_depth
     end
+
+    test "result_summary/1 is nil-safe and keeps stable shape" do
+      assert TestToTAgent.result_summary(nil) == %{
+               best_answer: nil,
+               top_candidates: [],
+               termination: %{},
+               tree: %{}
+             }
+    end
+  end
+
+  defp with_completed_strategy(agent, result) do
+    strategy_state = %{status: :completed, result: result}
+    put_in(agent.state[:__strategy__], strategy_state)
   end
 end

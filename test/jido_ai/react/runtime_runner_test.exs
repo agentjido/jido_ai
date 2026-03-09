@@ -2,8 +2,10 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   use ExUnit.Case, async: false
   use Mimic
 
+  alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Config
+  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReActStrategy
 
   defmodule RetryTool do
     use Jido.Action,
@@ -38,6 +40,67 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         })
 
     def run(%{a: a, b: b}, _context), do: {:ok, %{result: a + b}}
+  end
+
+  defmodule SlowOrderTool do
+    use Jido.Action,
+      name: "slow_order_tool",
+      description: "completes after fast tool",
+      schema: Zoi.object(%{})
+
+    def run(_params, _context) do
+      Process.sleep(40)
+
+      {:ok, %{marker: :slow},
+       [
+         %Jido.Agent.StateOp.SetState{
+           attrs: %{react_order_marker: :slow}
+         }
+       ]}
+    end
+  end
+
+  defmodule FastOrderTool do
+    use Jido.Action,
+      name: "fast_order_tool",
+      description: "completes before slow tool",
+      schema: Zoi.object(%{})
+
+    def run(_params, _context) do
+      {:ok, %{marker: :fast},
+       [
+         %Jido.Agent.StateOp.SetState{
+           attrs: %{react_order_marker: :fast}
+         }
+       ]}
+    end
+  end
+
+  defmodule SnapshotStateTool do
+    use Jido.Action,
+      name: "snapshot_state_tool",
+      description: "reads agent state snapshot and appends to sums",
+      schema:
+        Zoi.object(%{
+          step: Zoi.integer()
+        })
+
+    def run(%{step: step}, context) do
+      snapshot = context[:state] || %{}
+      seen = Map.get(snapshot, :sums, [])
+
+      {:ok,
+       %{
+         seen: seen,
+         step: step,
+         has_state: is_map(context[:state])
+       },
+       [
+         %Jido.Agent.StateOp.SetState{
+           attrs: %{sums: seen ++ [step]}
+         }
+       ]}
+    end
   end
 
   setup :set_mimic_from_context
@@ -129,9 +192,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   test "passes req_http_options to streaming requests" do
     req_http_options = [plug: {Req.Test, []}]
+    llm_opts = [thinking: %{type: :enabled, budget_tokens: 1_024}, reasoning_effort: :high]
 
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
       assert opts[:req_http_options] == req_http_options
+      assert opts[:thinking] == %{type: :enabled, budget_tokens: 1_024}
+      assert opts[:reasoning_effort] == :high
 
       {:ok,
        %{
@@ -145,7 +211,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       _ -> nil
     end)
 
-    config = Config.new(%{model: :capable, tools: %{}, req_http_options: req_http_options})
+    config = Config.new(%{model: :capable, tools: %{}, req_http_options: req_http_options, llm_opts: llm_opts})
     events = ReAct.stream("Say hello", config) |> Enum.to_list()
 
     assert Enum.any?(events, &(&1.kind == :request_completed))
@@ -153,6 +219,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   test "passes req_http_options to non-streaming requests" do
     req_http_options = [plug: {Req.Test, []}]
+    llm_opts = [thinking: %{type: :enabled, budget_tokens: 2_048}, reasoning_effort: :low]
 
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       flunk("stream_text should not be called when ReAct streaming is disabled")
@@ -160,6 +227,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, _messages, opts ->
       assert opts[:req_http_options] == req_http_options
+      assert opts[:thinking] == %{type: :enabled, budget_tokens: 2_048}
+      assert opts[:reasoning_effort] == :low
 
       {:ok,
        %{
@@ -169,7 +238,76 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
        }}
     end)
 
-    config = Config.new(%{model: :capable, tools: %{}, streaming: false, req_http_options: req_http_options})
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        streaming: false,
+        req_http_options: req_http_options,
+        llm_opts: llm_opts
+      })
+
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "normalizes string-key llm_opts maps and forwards ReqLLM options" do
+    llm_opts = %{
+      "thinking" => %{type: :enabled, budget_tokens: 768},
+      "reasoning_effort" => :medium,
+      "top_p" => 0.75,
+      "unknown_provider_flag" => true
+    }
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+      assert opts[:thinking] == %{type: :enabled, budget_tokens: 768}
+      assert opts[:reasoning_effort] == :medium
+      assert opts[:top_p] == 0.75
+      refute Keyword.has_key?(opts, nil)
+
+      {:ok,
+       %{
+         stream: [ReqLLM.StreamChunk.text("String-key llm opts normalized")],
+         usage: %{input_tokens: 2, output_tokens: 2}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, llm_opts: llm_opts})
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "normalizes provider_options maps in llm_opts before forwarding to ReqLLM" do
+    llm_opts = %{
+      "provider_options" => %{
+        "verbosity" => "high",
+        "__jido_ai_nonexistent_provider_option__" => true
+      }
+    }
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+      assert opts[:provider_options] == [verbosity: "high"]
+
+      {:ok,
+       %{
+         stream: [ReqLLM.StreamChunk.text("Provider options normalized")],
+         usage: %{input_tokens: 2, output_tokens: 2}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config = Config.new(%{model: "openai:gpt-4o", tools: %{}, llm_opts: llm_opts})
     events = ReAct.stream("Say hello", config) |> Enum.to_list()
 
     assert Enum.any?(events, &(&1.kind == :request_completed))
@@ -213,7 +351,159 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
     refute is_nil(tool_completed)
     assert tool_completed.data.attempts == 2
-    assert match?({:ok, _}, tool_completed.data.result)
+    assert match?({:ok, _, _}, tool_completed.data.result)
+  end
+
+  test "emits tool_completed events in original tool call order for parallel tools" do
+    stub_parallel_order_run()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SlowOrderTool.name() => SlowOrderTool, FastOrderTool.name() => FastOrderTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events = ReAct.stream("Run tools in order", config) |> Enum.to_list()
+
+    tool_completed_ids =
+      events
+      |> Enum.filter(&(&1.kind == :tool_completed))
+      |> Enum.map(& &1.data.tool_call_id)
+
+    assert tool_completed_ids == ["tc_slow", "tc_fast"]
+  end
+
+  test "strategy applies tool effects in deterministic call order" do
+    stub_parallel_order_run()
+    request_id = "req_strategy_ordering"
+
+    runtime_events =
+      ReAct.stream(
+        "Run tools in order",
+        Config.new(%{
+          model: :capable,
+          tools: %{SlowOrderTool.name() => SlowOrderTool, FastOrderTool.name() => FastOrderTool},
+          tool_max_retries: 0,
+          tool_retry_backoff_ms: 0
+        }),
+        request_id: request_id,
+        run_id: request_id
+      )
+      |> Enum.map(&Map.from_struct/1)
+
+    tool_completed_ids =
+      runtime_events
+      |> Enum.filter(&(&1.kind == :tool_completed))
+      |> Enum.map(&get_in(&1, [:data, :tool_call_id]))
+
+    assert tool_completed_ids == ["tc_slow", "tc_fast"]
+
+    agent = create_strategy_agent(tools: [SlowOrderTool, FastOrderTool])
+
+    {agent, [_spawn]} =
+      ReActStrategy.cmd(
+        agent,
+        [strategy_instruction(ReActStrategy.start_action(), %{query: "Run tools in order", request_id: request_id})],
+        %{}
+      )
+
+    {agent, []} =
+      Enum.reduce(runtime_events, {agent, []}, fn event, {acc_agent, _} ->
+        ReActStrategy.cmd(
+          acc_agent,
+          [strategy_instruction(:ai_react_worker_event, %{request_id: request_id, event: event})],
+          %{}
+        )
+      end)
+
+    state = StratState.get(agent, %{})
+    assert state.status == :completed
+    assert state.termination_reason == :final_answer
+    assert agent.state.react_order_marker == :fast
+  end
+
+  test "refreshes tool context state snapshot between rounds when state effects are allowed" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{state: %{sums: []}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+    second_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_2"))
+
+    assert {:ok, %{seen: [], step: 1}, _effects} = first_tool_completed.data.result
+    assert {:ok, %{seen: [1], step: 2}, _effects} = second_tool_completed.data.result
+  end
+
+  test "does not refresh tool context state snapshot when policy removes state effects" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0,
+        effect_policy: %{mode: :deny_all}
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{state: %{sums: []}, effect_policy: %{mode: :deny_all}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+    second_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_2"))
+
+    assert {:ok, %{seen: [], step: 1}, _effects} = first_tool_completed.data.result
+    assert {:ok, %{seen: [], step: 2}, _effects} = second_tool_completed.data.result
+  end
+
+  test "uses runtime config effect_policy with standalone state snapshot context" do
+    stub_state_snapshot_round_trip()
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0,
+        effect_policy: %{mode: :deny_all}
+      })
+
+    events =
+      ReAct.stream(
+        "Update sums twice",
+        config,
+        context: %{state: %{sums: []}}
+      )
+      |> Enum.to_list()
+
+    first_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_1"))
+    second_tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_step_2"))
+
+    assert {:ok, %{seen: [], step: 1, has_state: true}, _effects} =
+             first_tool_completed.data.result
+
+    assert {:ok, %{seen: [], step: 2}, _effects} = second_tool_completed.data.result
   end
 
   test "resumes from after_llm checkpoint token" do
@@ -284,13 +574,163 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       _ -> nil
     end)
 
+    {:ok, task_supervisor} = Task.Supervisor.start_link()
+    on_exit(fn -> if Process.alive?(task_supervisor), do: Process.exit(task_supervisor, :shutdown) end)
+
     config = Config.new(%{model: :capable, tools: %{}})
 
-    _first =
-      ReAct.stream("cancel me", config)
+    [first_event] =
+      ReAct.stream("cancel me", config, task_supervisor: task_supervisor)
       |> Enum.take(1)
 
-    Process.sleep(20)
-    refute_received {:react_runner, _, :event, _}
+    assert first_event.kind == :request_started
+
+    assert wait_until(fn ->
+             Task.Supervisor.children(task_supervisor) == []
+           end)
+  end
+
+  test "strategy consumes runtime runner event stream to terminal state" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      {:ok,
+       %{
+         stream: [ReqLLM.StreamChunk.text("Hello from runtime runner")],
+         usage: %{input_tokens: 3, output_tokens: 2}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    request_id = "req_strategy_runtime"
+
+    runtime_events =
+      ReAct.stream("Say hello", Config.new(%{model: :capable, tools: %{}}), request_id: request_id, run_id: request_id)
+      |> Enum.map(&Map.from_struct/1)
+
+    agent = create_strategy_agent(tools: [CalculatorTool])
+
+    {agent, [_spawn]} =
+      ReActStrategy.cmd(
+        agent,
+        [strategy_instruction(ReActStrategy.start_action(), %{query: "Say hello", request_id: request_id})],
+        %{}
+      )
+
+    {agent, []} =
+      Enum.reduce(runtime_events, {agent, []}, fn event, {acc_agent, _} ->
+        ReActStrategy.cmd(
+          acc_agent,
+          [strategy_instruction(:ai_react_worker_event, %{request_id: request_id, event: event})],
+          %{}
+        )
+      end)
+
+    state = StratState.get(agent, %{})
+    assert state.status == :completed
+    assert state.result == "Hello from runtime runner"
+    assert state.termination_reason == :final_answer
+    assert state.active_request_id == nil
+    assert state.react_worker_status == :ready
+  end
+
+  defp create_strategy_agent(opts) do
+    %Jido.Agent{
+      id: "react_strategy_test_agent",
+      name: "react_strategy_test_agent",
+      state: %{}
+    }
+    |> then(fn agent ->
+      {agent, []} = ReActStrategy.init(agent, %{strategy_opts: opts})
+      agent
+    end)
+  end
+
+  defp strategy_instruction(action, params) do
+    %Jido.Instruction{action: action, params: params}
+  end
+
+  defp stub_parallel_order_run do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      if count == 1 do
+        {:ok,
+         %{
+           stream: [
+             ReqLLM.StreamChunk.tool_call("slow_order_tool", %{}, %{id: "tc_slow"}),
+             ReqLLM.StreamChunk.tool_call("fast_order_tool", %{}, %{id: "tc_fast"})
+           ],
+           usage: %{input_tokens: 6, output_tokens: 3}
+         }}
+      else
+        {:ok,
+         %{
+           stream: [ReqLLM.StreamChunk.text("Tool round complete")],
+           usage: %{input_tokens: 2, output_tokens: 1}
+         }}
+      end
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+  end
+
+  defp stub_state_snapshot_round_trip do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.tool_call("snapshot_state_tool", %{"step" => 1}, %{id: "tc_step_1"})],
+             usage: %{input_tokens: 4, output_tokens: 2}
+           }}
+
+        2 ->
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.tool_call("snapshot_state_tool", %{"step" => 2}, %{id: "tc_step_2"})],
+             usage: %{input_tokens: 3, output_tokens: 2}
+           }}
+
+        _ ->
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.text("Done")],
+             usage: %{input_tokens: 2, output_tokens: 1}
+           }}
+      end
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+  end
+
+  defp wait_until(fun, timeout_ms \\ 500) when is_function(fun, 0) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    wait_until_loop(fun, deadline)
+  end
+
+  defp wait_until_loop(fun, deadline) do
+    if fun.() do
+      true
+    else
+      if System.monotonic_time(:millisecond) >= deadline do
+        false
+      else
+        Process.sleep(5)
+        wait_until_loop(fun, deadline)
+      end
+    end
   end
 end

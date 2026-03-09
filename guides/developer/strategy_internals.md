@@ -54,7 +54,7 @@ Fix:
 
 ## Defaults You Should Know
 
-- most strategies default model to `anthropic:claude-haiku-4-5`
+- most strategies default model alias to `:fast` (resolved via `Jido.AI.resolve_model/1`)
 - request error routing is standardized via `ai.request.error`
 - Adaptive delegates to selected strategy and can re-evaluate on new prompts
 
@@ -95,10 +95,54 @@ ToT parser flow is JSON-first with regex fallback:
 
 ToT tool orchestration is strategy-managed:
 
-- `ai.tool.result` and `ai.tool.error` are routed back into the strategy
+- `ai.tool.result` signals (including error envelopes) are routed back into the strategy
 - machine progression pauses during tool rounds
+- tool effects are applied in original tool-call order after the round is complete
 - follow-up LLM calls are issued with assistant tool-call + tool messages
+- follow-up tool messages preserve original tool-call order
 - round trips are bounded by `max_tool_round_trips`
+
+## Tool Context State Snapshot Contract
+
+For tool-executing strategy paths, action context includes a state snapshot under:
+
+- `:state` (canonical, core Jido-compatible)
+
+Current behavior by strategy:
+
+- ReAct: snapshot is injected at request start and refreshed between tool rounds after applying allowed `StateOp` effects in deterministic tool-call order.
+- ToT: snapshot is injected into each `Directive.ToolExec` context when the tool round is started.
+- Adaptive: inherits this behavior when delegating to ReAct/ToT.
+
+This key is runtime-managed and overrides same-named entries from user `tool_context`.
+
+## ReAct Context Projection Internals
+
+ReAct now uses explicit separation between core event log and LLM projection:
+
+- Core append-only log: `agent.state[:__thread__]` (`Jido.Thread`)
+- ReAct materialized view: `agent.state[:__strategy__].context` (`Jido.AI.Context`)
+
+Canonical ReAct control surface:
+
+- `ai.react.context.modify`
+
+Core thread entries emitted by ReAct:
+
+- `:ai_message` for user/assistant/tool message lifecycle
+- `:ai_context_operation` for context operations (`replace`, `switch`)
+
+Deferred semantics:
+
+- If a run is active, context operations are stored as `pending_context_op`
+- Deferred op is applied after terminal event (`completed`, `failed`, `cancelled`, worker-exit failure)
+
+Projection semantics:
+
+- ReAct projects lane-specific context using `context_ref`
+- Projection starts from latest `replace` anchor and folds subsequent `ai_message` entries
+
+See full model: [Thread-Context Projection Model](thread_context_projection_model.md)
 
 ## When To Use / Not Use
 
