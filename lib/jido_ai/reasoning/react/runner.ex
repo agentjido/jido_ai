@@ -16,6 +16,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   @receive_timeout 30_000
 
+  # Injected as a user message when the agent repeats the exact same tool
+  # calls with identical arguments on consecutive iterations.
+  @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
+
   @type stream_opt ::
           {:request_id, String.t()}
           | {:run_id, String.t()}
@@ -158,7 +162,21 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             state
 
           {:tool_calls, state, tool_calls} ->
+            prev_signature = Map.get(state, :__prev_tool_signature__)
+            current_signature = tool_call_signature(tool_calls)
+
             {state, context} = run_tool_round(state, owner, ref, config, context, tool_calls)
+
+            state = Map.put(state, :__prev_tool_signature__, current_signature)
+
+            state =
+              if prev_signature == current_signature and prev_signature != nil do
+                corrected_context = AIContext.append_user(state.context, @cycle_warning)
+                %{state | context: corrected_context}
+              else
+                state
+              end
+
             run_loop(state, owner, ref, config, context)
 
           {:error, state, reason, error_type} ->
@@ -794,4 +812,17 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp normalize_backoff(_), do: 0
 
   defp now_ms, do: System.system_time(:millisecond)
+
+  # Tool call maps may arrive with atom or string keys depending on the
+  # provider adapter, so we check both.
+  defp tool_call_signature(tool_calls) when is_list(tool_calls) do
+    tool_calls
+    |> Enum.map(fn tc ->
+      name = Map.get(tc, :name) || Map.get(tc, "name") || ""
+      args = Map.get(tc, :arguments) || Map.get(tc, "arguments") || ""
+      "#{name}:#{inspect(args)}"
+    end)
+    |> Enum.sort()
+    |> Enum.join("|")
+  end
 end
