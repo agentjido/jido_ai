@@ -1,16 +1,19 @@
 defmodule Mix.Tasks.JidoAi.Install.Docs do
   @moduledoc false
 
+  @doc "Returns the short description shown in Mix task listings."
   @spec short_doc() :: String.t()
   def short_doc do
     "Install and configure Jido AI for use in an application."
   end
 
+  @doc "Returns the example command shown in the task documentation."
   @spec example() :: String.t()
   def example do
     "mix igniter.install jido_ai"
   end
 
+  @doc "Returns the long-form task documentation."
   @spec long_doc() :: String.t()
   def long_doc do
     """
