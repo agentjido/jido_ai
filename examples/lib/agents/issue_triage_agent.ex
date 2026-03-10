@@ -38,11 +38,11 @@ defmodule Jido.AI.Examples.IssueTriageAgent do
 
   ## CLI Usage
 
-      GITHUB_TOKEN=ghp_xxx mix jido_ai --agent Jido.AI.Examples.IssueTriageAgent \\
+      GITHUB_TOKEN=ghp_xxx mix -C examples jido_ai --agent Jido.AI.Examples.IssueTriageAgent \\
         "List the 5 most recent issues in agentjido/jido and categorize them"
 
       # Optional write mode (disabled by default)
-      JIDO_AI_EXAMPLES_ALLOW_GITHUB_WRITES=true mix jido_ai --agent Jido.AI.Examples.IssueTriageAgent \\
+      JIDO_AI_EXAMPLES_ALLOW_GITHUB_WRITES=true mix -C examples jido_ai --agent Jido.AI.Examples.IssueTriageAgent \\
         "Apply labels to issue #123 in agentjido/jido"
 
   ## How Token Injection Works

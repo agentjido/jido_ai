@@ -13,7 +13,7 @@ defmodule Jido.AI.Quality.CoverageConfigTest do
 
     assert config["coverage_options"]["minimum_coverage"] == 80
 
-    assert "^lib/examples/" in config["skip_files"]
+    assert "^examples/" in config["skip_files"]
     assert "^lib/mix/tasks/" in config["skip_files"]
     assert "^test/support/" in config["skip_files"]
   end

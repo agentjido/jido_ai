@@ -82,8 +82,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
                Jido.Tools.Arithmetic.Add,
                Jido.Tools.Arithmetic.Subtract,
                Jido.Tools.Arithmetic.Multiply,
-               Jido.Tools.Arithmetic.Divide,
-               Jido.Tools.Weather
+               Jido.Tools.Arithmetic.Divide
              ]
 
       assert is_binary(config.system_prompt)

@@ -11,13 +11,15 @@ defmodule Jido.AI.Examples.Scripts.Bootstrap do
   end
 
   def load_dotenv! do
-    env_file = Path.join(File.cwd!(), ".env")
+    env_file =
+      [Path.join(File.cwd!(), ".env"), Path.expand("../.env", File.cwd!())]
+      |> Enum.find(&File.exists?/1)
 
     cond do
-      File.exists?(env_file) and Code.ensure_loaded?(Dotenvy) ->
+      is_binary(env_file) and Code.ensure_loaded?(Dotenvy) ->
         Dotenvy.source!([env_file])
 
-      File.exists?(env_file) ->
+      is_binary(env_file) ->
         raise "Dotenvy is required to load #{env_file}"
 
       true ->

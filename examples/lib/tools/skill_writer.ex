@@ -155,7 +155,7 @@ defmodule Jido.AI.Examples.Tools.WriteFileSkill do
     body = params.body
 
     content = generate_skill_md(name, description, license, allowed_tools, tags, metadata, body)
-    suggested_path = "priv/skills/#{name}/SKILL.md"
+    suggested_path = Jido.AI.Examples.Paths.examples_relative_repo_path("priv/skills/#{name}/SKILL.md")
 
     {:ok, %{format: "skill_md", suggested_path: suggested_path, content: content}}
   end

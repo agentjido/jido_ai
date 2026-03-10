@@ -41,11 +41,23 @@ Use `Jido.AI.resolve_model/1` when you need to confirm runtime resolution.
 ## 3. Define a First Agent
 
 ```elixir
+defmodule MyApp.Tools.ConvertTemperature do
+  use Jido.Action,
+    name: "convert_temperature",
+    description: "Convert Celsius to Fahrenheit",
+    schema: [celsius: [type: :float, required: true]]
+
+  @impl true
+  def run(%{celsius: celsius}, _context) do
+    {:ok, %{fahrenheit: celsius * 9 / 5 + 32}}
+  end
+end
+
 defmodule MyApp.WeatherAgent do
   use Jido.AI.Agent,
     name: "weather_agent",
     model: :fast,
-    tools: [Jido.AI.Examples.Tools.ConvertTemperature],
+    tools: [MyApp.Tools.ConvertTemperature],
     system_prompt: "You are a concise assistant. Use tools when needed."
 end
 

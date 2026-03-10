@@ -7,7 +7,7 @@ defmodule Jido.AI.Examples.Weather.CoTAgent do
 
   ## CLI Usage
 
-      mix jido_ai --agent Jido.AI.Examples.Weather.CoTAgent \\
+      mix -C examples jido_ai --agent Jido.AI.Examples.Weather.CoTAgent \\
         "How should I decide between running outdoors or at the gym if rain is likely?"
   """
 

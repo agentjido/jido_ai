@@ -6,7 +6,7 @@ defmodule Jido.AI.Examples.Weather.AoTAgent do
 
   ## CLI Usage
 
-      mix jido_ai --agent Jido.AI.Examples.Weather.AoTAgent \\
+      mix -C examples jido_ai --agent Jido.AI.Examples.Weather.AoTAgent \\
         "Find the best weather-safe weekend option with a fallback plan."
   """
 

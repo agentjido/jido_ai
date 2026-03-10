@@ -28,10 +28,10 @@ defmodule Jido.AI.Examples.TaskListAgent do
 
   ## CLI Usage
 
-      mix jido_ai --agent Jido.AI.Examples.TaskListAgent \\
+      mix -C examples jido_ai --agent Jido.AI.Examples.TaskListAgent \\
         "Create a plan to set up a CI/CD pipeline for an Elixir project"
 
-      mix jido_ai --agent Jido.AI.Examples.TaskListAgent \\
+      mix -C examples jido_ai --agent Jido.AI.Examples.TaskListAgent \\
         "Help me organize a product launch - what needs to happen?"
 
   ## How It Works

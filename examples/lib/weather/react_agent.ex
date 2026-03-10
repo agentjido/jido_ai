@@ -6,7 +6,7 @@ defmodule Jido.AI.Examples.Weather.ReActAgent do
 
   ## CLI Usage
 
-      mix jido_ai --agent Jido.AI.Examples.Weather.ReActAgent \\
+      mix -C examples jido_ai --agent Jido.AI.Examples.Weather.ReActAgent \\
         "Should I bring an umbrella in Chicago this evening?"
   """
 

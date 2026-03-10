@@ -1,17 +1,21 @@
 Code.require_file(Path.expand("../shared/bootstrap.exs", __DIR__))
 
 alias Jido.AI.Examples.Scripts.Bootstrap
+alias Jido.AI.Examples.Paths
 alias Jido.AI.Examples.SkillsDemoAgent
 alias Jido.AI.Skill.{Loader, Registry}
 
 Bootstrap.init!(required_env: ["ANTHROPIC_API_KEY"])
 Bootstrap.print_banner("Skills Multi-Agent Orchestration Demo")
 
-Bootstrap.assert!(File.exists?("priv/skills/unit-converter/SKILL.md"), "Missing priv/skills/unit-converter/SKILL.md")
-{:ok, _spec} = Loader.load("priv/skills/unit-converter/SKILL.md")
+skill_root = Paths.repo_path("priv/skills")
+unit_converter_skill = Path.join(skill_root, "unit-converter/SKILL.md")
+
+Bootstrap.assert!(File.exists?(unit_converter_skill), "Missing #{unit_converter_skill}")
+{:ok, _spec} = Loader.load(unit_converter_skill)
 
 :ok = Registry.ensure_started()
-{:ok, _count} = Registry.load_from_paths(["priv/skills"])
+{:ok, _count} = Registry.load_from_paths([skill_root])
 
 Bootstrap.start_named_jido!(SkillsMultiAgentOrchestrationDemo.Jido)
 {:ok, pid} = Jido.start_agent(SkillsMultiAgentOrchestrationDemo.Jido, SkillsDemoAgent)

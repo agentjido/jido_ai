@@ -6,7 +6,7 @@ defmodule Jido.AI.Examples.Weather.ToTAgent do
 
   ## CLI Usage
 
-      mix jido_ai --agent Jido.AI.Examples.Weather.ToTAgent \\
+      mix -C examples jido_ai --agent Jido.AI.Examples.Weather.ToTAgent \\
         "Plan three weekend options for Boston if weather is uncertain."
   """
 
