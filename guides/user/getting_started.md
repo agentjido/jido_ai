@@ -100,6 +100,7 @@ use Jido.AI.Agent,
 
 - ReAct model default alias: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
 - ReAct max iterations default: `10`
+- ReAct max tokens default: `4096`
 - Request await timeout default: `30_000ms`
 
 ## When To Use / Not Use

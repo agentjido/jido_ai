@@ -17,7 +17,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Continue do
         system_prompt: Zoi.string() |> Zoi.optional(),
         tools: Zoi.any() |> Zoi.optional(),
         max_iterations: Zoi.integer() |> Zoi.default(10),
-        max_tokens: Zoi.integer() |> Zoi.default(1024),
+        max_tokens: Zoi.integer() |> Zoi.default(4096),
         temperature: Zoi.float() |> Zoi.default(0.2),
         llm_opts: Zoi.any() |> Zoi.optional(),
         llm_timeout_ms: Zoi.integer() |> Zoi.optional(),

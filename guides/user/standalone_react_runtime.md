@@ -46,7 +46,7 @@ config = Jido.AI.Reasoning.ReAct.build_config(%{
   streaming: true,
 
   # LLM options
-  max_tokens: 1_024,
+  max_tokens: 4_096,
   temperature: 0.2,
   tool_choice: :auto,
   llm_opts: [thinking: %{type: :enabled, budget_tokens: 2048}, reasoning_effort: :high],
@@ -278,7 +278,7 @@ Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
 - `model` default: `:fast`
 - `max_iterations` default: `10`
 - `streaming` default: `true`
-- `max_tokens` default: `1_024`
+- `max_tokens` default: `4_096`
 - `temperature` default: `0.2`
 - `tool_choice` default: `:auto`
 - `llm_opts` default: `[]`

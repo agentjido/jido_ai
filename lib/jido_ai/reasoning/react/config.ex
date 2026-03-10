@@ -9,6 +9,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
   @default_model :fast
   @default_max_iterations 10
+  @default_max_tokens 4_096
   @legacy_insecure_token_secret "jido_ai_react_default_secret_change_me"
   @ephemeral_secret_key {:jido_ai, __MODULE__, :ephemeral_token_secret}
   @ephemeral_secret_warned_key {:jido_ai, __MODULE__, :ephemeral_token_secret_warned}
@@ -17,7 +18,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
                                         |> Map.new()
 
   @llm_schema Zoi.object(%{
-                max_tokens: Zoi.integer() |> Zoi.default(1_024),
+                max_tokens: Zoi.integer() |> Zoi.default(@default_max_tokens),
                 temperature: Zoi.number() |> Zoi.default(0.2),
                 timeout_ms: Zoi.integer() |> Zoi.nullish(),
                 tool_choice: Zoi.any() |> Zoi.default(:auto),
@@ -94,7 +95,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     llm_timeout = get_opt(opts_map, :llm_timeout_ms, get_opt(opts_map, :timeout_ms, nil))
 
     llm = %{
-      max_tokens: normalize_pos_integer(get_opt(opts_map, :max_tokens, 1_024), 1_024),
+      max_tokens: normalize_pos_integer(get_opt(opts_map, :max_tokens, @default_max_tokens), @default_max_tokens),
       temperature: normalize_float(get_opt(opts_map, :temperature, 0.2), 0.2),
       timeout_ms: normalize_optional_pos_integer(llm_timeout),
       tool_choice: get_opt(opts_map, :tool_choice, :auto),
