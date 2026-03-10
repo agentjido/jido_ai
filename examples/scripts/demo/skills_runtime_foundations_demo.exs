@@ -1,13 +1,17 @@
 Code.require_file(Path.expand("../shared/bootstrap.exs", __DIR__))
 
 alias Jido.AI.Examples.Scripts.Bootstrap
+alias Jido.AI.Examples.Paths
 alias Jido.AI.Skill
 alias Jido.AI.Skill.{Loader, Prompt, Registry}
 
 Bootstrap.init!()
 Bootstrap.print_banner("Skills Runtime Foundations Demo")
 
-Bootstrap.assert!(File.exists?("priv/skills/code-review/SKILL.md"), "Missing priv/skills/code-review/SKILL.md")
+skill_root = Paths.repo_path("priv/skills")
+code_review_skill = Path.join(skill_root, "code-review/SKILL.md")
+
+Bootstrap.assert!(File.exists?(code_review_skill), "Missing #{code_review_skill}")
 
 defmodule SkillsRuntimeFoundationsDemo.Calculator do
   use Jido.AI.Skill,
@@ -24,11 +28,11 @@ defmodule SkillsRuntimeFoundationsDemo.Calculator do
 end
 
 calc_manifest = Skill.manifest(SkillsRuntimeFoundationsDemo.Calculator)
-{:ok, runtime_manifest} = Loader.load("priv/skills/code-review/SKILL.md")
+{:ok, runtime_manifest} = Loader.load(code_review_skill)
 
 :ok = Registry.ensure_started()
 Registry.register(calc_manifest)
-{:ok, _count} = Registry.load_from_paths(["priv/skills"])
+{:ok, _count} = Registry.load_from_paths([skill_root])
 
 {:ok, _} = Registry.lookup("calculator")
 {:ok, _} = Skill.resolve("calculator")

@@ -3,7 +3,7 @@
     "minimum_coverage": 80
   },
   "skip_files": [
-    "^lib/examples/",
+    "^examples/",
     "^lib/mix/tasks/",
     "^test/support/"
   ]

@@ -7,11 +7,15 @@ Bootstrap.init!(required_env: ["BRAVE_SEARCH_API_KEY"])
 Bootstrap.print_banner("Browser Adapter Compatibility Smoke Demo")
 
 url = "https://example.com"
+browser = Module.concat([JidoBrowser])
+web_adapter = Module.concat([JidoBrowser, Adapters, Web])
+
+Bootstrap.assert!(Code.ensure_loaded?(browser), "jido_browser dependency is not available.")
 
 extract_with_fallback = fn session ->
   [:html, :text]
   |> Enum.reduce_while({:error, :no_content}, fn format, _acc ->
-    case JidoBrowser.extract_content(session, format: format, selector: "body") do
+    case apply(browser, :extract_content, [session, [format: format, selector: "body"]]) do
       {:ok, _session, %{content: content}} when is_binary(content) and byte_size(content) > 0 ->
         {:halt, {:ok, content, format}}
 
@@ -21,30 +25,30 @@ extract_with_fallback = fn session ->
   end)
 end
 
-case JidoBrowser.start_session(headless: true) do
+case apply(browser, :start_session, [[headless: true]]) do
   {:ok, session} ->
     try do
-      {:ok, session, _} = JidoBrowser.navigate(session, url)
+      {:ok, session, _} = apply(browser, :navigate, [session, url])
       {:ok, content, format} = extract_with_fallback.(session)
       Bootstrap.assert!(String.length(content) > 20, "Vibium adapter extraction returned empty content.")
       IO.puts("✓ Vibium adapter extraction OK (#{format}, #{String.length(content)} chars)")
     after
-      JidoBrowser.end_session(session)
+      apply(browser, :end_session, [session])
     end
 
   {:error, reason} ->
     raise "Failed to start Vibium adapter session: #{inspect(reason)}"
 end
 
-case JidoBrowser.start_session(adapter: JidoBrowser.Adapters.Web) do
+case apply(browser, :start_session, [[adapter: web_adapter]]) do
   {:ok, session} ->
     try do
-      {:ok, session, _} = JidoBrowser.navigate(session, url)
+      {:ok, session, _} = apply(browser, :navigate, [session, url])
       {:ok, content, format} = extract_with_fallback.(session)
       Bootstrap.assert!(String.length(content) > 20, "Web adapter extraction returned empty content.")
       IO.puts("✓ Web adapter extraction OK (#{format}, #{String.length(content)} chars)")
     after
-      JidoBrowser.end_session(session)
+      apply(browser, :end_session, [session])
     end
 
   {:error, reason} ->

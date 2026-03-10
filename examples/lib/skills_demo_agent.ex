@@ -4,13 +4,13 @@ defmodule Jido.AI.Examples.SkillsDemoAgent do
 
   This agent combines:
   - **Calculator skill** (module-based) - `Jido.AI.Examples.Skills.Calculator`
-  - **Unit Converter skill** (YAML file) - loaded from `priv/skills/unit-converter/SKILL.md`
+  - **Unit Converter skill** (YAML file) - loaded from `../priv/skills/unit-converter/SKILL.md`
 
   ## Usage
 
       # Ensure the registry is started and skill is loaded
       Jido.AI.Skill.Registry.start_link()
-      Jido.AI.Skill.Registry.load_from_paths(["priv/skills"])
+      Jido.AI.Examples.SkillsDemoAgent.load_default_skills()
 
       # Start the agent
       {:ok, pid} = Jido.start_agent(MyJido, Jido.AI.Examples.SkillsDemoAgent)
@@ -72,5 +72,12 @@ defmodule Jido.AI.Examples.SkillsDemoAgent do
   """
   def render_skills do
     Prompt.render(skills())
+  end
+
+  @doc """
+  Loads the file-based skills shipped with the parent `jido_ai` repo.
+  """
+  def load_default_skills do
+    Jido.AI.Skill.Registry.load_from_paths([Jido.AI.Examples.Paths.repo_path("priv/skills")])
   end
 end

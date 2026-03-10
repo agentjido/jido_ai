@@ -62,8 +62,6 @@ defmodule JidoAi.MixProject do
       {:jido, "~> 2.0"},
       {:jido_action, "~> 2.0"},
       {:req_llm, "~> 1.6"},
-      # Example-only browser tools (kept out of Hex runtime dependency graph)
-      {:jido_browser, "~> 1.0", only: [:dev, :test], runtime: false},
 
       # Runtime
       {:fsmx, "~> 0.5"},
@@ -255,9 +253,6 @@ defmodule JidoAi.MixProject do
         ],
         "Mix Tasks": [
           ~r/Mix\.Tasks\..*/
-        ],
-        Examples: [
-          ~r/Jido\.AI\.Examples\..*/
         ]
       ]
     ]

@@ -361,11 +361,8 @@ defmodule Mix.Tasks.JidoAi do
   defp parse_module(module_string) do
     module = Module.concat([module_string])
 
-    if Code.ensure_loaded?(module) do
-      module
-    else
-      raise "Module #{module_string} not found or not loaded"
-    end
+    ensure_module_loaded!(module, module_string)
+    module
   end
 
   defp parse_tools(nil), do: nil
@@ -376,13 +373,29 @@ defmodule Mix.Tasks.JidoAi do
     |> Enum.map(&String.trim/1)
     |> Enum.map(fn mod_string ->
       module = Module.concat([mod_string])
-
-      if !Code.ensure_loaded?(module) do
-        raise "Tool module #{mod_string} not found"
-      end
-
+      ensure_module_loaded!(module, mod_string)
       module
     end)
+  end
+
+  defp ensure_module_loaded!(module, module_string) do
+    if !Code.ensure_loaded?(module) do
+      maybe_require_example_module(module_string)
+    end
+
+    if !Code.ensure_loaded?(module) do
+      raise "Module #{module_string} not found or not loaded"
+    end
+  end
+
+  defp maybe_require_example_module(module_string) do
+    if String.starts_with?(module_string, "Jido.AI.Examples.") do
+      File.cwd!()
+      |> Path.join("examples/scripts/shared/bootstrap.exs")
+      |> Code.require_file()
+
+      :ok
+    end
   end
 
   defp start_jido_instance(instance_name) do
