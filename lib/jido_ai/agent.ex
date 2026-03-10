@@ -26,7 +26,7 @@ defmodule Jido.AI.Agent do
   - `:system_prompt` - Custom system prompt for the LLM
   - `:model` - Model alias or direct model spec (default: :fast, resolved via Jido.AI.resolve_model/1)
   - `:max_iterations` - Maximum reasoning iterations (default: 10)
-  - `:max_tokens` - Maximum tokens per LLM response (default: `1024`)
+  - `:max_tokens` - Maximum tokens per LLM response (default: `4096`)
   - `:streaming` - Whether to stream LLM responses (default: `true`)
   - `:request_policy` - Request concurrency policy (default: `:reject`)
   - `:tool_timeout_ms` - Per-attempt tool execution timeout in ms (default: 15_000)
@@ -116,7 +116,7 @@ defmodule Jido.AI.Agent do
 
   @default_model :fast
   @default_max_iterations 10
-  @default_max_tokens 1_024
+  @default_max_tokens 4_096
 
   @doc false
   def expand_aliases_in_ast(ast, caller_env) do

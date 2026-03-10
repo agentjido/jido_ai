@@ -75,7 +75,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   @default_model :fast
   @default_max_iterations 10
-  @default_max_tokens 1_024
+  @default_max_tokens 4_096
   @request_trace_cap 2000
   @applied_context_ops_cap 128
   @default_context_ref "default"

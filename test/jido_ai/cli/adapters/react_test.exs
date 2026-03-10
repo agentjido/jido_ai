@@ -79,7 +79,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
 
       assert config.model == Jido.AI.resolve_model(:fast)
       assert config.max_iterations == 10
-      assert config.max_tokens == 1_024
+      assert config.max_tokens == 4_096
 
       assert config.tools == [
                Jido.Tools.Arithmetic.Add,

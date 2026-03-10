@@ -12,7 +12,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
 
   @default_model :fast
   @default_max_iterations 10
-  @default_max_tokens 1_024
+  @default_max_tokens 4_096
   @default_tools [
     Jido.Tools.Arithmetic.Add,
     Jido.Tools.Arithmetic.Subtract,
