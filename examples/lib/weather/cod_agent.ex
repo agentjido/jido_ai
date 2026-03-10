@@ -6,7 +6,7 @@ defmodule Jido.AI.Examples.Weather.CoDAgent do
 
   ## CLI Usage
 
-      mix -C examples jido_ai --agent Jido.AI.Examples.Weather.CoDAgent \\
+      mix jido_ai --agent Jido.AI.Examples.Weather.CoDAgent \\
         "Give me a fast weather-aware commute recommendation for tomorrow morning."
   """
 

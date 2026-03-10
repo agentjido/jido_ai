@@ -3,6 +3,9 @@ defmodule Jido.AI.Examples.Scripts.Bootstrap do
 
   require Logger
 
+  @examples_root Path.expand("../..", __DIR__)
+  @examples_lib Path.join(@examples_root, "lib")
+
   def init!(opts \\ []) do
     Logger.configure(level: :warning)
     load_dotenv!()
@@ -75,4 +78,26 @@ defmodule Jido.AI.Examples.Scripts.Bootstrap do
         :ok
     end
   end
+
+  def load_examples! do
+    @examples_lib
+    |> Path.join("**/*.ex")
+    |> Path.wildcard()
+    |> Enum.sort_by(&load_order/1)
+    |> Enum.each(&Code.require_file/1)
+
+    :ok
+  end
+
+  defp load_order(file) do
+    basename = Path.basename(file)
+
+    if String.ends_with?(basename, "_agent.ex") do
+      {1, file}
+    else
+      {0, file}
+    end
+  end
 end
+
+Jido.AI.Examples.Scripts.Bootstrap.load_examples!()

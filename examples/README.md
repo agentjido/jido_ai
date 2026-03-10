@@ -1,25 +1,18 @@
 # Jido.AI Examples
 
-The runnable agents, tools, and demo scripts for `jido_ai` live in this standalone Mix project.
-This keeps optional example dependencies out of the core package dependency graph while preserving
-copy-pasteable demos and tests.
+The runnable agents, tools, and demo scripts for `jido_ai` live in this top-level `examples/`
+folder. They stay out of the root `elixirc_paths`, so the core package does not compile example
+modules by default.
 
-## Setup
-
-```bash
-mix deps.get
-```
-
-`examples/.env` is loaded automatically when present. If it does not exist, the scripts also fall
-back to `../.env`.
+Run everything from the repository root. `.env` is loaded from the repo root when present.
 
 ## Run Demo Scripts
 
 ```bash
-mix run scripts/demo/actions_llm_runtime_demo.exs
-mix run scripts/demo/actions_tool_calling_runtime_demo.exs
-mix run scripts/demo/actions_reasoning_runtime_demo.exs
-mix run scripts/demo/weather_multi_turn_context_demo.exs
+mix run examples/scripts/demo/actions_llm_runtime_demo.exs
+mix run examples/scripts/demo/actions_tool_calling_runtime_demo.exs
+mix run examples/scripts/demo/actions_reasoning_runtime_demo.exs
+mix run examples/scripts/demo/weather_multi_turn_context_demo.exs
 ```
 
 ## Run Example Agents

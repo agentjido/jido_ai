@@ -6,7 +6,7 @@ defmodule Jido.AI.Examples.Weather.GoTAgent do
 
   ## CLI Usage
 
-      mix -C examples jido_ai --agent Jido.AI.Examples.Weather.GoTAgent \\
+      mix jido_ai --agent Jido.AI.Examples.Weather.GoTAgent \\
         "Compare weather risks across NYC, Chicago, and Denver for a trip."
   """
 

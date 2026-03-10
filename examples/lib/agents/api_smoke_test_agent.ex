@@ -26,10 +26,10 @@ defmodule Jido.AI.Examples.ApiSmokeTestAgent do
 
   ## CLI Usage
 
-      mix -C examples jido_ai --agent Jido.AI.Examples.ApiSmokeTestAgent \\
+      mix jido_ai --agent Jido.AI.Examples.ApiSmokeTestAgent \\
         "Test https://api.github.com/zen and report the response"
 
-      mix -C examples jido_ai --agent Jido.AI.Examples.ApiSmokeTestAgent \\
+      mix jido_ai --agent Jido.AI.Examples.ApiSmokeTestAgent \\
         "Check if https://httpbin.org/status/500 is working correctly"
 
   ## Available Test Endpoints

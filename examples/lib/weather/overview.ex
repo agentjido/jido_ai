@@ -41,14 +41,14 @@ defmodule Jido.AI.Examples.Weather.Overview do
   @spec cli_examples() :: [String.t()]
   def cli_examples do
     [
-      ~s(mix -C examples jido_ai --agent Jido.AI.Examples.Weather.ReActAgent "Do I need an umbrella in Seattle tomorrow morning?"),
-      ~s(mix -C examples jido_ai --agent Jido.AI.Examples.Weather.CoDAgent "Give me a fast weather-aware commute recommendation with one backup."),
-      ~s(mix -C examples jido_ai --agent Jido.AI.Examples.Weather.AoTAgent "Find the best weather-safe weekend option with one backup."),
-      ~s(mix -C examples jido_ai --agent Jido.AI.Examples.Weather.CoTAgent "How should I decide between biking and transit in rainy weather?"),
-      ~s(mix -C examples jido_ai --agent Jido.AI.Examples.Weather.ToTAgent "Plan three weekend options for Boston if weather is uncertain."),
-      ~s(mix -C examples jido_ai --agent Jido.AI.Examples.Weather.GoTAgent "Compare weather risks across NYC, Chicago, and Denver for a trip."),
-      ~s(mix -C examples jido_ai --agent Jido.AI.Examples.Weather.TRMAgent "Stress test this storm-prep plan and improve it."),
-      ~s(mix -C examples jido_ai --agent Jido.AI.Examples.Weather.AdaptiveAgent "I need a weather-aware commute and backup plan for tomorrow.")
+      ~s(mix jido_ai --agent Jido.AI.Examples.Weather.ReActAgent "Do I need an umbrella in Seattle tomorrow morning?"),
+      ~s(mix jido_ai --agent Jido.AI.Examples.Weather.CoDAgent "Give me a fast weather-aware commute recommendation with one backup."),
+      ~s(mix jido_ai --agent Jido.AI.Examples.Weather.AoTAgent "Find the best weather-safe weekend option with one backup."),
+      ~s(mix jido_ai --agent Jido.AI.Examples.Weather.CoTAgent "How should I decide between biking and transit in rainy weather?"),
+      ~s(mix jido_ai --agent Jido.AI.Examples.Weather.ToTAgent "Plan three weekend options for Boston if weather is uncertain."),
+      ~s(mix jido_ai --agent Jido.AI.Examples.Weather.GoTAgent "Compare weather risks across NYC, Chicago, and Denver for a trip."),
+      ~s(mix jido_ai --agent Jido.AI.Examples.Weather.TRMAgent "Stress test this storm-prep plan and improve it."),
+      ~s(mix jido_ai --agent Jido.AI.Examples.Weather.AdaptiveAgent "I need a weather-aware commute and backup plan for tomorrow.")
     ]
   end
 end

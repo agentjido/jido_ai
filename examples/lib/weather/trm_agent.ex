@@ -6,7 +6,7 @@ defmodule Jido.AI.Examples.Weather.TRMAgent do
 
   ## CLI Usage
 
-      mix -C examples jido_ai --agent Jido.AI.Examples.Weather.TRMAgent \\
+      mix jido_ai --agent Jido.AI.Examples.Weather.TRMAgent \\
         "Improve my severe-weather emergency plan for a 2-day power outage."
   """
 
@@ -15,7 +15,7 @@ defmodule Jido.AI.Examples.Weather.TRMAgent do
   use Jido.AI.TRMAgent,
     name: "weather_trm_agent",
     description: "Recursive weather plan improver",
-    # Keep CLI-friendly defaults so `mix -C examples jido_ai --agent ...` finishes within default timeout.
+    # Keep CLI-friendly defaults so `mix jido_ai --agent ...` finishes within default timeout.
     max_supervision_steps: 2,
     act_threshold: 0.9
 

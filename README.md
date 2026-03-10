@@ -204,15 +204,14 @@ Deep reference:
 
 ## Runnable Examples
 
-The runnable demos now live in the standalone [`examples/`](https://github.com/agentjido/jido_ai/tree/main/examples)
-Mix project so optional example dependencies stay out of the core `jido_ai` package.
+The runnable demos now live in the top-level [`examples/`](https://github.com/agentjido/jido_ai/tree/main/examples)
+folder and are loaded on demand, so they stay out of the core `jido_ai` compile path.
 
 ```bash
-mix -C examples deps.get
-mix -C examples run scripts/demo/actions_llm_runtime_demo.exs
-mix -C examples run scripts/demo/actions_tool_calling_runtime_demo.exs
-mix -C examples run scripts/demo/actions_reasoning_runtime_demo.exs
-mix -C examples run scripts/demo/weather_multi_turn_context_demo.exs
+mix run examples/scripts/demo/actions_llm_runtime_demo.exs
+mix run examples/scripts/demo/actions_tool_calling_runtime_demo.exs
+mix run examples/scripts/demo/actions_reasoning_runtime_demo.exs
+mix run examples/scripts/demo/weather_multi_turn_context_demo.exs
 ```
 
 Additional examples:
