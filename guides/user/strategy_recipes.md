@@ -199,6 +199,7 @@ Fix:
 ## Defaults You Should Know
 
 - ReAct max iterations default: `10`
+- ReAct max tokens default: `4096`
 - AoT defaults: `profile: :standard`, `search_style: :dfs`, `temperature: 0.0`, `max_tokens: 2048`, `require_explicit_answer: true`
 - ToT defaults include `top_k: 3`, `min_depth: 2`, `max_nodes: 100`, `max_tool_round_trips: 3`
 - GoT defaults include `max_nodes: 20`, `max_depth: 5`, `aggregation_strategy: :synthesis`

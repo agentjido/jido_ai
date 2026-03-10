@@ -85,6 +85,13 @@ defmodule Jido.AI.AgentTest do
       streaming: false
   end
 
+  defmodule AgentWithMaxTokens do
+    use Jido.AI.Agent,
+      name: "agent_with_max_tokens",
+      tools: [TestCalculator],
+      max_tokens: 4_096
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -204,6 +211,14 @@ defmodule Jido.AI.AgentTest do
       config = state[:config]
 
       assert config.streaming == false
+    end
+
+    test "max_tokens is forwarded into strategy config" do
+      agent = AgentWithMaxTokens.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.max_tokens == 4_096
     end
 
     test "tools list resolves module aliases" do

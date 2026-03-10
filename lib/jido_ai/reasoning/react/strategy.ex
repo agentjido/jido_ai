@@ -56,6 +56,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
+          max_tokens: pos_integer(),
           streaming: boolean(),
           base_tool_context: map(),
           base_req_http_options: list(),
@@ -74,6 +75,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   @default_model :fast
   @default_max_iterations 10
+  @default_max_tokens 4_096
   @request_trace_cap 2000
   @applied_context_ops_cap 128
   @default_context_ref "default"
@@ -348,6 +350,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       trace_summary: trace_summary,
       model: config[:model],
       max_iterations: config[:max_iterations],
+      max_tokens: config[:max_tokens],
       streaming: config[:streaming],
       request_policy: config[:request_policy],
       runtime_adapter: true,
@@ -1550,6 +1553,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       system_prompt: config[:system_prompt],
       tools: config[:actions_by_name] || %{},
       max_iterations: config[:max_iterations],
+      max_tokens: config[:max_tokens],
       streaming: config[:streaming],
       req_http_options: req_http_options,
       llm_opts: llm_opts,
@@ -1777,6 +1781,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
+      max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens),
       streaming: Keyword.get(opts, :streaming, true),
       request_policy: request_policy,
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, 15_000),

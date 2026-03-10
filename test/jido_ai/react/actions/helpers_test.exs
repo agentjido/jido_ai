@@ -63,6 +63,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
       assert config.model == Jido.AI.resolve_model(:fast)
       assert config.tools == %{ToolB.name() => ToolB}
       assert config.max_iterations == 10
+      assert config.llm.max_tokens == 4_096
     end
 
     test "respects legacy timeout_ms fallback into llm timeout" do
