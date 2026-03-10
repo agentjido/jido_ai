@@ -15,6 +15,14 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
     end
   end
 
+  defmodule FixtureCoTAgent do
+    use Jido.AI.CoTAgent,
+      name: "fixture_cot_agent",
+      description: "Fixture CoT agent for adapter resolution tests"
+
+    def cli_adapter, do: CoTAdapter
+  end
+
   setup_all do
     {:ok,
      default_module: CoTAdapter.create_ephemeral_agent(%{}),
@@ -99,8 +107,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
       assert meta.duration_ms == 123
     end
 
-    test "weather CoT example resolves to CoT adapter" do
-      assert {:ok, CoTAdapter} = Adapter.resolve(nil, Jido.AI.Examples.Weather.CoTAgent)
+    test "fixture CoT agent resolves to CoT adapter" do
+      assert {:ok, CoTAdapter} = Adapter.resolve(nil, FixtureCoTAgent)
     end
   end
 end

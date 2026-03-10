@@ -2,7 +2,7 @@ defmodule Jido.AI.Examples.Weather.Overview do
   @moduledoc """
   Strategy-specific weather agents that are easy to run from `mix jido_ai`.
 
-  This module is a lightweight index for the weather examples in `lib/examples`.
+  This module is a lightweight index for the weather examples in `examples/lib`.
 
   ## Included Agents
 

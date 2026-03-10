@@ -1,3 +1,5 @@
+Code.require_file(Path.expand("../../../examples/scripts/shared/bootstrap.exs", __DIR__))
+
 defmodule Jido.AI.Examples.WeatherByLocationToolTest do
   use ExUnit.Case, async: false
   use Mimic

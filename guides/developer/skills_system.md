@@ -81,11 +81,11 @@ Fix:
 Run the end-to-end demo script:
 
 ```bash
-mix run lib/examples/scripts/demo/skills_runtime_foundations_demo.exs
+mix run examples/scripts/demo/skills_runtime_foundations_demo.exs
 ```
 
 Prerequisites:
-- run from project root
+- run from the repository root
 - keep `priv/skills/code-review/SKILL.md` available (checked by script)
 
 If required skill files are missing, the demo prints a skip message and continues.

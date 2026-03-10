@@ -15,6 +15,14 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
     end
   end
 
+  defmodule FixtureCoDAgent do
+    use Jido.AI.CoDAgent,
+      name: "fixture_cod_agent",
+      description: "Fixture CoD agent for adapter resolution tests"
+
+    def cli_adapter, do: CoDAdapter
+  end
+
   setup_all do
     {:ok,
      default_module: CoDAdapter.create_ephemeral_agent(%{}),
@@ -101,8 +109,8 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
       assert meta.duration_ms == 45
     end
 
-    test "weather CoD example resolves to CoD adapter" do
-      assert {:ok, CoDAdapter} = Adapter.resolve(nil, Jido.AI.Examples.Weather.CoDAgent)
+    test "fixture CoD agent resolves to CoD adapter" do
+      assert {:ok, CoDAdapter} = Adapter.resolve(nil, FixtureCoDAgent)
     end
   end
 end

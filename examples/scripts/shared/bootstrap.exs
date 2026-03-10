@@ -3,6 +3,9 @@ defmodule Jido.AI.Examples.Scripts.Bootstrap do
 
   require Logger
 
+  @examples_root Path.expand("../..", __DIR__)
+  @examples_lib Path.join(@examples_root, "lib")
+
   def init!(opts \\ []) do
     Logger.configure(level: :warning)
     load_dotenv!()
@@ -11,13 +14,15 @@ defmodule Jido.AI.Examples.Scripts.Bootstrap do
   end
 
   def load_dotenv! do
-    env_file = Path.join(File.cwd!(), ".env")
+    env_file =
+      [Path.join(File.cwd!(), ".env"), Path.expand("../.env", File.cwd!())]
+      |> Enum.find(&File.exists?/1)
 
     cond do
-      File.exists?(env_file) and Code.ensure_loaded?(Dotenvy) ->
+      is_binary(env_file) and Code.ensure_loaded?(Dotenvy) ->
         Dotenvy.source!([env_file])
 
-      File.exists?(env_file) ->
+      is_binary(env_file) ->
         raise "Dotenvy is required to load #{env_file}"
 
       true ->
@@ -73,4 +78,26 @@ defmodule Jido.AI.Examples.Scripts.Bootstrap do
         :ok
     end
   end
+
+  def load_examples! do
+    @examples_lib
+    |> Path.join("**/*.ex")
+    |> Path.wildcard()
+    |> Enum.sort_by(&load_order/1)
+    |> Enum.each(&Code.require_file/1)
+
+    :ok
+  end
+
+  defp load_order(file) do
+    basename = Path.basename(file)
+
+    if String.ends_with?(basename, "_agent.ex") do
+      {1, file}
+    else
+      {0, file}
+    end
+  end
 end
+
+Jido.AI.Examples.Scripts.Bootstrap.load_examples!()

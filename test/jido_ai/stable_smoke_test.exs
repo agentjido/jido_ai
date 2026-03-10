@@ -4,12 +4,17 @@ defmodule Jido.AI.StableSmokeTest do
   @moduletag :stable_smoke
   @moduletag :unit
 
-  test "weather strategy overview includes cod parity" do
-    agents = Jido.AI.Examples.Weather.Overview.agents()
+  defmodule StableSmokeCoDAgent do
+    use Jido.AI.CoDAgent,
+      name: "stable_smoke_cod_agent",
+      description: "Stable smoke fixture for CLI adapter wiring"
 
-    assert Map.has_key?(agents, :cod)
-    assert agents.cod == Jido.AI.Examples.Weather.CoDAgent
-    assert map_size(agents) == 8
+    def cli_adapter, do: Jido.AI.Reasoning.ChainOfDraft.CLIAdapter
+  end
+
+  test "strategy fixtures keep CLI adapter wiring intact" do
+    assert {:ok, Jido.AI.Reasoning.ChainOfDraft.CLIAdapter} =
+             Jido.AI.CLI.Adapter.resolve(nil, StableSmokeCoDAgent)
   end
 
   test "mix aliases expose the stable gate contract" do

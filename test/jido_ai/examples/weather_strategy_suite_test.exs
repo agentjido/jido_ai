@@ -1,3 +1,5 @@
+Code.require_file(Path.expand("../../../examples/scripts/shared/bootstrap.exs", __DIR__))
+
 defmodule Jido.AI.Examples.WeatherStrategySuiteTest do
   use ExUnit.Case, async: true
 

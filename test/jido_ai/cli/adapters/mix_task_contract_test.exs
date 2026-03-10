@@ -79,6 +79,15 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
       assert config.user_agent_module == nil
       assert config.tools == nil
     end
+
+    test "loads example agent modules from the top-level examples folder on demand" do
+      config = JidoAiTask.build_config(agent: "Jido.AI.Examples.Weather.CoDAgent")
+
+      assert config.user_agent_module == Jido.AI.Examples.Weather.CoDAgent
+      assert function_exported?(config.user_agent_module, :cli_adapter, 0)
+      assert Code.ensure_loaded?(Jido.AI.Examples.Weather.LiveContext)
+      assert Code.ensure_loaded?(Jido.AI.Examples.Tools.Weather.ByLocation)
+    end
   end
 
   describe "format_error/1" do

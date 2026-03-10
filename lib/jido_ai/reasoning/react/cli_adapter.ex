@@ -17,8 +17,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
     Jido.Tools.Arithmetic.Add,
     Jido.Tools.Arithmetic.Subtract,
     Jido.Tools.Arithmetic.Multiply,
-    Jido.Tools.Arithmetic.Divide,
-    Jido.Tools.Weather
+    Jido.Tools.Arithmetic.Divide
   ]
 
   @impl true
