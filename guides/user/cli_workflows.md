@@ -41,7 +41,6 @@ Supported `mix jido_ai` flags:
 - `--tools`
 - `--system`
 - `--max-iterations`
-- `--max-tokens`
 - `--stdin`
 - `--format` (`text | json`)
 - `--quiet`
@@ -60,7 +59,7 @@ Adapter mapping:
 
 Constraints:
 - If `--agent` is provided, it bypasses ephemeral agent creation.
-- `--agent` ignores `--model`, `--tools`, `--system`, and `--max-tokens`.
+- `--agent` ignores `--model`, `--tools`, and `--system`.
 - If the agent module exports `cli_adapter/0`, that adapter is used.
 
 ## CLI Error Formatting

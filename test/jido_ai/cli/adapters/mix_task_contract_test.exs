@@ -13,8 +13,6 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
         "openai:gpt-4.1",
         "--max-iterations",
         "7",
-        "--max-tokens",
-        "2048",
         "--stdin",
         "--timeout",
         "15000",
@@ -30,7 +28,6 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
       assert opts[:type] == "got"
       assert opts[:model] == "openai:gpt-4.1"
       assert opts[:max_iterations] == 7
-      assert opts[:max_tokens] == 2_048
       assert opts[:stdin] == true
       assert opts[:timeout] == 15_000
       assert opts[:trace] == true
@@ -46,7 +43,6 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
           type: "cot",
           model: "anthropic:claude-haiku-4-5",
           max_iterations: 12,
-          max_tokens: 6_144,
           system: "Reason carefully.",
           format: "json",
           quiet: true,
@@ -58,7 +54,6 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
       assert config.type == "cot"
       assert config.model == "anthropic:claude-haiku-4-5"
       assert config.max_iterations == 12
-      assert config.max_tokens == 6_144
       assert config.system_prompt == "Reason carefully."
       assert config.format == "json"
       assert config.quiet == true
@@ -75,7 +70,6 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
       assert config.type == nil
       assert config.model == nil
       assert config.max_iterations == nil
-      assert config.max_tokens == nil
       assert config.system_prompt == nil
       assert config.format == "text"
       assert config.quiet == false

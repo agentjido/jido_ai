@@ -28,7 +28,6 @@ defmodule Mix.Tasks.JidoAi do
       --tools MODULES      Comma-separated tool modules
       --system PROMPT      System prompt
       --max-iterations N   Max reasoning iterations (default: 10)
-      --max-tokens N       Max LLM response tokens (ReAct default: 1024)
 
   ### Input Mode
       --stdin              Read queries from stdin (one per line)
@@ -69,7 +68,6 @@ defmodule Mix.Tasks.JidoAi do
     tools: :string,
     system: :string,
     max_iterations: :integer,
-    max_tokens: :integer,
     stdin: :boolean,
     format: :string,
     quiet: :boolean,
@@ -149,7 +147,6 @@ defmodule Mix.Tasks.JidoAi do
       tools: parse_tools(opts[:tools]),
       system_prompt: opts[:system],
       max_iterations: opts[:max_iterations],
-      max_tokens: opts[:max_tokens],
       format: opts[:format] || "text",
       quiet: opts[:quiet] || false,
       timeout: opts[:timeout] || 60_000,
