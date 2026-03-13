@@ -313,6 +313,75 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_completed))
   end
 
+  test "passes previous_response_id between streaming tool rounds for OpenAI Responses models" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      previous_response_id =
+        opts
+        |> Keyword.get(:provider_options, [])
+        |> Keyword.get(:previous_response_id)
+
+      case count do
+        1 ->
+          assert is_nil(previous_response_id)
+
+          {:ok,
+           responses_stream_response(
+             [
+               ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "call_calc_1"}),
+               ReqLLM.StreamChunk.meta(%{
+                 finish_reason: :tool_calls,
+                 response_id: "resp_tool_round_1",
+                 usage: %{input_tokens: 4, output_tokens: 2}
+               })
+             ],
+             %{
+               finish_reason: :tool_calls,
+               response_id: "resp_tool_round_1",
+               usage: %{input_tokens: 4, output_tokens: 2}
+             },
+             "openai:gpt-4o-mini"
+           )}
+
+        2 ->
+          assert previous_response_id == "resp_tool_round_1"
+
+          {:ok,
+           responses_stream_response(
+             [
+               ReqLLM.StreamChunk.text("Result is 5"),
+               ReqLLM.StreamChunk.meta(%{
+                 finish_reason: :stop,
+                 response_id: "resp_tool_round_2",
+                 usage: %{input_tokens: 3, output_tokens: 2}
+               })
+             ],
+             %{
+               finish_reason: :stop,
+               response_id: "resp_tool_round_2",
+               usage: %{input_tokens: 3, output_tokens: 2}
+             },
+             "openai:gpt-4o-mini"
+           )}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: "openai:gpt-4o-mini",
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events = ReAct.stream("Calculate 2 + 3", config) |> Enum.to_list()
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert request_completed.data.result == "Result is 5"
+  end
+
   test "retries tool execution and reports attempts in tool_completed" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
@@ -714,6 +783,19 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       %{usage: usage} -> usage
       _ -> nil
     end)
+  end
+
+  defp responses_stream_response(chunks, metadata, model_spec) do
+    {:ok, model} = ReqLLM.model(model_spec)
+    {:ok, metadata_handle} = ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> metadata end)
+
+    %ReqLLM.StreamResponse{
+      stream: chunks,
+      metadata_handle: metadata_handle,
+      cancel: fn -> :ok end,
+      model: model,
+      context: ReqLLM.Context.new([])
+    }
   end
 
   defp wait_until(fun, timeout_ms \\ 500) when is_function(fun, 0) do

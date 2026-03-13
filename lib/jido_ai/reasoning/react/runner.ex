@@ -222,11 +222,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       )
 
     messages = AIContext.to_messages(state.context)
-    llm_opts = Config.llm_opts(config)
+    llm_opts = config |> Config.llm_opts() |> maybe_put_previous_response_id(state.llm_response_id)
 
     case request_turn(state, owner, ref, config, messages, llm_opts) do
-      {:ok, state, turn} ->
-        state = State.merge_usage(state, turn.usage)
+      {:ok, state, turn, response_id} ->
+        state =
+          state
+          |> State.merge_usage(turn.usage)
+          |> State.put_llm_response_id(response_id)
 
         {state, _} =
           emit_event(
@@ -298,7 +301,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     case ReqLLM.Generation.stream_text(config.model, messages, llm_opts) do
       {:ok, stream_response} ->
         case consume_stream(state, owner, ref, config, stream_response) do
-          {:ok, updated_state, turn} -> {:ok, updated_state, turn}
+          {:ok, updated_state, turn, response_id} -> {:ok, updated_state, turn, response_id}
           {:error, updated_state, reason} -> {:error, updated_state, reason, :llm_stream}
         end
 
@@ -331,6 +334,37 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       end)
 
     chunks = Enum.reverse(acc.chunks)
+
+    with {:ok, turn, response_id} <- build_turn_from_stream(stream_response, chunks, config.model) do
+      {:ok, acc.state, turn, response_id}
+    end
+  rescue
+    e ->
+      {:error, state, %{error: Exception.message(e), type: e.__struct__}}
+  end
+
+  defp consume_generate(%State{} = state, %Config{} = config, response) do
+    turn = Turn.from_response(response, model: config.model)
+    {:ok, state, turn, extract_response_id(response)}
+  rescue
+    e ->
+      {:error, state, %{error: Exception.message(e), type: e.__struct__}, :llm_response}
+  end
+
+  defp build_turn_from_stream(%ReqLLM.StreamResponse{} = stream_response, chunks, model) do
+    metadata = ReqLLM.StreamResponse.MetadataHandle.await(stream_response.metadata_handle)
+    builder = ReqLLM.Provider.ResponseBuilder.for_model(stream_response.model)
+
+    case builder.build_response(chunks, metadata, context: stream_response.context, model: stream_response.model) do
+      {:ok, response} ->
+        {:ok, Turn.from_response(response, model: model), extract_response_id(response)}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp build_turn_from_stream(stream_response, chunks, model) do
     summary = ReqLLM.Response.Stream.summarize(chunks)
 
     turn_type =
@@ -345,23 +379,49 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         text: summary.text,
         thinking_content: normalize_blank(summary.thinking),
         tool_calls: summary.tool_calls,
-        usage: ReqLLM.StreamResponse.usage(stream_response) || summary.usage,
-        model: config.model
+        usage: legacy_stream_usage(stream_response) || summary.usage,
+        model: model
       })
 
-    {:ok, acc.state, turn}
-  rescue
-    e ->
-      {:error, state, %{error: Exception.message(e), type: e.__struct__}}
+    {:ok, turn, nil}
   end
 
-  defp consume_generate(%State{} = state, %Config{} = config, response) do
-    turn = Turn.from_response(response, model: config.model)
-    {:ok, state, turn}
-  rescue
-    e ->
-      {:error, state, %{error: Exception.message(e), type: e.__struct__}, :llm_response}
+  defp legacy_stream_usage(%{usage: usage}) when is_map(usage), do: usage
+  defp legacy_stream_usage(_), do: nil
+
+  defp extract_response_id(%ReqLLM.Response{message: %ReqLLM.Message{metadata: metadata}})
+       when is_map(metadata) do
+    metadata[:response_id] || metadata["response_id"]
   end
+
+  defp extract_response_id(%{message: %{metadata: metadata}}) when is_map(metadata) do
+    metadata[:response_id] || metadata["response_id"]
+  end
+
+  defp extract_response_id(_), do: nil
+
+  defp maybe_put_previous_response_id(llm_opts, nil), do: llm_opts
+
+  defp maybe_put_previous_response_id(llm_opts, response_id) when is_list(llm_opts) and is_binary(response_id) do
+    provider_options = llm_opts |> Keyword.get(:provider_options, []) |> normalize_provider_options()
+    Keyword.put(llm_opts, :provider_options, Keyword.put(provider_options, :previous_response_id, response_id))
+  end
+
+  defp maybe_put_previous_response_id(llm_opts, _response_id), do: llm_opts
+
+  defp normalize_provider_options(options) when is_list(options), do: Enum.reject(options, fn {k, _v} -> is_nil(k) end)
+
+  defp normalize_provider_options(options) when is_map(options) do
+    options
+    |> Enum.reject(fn {k, _v} -> is_nil(k) end)
+    |> Enum.flat_map(fn
+      {k, v} when is_atom(k) -> [{k, v}]
+      {"previous_response_id", v} -> [previous_response_id: v]
+      _ -> []
+    end)
+  end
+
+  defp normalize_provider_options(_options), do: []
 
   defp maybe_emit_chunk_delta(%State{} = state, owner, ref, %ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg)
        when is_binary(text) and text != "" do
