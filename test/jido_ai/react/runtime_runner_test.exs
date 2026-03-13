@@ -320,7 +320,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
       case count do
         1 ->
-          arg_fragments = chunk_string(~s({"a":2,"b":3}), 3)
+          arg_fragments = chunk_string(~s({"a":2,"b":3}), 2)
 
           chunks =
             [
@@ -332,14 +332,14 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
           {:ok,
            %{
-             stream: delayed_stream(chunks, 5),
+             stream: delayed_stream(chunks, 15),
              usage: %{input_tokens: 4, output_tokens: 2}
            }}
 
         2 ->
           {:ok,
            %{
-             stream: delayed_stream([ReqLLM.StreamChunk.text("Result is 5")], 5),
+             stream: delayed_stream([ReqLLM.StreamChunk.text("Result is 5")], 15),
              usage: %{input_tokens: 3, output_tokens: 2}
            }}
       end
@@ -354,7 +354,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: :capable,
         tools: %{CalculatorTool.name() => CalculatorTool},
-        stream_receive_timeout_ms: 10,
+        stream_receive_timeout_ms: 60,
         tool_max_retries: 0,
         tool_retry_backoff_ms: 0
       })
@@ -379,7 +379,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
                ReqLLM.StreamChunk.text("from "),
                ReqLLM.StreamChunk.text("stream")
              ],
-             5
+             20
            ),
          usage: %{input_tokens: 2, output_tokens: 3}
        }}
@@ -395,7 +395,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         model: :capable,
         tools: %{},
         capture_deltas?: false,
-        stream_receive_timeout_ms: 10
+        stream_receive_timeout_ms: 80
       })
 
     events = ReAct.stream("Say hello", config) |> Enum.to_list()
@@ -403,6 +403,80 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     refute Enum.any?(events, &(&1.kind == :llm_delta))
     assert request_completed.data.result == "Hello from stream"
+  end
+
+  test "throttles synthetic progress for dense hidden chunk streams" do
+    hidden_text_chunks = for _ <- 1..50, do: ReqLLM.StreamChunk.text("x")
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      {:ok,
+       %{
+         stream: delayed_stream(hidden_text_chunks, 2),
+         usage: %{input_tokens: 2, output_tokens: 50}
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        capture_deltas?: false,
+        stream_receive_timeout_ms: 80
+      })
+
+    stream = ReAct.stream("Dense hidden stream", config)
+
+    Process.sleep(180)
+
+    assert {:message_queue_len, queue_len} = Process.info(self(), :message_queue_len)
+    assert queue_len < 15
+
+    events = Enum.to_list(stream)
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+
+    assert request_completed.data.result == String.duplicate("x", 50)
+  end
+
+  test "halts inactive streams after stream_receive_timeout_ms" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      {:ok,
+       %{
+         stream: delayed_stream([ReqLLM.StreamChunk.text("too late")], 150),
+         usage: %{input_tokens: 1, output_tokens: 1},
+         cancel: fn ->
+           send(parent, :idle_stream_cancelled)
+           :ok
+         end
+       }}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        stream_receive_timeout_ms: 40
+      })
+
+    started_at = System.monotonic_time(:millisecond)
+    events = ReAct.stream("stall", config) |> Enum.to_list()
+    elapsed_ms = System.monotonic_time(:millisecond) - started_at
+
+    assert elapsed_ms >= 30
+    assert elapsed_ms < 120
+    refute Enum.any?(events, &(&1.kind == :request_completed))
+    assert_receive :idle_stream_cancelled, 200
   end
 
   test "retries tool execution and reports attempts in tool_completed" do
@@ -651,6 +725,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "halting event consumption cancels active runner task" do
+    parent = self()
+
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       infinite_stream =
         Stream.repeatedly(fn ->
@@ -658,7 +734,15 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
           ReqLLM.StreamChunk.text("x")
         end)
 
-      {:ok, %{stream: infinite_stream, usage: %{input_tokens: 1, output_tokens: 1}}}
+      {:ok,
+       %{
+         stream: infinite_stream,
+         usage: %{input_tokens: 1, output_tokens: 1},
+         cancel: fn ->
+           send(parent, :stream_cancelled)
+           :ok
+         end
+       }}
     end)
 
     Mimic.stub(ReqLLM.StreamResponse, :usage, fn
@@ -676,6 +760,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       |> Enum.take(1)
 
     assert first_event.kind == :request_started
+    assert_receive :stream_cancelled, 200
 
     assert wait_until(fn ->
              Task.Supervisor.children(task_supervisor) == []

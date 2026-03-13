@@ -15,6 +15,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   require Logger
 
   @default_receive_timeout_ms 30_000
+  @cleanup_wait_ms 25
+  @stream_control_wait_ms 10
 
   # Injected as a user message when the agent repeats the exact same tool
   # calls with identical arguments on consecutive iterations.
@@ -74,6 +76,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               pid: pid,
               monitor_ref: monitor_ref,
               receive_timeout_ms: config.stream_receive_timeout_ms,
+              stream_cancel: nil,
+              stream_cancelled?: false,
               ref: ref
             }
           end,
@@ -307,6 +311,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp request_turn_stream(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
     case ReqLLM.Generation.stream_text(config.model, messages, llm_opts) do
       {:ok, stream_response} ->
+        announce_stream_control(owner, ref, stream_response)
+
         case consume_stream(state, owner, ref, config, stream_response) do
           {:ok, updated_state, turn} -> {:ok, updated_state, turn}
           {:error, updated_state, reason} -> {:error, updated_state, reason, :llm_stream}
@@ -331,20 +337,26 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     check_cancel!(state, ref)
 
     trace_cfg = config.trace
+    heartbeat_interval_ms = progress_interval_ms(config)
+    started_at_ms = monotonic_ms()
 
     acc =
-      Enum.reduce_while(stream_response.stream, %{chunks: [], state: state}, fn chunk, %{state: current} = acc ->
-        check_cancel!(current, ref)
+      Enum.reduce_while(stream_response.stream, %{chunks: [], state: state, last_owner_signal_ms: started_at_ms}, fn
+        chunk, %{state: current, last_owner_signal_ms: last_owner_signal_ms} = acc ->
+          check_cancel!(current, ref)
 
-        {current, emitted?} = maybe_emit_chunk_delta(current, owner, ref, chunk, trace_cfg)
+          {current, emitted?} = maybe_emit_chunk_delta(current, owner, ref, chunk, trace_cfg)
 
-        if emitted? do
-          :ok
-        else
-          notify_progress(owner, ref)
-        end
+          last_owner_signal_ms =
+            maybe_note_owner_signal(
+              emitted?,
+              owner,
+              ref,
+              last_owner_signal_ms,
+              heartbeat_interval_ms
+            )
 
-        {:cont, %{acc | chunks: [chunk | acc.chunks], state: current}}
+          {:cont, %{acc | chunks: [chunk | acc.chunks], state: current, last_owner_signal_ms: last_owner_signal_ms}}
       end)
 
     chunks = Enum.reverse(acc.chunks)
@@ -686,6 +698,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {:react_stream_cancel, _reason} ->
         next_event(nil, state)
 
+      {:react_runner, ^ref, :stream_control, control} ->
+        next_event(nil, apply_stream_control(state, control))
+
       {:react_runner, ^ref, :progress} ->
         next_event(nil, state)
 
@@ -706,6 +721,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     receive do
       {:react_stream_cancel, reason} ->
         next_event(nil, request_stream_cancel(state, reason))
+
+      {:react_runner, ^ref, :stream_control, control} ->
+        next_event(nil, apply_stream_control(state, control))
 
       {:react_runner, ^ref, :progress} ->
         next_event(nil, state)
@@ -729,16 +747,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     :ok
   end
 
-  defp cleanup(_owner, %{pid: pid, ref: ref}) when is_pid(pid) do
-    case Process.alive?(pid) do
-      true ->
-        send(pid, {:react_cancel, ref, :stream_halted})
-        Process.exit(pid, :kill)
-
-      _ ->
-        :ok
-    end
-
+  defp cleanup(_owner, %{pid: pid} = state) when is_pid(pid) do
+    state = request_stream_cancel(state, :stream_halted)
+    await_runner_shutdown(state)
     :ok
   end
 
@@ -784,6 +795,23 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp normalize_blank(""), do: nil
   defp normalize_blank(value), do: value
 
+  defp maybe_note_owner_signal(true, _owner, _ref, _last_owner_signal_ms, _interval_ms), do: monotonic_ms()
+
+  defp maybe_note_owner_signal(false, owner, ref, last_owner_signal_ms, interval_ms) do
+    current_ms = monotonic_ms()
+
+    if current_ms - last_owner_signal_ms >= interval_ms do
+      notify_progress(owner, ref)
+      current_ms
+    else
+      last_owner_signal_ms
+    end
+  end
+
+  defp progress_interval_ms(%Config{stream_receive_timeout_ms: timeout_ms}) do
+    max(1, div(timeout_ms, 2))
+  end
+
   defp maybe_redact_args(arguments, %Config{} = config) do
     case config.observability[:redact_tool_args?] do
       true -> Jido.AI.Observe.sanitize_sensitive(arguments)
@@ -812,6 +840,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp request_stream_cancel(%{cancel_sent?: true} = state, _reason), do: state
 
   defp request_stream_cancel(%{pid: pid, ref: ref} = state, reason) when is_pid(pid) do
+    state =
+      state
+      |> maybe_capture_stream_control()
+      |> invoke_stream_cancel()
+
     case Process.alive?(pid) do
       true -> send(pid, {:react_cancel, ref, reason})
       _ -> :ok
@@ -820,7 +853,75 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     Map.put(state, :cancel_sent?, true)
   end
 
-  defp request_stream_cancel(state, _reason), do: state
+  defp request_stream_cancel(state, _reason) do
+    state
+    |> maybe_capture_stream_control()
+    |> invoke_stream_cancel()
+    |> Map.put(:cancel_sent?, true)
+  end
+
+  defp announce_stream_control(owner, ref, stream_response) do
+    case stream_cancel_fun(stream_response) do
+      cancel_fun when is_function(cancel_fun, 0) ->
+        send(owner, {:react_runner, ref, :stream_control, %{cancel: cancel_fun}})
+
+      _ ->
+        :ok
+    end
+
+    :ok
+  end
+
+  defp apply_stream_control(state, %{cancel: cancel_fun}) when is_function(cancel_fun, 0) do
+    %{state | stream_cancel: cancel_fun}
+  end
+
+  defp apply_stream_control(state, _control), do: state
+
+  defp maybe_capture_stream_control(%{stream_cancel: cancel_fun} = state) when is_function(cancel_fun, 0), do: state
+
+  defp maybe_capture_stream_control(%{ref: ref} = state) do
+    receive do
+      {:react_runner, ^ref, :stream_control, control} ->
+        apply_stream_control(state, control)
+    after
+      @stream_control_wait_ms ->
+        state
+    end
+  end
+
+  defp invoke_stream_cancel(%{stream_cancelled?: true} = state), do: state
+
+  defp invoke_stream_cancel(%{stream_cancel: cancel_fun} = state) when is_function(cancel_fun, 0) do
+    _ = cancel_fun.()
+    %{state | stream_cancelled?: true}
+  rescue
+    _ -> %{state | stream_cancelled?: true}
+  end
+
+  defp invoke_stream_cancel(state), do: state
+
+  defp await_runner_shutdown(%{pid: pid, monitor_ref: monitor_ref}) when is_pid(pid) do
+    case Process.alive?(pid) do
+      true ->
+        receive do
+          {:DOWN, ^monitor_ref, :process, ^pid, _reason} ->
+            :ok
+        after
+          @cleanup_wait_ms ->
+            Process.exit(pid, :kill)
+            :ok
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp await_runner_shutdown(_state), do: :ok
+
+  defp stream_cancel_fun(%{cancel: cancel_fun}) when is_function(cancel_fun, 0), do: cancel_fun
+  defp stream_cancel_fun(_stream_response), do: nil
 
   defp safe_execute_module(module, params, context, opts) do
     Turn.execute_module(module, params, context, opts)
@@ -842,6 +943,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp normalize_backoff(_), do: 0
 
   defp now_ms, do: System.system_time(:millisecond)
+  defp monotonic_ms, do: System.monotonic_time(:millisecond)
 
   # Tool call maps may arrive with atom or string keys depending on the
   # provider adapter, so we check both.
