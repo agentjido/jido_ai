@@ -211,6 +211,75 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       assert result.usage.total_tokens > 0
     end
 
+    test "preserves assistant reasoning_details across auto_execute turns" do
+      parent = self()
+      call_key = {__MODULE__, :reasoning_call_count, self()}
+
+      on_exit(fn -> :persistent_term.erase(call_key) end)
+
+      reasoning_details = [%{signature: "sig_123", provider: :openai}]
+
+      Mimic.stub(ReqLLM.Generation, :generate_text, fn model, messages, _opts ->
+        count = :persistent_term.get(call_key, 0) + 1
+        :persistent_term.put(call_key, count)
+
+        case count do
+          1 ->
+            {:ok,
+             %{
+               message: %{
+                 content: "",
+                 tool_calls: [
+                   %{
+                     id: "tc_1",
+                     name: "calculator",
+                     arguments: %{"operation" => "add", "a" => 5, "b" => 3}
+                   }
+                 ],
+                 reasoning_details: reasoning_details
+               },
+               finish_reason: :tool_calls,
+               usage: %{input_tokens: 10, output_tokens: 8},
+               model: model
+             }}
+
+          2 ->
+            assistant_message =
+              Enum.find(messages, fn
+                %{role: role, tool_calls: tool_calls} when role in [:assistant, "assistant"] ->
+                  is_list(tool_calls) and tool_calls != []
+
+                _ ->
+                  false
+              end)
+
+            send(parent, {:assistant_reasoning_details, assistant_message[:reasoning_details]})
+
+            {:ok,
+             %{
+               message: %{content: "Tool execution complete: 8", tool_calls: nil},
+               finish_reason: :stop,
+               usage: %{input_tokens: 12, output_tokens: 6},
+               model: model
+             }}
+        end
+      end)
+
+      params = %{
+        prompt: "Calculate 5 + 3",
+        tools: ["calculator"],
+        auto_execute: true
+      }
+
+      context = %{
+        tools: %{TestCalculator.name() => TestCalculator}
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+      assert result.type == :final_answer
+      assert_receive {:assistant_reasoning_details, ^reasoning_details}
+    end
+
     test "enforces max_turns and returns deterministic terminal shape" do
       params = %{
         prompt: "loop tool execution",

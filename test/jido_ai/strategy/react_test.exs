@@ -378,6 +378,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "completed request history is reused for the next turn" do
       agent = create_agent(tools: [TestCalculator])
+      reasoning_details = [%{signature: "sig_123", provider: :openai}]
 
       {agent, [_spawn]} =
         ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Who am I?", request_id: "req_turn_1"})], %{})
@@ -388,6 +389,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
           turn_type: :final_answer,
           text: "You asked who you are.",
           thinking_content: nil,
+          reasoning_details: reasoning_details,
           tool_calls: [],
           usage: %{}
         }),
@@ -416,7 +418,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert history == [
                %{role: :user, content: "Who am I?"},
-               %{role: :assistant, content: "You asked who you are."},
+               %{role: :assistant, content: "You asked who you are.", reasoning_details: reasoning_details},
                %{role: :user, content: "What did I just ask?"}
              ]
     end

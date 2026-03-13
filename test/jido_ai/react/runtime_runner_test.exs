@@ -104,6 +104,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   setup :set_mimic_from_context
+  setup :stub_stream_response_processing
 
   setup do
     on_exit(fn ->
@@ -111,6 +112,11 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       :persistent_term.erase({__MODULE__, :llm_call_count})
     end)
 
+    :ok
+  end
+
+  defp stub_stream_response_processing(_context) do
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
     :ok
   end
 
@@ -477,6 +483,74 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert elapsed_ms < 120
     refute Enum.any?(events, &(&1.kind == :request_completed))
     assert_receive :idle_stream_cancelled, 200
+  end
+
+  test "preserves reasoning_details across tool turns" do
+    parent = self()
+
+    reasoning_details = [
+      %ReqLLM.Message.ReasoningDetails{
+        text: "Need calculator result before answering",
+        signature: "rsig_123",
+        encrypted?: true,
+        provider: :openai,
+        format: "responses/v1",
+        index: 0,
+        provider_data: %{token: "opaque-token"}
+      }
+    ]
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_reasoning"})],
+             reasoning_details: reasoning_details,
+             usage: %{input_tokens: 4, output_tokens: 2}
+           }}
+
+        2 ->
+          assistant_message =
+            Enum.find(messages, fn
+              %{role: role, tool_calls: tool_calls} when role in [:assistant, "assistant"] ->
+                is_list(tool_calls) and tool_calls != []
+
+              _ ->
+                false
+            end)
+
+          send(parent, {:assistant_reasoning_details, assistant_message[:reasoning_details]})
+
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.text("Result is 5")],
+             usage: %{input_tokens: 3, output_tokens: 2}
+           }}
+      end
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
+      %{usage: usage} -> usage
+      _ -> nil
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events = ReAct.stream("Calculate 2 + 3", config) |> Enum.to_list()
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+
+    assert_receive {:assistant_reasoning_details, ^reasoning_details}, 200
+    assert request_completed.data.result == "Result is 5"
   end
 
   test "retries tool execution and reports attempts in tool_completed" do
@@ -924,4 +998,60 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       end
     end
   end
+
+  defp process_stream_response(%{stream: stream} = stream_response, opts) do
+    callbacks = %{
+      on_result: Keyword.get(opts, :on_result),
+      on_thinking: Keyword.get(opts, :on_thinking),
+      on_tool_call: Keyword.get(opts, :on_tool_call)
+    }
+
+    chunks =
+      Enum.map(stream, fn chunk ->
+        invoke_stream_callback(chunk, callbacks)
+        chunk
+      end)
+
+    summary = ReqLLM.Response.Stream.summarize(chunks)
+
+    {:ok,
+     %{
+       message: %{
+         content: build_stream_content(summary.text, summary.thinking),
+         tool_calls: summary.tool_calls,
+         reasoning_details: Map.get(stream_response, :reasoning_details)
+       },
+       finish_reason: stream_finish_reason(summary.tool_calls, Map.get(stream_response, :finish_reason)),
+       usage: Map.get(stream_response, :usage, summary.usage),
+       model: Map.get(stream_response, :model)
+     }}
+  end
+
+  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :content, text: text}, %{on_result: callback})
+       when is_function(callback, 1) and is_binary(text),
+       do: callback.(text)
+
+  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :thinking, text: text}, %{on_thinking: callback})
+       when is_function(callback, 1) and is_binary(text),
+       do: callback.(text)
+
+  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :tool_call} = chunk, %{on_tool_call: callback})
+       when is_function(callback, 1),
+       do: callback.(chunk)
+
+  defp invoke_stream_callback(_chunk, _callbacks), do: :ok
+
+  defp build_stream_content(text, nil), do: text
+  defp build_stream_content(text, ""), do: text
+
+  defp build_stream_content(text, thinking) do
+    [
+      %{type: :thinking, thinking: thinking},
+      %{type: :text, text: text || ""}
+    ]
+  end
+
+  defp stream_finish_reason(tool_calls, _finish_reason) when is_list(tool_calls) and tool_calls != [], do: :tool_calls
+  defp stream_finish_reason(_tool_calls, finish_reason) when not is_nil(finish_reason), do: finish_reason
+  defp stream_finish_reason(_tool_calls, _finish_reason), do: :stop
 end

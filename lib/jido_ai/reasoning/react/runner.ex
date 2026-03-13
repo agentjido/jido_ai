@@ -253,6 +253,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               turn_type: turn.type,
               text: turn.text,
               thinking_content: turn.thinking_content,
+              reasoning_details: turn.reasoning_details,
               tool_calls: turn.tool_calls,
               usage: turn.usage
             },
@@ -267,7 +268,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               :tool_calls -> turn.tool_calls
               _ -> nil
             end,
-            maybe_thinking_opt(turn.thinking_content)
+            assistant_context_opts(turn)
           )
           |> then(&%{state | context: &1})
 
@@ -337,51 +338,40 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     check_cancel!(state, ref)
 
     trace_cfg = config.trace
+    state_key = stream_state_key(ref)
     heartbeat_interval_ms = progress_interval_ms(config)
-    started_at_ms = monotonic_ms()
 
-    acc =
-      Enum.reduce_while(stream_response.stream, %{chunks: [], state: state, last_owner_signal_ms: started_at_ms}, fn
-        chunk, %{state: current, last_owner_signal_ms: last_owner_signal_ms} = acc ->
-          check_cancel!(current, ref)
+    Process.put(state_key, state)
 
-          {current, emitted?} = maybe_emit_chunk_delta(current, owner, ref, chunk, trace_cfg)
+    instrumented_stream_response =
+      stream_response
+      |> put_stream(
+        instrument_stream(
+          stream_response.stream,
+          owner,
+          ref,
+          trace_cfg,
+          state_key,
+          state,
+          heartbeat_interval_ms
+        )
+      )
 
-          last_owner_signal_ms =
-            maybe_note_owner_signal(
-              emitted?,
-              owner,
-              ref,
-              last_owner_signal_ms,
-              heartbeat_interval_ms
-            )
+    case ReqLLM.StreamResponse.process_stream(
+           instrumented_stream_response,
+           stream_process_opts(owner, ref, trace_cfg, state_key)
+         ) do
+      {:ok, response} ->
+        {:ok, current_stream_state(state_key, state), Turn.from_response(response, model: config.model)}
 
-          {:cont, %{acc | chunks: [chunk | acc.chunks], state: current, last_owner_signal_ms: last_owner_signal_ms}}
-      end)
-
-    chunks = Enum.reverse(acc.chunks)
-    summary = ReqLLM.Response.Stream.summarize(chunks)
-
-    turn_type =
-      case summary.tool_calls do
-        tool_calls when is_list(tool_calls) and tool_calls != [] -> :tool_calls
-        _ -> :final_answer
-      end
-
-    turn =
-      Turn.from_result_map(%{
-        type: turn_type,
-        text: summary.text,
-        thinking_content: normalize_blank(summary.thinking),
-        tool_calls: summary.tool_calls,
-        usage: ReqLLM.StreamResponse.usage(stream_response) || summary.usage,
-        model: config.model
-      })
-
-    {:ok, acc.state, turn}
+      {:error, reason} ->
+        {:error, current_stream_state(state_key, state), reason}
+    end
   rescue
     e ->
-      {:error, state, %{error: Exception.message(e), type: e.__struct__}}
+      {:error, current_stream_state(stream_state_key(ref), state), %{error: Exception.message(e), type: e.__struct__}}
+  after
+    Process.delete(stream_state_key(ref))
   end
 
   defp consume_generate(%State{} = state, %Config{} = config, response) do
@@ -391,32 +381,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     e ->
       {:error, state, %{error: Exception.message(e), type: e.__struct__}, :llm_response}
   end
-
-  defp maybe_emit_chunk_delta(%State{} = state, owner, ref, %ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg)
-       when is_binary(text) and text != "" do
-    case trace_cfg[:capture_deltas?] do
-      true ->
-        {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :content, delta: text})
-        {state, true}
-
-      _ ->
-        {state, false}
-    end
-  end
-
-  defp maybe_emit_chunk_delta(%State{} = state, owner, ref, %ReqLLM.StreamChunk{type: :thinking, text: text}, trace_cfg)
-       when is_binary(text) and text != "" do
-    case trace_cfg[:capture_deltas?] do
-      true ->
-        {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :thinking, delta: text})
-        {state, true}
-
-      _ ->
-        {state, false}
-    end
-  end
-
-  defp maybe_emit_chunk_delta(%State{} = state, _owner, _ref, _chunk, _trace_cfg), do: {state, false}
 
   defp run_tool_round(%State{} = state, owner, ref, %Config{} = config, context, tool_calls)
        when is_list(tool_calls) do
@@ -792,8 +756,15 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp maybe_thinking_opt(""), do: []
   defp maybe_thinking_opt(thinking), do: [thinking: thinking]
 
-  defp normalize_blank(""), do: nil
-  defp normalize_blank(value), do: value
+  defp assistant_context_opts(%Turn{} = turn) do
+    turn.thinking_content
+    |> maybe_thinking_opt()
+    |> maybe_put_assistant_context_opt(:reasoning_details, turn.reasoning_details)
+  end
+
+  defp maybe_put_assistant_context_opt(opts, _key, nil), do: opts
+  defp maybe_put_assistant_context_opt(opts, _key, ""), do: opts
+  defp maybe_put_assistant_context_opt(opts, key, value), do: Keyword.put(opts, key, value)
 
   defp maybe_note_owner_signal(true, _owner, _ref, _last_owner_signal_ms, _interval_ms), do: monotonic_ms()
 
@@ -811,6 +782,79 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp progress_interval_ms(%Config{stream_receive_timeout_ms: timeout_ms}) do
     max(1, div(timeout_ms, 2))
   end
+
+  defp instrument_stream(stream, owner, ref, trace_cfg, state_key, initial_state, heartbeat_interval_ms) do
+    Stream.transform(stream, monotonic_ms(), fn chunk, last_owner_signal_ms ->
+      current_state = current_stream_state(state_key, initial_state)
+      check_cancel!(current_state, ref)
+
+      last_owner_signal_ms =
+        maybe_note_owner_signal(
+          visible_chunk?(chunk, trace_cfg),
+          owner,
+          ref,
+          last_owner_signal_ms,
+          heartbeat_interval_ms
+        )
+
+      {[chunk], last_owner_signal_ms}
+    end)
+  end
+
+  defp visible_chunk?(%ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg), do: delta_captured?(text, trace_cfg)
+  defp visible_chunk?(%ReqLLM.StreamChunk{type: :thinking, text: text}, trace_cfg), do: delta_captured?(text, trace_cfg)
+  defp visible_chunk?(_chunk, _trace_cfg), do: false
+
+  defp delta_captured?(text, trace_cfg), do: trace_cfg[:capture_deltas?] == true and is_binary(text) and text != ""
+
+  defp stream_process_opts(owner, ref, trace_cfg, state_key) do
+    []
+    |> maybe_put_stream_callback(trace_cfg, :on_result, fn text ->
+      emit_stream_delta(state_key, owner, ref, :content, text)
+    end)
+    |> maybe_put_stream_callback(trace_cfg, :on_thinking, fn text ->
+      emit_stream_delta(state_key, owner, ref, :thinking, text)
+    end)
+  end
+
+  defp maybe_put_stream_callback(opts, trace_cfg, callback_key, callback_fun) do
+    case trace_cfg[:capture_deltas?] do
+      true -> Keyword.put(opts, callback_key, callback_fun)
+      _ -> opts
+    end
+  end
+
+  defp emit_stream_delta(_state_key, _owner, _ref, _chunk_type, text) when text in [nil, ""], do: :ok
+
+  defp emit_stream_delta(state_key, owner, ref, chunk_type, text) do
+    update_stream_state(state_key, fn
+      %State{} = current_state ->
+        {next_state, _} =
+          emit_event(current_state, owner, ref, :llm_delta, %{chunk_type: chunk_type, delta: text})
+
+        next_state
+
+      other ->
+        other
+    end)
+
+    :ok
+  end
+
+  defp stream_state_key(ref), do: {__MODULE__, :stream_state, ref}
+
+  defp current_stream_state(state_key, default) do
+    Process.get(state_key, default)
+  end
+
+  defp update_stream_state(state_key, update_fun) when is_function(update_fun, 1) do
+    current_state = Process.get(state_key)
+    next_state = update_fun.(current_state)
+    Process.put(state_key, next_state)
+    next_state
+  end
+
+  defp put_stream(%{stream: _} = stream_response, stream), do: %{stream_response | stream: stream}
 
   defp maybe_redact_args(arguments, %Config{} = config) do
     case config.observability[:redact_tool_args?] do

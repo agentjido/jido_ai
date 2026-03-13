@@ -78,6 +78,18 @@ defmodule Jido.AI.TestSupport.FakeReqLLM do
     {:ok, final}
   end
 
+  def process_stream(%{stream: stream} = stream_response, opts) do
+    callbacks = extract_callbacks(opts)
+
+    chunks =
+      Enum.map(stream, fn chunk ->
+        invoke_chunk_callback(chunk, callbacks)
+        chunk
+      end)
+
+    {:ok, build_stream_response(stream_response, chunks)}
+  end
+
   def process_stream(_other, _opts), do: {:error, :invalid_stream_response}
 
   def stream_generation_text(model, messages, _opts) do
@@ -126,6 +138,58 @@ defmodule Jido.AI.TestSupport.FakeReqLLM do
 
   defp tool_message?(%{role: role}) when role in [:tool, "tool"], do: true
   defp tool_message?(_), do: false
+
+  defp extract_callbacks(opts) do
+    %{
+      on_result: Keyword.get(opts, :on_result),
+      on_thinking: Keyword.get(opts, :on_thinking),
+      on_tool_call: Keyword.get(opts, :on_tool_call)
+    }
+  end
+
+  defp invoke_chunk_callback(%ReqLLM.StreamChunk{type: :content, text: text}, %{on_result: callback})
+       when is_function(callback, 1) and is_binary(text),
+       do: callback.(text)
+
+  defp invoke_chunk_callback(%ReqLLM.StreamChunk{type: :thinking, text: text}, %{on_thinking: callback})
+       when is_function(callback, 1) and is_binary(text),
+       do: callback.(text)
+
+  defp invoke_chunk_callback(%ReqLLM.StreamChunk{type: :tool_call} = chunk, %{on_tool_call: callback})
+       when is_function(callback, 1),
+       do: callback.(chunk)
+
+  defp invoke_chunk_callback(_chunk, _callbacks), do: :ok
+
+  defp build_stream_response(stream_response, chunks) do
+    summary = ReqLLM.Response.Stream.summarize(chunks)
+    reasoning_details = Map.get(stream_response, :reasoning_details)
+
+    %{
+      message: %{
+        content: build_stream_content(summary.text, summary.thinking),
+        tool_calls: summary.tool_calls,
+        reasoning_details: reasoning_details
+      },
+      finish_reason: stream_finish_reason(summary.tool_calls, Map.get(stream_response, :finish_reason)),
+      usage: Map.get(stream_response, :usage, summary.usage),
+      model: Map.get(stream_response, :model)
+    }
+  end
+
+  defp build_stream_content(text, nil), do: text
+  defp build_stream_content(text, ""), do: text
+
+  defp build_stream_content(text, thinking) do
+    [
+      %{type: :thinking, thinking: thinking},
+      %{type: :text, text: text || ""}
+    ]
+  end
+
+  defp stream_finish_reason(tool_calls, _finish_reason) when is_list(tool_calls) and tool_calls != [], do: :tool_calls
+  defp stream_finish_reason(_tool_calls, finish_reason) when not is_nil(finish_reason), do: finish_reason
+  defp stream_finish_reason(_tool_calls, _finish_reason), do: :stop
 
   defp final_answer_response(model, content) do
     %{

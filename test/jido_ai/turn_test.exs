@@ -66,6 +66,18 @@ defmodule Jido.AI.TurnTest do
     end
 
     test "uses ReqLLM.Response classification for canonical responses" do
+      reasoning_details = [
+        %ReqLLM.Message.ReasoningDetails{
+          text: "Need a tool",
+          signature: "sig_1",
+          encrypted?: false,
+          provider: :anthropic,
+          format: "thinking/v1",
+          index: 0,
+          provider_data: %{}
+        }
+      ]
+
       response = %ReqLLM.Response{
         id: "resp_1",
         model: "anthropic:claude-haiku-4-5",
@@ -73,7 +85,8 @@ defmodule Jido.AI.TurnTest do
         message:
           ReqLLM.Context.assistant("",
             tool_calls: [ReqLLM.ToolCall.new("tc_1", "calculator", ~s({"a":1,"b":2}))]
-          ),
+          )
+          |> Map.put(:reasoning_details, reasoning_details),
         stream?: false,
         stream: nil,
         usage: %{"input_tokens" => "4", "output_tokens" => "2"},
@@ -87,6 +100,7 @@ defmodule Jido.AI.TurnTest do
       assert turn.type == :tool_calls
       assert turn.text == ""
       assert turn.thinking_content == nil
+      assert turn.reasoning_details == reasoning_details
       assert turn.tool_calls == [%{id: "tc_1", name: "calculator", arguments: %{"a" => 1, "b" => 2}}]
       assert turn.usage == %{input_tokens: 4, output_tokens: 2}
       assert turn.model == "anthropic:claude-haiku-4-5"
@@ -95,11 +109,14 @@ defmodule Jido.AI.TurnTest do
 
   describe "message projections" do
     test "projects assistant message and tool messages" do
+      reasoning_details = [%{signature: "sig_123"}]
+
       turn =
         %Turn{
           type: :tool_calls,
           text: "",
-          tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}]
+          tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}],
+          reasoning_details: reasoning_details
         }
         |> Turn.with_tool_results([
           %{id: "tc_1", name: "calculator", content: "{\"result\":8}", raw_result: {:ok, %{result: 8}, []}}
@@ -108,7 +125,8 @@ defmodule Jido.AI.TurnTest do
       assert Turn.assistant_message(turn) == %{
                role: :assistant,
                content: "",
-               tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}]
+               tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}],
+               reasoning_details: reasoning_details
              }
 
       assert Turn.tool_messages(turn) == [

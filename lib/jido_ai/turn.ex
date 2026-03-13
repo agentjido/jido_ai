@@ -37,6 +37,7 @@ defmodule Jido.AI.Turn do
           type: response_type(),
           text: String.t(),
           thinking_content: String.t() | nil,
+          reasoning_details: list() | nil,
           tool_calls: list(term()),
           usage: map() | nil,
           model: String.t() | nil,
@@ -46,6 +47,7 @@ defmodule Jido.AI.Turn do
   defstruct type: :final_answer,
             text: "",
             thinking_content: nil,
+            reasoning_details: nil,
             tool_calls: [],
             usage: nil,
             model: nil,
@@ -75,6 +77,7 @@ defmodule Jido.AI.Turn do
       type: normalize_type(classified.type),
       text: normalize_text(classified.text),
       thinking_content: normalize_optional_string(classified.thinking),
+      reasoning_details: normalize_reasoning_details(Map.get(response.message || %{}, :reasoning_details)),
       tool_calls: normalize_tool_calls(classified.tool_calls),
       usage: normalize_usage(ReqLLM.Response.usage(response)),
       model: Keyword.get(opts, :model, response.model),
@@ -92,6 +95,7 @@ defmodule Jido.AI.Turn do
       type: classify_type(tool_calls, finish_reason),
       text: extract_from_content(content),
       thinking_content: extract_thinking_content(content),
+      reasoning_details: normalize_reasoning_details(get_field(message, :reasoning_details)),
       tool_calls: tool_calls,
       usage: normalize_usage(get_field(response, :usage)),
       model: Keyword.get(opts, :model, get_field(response, :model)),
@@ -110,6 +114,7 @@ defmodule Jido.AI.Turn do
       type: normalize_type(get_field(map, :type, :final_answer)),
       text: normalize_text(get_field(map, :text, "")),
       thinking_content: normalize_optional_string(get_field(map, :thinking_content)),
+      reasoning_details: normalize_reasoning_details(get_field(map, :reasoning_details)),
       tool_calls: map |> get_field(:tool_calls, []) |> normalize_tool_calls(),
       usage: normalize_usage(get_field(map, :usage)),
       model: normalize_optional_string(get_field(map, :model)),
@@ -129,15 +134,11 @@ defmodule Jido.AI.Turn do
   Projects the turn into an assistant message compatible with ReqLLM context.
   """
   @spec assistant_message(t()) :: map()
-  def assistant_message(%__MODULE__{type: :tool_calls} = turn) do
-    %{role: :assistant, content: turn.text, tool_calls: turn.tool_calls}
+  def assistant_message(%__MODULE__{} = turn) do
+    %{role: :assistant, content: turn.text}
+    |> maybe_add(:tool_calls, assistant_tool_calls(turn))
+    |> maybe_add(:reasoning_details, turn.reasoning_details)
   end
-
-  def assistant_message(%__MODULE__{tool_calls: tool_calls} = turn) when is_list(tool_calls) and tool_calls != [] do
-    %{role: :assistant, content: turn.text, tool_calls: tool_calls}
-  end
-
-  def assistant_message(%__MODULE__{} = turn), do: %{role: :assistant, content: turn.text}
 
   @doc """
   Returns a copy of the turn with normalized tool results attached.
@@ -369,6 +370,11 @@ defmodule Jido.AI.Turn do
   defp normalize_optional_string(value) when is_binary(value) and value != "", do: value
   defp normalize_optional_string(_), do: nil
 
+  defp normalize_reasoning_details(reasoning_details) when is_list(reasoning_details) and reasoning_details != [],
+    do: reasoning_details
+
+  defp normalize_reasoning_details(_), do: nil
+
   defp extract_thinking_content(content) when is_list(content) do
     content
     |> Enum.filter(fn
@@ -402,6 +408,14 @@ defmodule Jido.AI.Turn do
   end
 
   defp normalize_tool_call(other), do: other
+
+  defp assistant_tool_calls(%__MODULE__{type: :tool_calls, tool_calls: tool_calls}) when is_list(tool_calls),
+    do: tool_calls
+
+  defp assistant_tool_calls(%__MODULE__{tool_calls: tool_calls}) when is_list(tool_calls) and tool_calls != [],
+    do: tool_calls
+
+  defp assistant_tool_calls(_turn), do: nil
 
   defp normalize_tool_results(results) when is_list(results) do
     Enum.map(results, &normalize_tool_result/1)
@@ -709,6 +723,9 @@ defmodule Jido.AI.Turn do
   defp get_field(map, key, default \\ nil) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
   end
+
+  defp maybe_add(map, _key, nil), do: map
+  defp maybe_add(map, key, value), do: Map.put(map, key, value)
 
   defp format_stacktrace_for_logging(stacktrace) do
     stacktrace
