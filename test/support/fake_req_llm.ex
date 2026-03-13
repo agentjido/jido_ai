@@ -1,6 +1,8 @@
 defmodule Jido.AI.TestSupport.FakeReqLLM do
   @moduledoc false
 
+  alias Jido.AI.TestSupport.StreamResponseFactory
+
   def setup_stubs(_context) do
     Mimic.stub(ReqLLM.Generation, :generate_text, &generate_text/3)
     Mimic.stub(ReqLLM.Generation, :generate_object, &generate_object/4)
@@ -84,10 +86,11 @@ defmodule Jido.AI.TestSupport.FakeReqLLM do
     prompt = extract_latest_user_prompt(messages)
 
     {:ok,
-     %{
-       stream: [ReqLLM.StreamChunk.text("Stubbed stream for: #{prompt}")],
-       model: model
-     }}
+     StreamResponseFactory.build(
+       [ReqLLM.StreamChunk.text("Stubbed stream for: #{prompt}")],
+       %{finish_reason: :stop, usage: %{input_tokens: 8, output_tokens: 13, total_tokens: 21}},
+       model
+     )}
   end
 
   def stream_usage(_stream_response) do

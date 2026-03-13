@@ -35,7 +35,8 @@ Build tool-using AI agents with explicit strategy, runtime policy, and reliable 
 ## Release Hygiene
 - Keep semver ranges stable (`~> 2.0` ecosystem peers; package currently `2.0.0-rc.0`)
 - Use Conventional Commits
-- Update `CHANGELOG.md`, guides, and migration notes for behavior/API changes
+- Do not update `CHANGELOG.md` unless the user explicitly requests it
+- Update guides and migration notes for behavior/API changes
 
 ## References
 - `README.md`

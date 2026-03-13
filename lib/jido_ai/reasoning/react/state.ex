@@ -7,7 +7,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   alias Jido.AI.Context, as: AIContext
 
   @status_values [:running, :awaiting_tools, :completed, :failed, :cancelled]
-  @version 2
+  @version 3
 
   @schema Zoi.struct(
             __MODULE__,
@@ -18,6 +18,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
               status: Zoi.atom() |> Zoi.default(:running),
               iteration: Zoi.integer() |> Zoi.default(1),
               llm_call_id: Zoi.string() |> Zoi.nullish(),
+              llm_response_id: Zoi.string() |> Zoi.nullish(),
               context: Zoi.any(),
               pending_tool_calls: Zoi.list(PendingToolCall.schema()) |> Zoi.default([]),
               usage: Zoi.map() |> Zoi.default(%{}),
@@ -60,6 +61,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       request_id: request_id,
       status: :running,
       iteration: 1,
+      llm_response_id: nil,
       context: context,
       pending_tool_calls: [],
       usage: %{},
@@ -91,6 +93,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
         status: status,
         iteration: Map.get(map, :iteration, Map.get(map, "iteration", 1)),
         llm_call_id: Map.get(map, :llm_call_id, Map.get(map, "llm_call_id")),
+        llm_response_id: Map.get(map, :llm_response_id, Map.get(map, "llm_response_id")),
         context: context,
         pending_tool_calls: restore_pending(Map.get(map, :pending_tool_calls, Map.get(map, "pending_tool_calls", []))),
         usage: Map.get(map, :usage, Map.get(map, "usage", %{})) || %{},
@@ -122,6 +125,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       status: state.status,
       iteration: state.iteration,
       llm_call_id: state.llm_call_id,
+      llm_response_id: state.llm_response_id,
       context: state.context,
       pending_tool_calls: state.pending_tool_calls,
       usage: state.usage,
@@ -164,6 +168,14 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   @spec put_llm_call_id(t(), String.t() | nil) :: t()
   def put_llm_call_id(%__MODULE__{} = state, call_id) do
     %{state | llm_call_id: call_id, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Stores the latest provider response id for multi-turn continuation.
+  """
+  @spec put_llm_response_id(t(), String.t() | nil) :: t()
+  def put_llm_response_id(%__MODULE__{} = state, response_id) do
+    %{state | llm_response_id: response_id, updated_at_ms: now_ms()}
   end
 
   @doc """

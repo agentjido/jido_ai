@@ -2,6 +2,8 @@ defmodule Jido.AI.Integration.RequestAwaitRejectionTest do
   use ExUnit.Case, async: false
   use Mimic
 
+  alias Jido.AI.TestSupport.StreamResponseFactory
+
   defmodule CoTAwaitAgent do
     use Jido.AI.CoTAgent, name: "cot_await_agent", model: "test:model"
   end
@@ -54,9 +56,15 @@ defmodule Jido.AI.Integration.RequestAwaitRejectionTest do
        }}
     end)
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       Process.sleep(150)
-      {:ok, %{stream: [ReqLLM.StreamChunk.text("ok")], usage: %{input_tokens: 1, output_tokens: 1}}}
+
+      {:ok,
+       StreamResponseFactory.build(
+         [ReqLLM.StreamChunk.text("ok")],
+         %{finish_reason: :stop, usage: %{input_tokens: 1, output_tokens: 1}},
+         model
+       )}
     end)
 
     Mimic.stub(ReqLLM.StreamResponse, :usage, fn

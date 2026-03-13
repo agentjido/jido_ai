@@ -15,6 +15,7 @@ defmodule Jido.AI.Turn do
   alias Jido.AI.{Effects, Observe, ToolAdapter}
   alias Jido.Action.Error.TimeoutError
   alias Jido.Action.Tool, as: ActionTool
+  alias ReqLLM.Context
 
   require Logger
 
@@ -40,6 +41,7 @@ defmodule Jido.AI.Turn do
           tool_calls: list(term()),
           usage: map() | nil,
           model: String.t() | nil,
+          message_metadata: map(),
           tool_results: list(tool_result())
         }
 
@@ -49,6 +51,7 @@ defmodule Jido.AI.Turn do
             tool_calls: [],
             usage: nil,
             model: nil,
+            message_metadata: %{},
             tool_results: []
 
   @doc """
@@ -78,6 +81,7 @@ defmodule Jido.AI.Turn do
       tool_calls: normalize_tool_calls(classified.tool_calls),
       usage: normalize_usage(ReqLLM.Response.usage(response)),
       model: Keyword.get(opts, :model, response.model),
+      message_metadata: normalize_metadata(response.message.metadata),
       tool_results: []
     }
   end
@@ -95,6 +99,7 @@ defmodule Jido.AI.Turn do
       tool_calls: tool_calls,
       usage: normalize_usage(get_field(response, :usage)),
       model: Keyword.get(opts, :model, get_field(response, :model)),
+      message_metadata: normalize_metadata(get_field(message, :metadata)),
       tool_results: []
     }
   end
@@ -113,6 +118,7 @@ defmodule Jido.AI.Turn do
       tool_calls: map |> get_field(:tool_calls, []) |> normalize_tool_calls(),
       usage: normalize_usage(get_field(map, :usage)),
       model: normalize_optional_string(get_field(map, :model)),
+      message_metadata: normalize_metadata(get_field(map, :message_metadata)),
       tool_results: map |> get_field(:tool_results, []) |> normalize_tool_results()
     }
   end
@@ -128,16 +134,16 @@ defmodule Jido.AI.Turn do
   @doc """
   Projects the turn into an assistant message compatible with ReqLLM context.
   """
-  @spec assistant_message(t()) :: map()
+  @spec assistant_message(t()) :: ReqLLM.Message.t()
   def assistant_message(%__MODULE__{type: :tool_calls} = turn) do
-    %{role: :assistant, content: turn.text, tool_calls: turn.tool_calls}
+    Context.assistant(turn.text, tool_calls: turn.tool_calls, metadata: turn.message_metadata)
   end
 
   def assistant_message(%__MODULE__{tool_calls: tool_calls} = turn) when is_list(tool_calls) and tool_calls != [] do
-    %{role: :assistant, content: turn.text, tool_calls: tool_calls}
+    Context.assistant(turn.text, tool_calls: tool_calls, metadata: turn.message_metadata)
   end
 
-  def assistant_message(%__MODULE__{} = turn), do: %{role: :assistant, content: turn.text}
+  def assistant_message(%__MODULE__{} = turn), do: Context.assistant(turn.text, metadata: turn.message_metadata)
 
   @doc """
   Returns a copy of the turn with normalized tool results attached.
@@ -306,19 +312,14 @@ defmodule Jido.AI.Turn do
   @doc """
   Projects tool results into `role: :tool` messages.
   """
-  @spec tool_messages(t() | [map()]) :: [map()]
+  @spec tool_messages(t() | [map()]) :: [ReqLLM.Message.t()]
   def tool_messages(%__MODULE__{tool_results: tool_results}), do: tool_messages(tool_results)
 
   def tool_messages(tool_results) when is_list(tool_results) do
     tool_results
     |> normalize_tool_results()
     |> Enum.map(fn result ->
-      %{
-        role: :tool,
-        tool_call_id: result.id,
-        name: result.name,
-        content: result.content
-      }
+      Context.tool_result(result.id, result.name, result.content)
     end)
   end
 
@@ -439,6 +440,9 @@ defmodule Jido.AI.Turn do
   end
 
   defp normalize_usage(_), do: nil
+
+  defp normalize_metadata(%{} = metadata), do: metadata
+  defp normalize_metadata(_), do: %{}
 
   defp normalize_usage_key("input_tokens"), do: :input_tokens
   defp normalize_usage_key("output_tokens"), do: :output_tokens

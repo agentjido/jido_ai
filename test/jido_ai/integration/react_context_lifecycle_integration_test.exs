@@ -4,6 +4,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Context
+  alias Jido.AI.TestSupport.StreamResponseFactory
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
 
@@ -43,7 +44,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
 
     # Mock LLM responses deterministically based on the latest user message
     # so the end-to-end context lifecycle is easy to reason about.
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
       # Emit raw LLM input back to the test process; this is how we assert the
       # exact projected context sent to ReqLLM on each turn.
       send(test_pid, {:llm_messages, messages})
@@ -57,10 +58,11 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
         end
 
       {:ok,
-       %{
-         stream: [ReqLLM.StreamChunk.text(text)],
-         usage: %{input_tokens: 5, output_tokens: 2}
-       }}
+       StreamResponseFactory.build(
+         [ReqLLM.StreamChunk.text(text)],
+         %{finish_reason: :stop, usage: %{input_tokens: 5, output_tokens: 2}},
+         model
+       )}
     end)
 
     Mimic.stub(ReqLLM.StreamResponse, :usage, fn
