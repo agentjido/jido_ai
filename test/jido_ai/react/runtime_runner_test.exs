@@ -590,6 +590,23 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
            end)
   end
 
+  describe "stream_timeout" do
+    test "default derives from tool_exec.timeout_ms + 60s" do
+      config = Config.new(%{model: :capable, tool_timeout_ms: 120_000})
+      assert Config.stream_timeout(config) == 180_000
+    end
+
+    test "explicit stream_timeout_ms overrides auto-derive" do
+      config = Config.new(%{model: :capable, stream_timeout_ms: 600_000})
+      assert Config.stream_timeout(config) == 600_000
+    end
+
+    test "default tool timeout gives 75s stream timeout" do
+      config = Config.new(%{model: :capable})
+      assert Config.stream_timeout(config) == 75_000
+    end
+  end
+
   test "strategy consumes runtime runner event stream to terminal state" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       {:ok,

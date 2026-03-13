@@ -32,6 +32,9 @@ defmodule Jido.AI.Agent do
   - `:tool_timeout_ms` - Per-attempt tool execution timeout in ms (default: 15_000)
   - `:tool_max_retries` - Number of retries for tool failures (default: 1)
   - `:tool_retry_backoff_ms` - Retry backoff in ms (default: 200)
+  - `:stream_timeout_ms` - Stream consumer timeout in ms (default: auto-derived
+    from tool_timeout_ms + 60s). How long to wait for events between coordinator
+    updates. Increase for agents with slow LLM responses or long tool executions.
   - `:effect_policy` - Agent-level effect policy (default allow-list)
   - `:strategy_effect_policy` - Optional strategy-level narrowing policy (cannot broaden agent policy)
   - `:runtime_adapter` - Deprecated compatibility flag (delegated ReAct runtime is always enabled)
@@ -233,6 +236,7 @@ defmodule Jido.AI.Agent do
     tool_timeout_ms = Keyword.get(opts, :tool_timeout_ms, 15_000)
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
     tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
+    stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, 0)
     # ReAct delegation is always enabled; keep runtime_adapter option for compatibility only.
     _runtime_adapter_opt = Keyword.get(opts, :runtime_adapter, true)
     runtime_adapter = true
@@ -299,6 +303,7 @@ defmodule Jido.AI.Agent do
         tool_timeout_ms: tool_timeout_ms,
         tool_max_retries: tool_max_retries,
         tool_retry_backoff_ms: tool_retry_backoff_ms,
+        stream_timeout_ms: stream_timeout_ms,
         runtime_adapter: runtime_adapter,
         runtime_task_supervisor: runtime_task_supervisor,
         observability: observability,
