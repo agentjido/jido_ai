@@ -4,6 +4,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
 
   alias Jido.AI.Actions.ToolCalling.CallWithTools
   alias Jido.AI.TestSupport.FakeReqLLM
+  alias Jido.AI.Turn
 
   defmodule TestCalculator do
     use Jido.Action,
@@ -46,10 +47,14 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
   defp tool_message_content(messages) when is_list(messages) do
     messages
     |> Enum.find_value(fn
-      %{role: role, content: content} when role in [:tool, "tool"] -> content
+      %ReqLLM.Message{role: :tool, content: content} -> Turn.extract_from_content(content)
+      %{role: role, content: content} when role in [:tool, "tool"] -> normalize_message_content(content)
       _ -> nil
     end)
   end
+
+  defp normalize_message_content(content) when is_list(content), do: Turn.extract_from_content(content)
+  defp normalize_message_content(content), do: content
 
   describe "schema" do
     test "has required fields" do
@@ -209,6 +214,75 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       assert result.turns >= 1
       assert is_map(result.usage)
       assert result.usage.total_tokens > 0
+    end
+
+    test "preserves OpenAI Responses response_id across auto_execute turns" do
+      test_pid = self()
+
+      expect(ReqLLM.Generation, :generate_text, 2, fn model, messages, opts ->
+        send(test_pid, {:generate_text, messages, opts})
+
+        if Enum.any?(messages, &match?(%ReqLLM.Message{role: :tool}, &1)) do
+          assistant_message =
+            Enum.find(messages, fn
+              %ReqLLM.Message{role: :assistant, tool_calls: tool_calls} when is_list(tool_calls) and tool_calls != [] ->
+                true
+
+              _ ->
+                false
+            end)
+
+          assert assistant_message.metadata[:response_id] == "resp_tool_round_1"
+
+          {:ok,
+           %{
+             message: %{
+               content: "Tool execution complete",
+               tool_calls: nil,
+               metadata: %{response_id: "resp_tool_round_2"}
+             },
+             finish_reason: :stop,
+             usage: %{input_tokens: 12, output_tokens: 24},
+             model: model
+           }}
+        else
+          assert model == "openai:gpt-4o-mini"
+          assert opts[:tools] != []
+
+          {:ok,
+           %{
+             message: %{
+               content: nil,
+               tool_calls: [
+                 %{
+                   id: "tc_1",
+                   name: "calculator",
+                   arguments: %{"operation" => "add", "a" => 5, "b" => 3}
+                 }
+               ],
+               metadata: %{response_id: "resp_tool_round_1"}
+             },
+             finish_reason: :tool_calls,
+             usage: %{input_tokens: 10, output_tokens: 8},
+             model: model
+           }}
+        end
+      end)
+
+      params = %{
+        prompt: "Calculate 5 + 3",
+        model: "openai:gpt-4o-mini",
+        tools: ["calculator"],
+        auto_execute: true
+      }
+
+      context = %{
+        tools: %{TestCalculator.name() => TestCalculator}
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+      assert result.type == :final_answer
+      assert result.text == "Tool execution complete"
     end
 
     test "enforces max_turns and returns deterministic terminal shape" do

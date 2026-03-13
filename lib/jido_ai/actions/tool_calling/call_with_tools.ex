@@ -213,7 +213,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
            final_turn
            |> public_result()
            |> Map.put(:turns, turn_count)
-           |> Map.put(:messages, next_messages)
+           |> Map.put(:messages, serialize_messages(next_messages))
            |> Map.put(:usage, merge_usage(usage_acc, final_turn.usage))}
 
         {:more_tools, next_turn, next_messages} ->
@@ -284,6 +284,23 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   defp append_assistant_message(messages, %Turn{} = turn), do: messages ++ [Turn.assistant_message(turn)]
 
   defp public_result(%Turn{} = turn), do: Turn.to_result_map(turn)
+
+  defp serialize_messages(messages) when is_list(messages) do
+    Enum.map(messages, &serialize_message/1)
+  end
+
+  defp serialize_message(%ReqLLM.Message{} = message) do
+    %{role: message.role, content: Turn.extract_from_content(message.content)}
+    |> maybe_put_message_attr(:name, message.name)
+    |> maybe_put_message_attr(:tool_call_id, message.tool_call_id)
+    |> maybe_put_message_attr(:tool_calls, message.tool_calls)
+  end
+
+  defp serialize_message(message), do: message
+
+  defp maybe_put_message_attr(map, _key, nil), do: map
+  defp maybe_put_message_attr(map, _key, []), do: map
+  defp maybe_put_message_attr(map, key, value), do: Map.put(map, key, value)
 
   defp merge_usage(first, second) do
     first_usage = normalize_usage(first)

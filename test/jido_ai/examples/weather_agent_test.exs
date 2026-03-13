@@ -6,6 +6,7 @@ defmodule Jido.AI.Examples.WeatherAgentTest do
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Examples.{ReActDemoAgent, WeatherAgent}
+  alias Jido.AI.TestSupport.StreamResponseFactory
 
   setup :set_mimic_from_context
 
@@ -22,12 +23,13 @@ defmodule Jido.AI.Examples.WeatherAgentTest do
       start_supervised!({Task.Supervisor, name: Jido.TaskSupervisor})
     end
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       {:ok,
-       %{
-         stream: [ReqLLM.StreamChunk.text("stubbed runtime response")],
-         usage: %{input_tokens: 4, output_tokens: 3}
-       }}
+       StreamResponseFactory.build(
+         [ReqLLM.StreamChunk.text("stubbed runtime response")],
+         %{finish_reason: :stop, usage: %{input_tokens: 4, output_tokens: 3}},
+         model
+       )}
     end)
 
     Mimic.stub(ReqLLM.StreamResponse, :usage, fn
