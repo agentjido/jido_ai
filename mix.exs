@@ -61,7 +61,7 @@ defmodule JidoAi.MixProject do
       # Jido ecosystem
       {:jido, "~> 2.0"},
       {:jido_action, "~> 2.0"},
-      {:req_llm, "~> 1.6"},
+      {:req_llm, github: "agentjido/req_llm", ref: "43f3ae3d6021a8fc82dc581a281786ac23d82db9"},
 
       # Runtime
       {:fsmx, "~> 0.5"},

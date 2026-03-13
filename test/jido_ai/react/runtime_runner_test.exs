@@ -1031,6 +1031,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   defp process_stream_response(%{stream: stream} = stream_response, opts) do
     callbacks = %{
+      on_chunk: Keyword.get(opts, :on_chunk),
+      on_meta: Keyword.get(opts, :on_meta),
       on_result: Keyword.get(opts, :on_result),
       on_thinking: Keyword.get(opts, :on_thinking),
       on_tool_call: Keyword.get(opts, :on_tool_call)
@@ -1057,19 +1059,33 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
      }}
   end
 
-  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :content, text: text}, %{on_result: callback})
+  defp invoke_stream_callback(chunk, callbacks) do
+    maybe_invoke_chunk_callback(chunk, callbacks.on_chunk)
+    maybe_invoke_meta_callback(chunk, callbacks.on_meta)
+    invoke_stream_specific_callback(chunk, callbacks)
+  end
+
+  defp invoke_stream_specific_callback(%ReqLLM.StreamChunk{type: :content, text: text}, %{on_result: callback})
        when is_function(callback, 1) and is_binary(text),
        do: callback.(text)
 
-  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :thinking, text: text}, %{on_thinking: callback})
+  defp invoke_stream_specific_callback(%ReqLLM.StreamChunk{type: :thinking, text: text}, %{on_thinking: callback})
        when is_function(callback, 1) and is_binary(text),
        do: callback.(text)
 
-  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :tool_call} = chunk, %{on_tool_call: callback})
+  defp invoke_stream_specific_callback(%ReqLLM.StreamChunk{type: :tool_call} = chunk, %{on_tool_call: callback})
        when is_function(callback, 1),
        do: callback.(chunk)
 
-  defp invoke_stream_callback(_chunk, _callbacks), do: :ok
+  defp invoke_stream_specific_callback(_chunk, _callbacks), do: :ok
+
+  defp maybe_invoke_chunk_callback(_chunk, callback) when not is_function(callback, 1), do: :ok
+  defp maybe_invoke_chunk_callback(chunk, callback), do: callback.(chunk)
+
+  defp maybe_invoke_meta_callback(%ReqLLM.StreamChunk{type: :meta} = chunk, callback) when is_function(callback, 1),
+    do: callback.(chunk)
+
+  defp maybe_invoke_meta_callback(_chunk, _callback), do: :ok
 
   defp build_stream_content(text, nil), do: text
   defp build_stream_content(text, ""), do: text
