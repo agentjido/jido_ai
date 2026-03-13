@@ -24,6 +24,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Collect do
         llm_opts: Zoi.any() |> Zoi.optional(),
         llm_timeout_ms: Zoi.integer() |> Zoi.optional(),
         req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
+        stream_receive_timeout_ms: Zoi.integer() |> Zoi.default(30_000),
         tool_timeout_ms: Zoi.integer() |> Zoi.default(15_000),
         tool_max_retries: Zoi.integer() |> Zoi.default(1),
         tool_retry_backoff_ms: Zoi.integer() |> Zoi.default(200),

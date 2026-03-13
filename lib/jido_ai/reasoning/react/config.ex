@@ -10,6 +10,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @default_model :fast
   @default_max_iterations 10
   @default_max_tokens 4_096
+  @default_stream_receive_timeout_ms 30_000
   @legacy_insecure_token_secret "jido_ai_react_default_secret_change_me"
   @ephemeral_secret_key {:jido_ai, __MODULE__, :ephemeral_token_secret}
   @ephemeral_secret_warned_key {:jido_ai, __MODULE__, :ephemeral_token_secret_warned}
@@ -60,6 +61,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               tools: Zoi.map() |> Zoi.default(%{}),
               max_iterations: Zoi.integer() |> Zoi.default(@default_max_iterations),
               streaming: Zoi.boolean() |> Zoi.default(true),
+              stream_receive_timeout_ms: Zoi.integer() |> Zoi.default(@default_stream_receive_timeout_ms),
               effect_policy: Zoi.any() |> Zoi.default(%{}),
               llm: @llm_schema,
               tool_exec: @tool_exec_schema,
@@ -141,6 +143,15 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       max_iterations:
         normalize_pos_integer(get_opt(opts_map, :max_iterations, @default_max_iterations), @default_max_iterations),
       streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
+      stream_receive_timeout_ms:
+        normalize_pos_integer(
+          get_opt(
+            opts_map,
+            :stream_receive_timeout_ms,
+            get_opt(opts_map, :receive_timeout_ms, @default_stream_receive_timeout_ms)
+          ),
+          @default_stream_receive_timeout_ms
+        ),
       effect_policy: get_opt(opts_map, :effect_policy, %{}),
       llm: llm,
       tool_exec: tool_exec,

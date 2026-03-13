@@ -31,6 +31,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
         max_iterations: 4,
         llm_timeout_ms: 1_234,
         llm_opts: [thinking: %{type: :enabled, budget_tokens: 512}],
+        stream_receive_timeout_ms: 4_321,
         tool_timeout_ms: 300,
         token_secret: "test-secret"
       }
@@ -42,6 +43,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
       assert config.max_iterations == 4
       assert config.llm.timeout_ms == 1_234
       assert config.llm.llm_opts == [thinking: %{type: :enabled, budget_tokens: 512}]
+      assert config.stream_receive_timeout_ms == 4_321
       assert config.tool_exec.timeout_ms == 300
       assert config.tools == %{ToolA.name() => ToolA}
       assert config.token.secret == "test-secret"

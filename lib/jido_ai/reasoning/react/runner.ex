@@ -14,7 +14,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   require Logger
 
-  @receive_timeout 30_000
+  @default_receive_timeout_ms 30_000
 
   # Injected as a user message when the agent repeats the exact same tool
   # calls with identical arguments on consecutive iterations.
@@ -66,7 +66,17 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         monitor_ref = Process.monitor(pid)
 
         Stream.resource(
-          fn -> %{done?: false, down?: false, cancel_sent?: false, pid: pid, monitor_ref: monitor_ref, ref: ref} end,
+          fn ->
+            %{
+              done?: false,
+              down?: false,
+              cancel_sent?: false,
+              pid: pid,
+              monitor_ref: monitor_ref,
+              receive_timeout_ms: config.stream_receive_timeout_ms,
+              ref: ref
+            }
+          end,
           &next_event(owner, &1),
           &cleanup(owner, &1)
         )
@@ -326,7 +336,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       Enum.reduce_while(stream_response.stream, %{chunks: [], state: state}, fn chunk, %{state: current} = acc ->
         check_cancel!(current, ref)
 
-        current = maybe_emit_chunk_delta(current, owner, ref, chunk, trace_cfg)
+        {current, emitted?} = maybe_emit_chunk_delta(current, owner, ref, chunk, trace_cfg)
+
+        if emitted? do
+          :ok
+        else
+          notify_progress(owner, ref)
+        end
+
         {:cont, %{acc | chunks: [chunk | acc.chunks], state: current}}
       end)
 
@@ -368,10 +385,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     case trace_cfg[:capture_deltas?] do
       true ->
         {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :content, delta: text})
-        state
+        {state, true}
 
       _ ->
-        state
+        {state, false}
     end
   end
 
@@ -380,14 +397,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     case trace_cfg[:capture_deltas?] do
       true ->
         {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :thinking, delta: text})
-        state
+        {state, true}
 
       _ ->
-        state
+        {state, false}
     end
   end
 
-  defp maybe_emit_chunk_delta(%State{} = state, _owner, _ref, _chunk, _trace_cfg), do: state
+  defp maybe_emit_chunk_delta(%State{} = state, _owner, _ref, _chunk, _trace_cfg), do: {state, false}
 
   defp run_tool_round(%State{} = state, owner, ref, %Config{} = config, context, tool_calls)
        when is_list(tool_calls) do
@@ -669,6 +686,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {:react_stream_cancel, _reason} ->
         next_event(nil, state)
 
+      {:react_runner, ^ref, :progress} ->
+        next_event(nil, state)
+
       {:react_runner, ^ref, :event, event} ->
         {[event], state}
 
@@ -681,9 +701,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp next_event(_owner, %{ref: ref} = state) do
+    receive_timeout_ms = Map.get(state, :receive_timeout_ms, @default_receive_timeout_ms)
+
     receive do
       {:react_stream_cancel, reason} ->
         next_event(nil, request_stream_cancel(state, reason))
+
+      {:react_runner, ^ref, :progress} ->
+        next_event(nil, state)
 
       {:react_runner, ^ref, :event, event} ->
         {[event], state}
@@ -694,9 +719,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {:DOWN, monitor_ref, :process, _pid, _reason} when monitor_ref == state.monitor_ref ->
         next_event(nil, %{state | down?: true})
     after
-      @receive_timeout ->
+      receive_timeout_ms ->
         {:halt, %{state | done?: true}}
     end
+  end
+
+  defp notify_progress(owner, ref) do
+    send(owner, {:react_runner, ref, :progress})
+    :ok
   end
 
   defp cleanup(_owner, %{pid: pid, ref: ref}) when is_pid(pid) do
