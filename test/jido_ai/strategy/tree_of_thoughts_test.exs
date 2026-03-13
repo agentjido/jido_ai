@@ -347,6 +347,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
             %{id: "call_1", name: OrderingSlowTool.name(), arguments: %{}},
             %{id: "call_2", name: OrderingFastTool.name(), arguments: %{}}
           ],
+          message_metadata: %{response_id: "resp_tool_round_1"},
           usage: %{}
         })
 
@@ -398,6 +399,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       assert agent.state.tot_order_marker == 2
 
       assert tool_message_ids(followup_directive.context) == ["call_1", "call_2"]
+      assert assistant_response_id(followup_directive.context) == "resp_tool_round_1"
     end
 
     test "fallback order ignores non-pending turn ids and completes tool round" do
@@ -600,6 +602,15 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     end)
     |> Enum.map(fn message ->
       Map.get(message, :tool_call_id, Map.get(message, "tool_call_id"))
+    end)
+  end
+
+  defp assistant_response_id(context) when is_list(context) do
+    context
+    |> Enum.find_value(fn
+      %{role: :assistant, metadata: %{response_id: response_id}} -> response_id
+      %{"role" => "assistant", "metadata" => %{"response_id" => response_id}} -> response_id
+      _ -> nil
     end)
   end
 end

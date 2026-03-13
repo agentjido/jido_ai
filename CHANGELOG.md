@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Aligned ecosystem dependency ranges to stable releases: `jido ~> 2.0`, `jido_action ~> 2.0`
 - Updated dev/test smoke dependency to `jido_browser ~> 1.0`
 - ReAct now preserves OpenAI Responses API `previous_response_id` across tool rounds so tool outputs can resume correctly on follow-up calls.
+- `CallWithTools` and Tree-of-Thoughts tool loops now preserve OpenAI Responses API continuation metadata across follow-up tool rounds.
 - Strategy runtimes now execute plugin-routed `Jido.Action` module instructions instead of no-oping unknown module actions.
 - Plugin-routed action context is standardized to include `state`, `agent`, and `plugin_state`.
 - LLM/tool-calling actions now consistently read mounted defaults from context/plugin state.
