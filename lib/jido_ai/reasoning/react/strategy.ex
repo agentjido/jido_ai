@@ -1336,6 +1336,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         turn_type = event_field(data, :turn_type, :final_answer)
         text = event_field(data, :text, "")
         thinking_content = event_field(data, :thinking_content)
+        reasoning_details = event_field(data, :reasoning_details)
         tool_calls = event_field(data, :tool_calls, [])
         usage = event_field(data, :usage, %{})
         call_id = llm_call_id || event_field(data, :call_id, "")
@@ -1354,7 +1355,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           base_state
           |> Map.put(:status, if(turn_type == :tool_calls, do: :awaiting_tool, else: :completed))
           |> Map.put(:pending_tool_calls, pending_tool_calls)
-          |> append_assistant_to_run_context(turn_type, text, tool_calls, thinking_content)
+          |> append_assistant_to_run_context(turn_type, text, tool_calls, thinking_content, reasoning_details)
           |> Map.update(:usage, usage || %{}, fn existing -> merge_usage(existing, usage || %{}) end)
           |> maybe_append_thinking_trace(thinking_content)
           |> maybe_put_result(turn_type, text)
@@ -1368,6 +1369,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
                  type: turn_type,
                  text: text,
                  thinking_content: thinking_content,
+                 reasoning_details: reasoning_details,
                  tool_calls: tool_calls,
                  usage: usage
                }, []}
@@ -1688,20 +1690,19 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp append_assistant_to_run_context(state, turn_type, text, tool_calls, thinking_content) do
+  defp append_assistant_to_run_context(state, turn_type, text, tool_calls, thinking_content, reasoning_details) do
     context = Map.get(state, :run_context) || Map.get(state, :context)
 
     case context do
       %AIContext{} = context ->
         assistant_tool_calls = if turn_type == :tool_calls, do: tool_calls, else: nil
 
-        thinking_opts =
-          case thinking_content do
-            thinking when is_binary(thinking) and thinking != "" -> [thinking: thinking]
-            _ -> []
-          end
+        assistant_opts =
+          []
+          |> maybe_put_assistant_context_opt(:thinking, thinking_content)
+          |> maybe_put_assistant_context_opt(:reasoning_details, reasoning_details)
 
-        Map.put(state, :run_context, AIContext.append_assistant(context, text, assistant_tool_calls, thinking_opts))
+        Map.put(state, :run_context, AIContext.append_assistant(context, text, assistant_tool_calls, assistant_opts))
 
       _ ->
         state
@@ -1720,6 +1721,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         state
     end
   end
+
+  defp maybe_put_assistant_context_opt(opts, _key, nil), do: opts
+  defp maybe_put_assistant_context_opt(opts, _key, ""), do: opts
+  defp maybe_put_assistant_context_opt(opts, key, value), do: Keyword.put(opts, key, value)
 
   defp commit_run_context(state) do
     case Map.get(state, :run_context) do

@@ -366,6 +366,230 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == "Result is 5"
   end
 
+  test "keeps tool-call argument fragment streams alive across idle timeout" do
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          arg_fragments = chunk_string(~s({"a":2,"b":3}), 2)
+
+          chunks =
+            [
+              ReqLLM.StreamChunk.tool_call("calculator", %{}, %{id: "tc_calc_fragments", index: 0})
+              | Enum.map(arg_fragments, fn fragment ->
+                  ReqLLM.StreamChunk.meta(%{tool_call_args: %{index: 0, fragment: fragment}})
+                end)
+            ]
+
+          {:ok,
+           %{
+             stream: delayed_stream(chunks, 30),
+             finish_reason: :tool_calls,
+             usage: %{input_tokens: 4, output_tokens: 2}
+           }}
+
+        2 ->
+          {:ok,
+           %{
+             stream: delayed_stream([ReqLLM.StreamChunk.text("Result is 5")], 30),
+             finish_reason: :stop,
+             usage: %{input_tokens: 3, output_tokens: 2}
+           }}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: "anthropic:claude-sonnet-4-5",
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        stream_receive_timeout_ms: 120,
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events = ReAct.stream("Calculate 2 + 3", config) |> Enum.to_list()
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_calc_fragments"))
+
+    assert request_completed.data.result == "Result is 5"
+    assert {:ok, %{result: 5}, _effects} = tool_completed.data.result
+  end
+
+  test "keeps active streams alive when llm deltas are not captured" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         delayed_stream(
+           [
+             ReqLLM.StreamChunk.text("Hello "),
+             ReqLLM.StreamChunk.text("from "),
+             ReqLLM.StreamChunk.text("stream")
+           ],
+           35
+         ),
+         %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 3}},
+         model
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        capture_deltas?: false,
+        stream_receive_timeout_ms: 150
+      })
+
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+
+    refute Enum.any?(events, &(&1.kind == :llm_delta))
+    assert request_completed.data.result == "Hello from stream"
+  end
+
+  test "throttles synthetic progress for dense hidden chunk streams" do
+    parent = self()
+    hidden_text_chunks = for _ <- 1..200, do: ReqLLM.StreamChunk.text("x")
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         delayed_stream(hidden_text_chunks, 2),
+         %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 200}},
+         model
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        capture_deltas?: false,
+        stream_receive_timeout_ms: 120
+      })
+
+    consumer =
+      spawn(fn ->
+        send(parent, {:consumer_started, self()})
+        send(parent, {:consumer_done, ReAct.stream("Dense hidden stream", config) |> Enum.to_list()})
+      end)
+
+    assert_receive {:consumer_started, ^consumer}, 200
+    Process.sleep(180)
+
+    assert {:message_queue_len, queue_len} = Process.info(consumer, :message_queue_len)
+    assert queue_len < 20
+
+    assert_receive {:consumer_done, events}, 2_000
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert request_completed.data.result == String.duplicate("x", 200)
+  end
+
+  test "halts inactive streams after stream_receive_timeout_ms" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         delayed_stream([ReqLLM.StreamChunk.text("too late")], 250),
+         %{finish_reason: :stop, usage: %{input_tokens: 1, output_tokens: 1}},
+         model,
+         cancel: fn ->
+           send(parent, :idle_stream_cancelled)
+           :ok
+         end
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        stream_receive_timeout_ms: 80
+      })
+
+    started_at = System.monotonic_time(:millisecond)
+    events = ReAct.stream("stall", config) |> Enum.to_list()
+    elapsed_ms = System.monotonic_time(:millisecond) - started_at
+
+    assert elapsed_ms >= 60
+    assert elapsed_ms < 200
+    refute Enum.any?(events, &(&1.kind == :request_completed))
+    assert_receive :idle_stream_cancelled, 200
+  end
+
+  test "preserves reasoning_details across tool turns" do
+    parent = self()
+
+    reasoning_details = [
+      %ReqLLM.Message.ReasoningDetails{
+        text: "Need calculator result before answering",
+        signature: "rsig_123",
+        encrypted?: true,
+        provider: :openai,
+        format: "responses/v1",
+        index: 0,
+        provider_data: %{token: "opaque-token"}
+      }
+    ]
+
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_reasoning"})],
+             finish_reason: :tool_calls,
+             reasoning_details: reasoning_details,
+             usage: %{input_tokens: 4, output_tokens: 2}
+           }}
+
+        2 ->
+          assistant_message =
+            Enum.find(messages, fn
+              %{role: role, tool_calls: tool_calls} when role in [:assistant, "assistant"] ->
+                is_list(tool_calls) and tool_calls != []
+
+              _ ->
+                false
+            end)
+
+          send(parent, {:assistant_reasoning_details, Map.get(assistant_message, :reasoning_details)})
+
+          {:ok,
+           %{
+             stream: [ReqLLM.StreamChunk.text("Result is 5")],
+             finish_reason: :stop,
+             usage: %{input_tokens: 3, output_tokens: 2}
+           }}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events = ReAct.stream("Calculate 2 + 3", config) |> Enum.to_list()
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+
+    assert_receive {:assistant_reasoning_details, ^reasoning_details}, 200
+    assert request_completed.data.result == "Result is 5"
+  end
+
   test "retries tool execution and reports attempts in tool_completed" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
@@ -606,6 +830,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "halting event consumption cancels active runner task" do
+    parent = self()
+
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       infinite_stream =
         Stream.repeatedly(fn ->
@@ -617,7 +843,11 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
        responses_stream_response(
          infinite_stream,
          %{finish_reason: :stop, usage: %{input_tokens: 1, output_tokens: 1}},
-         model
+         model,
+         cancel: fn ->
+           send(parent, :stream_cancelled)
+           :ok
+         end
        )}
     end)
 
@@ -631,6 +861,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       |> Enum.take(1)
 
     assert first_event.kind == :request_started
+    assert_receive :stream_cancelled, 200
 
     assert wait_until(fn ->
              Task.Supervisor.children(task_supervisor) == []
@@ -771,18 +1002,88 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end)
   end
 
-  defp responses_stream_response(chunks, metadata, model_spec) do
+  defp delayed_stream(chunks, delay_ms) do
+    Stream.map(chunks, fn chunk ->
+      Process.sleep(delay_ms)
+      chunk
+    end)
+  end
+
+  defp chunk_string(value, chunk_size) when is_binary(value) and is_integer(chunk_size) and chunk_size > 0 do
+    value
+    |> String.graphemes()
+    |> Enum.chunk_every(chunk_size)
+    |> Enum.map(&Enum.join/1)
+  end
+
+  defp responses_stream_response(chunks, metadata, model_spec, opts \\ []) do
     {:ok, model} = ReqLLM.model(model_spec)
     {:ok, metadata_handle} = ReqLLM.StreamResponse.MetadataHandle.start_link(fn -> metadata end)
 
     %ReqLLM.StreamResponse{
       stream: chunks,
       metadata_handle: metadata_handle,
-      cancel: fn -> :ok end,
+      cancel: Keyword.get(opts, :cancel, fn -> :ok end),
       model: model,
-      context: ReqLLM.Context.new([])
+      context: Keyword.get(opts, :context, ReqLLM.Context.new([]))
     }
   end
+
+  defp process_stream_response(%{stream: stream} = stream_response, opts) do
+    callbacks = %{
+      on_result: Keyword.get(opts, :on_result),
+      on_thinking: Keyword.get(opts, :on_thinking),
+      on_tool_call: Keyword.get(opts, :on_tool_call)
+    }
+
+    chunks =
+      Enum.map(stream, fn chunk ->
+        invoke_stream_callback(chunk, callbacks)
+        chunk
+      end)
+
+    summary = ReqLLM.Response.Stream.summarize(chunks)
+
+    {:ok,
+     %{
+       message: %{
+         content: build_stream_content(summary.text, summary.thinking),
+         tool_calls: summary.tool_calls,
+         reasoning_details: Map.get(stream_response, :reasoning_details)
+       },
+       finish_reason: stream_finish_reason(summary.tool_calls, Map.get(stream_response, :finish_reason)),
+       usage: Map.get(stream_response, :usage, summary.usage),
+       model: Map.get(stream_response, :model)
+     }}
+  end
+
+  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :content, text: text}, %{on_result: callback})
+       when is_function(callback, 1) and is_binary(text),
+       do: callback.(text)
+
+  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :thinking, text: text}, %{on_thinking: callback})
+       when is_function(callback, 1) and is_binary(text),
+       do: callback.(text)
+
+  defp invoke_stream_callback(%ReqLLM.StreamChunk{type: :tool_call} = chunk, %{on_tool_call: callback})
+       when is_function(callback, 1),
+       do: callback.(chunk)
+
+  defp invoke_stream_callback(_chunk, _callbacks), do: :ok
+
+  defp build_stream_content(text, nil), do: text
+  defp build_stream_content(text, ""), do: text
+
+  defp build_stream_content(text, thinking) do
+    [
+      %{type: :thinking, thinking: thinking},
+      %{type: :text, text: text || ""}
+    ]
+  end
+
+  defp stream_finish_reason(tool_calls, _finish_reason) when is_list(tool_calls) and tool_calls != [], do: :tool_calls
+  defp stream_finish_reason(_tool_calls, finish_reason) when not is_nil(finish_reason), do: finish_reason
+  defp stream_finish_reason(_tool_calls, _finish_reason), do: :stop
 
   defp wait_until(fun, timeout_ms \\ 500) when is_function(fun, 0) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms

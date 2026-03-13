@@ -14,8 +14,8 @@ defmodule Jido.AI.Turn do
 
   alias Jido.AI.{Effects, Observe, ToolAdapter}
   alias Jido.Action.Error.TimeoutError
-  alias ReqLLM.Context
   alias Jido.Action.Tool, as: ActionTool
+  alias ReqLLM.Context
 
   require Logger
 
@@ -38,22 +38,22 @@ defmodule Jido.AI.Turn do
           type: response_type(),
           text: String.t(),
           thinking_content: String.t() | nil,
+          reasoning_details: list() | nil,
           tool_calls: list(term()),
           usage: map() | nil,
           model: String.t() | nil,
-          metadata: map(),
-          reasoning_details: list(term()) | nil,
+          message_metadata: map(),
           tool_results: list(tool_result())
         }
 
   defstruct type: :final_answer,
             text: "",
             thinking_content: nil,
+            reasoning_details: nil,
             tool_calls: [],
             usage: nil,
             model: nil,
-            metadata: %{},
-            reasoning_details: nil,
+            message_metadata: %{},
             tool_results: []
 
   @doc """
@@ -80,11 +80,11 @@ defmodule Jido.AI.Turn do
       type: normalize_type(classified.type),
       text: normalize_text(classified.text),
       thinking_content: normalize_optional_string(classified.thinking),
+      reasoning_details: normalize_reasoning_details(Map.get(response.message || %{}, :reasoning_details)),
       tool_calls: normalize_tool_calls(classified.tool_calls),
       usage: normalize_usage(ReqLLM.Response.usage(response)),
       model: Keyword.get(opts, :model, response.model),
-      metadata: normalize_metadata(response.message && response.message.metadata),
-      reasoning_details: normalize_reasoning_details(response.message && response.message.reasoning_details),
+      message_metadata: normalize_metadata(response.message.metadata),
       tool_results: []
     }
   end
@@ -99,11 +99,11 @@ defmodule Jido.AI.Turn do
       type: classify_type(tool_calls, finish_reason),
       text: extract_from_content(content),
       thinking_content: extract_thinking_content(content),
+      reasoning_details: normalize_reasoning_details(get_field(message, :reasoning_details)),
       tool_calls: tool_calls,
       usage: normalize_usage(get_field(response, :usage)),
       model: Keyword.get(opts, :model, get_field(response, :model)),
-      metadata: normalize_metadata(get_field(message, :metadata)),
-      reasoning_details: normalize_reasoning_details(get_field(message, :reasoning_details)),
+      message_metadata: normalize_metadata(get_field(message, :metadata)),
       tool_results: []
     }
   end
@@ -119,11 +119,11 @@ defmodule Jido.AI.Turn do
       type: normalize_type(get_field(map, :type, :final_answer)),
       text: normalize_text(get_field(map, :text, "")),
       thinking_content: normalize_optional_string(get_field(map, :thinking_content)),
+      reasoning_details: normalize_reasoning_details(get_field(map, :reasoning_details)),
       tool_calls: map |> get_field(:tool_calls, []) |> normalize_tool_calls(),
       usage: normalize_usage(get_field(map, :usage)),
       model: normalize_optional_string(get_field(map, :model)),
-      metadata: normalize_metadata(get_field(map, :metadata, get_field(map, :message_metadata, %{}))),
-      reasoning_details: normalize_reasoning_details(get_field(map, :reasoning_details)),
+      message_metadata: normalize_metadata(get_field(map, :message_metadata)),
       tool_results: map |> get_field(:tool_results, []) |> normalize_tool_results()
     }
   end
@@ -140,22 +140,11 @@ defmodule Jido.AI.Turn do
   Projects the turn into an assistant message compatible with ReqLLM context.
   """
   @spec assistant_message(t()) :: ReqLLM.Message.t()
-  def assistant_message(%__MODULE__{type: :tool_calls} = turn) do
-    turn.text
-    |> Context.assistant(tool_calls: turn.tool_calls, metadata: turn.metadata)
-    |> put_reasoning_details(turn.reasoning_details)
-  end
-
-  def assistant_message(%__MODULE__{tool_calls: tool_calls} = turn) when is_list(tool_calls) and tool_calls != [] do
-    turn.text
-    |> Context.assistant(tool_calls: tool_calls, metadata: turn.metadata)
-    |> put_reasoning_details(turn.reasoning_details)
-  end
-
   def assistant_message(%__MODULE__{} = turn) do
-    turn.text
-    |> Context.assistant(metadata: turn.metadata)
-    |> put_reasoning_details(turn.reasoning_details)
+    [metadata: turn.message_metadata]
+    |> maybe_put_keyword(:tool_calls, assistant_tool_calls(turn))
+    |> then(&Context.assistant(turn.text, &1))
+    |> maybe_add(:reasoning_details, turn.reasoning_details)
   end
 
   @doc """
@@ -365,9 +354,7 @@ defmodule Jido.AI.Turn do
       thinking_content: turn.thinking_content,
       tool_calls: turn.tool_calls,
       usage: turn.usage,
-      model: turn.model,
-      metadata: turn.metadata,
-      reasoning_details: turn.reasoning_details
+      model: turn.model
     }
   end
 
@@ -384,6 +371,11 @@ defmodule Jido.AI.Turn do
 
   defp normalize_optional_string(value) when is_binary(value) and value != "", do: value
   defp normalize_optional_string(_), do: nil
+
+  defp normalize_reasoning_details(reasoning_details) when is_list(reasoning_details) and reasoning_details != [],
+    do: reasoning_details
+
+  defp normalize_reasoning_details(_), do: nil
 
   defp extract_thinking_content(content) when is_list(content) do
     content
@@ -418,6 +410,14 @@ defmodule Jido.AI.Turn do
   end
 
   defp normalize_tool_call(other), do: other
+
+  defp assistant_tool_calls(%__MODULE__{type: :tool_calls, tool_calls: tool_calls}) when is_list(tool_calls),
+    do: tool_calls
+
+  defp assistant_tool_calls(%__MODULE__{tool_calls: tool_calls}) when is_list(tool_calls) and tool_calls != [],
+    do: tool_calls
+
+  defp assistant_tool_calls(_turn), do: nil
 
   defp normalize_tool_results(results) when is_list(results) do
     Enum.map(results, &normalize_tool_result/1)
@@ -458,15 +458,6 @@ defmodule Jido.AI.Turn do
 
   defp normalize_metadata(%{} = metadata), do: metadata
   defp normalize_metadata(_), do: %{}
-
-  defp normalize_reasoning_details(nil), do: nil
-  defp normalize_reasoning_details(details) when is_list(details), do: details
-  defp normalize_reasoning_details(_), do: nil
-
-  defp put_reasoning_details(%ReqLLM.Message{} = message, nil), do: message
-
-  defp put_reasoning_details(%ReqLLM.Message{} = message, reasoning_details),
-    do: %{message | reasoning_details: reasoning_details}
 
   defp normalize_usage_key("input_tokens"), do: :input_tokens
   defp normalize_usage_key("output_tokens"), do: :output_tokens
@@ -737,6 +728,12 @@ defmodule Jido.AI.Turn do
   defp get_field(map, key, default \\ nil) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
   end
+
+  defp maybe_add(map, _key, nil), do: map
+  defp maybe_add(map, key, value), do: Map.put(map, key, value)
+
+  defp maybe_put_keyword(keyword, _key, nil), do: keyword
+  defp maybe_put_keyword(keyword, key, value), do: Keyword.put(keyword, key, value)
 
   defp format_stacktrace_for_logging(stacktrace) do
     stacktrace
