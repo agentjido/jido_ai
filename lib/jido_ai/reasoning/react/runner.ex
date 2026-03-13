@@ -364,31 +364,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp build_turn_from_stream(stream_response, chunks, model) do
-    summary = ReqLLM.Response.Stream.summarize(chunks)
-
-    turn_type =
-      case summary.tool_calls do
-        tool_calls when is_list(tool_calls) and tool_calls != [] -> :tool_calls
-        _ -> :final_answer
-      end
-
-    turn =
-      Turn.from_result_map(%{
-        type: turn_type,
-        text: summary.text,
-        thinking_content: normalize_blank(summary.thinking),
-        tool_calls: summary.tool_calls,
-        usage: legacy_stream_usage(stream_response) || summary.usage,
-        model: model
-      })
-
-    {:ok, turn, nil}
-  end
-
-  defp legacy_stream_usage(%{usage: usage}) when is_map(usage), do: usage
-  defp legacy_stream_usage(_), do: nil
-
   defp extract_response_id(%ReqLLM.Response{message: %ReqLLM.Message{metadata: metadata}})
        when is_map(metadata) do
     metadata[:response_id] || metadata["response_id"]
@@ -810,9 +785,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp maybe_thinking_opt(nil), do: []
   defp maybe_thinking_opt(""), do: []
   defp maybe_thinking_opt(thinking), do: [thinking: thinking]
-
-  defp normalize_blank(""), do: nil
-  defp normalize_blank(value), do: value
 
   defp maybe_redact_args(arguments, %Config{} = config) do
     case config.observability[:redact_tool_args?] do

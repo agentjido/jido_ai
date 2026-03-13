@@ -115,17 +115,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "emits ordered event envelopes for a final-answer run" do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       {:ok,
-       %{
-         stream: [ReqLLM.StreamChunk.text("Hello world")],
-         usage: %{input_tokens: 3, output_tokens: 2}
-       }}
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Hello world")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
+         model
+       )}
     end)
 
     config = Config.new(%{model: :capable, tools: %{}})
@@ -194,21 +190,17 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     req_http_options = [plug: {Req.Test, []}]
     llm_opts = [thinking: %{type: :enabled, budget_tokens: 1_024}, reasoning_effort: :high]
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
       assert opts[:req_http_options] == req_http_options
       assert opts[:thinking] == %{type: :enabled, budget_tokens: 1_024}
       assert opts[:reasoning_effort] == :high
 
       {:ok,
-       %{
-         stream: [ReqLLM.StreamChunk.text("Hello with req_http_options")],
-         usage: %{input_tokens: 2, output_tokens: 2}
-       }}
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Hello with req_http_options")],
+         %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 2}},
+         model
+       )}
     end)
 
     config = Config.new(%{model: :capable, tools: %{}, req_http_options: req_http_options, llm_opts: llm_opts})
@@ -260,22 +252,18 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       "unknown_provider_flag" => true
     }
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
       assert opts[:thinking] == %{type: :enabled, budget_tokens: 768}
       assert opts[:reasoning_effort] == :medium
       assert opts[:top_p] == 0.75
       refute Keyword.has_key?(opts, nil)
 
       {:ok,
-       %{
-         stream: [ReqLLM.StreamChunk.text("String-key llm opts normalized")],
-         usage: %{input_tokens: 2, output_tokens: 2}
-       }}
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("String-key llm opts normalized")],
+         %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 2}},
+         model
+       )}
     end)
 
     config = Config.new(%{model: :capable, tools: %{}, llm_opts: llm_opts})
@@ -292,19 +280,15 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       }
     }
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
       assert opts[:provider_options] == [verbosity: "high"]
 
       {:ok,
-       %{
-         stream: [ReqLLM.StreamChunk.text("Provider options normalized")],
-         usage: %{input_tokens: 2, output_tokens: 2}
-       }}
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Provider options normalized")],
+         %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 2}},
+         model
+       )}
     end)
 
     config = Config.new(%{model: "openai:gpt-4o", tools: %{}, llm_opts: llm_opts})
@@ -383,28 +367,25 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "retries tool execution and reports attempts in tool_completed" do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
       :persistent_term.put({__MODULE__, :llm_call_count}, count)
 
       if count == 1 do
         {:ok,
-         %{
-           stream: [ReqLLM.StreamChunk.tool_call("retry_tool", %{"value" => 7}, %{id: "tc_retry"})],
-           usage: %{input_tokens: 5, output_tokens: 3}
-         }}
+         responses_stream_response(
+           [ReqLLM.StreamChunk.tool_call("retry_tool", %{"value" => 7}, %{id: "tc_retry"})],
+           %{finish_reason: :tool_calls, usage: %{input_tokens: 5, output_tokens: 3}},
+           model
+         )}
       else
         {:ok,
-         %{
-           stream: [ReqLLM.StreamChunk.text("Tool complete")],
-           usage: %{input_tokens: 2, output_tokens: 1}
-         }}
+         responses_stream_response(
+           [ReqLLM.StreamChunk.text("Tool complete")],
+           %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 1}},
+           model
+         )}
       end
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
     end)
 
     config =
@@ -576,28 +557,25 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "resumes from after_llm checkpoint token" do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
       :persistent_term.put({__MODULE__, :llm_call_count}, count)
 
       if count == 1 do
         {:ok,
-         %{
-           stream: [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_calc"})],
-           usage: %{input_tokens: 4, output_tokens: 3}
-         }}
+         responses_stream_response(
+           [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_calc"})],
+           %{finish_reason: :tool_calls, usage: %{input_tokens: 4, output_tokens: 3}},
+           model
+         )}
       else
         {:ok,
-         %{
-           stream: [ReqLLM.StreamChunk.text("Result is 5")],
-           usage: %{input_tokens: 2, output_tokens: 2}
-         }}
+         responses_stream_response(
+           [ReqLLM.StreamChunk.text("Result is 5")],
+           %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 2}},
+           model
+         )}
       end
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
     end)
 
     config =
@@ -628,19 +606,19 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "halting event consumption cancels active runner task" do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       infinite_stream =
         Stream.repeatedly(fn ->
           Process.sleep(5)
           ReqLLM.StreamChunk.text("x")
         end)
 
-      {:ok, %{stream: infinite_stream, usage: %{input_tokens: 1, output_tokens: 1}}}
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
+      {:ok,
+       responses_stream_response(
+         infinite_stream,
+         %{finish_reason: :stop, usage: %{input_tokens: 1, output_tokens: 1}},
+         model
+       )}
     end)
 
     {:ok, task_supervisor} = Task.Supervisor.start_link()
@@ -660,17 +638,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "strategy consumes runtime runner event stream to terminal state" do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       {:ok,
-       %{
-         stream: [ReqLLM.StreamChunk.text("Hello from runtime runner")],
-         usage: %{input_tokens: 3, output_tokens: 2}
-       }}
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Hello from runtime runner")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
+         model
+       )}
     end)
 
     request_id = "req_strategy_runtime"
@@ -722,66 +696,61 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   defp stub_parallel_order_run do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
       :persistent_term.put({__MODULE__, :llm_call_count}, count)
 
       if count == 1 do
         {:ok,
-         %{
-           stream: [
+         responses_stream_response(
+           [
              ReqLLM.StreamChunk.tool_call("slow_order_tool", %{}, %{id: "tc_slow"}),
              ReqLLM.StreamChunk.tool_call("fast_order_tool", %{}, %{id: "tc_fast"})
            ],
-           usage: %{input_tokens: 6, output_tokens: 3}
-         }}
+           %{finish_reason: :tool_calls, usage: %{input_tokens: 6, output_tokens: 3}},
+           model
+         )}
       else
         {:ok,
-         %{
-           stream: [ReqLLM.StreamChunk.text("Tool round complete")],
-           usage: %{input_tokens: 2, output_tokens: 1}
-         }}
+         responses_stream_response(
+           [ReqLLM.StreamChunk.text("Tool round complete")],
+           %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 1}},
+           model
+         )}
       end
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
     end)
   end
 
   defp stub_state_snapshot_round_trip do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
       :persistent_term.put({__MODULE__, :llm_call_count}, count)
 
       case count do
         1 ->
           {:ok,
-           %{
-             stream: [ReqLLM.StreamChunk.tool_call("snapshot_state_tool", %{"step" => 1}, %{id: "tc_step_1"})],
-             usage: %{input_tokens: 4, output_tokens: 2}
-           }}
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("snapshot_state_tool", %{"step" => 1}, %{id: "tc_step_1"})],
+             %{finish_reason: :tool_calls, usage: %{input_tokens: 4, output_tokens: 2}},
+             model
+           )}
 
         2 ->
           {:ok,
-           %{
-             stream: [ReqLLM.StreamChunk.tool_call("snapshot_state_tool", %{"step" => 2}, %{id: "tc_step_2"})],
-             usage: %{input_tokens: 3, output_tokens: 2}
-           }}
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("snapshot_state_tool", %{"step" => 2}, %{id: "tc_step_2"})],
+             %{finish_reason: :tool_calls, usage: %{input_tokens: 3, output_tokens: 2}},
+             model
+           )}
 
         _ ->
           {:ok,
-           %{
-             stream: [ReqLLM.StreamChunk.text("Done")],
-             usage: %{input_tokens: 2, output_tokens: 1}
-           }}
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("Done")],
+             %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 1}},
+             model
+           )}
       end
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
     end)
   end
 

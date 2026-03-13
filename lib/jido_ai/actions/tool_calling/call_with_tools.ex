@@ -289,8 +289,6 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
     Enum.map(messages, &serialize_message/1)
   end
 
-  defp serialize_messages(other), do: other
-
   defp serialize_message(%ReqLLM.Message{} = message) do
     %{role: message.role, content: Turn.extract_from_content(message.content)}
     |> maybe_put_message_attr(:name, message.name)
