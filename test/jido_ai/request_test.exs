@@ -4,6 +4,10 @@ defmodule JidoTest.AI.RequestTest do
   alias Jido.AI.Request
   alias Jido.AI.Request.Handle
 
+  defmodule TestRequestTransformer do
+    def transform_request(request, _state, _config, _context), do: {:ok, request}
+  end
+
   defmodule FakeRuntimeServer do
     use GenServer
 
@@ -306,7 +310,11 @@ defmodule JidoTest.AI.RequestTest do
                  source: "/ai/test",
                  request_id: "req_123",
                  tool_context: %{actor: "user_1"},
-                 stream_timeout_ms: 123_456,
+                 tools: [:tool_override],
+                 allowed_tools: ["calculator"],
+                 request_transformer: TestRequestTransformer,
+                 stream_timeout_ms: 4_321,
+                 stream_timeout_ms: 4_321,
                  req_http_options: [plug: {Req.Test, []}],
                  llm_opts: [thinking: "enabled", reasoning_effort: :high]
                )
@@ -323,7 +331,10 @@ defmodule JidoTest.AI.RequestTest do
       assert signal.data.prompt == "What is 2+2?"
       assert signal.data.request_id == "req_123"
       assert signal.data.tool_context == %{actor: "user_1"}
-      assert signal.data.stream_timeout_ms == 123_456
+      assert signal.data.tools == [:tool_override]
+      assert signal.data.allowed_tools == ["calculator"]
+      assert signal.data.request_transformer == TestRequestTransformer
+      assert signal.data.stream_timeout_ms == 4_321
       assert signal.data.req_http_options == [plug: {Req.Test, []}]
       assert signal.data.llm_opts == [thinking: "enabled", reasoning_effort: :high]
     end

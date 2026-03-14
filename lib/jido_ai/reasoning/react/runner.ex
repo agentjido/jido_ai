@@ -6,7 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   state outside of caller-owned checkpoint tokens.
   """
 
-  alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token}
+  alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token, ToolSelection}
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Turn
@@ -171,7 +171,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         end)
 
       true ->
-        case run_llm_step(state, owner, ref, config) do
+        case run_llm_step(state, owner, ref, config, context) do
           {:final_answer, state} ->
             state
 
@@ -210,7 +210,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp run_llm_step(%State{} = state, owner, ref, %Config{} = config) do
+  defp run_llm_step(%State{} = state, owner, ref, %Config{} = config, runtime_context) do
     check_cancel!(state, ref)
 
     call_id = "call_#{state.run_id}_#{state.iteration}_#{Jido.Util.generate_id()}"
@@ -235,71 +235,148 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         llm_call_id: call_id
       )
 
-    messages = AIContext.to_messages(state.context)
-    llm_opts = config |> Config.llm_opts() |> maybe_put_previous_response_id(state.llm_response_id)
+    with {:ok, request} <- build_turn_request(state, config, runtime_context) do
+      state = %{state | active_tools: request.tools}
 
-    case request_turn(state, owner, ref, config, messages, llm_opts) do
-      {:ok, state, turn, response_id} ->
-        state =
-          state
-          |> State.merge_usage(turn.usage)
-          |> State.put_llm_response_id(response_id)
+      case request_turn(state, owner, ref, config, request.messages, request.llm_opts) do
+        {:ok, state, turn, response_id} ->
+          state =
+            state
+            |> State.merge_usage(turn.usage)
+            |> State.put_llm_response_id(response_id)
 
-        {state, _} =
-          emit_event(
-            state,
-            owner,
-            ref,
-            :llm_completed,
-            %{
-              call_id: call_id,
-              turn_type: turn.type,
-              text: turn.text,
-              thinking_content: turn.thinking_content,
-              reasoning_details: turn.reasoning_details,
-              tool_calls: turn.tool_calls,
-              usage: turn.usage
-            },
-            llm_call_id: call_id
-          )
+          {state, _} =
+            emit_event(
+              state,
+              owner,
+              ref,
+              :llm_completed,
+              %{
+                call_id: call_id,
+                turn_type: turn.type,
+                text: turn.text,
+                thinking_content: turn.thinking_content,
+                reasoning_details: Map.get(turn, :reasoning_details),
+                tool_calls: turn.tool_calls,
+                usage: turn.usage
+              },
+              llm_call_id: call_id
+            )
 
-        state =
-          AIContext.append_assistant(
-            state.context,
-            turn.text,
-            case turn.type do
-              :tool_calls -> turn.tool_calls
-              _ -> nil
-            end,
-            assistant_context_opts(turn)
-          )
-          |> then(&%{state | context: &1})
+          state =
+            AIContext.append_assistant(
+              state.context,
+              turn.text,
+              case turn.type do
+                :tool_calls -> turn.tool_calls
+                _ -> nil
+              end,
+              assistant_context_opts(turn)
+            )
+            |> then(&%{state | context: &1})
 
-        {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
+          {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
 
-        case Turn.needs_tools?(turn) do
-          true ->
-            {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
+          case Turn.needs_tools?(turn) do
+            true ->
+              {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
 
-          _ ->
-            completed =
-              state
-              |> State.put_status(:completed)
-              |> State.put_result(turn.text)
+            _ ->
+              completed =
+                state
+                |> State.put_status(:completed)
+                |> State.put_result(turn.text)
 
-            {completed, _} =
-              emit_event(completed, owner, ref, :request_completed, %{
-                result: turn.text,
-                termination_reason: :final_answer,
-                usage: completed.usage
-              })
+              {completed, _} =
+                emit_event(completed, owner, ref, :request_completed, %{
+                  result: turn.text,
+                  termination_reason: :final_answer,
+                  usage: completed.usage
+                })
 
-            {:final_answer, completed}
-        end
+              {:final_answer, completed}
+          end
 
-      {:error, state, reason, error_type} ->
-        {:error, state, reason, error_type}
+        {:error, state, reason, error_type} ->
+          {:error, state, reason, error_type}
+      end
+    else
+      {:error, reason} ->
+        {:error, state, reason, :request_transform}
     end
+  end
+
+  defp build_turn_request(%State{} = state, %Config{} = config, runtime_context) do
+    base_request = %{
+      messages: AIContext.to_messages(state.context),
+      llm_opts: config |> Config.llm_opts() |> maybe_put_previous_response_id(state.llm_response_id),
+      tools: config.tools
+    }
+
+    with {:ok, request} <- maybe_transform_request(base_request, state, config, runtime_context),
+         {:ok, messages} <- normalize_request_messages(request),
+         {:ok, tools} <- normalize_request_tools(request),
+         llm_opts <- sync_tools_in_llm_opts(config, request.llm_opts, tools) do
+      {:ok, %{messages: messages, llm_opts: llm_opts, tools: tools}}
+    end
+  end
+
+  defp maybe_transform_request(request, _state, %Config{request_transformer: nil}, _runtime_context), do: {:ok, request}
+
+  defp maybe_transform_request(request, %State{} = state, %Config{} = config, runtime_context) do
+    module = config.request_transformer
+
+    case module.transform_request(request, state, config, runtime_context) do
+      {:ok, %{} = overrides} ->
+        {:ok, apply_request_overrides(request, overrides, config)}
+
+      {:error, reason} ->
+        {:error, {:request_transformer, reason}}
+
+      other ->
+        {:error, {:invalid_request_transformer_result, other}}
+    end
+  rescue
+    e ->
+      {:error, {:request_transformer_exception, %{error: Exception.message(e), type: e.__struct__}}}
+  end
+
+  defp apply_request_overrides(request, overrides, %Config{} = config) when is_map(request) and is_map(overrides) do
+    request
+    |> maybe_put_request_field(:messages, Map.get(overrides, :messages, Map.get(overrides, "messages")))
+    |> maybe_put_request_field(:tools, Map.get(overrides, :tools, Map.get(overrides, "tools")))
+    |> maybe_merge_request_llm_opts(config, Map.get(overrides, :llm_opts, Map.get(overrides, "llm_opts")))
+  end
+
+  defp maybe_put_request_field(request, _field, nil), do: request
+  defp maybe_put_request_field(request, field, value), do: Map.put(request, field, value)
+
+  defp maybe_merge_request_llm_opts(request, _config, nil), do: request
+
+  defp maybe_merge_request_llm_opts(request, %Config{} = config, llm_opts_override) do
+    Map.update!(request, :llm_opts, fn base_opts ->
+      Config.merge_llm_opts(config, base_opts, llm_opts_override)
+    end)
+  end
+
+  defp normalize_request_messages(%{messages: messages}) when is_list(messages), do: {:ok, messages}
+  defp normalize_request_messages(_request), do: {:error, :invalid_request_messages}
+
+  defp normalize_request_tools(%{tools: tools}) do
+    case ToolSelection.normalize_input(tools) do
+      {:ok, action_map} -> {:ok, action_map}
+      {:error, reason} -> {:error, {:invalid_request_tools, reason}}
+    end
+  end
+
+  defp normalize_request_tools(_request), do: {:error, :invalid_request_tools}
+
+  defp sync_tools_in_llm_opts(%Config{} = config, llm_opts, tools) when is_list(llm_opts) and is_map(tools) do
+    reqllm_tools = Config.reqllm_tools(%{config | tools: tools})
+
+    llm_opts
+    |> Keyword.delete(:tools)
+    |> Keyword.put(:tools, reqllm_tools)
   end
 
   defp request_turn(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
@@ -410,6 +487,13 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp run_tool_round(%State{} = state, owner, ref, %Config{} = config, context, tool_calls)
        when is_list(tool_calls) do
+    effective_tools =
+      case state.active_tools do
+        %{} = tools when map_size(tools) > 0 -> tools
+        _ -> config.tools
+      end
+
+    tool_config = %{config | tools: effective_tools}
     pending = Enum.map(tool_calls, &PendingToolCall.from_tool_call/1)
     state = State.put_pending_tools(state, pending)
 
@@ -433,11 +517,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     results =
       pending
       |> Task.async_stream(
-        fn call -> execute_tool_with_retries(call, config, context) end,
+        fn call -> execute_tool_with_retries(call, tool_config, context) end,
         # Preserve deterministic tool completion/event ordering by original call order.
         ordered: true,
-        max_concurrency: config.tool_exec.concurrency,
-        timeout: config.tool_exec.timeout_ms + 50
+        max_concurrency: tool_config.tool_exec.concurrency,
+        timeout: tool_config.tool_exec.timeout_ms + 50
       )
       |> Enum.map(fn
         {:ok, result} -> result

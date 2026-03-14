@@ -16,6 +16,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Cancel do
         model: Zoi.any() |> Zoi.optional(),
         system_prompt: Zoi.string() |> Zoi.optional(),
         tools: Zoi.any() |> Zoi.optional(),
+        allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),
+        request_transformer: Zoi.atom() |> Zoi.optional(),
         max_iterations: Zoi.integer() |> Zoi.default(10),
         token_secret: Zoi.string() |> Zoi.optional(),
         token_ttl_ms: Zoi.integer() |> Zoi.optional(),

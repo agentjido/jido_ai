@@ -4,6 +4,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   """
 
   alias Jido.AI.ModelAliases
+  alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.ToolAdapter
   require Logger
 
@@ -58,6 +59,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               model: Zoi.string(description: "Resolved model spec"),
               system_prompt: Zoi.string() |> Zoi.nullish(),
               tools: Zoi.map() |> Zoi.default(%{}),
+              request_transformer: Zoi.atom() |> Zoi.nullish(),
               max_iterations: Zoi.integer() |> Zoi.default(@default_max_iterations),
               streaming: Zoi.boolean() |> Zoi.default(true),
               stream_timeout_ms: Zoi.integer() |> Zoi.default(0),
@@ -139,10 +141,11 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       model: resolved_model,
       system_prompt: normalize_optional_binary(get_opt(opts_map, :system_prompt, nil)),
       tools: tools,
+      request_transformer: normalize_request_transformer(get_opt(opts_map, :request_transformer, nil)),
       max_iterations:
         normalize_pos_integer(get_opt(opts_map, :max_iterations, @default_max_iterations), @default_max_iterations),
       streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
-      stream_timeout_ms: normalize_non_neg_integer(get_opt(opts_map, :stream_timeout_ms, 0), 0),
+      stream_timeout_ms: normalize_non_neg_integer(resolve_stream_timeout_ms(opts_map), 0),
       effect_policy: get_opt(opts_map, :effect_policy, %{}),
       llm: llm,
       tool_exec: tool_exec,
@@ -174,7 +177,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       Integer.to_string(config.tool_exec.max_retries),
       Integer.to_string(config.tool_exec.retry_backoff_ms),
       Integer.to_string(config.tool_exec.concurrency),
-      Enum.join(tool_names, ",")
+      Enum.join(tool_names, ","),
+      RequestTransformer.fingerprint(config.request_transformer)
     ]
 
     :crypto.hash(:sha256, Enum.join(parts, "|"))
@@ -229,6 +233,18 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     end
   end
 
+  @doc """
+  Merge request-scoped LLM option overrides into an existing normalized option list.
+  """
+  @spec merge_llm_opts(t(), keyword(), keyword() | map() | nil) :: keyword()
+  def merge_llm_opts(%__MODULE__{} = _config, base_opts, nil) when is_list(base_opts), do: base_opts
+
+  def merge_llm_opts(%__MODULE__{} = config, base_opts, overrides) when is_list(base_opts) do
+    provider_opt_keys_by_string = provider_opt_keys_by_string(config.model)
+    normalized_overrides = normalize_llm_opts(overrides, provider_opt_keys_by_string)
+    maybe_merge_llm_opts(base_opts, normalized_overrides)
+  end
+
   defp resolve_model(model) when is_binary(model), do: model
   defp resolve_model(model) when is_atom(model), do: ModelAliases.resolve_model(model)
   defp resolve_model(_), do: ModelAliases.resolve_model(@default_model)
@@ -239,6 +255,10 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
   defp get_opt(map, key, default) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
+  end
+
+  defp resolve_stream_timeout_ms(opts_map) when is_map(opts_map) do
+    get_opt(opts_map, :stream_timeout_ms, get_opt(opts_map, :stream_receive_timeout_ms, 0))
   end
 
   defp normalize_boolean(value, _default) when is_boolean(value), do: value
@@ -293,6 +313,23 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
   defp normalize_optional_binary(value) when is_binary(value) and value != "", do: value
   defp normalize_optional_binary(_), do: nil
+
+  defp normalize_request_transformer(request_transformer) do
+    case RequestTransformer.validate(request_transformer) do
+      {:ok, module} ->
+        module
+
+      {:error, {:request_transformer_not_loaded, module}} ->
+        raise ArgumentError, "invalid ReAct request_transformer: module #{inspect(module)} is not loaded"
+
+      {:error, {:request_transformer_missing_callback, module}} ->
+        raise ArgumentError,
+              "invalid ReAct request_transformer #{inspect(module)}: expected transform_request/4 callback"
+
+      {:error, :invalid_request_transformer} ->
+        raise ArgumentError, "invalid ReAct request_transformer: expected a module implementing transform_request/4"
+    end
+  end
 
   defp normalize_req_http_options(value) when is_list(value), do: value
   defp normalize_req_http_options(_), do: []

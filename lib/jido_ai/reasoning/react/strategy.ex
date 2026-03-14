@@ -39,8 +39,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Directive
   alias Jido.AI.Effects
   alias Jido.AI.ModelAliases
+  alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.Reasoning.ReAct.State, as: ReActState
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
+  alias Jido.AI.Reasoning.ReAct.ToolSelection
   alias Jido.AI.Signal
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Context, as: AIContext
@@ -53,6 +55,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           tools: [module()],
           reqllm_tools: [ReqLLM.Tool.t()],
           actions_by_name: %{String.t() => module()},
+          request_transformer: module() | nil,
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
@@ -64,6 +67,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           provider_opt_keys_by_string: %{optional(String.t()) => atom()},
           request_policy: :reject,
           stream_timeout_ms: non_neg_integer(),
+          stream_receive_timeout_ms: pos_integer(),
+          stream_timeout_ms: non_neg_integer(),
+          stream_receive_timeout_ms: pos_integer(),
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
@@ -164,6 +170,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           query: Zoi.string(),
           request_id: Zoi.string() |> Zoi.optional(),
           tool_context: Zoi.map() |> Zoi.optional(),
+          tools: Zoi.any() |> Zoi.optional(),
+          allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),
+          request_transformer: Zoi.atom() |> Zoi.optional(),
+          stream_receive_timeout_ms: Zoi.integer() |> Zoi.optional(),
           stream_timeout_ms: Zoi.integer() |> Zoi.optional(),
           req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
           llm_opts: Zoi.any() |> Zoi.optional()
@@ -351,9 +361,15 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       worker_status: state[:react_worker_status],
       trace_summary: trace_summary,
       model: config[:model],
+      request_transformer:
+        case config[:request_transformer] do
+          module when is_atom(module) -> Atom.to_string(module)
+          _ -> nil
+        end,
       max_iterations: config[:max_iterations],
       max_tokens: config[:max_tokens],
       streaming: config[:streaming],
+      stream_receive_timeout_ms: config[:stream_receive_timeout_ms],
       request_policy: config[:request_policy],
       runtime_adapter: true,
       tool_timeout_ms: config[:tool_timeout_ms],
@@ -527,66 +543,82 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       effective_llm_opts = Keyword.merge(base_llm_opts, run_llm_opts)
       state_snapshot = normalize_map_opt(Map.get(agent, :state, %{}))
 
-      runtime_config =
-        runtime_config_from_strategy(config,
-          req_http_options: effective_req_http_options,
-          llm_opts: effective_llm_opts,
-          stream_timeout_ms: Map.get(params, :stream_timeout_ms)
-        )
+      with {:ok, effective_tools} <- resolve_request_tools(config, params),
+           {:ok, request_transformer} <- resolve_request_transformer(config, params) do
+        runtime_config =
+          runtime_config_from_strategy(config,
+            req_http_options: effective_req_http_options,
+            llm_opts: effective_llm_opts,
+            tools: effective_tools,
+            stream_receive_timeout_ms: Map.get(params, :stream_receive_timeout_ms),
+            stream_timeout_ms: Map.get(params, :stream_timeout_ms),
+            request_transformer: request_transformer
+          )
 
-      base_context = strategy_context(state, config)
-      run_context = AIContext.append_user(base_context, query)
-      runtime_state = runtime_state_from_context(run_context, query, request_id, run_id)
-      context_ref = Map.get(state, :active_context_ref, @default_context_ref)
+        base_context = strategy_context(state, config)
+        run_context = AIContext.append_user(base_context, query)
+        runtime_state = runtime_state_from_context(run_context, query, request_id, run_id)
+        context_ref = Map.get(state, :active_context_ref, @default_context_ref)
 
-      {agent, state} =
-        append_ai_message_event(
-          agent,
-          state,
-          context_ref,
-          %{role: :user, content: query},
-          request_id,
-          run_id
-        )
+        {agent, state} =
+          append_ai_message_event(
+            agent,
+            state,
+            context_ref,
+            %{role: :user, content: query},
+            request_id,
+            run_id
+          )
 
-      worker_start_payload = %{
-        request_id: request_id,
-        run_id: run_id,
-        query: query,
-        config: runtime_config,
-        state: runtime_state,
-        task_supervisor: config[:runtime_task_supervisor],
-        context:
-          Map.merge(effective_tool_context, %{
-            state: state_snapshot,
-            request_id: request_id,
-            run_id: run_id,
-            agent_id: state[:agent_id] || Map.get(agent, :id),
-            observability: config[:observability] || %{},
-            effect_policy: config[:effect_policy] || Effects.default_policy()
-          })
-      }
+        worker_start_payload = %{
+          request_id: request_id,
+          run_id: run_id,
+          query: query,
+          config: runtime_config,
+          state: runtime_state,
+          task_supervisor: config[:runtime_task_supervisor],
+          context:
+            Map.merge(effective_tool_context, %{
+              state: state_snapshot,
+              request_id: request_id,
+              run_id: run_id,
+              agent_id: state[:agent_id] || Map.get(agent, :id),
+              observability: config[:observability] || %{},
+              effect_policy: config[:effect_policy] || Effects.default_policy()
+            })
+        }
 
-      {new_state, directives} = ensure_worker_start(state, worker_start_payload)
+        {new_state, directives} = ensure_worker_start(state, worker_start_payload)
 
-      new_state =
-        new_state
-        |> Map.put(:status, :awaiting_llm)
-        |> Map.put(:active_request_id, request_id)
-        |> Map.put(:current_llm_call_id, nil)
-        |> Map.put(:iteration, 1)
-        |> Map.put(:result, nil)
-        |> Map.put(:termination_reason, nil)
-        |> Map.put(:started_at, System.monotonic_time(:millisecond))
-        |> Map.put(:streaming_text, "")
-        |> Map.put(:streaming_thinking, "")
-        |> Map.put(:pending_tool_calls, [])
-        |> Map.put(:cancel_reason, nil)
-        |> Map.put(:checkpoint_token, nil)
-        |> Map.put(:run_context, run_context)
-        |> ensure_request_trace(request_id)
+        new_state =
+          new_state
+          |> Map.put(:status, :awaiting_llm)
+          |> Map.put(:active_request_id, request_id)
+          |> Map.put(:current_llm_call_id, nil)
+          |> Map.put(:iteration, 1)
+          |> Map.put(:result, nil)
+          |> Map.put(:termination_reason, nil)
+          |> Map.put(:started_at, System.monotonic_time(:millisecond))
+          |> Map.put(:streaming_text, "")
+          |> Map.put(:streaming_thinking, "")
+          |> Map.put(:pending_tool_calls, [])
+          |> Map.put(:cancel_reason, nil)
+          |> Map.put(:checkpoint_token, nil)
+          |> Map.put(:run_context, run_context)
+          |> ensure_request_trace(request_id)
 
-      {put_strategy_state(agent, new_state), directives}
+        {put_strategy_state(agent, new_state), directives}
+      else
+        {:error, reason, message} ->
+          directive =
+            Directive.EmitRequestError.new!(%{
+              request_id: request_id,
+              reason: reason,
+              message: message
+            })
+
+          {agent, [directive]}
+      end
     end
   end
 
@@ -1553,16 +1585,20 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       |> Keyword.get(:llm_opts, config[:base_llm_opts] || [])
       |> normalize_llm_opts(provider_opt_keys_by_string)
 
+    tools = Keyword.get(opts, :tools, config[:actions_by_name] || %{})
+    request_transformer = Keyword.get(opts, :request_transformer, config[:request_transformer])
+
     stream_timeout_ms =
-      case Keyword.fetch(opts, :stream_timeout_ms) do
-        {:ok, ms} when is_integer(ms) and ms >= 0 -> ms
-        _ -> config[:stream_timeout_ms]
-      end
+      resolve_stream_timeout_ms_opt(
+        opts,
+        Map.get(config, :stream_timeout_ms, Map.get(config, :stream_receive_timeout_ms, 0))
+      )
 
     runtime_opts = %{
       model: config[:model],
       system_prompt: config[:system_prompt],
-      tools: config[:actions_by_name] || %{},
+      tools: tools,
+      request_transformer: request_transformer,
       max_iterations: config[:max_iterations],
       max_tokens: config[:max_tokens],
       streaming: config[:streaming],
@@ -1793,11 +1829,16 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       tools: tools_modules,
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
+      request_transformer: validate_request_transformer_opt!(Keyword.get(opts, :request_transformer)),
       system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens),
       streaming: Keyword.get(opts, :streaming, true),
+      stream_receive_timeout_ms:
+        opts
+        |> Keyword.get(:stream_receive_timeout_ms, Keyword.get(opts, :stream_timeout_ms, 30_000))
+        |> normalize_stream_receive_timeout_ms(30_000),
       request_policy: request_policy,
       stream_timeout_ms: Keyword.get(opts, :stream_timeout_ms, 0),
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, 15_000),
@@ -1837,6 +1878,92 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_map_opt(%{} = value), do: value
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
+
+  defp resolve_request_tools(config, params) do
+    base_tools = config[:actions_by_name] || %{}
+    override_tools = Map.get(params, :tools)
+    allowed_tools = Map.get(params, :allowed_tools)
+
+    case ToolSelection.resolve(base_tools, override_tools, allowed_tools) do
+      {:ok, tools} ->
+        {:ok, tools}
+
+      {:error, :invalid_tools} ->
+        {:error, :invalid_tools, "Invalid tools override for this request"}
+
+      {:error, :invalid_allowed_tools} ->
+        {:error, :invalid_allowed_tools, "allowed_tools must be a list of tool names"}
+
+      {:error, {:unknown_allowed_tools, unknown}} ->
+        {:error, :unknown_allowed_tools, "Unknown allowed_tools: #{Enum.join(unknown, ", ")}"}
+
+      {:error, {:invalid_action, module, reason}} ->
+        {:error, :invalid_tools, "Invalid tool #{inspect(module)}: #{inspect(reason)}"}
+
+      {:error, reason} ->
+        {:error, :invalid_tools, "Unable to resolve tools: #{inspect(reason)}"}
+    end
+  end
+
+  defp resolve_request_transformer(config, params) do
+    case validate_request_transformer(Map.get(params, :request_transformer, config[:request_transformer])) do
+      {:ok, module} ->
+        {:ok, module}
+
+      {:error, message} ->
+        {:error, :invalid_request_transformer, message}
+    end
+  end
+
+  defp validate_request_transformer_opt!(request_transformer) do
+    case validate_request_transformer(request_transformer) do
+      {:ok, module} ->
+        module
+
+      {:error, message} ->
+        raise ArgumentError, message
+    end
+  end
+
+  defp validate_request_transformer(nil), do: {:ok, nil}
+
+  defp validate_request_transformer(request_transformer) do
+    case RequestTransformer.validate(request_transformer) do
+      {:ok, module} ->
+        {:ok, module}
+
+      {:error, {:request_transformer_not_loaded, module}} ->
+        {:error, "Request transformer #{inspect(module)} is not loaded"}
+
+      {:error, {:request_transformer_missing_callback, module}} ->
+        {:error, "Request transformer #{inspect(module)} must implement transform_request/4"}
+
+      {:error, :invalid_request_transformer} ->
+        {:error, "request_transformer must be a module implementing transform_request/4"}
+    end
+  end
+
+  defp resolve_stream_timeout_ms_opt(opts, default) when is_list(opts) do
+    case Keyword.fetch(opts, :stream_timeout_ms) do
+      {:ok, value} when is_integer(value) and value >= 0 ->
+        value
+
+      _ ->
+        case Keyword.fetch(opts, :stream_receive_timeout_ms) do
+          {:ok, value} when is_integer(value) and value > 0 ->
+            value
+
+          _ ->
+            default
+        end
+    end
+  end
+
+  defp normalize_stream_receive_timeout_ms(value, _default) when is_integer(value) and value > 0 do
+    value
+  end
+
+  defp normalize_stream_receive_timeout_ms(_value, default), do: default
 
   defp effect_policy_from_state(state) do
     state

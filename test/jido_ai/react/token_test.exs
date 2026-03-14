@@ -4,6 +4,14 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
   alias Jido.AI.Reasoning.ReAct.{Config, State, Token}
   @legacy_insecure_secret "jido_ai_react_default_secret_change_me"
 
+  defmodule TransformerA do
+    def transform_request(request, _state, _config, _context), do: {:ok, request}
+  end
+
+  defmodule TransformerB do
+    def transform_request(request, _state, _config, _context), do: {:ok, request}
+  end
+
   test "defaults omitted model to resolved :fast alias" do
     config = Config.new(%{tools: %{}})
 
@@ -45,6 +53,29 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
     config_b = Config.new(%{model: :fast, tools: %{}, token_secret: "secret-a"})
 
     state = State.new("hello", nil, request_id: "req_3", run_id: "run_3")
+    token = Token.issue(state, config_a)
+
+    assert {:error, :token_config_mismatch} = Token.decode(token, config_b)
+  end
+
+  test "request_transformer participates in config fingerprint" do
+    config_a =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        request_transformer: TransformerA,
+        token_secret: "secret-a"
+      })
+
+    config_b =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        request_transformer: TransformerB,
+        token_secret: "secret-a"
+      })
+
+    state = State.new("hello", nil, request_id: "req_transformer", run_id: "run_transformer")
     token = Token.issue(state, config_a)
 
     assert {:error, :token_config_mismatch} = Token.decode(token, config_b)

@@ -103,6 +103,56 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule SeenCodesTool do
+    use Jido.Action,
+      name: "seen_codes_tool",
+      description: "returns codes and stores them in the runtime state snapshot",
+      schema: Zoi.object(%{})
+
+    def run(_params, _context) do
+      seen_codes = ["8409.91.01", "8409.99.99"]
+
+      {:ok, %{seen_codes: seen_codes},
+       [
+         %Jido.Agent.StateOp.SetState{
+           attrs: %{seen_codes: seen_codes}
+         }
+       ]}
+    end
+  end
+
+  defmodule DynamicToolSchemaTransformer do
+    alias Jido.AI.Reasoning.ReAct.ToolSelection
+
+    def transform_request(request, _state, _config, runtime_context) do
+      seen_codes = get_in(runtime_context, [:state, :seen_codes]) || []
+
+      case seen_codes do
+        [] ->
+          {:ok, %{tools: only(request.tools, [SeenCodesTool.name()])}}
+
+        codes ->
+          {:ok,
+           %{
+             tools: %{},
+             llm_opts: [
+               provider_options: [
+                 response_schema: %{
+                   type: "object",
+                   properties: %{code: %{enum: codes}}
+                 }
+               ]
+             ]
+           }}
+      end
+    end
+
+    defp only(tools, names) do
+      {:ok, filtered} = ToolSelection.filter_allowed(tools, names)
+      filtered
+    end
+  end
+
   setup :set_mimic_from_context
 
   setup do
@@ -827,6 +877,73 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert collected.termination_reason == :final_answer
     assert collected.result == "Result is 5"
     assert is_binary(collected.final_token)
+  end
+
+  test "request_transformer can narrow tools and add llm opts from runtime state" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          send(parent, {:turn_one_tool_names, Enum.map(opts[:tools], & &1.name)})
+
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("seen_codes_tool", %{}, %{id: "tc_seen_codes"})],
+             %{finish_reason: :tool_calls, usage: %{input_tokens: 4, output_tokens: 2}},
+             model
+           )}
+
+        2 ->
+          send(parent, {:turn_two_tool_names, Enum.map(opts[:tools], & &1.name)})
+
+          response_schema =
+            opts
+            |> Keyword.get(:provider_options, [])
+            |> Keyword.get(:response_schema)
+
+          send(parent, {:turn_two_response_schema, response_schema})
+
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("Selected code 8409.91.01")],
+             %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
+             model
+           )}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{
+          CalculatorTool.name() => CalculatorTool,
+          SeenCodesTool.name() => SeenCodesTool
+        },
+        request_transformer: DynamicToolSchemaTransformer,
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events =
+      ReAct.stream(
+        "Classify using seen codes only",
+        config,
+        context: %{state: %{seen_codes: []}}
+      )
+      |> Enum.to_list()
+
+    assert_receive {:turn_one_tool_names, ["seen_codes_tool"]}, 200
+    assert_receive {:turn_two_tool_names, []}, 200
+
+    assert_receive {:turn_two_response_schema, response_schema}, 200
+    assert get_in(response_schema, [:properties, :code, :enum]) == ["8409.91.01", "8409.99.99"]
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert request_completed.data.result == "Selected code 8409.91.01"
   end
 
   test "halting event consumption cancels active runner task" do
