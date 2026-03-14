@@ -14,8 +14,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   require Logger
 
-  @receive_timeout 30_000
-
   # Injected as a user message when the agent repeats the exact same tool
   # calls with identical arguments on consecutive iterations.
   @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
@@ -60,13 +58,24 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp build_stream(%State{} = initial_state, %Config{} = config, opts, stream_opts) do
     owner = self()
     ref = make_ref()
+    stream_timeout = Config.stream_timeout(config)
 
     case start_task(fn -> coordinator(owner, ref, initial_state, config, opts, stream_opts) end, opts) do
       {:ok, pid} ->
         monitor_ref = Process.monitor(pid)
 
         Stream.resource(
-          fn -> %{done?: false, down?: false, cancel_sent?: false, pid: pid, monitor_ref: monitor_ref, ref: ref} end,
+          fn ->
+            %{
+              done?: false,
+              down?: false,
+              cancel_sent?: false,
+              pid: pid,
+              monitor_ref: monitor_ref,
+              ref: ref,
+              stream_timeout: stream_timeout
+            }
+          end,
           &next_event(owner, &1),
           &cleanup(owner, &1)
         )
@@ -715,7 +724,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp next_event(_owner, %{ref: ref} = state) do
+  defp next_event(_owner, %{ref: ref, stream_timeout: timeout} = state) do
     receive do
       {:react_stream_cancel, reason} ->
         next_event(nil, request_stream_cancel(state, reason))
@@ -729,7 +738,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {:DOWN, monitor_ref, :process, _pid, _reason} when monitor_ref == state.monitor_ref ->
         next_event(nil, %{state | down?: true})
     after
-      @receive_timeout ->
+      timeout ->
         {:halt, %{state | done?: true}}
     end
   end

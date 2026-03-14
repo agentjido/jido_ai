@@ -162,6 +162,32 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.pending_worker_start.config.llm.max_tokens == 4_096
     end
 
+    test "start propagates stream_timeout_ms option into runtime config" do
+      agent = create_agent(tools: [TestCalculator], stream_timeout_ms: 123_456)
+
+      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_1"})
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.pending_worker_start.config.stream_timeout_ms == 123_456
+    end
+
+    test "start applies request-scoped stream_timeout_ms override to runtime config" do
+      agent = create_agent(tools: [TestCalculator], stream_timeout_ms: 123_456)
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          stream_timeout_ms: 222_222
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.pending_worker_start.config.stream_timeout_ms == 222_222
+    end
+
     test "start merges base and run req_http_options into runtime config" do
       agent =
         create_agent(

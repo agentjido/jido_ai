@@ -71,6 +71,11 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
       assert config.llm.timeout_ms == 999
     end
 
+    test "forwards stream_timeout_ms into runtime config" do
+      config = Helpers.build_config(%{stream_timeout_ms: 123_456}, %{})
+      assert config.stream_timeout_ms == 123_456
+    end
+
     test "normalizes string-key llm_opts map entries into runtime options" do
       config =
         Helpers.build_config(

@@ -60,6 +60,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               tools: Zoi.map() |> Zoi.default(%{}),
               max_iterations: Zoi.integer() |> Zoi.default(@default_max_iterations),
               streaming: Zoi.boolean() |> Zoi.default(true),
+              stream_timeout_ms: Zoi.integer() |> Zoi.default(0),
               effect_policy: Zoi.any() |> Zoi.default(%{}),
               llm: @llm_schema,
               tool_exec: @tool_exec_schema,
@@ -141,6 +142,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       max_iterations:
         normalize_pos_integer(get_opt(opts_map, :max_iterations, @default_max_iterations), @default_max_iterations),
       streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
+      stream_timeout_ms: normalize_non_neg_integer(get_opt(opts_map, :stream_timeout_ms, 0), 0),
       effect_policy: get_opt(opts_map, :effect_policy, %{}),
       llm: llm,
       tool_exec: tool_exec,
@@ -187,6 +189,21 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     config.tools
     |> Map.values()
     |> ToolAdapter.from_actions()
+  end
+
+  @doc """
+  Returns the effective stream consumer timeout.
+
+  When `stream_timeout_ms` is 0 (default), auto-derives from
+  `tool_exec.timeout_ms + 60_000` to ensure the stream consumer
+  outlives the longest possible tool execution plus LLM response time.
+  """
+  @spec stream_timeout(t()) :: pos_integer()
+  def stream_timeout(%__MODULE__{} = config) do
+    case config.stream_timeout_ms do
+      0 -> config.tool_exec.timeout_ms + 60_000
+      ms -> ms
+    end
   end
 
   @doc """
