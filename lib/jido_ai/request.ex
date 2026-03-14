@@ -153,6 +153,7 @@ defmodule Jido.AI.Request do
   ## Options
 
   - `:tool_context` - Additional context merged with agent's tool_context
+  - `:stream_timeout_ms` - Request-scoped ReAct stream consumer timeout
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
   - `:request_id` - Custom request ID (auto-generated if not provided)
@@ -176,6 +177,7 @@ defmodule Jido.AI.Request do
     signal_type = Keyword.fetch!(opts, :signal_type)
     source = Keyword.fetch!(opts, :source)
     tool_context = Keyword.get(opts, :tool_context, %{})
+    stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms)
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
@@ -185,6 +187,7 @@ defmodule Jido.AI.Request do
     payload =
       %{query: query, prompt: query, request_id: request_id}
       |> maybe_add_tool_context(tool_context)
+      |> maybe_add_stream_timeout_ms(stream_timeout_ms)
       |> maybe_add_req_http_options(req_http_options)
       |> maybe_add_llm_opts(llm_opts)
 
@@ -513,6 +516,13 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_tool_context(payload, _), do: payload
+
+  defp maybe_add_stream_timeout_ms(payload, stream_timeout_ms)
+       when is_integer(stream_timeout_ms) and stream_timeout_ms >= 0 do
+    Map.put(payload, :stream_timeout_ms, stream_timeout_ms)
+  end
+
+  defp maybe_add_stream_timeout_ms(payload, _), do: payload
 
   defp maybe_add_req_http_options(payload, req_http_options)
        when is_list(req_http_options) and req_http_options != [] do

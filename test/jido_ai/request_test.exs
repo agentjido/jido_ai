@@ -306,6 +306,7 @@ defmodule JidoTest.AI.RequestTest do
                  source: "/ai/test",
                  request_id: "req_123",
                  tool_context: %{actor: "user_1"},
+                 stream_timeout_ms: 123_456,
                  req_http_options: [plug: {Req.Test, []}],
                  llm_opts: [thinking: "enabled", reasoning_effort: :high]
                )
@@ -322,6 +323,7 @@ defmodule JidoTest.AI.RequestTest do
       assert signal.data.prompt == "What is 2+2?"
       assert signal.data.request_id == "req_123"
       assert signal.data.tool_context == %{actor: "user_1"}
+      assert signal.data.stream_timeout_ms == 123_456
       assert signal.data.req_http_options == [plug: {Req.Test, []}]
       assert signal.data.llm_opts == [thinking: "enabled", reasoning_effort: :high]
     end

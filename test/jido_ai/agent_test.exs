@@ -92,6 +92,13 @@ defmodule Jido.AI.AgentTest do
       max_tokens: 4_096
   end
 
+  defmodule AgentWithStreamTimeout do
+    use Jido.AI.Agent,
+      name: "agent_with_stream_timeout",
+      tools: [TestCalculator],
+      stream_timeout_ms: 123_456
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -219,6 +226,14 @@ defmodule Jido.AI.AgentTest do
       config = state[:config]
 
       assert config.max_tokens == 4_096
+    end
+
+    test "stream_timeout_ms is forwarded into strategy config" do
+      agent = AgentWithStreamTimeout.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.stream_timeout_ms == 123_456
     end
 
     test "tools list resolves module aliases" do

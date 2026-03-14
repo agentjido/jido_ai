@@ -15,9 +15,10 @@ defmodule Jido.AI.Reasoning.ReAct.PublicApiTest do
 
   describe "build_config/1" do
     test "builds config from map and passes through config struct" do
-      built = ReAct.build_config(%{model: :fast})
+      built = ReAct.build_config(%{model: :fast, stream_timeout_ms: 123_456})
       assert %Config{} = built
       assert built.model == Jido.AI.resolve_model(:fast)
+      assert built.stream_timeout_ms == 123_456
 
       passthrough = ReAct.build_config(built)
       assert passthrough == built
