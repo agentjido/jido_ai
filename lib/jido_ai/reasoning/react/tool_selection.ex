@@ -23,9 +23,8 @@ defmodule Jido.AI.Reasoning.ReAct.ToolSelection do
   @spec resolve(tools_map(), tools_input(), [String.t()] | nil) ::
           {:ok, tools_map()} | {:error, term()}
   def resolve(base_tools, override_tools \\ nil, allowed_tools \\ nil) when is_map(base_tools) do
-    with {:ok, selected_tools} <- select_base_or_override(base_tools, override_tools),
-         {:ok, filtered_tools} <- filter_allowed(selected_tools, allowed_tools) do
-      {:ok, filtered_tools}
+    with {:ok, selected_tools} <- select_base_or_override(base_tools, override_tools) do
+      filter_allowed(selected_tools, allowed_tools)
     end
   end
 
@@ -87,12 +86,10 @@ defmodule Jido.AI.Reasoning.ReAct.ToolSelection do
   defp select_base_or_override(_base_tools, override_tools), do: normalize_input(override_tools)
 
   defp validate_modules(modules) when is_list(modules) do
-    cond do
-      Enum.any?(modules, &(not is_atom(&1))) ->
-        {:error, :invalid_tools}
-
-      true ->
-        ToolAdapter.validate_actions(modules)
+    if Enum.any?(modules, &(not is_atom(&1))) do
+      {:error, :invalid_tools}
+    else
+      ToolAdapter.validate_actions(modules)
     end
   end
 

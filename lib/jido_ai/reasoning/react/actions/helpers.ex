@@ -109,9 +109,6 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
 
       {:error, {:invalid_action, module, reason}} ->
         raise ArgumentError, "invalid ReAct tool #{inspect(module)}: #{inspect(reason)}"
-
-      {:error, reason} ->
-        raise ArgumentError, "unable to resolve ReAct tools: #{inspect(reason)}"
     end
   end
 

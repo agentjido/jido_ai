@@ -1899,9 +1899,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       {:error, {:invalid_action, module, reason}} ->
         {:error, :invalid_tools, "Invalid tool #{inspect(module)}: #{inspect(reason)}"}
-
-      {:error, reason} ->
-        {:error, :invalid_tools, "Unable to resolve tools: #{inspect(reason)}"}
     end
   end
 
