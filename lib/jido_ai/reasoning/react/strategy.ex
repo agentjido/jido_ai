@@ -63,6 +63,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           base_llm_opts: keyword(),
           provider_opt_keys_by_string: %{optional(String.t()) => atom()},
           request_policy: :reject,
+          stream_timeout_ms: non_neg_integer(),
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
@@ -163,6 +164,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           query: Zoi.string(),
           request_id: Zoi.string() |> Zoi.optional(),
           tool_context: Zoi.map() |> Zoi.optional(),
+          stream_timeout_ms: Zoi.integer() |> Zoi.optional(),
           req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
           llm_opts: Zoi.any() |> Zoi.optional()
         }),
@@ -528,7 +530,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       runtime_config =
         runtime_config_from_strategy(config,
           req_http_options: effective_req_http_options,
-          llm_opts: effective_llm_opts
+          llm_opts: effective_llm_opts,
+          stream_timeout_ms: Map.get(params, :stream_timeout_ms)
         )
 
       base_context = strategy_context(state, config)
@@ -1548,6 +1551,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       |> Keyword.get(:llm_opts, config[:base_llm_opts] || [])
       |> normalize_llm_opts(provider_opt_keys_by_string)
 
+    stream_timeout_ms =
+      case Keyword.fetch(opts, :stream_timeout_ms) do
+        {:ok, ms} when is_integer(ms) and ms >= 0 -> ms
+        _ -> config[:stream_timeout_ms]
+      end
+
     runtime_opts = %{
       model: config[:model],
       system_prompt: config[:system_prompt],
@@ -1555,6 +1564,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       max_iterations: config[:max_iterations],
       max_tokens: config[:max_tokens],
       streaming: config[:streaming],
+      stream_timeout_ms: stream_timeout_ms,
       req_http_options: req_http_options,
       llm_opts: llm_opts,
       tool_timeout_ms: config[:tool_timeout_ms],
@@ -1784,6 +1794,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens),
       streaming: Keyword.get(opts, :streaming, true),
       request_policy: request_policy,
+      stream_timeout_ms: Keyword.get(opts, :stream_timeout_ms, 0),
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, 15_000),
       tool_max_retries: Keyword.get(opts, :tool_max_retries, 1),
       tool_retry_backoff_ms: Keyword.get(opts, :tool_retry_backoff_ms, 200),

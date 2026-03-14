@@ -355,6 +355,7 @@ defmodule Jido.AI.Agent do
       ## Options
 
       - `:tool_context` - Additional context map merged with agent's tool_context
+      - `:stream_timeout_ms` - Request-scoped ReAct stream consumer timeout
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:timeout` - Timeout for the underlying cast (default: no timeout)
@@ -412,6 +413,7 @@ defmodule Jido.AI.Agent do
       ## Options
 
       - `:tool_context` - Additional context map merged with agent's tool_context
+      - `:stream_timeout_ms` - Request-scoped ReAct stream consumer timeout
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:timeout` - How long to wait in milliseconds (default: 30_000)
