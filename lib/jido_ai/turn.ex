@@ -84,8 +84,7 @@ defmodule Jido.AI.Turn do
       usage: normalize_usage(ReqLLM.Response.usage(response)),
       model: Keyword.get(opts, :model, response.model),
       metadata: normalize_metadata(response.message && response.message.metadata),
-      reasoning_details:
-        normalize_reasoning_details(response.message && response.message.reasoning_details),
+      reasoning_details: normalize_reasoning_details(response.message && response.message.reasoning_details),
       tool_results: []
     }
   end
@@ -123,7 +122,7 @@ defmodule Jido.AI.Turn do
       tool_calls: map |> get_field(:tool_calls, []) |> normalize_tool_calls(),
       usage: normalize_usage(get_field(map, :usage)),
       model: normalize_optional_string(get_field(map, :model)),
-      metadata: normalize_metadata(get_field(map, :metadata, %{})),
+      metadata: normalize_metadata(get_field(map, :metadata, get_field(map, :message_metadata, %{}))),
       reasoning_details: normalize_reasoning_details(get_field(map, :reasoning_details)),
       tool_results: map |> get_field(:tool_results, []) |> normalize_tool_results()
     }
@@ -140,34 +139,23 @@ defmodule Jido.AI.Turn do
   @doc """
   Projects the turn into an assistant message compatible with ReqLLM context.
   """
-  @spec assistant_message(t()) :: map()
+  @spec assistant_message(t()) :: ReqLLM.Message.t()
   def assistant_message(%__MODULE__{type: :tool_calls} = turn) do
-    %{
-      role: :assistant,
-      content: turn.text,
-      tool_calls: turn.tool_calls,
-      metadata: turn.metadata,
-      reasoning_details: turn.reasoning_details
-    }
+    turn.text
+    |> Context.assistant(tool_calls: turn.tool_calls, metadata: turn.metadata)
+    |> put_reasoning_details(turn.reasoning_details)
   end
 
   def assistant_message(%__MODULE__{tool_calls: tool_calls} = turn) when is_list(tool_calls) and tool_calls != [] do
-    %{
-      role: :assistant,
-      content: turn.text,
-      tool_calls: tool_calls,
-      metadata: turn.metadata,
-      reasoning_details: turn.reasoning_details
-    }
+    turn.text
+    |> Context.assistant(tool_calls: tool_calls, metadata: turn.metadata)
+    |> put_reasoning_details(turn.reasoning_details)
   end
 
   def assistant_message(%__MODULE__{} = turn) do
-    %{
-      role: :assistant,
-      content: turn.text,
-      metadata: turn.metadata,
-      reasoning_details: turn.reasoning_details
-    }
+    turn.text
+    |> Context.assistant(metadata: turn.metadata)
+    |> put_reasoning_details(turn.reasoning_details)
   end
 
   @doc """
@@ -377,7 +365,9 @@ defmodule Jido.AI.Turn do
       thinking_content: turn.thinking_content,
       tool_calls: turn.tool_calls,
       usage: turn.usage,
-      model: turn.model
+      model: turn.model,
+      metadata: turn.metadata,
+      reasoning_details: turn.reasoning_details
     }
   end
 
@@ -472,6 +462,11 @@ defmodule Jido.AI.Turn do
   defp normalize_reasoning_details(nil), do: nil
   defp normalize_reasoning_details(details) when is_list(details), do: details
   defp normalize_reasoning_details(_), do: nil
+
+  defp put_reasoning_details(%ReqLLM.Message{} = message, nil), do: message
+
+  defp put_reasoning_details(%ReqLLM.Message{} = message, reasoning_details),
+    do: %{message | reasoning_details: reasoning_details}
 
   defp normalize_usage_key("input_tokens"), do: :input_tokens
   defp normalize_usage_key("output_tokens"), do: :output_tokens

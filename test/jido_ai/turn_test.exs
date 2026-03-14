@@ -122,8 +122,27 @@ defmodule Jido.AI.TurnTest do
 
       assert turn.metadata == %{response_id: "resp_123"}
       assert turn.reasoning_details == [%{signature: "sig_abc"}]
+      assert %ReqLLM.Message{} = message
       assert message.metadata == %{response_id: "resp_123"}
       assert message.reasoning_details == [%{signature: "sig_abc"}]
+      assert [%ReqLLM.ToolCall{} = tool_call] = message.tool_calls
+      assert tool_call.id == "call_123"
+      assert ReqLLM.ToolCall.name(tool_call) == "list_directory"
+      assert ReqLLM.ToolCall.args_map(tool_call) == %{"path" => "."}
+    end
+  end
+
+  describe "from_result_map/1" do
+    test "accepts legacy message_metadata keys" do
+      turn =
+        Turn.from_result_map(%{
+          type: :tool_calls,
+          text: "Tool round",
+          tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 1, b: 2}}],
+          message_metadata: %{response_id: "resp_tool_round_1"}
+        })
+
+      assert turn.metadata == %{response_id: "resp_tool_round_1"}
     end
   end
 
@@ -143,10 +162,13 @@ defmodule Jido.AI.TurnTest do
       assistant_message = Turn.assistant_message(turn)
       [tool_message] = Turn.tool_messages(turn)
 
-      assert is_map(assistant_message)
+      assert %ReqLLM.Message{} = assistant_message
       assert assistant_message.role == :assistant
       assert assistant_message.metadata == %{response_id: "resp_tool_round_1"}
-      assert [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}] = assistant_message.tool_calls
+      assert [%ReqLLM.ToolCall{} = tool_call] = assistant_message.tool_calls
+      assert tool_call.id == "tc_1"
+      assert ReqLLM.ToolCall.name(tool_call) == "calculator"
+      assert ReqLLM.ToolCall.args_map(tool_call) == %{"a" => 5, "b" => 3}
 
       assert %ReqLLM.Message{} = tool_message
       assert tool_message.role == :tool
