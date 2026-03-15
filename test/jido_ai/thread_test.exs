@@ -123,6 +123,17 @@ defmodule Jido.AI.ContextTest do
       assert entry.thinking == "I need to calculate this"
       assert entry.tool_calls == tool_calls
     end
+
+    test "appends assistant with reasoning_details" do
+      reasoning_details = [%{signature: "sig_123"}]
+
+      thread =
+        AIContext.new()
+        |> AIContext.append_assistant("The answer is 4.", nil, reasoning_details: reasoning_details)
+
+      [entry] = thread.entries
+      assert entry.reasoning_details == reasoning_details
+    end
   end
 
   describe "append_tool_result/4" do
@@ -275,6 +286,19 @@ defmodule Jido.AI.ContextTest do
 
       assert message.role == :assistant
       assert message.content == "Just text"
+    end
+
+    test "projects assistant reasoning_details when present" do
+      reasoning_details = [%{signature: "sig_123"}]
+
+      thread =
+        AIContext.new()
+        |> AIContext.append_assistant("Just text", nil, reasoning_details: reasoning_details)
+
+      [message] = AIContext.to_messages(thread)
+
+      assert message.role == :assistant
+      assert message.reasoning_details == reasoning_details
     end
 
     test "falls back to full history for invalid limit option" do
@@ -604,6 +628,26 @@ defmodule Jido.AI.ContextTest do
       [entry] = thread.entries
       assert entry.content == "Just a plain message"
       assert entry.thinking == nil
+    end
+
+    test "round-trips assistant reasoning_details through message format" do
+      reasoning_details = [%{signature: "sig_123", provider: :openai}]
+
+      messages = [
+        %{
+          role: :assistant,
+          content: "Result",
+          reasoning_details: reasoning_details
+        }
+      ]
+
+      thread = AIContext.new() |> AIContext.append_messages(messages)
+
+      [entry] = thread.entries
+      assert entry.reasoning_details == reasoning_details
+
+      [projected] = AIContext.to_messages(thread)
+      assert projected.reasoning_details == reasoning_details
     end
   end
 

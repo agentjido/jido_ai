@@ -44,7 +44,7 @@ defmodule Jido.AI.TurnTest do
       assert turn.tool_calls == []
       assert turn.usage == %{input_tokens: 10, output_tokens: 5}
       assert turn.model == "anthropic:claude-haiku-4-5"
-      assert turn.metadata == %{response_id: "resp_plain_1"}
+      assert turn.message_metadata == %{response_id: "resp_plain_1"}
     end
 
     test "classifies tool calls from finish reason and tool call payload" do
@@ -68,6 +68,18 @@ defmodule Jido.AI.TurnTest do
     end
 
     test "uses ReqLLM.Response classification for canonical responses" do
+      reasoning_details = [
+        %ReqLLM.Message.ReasoningDetails{
+          text: "Need a tool",
+          signature: "sig_1",
+          encrypted?: false,
+          provider: :anthropic,
+          format: "thinking/v1",
+          index: 0,
+          provider_data: %{}
+        }
+      ]
+
       response = %ReqLLM.Response{
         id: "resp_1",
         model: "anthropic:claude-haiku-4-5",
@@ -76,7 +88,8 @@ defmodule Jido.AI.TurnTest do
           ReqLLM.Context.assistant("",
             tool_calls: [ReqLLM.ToolCall.new("tc_1", "calculator", ~s({"a":1,"b":2}))],
             metadata: %{response_id: "resp_1"}
-          ),
+          )
+          |> Map.put(:reasoning_details, reasoning_details),
         stream?: false,
         stream: nil,
         usage: %{"input_tokens" => "4", "output_tokens" => "2"},
@@ -90,70 +103,25 @@ defmodule Jido.AI.TurnTest do
       assert turn.type == :tool_calls
       assert turn.text == ""
       assert turn.thinking_content == nil
+      assert turn.reasoning_details == reasoning_details
       assert turn.tool_calls == [%{id: "tc_1", name: "calculator", arguments: %{"a" => 1, "b" => 2}}]
       assert turn.usage == %{input_tokens: 4, output_tokens: 2}
       assert turn.model == "anthropic:claude-haiku-4-5"
-      assert turn.metadata == %{response_id: "resp_1"}
-    end
-
-    test "preserves response metadata and reasoning details in assistant message projection" do
-      response = %ReqLLM.Response{
-        id: "resp_123",
-        model: "openai:gpt-5.4",
-        context: nil,
-        message: %ReqLLM.Message{
-          role: :assistant,
-          content: [ReqLLM.Message.ContentPart.text("Use the tool.")],
-          tool_calls: [%{id: "call_123", name: "list_directory", arguments: %{path: "."}}],
-          metadata: %{response_id: "resp_123"},
-          reasoning_details: [%{signature: "sig_abc"}]
-        },
-        object: nil,
-        stream?: false,
-        stream: nil,
-        usage: %{input_tokens: 10, output_tokens: 5, total_tokens: 15},
-        finish_reason: :tool_calls,
-        provider_meta: %{},
-        error: nil
-      }
-
-      turn = Turn.from_response(response)
-      message = Turn.assistant_message(turn)
-
-      assert turn.metadata == %{response_id: "resp_123"}
-      assert turn.reasoning_details == [%{signature: "sig_abc"}]
-      assert %ReqLLM.Message{} = message
-      assert message.metadata == %{response_id: "resp_123"}
-      assert message.reasoning_details == [%{signature: "sig_abc"}]
-      assert [%ReqLLM.ToolCall{} = tool_call] = message.tool_calls
-      assert tool_call.id == "call_123"
-      assert ReqLLM.ToolCall.name(tool_call) == "list_directory"
-      assert ReqLLM.ToolCall.args_map(tool_call) == %{"path" => "."}
-    end
-  end
-
-  describe "from_result_map/1" do
-    test "accepts legacy message_metadata keys" do
-      turn =
-        Turn.from_result_map(%{
-          type: :tool_calls,
-          text: "Tool round",
-          tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 1, b: 2}}],
-          message_metadata: %{response_id: "resp_tool_round_1"}
-        })
-
-      assert turn.metadata == %{response_id: "resp_tool_round_1"}
+      assert turn.message_metadata == %{response_id: "resp_1"}
     end
   end
 
   describe "message projections" do
-    test "projects assistant message metadata and tool messages as ReqLLM messages" do
+    test "projects assistant message metadata, reasoning_details, and tool messages as ReqLLM messages" do
+      reasoning_details = [%{signature: "sig_123"}]
+
       turn =
         %Turn{
           type: :tool_calls,
           text: "",
           tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}],
-          metadata: %{response_id: "resp_tool_round_1"}
+          message_metadata: %{response_id: "resp_tool_round_1"},
+          reasoning_details: reasoning_details
         }
         |> Turn.with_tool_results([
           %{id: "tc_1", name: "calculator", content: "{\"result\":8}", raw_result: {:ok, %{result: 8}, []}}
@@ -165,6 +133,7 @@ defmodule Jido.AI.TurnTest do
       assert %ReqLLM.Message{} = assistant_message
       assert assistant_message.role == :assistant
       assert assistant_message.metadata == %{response_id: "resp_tool_round_1"}
+      assert assistant_message.reasoning_details == reasoning_details
       assert [%ReqLLM.ToolCall{} = tool_call] = assistant_message.tool_calls
       assert tool_call.id == "tc_1"
       assert ReqLLM.ToolCall.name(tool_call) == "calculator"
