@@ -406,7 +406,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: "anthropic:claude-sonnet-4-5",
         tools: %{CalculatorTool.name() => CalculatorTool},
-        stream_receive_timeout_ms: 120,
+        stream_timeout_ms: 120,
         tool_max_retries: 0,
         tool_retry_backoff_ms: 0
       })
@@ -442,7 +442,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         model: :capable,
         tools: %{},
         capture_deltas?: false,
-        stream_receive_timeout_ms: 150
+        stream_timeout_ms: 150
       })
 
     events = ReAct.stream("Say hello", config) |> Enum.to_list()
@@ -470,7 +470,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         model: :capable,
         tools: %{},
         capture_deltas?: false,
-        stream_receive_timeout_ms: 120
+        stream_timeout_ms: 120
       })
 
     consumer =
@@ -490,7 +490,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == String.duplicate("x", 200)
   end
 
-  test "halts inactive streams after stream_receive_timeout_ms" do
+  test "halts inactive streams after stream_timeout_ms" do
     parent = self()
 
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
@@ -510,7 +510,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: :capable,
         tools: %{},
-        stream_receive_timeout_ms: 80
+        stream_timeout_ms: 80
       })
 
     started_at = System.monotonic_time(:millisecond)
