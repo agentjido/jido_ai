@@ -1,7 +1,7 @@
 defmodule JidoAi.MixProject do
   use Mix.Project
 
-  @version "2.0.0-rc.0"
+  @version "2.0.0"
   @source_url "https://github.com/agentjido/jido_ai"
   @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
   def project do
@@ -59,7 +59,7 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.0"},
+      {:jido, "~> 2.1"},
       {:jido_action, "~> 2.1"},
       {:req_llm, "~> 1.7"},
 
@@ -169,7 +169,8 @@ defmodule JidoAi.MixProject do
         "guides/developer/error_model_and_recovery.md",
         # Reference
         "guides/developer/actions_catalog.md",
-        "guides/developer/configuration_reference.md"
+        "guides/developer/configuration_reference.md",
+        "guides/developer/thread_context_projection_model.md"
       ],
       groups_for_extras: [
         {"Build With Jido.AI",
@@ -177,7 +178,7 @@ defmodule JidoAi.MixProject do
         {"Upgrading", ~r/guides\/user\/migration_plugins_and_signals_v3\.md/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
-        {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference)\.md/}
+        {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference|thread_context_projection_model)\.md/}
       ],
       groups_for_modules: [
         Core: [
