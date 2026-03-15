@@ -789,7 +789,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp maybe_put_assistant_context_opt(opts, _key, nil), do: opts
-  defp maybe_put_assistant_context_opt(opts, _key, ""), do: opts
   defp maybe_put_assistant_context_opt(opts, key, value), do: Keyword.put(opts, key, value)
 
   defp maybe_note_owner_signal(true, _owner, _ref, _last_owner_signal_ms, _interval_ms), do: monotonic_ms()
