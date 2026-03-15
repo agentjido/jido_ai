@@ -83,6 +83,7 @@ defmodule Jido.AI.Examples.Scripts.Bootstrap do
     @examples_lib
     |> Path.join("**/*.ex")
     |> Path.wildcard()
+    |> Enum.filter(&loadable_example?/1)
     |> Enum.sort_by(&load_order/1)
     |> Enum.each(&Code.require_file/1)
 
@@ -97,6 +98,33 @@ defmodule Jido.AI.Examples.Scripts.Bootstrap do
     else
       {0, file}
     end
+  end
+
+  defp loadable_example?(file) do
+    cond do
+      github_example_file?(file) and not github_tool_pack_available?() ->
+        false
+
+      true ->
+        true
+    end
+  end
+
+  defp github_example_file?(file) do
+    file == Path.join(@examples_lib, "agents/issue_triage_agent.ex") or
+      file == Path.join(@examples_lib, "tools/github.ex")
+  end
+
+  defp github_tool_pack_available? do
+    Enum.all?(
+      [
+        Jido.Tools.Github.Issues.List,
+        Jido.Tools.Github.Issues.Filter,
+        Jido.Tools.Github.Issues.Find,
+        Jido.Tools.Github.Issues.Update
+      ],
+      &Code.ensure_loaded?/1
+    )
   end
 end
 
