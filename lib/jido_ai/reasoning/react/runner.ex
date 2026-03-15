@@ -14,6 +14,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   require Logger
 
+  @cleanup_wait_ms 25
+  @stream_control_wait_ms 10
+
   # Injected as a user message when the agent repeats the exact same tool
   # calls with identical arguments on consecutive iterations.
   @cycle_warning "You already called the same tool(s) with identical parameters in the previous iteration and got the same results. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
@@ -58,7 +61,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp build_stream(%State{} = initial_state, %Config{} = config, opts, stream_opts) do
     owner = self()
     ref = make_ref()
-    stream_timeout = Config.stream_timeout(config)
+    receive_timeout_ms = Config.stream_timeout(config)
 
     case start_task(fn -> coordinator(owner, ref, initial_state, config, opts, stream_opts) end, opts) do
       {:ok, pid} ->
@@ -72,8 +75,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               cancel_sent?: false,
               pid: pid,
               monitor_ref: monitor_ref,
-              ref: ref,
-              stream_timeout: stream_timeout
+              receive_timeout_ms: receive_timeout_ms,
+              stream_cancel: nil,
+              stream_cancelled?: false,
+              ref: ref
             }
           end,
           &next_event(owner, &1),
@@ -251,6 +256,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               turn_type: turn.type,
               text: turn.text,
               thinking_content: turn.thinking_content,
+              reasoning_details: turn.reasoning_details,
               tool_calls: turn.tool_calls,
               usage: turn.usage
             },
@@ -265,7 +271,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               :tool_calls -> turn.tool_calls
               _ -> nil
             end,
-            maybe_thinking_opt(turn.thinking_content)
+            assistant_context_opts(turn)
           )
           |> then(&%{state | context: &1})
 
@@ -309,6 +315,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp request_turn_stream(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
     case ReqLLM.Generation.stream_text(config.model, messages, llm_opts) do
       {:ok, stream_response} ->
+        announce_stream_control(owner, ref, stream_response)
+
         case consume_stream(state, owner, ref, config, stream_response) do
           {:ok, updated_state, turn, response_id} -> {:ok, updated_state, turn, response_id}
           {:error, updated_state, reason} -> {:error, updated_state, reason, :llm_stream}
@@ -333,23 +341,29 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     check_cancel!(state, ref)
 
     trace_cfg = config.trace
+    state_key = stream_state_key(ref)
+    heartbeat_interval_ms = progress_interval_ms(config)
 
-    acc =
-      Enum.reduce_while(stream_response.stream, %{chunks: [], state: state}, fn chunk, %{state: current} = acc ->
-        check_cancel!(current, ref)
+    Process.put(state_key, state)
+    Process.put(stream_signal_key(ref), monotonic_ms())
 
-        current = maybe_emit_chunk_delta(current, owner, ref, chunk, trace_cfg)
-        {:cont, %{acc | chunks: [chunk | acc.chunks], state: current}}
-      end)
+    case ReqLLM.StreamResponse.process_stream(
+           stream_response,
+           stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms)
+         ) do
+      {:ok, response} ->
+        {:ok, current_stream_state(state_key, state), Turn.from_response(response, model: config.model),
+         extract_response_id(response)}
 
-    chunks = Enum.reverse(acc.chunks)
-
-    with {:ok, turn, response_id} <- build_turn_from_stream(stream_response, chunks, config.model) do
-      {:ok, acc.state, turn, response_id}
+      {:error, reason} ->
+        {:error, current_stream_state(state_key, state), reason}
     end
   rescue
     e ->
-      {:error, state, %{error: Exception.message(e), type: e.__struct__}}
+      {:error, current_stream_state(stream_state_key(ref), state), %{error: Exception.message(e), type: e.__struct__}}
+  after
+    Process.delete(stream_state_key(ref))
+    Process.delete(stream_signal_key(ref))
   end
 
   defp consume_generate(%State{} = state, %Config{} = config, response) do
@@ -358,19 +372,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   rescue
     e ->
       {:error, state, %{error: Exception.message(e), type: e.__struct__}, :llm_response}
-  end
-
-  defp build_turn_from_stream(%ReqLLM.StreamResponse{} = stream_response, chunks, model) do
-    metadata = ReqLLM.StreamResponse.MetadataHandle.await(stream_response.metadata_handle)
-    builder = ReqLLM.Provider.ResponseBuilder.for_model(stream_response.model)
-
-    case builder.build_response(chunks, metadata, context: stream_response.context, model: stream_response.model) do
-      {:ok, response} ->
-        {:ok, Turn.from_response(response, model: model), extract_response_id(response)}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
   end
 
   defp extract_response_id(%ReqLLM.Response{message: %ReqLLM.Message{metadata: metadata}})
@@ -406,32 +407,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp normalize_provider_options(_options), do: []
-
-  defp maybe_emit_chunk_delta(%State{} = state, owner, ref, %ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg)
-       when is_binary(text) and text != "" do
-    case trace_cfg[:capture_deltas?] do
-      true ->
-        {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :content, delta: text})
-        state
-
-      _ ->
-        state
-    end
-  end
-
-  defp maybe_emit_chunk_delta(%State{} = state, owner, ref, %ReqLLM.StreamChunk{type: :thinking, text: text}, trace_cfg)
-       when is_binary(text) and text != "" do
-    case trace_cfg[:capture_deltas?] do
-      true ->
-        {state, _} = emit_event(state, owner, ref, :llm_delta, %{chunk_type: :thinking, delta: text})
-        state
-
-      _ ->
-        state
-    end
-  end
-
-  defp maybe_emit_chunk_delta(%State{} = state, _owner, _ref, _chunk, _trace_cfg), do: state
 
   defp run_tool_round(%State{} = state, owner, ref, %Config{} = config, context, tool_calls)
        when is_list(tool_calls) do
@@ -713,6 +688,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {:react_stream_cancel, _reason} ->
         next_event(nil, state)
 
+      {:react_runner, ^ref, :stream_control, control} ->
+        next_event(nil, apply_stream_control(state, control))
+
+      {:react_runner, ^ref, :progress} ->
+        next_event(nil, state)
+
       {:react_runner, ^ref, :event, event} ->
         {[event], state}
 
@@ -724,10 +705,18 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp next_event(_owner, %{ref: ref, stream_timeout: timeout} = state) do
+  defp next_event(_owner, %{ref: ref} = state) do
+    receive_timeout_ms = Map.get(state, :receive_timeout_ms, 30_000)
+
     receive do
       {:react_stream_cancel, reason} ->
         next_event(nil, request_stream_cancel(state, reason))
+
+      {:react_runner, ^ref, :stream_control, control} ->
+        next_event(nil, apply_stream_control(state, control))
+
+      {:react_runner, ^ref, :progress} ->
+        next_event(nil, state)
 
       {:react_runner, ^ref, :event, event} ->
         {[event], state}
@@ -738,21 +727,19 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {:DOWN, monitor_ref, :process, _pid, _reason} when monitor_ref == state.monitor_ref ->
         next_event(nil, %{state | down?: true})
     after
-      timeout ->
+      receive_timeout_ms ->
         {:halt, %{state | done?: true}}
     end
   end
 
-  defp cleanup(_owner, %{pid: pid, ref: ref}) when is_pid(pid) do
-    case Process.alive?(pid) do
-      true ->
-        send(pid, {:react_cancel, ref, :stream_halted})
-        Process.exit(pid, :kill)
+  defp notify_progress(owner, ref) do
+    send(owner, {:react_runner, ref, :progress})
+    :ok
+  end
 
-      _ ->
-        :ok
-    end
-
+  defp cleanup(_owner, %{pid: pid} = state) when is_pid(pid) do
+    state = request_stream_cancel(state, :stream_halted)
+    await_runner_shutdown(state)
     :ok
   end
 
@@ -795,6 +782,110 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp maybe_thinking_opt(""), do: []
   defp maybe_thinking_opt(thinking), do: [thinking: thinking]
 
+  defp assistant_context_opts(%Turn{} = turn) do
+    turn.thinking_content
+    |> maybe_thinking_opt()
+    |> maybe_put_assistant_context_opt(:reasoning_details, turn.reasoning_details)
+  end
+
+  defp maybe_put_assistant_context_opt(opts, _key, nil), do: opts
+  defp maybe_put_assistant_context_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp maybe_note_owner_signal(true, _owner, _ref, _last_owner_signal_ms, _interval_ms), do: monotonic_ms()
+
+  defp maybe_note_owner_signal(false, owner, ref, last_owner_signal_ms, interval_ms) do
+    current_ms = monotonic_ms()
+
+    if current_ms - last_owner_signal_ms >= interval_ms do
+      notify_progress(owner, ref)
+      current_ms
+    else
+      last_owner_signal_ms
+    end
+  end
+
+  defp progress_interval_ms(%Config{} = config) do
+    max(1, div(Config.stream_timeout(config), 2))
+  end
+
+  defp visible_chunk?(%ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg), do: delta_captured?(text, trace_cfg)
+  defp visible_chunk?(%ReqLLM.StreamChunk{type: :thinking, text: text}, trace_cfg), do: delta_captured?(text, trace_cfg)
+  defp visible_chunk?(_chunk, _trace_cfg), do: false
+
+  defp delta_captured?(text, trace_cfg), do: trace_cfg[:capture_deltas?] == true and is_binary(text) and text != ""
+
+  defp stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms) do
+    []
+    |> Keyword.put(:on_chunk, fn chunk ->
+      note_stream_chunk_activity(chunk, state_key, owner, ref, trace_cfg, heartbeat_interval_ms)
+    end)
+    |> maybe_put_stream_callback(trace_cfg, :on_result, fn text ->
+      emit_stream_delta(state_key, owner, ref, :content, text)
+    end)
+    |> maybe_put_stream_callback(trace_cfg, :on_thinking, fn text ->
+      emit_stream_delta(state_key, owner, ref, :thinking, text)
+    end)
+  end
+
+  defp maybe_put_stream_callback(opts, trace_cfg, callback_key, callback_fun) do
+    case trace_cfg[:capture_deltas?] do
+      true -> Keyword.put(opts, callback_key, callback_fun)
+      _ -> opts
+    end
+  end
+
+  defp emit_stream_delta(_state_key, _owner, _ref, _chunk_type, text) when text in [nil, ""], do: :ok
+
+  defp emit_stream_delta(state_key, owner, ref, chunk_type, text) do
+    update_stream_state(state_key, fn
+      %State{} = current_state ->
+        {next_state, _} =
+          emit_event(current_state, owner, ref, :llm_delta, %{chunk_type: chunk_type, delta: text})
+
+        next_state
+
+      other ->
+        other
+    end)
+
+    :ok
+  end
+
+  defp stream_state_key(ref), do: {__MODULE__, :stream_state, ref}
+  defp stream_signal_key(ref), do: {__MODULE__, :stream_signal, ref}
+
+  defp note_stream_chunk_activity(chunk, state_key, owner, ref, trace_cfg, heartbeat_interval_ms) do
+    case current_stream_state(state_key, nil) do
+      %State{} = current_state -> check_cancel!(current_state, ref)
+      _ -> :ok
+    end
+
+    last_owner_signal_ms = Process.get(stream_signal_key(ref), monotonic_ms())
+
+    last_owner_signal_ms =
+      maybe_note_owner_signal(
+        visible_chunk?(chunk, trace_cfg),
+        owner,
+        ref,
+        last_owner_signal_ms,
+        heartbeat_interval_ms
+      )
+
+    Process.put(stream_signal_key(ref), last_owner_signal_ms)
+    :ok
+  end
+
+  defp current_stream_state(state_key, default) do
+    Process.get(state_key, default)
+  end
+
+  defp update_stream_state(state_key, update_fun) when is_function(update_fun, 1) do
+    current_state = Process.get(state_key)
+    next_state = update_fun.(current_state)
+    Process.put(state_key, next_state)
+    next_state
+  end
+
   defp maybe_redact_args(arguments, %Config{} = config) do
     case config.observability[:redact_tool_args?] do
       true -> Jido.AI.Observe.sanitize_sensitive(arguments)
@@ -823,6 +914,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp request_stream_cancel(%{cancel_sent?: true} = state, _reason), do: state
 
   defp request_stream_cancel(%{pid: pid, ref: ref} = state, reason) when is_pid(pid) do
+    state =
+      state
+      |> maybe_capture_stream_control()
+      |> invoke_stream_cancel()
+
     case Process.alive?(pid) do
       true -> send(pid, {:react_cancel, ref, reason})
       _ -> :ok
@@ -831,7 +927,75 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     Map.put(state, :cancel_sent?, true)
   end
 
-  defp request_stream_cancel(state, _reason), do: state
+  defp request_stream_cancel(state, _reason) do
+    state
+    |> maybe_capture_stream_control()
+    |> invoke_stream_cancel()
+    |> Map.put(:cancel_sent?, true)
+  end
+
+  defp announce_stream_control(owner, ref, stream_response) do
+    case stream_cancel_fun(stream_response) do
+      cancel_fun when is_function(cancel_fun, 0) ->
+        send(owner, {:react_runner, ref, :stream_control, %{cancel: cancel_fun}})
+
+      _ ->
+        :ok
+    end
+
+    :ok
+  end
+
+  defp apply_stream_control(state, %{cancel: cancel_fun}) when is_function(cancel_fun, 0) do
+    %{state | stream_cancel: cancel_fun}
+  end
+
+  defp apply_stream_control(state, _control), do: state
+
+  defp maybe_capture_stream_control(%{stream_cancel: cancel_fun} = state) when is_function(cancel_fun, 0), do: state
+
+  defp maybe_capture_stream_control(%{ref: ref} = state) do
+    receive do
+      {:react_runner, ^ref, :stream_control, control} ->
+        apply_stream_control(state, control)
+    after
+      @stream_control_wait_ms ->
+        state
+    end
+  end
+
+  defp invoke_stream_cancel(%{stream_cancelled?: true} = state), do: state
+
+  defp invoke_stream_cancel(%{stream_cancel: cancel_fun} = state) when is_function(cancel_fun, 0) do
+    _ = cancel_fun.()
+    %{state | stream_cancelled?: true}
+  rescue
+    _ -> %{state | stream_cancelled?: true}
+  end
+
+  defp invoke_stream_cancel(state), do: state
+
+  defp await_runner_shutdown(%{pid: pid, monitor_ref: monitor_ref}) when is_pid(pid) do
+    case Process.alive?(pid) do
+      true ->
+        receive do
+          {:DOWN, ^monitor_ref, :process, ^pid, _reason} ->
+            :ok
+        after
+          @cleanup_wait_ms ->
+            Process.exit(pid, :kill)
+            :ok
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp await_runner_shutdown(_state), do: :ok
+
+  defp stream_cancel_fun(%{cancel: cancel_fun}) when is_function(cancel_fun, 0), do: cancel_fun
+  defp stream_cancel_fun(_stream_response), do: nil
 
   defp safe_execute_module(module, params, context, opts) do
     Turn.execute_module(module, params, context, opts)
@@ -853,6 +1017,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp normalize_backoff(_), do: 0
 
   defp now_ms, do: System.system_time(:millisecond)
+  defp monotonic_ms, do: System.monotonic_time(:millisecond)
 
   # Tool call maps may arrive with atom or string keys depending on the
   # provider adapter, so we check both.
