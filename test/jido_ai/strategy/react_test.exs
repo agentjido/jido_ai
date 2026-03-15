@@ -25,6 +25,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     def run(%{query: query}, _ctx), do: {:ok, %{results: ["Found: #{query}"]}}
   end
 
+  defmodule TestRequestTransformer do
+    def transform_request(request, _state, _config, _context), do: {:ok, request}
+  end
+
   defp create_agent(opts) do
     %Jido.Agent{
       id: "test-agent",
@@ -77,6 +81,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     test "raises for unsupported request_policy values" do
       assert_raise ArgumentError, ~r/unsupported request_policy/, fn ->
         create_agent(tools: [TestCalculator], request_policy: :queue)
+      end
+    end
+
+    test "raises for invalid request_transformer values" do
+      assert_raise ArgumentError, ~r/Request transformer :not_a_module is not loaded/, fn ->
+        create_agent(tools: [TestCalculator], request_transformer: :not_a_module)
       end
     end
   end
@@ -234,6 +244,91 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                thinking: %{type: :enabled, budget_tokens: 1_024},
                reasoning_effort: :high
              ]
+    end
+
+    test "start applies request-scoped allowed_tools filter to runtime config" do
+      agent = create_agent(tools: [TestCalculator, TestSearch])
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "Search only",
+          request_id: "req_allowed_tools",
+          allowed_tools: ["search"]
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+      state = StratState.get(agent, %{})
+
+      assert Map.keys(state.pending_worker_start.config.tools) == ["search"]
+    end
+
+    test "start applies request-scoped tools override to runtime config" do
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "Use search instead",
+          request_id: "req_tools_override",
+          tools: [TestSearch]
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+      state = StratState.get(agent, %{})
+
+      assert Map.keys(state.pending_worker_start.config.tools) == ["search"]
+      assert state.pending_worker_start.config.request_transformer == nil
+    end
+
+    test "start applies request-scoped request_transformer override to runtime config" do
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "Transform this request",
+          request_id: "req_transformer_override",
+          request_transformer: TestRequestTransformer
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+      state = StratState.get(agent, %{})
+
+      assert state.pending_worker_start.config.request_transformer == TestRequestTransformer
+    end
+
+    test "start applies request-scoped stream timeout override to runtime config" do
+      agent = create_agent(tools: [TestCalculator], stream_receive_timeout_ms: 4_500)
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_timeout_override",
+          stream_timeout_ms: 9_000
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+      state = StratState.get(agent, %{})
+
+      assert state.pending_worker_start.config.stream_timeout_ms == 9_000
+    end
+
+    test "start rejects unknown allowed_tools with request error directive" do
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "bad tool",
+          request_id: "req_bad_allowed_tools",
+          allowed_tools: ["search"]
+        })
+
+      {agent, directives} = ReAct.cmd(agent, [start_instruction], %{})
+
+      assert [%Directive.EmitRequestError{} = directive] = directives
+      assert directive.request_id == "req_bad_allowed_tools"
+      assert directive.reason == :unknown_allowed_tools
+
+      state = StratState.get(agent, %{})
+      assert state.status == :idle
     end
 
     test "start accepts string-key llm_opts maps and normalizes ReqLLM options" do

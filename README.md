@@ -126,6 +126,25 @@ end
 {:ok, result2} = MyApp.Agent.await(request, timeout: 15_000)
 ```
 
+## Request-Scoped ReAct Controls
+
+`ask/3` and `ask_sync/3` can narrow or override the active tool registry for a single run:
+
+```elixir
+{:ok, result} =
+  MyApp.Agent.ask_sync(pid, "Multiply 15 by 23",
+    allowed_tools: ["multiply"],
+    tool_context: %{tenant_id: "acme"},
+    llm_opts: [reasoning_effort: :medium]
+  )
+```
+
+- `allowed_tools:` filters the agent's configured tools by name for one request.
+- `tools:` replaces the tool registry for one request.
+- `request_transformer:` lets you reshape each LLM turn, including dynamic tool gating and structured-output schemas.
+
+For retrieval or classification flows, prefer having tools write `StateOp.SetState` updates and let a `request_transformer` read `context[:state]` to constrain the next turn. That keeps tool exposure, runtime state, and output schemas aligned without scraping message history. See [Standalone ReAct Runtime](guides/user/standalone_react_runtime.md) for the pattern.
+
 Need one-shot text generation without an agent process?
 
 ```elixir

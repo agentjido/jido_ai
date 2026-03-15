@@ -35,6 +35,7 @@ defmodule Jido.AI.Agent do
   - `:stream_timeout_ms` - Stream consumer timeout in ms (default: auto-derived
     from tool_timeout_ms + 60s). How long to wait for events between coordinator
     updates. Increase for agents with slow LLM responses or long tool executions.
+    `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:effect_policy` - Agent-level effect policy (default allow-list)
   - `:strategy_effect_policy` - Optional strategy-level narrowing policy (cannot broaden agent policy)
   - `:runtime_adapter` - Deprecated compatibility flag (delegated ReAct runtime is always enabled)
@@ -42,6 +43,7 @@ defmodule Jido.AI.Agent do
   - `:observability` - Observability options map
   - `:req_http_options` - Base Req HTTP options passed through to ReqLLM calls
   - `:llm_opts` - Additional ReqLLM generation options merged into ReAct LLM calls
+  - `:request_transformer` - Module implementing per-turn ReAct request shaping
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`).
     Must be literal data only — module aliases, atoms, strings, numbers, lists, and maps are permitted.
     Function calls, module attributes (`@attr`), and pinned variables (`^var`) raise `CompileError`.
@@ -236,7 +238,7 @@ defmodule Jido.AI.Agent do
     tool_timeout_ms = Keyword.get(opts, :tool_timeout_ms, 15_000)
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
     tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
-    stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, 0)
+    stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms, 0))
     # ReAct delegation is always enabled; keep runtime_adapter option for compatibility only.
     _runtime_adapter_opt = Keyword.get(opts, :runtime_adapter, true)
     runtime_adapter = true
@@ -252,6 +254,12 @@ defmodule Jido.AI.Agent do
       opts
       |> Keyword.get(:llm_opts, [])
       |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
+    request_transformer =
+      case Keyword.get(opts, :request_transformer) do
+        {:__aliases__, _, _} = alias_ast -> Macro.expand(alias_ast, __CALLER__)
+        other -> other
+      end
 
     agent_effect_policy =
       opts
@@ -309,6 +317,7 @@ defmodule Jido.AI.Agent do
         observability: observability,
         req_http_options: req_http_options,
         llm_opts: llm_opts,
+        request_transformer: request_transformer,
         agent_effect_policy: agent_effect_policy,
         strategy_effect_policy: strategy_effect_policy,
         tool_context: tool_context
@@ -355,7 +364,11 @@ defmodule Jido.AI.Agent do
       ## Options
 
       - `:tool_context` - Additional context map merged with agent's tool_context
-      - `:stream_timeout_ms` - Request-scoped ReAct stream consumer timeout
+      - `:tools` - Request-scoped tool registry override for this run only
+      - `:allowed_tools` - Request-scoped allowlist of tool names
+      - `:request_transformer` - Module implementing per-turn ReAct request shaping
+      - `:stream_timeout_ms` - Request-scoped runtime inactivity timeout.
+        `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:timeout` - Timeout for the underlying cast (default: no timeout)
@@ -413,7 +426,11 @@ defmodule Jido.AI.Agent do
       ## Options
 
       - `:tool_context` - Additional context map merged with agent's tool_context
-      - `:stream_timeout_ms` - Request-scoped ReAct stream consumer timeout
+      - `:tools` - Request-scoped tool registry override for this run only
+      - `:allowed_tools` - Request-scoped allowlist of tool names
+      - `:request_transformer` - Module implementing per-turn ReAct request shaping
+      - `:stream_timeout_ms` - Request-scoped runtime inactivity timeout.
+        `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:timeout` - How long to wait in milliseconds (default: 30_000)

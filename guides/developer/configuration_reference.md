@@ -29,6 +29,7 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
   - `tool_retry_backoff_ms`: `200`
   - `req_http_options`: `[]`
   - `llm_opts`: `[]`
+  - `request_transformer`: `nil`
 
 - CoT (`Jido.AI.CoTAgent`)
   - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
@@ -71,6 +72,7 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
 
 - await timeout: `30_000ms`
 - max retained requests per agent state: `100`
+- request-scoped ReAct overrides: `tools`, `allowed_tools`, `request_transformer`, `tool_context`, `req_http_options`, `llm_opts`
 
 ## Security Defaults
 

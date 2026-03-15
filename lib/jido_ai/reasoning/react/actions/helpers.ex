@@ -2,23 +2,29 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
   @moduledoc false
 
   alias Jido.AI.Reasoning.ReAct.Config
+  alias Jido.AI.Reasoning.ReAct.ToolSelection
 
   @doc """
   Builds runtime ReAct configuration from action params and execution context.
   """
   @spec build_config(map(), map()) :: Config.t()
   def build_config(params, context) do
+    tools = resolve_tools!(params, context)
+
     opts = %{
       model: params[:model] || context[:model] || :fast,
       system_prompt: params[:system_prompt],
-      tools: params[:tools] || context[:tools] || get_in(context, [:plugin_state, :tool_calling, :tools]) || %{},
+      tools: tools,
+      request_transformer:
+        params[:request_transformer] || context[:request_transformer] ||
+          get_in(context, [:plugin_state, :tool_calling, :request_transformer]),
       max_iterations: params[:max_iterations],
       max_tokens: params[:max_tokens],
       temperature: params[:temperature],
       llm_opts: params[:llm_opts],
       llm_timeout_ms: params[:llm_timeout_ms] || params[:timeout_ms],
       req_http_options: params[:req_http_options],
-      stream_timeout_ms: params[:stream_timeout_ms],
+      stream_timeout_ms: Map.get(params, :stream_timeout_ms, Map.get(params, :stream_receive_timeout_ms)),
       tool_timeout_ms: params[:tool_timeout_ms],
       tool_max_retries: params[:tool_max_retries],
       tool_retry_backoff_ms: params[:tool_retry_backoff_ms],
@@ -77,4 +83,42 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
 
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp resolve_tools!(params, context) do
+    base_tools =
+      context[:tools] || get_in(context, [:plugin_state, :tool_calling, :tools]) || %{}
+
+    override_tools = params[:tools]
+
+    allowed_tools =
+      params[:allowed_tools] || context[:allowed_tools] ||
+        get_in(context, [:plugin_state, :tool_calling, :allowed_tools])
+
+    case ToolSelection.resolve(normalize_base_tools!(base_tools), override_tools, allowed_tools) do
+      {:ok, tools} ->
+        tools
+
+      {:error, :invalid_tools} ->
+        raise ArgumentError, "invalid ReAct tools: expected a tool map, module, or list of action modules"
+
+      {:error, :invalid_allowed_tools} ->
+        raise ArgumentError, "invalid ReAct allowed_tools: expected a list of tool names"
+
+      {:error, {:unknown_allowed_tools, unknown}} ->
+        raise ArgumentError, "unknown ReAct allowed_tools: #{Enum.join(unknown, ", ")}"
+
+      {:error, {:invalid_action, module, reason}} ->
+        raise ArgumentError, "invalid ReAct tool #{inspect(module)}: #{inspect(reason)}"
+    end
+  end
+
+  defp normalize_base_tools!(base_tools) do
+    case ToolSelection.normalize_input(base_tools) do
+      {:ok, tools} ->
+        tools
+
+      {:error, _reason} ->
+        raise ArgumentError, "invalid ReAct tools: expected a tool map, module, or list of action modules"
+    end
+  end
 end

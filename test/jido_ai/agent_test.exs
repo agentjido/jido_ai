@@ -41,6 +41,10 @@ defmodule Jido.AI.AgentTest do
     def run(%{query: query}, _ctx), do: {:ok, %{results: ["Found: #{query}"]}}
   end
 
+  defmodule TestRequestTransformer do
+    def transform_request(request, _state, _config, _context), do: {:ok, request}
+  end
+
   # ============================================================================
   # Test Agents Using Agent Macro
   # ============================================================================
@@ -97,6 +101,20 @@ defmodule Jido.AI.AgentTest do
       name: "agent_with_stream_timeout",
       tools: [TestCalculator],
       stream_timeout_ms: 123_456
+  end
+
+  defmodule AgentWithRequestTransformer do
+    use Jido.AI.Agent,
+      name: "agent_with_request_transformer",
+      tools: [TestCalculator],
+      request_transformer: TestRequestTransformer
+  end
+
+  defmodule AgentWithStreamTimeoutAlias do
+    use Jido.AI.Agent,
+      name: "agent_with_stream_timeout_alias",
+      tools: [TestCalculator],
+      stream_timeout_ms: 45_000
   end
 
   # ============================================================================
@@ -234,6 +252,23 @@ defmodule Jido.AI.AgentTest do
       config = state[:config]
 
       assert config.stream_timeout_ms == 123_456
+    end
+
+    test "request_transformer is forwarded into strategy config" do
+      agent = AgentWithRequestTransformer.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.request_transformer == TestRequestTransformer
+    end
+
+    test "stream_timeout_ms alias is forwarded into strategy config" do
+      agent = AgentWithStreamTimeoutAlias.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.stream_timeout_ms == 45_000
+      assert config.stream_receive_timeout_ms == 45_000
     end
 
     test "tools list resolves module aliases" do

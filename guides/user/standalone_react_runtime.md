@@ -51,6 +51,7 @@ config = Jido.AI.Reasoning.ReAct.build_config(%{
   tool_choice: :auto,
   llm_opts: [thinking: %{type: :enabled, budget_tokens: 2048}, reasoning_effort: :high],
   req_http_options: [receive_timeout: 60_000],
+  request_transformer: MyApp.DynamicRequestTransformer,
 
   # Tool execution
   tool_timeout_ms: 15_000,
@@ -107,6 +108,45 @@ When ReAct is used through `Jido.AI.Agent`, this key is injected automatically. 
 you can pass it through `stream/3` or `start/3` opts (`context: %{state: ...}`).
 
 If this key is present, ReAct refreshes it between tool rounds using allowed `StateOp` effects in tool-call order.
+
+## Dynamic Request Shaping
+
+`request_transformer` is the seam for classifier and retrieval flows where each LLM turn needs a different tool set or output schema.
+
+```elixir
+defmodule MyApp.DynamicRequestTransformer do
+  def transform_request(request, _state, _config, runtime_context) do
+    seen_codes = get_in(runtime_context, [:state, :seen_codes]) || []
+
+    case seen_codes do
+      [] ->
+        {:ok, %{tools: request.tools}}
+
+      codes ->
+        {:ok,
+         %{
+           tools: %{},
+           llm_opts: [
+             provider_options: [
+               response_schema: %{
+                 type: "object",
+                 properties: %{code: %{enum: codes}}
+               }
+             ]
+           ]
+         }}
+    end
+  end
+end
+```
+
+Typical pattern:
+
+- First turn exposes retrieval tools.
+- Retrieval tools write constrained IDs into `context[:state]` with `Jido.Agent.StateOp.SetState`.
+- Later turns disable tools and inject a schema derived from that runtime state.
+
+This keeps the LLM-visible tool list, the executable tool registry, and the structured-output contract aligned inside one run.
 
 ## Run To Completion
 
@@ -193,7 +233,7 @@ token = result.final_token
 MyApp.Repo.insert!(%MyApp.Checkpoint{token: token, run_id: handle.run_id})
 
 # 3. Later: resume from the token
-#    Config MUST match the original (same model, tools, system_prompt) —
+#    Config MUST match the original (same model, tools, system_prompt, request_transformer) —
 #    the token includes a config fingerprint that is verified on decode.
 {:ok, resumed} = ReAct.continue(token, config)
 resumed_result = ReAct.collect_stream(resumed.events)
@@ -300,7 +340,7 @@ Symptom:
 
 Fix:
 - The config you pass to `continue/3` must match the config used when the token was issued. The token encodes a SHA-256 fingerprint of model, system prompt, max iterations, streaming flag, tool execution settings, and tool names.
-- Verify you are passing the same `model`, `system_prompt`, `tools`, `max_iterations`, `streaming`, and `tool_exec` settings.
+- Verify you are passing the same `model`, `system_prompt`, `tools`, `request_transformer`, `max_iterations`, `streaming`, and `tool_exec` settings.
 
 ## Failure Mode: Token Expired
 

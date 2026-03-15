@@ -67,9 +67,63 @@ end
 # Per-request overrides
 {:ok, req2} =
   MyApp.MathAgent.ask(pid, "Explain how you solved that",
+    allowed_tools: ["add_numbers"],
+    tool_context: %{tenant_id: "acme"},
     llm_opts: [reasoning_effort: :medium]
   )
 ```
+
+## Optional: Shape ReAct Requests Per Turn
+
+Use `request_transformer` when the next LLM turn should depend on runtime state produced by earlier tools.
+
+```elixir
+defmodule MyApp.ClassifierTransformer do
+  def transform_request(request, _state, _config, runtime_context) do
+    seen_codes = get_in(runtime_context, [:state, :seen_codes]) || []
+
+    case seen_codes do
+      [] ->
+        {:ok, %{tools: request.tools}}
+
+      codes ->
+        {:ok,
+         %{
+           tools: %{},
+           llm_opts: [
+             provider_options: [
+               response_schema: %{
+                 type: "object",
+                 properties: %{code: %{enum: codes}}
+               }
+             ]
+           ]
+         }}
+    end
+  end
+end
+
+defmodule MyApp.ClassifierAgent do
+  use Jido.AI.Agent,
+    name: "classifier_agent",
+    model: :capable,
+    tools: [MyApp.Actions.FindSimilarCodes],
+    request_transformer: MyApp.ClassifierTransformer
+end
+```
+
+Then let your retrieval tool write the allowlist into runtime state:
+
+```elixir
+{:ok, %{seen_codes: codes},
+ [
+   %Jido.Agent.StateOp.SetState{
+     attrs: %{seen_codes: codes}
+   }
+ ]}
+```
+
+This pattern is the clean way to implement "show only the IDs the model has seen" flows. Prefer runtime state plus `request_transformer` over parsing thread history.
 
 ## Optional: Set Tool Context At Runtime
 

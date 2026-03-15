@@ -153,7 +153,11 @@ defmodule Jido.AI.Request do
   ## Options
 
   - `:tool_context` - Additional context merged with agent's tool_context
-  - `:stream_timeout_ms` - Request-scoped ReAct stream consumer timeout
+  - `:tools` - ReAct-only request-scoped tool registry override for this run
+  - `:allowed_tools` - ReAct-only request-scoped allowlist of tool names
+  - `:request_transformer` - ReAct-only module implementing per-turn request shaping
+  - `:stream_timeout_ms` - ReAct-only request-scoped runtime inactivity timeout.
+    `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
   - `:request_id` - Custom request ID (auto-generated if not provided)
@@ -177,7 +181,10 @@ defmodule Jido.AI.Request do
     signal_type = Keyword.fetch!(opts, :signal_type)
     source = Keyword.fetch!(opts, :source)
     tool_context = Keyword.get(opts, :tool_context, %{})
-    stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms)
+    tools = Keyword.get(opts, :tools)
+    allowed_tools = Keyword.get(opts, :allowed_tools)
+    request_transformer = Keyword.get(opts, :request_transformer)
+    stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms))
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
@@ -187,6 +194,9 @@ defmodule Jido.AI.Request do
     payload =
       %{query: query, prompt: query, request_id: request_id}
       |> maybe_add_tool_context(tool_context)
+      |> maybe_add_tools(tools)
+      |> maybe_add_allowed_tools(allowed_tools)
+      |> maybe_add_request_transformer(request_transformer)
       |> maybe_add_stream_timeout_ms(stream_timeout_ms)
       |> maybe_add_req_http_options(req_http_options)
       |> maybe_add_llm_opts(llm_opts)
@@ -523,6 +533,20 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_stream_timeout_ms(payload, _), do: payload
+
+  defp maybe_add_tools(payload, nil), do: payload
+  defp maybe_add_tools(payload, tools), do: Map.put(payload, :tools, tools)
+
+  defp maybe_add_allowed_tools(payload, allowed_tools) when is_list(allowed_tools) do
+    Map.put(payload, :allowed_tools, allowed_tools)
+  end
+
+  defp maybe_add_allowed_tools(payload, _), do: payload
+
+  defp maybe_add_request_transformer(payload, nil), do: payload
+
+  defp maybe_add_request_transformer(payload, request_transformer),
+    do: Map.put(payload, :request_transformer, request_transformer)
 
   defp maybe_add_req_http_options(payload, req_http_options)
        when is_list(req_http_options) and req_http_options != [] do

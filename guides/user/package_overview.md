@@ -23,6 +23,7 @@ After this guide, you should be able to explain the package in a prioritized way
 - Under the hood it uses `Jido.AI.Reasoning.ReAct.Strategy`.
 - It is built for tool use through a ReAct loop (reason, call tool, continue).
 - It supports request handles and async orchestration (`ask/await/ask_sync`).
+- ReAct requests can narrow tools per run with `allowed_tools` or fully override them with `tools`.
 - It uses standardized lifecycle and runtime contracts (`ai.request.*`, `ai.llm.*`, `ai.tool.*`).
 
 If your production workload needs reliable tool-calling agents, this is the default entry point.
@@ -68,7 +69,7 @@ ToT flexibility controls exposed at the agent macro level:
 - `top_k`, `min_depth`, `max_nodes`, `max_duration_ms`, `beam_width`
 - `early_success_threshold`, `convergence_window`, `min_score_improvement`
 - `max_parse_retries`
-- `tools`, `tool_context`, `tool_timeout_ms`, `tool_max_retries`, `tool_retry_backoff_ms`, `max_tool_round_trips`
+- `tools`, `tool_context`, `request_transformer`, `tool_timeout_ms`, `tool_max_retries`, `tool_retry_backoff_ms`, `max_tool_round_trips`
 
 ## Priority 3: Skills System (`SKILL.md` / skills.io-aligned workflow)
 

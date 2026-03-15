@@ -16,6 +16,16 @@ After this guide, you will use request handles (`ask/await`) and collect multipl
 {:ok, r2} = MyApp.MathAgent.await(req2)
 ```
 
+Per-request ReAct overrides travel with the request handle:
+
+```elixir
+{:ok, req3} =
+  MyApp.MathAgent.ask(pid, "Search only",
+    allowed_tools: ["search"],
+    tool_context: %{tenant_id: "acme"}
+  )
+```
+
 ## Runtime Contract Map
 
 - `Jido.AI.Request`: request handles, `await/2`, `await_many/2`, request state lifecycle.

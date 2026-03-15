@@ -23,6 +23,10 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
     def run(_params, _context), do: {:ok, :ok}
   end
 
+  defmodule RequestTransformer do
+    def transform_request(request, _state, _config, _context), do: {:ok, request}
+  end
+
   describe "build_config/2" do
     test "uses params over context and resolves model alias" do
       params = %{
@@ -68,9 +72,38 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
       assert config.llm.max_tokens == 4_096
     end
 
+    test "uses request_transformer from params or context" do
+      config_from_params = Helpers.build_config(%{request_transformer: RequestTransformer}, %{})
+      config_from_context = Helpers.build_config(%{}, %{request_transformer: RequestTransformer})
+
+      assert config_from_params.request_transformer == RequestTransformer
+      assert config_from_context.request_transformer == RequestTransformer
+    end
+
+    test "filters context tools with allowed_tools" do
+      config =
+        Helpers.build_config(
+          %{allowed_tools: [ToolB.name()]},
+          %{tools: [ToolA, ToolB]}
+        )
+
+      assert config.tools == %{ToolB.name() => ToolB}
+    end
+
+    test "raises for unknown allowed_tools" do
+      assert_raise ArgumentError, ~r/unknown ReAct allowed_tools: missing_tool/, fn ->
+        Helpers.build_config(%{allowed_tools: ["missing_tool"]}, %{tools: [ToolA]})
+      end
+    end
+
     test "respects legacy timeout_ms fallback into llm timeout" do
       config = Helpers.build_config(%{timeout_ms: 999}, %{})
       assert config.llm.timeout_ms == 999
+    end
+
+    test "accepts stream_receive_timeout_ms alias into runtime config" do
+      config = Helpers.build_config(%{stream_receive_timeout_ms: 1_234}, %{})
+      assert config.stream_timeout_ms == 1_234
     end
 
     test "forwards stream_timeout_ms into runtime config" do
