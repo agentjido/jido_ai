@@ -60,6 +60,10 @@ defmodule Mix.Tasks.JidoAi do
 
   @supported_types ~w(react aot cod cot tot got trm adaptive)
   @supported_formats ~w(text json)
+  @no_query_error """
+                  No query provided. Pass a prompt (mix jido_ai "<prompt>") or use --stdin for batch mode.
+                  """
+                  |> String.trim()
 
   @option_strict [
     type: :string,
@@ -110,20 +114,13 @@ defmodule Mix.Tasks.JidoAi do
       attach_trace_handlers()
     end
 
-    cond do
-      config.stdin ->
+    case validate_invocation(args, config) do
+      :ok ->
         start_jido_instance(JidoAi.CliJido)
         run_non_interactive(args, config)
 
-      Enum.empty?(args) ->
-        output_fatal_error(
-          config,
-          "No query provided. Pass a prompt (mix jido_ai \"<prompt>\") or use --stdin for batch mode."
-        )
-
-      true ->
-        start_jido_instance(JidoAi.CliJido)
-        run_non_interactive(args, config)
+      {:error, reason} ->
+        output_fatal_error(config, reason)
     end
   end
 
@@ -162,6 +159,14 @@ defmodule Mix.Tasks.JidoAi do
   def validate_format(format) do
     {:error, "Unsupported --format #{inspect(format)}. Supported formats: text, json"}
   end
+
+  @doc false
+  @spec validate_invocation([String.t()], map()) :: :ok | {:error, String.t()}
+  def validate_invocation(_args, %{stdin: true}), do: :ok
+
+  def validate_invocation([], _config), do: {:error, @no_query_error}
+
+  def validate_invocation(_args, _config), do: :ok
 
   defp run_non_interactive(args, config) do
     case resolve_adapter_and_agent(config) do

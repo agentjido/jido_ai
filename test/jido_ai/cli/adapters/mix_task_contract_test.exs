@@ -118,4 +118,15 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
       assert message =~ "text, json"
     end
   end
+
+  describe "validate_invocation/2" do
+    test "rejects empty invocations unless stdin mode is enabled" do
+      assert {:error, message} = JidoAiTask.validate_invocation([], %{stdin: false})
+      assert message =~ "No query provided"
+      assert message =~ "use --stdin"
+
+      assert :ok = JidoAiTask.validate_invocation([], %{stdin: true})
+      assert :ok = JidoAiTask.validate_invocation(["hello"], %{stdin: false})
+    end
+  end
 end
