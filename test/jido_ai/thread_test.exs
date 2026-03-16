@@ -5,6 +5,7 @@ defmodule Jido.AI.ContextTest do
 
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Context.Entry
+  alias ReqLLM.Message.ContentPart
 
   # ============================================================================
   # Thread Creation
@@ -149,6 +150,20 @@ defmodule Jido.AI.ContextTest do
       assert entry.name == "calculator"
       assert entry.content == ~s({"result": 3})
     end
+
+    test "accepts tool result content parts" do
+      parts = [
+        ContentPart.text(~s({"result": 3})),
+        ContentPart.image_url("https://example.com/chart.png")
+      ]
+
+      thread =
+        AIContext.new()
+        |> AIContext.append_tool_result("tc_1", "calculator", parts)
+
+      [entry] = thread.entries
+      assert entry.content == parts
+    end
   end
 
   describe "append/2" do
@@ -221,6 +236,23 @@ defmodule Jido.AI.ContextTest do
       assert Enum.at(messages, 4).role == :assistant
       assert Enum.at(messages, 5).role == :tool
       assert Enum.at(messages, 6).role == :assistant
+    end
+
+    test "projects multimodal tool results without collapsing content parts" do
+      parts = [
+        ContentPart.text(~s({"result": 4})),
+        ContentPart.image_url("https://example.com/chart.png")
+      ]
+
+      thread =
+        AIContext.new()
+        |> AIContext.append_user("What is 2+2?")
+        |> AIContext.append_assistant("", [%{id: "tc_1", name: "calc", arguments: %{}}])
+        |> AIContext.append_tool_result("tc_1", "calc", parts)
+
+      messages = AIContext.to_messages(thread)
+
+      assert %{role: :tool, tool_call_id: "tc_1", name: "calc", content: ^parts} = Enum.at(messages, 2)
     end
 
     test "respects limit option" do
@@ -545,6 +577,33 @@ defmodule Jido.AI.ContextTest do
       assert assistant.tool_calls == [%{id: "tc_1", name: "calc"}]
       assert tool.tool_call_id == "tc_1"
       assert tool.name == "calc"
+    end
+
+    test "preserves multimodal tool results when importing messages" do
+      parts = [
+        %{"type" => "text", "text" => ~s({"result": 42})},
+        %{"type" => "image_url", "url" => "https://example.com/chart.png"}
+      ]
+
+      messages = [
+        %{role: :tool, tool_call_id: "tc_1", name: "calc", content: parts}
+      ]
+
+      thread = AIContext.new() |> AIContext.append_messages(messages)
+
+      [entry] = thread.entries
+
+      assert [
+               %ContentPart{type: :text, text: ~s({"result": 42})},
+               %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
+             ] = entry.content
+
+      [projected] = AIContext.to_messages(thread)
+
+      assert [
+               %ContentPart{type: :text, text: ~s({"result": 42})},
+               %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
+             ] = projected.content
     end
   end
 

@@ -2,6 +2,7 @@ defmodule Jido.AI.TurnExecutionTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Turn
+  alias ReqLLM.Message.ContentPart
 
   # Define test Action modules
   defmodule TestActions.Calculator do
@@ -313,6 +314,22 @@ defmodule Jido.AI.TurnExecutionTest do
       assert Turn.format_tool_result_content({:ok, 42}) == "42"
       assert Turn.format_tool_result_content({:error, %{message: "boom"}}) == "boom"
       assert Turn.format_tool_result_content({:error, :badarg}) == ":badarg"
+    end
+
+    test "normalizes map content parts into multimodal tool content" do
+      assert [
+               %ContentPart{type: :text, text: "{\"value\":1}"},
+               %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
+             ] =
+               Turn.format_tool_result_content(
+                 {:ok,
+                  %{
+                    "value" => 1,
+                    "__content_parts__" => [
+                      %{"type" => "image_url", "url" => "https://example.com/chart.png"}
+                    ]
+                  }}
+               )
     end
   end
 

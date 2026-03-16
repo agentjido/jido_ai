@@ -16,6 +16,8 @@ defmodule Jido.AI.Turn do
   alias Jido.Action.Error.TimeoutError
   alias Jido.Action.Tool, as: ActionTool
   alias ReqLLM.Context
+  alias ReqLLM.Message.ContentPart
+  alias ReqLLM.ToolResult
 
   require Logger
 
@@ -27,10 +29,12 @@ defmodule Jido.AI.Turn do
 
   @default_timeout 30_000
 
+  @type tool_result_content :: String.t() | [ContentPart.t()]
+
   @type tool_result :: %{
           id: String.t(),
           name: String.t(),
-          content: String.t(),
+          content: tool_result_content(),
           raw_result: execute_result()
         }
 
@@ -326,14 +330,28 @@ defmodule Jido.AI.Turn do
   end
 
   @doc """
-  Formats a raw tool execution result to string content suitable for tool messages.
+  Formats a raw tool execution result into tool message content.
   """
-  @spec format_tool_result_content(execute_result() | {:ok, term()} | {:error, term()}) :: String.t()
+  @spec format_tool_result_content(execute_result() | {:ok, term()} | {:error, term()}) :: tool_result_content()
   def format_tool_result_content({:ok, result, _effects}), do: format_tool_result_content({:ok, result})
   def format_tool_result_content({:error, error, _effects}), do: format_tool_result_content({:error, error})
 
+  def format_tool_result_content({:ok, %ToolResult{} = result}),
+    do: normalize_tool_result_output(result.content, result.output)
+
   def format_tool_result_content({:ok, result}) when is_binary(result), do: result
-  def format_tool_result_content({:ok, result}) when is_map(result) or is_list(result), do: encode_or_inspect(result)
+
+  def format_tool_result_content({:ok, result}) when is_list(result) do
+    if content_parts_list?(result), do: normalize_content_parts(result), else: encode_or_inspect(result)
+  end
+
+  def format_tool_result_content({:ok, result}) when is_map(result) do
+    case extract_content_parts_result(result) do
+      {:ok, output, parts} -> normalize_tool_result_output(parts, output)
+      :error -> encode_or_inspect(result)
+    end
+  end
+
   def format_tool_result_content({:ok, result}), do: inspect(result)
 
   def format_tool_result_content({:error, error}) when is_map(error) do
@@ -747,7 +765,134 @@ defmodule Jido.AI.Turn do
     _ -> inspect(value)
   end
 
+  defp extract_content_parts_result(%{} = result) do
+    case get_field(result, :__content_parts__) do
+      parts when is_list(parts) ->
+        clean_result =
+          result
+          |> Map.delete(:__content_parts__)
+          |> Map.delete("__content_parts__")
+
+        {:ok, empty_map_to_nil(clean_result), normalize_content_parts(parts)}
+
+      _ ->
+        :error
+    end
+  end
+
+  defp extract_content_parts_result(_), do: :error
+
+  defp normalize_tool_result_output(content, output) do
+    parts = normalize_content_parts(content)
+    encoded_output = maybe_encode_tool_result_output(output)
+
+    cond do
+      parts == [] and is_nil(encoded_output) -> ""
+      parts == [] -> encoded_output
+      is_nil(encoded_output) -> parts
+      true -> [ContentPart.text(encoded_output) | parts]
+    end
+  end
+
+  defp maybe_encode_tool_result_output(nil), do: nil
+  defp maybe_encode_tool_result_output(%{} = map) when map_size(map) == 0, do: nil
+  defp maybe_encode_tool_result_output(output), do: encode_or_inspect(output)
+
+  defp normalize_content_parts(parts) when is_list(parts) do
+    Enum.flat_map(parts, fn
+      %ContentPart{} = part ->
+        [part]
+
+      text when is_binary(text) ->
+        [ContentPart.text(text)]
+
+      %{type: type} = part ->
+        case normalize_content_part_map(type, part) do
+          nil -> [ContentPart.text(inspect(part))]
+          normalized -> [normalized]
+        end
+
+      %{"type" => type} = part ->
+        case normalize_content_part_map(type, part) do
+          nil -> [ContentPart.text(inspect(part))]
+          normalized -> [normalized]
+        end
+
+      other ->
+        [ContentPart.text(inspect(other))]
+    end)
+  end
+
+  defp normalize_content_parts(content) when is_binary(content), do: [ContentPart.text(content)]
+  defp normalize_content_parts(nil), do: []
+  defp normalize_content_parts(other), do: [ContentPart.text(inspect(other))]
+
+  defp normalize_content_part_map(type, part) when type in [:text, "text"] do
+    text = get_field(part, :text)
+    metadata = get_field(part, :metadata, %{})
+    if is_binary(text), do: ContentPart.text(text, metadata), else: nil
+  end
+
+  defp normalize_content_part_map(type, part) when type in [:thinking, "thinking"] do
+    text = get_field(part, :thinking) || get_field(part, :text)
+    metadata = get_field(part, :metadata, %{})
+    if is_binary(text), do: ContentPart.thinking(text, metadata), else: nil
+  end
+
+  defp normalize_content_part_map(type, part) when type in [:image_url, "image_url"] do
+    url = get_field(part, :url)
+    metadata = get_field(part, :metadata, %{})
+    if is_binary(url), do: ContentPart.image_url(url, metadata), else: nil
+  end
+
+  defp normalize_content_part_map(type, part) when type in [:image, "image"] do
+    data = get_field(part, :data)
+    media_type = get_field(part, :media_type, "image/png")
+    metadata = get_field(part, :metadata, %{})
+
+    cond do
+      is_binary(data) and metadata == %{} -> ContentPart.image(data, media_type)
+      is_binary(data) -> ContentPart.image(data, media_type, metadata)
+      true -> nil
+    end
+  end
+
+  defp normalize_content_part_map(type, part) when type in [:file, "file"] do
+    data = get_field(part, :data)
+    filename = get_field(part, :filename)
+    media_type = get_field(part, :media_type, "application/octet-stream")
+
+    if is_binary(data) and is_binary(filename) do
+      ContentPart.file(data, filename, media_type)
+    else
+      nil
+    end
+  end
+
+  defp normalize_content_part_map(_, _), do: nil
+
+  defp content_parts_list?(parts) when is_list(parts) and parts != [] do
+    Enum.all?(parts, fn
+      %ContentPart{} -> true
+      %{type: type} when type in [:text, :thinking, :image_url, :image, :file] -> true
+      %{"type" => type} when type in ["text", "thinking", "image_url", "image", "file"] -> true
+      _ -> false
+    end)
+  end
+
+  defp content_parts_list?(_), do: false
+
+  defp empty_map_to_nil(%{} = map) when map_size(map) == 0, do: nil
+  defp empty_map_to_nil(value), do: value
+
   defp normalize_tool_result_content(content, _raw_result) when is_binary(content), do: content
+
+  defp normalize_tool_result_content(content, _raw_result) when is_list(content) do
+    if content_parts_list?(content),
+      do: normalize_content_parts(content),
+      else: format_tool_result_content({:ok, content})
+  end
+
   defp normalize_tool_result_content(nil, raw_result), do: format_tool_result_content(raw_result)
   defp normalize_tool_result_content(_content, raw_result), do: format_tool_result_content(raw_result)
 
