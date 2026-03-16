@@ -178,7 +178,8 @@ defmodule JidoAi.MixProject do
         {"Upgrading", ~r/guides\/user\/migration_plugins_and_signals_v3\.md/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|directives_runtime_contract|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
-        {"Reference", ~r/guides\/developer\/(actions_catalog|configuration_reference|thread_context_projection_model)\.md/}
+        {"Reference",
+         ~r/guides\/developer\/(actions_catalog|configuration_reference|thread_context_projection_model)\.md/}
       ],
       groups_for_modules: [
         Core: [
