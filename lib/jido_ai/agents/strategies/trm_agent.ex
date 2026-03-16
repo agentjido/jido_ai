@@ -91,7 +91,12 @@ defmodule Jido.AI.TRMAgent do
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
     description = Keyword.get(opts, :description, "TRM agent #{name}")
-    model = Keyword.get(opts, :model, @default_model)
+
+    model =
+      opts
+      |> Keyword.get(:model, @default_model)
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
     max_supervision_steps = Keyword.get(opts, :max_supervision_steps, @default_max_supervision_steps)
     act_threshold = Keyword.get(opts, :act_threshold, @default_act_threshold)
     plugins = Keyword.get(opts, :plugins, [])
@@ -109,7 +114,7 @@ defmodule Jido.AI.TRMAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.any() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(Macro.escape(model))),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),

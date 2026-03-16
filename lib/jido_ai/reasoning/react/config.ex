@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   Canonical configuration for the Task-based ReAct runtime.
   """
 
-  alias Jido.AI.ModelAliases
+  alias Jido.AI.ModelInput
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.ToolAdapter
   require Logger
@@ -56,7 +56,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
             __MODULE__,
             %{
               version: Zoi.integer() |> Zoi.default(1),
-              model: Zoi.string(description: "Resolved model spec"),
+              model: Zoi.any(description: "Resolved ReqLLM model input"),
               system_prompt: Zoi.string() |> Zoi.nullish(),
               tools: Zoi.map() |> Zoi.default(%{}),
               request_transformer: Zoi.atom() |> Zoi.nullish(),
@@ -87,7 +87,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @spec new(map() | keyword()) :: t()
   def new(opts \\ %{}) do
     opts_map = normalize_opts(opts)
-    resolved_model = opts_map |> get_opt(:model, @default_model) |> resolve_model()
+    resolved_model = opts_map |> get_opt(:model, @default_model) |> ModelInput.normalize!()
     provider_opt_keys_by_string = provider_opt_keys_by_string(resolved_model)
 
     tools =
@@ -169,7 +169,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
     parts = [
       "v#{config.version}",
-      config.model,
+      ModelInput.fingerprint_segment(config.model),
       config.system_prompt || "",
       Integer.to_string(config.max_iterations),
       to_string(config.streaming),
@@ -244,10 +244,6 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     normalized_overrides = normalize_llm_opts(overrides, provider_opt_keys_by_string)
     maybe_merge_llm_opts(base_opts, normalized_overrides)
   end
-
-  defp resolve_model(model) when is_binary(model), do: model
-  defp resolve_model(model) when is_atom(model), do: ModelAliases.resolve_model(model)
-  defp resolve_model(_), do: ModelAliases.resolve_model(@default_model)
 
   defp normalize_opts(opts) when is_list(opts), do: Map.new(opts)
   defp normalize_opts(opts) when is_map(opts), do: opts
@@ -419,18 +415,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     end
   end
 
-  defp provider_opt_keys_by_string(model_spec) when is_binary(model_spec) do
-    with {:ok, model} <- ReqLLM.model(model_spec),
-         {:ok, provider_mod} <- ReqLLM.provider(model.provider),
-         true <- function_exported?(provider_mod, :provider_schema, 0) do
-      provider_mod.provider_schema().schema
-      |> Keyword.keys()
-      |> Enum.map(&{Atom.to_string(&1), &1})
-      |> Map.new()
-    else
-      _ -> %{}
-    end
-  end
+  defp provider_opt_keys_by_string(model_spec), do: ModelInput.provider_opt_keys(model_spec)
 
   defp maybe_merge_llm_opts(opts, llm_opts) when is_list(llm_opts) do
     if llm_opts == [] do

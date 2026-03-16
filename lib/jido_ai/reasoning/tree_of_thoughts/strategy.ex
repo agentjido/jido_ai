@@ -888,13 +888,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     }
   end
 
-  defp resolve_model_spec(model) when is_atom(model) do
-    Jido.AI.resolve_model(model)
-  end
-
-  defp resolve_model_spec(model) when is_binary(model) do
-    model
-  end
+  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
 
   defp normalize_tools_modules(modules) when is_list(modules) do
     modules

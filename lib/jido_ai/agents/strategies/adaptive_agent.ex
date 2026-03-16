@@ -102,7 +102,12 @@ defmodule Jido.AI.AdaptiveAgent do
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
     description = Keyword.get(opts, :description, "Adaptive agent #{name}")
-    model = Keyword.get(opts, :model, @default_model)
+
+    model =
+      opts
+      |> Keyword.get(:model, @default_model)
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
     has_tools_opt? = Keyword.has_key?(opts, :tools)
     tools_ast = Keyword.get(opts, :tools, [])
 
@@ -139,7 +144,7 @@ defmodule Jido.AI.AdaptiveAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.any() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(Macro.escape(model))),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),

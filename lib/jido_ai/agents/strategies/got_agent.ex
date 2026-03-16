@@ -95,7 +95,12 @@ defmodule Jido.AI.GoTAgent do
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
     description = Keyword.get(opts, :description, "GoT agent #{name}")
-    model = Keyword.get(opts, :model, @default_model)
+
+    model =
+      opts
+      |> Keyword.get(:model, @default_model)
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
     max_nodes = Keyword.get(opts, :max_nodes, @default_max_nodes)
     max_depth = Keyword.get(opts, :max_depth, @default_max_depth)
     aggregation_strategy = Keyword.get(opts, :aggregation_strategy, @default_aggregation_strategy)
@@ -127,7 +132,7 @@ defmodule Jido.AI.GoTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.any() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(Macro.escape(model))),
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
           last_prompt: Zoi.string() |> Zoi.default(""),
