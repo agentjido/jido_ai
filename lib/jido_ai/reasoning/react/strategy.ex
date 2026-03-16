@@ -407,10 +407,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       @start ->
         run_context = Map.get(params, :tool_context) || %{}
         run_req_http_options = params |> Map.get(:req_http_options, []) |> normalize_req_http_options()
+        run_llm_opts = Map.get(params, :llm_opts, [])
 
         agent
         |> set_run_tool_context(run_context)
         |> set_run_req_http_options(run_req_http_options)
+        |> set_run_llm_opts(run_llm_opts)
         |> process_start(params)
 
       @cancel ->
@@ -470,7 +472,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       run_req_http_options = Map.get(state, :run_req_http_options, [])
       base_req_http_options = normalize_req_http_options(config[:base_req_http_options])
       effective_req_http_options = base_req_http_options ++ run_req_http_options
-      runtime_config = runtime_config_from_strategy(config, req_http_options: effective_req_http_options)
+      run_llm_opts = Map.get(state, :run_llm_opts, [])
+      base_llm_opts = config[:base_llm_opts] || []
+      effective_llm_opts = Keyword.merge(base_llm_opts, run_llm_opts)
+      runtime_config = runtime_config_from_strategy(config, req_http_options: effective_req_http_options, llm_opts: effective_llm_opts)
       base_thread = strategy_thread(state, config)
       run_thread = Thread.append_user(base_thread, query)
       runtime_state = runtime_state_from_thread(run_thread, query, request_id, run_id)
@@ -985,6 +990,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       max_iterations: config[:max_iterations],
       streaming: config[:streaming],
       req_http_options: req_http_options,
+      llm_opts: Keyword.get(opts, :llm_opts, config[:base_llm_opts] || []),
       tool_timeout_ms: config[:tool_timeout_ms],
       tool_max_retries: config[:tool_max_retries],
       tool_retry_backoff_ms: config[:tool_retry_backoff_ms],
@@ -1006,6 +1012,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     state = StratState.get(agent, %{})
     put_strategy_state(agent, Map.put(state, :run_req_http_options, req_http_options))
   end
+
+  defp set_run_llm_opts(agent, llm_opts) when is_list(llm_opts) do
+    state = StratState.get(agent, %{})
+    put_strategy_state(agent, Map.put(state, :run_llm_opts, llm_opts))
+  end
+
+  defp set_run_llm_opts(agent, _), do: agent
 
   defp normalize_action({inner, _meta}), do: normalize_action(inner)
   defp normalize_action(action), do: action
@@ -1198,7 +1211,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         ),
       agent_id: agent.id,
       base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt,
-      base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options()
+      base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options(),
+      base_llm_opts: opts |> Keyword.get(:llm_opts, [])
     }
   end
 

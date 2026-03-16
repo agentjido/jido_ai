@@ -17,7 +17,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
                 temperature: Zoi.number() |> Zoi.default(0.2),
                 timeout_ms: Zoi.integer() |> Zoi.nullish(),
                 tool_choice: Zoi.any() |> Zoi.default(:auto),
-                req_http_options: Zoi.list(Zoi.any()) |> Zoi.default([])
+                req_http_options: Zoi.list(Zoi.any()) |> Zoi.default([]),
+                llm_opts: Zoi.list(Zoi.any()) |> Zoi.default([])
               })
 
   @tool_exec_schema Zoi.object(%{
@@ -90,7 +91,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       temperature: normalize_float(get_opt(opts_map, :temperature, 0.2), 0.2),
       timeout_ms: normalize_optional_pos_integer(llm_timeout),
       tool_choice: get_opt(opts_map, :tool_choice, :auto),
-      req_http_options: normalize_req_http_options(get_opt(opts_map, :req_http_options, []))
+      req_http_options: normalize_req_http_options(get_opt(opts_map, :req_http_options, [])),
+      llm_opts: normalize_llm_opts(get_opt(opts_map, :llm_opts, []))
     }
 
     tool_exec = %{
@@ -194,6 +196,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       tools: reqllm_tools(config)
     ]
 
+    opts = maybe_merge_llm_opts(opts, config.llm.llm_opts)
     opts = maybe_put_req_http_options(opts, config.llm.req_http_options)
 
     if is_integer(config.llm.timeout_ms) do
@@ -270,6 +273,15 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
   defp normalize_req_http_options(value) when is_list(value), do: value
   defp normalize_req_http_options(_), do: []
+
+  defp normalize_llm_opts(value) when is_list(value), do: value
+  defp normalize_llm_opts(_), do: []
+
+  defp maybe_merge_llm_opts(opts, llm_opts) when is_list(llm_opts) and llm_opts != [] do
+    Keyword.merge(opts, llm_opts)
+  end
+
+  defp maybe_merge_llm_opts(opts, _), do: opts
 
   defp maybe_put_req_http_options(opts, req_http_options) when is_list(req_http_options) do
     if req_http_options == [] do
