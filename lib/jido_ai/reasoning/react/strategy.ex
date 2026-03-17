@@ -567,7 +567,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             context_ref,
             %{role: :user, content: query},
             request_id,
-            run_id
+            run_id,
+            nil,
+            Map.get(params, :extra_refs, %{})
           )
 
         worker_start_payload = %{
@@ -1022,7 +1024,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
          %{} = message,
          request_id,
          run_id,
-         signal_id \\ nil
+         signal_id,
+         extra_refs \\ %{}
        ) do
     payload =
       message
@@ -1038,6 +1041,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         run_id: run_id
       }
       |> maybe_put_ref(:signal_id, signal_id)
+      |> Map.merge(extra_refs)
 
     append_core_thread_entry(agent, state, :ai_message, payload, refs)
   end

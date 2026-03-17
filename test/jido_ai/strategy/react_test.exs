@@ -1197,6 +1197,31 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert Enum.all?(ai_messages, fn entry -> entry.payload.context_ref == "default" end)
     end
 
+    test "extra_refs in params are merged into user message entry refs" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.start_action(), %{
+              query: "hello",
+              request_id: "req_extra_refs",
+              extra_refs: %{slack_ts: "1234.001", custom_id: "abc"}
+            })
+          ],
+          %{}
+        )
+
+      core_thread = ThreadAgent.get(agent)
+      [user_entry] = Thread.filter_by_kind(core_thread, :ai_message)
+
+      assert user_entry.payload.role == :user
+      assert user_entry.refs.request_id == "req_extra_refs"
+      assert user_entry.refs.slack_ts == "1234.001"
+      assert user_entry.refs.custom_id == "abc"
+    end
+
     test "init with initial context from agent.state" do
       initial_context =
         Jido.AI.Context.new(system_prompt: "Restored")
