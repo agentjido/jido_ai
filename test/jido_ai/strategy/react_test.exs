@@ -1197,19 +1197,39 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert Enum.all?(ai_messages, fn entry -> entry.payload.context_ref == "default" end)
     end
 
-    test "extra_refs in params are merged into user message entry refs" do
+    test "start action normalization preserves extra_refs" do
+      normalized =
+        Jido.Agent.Strategy.normalize_instruction(
+          ReAct,
+          instruction(ReAct.start_action(), %{
+            query: "hello",
+            request_id: "req_extra_refs",
+            extra_refs: %{slack_ts: "1234.001", custom_id: "abc"}
+          }),
+          %{}
+        )
+
+      assert normalized.params.extra_refs == %{slack_ts: "1234.001", custom_id: "abc"}
+    end
+
+    test "extra_refs in normalized params are merged into user message entry refs" do
       agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        Jido.Agent.Strategy.normalize_instruction(
+          ReAct,
+          instruction(ReAct.start_action(), %{
+            query: "hello",
+            request_id: "req_extra_refs",
+            extra_refs: %{slack_ts: "1234.001", custom_id: "abc"}
+          }),
+          %{}
+        )
 
       {agent, [_spawn]} =
         ReAct.cmd(
           agent,
-          [
-            instruction(ReAct.start_action(), %{
-              query: "hello",
-              request_id: "req_extra_refs",
-              extra_refs: %{slack_ts: "1234.001", custom_id: "abc"}
-            })
-          ],
+          [start_instruction],
           %{}
         )
 
@@ -1220,6 +1240,36 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert user_entry.refs.request_id == "req_extra_refs"
       assert user_entry.refs.slack_ts == "1234.001"
       assert user_entry.refs.custom_id == "abc"
+    end
+
+    test "extra_refs cannot override reserved thread entry refs" do
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        Jido.Agent.Strategy.normalize_instruction(
+          ReAct,
+          instruction(ReAct.start_action(), %{
+            query: "hello",
+            request_id: "req_reserved_refs",
+            extra_refs: %{
+              request_id: "req_override",
+              run_id: "run_override",
+              signal_id: "sig_override",
+              slack_ts: "1234.002"
+            }
+          }),
+          %{}
+        )
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      core_thread = ThreadAgent.get(agent)
+      [user_entry] = Thread.filter_by_kind(core_thread, :ai_message)
+
+      assert user_entry.refs.request_id == "req_reserved_refs"
+      assert user_entry.refs.run_id == "req_reserved_refs"
+      refute Map.has_key?(user_entry.refs, :signal_id)
+      assert user_entry.refs.slack_ts == "1234.002"
     end
 
     test "init with initial context from agent.state" do

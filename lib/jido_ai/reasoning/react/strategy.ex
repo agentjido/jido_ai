@@ -176,7 +176,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           stream_receive_timeout_ms: Zoi.integer() |> Zoi.optional(),
           stream_timeout_ms: Zoi.integer() |> Zoi.optional(),
           req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
-          llm_opts: Zoi.any() |> Zoi.optional()
+          llm_opts: Zoi.any() |> Zoi.optional(),
+          extra_refs: Zoi.map() |> Zoi.optional()
         }),
       doc: "Start a delegated ReAct conversation with a user query",
       name: "ai.react.start"
@@ -1036,12 +1037,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       |> Map.new()
 
     refs =
-      %{
+      extra_refs
+      |> sanitize_extra_refs()
+      |> Map.merge(%{
         request_id: request_id,
         run_id: run_id
-      }
+      })
       |> maybe_put_ref(:signal_id, signal_id)
-      |> Map.merge(extra_refs)
 
     append_core_thread_entry(agent, state, :ai_message, payload, refs)
   end
@@ -1196,6 +1198,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp maybe_put_ref(refs, _key, nil), do: refs
   defp maybe_put_ref(refs, key, value), do: Map.put(refs, key, value)
+
+  defp sanitize_extra_refs(extra_refs) when is_map(extra_refs) do
+    Map.drop(extra_refs, [:request_id, :run_id, :signal_id])
+  end
+
+  defp sanitize_extra_refs(_extra_refs), do: %{}
 
   defp fetch_map_value(%{} = map, key) when is_atom(key) do
     Map.get(map, key, Map.get(map, Atom.to_string(key)))
