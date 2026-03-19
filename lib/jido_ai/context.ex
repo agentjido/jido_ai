@@ -55,10 +55,11 @@ defmodule Jido.AI.Context do
             tool_calls: list() | nil,
             tool_call_id: String.t() | nil,
             name: String.t() | nil,
-            timestamp: DateTime.t() | nil
+            timestamp: DateTime.t() | nil,
+            refs: map() | nil
           }
 
-    defstruct [:role, :content, :thinking, :reasoning_details, :tool_calls, :tool_call_id, :name, :timestamp]
+    defstruct [:role, :content, :thinking, :reasoning_details, :tool_calls, :tool_call_id, :name, :timestamp, :refs]
   end
 
   @doc """
@@ -95,9 +96,10 @@ defmodule Jido.AI.Context do
   @doc """
   Append a user message to the thread.
   """
-  @spec append_user(t(), String.t()) :: t()
-  def append_user(thread, content) when is_binary(content) do
-    append(thread, %Entry{role: :user, content: content})
+  @spec append_user(t(), String.t(), keyword()) :: t()
+  def append_user(thread, content, opts \\ []) when is_binary(content) do
+    refs = Keyword.get(opts, :refs)
+    append(thread, %Entry{role: :user, content: content, refs: refs})
   end
 
   @doc """
@@ -107,13 +109,15 @@ defmodule Jido.AI.Context do
   def append_assistant(thread, content, tool_calls \\ nil, opts \\ []) do
     thinking = Keyword.get(opts, :thinking)
     reasoning_details = Keyword.get(opts, :reasoning_details)
+    refs = Keyword.get(opts, :refs)
 
     append(thread, %Entry{
       role: :assistant,
       content: content,
       tool_calls: tool_calls,
       thinking: thinking,
-      reasoning_details: reasoning_details
+      reasoning_details: reasoning_details,
+      refs: refs
     })
   end
 
@@ -381,8 +385,9 @@ defmodule Jido.AI.Context do
 
   # Private helpers
 
-  defp entry_to_message(%Entry{role: :user, content: content}) do
+  defp entry_to_message(%Entry{role: :user, content: content, refs: refs}) do
     %{role: :user, content: content}
+    |> maybe_add(:refs, refs)
   end
 
   defp entry_to_message(%Entry{
@@ -390,10 +395,12 @@ defmodule Jido.AI.Context do
          content: content,
          thinking: thinking,
          reasoning_details: reasoning_details,
-         tool_calls: nil
+         tool_calls: nil,
+         refs: refs
        }) do
     %{role: :assistant, content: build_assistant_content(content, thinking)}
     |> maybe_add(:reasoning_details, reasoning_details)
+    |> maybe_add(:refs, refs)
   end
 
   defp entry_to_message(%Entry{
@@ -401,18 +408,22 @@ defmodule Jido.AI.Context do
          content: content,
          thinking: thinking,
          reasoning_details: reasoning_details,
-         tool_calls: tool_calls
+         tool_calls: tool_calls,
+         refs: refs
        }) do
     %{role: :assistant, content: build_assistant_content(content || "", thinking), tool_calls: tool_calls}
     |> maybe_add(:reasoning_details, reasoning_details)
+    |> maybe_add(:refs, refs)
   end
 
-  defp entry_to_message(%Entry{role: :tool, tool_call_id: id, name: name, content: content}) do
+  defp entry_to_message(%Entry{role: :tool, tool_call_id: id, name: name, content: content, refs: refs}) do
     %{role: :tool, tool_call_id: id, name: name, content: content}
+    |> maybe_add(:refs, refs)
   end
 
-  defp entry_to_message(%Entry{role: :system, content: content}) do
+  defp entry_to_message(%Entry{role: :system, content: content, refs: refs}) do
     %{role: :system, content: content}
+    |> maybe_add(:refs, refs)
   end
 
   # Preserve non-canonical roles from imported histories instead of crashing.
@@ -422,6 +433,7 @@ defmodule Jido.AI.Context do
     |> maybe_add(:tool_call_id, entry.tool_call_id)
     |> maybe_add(:tool_calls, entry.tool_calls)
     |> maybe_add(:reasoning_details, entry.reasoning_details)
+    |> maybe_add(:refs, entry.refs)
   end
 
   defp build_assistant_content(content, nil), do: content

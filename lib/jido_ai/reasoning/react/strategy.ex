@@ -556,7 +556,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           )
 
         base_context = strategy_context(state, config)
-        run_context = AIContext.append_user(base_context, query)
+        extra_refs = Map.get(params, :extra_refs, %{})
+        run_context = AIContext.append_user(base_context, query, refs: normalize_refs(extra_refs))
         runtime_state = runtime_state_from_context(run_context, query, request_id, run_id)
         context_ref = Map.get(state, :active_context_ref, @default_context_ref)
 
@@ -569,7 +570,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             request_id,
             run_id,
             nil,
-            Map.get(params, :extra_refs, %{})
+            extra_refs
           )
 
         worker_start_payload = %{
@@ -1111,19 +1112,23 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
            :ai_message <- fetch_map_value(entry, :kind),
            payload when is_map(payload) <- fetch_map_value(entry, :payload),
            ^context_ref <- fetch_map_value(payload, :context_ref) do
-        apply_projected_ai_message(acc, payload)
+        refs = fetch_map_value(entry, :refs)
+        apply_projected_ai_message(acc, payload, refs)
       else
         _ -> acc
       end
     end)
   end
 
-  defp apply_projected_ai_message(%AIContext{} = context, payload) do
+  defp apply_projected_ai_message(%AIContext{} = context, payload, refs) do
     case normalize_message_role(fetch_map_value(payload, :role)) do
       :user ->
         case fetch_map_value(payload, :content) do
-          content when is_binary(content) -> AIContext.append_user(context, content)
-          _ -> context
+          content when is_binary(content) ->
+            AIContext.append_user(context, content, refs: normalize_refs(refs))
+
+          _ ->
+            context
         end
 
       :assistant ->
@@ -1131,6 +1136,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_calls = fetch_map_value(payload, :tool_calls)
         thinking = fetch_map_value(payload, :thinking)
         opts = if is_binary(thinking) and thinking != "", do: [thinking: thinking], else: []
+        opts = Keyword.put(opts, :refs, normalize_refs(refs))
         AIContext.append_assistant(context, normalize_content(content), normalize_optional_list(tool_calls), opts)
 
       :tool ->
@@ -1222,6 +1228,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_content(value) when is_binary(value), do: value
   defp normalize_content(nil), do: ""
   defp normalize_content(value), do: inspect(value)
+
+  defp normalize_refs(refs) when is_map(refs) and map_size(refs) > 0, do: refs
+  defp normalize_refs(_), do: nil
 
   defp process_worker_child_started(agent, %{tag: tag, pid: pid}) when is_pid(pid) do
     state = StratState.get(agent, %{})

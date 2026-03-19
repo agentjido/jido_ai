@@ -1242,6 +1242,35 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert user_entry.refs.custom_id == "abc"
     end
 
+    test "extra_refs appear in run context messages sent to LLM" do
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        Jido.Agent.Strategy.normalize_instruction(
+          ReAct,
+          instruction(ReAct.start_action(), %{
+            query: "hello",
+            request_id: "req_ctx_refs",
+            extra_refs: %{slack_ts: "1234.001"}
+          }),
+          %{}
+        )
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [start_instruction],
+          %{}
+        )
+
+      run_context = agent.state.__strategy__.run_context
+      messages = Jido.AI.Context.to_messages(run_context)
+
+      user_msg = Enum.find(messages, &(&1.role == :user))
+      assert user_msg != nil
+      assert user_msg.refs == %{slack_ts: "1234.001"}
+    end
+
     test "extra_refs cannot override reserved thread entry refs" do
       agent = create_agent(tools: [TestCalculator])
 
