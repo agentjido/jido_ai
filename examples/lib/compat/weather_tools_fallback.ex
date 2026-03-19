@@ -63,10 +63,9 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.Geocode) do
         rescue
           error ->
             {:error,
-             Error.execution_error("Geocoding HTTP error: #{Exception.message(error)}", %{
-               type: :geocode_http_error,
-               reason: error
-             })}
+             Error.execution_error("Geocoding HTTP error: #{Exception.message(error)}",
+               details: %{type: :geocode_http_error, reason: error}
+             )}
         end
       end
     end
@@ -86,19 +85,16 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.Geocode) do
 
     defp transform_result(200, [], location) do
       {:error,
-       Error.execution_error("No geocoding results found for location: #{location}", %{
-         type: :geocode_no_results,
-         reason: %{location: location}
-       })}
+       Error.execution_error("No geocoding results found for location: #{location}",
+         details: %{type: :geocode_no_results, reason: %{location: location}}
+       )}
     end
 
     defp transform_result(status, body, _location) do
       {:error,
-       Error.execution_error("Geocoding API error (#{status})", %{
-         type: :geocode_request_failed,
-         status: status,
-         reason: %{status: status, body: body}
-       })}
+       Error.execution_error("Geocoding API error (#{status})",
+         details: %{type: :geocode_request_failed, status: status, reason: %{status: status, body: body}}
+       )}
     end
 
     defp parse_coordinate(value) when is_binary(value) do
@@ -188,10 +184,9 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.LocationToGrid) do
         rescue
           error ->
             {:error,
-             Error.execution_error("HTTP error fetching grid location: #{Exception.message(error)}", %{
-               type: :location_to_grid_http_error,
-               reason: error
-             })}
+             Error.execution_error("HTTP error fetching grid location: #{Exception.message(error)}",
+               details: %{type: :location_to_grid_http_error, reason: error}
+             )}
         end
       end
     end
@@ -221,11 +216,9 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.LocationToGrid) do
 
     defp transform_result(%{response: %{status: status, body: body}}) do
       {:error,
-       Error.execution_error("NWS API error (#{status})", %{
-         type: :location_to_grid_request_failed,
-         status: status,
-         reason: %{status: status, body: body}
-       })}
+       Error.execution_error("NWS API error (#{status})",
+         details: %{type: :location_to_grid_request_failed, status: status, reason: %{status: status, body: body}}
+       )}
     end
 
     defp apply_deadline_timeout(req_options, context) do
@@ -317,10 +310,9 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.Forecast) do
         rescue
           error ->
             {:error,
-             Error.execution_error("HTTP error fetching forecast: #{Exception.message(error)}", %{
-               type: :forecast_http_error,
-               reason: error
-             })}
+             Error.execution_error("HTTP error fetching forecast: #{Exception.message(error)}",
+               details: %{type: :forecast_http_error, reason: error}
+             )}
         end
       end
     end
@@ -347,11 +339,9 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.Forecast) do
 
     defp transform_result(%{response: %{status: status, body: body}}) do
       {:error,
-       Error.execution_error("NWS forecast API error (#{status})", %{
-         type: :forecast_request_failed,
-         status: status,
-         reason: %{status: status, body: body}
-       })}
+       Error.execution_error("NWS forecast API error (#{status})",
+         details: %{type: :forecast_request_failed, status: status, reason: %{status: status, body: body}}
+       )}
     end
 
     defp format_summary_periods(periods) do
@@ -514,11 +504,9 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.HourlyForecast) do
 
     defp transform_result(%{response: %{status: status, body: body}}) do
       {:error,
-       Error.execution_error("NWS hourly forecast API error (#{status})", %{
-         type: :hourly_forecast_request_failed,
-         status: status,
-         reason: %{status: status, body: body}
-       })}
+       Error.execution_error("NWS hourly forecast API error (#{status})",
+         details: %{type: :hourly_forecast_request_failed, status: status, reason: %{status: status, body: body}}
+       )}
     end
 
     defp apply_deadline_timeout(req_options, context) do
@@ -618,21 +606,20 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.CurrentConditions) do
 
             %{status: status, body: body} ->
               {:error,
-               Error.execution_error("Failed to get observation stations (#{status})", %{
-                 type: :observation_stations_request_failed,
-                 status: status,
-                 reason: %{status: status, body: body}
-               })}
+               Error.execution_error("Failed to get observation stations (#{status})",
+                 details: %{
+                   type: :observation_stations_request_failed,
+                   status: status,
+                   reason: %{status: status, body: body}
+                 }
+               )}
           end
         rescue
           error ->
             {:error,
              Error.execution_error(
                "HTTP error getting observation stations: #{Exception.message(error)}",
-               %{
-                 type: :observation_stations_http_error,
-                 reason: error
-               }
+               details: %{type: :observation_stations_http_error, reason: error}
              )}
         end
       end
@@ -682,21 +669,20 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.CurrentConditions) do
 
             %{status: status, body: body} ->
               {:error,
-               Error.execution_error("Failed to get current conditions (#{status})", %{
-                 type: :current_conditions_request_failed,
-                 status: status,
-                 reason: %{status: status, body: body}
-               })}
+               Error.execution_error("Failed to get current conditions (#{status})",
+                 details: %{
+                   type: :current_conditions_request_failed,
+                   status: status,
+                   reason: %{status: status, body: body}
+                 }
+               )}
           end
         rescue
           error ->
             {:error,
              Error.execution_error(
                "HTTP error getting current conditions: #{Exception.message(error)}",
-               %{
-                 type: :current_conditions_http_error,
-                 reason: error
-               }
+               details: %{type: :current_conditions_http_error, reason: error}
              )}
         end
       end
@@ -704,10 +690,9 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.CurrentConditions) do
 
     defp get_current_conditions(nil, _context) do
       {:error,
-       Error.execution_error("No observation stations available", %{
-         type: :observation_stations_empty,
-         reason: :no_observation_stations
-       })}
+       Error.execution_error("No observation stations available",
+         details: %{type: :observation_stations_empty, reason: :no_observation_stations}
+       )}
     end
 
     defp format_measurement(%{"value" => nil}), do: nil

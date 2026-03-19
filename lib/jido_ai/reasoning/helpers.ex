@@ -549,12 +549,12 @@ defmodule Jido.AI.Reasoning.Helpers do
   end
 
   defp apply_instruction_result({:error, reason}, %Agent{} = agent) do
-    error = Jido.Error.execution_error("Instruction failed", %{reason: reason})
+    error = Jido.Error.execution_error("Instruction failed", details: %{reason: reason})
     {agent, [%Jido.Agent.Directive.Error{error: error, context: :instruction}]}
   end
 
   defp apply_instruction_result({:error, reason, _}, %Agent{} = agent) do
-    error = Jido.Error.execution_error("Instruction failed", %{reason: reason})
+    error = Jido.Error.execution_error("Instruction failed", details: %{reason: reason})
     {agent, [%Jido.Agent.Directive.Error{error: error, context: :instruction}]}
   end
 
