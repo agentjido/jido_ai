@@ -63,9 +63,10 @@ defmodule Jido.AI.Examples.Tools.Weather.ByLocation do
 
   defp resolve_location(location, _context) do
     {:error,
-     Error.execution_error("Location must be a string",
-       details: %{type: :invalid_location_type, reason: %{location: location}}
-     )}
+     Error.execution_error("Location must be a string", %{
+       type: :invalid_location_type,
+       reason: %{location: location}
+     })}
   end
 
   defp geocode_location(location, context) do
@@ -80,15 +81,17 @@ defmodule Jido.AI.Examples.Tools.Weather.ByLocation do
 
       {:ok, geocode_result} ->
         {:error,
-         Error.execution_error("Geocode result did not include coordinates",
-           details: %{type: :geocode_coordinates_missing, reason: geocode_result}
-         )}
+         Error.execution_error("Geocode result did not include coordinates", %{
+           type: :geocode_coordinates_missing,
+           reason: geocode_result
+         })}
 
       {:error, reason} ->
         {:error,
-         Error.execution_error("Failed to geocode location: #{error_message(reason)}",
-           details: %{type: :geocode_failed, reason: reason}
-         )}
+         Error.execution_error("Failed to geocode location: #{error_message(reason)}", %{
+           type: :geocode_failed,
+           reason: reason
+         })}
     end
   end
 
@@ -104,9 +107,10 @@ defmodule Jido.AI.Examples.Tools.Weather.ByLocation do
 
       {:error, reason} ->
         {:error,
-         Error.execution_error("Failed to get grid info: #{error_message(reason)}",
-           details: %{type: :grid_lookup_failed, reason: reason}
-         )}
+         Error.execution_error("Failed to get grid info: #{error_message(reason)}", %{
+           type: :grid_lookup_failed,
+           reason: reason
+         })}
     end
   end
 
@@ -128,9 +132,10 @@ defmodule Jido.AI.Examples.Tools.Weather.ByLocation do
 
       {:error, reason} ->
         {:error,
-         Error.execution_error("Failed to get forecast: #{error_message(reason)}",
-           details: %{type: :forecast_fetch_failed, reason: reason}
-         )}
+         Error.execution_error("Failed to get forecast: #{error_message(reason)}", %{
+           type: :forecast_fetch_failed,
+           reason: reason
+         })}
     end
   end
 
