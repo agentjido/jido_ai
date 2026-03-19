@@ -124,9 +124,10 @@ defmodule Jido.AI.Context do
   @doc """
   Append a tool result to the thread.
   """
-  @spec append_tool_result(t(), String.t(), String.t(), String.t() | [ContentPart.t()]) :: t()
-  def append_tool_result(thread, tool_call_id, name, content) do
-    append(thread, %Entry{role: :tool, tool_call_id: tool_call_id, name: name, content: content})
+  @spec append_tool_result(t(), String.t(), String.t(), String.t() | [ContentPart.t()], keyword()) :: t()
+  def append_tool_result(thread, tool_call_id, name, content, opts \\ []) do
+    refs = Keyword.get(opts, :refs)
+    append(thread, %Entry{role: :tool, tool_call_id: tool_call_id, name: name, content: content, refs: refs})
   end
 
   @doc """
@@ -459,7 +460,8 @@ defmodule Jido.AI.Context do
       reasoning_details: get_field(msg, :reasoning_details, "reasoning_details"),
       tool_calls: get_field(msg, :tool_calls, "tool_calls"),
       tool_call_id: get_field(msg, :tool_call_id, "tool_call_id"),
-      name: get_field(msg, :name, "name")
+      name: get_field(msg, :name, "name"),
+      refs: normalize_entry_refs(get_field(msg, :refs, "refs"))
     }
   end
 
@@ -611,9 +613,13 @@ defmodule Jido.AI.Context do
       tool_calls: get_field(entry, :tool_calls),
       tool_call_id: get_field(entry, :tool_call_id),
       name: get_field(entry, :name),
-      timestamp: get_field(entry, :timestamp)
+      timestamp: get_field(entry, :timestamp),
+      refs: normalize_entry_refs(get_field(entry, :refs))
     }
   end
+
+  defp normalize_entry_refs(refs) when is_map(refs) and map_size(refs) > 0, do: refs
+  defp normalize_entry_refs(_refs), do: nil
 
   defp generate_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
