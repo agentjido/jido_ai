@@ -556,7 +556,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           )
 
         base_context = strategy_context(state, config)
-        run_context = AIContext.append_user(base_context, query)
+        extra_refs = Map.get(params, :extra_refs, %{})
+        run_context = AIContext.append_user(base_context, query, refs: normalize_refs(extra_refs))
         runtime_state = runtime_state_from_context(run_context, query, request_id, run_id)
         context_ref = Map.get(state, :active_context_ref, @default_context_ref)
 
@@ -569,7 +570,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             request_id,
             run_id,
             nil,
-            Map.get(params, :extra_refs, %{})
+            extra_refs
           )
 
         worker_start_payload = %{
@@ -1111,19 +1112,23 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
            :ai_message <- fetch_map_value(entry, :kind),
            payload when is_map(payload) <- fetch_map_value(entry, :payload),
            ^context_ref <- fetch_map_value(payload, :context_ref) do
-        apply_projected_ai_message(acc, payload)
+        refs = fetch_map_value(entry, :refs)
+        apply_projected_ai_message(acc, payload, refs)
       else
         _ -> acc
       end
     end)
   end
 
-  defp apply_projected_ai_message(%AIContext{} = context, payload) do
+  defp apply_projected_ai_message(%AIContext{} = context, payload, refs) do
     case normalize_message_role(fetch_map_value(payload, :role)) do
       :user ->
         case fetch_map_value(payload, :content) do
-          content when is_binary(content) -> AIContext.append_user(context, content)
-          _ -> context
+          content when is_binary(content) ->
+            AIContext.append_user(context, content, refs: normalize_refs(refs))
+
+          _ ->
+            context
         end
 
       :assistant ->
@@ -1131,6 +1136,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_calls = fetch_map_value(payload, :tool_calls)
         thinking = fetch_map_value(payload, :thinking)
         opts = if is_binary(thinking) and thinking != "", do: [thinking: thinking], else: []
+        opts = Keyword.put(opts, :refs, normalize_refs(refs))
         AIContext.append_assistant(context, normalize_content(content), normalize_optional_list(tool_calls), opts)
 
       :tool ->
@@ -1140,7 +1146,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
               context,
               tool_call_id,
               name,
-              normalize_content(fetch_map_value(payload, :content))
+              normalize_content(fetch_map_value(payload, :content)),
+              refs: normalize_refs(refs)
             )
 
           _ ->
@@ -1222,6 +1229,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_content(value) when is_binary(value), do: value
   defp normalize_content(nil), do: ""
   defp normalize_content(value), do: inspect(value)
+
+  defp normalize_refs(refs) when is_map(refs) and map_size(refs) > 0, do: refs
+  defp normalize_refs(_), do: nil
 
   defp process_worker_child_started(agent, %{tag: tag, pid: pid}) when is_pid(pid) do
     state = StratState.get(agent, %{})
@@ -1394,11 +1404,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             }
           end)
 
+        refs = runtime_event_refs(event, request_id)
+
         updated =
           base_state
           |> Map.put(:status, if(turn_type == :tool_calls, do: :awaiting_tool, else: :completed))
           |> Map.put(:pending_tool_calls, pending_tool_calls)
-          |> append_assistant_to_run_context(turn_type, text, tool_calls, thinking_content, reasoning_details)
+          |> append_assistant_to_run_context(turn_type, text, tool_calls, thinking_content, reasoning_details, refs)
           |> Map.update(:usage, usage || %{}, fn existing -> merge_usage(existing, usage || %{}) end)
           |> maybe_append_thinking_trace(thinking_content)
           |> maybe_put_result(turn_type, text)
@@ -1429,12 +1441,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_name = event_field(data, :tool_name, event_field(event, :tool_name, ""))
         tool_result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
 
+        refs = runtime_event_refs(event, request_id)
+
         updated =
           base_state
           |> Map.update(:pending_tool_calls, [], fn pending ->
             Enum.map(pending, fn tc -> if tc.id == tool_call_id, do: %{tc | result: tool_result}, else: tc end)
           end)
-          |> append_tool_result_to_run_context(tool_call_id, tool_name, tool_result)
+          |> append_tool_result_to_run_context(tool_call_id, tool_name, tool_result, refs)
 
         signal = Signal.ToolResult.new!(%{call_id: tool_call_id, tool_name: tool_name, result: tool_result})
         {updated, [signal]}
@@ -1737,7 +1751,15 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp append_assistant_to_run_context(state, turn_type, text, tool_calls, thinking_content, reasoning_details) do
+  defp append_assistant_to_run_context(
+         state,
+         turn_type,
+         text,
+         tool_calls,
+         thinking_content,
+         reasoning_details,
+         refs
+       ) do
     context = Map.get(state, :run_context) || Map.get(state, :context)
 
     case context do
@@ -1748,6 +1770,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           []
           |> maybe_put_assistant_context_opt(:thinking, thinking_content)
           |> maybe_put_assistant_context_opt(:reasoning_details, reasoning_details)
+          |> maybe_put_assistant_context_opt(:refs, normalize_refs(refs))
 
         Map.put(state, :run_context, AIContext.append_assistant(context, text, assistant_tool_calls, assistant_opts))
 
@@ -1756,13 +1779,18 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp append_tool_result_to_run_context(state, tool_call_id, tool_name, tool_result) do
+  defp append_tool_result_to_run_context(state, tool_call_id, tool_name, tool_result, refs) do
     context = Map.get(state, :run_context) || Map.get(state, :context)
 
     case context do
       %AIContext{} = context when is_binary(tool_call_id) and is_binary(tool_name) ->
         content = Turn.format_tool_result_content(tool_result)
-        Map.put(state, :run_context, AIContext.append_tool_result(context, tool_call_id, tool_name, content))
+
+        Map.put(
+          state,
+          :run_context,
+          AIContext.append_tool_result(context, tool_call_id, tool_name, content, refs: normalize_refs(refs))
+        )
 
       _ ->
         state
@@ -1772,6 +1800,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp maybe_put_assistant_context_opt(opts, _key, nil), do: opts
   defp maybe_put_assistant_context_opt(opts, _key, ""), do: opts
   defp maybe_put_assistant_context_opt(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp runtime_event_refs(event, fallback_request_id) do
+    %{}
+    |> maybe_put_ref(:request_id, event_field(event, :request_id, fallback_request_id))
+    |> maybe_put_ref(:run_id, event_field(event, :run_id, fallback_request_id))
+    |> maybe_put_ref(:signal_id, event_field(event, :id))
+    |> normalize_refs()
+  end
 
   defp commit_run_context(state) do
     case Map.get(state, :run_context) do

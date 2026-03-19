@@ -539,7 +539,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert history == [
                %{role: :user, content: "Who am I?"},
-               %{role: :assistant, content: "You asked who you are.", reasoning_details: reasoning_details},
+               %{
+                 role: :assistant,
+                 content: "You asked who you are.",
+                 reasoning_details: reasoning_details,
+                 refs: %{request_id: "req_turn_1", run_id: "req_turn_1", signal_id: "evt_2"}
+               },
                %{role: :user, content: "What did I just ask?"}
              ]
     end
@@ -576,7 +581,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert conversation == [
                %{role: :user, content: "Track this"},
-               %{role: :assistant, content: "Tracked"}
+               %{
+                 role: :assistant,
+                 content: "Tracked",
+                 refs: %{request_id: "req_snap", run_id: "req_snap", signal_id: "evt_2"}
+               }
              ]
     end
 
@@ -1240,6 +1249,80 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert user_entry.refs.request_id == "req_extra_refs"
       assert user_entry.refs.slack_ts == "1234.001"
       assert user_entry.refs.custom_id == "abc"
+    end
+
+    test "extra_refs appear in run context messages sent to LLM" do
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        Jido.Agent.Strategy.normalize_instruction(
+          ReAct,
+          instruction(ReAct.start_action(), %{
+            query: "hello",
+            request_id: "req_ctx_refs",
+            extra_refs: %{slack_ts: "1234.001"}
+          }),
+          %{}
+        )
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [start_instruction],
+          %{}
+        )
+
+      run_context = agent.state.__strategy__.run_context
+      messages = Jido.AI.Context.to_messages(run_context)
+
+      user_msg = Enum.find(messages, &(&1.role == :user))
+      assert user_msg != nil
+      assert user_msg.refs == %{slack_ts: "1234.001"}
+    end
+
+    test "runtime assistant and tool messages retain refs in run context" do
+      agent = create_agent(tools: [TestCalculator])
+
+      start_instruction =
+        Jido.Agent.Strategy.normalize_instruction(
+          ReAct,
+          instruction(ReAct.start_action(), %{
+            query: "hello",
+            request_id: "req_runtime_refs"
+          }),
+          %{}
+        )
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      events = [
+        runtime_event(:llm_completed, "req_runtime_refs", 2, %{
+          turn_type: :tool_calls,
+          text: "",
+          thinking_content: nil,
+          reasoning_details: nil,
+          tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{operation: "add", a: 1, b: 2}}],
+          usage: %{}
+        }),
+        runtime_event(:tool_completed, "req_runtime_refs", 3, %{
+          tool_call_id: "tc_1",
+          tool_name: "calculator",
+          result: {:ok, %{result: 3}, []}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_runtime_refs", event: event})], %{})
+        end)
+
+      messages = Jido.AI.Context.to_messages(agent.state.__strategy__.run_context)
+
+      assistant_msg = Enum.find(messages, &(&1.role == :assistant))
+      tool_msg = Enum.find(messages, &(&1.role == :tool))
+
+      assert assistant_msg.refs == %{request_id: "req_runtime_refs", run_id: "req_runtime_refs", signal_id: "evt_2"}
+      assert tool_msg.refs == %{request_id: "req_runtime_refs", run_id: "req_runtime_refs", signal_id: "evt_3"}
     end
 
     test "extra_refs cannot override reserved thread entry refs" do
