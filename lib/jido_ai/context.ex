@@ -32,6 +32,7 @@ defmodule Jido.AI.Context do
   """
 
   alias __MODULE__.Entry
+  alias ReqLLM.Message.ContentPart
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -48,7 +49,7 @@ defmodule Jido.AI.Context do
 
     @type t :: %__MODULE__{
             role: :user | :assistant | :tool | :system,
-            content: String.t() | nil,
+            content: String.t() | [ContentPart.t()] | nil,
             thinking: String.t() | nil,
             reasoning_details: list() | nil,
             tool_calls: list() | nil,
@@ -119,7 +120,7 @@ defmodule Jido.AI.Context do
   @doc """
   Append a tool result to the thread.
   """
-  @spec append_tool_result(t(), String.t(), String.t(), String.t()) :: t()
+  @spec append_tool_result(t(), String.t(), String.t(), String.t() | [ContentPart.t()]) :: t()
   def append_tool_result(thread, tool_call_id, name, content) do
     append(thread, %Entry{role: :tool, tool_call_id: tool_call_id, name: name, content: content})
   end
@@ -314,7 +315,7 @@ defmodule Jido.AI.Context do
     base = %{role: entry.role}
 
     base
-    |> maybe_add(:content, truncate_string(entry.content, truncate))
+    |> maybe_add(:content, truncate_content(entry.content, truncate))
     |> maybe_add(:tool_calls, format_tool_calls_for_debug(entry.tool_calls))
     |> maybe_add(:name, entry.name)
     |> maybe_add(:tool_call_id, entry.tool_call_id)
@@ -340,6 +341,10 @@ defmodule Jido.AI.Context do
   defp truncate_string(str, max) when byte_size(str) <= max, do: str
   defp truncate_string(str, max), do: String.slice(str, 0, max) <> "..."
 
+  defp truncate_content(nil, _max), do: nil
+  defp truncate_content(content, max) when is_binary(content), do: truncate_string(content, max)
+  defp truncate_content(content, max), do: content |> inspect() |> truncate_string(max)
+
   defp format_entry_for_pp(%Entry{role: :user, content: content}) do
     "[user]   #{content}"
   end
@@ -362,7 +367,7 @@ defmodule Jido.AI.Context do
   end
 
   defp format_entry_for_pp(%Entry{role: :tool, name: name, content: content}) do
-    truncated = truncate_string(content, 60)
+    truncated = truncate_content(content, 60)
     "[tool]   #{name}: #{truncated}"
   end
 
@@ -431,12 +436,13 @@ defmodule Jido.AI.Context do
 
   defp message_to_entry(msg) when is_map(msg) do
     role = get_field(msg, :role, "role")
-    content = get_field(msg, :content, "content")
-    {text_content, thinking} = extract_entry_thinking(content)
+    normalized_role = normalize_role(role)
+    raw_content = get_field(msg, :content, "content")
+    {text_content, thinking} = extract_entry_thinking(raw_content)
 
     %Entry{
-      role: normalize_role(role),
-      content: text_content,
+      role: normalized_role,
+      content: normalize_entry_content(normalized_role, raw_content, text_content),
       thinking: thinking,
       reasoning_details: get_field(msg, :reasoning_details, "reasoning_details"),
       tool_calls: get_field(msg, :tool_calls, "tool_calls"),
@@ -444,6 +450,80 @@ defmodule Jido.AI.Context do
       name: get_field(msg, :name, "name")
     }
   end
+
+  defp normalize_entry_content(:tool, content, _text_content) when is_list(content),
+    do: normalize_tool_content_parts(content)
+
+  defp normalize_entry_content(_role, _content, text_content), do: text_content
+
+  defp normalize_tool_content_parts(parts) do
+    Enum.flat_map(parts, fn
+      %ContentPart{} = part ->
+        [part]
+
+      text when is_binary(text) ->
+        [ContentPart.text(text)]
+
+      %{type: type} = part ->
+        case normalize_tool_content_part_map(type, part) do
+          nil -> [ContentPart.text(inspect(part))]
+          normalized -> [normalized]
+        end
+
+      %{"type" => type} = part ->
+        case normalize_tool_content_part_map(type, part) do
+          nil -> [ContentPart.text(inspect(part))]
+          normalized -> [normalized]
+        end
+
+      other ->
+        [ContentPart.text(inspect(other))]
+    end)
+  end
+
+  defp normalize_tool_content_part_map(type, part) when type in [:text, "text"] do
+    text = get_field(part, :text)
+    metadata = get_field(part, :metadata, %{})
+    if is_binary(text), do: ContentPart.text(text, metadata), else: nil
+  end
+
+  defp normalize_tool_content_part_map(type, part) when type in [:thinking, "thinking"] do
+    text = get_field(part, :thinking) || get_field(part, :text)
+    metadata = get_field(part, :metadata, %{})
+    if is_binary(text), do: ContentPart.thinking(text, metadata), else: nil
+  end
+
+  defp normalize_tool_content_part_map(type, part) when type in [:image_url, "image_url"] do
+    url = get_field(part, :url)
+    metadata = get_field(part, :metadata, %{})
+    if is_binary(url), do: ContentPart.image_url(url, metadata), else: nil
+  end
+
+  defp normalize_tool_content_part_map(type, part) when type in [:image, "image"] do
+    data = get_field(part, :data)
+    media_type = get_field(part, :media_type, "image/png")
+    metadata = get_field(part, :metadata, %{})
+
+    cond do
+      is_binary(data) and metadata == %{} -> ContentPart.image(data, media_type)
+      is_binary(data) -> ContentPart.image(data, media_type, metadata)
+      true -> nil
+    end
+  end
+
+  defp normalize_tool_content_part_map(type, part) when type in [:file, "file"] do
+    data = get_field(part, :data)
+    filename = get_field(part, :filename)
+    media_type = get_field(part, :media_type, "application/octet-stream")
+
+    if is_binary(data) and is_binary(filename) do
+      ContentPart.file(data, filename, media_type)
+    else
+      nil
+    end
+  end
+
+  defp normalize_tool_content_part_map(_, _), do: nil
 
   defp extract_entry_thinking(content) when is_list(content) do
     thinking =
@@ -506,10 +586,15 @@ defmodule Jido.AI.Context do
   defp coerce_entry(%Entry{} = entry), do: entry
 
   defp coerce_entry(%{} = entry) do
+    role = get_field(entry, :role) |> normalize_role()
+    raw_content = get_field(entry, :content)
+    explicit_thinking = get_field(entry, :thinking)
+    {text_content, extracted_thinking} = extract_entry_thinking(raw_content)
+
     %Entry{
-      role: get_field(entry, :role),
-      content: get_field(entry, :content),
-      thinking: get_field(entry, :thinking),
+      role: role,
+      content: normalize_entry_content(role, raw_content, text_content),
+      thinking: explicit_thinking || if(role == :assistant, do: extracted_thinking, else: nil),
       reasoning_details: get_field(entry, :reasoning_details),
       tool_calls: get_field(entry, :tool_calls),
       tool_call_id: get_field(entry, :tool_call_id),

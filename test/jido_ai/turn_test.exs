@@ -2,6 +2,7 @@ defmodule Jido.AI.TurnTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Turn
+  alias ReqLLM.Message.ContentPart
 
   @moduletag :unit
 
@@ -152,6 +153,22 @@ defmodule Jido.AI.TurnTest do
       assert Turn.format_tool_result_content({:ok, %{value: 1}}) == "{\"value\":1}"
       assert Turn.format_tool_result_content({:error, %{message: "boom"}}) == "boom"
       assert Turn.format_tool_result_content({:error, :badarg}) == ":badarg"
+    end
+
+    test "preserves explicit content parts alongside structured tool output" do
+      image = ContentPart.image_url("https://example.com/chart.png")
+
+      assert [
+               %ContentPart{type: :text, text: "{\"value\":1}"},
+               %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
+             ] =
+               Turn.format_tool_result_content(
+                 {:ok,
+                  %{
+                    "__content_parts__" => [image],
+                    value: 1
+                  }}
+               )
     end
   end
 
