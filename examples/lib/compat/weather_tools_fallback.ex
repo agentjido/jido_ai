@@ -629,10 +629,7 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.CurrentConditions) do
             {:error,
              Error.execution_error(
                "HTTP error getting observation stations: #{Exception.message(error)}",
-               %{
-                 type: :observation_stations_http_error,
-                 reason: error
-               }
+               %{type: :observation_stations_http_error, reason: error}
              )}
         end
       end
@@ -693,10 +690,7 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.CurrentConditions) do
             {:error,
              Error.execution_error(
                "HTTP error getting current conditions: #{Exception.message(error)}",
-               %{
-                 type: :current_conditions_http_error,
-                 reason: error
-               }
+               %{type: :current_conditions_http_error, reason: error}
              )}
         end
       end

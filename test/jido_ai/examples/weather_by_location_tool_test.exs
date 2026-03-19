@@ -83,4 +83,12 @@ defmodule Jido.AI.Examples.WeatherByLocationToolTest do
     assert_received :forecast_called
     refute_received :geocode_called
   end
+
+  test "returns action error details as a map for invalid input" do
+    assert {:error, error} = ByLocation.run(%{location: 1234}, %{})
+
+    assert error.message == "Location must be a string"
+    assert is_map(error.details)
+    assert error.details == %{type: :invalid_location_type, reason: %{location: 1234}}
+  end
 end
