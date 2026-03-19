@@ -107,18 +107,25 @@ defmodule Jido.AI.Context do
   """
   @spec append_assistant(t(), String.t() | nil, list() | nil, keyword()) :: t()
   def append_assistant(thread, content, tool_calls \\ nil, opts \\ []) do
-    thinking = Keyword.get(opts, :thinking)
-    reasoning_details = Keyword.get(opts, :reasoning_details)
-    refs = Keyword.get(opts, :refs)
+    has_text = is_binary(content) and content != ""
+    has_tools = is_list(tool_calls) and tool_calls != []
 
-    append(thread, %Entry{
-      role: :assistant,
-      content: content,
-      tool_calls: tool_calls,
-      thinking: thinking,
-      reasoning_details: reasoning_details,
-      refs: refs
-    })
+    if not has_text and not has_tools do
+      thread
+    else
+      thinking = Keyword.get(opts, :thinking)
+      reasoning_details = Keyword.get(opts, :reasoning_details)
+      refs = Keyword.get(opts, :refs)
+
+      append(thread, %Entry{
+        role: :assistant,
+        content: if(has_text, do: content),
+        tool_calls: tool_calls,
+        thinking: thinking,
+        reasoning_details: reasoning_details,
+        refs: refs
+      })
+    end
   end
 
   @doc """

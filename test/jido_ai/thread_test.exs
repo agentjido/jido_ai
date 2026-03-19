@@ -86,7 +86,38 @@ defmodule Jido.AI.ContextTest do
       assert AIContext.length(thread) == 1
       [entry] = thread.entries
       assert entry.role == :assistant
-      assert entry.content == ""
+      assert entry.content == nil
+      assert entry.tool_calls == tool_calls
+    end
+  end
+
+  describe "append_assistant with blank content" do
+    test "skips append when content is empty and no tool calls" do
+      thread =
+        AIContext.new()
+        |> AIContext.append_assistant("")
+
+      assert AIContext.length(thread) == 0
+    end
+
+    test "skips append when content is nil and no tool calls" do
+      thread =
+        AIContext.new()
+        |> AIContext.append_assistant(nil)
+
+      assert AIContext.length(thread) == 0
+    end
+
+    test "keeps tool calls but drops blank text" do
+      tool_calls = [%{id: "tc_1", name: "acknowledge", arguments: %{}}]
+
+      thread =
+        AIContext.new()
+        |> AIContext.append_assistant("", tool_calls)
+
+      assert AIContext.length(thread) == 1
+      [entry] = thread.entries
+      assert entry.content == nil
       assert entry.tool_calls == tool_calls
     end
   end
