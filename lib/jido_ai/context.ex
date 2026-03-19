@@ -586,10 +586,15 @@ defmodule Jido.AI.Context do
   defp coerce_entry(%Entry{} = entry), do: entry
 
   defp coerce_entry(%{} = entry) do
+    role = get_field(entry, :role) |> normalize_role()
+    raw_content = get_field(entry, :content)
+    explicit_thinking = get_field(entry, :thinking)
+    {text_content, extracted_thinking} = extract_entry_thinking(raw_content)
+
     %Entry{
-      role: get_field(entry, :role),
-      content: get_field(entry, :content),
-      thinking: get_field(entry, :thinking),
+      role: role,
+      content: normalize_entry_content(role, raw_content, text_content),
+      thinking: explicit_thinking || if(role == :assistant, do: extracted_thinking, else: nil),
       reasoning_details: get_field(entry, :reasoning_details),
       tool_calls: get_field(entry, :tool_calls),
       tool_call_id: get_field(entry, :tool_call_id),

@@ -758,6 +758,40 @@ defmodule Jido.AI.ContextTest do
       assert AIContext.to_messages(coerced) == AIContext.to_messages(context)
     end
 
+    test "normalizes multimodal tool results from raw entry maps" do
+      raw = %{
+        id: "ctx",
+        entries: [
+          %{
+            role: :tool,
+            tool_call_id: "tc_1",
+            name: "calc",
+            content: [
+              %{"type" => "text", "text" => ~s({"result": 42})},
+              %{"type" => "image_url", "url" => "https://example.com/chart.png"}
+            ]
+          }
+        ],
+        system_prompt: nil
+      }
+
+      assert {:ok, %AIContext{} = coerced} = AIContext.coerce(raw)
+
+      [entry] = coerced.entries
+
+      assert [
+               %ContentPart{type: :text, text: ~s({"result": 42})},
+               %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
+             ] = entry.content
+
+      [projected] = AIContext.to_messages(coerced)
+
+      assert [
+               %ContentPart{type: :text, text: ~s({"result": 42})},
+               %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
+             ] = projected.content
+    end
+
     test "rejects Jido.Thread structs" do
       core_thread = Jido.Thread.new()
       assert :error == AIContext.coerce(core_thread)

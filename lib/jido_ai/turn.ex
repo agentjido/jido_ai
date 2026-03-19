@@ -765,7 +765,7 @@ defmodule Jido.AI.Turn do
     _ -> inspect(value)
   end
 
-  defp extract_content_parts_result(%{} = result) do
+  defp extract_content_parts_result(result) do
     case get_field(result, :__content_parts__) do
       parts when is_list(parts) ->
         clean_result =
@@ -779,8 +779,6 @@ defmodule Jido.AI.Turn do
         :error
     end
   end
-
-  defp extract_content_parts_result(_), do: :error
 
   defp normalize_tool_result_output(content, output) do
     parts = normalize_content_parts(content)
