@@ -38,7 +38,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.Effects
-  alias Jido.AI.ModelAliases
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.Reasoning.ReAct.State, as: ReActState
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
@@ -1529,7 +1528,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
     Signal.Usage.new!(%{
       call_id: call_id,
-      model: model || "",
+      model: Jido.AI.ModelInput.label(model),
       input_tokens: input_tokens,
       output_tokens: output_tokens,
       total_tokens: input_tokens + output_tokens
@@ -1865,8 +1864,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     }
   end
 
-  defp resolve_model_spec(model) when is_atom(model), do: ModelAliases.resolve_model(model)
-  defp resolve_model_spec(model) when is_binary(model), do: model
+  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
 
   defp validate_request_policy!(:reject), do: :reject
 
@@ -2060,18 +2058,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp provider_opt_keys_by_string(model_spec) when is_binary(model_spec) do
-    with {:ok, model} <- ReqLLM.model(model_spec),
-         {:ok, provider_mod} <- ReqLLM.provider(model.provider),
-         true <- function_exported?(provider_mod, :provider_schema, 0) do
-      provider_mod.provider_schema().schema
-      |> Keyword.keys()
-      |> Enum.map(&{Atom.to_string(&1), &1})
-      |> Map.new()
-    else
-      _ -> %{}
-    end
-  end
+  defp provider_opt_keys_by_string(model_spec), do: Jido.AI.ModelInput.provider_opt_keys(model_spec)
 
   defp generate_call_id, do: "req_#{Jido.Util.generate_id()}"
 

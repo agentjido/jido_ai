@@ -110,6 +110,20 @@ defmodule Jido.AI.AgentTest do
       request_transformer: TestRequestTransformer
   end
 
+  defmodule AgentWithInlineModelMap do
+    use Jido.AI.Agent,
+      name: "agent_with_inline_model_map",
+      tools: [TestCalculator],
+      model: %{provider: :openai, id: "gpt-4o-mini", base_url: "http://localhost:4000/v1"}
+  end
+
+  defmodule AgentWithTupleModelSpec do
+    use Jido.AI.Agent,
+      name: "agent_with_tuple_model_spec",
+      tools: [TestCalculator],
+      model: {:openai, "gpt-4o-mini", []}
+  end
+
   defmodule AgentWithStreamTimeoutAlias do
     use Jido.AI.Agent,
       name: "agent_with_stream_timeout_alias",
@@ -260,6 +274,22 @@ defmodule Jido.AI.AgentTest do
       config = state[:config]
 
       assert config.request_transformer == TestRequestTransformer
+    end
+
+    test "inline map model specs are evaluated and forwarded into strategy config" do
+      agent = AgentWithInlineModelMap.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.model == %{provider: :openai, id: "gpt-4o-mini", base_url: "http://localhost:4000/v1"}
+    end
+
+    test "tuple model specs are evaluated and forwarded into strategy config" do
+      agent = AgentWithTupleModelSpec.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.model == {:openai, "gpt-4o-mini", []}
     end
 
     test "stream_timeout_ms alias is forwarded into strategy config" do

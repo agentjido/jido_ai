@@ -81,6 +81,17 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
     assert {:error, :token_config_mismatch} = Token.decode(token, config_b)
   end
 
+  test "fingerprint supports inline model specs" do
+    config =
+      Config.new(%{
+        model: %{provider: :openai, id: "gpt-4o-mini", base_url: "http://localhost:4000/v1"},
+        tools: %{},
+        token_secret: "secret-a"
+      })
+
+    assert is_binary(Config.fingerprint(config))
+  end
+
   test "rejects expired tokens" do
     config = Config.new(%{model: :capable, tools: %{}, token_secret: "secret-a", token_ttl_ms: 1})
     state = State.new("hello", nil, request_id: "req_4", run_id: "run_4")

@@ -201,6 +201,29 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
   end
 
+  test "passes inline model specs through to ReqLLM requests" do
+    inline_model = %{provider: :openai, id: "gpt-4o-mini", base_url: "http://localhost:4000/v1"}
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      assert model == inline_model
+
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Hello from inline model")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
+         model
+       )}
+    end)
+
+    config = Config.new(%{model: inline_model, tools: %{}})
+
+    events =
+      ReAct.stream("Say hello", config, request_id: "req_inline_model", run_id: "run_inline_model")
+      |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
   test "uses non-streaming generation when streaming is disabled" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       flunk("stream_text should not be called when ReAct streaming is disabled")

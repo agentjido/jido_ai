@@ -329,9 +329,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
     }
   end
 
-  defp resolve_model_spec(model) when is_atom(model), do: Jido.AI.resolve_model(model)
-  defp resolve_model_spec(model) when is_binary(model), do: model
-  defp resolve_model_spec(_), do: Jido.AI.resolve_model(@default_model)
+  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
 
   defp normalize_temperature(temp) when is_number(temp), do: temp * 1.0
   defp normalize_temperature(_), do: 0.0

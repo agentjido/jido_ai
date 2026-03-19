@@ -391,13 +391,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
     }
   end
 
-  defp resolve_model_spec(model) when is_atom(model) do
-    Jido.AI.resolve_model(model)
-  end
-
-  defp resolve_model_spec(model) when is_binary(model) do
-    model
-  end
+  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
 
   defp handle_initial_instruction(agent, instructions, ctx, state) do
     # Find the start instruction
