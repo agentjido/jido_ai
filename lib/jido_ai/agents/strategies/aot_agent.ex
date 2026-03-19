@@ -17,7 +17,12 @@ defmodule Jido.AI.AoTAgent do
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
     description = Keyword.get(opts, :description, "AoT agent #{name}")
-    model = Keyword.get(opts, :model, @default_model)
+
+    model =
+      opts
+      |> Keyword.get(:model, @default_model)
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
     profile = Keyword.get(opts, :profile, @default_profile)
     search_style = Keyword.get(opts, :search_style, @default_search_style)
     temperature = Keyword.get(opts, :temperature, @default_temperature)
@@ -42,7 +47,7 @@ defmodule Jido.AI.AoTAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.any() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(Macro.escape(model))),
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
           last_prompt: Zoi.string() |> Zoi.default(""),

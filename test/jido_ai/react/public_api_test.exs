@@ -23,6 +23,16 @@ defmodule Jido.AI.Reasoning.ReAct.PublicApiTest do
       passthrough = ReAct.build_config(built)
       assert passthrough == built
     end
+
+    test "accepts ReqLLM inline, tuple, and struct model specs" do
+      inline_model = %{provider: :openai, id: "gpt-4o-mini", base_url: "http://localhost:4000/v1"}
+      tuple_model = {:openai, "gpt-4o-mini", []}
+      struct_model = ReqLLM.model!(inline_model)
+
+      assert ReAct.build_config(%{model: inline_model, tools: %{}}).model == inline_model
+      assert ReAct.build_config(%{model: tuple_model, tools: %{}}).model == tuple_model
+      assert ReAct.build_config(%{model: struct_model, tools: %{}}).model == struct_model
+    end
   end
 
   describe "stream APIs" do

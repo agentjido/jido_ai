@@ -145,13 +145,17 @@ defmodule Jido.AI.Agent do
       {:%, meta, args} ->
         {:%, meta, args}
 
+      # Allow tuple syntax: {...}
+      {:{}, meta, elements} ->
+        {:{}, meta, elements}
+
       # Allow 2-tuples (key-value pairs in maps)
-      {key, value} when not is_atom(key) or key not in [:__aliases__, :%, :%{}] ->
+      {key, value} when not is_atom(key) or key not in [:__aliases__, :%, :%{}, :{}] ->
         {key, value}
 
       # Reject function calls and other unsafe constructs
       {func, meta, args} = node when is_atom(func) and is_list(args) ->
-        if func in [:__aliases__, :%, :%{}] do
+        if func in [:__aliases__, :%, :%{}, :{}] do
           node
         else
           raise CompileError,
@@ -187,6 +191,12 @@ defmodule Jido.AI.Agent do
     case value do
       nil ->
         nil
+
+      value when is_tuple(value) ->
+        value
+        |> expand_aliases_in_ast(caller_env)
+        |> Code.eval_quoted([], caller_env)
+        |> elem(0)
 
       value when is_map(value) ->
         value
@@ -230,7 +240,12 @@ defmodule Jido.AI.Agent do
     description = Keyword.get(opts, :description, "AI agent #{name}")
     tags = Keyword.get(opts, :tags, [])
     system_prompt = Keyword.get(opts, :system_prompt)
-    model = Keyword.get(opts, :model, @default_model)
+
+    model =
+      opts
+      |> Keyword.get(:model, @default_model)
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
     max_iterations = Keyword.get(opts, :max_iterations, @default_max_iterations)
     max_tokens = Keyword.get(opts, :max_tokens, @default_max_tokens)
     streaming = Keyword.get(opts, :streaming, true)
@@ -330,7 +345,7 @@ defmodule Jido.AI.Agent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.any() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(Macro.escape(model))),
           # Request tracking for concurrent request isolation
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),

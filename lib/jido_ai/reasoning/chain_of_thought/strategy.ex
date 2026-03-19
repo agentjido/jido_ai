@@ -565,7 +565,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
 
     Signal.Usage.new!(%{
       call_id: call_id,
-      model: model || "",
+      model: Jido.AI.ModelInput.label(model),
       input_tokens: input_tokens,
       output_tokens: output_tokens,
       total_tokens: input_tokens + output_tokens,
@@ -724,8 +724,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
 
-  defp resolve_model_spec(model) when is_atom(model), do: Jido.AI.resolve_model(model)
-  defp resolve_model_spec(model) when is_binary(model), do: model
+  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
 
   defp generate_call_id, do: Machine.generate_call_id()
 

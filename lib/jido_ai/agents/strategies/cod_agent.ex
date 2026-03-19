@@ -13,7 +13,12 @@ defmodule Jido.AI.CoDAgent do
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
     description = Keyword.get(opts, :description, "CoD agent #{name}")
-    model = Keyword.get(opts, :model, @default_model)
+
+    model =
+      opts
+      |> Keyword.get(:model, @default_model)
+      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+
     system_prompt = Keyword.get(opts, :system_prompt, Jido.AI.Reasoning.ChainOfDraft.default_system_prompt())
     plugins = Keyword.get(opts, :plugins, [])
 
@@ -25,7 +30,7 @@ defmodule Jido.AI.CoDAgent do
       quote do
         Zoi.object(%{
           __strategy__: Zoi.map() |> Zoi.default(%{}),
-          model: Zoi.any() |> Zoi.default(unquote(model)),
+          model: Zoi.any() |> Zoi.default(unquote(Macro.escape(model))),
           requests: Zoi.map() |> Zoi.default(%{}),
           last_request_id: Zoi.string() |> Zoi.optional(),
           last_prompt: Zoi.string() |> Zoi.default(""),
