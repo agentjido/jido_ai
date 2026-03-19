@@ -316,7 +316,8 @@ defmodule JidoTest.AI.RequestTest do
                  stream_timeout_ms: 4_321,
                  stream_timeout_ms: 4_321,
                  req_http_options: [plug: {Req.Test, []}],
-                 llm_opts: [thinking: "enabled", reasoning_effort: :high]
+                 llm_opts: [thinking: "enabled", reasoning_effort: :high],
+                 extra_refs: %{slack_ts: "1234.001", custom_id: "abc"}
                )
 
       assert handle.id == "req_123"
@@ -337,6 +338,7 @@ defmodule JidoTest.AI.RequestTest do
       assert signal.data.stream_timeout_ms == 4_321
       assert signal.data.req_http_options == [plug: {Req.Test, []}]
       assert signal.data.llm_opts == [thinking: "enabled", reasoning_effort: :high]
+      assert signal.data.extra_refs == %{slack_ts: "1234.001", custom_id: "abc"}
     end
 
     test "await/2 returns successful result for completed request payload" do

@@ -160,6 +160,7 @@ defmodule Jido.AI.Request do
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+  - `:extra_refs` - Map of additional refs to attach to the user message thread entry
   - `:request_id` - Custom request ID (auto-generated if not provided)
 
   ## Signal Options (required)
@@ -191,6 +192,8 @@ defmodule Jido.AI.Request do
 
     # Build payload with request_id for correlation.
     # Keep both query and prompt keys so all strategy start schemas can consume it.
+    extra_refs = Keyword.get(opts, :extra_refs, %{})
+
     payload =
       %{query: query, prompt: query, request_id: request_id}
       |> maybe_add_tool_context(tool_context)
@@ -200,6 +203,7 @@ defmodule Jido.AI.Request do
       |> maybe_add_stream_timeout_ms(stream_timeout_ms)
       |> maybe_add_req_http_options(req_http_options)
       |> maybe_add_llm_opts(llm_opts)
+      |> maybe_add_extra_refs(extra_refs)
 
     signal = Signal.new!(signal_type, payload, source: source)
 
@@ -564,6 +568,12 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_llm_opts(payload, _), do: payload
+
+  defp maybe_add_extra_refs(payload, refs) when is_map(refs) and map_size(refs) > 0 do
+    Map.put(payload, :extra_refs, refs)
+  end
+
+  defp maybe_add_extra_refs(payload, _), do: payload
 
   defp normalize_await_result({:ok, %{status: :completed, result: result}}) do
     {:ok, result}
