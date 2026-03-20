@@ -239,7 +239,16 @@ defmodule Jido.AI.Agent do
 
     description = Keyword.get(opts, :description, "AI agent #{name}")
     tags = Keyword.get(opts, :tags, [])
-    system_prompt = Keyword.get(opts, :system_prompt)
+    system_prompt =
+      case Keyword.get(opts, :system_prompt) do
+        nil -> nil
+        val when is_binary(val) -> val
+        {:@, _, [{attr_name, _, nil}]} ->
+          Module.get_attribute(__CALLER__.module, attr_name)
+        ast ->
+          {evaluated, _} = Code.eval_quoted(ast, [], __CALLER__)
+          evaluated
+      end
 
     model =
       opts
