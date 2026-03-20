@@ -239,15 +239,17 @@ defmodule Jido.AI.Agent do
 
     description = Keyword.get(opts, :description, "AI agent #{name}")
     tags = Keyword.get(opts, :tags, [])
+    # system_prompt may arrive as a string literal or as AST (e.g. @attr).
+    # AST forms like module attributes can only be resolved in the calling
+    # module's compile context, so we defer them to the quote block via
+    # strategy_opts_ast below. For strings and nil we resolve eagerly.
+    system_prompt_raw = Keyword.get(opts, :system_prompt)
+
     system_prompt =
-      case Keyword.get(opts, :system_prompt) do
+      case system_prompt_raw do
         nil -> nil
         val when is_binary(val) -> val
-        {:@, _, [{attr_name, _, nil}]} ->
-          Module.get_attribute(__CALLER__.module, attr_name)
-        ast ->
-          {evaluated, _} = Code.eval_quoted(ast, [], __CALLER__)
-          evaluated
+        _ast -> :deferred
       end
 
     model =
@@ -346,7 +348,27 @@ defmodule Jido.AI.Agent do
         strategy_effect_policy: strategy_effect_policy,
         tool_context: tool_context
       ]
-      |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
+      |> then(fn o ->
+        case system_prompt do
+          :deferred -> o  # Will be added in the quote block
+          nil -> o
+          val -> Keyword.put(o, :system_prompt, val)
+        end
+      end)
+
+    # For deferred system_prompt (AST like @attr), build an AST expression
+    # that merges it into strategy_opts at compile time in the calling module's
+    # context, where the attribute is actually accessible.
+    strategy_opts_ast =
+      case system_prompt do
+        :deferred ->
+          quote do
+            unquote(Macro.escape(strategy_opts)) ++ [system_prompt: unquote(system_prompt_raw)]
+          end
+
+        _ ->
+          Macro.escape(strategy_opts)
+      end
 
     # Build base_schema AST at macro expansion time
     # Includes request tracking fields for concurrent request isolation
@@ -371,7 +393,7 @@ defmodule Jido.AI.Agent do
         description: unquote(description),
         tags: unquote(tags),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Reasoning.ReAct.Strategy, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.ReAct.Strategy, unquote(strategy_opts_ast)},
         schema: unquote(base_schema_ast)
 
       unquote(__MODULE__.compatibility_overrides_ast())

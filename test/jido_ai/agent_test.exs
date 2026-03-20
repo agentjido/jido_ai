@@ -131,6 +131,15 @@ defmodule Jido.AI.AgentTest do
       stream_timeout_ms: 45_000
   end
 
+  defmodule AgentWithModuleAttrSystemPrompt do
+    @my_prompt "You are a helpful testing assistant."
+
+    use Jido.AI.Agent,
+      name: "agent_with_attr_prompt",
+      tools: [TestCalculator],
+      system_prompt: @my_prompt
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -299,6 +308,14 @@ defmodule Jido.AI.AgentTest do
 
       assert config.stream_timeout_ms == 45_000
       assert config.stream_receive_timeout_ms == 45_000
+    end
+
+    test "system_prompt from module attribute is resolved at compile time" do
+      agent = AgentWithModuleAttrSystemPrompt.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert config.system_prompt == "You are a helpful testing assistant."
     end
 
     test "tools list resolves module aliases" do
