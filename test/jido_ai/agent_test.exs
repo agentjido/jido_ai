@@ -140,6 +140,20 @@ defmodule Jido.AI.AgentTest do
       system_prompt: @my_prompt
   end
 
+  defmodule AgentWithFalseSystemPrompt do
+    use Jido.AI.Agent,
+      name: "agent_with_false_prompt",
+      tools: [TestCalculator],
+      system_prompt: false
+  end
+
+  defmodule AgentWithNilSystemPrompt do
+    use Jido.AI.Agent,
+      name: "agent_with_nil_prompt",
+      tools: [TestCalculator],
+      system_prompt: nil
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -316,6 +330,39 @@ defmodule Jido.AI.AgentTest do
       config = state[:config]
 
       assert config.system_prompt == "You are a helpful testing assistant."
+    end
+
+    test "false system_prompt is treated as omitted" do
+      default_config = StratState.get(BasicAgent.new(), %{})[:config]
+      config = StratState.get(AgentWithFalseSystemPrompt.new(), %{})[:config]
+
+      assert config.system_prompt == default_config.system_prompt
+    end
+
+    test "nil system_prompt is treated as omitted" do
+      default_config = StratState.get(BasicAgent.new(), %{})[:config]
+      config = StratState.get(AgentWithNilSystemPrompt.new(), %{})[:config]
+
+      assert config.system_prompt == default_config.system_prompt
+    end
+
+    test "raises when module attribute system_prompt does not resolve to a binary" do
+      module_name = Module.concat(__MODULE__, :"InvalidPromptAgent#{System.unique_integer([:positive, :monotonic])}")
+
+      source = """
+      defmodule #{inspect(module_name)} do
+        @prompt 123
+
+        use Jido.AI.Agent,
+          name: "invalid_prompt_agent",
+          tools: [#{inspect(TestCalculator)}],
+          system_prompt: @prompt
+      end
+      """
+
+      assert_raise CompileError, ~r/system_prompt must be a binary, nil, false/, fn ->
+        Code.compile_string(source)
+      end
     end
 
     test "tools list resolves module aliases" do

@@ -224,6 +224,28 @@ defmodule Jido.AI.Agent do
     end
   end
 
+  @doc false
+  def normalize_system_prompt_value(value, file, line) do
+    case value do
+      nil -> :absent
+      false -> :absent
+      "" -> :absent
+      value when is_binary(value) -> {:resolved, value}
+      other -> raise_invalid_system_prompt!(other, file, line)
+    end
+  end
+
+  defp raise_invalid_system_prompt!(value, file, line) do
+    raise CompileError,
+      description:
+        "system_prompt must be a binary, nil, false, or a compile-time literal/module attribute resolving to one, got: #{inspect(value)}",
+      file: file,
+      line: line
+  end
+
+  defp system_prompt_line({_, meta, _}, default), do: Keyword.get(meta, :line, default)
+  defp system_prompt_line(_, default), do: default
+
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
@@ -239,17 +261,27 @@ defmodule Jido.AI.Agent do
 
     description = Keyword.get(opts, :description, "AI agent #{name}")
     tags = Keyword.get(opts, :tags, [])
-    # system_prompt may arrive as a string literal or as AST (e.g. @attr).
-    # AST forms like module attributes can only be resolved in the calling
-    # module's compile context, so we defer them to the quote block via
-    # strategy_opts_ast below. For strings and nil we resolve eagerly.
     system_prompt_raw = Keyword.get(opts, :system_prompt)
+    system_prompt_line = system_prompt_line(system_prompt_raw, __CALLER__.line)
 
     system_prompt =
       case system_prompt_raw do
-        nil -> nil
-        val when is_binary(val) -> val
-        _ast -> :deferred
+        {:@, _, [{_name, _, _}]} = attr_ast ->
+          {:deferred, attr_ast}
+
+        other ->
+          expanded = Macro.expand(other, __CALLER__)
+
+          if Macro.quoted_literal?(expanded) do
+            {resolved, _binding} = Code.eval_quoted(expanded, [], __CALLER__)
+            __MODULE__.normalize_system_prompt_value(resolved, __CALLER__.file, system_prompt_line)
+          else
+            raise CompileError,
+              description:
+                "system_prompt only supports binaries, nil, false, compile-time literal expressions, or bare module attributes",
+              file: __CALLER__.file,
+              line: system_prompt_line
+          end
       end
 
     model =
@@ -350,20 +382,27 @@ defmodule Jido.AI.Agent do
       ]
       |> then(fn o ->
         case system_prompt do
-          :deferred -> o  # Will be added in the quote block
-          nil -> o
-          val -> Keyword.put(o, :system_prompt, val)
+          :absent -> o
+          {:resolved, value} -> Keyword.put(o, :system_prompt, value)
+          {:deferred, _attr_ast} -> o
         end
       end)
 
-    # For deferred system_prompt (AST like @attr), build an AST expression
-    # that merges it into strategy_opts at compile time in the calling module's
-    # context, where the attribute is actually accessible.
     strategy_opts_ast =
       case system_prompt do
-        :deferred ->
+        {:deferred, attr_ast} ->
           quote do
-            unquote(Macro.escape(strategy_opts)) ++ [system_prompt: unquote(system_prompt_raw)]
+            case unquote(__MODULE__).normalize_system_prompt_value(
+                   unquote(attr_ast),
+                   __ENV__.file,
+                   unquote(system_prompt_line)
+                 ) do
+              :absent ->
+                unquote(Macro.escape(strategy_opts))
+
+              {:resolved, value} ->
+                Keyword.put(unquote(Macro.escape(strategy_opts)), :system_prompt, value)
+            end
           end
 
         _ ->
