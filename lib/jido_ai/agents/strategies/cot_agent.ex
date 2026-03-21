@@ -86,6 +86,9 @@ defmodule Jido.AI.CoTAgent do
 
   @default_model :fast
 
+  defp system_prompt_line({_, meta, _}, default), do: Keyword.get(meta, :line, default)
+  defp system_prompt_line(_, default), do: default
+
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
     description = Keyword.get(opts, :description, "CoT agent #{name}")
@@ -95,7 +98,29 @@ defmodule Jido.AI.CoTAgent do
       |> Keyword.get(:model, @default_model)
       |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
 
-    system_prompt = Keyword.get(opts, :system_prompt)
+    system_prompt_raw = Keyword.get(opts, :system_prompt)
+    system_prompt_line = system_prompt_line(system_prompt_raw, __CALLER__.line)
+
+    system_prompt =
+      case system_prompt_raw do
+        {:@, _, [{_name, _, _}]} = attr_ast ->
+          {:deferred, attr_ast}
+
+        other ->
+          expanded = Macro.expand(other, __CALLER__)
+
+          if Macro.quoted_literal?(expanded) do
+            {resolved, _binding} = Code.eval_quoted(expanded, [], __CALLER__)
+            Jido.AI.Agent.normalize_system_prompt_value(resolved, __CALLER__.file, system_prompt_line)
+          else
+            raise CompileError,
+              description:
+                "system_prompt only supports binaries, nil, false, compile-time literal expressions, or bare module attributes",
+              file: __CALLER__.file,
+              line: system_prompt_line
+          end
+      end
+
     plugins = Keyword.get(opts, :plugins, [])
 
     ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
@@ -103,8 +128,33 @@ defmodule Jido.AI.CoTAgent do
     strategy_opts =
       [model: model]
       |> then(fn o ->
-        if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o
+        case system_prompt do
+          :absent -> o
+          {:resolved, value} -> Keyword.put(o, :system_prompt, value)
+          {:deferred, _attr_ast} -> o
+        end
       end)
+
+    strategy_opts_ast =
+      case system_prompt do
+        {:deferred, attr_ast} ->
+          quote do
+            case Jido.AI.Agent.normalize_system_prompt_value(
+                   unquote(attr_ast),
+                   __ENV__.file,
+                   unquote(system_prompt_line)
+                 ) do
+              :absent ->
+                unquote(Macro.escape(strategy_opts))
+
+              {:resolved, value} ->
+                Keyword.put(unquote(Macro.escape(strategy_opts)), :system_prompt, value)
+            end
+          end
+
+        _ ->
+          Macro.escape(strategy_opts)
+      end
 
     # Includes request tracking fields for concurrent request isolation
     base_schema_ast =
@@ -127,7 +177,7 @@ defmodule Jido.AI.CoTAgent do
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Reasoning.ChainOfThought.Strategy, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.ChainOfThought.Strategy, unquote(strategy_opts_ast)},
         schema: unquote(base_schema_ast)
 
       unquote(Jido.AI.Agent.compatibility_overrides_ast())
@@ -138,7 +188,7 @@ defmodule Jido.AI.CoTAgent do
       Returns the strategy options configured for this agent.
       """
       def strategy_opts do
-        unquote(Macro.escape(strategy_opts))
+        unquote(strategy_opts_ast)
       end
 
       @doc """
