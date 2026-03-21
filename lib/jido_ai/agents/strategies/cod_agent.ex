@@ -10,6 +10,9 @@ defmodule Jido.AI.CoDAgent do
 
   @default_model :fast
 
+  defp system_prompt_line({_, meta, _}, default), do: Keyword.get(meta, :line, default)
+  defp system_prompt_line(_, default), do: default
+
   defmacro __using__(opts) do
     name = Keyword.fetch!(opts, :name)
     description = Keyword.get(opts, :description, "CoD agent #{name}")
@@ -19,12 +22,73 @@ defmodule Jido.AI.CoDAgent do
       |> Keyword.get(:model, @default_model)
       |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
 
-    system_prompt = Keyword.get(opts, :system_prompt, Jido.AI.Reasoning.ChainOfDraft.default_system_prompt())
+    default_system_prompt = Jido.AI.Reasoning.ChainOfDraft.default_system_prompt()
+
+    system_prompt_raw =
+      case Keyword.fetch(opts, :system_prompt) do
+        :error -> default_system_prompt
+        {:ok, value} -> value
+      end
+
+    system_prompt_line = system_prompt_line(system_prompt_raw, __CALLER__.line)
+
+    system_prompt =
+      case system_prompt_raw do
+        {:@, _, [{_name, _, _}]} = attr_ast ->
+          {:deferred, attr_ast}
+
+        other ->
+          expanded = Macro.expand(other, __CALLER__)
+
+          if Macro.quoted_literal?(expanded) do
+            {resolved, _binding} = Code.eval_quoted(expanded, [], __CALLER__)
+
+            case Jido.AI.Agent.normalize_system_prompt_value(resolved, __CALLER__.file, system_prompt_line) do
+              :absent -> {:resolved, default_system_prompt}
+              {:resolved, value} -> {:resolved, value}
+            end
+          else
+            raise CompileError,
+              description:
+                "system_prompt only supports binaries, nil, false, compile-time literal expressions, or bare module attributes",
+              file: __CALLER__.file,
+              line: system_prompt_line
+          end
+      end
+
     plugins = Keyword.get(opts, :plugins, [])
 
     ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
-    strategy_opts = [model: model, system_prompt: system_prompt]
+    strategy_opts =
+      [model: model]
+      |> then(fn o ->
+        case system_prompt do
+          {:resolved, value} -> Keyword.put(o, :system_prompt, value)
+          {:deferred, _attr_ast} -> o
+        end
+      end)
+
+    strategy_opts_ast =
+      case system_prompt do
+        {:deferred, attr_ast} ->
+          quote do
+            case Jido.AI.Agent.normalize_system_prompt_value(
+                   unquote(attr_ast),
+                   __ENV__.file,
+                   unquote(system_prompt_line)
+                 ) do
+              :absent ->
+                Keyword.put(unquote(Macro.escape(strategy_opts)), :system_prompt, unquote(default_system_prompt))
+
+              {:resolved, value} ->
+                Keyword.put(unquote(Macro.escape(strategy_opts)), :system_prompt, value)
+            end
+          end
+
+        _ ->
+          Macro.escape(strategy_opts)
+      end
 
     base_schema_ast =
       quote do
@@ -44,7 +108,7 @@ defmodule Jido.AI.CoDAgent do
         name: unquote(name),
         description: unquote(description),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Reasoning.ChainOfDraft.Strategy, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.ChainOfDraft.Strategy, unquote(strategy_opts_ast)},
         schema: unquote(base_schema_ast)
 
       unquote(Jido.AI.Agent.compatibility_overrides_ast())
@@ -55,7 +119,7 @@ defmodule Jido.AI.CoDAgent do
       Returns the strategy options configured for this agent.
       """
       def strategy_opts do
-        unquote(Macro.escape(strategy_opts))
+        unquote(strategy_opts_ast)
       end
 
       @doc """

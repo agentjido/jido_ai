@@ -22,6 +22,26 @@ defmodule Jido.AI.CoTAgentTest do
       system_prompt: "Think in clear numbered steps."
   end
 
+  defmodule AttrPromptCoTAgent do
+    @prompt "Think with an attribute prompt."
+
+    use Jido.AI.CoTAgent,
+      name: "attr_prompt_cot_agent",
+      system_prompt: @prompt
+  end
+
+  defmodule FalsePromptCoTAgent do
+    use Jido.AI.CoTAgent,
+      name: "false_prompt_cot_agent",
+      system_prompt: false
+  end
+
+  defmodule NilPromptCoTAgent do
+    use Jido.AI.CoTAgent,
+      name: "nil_prompt_cot_agent",
+      system_prompt: nil
+  end
+
   describe "module creation" do
     test "defines expected helper API" do
       assert function_exported?(TestCoTAgent, :think, 2)
@@ -48,6 +68,42 @@ defmodule Jido.AI.CoTAgentTest do
 
       assert opts[:model] == "openai:gpt-4"
       assert opts[:system_prompt] == "Think in clear numbered steps."
+    end
+
+    test "resolves system_prompt from module attribute" do
+      opts = AttrPromptCoTAgent.strategy_opts()
+
+      assert opts[:system_prompt] == "Think with an attribute prompt."
+    end
+
+    test "treats false system_prompt as omitted" do
+      opts = FalsePromptCoTAgent.strategy_opts()
+
+      refute Keyword.has_key?(opts, :system_prompt)
+    end
+
+    test "treats nil system_prompt as omitted" do
+      opts = NilPromptCoTAgent.strategy_opts()
+
+      refute Keyword.has_key?(opts, :system_prompt)
+    end
+
+    test "raises when module attribute system_prompt does not resolve to a binary" do
+      module_name = Module.concat(__MODULE__, :"InvalidPromptCoTAgent#{System.unique_integer([:positive, :monotonic])}")
+
+      source = """
+      defmodule #{inspect(module_name)} do
+        @prompt 123
+
+        use Jido.AI.CoTAgent,
+          name: "invalid_prompt_cot_agent",
+          system_prompt: @prompt
+      end
+      """
+
+      assert_raise CompileError, ~r/system_prompt must be a binary, nil, false/, fn ->
+        Code.compile_string(source)
+      end
     end
   end
 

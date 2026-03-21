@@ -68,6 +68,26 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       state = StratState.get(agent, %{})
       assert state[:config].system_prompt == Machine.default_system_prompt()
     end
+
+    test "uses default system prompt when false is provided" do
+      agent = create_agent(system_prompt: false)
+      state = StratState.get(agent, %{})
+
+      assert state[:config].system_prompt == Machine.default_system_prompt()
+    end
+
+    test "uses default system prompt when nil is provided" do
+      agent = create_agent(system_prompt: nil)
+      state = StratState.get(agent, %{})
+
+      assert state[:config].system_prompt == Machine.default_system_prompt()
+    end
+
+    test "raises for non-binary system_prompt values" do
+      assert_raise ArgumentError, ~r/invalid system_prompt/, fn ->
+        create_agent(system_prompt: 123)
+      end
+    end
   end
 
   describe "action_spec/1" do

@@ -698,11 +698,11 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
     raw_model = Map.get(agent.state, :model, Keyword.get(opts, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
 
-    system_prompt =
-      Map.get(agent.state, :system_prompt, Keyword.get(opts, :system_prompt, Machine.default_system_prompt()))
-
     %{
-      system_prompt: system_prompt,
+      system_prompt:
+        normalize_system_prompt_opt(
+          Map.get(agent.state, :system_prompt, Keyword.get(opts, :system_prompt, Machine.default_system_prompt()))
+        ),
       model: resolved_model,
       request_policy: Map.get(agent.state, :request_policy, Keyword.get(opts, :request_policy, :reject)),
       llm_timeout_ms: Map.get(agent.state, :llm_timeout_ms, Keyword.get(opts, :llm_timeout_ms)),
@@ -723,6 +723,13 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   defp normalize_map_opt(%{} = value), do: value
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
+
+  defp normalize_system_prompt_opt(prompt) when is_binary(prompt) and prompt != "", do: prompt
+  defp normalize_system_prompt_opt(prompt) when prompt in [nil, false, ""], do: Machine.default_system_prompt()
+
+  defp normalize_system_prompt_opt(other) do
+    raise ArgumentError, "invalid system_prompt: expected binary, nil, or false, got #{inspect(other)}"
+  end
 
   defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
 
