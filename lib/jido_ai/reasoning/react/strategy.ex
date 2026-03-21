@@ -1877,7 +1877,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
       request_transformer: validate_request_transformer_opt!(Keyword.get(opts, :request_transformer)),
-      system_prompt: Keyword.get(opts, :system_prompt, @default_system_prompt),
+      system_prompt: normalize_system_prompt_opt(opts),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens),
@@ -1910,6 +1910,22 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       base_llm_opts: opts |> Keyword.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string),
       provider_opt_keys_by_string: provider_opt_keys_by_string
     }
+  end
+
+  defp normalize_system_prompt_opt(opts) do
+    case Keyword.fetch(opts, :system_prompt) do
+      :error ->
+        @default_system_prompt
+
+      {:ok, prompt} when is_binary(prompt) and prompt != "" ->
+        prompt
+
+      {:ok, prompt} when prompt in [nil, false, ""] ->
+        nil
+
+      {:ok, other} ->
+        raise ArgumentError, "invalid system_prompt: expected binary, nil, or false, got #{inspect(other)}"
+    end
   end
 
   defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)

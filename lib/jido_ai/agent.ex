@@ -224,6 +224,28 @@ defmodule Jido.AI.Agent do
     end
   end
 
+  @doc false
+  def normalize_system_prompt_value(value, file, line) do
+    case value do
+      nil -> :absent
+      false -> :absent
+      "" -> :absent
+      value when is_binary(value) -> {:resolved, value}
+      other -> raise_invalid_system_prompt!(other, file, line)
+    end
+  end
+
+  defp raise_invalid_system_prompt!(value, file, line) do
+    raise CompileError,
+      description:
+        "system_prompt must be a binary, nil, false, or a compile-time literal/module attribute resolving to one, got: #{inspect(value)}",
+      file: file,
+      line: line
+  end
+
+  defp system_prompt_line({_, meta, _}, default), do: Keyword.get(meta, :line, default)
+  defp system_prompt_line(_, default), do: default
+
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
@@ -239,7 +261,28 @@ defmodule Jido.AI.Agent do
 
     description = Keyword.get(opts, :description, "AI agent #{name}")
     tags = Keyword.get(opts, :tags, [])
-    system_prompt = Keyword.get(opts, :system_prompt)
+    system_prompt_raw = Keyword.get(opts, :system_prompt)
+    system_prompt_line = system_prompt_line(system_prompt_raw, __CALLER__.line)
+
+    system_prompt =
+      case system_prompt_raw do
+        {:@, _, [{_name, _, _}]} = attr_ast ->
+          {:deferred, attr_ast}
+
+        other ->
+          expanded = Macro.expand(other, __CALLER__)
+
+          if Macro.quoted_literal?(expanded) do
+            {resolved, _binding} = Code.eval_quoted(expanded, [], __CALLER__)
+            __MODULE__.normalize_system_prompt_value(resolved, __CALLER__.file, system_prompt_line)
+          else
+            raise CompileError,
+              description:
+                "system_prompt only supports binaries, nil, false, compile-time literal expressions, or bare module attributes",
+              file: __CALLER__.file,
+              line: system_prompt_line
+          end
+      end
 
     model =
       opts
@@ -337,7 +380,34 @@ defmodule Jido.AI.Agent do
         strategy_effect_policy: strategy_effect_policy,
         tool_context: tool_context
       ]
-      |> then(fn o -> if system_prompt, do: Keyword.put(o, :system_prompt, system_prompt), else: o end)
+      |> then(fn o ->
+        case system_prompt do
+          :absent -> o
+          {:resolved, value} -> Keyword.put(o, :system_prompt, value)
+          {:deferred, _attr_ast} -> o
+        end
+      end)
+
+    strategy_opts_ast =
+      case system_prompt do
+        {:deferred, attr_ast} ->
+          quote do
+            case unquote(__MODULE__).normalize_system_prompt_value(
+                   unquote(attr_ast),
+                   __ENV__.file,
+                   unquote(system_prompt_line)
+                 ) do
+              :absent ->
+                unquote(Macro.escape(strategy_opts))
+
+              {:resolved, value} ->
+                Keyword.put(unquote(Macro.escape(strategy_opts)), :system_prompt, value)
+            end
+          end
+
+        _ ->
+          Macro.escape(strategy_opts)
+      end
 
     # Build base_schema AST at macro expansion time
     # Includes request tracking fields for concurrent request isolation
@@ -362,7 +432,7 @@ defmodule Jido.AI.Agent do
         description: unquote(description),
         tags: unquote(tags),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
-        strategy: {Jido.AI.Reasoning.ReAct.Strategy, unquote(Macro.escape(strategy_opts))},
+        strategy: {Jido.AI.Reasoning.ReAct.Strategy, unquote(strategy_opts_ast)},
         schema: unquote(base_schema_ast)
 
       unquote(__MODULE__.compatibility_overrides_ast())

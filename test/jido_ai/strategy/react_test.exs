@@ -89,6 +89,20 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         create_agent(tools: [TestCalculator], request_transformer: :not_a_module)
       end
     end
+
+    test "treats false system_prompt as no prompt for direct strategy callers" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: false)
+      state = StratState.get(agent, %{})
+
+      assert state.config.system_prompt == nil
+      assert state.context.system_prompt == nil
+    end
+
+    test "raises for non-binary system_prompt values" do
+      assert_raise ArgumentError, ~r/invalid system_prompt/, fn ->
+        create_agent(tools: [TestCalculator], system_prompt: 123)
+      end
+    end
   end
 
   describe "signal_routes/1" do
