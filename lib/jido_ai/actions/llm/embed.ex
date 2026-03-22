@@ -58,7 +58,9 @@ defmodule Jido.AI.Actions.LLM.Embed do
           |> Zoi.optional(),
         texts: Zoi.string(description: "Single text to embed") |> Zoi.optional(),
         texts_list:
-          Zoi.list(Zoi.string(), description: "List of texts to embed (alternative to single text)")
+          Zoi.list(Zoi.string(),
+            description: "List of texts to embed (alternative to single text)"
+          )
           |> Zoi.optional(),
         dimensions:
           Zoi.integer(description: "Output dimensions for models that support it")
@@ -68,7 +70,10 @@ defmodule Jido.AI.Actions.LLM.Embed do
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Error.Sanitize
+  alias Jido.AI.Observe
   alias Jido.AI.Validation
+
+  @telemetry_prefix [:jido, :ai, :llm, :embed]
 
   @doc """
   Executes the embedding action.
@@ -81,15 +86,70 @@ defmodule Jido.AI.Actions.LLM.Embed do
   @impl Jido.Action
   def run(params, context) do
     params = apply_context_defaults(params, context)
+    obs_cfg = context[:observability] || %{}
+
+    texts = normalize_texts(params[:texts], params[:texts_list])
+
+    metadata = %{
+      action: "llm_embed",
+      model: params[:model],
+      text_count: length(texts),
+      total_text_length: Enum.reduce(texts, 0, fn t, acc -> acc + String.length(t) end)
+    }
+
+    Observe.emit(
+      obs_cfg,
+      @telemetry_prefix ++ [:start],
+      %{system_time: System.system_time()},
+      metadata
+    )
+
+    start_time = System.monotonic_time()
 
     with {:ok, _validated} <- validate_and_sanitize_params(params),
          {:ok, model} <- Helpers.resolve_model(params[:model], :embedding),
-         texts = normalize_texts(params[:texts], params[:texts_list]),
          opts = build_opts(params),
          {:ok, response} <- ReqLLM.Embedding.embed(model, texts, opts) do
+      duration_native = System.monotonic_time() - start_time
+
+      measurements = %{
+        duration: duration_native,
+        duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+      }
+
+      result_metadata =
+        metadata
+        |> Map.merge(%{
+          model: model,
+          dimensions: get_in(response, [:usage, :dimensions]) || List.first(response) |> length()
+        })
+        |> Observe.sanitize_sensitive()
+
+      Observe.emit(obs_cfg, @telemetry_prefix ++ [:complete], measurements, result_metadata)
       {:ok, format_result(response, model)}
     else
-      {:error, reason} -> {:error, sanitize_error_for_user(reason)}
+      {:error, reason} ->
+        duration_native = System.monotonic_time() - start_time
+
+        error_metadata =
+          metadata
+          |> Map.merge(%{
+            error_type: :llm_error,
+            error_reason: inspect(reason)
+          })
+          |> Observe.sanitize_sensitive()
+
+        Observe.emit(
+          obs_cfg,
+          @telemetry_prefix ++ [:error],
+          %{
+            duration: duration_native,
+            duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+          },
+          error_metadata
+        )
+
+        {:error, sanitize_error_for_user(reason)}
     end
   end
 

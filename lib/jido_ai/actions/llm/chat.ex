@@ -59,7 +59,10 @@ defmodule Jido.AI.Actions.LLM.Chat do
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Error.Sanitize
+  alias Jido.AI.Observe
   alias ReqLLM.Context
+
+  @telemetry_prefix [:jido, :ai, :llm, :chat]
 
   @doc """
   Executes the chat action.
@@ -84,15 +87,69 @@ defmodule Jido.AI.Actions.LLM.Chat do
   @impl Jido.Action
   def run(params, context) do
     params = apply_context_defaults(params, context)
+    obs_cfg = context[:observability] || %{}
+
+    metadata = %{
+      action: "llm_chat",
+      model: params[:model],
+      prompt_length: String.length(params[:prompt] || "")
+    }
+
+    Observe.emit(
+      obs_cfg,
+      @telemetry_prefix ++ [:start],
+      %{system_time: System.system_time()},
+      metadata
+    )
+
+    start_time = System.monotonic_time()
 
     with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
          {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
-         {:ok, req_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         {:ok, req_context} <-
+           build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          opts = Helpers.build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, req_context.messages, opts) do
+      duration_native = System.monotonic_time() - start_time
+
+      measurements = %{
+        duration: duration_native,
+        duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+      }
+
+      result_metadata =
+        metadata
+        |> Map.merge(%{
+          model: model,
+          usage: Helpers.extract_usage(response)
+        })
+        |> Observe.sanitize_sensitive()
+
+      Observe.emit(obs_cfg, @telemetry_prefix ++ [:complete], measurements, result_metadata)
       {:ok, format_result(response, model)}
     else
-      {:error, reason} -> {:error, sanitize_error_for_user(reason)}
+      {:error, reason} ->
+        duration_native = System.monotonic_time() - start_time
+
+        error_metadata =
+          metadata
+          |> Map.merge(%{
+            error_type: :llm_error,
+            error_reason: inspect(reason)
+          })
+          |> Observe.sanitize_sensitive()
+
+        Observe.emit(
+          obs_cfg,
+          @telemetry_prefix ++ [:error],
+          %{
+            duration: duration_native,
+            duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+          },
+          error_metadata
+        )
+
+        {:error, sanitize_error_for_user(reason)}
     end
   end
 
