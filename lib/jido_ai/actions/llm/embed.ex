@@ -73,7 +73,7 @@ defmodule Jido.AI.Actions.LLM.Embed do
   alias Jido.AI.Observe
   alias Jido.AI.Validation
 
-  @telemetry_prefix [:jido, :ai, :llm, :embed]
+  @telemetry_prefix [:jido, :ai, :llm]
 
   @doc """
   Executes the embedding action.
@@ -88,25 +88,25 @@ defmodule Jido.AI.Actions.LLM.Embed do
     params = apply_context_defaults(params, context)
     obs_cfg = context[:observability] || %{}
 
-    texts = normalize_texts(params[:texts], params[:texts_list])
-
-    metadata = %{
+    initial_metadata = %{
       action: "llm_embed",
-      model: params[:model],
-      text_count: length(texts),
-      total_text_length: Enum.reduce(texts, 0, fn t, acc -> acc + String.length(t) end)
+      model: params[:model]
     }
 
     Observe.emit(
       obs_cfg,
       @telemetry_prefix ++ [:start],
       %{system_time: System.system_time()},
-      metadata
+      initial_metadata
     )
 
     start_time = System.monotonic_time()
 
-    with {:ok, _validated} <- validate_and_sanitize_params(params),
+    with {:ok, validated} <- validate_and_sanitize_params(params),
+         texts = normalize_texts(validated[:texts], validated[:texts_list]),
+         text_count = length(texts),
+         total_text_length = calculate_total_length(texts),
+         metadata = Map.merge(initial_metadata, %{text_count: text_count, total_text_length: total_text_length}),
          {:ok, model} <- Helpers.resolve_model(params[:model], :embedding),
          opts = build_opts(params),
          {:ok, response} <- ReqLLM.Embedding.embed(model, texts, opts) do
@@ -121,7 +121,7 @@ defmodule Jido.AI.Actions.LLM.Embed do
         metadata
         |> Map.merge(%{
           model: model,
-          dimensions: get_in(response, [:usage, :dimensions]) || List.first(response) |> length()
+          dimensions: get_in(response, [:usage, :dimensions]) || extract_dimensions(response)
         })
         |> Observe.sanitize_sensitive()
 
@@ -281,6 +281,9 @@ defmodule Jido.AI.Actions.LLM.Embed do
   end
 
   defp extract_embeddings(embeddings) when is_list(embeddings), do: embeddings
+
+  defp calculate_total_length([]), do: 0
+  defp calculate_total_length(texts), do: Enum.reduce(texts, 0, fn t, acc -> acc + String.length(t) end)
 
   defp extract_dimensions([]), do: 0
   defp extract_dimensions([embedding | _]), do: length(embedding)

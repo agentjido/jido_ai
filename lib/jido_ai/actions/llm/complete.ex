@@ -52,7 +52,7 @@ defmodule Jido.AI.Actions.LLM.Complete do
   alias Jido.AI.Observe
   alias ReqLLM.Context
 
-  @telemetry_prefix [:jido, :ai, :llm, :complete]
+  @telemetry_prefix [:jido, :ai, :llm]
 
   @doc """
   Executes the completion action.
@@ -79,22 +79,23 @@ defmodule Jido.AI.Actions.LLM.Complete do
     params = apply_context_defaults(params, context)
     obs_cfg = context[:observability] || %{}
 
-    metadata = %{
+    initial_metadata = %{
       action: "llm_complete",
-      model: params[:model],
-      prompt_length: String.length(params[:prompt] || "")
+      model: params[:model]
     }
 
     Observe.emit(
       obs_cfg,
       @telemetry_prefix ++ [:start],
       %{system_time: System.system_time()},
-      metadata
+      initial_metadata
     )
 
     start_time = System.monotonic_time()
 
     with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
+         prompt_length = String.length(validated_params[:prompt] || ""),
+         metadata = Map.put(initial_metadata, :prompt_length, prompt_length),
          {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
          {:ok, req_context} <- build_messages(validated_params[:prompt]),
          opts = Helpers.build_opts(validated_params),

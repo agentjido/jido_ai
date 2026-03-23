@@ -62,7 +62,7 @@ defmodule Jido.AI.Actions.LLM.Chat do
   alias Jido.AI.Observe
   alias ReqLLM.Context
 
-  @telemetry_prefix [:jido, :ai, :llm, :chat]
+  @telemetry_prefix [:jido, :ai, :llm]
 
   @doc """
   Executes the chat action.
@@ -89,22 +89,23 @@ defmodule Jido.AI.Actions.LLM.Chat do
     params = apply_context_defaults(params, context)
     obs_cfg = context[:observability] || %{}
 
-    metadata = %{
+    initial_metadata = %{
       action: "llm_chat",
-      model: params[:model],
-      prompt_length: String.length(params[:prompt] || "")
+      model: params[:model]
     }
 
     Observe.emit(
       obs_cfg,
       @telemetry_prefix ++ [:start],
       %{system_time: System.system_time()},
-      metadata
+      initial_metadata
     )
 
     start_time = System.monotonic_time()
 
     with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
+         prompt_length = String.length(validated_params[:prompt] || ""),
+         metadata = Map.put(initial_metadata, :prompt_length, prompt_length),
          {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
          {:ok, req_context} <-
            build_messages(validated_params[:prompt], validated_params[:system_prompt]),
