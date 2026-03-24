@@ -1020,26 +1020,30 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     do: {:ok, state}
 
   defp drain_pending_input(%State{} = state, owner, ref, %Config{pending_input_server: server}) do
-    with {:ok, items} <- PendingInputServer.drain_result(server) do
-      next_state =
-        Enum.reduce(items, state, fn item, acc ->
-          refs = normalize_optional_refs(item[:refs])
-          next_context = AIContext.append_user(acc.context, item.content, refs: refs)
-          next_state = %{acc | context: next_context}
+    case PendingInputServer.drain_result(server) do
+      {:ok, items} ->
+        next_state =
+          Enum.reduce(items, state, fn item, acc ->
+            refs = normalize_optional_refs(item[:refs])
+            next_context = AIContext.append_user(acc.context, item.content, refs: refs)
+            next_state = %{acc | context: next_context}
 
-          {next_state, _} =
-            emit_event(next_state, owner, ref, :input_injected, %{
-              input_id: item.id,
-              content: item.content,
-              source: item.source,
-              refs: refs,
-              at_ms: item.at_ms
-            })
+            {next_state, _} =
+              emit_event(next_state, owner, ref, :input_injected, %{
+                input_id: item.id,
+                content: item.content,
+                source: item.source,
+                refs: refs,
+                at_ms: item.at_ms
+              })
 
-          next_state
-        end)
+            next_state
+          end)
 
-      {:ok, next_state}
+        {:ok, next_state}
+
+      {:error, reason} ->
+        {:error, state, reason}
     end
   end
 
