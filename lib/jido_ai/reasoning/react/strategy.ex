@@ -1135,8 +1135,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp project_context_from_entries(entries, context_ref, %AIContext{} = fallback_context)
        when is_list(entries) do
     {anchor_context, anchor_seq} =
-      Enum.reduce(entries, {fallback_context, -1}, fn entry,
-                                                      {current_context, current_anchor_seq} ->
+      Enum.reduce(entries, {fallback_context, -1}, fn entry, {current_context, current_anchor_seq} ->
         with :ai_context_operation <- fetch_map_value(entry, :kind),
              payload when is_map(payload) <- fetch_map_value(entry, :payload),
              ^context_ref <- fetch_map_value(payload, :context_ref),
@@ -1790,9 +1789,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp worker_cancel_signal(request_id, reason) do
-    Jido.Signal.new!("ai.react.worker.cancel", %{request_id: request_id, reason: reason},
-      source: @source
-    )
+    Jido.Signal.new!("ai.react.worker.cancel", %{request_id: request_id, reason: reason}, source: @source)
   end
 
   defp react_worker_tag?(tag), do: tag == @worker_tag or tag == Atom.to_string(@worker_tag)
@@ -1902,9 +1899,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         Map.put(
           state,
           :run_context,
-          AIContext.append_tool_result(context, tool_call_id, tool_name, content,
-            refs: normalize_refs(refs)
-          )
+          AIContext.append_tool_result(context, tool_call_id, tool_name, content, refs: normalize_refs(refs))
         )
 
       _ ->
@@ -1994,8 +1989,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       tools: tools_modules,
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
-      request_transformer:
-        validate_request_transformer_opt!(Keyword.get(opts, :request_transformer)),
+      request_transformer: validate_request_transformer_opt!(Keyword.get(opts, :request_transformer)),
       system_prompt: normalize_system_prompt_opt(opts),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
@@ -2025,10 +2019,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         ),
       agent_id: agent.id,
       base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt,
-      base_req_http_options:
-        opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options(),
-      base_llm_opts:
-        opts |> Keyword.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string),
+      base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options(),
+      base_llm_opts: opts |> Keyword.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string),
       provider_opt_keys_by_string: provider_opt_keys_by_string
     }
   end
@@ -2087,9 +2079,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp resolve_request_transformer(config, params) do
-    case validate_request_transformer(
-           Map.get(params, :request_transformer, config[:request_transformer])
-         ) do
+    case validate_request_transformer(Map.get(params, :request_transformer, config[:request_transformer])) do
       {:ok, module} ->
         {:ok, module}
 
