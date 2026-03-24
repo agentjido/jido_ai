@@ -1,5 +1,11 @@
 defmodule Jido.AI.PendingInputServer do
-  @moduledoc false
+  @moduledoc """
+  Per-run FIFO queue for ReAct steering input.
+
+  The server is owned by the parent ReAct strategy process for the active run.
+  Inputs are accepted synchronously, drained by the runtime before LLM turns,
+  and the queue can be sealed at terminal boundaries to reject late arrivals.
+  """
 
   use GenServer
 
@@ -20,11 +26,17 @@ defmodule Jido.AI.PendingInputServer do
         }
 
   @spec start_link(keyword()) :: GenServer.on_start()
+  @doc """
+  Starts a pending-input queue for a single active run.
+  """
   def start_link(opts) when is_list(opts) do
     GenServer.start_link(__MODULE__, opts)
   end
 
   @spec enqueue(GenServer.server(), input_item(), timeout()) :: :ok | {:error, term()}
+  @doc """
+  Enqueues a user-style input item for later consumption by the runtime.
+  """
   def enqueue(server, input_item, timeout \\ 5_000) when is_map(input_item) do
     GenServer.call(server, {:enqueue, input_item}, timeout)
   catch
@@ -32,6 +44,9 @@ defmodule Jido.AI.PendingInputServer do
   end
 
   @spec drain(GenServer.server(), timeout()) :: [map()]
+  @doc """
+  Returns all queued input items in FIFO order and clears the queue.
+  """
   def drain(server, timeout \\ 5_000) do
     GenServer.call(server, :drain, timeout)
   catch
@@ -39,6 +54,9 @@ defmodule Jido.AI.PendingInputServer do
   end
 
   @spec has_pending?(GenServer.server(), timeout()) :: boolean()
+  @doc """
+  Returns true when the queue currently contains at least one item.
+  """
   def has_pending?(server, timeout \\ 5_000) do
     GenServer.call(server, :has_pending?, timeout)
   catch
@@ -46,6 +64,9 @@ defmodule Jido.AI.PendingInputServer do
   end
 
   @spec seal(GenServer.server(), timeout()) :: :ok | {:error, term()}
+  @doc """
+  Seals the queue so future enqueue attempts are rejected.
+  """
   def seal(server, timeout \\ 5_000) do
     GenServer.call(server, :seal, timeout)
   catch
@@ -53,6 +74,12 @@ defmodule Jido.AI.PendingInputServer do
   end
 
   @spec seal_if_empty(GenServer.server(), timeout()) :: :sealed | :pending | {:error, term()}
+  @doc """
+  Seals the queue only when it is empty.
+
+  Returns `:sealed` when the queue is empty and has been sealed, or `:pending`
+  when items remain and the queue must be drained before completion.
+  """
   def seal_if_empty(server, timeout \\ 5_000) do
     GenServer.call(server, :seal_if_empty, timeout)
   catch
@@ -60,6 +87,9 @@ defmodule Jido.AI.PendingInputServer do
   end
 
   @spec stop(GenServer.server()) :: :ok
+  @doc """
+  Stops the queue process, ignoring shutdown races.
+  """
   def stop(server) do
     GenServer.stop(server, :normal)
   catch
