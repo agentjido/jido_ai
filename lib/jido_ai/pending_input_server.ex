@@ -9,6 +9,8 @@ defmodule Jido.AI.PendingInputServer do
 
   use GenServer
 
+  @default_max_queue_size 64
+
   @type input_item :: %{
           optional(:id) => String.t(),
           required(:content) => String.t(),
@@ -22,8 +24,21 @@ defmodule Jido.AI.PendingInputServer do
           owner_ref: reference(),
           request_id: String.t() | nil,
           queue: :queue.queue(map()),
+          queue_len: non_neg_integer(),
+          max_queue_size: pos_integer(),
           sealed?: boolean()
         }
+
+  @spec start(keyword()) :: GenServer.on_start()
+  @doc """
+  Starts a pending-input queue without linking it to the caller.
+
+  The queue already monitors its `:owner`, so callers that want fault isolation
+  should prefer this entrypoint over `start_link/1`.
+  """
+  def start(opts) when is_list(opts) do
+    GenServer.start(__MODULE__, opts)
+  end
 
   @spec start_link(keyword()) :: GenServer.on_start()
   @doc """
@@ -51,6 +66,19 @@ defmodule Jido.AI.PendingInputServer do
     GenServer.call(server, :drain, timeout)
   catch
     :exit, _ -> []
+  end
+
+  @spec drain_result(GenServer.server(), timeout()) :: {:ok, [map()]} | {:error, term()}
+  @doc """
+  Returns all queued input items in FIFO order and clears the queue.
+
+  Unlike `drain/2`, this preserves queue availability failures so callers can
+  fail the active run instead of silently dropping steering state.
+  """
+  def drain_result(server, timeout \\ 5_000) do
+    {:ok, GenServer.call(server, :drain, timeout)}
+  catch
+    :exit, _ -> {:error, :unavailable}
   end
 
   @spec has_pending?(GenServer.server(), timeout()) :: boolean()
@@ -107,6 +135,8 @@ defmodule Jido.AI.PendingInputServer do
        owner_ref: owner_ref,
        request_id: Keyword.get(opts, :request_id),
        queue: :queue.new(),
+       queue_len: 0,
+       max_queue_size: normalize_max_queue_size(Keyword.get(opts, :max_queue_size)),
        sealed?: false
      }}
   end
@@ -119,7 +149,11 @@ defmodule Jido.AI.PendingInputServer do
   def handle_call({:enqueue, input_item}, _from, state) do
     case normalize_input_item(input_item) do
       {:ok, item} ->
-        {:reply, :ok, %{state | queue: :queue.in(item, state.queue)}}
+        if state.queue_len >= state.max_queue_size do
+          {:reply, {:error, :queue_full}, state}
+        else
+          {:reply, :ok, %{state | queue: :queue.in(item, state.queue), queue_len: state.queue_len + 1}}
+        end
 
       {:error, reason} ->
         {:reply, {:error, reason}, state}
@@ -127,11 +161,11 @@ defmodule Jido.AI.PendingInputServer do
   end
 
   def handle_call(:drain, _from, state) do
-    {:reply, :queue.to_list(state.queue), %{state | queue: :queue.new()}}
+    {:reply, :queue.to_list(state.queue), %{state | queue: :queue.new(), queue_len: 0}}
   end
 
   def handle_call(:has_pending?, _from, state) do
-    {:reply, not :queue.is_empty(state.queue), state}
+    {:reply, state.queue_len > 0, state}
   end
 
   def handle_call(:seal, _from, state) do
@@ -139,7 +173,7 @@ defmodule Jido.AI.PendingInputServer do
   end
 
   def handle_call(:seal_if_empty, _from, state) do
-    if :queue.is_empty(state.queue) do
+    if state.queue_len == 0 do
       {:reply, :sealed, %{state | sealed?: true}}
     else
       {:reply, :pending, state}
@@ -154,18 +188,27 @@ defmodule Jido.AI.PendingInputServer do
   def handle_info(_message, state), do: {:noreply, state}
 
   defp normalize_input_item(%{content: content} = item) when is_binary(content) do
-    {:ok,
-     %{
-       id: Map.get(item, :id, "inp_#{Jido.Util.generate_id()}"),
-       content: content,
-       source: Map.get(item, :source),
-       refs: normalize_refs(Map.get(item, :refs)),
-       at_ms: Map.get(item, :at_ms, System.system_time(:millisecond))
-     }}
+    trimmed = String.trim(content)
+
+    if trimmed == "" do
+      {:error, :empty_content}
+    else
+      {:ok,
+       %{
+         id: Map.get(item, :id, "inp_#{Jido.Util.generate_id()}"),
+         content: trimmed,
+         source: Map.get(item, :source),
+         refs: normalize_refs(Map.get(item, :refs)),
+         at_ms: Map.get(item, :at_ms, System.system_time(:millisecond))
+       }}
+    end
   end
 
   defp normalize_input_item(_item), do: {:error, :invalid_input}
 
   defp normalize_refs(%{} = refs), do: refs
   defp normalize_refs(_), do: nil
+
+  defp normalize_max_queue_size(size) when is_integer(size) and size > 0, do: size
+  defp normalize_max_queue_size(_size), do: @default_max_queue_size
 end

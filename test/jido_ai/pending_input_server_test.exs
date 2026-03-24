@@ -36,6 +36,18 @@ defmodule Jido.AI.PendingInputServerTest do
     assert :ok = PendingInputServer.enqueue(server, %{content: "next"})
   end
 
+  test "rejects blank input and enforces a bounded queue" do
+    {:ok, server} =
+      PendingInputServer.start_link(owner: self(), request_id: "req_bounded", max_queue_size: 2)
+
+    assert {:error, :empty_content} = PendingInputServer.enqueue(server, %{content: "   "})
+    assert :ok = PendingInputServer.enqueue(server, %{content: " first "})
+    assert :ok = PendingInputServer.enqueue(server, %{content: "second"})
+    assert {:error, :queue_full} = PendingInputServer.enqueue(server, %{content: "third"})
+
+    assert [%{content: "first"}, %{content: "second"}] = PendingInputServer.drain(server)
+  end
+
   test "server exits when its owner exits" do
     owner =
       spawn(fn ->

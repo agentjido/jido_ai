@@ -572,6 +572,35 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert [] == PendingInputServer.drain(state.pending_input_server)
     end
 
+    test "steer rejects blank content without mutating the queue" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_blank"})],
+          %{}
+        )
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.steer_action(), %{
+              content: "   ",
+              expected_request_id: "req_blank"
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.kind == :steer
+      assert state.last_pending_input_control.status == :rejected
+      assert state.last_pending_input_control.reason == :empty_content
+      assert [] == PendingInputServer.drain(state.pending_input_server)
+    end
+
     test "input_injected runtime events update run context and append a user thread entry" do
       agent = create_agent(tools: [TestCalculator])
 

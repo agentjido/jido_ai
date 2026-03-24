@@ -307,6 +307,41 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == "A2"
   end
 
+  test "fails the request when the pending input queue disappears before final completion" do
+    {:ok, pending_input_server} =
+      PendingInputServer.start(owner: self(), request_id: "req_pending_server_exit")
+
+    on_exit(fn ->
+      if Process.alive?(pending_input_server), do: PendingInputServer.stop(pending_input_server)
+    end)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      assert user_contents(messages) == ["Q1"]
+      assert assistant_contents(messages) == []
+
+      Process.exit(pending_input_server, :kill)
+
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("A1")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
+         model
+       )}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, pending_input_server: pending_input_server})
+
+    events =
+      ReAct.stream("Q1", config, request_id: "req_pending_server_exit", run_id: "req_pending_server_exit")
+      |> Enum.to_list()
+
+    refute Enum.any?(events, &(&1.kind == :request_completed))
+
+    request_failed = Enum.find(events, &(&1.kind == :request_failed))
+    assert request_failed.data.error == {:pending_input_server, :unavailable}
+    assert request_failed.data.error_type == :runtime
+  end
+
   test "uses non-streaming generation when streaming is disabled" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
       flunk("stream_text should not be called when ReAct streaming is disabled")

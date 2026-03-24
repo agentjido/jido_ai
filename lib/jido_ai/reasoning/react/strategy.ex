@@ -1950,7 +1950,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp start_pending_input_server(request_id) when is_binary(request_id) do
-    case PendingInputServer.start_link(owner: self(), request_id: request_id) do
+    case PendingInputServer.start(owner: self(), request_id: request_id) do
       {:ok, pid} -> {:ok, pid}
       {:error, _reason} -> {:error, :pending_input_unavailable}
     end

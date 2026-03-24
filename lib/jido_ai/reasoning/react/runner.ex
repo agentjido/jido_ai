@@ -180,51 +180,45 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         end)
 
       true ->
-        state = drain_pending_input(state, owner, ref, config)
+        case drain_pending_input(state, owner, ref, config) do
+          {:ok, state} ->
+            case run_llm_step(state, owner, ref, config, context) do
+              {:final_answer, state} ->
+                case maybe_continue_after_final_answer(state, owner, ref, config) do
+                  {:continue, state} ->
+                    run_loop(state, owner, ref, config, context)
 
-        case run_llm_step(state, owner, ref, config, context) do
-          {:final_answer, state} ->
-            case maybe_continue_after_final_answer(state, owner, ref, config) do
-              {:continue, state} ->
+                  {:complete, state} ->
+                    state
+
+                  {:error, state, reason, error_type} ->
+                    fail_run(state, owner, ref, config, reason, error_type)
+                end
+
+              {:tool_calls, state, tool_calls} ->
+                prev_signature = Map.get(state, :__prev_tool_signature__)
+                current_signature = tool_call_signature(tool_calls)
+
+                {state, context} = run_tool_round(state, owner, ref, config, context, tool_calls)
+
+                state = Map.put(state, :__prev_tool_signature__, current_signature)
+
+                state =
+                  if prev_signature == current_signature and prev_signature != nil do
+                    corrected_context = AIContext.append_user(state.context, @cycle_warning)
+                    %{state | context: corrected_context}
+                  else
+                    state
+                  end
+
                 run_loop(state, owner, ref, config, context)
 
-              {:complete, state} ->
-                state
+              {:error, state, reason, error_type} ->
+                fail_run(state, owner, ref, config, reason, error_type)
             end
 
-          {:tool_calls, state, tool_calls} ->
-            prev_signature = Map.get(state, :__prev_tool_signature__)
-            current_signature = tool_call_signature(tool_calls)
-
-            {state, context} = run_tool_round(state, owner, ref, config, context, tool_calls)
-
-            state = Map.put(state, :__prev_tool_signature__, current_signature)
-
-            state =
-              if prev_signature == current_signature and prev_signature != nil do
-                corrected_context = AIContext.append_user(state.context, @cycle_warning)
-                %{state | context: corrected_context}
-              else
-                state
-              end
-
-            run_loop(state, owner, ref, config, context)
-
-          {:error, state, reason, error_type} ->
-            seal_pending_input_server(config)
-
-            state
-            |> State.put_status(:failed)
-            |> State.put_error(reason)
-            |> then(fn failed ->
-              {failed, _} =
-                emit_event(failed, owner, ref, :request_failed, %{
-                  error: reason,
-                  error_type: error_type
-                })
-
-              failed
-            end)
+          {:error, state, reason} ->
+            fail_run(state, owner, ref, config, {:pending_input_server, reason}, :runtime)
         end
     end
   end
@@ -993,16 +987,21 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp maybe_continue_after_final_answer(%State{} = state, owner, ref, %Config{} = config) do
     case seal_pending_input_server_if_empty(config) do
       :pending ->
-        state =
-          state
-          |> drain_pending_input(owner, ref, config)
-          |> State.put_status(:running)
-          |> State.put_result(nil)
-          |> State.inc_iteration()
+        case drain_pending_input(state, owner, ref, config) do
+          {:ok, state} ->
+            state =
+              state
+              |> State.put_status(:running)
+              |> State.put_result(nil)
+              |> State.inc_iteration()
 
-        {:continue, state}
+            {:continue, state}
 
-      _ ->
+          {:error, state, reason} ->
+            {:error, state, {:pending_input_server, reason}, :runtime}
+        end
+
+      :sealed ->
         {state, _} =
           emit_event(state, owner, ref, :request_completed, %{
             result: state.result,
@@ -1011,27 +1010,53 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           })
 
         {:complete, state}
+
+      {:error, reason} ->
+        {:error, state, {:pending_input_server, reason}, :runtime}
     end
   end
 
-  defp drain_pending_input(%State{} = state, _owner, _ref, %Config{pending_input_server: nil}), do: state
+  defp drain_pending_input(%State{} = state, _owner, _ref, %Config{pending_input_server: nil}),
+    do: {:ok, state}
 
   defp drain_pending_input(%State{} = state, owner, ref, %Config{pending_input_server: server}) do
-    Enum.reduce(PendingInputServer.drain(server), state, fn item, acc ->
-      refs = normalize_optional_refs(item[:refs])
-      next_context = AIContext.append_user(acc.context, item.content, refs: refs)
-      next_state = %{acc | context: next_context}
+    with {:ok, items} <- PendingInputServer.drain_result(server) do
+      next_state =
+        Enum.reduce(items, state, fn item, acc ->
+          refs = normalize_optional_refs(item[:refs])
+          next_context = AIContext.append_user(acc.context, item.content, refs: refs)
+          next_state = %{acc | context: next_context}
 
-      {next_state, _} =
-        emit_event(next_state, owner, ref, :input_injected, %{
-          input_id: item.id,
-          content: item.content,
-          source: item.source,
-          refs: refs,
-          at_ms: item.at_ms
+          {next_state, _} =
+            emit_event(next_state, owner, ref, :input_injected, %{
+              input_id: item.id,
+              content: item.content,
+              source: item.source,
+              refs: refs,
+              at_ms: item.at_ms
+            })
+
+          next_state
+        end)
+
+      {:ok, next_state}
+    end
+  end
+
+  defp fail_run(%State{} = state, owner, ref, %Config{} = config, reason, error_type) do
+    seal_pending_input_server(config)
+
+    state
+    |> State.put_status(:failed)
+    |> State.put_error(reason)
+    |> then(fn failed ->
+      {failed, _} =
+        emit_event(failed, owner, ref, :request_failed, %{
+          error: reason,
+          error_type: error_type
         })
 
-      next_state
+      failed
     end)
   end
 
