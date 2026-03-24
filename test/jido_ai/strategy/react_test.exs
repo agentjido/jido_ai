@@ -722,7 +722,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.active_request_id == nil
       assert state.react_worker_pid == nil
       assert state.react_worker_status == :missing
-      assert state.result =~ "react_worker_exit"
+      assert state.result == {:react_worker_exit, :killed}
     end
 
     test "stores request trace up to 2000 events then marks truncated" do
@@ -916,6 +916,36 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert last_entry.kind == :ai_context_operation
       assert last_entry.payload.operation.type == :replace
       assert last_entry.payload.operation.reason == :manual
+    end
+
+    test "request_failed preserves raw error in snapshot result" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_raw_error"})],
+          %{}
+        )
+
+      error_struct = %{type: :stream_error, status: 503, message: "Too many connections"}
+
+      failed_event =
+        runtime_event(:request_failed, "req_raw_error", 2, %{
+          error: error_struct
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_raw_error", event: failed_event})],
+          %{}
+        )
+
+      snapshot = ReAct.snapshot(agent, %{})
+      assert snapshot.status == :failure
+      assert snapshot.done?
+      assert snapshot.result == error_struct
     end
 
     test "context.modify replace while active run is deferred and applied after request failure" do

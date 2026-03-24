@@ -125,7 +125,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.StrategyTest do
       state = StratState.get(agent, %{})
       assert state[:status] == :error
       assert state[:termination_reason] == :error
-      assert state[:result] =~ "rate_limited"
+      assert state[:result] == :rate_limited
       assert state[:active_request_id] == nil
     end
 

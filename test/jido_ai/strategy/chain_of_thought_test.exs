@@ -215,7 +215,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       state = StratState.get(agent, %{})
       assert state[:status] == :error
       assert state[:termination_reason] == :error
-      assert state[:result] =~ "rate_limited"
+      assert state[:result] == :rate_limited
       assert state[:active_request_id] == nil
     end
 
@@ -237,8 +237,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       state = StratState.get(agent, %{})
       assert state[:status] == :error
       assert state[:termination_reason] == :error
-      assert state[:result] =~ "cancelled"
-      assert state[:result] =~ "user_cancelled"
+      assert state[:result] == {:cancelled, :user_cancelled}
       assert state[:active_request_id] == nil
     end
 
@@ -288,7 +287,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       assert state[:status] == :error
       assert state[:active_request_id] == nil
       assert state[:cot_worker_status] == :missing
-      assert state[:result] =~ "cot_worker_exit"
+      assert state[:result] == {:cot_worker_exit, :killed}
     end
 
     test "busy second request emits request error directive" do
