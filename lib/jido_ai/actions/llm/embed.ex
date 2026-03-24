@@ -164,9 +164,8 @@ defmodule Jido.AI.Actions.LLM.Embed do
   # Private Functions
 
   defp validate_and_sanitize_params(params) do
-    with {:ok, _validated} <- validate_texts(params) do
-      {:ok, params}
-    else
+    case validate_texts(params) do
+      {:ok, _validated} -> {:ok, params}
       {:error, reason} -> {:error, reason}
     end
   end
