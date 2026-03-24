@@ -220,6 +220,8 @@ defmodule Jido.AI.AgentTest do
     test "compiles agent with basic options" do
       assert function_exported?(BasicAgent, :ask, 2)
       assert function_exported?(BasicAgent, :ask, 3)
+      assert function_exported?(BasicAgent, :steer, 3)
+      assert function_exported?(BasicAgent, :inject, 3)
       assert function_exported?(BasicAgent, :on_before_cmd, 2)
       assert function_exported?(BasicAgent, :on_after_cmd, 3)
     end

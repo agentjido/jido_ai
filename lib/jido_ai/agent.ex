@@ -773,7 +773,38 @@ defmodule Jido.AI.Agent do
         Jido.AgentServer.cast(pid, signal)
       end
 
-      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3, cancel: 2
+      @doc """
+      Steer an active request with additional user-visible input.
+
+      Returns `{:ok, agent}` when the input is accepted for the current ReAct run
+      or `{:error, {:rejected, reason}}` when no eligible run is active.
+      """
+      @spec steer(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, Jido.Agent.t()} | {:error, term()}
+      def steer(pid, content, opts \\ []) when is_binary(content) do
+        Jido.AI.steer(pid, content, Keyword.put_new(opts, :source, "/ai/react/agent"))
+      end
+
+      @doc """
+      Inject user-visible input into an active request.
+
+      This is intended for programmatic or inter-agent steering and follows the
+      same acceptance rules as `steer/3`.
+      """
+      @spec inject(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, Jido.Agent.t()} | {:error, term()}
+      def inject(pid, content, opts \\ []) when is_binary(content) do
+        Jido.AI.inject(pid, content, Keyword.put_new(opts, :source, "/ai/react/agent"))
+      end
+
+      defoverridable on_before_cmd: 2,
+                     on_after_cmd: 3,
+                     ask: 3,
+                     await: 2,
+                     ask_sync: 3,
+                     cancel: 2,
+                     steer: 3,
+                     inject: 3
     end
   end
 

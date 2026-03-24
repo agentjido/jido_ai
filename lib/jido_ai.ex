@@ -329,6 +329,38 @@ defmodule Jido.AI do
   end
 
   @doc """
+  Steers an active ReAct run with additional user-visible input.
+
+  Returns `{:ok, agent}` when the input is accepted for the active run or
+  `{:error, {:rejected, reason}}` when no eligible run is available.
+
+  ## Options
+
+    * `:timeout` - Call timeout in milliseconds (default: 5000)
+    * `:expected_request_id` - Optional guard for the currently active request
+    * `:source` - Optional source marker recorded with the injected input
+    * `:extra_refs` - Optional refs merged into the injected user message
+
+  """
+  @spec steer(GenServer.server(), String.t(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def steer(agent_server, content, opts \\ []) when is_binary(content) do
+    control_agent(agent_server, "ai.react.steer", content, opts, :steer)
+  end
+
+  @doc """
+  Injects user-visible input into an active ReAct run.
+
+  This is intended for programmatic or inter-agent steering and follows the same
+  acceptance rules as `steer/3`.
+  """
+  @spec inject(GenServer.server(), String.t(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def inject(agent_server, content, opts \\ []) when is_binary(content) do
+    control_agent(agent_server, "ai.react.inject", content, opts, :inject)
+  end
+
+  @doc """
   Lists all currently registered tools for an agent.
 
   Can be called with either an agent struct or an agent server (PID/name).
@@ -486,6 +518,47 @@ defmodule Jido.AI do
 
       _ ->
         strat_state
+    end
+  end
+
+  defp control_agent(agent_server, signal_type, content, opts, kind)
+       when is_binary(signal_type) and is_binary(content) and kind in [:steer, :inject] do
+    timeout = Keyword.get(opts, :timeout, 5_000)
+
+    signal =
+      Jido.Signal.new!(
+        signal_type,
+        %{
+          content: content
+        }
+        |> maybe_put_control_opt(:expected_request_id, Keyword.get(opts, :expected_request_id))
+        |> maybe_put_control_opt(:source, Keyword.get(opts, :source, "/jido/ai"))
+        |> maybe_put_control_opt(:extra_refs, Keyword.get(opts, :extra_refs)),
+        source: "/jido/ai"
+      )
+
+    case Jido.AgentServer.call(agent_server, signal, timeout) do
+      {:ok, agent} ->
+        normalize_control_result(agent, kind)
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp maybe_put_control_opt(payload, _key, nil), do: payload
+  defp maybe_put_control_opt(payload, key, value), do: Map.put(payload, key, value)
+
+  defp normalize_control_result(%Jido.Agent{} = agent, kind) do
+    case StratState.get(agent, %{}) |> Map.get(:last_pending_input_control) do
+      %{kind: ^kind, status: :accepted} ->
+        {:ok, agent}
+
+      %{kind: ^kind, status: :rejected, reason: reason} ->
+        {:error, {:rejected, reason}}
+
+      _ ->
+        {:error, :unknown_control_result}
     end
   end
 

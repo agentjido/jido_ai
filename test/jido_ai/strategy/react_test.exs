@@ -4,6 +4,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
+  alias Jido.AI.PendingInputServer
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
@@ -111,6 +112,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       route_map = Map.new(routes)
 
       assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
+      assert route_map["ai.react.steer"] == {:strategy_cmd, :ai_react_steer}
+      assert route_map["ai.react.inject"] == {:strategy_cmd, :ai_react_inject}
       assert route_map["ai.react.set_system_prompt"] == {:strategy_cmd, :ai_react_set_system_prompt}
       refute Map.has_key?(route_map, "ai.react.set_context")
       assert route_map["ai.react.context.modify"] == {:strategy_cmd, :ai_react_context_modify}
@@ -485,11 +488,153 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert length(trace.events) == 1
     end
 
+    test "steer enqueues accepted input for an active run" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_steer"})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert is_pid(state.pending_input_server)
+      assert Process.alive?(state.pending_input_server)
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.steer_action(), %{
+              content: "Actually answer Q2",
+              expected_request_id: "req_steer",
+              source: "/test/steer",
+              extra_refs: %{origin: "suite"}
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.kind == :steer
+      assert state.last_pending_input_control.status == :accepted
+      assert state.last_pending_input_control.request_id == "req_steer"
+
+      [queued] = PendingInputServer.drain(state.pending_input_server)
+      assert queued.content == "Actually answer Q2"
+      assert queued.source == "/test/steer"
+      assert queued.refs == %{origin: "suite"}
+    end
+
+    test "inject rejects while idle" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.inject_action(), %{content: "Programmatic input"})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.kind == :inject
+      assert state.last_pending_input_control.status == :rejected
+      assert state.last_pending_input_control.reason == :idle
+    end
+
+    test "steer rejects request_id mismatches without mutating the queue" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_live"})],
+          %{}
+        )
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.steer_action(), %{
+              content: "Wrong run",
+              expected_request_id: "req_other"
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.kind == :steer
+      assert state.last_pending_input_control.status == :rejected
+      assert state.last_pending_input_control.reason == :request_mismatch
+      assert [] == PendingInputServer.drain(state.pending_input_server)
+    end
+
+    test "input_injected runtime events update run context and append a user thread entry" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_input_injected"})],
+          %{}
+        )
+
+      event =
+        runtime_event(:input_injected, "req_input_injected", 2, %{
+          content: "Actually answer Q2",
+          source: "/test/runtime",
+          refs: %{origin: "suite"}
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_input_injected", event: event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.status == :awaiting_llm
+      assert state.result == nil
+
+      run_messages = Jido.AI.Context.to_messages(state.run_context)
+      run_users = Enum.filter(run_messages, &(&1.role == :user))
+      assert Enum.map(run_users, & &1.content) == ["Q1", "Actually answer Q2"]
+
+      assert List.last(run_users).refs == %{
+               origin: "suite",
+               request_id: "req_input_injected",
+               run_id: "req_input_injected",
+               signal_id: "evt_2"
+             }
+
+      core_thread = ThreadAgent.get(agent)
+      ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
+      assert Enum.map(ai_messages, & &1.payload.role) == [:user, :user]
+
+      injected_entry = List.last(ai_messages)
+      assert injected_entry.payload.content == "Actually answer Q2"
+      assert injected_entry.refs.request_id == "req_input_injected"
+      assert injected_entry.refs.run_id == "req_input_injected"
+      assert injected_entry.refs.signal_id == "evt_2"
+      assert injected_entry.refs.source == "/test/runtime"
+      assert injected_entry.refs.origin == "suite"
+    end
+
     test "request_completed event marks request terminal and keeps checkpoint token" do
       agent = create_agent(tools: [TestCalculator])
 
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "q", request_id: "req_done"})],
+          %{}
+        )
+
       events = [
-        runtime_event(:request_started, "req_done", 1, %{query: "q"}),
         runtime_event(:checkpoint, "req_done", 2, %{token: "tok_1", reason: :after_llm}),
         runtime_event(:request_completed, "req_done", 3, %{
           result: "done",
@@ -509,6 +654,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.result == "done"
       assert state.checkpoint_token == "tok_1"
       assert state.react_worker_status == :ready
+      assert state.pending_input_server == nil
     end
 
     test "completed request history is reused for the next turn" do

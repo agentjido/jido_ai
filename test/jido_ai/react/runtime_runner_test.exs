@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   use Mimic
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.PendingInputServer
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Config
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReActStrategy
@@ -240,6 +241,70 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       |> Enum.to_list()
 
     assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "drains pending input after a final answer before completing the request" do
+    {:ok, pending_input_server} =
+      PendingInputServer.start_link(owner: self(), request_id: "req_pending_after_final")
+
+    on_exit(fn ->
+      if Process.alive?(pending_input_server), do: PendingInputServer.stop(pending_input_server)
+    end)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          assert user_contents(messages) == ["Q1"]
+          assert assistant_contents(messages) == []
+
+          assert :ok =
+                   PendingInputServer.enqueue(pending_input_server, %{
+                     content: "Actually answer Q2",
+                     source: "/test/runtime",
+                     refs: %{origin: "suite"}
+                   })
+
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("A1")],
+             %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
+             model
+           )}
+
+        2 ->
+          assert user_contents(messages) == ["Q1", "Actually answer Q2"]
+          assert assistant_contents(messages) == ["A1"]
+
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("A2")],
+             %{finish_reason: :stop, usage: %{input_tokens: 4, output_tokens: 2}},
+             model
+           )}
+      end
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, pending_input_server: pending_input_server})
+
+    events =
+      ReAct.stream("Q1", config, request_id: "req_pending_after_final", run_id: "req_pending_after_final")
+      |> Enum.to_list()
+
+    assert Enum.count(events, &(&1.kind == :llm_started)) == 2
+    assert Enum.count(events, &(&1.kind == :llm_completed)) == 2
+    assert Enum.count(events, &(&1.kind == :input_injected)) == 1
+    assert Enum.count(events, &(&1.kind == :request_completed)) == 1
+
+    input_injected = Enum.find(events, &(&1.kind == :input_injected))
+    assert input_injected.data.content == "Actually answer Q2"
+    assert input_injected.data.source == "/test/runtime"
+    assert input_injected.data.refs == %{origin: "suite"}
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert request_completed.data.result == "A2"
   end
 
   test "uses non-streaming generation when streaming is disabled" do
@@ -1274,6 +1339,33 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
        do: callback.(chunk)
 
   defp invoke_stream_specific_callback(_chunk, _callbacks), do: :ok
+
+  defp user_contents(messages) when is_list(messages) do
+    messages
+    |> Enum.filter(&(message_role(&1) == :user))
+    |> Enum.map(&message_content/1)
+  end
+
+  defp assistant_contents(messages) when is_list(messages) do
+    messages
+    |> Enum.filter(&(message_role(&1) == :assistant))
+    |> Enum.map(&message_content/1)
+  end
+
+  defp message_role(message) when is_map(message) do
+    case Map.get(message, :role, Map.get(message, "role")) do
+      role when is_atom(role) -> role
+      "user" -> :user
+      "assistant" -> :assistant
+      "tool" -> :tool
+      "system" -> :system
+      _ -> :unknown
+    end
+  end
+
+  defp message_content(message) when is_map(message) do
+    Map.get(message, :content, Map.get(message, "content"))
+  end
 
   defp maybe_invoke_chunk_callback(_chunk, callback) when not is_function(callback, 1), do: :ok
   defp maybe_invoke_chunk_callback(chunk, callback), do: callback.(chunk)

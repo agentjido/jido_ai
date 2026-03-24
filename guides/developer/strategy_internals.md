@@ -126,11 +126,22 @@ ReAct now uses explicit separation between core event log and LLM projection:
 Canonical ReAct control surface:
 
 - `ai.react.context.modify`
+- `ai.react.steer`
+- `ai.react.inject`
 
 Core thread entries emitted by ReAct:
 
 - `:ai_message` for user/assistant/tool message lifecycle
 - `:ai_context_operation` for context operations (`replace`, `switch`)
+
+Pending-input semantics:
+
+- active runs own a per-run `Jido.AI.PendingInputServer`
+- `ai.react.steer` and `ai.react.inject` synchronously enqueue user-style input there
+- queued input is not appended to the core thread on enqueue
+- runtime emits `:input_injected` only when it drains queued input into `run_context`
+- strategy appends a user `:ai_message` only on `:input_injected`, so undrained input is not persisted
+- `:request_completed` is emitted only after the runtime confirms the pending-input queue is empty and sealed
 
 Deferred semantics:
 

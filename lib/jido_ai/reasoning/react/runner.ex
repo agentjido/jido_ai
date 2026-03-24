@@ -6,6 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   state outside of caller-owned checkpoint tokens.
   """
 
+  alias Jido.AI.PendingInputServer
   alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token, ToolSelection}
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
@@ -118,6 +119,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       |> finalize(owner, ref, config)
     catch
       {:cancelled, %State{} = current_state, reason} ->
+        seal_pending_input_server(config)
+
         cancelled_state =
           current_state
           |> State.put_status(:cancelled)
@@ -130,6 +133,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         send(owner, {:react_runner, ref, :done})
 
       kind, reason ->
+        seal_pending_input_server(config)
+
         failed_state =
           state
           |> State.put_status(:failed)
@@ -158,6 +163,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         run_loop(state, owner, ref, config, context)
 
       state.iteration > config.max_iterations ->
+        seal_pending_input_server(config)
+
         state
         |> State.put_status(:completed)
         |> State.put_result("Maximum iterations reached without a final answer.")
@@ -173,9 +180,17 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         end)
 
       true ->
+        state = drain_pending_input(state, owner, ref, config)
+
         case run_llm_step(state, owner, ref, config, context) do
           {:final_answer, state} ->
-            state
+            case maybe_continue_after_final_answer(state, owner, ref, config) do
+              {:continue, state} ->
+                run_loop(state, owner, ref, config, context)
+
+              {:complete, state} ->
+                state
+            end
 
           {:tool_calls, state, tool_calls} ->
             prev_signature = Map.get(state, :__prev_tool_signature__)
@@ -196,6 +211,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             run_loop(state, owner, ref, config, context)
 
           {:error, state, reason, error_type} ->
+            seal_pending_input_server(config)
+
             state
             |> State.put_status(:failed)
             |> State.put_error(reason)
@@ -288,13 +305,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                 state
                 |> State.put_status(:completed)
                 |> State.put_result(turn.text)
-
-              {completed, _} =
-                emit_event(completed, owner, ref, :request_completed, %{
-                  result: turn.text,
-                  termination_reason: :final_answer,
-                  usage: completed.usage
-                })
 
               {:final_answer, completed}
           end
@@ -979,6 +989,63 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       0 -> :ok
     end
   end
+
+  defp maybe_continue_after_final_answer(%State{} = state, owner, ref, %Config{} = config) do
+    case seal_pending_input_server_if_empty(config) do
+      :pending ->
+        state =
+          state
+          |> drain_pending_input(owner, ref, config)
+          |> State.put_status(:running)
+          |> State.put_result(nil)
+          |> State.inc_iteration()
+
+        {:continue, state}
+
+      _ ->
+        {state, _} =
+          emit_event(state, owner, ref, :request_completed, %{
+            result: state.result,
+            termination_reason: :final_answer,
+            usage: state.usage
+          })
+
+        {:complete, state}
+    end
+  end
+
+  defp drain_pending_input(%State{} = state, _owner, _ref, %Config{pending_input_server: nil}), do: state
+
+  defp drain_pending_input(%State{} = state, owner, ref, %Config{pending_input_server: server}) do
+    Enum.reduce(PendingInputServer.drain(server), state, fn item, acc ->
+      refs = normalize_optional_refs(item[:refs])
+      next_context = AIContext.append_user(acc.context, item.content, refs: refs)
+      next_state = %{acc | context: next_context}
+
+      {next_state, _} =
+        emit_event(next_state, owner, ref, :input_injected, %{
+          input_id: item.id,
+          content: item.content,
+          source: item.source,
+          refs: refs,
+          at_ms: item.at_ms
+        })
+
+      next_state
+    end)
+  end
+
+  defp seal_pending_input_server(%Config{pending_input_server: nil}), do: :ok
+  defp seal_pending_input_server(%Config{pending_input_server: server}), do: PendingInputServer.seal(server)
+
+  defp seal_pending_input_server_if_empty(%Config{pending_input_server: nil}), do: :sealed
+
+  defp seal_pending_input_server_if_empty(%Config{pending_input_server: server}) do
+    PendingInputServer.seal_if_empty(server)
+  end
+
+  defp normalize_optional_refs(%{} = refs), do: refs
+  defp normalize_optional_refs(_), do: nil
 
   defp fetch_extra(extra, key, default \\ nil)
 
