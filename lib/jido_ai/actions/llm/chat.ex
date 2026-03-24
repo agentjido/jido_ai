@@ -88,11 +88,14 @@ defmodule Jido.AI.Actions.LLM.Chat do
   def run(params, context) do
     params = apply_context_defaults(params, context)
     obs_cfg = context[:observability] || %{}
+    prompt_length = if is_binary(params[:prompt]), do: String.length(params[:prompt]), else: 0
 
     initial_metadata = %{
       action: "llm_chat",
       model: params[:model]
     }
+
+    base_metadata = Map.put(initial_metadata, :prompt_length, prompt_length)
 
     Observe.emit(
       obs_cfg,
@@ -104,8 +107,6 @@ defmodule Jido.AI.Actions.LLM.Chat do
     start_time = System.monotonic_time()
 
     with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
-         prompt_length = String.length(validated_params[:prompt] || ""),
-         metadata = Map.put(initial_metadata, :prompt_length, prompt_length),
          {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
          {:ok, req_context} <-
            build_messages(validated_params[:prompt], validated_params[:system_prompt]),
@@ -119,7 +120,7 @@ defmodule Jido.AI.Actions.LLM.Chat do
       }
 
       result_metadata =
-        metadata
+        base_metadata
         |> Map.merge(%{
           model: model,
           usage: Helpers.extract_usage(response)
@@ -133,7 +134,7 @@ defmodule Jido.AI.Actions.LLM.Chat do
         duration_native = System.monotonic_time() - start_time
 
         error_metadata =
-          metadata
+          base_metadata
           |> Map.merge(%{
             error_type: :llm_error,
             error_reason: inspect(reason)

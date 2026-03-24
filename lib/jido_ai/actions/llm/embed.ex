@@ -88,10 +88,21 @@ defmodule Jido.AI.Actions.LLM.Embed do
     params = apply_context_defaults(params, context)
     obs_cfg = context[:observability] || %{}
 
+    telemetry_texts =
+      params
+      |> then(&normalize_texts(&1[:texts], &1[:texts_list]))
+      |> Enum.filter(&is_binary/1)
+
     initial_metadata = %{
       action: "llm_embed",
       model: params[:model]
     }
+
+    base_metadata =
+      Map.merge(initial_metadata, %{
+        text_count: length(telemetry_texts),
+        total_text_length: calculate_total_length(telemetry_texts)
+      })
 
     Observe.emit(
       obs_cfg,
@@ -104,9 +115,6 @@ defmodule Jido.AI.Actions.LLM.Embed do
 
     with {:ok, validated} <- validate_and_sanitize_params(params),
          texts = normalize_texts(validated[:texts], validated[:texts_list]),
-         text_count = length(texts),
-         total_text_length = calculate_total_length(texts),
-         metadata = Map.merge(initial_metadata, %{text_count: text_count, total_text_length: total_text_length}),
          {:ok, model} <- Helpers.resolve_model(params[:model], :embedding),
          opts = build_opts(params),
          {:ok, response} <- ReqLLM.Embedding.embed(model, texts, opts) do
@@ -118,7 +126,7 @@ defmodule Jido.AI.Actions.LLM.Embed do
       }
 
       result_metadata =
-        metadata
+        base_metadata
         |> Map.merge(%{
           model: model,
           dimensions: get_in(response, [:usage, :dimensions]) || extract_dimensions(response)
@@ -132,7 +140,7 @@ defmodule Jido.AI.Actions.LLM.Embed do
         duration_native = System.monotonic_time() - start_time
 
         error_metadata =
-          metadata
+          base_metadata
           |> Map.merge(%{
             error_type: :llm_error,
             error_reason: inspect(reason)
