@@ -178,6 +178,14 @@ defmodule Jido.AI.ToolAdapterTest do
       assert {:error, {:invalid_action, NotAnAction, _reason}} =
                ToolAdapter.validate_actions([ParamAction, NotAnAction])
     end
+
+    test "returns :not_loaded for a module that cannot be loaded" do
+      # Before the fix, a non-existent module would return :missing_name
+      # because function_exported?/3 returns false for unloaded modules.
+      # After the fix, it correctly returns :not_loaded.
+      assert {:error, {:invalid_action, This.Module.Does.Not.Exist, :not_loaded}} =
+               ToolAdapter.validate_actions([This.Module.Does.Not.Exist])
+    end
   end
 
   describe "to_action_map/1" do
