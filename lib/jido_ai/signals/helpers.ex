@@ -1,6 +1,10 @@
 defmodule Jido.AI.Signal.Helpers do
   @moduledoc """
-  Shared helpers for signal correlation and standardized error envelopes.
+  Shared helpers for signal correlation and standardized AI runtime error envelopes.
+
+  The envelope defined here is owned by `jido_ai`. Upstream packages such as
+  `jido_action` should expose only generic error information and retryability;
+  they are adapted to the AI runtime contract at this boundary.
   """
 
   alias Jido.Signal
