@@ -247,6 +247,7 @@ defmodule Jido.AI.ToolAdapter do
 
   defp validate_action_module(module) do
     cond do
+      not Code.ensure_loaded?(module) -> {:error, :not_loaded}
       not function_exported?(module, :name, 0) -> {:error, :missing_name}
       not function_exported?(module, :description, 0) -> {:error, :missing_description}
       not function_exported?(module, :schema, 0) -> {:error, :missing_schema}
