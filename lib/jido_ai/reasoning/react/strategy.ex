@@ -36,6 +36,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Observe
   alias Jido.AI.Directive
   alias Jido.AI.Effects
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
@@ -43,6 +44,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.Reasoning.ReAct.ToolSelection
   alias Jido.AI.Signal
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.ToolAdapter
@@ -1389,6 +1391,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     kind = event_kind(event)
     iteration = event_field(event, :iteration, state[:iteration] || 0)
     request_id = event_field(event, :request_id, state[:active_request_id])
+    run_id = event_field(event, :run_id, request_id)
     llm_call_id = event_field(event, :llm_call_id, state[:current_llm_call_id])
     data = event_field(event, :data, %{})
 
@@ -1415,9 +1418,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         signal =
           Signal.RequestStarted.new!(%{request_id: request_id, query: query, run_id: request_id})
 
+        emit_runtime_telemetry(state, :request_started, request_id, run_id, iteration, llm_call_id, event, data)
         {started_state, [signal]}
 
       :llm_started ->
+        emit_runtime_telemetry(state, :llm_started, request_id, run_id, iteration, llm_call_id, event, data)
         {Map.put(base_state, :status, :awaiting_llm), []}
 
       :llm_delta ->
@@ -1436,6 +1441,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         signal =
           Signal.LLMDelta.new!(%{call_id: llm_call_id || "", delta: delta, chunk_type: chunk_type})
 
+        emit_runtime_telemetry(state, :llm_delta, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :llm_completed ->
@@ -1489,10 +1495,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
                  reasoning_details: reasoning_details,
                  tool_calls: tool_calls,
                  usage: usage
-               }, []}
+               }, []},
+            metadata: runtime_signal_metadata(request_id, run_id, iteration, :generate_text)
           })
 
-        usage_signal = maybe_usage_signal(call_id, config_model(state), usage)
+        usage_signal = maybe_usage_signal(call_id, config_model(state), usage, request_id, run_id, iteration)
+        emit_runtime_telemetry(state, :llm_completed, request_id, run_id, iteration, call_id, event, data)
         {updated, Enum.reject([llm_signal, usage_signal], &is_nil/1)}
 
       :tool_started ->
@@ -1506,9 +1514,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           Signal.ToolStarted.new!(%{
             call_id: tool_call_id,
             tool_name: tool_name,
-            arguments: arguments
+            arguments: arguments,
+            metadata: runtime_signal_metadata(request_id, run_id, iteration, :tool_execute)
           })
 
+        emit_runtime_telemetry(state, :tool_started, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :tool_completed ->
@@ -1531,9 +1541,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           Signal.ToolResult.new!(%{
             call_id: tool_call_id,
             tool_name: tool_name,
-            result: tool_result
+            result: tool_result,
+            metadata: runtime_signal_metadata(request_id, run_id, iteration, :tool_execute)
           })
 
+        emit_runtime_telemetry(state, :tool_completed, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :request_completed ->
@@ -1560,6 +1572,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             run_id: request_id
           })
 
+        emit_runtime_telemetry(state, :request_completed, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :request_failed ->
@@ -1579,6 +1592,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         signal =
           Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
 
+        emit_runtime_telemetry(state, :request_failed, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :request_cancelled ->
@@ -1600,6 +1614,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         signal =
           Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
 
+        emit_runtime_telemetry(state, :request_cancelled, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :checkpoint ->
@@ -1639,9 +1654,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp maybe_put_result(state, :final_answer, result), do: Map.put(state, :result, result)
   defp maybe_put_result(state, _turn_type, _result), do: state
 
-  defp maybe_usage_signal(_call_id, _model, usage) when usage in [%{}, nil], do: nil
+  defp maybe_usage_signal(_call_id, _model, usage, _request_id, _run_id, _iteration) when usage in [%{}, nil], do: nil
 
-  defp maybe_usage_signal(call_id, model, usage) do
+  defp maybe_usage_signal(call_id, model, usage, request_id, run_id, iteration) do
     input_tokens = Map.get(usage, :input_tokens, 0)
     output_tokens = Map.get(usage, :output_tokens, 0)
 
@@ -1650,7 +1665,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       model: Jido.AI.ModelInput.label(model),
       input_tokens: input_tokens,
       output_tokens: output_tokens,
-      total_tokens: input_tokens + output_tokens
+      total_tokens: input_tokens + output_tokens,
+      metadata: runtime_signal_metadata(request_id, run_id, iteration, :generate_text)
     })
   end
 
@@ -2147,7 +2163,133 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     |> Map.get(:effect_policy, Effects.default_policy())
   end
 
-  defp normalize_tool_result(result), do: Effects.normalize_result(result)
+  defp normalize_tool_result(result), do: SignalHelpers.normalize_result(result, :tool_error, "Tool execution failed")
+
+  defp runtime_signal_metadata(request_id, run_id, iteration, operation) do
+    %{
+      request_id: request_id,
+      run_id: run_id,
+      iteration: iteration,
+      origin: :worker_runtime,
+      operation: operation,
+      strategy: :react
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  defp emit_runtime_telemetry(state, kind, request_id, run_id, iteration, llm_call_id, event, data) do
+    obs_cfg = get_in(state, [:config, :observability]) || %{}
+    usage = event_field(data, :usage, %{}) || %{}
+
+    metadata =
+      %{
+        agent_id: get_in(state, [:config, :agent_id]),
+        request_id: request_id,
+        run_id: run_id,
+        iteration: iteration,
+        llm_call_id: llm_call_id,
+        tool_call_id: event_field(event, :tool_call_id),
+        tool_name: event_field(event, :tool_name),
+        model: Jido.AI.ModelInput.label(config_model(state)),
+        origin: :worker_runtime,
+        operation: telemetry_operation(kind),
+        strategy: :react,
+        termination_reason: telemetry_termination_reason(kind, data),
+        error_type: telemetry_error_type(kind, data)
+      }
+
+    measurements = %{
+      duration_ms: event_field(data, :duration_ms, 0),
+      input_tokens: Map.get(usage, :input_tokens, 0),
+      output_tokens: Map.get(usage, :output_tokens, 0),
+      total_tokens: Map.get(usage, :total_tokens, Map.get(usage, :input_tokens, 0) + Map.get(usage, :output_tokens, 0)),
+      retry_count: max(event_field(data, :attempts, 1) - 1, 0),
+      queue_ms: 0
+    }
+
+    case kind do
+      :request_started ->
+        Observe.emit(obs_cfg, Observe.request(:start), measurements, metadata)
+
+      :request_completed ->
+        Observe.emit(obs_cfg, Observe.request(:complete), measurements, metadata)
+
+      :request_failed ->
+        Observe.emit(obs_cfg, Observe.request(:failed), measurements, metadata)
+
+      :request_cancelled ->
+        Observe.emit(obs_cfg, Observe.request(:cancelled), measurements, metadata)
+
+      :llm_started ->
+        Observe.emit(obs_cfg, Observe.llm(:start), measurements, metadata)
+
+      :llm_delta ->
+        Observe.emit(obs_cfg, Observe.llm(:delta), measurements, metadata, feature_gate: :llm_deltas)
+
+      :llm_completed ->
+        Observe.emit(obs_cfg, Observe.llm(:complete), measurements, metadata)
+
+      :tool_started ->
+        Observe.emit(obs_cfg, Observe.tool(:start), measurements, metadata)
+
+      :tool_completed ->
+        emit_tool_completed_telemetry(
+          obs_cfg,
+          metadata,
+          measurements,
+          normalize_tool_result(event_field(data, :result))
+        )
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, {:ok, _result, _effects}) do
+    Observe.emit(obs_cfg, Observe.tool(:complete), measurements, metadata)
+  end
+
+  defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, {:error, %{type: :timeout}, _effects}) do
+    Observe.emit(obs_cfg, Observe.tool(:timeout), measurements, metadata)
+    Observe.emit(obs_cfg, Observe.tool(:error), measurements, Map.put(metadata, :termination_reason, :error))
+  end
+
+  defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, {:error, %{type: type}, _effects}) do
+    Observe.emit(obs_cfg, Observe.tool(:error), measurements, %{metadata | error_type: type, termination_reason: :error})
+  end
+
+  defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, _other) do
+    Observe.emit(obs_cfg, Observe.tool(:error), measurements, %{
+      metadata
+      | error_type: :tool_error,
+        termination_reason: :error
+    })
+  end
+
+  defp telemetry_operation(:tool_started), do: :tool_execute
+  defp telemetry_operation(:tool_completed), do: :tool_execute
+  defp telemetry_operation(_kind), do: :generate_text
+
+  defp telemetry_termination_reason(:request_completed, data), do: event_field(data, :termination_reason, :complete)
+  defp telemetry_termination_reason(:request_failed, _data), do: :error
+  defp telemetry_termination_reason(:request_cancelled, _data), do: :cancelled
+
+  defp telemetry_termination_reason(:tool_completed, data),
+    do: if(match?({:ok, _, _}, normalize_tool_result(event_field(data, :result))), do: :complete, else: :error)
+
+  defp telemetry_termination_reason(_kind, _data), do: nil
+
+  defp telemetry_error_type(:request_failed, data), do: infer_error_type(event_field(data, :error))
+  defp telemetry_error_type(:tool_completed, data), do: infer_error_type(event_field(data, :result))
+  defp telemetry_error_type(_kind, _data), do: nil
+
+  defp infer_error_type({:error, %{type: type}, _effects}) when is_atom(type), do: type
+  defp infer_error_type({:error, %{code: type}, _effects}) when is_atom(type), do: type
+  defp infer_error_type(%{type: type}) when is_atom(type), do: type
+  defp infer_error_type(%{code: type}) when is_atom(type), do: type
+  defp infer_error_type({:cancelled, _}), do: :cancelled
+  defp infer_error_type(_), do: nil
 
   defp normalize_req_http_options(req_http_options) when is_list(req_http_options),
     do: req_http_options

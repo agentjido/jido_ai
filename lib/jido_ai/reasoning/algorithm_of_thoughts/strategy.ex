@@ -13,6 +13,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
   alias Jido.AI.Directive
   alias Jido.AI.Reasoning.AlgorithmOfThoughts.Machine
   alias Jido.AI.Reasoning.Helpers
+  alias Jido.AI.Reasoning.RequestLifecycle
   alias ReqLLM.Context
 
   @type profile :: :short | :standard | :long
@@ -95,6 +96,9 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
       {"ai.llm.response", {:strategy_cmd, @llm_result}},
       {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
       {"ai.request.error", {:strategy_cmd, @request_error}},
+      {"ai.request.started", Jido.Actions.Control.Noop},
+      {"ai.request.completed", Jido.Actions.Control.Noop},
+      {"ai.request.failed", Jido.Actions.Control.Noop},
       {"ai.usage", Jido.Actions.Control.Noop}
     ]
   end
@@ -229,10 +233,32 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
     new_state =
       state
       |> Map.merge(Machine.to_map(machine))
+      |> merge_runtime_state(state, msg)
       |> Helpers.apply_to_state([Helpers.update_config(config)])
 
+    emit_request_lifecycle(state, new_state, msg)
     {StratState.put(agent, new_state), lifted_directives}
   end
+
+  defp merge_runtime_state(new_state, previous_state, {:start, _prompt, request_id}),
+    do: RequestLifecycle.put_active_request_id(previous_state, new_state, request_id, [:exploring])
+
+  defp merge_runtime_state(new_state, previous_state, _msg),
+    do: RequestLifecycle.put_active_request_id(previous_state, new_state, nil, [:exploring])
+
+  defp emit_request_lifecycle(previous_state, new_state, {:start, prompt, request_id}) do
+    if previous_state[:status] == :idle and new_state[:status] == :exploring do
+      RequestLifecycle.emit_started(:aot, new_state, request_id, prompt)
+    else
+      :ok
+    end
+  end
+
+  defp emit_request_lifecycle(previous_state, new_state, {:llm_result, _call_id, _result}) do
+    RequestLifecycle.emit_terminal(:aot, previous_state, new_state)
+  end
+
+  defp emit_request_lifecycle(_previous_state, _new_state, _msg), do: :ok
 
   defp lift_directives(directives, config) do
     model =

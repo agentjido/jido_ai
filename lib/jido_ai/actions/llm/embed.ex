@@ -73,8 +73,6 @@ defmodule Jido.AI.Actions.LLM.Embed do
   alias Jido.AI.Observe
   alias Jido.AI.Validation
 
-  @telemetry_prefix [:jido, :ai, :llm]
-
   @doc """
   Executes the embedding action.
 
@@ -93,23 +91,15 @@ defmodule Jido.AI.Actions.LLM.Embed do
       |> then(&normalize_texts(&1[:texts], &1[:texts_list]))
       |> Enum.filter(&is_binary/1)
 
-    initial_metadata = %{
-      action: "llm_embed",
-      model: params[:model]
-    }
-
     base_metadata =
-      Map.merge(initial_metadata, %{
+      Helpers.telemetry_metadata(context, :embed, %{
+        action: "llm_embed",
+        model: params[:model],
         text_count: length(telemetry_texts),
         total_text_length: calculate_total_length(telemetry_texts)
       })
 
-    Observe.emit(
-      obs_cfg,
-      @telemetry_prefix ++ [:start],
-      %{system_time: System.system_time()},
-      initial_metadata
-    )
+    Observe.emit(obs_cfg, Observe.llm(:start), %{system_time: System.system_time()}, base_metadata)
 
     start_time = System.monotonic_time()
 
@@ -133,7 +123,7 @@ defmodule Jido.AI.Actions.LLM.Embed do
         })
         |> Observe.sanitize_sensitive()
 
-      Observe.emit(obs_cfg, @telemetry_prefix ++ [:complete], measurements, result_metadata)
+      Observe.emit(obs_cfg, Observe.llm(:complete), measurements, result_metadata)
       {:ok, format_result(response, model)}
     else
       {:error, reason} ->
@@ -142,14 +132,15 @@ defmodule Jido.AI.Actions.LLM.Embed do
         error_metadata =
           base_metadata
           |> Map.merge(%{
-            error_type: :llm_error,
-            error_reason: inspect(reason)
+            error_type: Helpers.telemetry_error_type(reason),
+            error_reason: inspect(reason),
+            termination_reason: :error
           })
           |> Observe.sanitize_sensitive()
 
         Observe.emit(
           obs_cfg,
-          @telemetry_prefix ++ [:error],
+          Observe.llm(:error),
           %{
             duration: duration_native,
             duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)

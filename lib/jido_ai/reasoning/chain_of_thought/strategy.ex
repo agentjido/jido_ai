@@ -30,6 +30,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Observe
   alias Jido.AI.Reasoning.ChainOfThought.Machine
   alias Jido.AI.Directive
   alias Jido.AI.Signal
@@ -460,6 +461,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
           |> ensure_request_trace(request_id)
 
         signal = Signal.RequestStarted.new!(%{request_id: request_id, query: prompt, run_id: request_id})
+        emit_runtime_telemetry(state, :request_started, request_id, run_id, llm_call_id, data)
         {started_state, [signal]}
 
       :llm_started ->
@@ -499,10 +501,12 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
                %{
                  text: text,
                  usage: usage
-               }}
+               }, []},
+            metadata: runtime_signal_metadata(request_id, run_id, :generate_text)
           })
 
         usage_signal = maybe_usage_signal(call_id || "", config_model(state), usage, request_id, run_id)
+        emit_runtime_telemetry(state, :llm_completed, request_id, run_id, call_id, data)
         {updated, Enum.reject([llm_signal, usage_signal], &is_nil/1)}
 
       :request_completed ->
@@ -523,6 +527,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
           |> Map.put(:active_request_id, nil)
 
         signal = Signal.RequestCompleted.new!(%{request_id: request_id, result: result, run_id: request_id})
+        emit_runtime_telemetry(state, :request_completed, request_id, run_id, llm_call_id, data)
         {updated, [signal]}
 
       :request_failed ->
@@ -536,6 +541,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
           |> Map.put(:active_request_id, nil)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
+        emit_runtime_telemetry(state, :request_failed, request_id, run_id, llm_call_id, data)
         {updated, [signal]}
 
       :request_cancelled ->
@@ -550,6 +556,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
           |> Map.put(:active_request_id, nil)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
+        emit_runtime_telemetry(state, :request_cancelled, request_id, run_id, llm_call_id, data)
         {updated, [signal]}
 
       _ ->
@@ -569,10 +576,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
       input_tokens: input_tokens,
       output_tokens: output_tokens,
       total_tokens: input_tokens + output_tokens,
-      metadata: %{
-        request_id: request_id,
-        run_id: run_id
-      }
+      metadata: runtime_signal_metadata(request_id, run_id, :generate_text)
     })
   end
 
@@ -602,6 +606,66 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   end
 
   defp normalize_event_map(event) when is_map(event), do: event
+
+  defp runtime_signal_metadata(request_id, run_id, operation) do
+    %{
+      request_id: request_id,
+      run_id: run_id,
+      origin: :worker_runtime,
+      operation: operation,
+      strategy: :cot
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  defp emit_runtime_telemetry(state, kind, request_id, run_id, llm_call_id, data) do
+    obs_cfg = get_in(state, [:config, :observability]) || %{}
+    usage = event_field(data, :usage, %{}) || %{}
+
+    metadata = %{
+      agent_id: nil,
+      request_id: request_id,
+      run_id: run_id,
+      iteration: nil,
+      llm_call_id: llm_call_id,
+      tool_call_id: nil,
+      tool_name: nil,
+      model: Jido.AI.ModelInput.label(config_model(state)),
+      origin: :worker_runtime,
+      operation: :generate_text,
+      strategy: :cot,
+      termination_reason: telemetry_termination_reason(kind),
+      error_type: if(kind == :request_failed, do: infer_error_type(event_field(data, :error)), else: nil)
+    }
+
+    measurements = %{
+      duration_ms: 0,
+      input_tokens: Map.get(usage, :input_tokens, 0),
+      output_tokens: Map.get(usage, :output_tokens, 0),
+      total_tokens: Map.get(usage, :total_tokens, Map.get(usage, :input_tokens, 0) + Map.get(usage, :output_tokens, 0))
+    }
+
+    case kind do
+      :request_started -> Observe.emit(obs_cfg, Observe.request(:start), measurements, metadata)
+      :llm_completed -> Observe.emit(obs_cfg, Observe.llm(:complete), measurements, metadata)
+      :request_completed -> Observe.emit(obs_cfg, Observe.request(:complete), measurements, metadata)
+      :request_failed -> Observe.emit(obs_cfg, Observe.request(:failed), measurements, metadata)
+      :request_cancelled -> Observe.emit(obs_cfg, Observe.request(:cancelled), measurements, metadata)
+      _ -> :ok
+    end
+  end
+
+  defp telemetry_termination_reason(:request_completed), do: :complete
+  defp telemetry_termination_reason(:request_failed), do: :error
+  defp telemetry_termination_reason(:request_cancelled), do: :cancelled
+  defp telemetry_termination_reason(_kind), do: nil
+
+  defp infer_error_type({:error, %{type: type}, _effects}) when is_atom(type), do: type
+  defp infer_error_type({:error, %{code: type}, _effects}) when is_atom(type), do: type
+  defp infer_error_type(%{type: type}) when is_atom(type), do: type
+  defp infer_error_type(%{code: type}) when is_atom(type), do: type
+  defp infer_error_type(_), do: nil
 
   defp config_model(state) do
     state

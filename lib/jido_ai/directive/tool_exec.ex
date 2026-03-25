@@ -97,6 +97,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
 
   alias Jido.AI.Observe
   alias Jido.AI.Signal
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Turn
   alias Jido.Tracing.Context, as: TraceContext
 
@@ -118,6 +119,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     iteration = Map.get(directive, :iteration) || metadata[:iteration] || context[:iteration]
     run_id = metadata[:run_id] || context[:run_id] || request_id
     agent_id = metadata[:agent_id] || context[:agent_id]
+    strategy = metadata[:strategy] || context[:strategy]
 
     agent_pid = self()
     task_supervisor = Jido.AI.Directive.Helpers.get_task_supervisor(state)
@@ -141,12 +143,18 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
              tool_call_id: call_id,
              tool_name: tool_name,
              model: nil,
+             origin: :worker_runtime,
+             operation: :tool_execute,
+             strategy: strategy,
              termination_reason: nil,
              error_type: nil
            }
 
            start_ms = System.monotonic_time(:millisecond)
            span_ctx = Observe.start_span(obs_cfg, Observe.tool(:span), event_meta)
+           signal_metadata = signal_metadata(event_meta)
+
+           emit_tool_started(agent_pid, call_id, tool_name, arguments, signal_metadata)
 
            maybe_emit(
              obs_cfg,
@@ -224,18 +232,36 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
            end
 
            # Signal construction in a separate try to ensure we always attempt delivery
-           send_tool_result(agent_pid, call_id, tool_name, result)
+           send_tool_result(agent_pid, call_id, tool_name, result, signal_metadata)
          end) do
       {:ok, _pid} ->
         {:async, nil, state}
 
       {:error, reason} ->
+        signal_metadata =
+          %{
+            request_id: request_id,
+            run_id: run_id,
+            iteration: iteration,
+            origin: :worker_runtime,
+            operation: :tool_execute,
+            strategy: strategy
+          }
+          |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+          |> Map.new()
+
         send_tool_result(
           agent_pid,
           call_id,
           tool_name,
-          {:error, error_envelope(:supervisor, "Failed to start tool execution task", %{reason: inspect(reason)}, true),
-           []}
+          {:error,
+           SignalHelpers.error_envelope(
+             :supervisor,
+             "Failed to start tool execution task",
+             %{tool_name: tool_name, reason: inspect(reason)},
+             true
+           ), []},
+          signal_metadata
         )
 
         {:ok, state}
@@ -256,7 +282,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
          obs_cfg
        ) do
     0..max_retries
-    |> Enum.reduce_while({{:error, error_envelope(:executor, "uninitialized error"), []}, 0}, fn attempt, _acc ->
+    |> Enum.reduce_while({{:error, SignalHelpers.error_envelope(:executor, "uninitialized error"), []}, 0}, fn attempt,
+                                                                                                               _acc ->
       if attempt > 0 do
         maybe_emit(obs_cfg, Observe.tool(:retry), %{duration_ms: 0, retry_count: attempt}, event_meta)
 
@@ -279,7 +306,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           {:halt, {ok, attempt}}
 
         {:error, error, _effects} ->
-          retryable? = retryable_error?(error)
+          retryable? = SignalHelpers.retryable?(error)
 
           if retryable? and attempt < max_retries do
             {:cont, {result, attempt}}
@@ -311,10 +338,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
             normalize_result(result, tool_name)
 
           {:exit, _reason} ->
-            {:error, error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
+            {:error,
+             SignalHelpers.error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
 
           nil ->
-            {:error, error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
+            {:error,
+             SignalHelpers.error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
         end
       after
         Process.demonitor(task.ref, [:flush])
@@ -337,7 +366,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     rescue
       e ->
         {:error,
-         error_envelope(
+         SignalHelpers.error_envelope(
            :exception,
            Exception.message(e),
            %{tool_name: tool_name, exception_type: inspect(e.__struct__)},
@@ -346,10 +375,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     catch
       kind, reason ->
         {:error,
-         error_envelope(
+         SignalHelpers.error_envelope(
            :exception,
            "Caught #{kind}: #{inspect(reason)}",
-           %{tool_name: tool_name},
+           %{tool_name: tool_name, kind: kind},
            false
          ), []}
     end
@@ -359,75 +388,51 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   defp normalize_result({:ok, result}, _tool_name), do: {:ok, result, []}
 
   defp normalize_result({:error, reason, effects}, tool_name) do
-    {:error, normalize_error(reason, tool_name), List.wrap(effects)}
+    {:error, SignalHelpers.normalize_error(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name}),
+     List.wrap(effects)}
   end
 
   defp normalize_result({:error, reason}, tool_name) do
-    {:error, normalize_error(reason, tool_name), []}
+    {:error, SignalHelpers.normalize_error(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name}),
+     []}
   end
 
   defp normalize_result(other, tool_name) do
     {:error,
-     error_envelope(
+     SignalHelpers.error_envelope(
        :executor,
        "Unexpected tool execution result: #{inspect(other)}",
-       %{tool_name: tool_name},
+       %{tool_name: tool_name, result: inspect(other)},
        false
      ), []}
-  end
-
-  defp normalize_error(%{type: type, message: message} = error, _tool_name)
-       when is_atom(type) and is_binary(message) do
-    %{
-      type: type,
-      message: message,
-      retryable?: Map.get(error, :retryable?, type == :timeout),
-      details: Map.get(error, :details, %{})
-    }
-  end
-
-  defp normalize_error({:unknown_tool, message}, _tool_name) when is_binary(message) do
-    error_envelope(:unknown_tool, message, %{}, false)
-  end
-
-  defp normalize_error({:validation, details}, _tool_name) do
-    error_envelope(:validation, "Tool validation failed", %{details: details}, false)
-  end
-
-  defp normalize_error(:timeout, _tool_name) do
-    error_envelope(:timeout, "Tool execution timed out", %{}, true)
-  end
-
-  defp normalize_error(reason, _tool_name) when is_atom(reason) do
-    error_envelope(:executor, Atom.to_string(reason), %{reason: reason}, false)
-  end
-
-  defp normalize_error(reason, _tool_name) do
-    error_envelope(:executor, "Tool execution failed", %{reason: inspect(reason)}, false)
-  end
-
-  defp retryable_error?(%{retryable?: retryable?}) when is_boolean(retryable?), do: retryable?
-
-  defp error_envelope(type, message, details \\ %{}, retryable? \\ false) do
-    %{
-      type: type,
-      message: message,
-      retryable?: retryable?,
-      details: details
-    }
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
     Observe.emit(obs_cfg, event, measurements, metadata)
   end
 
+  defp emit_tool_started(agent_pid, call_id, tool_name, arguments, metadata) do
+    signal =
+      Signal.ToolStarted.new!(%{
+        call_id: call_id,
+        tool_name: tool_name,
+        arguments: arguments,
+        metadata: metadata
+      })
+
+    Jido.AgentServer.cast(agent_pid, signal)
+  rescue
+    _ -> :ok
+  end
+
   # Sends tool result signal, with fallback for signal construction failures
-  defp send_tool_result(agent_pid, call_id, tool_name, result) do
+  defp send_tool_result(agent_pid, call_id, tool_name, result, metadata) do
     signal =
       Signal.ToolResult.new!(%{
         call_id: call_id,
         tool_name: tool_name,
-        result: result
+        result: normalize_result(result, tool_name),
+        metadata: metadata
       })
 
     Jido.AgentServer.cast(agent_pid, signal)
@@ -440,13 +445,23 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           tool_name: tool_name || "unknown",
           result:
             {:error,
-             %{
-               error: "Signal construction failed: #{Exception.message(e)}",
-               type: :internal_error
-             }, []}
+             SignalHelpers.error_envelope(
+               :internal_error,
+               "Signal construction failed: #{Exception.message(e)}",
+               %{tool_name: tool_name || "unknown"},
+               false
+             ), []},
+          metadata: metadata
         })
 
       Jido.AgentServer.cast(agent_pid, fallback_signal)
+  end
+
+  defp signal_metadata(event_meta) do
+    event_meta
+    |> Map.take([:request_id, :run_id, :iteration, :origin, :operation, :strategy])
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
   end
 
   defp get_tools_from_state(%Jido.AgentServer.State{agent: agent}) do

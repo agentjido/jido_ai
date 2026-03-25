@@ -62,8 +62,6 @@ defmodule Jido.AI.Actions.LLM.Chat do
   alias Jido.AI.Observe
   alias ReqLLM.Context
 
-  @telemetry_prefix [:jido, :ai, :llm]
-
   @doc """
   Executes the chat action.
 
@@ -90,19 +88,14 @@ defmodule Jido.AI.Actions.LLM.Chat do
     obs_cfg = context[:observability] || %{}
     prompt_length = if is_binary(params[:prompt]), do: String.length(params[:prompt]), else: 0
 
-    initial_metadata = %{
-      action: "llm_chat",
-      model: params[:model]
-    }
+    base_metadata =
+      Helpers.telemetry_metadata(context, :chat, %{
+        action: "llm_chat",
+        model: params[:model],
+        prompt_length: prompt_length
+      })
 
-    base_metadata = Map.put(initial_metadata, :prompt_length, prompt_length)
-
-    Observe.emit(
-      obs_cfg,
-      @telemetry_prefix ++ [:start],
-      %{system_time: System.system_time()},
-      initial_metadata
-    )
+    Observe.emit(obs_cfg, Observe.llm(:start), %{system_time: System.system_time()}, base_metadata)
 
     start_time = System.monotonic_time()
 
@@ -127,7 +120,7 @@ defmodule Jido.AI.Actions.LLM.Chat do
         })
         |> Observe.sanitize_sensitive()
 
-      Observe.emit(obs_cfg, @telemetry_prefix ++ [:complete], measurements, result_metadata)
+      Observe.emit(obs_cfg, Observe.llm(:complete), measurements, result_metadata)
       {:ok, format_result(response, model)}
     else
       {:error, reason} ->
@@ -136,14 +129,15 @@ defmodule Jido.AI.Actions.LLM.Chat do
         error_metadata =
           base_metadata
           |> Map.merge(%{
-            error_type: :llm_error,
-            error_reason: inspect(reason)
+            error_type: Helpers.telemetry_error_type(reason),
+            error_reason: inspect(reason),
+            termination_reason: :error
           })
           |> Observe.sanitize_sensitive()
 
         Observe.emit(
           obs_cfg,
-          @telemetry_prefix ++ [:error],
+          Observe.llm(:error),
           %{
             duration: duration_native,
             duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)

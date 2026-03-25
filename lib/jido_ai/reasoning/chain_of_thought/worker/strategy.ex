@@ -7,7 +7,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.ChainOfThought.Machine
-  alias Jido.AI.Reasoning.ReAct.Event
+  alias Jido.AI.Runtime.Event
 
   @default_model :fast
 

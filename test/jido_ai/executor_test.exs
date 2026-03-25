@@ -4,6 +4,8 @@ defmodule Jido.AI.TurnExecutionTest do
   alias Jido.AI.Turn
   alias ReqLLM.Message.ContentPart
 
+  defp decode_tool_content(content) when is_binary(content), do: Jason.decode!(content)
+
   # Define test Action modules
   defmodule TestActions.Calculator do
     use Jido.Action,
@@ -172,8 +174,8 @@ defmodule Jido.AI.TurnExecutionTest do
         )
 
       assert {:error, error, []} = result
-      assert error.error == "Division by zero"
-      assert error.tool_name == "calculator"
+      assert error.message == "Division by zero"
+      assert error.details.tool_name == "calculator"
       assert error.type == :execution_error
     end
   end
@@ -197,8 +199,8 @@ defmodule Jido.AI.TurnExecutionTest do
       result = Turn.execute("unknown_tool", %{}, %{}, tools: %{})
 
       assert {:error, error, []} = result
-      assert error.error == "Tool not found: unknown_tool"
-      assert error.tool_name == "unknown_tool"
+      assert error.message == "Tool not found: unknown_tool"
+      assert error.details.tool_name == "unknown_tool"
       assert error.type == :not_found
     end
   end
@@ -215,8 +217,8 @@ defmodule Jido.AI.TurnExecutionTest do
 
       assert {:error, error, []} = result
       assert error.type == :timeout
-      assert error.tool_name == "slow_action"
-      assert String.contains?(error.error, "timed out")
+      assert error.details.tool_name == "slow_action"
+      assert String.contains?(error.message, "timed out")
     end
   end
 
@@ -226,8 +228,8 @@ defmodule Jido.AI.TurnExecutionTest do
 
       assert {:error, error, []} = result
       assert error.type == :execution_error
-      assert error.tool_name == "error_action"
-      assert error.error == "test error"
+      assert error.details.tool_name == "error_action"
+      assert error.message == "test error"
     end
 
     test "handles missing required parameters", %{tools: tools} do
@@ -235,9 +237,9 @@ defmodule Jido.AI.TurnExecutionTest do
 
       assert {:error, error, []} = result
       assert error.type == :execution_error
-      assert error.tool_name == "calculator"
+      assert error.details.tool_name == "calculator"
       # Error message should mention missing required option
-      assert String.contains?(error.error, "required")
+      assert String.contains?(error.message, "required")
     end
   end
 
@@ -309,16 +311,45 @@ defmodule Jido.AI.TurnExecutionTest do
 
   describe "format_tool_result_content/1" do
     test "formats common success and error payloads" do
-      assert Turn.format_tool_result_content({:ok, "hello"}) == "hello"
-      assert Turn.format_tool_result_content({:ok, %{value: 1}}) == "{\"value\":1}"
-      assert Turn.format_tool_result_content({:ok, 42}) == "42"
-      assert Turn.format_tool_result_content({:error, %{message: "boom"}}) == "boom"
-      assert Turn.format_tool_result_content({:error, :badarg}) == ":badarg"
+      assert decode_tool_content(Turn.format_tool_result_content({:ok, "hello"})) == %{
+               "ok" => true,
+               "result" => "hello"
+             }
+
+      assert decode_tool_content(Turn.format_tool_result_content({:ok, %{value: 1}})) == %{
+               "ok" => true,
+               "result" => %{"value" => 1}
+             }
+
+      assert decode_tool_content(Turn.format_tool_result_content({:ok, 42})) == %{
+               "ok" => true,
+               "result" => 42
+             }
+
+      assert decode_tool_content(Turn.format_tool_result_content({:error, %{message: "boom"}})) == %{
+               "ok" => false,
+               "error" => %{
+                 "message" => "boom",
+                 "type" => "execution_error",
+                 "retryable?" => false,
+                 "details" => %{}
+               }
+             }
+
+      assert decode_tool_content(Turn.format_tool_result_content({:error, :badarg})) == %{
+               "ok" => false,
+               "error" => %{
+                 "message" => "badarg",
+                 "type" => "execution_error",
+                 "retryable?" => false,
+                 "details" => %{"reason" => "badarg"}
+               }
+             }
     end
 
     test "normalizes map content parts into multimodal tool content" do
       assert [
-               %ContentPart{type: :text, text: "{\"value\":1}"},
+               %ContentPart{type: :text, text: encoded_payload},
                %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
              ] =
                Turn.format_tool_result_content(
@@ -330,6 +361,14 @@ defmodule Jido.AI.TurnExecutionTest do
                     ]
                   }}
                )
+
+      assert Jason.decode!(encoded_payload) == %{
+               "ok" => true,
+               "result" => %{
+                 "output" => %{"value" => 1},
+                 "content" => [%{"type" => "image_url", "url" => "https://example.com/chart.png"}]
+               }
+             }
     end
   end
 
@@ -531,7 +570,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
         assert {:error, error, []} = result
         assert error.type == :execution_error
-        assert error.tool_name == "exception_action2"
+        assert error.details.tool_name == "exception_action2"
 
         refute Map.has_key?(error, :stacktrace)
       end)

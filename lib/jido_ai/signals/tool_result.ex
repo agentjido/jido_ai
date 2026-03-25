@@ -14,6 +14,7 @@ defmodule Jido.AI.Signal.ToolResult do
         required: true,
         doc:
           "Canonical: {:ok, result, effects} | {:error, reason, effects} (legacy 2-tuples are normalized at boundaries)"
-      ]
+      ],
+      metadata: [type: :map, default: %{}, doc: "Optional request/run/origin metadata for correlation"]
     ]
 end
