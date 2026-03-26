@@ -257,4 +257,35 @@ defmodule Jido.AI.Actions.Helpers do
   def format_result({:error, error}) do
     {:error, sanitize_error(error)}
   end
+
+  @doc """
+  Builds canonical AI telemetry metadata for direct LLM actions.
+  """
+  def telemetry_metadata(context, operation, extra \\ %{})
+      when is_map(context) and is_atom(operation) and is_map(extra) do
+    %{
+      agent_id: context[:agent_id],
+      request_id: context[:request_id],
+      run_id: context[:run_id] || context[:request_id],
+      iteration: context[:iteration],
+      llm_call_id: nil,
+      tool_call_id: nil,
+      tool_name: nil,
+      model: context[:model] || context[:default_model],
+      origin: :action,
+      operation: operation,
+      strategy: context[:strategy],
+      termination_reason: nil,
+      error_type: nil
+    }
+    |> Map.merge(extra)
+  end
+
+  @doc """
+  Classifies action-layer LLM errors into canonical telemetry error types.
+  """
+  def telemetry_error_type(%{type: type}) when is_atom(type), do: type
+  def telemetry_error_type(%{code: type}) when is_atom(type), do: type
+  def telemetry_error_type(:timeout), do: :timeout
+  def telemetry_error_type(_), do: :llm_error
 end

@@ -17,7 +17,7 @@ After this guide, you can add directive behavior while preserving correlation, r
 
 - `LLMStream` / `LLMGenerate` -> `ai.llm.delta`, `ai.llm.response`, `ai.usage`
 - `LLMEmbed` -> `ai.embed.result`
-- `ToolExec` -> `ai.tool.result`
+- `ToolExec` -> `ai.tool.started`, `ai.tool.result`
 - `EmitToolError` -> `ai.tool.result` (error payload)
 - `EmitRequestError` -> `ai.request.error`
 
@@ -29,6 +29,22 @@ For `ai.llm.response` and `ai.tool.result`, `data.result` should be treated as a
 - `{:error, reason, effects}`
 
 Legacy 2-tuples may appear at boundaries but are normalized by runtime/policy helpers.
+
+## Canonical Error Envelope
+
+Runtime-emitted failures for `ai.llm.response` and `ai.tool.result` normalize to:
+
+```elixir
+%{
+  type: atom(),
+  message: String.t(),
+  details: map(),
+  retryable?: boolean()
+}
+```
+
+Legacy error shapes may still enter at boundaries, but runtime helpers normalize
+them before the signal leaves the runtime layer.
 
 ## Contract Rules
 
@@ -76,6 +92,7 @@ If you change directive fields or emitted signal payloads, update directive/runt
 - `LLM*` directives support either direct `model` or `model_alias`
 - `ToolExec` retries default to `0` unless set
 - metadata fields are designed for observability and debugging
+- action-origin LLM telemetry shares the canonical `[:jido, :ai, :llm, ...]` namespace and is distinguished by metadata such as `origin` and `operation`
 
 ## When To Use / Not Use
 

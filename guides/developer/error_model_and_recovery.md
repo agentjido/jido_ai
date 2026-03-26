@@ -23,6 +23,15 @@ After this guide, you can classify failures and pick the right recovery path.
 - Validation: fail fast and return actionable messages
 - Unknown: sanitize user response, log full detail
 
+## Package Boundary
+
+`jido_ai` owns the AI runtime error envelope used in signals, tool results, and
+telemetry-facing payloads.
+
+Upstream packages such as `jido_action` should stay generic. They can expose
+error type/message/details and retryability, but they should not define
+AI-specific contracts.
+
 ## Example: Sanitized User Message + Full Log
 
 ```elixir

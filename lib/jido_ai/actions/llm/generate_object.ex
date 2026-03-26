@@ -75,6 +75,7 @@ defmodule Jido.AI.Actions.LLM.GenerateObject do
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Error.Sanitize
+  alias Jido.AI.Observe
   alias ReqLLM.Context
 
   @doc """
@@ -88,7 +89,7 @@ defmodule Jido.AI.Actions.LLM.GenerateObject do
   ## Result Format
 
       %{
-        object: %{...},
+        object: %{name: "Alice", age: 28, occupation: "Software Engineer"},
         model: "anthropic:claude-haiku-4-5",
         usage: %{
           input_tokens: 25,
@@ -100,11 +101,25 @@ defmodule Jido.AI.Actions.LLM.GenerateObject do
   @impl Jido.Action
   def run(params, context) do
     params = apply_context_defaults(params, context)
+    obs_cfg = context[:observability] || %{}
+    prompt_length = if is_binary(params[:prompt]), do: String.length(params[:prompt]), else: 0
+
+    base_metadata =
+      Helpers.telemetry_metadata(context, :generate_object, %{
+        action: "llm_generate_object",
+        model: params[:model],
+        prompt_length: prompt_length
+      })
+
+    Observe.emit(obs_cfg, Observe.llm(:start), %{system_time: System.system_time()}, base_metadata)
+
+    start_time = System.monotonic_time()
 
     with {:ok, validated_params} <- Helpers.validate_and_sanitize_input(params),
          {:ok, _schema} <- validate_object_schema(validated_params[:object_schema]),
          {:ok, model} <- Helpers.resolve_model(validated_params[:model], :fast),
-         {:ok, req_context} <- build_messages(validated_params[:prompt], validated_params[:system_prompt]),
+         {:ok, req_context} <-
+           build_messages(validated_params[:prompt], validated_params[:system_prompt]),
          opts = Helpers.build_opts(validated_params),
          {:ok, response} <-
            ReqLLM.Generation.generate_object(
@@ -113,9 +128,47 @@ defmodule Jido.AI.Actions.LLM.GenerateObject do
              validated_params[:object_schema],
              opts
            ) do
+      duration_native = System.monotonic_time() - start_time
+
+      measurements = %{
+        duration: duration_native,
+        duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+      }
+
+      result_metadata =
+        base_metadata
+        |> Map.merge(%{
+          model: model,
+          usage: Helpers.extract_usage(response)
+        })
+        |> Observe.sanitize_sensitive()
+
+      Observe.emit(obs_cfg, Observe.llm(:complete), measurements, result_metadata)
       {:ok, format_result(response, model)}
     else
-      {:error, reason} -> {:error, sanitize_error_for_user(reason)}
+      {:error, reason} ->
+        duration_native = System.monotonic_time() - start_time
+
+        error_metadata =
+          base_metadata
+          |> Map.merge(%{
+            error_type: Helpers.telemetry_error_type(reason),
+            error_reason: inspect(reason),
+            termination_reason: :error
+          })
+          |> Observe.sanitize_sensitive()
+
+        Observe.emit(
+          obs_cfg,
+          Observe.llm(:error),
+          %{
+            duration: duration_native,
+            duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+          },
+          error_metadata
+        )
+
+        {:error, sanitize_error_for_user(reason)}
     end
   end
 
