@@ -24,6 +24,9 @@ defmodule Jido.AI.Observe do
     :tool_call_id,
     :tool_name,
     :model,
+    :origin,
+    :operation,
+    :strategy,
     :termination_reason,
     :error_type
   ]

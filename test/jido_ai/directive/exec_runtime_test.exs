@@ -16,6 +16,9 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
     :ok
   end
 
+  defp assert_ok_result({:ok, value, []}), do: value
+  defp assert_error_result({:error, error, []}), do: error
+
   describe "LLMGenerate DirectiveExec" do
     test "emits usage and llm response signals on success" do
       supervisor = DirectiveSupport.start_task_supervisor!()
@@ -53,7 +56,8 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
       assert response_signal.data.call_id == "llm_gen_ok"
-      assert {:ok, %Jido.AI.Turn{text: "hello world"}} = response_signal.data.result
+      assert %Jido.AI.Turn{text: "hello world"} = assert_ok_result(response_signal.data.result)
+      assert response_signal.data.metadata == %{origin: :directive, operation: :generate_text}
     end
 
     test "returns sync ok with supervisor error envelope when task cannot start" do
@@ -75,7 +79,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:ok, ^state} = DirectiveExec.exec(directive, nil, state)
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
-      assert {:error, %{type: :supervisor}} = response_signal.data.result
+      assert %{type: :supervisor, retryable?: true} = assert_error_result(response_signal.data.result)
     end
 
     test "converts generate_text exceptions into error envelopes" do
@@ -98,9 +102,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
-
-      assert {:error, %{exception: "boom", type: RuntimeError, error_type: :unknown}} =
-               response_signal.data.result
+      assert %{type: :llm_error, message: "LLM request failed"} = assert_error_result(response_signal.data.result)
     end
   end
 
@@ -230,7 +232,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert usage_signal.data.total_tokens == 5
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
-      assert {:ok, %Jido.AI.Turn{text: "hello world"}} = response_signal.data.result
+      assert %Jido.AI.Turn{text: "hello world"} = assert_ok_result(response_signal.data.result)
     end
 
     test "does not emit usage signal when stream usage is nil" do
@@ -267,7 +269,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       refute_receive {:"$gen_cast", {:signal, %Jido.Signal{type: "ai.usage"}}}, 100
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
-      assert {:ok, %Jido.AI.Turn{text: "no usage"}} = response_signal.data.result
+      assert %Jido.AI.Turn{text: "no usage"} = assert_ok_result(response_signal.data.result)
     end
 
     test "returns error envelope when stream processing returns error" do
@@ -295,7 +297,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
-      assert {:error, :bad_stream} = response_signal.data.result
+      assert %{type: :llm_error, message: "bad_stream"} = assert_error_result(response_signal.data.result)
     end
 
     test "returns error envelope when stream_text fails" do
@@ -317,7 +319,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
-      assert {:error, :network} = response_signal.data.result
+      assert %{type: :llm_error, message: "network"} = assert_error_result(response_signal.data.result)
     end
 
     test "converts thrown values into catch error envelopes" do
@@ -339,7 +341,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
-      assert {:error, %{caught: :throw, error_type: :unknown}} = response_signal.data.result
+      assert %{type: :llm_error, message: "LLM request failed"} = assert_error_result(response_signal.data.result)
     end
 
     test "returns sync ok with supervisor error envelope when task cannot start" do
@@ -361,7 +363,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:ok, ^state} = DirectiveExec.exec(directive, nil, state)
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
-      assert {:error, %{type: :supervisor}} = response_signal.data.result
+      assert %{type: :supervisor, retryable?: true} = assert_error_result(response_signal.data.result)
     end
   end
 
@@ -393,6 +395,11 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert signal.data.call_id == "tool_ok"
       assert signal.data.tool_name == "dummy"
       assert signal.data.result == {:ok, %{value: 8}, []}
+
+      assert signal.data.metadata == %{
+               operation: :tool_execute,
+               origin: :worker_runtime
+             }
     end
 
     test "emits timeout error when execution exceeds timeout_ms" do
@@ -417,6 +424,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
 
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
       assert {:error, %{type: :timeout, retryable?: true}, []} = signal.data.result
+      assert signal.data.metadata.operation == :tool_execute
     end
 
     test "retries retryable errors and succeeds on a later attempt" do
@@ -504,6 +512,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
 
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
       assert {:error, %{type: :supervisor}, []} = signal.data.result
+      assert signal.data.metadata.operation == :tool_execute
     end
 
     test "falls back to internal_error signal when tool result signal construction fails" do
@@ -539,6 +548,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
 
       signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
       assert {:error, %{type: :internal_error}, []} = signal.data.result
+      assert signal.data.metadata.operation == :tool_execute
     end
   end
 end

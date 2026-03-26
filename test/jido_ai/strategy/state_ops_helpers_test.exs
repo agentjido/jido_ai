@@ -1,4 +1,4 @@
-defmodule Jido.AI.Reasoning.HelpersTest do
+defmodule Jido.AI.Reasoning.StateOpsHelpersTest do
   @moduledoc """
   Unit tests for Helpers.
   """

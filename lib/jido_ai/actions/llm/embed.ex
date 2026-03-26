@@ -58,7 +58,9 @@ defmodule Jido.AI.Actions.LLM.Embed do
           |> Zoi.optional(),
         texts: Zoi.string(description: "Single text to embed") |> Zoi.optional(),
         texts_list:
-          Zoi.list(Zoi.string(), description: "List of texts to embed (alternative to single text)")
+          Zoi.list(Zoi.string(),
+            description: "List of texts to embed (alternative to single text)"
+          )
           |> Zoi.optional(),
         dimensions:
           Zoi.integer(description: "Output dimensions for models that support it")
@@ -68,6 +70,7 @@ defmodule Jido.AI.Actions.LLM.Embed do
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Error.Sanitize
+  alias Jido.AI.Observe
   alias Jido.AI.Validation
 
   @doc """
@@ -81,24 +84,79 @@ defmodule Jido.AI.Actions.LLM.Embed do
   @impl Jido.Action
   def run(params, context) do
     params = apply_context_defaults(params, context)
+    obs_cfg = context[:observability] || %{}
 
-    with {:ok, _validated} <- validate_and_sanitize_params(params),
+    telemetry_texts =
+      params
+      |> then(&normalize_texts(&1[:texts], &1[:texts_list]))
+      |> Enum.filter(&is_binary/1)
+
+    base_metadata =
+      Helpers.telemetry_metadata(context, :embed, %{
+        action: "llm_embed",
+        model: params[:model],
+        text_count: length(telemetry_texts),
+        total_text_length: calculate_total_length(telemetry_texts)
+      })
+
+    Observe.emit(obs_cfg, Observe.llm(:start), %{system_time: System.system_time()}, base_metadata)
+
+    start_time = System.monotonic_time()
+
+    with {:ok, validated} <- validate_and_sanitize_params(params),
+         texts = normalize_texts(validated[:texts], validated[:texts_list]),
          {:ok, model} <- Helpers.resolve_model(params[:model], :embedding),
-         texts = normalize_texts(params[:texts], params[:texts_list]),
          opts = build_opts(params),
          {:ok, response} <- ReqLLM.Embedding.embed(model, texts, opts) do
+      duration_native = System.monotonic_time() - start_time
+
+      measurements = %{
+        duration: duration_native,
+        duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+      }
+
+      result_metadata =
+        base_metadata
+        |> Map.merge(%{
+          model: model,
+          dimensions: get_in(response, [:usage, :dimensions]) || extract_dimensions(response)
+        })
+        |> Observe.sanitize_sensitive()
+
+      Observe.emit(obs_cfg, Observe.llm(:complete), measurements, result_metadata)
       {:ok, format_result(response, model)}
     else
-      {:error, reason} -> {:error, sanitize_error_for_user(reason)}
+      {:error, reason} ->
+        duration_native = System.monotonic_time() - start_time
+
+        error_metadata =
+          base_metadata
+          |> Map.merge(%{
+            error_type: Helpers.telemetry_error_type(reason),
+            error_reason: inspect(reason),
+            termination_reason: :error
+          })
+          |> Observe.sanitize_sensitive()
+
+        Observe.emit(
+          obs_cfg,
+          Observe.llm(:error),
+          %{
+            duration: duration_native,
+            duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+          },
+          error_metadata
+        )
+
+        {:error, sanitize_error_for_user(reason)}
     end
   end
 
   # Private Functions
 
   defp validate_and_sanitize_params(params) do
-    with {:ok, _validated} <- validate_texts(params) do
-      {:ok, params}
-    else
+    case validate_texts(params) do
+      {:ok, _validated} -> {:ok, params}
       {:error, reason} -> {:error, reason}
     end
   end
@@ -221,6 +279,9 @@ defmodule Jido.AI.Actions.LLM.Embed do
   end
 
   defp extract_embeddings(embeddings) when is_list(embeddings), do: embeddings
+
+  defp calculate_total_length([]), do: 0
+  defp calculate_total_length(texts), do: Enum.reduce(texts, 0, fn t, acc -> acc + String.length(t) end)
 
   defp extract_dimensions([]), do: 0
   defp extract_dimensions([embedding | _]), do: length(embedding)

@@ -13,7 +13,7 @@ Signal names are stable string contracts:
 - plugin strategy runs:
   `reasoning.cod.run`, `reasoning.cot.run`, `reasoning.aot.run`, `reasoning.tot.run`, `reasoning.got.run`, `reasoning.trm.run`, `reasoning.adaptive.run`
 - runtime emitted signals:
-  `ai.request.started`, `ai.request.completed`, `ai.request.failed`, `ai.request.error`, `ai.llm.response`, `ai.llm.delta`, `ai.tool.result`, `ai.embed.result`, `ai.usage`, `ai.react.worker.event`
+  `ai.request.started`, `ai.request.completed`, `ai.request.failed`, `ai.request.error`, `ai.llm.response`, `ai.llm.delta`, `ai.tool.started`, `ai.tool.result`, `ai.embed.result`, `ai.usage`, `ai.react.worker.event`
 
 ReAct worker control/internal runtime signals (for worker orchestration) are separate from the public contracts above:
 `ai.react.worker.start`, `ai.react.worker.cancel`, `ai.react.worker.runtime.event`, `ai.react.worker.runtime.done`, `ai.react.worker.runtime.failed`.
@@ -28,10 +28,37 @@ Typed signal modules define payload contracts and canonical signal types:
 - `Jido.AI.Signal.RequestError` -> `ai.request.error`
 - `Jido.AI.Signal.LLMResponse` -> `ai.llm.response`
 - `Jido.AI.Signal.LLMDelta` -> `ai.llm.delta`
+- `Jido.AI.Signal.ToolStarted` -> `ai.tool.started`
 - `Jido.AI.Signal.ToolResult` -> `ai.tool.result`
 - `Jido.AI.Signal.EmbedResult` -> `ai.embed.result`
 - `Jido.AI.Signal.Usage` -> `ai.usage`
 - `Jido.AI.Reasoning.ReAct.Signal` -> `ai.react.worker.event`
+
+## Lifecycle Notes
+
+- `ai.tool.started` is the public start-of-execution contract for tool-capable runtimes.
+- `ai.tool.result` is the terminal contract for both success and failure.
+
+## Metadata Contract
+
+The public signal payload remains the primary contract. Some signals also carry
+optional `metadata` maps for runtime correlation and observability:
+
+- `ai.llm.response.metadata`
+- `ai.tool.started.metadata`
+- `ai.tool.result.metadata`
+- `ai.usage.metadata`
+
+Common metadata keys:
+
+- `request_id`
+- `run_id`
+- `iteration`
+- `origin` (`:directive`, `:action`, `:worker_runtime`)
+- `operation` (`:chat`, `:complete`, `:generate_object`, `:stream_text`, `:generate_text`, `:embed`, `:tool_execute`)
+- `strategy`
+
+These fields are additive. Consumers must tolerate missing keys.
 
 ## Example: Emit Standard Request Error
 

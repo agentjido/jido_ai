@@ -36,6 +36,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Observe
   alias Jido.AI.Directive
   alias Jido.AI.Effects
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
@@ -43,6 +44,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.Reasoning.ReAct.ToolSelection
   alias Jido.AI.Signal
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.ToolAdapter
@@ -461,15 +463,23 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     {agent, Enum.reverse(directives_rev)}
   end
 
-  defp process_instruction(agent, %Jido.Instruction{action: action, params: params} = instruction, ctx) do
+  defp process_instruction(
+         agent,
+         %Jido.Instruction{action: action, params: params} = instruction,
+         ctx
+       ) do
     case normalize_action(action) do
       @start ->
         state = StratState.get(agent, %{})
         config = state[:config] || %{}
         provider_opt_keys_by_string = config[:provider_opt_keys_by_string] || %{}
         run_tool_context = Map.get(params, :tool_context) || %{}
-        run_req_http_options = params |> Map.get(:req_http_options, []) |> normalize_req_http_options()
-        run_llm_opts = params |> Map.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string)
+
+        run_req_http_options =
+          params |> Map.get(:req_http_options, []) |> normalize_req_http_options()
+
+        run_llm_opts =
+          params |> Map.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string)
 
         agent
         |> set_run_tool_context(run_tool_context)
@@ -633,12 +643,18 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     reason = Map.get(params, :reason, :user_cancelled)
 
     should_cancel? =
-      is_binary(request_id) and request_id == state[:active_request_id] and is_pid(state[:react_worker_pid]) and
+      is_binary(request_id) and request_id == state[:active_request_id] and
+        is_pid(state[:react_worker_pid]) and
         Process.alive?(state[:react_worker_pid])
 
     directives =
       if should_cancel? do
-        [AgentDirective.emit_to_pid(worker_cancel_signal(request_id, reason), state[:react_worker_pid])]
+        [
+          AgentDirective.emit_to_pid(
+            worker_cancel_signal(request_id, reason),
+            state[:react_worker_pid]
+          )
+        ]
       else
         []
       end
@@ -655,7 +671,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp process_request_error(agent, %{request_id: request_id, reason: reason, message: message}) do
     state = StratState.get(agent, %{})
-    new_state = Map.put(state, :last_request_error, %{request_id: request_id, reason: reason, message: message})
+
+    new_state =
+      Map.put(state, :last_request_error, %{
+        request_id: request_id,
+        reason: reason,
+        message: message
+      })
+
     {put_strategy_state(agent, new_state), []}
   end
 
@@ -786,7 +809,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp legacy_thread_context?(%{} = value) do
     has_entries_key? = Map.has_key?(value, :entries) or Map.has_key?(value, "entries")
-    has_system_prompt_key? = Map.has_key?(value, :system_prompt) or Map.has_key?(value, "system_prompt")
+
+    has_system_prompt_key? =
+      Map.has_key?(value, :system_prompt) or Map.has_key?(value, "system_prompt")
+
     has_entries_key? and has_system_prompt_key?
   end
 
@@ -835,7 +861,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
          operation: %{type: :switch} = operation
        }) do
     projected_context =
-      project_context_from_core_thread(agent, context_ref, fresh_projection_context(state[:config] || %{}))
+      project_context_from_core_thread(
+        agent,
+        context_ref,
+        fresh_projection_context(state[:config] || %{})
+      )
 
     state =
       state
@@ -854,7 +884,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     {agent, state}
   end
 
-  defp maybe_sync_config_prompt(state, %AIContext{system_prompt: prompt}) when is_binary(prompt) do
+  defp maybe_sync_config_prompt(state, %AIContext{system_prompt: prompt})
+       when is_binary(prompt) do
     Helpers.apply_to_state(state, [
       Helpers.set_config_field(:system_prompt, prompt)
     ])
@@ -966,7 +997,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp record_applied_context_op(state, op_id) when is_binary(op_id) do
     existing = Map.get(state, :applied_context_ops, [])
-    updated = [op_id | Enum.reject(existing, &(&1 == op_id))] |> Enum.take(@applied_context_ops_cap)
+
+    updated =
+      [op_id | Enum.reject(existing, &(&1 == op_id))] |> Enum.take(@applied_context_ops_cap)
+
     Map.put(state, :applied_context_ops, updated)
   end
 
@@ -991,7 +1025,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           agent,
           state,
           context_ref,
-          %{role: :assistant, content: text, tool_calls: assistant_tool_calls, thinking: thinking},
+          %{
+            role: :assistant,
+            content: text,
+            tool_calls: assistant_tool_calls,
+            thinking: thinking
+          },
           request_id,
           run_id,
           signal_id
@@ -1048,7 +1087,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     append_core_thread_entry(agent, state, :ai_message, payload, refs)
   end
 
-  defp append_ai_context_operation_event(agent, state, %{op_id: op_id, context_ref: context_ref, operation: operation}) do
+  defp append_ai_context_operation_event(agent, state, %{
+         op_id: op_id,
+         context_ref: context_ref,
+         operation: operation
+       }) do
     serialized_operation =
       operation
       |> Map.update(:result_context, nil, fn
@@ -1069,7 +1112,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     append_core_thread_entry(agent, state, :ai_context_operation, payload, refs)
   end
 
-  defp append_core_thread_entry(agent, state, kind, payload, refs) when is_map(payload) and is_map(refs) do
+  defp append_core_thread_entry(agent, state, kind, payload, refs)
+       when is_map(payload) and is_map(refs) do
     agent =
       ThreadAgent.append(agent, %{
         kind: kind,
@@ -1090,7 +1134,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp project_context_from_entries(entries, context_ref, %AIContext{} = fallback_context) when is_list(entries) do
+  defp project_context_from_entries(entries, context_ref, %AIContext{} = fallback_context)
+       when is_list(entries) do
     {anchor_context, anchor_seq} =
       Enum.reduce(entries, {fallback_context, -1}, fn entry, {current_context, current_anchor_seq} ->
         with :ai_context_operation <- fetch_map_value(entry, :kind),
@@ -1137,7 +1182,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         thinking = fetch_map_value(payload, :thinking)
         opts = if is_binary(thinking) and thinking != "", do: [thinking: thinking], else: []
         opts = Keyword.put(opts, :refs, normalize_refs(refs))
-        AIContext.append_assistant(context, normalize_content(content), normalize_optional_list(tool_calls), opts)
+
+        AIContext.append_assistant(
+          context,
+          normalize_content(content),
+          normalize_optional_list(tool_calls),
+          opts
+        )
 
       :tool ->
         case {fetch_map_value(payload, :tool_call_id), fetch_map_value(payload, :name)} do
@@ -1340,6 +1391,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     kind = event_kind(event)
     iteration = event_field(event, :iteration, state[:iteration] || 0)
     request_id = event_field(event, :request_id, state[:active_request_id])
+    run_id = event_field(event, :run_id, request_id)
     llm_call_id = event_field(event, :llm_call_id, state[:current_llm_call_id])
     data = event_field(event, :data, %{})
 
@@ -1363,10 +1415,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:streaming_thinking, "")
           |> ensure_request_trace(request_id)
 
-        signal = Signal.RequestStarted.new!(%{request_id: request_id, query: query, run_id: request_id})
+        signal =
+          Signal.RequestStarted.new!(%{request_id: request_id, query: query, run_id: request_id})
+
+        emit_runtime_telemetry(state, :request_started, request_id, run_id, iteration, llm_call_id, event, data)
         {started_state, [signal]}
 
       :llm_started ->
+        emit_runtime_telemetry(state, :llm_started, request_id, run_id, iteration, llm_call_id, event, data)
         {Map.put(base_state, :status, :awaiting_llm), []}
 
       :llm_delta ->
@@ -1382,7 +1438,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
               Map.update(base_state, :streaming_text, delta, &(&1 <> delta))
           end
 
-        signal = Signal.LLMDelta.new!(%{call_id: llm_call_id || "", delta: delta, chunk_type: chunk_type})
+        signal =
+          Signal.LLMDelta.new!(%{call_id: llm_call_id || "", delta: delta, chunk_type: chunk_type})
+
+        emit_runtime_telemetry(state, :llm_delta, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :llm_completed ->
@@ -1410,8 +1469,17 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           base_state
           |> Map.put(:status, if(turn_type == :tool_calls, do: :awaiting_tool, else: :completed))
           |> Map.put(:pending_tool_calls, pending_tool_calls)
-          |> append_assistant_to_run_context(turn_type, text, tool_calls, thinking_content, reasoning_details, refs)
-          |> Map.update(:usage, usage || %{}, fn existing -> merge_usage(existing, usage || %{}) end)
+          |> append_assistant_to_run_context(
+            turn_type,
+            text,
+            tool_calls,
+            thinking_content,
+            reasoning_details,
+            refs
+          )
+          |> Map.update(:usage, usage || %{}, fn existing ->
+            merge_usage(existing, usage || %{})
+          end)
           |> maybe_append_thinking_trace(thinking_content)
           |> maybe_put_result(turn_type, text)
 
@@ -1427,14 +1495,31 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
                  reasoning_details: reasoning_details,
                  tool_calls: tool_calls,
                  usage: usage
-               }, []}
+               }, []},
+            metadata: runtime_signal_metadata(request_id, run_id, iteration, :generate_text)
           })
 
-        usage_signal = maybe_usage_signal(call_id, config_model(state), usage)
+        usage_signal = maybe_usage_signal(call_id, config_model(state), usage, request_id, run_id, iteration)
+        emit_runtime_telemetry(state, :llm_completed, request_id, run_id, iteration, call_id, event, data)
         {updated, Enum.reject([llm_signal, usage_signal], &is_nil/1)}
 
       :tool_started ->
-        {Map.put(base_state, :status, :awaiting_tool), []}
+        tool_call_id = event_field(data, :tool_call_id, event_field(event, :tool_call_id, ""))
+        tool_name = event_field(data, :tool_name, event_field(event, :tool_name, ""))
+        arguments = event_field(data, :arguments, [])
+
+        updated = Map.put(base_state, :status, :awaiting_tool)
+
+        signal =
+          Signal.ToolStarted.new!(%{
+            call_id: tool_call_id,
+            tool_name: tool_name,
+            arguments: arguments,
+            metadata: runtime_signal_metadata(request_id, run_id, iteration, :tool_execute)
+          })
+
+        emit_runtime_telemetry(state, :tool_started, request_id, run_id, iteration, llm_call_id, event, data)
+        {updated, [signal]}
 
       :tool_completed ->
         tool_call_id = event_field(data, :tool_call_id, event_field(event, :tool_call_id, ""))
@@ -1446,11 +1531,21 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         updated =
           base_state
           |> Map.update(:pending_tool_calls, [], fn pending ->
-            Enum.map(pending, fn tc -> if tc.id == tool_call_id, do: %{tc | result: tool_result}, else: tc end)
+            Enum.map(pending, fn tc ->
+              if tc.id == tool_call_id, do: %{tc | result: tool_result}, else: tc
+            end)
           end)
           |> append_tool_result_to_run_context(tool_call_id, tool_name, tool_result, refs)
 
-        signal = Signal.ToolResult.new!(%{call_id: tool_call_id, tool_name: tool_name, result: tool_result})
+        signal =
+          Signal.ToolResult.new!(%{
+            call_id: tool_call_id,
+            tool_name: tool_name,
+            result: tool_result,
+            metadata: runtime_signal_metadata(request_id, run_id, iteration, :tool_execute)
+          })
+
+        emit_runtime_telemetry(state, :tool_completed, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :request_completed ->
@@ -1470,7 +1565,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
 
-        signal = Signal.RequestCompleted.new!(%{request_id: request_id, result: result, run_id: request_id})
+        signal =
+          Signal.RequestCompleted.new!(%{
+            request_id: request_id,
+            result: result,
+            run_id: request_id
+          })
+
+        emit_runtime_telemetry(state, :request_completed, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :request_failed ->
@@ -1487,7 +1589,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
 
-        signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
+        signal =
+          Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
+
+        emit_runtime_telemetry(state, :request_failed, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :request_cancelled ->
@@ -1506,7 +1611,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.delete(:run_req_http_options)
           |> Map.delete(:run_llm_opts)
 
-        signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
+        signal =
+          Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
+
+        emit_runtime_telemetry(state, :request_cancelled, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
 
       :checkpoint ->
@@ -1546,9 +1654,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp maybe_put_result(state, :final_answer, result), do: Map.put(state, :result, result)
   defp maybe_put_result(state, _turn_type, _result), do: state
 
-  defp maybe_usage_signal(_call_id, _model, usage) when usage in [%{}, nil], do: nil
+  defp maybe_usage_signal(_call_id, _model, usage, _request_id, _run_id, _iteration) when usage in [%{}, nil], do: nil
 
-  defp maybe_usage_signal(call_id, model, usage) do
+  defp maybe_usage_signal(call_id, model, usage, request_id, run_id, iteration) do
     input_tokens = Map.get(usage, :input_tokens, 0)
     output_tokens = Map.get(usage, :output_tokens, 0)
 
@@ -1557,12 +1665,15 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       model: Jido.AI.ModelInput.label(model),
       input_tokens: input_tokens,
       output_tokens: output_tokens,
-      total_tokens: input_tokens + output_tokens
+      total_tokens: input_tokens + output_tokens,
+      metadata: runtime_signal_metadata(request_id, run_id, iteration, :generate_text)
     })
   end
 
   defp merge_usage(existing, incoming) do
-    Map.merge(existing || %{}, incoming || %{}, fn _k, left, right -> (left || 0) + (right || 0) end)
+    Map.merge(existing || %{}, incoming || %{}, fn _k, left, right ->
+      (left || 0) + (right || 0)
+    end)
   end
 
   defp event_kind(event) do
@@ -1663,7 +1774,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp ensure_worker_start(state, worker_start_payload) do
     if is_pid(state[:react_worker_pid]) and Process.alive?(state[:react_worker_pid]) do
-      directive = AgentDirective.emit_to_pid(worker_start_signal(worker_start_payload), state[:react_worker_pid])
+      directive =
+        AgentDirective.emit_to_pid(
+          worker_start_signal(worker_start_payload),
+          state[:react_worker_pid]
+        )
 
       new_state =
         state
@@ -1672,7 +1787,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       {new_state, [directive]}
     else
-      spawn_directive = AgentDirective.spawn_agent(Jido.AI.Reasoning.ReAct.Worker.Agent, @worker_tag)
+      spawn_directive =
+        AgentDirective.spawn_agent(Jido.AI.Reasoning.ReAct.Worker.Agent, @worker_tag)
 
       new_state =
         state
@@ -1694,7 +1810,9 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp react_worker_tag?(tag), do: tag == @worker_tag or tag == Atom.to_string(@worker_tag)
 
-  defp worker_pid_matches?(expected, actual) when is_pid(expected) and is_pid(actual), do: expected == actual
+  defp worker_pid_matches?(expected, actual) when is_pid(expected) and is_pid(actual),
+    do: expected == actual
+
   defp worker_pid_matches?(_expected, _actual), do: true
 
   defp busy?(state, config) do
@@ -1702,7 +1820,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       is_binary(state[:active_request_id])
   end
 
-  defp maybe_mark_worker_ready(state, kind) when kind in [:request_completed, :request_failed, :request_cancelled] do
+  defp maybe_mark_worker_ready(state, kind)
+       when kind in [:request_completed, :request_failed, :request_cancelled] do
     Map.put(state, :react_worker_status, :ready)
   end
 
@@ -1714,7 +1833,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         data = event_field(event, :data, %{})
         result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
         policy = effect_policy_from_state(state)
-        {agent, directives, _stats, _filtered_result} = Effects.apply_result(agent, result, policy)
+
+        {agent, directives, _stats, _filtered_result} =
+          Effects.apply_result(agent, result, policy)
+
         {agent, directives}
 
       _ ->
@@ -1772,7 +1894,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> maybe_put_assistant_context_opt(:reasoning_details, reasoning_details)
           |> maybe_put_assistant_context_opt(:refs, normalize_refs(refs))
 
-        Map.put(state, :run_context, AIContext.append_assistant(context, text, assistant_tool_calls, assistant_opts))
+        Map.put(
+          state,
+          :run_context,
+          AIContext.append_assistant(context, text, assistant_tool_calls, assistant_opts)
+        )
 
       _ ->
         state
@@ -1849,7 +1975,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     opts = ctx[:strategy_opts] || []
     observability_overrides = opts |> Keyword.get(:observability, %{}) |> normalize_map_opt()
     tool_context_opt = opts |> Keyword.get(:tool_context, %{}) |> normalize_map_opt()
-    agent_effect_policy = Keyword.get(opts, :agent_effect_policy, Keyword.get(opts, :effect_policy, %{}))
+
+    agent_effect_policy =
+      Keyword.get(opts, :agent_effect_policy, Keyword.get(opts, :effect_policy, %{}))
+
     strategy_effect_policy = Keyword.get(opts, :strategy_effect_policy, %{})
 
     tools_modules =
@@ -1924,7 +2053,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         nil
 
       {:ok, other} ->
-        raise ArgumentError, "invalid system_prompt: expected binary, nil, or false, got #{inspect(other)}"
+        raise ArgumentError,
+              "invalid system_prompt: expected binary, nil, or false, got #{inspect(other)}"
     end
   end
 
@@ -2018,7 +2148,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp normalize_stream_receive_timeout_ms(value, _default) when is_integer(value) and value > 0 do
+  defp normalize_stream_receive_timeout_ms(value, _default)
+       when is_integer(value) and value > 0 do
     value
   end
 
@@ -2032,9 +2163,126 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     |> Map.get(:effect_policy, Effects.default_policy())
   end
 
-  defp normalize_tool_result(result), do: Effects.normalize_result(result)
+  defp normalize_tool_result(result), do: SignalHelpers.normalize_result(result, :tool_error, "Tool execution failed")
 
-  defp normalize_req_http_options(req_http_options) when is_list(req_http_options), do: req_http_options
+  defp runtime_signal_metadata(request_id, run_id, iteration, operation) do
+    %{
+      request_id: request_id,
+      run_id: run_id,
+      iteration: iteration,
+      origin: :worker_runtime,
+      operation: operation,
+      strategy: :react
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  defp emit_runtime_telemetry(state, kind, request_id, run_id, iteration, llm_call_id, event, data) do
+    obs_cfg = get_in(state, [:config, :observability]) || %{}
+    usage = event_field(data, :usage, %{}) || %{}
+
+    metadata =
+      %{
+        agent_id: get_in(state, [:config, :agent_id]),
+        request_id: request_id,
+        run_id: run_id,
+        iteration: iteration,
+        llm_call_id: llm_call_id,
+        tool_call_id: event_field(event, :tool_call_id),
+        tool_name: event_field(event, :tool_name),
+        model: Jido.AI.ModelInput.label(config_model(state)),
+        origin: :worker_runtime,
+        operation: telemetry_operation(kind),
+        strategy: :react,
+        termination_reason: telemetry_termination_reason(kind, data),
+        error_type: telemetry_error_type(kind, data)
+      }
+
+    measurements = %{
+      duration_ms: event_field(data, :duration_ms, 0),
+      input_tokens: Map.get(usage, :input_tokens, 0),
+      output_tokens: Map.get(usage, :output_tokens, 0),
+      total_tokens: Map.get(usage, :total_tokens, Map.get(usage, :input_tokens, 0) + Map.get(usage, :output_tokens, 0)),
+      retry_count: max(event_field(data, :attempts, 1) - 1, 0),
+      queue_ms: 0
+    }
+
+    case kind do
+      :request_started ->
+        Observe.emit(obs_cfg, Observe.request(:start), measurements, metadata)
+
+      :request_completed ->
+        Observe.emit(obs_cfg, Observe.request(:complete), measurements, metadata)
+
+      :request_failed ->
+        Observe.emit(obs_cfg, Observe.request(:failed), measurements, metadata)
+
+      :request_cancelled ->
+        Observe.emit(obs_cfg, Observe.request(:cancelled), measurements, metadata)
+
+      :llm_started ->
+        Observe.emit(obs_cfg, Observe.llm(:start), measurements, metadata)
+
+      :llm_delta ->
+        Observe.emit(obs_cfg, Observe.llm(:delta), measurements, metadata, feature_gate: :llm_deltas)
+
+      :llm_completed ->
+        Observe.emit(obs_cfg, Observe.llm(:complete), measurements, metadata)
+
+      :tool_started ->
+        Observe.emit(obs_cfg, Observe.tool(:start), measurements, metadata)
+
+      :tool_completed ->
+        emit_tool_completed_telemetry(
+          obs_cfg,
+          metadata,
+          measurements,
+          normalize_tool_result(event_field(data, :result))
+        )
+    end
+  end
+
+  defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, {:ok, _result, _effects}) do
+    Observe.emit(obs_cfg, Observe.tool(:complete), measurements, metadata)
+  end
+
+  defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, {:error, %{type: :timeout}, _effects}) do
+    Observe.emit(obs_cfg, Observe.tool(:timeout), measurements, metadata)
+    Observe.emit(obs_cfg, Observe.tool(:error), measurements, Map.put(metadata, :termination_reason, :error))
+  end
+
+  defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, {:error, %{type: type}, _effects}) do
+    Observe.emit(obs_cfg, Observe.tool(:error), measurements, %{metadata | error_type: type, termination_reason: :error})
+  end
+
+  defp telemetry_operation(:tool_started), do: :tool_execute
+  defp telemetry_operation(:tool_completed), do: :tool_execute
+  defp telemetry_operation(_kind), do: :generate_text
+
+  defp telemetry_termination_reason(:request_completed, data), do: event_field(data, :termination_reason, :complete)
+  defp telemetry_termination_reason(:request_failed, _data), do: :error
+  defp telemetry_termination_reason(:request_cancelled, _data), do: :cancelled
+
+  defp telemetry_termination_reason(:tool_completed, data),
+    do: if(match?({:ok, _, _}, normalize_tool_result(event_field(data, :result))), do: :complete, else: :error)
+
+  defp telemetry_termination_reason(_kind, _data), do: nil
+
+  defp telemetry_error_type(:request_failed, data), do: infer_error_type(event_field(data, :error))
+  defp telemetry_error_type(:tool_completed, data), do: infer_error_type(event_field(data, :result))
+  defp telemetry_error_type(_kind, _data), do: nil
+
+  defp infer_error_type({:error, %{type: type}, _effects}) when is_atom(type), do: type
+  defp infer_error_type({:error, %{code: type}, _effects}) when is_atom(type), do: type
+  defp infer_error_type(%{type: type}) when is_atom(type), do: type
+  defp infer_error_type(%{code: type}) when is_atom(type), do: type
+  defp infer_error_type({:cancelled, _}), do: :cancelled
+  defp infer_error_type(_), do: nil
+
+  defp normalize_req_http_options(req_http_options) when is_list(req_http_options),
+    do: req_http_options
+
   defp normalize_req_http_options(_), do: []
 
   defp normalize_llm_opts(llm_opts, provider_opt_keys_by_string) when is_list(llm_opts) do
@@ -2045,7 +2293,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     llm_opts
     |> Enum.map(fn {key, value} ->
       normalized_key = normalize_llm_opt_key(key)
-      normalized_value = normalize_llm_opt_value(normalized_key, value, provider_opt_keys_by_string)
+
+      normalized_value =
+        normalize_llm_opt_value(normalized_key, value, provider_opt_keys_by_string)
+
       {normalized_key, normalized_value}
     end)
     |> normalize_llm_opt_pairs(provider_opt_keys_by_string)
@@ -2122,7 +2373,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp provider_opt_keys_by_string(model_spec), do: Jido.AI.ModelInput.provider_opt_keys(model_spec)
+  defp provider_opt_keys_by_string(model_spec),
+    do: Jido.AI.ModelInput.provider_opt_keys(model_spec)
 
   defp generate_call_id, do: "req_#{Jido.Util.generate_id()}"
 
