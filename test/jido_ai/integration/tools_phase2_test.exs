@@ -312,8 +312,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       assert {:error, error, []} = result
       assert error.type == :not_found
-      assert error.tool_name == "nonexistent_tool"
-      assert String.contains?(error.error, "not found")
+      assert error.details.tool_name == "nonexistent_tool"
+      assert String.contains?(error.message, "not found")
     end
 
     test "executor handles tool execution errors gracefully", %{tools: tools} do
@@ -322,8 +322,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       assert {:error, error, []} = result
       assert error.type == :execution_error
-      assert error.tool_name == "failing_action"
-      assert error.error == "Something went wrong"
+      assert error.details.tool_name == "failing_action"
+      assert error.message == "Something went wrong"
     end
 
     test "executor handles validation errors for missing required params", %{tools: tools} do
@@ -332,7 +332,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       assert {:error, error, []} = result
       assert error.type == :execution_error
-      assert String.contains?(error.error, "required")
+      assert String.contains?(error.message, "required")
     end
 
     test "executor normalizes string keys to atom keys", %{tools: tools} do
@@ -367,7 +367,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       assert {:error, error, []} = result
       assert error.type == :timeout
-      assert error.tool_name == "slow_action"
+      assert error.details.tool_name == "slow_action"
     end
 
     test "complete simulated tool calling flow", %{tools: tools} do
@@ -399,7 +399,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       # 4. Format result for tool message content (would be added back to conversation)
       formatted = Turn.format_tool_result_content(result)
-      assert formatted == "{\"result\":56}"
+      assert Jason.decode!(formatted) == %{"ok" => true, "result" => %{"result" => 56}}
     end
 
     test "sequential tool calls maintain state correctly", %{tools: tools} do
@@ -439,8 +439,8 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
 
       assert {:error, error, []} = result
       assert error.type == :execution_error
-      assert error.tool_name == "calculator"
-      assert error.error == "Division by zero"
+      assert error.details.tool_name == "calculator"
+      assert error.message == "Division by zero"
     end
   end
 

@@ -29,6 +29,23 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule NonRetryTool do
+    use Jido.Action,
+      name: "non_retry_tool",
+      description: "Fails with a non-retryable error",
+      schema:
+        Zoi.object(%{
+          value: Zoi.integer()
+        })
+
+    def run(%{value: _value}, _context) do
+      key = {__MODULE__, :attempts}
+      attempt = :persistent_term.get(key, 0) + 1
+      :persistent_term.put(key, attempt)
+      {:error, :badarg}
+    end
+  end
+
   defmodule CalculatorTool do
     use Jido.Action,
       name: "calculator",
@@ -158,6 +175,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   setup do
     on_exit(fn ->
       :persistent_term.erase({RetryTool, :attempts})
+      :persistent_term.erase({NonRetryTool, :attempts})
       :persistent_term.erase({__MODULE__, :llm_call_count})
     end)
 
@@ -699,6 +717,44 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     refute is_nil(tool_completed)
     assert tool_completed.data.attempts == 2
     assert match?({:ok, _, _}, tool_completed.data.result)
+  end
+
+  test "does not retry non-retryable tool failures" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      if count == 1 do
+        {:ok,
+         responses_stream_response(
+           [ReqLLM.StreamChunk.tool_call("non_retry_tool", %{"value" => 7}, %{id: "tc_non_retry"})],
+           %{finish_reason: :tool_calls, usage: %{input_tokens: 5, output_tokens: 3}},
+           model
+         )}
+      else
+        {:ok,
+         responses_stream_response(
+           [ReqLLM.StreamChunk.text("Tool failed")],
+           %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 1}},
+           model
+         )}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{NonRetryTool.name() => NonRetryTool},
+        tool_max_retries: 2,
+        tool_retry_backoff_ms: 0
+      })
+
+    events = ReAct.stream("Run non-retry tool", config) |> Enum.to_list()
+
+    tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
+    refute is_nil(tool_completed)
+    assert tool_completed.data.attempts == 1
+    assert match?({:error, _, _}, tool_completed.data.result)
   end
 
   test "emits tool_completed events in original tool call order for parallel tools" do

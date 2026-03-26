@@ -46,6 +46,18 @@ Runtime-emitted failures for `ai.llm.response` and `ai.tool.result` normalize to
 Legacy error shapes may still enter at boundaries, but runtime helpers normalize
 them before the signal leaves the runtime layer.
 
+## Tool Result Content Contract
+
+For model follow-up turns, the canonical tool result semantics should be
+represented in the content body:
+
+- success: `%{ok: true, result: ...}`
+- failure: `%{ok: false, error: %{type: ..., message: ..., details: ..., retryable?: ...}}`
+
+Runtime may also preserve native outputs in metadata for adapters and local
+tooling, but metadata is supplementary and should not be the only place the
+result meaning exists.
+
 ## Contract Rules
 
 - Directives describe work; they do not own strategy state transitions.

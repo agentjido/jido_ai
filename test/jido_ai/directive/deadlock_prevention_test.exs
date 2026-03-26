@@ -50,7 +50,15 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
       assert signal.type == "ai.tool.result"
       assert signal.data.call_id == "tc_123"
       assert signal.data.tool_name == "unknown_tool"
-      assert signal.data.result == {:error, {:unknown_tool, "Tool 'unknown_tool' not found"}}
+
+      assert signal.data.result ==
+               {:error,
+                %{
+                  type: :unknown_tool,
+                  message: "Tool 'unknown_tool' not found",
+                  details: %{tool_name: "unknown_tool"},
+                  retryable?: false
+                }, []}
     end
   end
 
@@ -152,7 +160,7 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
       assert signal.type == "ai.tool.result"
       assert signal.data.call_id == "tc_123"
       assert signal.data.tool_name == "unknown_tool"
-      assert {:error, {:unknown_tool, _}} = signal.data.result
+      assert {:error, {:unknown_tool, "Tool 'unknown_tool' not found"}} = signal.data.result
     end
 
     test "creates valid ToolResult signal with exception error" do
@@ -163,11 +171,11 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
           result:
             {:error,
              %{
-               error: "something went wrong",
-               tool_name: "crashy_tool",
+               message: "something went wrong",
                type: :exception,
-               exception_type: RuntimeError
-             }}
+               details: %{tool_name: "crashy_tool", exception_type: RuntimeError},
+               retryable?: false
+             }, []}
         })
 
       assert signal.type == "ai.tool.result"
@@ -175,11 +183,11 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
       assert signal.data.result ==
                {:error,
                 %{
-                  error: "something went wrong",
-                  tool_name: "crashy_tool",
+                  message: "something went wrong",
                   type: :exception,
-                  exception_type: RuntimeError
-                }}
+                  details: %{tool_name: "crashy_tool", exception_type: RuntimeError},
+                  retryable?: false
+                }, []}
     end
   end
 end

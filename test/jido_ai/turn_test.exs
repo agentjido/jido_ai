@@ -6,6 +6,8 @@ defmodule Jido.AI.TurnTest do
 
   @moduletag :unit
 
+  defp decode_tool_content(content) when is_binary(content), do: Jason.decode!(content)
+
   defmodule Calculator do
     use Jido.Action,
       name: "calculator",
@@ -144,22 +146,47 @@ defmodule Jido.AI.TurnTest do
       assert tool_message.role == :tool
       assert tool_message.tool_call_id == "tc_1"
       assert tool_message.name == "calculator"
-      assert Turn.extract_from_content(tool_message.content) == "{\"result\":8}"
+
+      assert decode_tool_content(Turn.extract_from_content(tool_message.content)) == %{
+               "ok" => true,
+               "result" => %{"result" => 8}
+             }
     end
   end
 
   describe "format_tool_result_content/1" do
     test "formats common success and error shapes" do
-      assert Turn.format_tool_result_content({:ok, %{value: 1}}) == "{\"value\":1}"
-      assert Turn.format_tool_result_content({:error, %{message: "boom"}}) == "boom"
-      assert Turn.format_tool_result_content({:error, :badarg}) == ":badarg"
+      assert decode_tool_content(Turn.format_tool_result_content({:ok, %{value: 1}})) == %{
+               "ok" => true,
+               "result" => %{"value" => 1}
+             }
+
+      assert decode_tool_content(Turn.format_tool_result_content({:error, %{message: "boom"}})) == %{
+               "ok" => false,
+               "error" => %{
+                 "message" => "boom",
+                 "type" => "execution_error",
+                 "retryable?" => false,
+                 "details" => %{}
+               }
+             }
+
+      assert decode_tool_content(Turn.format_tool_result_content({:error, :badarg})) == %{
+               "ok" => false,
+               "error" => %{
+                 "message" => "badarg",
+                 "type" => "execution_error",
+                 "retryable?" => false,
+                 "details" => %{"reason" => "badarg"}
+               }
+             }
     end
 
     test "preserves explicit content parts alongside structured tool output" do
       image = ContentPart.image_url("https://example.com/chart.png")
 
       assert [
-               %ContentPart{type: :text, text: "{\"value\":1}"},
+               %ContentPart{type: :text, text: encoded_payload},
                %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
              ] =
                Turn.format_tool_result_content(
@@ -169,6 +196,14 @@ defmodule Jido.AI.TurnTest do
                     value: 1
                   }}
                )
+
+      assert Jason.decode!(encoded_payload) == %{
+               "ok" => true,
+               "result" => %{
+                 "output" => %{"value" => 1},
+                 "content" => [%{"type" => "image_url", "url" => "https://example.com/chart.png"}]
+               }
+             }
     end
   end
 
@@ -190,7 +225,12 @@ defmodule Jido.AI.TurnTest do
       [tool_result] = updated_turn.tool_results
       assert tool_result.id == "tc_1"
       assert tool_result.name == "calculator"
-      assert tool_result.content == "{\"result\":8}"
+
+      assert decode_tool_content(tool_result.content) == %{
+               "ok" => true,
+               "result" => %{"result" => 8}
+             }
+
       assert tool_result.raw_result == {:ok, %{result: 8}, []}
     end
 

@@ -10,6 +10,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.ModelInput
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Turn
   alias Jido.Agent.State, as: AgentState
 
@@ -708,7 +709,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     max_retries = normalize_retry_count(config.tool_exec[:max_retries])
     backoff_ms = normalize_backoff(config.tool_exec[:retry_backoff_ms])
 
-    case retryable?(result) and attempt <= max_retries do
+    case SignalHelpers.retryable?(result) and attempt <= max_retries do
       true ->
         case backoff_ms > 0 do
           true -> Process.sleep(backoff_ms)
@@ -721,13 +722,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         {pending_call, result, attempt, duration_ms}
     end
   end
-
-  defp retryable?({:ok, _, _}), do: false
-
-  defp retryable?({:error, %{type: :timeout}, _}), do: true
-  defp retryable?({:error, %{type: :exception}, _}), do: true
-  defp retryable?({:error, %{type: :execution_error}, _}), do: true
-  defp retryable?({:error, _, _}), do: false
 
   defp finalize(%State{} = state, owner, ref, %Config{} = config) do
     {state, _token} = emit_checkpoint(state, owner, ref, config, :terminal)
