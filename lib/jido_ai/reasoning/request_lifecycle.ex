@@ -8,6 +8,12 @@ defmodule Jido.AI.Reasoning.RequestLifecycle do
 
   @type lifecycle_event :: :start | :complete | :failed
 
+  @doc """
+  Tracks the active request identifier across non-delegated strategy transitions.
+
+  The request id is retained while the state remains active and is cleared once
+  the strategy reaches a terminal status.
+  """
   @spec put_active_request_id(map(), map(), String.t() | nil, [term()]) :: map()
   def put_active_request_id(previous_state, new_state, request_id, active_statuses)
       when is_map(previous_state) and is_map(new_state) and is_list(active_statuses) do
@@ -23,6 +29,12 @@ defmodule Jido.AI.Reasoning.RequestLifecycle do
     end
   end
 
+  @doc """
+  Emits the public request-started signal and matching request telemetry.
+
+  This is used by non-delegated strategies that own their request lifecycle
+  directly rather than projecting it from worker runtime events.
+  """
   @spec emit_started(atom(), map(), String.t(), String.t(), keyword()) :: :ok
   def emit_started(strategy, state, request_id, query, opts \\ [])
       when is_atom(strategy) and is_map(state) and is_binary(request_id) and is_binary(query) and is_list(opts) do
@@ -31,6 +43,12 @@ defmodule Jido.AI.Reasoning.RequestLifecycle do
     emit_request_telemetry(strategy, state, :start, request_id, opts)
   end
 
+  @doc """
+  Emits the terminal request signal and telemetry when a strategy completes or fails.
+
+  A terminal event is emitted only on the transition into a completed or error
+  status, and only when a request id can be resolved from state or options.
+  """
   @spec emit_terminal(atom(), map(), map(), keyword()) :: :ok
   def emit_terminal(strategy, previous_state, new_state, opts \\ [])
       when is_atom(strategy) and is_map(previous_state) and is_map(new_state) and is_list(opts) do
@@ -53,6 +71,12 @@ defmodule Jido.AI.Reasoning.RequestLifecycle do
     end
   end
 
+  @doc """
+  Emits normalized request lifecycle telemetry for a reasoning strategy.
+
+  Callers can override derived metadata such as usage, model, iteration, or
+  llm call id through `opts` when the state does not yet contain that data.
+  """
   @spec emit_request_telemetry(atom(), map(), lifecycle_event(), String.t(), keyword()) :: :ok
   def emit_request_telemetry(strategy, state, event, request_id, opts \\ [])
       when is_atom(strategy) and is_map(state) and is_binary(request_id) and is_list(opts) do
@@ -90,11 +114,20 @@ defmodule Jido.AI.Reasoning.RequestLifecycle do
     Observe.emit(obs_cfg, Observe.request(event), measurements, metadata)
   end
 
+  @doc """
+  Extracts usage accounting from strategy state or its terminal result payload.
+  """
   @spec extract_usage(map()) :: map()
   def extract_usage(%{usage: usage}) when is_map(usage) and usage != %{}, do: usage
   def extract_usage(%{result: %{usage: usage}}) when is_map(usage), do: usage
   def extract_usage(_state), do: %{}
 
+  @doc """
+  Infers a normalized error type atom from common runtime error shapes.
+
+  This accepts both the new canonical envelope and legacy tuple or map forms
+  that still appear at runtime boundaries during the 2.0 transition.
+  """
   @spec infer_error_type(term()) :: atom() | nil
   def infer_error_type(%{termination: termination}) when is_atom(termination), do: termination
   def infer_error_type(%{reason: reason}) when is_atom(reason), do: reason
