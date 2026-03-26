@@ -331,8 +331,11 @@ defmodule Jido.AI do
   @doc """
   Steers an active ReAct run with additional user-visible input.
 
-  Returns `{:ok, agent}` when the input is accepted for the active run or
+  Returns `{:ok, agent}` when the input is queued for the active run or
   `{:error, {:rejected, reason}}` when no eligible run is available.
+
+  Queued input is best-effort. If the active run terminates before the runtime
+  drains the queue into conversation state, the queued input is dropped.
 
   ## Options
 
@@ -352,7 +355,7 @@ defmodule Jido.AI do
   Injects user-visible input into an active ReAct run.
 
   This is intended for programmatic or inter-agent steering and follows the same
-  acceptance rules as `steer/3`.
+  queuing rules as `steer/3`.
   """
   @spec inject(GenServer.server(), String.t(), keyword()) ::
           {:ok, Jido.Agent.t()} | {:error, term()}
@@ -551,7 +554,7 @@ defmodule Jido.AI do
 
   defp normalize_control_result(%Jido.Agent{} = agent, kind) do
     case StratState.get(agent, %{}) |> Map.get(:last_pending_input_control) do
-      %{kind: ^kind, status: :accepted} ->
+      %{kind: ^kind, status: :queued} ->
         {:ok, agent}
 
       %{kind: ^kind, status: :rejected, reason: reason} ->

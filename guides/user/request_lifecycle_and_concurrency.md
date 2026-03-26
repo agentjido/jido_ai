@@ -33,7 +33,7 @@ Per-request ReAct overrides travel with the request handle:
 ```elixir
 {:ok, request} = MyApp.MathAgent.ask(pid, "Work on Q1")
 
-:ok = MyApp.MathAgent.steer(pid, "Actually prioritize Q2", expected_request_id: request.id)
+{:ok, _agent} = MyApp.MathAgent.steer(pid, "Actually prioritize Q2", expected_request_id: request.id)
 
 {:ok, result} = MyApp.MathAgent.await(request)
 ```
@@ -45,6 +45,8 @@ Use:
 Important:
 - neither `steer/3` nor `inject/3` creates a new request handle
 - both reject idle agents with `{:error, {:rejected, :idle}}`
+- successful `steer/3` / `inject/3` means the input was queued, not durably persisted
+- if the run terminates before the runtime drains queued input, that input is dropped
 - normal concurrent `ask/3` calls still busy-reject while a ReAct run is active
 - steering is ReAct-only in this version
 

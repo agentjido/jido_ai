@@ -138,9 +138,11 @@ Pending-input semantics:
 
 - active runs own a per-run `Jido.AI.PendingInputServer`
 - `ai.react.steer` and `ai.react.inject` synchronously enqueue user-style input there
+- enqueue success means the input is queued for best-effort delivery, not durably accepted
 - queued input is not appended to the core thread on enqueue
 - runtime emits `:input_injected` only when it drains queued input into `run_context`
 - strategy appends a user `:ai_message` only on `:input_injected`, so undrained input is not persisted
+- if a run fails, is cancelled, or exits before drain, queued input is dropped
 - `:request_completed` is emitted only after the runtime confirms the pending-input queue is empty and sealed
 
 Deferred semantics:

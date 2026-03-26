@@ -776,8 +776,11 @@ defmodule Jido.AI.Agent do
       @doc """
       Steer an active request with additional user-visible input.
 
-      Returns `{:ok, agent}` when the input is accepted for the current ReAct run
+      Returns `{:ok, agent}` when the input is queued for the current ReAct run
       or `{:error, {:rejected, reason}}` when no eligible run is active.
+
+      Queued input is best-effort. If the run terminates before the runtime
+      drains the queue into conversation state, the queued input is dropped.
       """
       @spec steer(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, Jido.Agent.t()} | {:error, term()}
@@ -789,7 +792,7 @@ defmodule Jido.AI.Agent do
       Inject user-visible input into an active request.
 
       This is intended for programmatic or inter-agent steering and follows the
-      same acceptance rules as `steer/3`.
+      same queuing rules as `steer/3`.
       """
       @spec inject(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, Jido.Agent.t()} | {:error, term()}

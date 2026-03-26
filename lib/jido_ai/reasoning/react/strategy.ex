@@ -704,7 +704,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
          :ok <- PendingInputServer.enqueue(server, pending_input_item(content, params)) do
       new_state =
         record_pending_input_control(state, kind,
-          status: :accepted,
+          status: :queued,
           request_id: request_id
         )
 

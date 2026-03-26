@@ -3,7 +3,7 @@ defmodule Jido.AI.PendingInputServer do
   Per-run FIFO queue for ReAct steering input.
 
   The server is owned by the parent ReAct strategy process for the active run.
-  Inputs are accepted synchronously, drained by the runtime before LLM turns,
+  Inputs are queued synchronously, drained by the runtime before LLM turns,
   and the queue can be sealed at terminal boundaries to reject late arrivals.
   """
 

@@ -488,7 +488,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert length(trace.events) == 1
     end
 
-    test "steer enqueues accepted input for an active run" do
+    test "steer queues input for an active run" do
       agent = create_agent(tools: [TestCalculator])
 
       {agent, [_spawn]} =
@@ -518,13 +518,62 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       state = StratState.get(agent, %{})
       assert state.last_pending_input_control.kind == :steer
-      assert state.last_pending_input_control.status == :accepted
+      assert state.last_pending_input_control.status == :queued
       assert state.last_pending_input_control.request_id == "req_steer"
 
       [queued] = PendingInputServer.drain(state.pending_input_server)
       assert queued.content == "Actually answer Q2"
       assert queued.source == "/test/steer"
       assert queued.refs == %{origin: "suite"}
+    end
+
+    test "queued input is dropped if the request fails before runtime drain" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_drop"})],
+          %{}
+        )
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.steer_action(), %{
+              content: "Actually answer Q2",
+              expected_request_id: "req_drop",
+              source: "/test/steer"
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.status == :queued
+
+      event =
+        runtime_event(:request_failed, "req_drop", 2, %{
+          error: :boom
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_drop", event: event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.status == :error
+      assert state.pending_input_server == nil
+
+      core_thread = ThreadAgent.get(agent)
+      ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
+
+      assert Enum.map(ai_messages, & &1.payload.content) == ["Q1"]
+      refute Enum.any?(ai_messages, &(&1.payload.content == "Actually answer Q2"))
     end
 
     test "inject rejects while idle" do
