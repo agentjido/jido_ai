@@ -26,11 +26,36 @@ Per-request ReAct overrides travel with the request handle:
   )
 ```
 
+## Steering An Active ReAct Run
+
+`ask/await` remains the request API. Mid-run steering is a separate control path:
+
+```elixir
+{:ok, request} = MyApp.MathAgent.ask(pid, "Work on Q1")
+
+{:ok, _agent} = MyApp.MathAgent.steer(pid, "Actually prioritize Q2", expected_request_id: request.id)
+
+{:ok, result} = MyApp.MathAgent.await(request)
+```
+
+Use:
+- `steer/3` for user-visible follow-up input on an active ReAct run
+- `inject/3` for programmatic or inter-agent input on an active ReAct run
+
+Important:
+- neither `steer/3` nor `inject/3` creates a new request handle
+- both reject idle agents with `{:error, {:rejected, :idle}}`
+- successful `steer/3` / `inject/3` means the input was queued, not durably persisted
+- if the run terminates before the runtime drains queued input, that input is dropped
+- normal concurrent `ask/3` calls still busy-reject while a ReAct run is active
+- steering is ReAct-only in this version
+
 ## Runtime Contract Map
 
 - `Jido.AI.Request`: request handles, `await/2`, `await_many/2`, request state lifecycle.
 - `Jido.AI.Turn`: normalized response shape and assistant/tool message projection.
 - `Jido.AI.Context`: conversation accumulation and context projection for follow-up turns.
+- `Jido.AI.steer/3` and `Jido.AI.inject/3`: explicit control path for active ReAct runs.
 - Directive runtime behavior is documented in [Directives Runtime Contract](../developer/directives_runtime_contract.md).
 
 ## Await Many

@@ -52,6 +52,7 @@ Operation map fields:
 
 2. Run progression:
 - append assistant/tool `:ai_message` entries as runtime events arrive
+- append drained steering/injection input as user `:ai_message` when runtime emits `:input_injected`
 - update `run_context` in lockstep
 
 3. Context modify during active run:
@@ -68,6 +69,12 @@ For a lane (`context_ref`):
 - find latest `:replace` anchor
 - fold subsequent `:ai_message` events by sequence
 - produce deterministic `Jido.AI.Context` at any seq boundary
+
+## Steering Scope
+
+- ReAct steering is user-style only in this version
+- drained `steer` / `inject` input projects as `role: :user`
+- hidden/system-role steering is not projected or persisted
 
 ## Idempotency
 

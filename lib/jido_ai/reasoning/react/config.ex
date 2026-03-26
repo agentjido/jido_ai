@@ -60,6 +60,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               system_prompt: Zoi.string() |> Zoi.nullish(),
               tools: Zoi.map() |> Zoi.default(%{}),
               request_transformer: Zoi.atom() |> Zoi.nullish(),
+              pending_input_server: Zoi.any() |> Zoi.nullish(),
               max_iterations: Zoi.integer() |> Zoi.default(@default_max_iterations),
               streaming: Zoi.boolean() |> Zoi.default(true),
               stream_timeout_ms: Zoi.integer() |> Zoi.default(0),
@@ -142,6 +143,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       system_prompt: normalize_optional_binary(get_opt(opts_map, :system_prompt, nil)),
       tools: tools,
       request_transformer: normalize_request_transformer(get_opt(opts_map, :request_transformer, nil)),
+      pending_input_server: get_opt(opts_map, :pending_input_server, nil),
       max_iterations:
         normalize_pos_integer(get_opt(opts_map, :max_iterations, @default_max_iterations), @default_max_iterations),
       streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
