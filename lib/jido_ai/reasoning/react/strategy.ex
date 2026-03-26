@@ -2240,9 +2240,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           measurements,
           normalize_tool_result(event_field(data, :result))
         )
-
-      _ ->
-        :ok
     end
   end
 
@@ -2257,14 +2254,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, {:error, %{type: type}, _effects}) do
     Observe.emit(obs_cfg, Observe.tool(:error), measurements, %{metadata | error_type: type, termination_reason: :error})
-  end
-
-  defp emit_tool_completed_telemetry(obs_cfg, metadata, measurements, _other) do
-    Observe.emit(obs_cfg, Observe.tool(:error), measurements, %{
-      metadata
-      | error_type: :tool_error,
-        termination_reason: :error
-    })
   end
 
   defp telemetry_operation(:tool_started), do: :tool_execute

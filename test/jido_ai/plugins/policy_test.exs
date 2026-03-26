@@ -45,7 +45,7 @@ defmodule Jido.AI.Plugins.PolicyTest do
       assert {:ok, {:continue, rewritten}} = Policy.handle_signal(signal, ctx(%{mode: :enforce}))
       assert rewritten.type == "ai.tool.result"
       assert {:error, envelope, []} = rewritten.data.result
-      assert envelope.code == :malformed_result
+      assert envelope.type == :malformed_result
     end
 
     test "normalizes malformed result envelopes for ai.llm.response" do
@@ -54,7 +54,7 @@ defmodule Jido.AI.Plugins.PolicyTest do
       assert {:ok, {:continue, rewritten}} = Policy.handle_signal(signal, ctx(%{mode: :enforce}))
       assert rewritten.type == "ai.llm.response"
       assert {:error, envelope, []} = rewritten.data.result
-      assert envelope.code == :malformed_result
+      assert envelope.type == :malformed_result
     end
 
     test "sanitizes and truncates ai.llm.delta chunks" do
