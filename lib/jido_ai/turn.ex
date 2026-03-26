@@ -13,6 +13,7 @@ defmodule Jido.AI.Turn do
   """
 
   alias Jido.AI.{Effects, Observe, ToolAdapter}
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Action.Error.TimeoutError
   alias Jido.Action.Tool, as: ActionTool
   alias ReqLLM.Context
@@ -185,7 +186,13 @@ defmodule Jido.AI.Turn do
           execute_internal(module, tool_name, params, context, timeout, exec_opts)
 
         :error ->
-          {:error, error_envelope(tool_name, :not_found, "Tool not found: #{tool_name}"), []}
+          {:error,
+           SignalHelpers.error_envelope(
+             :not_found,
+             "Tool not found: #{tool_name}",
+             %{tool_name: tool_name},
+             false
+           ), []}
       end
 
     finalize_execute_telemetry(tool_name, result, start_time, context)
@@ -336,30 +343,48 @@ defmodule Jido.AI.Turn do
   def format_tool_result_content({:ok, result, _effects}), do: format_tool_result_content({:ok, result})
   def format_tool_result_content({:error, error, _effects}), do: format_tool_result_content({:error, error})
 
-  def format_tool_result_content({:ok, %ToolResult{} = result}),
-    do: normalize_tool_result_output(result.content, result.output)
+  def format_tool_result_content({:ok, %ToolResult{} = result}) do
+    payload = build_tool_result_payload(result.output, result.content, result.metadata)
+    encode_tool_result_envelope(%{ok: true, result: payload}, normalize_content_parts(result.content))
+  end
 
-  def format_tool_result_content({:ok, result}) when is_binary(result), do: result
+  def format_tool_result_content({:ok, result}) when is_binary(result),
+    do: encode_tool_result_envelope(%{ok: true, result: result})
 
   def format_tool_result_content({:ok, result}) when is_list(result) do
-    if content_parts_list?(result), do: normalize_content_parts(result), else: encode_or_inspect(result)
+    if content_parts_list?(result) do
+      parts = normalize_content_parts(result)
+      encode_tool_result_envelope(%{ok: true, result: %{content: serialize_content_parts(parts)}}, parts)
+    else
+      encode_tool_result_envelope(%{ok: true, result: result})
+    end
   end
 
   def format_tool_result_content({:ok, result}) when is_map(result) do
     case extract_content_parts_result(result) do
-      {:ok, output, parts} -> normalize_tool_result_output(parts, output)
-      :error -> encode_or_inspect(result)
+      {:ok, output, parts} ->
+        encode_tool_result_envelope(%{ok: true, result: build_tool_result_payload(output, parts)}, parts)
+
+      :error ->
+        encode_tool_result_envelope(%{ok: true, result: result})
     end
   end
 
-  def format_tool_result_content({:ok, result}), do: inspect(result)
+  def format_tool_result_content({:ok, result}), do: encode_tool_result_envelope(%{ok: true, result: result})
 
-  def format_tool_result_content({:error, error}) when is_map(error) do
-    get_field(error, :message) || get_field(error, :error) || "Execution failed"
+  def format_tool_result_content({:error, error}) do
+    encode_tool_result_envelope(%{
+      ok: false,
+      error: SignalHelpers.normalize_error(error, :execution_error, "Tool execution failed")
+    })
   end
 
-  def format_tool_result_content({:error, error}), do: inspect(error)
-  def format_tool_result_content(other), do: inspect(other)
+  def format_tool_result_content(other) do
+    encode_tool_result_envelope(%{
+      ok: false,
+      error: SignalHelpers.error_envelope(:invalid_result, "Invalid tool result envelope", %{result: inspect(other)})
+    })
+  end
 
   @doc """
   Converts a turn to a plain result map for public action/plugin outputs.
@@ -536,19 +561,21 @@ defmodule Jido.AI.Turn do
     timeout_ms = reason.timeout || timeout_from_details(reason.details)
     message = Exception.message(reason)
 
-    error_envelope(tool_name, :timeout, message, reason.details || %{})
-    |> Map.put(:timeout_ms, timeout_ms)
+    SignalHelpers.error_envelope(
+      :timeout,
+      message,
+      %{tool_name: tool_name, timeout_ms: timeout_ms}
+      |> Map.merge(reason.details || %{}),
+      true
+    )
   end
 
   defp format_error(tool_name, reason) when is_exception(reason) do
-    message = Exception.message(reason)
-    error_envelope(tool_name, :execution_error, message, %{exception_type: reason.__struct__})
+    SignalHelpers.normalize_error(reason, :execution_error, Exception.message(reason), %{tool_name: tool_name})
   end
 
   defp format_error(tool_name, reason) do
-    message = inspect(reason)
-    details = reason
-    error_envelope(tool_name, :execution_error, message, details)
+    SignalHelpers.normalize_error(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name})
   end
 
   defp format_exception(tool_name, exception, stacktrace) do
@@ -561,25 +588,23 @@ defmodule Jido.AI.Turn do
 
     message = Exception.message(exception)
 
-    error_envelope(tool_name, :exception, message, %{exception_type: exception.__struct__})
-    |> Map.put(:exception_type, exception.__struct__)
+    SignalHelpers.error_envelope(
+      :exception,
+      message,
+      %{tool_name: tool_name, exception_type: exception.__struct__},
+      false
+    )
   end
 
   defp format_catch(tool_name, kind, reason) do
     message = "Caught #{kind}: #{inspect(reason)}"
 
-    error_envelope(tool_name, :caught, message, %{kind: kind})
-    |> Map.put(:kind, kind)
-  end
-
-  defp error_envelope(tool_name, type, message, details \\ nil) do
-    %{
-      error: message,
-      message: message,
-      tool_name: tool_name,
-      type: type,
-      details: details
-    }
+    SignalHelpers.error_envelope(
+      :caught,
+      message,
+      %{tool_name: tool_name, kind: kind, reason: inspect(reason)},
+      false
+    )
   end
 
   defp timeout_from_details(%{} = details), do: get_field(details, :timeout)
@@ -691,7 +716,7 @@ defmodule Jido.AI.Turn do
     raw_result =
       case tool_name do
         "" ->
-          {:error, %{type: :validation, message: "Missing tool name"}, []}
+          {:error, SignalHelpers.error_envelope(:validation, "Missing tool name"), []}
 
         _ ->
           execute(tool_name, arguments, context, exec_opts)
@@ -759,10 +784,28 @@ defmodule Jido.AI.Turn do
     |> Exception.format_stacktrace()
   end
 
-  defp encode_or_inspect(value) do
-    Jason.encode!(value)
-  rescue
-    _ -> inspect(value)
+  defp encode_tool_result_envelope(payload, parts \\ []) when is_map(payload) and is_list(parts) do
+    encoded = Jason.encode!(payload)
+
+    case parts do
+      [] -> encoded
+      normalized_parts -> [ContentPart.text(encoded) | normalized_parts]
+    end
+  end
+
+  defp build_tool_result_payload(output, content, metadata \\ %{}) do
+    payload =
+      %{}
+      |> maybe_add(:output, empty_map_to_nil(output))
+      |> maybe_add(:content, normalize_tool_result_content_payload(content))
+      |> maybe_add(:metadata, empty_map_to_nil(metadata))
+
+    case payload do
+      %{output: result} when map_size(payload) == 1 -> result
+      %{content: result} when map_size(payload) == 1 -> result
+      %{} = map when map_size(map) > 0 -> map
+      _ -> nil
+    end
   end
 
   defp extract_content_parts_result(result) do
@@ -779,22 +822,6 @@ defmodule Jido.AI.Turn do
         :error
     end
   end
-
-  defp normalize_tool_result_output(content, output) do
-    parts = normalize_content_parts(content)
-    encoded_output = maybe_encode_tool_result_output(output)
-
-    cond do
-      parts == [] and is_nil(encoded_output) -> ""
-      parts == [] -> encoded_output
-      is_nil(encoded_output) -> parts
-      true -> [ContentPart.text(encoded_output) | parts]
-    end
-  end
-
-  defp maybe_encode_tool_result_output(nil), do: nil
-  defp maybe_encode_tool_result_output(%{} = map) when map_size(map) == 0, do: nil
-  defp maybe_encode_tool_result_output(output), do: encode_or_inspect(output)
 
   defp normalize_content_parts(parts) when is_list(parts) do
     Enum.flat_map(parts, fn
@@ -883,7 +910,36 @@ defmodule Jido.AI.Turn do
   defp empty_map_to_nil(%{} = map) when map_size(map) == 0, do: nil
   defp empty_map_to_nil(value), do: value
 
-  defp normalize_tool_result_content(content, _raw_result) when is_binary(content), do: content
+  defp normalize_tool_result_content_payload(content) when is_binary(content), do: content
+
+  defp normalize_tool_result_content_payload(content) when is_list(content) do
+    if content_parts_list?(content),
+      do: serialize_content_parts(normalize_content_parts(content)),
+      else: content
+  end
+
+  defp normalize_tool_result_content_payload(nil), do: nil
+  defp normalize_tool_result_content_payload(other), do: other
+
+  defp serialize_content_parts(parts) when is_list(parts) do
+    Enum.map(parts, fn
+      %ContentPart{} = part ->
+        part
+        |> Map.from_struct()
+        |> Enum.reject(fn
+          {:metadata, metadata} -> metadata in [nil, %{}]
+          {_key, value} -> is_nil(value)
+        end)
+        |> Map.new()
+
+      other ->
+        other
+    end)
+  end
+
+  defp normalize_tool_result_content(content, raw_result) when is_binary(content) do
+    if canonical_tool_payload?(content), do: content, else: format_tool_result_content(raw_result)
+  end
 
   defp normalize_tool_result_content(content, _raw_result) when is_list(content) do
     if content_parts_list?(content),
@@ -892,7 +948,18 @@ defmodule Jido.AI.Turn do
   end
 
   defp normalize_tool_result_content(nil, raw_result), do: format_tool_result_content(raw_result)
+
+  defp normalize_tool_result_content(content, _raw_result) when is_map(content),
+    do: encode_tool_result_envelope(%{ok: true, result: build_tool_result_payload(content, nil)})
+
   defp normalize_tool_result_content(_content, raw_result), do: format_tool_result_content(raw_result)
+
+  defp canonical_tool_payload?(content) when is_binary(content) do
+    case Jason.decode(content) do
+      {:ok, %{"ok" => _}} -> true
+      _ -> false
+    end
+  end
 
   defp normalize_raw_result(raw_result), do: Effects.normalize_result(raw_result)
 

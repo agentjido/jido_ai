@@ -73,6 +73,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   alias Jido.AI.Directive
   alias Jido.AI.Effects
   alias Jido.AI.Reasoning.Helpers
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Reasoning.TreeOfThoughts.Machine
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
@@ -528,7 +529,15 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
                 Directive.EmitToolError.new!(%{
                   id: call.call_id,
                   tool_name: call.tool_name,
-                  error: %{type: :not_found, message: "Tool not found: #{call.tool_name}"}
+                  error: %{type: :not_found, message: "Tool not found: #{call.tool_name}"},
+                  metadata: %{
+                    request_id: request_id,
+                    run_id: request_id,
+                    iteration: iteration,
+                    origin: :worker_runtime,
+                    operation: :tool_execute,
+                    strategy: :tot
+                  }
                 })
 
               module ->
@@ -549,7 +558,13 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
                   max_retries: config[:tool_max_retries],
                   retry_backoff_ms: config[:tool_retry_backoff_ms],
                   request_id: request_id,
-                  iteration: iteration
+                  iteration: iteration,
+                  metadata: %{
+                    request_id: request_id,
+                    run_id: request_id,
+                    iteration: iteration,
+                    strategy: :tot
+                  }
                 })
             end
           end)
@@ -903,7 +918,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
 
-  defp normalize_tool_result(result), do: Effects.normalize_result(result)
+  defp normalize_tool_result(result), do: SignalHelpers.normalize_result(result, :tool_error, "Tool execution failed")
 
   defp generate_call_id, do: Machine.generate_call_id()
 
