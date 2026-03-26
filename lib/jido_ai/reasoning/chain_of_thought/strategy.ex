@@ -652,7 +652,6 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
       :request_completed -> Observe.emit(obs_cfg, Observe.request(:complete), measurements, metadata)
       :request_failed -> Observe.emit(obs_cfg, Observe.request(:failed), measurements, metadata)
       :request_cancelled -> Observe.emit(obs_cfg, Observe.request(:cancelled), measurements, metadata)
-      _ -> :ok
     end
   end
 
