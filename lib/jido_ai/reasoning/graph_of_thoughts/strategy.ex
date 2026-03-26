@@ -72,6 +72,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
   alias Jido.AI.Directive
   alias Jido.AI.Reasoning.GraphOfThoughts.Machine
   alias Jido.AI.Reasoning.Helpers
+  alias Jido.AI.Reasoning.RequestLifecycle
   alias ReqLLM.Context
 
   @default_model :fast
@@ -140,6 +141,9 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
       {"ai.llm.response", {:strategy_cmd, @llm_result}},
       {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
       {"ai.request.error", {:strategy_cmd, @request_error}},
+      {"ai.request.started", Jido.Actions.Control.Noop},
+      {"ai.request.completed", Jido.Actions.Control.Noop},
+      {"ai.request.failed", Jido.Actions.Control.Noop},
       # Usage report is emitted for observability but doesn't need processing
       {"ai.usage", Jido.Actions.Control.Noop}
     ]
@@ -332,10 +336,16 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     lifted = lift_directives(directives, state)
 
     updated_state =
-      updated_machine
-      |> Machine.to_map()
-      |> Helpers.apply_to_state([Helpers.update_config(state[:config])])
+      RequestLifecycle.put_active_request_id(
+        state,
+        updated_machine
+        |> Machine.to_map()
+        |> Helpers.apply_to_state([Helpers.update_config(state[:config])]),
+        request_id,
+        [:generating, "generating"]
+      )
 
+    emit_request_started(updated_state, request_id, prompt)
     updated_agent = StratState.put(agent, updated_state)
     {updated_agent, lifted}
   end
@@ -353,8 +363,10 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     updated_state =
       updated_machine
       |> Machine.to_map()
+      |> merge_runtime_state(state)
       |> Helpers.apply_to_state([Helpers.update_config(state[:config])])
 
+    emit_terminal_request_lifecycle(state, updated_state)
     updated_agent = StratState.put(agent, updated_state)
     {updated_agent, lifted}
   end
@@ -375,6 +387,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     updated_state =
       updated_machine
       |> Machine.to_map()
+      |> merge_runtime_state(state)
       |> Helpers.apply_to_state([Helpers.update_config(state[:config])])
 
     updated_agent = StratState.put(agent, updated_state)
@@ -400,6 +413,18 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
   end
 
   defp process_instruction(_agent, _instruction, _ctx), do: :noop
+
+  defp merge_runtime_state(new_state, previous_state) do
+    RequestLifecycle.put_active_request_id(previous_state, new_state, nil, [:generating, "generating"])
+  end
+
+  defp emit_request_started(state, request_id, prompt) do
+    RequestLifecycle.emit_started(:got, state, request_id, prompt)
+  end
+
+  defp emit_terminal_request_lifecycle(previous_state, new_state) do
+    RequestLifecycle.emit_terminal(:got, previous_state, new_state)
+  end
 
   defp lift_directives(directives, state) do
     config = Map.get(state, :config, %{})
