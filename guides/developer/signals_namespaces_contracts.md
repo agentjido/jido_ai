@@ -38,6 +38,7 @@ Typed signal modules define payload contracts and canonical signal types:
 
 - `ai.tool.started` is the public start-of-execution contract for tool-capable runtimes.
 - `ai.tool.result` is the terminal contract for both success and failure.
+- `ai.request.started`, `ai.request.completed`, and `ai.request.failed` are expected across reasoning strategies, including AoT, CoT/CoD, GoT, ReAct, ToT, and TRM.
 
 ## Metadata Contract
 
@@ -83,6 +84,7 @@ Fix:
 
 - canonical list lives in module type declarations (`Jido.AI.Signal.*`) and strategy/plugin route declarations (`signal_routes/1`, plugin `signal_types/0`)
 - signal payload schemas should remain backward compatible when possible
+- runtime event envelopes are strategy-agnostic via `Jido.AI.Runtime.Event`; `Jido.AI.Reasoning.ReAct.Event` remains a compatibility wrapper
 
 ## When To Use / Not Use
 

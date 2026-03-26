@@ -66,6 +66,7 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.Reasoning.Helpers
+  alias Jido.AI.Reasoning.RequestLifecycle
   alias Jido.AI.Reasoning.TRM.Machine
   alias Jido.AI.Reasoning.TRM.Reasoning
   alias Jido.AI.Reasoning.TRM.Supervision
@@ -148,6 +149,9 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
       {"ai.llm.response", {:strategy_cmd, @llm_result}},
       {"ai.llm.delta", {:strategy_cmd, @llm_partial}},
       {"ai.request.error", {:strategy_cmd, @request_error}},
+      {"ai.request.started", Jido.Actions.Control.Noop},
+      {"ai.request.completed", Jido.Actions.Control.Noop},
+      {"ai.request.failed", Jido.Actions.Control.Noop},
       # Usage report is emitted for observability but doesn't need processing
       {"ai.usage", Jido.Actions.Control.Noop}
     ]
@@ -332,8 +336,10 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
             new_state =
               machine
               |> Machine.to_map()
+              |> merge_runtime_state(state, msg)
               |> Helpers.apply_to_state([Helpers.update_config(config)])
 
+            emit_request_lifecycle(state, new_state, msg)
             agent = StratState.put(agent, new_state)
             {agent, lift_directives(directives, config)}
 
@@ -427,6 +433,39 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
       :noop
     end
   end
+
+  defp merge_runtime_state(new_state, previous_state, {:start, _prompt, request_id}) do
+    RequestLifecycle.put_active_request_id(previous_state, new_state, request_id, [:reasoning, :supervising, :improving])
+  end
+
+  defp merge_runtime_state(new_state, previous_state, _msg) do
+    RequestLifecycle.put_active_request_id(previous_state, new_state, nil, [:reasoning, :supervising, :improving])
+  end
+
+  defp emit_request_lifecycle(previous_state, new_state, {:start, prompt, request_id}) do
+    if previous_state[:status] == :idle and new_state[:status] == :reasoning do
+      RequestLifecycle.emit_started(:trm, new_state, request_id, prompt, iteration: new_state[:supervision_step])
+    else
+      :ok
+    end
+  end
+
+  defp emit_request_lifecycle(previous_state, new_state, msg)
+       when elem(msg, 0) in [:reasoning_result, :supervision_result, :improvement_result] do
+    RequestLifecycle.emit_terminal(
+      :trm,
+      previous_state,
+      new_state,
+      iteration: new_state[:supervision_step],
+      error_type: infer_msg_error_type(msg)
+    )
+  end
+
+  defp emit_request_lifecycle(_previous_state, _new_state, _msg), do: :ok
+
+  defp infer_msg_error_type({_phase, _call_id, {:error, reason, _effects}}) when is_atom(reason), do: reason
+  defp infer_msg_error_type({_phase, _call_id, {:error, reason}}) when is_atom(reason), do: reason
+  defp infer_msg_error_type(_msg), do: nil
 
   # NOTE: The directive building functions below (build_*_directive and
   # convert_to_reqllm_context) share patterns with other strategies like ReAct.
