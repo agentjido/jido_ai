@@ -400,6 +400,7 @@ defmodule Jido.AI.Request do
   @spec complete_request(struct(), String.t(), any(), keyword()) :: struct()
   def complete_request(agent, request_id, result, opts \\ []) do
     meta = Keyword.get(opts, :meta, %{})
+    last_answer = Keyword.get(opts, :last_answer, compat_text(result))
 
     state =
       agent.state
@@ -411,7 +412,7 @@ defmodule Jido.AI.Request do
           %{req | status: :completed, result: result, completed_at: System.system_time(:millisecond)}
           |> Map.put(:meta, Map.merge(Map.get(req, :meta, %{}), meta))
       end)
-      |> Map.put(:last_answer, result || "")
+      |> Map.put(:last_answer, last_answer)
       |> Map.put(:completed, true)
 
     %{agent | state: state}
@@ -582,6 +583,12 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_extra_refs(payload, _), do: payload
+
+  @doc false
+  @spec compat_text(any()) :: String.t()
+  def compat_text(nil), do: ""
+  def compat_text(value) when is_binary(value), do: value
+  def compat_text(value), do: inspect(value)
 
   defp snapshot_request_meta(%{details: details} = snapshot) when is_map(details) do
     %{}

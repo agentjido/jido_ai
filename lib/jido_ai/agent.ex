@@ -632,7 +632,7 @@ defmodule Jido.AI.Agent do
               agent
               | state:
                   Map.merge(agent.state, %{
-                    last_answer: jido_ai_agent_compat_result(snap.result),
+                    last_answer: Request.compat_text(snap.result),
                     completed: true
                   })
             }
@@ -663,10 +663,6 @@ defmodule Jido.AI.Agent do
       end
 
       defp request_pending?(_agent, _request_id), do: false
-
-      defp jido_ai_agent_compat_result(nil), do: ""
-      defp jido_ai_agent_compat_result(value) when is_binary(value), do: value
-      defp jido_ai_agent_compat_result(value), do: inspect(value)
 
       defp failure_reason(snap) do
         details = snap.details

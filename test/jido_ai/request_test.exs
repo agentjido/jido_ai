@@ -192,6 +192,17 @@ defmodule JidoTest.AI.RequestTest do
       assert request.meta == %{}
     end
 
+    test "complete_request/4 keeps last_answer as a compatibility string for non-binary results" do
+      agent = %MockAgent{state: Request.init_state(%{})}
+      agent = Request.start_request(agent, "req-1", "query")
+      agent = Request.complete_request(agent, "req-1", %{answer: 4})
+
+      request = agent.state.requests["req-1"]
+      assert request.status == :completed
+      assert request.result == %{answer: 4}
+      assert agent.state.last_answer == "%{answer: 4}"
+    end
+
     test "complete_request_from_snapshot/4 captures normalized request metadata" do
       agent = %MockAgent{state: Request.init_state(%{})}
       agent = Request.start_request(agent, "req-1", "query")
