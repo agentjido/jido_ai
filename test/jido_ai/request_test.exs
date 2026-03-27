@@ -192,6 +192,37 @@ defmodule JidoTest.AI.RequestTest do
       assert request.meta == %{}
     end
 
+    test "complete_request_from_snapshot/4 captures normalized request metadata" do
+      agent = %MockAgent{state: Request.init_state(%{})}
+      agent = Request.start_request(agent, "req-1", "query")
+
+      reasoning_details = [%{signature: "sig_123", provider: :openai}]
+      thinking_trace = [%{call_id: "call_1", iteration: 1, thinking: "Step by step..."}]
+
+      snapshot = %{
+        result: "The answer",
+        details: %{
+          usage: %{input_tokens: 10, output_tokens: 6, reasoning_tokens: 42},
+          thinking_trace: thinking_trace,
+          streaming_thinking: "Final reasoning",
+          conversation: [
+            %{role: :user, content: "query"},
+            %{role: :assistant, content: "The answer", reasoning_details: reasoning_details}
+          ]
+        }
+      }
+
+      agent = Request.complete_request_from_snapshot(agent, "req-1", snapshot)
+
+      request = agent.state.requests["req-1"]
+      assert request.status == :completed
+      assert request.result == "The answer"
+      assert request.meta.usage == %{input_tokens: 10, output_tokens: 6, reasoning_tokens: 42}
+      assert request.meta.reasoning_details == reasoning_details
+      assert request.meta.thinking_trace == thinking_trace
+      assert request.meta.last_thinking == "Final reasoning"
+    end
+
     test "fail_request/3 updates request with error" do
       agent = %MockAgent{state: Request.init_state(%{})}
       agent = Request.start_request(agent, "req-1", "query")

@@ -108,6 +108,23 @@ Each request is tracked with status like:
 
 Agent state keeps request maps and compatibility fields (`last_query`, `last_answer`, etc.).
 
+Completed request records may also include normalized `meta` when the runtime
+has it available. Common keys are:
+- `:usage`
+- `:reasoning_details`
+- `:thinking_trace`
+- `:last_thinking`
+
+Example:
+
+```elixir
+{:ok, status} = Jido.AgentServer.status(pid)
+request_id = status.raw_state[:last_request_id]
+
+get_in(status.raw_state, [:requests, request_id, :meta])
+# %{usage: %{...}, reasoning_details: [...], ...}
+```
+
 ## Failure Mode: Timeouts Under Load
 
 Symptom:

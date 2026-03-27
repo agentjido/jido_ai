@@ -285,7 +285,7 @@ defmodule Jido.AI.GoTAgent do
         if request_pending?(agent, request_id) and snap.done? do
           case snap.status do
             :success ->
-              Request.complete_request(agent, request_id, snap.result)
+              Request.complete_request_from_snapshot(agent, request_id, snap)
 
             :failure ->
               Request.fail_request(agent, request_id, failure_reason(snap))

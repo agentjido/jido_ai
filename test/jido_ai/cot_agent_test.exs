@@ -142,6 +142,26 @@ defmodule Jido.AI.CoTAgentTest do
       assert updated_agent.state.completed == true
     end
 
+    test "on_after_cmd stores request meta from completed strategy snapshots" do
+      agent =
+        TestCoTAgent.new()
+        |> Request.start_request("req_done", "query")
+        |> with_completed_strategy("final reasoning", %{usage: %{input_tokens: 5, output_tokens: 2}})
+
+      {:ok, updated_agent, directives} =
+        TestCoTAgent.on_after_cmd(
+          agent,
+          {:cot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+
+      assert get_in(updated_agent.state, [:requests, "req_done", :meta]) == %{
+               usage: %{input_tokens: 5, output_tokens: 2}
+             }
+    end
+
     test "on_after_cmd marks pending request failed on terminal failure snapshot" do
       raw_error = %{type: :provider_error, status: 503, message: "busy"}
 
@@ -189,8 +209,8 @@ defmodule Jido.AI.CoTAgentTest do
     end
   end
 
-  defp with_completed_strategy(agent, result) do
-    strategy_state = %{status: :completed, result: result, steps: []}
+  defp with_completed_strategy(agent, result, overrides \\ %{}) do
+    strategy_state = Map.merge(%{status: :completed, result: result, steps: []}, overrides)
     put_in(agent.state[:__strategy__], strategy_state)
   end
 

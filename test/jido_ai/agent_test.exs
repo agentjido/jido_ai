@@ -6,6 +6,7 @@ defmodule Jido.AI.AgentTest do
   import ExUnit.CaptureIO
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Request
   alias Jido.AI.Agent
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
@@ -470,6 +471,34 @@ defmodule Jido.AI.AgentTest do
       assert updated_agent.state.last_answer == inspect(raw_error)
       assert updated_agent.state.completed == true
     end
+
+    test "on_after_cmd stores enriched request meta from the ReAct snapshot" do
+      reasoning_details = [%{signature: "sig_123", provider: :openai}]
+      thinking_trace = [%{call_id: "call_1", iteration: 1, thinking: "Step by step..."}]
+
+      agent =
+        BasicAgent.new()
+        |> Request.start_request("req_meta", "query")
+        |> with_completed_strategy("final answer", %{
+          usage: %{input_tokens: 7, output_tokens: 3, reasoning_tokens: 18},
+          thinking_trace: thinking_trace,
+          streaming_thinking: "Final reasoning",
+          run_context:
+            AIContext.new()
+            |> AIContext.append_user("query")
+            |> AIContext.append_assistant("final answer", nil, reasoning_details: reasoning_details)
+        })
+
+      {:ok, updated_agent, _directives} =
+        BasicAgent.on_after_cmd(agent, {:ai_react_start, %{request_id: "req_meta"}}, [])
+
+      request = get_in(updated_agent.state, [:requests, "req_meta"])
+      assert request.status == :completed
+      assert request.meta.usage.reasoning_tokens == 18
+      assert request.meta.reasoning_details == reasoning_details
+      assert request.meta.thinking_trace == thinking_trace
+      assert request.meta.last_thinking == "Final reasoning"
+    end
   end
 
   # ============================================================================
@@ -506,6 +535,15 @@ defmodule Jido.AI.AgentTest do
 
   defp with_failed_strategy(agent, result) do
     strategy_state = %{status: :error, result: result, termination_reason: :provider_error}
+    put_in(agent.state[:__strategy__], strategy_state)
+  end
+
+  defp with_completed_strategy(agent, result, overrides) do
+    strategy_state =
+      agent.state[:__strategy__]
+      |> Map.merge(%{status: :completed, result: result})
+      |> Map.merge(overrides)
+
     put_in(agent.state[:__strategy__], strategy_state)
   end
 end
