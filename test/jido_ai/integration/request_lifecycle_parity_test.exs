@@ -195,7 +195,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       snapshot = ChainOfThought.snapshot(failed_agent, %{})
       assert snapshot.done?
       assert snapshot.status == :failure
-      assert snapshot.result =~ "provider_error"
+      assert snapshot.result == {:provider_error, :overloaded}
     end
   end
 

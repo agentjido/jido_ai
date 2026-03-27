@@ -448,6 +448,28 @@ defmodule Jido.AI.AgentTest do
       assert get_in(agent.state, [:requests, "req_1", :result]) == "done"
       assert get_in(agent.state, [:requests, "req_1", :error]) == nil
     end
+
+    test "on_after_cmd keeps last_answer string while request failure stores raw term" do
+      raw_error = %{type: :provider_error, status: 503, message: "try later"}
+
+      agent =
+        BasicAgent.new()
+        |> Request.start_request("req_failed", "query")
+        |> with_failed_strategy(raw_error)
+
+      {:ok, updated_agent, directives} =
+        BasicAgent.on_after_cmd(
+          agent,
+          {:ai_react_worker_event, %{request_id: "req_failed", event: %{request_id: "req_failed"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_failed", :status]) == :failed
+      assert get_in(updated_agent.state, [:requests, "req_failed", :error]) == {:failed, :provider_error, raw_error}
+      assert updated_agent.state.last_answer == inspect(raw_error)
+      assert updated_agent.state.completed == true
+    end
   end
 
   # ============================================================================
@@ -480,5 +502,10 @@ defmodule Jido.AI.AgentTest do
     test "returns empty list for empty input" do
       assert Agent.tools_from_skills([]) == []
     end
+  end
+
+  defp with_failed_strategy(agent, result) do
+    strategy_state = %{status: :error, result: result, termination_reason: :provider_error}
+    put_in(agent.state[:__strategy__], strategy_state)
   end
 end

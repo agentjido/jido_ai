@@ -83,9 +83,9 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapter do
           if status.snapshot.done? do
             answer =
               case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_result, "")
-                "" -> Map.get(status.raw_state, :last_result, "")
-                result -> result
+                nil -> format_cli_answer(Map.get(status.raw_state, :last_result, ""))
+                "" -> format_cli_answer(Map.get(status.raw_state, :last_result, ""))
+                result -> format_cli_answer(result)
               end
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
@@ -110,4 +110,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapter do
       duration_ms: Map.get(details, :duration_ms)
     }
   end
+
+  defp format_cli_answer(nil), do: ""
+  defp format_cli_answer(value) when is_binary(value), do: value
+  defp format_cli_answer(value), do: inspect(value)
 end

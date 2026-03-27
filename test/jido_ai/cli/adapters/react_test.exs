@@ -155,5 +155,16 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
       assert meta.usage.output_tokens == 5
       assert meta.usage.total_tokens == 15
     end
+
+    test "await inspects non-binary failure results for CLI-safe output" do
+      status = AdapterTestSupport.status(result: {:provider_error, :overloaded}, snapshot_status: :failure)
+
+      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+
+      assert {:ok, %{answer: "{:provider_error, :overloaded}", meta: meta}} =
+               ReActAdapter.await(self(), 100, %{})
+
+      assert meta.status == :failure
+    end
   end
 end

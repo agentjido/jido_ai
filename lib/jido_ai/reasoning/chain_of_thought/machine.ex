@@ -293,7 +293,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Machine do
       machine =
         machine
         |> Map.put(:termination_reason, :error)
-        |> Map.put(:result, "Error: #{inspect(reason)}")
+        |> Map.put(:result, reason)
 
       {machine, []}
     end)

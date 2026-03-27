@@ -422,7 +422,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
             base_state
             |> Map.put(:status, :error)
             |> Map.put(:termination_reason, :error)
-            |> Map.put(:result, "Error: #{inspect(error)}")
+            |> Map.put(:result, error)
             |> Map.put(:active_request_id, nil)
 
           {put_strategy_state(agent, failed_state), []}
@@ -537,7 +537,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
           base_state
           |> Map.put(:status, :error)
           |> Map.put(:termination_reason, :error)
-          |> Map.put(:result, "Error: #{inspect(error)}")
+          |> Map.put(:result, error)
           |> Map.put(:active_request_id, nil)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})
@@ -552,7 +552,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
           base_state
           |> Map.put(:status, :error)
           |> Map.put(:termination_reason, :error)
-          |> Map.put(:result, "Error: #{inspect(error)}")
+          |> Map.put(:result, error)
           |> Map.put(:active_request_id, nil)
 
         signal = Signal.RequestFailed.new!(%{request_id: request_id, error: error, run_id: request_id})

@@ -1454,7 +1454,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             base_state
             |> Map.put(:status, :error)
             |> Map.put(:termination_reason, :error)
-            |> Map.put(:result, inspect(error))
+            |> Map.put(:result, error)
             |> Map.put(:active_request_id, nil)
             |> stop_pending_input_server()
             |> Map.put(:run_context, nil)
@@ -1707,7 +1707,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           base_state
           |> stop_pending_input_server()
           |> Map.put(:status, :error)
-          |> Map.put(:result, inspect(error))
+          |> Map.put(:result, error)
           |> Map.put(:termination_reason, :error)
           |> Map.put(:run_context, nil)
           |> Map.put(:active_request_id, nil)
@@ -1729,7 +1729,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           base_state
           |> stop_pending_input_server()
           |> Map.put(:status, :error)
-          |> Map.put(:result, inspect(error))
+          |> Map.put(:result, error)
           |> Map.put(:termination_reason, :cancelled)
           |> Map.put(:cancel_reason, reason)
           |> Map.put(:run_context, nil)
