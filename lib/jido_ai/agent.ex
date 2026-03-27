@@ -580,12 +580,7 @@ defmodule Jido.AI.Agent do
             case snap.status do
               :success ->
                 agent =
-                  Request.complete_request(
-                    agent,
-                    request_id,
-                    snap.result,
-                    meta: jido_ai_agent_thinking_meta(snap)
-                  )
+                  Request.complete_request_from_snapshot(agent, request_id, snap)
 
                 emit_request_completed_signal(agent, request_id, snap.result)
                 agent
@@ -637,19 +632,14 @@ defmodule Jido.AI.Agent do
               agent
               | state:
                   Map.merge(agent.state, %{
-                    last_answer: jido_ai_agent_compat_result(snap.result),
+                    last_answer: Request.compat_text(snap.result),
                     completed: true
                   })
             }
 
             case snap.status do
               :success ->
-                Request.complete_request(
-                  agent,
-                  request_id,
-                  snap.result,
-                  meta: jido_ai_agent_thinking_meta(snap)
-                )
+                Request.complete_request_from_snapshot(agent, request_id, snap)
 
               :failure ->
                 reason = failure_reason(snap)
@@ -673,29 +663,6 @@ defmodule Jido.AI.Agent do
       end
 
       defp request_pending?(_agent, _request_id), do: false
-
-      defp jido_ai_agent_compat_result(nil), do: ""
-      defp jido_ai_agent_compat_result(value) when is_binary(value), do: value
-      defp jido_ai_agent_compat_result(value), do: inspect(value)
-
-      # Use a prefixed helper name to avoid collisions with user-defined functions
-      # in modules that `use Jido.AI.Agent`.
-      defp jido_ai_agent_thinking_meta(snap) do
-        details = snap.details
-        meta = %{}
-
-        meta =
-          if details[:thinking_trace] && details[:thinking_trace] != [],
-            do: Map.put(meta, :thinking_trace, details[:thinking_trace]),
-            else: meta
-
-        meta =
-          if details[:streaming_thinking] && details[:streaming_thinking] != "",
-            do: Map.put(meta, :last_thinking, details[:streaming_thinking]),
-            else: meta
-
-        meta
-      end
 
       defp failure_reason(snap) do
         details = snap.details
