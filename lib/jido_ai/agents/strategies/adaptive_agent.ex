@@ -345,7 +345,7 @@ defmodule Jido.AI.AdaptiveAgent do
             agent
             | state:
                 Map.merge(agent.state, %{
-                  last_result: snap.result || "",
+                  last_result: compat_result(snap.result),
                   completed: true,
                   selected_strategy: selected_strategy
                 })
@@ -357,6 +357,10 @@ defmodule Jido.AI.AdaptiveAgent do
           }
         end
       end
+
+      defp compat_result(nil), do: ""
+      defp compat_result(value) when is_binary(value), do: value
+      defp compat_result(value), do: inspect(value)
 
       defp request_id_from_action({_, params}, fallback) when is_map(params) do
         params[:request_id] ||
