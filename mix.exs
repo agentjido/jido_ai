@@ -61,7 +61,7 @@ defmodule JidoAi.MixProject do
       # Jido ecosystem
       {:jido, "~> 2.1"},
       {:jido_action, "~> 2.1"},
-      {:req_llm, "~> 1.7"},
+      {:req_llm, "~> 1.9"},
 
       # Runtime
       {:fsmx, "~> 0.5"},
@@ -75,7 +75,6 @@ defmodule JidoAi.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.22", only: [:dev], runtime: false},
-      {:dotenvy, "~> 1.1"},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18", only: [:dev, :test]},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
