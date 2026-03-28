@@ -315,7 +315,7 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
     }
   end
 
-  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
+  defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp process_instruction(agent, %Jido.Instruction{action: action, params: params} = instruction, ctx) do
     normalized_action = normalize_action(action)

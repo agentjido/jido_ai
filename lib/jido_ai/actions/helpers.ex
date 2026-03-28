@@ -37,12 +37,12 @@ defmodule Jido.AI.Actions.Helpers do
 
   ## Parameters
 
-  * `model` - Model alias (atom) or direct spec (string)
+  * `model` - Model alias or direct ReqLLM model input
   * `default` - Default model alias to use if model is nil
 
   ## Returns
 
-  * `{:ok, model_spec}` - Successfully resolved model
+  * `{:ok, model_input}` - Successfully resolved model
   * `{:error, :invalid_model_format}` - Invalid model format
 
   ## Examples
@@ -57,9 +57,12 @@ defmodule Jido.AI.Actions.Helpers do
       {:ok, "openai:gpt-4"}
   """
   def resolve_model(nil, default), do: {:ok, Jido.AI.resolve_model(default)}
-  def resolve_model(model, _default) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
-  def resolve_model(model, _default) when is_binary(model), do: {:ok, model}
-  def resolve_model(_model, _default), do: {:error, :invalid_model_format}
+
+  def resolve_model(model, _default) do
+    {:ok, Jido.AI.resolve_model(model)}
+  rescue
+    ArgumentError -> {:error, :invalid_model_format}
+  end
 
   @doc """
   Builds ReqLLM options from action parameters.

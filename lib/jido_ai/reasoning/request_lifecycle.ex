@@ -96,7 +96,7 @@ defmodule Jido.AI.Reasoning.RequestLifecycle do
       llm_call_id: llm_call_id,
       tool_call_id: nil,
       tool_name: nil,
-      model: if(model, do: Jido.AI.ModelInput.label(model), else: nil),
+      model: if(model, do: Jido.AI.model_label(model), else: nil),
       origin: :worker_runtime,
       operation: operation,
       strategy: strategy,

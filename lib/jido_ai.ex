@@ -75,9 +75,16 @@ defmodule Jido.AI do
   @type model_alias ::
           :fast | :capable | :thinking | :reasoning | :planning | :image | :embedding | atom()
   @type model_spec :: String.t()
+  @type resolved_model_input ::
+          model_spec()
+          | map()
+          | {atom(), model_spec(), keyword()}
+          | {atom(), keyword()}
+          | %LLMDB.Model{}
+  @type model_input :: model_alias() | resolved_model_input()
   @type llm_kind :: :text | :object | :stream
   @type llm_generation_opts :: %{
-          optional(:model) => model_alias() | model_spec(),
+          optional(:model) => model_input(),
           optional(:system_prompt) => String.t(),
           optional(:max_tokens) => non_neg_integer(),
           optional(:temperature) => number(),
@@ -152,19 +159,20 @@ defmodule Jido.AI do
   end
 
   @doc """
-  Resolves a model alias or passes through a direct model spec.
+  Resolves a model alias or passes through a direct ReqLLM model input.
 
   Model aliases are atoms like `:fast`, `:capable`, `:reasoning` that map
-  to full ReqLLM model specifications. Direct model specs (strings) are
-  passed through unchanged.
+  to full ReqLLM model specifications. Direct model inputs are passed through
+  unchanged and may be strings, ReqLLM tuples, inline maps, or `%LLMDB.Model{}`
+  structs.
 
   ## Arguments
 
-    * `model` - Either a model alias atom or a direct model spec string
+    * `model` - Either a model alias atom or a direct ReqLLM model input
 
   ## Returns
 
-    A ReqLLM model specification string.
+    A resolved ReqLLM model input.
 
   ## Examples
 
@@ -174,11 +182,71 @@ defmodule Jido.AI do
       iex> Jido.AI.resolve_model("openai:gpt-4")
       "openai:gpt-4"
 
+      iex> Jido.AI.resolve_model({:openai, "gpt-4.1", []})
+      {:openai, "gpt-4.1", []}
+
       Jido.AI.resolve_model(:unknown_alias)
       # raises ArgumentError with unknown alias message
   """
-  @spec resolve_model(model_alias() | model_spec()) :: model_spec()
-  def resolve_model(model), do: ModelAliases.resolve_model(model)
+  @spec resolve_model(model_input()) :: resolved_model_input()
+  def resolve_model(model) when is_atom(model), do: ModelAliases.resolve_model(model)
+  def resolve_model(model) when is_binary(model), do: model
+  def resolve_model(%LLMDB.Model{} = model), do: model
+  def resolve_model(model) when is_map(model) and not is_struct(model), do: model
+
+  def resolve_model({provider, model_id, provider_opts} = model)
+      when is_atom(provider) and is_binary(model_id) and is_list(provider_opts),
+      do: model
+
+  def resolve_model({provider, provider_opts} = model) when is_atom(provider) and is_list(provider_opts), do: model
+
+  def resolve_model(model) do
+    raise ArgumentError,
+          "invalid model input #{inspect(model)}. " <>
+            "Expected a model alias, string spec, ReqLLM tuple spec, inline model map, or %LLMDB.Model{}."
+  end
+
+  @doc """
+  Returns a stable human-readable label for a model input.
+  """
+  @spec model_label(model_input()) :: String.t()
+  def model_label(model) when is_atom(model), do: resolve_model(model)
+  def model_label(model) when is_binary(model), do: model
+
+  def model_label(model) do
+    case ReqLLM.model(model) do
+      {:ok, %LLMDB.Model{} = normalized} -> format_model_label(normalized)
+      _ -> inspect(model)
+    end
+  end
+
+  @doc false
+  @spec model_fingerprint_segment(model_input()) :: String.t()
+  def model_fingerprint_segment(model) when is_atom(model), do: resolve_model(model)
+  def model_fingerprint_segment(model) when is_binary(model), do: model
+
+  def model_fingerprint_segment(model) do
+    model
+    |> fingerprint_model_term()
+    |> :erlang.term_to_binary([:deterministic])
+    |> Base.url_encode64(padding: false)
+  end
+
+  @doc false
+  @spec provider_opt_keys(model_input()) :: %{optional(String.t()) => atom()}
+  def provider_opt_keys(model) do
+    with {:ok, %LLMDB.Model{} = normalized} <- ReqLLM.model(resolve_model(model)),
+         provider when is_atom(provider) <- Map.get(normalized, :provider),
+         {:ok, provider_mod} <- ReqLLM.provider(provider),
+         true <- function_exported?(provider_mod, :provider_schema, 0) do
+      provider_mod.provider_schema().schema
+      |> Keyword.keys()
+      |> Enum.map(&{Atom.to_string(&1), &1})
+      |> Map.new()
+    else
+      _ -> %{}
+    end
+  end
 
   @doc """
   Thin facade for `ReqLLM.Generation.generate_text/3`.
@@ -643,4 +711,28 @@ defmodule Jido.AI do
 
   defp merge_extra_opts(opts, extra_opts) when is_list(extra_opts), do: Keyword.merge(opts, extra_opts)
   defp merge_extra_opts(opts, _), do: opts
+
+  defp format_model_label(%LLMDB.Model{} = model) do
+    provider = Map.get(model, :provider)
+    model_id = Map.get(model, :model) || Map.get(model, :id)
+
+    cond do
+      is_atom(provider) and is_binary(model_id) -> "#{provider}:#{model_id}"
+      is_binary(provider) and is_binary(model_id) -> "#{provider}:#{model_id}"
+      true -> inspect(model)
+    end
+  end
+
+  defp fingerprint_model_term(model) do
+    case ReqLLM.model(model) do
+      {:ok, %LLMDB.Model{} = normalized} ->
+        normalized
+        |> Map.from_struct()
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+        |> Map.new()
+
+      _ ->
+        model
+    end
+  end
 end

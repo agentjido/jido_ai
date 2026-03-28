@@ -540,7 +540,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
   end
 
-  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
+  defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp normalize_blank(""), do: nil
   defp normalize_blank(value), do: value

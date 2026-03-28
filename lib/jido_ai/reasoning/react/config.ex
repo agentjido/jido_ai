@@ -3,7 +3,6 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   Canonical configuration for the Task-based ReAct runtime.
   """
 
-  alias Jido.AI.ModelInput
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.ToolAdapter
   require Logger
@@ -88,7 +87,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @spec new(map() | keyword()) :: t()
   def new(opts \\ %{}) do
     opts_map = normalize_opts(opts)
-    resolved_model = opts_map |> get_opt(:model, @default_model) |> ModelInput.normalize!()
+    resolved_model = opts_map |> get_opt(:model, @default_model) |> Jido.AI.resolve_model()
     provider_opt_keys_by_string = provider_opt_keys_by_string(resolved_model)
 
     tools =
@@ -171,7 +170,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
     parts = [
       "v#{config.version}",
-      ModelInput.fingerprint_segment(config.model),
+      Jido.AI.model_fingerprint_segment(config.model),
       config.system_prompt || "",
       Integer.to_string(config.max_iterations),
       to_string(config.streaming),
@@ -417,7 +416,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     end
   end
 
-  defp provider_opt_keys_by_string(model_spec), do: ModelInput.provider_opt_keys(model_spec)
+  defp provider_opt_keys_by_string(model_spec), do: Jido.AI.provider_opt_keys(model_spec)
 
   defp maybe_merge_llm_opts(opts, llm_opts) when is_list(llm_opts) do
     if llm_opts == [] do

@@ -1,5 +1,5 @@
 defmodule Jido.AITest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI
