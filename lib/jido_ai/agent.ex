@@ -756,7 +756,7 @@ defmodule Jido.AI.Agent do
       @spec steer(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, Jido.Agent.t()} | {:error, term()}
       def steer(pid, content, opts \\ []) when is_binary(content) do
-        Jido.AI.steer(pid, content, Keyword.put_new(opts, :source, "/ai/react/agent"))
+        Jido.AI.Reasoning.ReAct.steer(pid, content, Keyword.put_new(opts, :source, "/ai/react/agent"))
       end
 
       @doc """
@@ -768,7 +768,7 @@ defmodule Jido.AI.Agent do
       @spec inject(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
               {:ok, Jido.Agent.t()} | {:error, term()}
       def inject(pid, content, opts \\ []) when is_binary(content) do
-        Jido.AI.inject(pid, content, Keyword.put_new(opts, :source, "/ai/react/agent"))
+        Jido.AI.Reasoning.ReAct.inject(pid, content, Keyword.put_new(opts, :source, "/ai/react/agent"))
       end
 
       defoverridable on_before_cmd: 2,

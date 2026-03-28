@@ -3,6 +3,7 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
   use Mimic
 
   alias Jido.AI
+  alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.TestSupport.StreamResponseFactory
 
   defmodule SteeringAgent do
@@ -79,7 +80,7 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
     assert assistant_contents(first_messages) == []
 
     assert {:ok, _agent} =
-             SteeringAgent.steer(
+             ReAct.steer(
                pid,
                "Q2",
                expected_request_id: request.id,
