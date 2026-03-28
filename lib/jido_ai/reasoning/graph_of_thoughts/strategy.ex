@@ -323,7 +323,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     }
   end
 
-  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
+  defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp process_instruction(agent, %{action: @start, params: params}, _ctx) do
     state = StratState.get(agent, %{})

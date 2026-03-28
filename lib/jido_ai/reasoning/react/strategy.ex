@@ -1789,7 +1789,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
     Signal.Usage.new!(%{
       call_id: call_id,
-      model: Jido.AI.ModelInput.label(model),
+      model: Jido.AI.model_label(model),
       input_tokens: input_tokens,
       output_tokens: output_tokens,
       total_tokens: input_tokens + output_tokens,
@@ -2274,7 +2274,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
+  defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp validate_request_policy!(:reject), do: :reject
 
@@ -2407,7 +2407,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         llm_call_id: llm_call_id,
         tool_call_id: event_field(event, :tool_call_id),
         tool_name: event_field(event, :tool_name),
-        model: Jido.AI.ModelInput.label(config_model(state)),
+        model: Jido.AI.model_label(config_model(state)),
         origin: :worker_runtime,
         operation: telemetry_operation(kind),
         strategy: :react,
@@ -2590,7 +2590,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp provider_opt_keys_by_string(model_spec),
-    do: Jido.AI.ModelInput.provider_opt_keys(model_spec)
+    do: Jido.AI.provider_opt_keys(model_spec)
 
   defp generate_call_id, do: "req_#{Jido.Util.generate_id()}"
 

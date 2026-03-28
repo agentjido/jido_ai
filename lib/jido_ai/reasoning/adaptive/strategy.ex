@@ -391,7 +391,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
     }
   end
 
-  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
+  defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp handle_initial_instruction(agent, instructions, ctx, state) do
     # Find the start instruction

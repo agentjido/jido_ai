@@ -61,6 +61,31 @@ defmodule Jido.AI.CoreTest do
       end
     end
 
+    test "resolve_model/1 accepts ReqLLM tuple, inline map, and model struct inputs" do
+      tuple_model = {:openai, "gpt-4.1", [reasoning_effort: :medium]}
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+      struct_model = LLMDB.Model.new!(%{provider: :openai, id: "gpt-4.1"})
+
+      assert AI.resolve_model(tuple_model) == tuple_model
+      assert AI.resolve_model(inline_model) == inline_model
+      assert AI.resolve_model(struct_model) == struct_model
+    end
+
+    test "model helpers normalize labels and fingerprints for direct ReqLLM inputs" do
+      tuple_model = {:openai, "gpt-4.1", [reasoning_effort: :medium]}
+
+      assert AI.model_label(:fast) == AI.resolve_model(:fast)
+      assert AI.model_label(tuple_model) == "openai:gpt-4.1"
+      assert is_binary(AI.model_fingerprint_segment(tuple_model))
+      assert AI.provider_opt_keys(:fast) |> is_map()
+    end
+
+    test "resolve_model/1 raises for unsupported direct model inputs" do
+      assert_raise ArgumentError, ~r/invalid model input/, fn ->
+        AI.resolve_model(123)
+      end
+    end
+
     test "llm_defaults merges configured maps and validates kind" do
       Application.put_env(:jido_ai, :llm_defaults, %{text: %{max_tokens: 55, temperature: 0.6}})
 

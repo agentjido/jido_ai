@@ -10,7 +10,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token, ToolSelection}
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
-  alias Jido.AI.ModelInput
   alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Turn
   alias Jido.Agent.State, as: AgentState
@@ -436,7 +435,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
          ) do
       {:ok, response} ->
         {:ok, current_stream_state(state_key, state),
-         Turn.from_response(response, model: ModelInput.label(config.model)), extract_response_id(response)}
+         Turn.from_response(response, model: Jido.AI.model_label(config.model)), extract_response_id(response)}
 
       {:error, reason} ->
         {:error, current_stream_state(state_key, state), reason}
@@ -450,7 +449,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp consume_generate(%State{} = state, %Config{} = config, response) do
-    turn = Turn.from_response(response, model: ModelInput.label(config.model))
+    turn = Turn.from_response(response, model: Jido.AI.model_label(config.model))
     {:ok, state, turn, extract_response_id(response)}
   rescue
     e ->

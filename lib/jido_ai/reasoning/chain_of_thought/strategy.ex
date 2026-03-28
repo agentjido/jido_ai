@@ -572,7 +572,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
 
     Signal.Usage.new!(%{
       call_id: call_id,
-      model: Jido.AI.ModelInput.label(model),
+      model: Jido.AI.model_label(model),
       input_tokens: input_tokens,
       output_tokens: output_tokens,
       total_tokens: input_tokens + output_tokens,
@@ -631,7 +631,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
       llm_call_id: llm_call_id,
       tool_call_id: nil,
       tool_name: nil,
-      model: Jido.AI.ModelInput.label(config_model(state)),
+      model: Jido.AI.model_label(config_model(state)),
       origin: :worker_runtime,
       operation: :generate_text,
       strategy: :cot,
@@ -794,7 +794,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
     raise ArgumentError, "invalid system_prompt: expected binary, nil, or false, got #{inspect(other)}"
   end
 
-  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
+  defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp generate_call_id, do: Machine.generate_call_id()
 
