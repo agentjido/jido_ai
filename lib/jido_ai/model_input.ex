@@ -1,10 +1,17 @@
 defmodule Jido.AI.ModelInput do
   @moduledoc false
 
-  @type t :: Jido.AI.model_alias() | ReqLLM.model_input()
+  @type normalized_t ::
+          String.t()
+          | map()
+          | {atom(), String.t(), keyword()}
+          | {atom(), keyword()}
+          | %LLMDB.Model{}
+
+  @type t :: Jido.AI.model_alias() | normalized_t()
 
   @doc false
-  @spec normalize!(t()) :: ReqLLM.model_input()
+  @spec normalize!(t()) :: normalized_t()
   def normalize!(model) when is_atom(model), do: Jido.AI.resolve_model(model)
   def normalize!(model) when is_binary(model), do: model
   def normalize!(%LLMDB.Model{} = model), do: model
@@ -29,7 +36,7 @@ defmodule Jido.AI.ModelInput do
 
   def label(model) do
     case ReqLLM.model(model) do
-      {:ok, %LLMDB.Model{} = normalized} -> LLMDB.Model.spec(normalized)
+      {:ok, %LLMDB.Model{} = normalized} -> format_label(normalized)
       _ -> inspect(model)
     end
   end
@@ -73,4 +80,10 @@ defmodule Jido.AI.ModelInput do
         model
     end
   end
+
+  defp format_label(%LLMDB.Model{provider: provider, id: id})
+       when is_atom(provider) and is_binary(id),
+       do: "#{provider}:#{id}"
+
+  defp format_label(%LLMDB.Model{} = model), do: inspect(model)
 end
