@@ -39,7 +39,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Observe
   alias Jido.AI.Directive
   alias Jido.AI.Effects
-  alias Jido.AI.PendingInputServer
+  alias Jido.AI.Reasoning.ReAct.PendingInput
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.Reasoning.ReAct.State, as: ReActState
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
@@ -595,11 +595,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       base_llm_opts = normalize_llm_opts(config[:base_llm_opts], provider_opt_keys_by_string)
       effective_llm_opts = Keyword.merge(base_llm_opts, run_llm_opts)
       state_snapshot = normalize_map_opt(Map.get(agent, :state, %{}))
-      state = stop_pending_input_server(state)
+      state = PendingInput.stop(state)
 
       with {:ok, effective_tools} <- resolve_request_tools(config, params),
            {:ok, request_transformer} <- resolve_request_transformer(config, params),
-           {:ok, pending_input_server} <- start_pending_input_server(request_id) do
+           {:ok, pending_input_server} <- PendingInput.start(request_id) do
         runtime_config =
           runtime_config_from_strategy(config,
             req_http_options: effective_req_http_options,
@@ -699,25 +699,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
        when is_binary(content) and kind in [:steer, :inject] do
     state = StratState.get(agent, %{})
 
-    with {:ok, request_id} <- resolve_pending_input_request_id(state, params),
-         {:ok, server} <- fetch_pending_input_server(state),
-         :ok <- PendingInputServer.enqueue(server, pending_input_item(content, params)) do
-      new_state =
-        record_pending_input_control(state, kind,
-          status: :queued,
-          request_id: request_id
-        )
+    case PendingInput.accept_control(state, params, kind) do
+      {:ok, new_state} ->
+        {put_strategy_state(agent, new_state), []}
 
-      {put_strategy_state(agent, new_state), []}
-    else
-      {:error, reason} ->
-        new_state =
-          record_pending_input_control(state, kind,
-            status: :rejected,
-            reason: reason,
-            request_id: state[:active_request_id]
-          )
-
+      {:error, new_state} ->
         {put_strategy_state(agent, new_state), []}
     end
   end
@@ -907,10 +893,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp active_run?(state) do
     is_binary(state[:active_request_id]) and state[:status] in [:awaiting_llm, :awaiting_tool]
-  end
-
-  defp pending_input_run?(state) do
-    is_binary(state[:active_request_id]) and state[:status] in [:awaiting_llm, :awaiting_tool, :completed]
   end
 
   defp apply_context_op(agent, state, %{op_id: op_id} = context_op) do
@@ -1456,7 +1438,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             |> Map.put(:termination_reason, :error)
             |> Map.put(:result, error)
             |> Map.put(:active_request_id, nil)
-            |> stop_pending_input_server()
+            |> PendingInput.stop()
             |> Map.put(:run_context, nil)
             |> Map.delete(:run_tool_context)
             |> Map.delete(:run_req_http_options)
@@ -1679,7 +1661,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
         updated =
           base_state
-          |> stop_pending_input_server()
+          |> PendingInput.stop()
           |> Map.put(:status, :completed)
           |> Map.put(:result, result)
           |> Map.put(:termination_reason, termination_reason)
@@ -1705,7 +1687,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
         updated =
           base_state
-          |> stop_pending_input_server()
+          |> PendingInput.stop()
           |> Map.put(:status, :error)
           |> Map.put(:result, error)
           |> Map.put(:termination_reason, :error)
@@ -1727,7 +1709,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
         updated =
           base_state
-          |> stop_pending_input_server()
+          |> PendingInput.stop()
           |> Map.put(:status, :error)
           |> Map.put(:result, error)
           |> Map.put(:termination_reason, :cancelled)
@@ -1948,75 +1930,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     config[:request_policy] == :reject and state[:status] in [:awaiting_llm, :awaiting_tool] and
       is_binary(state[:active_request_id])
   end
-
-  defp start_pending_input_server(request_id) when is_binary(request_id) do
-    case PendingInputServer.start(owner: self(), request_id: request_id) do
-      {:ok, pid} -> {:ok, pid}
-      {:error, _reason} -> {:error, :pending_input_unavailable}
-    end
-  end
-
-  defp fetch_pending_input_server(state) do
-    case Map.get(state, :pending_input_server) do
-      pid when is_pid(pid) ->
-        if Process.alive?(pid), do: {:ok, pid}, else: {:error, :pending_input_unavailable}
-
-      _ ->
-        {:error, :pending_input_unavailable}
-    end
-  end
-
-  defp stop_pending_input_server(state) do
-    case Map.get(state, :pending_input_server) do
-      pid when is_pid(pid) ->
-        PendingInputServer.stop(pid)
-        Map.put(state, :pending_input_server, nil)
-
-      _ ->
-        Map.put(state, :pending_input_server, nil)
-    end
-  end
-
-  defp resolve_pending_input_request_id(state, params) do
-    expected_request_id = Map.get(params, :expected_request_id)
-    active_request_id = state[:active_request_id]
-
-    cond do
-      not pending_input_run?(state) ->
-        {:error, :idle}
-
-      is_binary(expected_request_id) and expected_request_id != active_request_id ->
-        {:error, :request_mismatch}
-
-      is_binary(active_request_id) ->
-        {:ok, active_request_id}
-
-      true ->
-        {:error, :idle}
-    end
-  end
-
-  defp pending_input_item(content, params) do
-    %{
-      content: content,
-      source: Map.get(params, :source),
-      refs: normalize_optional_refs(Map.get(params, :extra_refs))
-    }
-  end
-
-  defp record_pending_input_control(state, kind, attrs) when kind in [:steer, :inject] and is_list(attrs) do
-    result =
-      attrs
-      |> Keyword.put(:kind, kind)
-      |> Keyword.put(:at_ms, System.system_time(:millisecond))
-      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
-      |> Map.new()
-
-    Map.put(state, :last_pending_input_control, result)
-  end
-
-  defp normalize_optional_refs(%{} = refs), do: refs
-  defp normalize_optional_refs(_), do: nil
 
   defp maybe_mark_worker_ready(state, kind) when kind in [:request_completed, :request_failed, :request_cancelled] do
     Map.put(state, :react_worker_status, :ready)
