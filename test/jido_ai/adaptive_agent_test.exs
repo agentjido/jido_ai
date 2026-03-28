@@ -105,6 +105,25 @@ defmodule Jido.AI.AdaptiveAgentTest do
       assert updated_agent.state.completed == true
     end
 
+    test "on_after_cmd keeps last_result string while request failure stores raw term" do
+      raw_error = %{type: :provider_error, status: 503, message: "busy"}
+
+      agent =
+        TestAdaptiveAgent.new()
+        |> Request.start_request("req_failed", "query")
+        |> with_failed_strategy(raw_error)
+
+      {:ok, updated_agent, directives} =
+        TestAdaptiveAgent.on_after_cmd(agent, {:adaptive_start, %{request_id: "req_failed"}}, [:noop])
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_failed", :status]) == :failed
+      assert match?({:failed, _, ^raw_error}, get_in(updated_agent.state, [:requests, "req_failed", :error]))
+      assert updated_agent.state.last_result == inspect(raw_error)
+      assert updated_agent.state.selected_strategy == :cod
+      assert updated_agent.state.completed == true
+    end
+
     test "on_after_cmd preserves pending request when strategy is still running" do
       agent =
         TestAdaptiveAgent.new()
@@ -135,6 +154,17 @@ defmodule Jido.AI.AdaptiveAgentTest do
       selected_strategy: ChainOfDraft,
       strategy_type: :cod,
       status: :completed,
+      result: result
+    }
+
+    put_in(agent.state[:__strategy__], strategy_state)
+  end
+
+  defp with_failed_strategy(agent, result) do
+    strategy_state = %{
+      selected_strategy: ChainOfDraft,
+      strategy_type: :cod,
+      status: :error,
       result: result
     }
 

@@ -113,5 +113,16 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
       assert meta.task_type == :reasoning
       assert meta.available_strategies == [:cot, :react]
     end
+
+    test "await inspects non-binary failure results for CLI-safe output" do
+      status = AdapterTestSupport.status(result: {:provider_error, :overloaded}, snapshot_status: :failure)
+
+      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+
+      assert {:ok, %{answer: "{:provider_error, :overloaded}", meta: meta}} =
+               AdaptiveAdapter.await(self(), 100, %{})
+
+      assert meta.status == :failure
+    end
   end
 end
