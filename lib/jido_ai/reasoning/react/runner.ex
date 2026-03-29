@@ -1056,7 +1056,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   # returned a failure-like finish reason with no meaningful content. Preventing an empty
   # incomplete response from being silently accepted as a successful final answer.
   defp validate_terminal_response(%Turn{} = turn) do
-    blank_text? = turn.text == "" or is_nil(turn.text)
+    blank_text? = turn.text == ""
     failure_reason? = turn.finish_reason in [:error, :incomplete, :cancelled]
 
     if blank_text? and failure_reason? do
