@@ -965,6 +965,40 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert trace.truncated? == true
       assert length(trace.events) == 2000
     end
+
+    test "request_failed with {:incomplete_response, :incomplete} preserves structured error" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q_incomplete", request_id: "req_incomplete"})],
+          %{}
+        )
+
+      # This matches what runner.ex emits via fail_run when validate_terminal_response/1
+      # detects a blank text + failure finish_reason.
+      incomplete_error = {:incomplete_response, :incomplete}
+
+      failed_event =
+        runtime_event(:request_failed, "req_incomplete", 2, %{
+          error: incomplete_error,
+          error_type: :llm_response
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_incomplete", event: failed_event})],
+          %{}
+        )
+
+      snapshot = ReAct.snapshot(agent, %{})
+      assert snapshot.status == :failure
+      assert snapshot.done?
+      # The raw error tuple must be preserved — not stringified or wrapped
+      assert snapshot.result == incomplete_error
+    end
   end
 
   describe "tool configuration and compatibility" do

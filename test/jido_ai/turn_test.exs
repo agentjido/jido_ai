@@ -112,6 +112,67 @@ defmodule Jido.AI.TurnTest do
       assert turn.model == "anthropic:claude-haiku-4-5"
       assert turn.message_metadata == %{response_id: "resp_1"}
     end
+
+    test "propagates finish_reason from ReqLLM.Response for incomplete responses" do
+      response = %ReqLLM.Response{
+        id: "resp_incomplete",
+        model: "test:model",
+        context: ReqLLM.Context.new(),
+        message: ReqLLM.Context.assistant("", metadata: %{}),
+        stream?: false,
+        stream: nil,
+        usage: %{input_tokens: 5, output_tokens: 0},
+        finish_reason: :incomplete,
+        provider_meta: %{},
+        error: nil
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.text == ""
+      assert turn.finish_reason == :incomplete
+    end
+
+    test "propagates finish_reason from generic map responses" do
+      response = %{
+        message: %{content: "", tool_calls: nil},
+        finish_reason: :incomplete,
+        usage: %{input_tokens: 5, output_tokens: 0}
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.text == ""
+      assert turn.finish_reason == :incomplete
+    end
+
+    test "finish_reason is :stop for normal successful responses" do
+      response = %{
+        message: %{content: "Hello!", tool_calls: nil},
+        finish_reason: :stop,
+        usage: %{input_tokens: 5, output_tokens: 3}
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.text == "Hello!"
+      assert turn.finish_reason == :stop
+    end
+
+    test "finish_reason defaults to nil when not present in map response" do
+      response = %{
+        message: %{content: "Hello!", tool_calls: nil},
+        usage: %{input_tokens: 5, output_tokens: 3}
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.finish_reason == nil
+    end
   end
 
   describe "message projections" do

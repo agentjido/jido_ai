@@ -294,12 +294,18 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
 
             _ ->
-              completed =
-                state
-                |> State.put_status(:completed)
-                |> State.put_result(turn.text)
+              case validate_terminal_response(turn) do
+                :ok ->
+                  completed =
+                    state
+                    |> State.put_status(:completed)
+                    |> State.put_result(turn.text)
 
-              {:final_answer, completed}
+                  {:final_answer, completed}
+
+                {:error, reason} ->
+                  {:error, state, reason, :llm_response}
+              end
           end
 
         {:error, state, reason, error_type} ->
@@ -1043,6 +1049,20 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
       {:error, reason} ->
         {:error, state, reason}
+    end
+  end
+
+  # Returns :ok if the turn is a valid terminal response, or {:error, reason} if the LLM
+  # returned a failure-like finish reason with no meaningful content. Preventing an empty
+  # incomplete response from being silently accepted as a successful final answer.
+  defp validate_terminal_response(%Turn{} = turn) do
+    blank_text? = turn.text == "" or is_nil(turn.text)
+    failure_reason? = turn.finish_reason in [:error, :incomplete, :cancelled]
+
+    if blank_text? and failure_reason? do
+      {:error, {:incomplete_response, turn.finish_reason}}
+    else
+      :ok
     end
   end
 

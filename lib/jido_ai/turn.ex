@@ -47,6 +47,7 @@ defmodule Jido.AI.Turn do
           tool_calls: list(term()),
           usage: map() | nil,
           model: String.t() | nil,
+          finish_reason: atom() | nil,
           message_metadata: map(),
           tool_results: list(tool_result())
         }
@@ -58,6 +59,7 @@ defmodule Jido.AI.Turn do
             tool_calls: [],
             usage: nil,
             model: nil,
+            finish_reason: nil,
             message_metadata: %{},
             tool_results: []
 
@@ -89,6 +91,7 @@ defmodule Jido.AI.Turn do
       tool_calls: normalize_tool_calls(classified.tool_calls),
       usage: normalize_usage(ReqLLM.Response.usage(response)),
       model: Keyword.get(opts, :model, response.model),
+      finish_reason: classified.finish_reason,
       message_metadata: normalize_metadata(response.message.metadata),
       tool_results: []
     }
@@ -108,6 +111,7 @@ defmodule Jido.AI.Turn do
       tool_calls: tool_calls,
       usage: normalize_usage(get_field(response, :usage)),
       model: Keyword.get(opts, :model, get_field(response, :model)),
+      finish_reason: finish_reason,
       message_metadata: normalize_metadata(get_field(message, :metadata)),
       tool_results: []
     }
