@@ -1,7 +1,7 @@
 defmodule JidoAi.MixProject do
   use Mix.Project
 
-  @version "2.0.0"
+  @version "2.1.0"
   @source_url "https://github.com/agentjido/jido_ai"
   @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
   def project do

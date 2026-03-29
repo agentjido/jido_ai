@@ -63,6 +63,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog -->
 
+## [v2.1.0](https://github.com/agentjido/jido_ai/compare/v2.0.0...v2.1.0) (2026-03-29)
+
+
+
+
+### Features:
+
+* request: enrich completed request metadata (#233) by mikehostetler
+
+* request: enrich completed request metadata by mikehostetler
+
+* react: add queued mid-run steering controls (#225) by mikehostetler
+
+* react: add mid-run steering controls by mikehostetler
+
+* split out reasoning lifecycle parity (#231) by mikehostetler
+
+* split out reasoning lifecycle parity by mikehostetler
+
+* split out AI tool error contract (#230) by mikehostetler
+
+* split out AI observability core (#229) by mikehostetler
+
+* split out AI observability core by mikehostetler
+
+* context: carry refs through context entries and projection (#213) by Julian Scheid
+
+* context: carry refs through context entries and projection by Julian Scheid
+
+* react: allow callers to attach extra refs to thread entries by mikehostetler
+
+* react: allow callers to attach extra refs to thread entries (#211) by Julian Scheid
+
+* react: allow callers to attach extra refs to thread entries by Julian Scheid
+
+### Bug Fixes:
+
+* preserve formatter imports during jido_ai.install (#237) by mikehostetler
+
+* stop importing jido_ai formatter config by mikehostetler
+
+* avoid dialyzer warnings in model input by mikehostetler
+
+* adaptive: preserve compatibility strings for failures (#234) by mikehostetler
+
+* request: normalize compatibility last_answer by mikehostetler
+
+* strategy: preserve raw error terms in snapshot result (#223) by Julian Scheid
+
+* strategy: preserve raw error terms in snapshot result by Julian Scheid
+
+* cli: preserve compatibility strings for raw failures by Julian Scheid
+
+* react: harden steering queue lifecycle by mikehostetler
+
+* react: align queue error types by mikehostetler
+
+* react: preserve input injected compatibility events by mikehostetler
+
+* remove dead lifecycle telemetry fallback by mikehostetler
+
+* unblock split PR CI by mikehostetler
+
+* tool_adapter: ensure modules are loaded before validating (#226) by Philip Munksgaard
+
+* pass details as keyword to `execution_error` (#214) by Julian Scheid
+
+* pass details as keyword to execution_error by Julian Scheid
+
+* examples: preserve action error details maps by Julian Scheid
+
+* context: preserve refs during replay and restore by Julian Scheid
+
+* preserve multimodal tool result content parts (#209) by mikehostetler
+
+* agent: accept full ReqLLM model inputs by mikehostetler
+
+* preserve multimodal tool result content parts by mikehostetler
+
+* react: preserve extra thread refs by mikehostetler
+
+* context: normalize restored multimodal tool content by mikehostetler
+
+* react: preserve extra thread refs by Julian Scheid
+
+* agent: accept full ReqLLM model inputs (#206) by mikehostetler
+
+* format mix.exs for CI by mikehostetler
+
+### Refactoring:
+
+* react: tighten queued control boundaries (#235) by mikehostetler
+
+* remove ModelInput helper (#238) by mikehostetler
+
+* remove ModelInput helper by mikehostetler
+
+* react: clarify queued steering semantics by mikehostetler
+
+* cli: codify non-interactive mix task contract (#205) by mikehostetler
+
 ## [2.0.0](https://github.com/agentjido/jido_ai/compare/v2.0.0-rc.0...2.0.0) (2026-03-15)
 ### Breaking Changes:
 
