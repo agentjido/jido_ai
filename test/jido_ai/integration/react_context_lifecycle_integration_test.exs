@@ -28,16 +28,8 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   setup :set_mimic_from_context
 
   setup do
-    if is_nil(Process.whereis(Jido.Registry)) do
-      start_supervised!({Registry, keys: :unique, name: Jido.Registry})
-    end
-
-    if is_nil(Process.whereis(Jido.AgentSupervisor)) do
-      start_supervised!({DynamicSupervisor, strategy: :one_for_one, name: Jido.AgentSupervisor})
-    end
-
-    if is_nil(Process.whereis(Jido.TaskSupervisor)) do
-      start_supervised!({Task.Supervisor, name: Jido.TaskSupervisor})
+    if is_nil(Process.whereis(Jido)) do
+      start_supervised!({Jido, name: Jido})
     end
 
     test_pid = self()
