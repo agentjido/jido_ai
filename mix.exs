@@ -59,8 +59,8 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.1"},
-      {:jido_action, "~> 2.1"},
+      {:jido, "~> 2.2"},
+      {:jido_action, "~> 2.2"},
       {:req_llm, "~> 1.9"},
 
       # Runtime
