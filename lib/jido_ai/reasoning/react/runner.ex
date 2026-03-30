@@ -1073,8 +1073,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp invalid_blank_terminal_finish_reason?(reason) when reason in [nil, :stop, :tool_calls], do: false
-  defp invalid_blank_terminal_finish_reason?(reason) when is_atom(reason), do: true
-  defp invalid_blank_terminal_finish_reason?(_reason), do: false
+  defp invalid_blank_terminal_finish_reason?(_reason), do: true
 
   defp fail_run(%State{} = state, owner, ref, %Config{} = config, reason, error_type) do
     seal_pending_input_server(config)
