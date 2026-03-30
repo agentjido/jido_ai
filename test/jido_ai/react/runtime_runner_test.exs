@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   use Mimic
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Context, as: AIContext
   alias Jido.AI.PendingInputServer
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Config
@@ -340,6 +341,48 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     request_failed = Enum.find(events, &(&1.kind == :request_failed))
     assert request_failed.data.error == {:pending_input_server, :unavailable}
     assert request_failed.data.error_type == :runtime
+  end
+
+  test "blank truncated terminal responses fail before llm_completed and after_llm checkpoint emission" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [],
+         %{finish_reason: :length, usage: %{input_tokens: 3, output_tokens: 0}},
+         model
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        token_secret: "blank-terminal-secret"
+      })
+
+    events =
+      ReAct.stream("Say hello", config, request_id: "req_blank_terminal", run_id: "req_blank_terminal")
+      |> Enum.to_list()
+
+    refute Enum.any?(events, &(&1.kind == :llm_completed))
+    refute Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :after_llm))
+
+    request_failed = Enum.find(events, &(&1.kind == :request_failed))
+    assert request_failed.data.error == {:incomplete_response, :length}
+    assert request_failed.data.error_type == :llm_response
+    assert Map.take(request_failed.data.usage, [:input_tokens, :output_tokens]) == %{input_tokens: 3, output_tokens: 0}
+
+    terminal_checkpoint = Enum.find(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+    assert is_binary(terminal_checkpoint.data.token)
+
+    assert {:ok, failed_state, _payload} =
+             Jido.AI.Reasoning.ReAct.Token.decode_state(terminal_checkpoint.data.token, config)
+
+    assert failed_state.status == :failed
+    assert failed_state.error == {:incomplete_response, :length}
+    assert Map.take(failed_state.usage, [:input_tokens, :output_tokens]) == %{input_tokens: 3, output_tokens: 0}
+    assert user_contents(AIContext.to_messages(failed_state.context)) == ["Say hello"]
+    assert assistant_contents(AIContext.to_messages(failed_state.context)) == []
   end
 
   test "uses non-streaming generation when streaming is disabled" do

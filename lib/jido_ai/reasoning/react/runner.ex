@@ -257,55 +257,56 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             |> State.merge_usage(turn.usage)
             |> State.put_llm_response_id(response_id)
 
-          {state, _} =
-            emit_event(
-              state,
-              owner,
-              ref,
-              :llm_completed,
-              %{
-                call_id: call_id,
-                turn_type: turn.type,
-                text: turn.text,
-                thinking_content: turn.thinking_content,
-                reasoning_details: Map.get(turn, :reasoning_details),
-                tool_calls: turn.tool_calls,
-                usage: turn.usage
-              },
-              llm_call_id: call_id
-            )
+          case validate_terminal_response(turn) do
+            :ok ->
+              {state, _} =
+                emit_event(
+                  state,
+                  owner,
+                  ref,
+                  :llm_completed,
+                  %{
+                    call_id: call_id,
+                    turn_type: turn.type,
+                    text: turn.text,
+                    thinking_content: turn.thinking_content,
+                    reasoning_details: Map.get(turn, :reasoning_details),
+                    tool_calls: turn.tool_calls,
+                    usage: turn.usage,
+                    finish_reason: turn.finish_reason
+                  },
+                  llm_call_id: call_id
+                )
 
-          state =
-            AIContext.append_assistant(
-              state.context,
-              turn.text,
-              case turn.type do
-                :tool_calls -> turn.tool_calls
-                _ -> nil
-              end,
-              assistant_context_opts(turn)
-            )
-            |> then(&%{state | context: &1})
+              state =
+                AIContext.append_assistant(
+                  state.context,
+                  turn.text,
+                  case turn.type do
+                    :tool_calls -> turn.tool_calls
+                    _ -> nil
+                  end,
+                  assistant_context_opts(turn)
+                )
+                |> then(&%{state | context: &1})
 
-          {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
+              {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
 
-          case Turn.needs_tools?(turn) do
-            true ->
-              {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
+              case Turn.needs_tools?(turn) do
+                true ->
+                  {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
 
-            _ ->
-              case validate_terminal_response(turn) do
-                :ok ->
+                _ ->
                   completed =
                     state
                     |> State.put_status(:completed)
                     |> State.put_result(turn.text)
 
                   {:final_answer, completed}
-
-                {:error, reason} ->
-                  {:error, state, reason, :llm_response}
               end
+
+            {:error, reason} ->
+              {:error, state, reason, :llm_response}
           end
 
         {:error, state, reason, error_type} ->
@@ -1052,19 +1053,28 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  # Returns :ok if the turn is a valid terminal response, or {:error, reason} if the LLM
-  # returned a failure-like finish reason with no meaningful content. Preventing an empty
-  # incomplete response from being silently accepted as a successful final answer.
+  # Returns :ok for tool-call turns and accepted terminal responses.
+  # Rejects blank terminal responses when the provider reported a non-success
+  # finish reason so we do not emit a phantom assistant turn or checkpoint it.
   defp validate_terminal_response(%Turn{} = turn) do
-    blank_text? = turn.text == ""
-    failure_reason? = turn.finish_reason in [:error, :incomplete, :cancelled]
+    cond do
+      Turn.needs_tools?(turn) ->
+        :ok
 
-    if blank_text? and failure_reason? do
-      {:error, {:incomplete_response, turn.finish_reason}}
-    else
-      :ok
+      turn.text != "" ->
+        :ok
+
+      invalid_blank_terminal_finish_reason?(turn.finish_reason) ->
+        {:error, {:incomplete_response, turn.finish_reason}}
+
+      true ->
+        :ok
     end
   end
+
+  defp invalid_blank_terminal_finish_reason?(reason) when reason in [nil, :stop, :tool_calls], do: false
+  defp invalid_blank_terminal_finish_reason?(reason) when is_atom(reason), do: true
+  defp invalid_blank_terminal_finish_reason?(_reason), do: false
 
   defp fail_run(%State{} = state, owner, ref, %Config{} = config, reason, error_type) do
     seal_pending_input_server(config)
@@ -1076,7 +1086,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {failed, _} =
         emit_event(failed, owner, ref, :request_failed, %{
           error: reason,
-          error_type: error_type
+          error_type: error_type,
+          usage: failed.usage
         })
 
       failed

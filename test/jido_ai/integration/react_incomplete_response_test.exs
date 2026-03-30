@@ -1,9 +1,7 @@
 defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
   @moduledoc """
-  Regression tests for the bug where an incomplete or empty LLM response
-  (finish_reason: :incomplete with blank text) was silently accepted as a
-  successful final answer, causing ask_sync/3 to return {:ok, ""} instead of
-  {:error, reason}.
+  Regression tests for blank terminal responses that providers report as
+  failures or truncations.
   """
   use ExUnit.Case, async: false
   use Mimic
@@ -32,78 +30,76 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
     :ok
   end
 
-  describe "incomplete streaming response" do
+  defp start_basic_agent do
+    {:ok, pid} = Jido.AgentServer.start_link(agent: BasicAgent)
+    on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
+    pid
+  end
+
+  defp stub_blank_stream_response(finish_reason) do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       StreamResponseFactory.build(
+         [],
+         %{finish_reason: finish_reason, usage: %{input_tokens: 5, output_tokens: 0}},
+         model
+       )}
+    end)
+  end
+
+  describe "blank terminal streaming response" do
     test "returns {:error, {:incomplete_response, :incomplete}} instead of {:ok, \"\"}" do
-      Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-        # Simulate provider failure: stream closes with no content and finish_reason: :incomplete
-        {:ok,
-         StreamResponseFactory.build(
-           [],
-           %{finish_reason: :incomplete, usage: %{input_tokens: 5, output_tokens: 0}},
-           model
-         )}
-      end)
+      stub_blank_stream_response(:incomplete)
 
-      {:ok, pid} = Jido.AgentServer.start_link(agent: BasicAgent)
-      on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
-
+      pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
       assert {:error, {:failed, :error, {:incomplete_response, :incomplete}}} = result
     end
 
     test "does not return {:ok, \"\"} for incomplete response" do
-      Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-        {:ok,
-         StreamResponseFactory.build(
-           [],
-           %{finish_reason: :incomplete, usage: %{input_tokens: 5, output_tokens: 0}},
-           model
-         )}
-      end)
+      stub_blank_stream_response(:incomplete)
 
-      {:ok, pid} = Jido.AgentServer.start_link(agent: BasicAgent)
-      on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
-
+      pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
       refute result == {:ok, ""}
     end
 
     test "returns {:error, {:incomplete_response, :error}} for error finish_reason with blank text" do
-      Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-        {:ok,
-         StreamResponseFactory.build(
-           [],
-           %{finish_reason: :error, usage: %{input_tokens: 5, output_tokens: 0}},
-           model
-         )}
-      end)
+      stub_blank_stream_response(:error)
 
-      {:ok, pid} = Jido.AgentServer.start_link(agent: BasicAgent)
-      on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
-
+      pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
       assert {:error, {:failed, :error, {:incomplete_response, :error}}} = result
     end
 
     test "returns {:error, {:incomplete_response, :cancelled}} for cancelled finish_reason with blank text" do
-      Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-        {:ok,
-         StreamResponseFactory.build(
-           [],
-           %{finish_reason: :cancelled, usage: %{input_tokens: 5, output_tokens: 0}},
-           model
-         )}
-      end)
+      stub_blank_stream_response(:cancelled)
 
-      {:ok, pid} = Jido.AgentServer.start_link(agent: BasicAgent)
-      on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
-
+      pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
       assert {:error, {:failed, :error, {:incomplete_response, :cancelled}}} = result
+    end
+
+    test "returns {:error, {:incomplete_response, :length}} for truncated blank responses" do
+      stub_blank_stream_response(:length)
+
+      pid = start_basic_agent()
+      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+
+      assert {:error, {:failed, :error, {:incomplete_response, :length}}} = result
+    end
+
+    test "returns {:error, {:incomplete_response, :content_filter}} for filtered blank responses" do
+      stub_blank_stream_response(:content_filter)
+
+      pid = start_basic_agent()
+      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+
+      assert {:error, {:failed, :error, {:incomplete_response, :content_filter}}} = result
     end
 
     test "successful response with :stop still returns {:ok, text}" do
@@ -116,8 +112,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
          )}
       end)
 
-      {:ok, pid} = Jido.AgentServer.start_link(agent: BasicAgent)
-      on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
+      pid = start_basic_agent()
 
       assert {:ok, "Hello, World!"} = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
     end
@@ -135,8 +130,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
          )}
       end)
 
-      {:ok, pid} = Jido.AgentServer.start_link(agent: BasicAgent)
-      on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
+      pid = start_basic_agent()
 
       assert {:ok, "Partial response before cutoff"} = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
     end

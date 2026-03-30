@@ -148,6 +148,32 @@ defmodule Jido.AI.TurnTest do
       assert turn.finish_reason == :incomplete
     end
 
+    test "normalizes string finish_reason values from generic map responses" do
+      response = %{
+        message: %{content: "", tool_calls: nil},
+        finish_reason: "max_tokens",
+        usage: %{input_tokens: 5, output_tokens: 0}
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.text == ""
+      assert turn.finish_reason == :length
+    end
+
+    test "normalizes finish_reason in result maps" do
+      turn =
+        Turn.from_result_map(%{
+          type: :final_answer,
+          text: "",
+          finish_reason: "content_filter",
+          usage: %{input_tokens: 5, output_tokens: 0}
+        })
+
+      assert turn.finish_reason == :content_filter
+    end
+
     test "finish_reason is :stop for normal successful responses" do
       response = %{
         message: %{content: "Hello!", tool_calls: nil},

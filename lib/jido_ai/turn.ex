@@ -91,7 +91,7 @@ defmodule Jido.AI.Turn do
       tool_calls: normalize_tool_calls(classified.tool_calls),
       usage: normalize_usage(ReqLLM.Response.usage(response)),
       model: Keyword.get(opts, :model, response.model),
-      finish_reason: classified.finish_reason,
+      finish_reason: normalize_finish_reason(classified.finish_reason),
       message_metadata: normalize_metadata(response.message.metadata),
       tool_results: []
     }
@@ -101,7 +101,7 @@ defmodule Jido.AI.Turn do
     message = get_field(response, :message, %{}) || %{}
     content = get_field(message, :content)
     tool_calls = message |> get_field(:tool_calls, []) |> normalize_tool_calls()
-    finish_reason = get_field(response, :finish_reason)
+    finish_reason = response |> get_field(:finish_reason) |> normalize_finish_reason()
 
     %__MODULE__{
       type: classify_type(tool_calls, finish_reason),
@@ -132,6 +132,7 @@ defmodule Jido.AI.Turn do
       tool_calls: map |> get_field(:tool_calls, []) |> normalize_tool_calls(),
       usage: normalize_usage(get_field(map, :usage)),
       model: normalize_optional_string(get_field(map, :model)),
+      finish_reason: normalize_finish_reason(get_field(map, :finish_reason)),
       message_metadata: normalize_metadata(get_field(map, :message_metadata)),
       tool_results: map |> get_field(:tool_results, []) |> normalize_tool_results()
     }
@@ -401,7 +402,8 @@ defmodule Jido.AI.Turn do
       thinking_content: turn.thinking_content,
       tool_calls: turn.tool_calls,
       usage: turn.usage,
-      model: turn.model
+      model: turn.model,
+      finish_reason: turn.finish_reason
     }
   end
 
@@ -412,6 +414,23 @@ defmodule Jido.AI.Turn do
   defp normalize_type(:tool_calls), do: :tool_calls
   defp normalize_type("tool_calls"), do: :tool_calls
   defp normalize_type(_), do: :final_answer
+
+  defp normalize_finish_reason(nil), do: nil
+  defp normalize_finish_reason(reason) when is_atom(reason), do: reason
+  defp normalize_finish_reason("stop"), do: :stop
+  defp normalize_finish_reason("completed"), do: :stop
+  defp normalize_finish_reason("tool_calls"), do: :tool_calls
+  defp normalize_finish_reason("tool_use"), do: :tool_calls
+  defp normalize_finish_reason("length"), do: :length
+  defp normalize_finish_reason("max_tokens"), do: :length
+  defp normalize_finish_reason("max_output_tokens"), do: :length
+  defp normalize_finish_reason("content_filter"), do: :content_filter
+  defp normalize_finish_reason("end_turn"), do: :stop
+  defp normalize_finish_reason("error"), do: :error
+  defp normalize_finish_reason("cancelled"), do: :cancelled
+  defp normalize_finish_reason("incomplete"), do: :incomplete
+  defp normalize_finish_reason("unknown"), do: :unknown
+  defp normalize_finish_reason(_), do: :unknown
 
   defp normalize_text(text) when is_binary(text), do: text
   defp normalize_text(_), do: ""
