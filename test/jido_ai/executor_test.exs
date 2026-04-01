@@ -236,7 +236,7 @@ defmodule Jido.AI.TurnExecutionTest do
       result = Turn.execute("calculator", %{}, %{}, tools: tools)
 
       assert {:error, error, []} = result
-      assert error.type == :execution_error
+      assert error.type == :validation_error
       assert error.details.tool_name == "calculator"
       # Error message should mention missing required option
       assert String.contains?(error.message, "required")

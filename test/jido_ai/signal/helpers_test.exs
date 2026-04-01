@@ -63,6 +63,25 @@ defmodule Jido.AI.Signal.HelpersTest do
     end
   end
 
+  describe "normalize_error with exception structs" do
+    test "exception struct dispatches to Jido.Error.to_map, not the plain-map clause" do
+      error =
+        Jido.Action.Error.ExecutionFailureError.exception(
+          message: "missing mcp_session in tool context",
+          details: %{type: :transport}
+        )
+
+      result = Helpers.normalize_error(error, :execution_error, "fallback", %{tool_name: "bash"})
+
+      assert result.message == "missing mcp_session in tool context"
+      assert result.type == :execution_error
+      # details must NOT contain __struct__ — that indicates Map.drop on a struct
+      refute Map.has_key?(result.details, :__struct__)
+      assert result.details[:tool_name] == "bash"
+      assert result.details[:type] == :transport
+    end
+  end
+
   describe "sanitize_delta/2" do
     test "removes control bytes and truncates by max chars" do
       assert Helpers.sanitize_delta("abc" <> <<1>> <> "def", 10) == "abcdef"
