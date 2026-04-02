@@ -1,6 +1,8 @@
 defmodule Jido.AI.TurnTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias Jido.AI.Turn
   alias ReqLLM.Message.ContentPart
 
@@ -355,6 +357,109 @@ defmodule Jido.AI.TurnTest do
       assert is_integer(measurements.duration_ms)
       assert measurements.duration_ms >= 0
       assert is_integer(measurements.duration)
+    end
+  end
+
+  describe "log_level propagation" do
+    # By default, Jido.Exec.run uses :info as its log_level threshold, which causes
+    # :notice-level "Executing ..." lines to appear on every tool call. The fix in
+    # execute_internal/6 injects the global Jido observability config so callers can
+    # control verbosity without patching Logger module levels at startup.
+
+    test "execute_module suppresses action execution logs when log_level: :warning is passed" do
+      log =
+        capture_log(fn ->
+          assert {:ok, _result, _effects} =
+                   Turn.execute_module(
+                     Calculator,
+                     %{operation: "add", a: 1, b: 2},
+                     %{},
+                     log_level: :warning
+                   )
+        end)
+
+      refute log =~ "Executing"
+    end
+
+    test "execute suppresses action execution logs when log_level: :warning is passed" do
+      tools = %{Calculator.name() => Calculator}
+
+      log =
+        capture_log(fn ->
+          assert {:ok, _result, _effects} =
+                   Turn.execute(
+                     Calculator.name(),
+                     %{"operation" => "add", "a" => 1, "b" => 2},
+                     %{},
+                     tools: tools,
+                     log_level: :warning
+                   )
+        end)
+
+      refute log =~ "Executing"
+    end
+
+    test "run_tools suppresses action execution logs when log_level: :warning is in opts" do
+      turn = %Turn{
+        type: :tool_calls,
+        text: "",
+        tool_calls: [
+          %{id: "tc_1", name: "calculator", arguments: %{"operation" => "add", "a" => 2, "b" => 3}}
+        ]
+      }
+
+      context = %{tools: %{Calculator.name() => Calculator}}
+
+      log =
+        capture_log(fn ->
+          assert {:ok, updated_turn} = Turn.run_tools(turn, context, log_level: :warning)
+          assert length(updated_turn.tool_results) == 1
+        end)
+
+      refute log =~ "Executing"
+    end
+
+    test "execute_module respects global :jido telemetry log_level config" do
+      # Temporarily override the global config to :warning and verify no Executing logs.
+      original = Application.get_env(:jido, :telemetry, [])
+
+      on_exit(fn -> Application.put_env(:jido, :telemetry, original) end)
+
+      Application.put_env(:jido, :telemetry, Keyword.put(original, :log_level, :warning))
+
+      log =
+        capture_log(fn ->
+          assert {:ok, _result, _effects} =
+                   Turn.execute_module(
+                     Calculator,
+                     %{operation: "add", a: 3, b: 4},
+                     %{}
+                   )
+        end)
+
+      refute log =~ "Executing"
+    end
+
+    test "explicit log_level opt takes precedence over global config" do
+      original = Application.get_env(:jido, :telemetry, [])
+      on_exit(fn -> Application.put_env(:jido, :telemetry, original) end)
+
+      # Set global config to :debug (would normally produce logs)
+      Application.put_env(:jido, :telemetry, Keyword.put(original, :log_level, :debug))
+
+      # Explicit :warning in opts should win
+      log =
+        capture_log(fn ->
+          assert {:ok, _result, _effects} =
+                   Turn.execute_module(
+                     Calculator,
+                     %{operation: "add", a: 1, b: 1},
+                     %{},
+                     log_level: :warning
+                   )
+        end)
+
+      refute log =~ "Executing"
     end
   end
 end

@@ -554,7 +554,12 @@ defmodule Jido.AI.Turn do
   defp execute_internal(module, tool_name, params, context, timeout, exec_opts) do
     schema = module.schema()
     normalized_params = normalize_params(params, schema)
-    run_opts = timeout_opts(timeout) ++ exec_opts
+
+    # Inject log_level from global Jido observability config if the caller did not
+    # specify one explicitly. Without this, Jido.Exec.run defaults to :info, causing
+    # :notice-level "Executing ..." log lines on every tool call.
+    exec_opts_with_log = Keyword.put_new(exec_opts, :log_level, Jido.Observe.Config.action_log_level())
+    run_opts = timeout_opts(timeout) ++ exec_opts_with_log
 
     result =
       case Jido.Exec.run(module, normalized_params, context, run_opts) do
