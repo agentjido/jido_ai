@@ -899,6 +899,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp visible_chunk?(%ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg), do: delta_captured?(text, trace_cfg)
   defp visible_chunk?(%ReqLLM.StreamChunk{type: :thinking, text: text}, trace_cfg), do: delta_captured?(text, trace_cfg)
+  defp visible_chunk?(%ReqLLM.StreamChunk{type: :tool_call}, trace_cfg), do: trace_cfg[:capture_deltas?] == true
   defp visible_chunk?(_chunk, _trace_cfg), do: false
 
   defp delta_captured?(text, trace_cfg), do: trace_cfg[:capture_deltas?] == true and is_binary(text) and text != ""
@@ -913,6 +914,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end)
     |> maybe_put_stream_callback(trace_cfg, :on_thinking, fn text ->
       emit_stream_delta(state_key, owner, ref, :thinking, text)
+    end)
+    |> maybe_put_stream_callback(trace_cfg, :on_tool_call, fn chunk ->
+      emit_stream_delta(state_key, owner, ref, :tool_call, chunk.name || "")
     end)
   end
 
