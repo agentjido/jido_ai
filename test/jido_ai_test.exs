@@ -16,29 +16,40 @@ defmodule Jido.AITest do
     end)
   end
 
+  defp with_model_aliases(aliases, fun) do
+    original = Application.get_env(:jido_ai, :model_aliases)
+    Application.put_env(:jido_ai, :model_aliases, aliases)
+
+    on_exit(fn ->
+      if is_nil(original) do
+        Application.delete_env(:jido_ai, :model_aliases)
+      else
+        Application.put_env(:jido_ai, :model_aliases, original)
+      end
+    end)
+
+    fun.()
+  end
+
   describe "model_aliases/0 and resolve_model/1" do
     test "loads built-in defaults" do
       assert is_binary(AI.resolve_model(:fast))
     end
 
     test "merges configured aliases over defaults" do
-      original = Application.get_env(:jido_ai, :model_aliases)
-
-      Application.put_env(:jido_ai, :model_aliases, %{
-        fast: "test:fast",
-        custom: "test:custom"
-      })
-
-      on_exit(fn ->
-        if is_nil(original) do
-          Application.delete_env(:jido_ai, :model_aliases)
-        else
-          Application.put_env(:jido_ai, :model_aliases, original)
-        end
+      with_model_aliases(%{fast: "test:fast", custom: "test:custom"}, fn ->
+        assert AI.resolve_model(:fast) == "test:fast"
+        assert AI.resolve_model(:custom) == "test:custom"
       end)
+    end
 
-      assert AI.resolve_model(:fast) == "test:fast"
-      assert AI.resolve_model(:custom) == "test:custom"
+    test "configured aliases can resolve to inline model specs" do
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+
+      with_model_aliases(%{capable: inline_model}, fn ->
+        assert AI.resolve_model(:capable) == inline_model
+        assert AI.model_label(:capable) == "openai:gpt-4.1"
+      end)
     end
   end
 

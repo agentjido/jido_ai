@@ -28,6 +28,18 @@ defmodule Jido.AI do
           capable: "provider:your-capable-model"
         }
 
+  Aliases can also point at full direct model specs when you need richer
+  ReqLLM metadata, such as a custom OpenAI-compatible `base_url`:
+
+      config :jido_ai,
+        model_aliases: %{
+          capable: %{
+            provider: :openai,
+            id: "moonshotai.kimi-k2.5",
+            base_url: "https://proxy.example.com/v1"
+          }
+        }
+
   A broad list of provider/model IDs is available at: https://llmdb.xyz
 
   ## LLM Defaults
@@ -76,13 +88,7 @@ defmodule Jido.AI do
   @type model_alias ::
           :fast | :capable | :thinking | :reasoning | :planning | :image | :embedding | atom()
   @type model_spec :: String.t()
-  @type resolved_model_input ::
-          model_spec()
-          | map()
-          | {atom(), model_spec(), keyword()}
-          | {atom(), keyword()}
-          | %LLMDB.Model{}
-  @type model_input :: model_alias() | resolved_model_input()
+  @type model_input :: model_alias() | ReqLLM.model_input()
   @type llm_kind :: :text | :object | :stream
   @type llm_generation_opts :: %{
           optional(:model) => model_input(),
@@ -124,7 +130,7 @@ defmodule Jido.AI do
       iex> is_binary(aliases[:fast])
       true
   """
-  @spec model_aliases() :: %{model_alias() => model_spec()}
+  @spec model_aliases() :: %{model_alias() => ReqLLM.model_input()}
   def model_aliases, do: ModelAliases.model_aliases()
 
   @doc """
@@ -163,8 +169,8 @@ defmodule Jido.AI do
   Resolves a model alias or passes through a direct ReqLLM model input.
 
   Model aliases are atoms like `:fast`, `:capable`, `:reasoning` that map
-  to full ReqLLM model specifications. Direct model inputs are passed through
-  unchanged and may be strings, ReqLLM tuples, inline maps, or `%LLMDB.Model{}`
+  to full ReqLLM model specifications. Both alias values and direct model
+  inputs may be strings, ReqLLM tuples, inline maps, or `%LLMDB.Model{}`
   structs.
 
   ## Arguments
@@ -189,7 +195,7 @@ defmodule Jido.AI do
       Jido.AI.resolve_model(:unknown_alias)
       # raises ArgumentError with unknown alias message
   """
-  @spec resolve_model(model_input()) :: resolved_model_input()
+  @spec resolve_model(model_input()) :: ReqLLM.model_input()
   def resolve_model(model) when is_atom(model), do: ModelAliases.resolve_model(model)
   def resolve_model(model) when is_binary(model), do: model
   def resolve_model(%LLMDB.Model{} = model), do: model
@@ -199,7 +205,9 @@ defmodule Jido.AI do
       when is_atom(provider) and is_binary(model_id) and is_list(provider_opts),
       do: model
 
-  def resolve_model({provider, provider_opts} = model) when is_atom(provider) and is_list(provider_opts), do: model
+  def resolve_model({provider, provider_opts} = model)
+      when is_atom(provider) and is_list(provider_opts),
+      do: model
 
   def resolve_model(model) do
     raise ArgumentError,
@@ -211,7 +219,7 @@ defmodule Jido.AI do
   Returns a stable human-readable label for a model input.
   """
   @spec model_label(model_input()) :: String.t()
-  def model_label(model) when is_atom(model), do: resolve_model(model)
+  def model_label(model) when is_atom(model), do: model |> resolve_model() |> model_label()
   def model_label(model) when is_binary(model), do: model
 
   def model_label(model) do
@@ -223,7 +231,9 @@ defmodule Jido.AI do
 
   @doc false
   @spec model_fingerprint_segment(model_input()) :: String.t()
-  def model_fingerprint_segment(model) when is_atom(model), do: resolve_model(model)
+  def model_fingerprint_segment(model) when is_atom(model),
+    do: model |> resolve_model() |> model_fingerprint_segment()
+
   def model_fingerprint_segment(model) when is_binary(model), do: model
 
   def model_fingerprint_segment(model) do

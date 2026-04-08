@@ -42,14 +42,38 @@ defmodule Jido.AI.CoreTest do
     :ok
   end
 
+  defp with_model_aliases(aliases, fun) do
+    original = Application.get_env(:jido_ai, :model_aliases)
+    Application.put_env(:jido_ai, :model_aliases, aliases)
+
+    on_exit(fn ->
+      if is_nil(original) do
+        Application.delete_env(:jido_ai, :model_aliases)
+      else
+        Application.put_env(:jido_ai, :model_aliases, original)
+      end
+    end)
+
+    fun.()
+  end
+
   describe "model aliases and llm defaults" do
     test "model_aliases/0 merges configured aliases over defaults" do
-      Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4.1-mini", custom: "test:custom"})
-      aliases = AI.model_aliases()
+      aliases =
+        with_model_aliases(%{fast: "openai:gpt-4.1-mini", custom: "test:custom"}, fn ->
+          AI.model_aliases()
+        end)
 
       assert aliases[:fast] == "openai:gpt-4.1-mini"
       assert aliases[:custom] == "test:custom"
       assert is_binary(aliases[:capable])
+    end
+
+    test "model_aliases/0 supports direct model specs for configured aliases" do
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+
+      aliases = with_model_aliases(%{capable: inline_model}, fn -> AI.model_aliases() end)
+      assert aliases[:capable] == inline_model
     end
 
     test "resolve_model/1 passes strings, resolves aliases, and raises for unknown alias" do
@@ -59,6 +83,14 @@ defmodule Jido.AI.CoreTest do
       assert_raise ArgumentError, ~r/Unknown model alias/, fn ->
         AI.resolve_model(:does_not_exist)
       end
+    end
+
+    test "resolve_model/1 resolves aliases to direct model specs" do
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+
+      with_model_aliases(%{capable: inline_model}, fn ->
+        assert AI.resolve_model(:capable) == inline_model
+      end)
     end
 
     test "resolve_model/1 accepts ReqLLM tuple, inline map, and model struct inputs" do
@@ -78,6 +110,24 @@ defmodule Jido.AI.CoreTest do
       assert AI.model_label(tuple_model) == "openai:gpt-4.1"
       assert is_binary(AI.model_fingerprint_segment(tuple_model))
       assert AI.provider_opt_keys(:fast) |> is_map()
+    end
+
+    test "model helpers normalize labels and fingerprints for alias-backed inline specs" do
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+
+      with_model_aliases(%{capable: inline_model}, fn ->
+        assert AI.model_label(:capable) == "openai:gpt-4.1"
+        assert is_binary(AI.model_fingerprint_segment(:capable))
+        assert AI.provider_opt_keys(:capable) |> is_map()
+      end)
+    end
+
+    test "resolve_model/1 raises for invalid configured alias specs" do
+      with_model_aliases(%{capable: [:invalid]}, fn ->
+        assert_raise ArgumentError, ~r/Invalid model spec configured for alias :capable/, fn ->
+          AI.resolve_model(:capable)
+        end
+      end)
     end
 
     test "resolve_model/1 raises for unsupported direct model inputs" do
