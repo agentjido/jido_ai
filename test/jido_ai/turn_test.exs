@@ -292,6 +292,28 @@ defmodule Jido.AI.TurnTest do
                }
              }
     end
+
+    test "file content parts with binary data are excluded from JSON payload" do
+      pdf_binary = <<37, 80, 68, 70, 45, 49, 46, 55>>
+      file_part = ContentPart.file(pdf_binary, "test.pdf", "application/pdf")
+
+      assert [
+               %ContentPart{type: :text, text: encoded_payload},
+               %ContentPart{type: :file}
+             ] =
+               Turn.format_tool_result_content(
+                 {:ok,
+                  %{
+                    "__content_parts__" => [file_part],
+                    summary: "test result"
+                  }}
+               )
+
+      decoded = Jason.decode!(encoded_payload)
+      assert decoded["ok"] == true
+      # The file content part should NOT appear in the JSON payload
+      assert decoded["result"] == %{"summary" => "test result"}
+    end
   end
 
   describe "run_tools/3" do

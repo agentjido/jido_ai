@@ -368,7 +368,17 @@ defmodule Jido.AI.Turn do
   def format_tool_result_content({:ok, result}) when is_map(result) do
     case extract_content_parts_result(result) do
       {:ok, output, parts} ->
-        encode_tool_result_envelope(%{ok: true, result: build_tool_result_payload(output, parts)}, parts)
+        # Only include text-safe content parts in the JSON payload.
+        # File/binary content parts (e.g., PDFs) cannot be JSON-encoded
+        # and are already sent as separate content blocks via `parts`.
+        json_safe_parts =
+          case Enum.filter(parts, &json_safe_content_part?/1) do
+            [] -> nil
+            filtered -> filtered
+          end
+
+        json_payload = build_tool_result_payload(output, json_safe_parts)
+        encode_tool_result_envelope(%{ok: true, result: json_payload}, parts)
 
       :error ->
         encode_tool_result_envelope(%{ok: true, result: result})
@@ -845,6 +855,13 @@ defmodule Jido.AI.Turn do
         :error
     end
   end
+
+  # File content parts carry raw binary data that can't be JSON-encoded.
+  # Only include text-safe parts (text, image_url, video_url, thinking) in the JSON payload.
+  defp json_safe_content_part?(%ContentPart{type: :file}), do: false
+  defp json_safe_content_part?(%ContentPart{type: :image, data: data}) when is_binary(data), do: false
+  defp json_safe_content_part?(%ContentPart{}), do: true
+  defp json_safe_content_part?(_), do: true
 
   defp normalize_content_parts(parts) when is_list(parts) do
     Enum.flat_map(parts, fn
