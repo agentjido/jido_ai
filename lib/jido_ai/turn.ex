@@ -959,16 +959,11 @@ defmodule Jido.AI.Turn do
   defp empty_map_to_nil(%{} = map) when map_size(map) == 0, do: nil
   defp empty_map_to_nil(value), do: value
 
-  defp normalize_tool_result_content_payload(content) when is_binary(content), do: content
-
   defp normalize_tool_result_content_payload(content) when is_list(content) do
-    if content_parts_list?(content),
-      do: serialize_content_parts(normalize_content_parts(content)),
-      else: content
+    serialize_content_parts(content)
   end
 
   defp normalize_tool_result_content_payload(nil), do: nil
-  defp normalize_tool_result_content_payload(other), do: other
 
   defp serialize_content_parts(parts) when is_list(parts) do
     Enum.map(parts, fn
@@ -980,9 +975,6 @@ defmodule Jido.AI.Turn do
           {_key, value} -> is_nil(value)
         end)
         |> Map.new()
-
-      other ->
-        other
     end)
   end
 
