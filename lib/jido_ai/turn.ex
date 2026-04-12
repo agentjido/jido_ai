@@ -349,8 +349,9 @@ defmodule Jido.AI.Turn do
   def format_tool_result_content({:error, error, _effects}), do: format_tool_result_content({:error, error})
 
   def format_tool_result_content({:ok, %ToolResult{} = result}) do
-    payload = build_tool_result_payload(result.output, result.content, result.metadata)
-    encode_tool_result_envelope(%{ok: true, result: payload}, normalize_content_parts(result.content))
+    parts = normalize_content_parts(result.content)
+    payload = build_tool_result_payload(result.output, json_safe_content_parts(parts), result.metadata)
+    encode_tool_result_envelope(%{ok: true, result: payload}, parts)
   end
 
   def format_tool_result_content({:ok, result}) when is_binary(result),
@@ -359,7 +360,14 @@ defmodule Jido.AI.Turn do
   def format_tool_result_content({:ok, result}) when is_list(result) do
     if content_parts_list?(result) do
       parts = normalize_content_parts(result)
-      encode_tool_result_envelope(%{ok: true, result: %{content: serialize_content_parts(parts)}}, parts)
+
+      payload =
+        case json_safe_content_parts(parts) do
+          nil -> nil
+          safe_parts -> %{content: serialize_content_parts(safe_parts)}
+        end
+
+      encode_tool_result_envelope(%{ok: true, result: payload}, parts)
     else
       encode_tool_result_envelope(%{ok: true, result: result})
     end
@@ -371,13 +379,7 @@ defmodule Jido.AI.Turn do
         # Only include text-safe content parts in the JSON payload.
         # File/binary content parts (e.g., PDFs) cannot be JSON-encoded
         # and are already sent as separate content blocks via `parts`.
-        json_safe_parts =
-          case Enum.filter(parts, &json_safe_content_part?/1) do
-            [] -> nil
-            filtered -> filtered
-          end
-
-        json_payload = build_tool_result_payload(output, json_safe_parts)
+        json_payload = build_tool_result_payload(output, json_safe_content_parts(parts))
         encode_tool_result_envelope(%{ok: true, result: json_payload}, parts)
 
       :error ->
@@ -858,6 +860,13 @@ defmodule Jido.AI.Turn do
 
   # File content parts carry raw binary data that can't be JSON-encoded.
   # Only include text-safe parts (text, image_url, video_url, thinking) in the JSON payload.
+  defp json_safe_content_parts(parts) when is_list(parts) do
+    case Enum.filter(parts, &json_safe_content_part?/1) do
+      [] -> nil
+      filtered -> filtered
+    end
+  end
+
   defp json_safe_content_part?(%ContentPart{type: :file}), do: false
   defp json_safe_content_part?(%ContentPart{type: :image, data: data}) when is_binary(data), do: false
   defp json_safe_content_part?(%ContentPart{}), do: true
