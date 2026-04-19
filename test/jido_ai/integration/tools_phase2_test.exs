@@ -331,7 +331,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       result = Turn.execute("calculator", %{}, %{}, tools: tools)
 
       assert {:error, error, []} = result
-      assert error.type == :execution_error
+      assert error.type == :validation_error
       assert String.contains?(error.message, "required")
     end
 
