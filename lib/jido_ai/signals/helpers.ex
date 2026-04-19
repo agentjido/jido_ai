@@ -64,7 +64,8 @@ defmodule Jido.AI.Signal.Helpers do
   def normalize_error(%module{} = reason, fallback_type, fallback_message, extra_details)
       when is_map(extra_details) do
     cond do
-      function_exported?(Jido.Error, :to_map, 1) and function_exported?(module, :message, 1) ->
+      Code.ensure_loaded?(Jido.Error) and function_exported?(Jido.Error, :to_map, 1) and
+          function_exported?(module, :message, 1) ->
         reason
         |> Jido.Error.to_map()
         |> Map.drop([:stacktrace])

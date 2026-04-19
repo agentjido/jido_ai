@@ -38,23 +38,15 @@ defmodule Jido.AI.Signal.HelpersTest do
              }
     end
 
-    test "normalizes Jido.Action error structs before the generic map fallback" do
+    test "normalizes Jido.Action error structs through Jido.Error.to_map/1" do
       error = ActionError.execution_error("boom", %{step: :list, retry: false})
 
-      normalized = Helpers.normalize_error(error)
-
-      assert normalized.type == :execution_error
-      assert normalized.message == "boom"
-      assert normalized.retryable? == false
-      refute Map.get(normalized.details, :reason)
-
-      details =
-        case normalized.details do
-          %{details: details} when is_map(details) -> details
-          details when is_map(details) -> details
-        end
-
-      assert details == %{step: :list, retry: false}
+      assert Helpers.normalize_error(error) == %{
+               type: :execution_error,
+               message: "boom",
+               details: %{step: :list, retry: false},
+               retryable?: false
+             }
     end
   end
 
