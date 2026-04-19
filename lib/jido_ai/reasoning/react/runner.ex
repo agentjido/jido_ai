@@ -158,8 +158,13 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         state
 
       state.status == :awaiting_tools and state.pending_tool_calls != [] ->
-        {state, context} = run_pending_tool_round(state, owner, ref, config, context)
-        run_loop(state, owner, ref, config, context)
+        case run_pending_tool_round(state, owner, ref, config, context) do
+          {:ok, state, context} ->
+            run_loop(state, owner, ref, config, context)
+
+          {:error, state, reason, error_type} ->
+            fail_run(state, owner, ref, config, reason, error_type)
+        end
 
       state.iteration > config.max_iterations ->
         seal_pending_input_server(config)
@@ -198,19 +203,23 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                 prev_signature = Map.get(state, :__prev_tool_signature__)
                 current_signature = tool_call_signature(tool_calls)
 
-                {state, context} = run_tool_round(state, owner, ref, config, context, tool_calls)
+                case run_tool_round(state, owner, ref, config, context, tool_calls) do
+                  {:ok, state, context} ->
+                    state = Map.put(state, :__prev_tool_signature__, current_signature)
 
-                state = Map.put(state, :__prev_tool_signature__, current_signature)
+                    state =
+                      if prev_signature == current_signature and prev_signature != nil do
+                        corrected_context = AIContext.append_user(state.context, @cycle_warning)
+                        %{state | context: corrected_context}
+                      else
+                        state
+                      end
 
-                state =
-                  if prev_signature == current_signature and prev_signature != nil do
-                    corrected_context = AIContext.append_user(state.context, @cycle_warning)
-                    %{state | context: corrected_context}
-                  else
-                    state
-                  end
+                    run_loop(state, owner, ref, config, context)
 
-                run_loop(state, owner, ref, config, context)
+                  {:error, state, reason, error_type} ->
+                    fail_run(state, owner, ref, config, reason, error_type)
+                end
 
               {:error, state, reason, error_type} ->
                 fail_run(state, owner, ref, config, reason, error_type)
@@ -499,87 +508,92 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp run_tool_round(%State{} = state, owner, ref, %Config{} = config, context, tool_calls)
        when is_list(tool_calls) do
-    effective_tools =
-      case state.active_tools do
-        %{} = tools when map_size(tools) > 0 -> tools
-        _ -> config.tools
-      end
+    case preflight_tool_calls(tool_calls, context) do
+      :ok ->
+        effective_tools =
+          case state.active_tools do
+            %{} = tools when map_size(tools) > 0 -> tools
+            _ -> config.tools
+          end
 
-    tool_config = %{config | tools: effective_tools}
-    pending = Enum.map(tool_calls, &PendingToolCall.from_tool_call/1)
-    state = State.put_pending_tools(state, pending)
+        tool_config = %{config | tools: effective_tools}
+        pending = Enum.map(tool_calls, &PendingToolCall.from_tool_call/1)
+        state = State.put_pending_tools(state, pending)
 
-    {state, _} =
-      Enum.reduce(pending, {state, nil}, fn pending_call, {acc, _} ->
-        emit_event(
-          acc,
-          owner,
-          ref,
-          :tool_started,
-          %{
-            tool_call_id: pending_call.id,
-            tool_name: pending_call.name,
-            arguments: maybe_redact_args(pending_call.arguments, config)
-          },
-          tool_call_id: pending_call.id,
-          tool_name: pending_call.name
-        )
-      end)
-
-    results =
-      pending
-      |> Task.async_stream(
-        fn call -> execute_tool_with_retries(call, tool_config, context) end,
-        # Preserve deterministic tool completion/event ordering by original call order.
-        ordered: true,
-        max_concurrency: tool_config.tool_exec.concurrency,
-        timeout: tool_config.tool_exec.timeout_ms + 50
-      )
-      |> Enum.map(fn
-        {:ok, result} -> result
-        {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
-      end)
-
-    {state, updated_context} =
-      Enum.reduce(results, {state, state.context}, fn
-        {pending_call, result, attempts, duration_ms}, {acc, context_acc} ->
-          completed = PendingToolCall.complete(pending_call, result, attempts, duration_ms)
-
-          {acc, _} =
+        {state, _} =
+          Enum.reduce(pending, {state, nil}, fn pending_call, {acc, _} ->
             emit_event(
               acc,
               owner,
               ref,
-              :tool_completed,
+              :tool_started,
               %{
-                tool_call_id: completed.id,
-                tool_name: completed.name,
-                result: result,
-                attempts: attempts,
-                duration_ms: duration_ms
+                tool_call_id: pending_call.id,
+                tool_name: pending_call.name,
+                arguments: maybe_redact_args(pending_call.arguments, config)
               },
-              tool_call_id: completed.id,
-              tool_name: completed.name
+              tool_call_id: pending_call.id,
+              tool_name: pending_call.name
             )
+          end)
 
-          content = Turn.format_tool_result_content(result)
-          context_acc = AIContext.append_tool_result(context_acc, completed.id, completed.name, content)
-          {acc, context_acc}
+        results =
+          pending
+          |> Task.async_stream(
+            fn call -> execute_tool_with_retries(call, tool_config, context) end,
+            ordered: true,
+            max_concurrency: tool_config.tool_exec.concurrency,
+            timeout: tool_config.tool_exec.timeout_ms + 50
+          )
+          |> Enum.map(fn
+            {:ok, result} -> result
+            {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
+          end)
 
-        {:error, reason}, {acc, context_acc} ->
-          Logger.error("tool task failure", reason: inspect(reason))
-          {acc, context_acc}
-      end)
+        {state, updated_context} =
+          Enum.reduce(results, {state, state.context}, fn
+            {pending_call, result, attempts, duration_ms}, {acc, context_acc} ->
+              completed = PendingToolCall.complete(pending_call, result, attempts, duration_ms)
 
-    state =
-      state
-      |> State.put_status(:running)
-      |> State.clear_pending_tools()
-      |> State.inc_iteration()
-      |> Map.put(:context, updated_context)
+              {acc, _} =
+                emit_event(
+                  acc,
+                  owner,
+                  ref,
+                  :tool_completed,
+                  %{
+                    tool_call_id: completed.id,
+                    tool_name: completed.name,
+                    result: result,
+                    attempts: attempts,
+                    duration_ms: duration_ms
+                  },
+                  tool_call_id: completed.id,
+                  tool_name: completed.name
+                )
 
-    {state, _token} = emit_checkpoint(state, owner, ref, config, :after_tools)
-    {state, evolve_context_state_snapshot(context, results)}
+              content = Turn.format_tool_result_content(result)
+              context_acc = AIContext.append_tool_result(context_acc, completed.id, completed.name, content)
+              {acc, context_acc}
+
+            {:error, reason}, {acc, context_acc} ->
+              Logger.error("tool task failure", reason: inspect(reason))
+              {acc, context_acc}
+          end)
+
+        state =
+          state
+          |> State.put_status(:running)
+          |> State.clear_pending_tools()
+          |> State.inc_iteration()
+          |> Map.put(:context, updated_context)
+
+        {state, _token} = emit_checkpoint(state, owner, ref, config, :after_tools)
+        {:ok, state, evolve_context_state_snapshot(context, results)}
+
+      {:error, reason} ->
+        {:error, State.put_status(state, :failed), reason, :tool_guardrail}
+    end
   end
 
   defp run_pending_tool_round(%State{} = state, owner, ref, %Config{} = config, context) do
@@ -595,6 +609,51 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       end)
     )
   end
+
+  defp preflight_tool_calls(tool_calls, context) when is_list(tool_calls) and is_map(context) do
+    Enum.reduce_while(tool_calls, :ok, fn tool_call, :ok ->
+      case maybe_apply_tool_guardrail_callback(
+             %{
+               tool_name: tool_call_field(tool_call, :name, ""),
+               tool_call_id: tool_call_field(tool_call, :id, ""),
+               arguments: tool_call_field(tool_call, :arguments, %{}),
+               context: context
+             },
+             context
+           ) do
+        :ok ->
+          {:cont, :ok}
+
+        {:error, reason} ->
+          {:halt, {:error, reason}}
+
+        {:interrupt, interrupt} ->
+          {:halt, {:error, {:interrupt, interrupt}}}
+      end
+    end)
+  end
+
+  defp preflight_tool_calls(_tool_calls, _context), do: :ok
+
+  defp tool_call_field(tool_call, key, default) when is_map(tool_call) do
+    Map.get(tool_call, key, Map.get(tool_call, Atom.to_string(key), default))
+  end
+
+  defp maybe_apply_tool_guardrail_callback(tool_call, context) when is_map(context) do
+    callback =
+      Map.get(context, :__tool_guardrail_callback__) ||
+        Map.get(context, "__tool_guardrail_callback__")
+
+    case callback do
+      fun when is_function(fun, 1) -> fun.(tool_call)
+      _ -> :ok
+    end
+  rescue
+    error ->
+      {:error, {:tool_guardrail_callback_failed, Exception.message(error)}}
+  end
+
+  defp maybe_apply_tool_guardrail_callback(_tool_call, _context), do: :ok
 
   defp evolve_context_state_snapshot(context, results) when is_map(context) and is_list(results) do
     case current_state_snapshot(context) do

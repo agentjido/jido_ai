@@ -900,6 +900,106 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert match?({:error, _, _}, tool_completed.data.result)
   end
 
+  test "preflight tool callback can block a tool round before execution" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_calc_blocked"})],
+         %{finish_reason: :tool_calls, usage: %{input_tokens: 5, output_tokens: 3}},
+         model
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events =
+      ReAct.stream(
+        "Calculate 2 + 3",
+        config,
+        context: %{
+          __tool_guardrail_callback__: fn tool_call ->
+            send(parent, {:preflight_tool_call, tool_call})
+            {:error, :tool_blocked}
+          end
+        }
+      )
+      |> Enum.to_list()
+
+    assert_receive {:preflight_tool_call,
+                    %{
+                      tool_name: "calculator",
+                      tool_call_id: "tc_calc_blocked",
+                      arguments: %{"a" => 2, "b" => 3}
+                    }},
+                   200
+
+    refute Enum.any?(events, &(&1.kind == :tool_started))
+    refute Enum.any?(events, &(&1.kind == :tool_completed))
+    refute Enum.any?(events, &(&1.kind == :request_completed))
+
+    request_failed = Enum.find(events, &(&1.kind == :request_failed))
+    assert request_failed.data.error == :tool_blocked
+    assert request_failed.data.error_type == :tool_guardrail
+  end
+
+  test "preflight tool callback can interrupt a tool round before execution" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 20, "b" => 30}, %{id: "tc_calc_interrupt"})],
+         %{finish_reason: :tool_calls, usage: %{input_tokens: 5, output_tokens: 3}},
+         model
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events =
+      ReAct.stream(
+        "Calculate 20 + 30",
+        config,
+        context: %{
+          __tool_guardrail_callback__: fn tool_call ->
+            send(parent, {:preflight_interrupt_tool_call, tool_call})
+            {:interrupt, %{kind: :approval, message: "Approval required"}}
+          end
+        }
+      )
+      |> Enum.to_list()
+
+    assert_receive {:preflight_interrupt_tool_call,
+                    %{
+                      tool_name: "calculator",
+                      tool_call_id: "tc_calc_interrupt",
+                      arguments: %{"a" => 20, "b" => 30}
+                    }},
+                   200
+
+    refute Enum.any?(events, &(&1.kind == :tool_started))
+    refute Enum.any?(events, &(&1.kind == :tool_completed))
+    refute Enum.any?(events, &(&1.kind == :request_completed))
+
+    request_failed = Enum.find(events, &(&1.kind == :request_failed))
+    assert request_failed.data.error == {:interrupt, %{kind: :approval, message: "Approval required"}}
+    assert request_failed.data.error_type == :tool_guardrail
+  end
+
   test "emits tool_completed events in original tool call order for parallel tools" do
     stub_parallel_order_run()
 
