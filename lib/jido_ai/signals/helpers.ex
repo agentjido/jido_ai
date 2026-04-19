@@ -61,16 +61,6 @@ defmodule Jido.AI.Signal.Helpers do
     )
   end
 
-  def normalize_error(%{message: message} = error, fallback_type, _fallback_message, extra_details)
-      when not is_nil(message) and is_map(extra_details) do
-    details =
-      error
-      |> Map.drop([:message, :retryable, :retryable?])
-      |> merge_error_details(extra_details)
-
-    error_envelope(fallback_type, normalize_message(message), details, normalize_retryable(error, fallback_type))
-  end
-
   def normalize_error(%module{} = reason, fallback_type, fallback_message, extra_details)
       when is_map(extra_details) do
     cond do
@@ -96,6 +86,16 @@ defmodule Jido.AI.Signal.Helpers do
           false
         )
     end
+  end
+
+  def normalize_error(%{message: message} = error, fallback_type, _fallback_message, extra_details)
+      when not is_nil(message) and is_map(extra_details) do
+    details =
+      error
+      |> Map.drop([:message, :retryable, :retryable?])
+      |> merge_error_details(extra_details)
+
+    error_envelope(fallback_type, normalize_message(message), details, normalize_retryable(error, fallback_type))
   end
 
   def normalize_error({type, message}, _fallback_type, _fallback_message, extra_details)

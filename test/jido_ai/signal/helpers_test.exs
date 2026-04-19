@@ -2,6 +2,7 @@ defmodule Jido.AI.Signal.HelpersTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Signal.Helpers
+  alias Jido.Action.Error, as: ActionError
 
   describe "normalize_result/3" do
     test "passes through ok and error tuples and wraps invalid values" do
@@ -34,6 +35,17 @@ defmodule Jido.AI.Signal.HelpersTest do
                message: "transient_error",
                details: %{},
                retryable?: true
+             }
+    end
+
+    test "normalizes Jido.Action error structs through Jido.Error.to_map/1" do
+      error = ActionError.execution_error("boom", %{step: :list, retry: false})
+
+      assert Helpers.normalize_error(error) == %{
+               type: :execution_error,
+               message: "boom",
+               details: %{step: :list, retry: false},
+               retryable?: false
              }
     end
   end

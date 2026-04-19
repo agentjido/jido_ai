@@ -4,6 +4,7 @@ defmodule Jido.AI.TurnTest do
   import ExUnit.CaptureLog
 
   alias Jido.AI.Turn
+  alias Jido.Action.Error, as: ActionError
   alias ReqLLM.Message.ContentPart
   alias ReqLLM.ToolResult
 
@@ -268,6 +269,20 @@ defmodule Jido.AI.TurnTest do
                  "type" => "execution_error",
                  "retryable?" => false,
                  "details" => %{"reason" => "badarg"}
+               }
+             }
+    end
+
+    test "formats Jido.Action error structs without leaking struct metadata into details" do
+      error = ActionError.execution_error("boom", %{step: :list, retry: false})
+
+      assert decode_tool_content(Turn.format_tool_result_content({:error, error})) == %{
+               "ok" => false,
+               "error" => %{
+                 "message" => "boom",
+                 "type" => "execution_error",
+                 "retryable?" => false,
+                 "details" => %{"step" => "list", "retry" => false}
                }
              }
     end
