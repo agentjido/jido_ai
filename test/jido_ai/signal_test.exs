@@ -174,6 +174,17 @@ defmodule Jido.AI.SignalTest do
       assert signal.data.delta == ""
     end
 
+    test "creates partial signal with metadata for request correlation" do
+      signal =
+        LLMDelta.new!(%{
+          call_id: "call_partial_5",
+          delta: "hello",
+          metadata: %{request_id: "req_1", run_id: "req_1", strategy: :react}
+        })
+
+      assert signal.data.metadata == %{request_id: "req_1", run_id: "req_1", strategy: :react}
+    end
+
     test "creates multiple partial signals for streaming" do
       chunks = ["Hello", ", ", "world", "!"]
 

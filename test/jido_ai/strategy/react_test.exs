@@ -5,6 +5,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.PendingInputServer
+  alias Jido.AI.Request
+  alias Jido.AI.Reasoning.ReAct.Event
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
@@ -76,6 +78,15 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       tool_name: nil,
       data: data
     }
+  end
+
+  defp with_stream_request(agent, request_id, sink \\ self()) do
+    requests =
+      agent.state
+      |> Map.get(:requests, %{})
+      |> Map.put(request_id, %{stream_to: {:pid, sink}})
+
+    %{agent | state: Map.put(agent.state, :requests, requests)}
   end
 
   describe "init validation" do
@@ -473,6 +484,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "worker runtime event updates state and emits lifecycle signals" do
       agent = create_agent(tools: [TestCalculator])
+      agent = with_stream_request(agent, "req_evt")
+      tag = Request.Stream.message_tag()
 
       event = runtime_event(:request_started, "req_evt", 1, %{query: "hello"})
 
@@ -486,6 +499,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       trace = state.request_traces["req_evt"]
       assert trace.truncated? == false
       assert length(trace.events) == 1
+
+      assert_receive {^tag, %Event{kind: :request_started, request_id: "req_evt"}}
     end
 
     test "steer queues input for an active run" do
@@ -921,6 +936,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "worker crash while active request marks request failed" do
       agent = create_agent(tools: [TestCalculator])
+      agent = with_stream_request(agent, "req_crash")
+      tag = Request.Stream.message_tag()
 
       state =
         agent
@@ -947,6 +964,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.react_worker_pid == nil
       assert state.react_worker_status == :missing
       assert state.result == {:react_worker_exit, :killed}
+
+      assert_receive {^tag,
+                      %Event{
+                        kind: :request_failed,
+                        request_id: "req_crash",
+                        data: %{error: {:react_worker_exit, :killed}, reason: :react_worker_exit}
+                      }}
     end
 
     test "stores request trace up to 2000 events then marks truncated" do

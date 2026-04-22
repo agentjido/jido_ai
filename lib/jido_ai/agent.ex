@@ -54,6 +54,7 @@ defmodule Jido.AI.Agent do
   ## Generated Functions
 
   - `ask/2,3` - Async: sends query, returns `{:ok, %Request{}}` for later awaiting
+  - `ask_stream/2,3` - Async: sends query and returns a request handle plus runtime event stream
   - `await/1,2` - Awaits a specific request's completion
   - `ask_sync/2,3` - Sync convenience: sends query and waits for result
   - `on_before_cmd/2` - Captures request in state before processing
@@ -456,6 +457,7 @@ defmodule Jido.AI.Agent do
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+      - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
       - `:timeout` - Timeout for the underlying cast (default: no timeout)
 
       ## Examples
@@ -475,6 +477,37 @@ defmodule Jido.AI.Agent do
             source: "/ai/react/agent"
           )
         )
+      end
+
+      @doc """
+      Send a query and return both its request handle and runtime event stream.
+
+      The returned enumerable yields canonical ReAct runtime events until the
+      request emits `:request_completed`, `:request_failed`, or
+      `:request_cancelled`.
+
+      ## Options
+
+      Accepts the same options as `ask/3`, plus:
+      - `:stream_event_timeout_ms` - Optional mailbox receive timeout for the enumerable
+
+      ## Examples
+
+          {:ok, %{request: request, events: events}} = MyAgent.ask_stream(pid, "What is 2+2?")
+          for event <- events do
+            IO.inspect(event.kind)
+          end
+          {:ok, result} = MyAgent.await(request)
+
+      """
+      @spec ask_stream(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, %{request: Request.Handle.t(), events: Enumerable.t()}} | {:error, term()}
+      def ask_stream(pid, query, opts \\ []) when is_binary(query) do
+        opts = Keyword.put(opts, :stream_to, {:pid, self()})
+
+        with {:ok, request} <- ask(pid, query, opts) do
+          {:ok, %{request: request, events: Request.Stream.events(request, opts)}}
+        end
       end
 
       @doc """
@@ -545,7 +578,7 @@ defmodule Jido.AI.Agent do
         action = {:ai_react_start, params}
 
         # Use RequestTracking to manage state
-        agent = Request.start_request(agent, request_id, query)
+        agent = Request.start_request(agent, request_id, query, stream_to: params[:stream_to])
 
         {:ok, agent, action}
       end
@@ -555,8 +588,12 @@ defmodule Jido.AI.Agent do
             agent,
             {:ai_react_request_error, %{request_id: request_id, reason: reason, message: message}} = action
           ) do
-        agent = Request.fail_request(agent, request_id, {:rejected, reason, message})
-        emit_request_failed_signal(agent, request_id, {:rejected, reason, message})
+        error = {:rejected, reason, message}
+        stream_to = get_in(agent.state, [:requests, request_id, :stream_to])
+
+        agent = Request.fail_request(agent, request_id, error)
+        Request.Stream.send_event(stream_to, Request.Stream.failed_event(request_id, error, reason: reason))
+        emit_request_failed_signal(agent, request_id, error)
         {:ok, agent, action}
       end
 
@@ -774,6 +811,7 @@ defmodule Jido.AI.Agent do
       defoverridable on_before_cmd: 2,
                      on_after_cmd: 3,
                      ask: 3,
+                     ask_stream: 3,
                      await: 2,
                      ask_sync: 3,
                      cancel: 2,

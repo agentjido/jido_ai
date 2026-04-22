@@ -26,6 +26,43 @@ Per-request ReAct overrides travel with the request handle:
   )
 ```
 
+## Request Event Streaming
+
+Use `ask_stream/3` when a caller needs canonical ReAct runtime events while a
+request is running:
+
+```elixir
+{:ok, %{request: request, events: events}} =
+  MyApp.MathAgent.ask_stream(pid, "Show your work")
+
+for event <- events do
+  IO.inspect({event.kind, event.data})
+end
+
+{:ok, result} = MyApp.MathAgent.await(request)
+```
+
+The enumerable yields `%Jido.AI.Reasoning.ReAct.Event{}` values and stops after
+`:request_completed`, `:request_failed`, or `:request_cancelled`.
+
+For mailbox-oriented integrations, pass a pid sink directly:
+
+```elixir
+{:ok, request} =
+  MyApp.MathAgent.ask(pid, "Show your work",
+    stream_to: {:pid, self()}
+  )
+
+receive do
+  {:jido_ai_request_event, %Jido.AI.Reasoning.ReAct.Event{} = event} ->
+    IO.inspect(event.kind)
+end
+```
+
+Pid sinks are request-scoped and use the calling process mailbox. They do not
+provide backpressure; keep handlers lightweight and always consume terminal
+events so request streams close cleanly.
+
 ## Steering An Active ReAct Run
 
 `ask/await` remains the request API. Mid-run steering is a separate control path:

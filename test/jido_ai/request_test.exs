@@ -3,6 +3,7 @@ defmodule JidoTest.AI.RequestTest do
 
   alias Jido.AI.Request
   alias Jido.AI.Request.Handle
+  alias Jido.AI.Reasoning.ReAct.Event
 
   defmodule TestRequestTransformer do
     def transform_request(request, _state, _config, _context), do: {:ok, request}
@@ -147,6 +148,13 @@ defmodule JidoTest.AI.RequestTest do
       assert agent.state.last_request_id == "req-1"
       assert agent.state.completed == false
       assert agent.state.last_answer == ""
+    end
+
+    test "start_request/4 records request-scoped stream sink" do
+      agent = %MockAgent{state: Request.init_state(%{})}
+      agent = Request.start_request(agent, "req-1", "What is 2+2?", stream_to: {:pid, self()})
+
+      assert agent.state.requests["req-1"].stream_to == {:pid, self()}
     end
 
     test "complete_request/3 updates request with result" do
@@ -343,6 +351,50 @@ defmodule JidoTest.AI.RequestTest do
   end
 
   describe "runtime await contracts" do
+    test "request stream enumerable yields matching events until terminal event" do
+      handle = Handle.new("req_stream", self(), "query")
+      tag = Request.Stream.message_tag()
+
+      first =
+        Event.new(%{
+          seq: 1,
+          run_id: "req_stream",
+          request_id: "req_stream",
+          iteration: 1,
+          kind: :llm_delta,
+          data: %{chunk_type: :content, delta: "hello"}
+        })
+
+      terminal =
+        Event.new(%{
+          seq: 2,
+          run_id: "req_stream",
+          request_id: "req_stream",
+          iteration: 1,
+          kind: :request_completed,
+          data: %{result: "done"}
+        })
+
+      other =
+        Event.new(%{
+          seq: 1,
+          run_id: "other",
+          request_id: "other",
+          iteration: 1,
+          kind: :request_completed,
+          data: %{}
+        })
+
+      send(self(), {tag, other})
+      send(self(), {tag, first})
+      send(self(), {tag, terminal})
+
+      assert [^first, ^terminal] =
+               handle
+               |> Request.Stream.events(stream_event_timeout_ms: 10)
+               |> Enum.to_list()
+    end
+
     test "create_and_send/3 emits request-scoped signal payload and returns handle" do
       server = start_runtime_server([])
 
@@ -356,7 +408,7 @@ defmodule JidoTest.AI.RequestTest do
                  allowed_tools: ["calculator"],
                  request_transformer: TestRequestTransformer,
                  stream_timeout_ms: 4_321,
-                 stream_timeout_ms: 4_321,
+                 stream_to: {:pid, self()},
                  req_http_options: [plug: {Req.Test, []}],
                  llm_opts: [thinking: "enabled", reasoning_effort: :high],
                  extra_refs: %{slack_ts: "1234.001", custom_id: "abc"}
@@ -378,9 +430,21 @@ defmodule JidoTest.AI.RequestTest do
       assert signal.data.allowed_tools == ["calculator"]
       assert signal.data.request_transformer == TestRequestTransformer
       assert signal.data.stream_timeout_ms == 4_321
+      assert signal.data.stream_to == {:pid, self()}
       assert signal.data.req_http_options == [plug: {Req.Test, []}]
       assert signal.data.llm_opts == [thinking: "enabled", reasoning_effort: :high]
       assert signal.data.extra_refs == %{slack_ts: "1234.001", custom_id: "abc"}
+    end
+
+    test "create_and_send/3 rejects invalid stream sink" do
+      server = start_runtime_server([])
+
+      assert {:error, {:invalid_stream_to, :bad_sink}} =
+               Request.create_and_send(server, "What is 2+2?",
+                 signal_type: "ai.test.query",
+                 source: "/ai/test",
+                 stream_to: :bad_sink
+               )
     end
 
     test "await/2 returns successful result for completed request payload" do

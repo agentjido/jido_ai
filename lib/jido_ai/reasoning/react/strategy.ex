@@ -39,6 +39,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Observe
   alias Jido.AI.Directive
   alias Jido.AI.Effects
+  alias Jido.AI.Request.Stream, as: RequestStream
   alias Jido.AI.Reasoning.ReAct.PendingInput
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.Reasoning.ReAct.State, as: ReActState
@@ -185,6 +186,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           tools: Zoi.any() |> Zoi.optional(),
           allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),
           request_transformer: Zoi.atom() |> Zoi.optional(),
+          stream_to: Zoi.any() |> Zoi.optional(),
           stream_receive_timeout_ms: Zoi.integer() |> Zoi.optional(),
           stream_timeout_ms: Zoi.integer() |> Zoi.optional(),
           req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
@@ -1422,6 +1424,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
         if is_binary(request_id) and state[:status] in [:awaiting_llm, :awaiting_tool] do
           error = {:react_worker_exit, reason}
+          stream_to = request_stream_to(agent, request_id)
 
           failure_signal =
             Signal.RequestFailed.new!(%{
@@ -1429,6 +1432,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
               error: error,
               run_id: request_id
             })
+
+          RequestStream.send_event(
+            stream_to,
+            RequestStream.failed_event(request_id, error, reason: :react_worker_exit)
+          )
 
           Jido.AgentServer.cast(self(), failure_signal)
 
@@ -1466,6 +1474,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     state = append_trace_event(state, request_id, event)
     {new_state, signals} = apply_runtime_event(state, event)
     Enum.each(signals, &Jido.AgentServer.cast(self(), &1))
+    RequestStream.send_event(request_stream_to(agent, request_id), event)
 
     kind = event_kind(event)
     {agent, new_state} = maybe_append_ai_message_event_from_runtime(agent, new_state, event)
@@ -1531,7 +1540,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           end
 
         signal =
-          Signal.LLMDelta.new!(%{call_id: llm_call_id || "", delta: delta, chunk_type: chunk_type})
+          Signal.LLMDelta.new!(%{
+            call_id: llm_call_id || "",
+            delta: delta,
+            chunk_type: chunk_type,
+            metadata: runtime_signal_metadata(request_id, run_id, iteration, :generate_text)
+          })
 
         emit_runtime_telemetry(state, :llm_delta, request_id, run_id, iteration, llm_call_id, event, data)
         {updated, [signal]}
@@ -2293,6 +2307,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp normalize_tool_result(result), do: SignalHelpers.normalize_result(result, :tool_error, "Tool execution failed")
+
+  defp request_stream_to(agent, request_id) when is_binary(request_id) do
+    get_in(agent.state, [:requests, request_id, :stream_to])
+  end
+
+  defp request_stream_to(_agent, _request_id), do: nil
 
   defp runtime_signal_metadata(request_id, run_id, iteration, operation) do
     %{

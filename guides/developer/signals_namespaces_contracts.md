@@ -46,6 +46,7 @@ The public signal payload remains the primary contract. Some signals also carry
 optional `metadata` maps for runtime correlation and observability:
 
 - `ai.llm.response.metadata`
+- `ai.llm.delta.metadata`
 - `ai.tool.started.metadata`
 - `ai.tool.result.metadata`
 - `ai.usage.metadata`

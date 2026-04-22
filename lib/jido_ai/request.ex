@@ -60,6 +60,7 @@ defmodule Jido.AI.Request do
   ```
   """
 
+  alias Jido.AI.Request.Stream, as: RequestStream
   alias Jido.Signal
 
   @type status :: :pending | :completed | :failed | :timeout
@@ -161,6 +162,7 @@ defmodule Jido.AI.Request do
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
   - `:extra_refs` - Map of additional refs to attach to the user message thread entry
+  - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
   - `:request_id` - Custom request ID (auto-generated if not provided)
 
   ## Signal Options (required)
@@ -189,31 +191,35 @@ defmodule Jido.AI.Request do
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
+    stream_to = Keyword.get(opts, :stream_to)
 
-    # Build payload with request_id for correlation.
-    # Keep both query and prompt keys so all strategy start schemas can consume it.
-    extra_refs = Keyword.get(opts, :extra_refs, %{})
+    with {:ok, stream_to} <- RequestStream.normalize_sink(stream_to) do
+      # Build payload with request_id for correlation.
+      # Keep both query and prompt keys so all strategy start schemas can consume it.
+      extra_refs = Keyword.get(opts, :extra_refs, %{})
 
-    payload =
-      %{query: query, prompt: query, request_id: request_id}
-      |> maybe_add_tool_context(tool_context)
-      |> maybe_add_tools(tools)
-      |> maybe_add_allowed_tools(allowed_tools)
-      |> maybe_add_request_transformer(request_transformer)
-      |> maybe_add_stream_timeout_ms(stream_timeout_ms)
-      |> maybe_add_req_http_options(req_http_options)
-      |> maybe_add_llm_opts(llm_opts)
-      |> maybe_add_extra_refs(extra_refs)
+      payload =
+        %{query: query, prompt: query, request_id: request_id}
+        |> maybe_add_tool_context(tool_context)
+        |> maybe_add_tools(tools)
+        |> maybe_add_allowed_tools(allowed_tools)
+        |> maybe_add_request_transformer(request_transformer)
+        |> maybe_add_stream_timeout_ms(stream_timeout_ms)
+        |> maybe_add_req_http_options(req_http_options)
+        |> maybe_add_llm_opts(llm_opts)
+        |> maybe_add_extra_refs(extra_refs)
+        |> maybe_add_stream_to(stream_to)
 
-    signal = Signal.new!(signal_type, payload, source: source)
+      signal = Signal.new!(signal_type, payload, source: source)
 
-    case Jido.AgentServer.cast(server, signal) do
-      :ok ->
-        request = Handle.new(request_id, server, query)
-        {:ok, request}
+      case Jido.AgentServer.cast(server, signal) do
+        :ok ->
+          request = Handle.new(request_id, server, query)
+          {:ok, request}
 
-      {:error, _} = error ->
-        error
+        {:error, _} = error ->
+          error
+      end
     end
   end
 
@@ -358,16 +364,20 @@ defmodule Jido.AI.Request do
         {:ok, agent, action}
       end
   """
-  @spec start_request(struct(), String.t(), String.t()) :: struct()
-  def start_request(agent, request_id, query) when is_binary(request_id) and is_binary(query) do
-    request = %{
-      query: query,
-      status: :pending,
-      result: nil,
-      error: nil,
-      inserted_at: System.system_time(:millisecond),
-      completed_at: nil
-    }
+  @spec start_request(struct(), String.t(), String.t(), keyword()) :: struct()
+  def start_request(agent, request_id, query, opts \\ []) when is_binary(request_id) and is_binary(query) do
+    stream_to = Keyword.get(opts, :stream_to)
+
+    request =
+      %{
+        query: query,
+        status: :pending,
+        result: nil,
+        error: nil,
+        inserted_at: System.system_time(:millisecond),
+        completed_at: nil
+      }
+      |> maybe_add_request_stream_to(stream_to)
 
     state =
       agent.state
@@ -547,6 +557,9 @@ defmodule Jido.AI.Request do
 
   defp maybe_add_stream_timeout_ms(payload, _), do: payload
 
+  defp maybe_add_stream_to(payload, nil), do: payload
+  defp maybe_add_stream_to(payload, stream_to), do: Map.put(payload, :stream_to, stream_to)
+
   defp maybe_add_tools(payload, nil), do: payload
   defp maybe_add_tools(payload, tools), do: Map.put(payload, :tools, tools)
 
@@ -583,6 +596,9 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_extra_refs(payload, _), do: payload
+
+  defp maybe_add_request_stream_to(request, nil), do: request
+  defp maybe_add_request_stream_to(request, stream_to), do: Map.put(request, :stream_to, stream_to)
 
   @doc false
   @spec compat_text(any()) :: String.t()
