@@ -334,6 +334,11 @@ defmodule Jido.AI.Agent do
     # that need to be evaluated in the calling module's context
     plugins = Keyword.get(opts, :plugins, [])
 
+    default_plugins =
+      opts
+      |> Keyword.get(:default_plugins)
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
     ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
     # Extract tool_context at macro expansion time
@@ -433,6 +438,7 @@ defmodule Jido.AI.Agent do
         description: unquote(description),
         tags: unquote(tags),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
+        default_plugins: unquote(Macro.escape(default_plugins)),
         strategy: {Jido.AI.Reasoning.ReAct.Strategy, unquote(strategy_opts_ast)},
         schema: unquote(base_schema_ast)
 

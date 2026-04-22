@@ -47,6 +47,26 @@ defmodule Jido.AI.AgentTest do
     def transform_request(request, _state, _config, _context), do: {:ok, request}
   end
 
+  defmodule ReplacementMemoryPlugin do
+    @moduledoc false
+    @state_schema Zoi.object(%{namespace: Zoi.string() |> Zoi.default("agent:replacement")})
+    @config_schema Zoi.object(%{namespace: Zoi.string() |> Zoi.default("agent:replacement")})
+
+    use Jido.Plugin,
+      name: "replacement_memory",
+      state_key: :__memory__,
+      actions: [],
+      schema: @state_schema,
+      config_schema: @config_schema,
+      singleton: true,
+      capabilities: [:memory]
+
+    @impl true
+    def mount(_agent, config) do
+      {:ok, %{namespace: Map.get(config, :namespace, "agent:replacement")}}
+    end
+  end
+
   # ============================================================================
   # Test Agents Using Agent Macro
   # ============================================================================
@@ -156,6 +176,20 @@ defmodule Jido.AI.AgentTest do
       system_prompt: nil
   end
 
+  defmodule AgentWithoutDefaultMemory do
+    use Jido.AI.Agent,
+      name: "agent_without_default_memory",
+      tools: [TestCalculator],
+      default_plugins: %{__memory__: false}
+  end
+
+  defmodule AgentWithReplacementMemory do
+    use Jido.AI.Agent,
+      name: "agent_with_replacement_memory",
+      tools: [TestCalculator],
+      default_plugins: %{__memory__: {ReplacementMemoryPlugin, %{namespace: "agent:ai-replacement"}}}
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -237,6 +271,23 @@ defmodule Jido.AI.AgentTest do
     test "agent has correct description" do
       agent = BasicAgent.new()
       assert agent.description == "A basic test agent"
+    end
+
+    test "forwards default plugin exclusions to Jido.Agent" do
+      modules = Enum.map(AgentWithoutDefaultMemory.plugin_instances(), & &1.module)
+
+      refute Jido.Memory.Plugin in modules
+      assert Jido.Thread.Plugin in modules
+      assert Jido.Identity.Plugin in modules
+    end
+
+    test "forwards default plugin replacements with config to Jido.Agent" do
+      modules = Enum.map(AgentWithReplacementMemory.plugin_instances(), & &1.module)
+      agent = AgentWithReplacementMemory.new()
+
+      assert ReplacementMemoryPlugin in modules
+      refute Jido.Memory.Plugin in modules
+      assert agent.state[:__memory__].namespace == "agent:ai-replacement"
     end
 
     test "tool_context with module aliases resolves correctly" do
