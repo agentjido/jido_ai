@@ -653,8 +653,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {:error, {:tool_guardrail_callback_failed, Exception.message(error)}}
   end
 
-  defp maybe_apply_tool_guardrail_callback(_tool_call, _context), do: :ok
-
   defp evolve_context_state_snapshot(context, results) when is_map(context) and is_list(results) do
     case current_state_snapshot(context) do
       {:ok, snapshot} ->
