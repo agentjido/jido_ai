@@ -82,6 +82,7 @@ defmodule Jido.AI do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.ModelAliases
   alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
   alias ReqLLM.Context
 
@@ -490,6 +491,41 @@ defmodule Jido.AI do
   # ============================================================================
 
   @doc """
+  Registers a tool module directly on an agent struct.
+
+  This is the struct-level equivalent of `register_tool/3` — safe to call from
+  within the agent process or an action already executing inside the agent. It
+  updates the ReAct strategy tool config without sending an `AgentServer` signal.
+
+  ## Options
+
+    * `:validate` - Validate tool implements required callbacks (default: true)
+  """
+  @spec register_tool_direct(Jido.Agent.t(), module(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def register_tool_direct(%Jido.Agent{} = agent, tool_module, opts \\ [])
+      when is_atom(tool_module) do
+    if Keyword.get(opts, :validate, true) do
+      with :ok <- validate_tool_module(tool_module) do
+        {:ok, add_tool_to_agent(agent, tool_module)}
+      end
+    else
+      {:ok, add_tool_to_agent(agent, tool_module)}
+    end
+  end
+
+  @doc """
+  Unregisters a tool directly from an agent struct by tool name.
+
+  This is the struct-level equivalent of `unregister_tool/3` — safe to call from
+  within the agent process or an action already executing inside the agent.
+  """
+  @spec unregister_tool_direct(Jido.Agent.t(), String.t()) :: {:ok, Jido.Agent.t()}
+  def unregister_tool_direct(%Jido.Agent{} = agent, tool_name) when is_binary(tool_name) do
+    {:ok, remove_tool_from_agent(agent, tool_name)}
+  end
+
+  @doc """
   Sets the system prompt directly on the agent's strategy config.
 
   This is the struct-level equivalent of `set_system_prompt/3` — safe to call
@@ -584,6 +620,35 @@ defmodule Jido.AI do
       _ ->
         strat_state
     end
+  end
+
+  defp add_tool_to_agent(%Jido.Agent{} = agent, tool_module) do
+    update_agent_tools(agent, fn tools ->
+      [tool_module | tools] |> Enum.uniq()
+    end)
+  end
+
+  defp remove_tool_from_agent(%Jido.Agent{} = agent, tool_name) do
+    update_agent_tools(agent, fn tools ->
+      Enum.reject(tools, fn module -> module.name() == tool_name end)
+    end)
+  end
+
+  defp update_agent_tools(%Jido.Agent{} = agent, update_fun) when is_function(update_fun, 1) do
+    StratState.update(agent, fn strat_state ->
+      config = Map.get(strat_state, :config, %{})
+      tools = config |> Map.get(:tools, []) |> List.wrap() |> update_fun.()
+      actions_by_name = Map.new(tools, &{&1.name(), &1})
+      reqllm_tools = ToolAdapter.from_actions(tools)
+
+      updated_config =
+        config
+        |> Map.put(:tools, tools)
+        |> Map.put(:actions_by_name, actions_by_name)
+        |> Map.put(:reqllm_tools, reqllm_tools)
+
+      Map.put(strat_state, :config, updated_config)
+    end)
   end
 
   # Private helpers for tool management

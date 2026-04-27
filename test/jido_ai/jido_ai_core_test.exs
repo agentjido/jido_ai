@@ -234,6 +234,36 @@ defmodule Jido.AI.CoreTest do
       assert {:ok, :registered} = AI.register_tool(self(), ValidTool)
     end
 
+    test "register_tool_direct validates and updates strategy tool config without AgentServer call" do
+      agent = %Jido.Agent{state: %{}}
+
+      assert {:error, {:not_loaded, Missing.Tool}} =
+               AI.register_tool_direct(agent, Missing.Tool)
+
+      assert {:error, :not_a_tool} = AI.register_tool_direct(agent, IncompleteTool)
+
+      assert {:ok, agent} = AI.register_tool_direct(agent, ValidTool)
+
+      config = AI.get_strategy_config(agent)
+      assert config.tools == [ValidTool]
+      assert config.actions_by_name == %{"valid_tool" => ValidTool}
+      assert AI.list_tools(agent) == [ValidTool]
+      assert AI.has_tool?(agent, "valid_tool")
+    end
+
+    test "unregister_tool_direct removes tool config without AgentServer call" do
+      agent = %Jido.Agent{state: %{}}
+      assert {:ok, agent} = AI.register_tool_direct(agent, ValidTool)
+      assert {:ok, agent} = AI.unregister_tool_direct(agent, "valid_tool")
+
+      config = AI.get_strategy_config(agent)
+      assert config.tools == []
+      assert config.actions_by_name == %{}
+      assert config.reqllm_tools == []
+      assert AI.list_tools(agent) == []
+      refute AI.has_tool?(agent, "valid_tool")
+    end
+
     test "unregister_tool and set_system_prompt wrap signals and delegate call" do
       Mimic.stub(Jido.AgentServer, :call, fn _server, signal, timeout ->
         assert timeout == 5_000
