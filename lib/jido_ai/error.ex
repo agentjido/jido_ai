@@ -113,3 +113,16 @@ defmodule Jido.AI.Error.Validation.Invalid do
   def message(%{field: field}) when is_binary(field), do: "Invalid field: #{field}"
   def message(_), do: "Validation error"
 end
+
+defmodule Jido.AI.Error.Validation.Output do
+  @moduledoc "Structured output validation error"
+
+  use Splode.Error,
+    fields: [:message, :field, :details],
+    class: :validation
+
+  @impl true
+  def message(%{message: message}) when is_binary(message), do: message
+  def message(%{field: field}) when field in [:output, "output"], do: "Structured output validation failed"
+  def message(_), do: "Structured output validation failed"
+end

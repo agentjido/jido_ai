@@ -88,6 +88,12 @@ defmodule Jido.AI.Observe do
   def request(event), do: [:jido, :ai, :request, event]
 
   @doc """
+  Builds a structured output telemetry event path under `[:jido, :ai, :output, ...]`.
+  """
+  @spec output(atom()) :: event_name()
+  def output(event), do: [:jido, :ai, :output, event]
+
+  @doc """
   Builds a strategy telemetry event path under `[:jido, :ai, :strategy, strategy, ...]`.
   """
   @spec strategy(atom(), atom()) :: event_name()
@@ -225,6 +231,8 @@ defmodule Jido.AI.Observe do
 
   defp valid_event?([:jido, :ai, :request, event]) when event in [:start, :complete, :failed, :rejected, :cancelled],
     do: true
+
+  defp valid_event?([:jido, :ai, :output, event]) when event in [:start, :validated, :repair, :error], do: true
 
   defp valid_event?([:jido, :ai, :strategy, strategy, event]) when is_atom(strategy) and is_atom(event), do: true
   defp valid_event?([:jido, :ai, :tool, :execute, event]) when event in [:start, :stop, :exception], do: true

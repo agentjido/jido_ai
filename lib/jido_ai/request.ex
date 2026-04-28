@@ -161,6 +161,8 @@ defmodule Jido.AI.Request do
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+  - `:output` - `:raw` to bypass agent-level structured output for this request,
+    or a request-scoped structured output config
   - `:extra_refs` - Map of additional refs to attach to the user message thread entry
   - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
   - `:request_id` - Custom request ID (auto-generated if not provided)
@@ -190,6 +192,7 @@ defmodule Jido.AI.Request do
     stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms))
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
+    output = Keyword.get(opts, :output)
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
     stream_to = Keyword.get(opts, :stream_to)
 
@@ -207,6 +210,7 @@ defmodule Jido.AI.Request do
         |> maybe_add_stream_timeout_ms(stream_timeout_ms)
         |> maybe_add_req_http_options(req_http_options)
         |> maybe_add_llm_opts(llm_opts)
+        |> maybe_add_output(output)
         |> maybe_add_extra_refs(extra_refs)
         |> maybe_add_stream_to(stream_to)
 
@@ -591,6 +595,9 @@ defmodule Jido.AI.Request do
 
   defp maybe_add_llm_opts(payload, _), do: payload
 
+  defp maybe_add_output(payload, nil), do: payload
+  defp maybe_add_output(payload, output), do: Map.put(payload, :output, output)
+
   defp maybe_add_extra_refs(payload, refs) when is_map(refs) and map_size(refs) > 0 do
     Map.put(payload, :extra_refs, refs)
   end
@@ -609,6 +616,7 @@ defmodule Jido.AI.Request do
   defp snapshot_request_meta(%{details: details} = snapshot) when is_map(details) do
     %{}
     |> maybe_put_meta(:usage, extract_snapshot_usage(details, snapshot))
+    |> maybe_put_meta(:output, normalize_non_empty_map(get_field(details, :output)))
     |> maybe_put_meta(:reasoning_details, extract_snapshot_reasoning_details(details, snapshot))
     |> maybe_put_meta(:thinking_trace, normalize_non_empty_list(get_field(details, :thinking_trace)))
     |> maybe_put_meta(:last_thinking, extract_snapshot_last_thinking(details, snapshot))

@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   Canonical configuration for the Task-based ReAct runtime.
   """
 
+  alias Jido.AI.Output
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.ToolAdapter
   require Logger
@@ -64,6 +65,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               streaming: Zoi.boolean() |> Zoi.default(true),
               stream_timeout_ms: Zoi.integer() |> Zoi.default(0),
               effect_policy: Zoi.any() |> Zoi.default(%{}),
+              output: Zoi.any() |> Zoi.nullish(),
               llm: @llm_schema,
               tool_exec: @tool_exec_schema,
               observability: @observability_schema,
@@ -94,6 +96,11 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       opts_map
       |> get_opt(:tools, %{})
       |> ToolAdapter.to_action_map()
+
+    output =
+      opts_map
+      |> get_opt(:output, nil)
+      |> Output.new!()
 
     llm_timeout = get_opt(opts_map, :llm_timeout_ms, get_opt(opts_map, :timeout_ms, nil))
 
@@ -148,6 +155,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
       stream_timeout_ms: normalize_non_neg_integer(resolve_stream_timeout_ms(opts_map), 0),
       effect_policy: get_opt(opts_map, :effect_policy, %{}),
+      output: output,
       llm: llm,
       tool_exec: tool_exec,
       observability: observability,
@@ -179,7 +187,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       Integer.to_string(config.tool_exec.retry_backoff_ms),
       Integer.to_string(config.tool_exec.concurrency),
       Enum.join(tool_names, ","),
-      RequestTransformer.fingerprint(config.request_transformer)
+      RequestTransformer.fingerprint(config.request_transformer),
+      Output.fingerprint(config.output)
     ]
 
     :crypto.hash(:sha256, Enum.join(parts, "|"))

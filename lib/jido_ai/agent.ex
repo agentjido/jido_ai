@@ -44,6 +44,7 @@ defmodule Jido.AI.Agent do
   - `:req_http_options` - Base Req HTTP options passed through to ReqLLM calls
   - `:llm_opts` - Additional ReqLLM generation options merged into ReAct LLM calls
   - `:request_transformer` - Module implementing per-turn ReAct request shaping
+  - `:output` - Structured final-output config with an object-shaped Zoi or JSON Schema
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`).
     Must be literal data only — module aliases, atoms, strings, numbers, lists, and maps are permitted.
     Function calls, module attributes (`@attr`), and pinned variables (`^var`) raise `CompileError`.
@@ -247,6 +248,40 @@ defmodule Jido.AI.Agent do
   defp system_prompt_line({_, meta, _}, default), do: Keyword.get(meta, :line, default)
   defp system_prompt_line(_, default), do: default
 
+  @doc false
+  def expand_and_eval_output_option(nil, _caller_env, _file, _line), do: nil
+
+  def expand_and_eval_output_option(value, caller_env, file, line) do
+    value =
+      case value do
+        value when is_map(value) ->
+          value
+
+        value when is_list(value) ->
+          value
+          |> Macro.prewalk(fn
+            {:__aliases__, _, _} = alias_node -> Macro.expand(alias_node, caller_env)
+            other -> other
+          end)
+          |> Code.eval_quoted([], caller_env)
+          |> elem(0)
+
+        other ->
+          other
+          |> Macro.expand(caller_env)
+          |> Code.eval_quoted([], caller_env)
+          |> elem(0)
+      end
+
+    Jido.AI.Output.new!(value)
+  rescue
+    error ->
+      raise CompileError,
+        description: "invalid output option: #{Exception.message(error)}",
+        file: file,
+        line: line
+  end
+
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
@@ -313,6 +348,11 @@ defmodule Jido.AI.Agent do
       opts
       |> Keyword.get(:llm_opts, [])
       |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+
+    output =
+      opts
+      |> Keyword.get(:output)
+      |> __MODULE__.expand_and_eval_output_option(__CALLER__, __CALLER__.file, __CALLER__.line)
 
     request_transformer =
       case Keyword.get(opts, :request_transformer) do
@@ -381,6 +421,7 @@ defmodule Jido.AI.Agent do
         observability: observability,
         req_http_options: req_http_options,
         llm_opts: llm_opts,
+        output: output,
         request_transformer: request_transformer,
         agent_effect_policy: agent_effect_policy,
         strategy_effect_policy: strategy_effect_policy,
@@ -463,6 +504,7 @@ defmodule Jido.AI.Agent do
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+      - `:output` - `:raw` to bypass structured output or a request-scoped output config
       - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
       - `:timeout` - Timeout for the underlying cast (default: no timeout)
 
@@ -557,6 +599,7 @@ defmodule Jido.AI.Agent do
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+      - `:output` - `:raw` to bypass structured output or a request-scoped output config
       - `:timeout` - How long to wait in milliseconds (default: 30_000)
 
       ## Examples

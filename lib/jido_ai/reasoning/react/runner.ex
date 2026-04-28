@@ -7,6 +7,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   """
 
   alias Jido.AI.PendingInputServer
+  alias Jido.AI.Output
   alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token, ToolSelection}
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
@@ -169,19 +170,15 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       state.iteration > config.max_iterations ->
         seal_pending_input_server(config)
 
-        state
-        |> State.put_status(:completed)
-        |> State.put_result("Maximum iterations reached without a final answer.")
-        |> then(fn completed ->
-          {completed, _} =
-            emit_event(completed, owner, ref, :request_completed, %{
-              result: completed.result,
-              termination_reason: :max_iterations,
-              usage: completed.usage
-            })
+        completed =
+          state
+          |> State.put_status(:completed)
+          |> State.put_result("Maximum iterations reached without a final answer.")
 
-          completed
-        end)
+        case complete_run(completed, owner, ref, config, :max_iterations) do
+          {:ok, completed} -> completed
+          {:error, failed_state, reason, error_type} -> fail_run(failed_state, owner, ref, config, reason, error_type)
+        end
 
       true ->
         case drain_pending_input(state, owner, ref, config) do
@@ -335,6 +332,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     }
 
     with {:ok, request} <- maybe_transform_request(base_request, state, config, runtime_context),
+         request <- maybe_apply_output_instructions(request, config.output),
          {:ok, messages} <- normalize_request_messages(request),
          {:ok, tools} <- normalize_request_tools(request),
          llm_opts <- sync_tools_in_llm_opts(config, request.llm_opts, tools) do
@@ -379,6 +377,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       Config.merge_llm_opts(config, base_opts, llm_opts_override)
     end)
   end
+
+  defp maybe_apply_output_instructions(%{messages: messages} = request, %Output{} = output) when is_list(messages) do
+    %{request | messages: Output.apply_instructions(messages, output)}
+  end
+
+  defp maybe_apply_output_instructions(request, _output), do: request
 
   defp normalize_request_messages(%{messages: messages}) when is_list(messages), do: {:ok, messages}
   defp normalize_request_messages(_request), do: {:error, :invalid_request_messages}
@@ -796,6 +800,112 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     state
   end
 
+  defp complete_run(%State{} = state, owner, ref, %Config{} = config, termination_reason) do
+    with {:ok, state} <- finalize_output(state, owner, ref, config) do
+      {state, _} =
+        emit_event(state, owner, ref, :request_completed, %{
+          result: state.result,
+          termination_reason: termination_reason,
+          usage: state.usage,
+          output: state.output
+        })
+
+      {:ok, state}
+    end
+  end
+
+  defp finalize_output(%State{} = state, _owner, _ref, %Config{output: nil}), do: {:ok, state}
+
+  defp finalize_output(%State{} = state, owner, ref, %Config{output: %Output{} = output} = config) do
+    context = output_context(state, config)
+    {state, _} = emit_output_event(state, owner, ref, :output_started, output, :started, state.result, attempt: 0)
+
+    case Output.parse(output, state.result) do
+      {:ok, parsed} ->
+        meta = Output.meta(output, :validated, state.result, attempt: 0)
+
+        {state, _} =
+          emit_output_event(state, owner, ref, :output_validated, output, :validated, parsed, attempt: 0)
+
+        {:ok, state |> State.put_result(parsed) |> State.put_output(meta)}
+
+      {:error, reason} ->
+        repair_or_fail_output(state, owner, ref, output, context, state.result, reason, 1)
+    end
+  end
+
+  defp repair_or_fail_output(
+         state,
+         owner,
+         ref,
+         %Output{on_validation_error: :repair, retries: retries} = output,
+         context,
+         raw,
+         reason,
+         attempt
+       )
+       when attempt <= retries do
+    {state, _} =
+      emit_output_event(state, owner, ref, :output_repair, output, :repair, raw,
+        attempt: attempt,
+        validation_error: reason
+      )
+
+    case Output.repair(output, raw, reason, context) do
+      {:ok, parsed} ->
+        meta = Output.meta(output, :repaired, raw, attempt: attempt, validation_error: reason)
+
+        {state, _} =
+          emit_output_event(state, owner, ref, :output_validated, output, :validated, parsed, attempt: attempt)
+
+        {:ok, state |> State.put_result(parsed) |> State.put_output(meta)}
+
+      {:error, repair_reason} ->
+        repair_or_fail_output(state, owner, ref, output, context, raw, repair_reason, attempt + 1)
+    end
+  end
+
+  defp repair_or_fail_output(state, owner, ref, %Output{} = output, _context, raw, reason, attempt) do
+    meta = Output.meta(output, :error, raw, attempt: max(attempt - 1, 0), error: reason)
+
+    {state, _} =
+      emit_output_event(state, owner, ref, :output_failed, output, :error, raw,
+        attempt: max(attempt - 1, 0),
+        error: reason
+      )
+
+    {:error, State.put_output(state, meta), reason, :output_validation}
+  end
+
+  defp emit_output_event(%State{} = state, owner, ref, kind, %Output{} = output, status, raw, opts) do
+    data =
+      output
+      |> Output.meta(status, raw, opts)
+      |> Map.put(:schema_summary, output_schema_summary(output))
+
+    emit_event(state, owner, ref, kind, data)
+  end
+
+  defp output_context(%State{} = state, %Config{} = config) do
+    %{
+      model: config.model,
+      llm_opts: Config.llm_opts(config),
+      user_message: latest_query(state),
+      request_id: state.request_id,
+      run_id: state.run_id
+    }
+  end
+
+  defp output_schema_summary(%Output{} = output) do
+    %{
+      schema_kind: output.schema_kind,
+      required: get_in(Output.json_schema(output), ["required"]) || [],
+      properties: output |> Output.json_schema() |> Map.get("properties", %{}) |> Map.keys()
+    }
+  rescue
+    _ -> %{schema_kind: output.schema_kind}
+  end
+
   defp emit_checkpoint(%State{} = state, owner, ref, %Config{} = config, reason)
        when reason in [:after_llm, :after_tools, :terminal] do
     token = Token.issue(state, config)
@@ -1069,14 +1179,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         end
 
       :sealed ->
-        {state, _} =
-          emit_event(state, owner, ref, :request_completed, %{
-            result: state.result,
-            termination_reason: :final_answer,
-            usage: state.usage
-          })
-
-        {:complete, state}
+        case complete_run(state, owner, ref, config, :final_answer) do
+          {:ok, state} -> {:complete, state}
+          {:error, state, reason, error_type} -> {:error, state, reason, error_type}
+        end
 
       {:error, reason} ->
         {:error, state, {:pending_input_server, reason}, :runtime}

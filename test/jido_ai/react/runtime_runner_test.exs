@@ -221,6 +221,78 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
   end
 
+  test "validates structured output before request completion" do
+    schema = ticket_schema()
+
+    Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, messages, _opts ->
+      assert [%{role: :system, content: prompt} | _] = messages
+      assert prompt =~ "Structured output:"
+      assert prompt =~ "category"
+
+      {:ok,
+       %{
+         message: %{content: ~s({"category":"billing","confidence":0.93,"summary":"Invoice issue"}), tool_calls: nil},
+         finish_reason: :stop,
+         usage: %{input_tokens: 3, output_tokens: 8}
+       }}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, streaming: false, output: [schema: schema]})
+
+    events =
+      ReAct.stream("Classify this ticket", config, request_id: "req_output", run_id: "run_output")
+      |> Enum.to_list()
+
+    completed = Enum.find(events, &(&1.kind == :request_completed))
+
+    assert completed.data.result == %{
+             category: :billing,
+             confidence: 0.93,
+             summary: "Invoice issue"
+           }
+
+    assert Enum.any?(events, &(&1.kind == :output_started))
+    assert Enum.any?(events, &(&1.kind == :output_validated))
+  end
+
+  test "repairs invalid structured output with tools removed from repair call" do
+    schema = ticket_schema()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("This is a billing issue with high confidence.")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
+         model
+       )}
+    end)
+
+    Mimic.expect(ReqLLM.Generation, :generate_object, fn _model, messages, ^schema, opts ->
+      assert Keyword.get(opts, :tools) == nil
+      assert Keyword.get(opts, :tool_choice) == nil
+      assert Enum.any?(messages, &String.contains?(to_string(&1.content), "billing issue"))
+
+      {:ok, %{object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}}}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{CalculatorTool.name() => CalculatorTool}, output: [schema: schema]})
+
+    events =
+      ReAct.stream("Classify this ticket", config, request_id: "req_repair", run_id: "run_repair")
+      |> Enum.to_list()
+
+    completed = Enum.find(events, &(&1.kind == :request_completed))
+
+    assert completed.data.result == %{
+             category: :billing,
+             confidence: 0.88,
+             summary: "Billing issue"
+           }
+
+    assert Enum.any?(events, &(&1.kind == :output_repair))
+    assert Enum.any?(events, &(&1.kind == :output_validated and &1.data.status == :validated))
+  end
+
   test "passes inline model specs through to ReqLLM requests" do
     inline_model = %{provider: :openai, id: "gpt-4o-mini", base_url: "http://localhost:4000/v1"}
 
@@ -1439,6 +1511,14 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
            )}
       end
     end)
+  end
+
+  defp ticket_schema do
+    Zoi.object(%{
+      category: Zoi.enum([:billing, :technical, :account]),
+      confidence: Zoi.float(),
+      summary: Zoi.string()
+    })
   end
 
   defp delayed_stream(chunks, delay_ms) do

@@ -186,6 +186,7 @@ defmodule JidoAi.MixProject do
           Jido.AI.Agent,
           Jido.AI.Request,
           Jido.AI.Request.Handle,
+          Jido.AI.Output,
           Jido.AI.Thread,
           Jido.AI.Thread.Entry,
           Jido.AI.Turn,

@@ -37,6 +37,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Observe
+  alias Jido.AI.Output
   alias Jido.AI.Directive
   alias Jido.AI.Effects
   alias Jido.AI.Request.Stream, as: RequestStream
@@ -77,6 +78,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
           effect_policy: map(),
+          output: Output.t() | nil,
           observability: map(),
           runtime_adapter: true,
           runtime_task_supervisor: pid() | atom() | nil,
@@ -191,6 +193,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           stream_timeout_ms: Zoi.integer() |> Zoi.optional(),
           req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
           llm_opts: Zoi.any() |> Zoi.optional(),
+          output: Zoi.any() |> Zoi.optional(),
           extra_refs: Zoi.map() |> Zoi.optional()
         }),
       doc: "Start a delegated ReAct conversation with a user query",
@@ -390,6 +393,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       streaming_thinking: state[:streaming_thinking],
       thinking_trace: state[:thinking_trace],
       usage: state[:usage],
+      output: state[:output],
       duration_ms: calculate_duration(state[:started_at]),
       tool_calls: format_tool_calls(state[:pending_tool_calls] || []),
       current_llm_call_id: state[:current_llm_call_id],
@@ -601,6 +605,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       with {:ok, effective_tools} <- resolve_request_tools(config, params),
            {:ok, request_transformer} <- resolve_request_transformer(config, params),
+           {:ok, output} <- resolve_request_output(config, params),
            {:ok, pending_input_server} <- PendingInput.start(request_id) do
         runtime_config =
           runtime_config_from_strategy(config,
@@ -610,6 +615,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             stream_receive_timeout_ms: Map.get(params, :stream_receive_timeout_ms),
             stream_timeout_ms: Map.get(params, :stream_timeout_ms),
             request_transformer: request_transformer,
+            output: output,
             pending_input_server: pending_input_server
           )
 
@@ -660,6 +666,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:current_llm_call_id, nil)
           |> Map.put(:iteration, 1)
           |> Map.put(:result, nil)
+          |> Map.put(:output, %{})
           |> Map.put(:termination_reason, nil)
           |> Map.put(:started_at, System.monotonic_time(:millisecond))
           |> Map.put(:streaming_text, "")
@@ -1623,6 +1630,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
         {updated, []}
 
+      kind when kind in [:output_started, :output_validated, :output_repair, :output_failed] ->
+        updated = Map.put(base_state, :output, data)
+        emit_runtime_telemetry(state, kind, request_id, run_id, iteration, llm_call_id, event, data)
+        {updated, []}
+
       :tool_started ->
         tool_call_id = event_field(data, :tool_call_id, event_field(event, :tool_call_id, ""))
         tool_name = event_field(data, :tool_name, event_field(event, :tool_name, ""))
@@ -1847,6 +1859,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
     tools = Keyword.get(opts, :tools, config[:actions_by_name] || %{})
     request_transformer = Keyword.get(opts, :request_transformer, config[:request_transformer])
+    output = Keyword.get(opts, :output, config[:output])
 
     stream_timeout_ms =
       resolve_stream_timeout_ms_opt(
@@ -1873,7 +1886,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       capture_deltas?: get_in(config, [:observability, :emit_llm_deltas?]),
       pending_input_server: Keyword.get(opts, :pending_input_server),
       runtime_task_supervisor: config[:runtime_task_supervisor],
-      effect_policy: config[:effect_policy]
+      effect_policy: config[:effect_policy],
+      output: output
     }
 
     ReActRuntimeConfig.new(runtime_opts)
@@ -2180,6 +2194,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt,
       base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options(),
       base_llm_opts: opts |> Keyword.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string),
+      output: opts |> Keyword.get(:output) |> Output.new!(),
       provider_opt_keys_by_string: provider_opt_keys_by_string
     }
   end
@@ -2244,6 +2259,22 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
       {:error, message} ->
         {:error, :invalid_request_transformer, message}
+    end
+  end
+
+  defp resolve_request_output(config, params) do
+    case Map.fetch(params, :output) do
+      :error ->
+        {:ok, config[:output]}
+
+      {:ok, raw} when raw in [:raw, "raw"] ->
+        {:ok, nil}
+
+      {:ok, raw} ->
+        case Output.new(raw) do
+          {:ok, output} -> {:ok, output}
+          {:error, reason} -> {:error, :invalid_output, "Invalid output config: #{inspect(reason)}"}
+        end
     end
   end
 
@@ -2379,6 +2410,18 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       :llm_completed ->
         Observe.emit(obs_cfg, Observe.llm(:complete), measurements, metadata)
 
+      :output_started ->
+        Observe.emit(obs_cfg, Observe.output(:start), measurements, metadata)
+
+      :output_validated ->
+        Observe.emit(obs_cfg, Observe.output(:validated), measurements, metadata)
+
+      :output_repair ->
+        Observe.emit(obs_cfg, Observe.output(:repair), measurements, metadata)
+
+      :output_failed ->
+        Observe.emit(obs_cfg, Observe.output(:error), measurements, metadata)
+
       :tool_started ->
         Observe.emit(obs_cfg, Observe.tool(:start), measurements, metadata)
 
@@ -2407,8 +2450,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp telemetry_operation(:tool_started), do: :tool_execute
   defp telemetry_operation(:tool_completed), do: :tool_execute
+  defp telemetry_operation(:output_started), do: :structured_output
+  defp telemetry_operation(:output_validated), do: :structured_output
+  defp telemetry_operation(:output_repair), do: :structured_output
+  defp telemetry_operation(:output_failed), do: :structured_output
   defp telemetry_operation(_kind), do: :generate_text
 
+  defp telemetry_termination_reason(kind, _data) when kind in [:output_validated], do: :complete
+  defp telemetry_termination_reason(kind, _data) when kind in [:output_failed], do: :error
   defp telemetry_termination_reason(:request_completed, data), do: event_field(data, :termination_reason, :complete)
   defp telemetry_termination_reason(:request_failed, _data), do: :error
   defp telemetry_termination_reason(:request_cancelled, _data), do: :cancelled
@@ -2419,6 +2468,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp telemetry_termination_reason(_kind, _data), do: nil
 
   defp telemetry_error_type(:request_failed, data), do: infer_error_type(event_field(data, :error))
+  defp telemetry_error_type(:output_failed, _data), do: :output_validation
   defp telemetry_error_type(:tool_completed, data), do: infer_error_type(event_field(data, :result))
   defp telemetry_error_type(_kind, _data), do: nil
 
