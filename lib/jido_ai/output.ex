@@ -40,7 +40,13 @@ defmodule Jido.AI.Output do
 
   def new(attrs) when is_list(attrs) or is_map(attrs) do
     attrs = Map.new(attrs)
-    schema = Map.get(attrs, :schema) || Map.get(attrs, "schema") || Map.get(attrs, :object_schema)
+
+    schema =
+      Map.get(attrs, :schema) ||
+        Map.get(attrs, "schema") ||
+        Map.get(attrs, :object_schema) ||
+        Map.get(attrs, "object_schema")
+
     retries = Map.get(attrs, :retries, Map.get(attrs, "retries", @default_retries))
     mode = Map.get(attrs, :on_validation_error, Map.get(attrs, "on_validation_error", @default_on_validation_error))
 
@@ -231,6 +237,7 @@ defmodule Jido.AI.Output do
 
   def raw_preview(value) do
     value
+    |> sanitize_preview_value()
     |> inspect(limit: 20, printable_limit: @raw_preview_bytes)
     |> String.slice(0, @raw_preview_bytes)
   end
@@ -259,7 +266,7 @@ defmodule Jido.AI.Output do
 
       case ReqLLM.Generation.generate_object(model, messages, output.schema, llm_opts) do
         {:ok, response} ->
-          unwrap_generated_object(response)
+          unwrap_generated_response(response)
 
         {:error, error} ->
           {:error, output_error({:repair_failed, reason_message(error)}, raw)}
@@ -280,14 +287,9 @@ defmodule Jido.AI.Output do
     """
   end
 
-  defp unwrap_generated_object(%ReqLLM.Response{} = response) do
+  defp unwrap_generated_response(%ReqLLM.Response{} = response) do
     ReqLLM.Response.unwrap_object(response, json_repair: true)
   end
-
-  defp unwrap_generated_object(%{object: object}) when is_map(object), do: {:ok, object}
-  defp unwrap_generated_object(%{"object" => object}) when is_map(object), do: {:ok, object}
-  defp unwrap_generated_object(%{} = object), do: {:ok, object}
-  defp unwrap_generated_object(other), do: {:error, output_error(:expected_map, other)}
 
   defp unwrap_object_map(%{object: object}) when is_map(object), do: object
   defp unwrap_object_map(%{"object" => object}) when is_map(object), do: object
@@ -298,6 +300,11 @@ defmodule Jido.AI.Output do
   defp append_system_prompt([%{role: role, content: content} = first | rest], addition)
        when role in [:system, "system"] and is_binary(content) do
     [%{first | content: join_prompt(content, addition)} | rest]
+  end
+
+  defp append_system_prompt([%{"role" => role, "content" => content} = first | rest], addition)
+       when role in [:system, "system"] and is_binary(content) do
+    [Map.put(first, "content", join_prompt(content, addition)) | rest]
   end
 
   defp append_system_prompt(messages, addition), do: [%{role: :system, content: addition} | messages]
@@ -319,7 +326,7 @@ defmodule Jido.AI.Output do
   defp strip_markdown_fence(value) do
     trimmed = String.trim(value)
 
-    case Regex.run(~r/\A```(?:json)?\s*(.*?)\s*```\z/s, trimmed) do
+    case Regex.run(~r/\A```[^\n]*\n?(.*?)\s*```\z/s, trimmed) do
       [_, inner] -> String.trim(inner)
       _other -> trimmed
     end
@@ -407,9 +414,11 @@ defmodule Jido.AI.Output do
   end
 
   defp format_meta_error(nil), do: nil
-  defp format_meta_error(%{details: details}), do: details
+  defp format_meta_error(%{details: details}), do: sanitize_preview_value(details)
   defp format_meta_error(reason), do: inspect(reason, limit: 20, printable_limit: @raw_preview_bytes)
 
   defp reason_message(%{__exception__: true} = error), do: Exception.message(error)
   defp reason_message(reason), do: inspect(reason, limit: 20, printable_limit: @raw_preview_bytes)
+
+  defp sanitize_preview_value(value), do: Jido.AI.Observe.sanitize_sensitive(value)
 end

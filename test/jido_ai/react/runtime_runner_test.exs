@@ -224,20 +224,20 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   test "validates structured output before request completion" do
     schema = ticket_schema()
 
-    Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
       assert [%{role: :system, content: prompt} | _] = messages
       assert prompt =~ "Structured output:"
       assert prompt =~ "category"
 
       {:ok,
-       %{
-         message: %{content: ~s({"category":"billing","confidence":0.93,"summary":"Invoice issue"}), tool_calls: nil},
-         finish_reason: :stop,
-         usage: %{input_tokens: 3, output_tokens: 8}
-       }}
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text(~s({"category":"billing","confidence":0.93,"summary":"Invoice issue"}))],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
+         model
+       )}
     end)
 
-    config = Config.new(%{model: :capable, tools: %{}, streaming: false, output: [schema: schema]})
+    config = Config.new(%{model: :capable, tools: %{}, output: [schema: schema]})
 
     events =
       ReAct.stream("Classify this ticket", config, request_id: "req_output", run_id: "run_output")
@@ -272,7 +272,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       assert Keyword.get(opts, :tool_choice) == nil
       assert Enum.any?(messages, &String.contains?(to_string(&1.content), "billing issue"))
 
-      {:ok, %{object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}}}
+      {:ok,
+       %ReqLLM.Response{
+         id: "repair-output",
+         model: "test",
+         context: nil,
+         object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}
+       }}
     end)
 
     config = Config.new(%{model: :capable, tools: %{CalculatorTool.name() => CalculatorTool}, output: [schema: schema]})

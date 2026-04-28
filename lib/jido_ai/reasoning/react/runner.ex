@@ -232,7 +232,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     check_cancel!(state, ref)
 
     call_id = "call_#{state.run_id}_#{state.iteration}_#{Jido.Util.generate_id()}"
-    state = State.put_llm_call_id(state, call_id)
+
+    state =
+      state
+      |> State.clear_streaming()
+      |> State.put_llm_call_id(call_id)
 
     {state, _} =
       emit_event(
@@ -454,8 +458,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
            stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms)
          ) do
       {:ok, response} ->
-        {:ok, current_stream_state(state_key, state),
-         Turn.from_response(response, model: Jido.AI.model_label(config.model)), extract_response_id(response)}
+        current_state = current_stream_state(state_key, state)
+
+        turn =
+          response
+          |> Turn.from_response(model: Jido.AI.model_label(config.model))
+          |> apply_stream_accumulator(current_state)
+
+        {:ok, current_state, turn, extract_response_id(response)}
 
       {:error, reason} ->
         {:error, current_stream_state(state_key, state), reason}
@@ -897,10 +907,15 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp output_schema_summary(%Output{} = output) do
+    schema = Output.json_schema(output)
+
     %{
       schema_kind: output.schema_kind,
-      required: get_in(Output.json_schema(output), ["required"]) || [],
-      properties: output |> Output.json_schema() |> Map.get("properties", %{}) |> Map.keys()
+      required: Map.get(schema, "required", Map.get(schema, :required, [])),
+      properties:
+        schema
+        |> Map.get("properties", Map.get(schema, :properties, %{}))
+        |> Map.keys()
     }
   rescue
     _ -> %{schema_kind: output.schema_kind}
@@ -1047,6 +1062,28 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp maybe_put_assistant_context_opt(opts, _key, nil), do: opts
   defp maybe_put_assistant_context_opt(opts, key, value), do: Keyword.put(opts, key, value)
 
+  defp apply_stream_accumulator(%Turn{} = turn, %State{} = state) do
+    turn
+    |> maybe_put_accumulated_text(state.streaming_text)
+    |> maybe_put_accumulated_thinking(state.streaming_thinking)
+  end
+
+  defp apply_stream_accumulator(%Turn{} = turn, _state), do: turn
+
+  defp maybe_put_accumulated_text(%Turn{type: :final_answer, text: text} = turn, accumulated)
+       when text in [nil, ""] and is_binary(accumulated) and accumulated != "" do
+    %{turn | text: accumulated}
+  end
+
+  defp maybe_put_accumulated_text(turn, _accumulated), do: turn
+
+  defp maybe_put_accumulated_thinking(%Turn{thinking_content: thinking} = turn, accumulated)
+       when thinking in [nil, ""] and is_binary(accumulated) and accumulated != "" do
+    %{turn | thinking_content: accumulated}
+  end
+
+  defp maybe_put_accumulated_thinking(turn, _accumulated), do: turn
+
   defp maybe_note_owner_signal(true, _owner, _ref, _last_owner_signal_ms, _interval_ms), do: monotonic_ms()
 
   defp maybe_note_owner_signal(false, owner, ref, last_owner_signal_ms, interval_ms) do
@@ -1099,6 +1136,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp emit_stream_delta(state_key, owner, ref, chunk_type, text) do
     update_stream_state(state_key, fn
       %State{} = current_state ->
+        current_state = append_stream_delta(current_state, chunk_type, text)
+
         {next_state, _} =
           emit_event(current_state, owner, ref, :llm_delta, %{chunk_type: chunk_type, delta: text})
 
@@ -1110,6 +1149,16 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
     :ok
   end
+
+  defp append_stream_delta(%State{} = state, :content, text) when is_binary(text) do
+    %{state | streaming_text: state.streaming_text <> text, updated_at_ms: now_ms()}
+  end
+
+  defp append_stream_delta(%State{} = state, :thinking, text) when is_binary(text) do
+    %{state | streaming_thinking: state.streaming_thinking <> text, updated_at_ms: now_ms()}
+  end
+
+  defp append_stream_delta(%State{} = state, _chunk_type, _text), do: state
 
   defp stream_state_key(ref), do: {__MODULE__, :stream_state, ref}
   defp stream_signal_key(ref), do: {__MODULE__, :stream_signal, ref}

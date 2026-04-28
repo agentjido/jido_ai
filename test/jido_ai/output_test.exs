@@ -36,6 +36,19 @@ defmodule Jido.AI.OutputTest do
     assert parsed == %{category: :billing, confidence: 0.91, summary: "Refund request"}
   end
 
+  test "parses fenced JSON text" do
+    {:ok, output} = Output.new(schema: @schema)
+
+    assert {:ok, parsed} =
+             Output.parse(output, """
+             ```JSON
+             {"category":"account","confidence":0.82,"summary":"Password reset"}
+             ```
+             """)
+
+    assert parsed.category == :account
+  end
+
   test "applies Zoi defaults and returns structured output validation errors" do
     {:ok, output} = Output.new(schema: @schema)
 
@@ -67,5 +80,22 @@ defmodule Jido.AI.OutputTest do
     assert prompt =~ "Structured output:"
     assert prompt =~ "Return the final answer as a single JSON object"
     assert prompt =~ "category"
+  end
+
+  test "appends structured output instructions to string-key system messages" do
+    {:ok, output} = Output.new(schema: @schema)
+
+    messages =
+      [%{"role" => "system", "content" => "Base prompt"}, %{"role" => "user", "content" => "Classify this"}]
+      |> Output.apply_instructions(output)
+
+    assert [%{"role" => "system", "content" => prompt}, %{"role" => "user"}] = messages
+    assert prompt =~ "Base prompt"
+    assert prompt =~ "Structured output:"
+  end
+
+  test "redacts sensitive keys in metadata previews" do
+    assert Output.raw_preview(%{api_key: "secret", nested: %{token: "hidden"}, ok: "visible"}) =~ "[REDACTED]"
+    refute Output.raw_preview(%{api_key: "secret"}) =~ "secret"
   end
 end
