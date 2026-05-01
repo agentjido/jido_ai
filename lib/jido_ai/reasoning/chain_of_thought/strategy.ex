@@ -479,7 +479,9 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
             base_state
           end
 
-        signal = Signal.LLMDelta.new!(%{call_id: llm_call_id || "", delta: delta, chunk_type: chunk_type})
+        signal =
+          Signal.LLMDelta.new!(llm_delta_signal_data(event, request_id, run_id, llm_call_id, delta, chunk_type))
+
         {updated, [signal]}
 
       :llm_completed ->
@@ -604,6 +606,20 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
   defp event_field(map, key, default \\ nil) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
   end
+
+  defp llm_delta_signal_data(event, request_id, run_id, llm_call_id, delta, chunk_type) do
+    %{
+      call_id: llm_call_id || "",
+      delta: delta,
+      chunk_type: chunk_type
+    }
+    |> maybe_put(:seq, event_field(event, :seq))
+    |> maybe_put(:run_id, run_id)
+    |> maybe_put(:request_id, request_id)
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp normalize_event_map(event) when is_map(event), do: event
 
