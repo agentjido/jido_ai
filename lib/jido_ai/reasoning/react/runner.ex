@@ -19,6 +19,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   @cleanup_wait_ms 25
   @stream_control_wait_ms 10
+  @openai_websocket_session_key {__MODULE__, :openai_websocket_session}
 
   # Injected as a user message when the agent repeats the exact same tool
   # calls with identical arguments on consecutive iterations.
@@ -148,6 +149,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
         {_failed_state, _token} = emit_checkpoint(failed_state, owner, ref, config, :terminal)
         send(owner, {:react_runner, ref, :done})
+    after
+      close_openai_websocket_session()
     end
   end
 
@@ -340,7 +343,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
          {:ok, messages} <- normalize_request_messages(request),
          {:ok, tools} <- normalize_request_tools(request),
          llm_opts <- sync_tools_in_llm_opts(config, request.llm_opts, tools) do
-      {:ok, %{messages: messages, llm_opts: llm_opts, tools: tools}}
+      {:ok, %{messages: messages, llm_opts: maybe_put_openai_websocket_session(config, llm_opts), tools: tools}}
     end
   end
 
@@ -519,6 +522,86 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp normalize_provider_options(_options), do: []
+
+  defp maybe_put_openai_websocket_session(%Config{} = config, llm_opts) when is_list(llm_opts) do
+    provider_options = llm_opts |> Keyword.get(:provider_options, []) |> normalize_provider_options()
+
+    if reuse_openai_websocket?(config, provider_options) and is_nil(provider_options[:openai_websocket_session]) do
+      case openai_websocket_session(config, llm_opts) do
+        session when is_pid(session) ->
+          Keyword.put(llm_opts, :provider_options, Keyword.put(provider_options, :openai_websocket_session, session))
+
+        _ ->
+          llm_opts
+      end
+    else
+      llm_opts
+    end
+  end
+
+  defp reuse_openai_websocket?(%Config{} = config, provider_options) do
+    openai_responses_websocket_model?(config.model) and truthy?(provider_options[:openai_reuse_websocket]) and
+      provider_options[:openai_stream_transport] in [:websocket, "websocket"]
+  end
+
+  defp openai_responses_websocket_model?(model) when is_map(model) do
+    Map.get(model, :provider) in [:openai, :openai_codex]
+  end
+
+  defp openai_responses_websocket_model?(model) when is_binary(model) do
+    String.starts_with?(model, ["openai:", "openai_codex:"])
+  end
+
+  defp openai_responses_websocket_model?(_model), do: false
+
+  defp truthy?(value), do: value in [true, "true", 1, "1"]
+
+  defp openai_websocket_session(%Config{} = config, llm_opts) do
+    case Process.get(@openai_websocket_session_key) do
+      session when is_pid(session) ->
+        session
+
+      _ ->
+        start_openai_websocket_session(config.model, llm_opts)
+    end
+  end
+
+  defp start_openai_websocket_session(model, llm_opts) do
+    module = openai_websocket_session_module(model)
+
+    with {:ok, resolved_model} <- ReqLLM.model(model),
+         true <- Code.ensure_loaded?(module),
+         true <- function_exported?(module, :start_responses_session, 2) do
+      case apply(module, :start_responses_session, [resolved_model, llm_opts]) do
+        {:ok, session} ->
+          Process.put(@openai_websocket_session_key, session)
+          session
+
+        _ ->
+          nil
+      end
+    end
+  end
+
+  defp openai_websocket_session_module(%{provider: :openai_codex}), do: ReqLLM.Providers.OpenAICodex
+  defp openai_websocket_session_module("openai_codex:" <> _model), do: ReqLLM.Providers.OpenAICodex
+  defp openai_websocket_session_module(_model), do: ReqLLM.Providers.OpenAI
+
+  defp close_openai_websocket_session do
+    case Process.delete(@openai_websocket_session_key) do
+      session when is_pid(session) ->
+        close_websocket_session(session)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp close_websocket_session(session) do
+    if Process.alive?(session), do: ReqLLM.Streaming.WebSocketSession.close(session)
+  catch
+    _, _ -> :ok
+  end
 
   defp run_tool_round(%State{} = state, owner, ref, %Config{} = config, context, tool_calls)
        when is_list(tool_calls) do
@@ -1389,8 +1472,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp invoke_stream_cancel(%{stream_cancel: cancel_fun} = state) when is_function(cancel_fun, 0) do
     _ = cancel_fun.()
     %{state | stream_cancelled?: true}
-  rescue
-    _ -> %{state | stream_cancelled?: true}
+  catch
+    _, _ -> %{state | stream_cancelled?: true}
   end
 
   defp invoke_stream_cancel(state), do: state

@@ -609,6 +609,42 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_completed))
   end
 
+  test "preserves caller-owned websocket session in OpenAI provider options" do
+    session = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
+      assert model == "openai_codex:gpt-5.5"
+
+      assert opts
+             |> Keyword.fetch!(:provider_options)
+             |> Keyword.fetch!(:openai_websocket_session) == session
+
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("WebSocket session forwarded")],
+         %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 2}},
+         model
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: "openai_codex:gpt-5.5",
+        tools: %{},
+        llm_opts: [
+          provider_options: [
+            openai_stream_transport: :websocket,
+            openai_reuse_websocket: true,
+            openai_websocket_session: session
+          ]
+        ]
+      })
+
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
   test "passes previous_response_id between streaming tool rounds for OpenAI Responses models" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
