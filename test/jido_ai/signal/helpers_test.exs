@@ -46,7 +46,7 @@ defmodule Jido.AI.Signal.HelpersTest do
                message: "boom",
                details: %{step: :list, retry: false},
                retryable?: false
-              }
+             }
     end
 
     test "normalizes details into JSON-safe values" do
