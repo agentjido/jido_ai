@@ -185,6 +185,23 @@ defmodule Jido.AI.SignalTest do
       assert signal.data.metadata == %{request_id: "req_1", run_id: "req_1", strategy: :react}
     end
 
+    test "creates partial signal with runtime ordering metadata" do
+      signal =
+        LLMDelta.new!(%{
+          call_id: "call_partial_6",
+          delta: "ordered",
+          seq: 42,
+          run_id: "run_1",
+          request_id: "req_1",
+          iteration: 3
+        })
+
+      assert signal.data.seq == 42
+      assert signal.data.run_id == "run_1"
+      assert signal.data.request_id == "req_1"
+      assert signal.data.iteration == 3
+    end
+
     test "creates multiple partial signals for streaming" do
       chunks = ["Hello", ", ", "world", "!"]
 

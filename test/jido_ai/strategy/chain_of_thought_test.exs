@@ -200,6 +200,25 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       assert state[:cot_worker_status] == :ready
     end
 
+    test "propagates runtime ordering metadata to LLMDelta signals" do
+      agent = create_agent()
+      request_id = "req_cot_delta_meta"
+
+      event = worker_event(:llm_delta, request_id, 23, %{chunk_type: :content, delta: "ordered"})
+
+      {_agent, []} =
+        ChainOfThought.cmd(agent, [instruction(:cot_worker_event, %{request_id: request_id, event: event})], %{})
+
+      assert_receive {:"$gen_cast", {:signal, signal}}
+      assert signal.type == "ai.llm.delta"
+      assert signal.data.call_id == "cot_call_req_cot_delta_meta"
+      assert signal.data.delta == "ordered"
+      assert signal.data.chunk_type == :content
+      assert signal.data.seq == 23
+      assert signal.data.run_id == request_id
+      assert signal.data.request_id == request_id
+    end
+
     test "request_failed worker event transitions to error state" do
       agent = create_agent()
 

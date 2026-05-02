@@ -36,6 +36,7 @@ Typed signal modules define payload contracts and canonical signal types:
 
 ## Lifecycle Notes
 
+- `ai.llm.delta` carries incremental model text. Runtime-backed strategies may include optional ordering and correlation fields (`seq`, `request_id`, `run_id`, `iteration`). Consumers that need exact transcript reconstruction should order deltas by `seq` within the same `call_id` when it is present; delivery order alone is not a durable ordering contract.
 - `ai.tool.started` is the public start-of-execution contract for tool-capable runtimes.
 - `ai.tool.result` is the terminal contract for both success and failure.
 - `ai.request.started`, `ai.request.completed`, and `ai.request.failed` are expected across reasoning strategies, including AoT, CoT/CoD, GoT, ReAct, ToT, and TRM.
