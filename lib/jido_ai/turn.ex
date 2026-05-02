@@ -24,7 +24,11 @@ defmodule Jido.AI.Turn do
 
   @type response_type :: :tool_calls | :final_answer
   @type tools_map :: %{String.t() => module()}
-  @type execute_opts :: [timeout: pos_integer() | nil, tools: tools_map() | [module()] | module() | nil]
+  @type execute_opts :: [
+          timeout: pos_integer() | nil,
+          tools: tools_map() | [module()] | module() | nil,
+          telemetry_metadata: map()
+        ]
   @type execute_result :: {:ok, term(), [term()]} | {:error, term(), [term()]}
   @type run_opts :: [timeout: pos_integer() | nil, tools: map() | [module()] | module() | nil]
 
@@ -179,11 +183,12 @@ defmodule Jido.AI.Turn do
   def execute(tool_name, params, context, opts \\ []) when is_binary(tool_name) do
     context = normalize_context(context)
     timeout = Keyword.get(opts, :timeout, @default_timeout)
-    exec_opts = Keyword.delete(opts, :timeout)
+    exec_opts = opts |> Keyword.delete(:timeout) |> Keyword.delete(:telemetry_metadata)
     tools = opts |> Keyword.get(:tools, %{}) |> ToolAdapter.to_action_map()
+    telemetry_context = telemetry_context(context, opts)
     start_time = System.monotonic_time()
 
-    start_execute_telemetry(tool_name, params, context)
+    start_execute_telemetry(tool_name, params, telemetry_context)
 
     result =
       case Map.fetch(tools, tool_name) do
@@ -200,7 +205,7 @@ defmodule Jido.AI.Turn do
            ), []}
       end
 
-    finalize_execute_telemetry(tool_name, result, start_time, context)
+    finalize_execute_telemetry(tool_name, result, start_time, telemetry_context)
     result
   end
 
@@ -211,13 +216,14 @@ defmodule Jido.AI.Turn do
   def execute_module(module, params, context, opts \\ []) do
     context = normalize_context(context)
     timeout = Keyword.get(opts, :timeout, @default_timeout)
-    exec_opts = Keyword.delete(opts, :timeout)
+    exec_opts = opts |> Keyword.delete(:timeout) |> Keyword.delete(:telemetry_metadata)
+    telemetry_context = telemetry_context(context, opts)
     tool_name = module.name()
     start_time = System.monotonic_time()
 
-    start_execute_telemetry(tool_name, params, context)
+    start_execute_telemetry(tool_name, params, telemetry_context)
     result = execute_internal(module, tool_name, params, context, timeout, exec_opts)
-    finalize_execute_telemetry(tool_name, result, start_time, context)
+    finalize_execute_telemetry(tool_name, result, start_time, telemetry_context)
 
     result
   end
@@ -750,6 +756,18 @@ defmodule Jido.AI.Turn do
   defp normalize_context(context) when is_map(context), do: context
   defp normalize_context(_), do: %{}
 
+  defp telemetry_context(context, opts) do
+    telemetry_metadata =
+      opts
+      |> Keyword.get(:telemetry_metadata, %{})
+      |> normalize_context()
+
+    Map.merge(context, telemetry_metadata)
+  end
+
+  defp tool_call_telemetry_metadata(""), do: nil
+  defp tool_call_telemetry_metadata(call_id), do: %{call_id: call_id, tool_call_id: call_id}
+
   defp run_single_tool(tool_call, context, tools, timeout) do
     call_id = normalize_text(extract_tool_call_id(tool_call))
     tool_name = normalize_text(extract_tool_call_name(tool_call))
@@ -758,6 +776,7 @@ defmodule Jido.AI.Turn do
     exec_opts =
       [tools: tools]
       |> maybe_add_timeout(timeout)
+      |> maybe_put_keyword(:telemetry_metadata, tool_call_telemetry_metadata(call_id))
 
     raw_result =
       case tool_name do

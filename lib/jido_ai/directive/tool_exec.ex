@@ -163,15 +163,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
              event_meta
            )
 
-           exec_context = Map.merge(context, %{call_id: call_id, tool_call_id: call_id})
-
            {result, retry_count} =
              execute_with_retries(
                task_supervisor,
                action_module,
                tool_name,
                arguments,
-               exec_context,
+               context,
                tools,
                timeout_ms,
                max_retries,
@@ -300,7 +298,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           arguments,
           context,
           tools,
-          timeout_ms
+          timeout_ms,
+          event_meta
         )
 
       case result do
@@ -326,12 +325,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
          arguments,
          context,
          tools,
-         timeout_ms
+         timeout_ms,
+         event_meta
        ) do
     if is_integer(timeout_ms) and timeout_ms > 0 do
       task =
         Task.Supervisor.async_nolink(task_supervisor, fn ->
-          execute_action(action_module, tool_name, arguments, context, tools)
+          execute_action(action_module, tool_name, arguments, context, tools, event_meta)
         end)
 
       try do
@@ -351,19 +351,21 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
         Process.demonitor(task.ref, [:flush])
       end
     else
-      execute_action(action_module, tool_name, arguments, context, tools)
+      execute_action(action_module, tool_name, arguments, context, tools, event_meta)
       |> normalize_result(tool_name)
     end
   end
 
-  defp execute_action(action_module, tool_name, arguments, context, tools) do
+  defp execute_action(action_module, tool_name, arguments, context, tools, event_meta) do
     try do
+      telemetry_metadata = turn_telemetry_metadata(event_meta)
+
       case action_module do
         nil ->
-          Turn.execute(tool_name, arguments, context, tools: tools)
+          Turn.execute(tool_name, arguments, context, tools: tools, telemetry_metadata: telemetry_metadata)
 
         module when is_atom(module) ->
-          Turn.execute_module(module, arguments, context)
+          Turn.execute_module(module, arguments, context, telemetry_metadata: telemetry_metadata)
       end
     rescue
       e ->
@@ -384,6 +386,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
            false
          ), []}
     end
+  end
+
+  defp turn_telemetry_metadata(event_meta) when is_map(event_meta) do
+    call_id = Map.get(event_meta, :tool_call_id)
+    Map.put(event_meta, :call_id, call_id)
   end
 
   defp normalize_result({:ok, result, effects}, _tool_name), do: {:ok, result, List.wrap(effects)}

@@ -27,6 +27,22 @@ defmodule Jido.AI.TurnTest do
     def run(_params, _context), do: {:error, :unsupported_operation}
   end
 
+  defmodule ContextEcho do
+    use Jido.Action,
+      name: "context_echo",
+      description: "Returns selected execution context flags",
+      schema: Zoi.object(%{})
+
+    def run(_params, context) do
+      {:ok,
+       %{
+         origin: context[:origin],
+         has_call_id: Map.has_key?(context, :call_id),
+         has_tool_call_id: Map.has_key?(context, :tool_call_id)
+       }}
+    end
+  end
+
   describe "from_response/2" do
     test "classifies final answer and extracts thinking/text content" do
       response = %{
@@ -397,6 +413,50 @@ defmodule Jido.AI.TurnTest do
       turn = %Turn{type: :final_answer, text: "done", tool_calls: []}
       assert {:ok, ^turn} = Turn.run_tools(turn, %{})
     end
+
+    test "emits per-tool telemetry id without changing action context" do
+      test_pid = self()
+      handler_id = "turn-run-tools-stop-id-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:stop_metadata, metadata})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      turn = %Turn{
+        type: :tool_calls,
+        text: "",
+        tool_calls: [
+          %{id: "tc_run_tools_1", name: "context_echo", arguments: %{}}
+        ]
+      }
+
+      context = %{
+        tools: %{ContextEcho.name() => ContextEcho},
+        observability: %{emit_telemetry?: true},
+        origin: :test
+      }
+
+      assert {:ok, updated_turn} = Turn.run_tools(turn, context)
+
+      assert [
+               %{
+                 id: "tc_run_tools_1",
+                 raw_result: {:ok, %{origin: :test, has_call_id: false, has_tool_call_id: false}, []}
+               }
+             ] = updated_turn.tool_results
+
+      assert_receive {:stop_metadata, stop_metadata}
+      assert stop_metadata.tool_call_id == "tc_run_tools_1"
+      assert stop_metadata.call_id == "tc_run_tools_1"
+    end
   end
 
   describe "tool execution telemetry" do
@@ -427,6 +487,37 @@ defmodule Jido.AI.TurnTest do
       assert is_integer(measurements.duration_ms)
       assert measurements.duration_ms >= 0
       assert is_integer(measurements.duration)
+    end
+
+    test "execute_module telemetry metadata does not change action context" do
+      test_pid = self()
+      stop_handler_id = "turn-stop-metadata-id-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          stop_handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:stop_metadata, metadata})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(stop_handler_id) end)
+
+      context = %{observability: %{emit_telemetry?: true}, origin: :test}
+
+      assert {:ok, %{origin: :test, has_call_id: false, has_tool_call_id: false}, _effects} =
+               Turn.execute_module(
+                 ContextEcho,
+                 %{},
+                 context,
+                 telemetry_metadata: %{call_id: "tc_meta_1", tool_call_id: "tc_meta_1"}
+               )
+
+      assert_receive {:stop_metadata, stop_metadata}
+      assert stop_metadata.tool_call_id == "tc_meta_1"
+      assert stop_metadata.call_id == "tc_meta_1"
     end
 
     test "execute telemetry uses tool_call_id from context" do

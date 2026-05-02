@@ -372,10 +372,12 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       supervisor = DirectiveSupport.start_task_supervisor!()
       on_exit(fn -> DirectiveSupport.stop_task_supervisor(supervisor) end)
 
-      Mimic.stub(Jido.AI.Turn, :execute_module, fn module, params, context ->
+      Mimic.stub(Jido.AI.Turn, :execute_module, fn module, params, context, opts ->
         assert module == DummyAction
         assert params == %{"value" => 7}
         assert context == %{origin: :test}
+        assert get_in(opts, [:telemetry_metadata, :tool_call_id]) == "tool_ok"
+        assert get_in(opts, [:telemetry_metadata, :call_id]) == "tool_ok"
         {:ok, %{value: 8}}
       end)
 
@@ -406,7 +408,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       supervisor = DirectiveSupport.start_task_supervisor!()
       on_exit(fn -> DirectiveSupport.stop_task_supervisor(supervisor) end)
 
-      Mimic.stub(Jido.AI.Turn, :execute_module, fn _module, _params, _context ->
+      Mimic.stub(Jido.AI.Turn, :execute_module, fn _module, _params, _context, _opts ->
         Process.sleep(50)
         {:ok, %{slow: true}}
       end)
@@ -532,7 +534,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
         end
       end)
 
-      Mimic.stub(Jido.AI.Turn, :execute_module, fn _module, _params, _context ->
+      Mimic.stub(Jido.AI.Turn, :execute_module, fn _module, _params, _context, _opts ->
         {:ok, %{value: :ok}}
       end)
 

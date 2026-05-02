@@ -61,6 +61,22 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     def run(%{a: a, b: b}, _context), do: {:ok, %{result: a + b}}
   end
 
+  defmodule ContextEchoTool do
+    use Jido.Action,
+      name: "context_echo_tool",
+      description: "returns selected execution context flags",
+      schema: Zoi.object(%{})
+
+    def run(_params, context) do
+      {:ok,
+       %{
+         marker: context[:marker],
+         has_call_id: Map.has_key?(context, :call_id),
+         has_tool_call_id: Map.has_key?(context, :tool_call_id)
+       }}
+    end
+  end
+
   defmodule SlowOrderTool do
     use Jido.Action,
       name: "slow_order_tool",
@@ -1182,6 +1198,65 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert state.status == :completed
     assert state.termination_reason == :final_answer
     assert agent.state.react_order_marker == :fast
+  end
+
+  test "keeps telemetry ids out of standalone tool action context" do
+    test_pid = self()
+    handler_id = "react-tool-execute-stop-id-#{System.unique_integer([:positive])}"
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:jido, :ai, :tool, :execute, :stop],
+        fn _event, _measurements, metadata, _config ->
+          send(test_pid, {:stop_metadata, metadata})
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      if count == 1 do
+        {:ok,
+         responses_stream_response(
+           [ReqLLM.StreamChunk.tool_call("context_echo_tool", %{}, %{id: "tc_context_echo"})],
+           %{finish_reason: :tool_calls, usage: %{input_tokens: 4, output_tokens: 2}},
+           model
+         )}
+      else
+        {:ok,
+         responses_stream_response(
+           [ReqLLM.StreamChunk.text("Done")],
+           %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 1}},
+           model
+         )}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{ContextEchoTool.name() => ContextEchoTool},
+        tool_max_retries: 0,
+        tool_retry_backoff_ms: 0
+      })
+
+    events =
+      ReAct.stream("Echo context", config, context: %{marker: :kept})
+      |> Enum.to_list()
+
+    tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_context_echo"))
+
+    assert {:ok, %{marker: :kept, has_call_id: false, has_tool_call_id: false}, _effects} =
+             tool_completed.data.result
+
+    assert_receive {:stop_metadata, stop_metadata}
+    assert stop_metadata.tool_call_id == "tc_context_echo"
+    assert stop_metadata.call_id == "tc_context_echo"
   end
 
   test "refreshes tool context state snapshot between rounds when state effects are allowed" do
