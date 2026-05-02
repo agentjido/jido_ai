@@ -660,11 +660,13 @@ defmodule Jido.AI.Turn do
 
   defp start_execute_telemetry(tool_name, params, context) do
     obs_cfg = context[:observability] || %{}
+    tool_call_id = context[:tool_call_id] || context[:call_id]
 
     metadata =
       %{
         tool_name: tool_name,
         params: Observe.sanitize_sensitive(params),
+        tool_call_id: tool_call_id,
         call_id: context[:call_id],
         request_id: context[:request_id] || context[:run_id],
         run_id: context[:run_id],
@@ -685,11 +687,13 @@ defmodule Jido.AI.Turn do
   defp stop_execute_telemetry(tool_name, result, start_time, context) do
     obs_cfg = context[:observability] || %{}
     duration_native = System.monotonic_time() - start_time
+    tool_call_id = context[:tool_call_id] || context[:call_id]
 
     metadata =
       %{
         tool_name: tool_name,
         result: result,
+        tool_call_id: tool_call_id,
         call_id: context[:call_id],
         request_id: context[:request_id] || context[:run_id],
         run_id: context[:run_id],
@@ -711,11 +715,13 @@ defmodule Jido.AI.Turn do
   defp exception_execute_telemetry(tool_name, reason, start_time, context) do
     obs_cfg = context[:observability] || %{}
     duration_native = System.monotonic_time() - start_time
+    tool_call_id = context[:tool_call_id] || context[:call_id]
 
     metadata =
       %{
         tool_name: tool_name,
         reason: reason,
+        tool_call_id: tool_call_id,
         call_id: context[:call_id],
         request_id: context[:request_id] || context[:run_id],
         run_id: context[:run_id],

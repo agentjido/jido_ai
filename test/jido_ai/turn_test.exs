@@ -428,6 +428,76 @@ defmodule Jido.AI.TurnTest do
       assert measurements.duration_ms >= 0
       assert is_integer(measurements.duration)
     end
+
+    test "execute telemetry uses tool_call_id from context" do
+      test_pid = self()
+      start_handler_id = "turn-start-id-#{System.unique_integer([:positive])}"
+      stop_handler_id = "turn-stop-id-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          start_handler_id,
+          [:jido, :ai, :tool, :execute, :start],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:start_metadata, metadata})
+          end,
+          nil
+        )
+
+      :ok =
+        :telemetry.attach(
+          stop_handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:stop_metadata, metadata})
+          end,
+          nil
+        )
+
+      on_exit(fn ->
+        :telemetry.detach(start_handler_id)
+        :telemetry.detach(stop_handler_id)
+      end)
+
+      assert {:ok, _result, _effects} =
+               Turn.execute_module(
+                 Calculator,
+                 %{operation: "add", a: 1, b: 2},
+                 %{observability: %{emit_telemetry?: true}, tool_call_id: "tc_ctx_1"}
+               )
+
+      assert_receive {:start_metadata, start_metadata}
+      assert_receive {:stop_metadata, stop_metadata}
+      assert start_metadata.tool_call_id == "tc_ctx_1"
+      assert stop_metadata.tool_call_id == "tc_ctx_1"
+    end
+
+    test "execute telemetry falls back to call_id when tool_call_id is missing" do
+      test_pid = self()
+      stop_handler_id = "turn-stop-fallback-id-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          stop_handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:stop_metadata, metadata})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(stop_handler_id) end)
+
+      assert {:ok, _result, _effects} =
+               Turn.execute_module(
+                 Calculator,
+                 %{operation: "add", a: 1, b: 2},
+                 %{observability: %{emit_telemetry?: true}, call_id: "tc_legacy_1"}
+               )
+
+      assert_receive {:stop_metadata, stop_metadata}
+      assert stop_metadata.tool_call_id == "tc_legacy_1"
+    end
   end
 
   describe "log_level propagation" do

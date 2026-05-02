@@ -779,6 +779,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp do_execute_tool_with_retries(%PendingToolCall{} = pending_call, module, %Config{} = config, context, attempt) do
     start_ms = System.monotonic_time(:millisecond)
     timeout_ms = normalize_timeout(config.tool_exec[:timeout_ms])
+    context = Map.merge(context, %{call_id: pending_call.id, tool_call_id: pending_call.id})
 
     result =
       safe_execute_module(module, pending_call.arguments, context,

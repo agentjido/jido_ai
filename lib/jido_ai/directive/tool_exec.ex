@@ -163,13 +163,15 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
              event_meta
            )
 
+           exec_context = Map.merge(context, %{call_id: call_id, tool_call_id: call_id})
+
            {result, retry_count} =
              execute_with_retries(
                task_supervisor,
                action_module,
                tool_name,
                arguments,
-               context,
+               exec_context,
                tools,
                timeout_ms,
                max_retries,
