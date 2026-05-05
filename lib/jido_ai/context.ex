@@ -96,8 +96,8 @@ defmodule Jido.AI.Context do
   @doc """
   Append a user message to the thread.
   """
-  @spec append_user(t(), String.t(), keyword()) :: t()
-  def append_user(thread, content, opts \\ []) when is_binary(content) do
+  @spec append_user(t(), String.t() | [ContentPart.t()], keyword()) :: t()
+  def append_user(thread, content, opts \\ []) when is_binary(content) or is_list(content) do
     refs = Keyword.get(opts, :refs)
     append(thread, %Entry{role: :user, content: content, refs: refs})
   end
@@ -465,10 +465,12 @@ defmodule Jido.AI.Context do
     }
   end
 
-  defp normalize_entry_content(:tool, content, _text_content) when is_list(content),
-    do: normalize_tool_content_parts(content)
+  defp normalize_entry_content(role, content, _text_content) when role in [:user, :tool] and is_list(content),
+    do: normalize_content_parts(content)
 
   defp normalize_entry_content(_role, _content, text_content), do: text_content
+
+  defp normalize_content_parts(parts), do: normalize_tool_content_parts(parts)
 
   defp normalize_tool_content_parts(parts) do
     Enum.flat_map(parts, fn

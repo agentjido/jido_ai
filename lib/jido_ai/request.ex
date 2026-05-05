@@ -61,6 +61,7 @@ defmodule Jido.AI.Request do
   """
 
   alias Jido.AI.Request.Stream, as: RequestStream
+  alias Jido.AI.Query
   alias Jido.Signal
 
   @type status :: :pending | :completed | :failed | :timeout
@@ -86,7 +87,7 @@ defmodule Jido.AI.Request do
               %{
                 id: Zoi.string(description: "Unique request identifier (UUID)"),
                 server: Zoi.any(description: "The agent server (pid, atom, or via tuple)"),
-                query: Zoi.string(description: "The original query/prompt"),
+                query: Query.schema(description: "The original query/prompt"),
                 status:
                   Zoi.enum([:pending, :completed, :failed, :timeout],
                     description: "Current request status"
@@ -180,9 +181,9 @@ defmodule Jido.AI.Request do
         source: "/ai/react/agent"
       )
   """
-  @spec create_and_send(server(), String.t(), keyword()) ::
+  @spec create_and_send(server(), String.t() | [ReqLLM.Message.ContentPart.t()], keyword()) ::
           {:ok, Handle.t()} | {:error, term()}
-  def create_and_send(server, query, opts) when is_binary(query) do
+  def create_and_send(server, query, opts) when is_binary(query) or is_list(query) do
     signal_type = Keyword.fetch!(opts, :signal_type)
     source = Keyword.fetch!(opts, :source)
     tool_context = Keyword.get(opts, :tool_context, %{})
@@ -245,9 +246,9 @@ defmodule Jido.AI.Request do
         source: "/ai/react/agent"
       )
   """
-  @spec send_and_await(server(), String.t(), keyword()) ::
+  @spec send_and_await(server(), String.t() | [ReqLLM.Message.ContentPart.t()], keyword()) ::
           {:ok, any()} | {:error, term()}
-  def send_and_await(server, query, opts) when is_binary(query) do
+  def send_and_await(server, query, opts) when is_binary(query) or is_list(query) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
 
     with {:ok, request} <- create_and_send(server, query, opts) do

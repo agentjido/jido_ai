@@ -3,6 +3,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Collect do
   Collect a terminal result from ReAct events or a checkpoint token.
   """
 
+  alias Jido.AI.Query
+
   use Jido.Action,
     name: "react_collect",
     description: "Collect terminal output from ReAct runtime events/checkpoint",
@@ -14,7 +16,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Collect do
         events: Zoi.any() |> Zoi.optional(),
         checkpoint_token: Zoi.string() |> Zoi.optional(),
         run_until_terminal?: Zoi.boolean() |> Zoi.default(true),
-        query: Zoi.string() |> Zoi.optional(),
+        query: Query.schema() |> Zoi.optional(),
         model: Zoi.any() |> Zoi.optional(),
         system_prompt: Zoi.string() |> Zoi.optional(),
         tools: Zoi.any() |> Zoi.optional(),
@@ -39,8 +41,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Collect do
         runtime_context: Zoi.map() |> Zoi.optional()
       })
 
-  alias Jido.AI.Reasoning.ReAct.Actions.Helpers
   alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.Reasoning.ReAct.Actions.Helpers
 
   @impl Jido.Action
   def run(params, context) do
