@@ -97,7 +97,7 @@ defmodule Jido.AI.Live.RequestStreamLiveTest do
     streamed_text =
       event_list
       |> Enum.filter(&(&1.kind == :llm_delta))
-      |> Enum.map_join(&to_string(&1.data[:delta] || &1.data["delta"] || ""))
+      |> Enum.map_join(&to_string(&1.data[:delta] || ""))
 
     assert String.length(streamed_text) > 0
 

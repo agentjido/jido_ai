@@ -305,8 +305,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
 
   defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
-    input_tokens = Map.get(usage, :input_tokens) || Map.get(usage, "input_tokens") || 0
-    output_tokens = Map.get(usage, :output_tokens) || Map.get(usage, "output_tokens") || 0
+    input_tokens = usage[:input_tokens] || 0
+    output_tokens = usage[:output_tokens] || 0
 
     if input_tokens > 0 or output_tokens > 0 do
       signal =

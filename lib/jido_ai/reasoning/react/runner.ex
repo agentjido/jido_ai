@@ -491,11 +491,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp extract_response_id(%ReqLLM.Response{message: %ReqLLM.Message{metadata: metadata}})
        when is_map(metadata) do
-    metadata[:response_id] || metadata["response_id"]
+    metadata[:response_id]
   end
 
   defp extract_response_id(%{message: %{metadata: metadata}}) when is_map(metadata) do
-    metadata[:response_id] || metadata["response_id"]
+    metadata[:response_id]
   end
 
   defp extract_response_id(_), do: nil
@@ -737,9 +737,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp maybe_apply_tool_guardrail_callback(tool_call, context) when is_map(context) do
-    callback =
-      Map.get(context, :__tool_guardrail_callback__) ||
-        Map.get(context, "__tool_guardrail_callback__")
+    callback = context[:__tool_guardrail_callback__]
 
     case callback do
       fun when is_function(fun, 1) -> fun.(tool_call)
@@ -1529,8 +1527,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp tool_call_signature(tool_calls) when is_list(tool_calls) do
     tool_calls
     |> Enum.map(fn tc ->
-      name = Map.get(tc, :name) || Map.get(tc, "name") || ""
-      args = Map.get(tc, :arguments) || Map.get(tc, "arguments") || ""
+      name = Map.get(tc, :name, "")
+      args = Map.get(tc, :arguments, "")
       "#{name}:#{inspect(args)}"
     end)
     |> Enum.sort()
