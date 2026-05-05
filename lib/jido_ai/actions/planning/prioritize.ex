@@ -228,7 +228,7 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
     order_section
     |> String.split("\n")
     |> Enum.map(&extract_task_from_line/1)
-    |> Enum.filter(fn t -> t != nil end)
+    |> Enum.reject(&is_nil/1)
   end
 
   defp extract_task_from_line(line) do

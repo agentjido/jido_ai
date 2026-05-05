@@ -61,7 +61,7 @@ defmodule Jido.AI.TestSupport.FakeReqLLM do
   def stream_text(model, messages, _opts) do
     prompt = extract_latest_user_prompt(messages)
     chunks = ["Stubbed ", "stream ", "for ", prompt]
-    content = Enum.join(chunks, "")
+    content = Enum.join(chunks)
 
     {:ok,
      %{
