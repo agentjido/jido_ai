@@ -43,6 +43,14 @@ defmodule Jido.AI.AgentTest do
     def run(%{query: query}, _ctx), do: {:ok, %{results: ["Found: #{query}"]}}
   end
 
+  defmodule TestSignalAction do
+    use Jido.Action,
+      name: "signal_action",
+      description: "Handles custom agent signals"
+
+    def run(params, _ctx), do: {:ok, params}
+  end
+
   defmodule TestRequestTransformer do
     def transform_request(request, _state, _config, _context), do: {:ok, request}
   end
@@ -174,6 +182,33 @@ defmodule Jido.AI.AgentTest do
       name: "agent_with_nil_prompt",
       tools: [TestCalculator],
       system_prompt: nil
+  end
+
+  defmodule AgentWithSignalRoutes do
+    use Jido.AI.Agent,
+      name: "agent_with_signal_routes",
+      tools: [TestCalculator],
+      signal_routes: [
+        {"custom.state.patch", TestSignalAction}
+      ]
+  end
+
+  defmodule AgentWithSignalRouteStaticParams do
+    use Jido.AI.Agent,
+      name: "agent_with_signal_route_static_params",
+      tools: [TestCalculator],
+      signal_routes: [
+        {"custom.static", {TestSignalAction, %{mode: :patch}}}
+      ]
+  end
+
+  defmodule AgentWithSignalRoutesFromAttribute do
+    @signal_routes [{"custom.attr.patch", TestSignalAction}]
+
+    use Jido.AI.Agent,
+      name: "agent_with_signal_routes_from_attribute",
+      tools: [TestCalculator],
+      signal_routes: @signal_routes
   end
 
   defmodule AgentWithoutDefaultMemory do
@@ -400,6 +435,48 @@ defmodule Jido.AI.AgentTest do
       config = StratState.get(AgentWithNilSystemPrompt.new(), %{})[:config]
 
       assert config.system_prompt == default_config.system_prompt
+    end
+
+    test "signal_routes option is forwarded to the base agent" do
+      expected_routes = [{"custom.state.patch", TestSignalAction}]
+
+      assert AgentWithSignalRoutes.signal_routes() == expected_routes
+      assert AgentWithSignalRoutes.signal_routes(%{agent_module: AgentWithSignalRoutes}) == expected_routes
+    end
+
+    test "signal_routes option supports static params route format" do
+      assert [{"custom.static", {TestSignalAction, %{mode: :patch}}}] =
+               AgentWithSignalRouteStaticParams.signal_routes()
+    end
+
+    test "signal_routes option supports module attributes" do
+      assert AgentWithSignalRoutesFromAttribute.signal_routes() == [
+               {"custom.attr.patch", TestSignalAction}
+             ]
+    end
+
+    test "signal_routes option is used by AgentServer routing" do
+      suffix = System.unique_integer([:positive, :monotonic])
+      registry = Module.concat(__MODULE__, :"SignalRouteRegistry#{suffix}")
+      start_supervised!({Registry, keys: :unique, name: registry})
+
+      {:ok, pid} =
+        Jido.AgentServer.start_link(
+          agent: AgentWithSignalRoutes,
+          id: "signal-route-agent-#{suffix}",
+          registry: registry
+        )
+
+      on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
+
+      signal =
+        Jido.Signal.new!("custom.state.patch", %{patched_by_signal: true}, source: "/jido_ai/agent_test")
+
+      assert {:ok, agent} = Jido.AgentServer.call(pid, signal)
+      assert agent.state.patched_by_signal == true
+
+      assert {:ok, server_state} = Jido.AgentServer.state(pid)
+      assert server_state.agent.state.patched_by_signal == true
     end
 
     test "raises when module attribute system_prompt does not resolve to a binary" do

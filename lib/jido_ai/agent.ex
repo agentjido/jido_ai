@@ -51,6 +51,8 @@ defmodule Jido.AI.Agent do
     Runtime reserves `:state` (core Jido-compatible) for tool execution snapshots.
     User-provided values for that key are overwritten per request.
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
+  - `:signal_routes` - Additional agent-level signal routes forwarded to `Jido.Agent`.
+    ReAct routes are still provided by the default strategy.
 
   ## Generated Functions
 
@@ -373,6 +375,7 @@ defmodule Jido.AI.Agent do
     # Don't extract tool_context here - it contains AST with module aliases
     # that need to be evaluated in the calling module's context
     plugins = Keyword.get(opts, :plugins, [])
+    signal_routes_ast = Keyword.get(opts, :signal_routes, [])
 
     default_plugins =
       opts
@@ -479,6 +482,7 @@ defmodule Jido.AI.Agent do
         description: unquote(description),
         tags: unquote(tags),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
+        signal_routes: unquote(signal_routes_ast),
         default_plugins: unquote(Macro.escape(default_plugins)),
         strategy: {Jido.AI.Reasoning.ReAct.Strategy, unquote(strategy_opts_ast)},
         schema: unquote(base_schema_ast)
