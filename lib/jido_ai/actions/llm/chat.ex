@@ -133,7 +133,7 @@ defmodule Jido.AI.Actions.LLM.Chat do
         duration_native = System.monotonic_time() - start_time
 
         error_metadata =
-          metadata
+          initial_metadata
           |> Map.merge(%{
             error_type: :llm_error,
             error_reason: inspect(reason)

@@ -28,6 +28,61 @@ defmodule Jido.AI.Skill.Diagnostics do
       Diagnostics.to_map(diagnostics)
   """
 
+  defmodule Warning do
+    @moduledoc """
+    Represents a single diagnostic warning.
+    """
+
+    defstruct [:type, :message, :severity, :timestamp]
+
+    @type t :: %__MODULE__{
+            type: atom(),
+            message: String.t(),
+            severity: :low | :medium | :high,
+            timestamp: DateTime.t()
+          }
+
+    @doc """
+    Creates a new warning.
+
+    ## Options
+
+    - `:severity` - One of `:low`, `:medium`, `:high` (default: `:low`)
+    """
+    @spec new(atom(), String.t(), keyword()) :: t()
+    def new(type, message, opts \\ []) do
+      severity = Keyword.get(opts, :severity, :low)
+
+      %__MODULE__{
+        type: type,
+        message: message,
+        severity: severity,
+        timestamp: DateTime.utc_now()
+      }
+    end
+
+    @doc """
+    Converts warning to a plain map.
+    """
+    @spec to_map(t()) :: map()
+    def to_map(%__MODULE__{} = warning) do
+      %{
+        type: warning.type,
+        message: warning.message,
+        severity: warning.severity,
+        timestamp: DateTime.to_iso8601(warning.timestamp)
+      }
+    end
+
+    @doc """
+    Formats warning for display.
+    """
+    @spec format(t()) :: String.t()
+    def format(%__MODULE__{} = warning) do
+      "[#{warning.severity}] #{warning.type}: #{warning.message}"
+    end
+  end
+
   defstruct warnings: [], errors: [], timestamp: nil
 
   @type t :: %__MODULE__{
@@ -151,60 +206,4 @@ defmodule Jido.AI.Skill.Diagnostics do
   end
 
   defp format_error(error), do: inspect(error)
-
-  # Warning submodule
-  defmodule Warning do
-    @moduledoc """
-    Represents a single diagnostic warning.
-    """
-
-    defstruct [:type, :message, :severity, :timestamp]
-
-    @type t :: %__MODULE__{
-            type: atom(),
-            message: String.t(),
-            severity: :low | :medium | :high,
-            timestamp: DateTime.t()
-          }
-
-    @doc """
-    Creates a new warning.
-
-    ## Options
-
-    - `:severity` - One of `:low`, `:medium`, `:high` (default: `:low`)
-    """
-    @spec new(atom(), String.t(), keyword()) :: t()
-    def new(type, message, opts \\ []) do
-      severity = Keyword.get(opts, :severity, :low)
-
-      %__MODULE__{
-        type: type,
-        message: message,
-        severity: severity,
-        timestamp: DateTime.utc_now()
-      }
-    end
-
-    @doc """
-    Converts warning to a plain map.
-    """
-    @spec to_map(t()) :: map()
-    def to_map(%__MODULE__{} = warning) do
-      %{
-        type: warning.type,
-        message: warning.message,
-        severity: warning.severity,
-        timestamp: DateTime.to_iso8601(warning.timestamp)
-      }
-    end
-
-    @doc """
-    Formats warning for display.
-    """
-    @spec format(t()) :: String.t()
-    def format(%__MODULE__{} = warning) do
-      "[#{warning.severity}] #{warning.type}: #{warning.message}"
-    end
-  end
 end
