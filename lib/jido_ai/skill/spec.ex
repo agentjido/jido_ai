@@ -8,6 +8,8 @@ defmodule Jido.AI.Skill.Spec do
   @type source :: {:module, module()} | {:file, String.t()}
   @type body_ref :: {:file, String.t()} | {:inline, String.t()} | nil
 
+  alias Jido.AI.Skill.Diagnostics
+
   @type t :: %__MODULE__{
           name: String.t(),
           description: String.t(),
@@ -20,7 +22,8 @@ defmodule Jido.AI.Skill.Spec do
           actions: [module()],
           plugins: [module()],
           vsn: String.t() | nil,
-          tags: [String.t()]
+          tags: [String.t()],
+          diagnostics: Diagnostics.t() | nil
         }
 
   defstruct [
@@ -35,6 +38,7 @@ defmodule Jido.AI.Skill.Spec do
     actions: [],
     plugins: [],
     vsn: nil,
-    tags: []
+    tags: [],
+    diagnostics: nil
   ]
 end
