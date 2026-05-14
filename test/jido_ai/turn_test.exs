@@ -1,10 +1,16 @@
 defmodule Jido.AI.TurnTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias Jido.AI.Turn
+  alias Jido.Action.Error, as: ActionError
   alias ReqLLM.Message.ContentPart
+  alias ReqLLM.ToolResult
 
   @moduletag :unit
+
+  defp decode_tool_content(content) when is_binary(content), do: Jason.decode!(content)
 
   defmodule Calculator do
     use Jido.Action,
@@ -19,6 +25,22 @@ defmodule Jido.AI.TurnTest do
 
     def run(%{operation: "add", a: a, b: b}, _context), do: {:ok, %{result: a + b}}
     def run(_params, _context), do: {:error, :unsupported_operation}
+  end
+
+  defmodule ContextEcho do
+    use Jido.Action,
+      name: "context_echo",
+      description: "Returns selected execution context flags",
+      schema: Zoi.object(%{})
+
+    def run(_params, context) do
+      {:ok,
+       %{
+         origin: context[:origin],
+         has_call_id: Map.has_key?(context, :call_id),
+         has_tool_call_id: Map.has_key?(context, :tool_call_id)
+       }}
+    end
   end
 
   describe "from_response/2" do
@@ -110,6 +132,93 @@ defmodule Jido.AI.TurnTest do
       assert turn.model == "anthropic:claude-haiku-4-5"
       assert turn.message_metadata == %{response_id: "resp_1"}
     end
+
+    test "propagates finish_reason from ReqLLM.Response for incomplete responses" do
+      response = %ReqLLM.Response{
+        id: "resp_incomplete",
+        model: "test:model",
+        context: ReqLLM.Context.new(),
+        message: ReqLLM.Context.assistant("", metadata: %{}),
+        stream?: false,
+        stream: nil,
+        usage: %{input_tokens: 5, output_tokens: 0},
+        finish_reason: :incomplete,
+        provider_meta: %{},
+        error: nil
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.text == ""
+      assert turn.finish_reason == :incomplete
+    end
+
+    test "propagates finish_reason from generic map responses" do
+      response = %{
+        message: %{content: "", tool_calls: nil},
+        finish_reason: :incomplete,
+        usage: %{input_tokens: 5, output_tokens: 0}
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.text == ""
+      assert turn.finish_reason == :incomplete
+    end
+
+    test "normalizes string finish_reason values from generic map responses" do
+      response = %{
+        message: %{content: "", tool_calls: nil},
+        finish_reason: "max_tokens",
+        usage: %{input_tokens: 5, output_tokens: 0}
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.text == ""
+      assert turn.finish_reason == :length
+    end
+
+    test "normalizes finish_reason in result maps" do
+      turn =
+        Turn.from_result_map(%{
+          type: :final_answer,
+          text: "",
+          finish_reason: "content_filter",
+          usage: %{input_tokens: 5, output_tokens: 0}
+        })
+
+      assert turn.finish_reason == :content_filter
+    end
+
+    test "finish_reason is :stop for normal successful responses" do
+      response = %{
+        message: %{content: "Hello!", tool_calls: nil},
+        finish_reason: :stop,
+        usage: %{input_tokens: 5, output_tokens: 3}
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.text == "Hello!"
+      assert turn.finish_reason == :stop
+    end
+
+    test "finish_reason defaults to nil when not present in map response" do
+      response = %{
+        message: %{content: "Hello!", tool_calls: nil},
+        usage: %{input_tokens: 5, output_tokens: 3}
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.type == :final_answer
+      assert turn.finish_reason == nil
+    end
   end
 
   describe "message projections" do
@@ -144,22 +253,61 @@ defmodule Jido.AI.TurnTest do
       assert tool_message.role == :tool
       assert tool_message.tool_call_id == "tc_1"
       assert tool_message.name == "calculator"
-      assert Turn.extract_from_content(tool_message.content) == "{\"result\":8}"
+
+      assert decode_tool_content(Turn.extract_from_content(tool_message.content)) == %{
+               "ok" => true,
+               "result" => %{"result" => 8}
+             }
     end
   end
 
   describe "format_tool_result_content/1" do
     test "formats common success and error shapes" do
-      assert Turn.format_tool_result_content({:ok, %{value: 1}}) == "{\"value\":1}"
-      assert Turn.format_tool_result_content({:error, %{message: "boom"}}) == "boom"
-      assert Turn.format_tool_result_content({:error, :badarg}) == ":badarg"
+      assert decode_tool_content(Turn.format_tool_result_content({:ok, %{value: 1}})) == %{
+               "ok" => true,
+               "result" => %{"value" => 1}
+             }
+
+      assert decode_tool_content(Turn.format_tool_result_content({:error, %{message: "boom"}})) == %{
+               "ok" => false,
+               "error" => %{
+                 "message" => "boom",
+                 "type" => "execution_error",
+                 "retryable?" => false,
+                 "details" => %{}
+               }
+             }
+
+      assert decode_tool_content(Turn.format_tool_result_content({:error, :badarg})) == %{
+               "ok" => false,
+               "error" => %{
+                 "message" => "badarg",
+                 "type" => "execution_error",
+                 "retryable?" => false,
+                 "details" => %{"reason" => "badarg"}
+               }
+             }
+    end
+
+    test "formats Jido.Action error structs without leaking struct metadata into details" do
+      error = ActionError.execution_error("boom", %{step: :list, retry: false})
+
+      assert decode_tool_content(Turn.format_tool_result_content({:error, error})) == %{
+               "ok" => false,
+               "error" => %{
+                 "message" => "boom",
+                 "type" => "execution_error",
+                 "retryable?" => false,
+                 "details" => %{"step" => "list", "retry" => false}
+               }
+             }
     end
 
     test "preserves explicit content parts alongside structured tool output" do
       image = ContentPart.image_url("https://example.com/chart.png")
 
       assert [
-               %ContentPart{type: :text, text: "{\"value\":1}"},
+               %ContentPart{type: :text, text: encoded_payload},
                %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
              ] =
                Turn.format_tool_result_content(
@@ -169,6 +317,68 @@ defmodule Jido.AI.TurnTest do
                     value: 1
                   }}
                )
+
+      assert Jason.decode!(encoded_payload) == %{
+               "ok" => true,
+               "result" => %{
+                 "output" => %{"value" => 1},
+                 "content" => [%{"type" => "image_url", "url" => "https://example.com/chart.png"}]
+               }
+             }
+    end
+
+    test "map-based file content parts with non-UTF-8 binary data are excluded from JSON payload" do
+      pdf_binary = <<0xE2, 0x28, 0xA1>>
+      file_part = ContentPart.file(pdf_binary, "test.pdf", "application/pdf")
+
+      assert [
+               %ContentPart{type: :text, text: encoded_payload},
+               %ContentPart{type: :file}
+             ] =
+               Turn.format_tool_result_content(
+                 {:ok,
+                  %{
+                    "__content_parts__" => [file_part],
+                    summary: "test result"
+                  }}
+               )
+
+      decoded = Jason.decode!(encoded_payload)
+      assert decoded["ok"] == true
+      assert decoded["result"] == %{"summary" => "test result"}
+    end
+
+    test "ToolResult file content parts with non-UTF-8 binary data are excluded from JSON payload" do
+      pdf_binary = <<0xE2, 0x28, 0xA1>>
+      file_part = ContentPart.file(pdf_binary, "test.pdf", "application/pdf")
+
+      assert [
+               %ContentPart{type: :text, text: encoded_payload},
+               %ContentPart{type: :file}
+             ] =
+               Turn.format_tool_result_content(
+                 {:ok, %ToolResult{output: %{summary: "test result"}, content: [file_part], metadata: %{}}}
+               )
+
+      assert Jason.decode!(encoded_payload) == %{
+               "ok" => true,
+               "result" => %{"summary" => "test result"}
+             }
+    end
+
+    test "bare file content-part lists with non-UTF-8 binary data omit JSON content payload" do
+      pdf_binary = <<0xE2, 0x28, 0xA1>>
+      file_part = ContentPart.file(pdf_binary, "test.pdf", "application/pdf")
+
+      assert [
+               %ContentPart{type: :text, text: encoded_payload},
+               %ContentPart{type: :file}
+             ] = Turn.format_tool_result_content({:ok, [file_part]})
+
+      assert Jason.decode!(encoded_payload) == %{
+               "ok" => true,
+               "result" => nil
+             }
     end
   end
 
@@ -190,13 +400,62 @@ defmodule Jido.AI.TurnTest do
       [tool_result] = updated_turn.tool_results
       assert tool_result.id == "tc_1"
       assert tool_result.name == "calculator"
-      assert tool_result.content == "{\"result\":8}"
+
+      assert decode_tool_content(tool_result.content) == %{
+               "ok" => true,
+               "result" => %{"result" => 8}
+             }
+
       assert tool_result.raw_result == {:ok, %{result: 8}, []}
     end
 
     test "returns original turn when no tool calls are requested" do
       turn = %Turn{type: :final_answer, text: "done", tool_calls: []}
       assert {:ok, ^turn} = Turn.run_tools(turn, %{})
+    end
+
+    test "emits per-tool telemetry id without changing action context" do
+      test_pid = self()
+      handler_id = "turn-run-tools-stop-id-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:stop_metadata, metadata})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      turn = %Turn{
+        type: :tool_calls,
+        text: "",
+        tool_calls: [
+          %{id: "tc_run_tools_1", name: "context_echo", arguments: %{}}
+        ]
+      }
+
+      context = %{
+        tools: %{ContextEcho.name() => ContextEcho},
+        observability: %{emit_telemetry?: true},
+        origin: :test
+      }
+
+      assert {:ok, updated_turn} = Turn.run_tools(turn, context)
+
+      assert [
+               %{
+                 id: "tc_run_tools_1",
+                 raw_result: {:ok, %{origin: :test, has_call_id: false, has_tool_call_id: false}, []}
+               }
+             ] = updated_turn.tool_results
+
+      assert_receive {:stop_metadata, stop_metadata}
+      assert stop_metadata.tool_call_id == "tc_run_tools_1"
+      assert stop_metadata.call_id == "tc_run_tools_1"
     end
   end
 
@@ -228,6 +487,210 @@ defmodule Jido.AI.TurnTest do
       assert is_integer(measurements.duration_ms)
       assert measurements.duration_ms >= 0
       assert is_integer(measurements.duration)
+    end
+
+    test "execute_module telemetry metadata does not change action context" do
+      test_pid = self()
+      stop_handler_id = "turn-stop-metadata-id-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          stop_handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:stop_metadata, metadata})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(stop_handler_id) end)
+
+      context = %{observability: %{emit_telemetry?: true}, origin: :test}
+
+      assert {:ok, %{origin: :test, has_call_id: false, has_tool_call_id: false}, _effects} =
+               Turn.execute_module(
+                 ContextEcho,
+                 %{},
+                 context,
+                 telemetry_metadata: %{call_id: "tc_meta_1", tool_call_id: "tc_meta_1"}
+               )
+
+      assert_receive {:stop_metadata, stop_metadata}
+      assert stop_metadata.tool_call_id == "tc_meta_1"
+      assert stop_metadata.call_id == "tc_meta_1"
+    end
+
+    test "execute telemetry uses tool_call_id from context" do
+      test_pid = self()
+      start_handler_id = "turn-start-id-#{System.unique_integer([:positive])}"
+      stop_handler_id = "turn-stop-id-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          start_handler_id,
+          [:jido, :ai, :tool, :execute, :start],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:start_metadata, metadata})
+          end,
+          nil
+        )
+
+      :ok =
+        :telemetry.attach(
+          stop_handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:stop_metadata, metadata})
+          end,
+          nil
+        )
+
+      on_exit(fn ->
+        :telemetry.detach(start_handler_id)
+        :telemetry.detach(stop_handler_id)
+      end)
+
+      assert {:ok, _result, _effects} =
+               Turn.execute_module(
+                 Calculator,
+                 %{operation: "add", a: 1, b: 2},
+                 %{observability: %{emit_telemetry?: true}, tool_call_id: "tc_ctx_1"}
+               )
+
+      assert_receive {:start_metadata, start_metadata}
+      assert_receive {:stop_metadata, stop_metadata}
+      assert start_metadata.tool_call_id == "tc_ctx_1"
+      assert stop_metadata.tool_call_id == "tc_ctx_1"
+    end
+
+    test "execute telemetry falls back to call_id when tool_call_id is missing" do
+      test_pid = self()
+      stop_handler_id = "turn-stop-fallback-id-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          stop_handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            send(test_pid, {:stop_metadata, metadata})
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(stop_handler_id) end)
+
+      assert {:ok, _result, _effects} =
+               Turn.execute_module(
+                 Calculator,
+                 %{operation: "add", a: 1, b: 2},
+                 %{observability: %{emit_telemetry?: true}, call_id: "tc_legacy_1"}
+               )
+
+      assert_receive {:stop_metadata, stop_metadata}
+      assert stop_metadata.tool_call_id == "tc_legacy_1"
+    end
+  end
+
+  describe "log_level propagation" do
+    # By default, Jido.Exec.run uses :info as its log_level threshold, which causes
+    # :notice-level "Executing ..." lines to appear on every tool call. The fix in
+    # execute_internal/6 injects the global Jido observability config so callers can
+    # control verbosity without patching Logger module levels at startup.
+
+    test "execute_module suppresses action execution logs when log_level: :warning is passed" do
+      log =
+        capture_log(fn ->
+          assert {:ok, _result, _effects} =
+                   Turn.execute_module(
+                     Calculator,
+                     %{operation: "add", a: 1, b: 2},
+                     %{},
+                     log_level: :warning
+                   )
+        end)
+
+      refute log =~ "Executing"
+    end
+
+    test "execute suppresses action execution logs when log_level: :warning is passed" do
+      tools = %{Calculator.name() => Calculator}
+
+      log =
+        capture_log(fn ->
+          assert {:ok, _result, _effects} =
+                   Turn.execute(
+                     Calculator.name(),
+                     %{"operation" => "add", "a" => 1, "b" => 2},
+                     %{},
+                     tools: tools,
+                     log_level: :warning
+                   )
+        end)
+
+      refute log =~ "Executing"
+    end
+
+    test "run_tools suppresses action execution logs when log_level: :warning is in opts" do
+      turn = %Turn{
+        type: :tool_calls,
+        text: "",
+        tool_calls: [
+          %{id: "tc_1", name: "calculator", arguments: %{"operation" => "add", "a" => 2, "b" => 3}}
+        ]
+      }
+
+      context = %{tools: %{Calculator.name() => Calculator}}
+
+      log =
+        capture_log(fn ->
+          assert {:ok, updated_turn} = Turn.run_tools(turn, context, log_level: :warning)
+          assert length(updated_turn.tool_results) == 1
+        end)
+
+      refute log =~ "Executing"
+    end
+
+    test "execute_module respects global :jido telemetry log_level config" do
+      # Temporarily override the global config to :warning and verify no Executing logs.
+      original = Application.get_env(:jido, :telemetry, [])
+
+      on_exit(fn -> Application.put_env(:jido, :telemetry, original) end)
+
+      Application.put_env(:jido, :telemetry, Keyword.put(original, :log_level, :warning))
+
+      log =
+        capture_log(fn ->
+          assert {:ok, _result, _effects} =
+                   Turn.execute_module(
+                     Calculator,
+                     %{operation: "add", a: 3, b: 4},
+                     %{}
+                   )
+        end)
+
+      refute log =~ "Executing"
+    end
+
+    test "explicit log_level opt takes precedence over global config" do
+      original = Application.get_env(:jido, :telemetry, [])
+      on_exit(fn -> Application.put_env(:jido, :telemetry, original) end)
+
+      # Set global config to :debug (would normally produce logs)
+      Application.put_env(:jido, :telemetry, Keyword.put(original, :log_level, :debug))
+
+      # Explicit :warning in opts should win
+      log =
+        capture_log(fn ->
+          assert {:ok, _result, _effects} =
+                   Turn.execute_module(
+                     Calculator,
+                     %{operation: "add", a: 1, b: 1},
+                     %{},
+                     log_level: :warning
+                   )
+        end)
+
+      refute log =~ "Executing"
     end
   end
 end

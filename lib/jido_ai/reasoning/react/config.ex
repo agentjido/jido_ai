@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   Canonical configuration for the Task-based ReAct runtime.
   """
 
-  alias Jido.AI.ModelInput
+  alias Jido.AI.Output
   alias Jido.AI.Reasoning.ReAct.RequestTransformer
   alias Jido.AI.ToolAdapter
   require Logger
@@ -60,10 +60,12 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               system_prompt: Zoi.string() |> Zoi.nullish(),
               tools: Zoi.map() |> Zoi.default(%{}),
               request_transformer: Zoi.atom() |> Zoi.nullish(),
+              pending_input_server: Zoi.any() |> Zoi.nullish(),
               max_iterations: Zoi.integer() |> Zoi.default(@default_max_iterations),
               streaming: Zoi.boolean() |> Zoi.default(true),
               stream_timeout_ms: Zoi.integer() |> Zoi.default(0),
               effect_policy: Zoi.any() |> Zoi.default(%{}),
+              output: Zoi.any() |> Zoi.nullish(),
               llm: @llm_schema,
               tool_exec: @tool_exec_schema,
               observability: @observability_schema,
@@ -87,13 +89,18 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @spec new(map() | keyword()) :: t()
   def new(opts \\ %{}) do
     opts_map = normalize_opts(opts)
-    resolved_model = opts_map |> get_opt(:model, @default_model) |> ModelInput.normalize!()
+    resolved_model = opts_map |> get_opt(:model, @default_model) |> Jido.AI.resolve_model()
     provider_opt_keys_by_string = provider_opt_keys_by_string(resolved_model)
 
     tools =
       opts_map
       |> get_opt(:tools, %{})
       |> ToolAdapter.to_action_map()
+
+    output =
+      opts_map
+      |> get_opt(:output, nil)
+      |> Output.new!()
 
     llm_timeout = get_opt(opts_map, :llm_timeout_ms, get_opt(opts_map, :timeout_ms, nil))
 
@@ -142,11 +149,13 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       system_prompt: normalize_optional_binary(get_opt(opts_map, :system_prompt, nil)),
       tools: tools,
       request_transformer: normalize_request_transformer(get_opt(opts_map, :request_transformer, nil)),
+      pending_input_server: get_opt(opts_map, :pending_input_server, nil),
       max_iterations:
         normalize_pos_integer(get_opt(opts_map, :max_iterations, @default_max_iterations), @default_max_iterations),
       streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
       stream_timeout_ms: normalize_non_neg_integer(resolve_stream_timeout_ms(opts_map), 0),
       effect_policy: get_opt(opts_map, :effect_policy, %{}),
+      output: output,
       llm: llm,
       tool_exec: tool_exec,
       observability: observability,
@@ -169,7 +178,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
     parts = [
       "v#{config.version}",
-      ModelInput.fingerprint_segment(config.model),
+      Jido.AI.model_fingerprint_segment(config.model),
       config.system_prompt || "",
       Integer.to_string(config.max_iterations),
       to_string(config.streaming),
@@ -178,7 +187,8 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       Integer.to_string(config.tool_exec.retry_backoff_ms),
       Integer.to_string(config.tool_exec.concurrency),
       Enum.join(tool_names, ","),
-      RequestTransformer.fingerprint(config.request_transformer)
+      RequestTransformer.fingerprint(config.request_transformer),
+      Output.fingerprint(config.output)
     ]
 
     :crypto.hash(:sha256, Enum.join(parts, "|"))
@@ -415,7 +425,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     end
   end
 
-  defp provider_opt_keys_by_string(model_spec), do: ModelInput.provider_opt_keys(model_spec)
+  defp provider_opt_keys_by_string(model_spec), do: Jido.AI.provider_opt_keys(model_spec)
 
   defp maybe_merge_llm_opts(opts, llm_opts) when is_list(llm_opts) do
     if llm_opts == [] do

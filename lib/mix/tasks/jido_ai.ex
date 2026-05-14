@@ -577,24 +577,41 @@ defmodule Mix.Tasks.JidoAi do
 
   def handle_trace_event([:jido, :ai, :llm, event], measurements, metadata, _config)
       when event in [:start, :delta, :complete, :error] do
-    call_id = metadata[:llm_call_id] || "?"
     model = metadata[:model] || "?"
     duration = measurements[:duration_ms] || 0
 
+    details =
+      [
+        if(is_binary(metadata[:llm_call_id]), do: "call=#{metadata[:llm_call_id]}"),
+        if(metadata[:origin], do: "origin=#{metadata[:origin]}"),
+        if(metadata[:operation], do: "op=#{metadata[:operation]}")
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+
     IO.puts(
-      "    #{@colors.cyan}LLM #{String.upcase(to_string(event))}#{@colors.reset} call=#{call_id} model=#{model} #{@colors.dim}(#{duration}ms)#{@colors.reset}"
+      "    #{@colors.cyan}LLM #{String.upcase(to_string(event))}#{@colors.reset} #{Enum.join(Enum.reject([details, "model=#{model}"], &(&1 in [nil, ""])), " ")} #{@colors.dim}(#{duration}ms)#{@colors.reset}"
     )
   end
 
   def handle_trace_event([:jido, :ai, :tool, event], measurements, metadata, _config)
       when event in [:start, :retry, :complete, :error, :timeout] do
     tool = metadata[:tool_name] || "?"
-    call_id = metadata[:tool_call_id] || "?"
     duration = measurements[:duration_ms] || 0
     retries = measurements[:retry_count] || 0
 
+    details =
+      [
+        tool,
+        if(is_binary(metadata[:tool_call_id]), do: "call=#{metadata[:tool_call_id]}"),
+        if(metadata[:origin], do: "origin=#{metadata[:origin]}"),
+        if(metadata[:strategy], do: "strategy=#{metadata[:strategy]}")
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+
     IO.puts(
-      "    #{@colors.yellow}TOOL #{String.upcase(to_string(event))}#{@colors.reset} #{tool} call=#{call_id} #{@colors.dim}(#{duration}ms, retries=#{retries})#{@colors.reset}"
+      "    #{@colors.yellow}TOOL #{String.upcase(to_string(event))}#{@colors.reset} #{details} #{@colors.dim}(#{duration}ms, retries=#{retries})#{@colors.reset}"
     )
   end
 

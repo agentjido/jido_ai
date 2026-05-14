@@ -15,7 +15,8 @@ defmodule Jido.AI.Directive.EmitToolError do
             %{
               id: Zoi.string(description: "Tool call ID from LLM (ReqLLM.ToolCall.id)"),
               tool_name: Zoi.string(description: "Name of the tool that could not be resolved"),
-              error: Zoi.any(description: "Error tuple or map describing the failure")
+              error: Zoi.any(description: "Error tuple or map describing the failure"),
+              metadata: Zoi.map(description: "Optional correlation metadata") |> Zoi.default(%{})
             },
             coerce: true
           )
@@ -45,6 +46,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
   """
 
   alias Jido.AI.Signal
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
 
   def exec(directive, _input_signal, state) do
     %{
@@ -54,13 +56,17 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
     } = directive
 
     agent_pid = self()
+    metadata = Map.get(directive, :metadata, %{})
 
     # Emit the error result synchronously (no task needed)
     signal =
       Signal.ToolResult.new!(%{
         call_id: call_id,
         tool_name: tool_name,
-        result: {:error, error}
+        result:
+          {:error,
+           SignalHelpers.normalize_error(error, :execution_error, "Tool execution failed", %{tool_name: tool_name}), []},
+        metadata: metadata
       })
 
     Jido.AgentServer.cast(agent_pid, signal)

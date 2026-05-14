@@ -107,6 +107,17 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
       assert meta.duration_ms == 123
     end
 
+    test "await inspects non-binary failure results for CLI-safe output" do
+      status = AdapterTestSupport.status(result: {:provider_error, :overloaded}, snapshot_status: :failure)
+
+      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+
+      assert {:ok, %{answer: "{:provider_error, :overloaded}", meta: meta}} =
+               CoTAdapter.await(self(), 100, %{})
+
+      assert meta.status == :failure
+    end
+
     test "fixture CoT agent resolves to CoT adapter" do
       assert {:ok, CoTAdapter} = Adapter.resolve(nil, FixtureCoTAgent)
     end

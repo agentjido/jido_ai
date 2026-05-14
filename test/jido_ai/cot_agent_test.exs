@@ -142,11 +142,33 @@ defmodule Jido.AI.CoTAgentTest do
       assert updated_agent.state.completed == true
     end
 
+    test "on_after_cmd stores request meta from completed strategy snapshots" do
+      agent =
+        TestCoTAgent.new()
+        |> Request.start_request("req_done", "query")
+        |> with_completed_strategy("final reasoning", %{usage: %{input_tokens: 5, output_tokens: 2}})
+
+      {:ok, updated_agent, directives} =
+        TestCoTAgent.on_after_cmd(
+          agent,
+          {:cot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+
+      assert get_in(updated_agent.state, [:requests, "req_done", :meta]) == %{
+               usage: %{input_tokens: 5, output_tokens: 2}
+             }
+    end
+
     test "on_after_cmd marks pending request failed on terminal failure snapshot" do
+      raw_error = %{type: :provider_error, status: 503, message: "busy"}
+
       agent =
         TestCoTAgent.new()
         |> Request.start_request("req_failed", "query")
-        |> with_failed_strategy("provider overloaded")
+        |> with_failed_strategy("req_failed", raw_error)
 
       {:ok, updated_agent, directives} =
         TestCoTAgent.on_after_cmd(
@@ -157,6 +179,10 @@ defmodule Jido.AI.CoTAgentTest do
 
       assert directives == [:noop]
       assert get_in(updated_agent.state, [:requests, "req_failed", :status]) == :failed
+      assert match?({:failed, _, ^raw_error}, get_in(updated_agent.state, [:requests, "req_failed", :error]))
+
+      assert updated_agent.state.last_result == inspect(raw_error)
+      assert updated_agent.state.completed == true
     end
   end
 
@@ -183,13 +209,33 @@ defmodule Jido.AI.CoTAgentTest do
     end
   end
 
-  defp with_completed_strategy(agent, result) do
-    strategy_state = %{status: :completed, result: result, steps: []}
+  defp with_completed_strategy(agent, result, overrides \\ %{}) do
+    strategy_state = Map.merge(%{status: :completed, result: result, steps: []}, overrides)
     put_in(agent.state[:__strategy__], strategy_state)
   end
 
-  defp with_failed_strategy(agent, result) do
-    strategy_state = %{status: :error, result: result, termination_reason: :provider_error}
-    put_in(agent.state[:__strategy__], strategy_state)
+  defp with_failed_strategy(agent, request_id, result) do
+    failed_event = %{
+      id: "evt_failed",
+      seq: 1,
+      at_ms: 1_700_000_000_100,
+      run_id: request_id,
+      request_id: request_id,
+      iteration: 1,
+      kind: :request_failed,
+      llm_call_id: "cot_call_1",
+      tool_call_id: nil,
+      tool_name: nil,
+      data: %{error: result}
+    }
+
+    {agent, _directives} =
+      ChainOfThought.cmd(
+        agent,
+        [%Jido.Instruction{action: :cot_worker_event, params: %{request_id: request_id, event: failed_event}}],
+        %{}
+      )
+
+    agent
   end
 end

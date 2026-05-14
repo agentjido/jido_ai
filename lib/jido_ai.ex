@@ -28,6 +28,18 @@ defmodule Jido.AI do
           capable: "provider:your-capable-model"
         }
 
+  Aliases can also point at full direct model specs when you need richer
+  ReqLLM metadata, such as a custom OpenAI-compatible `base_url`:
+
+      config :jido_ai,
+        model_aliases: %{
+          capable: %{
+            provider: :openai,
+            id: "moonshotai.kimi-k2.5",
+            base_url: "https://proxy.example.com/v1"
+          }
+        }
+
   A broad list of provider/model IDs is available at: https://llmdb.xyz
 
   ## LLM Defaults
@@ -69,15 +81,18 @@ defmodule Jido.AI do
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.ModelAliases
+  alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
   alias ReqLLM.Context
 
   @type model_alias ::
           :fast | :capable | :thinking | :reasoning | :planning | :image | :embedding | atom()
   @type model_spec :: String.t()
+  @type model_input :: model_alias() | ReqLLM.model_input()
   @type llm_kind :: :text | :object | :stream
   @type llm_generation_opts :: %{
-          optional(:model) => model_alias() | model_spec(),
+          optional(:model) => model_input(),
           optional(:system_prompt) => String.t(),
           optional(:max_tokens) => non_neg_integer(),
           optional(:temperature) => number(),
@@ -116,7 +131,7 @@ defmodule Jido.AI do
       iex> is_binary(aliases[:fast])
       true
   """
-  @spec model_aliases() :: %{model_alias() => model_spec()}
+  @spec model_aliases() :: %{model_alias() => ReqLLM.model_input()}
   def model_aliases, do: ModelAliases.model_aliases()
 
   @doc """
@@ -152,19 +167,20 @@ defmodule Jido.AI do
   end
 
   @doc """
-  Resolves a model alias or passes through a direct model spec.
+  Resolves a model alias or passes through a direct ReqLLM model input.
 
   Model aliases are atoms like `:fast`, `:capable`, `:reasoning` that map
-  to full ReqLLM model specifications. Direct model specs (strings) are
-  passed through unchanged.
+  to full ReqLLM model specifications. Both alias values and direct model
+  inputs may be strings, ReqLLM tuples, inline maps, or `%LLMDB.Model{}`
+  structs.
 
   ## Arguments
 
-    * `model` - Either a model alias atom or a direct model spec string
+    * `model` - Either a model alias atom or a direct ReqLLM model input
 
   ## Returns
 
-    A ReqLLM model specification string.
+    A resolved ReqLLM model input.
 
   ## Examples
 
@@ -174,11 +190,75 @@ defmodule Jido.AI do
       iex> Jido.AI.resolve_model("openai:gpt-4")
       "openai:gpt-4"
 
+      iex> Jido.AI.resolve_model({:openai, "gpt-4.1", []})
+      {:openai, "gpt-4.1", []}
+
       Jido.AI.resolve_model(:unknown_alias)
       # raises ArgumentError with unknown alias message
   """
-  @spec resolve_model(model_alias() | model_spec()) :: model_spec()
-  def resolve_model(model), do: ModelAliases.resolve_model(model)
+  @spec resolve_model(model_input()) :: ReqLLM.model_input()
+  def resolve_model(model) when is_atom(model), do: ModelAliases.resolve_model(model)
+  def resolve_model(model) when is_binary(model), do: model
+  def resolve_model(%LLMDB.Model{} = model), do: model
+  def resolve_model(model) when is_map(model) and not is_struct(model), do: model
+
+  def resolve_model({provider, model_id, provider_opts} = model)
+      when is_atom(provider) and is_binary(model_id) and is_list(provider_opts),
+      do: model
+
+  def resolve_model({provider, provider_opts} = model)
+      when is_atom(provider) and is_list(provider_opts),
+      do: model
+
+  def resolve_model(model) do
+    raise ArgumentError,
+          "invalid model input #{inspect(model)}. " <>
+            "Expected a model alias, string spec, ReqLLM tuple spec, inline model map, or %LLMDB.Model{}."
+  end
+
+  @doc """
+  Returns a stable human-readable label for a model input.
+  """
+  @spec model_label(model_input()) :: String.t()
+  def model_label(model) when is_atom(model), do: model |> resolve_model() |> model_label()
+  def model_label(model) when is_binary(model), do: model
+
+  def model_label(model) do
+    case ReqLLM.model(model) do
+      {:ok, %LLMDB.Model{} = normalized} -> format_model_label(normalized)
+      _ -> inspect(model)
+    end
+  end
+
+  @doc false
+  @spec model_fingerprint_segment(model_input()) :: String.t()
+  def model_fingerprint_segment(model) when is_atom(model),
+    do: model |> resolve_model() |> model_fingerprint_segment()
+
+  def model_fingerprint_segment(model) when is_binary(model), do: model
+
+  def model_fingerprint_segment(model) do
+    model
+    |> fingerprint_model_term()
+    |> :erlang.term_to_binary([:deterministic])
+    |> Base.url_encode64(padding: false)
+  end
+
+  @doc false
+  @spec provider_opt_keys(model_input()) :: %{optional(String.t()) => atom()}
+  def provider_opt_keys(model) do
+    with {:ok, %LLMDB.Model{} = normalized} <- ReqLLM.model(resolve_model(model)),
+         provider when is_atom(provider) <- Map.get(normalized, :provider),
+         {:ok, provider_mod} <- ReqLLM.provider(provider),
+         true <- function_exported?(provider_mod, :provider_schema, 0) do
+      provider_mod.provider_schema().schema
+      |> Keyword.keys()
+      |> Enum.map(&{Atom.to_string(&1), &1})
+      |> Map.new()
+    else
+      _ -> %{}
+    end
+  end
 
   @doc """
   Thin facade for `ReqLLM.Generation.generate_text/3`.
@@ -329,6 +409,24 @@ defmodule Jido.AI do
   end
 
   @doc """
+  Compatibility wrapper for `Jido.AI.Reasoning.ReAct.steer/3`.
+  """
+  @spec steer(GenServer.server(), String.t(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def steer(agent_server, content, opts \\ []) when is_binary(content) do
+    ReAct.steer(agent_server, content, Keyword.put_new(opts, :source, "/jido/ai"))
+  end
+
+  @doc """
+  Compatibility wrapper for `Jido.AI.Reasoning.ReAct.inject/3`.
+  """
+  @spec inject(GenServer.server(), String.t(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def inject(agent_server, content, opts \\ []) when is_binary(content) do
+    ReAct.inject(agent_server, content, Keyword.put_new(opts, :source, "/jido/ai"))
+  end
+
+  @doc """
   Lists all currently registered tools for an agent.
 
   Can be called with either an agent struct or an agent server (PID/name).
@@ -391,6 +489,41 @@ defmodule Jido.AI do
   # in on_before_cmd / on_after_cmd hooks) where a GenServer.call to self()
   # would deadlock.
   # ============================================================================
+
+  @doc """
+  Registers a tool module directly on an agent struct.
+
+  This is the struct-level equivalent of `register_tool/3` — safe to call from
+  within the agent process or an action already executing inside the agent. It
+  updates the ReAct strategy tool config without sending an `AgentServer` signal.
+
+  ## Options
+
+    * `:validate` - Validate tool implements required callbacks (default: true)
+  """
+  @spec register_tool_direct(Jido.Agent.t(), module(), keyword()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def register_tool_direct(%Jido.Agent{} = agent, tool_module, opts \\ [])
+      when is_atom(tool_module) do
+    if Keyword.get(opts, :validate, true) do
+      with :ok <- validate_tool_module(tool_module) do
+        {:ok, add_tool_to_agent(agent, tool_module)}
+      end
+    else
+      {:ok, add_tool_to_agent(agent, tool_module)}
+    end
+  end
+
+  @doc """
+  Unregisters a tool directly from an agent struct by tool name.
+
+  This is the struct-level equivalent of `unregister_tool/3` — safe to call from
+  within the agent process or an action already executing inside the agent.
+  """
+  @spec unregister_tool_direct(Jido.Agent.t(), String.t()) :: {:ok, Jido.Agent.t()}
+  def unregister_tool_direct(%Jido.Agent{} = agent, tool_name) when is_binary(tool_name) do
+    {:ok, remove_tool_from_agent(agent, tool_name)}
+  end
 
   @doc """
   Sets the system prompt directly on the agent's strategy config.
@@ -489,6 +622,35 @@ defmodule Jido.AI do
     end
   end
 
+  defp add_tool_to_agent(%Jido.Agent{} = agent, tool_module) do
+    update_agent_tools(agent, fn tools ->
+      [tool_module | tools] |> Enum.uniq()
+    end)
+  end
+
+  defp remove_tool_from_agent(%Jido.Agent{} = agent, tool_name) do
+    update_agent_tools(agent, fn tools ->
+      Enum.reject(tools, fn module -> module.name() == tool_name end)
+    end)
+  end
+
+  defp update_agent_tools(%Jido.Agent{} = agent, update_fun) when is_function(update_fun, 1) do
+    StratState.update(agent, fn strat_state ->
+      config = Map.get(strat_state, :config, %{})
+      tools = config |> Map.get(:tools, []) |> List.wrap() |> update_fun.()
+      actions_by_name = Map.new(tools, &{&1.name(), &1})
+      reqllm_tools = ToolAdapter.from_actions(tools)
+
+      updated_config =
+        config
+        |> Map.put(:tools, tools)
+        |> Map.put(:actions_by_name, actions_by_name)
+        |> Map.put(:reqllm_tools, reqllm_tools)
+
+      Map.put(strat_state, :config, updated_config)
+    end)
+  end
+
   # Private helpers for tool management
 
   defp do_register_tool(agent_server, tool_module, opts) do
@@ -567,4 +729,28 @@ defmodule Jido.AI do
 
   defp merge_extra_opts(opts, extra_opts) when is_list(extra_opts), do: Keyword.merge(opts, extra_opts)
   defp merge_extra_opts(opts, _), do: opts
+
+  defp format_model_label(%LLMDB.Model{} = model) do
+    provider = Map.get(model, :provider)
+    model_id = Map.get(model, :model) || Map.get(model, :id)
+
+    cond do
+      is_atom(provider) and is_binary(model_id) -> "#{provider}:#{model_id}"
+      is_binary(provider) and is_binary(model_id) -> "#{provider}:#{model_id}"
+      true -> inspect(model)
+    end
+  end
+
+  defp fingerprint_model_term(model) do
+    case ReqLLM.model(model) do
+      {:ok, %LLMDB.Model{} = normalized} ->
+        normalized
+        |> Map.from_struct()
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+        |> Map.new()
+
+      _ ->
+        model
+    end
+  end
 end

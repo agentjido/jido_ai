@@ -3,6 +3,7 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
 
   alias Jido.AI.CLI.Adapter
   alias Mix.Tasks.JidoAi, as: JidoAiTask
+  import ExUnit.CaptureIO
 
   describe "option_parser_config/0" do
     test "accepts documented long and short options" do
@@ -127,6 +128,44 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
 
       assert :ok = JidoAiTask.validate_invocation([], %{stdin: true})
       assert :ok = JidoAiTask.validate_invocation(["hello"], %{stdin: false})
+    end
+  end
+
+  describe "handle_trace_event/4" do
+    test "formats action-origin llm telemetry without placeholder call ids" do
+      output =
+        capture_io(fn ->
+          JidoAiTask.handle_trace_event(
+            [:jido, :ai, :llm, :complete],
+            %{duration_ms: 12},
+            %{model: "anthropic:claude-haiku-4-5", origin: :action, operation: :embed},
+            nil
+          )
+        end)
+
+      assert output =~ "LLM COMPLETE"
+      assert output =~ "origin=action"
+      assert output =~ "op=embed"
+      assert output =~ "model=anthropic:claude-haiku-4-5"
+      refute output =~ "call=?"
+    end
+
+    test "formats tool telemetry without placeholder tool call ids" do
+      output =
+        capture_io(fn ->
+          JidoAiTask.handle_trace_event(
+            [:jido, :ai, :tool, :start],
+            %{duration_ms: 0, retry_count: 0},
+            %{tool_name: "calculator", origin: :worker_runtime, strategy: :tot},
+            nil
+          )
+        end)
+
+      assert output =~ "TOOL START"
+      assert output =~ "calculator"
+      assert output =~ "origin=worker_runtime"
+      assert output =~ "strategy=tot"
+      refute output =~ "call=?"
     end
   end
 end

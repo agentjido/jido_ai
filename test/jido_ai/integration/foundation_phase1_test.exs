@@ -12,7 +12,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
   Tests use mocked response data and do not make actual API calls.
   """
 
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Jido.AI.Directive.{Helpers, LLMEmbed, LLMGenerate, LLMStream}
   alias Jido.AI.Signal.{EmbedResult, LLMResponse, RequestFailed, ToolResult, Usage}

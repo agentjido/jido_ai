@@ -91,6 +91,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
   alias Jido.AI.{Observe, Signal, Turn}
   alias Jido.AI.Directive.Helpers
+  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -120,6 +121,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       tool_call_id: nil,
       tool_name: nil,
       model: model,
+      origin: :directive,
+      operation: :stream_text,
+      strategy: metadata[:strategy],
       termination_reason: nil,
       error_type: nil
     }
@@ -190,7 +194,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
                )
            end
 
-           signal = Signal.LLMResponse.new!(%{call_id: call_id, result: result})
+           signal =
+             Signal.LLMResponse.new!(%{
+               call_id: call_id,
+               result: SignalHelpers.normalize_result(result, :llm_error, "LLM request failed"),
+               metadata: signal_metadata(event_meta)
+             })
+
            Jido.AgentServer.cast(agent_pid, signal)
          end) do
       {:ok, _pid} ->
@@ -200,7 +210,15 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
         signal =
           Signal.LLMResponse.new!(%{
             call_id: call_id,
-            result: {:error, %{type: :supervisor, reason: inspect(reason), error_type: :unknown}}
+            result:
+              {:error,
+               SignalHelpers.error_envelope(
+                 :supervisor,
+                 "Failed to start LLM stream task",
+                 %{reason: inspect(reason)},
+                 true
+               ), []},
+            metadata: signal_metadata(event_meta)
           })
 
         Jido.AgentServer.cast(agent_pid, signal)
@@ -308,6 +326,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     end
 
     :ok
+  end
+
+  defp signal_metadata(event_meta) do
+    event_meta
+    |> Map.take([:request_id, :run_id, :iteration, :origin, :operation, :strategy])
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do

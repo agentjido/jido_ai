@@ -44,16 +44,20 @@ defmodule Jido.AI.Agent do
   - `:req_http_options` - Base Req HTTP options passed through to ReqLLM calls
   - `:llm_opts` - Additional ReqLLM generation options merged into ReAct LLM calls
   - `:request_transformer` - Module implementing per-turn ReAct request shaping
+  - `:output` - Structured final-output config with an object-shaped Zoi or JSON Schema
   - `:tool_context` - Context map passed to all tool executions (e.g., `%{actor: user, domain: MyDomain}`).
     Must be literal data only — module aliases, atoms, strings, numbers, lists, and maps are permitted.
     Function calls, module attributes (`@attr`), and pinned variables (`^var`) raise `CompileError`.
     Runtime reserves `:state` (core Jido-compatible) for tool execution snapshots.
     User-provided values for that key are overwritten per request.
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
+  - `:signal_routes` - Additional agent-level signal routes forwarded to `Jido.Agent`.
+    ReAct routes are still provided by the default strategy.
 
   ## Generated Functions
 
   - `ask/2,3` - Async: sends query, returns `{:ok, %Request{}}` for later awaiting
+  - `ask_stream/2,3` - Async: sends query and returns a request handle plus runtime event stream
   - `await/1,2` - Awaits a specific request's completion
   - `ask_sync/2,3` - Sync convenience: sends query and waits for result
   - `on_before_cmd/2` - Captures request in state before processing
@@ -246,6 +250,40 @@ defmodule Jido.AI.Agent do
   defp system_prompt_line({_, meta, _}, default), do: Keyword.get(meta, :line, default)
   defp system_prompt_line(_, default), do: default
 
+  @doc false
+  def expand_and_eval_output_option(nil, _caller_env, _file, _line), do: nil
+
+  def expand_and_eval_output_option(value, caller_env, file, line) do
+    value =
+      case value do
+        value when is_map(value) ->
+          value
+
+        value when is_list(value) ->
+          value
+          |> Macro.prewalk(fn
+            {:__aliases__, _, _} = alias_node -> Macro.expand(alias_node, caller_env)
+            other -> other
+          end)
+          |> Code.eval_quoted([], caller_env)
+          |> elem(0)
+
+        other ->
+          other
+          |> Macro.expand(caller_env)
+          |> Code.eval_quoted([], caller_env)
+          |> elem(0)
+      end
+
+    Jido.AI.Output.new!(value)
+  rescue
+    error ->
+      raise CompileError,
+        description: "invalid output option: #{Exception.message(error)}",
+        file: file,
+        line: line
+  end
+
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
@@ -313,6 +351,11 @@ defmodule Jido.AI.Agent do
       |> Keyword.get(:llm_opts, [])
       |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
 
+    output =
+      opts
+      |> Keyword.get(:output)
+      |> __MODULE__.expand_and_eval_output_option(__CALLER__, __CALLER__.file, __CALLER__.line)
+
     request_transformer =
       case Keyword.get(opts, :request_transformer) do
         {:__aliases__, _, _} = alias_ast -> Macro.expand(alias_ast, __CALLER__)
@@ -332,6 +375,12 @@ defmodule Jido.AI.Agent do
     # Don't extract tool_context here - it contains AST with module aliases
     # that need to be evaluated in the calling module's context
     plugins = Keyword.get(opts, :plugins, [])
+    signal_routes_ast = Keyword.get(opts, :signal_routes, [])
+
+    default_plugins =
+      opts
+      |> Keyword.get(:default_plugins)
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
 
     ai_plugins = Jido.AI.PluginStack.default_plugins(opts)
 
@@ -375,6 +424,7 @@ defmodule Jido.AI.Agent do
         observability: observability,
         req_http_options: req_http_options,
         llm_opts: llm_opts,
+        output: output,
         request_transformer: request_transformer,
         agent_effect_policy: agent_effect_policy,
         strategy_effect_policy: strategy_effect_policy,
@@ -432,6 +482,8 @@ defmodule Jido.AI.Agent do
         description: unquote(description),
         tags: unquote(tags),
         plugins: unquote(ai_plugins) ++ unquote(plugins),
+        signal_routes: unquote(signal_routes_ast),
+        default_plugins: unquote(Macro.escape(default_plugins)),
         strategy: {Jido.AI.Reasoning.ReAct.Strategy, unquote(strategy_opts_ast)},
         schema: unquote(base_schema_ast)
 
@@ -456,6 +508,8 @@ defmodule Jido.AI.Agent do
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+      - `:output` - `:raw` to bypass structured output or a request-scoped output config
+      - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
       - `:timeout` - Timeout for the underlying cast (default: no timeout)
 
       ## Examples
@@ -475,6 +529,37 @@ defmodule Jido.AI.Agent do
             source: "/ai/react/agent"
           )
         )
+      end
+
+      @doc """
+      Send a query and return both its request handle and runtime event stream.
+
+      The returned enumerable yields canonical ReAct runtime events until the
+      request emits `:request_completed`, `:request_failed`, or
+      `:request_cancelled`.
+
+      ## Options
+
+      Accepts the same options as `ask/3`, plus:
+      - `:stream_event_timeout_ms` - Optional mailbox receive timeout for the enumerable
+
+      ## Examples
+
+          {:ok, %{request: request, events: events}} = MyAgent.ask_stream(pid, "What is 2+2?")
+          for event <- events do
+            IO.inspect(event.kind)
+          end
+          {:ok, result} = MyAgent.await(request)
+
+      """
+      @spec ask_stream(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, %{request: Request.Handle.t(), events: Enumerable.t()}} | {:error, term()}
+      def ask_stream(pid, query, opts \\ []) when is_binary(query) do
+        opts = Keyword.put(opts, :stream_to, {:pid, self()})
+
+        with {:ok, request} <- ask(pid, query, opts) do
+          {:ok, %{request: request, events: Request.Stream.events(request, opts)}}
+        end
       end
 
       @doc """
@@ -518,6 +603,7 @@ defmodule Jido.AI.Agent do
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+      - `:output` - `:raw` to bypass structured output or a request-scoped output config
       - `:timeout` - How long to wait in milliseconds (default: 30_000)
 
       ## Examples
@@ -545,7 +631,7 @@ defmodule Jido.AI.Agent do
         action = {:ai_react_start, params}
 
         # Use RequestTracking to manage state
-        agent = Request.start_request(agent, request_id, query)
+        agent = Request.start_request(agent, request_id, query, stream_to: params[:stream_to])
 
         {:ok, agent, action}
       end
@@ -555,8 +641,12 @@ defmodule Jido.AI.Agent do
             agent,
             {:ai_react_request_error, %{request_id: request_id, reason: reason, message: message}} = action
           ) do
-        agent = Request.fail_request(agent, request_id, {:rejected, reason, message})
-        emit_request_failed_signal(agent, request_id, {:rejected, reason, message})
+        error = {:rejected, reason, message}
+        stream_to = get_in(agent.state, [:requests, request_id, :stream_to])
+
+        agent = Request.fail_request(agent, request_id, error)
+        Request.Stream.send_event(stream_to, Request.Stream.failed_event(request_id, error, reason: reason))
+        emit_request_failed_signal(agent, request_id, error)
         {:ok, agent, action}
       end
 
@@ -580,12 +670,7 @@ defmodule Jido.AI.Agent do
             case snap.status do
               :success ->
                 agent =
-                  Request.complete_request(
-                    agent,
-                    request_id,
-                    snap.result,
-                    meta: jido_ai_agent_thinking_meta(snap)
-                  )
+                  Request.complete_request_from_snapshot(agent, request_id, snap)
 
                 emit_request_completed_signal(agent, request_id, snap.result)
                 agent
@@ -637,19 +722,14 @@ defmodule Jido.AI.Agent do
               agent
               | state:
                   Map.merge(agent.state, %{
-                    last_answer: snap.result || "",
+                    last_answer: Request.compat_text(snap.result),
                     completed: true
                   })
             }
 
             case snap.status do
               :success ->
-                Request.complete_request(
-                  agent,
-                  request_id,
-                  snap.result,
-                  meta: jido_ai_agent_thinking_meta(snap)
-                )
+                Request.complete_request_from_snapshot(agent, request_id, snap)
 
               :failure ->
                 reason = failure_reason(snap)
@@ -673,25 +753,6 @@ defmodule Jido.AI.Agent do
       end
 
       defp request_pending?(_agent, _request_id), do: false
-
-      # Use a prefixed helper name to avoid collisions with user-defined functions
-      # in modules that `use Jido.AI.Agent`.
-      defp jido_ai_agent_thinking_meta(snap) do
-        details = snap.details
-        meta = %{}
-
-        meta =
-          if details[:thinking_trace] && details[:thinking_trace] != [],
-            do: Map.put(meta, :thinking_trace, details[:thinking_trace]),
-            else: meta
-
-        meta =
-          if details[:streaming_thinking] && details[:streaming_thinking] != "",
-            do: Map.put(meta, :last_thinking, details[:streaming_thinking]),
-            else: meta
-
-        meta
-      end
 
       defp failure_reason(snap) do
         details = snap.details
@@ -773,7 +834,42 @@ defmodule Jido.AI.Agent do
         Jido.AgentServer.cast(pid, signal)
       end
 
-      defoverridable on_before_cmd: 2, on_after_cmd: 3, ask: 3, await: 2, ask_sync: 3, cancel: 2
+      @doc """
+      Steer an active request with additional user-visible input.
+
+      Returns `{:ok, agent}` when the input is queued for the current ReAct run
+      or `{:error, {:rejected, reason}}` when no eligible run is active.
+
+      Queued input is best-effort. If the run terminates before the runtime
+      drains the queue into conversation state, the queued input is dropped.
+      """
+      @spec steer(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, Jido.Agent.t()} | {:error, term()}
+      def steer(pid, content, opts \\ []) when is_binary(content) do
+        Jido.AI.Reasoning.ReAct.steer(pid, content, Keyword.put_new(opts, :source, "/ai/react/agent"))
+      end
+
+      @doc """
+      Inject user-visible input into an active request.
+
+      This is intended for programmatic or inter-agent steering and follows the
+      same queuing rules as `steer/3`.
+      """
+      @spec inject(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+              {:ok, Jido.Agent.t()} | {:error, term()}
+      def inject(pid, content, opts \\ []) when is_binary(content) do
+        Jido.AI.Reasoning.ReAct.inject(pid, content, Keyword.put_new(opts, :source, "/ai/react/agent"))
+      end
+
+      defoverridable on_before_cmd: 2,
+                     on_after_cmd: 3,
+                     ask: 3,
+                     ask_stream: 3,
+                     await: 2,
+                     ask_sync: 3,
+                     cancel: 2,
+                     steer: 3,
+                     inject: 3
     end
   end
 

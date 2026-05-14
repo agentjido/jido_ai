@@ -7,7 +7,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.ChainOfThought.Machine
-  alias Jido.AI.Reasoning.ReAct.Event
+  alias Jido.AI.Runtime.Event
 
   @default_model :fast
 
@@ -540,7 +540,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))
   end
 
-  defp resolve_model_spec(model), do: Jido.AI.ModelInput.normalize!(model)
+  defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp normalize_blank(""), do: nil
   defp normalize_blank(value), do: value

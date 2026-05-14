@@ -13,6 +13,7 @@ defmodule Jido.AI.Signal.ToolStarted do
         type: :any,
         required: false,
         doc: "Arguments passed to the tool (may be redacted for sensitive data)"
-      ]
+      ],
+      metadata: [type: :map, default: %{}, doc: "Optional request/run/origin metadata for correlation"]
     ]
 end

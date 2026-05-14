@@ -78,6 +78,23 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert updated_agent.state.plugin_fallback_executed == true
       assert is_list(directives)
     end
+
+    test "ReAct strategy lazy-loads plugin-routed action modules before fallback execution" do
+      agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      {agent, _} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
+
+      action = compile_lazy_plugin_action()
+      assert :code.is_loaded(action) == false
+
+      instruction = %Jido.Instruction{action: action, params: %{}}
+
+      {updated_agent, directives} =
+        ReAct.cmd(agent, [instruction], %{agent_module: __MODULE__, strategy_opts: [tools: [TestCalculator]]})
+
+      assert updated_agent.state.plugin_fallback_executed == true
+      assert is_list(directives)
+      assert match?({:file, _}, :code.is_loaded(action))
+    end
   end
 
   describe "Direct Action Execution" do
@@ -221,5 +238,42 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
       assert function_exported?(helpers, :execute_action_instruction, 3)
       assert function_exported?(helpers, :action_context, 2)
     end
+  end
+
+  defp compile_lazy_plugin_action do
+    suffix = System.unique_integer([:positive, :monotonic])
+    module = Module.concat(__MODULE__, :"LazyPluginFallbackAction#{suffix}")
+    dir = Path.join(System.tmp_dir!(), "jido_ai_lazy_plugin_action_#{suffix}")
+    beam_file = Path.join(dir, Atom.to_string(module) <> ".beam")
+
+    File.mkdir_p!(dir)
+
+    source = """
+    defmodule #{inspect(module)} do
+      use Jido.Action,
+        name: "lazy_plugin_fallback_action_#{suffix}",
+        description: "sets a marker in state"
+
+      def run(_params, _context), do: {:ok, %{plugin_fallback_executed: true}}
+    end
+    """
+
+    [{^module, beam}] = Code.compile_string(source)
+    File.write!(beam_file, beam)
+    Code.prepend_path(dir)
+    unload_module(module)
+
+    on_exit(fn ->
+      unload_module(module)
+      Code.delete_path(dir)
+      File.rm_rf!(dir)
+    end)
+
+    module
+  end
+
+  defp unload_module(module) do
+    :code.delete(module)
+    :code.purge(module)
   end
 end

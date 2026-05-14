@@ -60,6 +60,7 @@ defmodule Jido.AI.Request do
   ```
   """
 
+  alias Jido.AI.Request.Stream, as: RequestStream
   alias Jido.Signal
 
   @type status :: :pending | :completed | :failed | :timeout
@@ -160,7 +161,10 @@ defmodule Jido.AI.Request do
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+  - `:output` - `:raw` to bypass agent-level structured output for this request,
+    or a request-scoped structured output config
   - `:extra_refs` - Map of additional refs to attach to the user message thread entry
+  - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
   - `:request_id` - Custom request ID (auto-generated if not provided)
 
   ## Signal Options (required)
@@ -188,32 +192,38 @@ defmodule Jido.AI.Request do
     stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms))
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
+    output = Keyword.get(opts, :output)
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
+    stream_to = Keyword.get(opts, :stream_to)
 
-    # Build payload with request_id for correlation.
-    # Keep both query and prompt keys so all strategy start schemas can consume it.
-    extra_refs = Keyword.get(opts, :extra_refs, %{})
+    with {:ok, stream_to} <- RequestStream.normalize_sink(stream_to) do
+      # Build payload with request_id for correlation.
+      # Keep both query and prompt keys so all strategy start schemas can consume it.
+      extra_refs = Keyword.get(opts, :extra_refs, %{})
 
-    payload =
-      %{query: query, prompt: query, request_id: request_id}
-      |> maybe_add_tool_context(tool_context)
-      |> maybe_add_tools(tools)
-      |> maybe_add_allowed_tools(allowed_tools)
-      |> maybe_add_request_transformer(request_transformer)
-      |> maybe_add_stream_timeout_ms(stream_timeout_ms)
-      |> maybe_add_req_http_options(req_http_options)
-      |> maybe_add_llm_opts(llm_opts)
-      |> maybe_add_extra_refs(extra_refs)
+      payload =
+        %{query: query, prompt: query, request_id: request_id}
+        |> maybe_add_tool_context(tool_context)
+        |> maybe_add_tools(tools)
+        |> maybe_add_allowed_tools(allowed_tools)
+        |> maybe_add_request_transformer(request_transformer)
+        |> maybe_add_stream_timeout_ms(stream_timeout_ms)
+        |> maybe_add_req_http_options(req_http_options)
+        |> maybe_add_llm_opts(llm_opts)
+        |> maybe_add_output(output)
+        |> maybe_add_extra_refs(extra_refs)
+        |> maybe_add_stream_to(stream_to)
 
-    signal = Signal.new!(signal_type, payload, source: source)
+      signal = Signal.new!(signal_type, payload, source: source)
 
-    case Jido.AgentServer.cast(server, signal) do
-      :ok ->
-        request = Handle.new(request_id, server, query)
-        {:ok, request}
+      case Jido.AgentServer.cast(server, signal) do
+        :ok ->
+          request = Handle.new(request_id, server, query)
+          {:ok, request}
 
-      {:error, _} = error ->
-        error
+        {:error, _} = error ->
+          error
+      end
     end
   end
 
@@ -358,16 +368,20 @@ defmodule Jido.AI.Request do
         {:ok, agent, action}
       end
   """
-  @spec start_request(struct(), String.t(), String.t()) :: struct()
-  def start_request(agent, request_id, query) when is_binary(request_id) and is_binary(query) do
-    request = %{
-      query: query,
-      status: :pending,
-      result: nil,
-      error: nil,
-      inserted_at: System.system_time(:millisecond),
-      completed_at: nil
-    }
+  @spec start_request(struct(), String.t(), String.t(), keyword()) :: struct()
+  def start_request(agent, request_id, query, opts \\ []) when is_binary(request_id) and is_binary(query) do
+    stream_to = Keyword.get(opts, :stream_to)
+
+    request =
+      %{
+        query: query,
+        status: :pending,
+        result: nil,
+        error: nil,
+        inserted_at: System.system_time(:millisecond),
+        completed_at: nil
+      }
+      |> maybe_add_request_stream_to(stream_to)
 
     state =
       agent.state
@@ -400,6 +414,7 @@ defmodule Jido.AI.Request do
   @spec complete_request(struct(), String.t(), any(), keyword()) :: struct()
   def complete_request(agent, request_id, result, opts \\ []) do
     meta = Keyword.get(opts, :meta, %{})
+    last_answer = Keyword.get(opts, :last_answer, compat_text(result))
 
     state =
       agent.state
@@ -411,10 +426,18 @@ defmodule Jido.AI.Request do
           %{req | status: :completed, result: result, completed_at: System.system_time(:millisecond)}
           |> Map.put(:meta, Map.merge(Map.get(req, :meta, %{}), meta))
       end)
-      |> Map.put(:last_answer, result || "")
+      |> Map.put(:last_answer, last_answer)
       |> Map.put(:completed, true)
 
     %{agent | state: state}
+  end
+
+  @doc false
+  @spec complete_request_from_snapshot(struct(), String.t(), map(), keyword()) :: struct()
+  def complete_request_from_snapshot(agent, request_id, %{result: result} = snapshot, opts \\ []) do
+    explicit_meta = Keyword.get(opts, :meta, %{})
+    meta = Map.merge(snapshot_request_meta(snapshot), normalize_meta(explicit_meta))
+    complete_request(agent, request_id, result, Keyword.put(opts, :meta, meta))
   end
 
   @doc """
@@ -538,6 +561,9 @@ defmodule Jido.AI.Request do
 
   defp maybe_add_stream_timeout_ms(payload, _), do: payload
 
+  defp maybe_add_stream_to(payload, nil), do: payload
+  defp maybe_add_stream_to(payload, stream_to), do: Map.put(payload, :stream_to, stream_to)
+
   defp maybe_add_tools(payload, nil), do: payload
   defp maybe_add_tools(payload, tools), do: Map.put(payload, :tools, tools)
 
@@ -569,11 +595,106 @@ defmodule Jido.AI.Request do
 
   defp maybe_add_llm_opts(payload, _), do: payload
 
+  defp maybe_add_output(payload, nil), do: payload
+  defp maybe_add_output(payload, output), do: Map.put(payload, :output, output)
+
   defp maybe_add_extra_refs(payload, refs) when is_map(refs) and map_size(refs) > 0 do
     Map.put(payload, :extra_refs, refs)
   end
 
   defp maybe_add_extra_refs(payload, _), do: payload
+
+  defp maybe_add_request_stream_to(request, nil), do: request
+  defp maybe_add_request_stream_to(request, stream_to), do: Map.put(request, :stream_to, stream_to)
+
+  @doc false
+  @spec compat_text(any()) :: String.t()
+  def compat_text(nil), do: ""
+  def compat_text(value) when is_binary(value), do: value
+  def compat_text(value), do: inspect(value)
+
+  defp snapshot_request_meta(%{details: details} = snapshot) when is_map(details) do
+    %{}
+    |> maybe_put_meta(:usage, extract_snapshot_usage(details, snapshot))
+    |> maybe_put_meta(:output, normalize_non_empty_map(get_field(details, :output)))
+    |> maybe_put_meta(:reasoning_details, extract_snapshot_reasoning_details(details, snapshot))
+    |> maybe_put_meta(:thinking_trace, normalize_non_empty_list(get_field(details, :thinking_trace)))
+    |> maybe_put_meta(:last_thinking, extract_snapshot_last_thinking(details, snapshot))
+  end
+
+  defp snapshot_request_meta(_), do: %{}
+
+  defp extract_snapshot_usage(details, snapshot) do
+    details
+    |> get_field(:usage, get_field(snapshot, :result) |> get_field(:usage))
+    |> normalize_non_empty_map()
+  end
+
+  defp extract_snapshot_reasoning_details(details, snapshot) do
+    details
+    |> get_field(:reasoning_details, get_field(snapshot, :result) |> get_field(:reasoning_details))
+    |> normalize_non_empty_list()
+    |> case do
+      nil -> extract_reasoning_details_from_conversation(get_field(details, :conversation))
+      reasoning_details -> reasoning_details
+    end
+  end
+
+  defp extract_snapshot_last_thinking(details, snapshot) do
+    details
+    |> get_field(:streaming_thinking, get_field(details, :last_thinking))
+    |> normalize_non_empty_string()
+    |> case do
+      nil ->
+        snapshot
+        |> get_field(:result)
+        |> get_field(:thinking_content)
+        |> normalize_non_empty_string()
+
+      last_thinking ->
+        last_thinking
+    end
+  end
+
+  defp extract_reasoning_details_from_conversation(conversation) when is_list(conversation) do
+    conversation
+    |> Enum.reverse()
+    |> Enum.find_value(fn message ->
+      case get_field(message, :role) do
+        role when role in [:assistant, "assistant"] ->
+          message
+          |> get_field(:reasoning_details)
+          |> normalize_non_empty_list()
+
+        _ ->
+          nil
+      end
+    end)
+  end
+
+  defp extract_reasoning_details_from_conversation(_), do: nil
+
+  defp maybe_put_meta(meta, _key, nil), do: meta
+  defp maybe_put_meta(meta, key, value), do: Map.put(meta, key, value)
+
+  defp normalize_meta(meta) when is_map(meta), do: meta
+  defp normalize_meta(_), do: %{}
+
+  defp normalize_non_empty_map(map) when is_map(map) and map != %{}, do: map
+  defp normalize_non_empty_map(_), do: nil
+
+  defp normalize_non_empty_list(list) when is_list(list) and list != [], do: list
+  defp normalize_non_empty_list(_), do: nil
+
+  defp normalize_non_empty_string(value) when is_binary(value) and value != "", do: value
+  defp normalize_non_empty_string(_), do: nil
+
+  defp get_field(map, key, default \\ nil)
+  defp get_field(map, _key, default) when not is_map(map), do: default
+
+  defp get_field(map, key, default) when is_atom(key) do
+    Map.get(map, key, Map.get(map, Atom.to_string(key), default))
+  end
 
   defp normalize_await_result({:ok, %{status: :completed, result: result}}) do
     {:ok, result}

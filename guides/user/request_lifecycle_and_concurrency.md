@@ -26,11 +26,73 @@ Per-request ReAct overrides travel with the request handle:
   )
 ```
 
+## Request Event Streaming
+
+Use `ask_stream/3` when a caller needs canonical ReAct runtime events while a
+request is running:
+
+```elixir
+{:ok, %{request: request, events: events}} =
+  MyApp.MathAgent.ask_stream(pid, "Show your work")
+
+for event <- events do
+  IO.inspect({event.kind, event.data})
+end
+
+{:ok, result} = MyApp.MathAgent.await(request)
+```
+
+The enumerable yields `%Jido.AI.Reasoning.ReAct.Event{}` values and stops after
+`:request_completed`, `:request_failed`, or `:request_cancelled`.
+
+For mailbox-oriented integrations, pass a pid sink directly:
+
+```elixir
+{:ok, request} =
+  MyApp.MathAgent.ask(pid, "Show your work",
+    stream_to: {:pid, self()}
+  )
+
+receive do
+  {:jido_ai_request_event, %Jido.AI.Reasoning.ReAct.Event{} = event} ->
+    IO.inspect(event.kind)
+end
+```
+
+Pid sinks are request-scoped and use the calling process mailbox. They do not
+provide backpressure; keep handlers lightweight and always consume terminal
+events so request streams close cleanly.
+
+## Steering An Active ReAct Run
+
+`ask/await` remains the request API. Mid-run steering is a separate control path:
+
+```elixir
+{:ok, request} = MyApp.MathAgent.ask(pid, "Work on Q1")
+
+{:ok, _agent} = MyApp.MathAgent.steer(pid, "Actually prioritize Q2", expected_request_id: request.id)
+
+{:ok, result} = MyApp.MathAgent.await(request)
+```
+
+Use:
+- `steer/3` for user-visible follow-up input on an active ReAct run
+- `inject/3` for programmatic or inter-agent input on an active ReAct run
+
+Important:
+- neither `steer/3` nor `inject/3` creates a new request handle
+- both reject idle agents with `{:error, {:rejected, :idle}}`
+- successful `steer/3` / `inject/3` means the input was queued, not durably persisted
+- if the run terminates before the runtime drains queued input, that input is dropped
+- normal concurrent `ask/3` calls still busy-reject while a ReAct run is active
+- steering is ReAct-only in this version
+
 ## Runtime Contract Map
 
 - `Jido.AI.Request`: request handles, `await/2`, `await_many/2`, request state lifecycle.
 - `Jido.AI.Turn`: normalized response shape and assistant/tool message projection.
 - `Jido.AI.Context`: conversation accumulation and context projection for follow-up turns.
+- `Jido.AI.steer/3` and `Jido.AI.inject/3`: explicit control path for active ReAct runs.
 - Directive runtime behavior is documented in [Directives Runtime Contract](../developer/directives_runtime_contract.md).
 
 ## Await Many
@@ -82,6 +144,23 @@ Each request is tracked with status like:
 - `:timeout`
 
 Agent state keeps request maps and compatibility fields (`last_query`, `last_answer`, etc.).
+
+Completed request records may also include normalized `meta` when the runtime
+has it available. Common keys are:
+- `:usage`
+- `:reasoning_details`
+- `:thinking_trace`
+- `:last_thinking`
+
+Example:
+
+```elixir
+{:ok, status} = Jido.AgentServer.status(pid)
+request_id = status.raw_state[:last_request_id]
+
+get_in(status.raw_state, [:requests, request_id, :meta])
+# %{usage: %{...}, reasoning_details: [...], ...}
+```
 
 ## Failure Mode: Timeouts Under Load
 

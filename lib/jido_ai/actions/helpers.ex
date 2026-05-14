@@ -37,12 +37,12 @@ defmodule Jido.AI.Actions.Helpers do
 
   ## Parameters
 
-  * `model` - Model alias (atom) or direct spec (string)
+  * `model` - Model alias or direct ReqLLM model input
   * `default` - Default model alias to use if model is nil
 
   ## Returns
 
-  * `{:ok, model_spec}` - Successfully resolved model
+  * `{:ok, model_input}` - Successfully resolved model
   * `{:error, :invalid_model_format}` - Invalid model format
 
   ## Examples
@@ -57,9 +57,12 @@ defmodule Jido.AI.Actions.Helpers do
       {:ok, "openai:gpt-4"}
   """
   def resolve_model(nil, default), do: {:ok, Jido.AI.resolve_model(default)}
-  def resolve_model(model, _default) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
-  def resolve_model(model, _default) when is_binary(model), do: {:ok, model}
-  def resolve_model(_model, _default), do: {:error, :invalid_model_format}
+
+  def resolve_model(model, _default) do
+    {:ok, Jido.AI.resolve_model(model)}
+  rescue
+    ArgumentError -> {:error, :invalid_model_format}
+  end
 
   @doc """
   Builds ReqLLM options from action parameters.
@@ -257,4 +260,35 @@ defmodule Jido.AI.Actions.Helpers do
   def format_result({:error, error}) do
     {:error, sanitize_error(error)}
   end
+
+  @doc """
+  Builds canonical AI telemetry metadata for direct LLM actions.
+  """
+  def telemetry_metadata(context, operation, extra \\ %{})
+      when is_map(context) and is_atom(operation) and is_map(extra) do
+    %{
+      agent_id: context[:agent_id],
+      request_id: context[:request_id],
+      run_id: context[:run_id] || context[:request_id],
+      iteration: context[:iteration],
+      llm_call_id: nil,
+      tool_call_id: nil,
+      tool_name: nil,
+      model: context[:model] || context[:default_model],
+      origin: :action,
+      operation: operation,
+      strategy: context[:strategy],
+      termination_reason: nil,
+      error_type: nil
+    }
+    |> Map.merge(extra)
+  end
+
+  @doc """
+  Classifies action-layer LLM errors into canonical telemetry error types.
+  """
+  def telemetry_error_type(%{type: type}) when is_atom(type), do: type
+  def telemetry_error_type(%{code: type}) when is_atom(type), do: type
+  def telemetry_error_type(:timeout), do: :timeout
+  def telemetry_error_type(_), do: :llm_error
 end

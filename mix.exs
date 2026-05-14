@@ -1,7 +1,7 @@
 defmodule JidoAi.MixProject do
   use Mix.Project
 
-  @version "2.0.0"
+  @version "2.1.0"
   @source_url "https://github.com/agentjido/jido_ai"
   @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
   def project do
@@ -30,7 +30,7 @@ defmodule JidoAi.MixProject do
 
       # Dialyzer
       dialyzer: [
-        plt_add_apps: [:mix]
+        plt_add_apps: [:mix, :llm_db]
       ]
     ]
   end
@@ -59,9 +59,9 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.1"},
-      {:jido_action, "~> 2.1"},
-      {:req_llm, "~> 1.7"},
+      {:jido, "~> 2.2"},
+      {:jido_action, "~> 2.2"},
+      {:req_llm, "~> 1.9"},
 
       # Runtime
       {:fsmx, "~> 0.5"},
@@ -75,7 +75,6 @@ defmodule JidoAi.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.22", only: [:dev], runtime: false},
-      {:dotenvy, "~> 1.1"},
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18", only: [:dev, :test]},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
@@ -187,6 +186,7 @@ defmodule JidoAi.MixProject do
           Jido.AI.Agent,
           Jido.AI.Request,
           Jido.AI.Request.Handle,
+          Jido.AI.Output,
           Jido.AI.Thread,
           Jido.AI.Thread.Entry,
           Jido.AI.Turn,

@@ -30,6 +30,7 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
   - `req_http_options`: `[]`
   - `llm_opts`: `[]`
   - `request_transformer`: `nil`
+  - `signal_routes`: `[]` (agent-level routes merged with ReAct strategy routes)
 
 - CoT (`Jido.AI.CoTAgent`)
   - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)

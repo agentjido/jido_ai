@@ -1,46 +1,45 @@
 defmodule Jido.AI.Reasoning.ReAct.Event do
   @moduledoc """
-  Canonical event envelope emitted by the ReAct runtime.
+  Compatibility wrapper around `Jido.AI.Runtime.Event`.
+
+  ReAct still emits `:input_injected` as a runtime-only compatibility event even
+  though that kind is not part of the generic shared runtime event contract.
   """
 
-  @kind_values [
-    :request_started,
-    :llm_started,
-    :llm_delta,
-    :llm_completed,
-    :tool_started,
-    :tool_completed,
-    :checkpoint,
-    :request_completed,
-    :request_failed,
-    :request_cancelled
+  alias Jido.AI.Runtime.Event, as: RuntimeEvent
+
+  @kind_values RuntimeEvent.kinds() ++ [:input_injected]
+
+  @type t :: %__MODULE__{
+          id: String.t(),
+          seq: integer(),
+          at_ms: integer(),
+          run_id: String.t(),
+          request_id: String.t(),
+          iteration: integer(),
+          kind: atom(),
+          llm_call_id: String.t() | nil,
+          tool_call_id: String.t() | nil,
+          tool_name: String.t() | nil,
+          data: map()
+        }
+
+  defstruct [
+    :id,
+    :seq,
+    :at_ms,
+    :run_id,
+    :request_id,
+    :iteration,
+    :kind,
+    :llm_call_id,
+    :tool_call_id,
+    :tool_name,
+    data: %{}
   ]
 
-  @schema Zoi.struct(
-            __MODULE__,
-            %{
-              id: Zoi.string(),
-              seq: Zoi.integer(),
-              at_ms: Zoi.integer(),
-              run_id: Zoi.string(),
-              request_id: Zoi.string(),
-              iteration: Zoi.integer(),
-              kind: Zoi.atom(),
-              llm_call_id: Zoi.string() |> Zoi.nullish(),
-              tool_call_id: Zoi.string() |> Zoi.nullish(),
-              tool_name: Zoi.string() |> Zoi.nullish(),
-              data: Zoi.map() |> Zoi.default(%{})
-            },
-            coerce: true
-          )
-
-  @type t :: unquote(Zoi.type_spec(@schema))
-
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
-
   @doc false
-  def schema, do: @schema
+  def schema, do: RuntimeEvent.schema()
 
   @spec kinds() :: [atom()]
   def kinds, do: @kind_values
@@ -59,15 +58,21 @@ defmodule Jido.AI.Reasoning.ReAct.Event do
       |> Map.put_new(:tool_name, nil)
       |> Map.put_new(:data, %{})
 
-    case Zoi.parse(@schema, attrs) do
-      {:ok, event} -> validate_kind!(event)
-      {:error, errors} -> raise ArgumentError, "invalid ReAct event: #{inspect(errors)}"
+    case Zoi.parse(RuntimeEvent.schema(), attrs) do
+      {:ok, event} ->
+        event
+        |> validate_kind!()
+        |> Map.from_struct()
+        |> then(&struct!(__MODULE__, &1))
+
+      {:error, errors} ->
+        raise ArgumentError, "invalid ReAct event: #{inspect(errors)}"
     end
   end
 
-  defp validate_kind!(%__MODULE__{kind: kind} = event) when kind in @kind_values, do: event
+  defp validate_kind!(%RuntimeEvent{kind: kind} = event) when kind in @kind_values, do: event
 
-  defp validate_kind!(%__MODULE__{kind: kind}) do
+  defp validate_kind!(%RuntimeEvent{kind: kind}) do
     raise ArgumentError,
           "invalid ReAct event kind: #{inspect(kind)}; expected one of #{inspect(@kind_values)}"
   end

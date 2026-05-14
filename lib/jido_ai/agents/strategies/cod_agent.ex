@@ -217,7 +217,7 @@ defmodule Jido.AI.CoDAgent do
         if request_pending?(agent, request_id) and snap.done? do
           case snap.status do
             :success ->
-              Request.complete_request(agent, request_id, snap.result)
+              Request.complete_request_from_snapshot(agent, request_id, snap)
 
             :failure ->
               Request.fail_request(agent, request_id, failure_reason(snap))
@@ -241,7 +241,7 @@ defmodule Jido.AI.CoDAgent do
 
       defp maybe_put_last_result(agent, snap) do
         if snap.done? do
-          put_in(agent.state[:last_result], snap.result || "")
+          put_in(agent.state[:last_result], compat_result(snap.result))
         else
           agent
         end
@@ -253,7 +253,7 @@ defmodule Jido.AI.CoDAgent do
             agent
             | state:
                 Map.merge(agent.state, %{
-                  last_result: snap.result || "",
+                  last_result: compat_result(snap.result),
                   completed: true
                 })
           }
@@ -261,6 +261,10 @@ defmodule Jido.AI.CoDAgent do
           agent
         end
       end
+
+      defp compat_result(nil), do: ""
+      defp compat_result(value) when is_binary(value), do: value
+      defp compat_result(value), do: inspect(value)
 
       defp request_id_from_action({_, params}, fallback) when is_map(params) do
         params[:request_id] ||

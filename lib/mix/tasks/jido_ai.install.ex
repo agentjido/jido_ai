@@ -27,9 +27,8 @@ defmodule Mix.Tasks.JidoAi.Install.Docs do
 
     ## What this task does
 
-    1. Adds `:jido_ai` formatter configuration
-    2. Configures default model aliases in `config/config.exs`
-    3. Reminds you to set up LLM provider API keys
+    1. Configures default model aliases in `config/config.exs`
+    2. Reminds you to set up LLM provider API keys
     """
   end
 end
@@ -62,7 +61,6 @@ if Code.ensure_loaded?(Igniter) do
     @impl Igniter.Mix.Task
     def igniter(igniter) do
       igniter
-      |> Igniter.Project.Formatter.import_dep(:jido_ai)
       |> Igniter.Project.Config.configure_new(
         "config.exs",
         :jido_ai,

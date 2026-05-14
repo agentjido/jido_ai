@@ -19,6 +19,16 @@ defmodule Jido.AI.Actions.HelpersTest do
       assert {:ok, "openai:gpt-4"} = Helpers.resolve_model("openai:gpt-4", :fast)
     end
 
+    test "passes through tuple, inline map, and model struct inputs" do
+      tuple_model = {:openai, "gpt-4.1", [reasoning_effort: :medium]}
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+      struct_model = LLMDB.Model.new!(%{provider: :openai, id: "gpt-4.1"})
+
+      assert {:ok, ^tuple_model} = Helpers.resolve_model(tuple_model, :fast)
+      assert {:ok, ^inline_model} = Helpers.resolve_model(inline_model, :fast)
+      assert {:ok, ^struct_model} = Helpers.resolve_model(struct_model, :fast)
+    end
+
     test "returns error for invalid model format" do
       assert {:error, :invalid_model_format} = Helpers.resolve_model(123, :fast)
       assert {:error, :invalid_model_format} = Helpers.resolve_model([:invalid], :fast)

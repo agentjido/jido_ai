@@ -6,8 +6,10 @@ defmodule Jido.AI.AgentTest do
   import ExUnit.CaptureIO
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Request
   alias Jido.AI.Agent
+  alias Jido.AI.Reasoning.ReAct.Event
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
 
   # ============================================================================
@@ -41,8 +43,36 @@ defmodule Jido.AI.AgentTest do
     def run(%{query: query}, _ctx), do: {:ok, %{results: ["Found: #{query}"]}}
   end
 
+  defmodule TestSignalAction do
+    use Jido.Action,
+      name: "signal_action",
+      description: "Handles custom agent signals"
+
+    def run(params, _ctx), do: {:ok, params}
+  end
+
   defmodule TestRequestTransformer do
     def transform_request(request, _state, _config, _context), do: {:ok, request}
+  end
+
+  defmodule ReplacementMemoryPlugin do
+    @moduledoc false
+    @state_schema Zoi.object(%{namespace: Zoi.string() |> Zoi.default("agent:replacement")})
+    @config_schema Zoi.object(%{namespace: Zoi.string() |> Zoi.default("agent:replacement")})
+
+    use Jido.Plugin,
+      name: "replacement_memory",
+      state_key: :__memory__,
+      actions: [],
+      schema: @state_schema,
+      config_schema: @config_schema,
+      singleton: true,
+      capabilities: [:memory]
+
+    @impl true
+    def mount(_agent, config) do
+      {:ok, %{namespace: Map.get(config, :namespace, "agent:replacement")}}
+    end
   end
 
   # ============================================================================
@@ -154,6 +184,47 @@ defmodule Jido.AI.AgentTest do
       system_prompt: nil
   end
 
+  defmodule AgentWithSignalRoutes do
+    use Jido.AI.Agent,
+      name: "agent_with_signal_routes",
+      tools: [TestCalculator],
+      signal_routes: [
+        {"custom.state.patch", TestSignalAction}
+      ]
+  end
+
+  defmodule AgentWithSignalRouteStaticParams do
+    use Jido.AI.Agent,
+      name: "agent_with_signal_route_static_params",
+      tools: [TestCalculator],
+      signal_routes: [
+        {"custom.static", {TestSignalAction, %{mode: :patch}}}
+      ]
+  end
+
+  defmodule AgentWithSignalRoutesFromAttribute do
+    @signal_routes [{"custom.attr.patch", TestSignalAction}]
+
+    use Jido.AI.Agent,
+      name: "agent_with_signal_routes_from_attribute",
+      tools: [TestCalculator],
+      signal_routes: @signal_routes
+  end
+
+  defmodule AgentWithoutDefaultMemory do
+    use Jido.AI.Agent,
+      name: "agent_without_default_memory",
+      tools: [TestCalculator],
+      default_plugins: %{__memory__: false}
+  end
+
+  defmodule AgentWithReplacementMemory do
+    use Jido.AI.Agent,
+      name: "agent_with_replacement_memory",
+      tools: [TestCalculator],
+      default_plugins: %{__memory__: {ReplacementMemoryPlugin, %{namespace: "agent:ai-replacement"}}}
+  end
+
   # ============================================================================
   # expand_aliases_in_ast/2 Tests
   # ============================================================================
@@ -220,6 +291,9 @@ defmodule Jido.AI.AgentTest do
     test "compiles agent with basic options" do
       assert function_exported?(BasicAgent, :ask, 2)
       assert function_exported?(BasicAgent, :ask, 3)
+      assert function_exported?(BasicAgent, :ask_stream, 3)
+      assert function_exported?(BasicAgent, :steer, 3)
+      assert function_exported?(BasicAgent, :inject, 3)
       assert function_exported?(BasicAgent, :on_before_cmd, 2)
       assert function_exported?(BasicAgent, :on_after_cmd, 3)
     end
@@ -232,6 +306,23 @@ defmodule Jido.AI.AgentTest do
     test "agent has correct description" do
       agent = BasicAgent.new()
       assert agent.description == "A basic test agent"
+    end
+
+    test "forwards default plugin exclusions to Jido.Agent" do
+      modules = Enum.map(AgentWithoutDefaultMemory.plugin_instances(), & &1.module)
+
+      refute Jido.Memory.Plugin in modules
+      assert Jido.Thread.Plugin in modules
+      assert Jido.Identity.Plugin in modules
+    end
+
+    test "forwards default plugin replacements with config to Jido.Agent" do
+      modules = Enum.map(AgentWithReplacementMemory.plugin_instances(), & &1.module)
+      agent = AgentWithReplacementMemory.new()
+
+      assert ReplacementMemoryPlugin in modules
+      refute Jido.Memory.Plugin in modules
+      assert agent.state[:__memory__].namespace == "agent:ai-replacement"
     end
 
     test "tool_context with module aliases resolves correctly" do
@@ -346,6 +437,48 @@ defmodule Jido.AI.AgentTest do
       assert config.system_prompt == default_config.system_prompt
     end
 
+    test "signal_routes option is forwarded to the base agent" do
+      expected_routes = [{"custom.state.patch", TestSignalAction}]
+
+      assert AgentWithSignalRoutes.signal_routes() == expected_routes
+      assert AgentWithSignalRoutes.signal_routes(%{agent_module: AgentWithSignalRoutes}) == expected_routes
+    end
+
+    test "signal_routes option supports static params route format" do
+      assert [{"custom.static", {TestSignalAction, %{mode: :patch}}}] =
+               AgentWithSignalRouteStaticParams.signal_routes()
+    end
+
+    test "signal_routes option supports module attributes" do
+      assert AgentWithSignalRoutesFromAttribute.signal_routes() == [
+               {"custom.attr.patch", TestSignalAction}
+             ]
+    end
+
+    test "signal_routes option is used by AgentServer routing" do
+      suffix = System.unique_integer([:positive, :monotonic])
+      registry = Module.concat(__MODULE__, :"SignalRouteRegistry#{suffix}")
+      start_supervised!({Registry, keys: :unique, name: registry})
+
+      {:ok, pid} =
+        Jido.AgentServer.start_link(
+          agent: AgentWithSignalRoutes,
+          id: "signal-route-agent-#{suffix}",
+          registry: registry
+        )
+
+      on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
+
+      signal =
+        Jido.Signal.new!("custom.state.patch", %{patched_by_signal: true}, source: "/jido_ai/agent_test")
+
+      assert {:ok, agent} = Jido.AgentServer.call(pid, signal)
+      assert agent.state.patched_by_signal == true
+
+      assert {:ok, server_state} = Jido.AgentServer.state(pid)
+      assert server_state.agent.state.patched_by_signal == true
+    end
+
     test "raises when module attribute system_prompt does not resolve to a binary" do
       module_name = Module.concat(__MODULE__, :"InvalidPromptAgent#{System.unique_integer([:positive, :monotonic])}")
 
@@ -413,12 +546,17 @@ defmodule Jido.AI.AgentTest do
       # This is a compile-time check - the function is generated by the macro
       assert :erlang.fun_info(&BasicAgent.ask/3, :arity) == {:arity, 3}
     end
+
+    test "ask_stream/3 exists as stream wrapper" do
+      assert :erlang.fun_info(&BasicAgent.ask_stream/3, :arity) == {:arity, 3}
+    end
   end
 
   describe "request lifecycle hooks" do
     test "on_before_cmd marks request as failed on react_request_error" do
       agent = BasicAgent.new()
-      agent = Request.start_request(agent, "req_1", "query")
+      agent = Request.start_request(agent, "req_1", "query", stream_to: {:pid, self()})
+      tag = Request.Stream.message_tag()
 
       {:ok, agent, _action} =
         BasicAgent.on_before_cmd(
@@ -428,6 +566,13 @@ defmodule Jido.AI.AgentTest do
 
       assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
       assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}
+
+      assert_receive {^tag,
+                      %Event{
+                        kind: :request_failed,
+                        request_id: "req_1",
+                        data: %{error: {:rejected, :busy, "busy"}, reason: :busy}
+                      }}
     end
 
     test "on_after_cmd cancel does not overwrite completed request" do
@@ -445,6 +590,56 @@ defmodule Jido.AI.AgentTest do
       assert get_in(agent.state, [:requests, "req_1", :status]) == :completed
       assert get_in(agent.state, [:requests, "req_1", :result]) == "done"
       assert get_in(agent.state, [:requests, "req_1", :error]) == nil
+    end
+
+    test "on_after_cmd keeps last_answer string while request failure stores raw term" do
+      raw_error = %{type: :provider_error, status: 503, message: "try later"}
+
+      agent =
+        BasicAgent.new()
+        |> Request.start_request("req_failed", "query")
+        |> with_failed_strategy(raw_error)
+
+      {:ok, updated_agent, directives} =
+        BasicAgent.on_after_cmd(
+          agent,
+          {:ai_react_worker_event, %{request_id: "req_failed", event: %{request_id: "req_failed"}}},
+          [:noop]
+        )
+
+      assert directives == [:noop]
+      assert get_in(updated_agent.state, [:requests, "req_failed", :status]) == :failed
+      assert get_in(updated_agent.state, [:requests, "req_failed", :error]) == {:failed, :provider_error, raw_error}
+      assert updated_agent.state.last_answer == inspect(raw_error)
+      assert updated_agent.state.completed == true
+    end
+
+    test "on_after_cmd stores enriched request meta from the ReAct snapshot" do
+      reasoning_details = [%{signature: "sig_123", provider: :openai}]
+      thinking_trace = [%{call_id: "call_1", iteration: 1, thinking: "Step by step..."}]
+
+      agent =
+        BasicAgent.new()
+        |> Request.start_request("req_meta", "query")
+        |> with_completed_strategy("final answer", %{
+          usage: %{input_tokens: 7, output_tokens: 3, reasoning_tokens: 18},
+          thinking_trace: thinking_trace,
+          streaming_thinking: "Final reasoning",
+          run_context:
+            AIContext.new()
+            |> AIContext.append_user("query")
+            |> AIContext.append_assistant("final answer", nil, reasoning_details: reasoning_details)
+        })
+
+      {:ok, updated_agent, _directives} =
+        BasicAgent.on_after_cmd(agent, {:ai_react_start, %{request_id: "req_meta"}}, [])
+
+      request = get_in(updated_agent.state, [:requests, "req_meta"])
+      assert request.status == :completed
+      assert request.meta.usage.reasoning_tokens == 18
+      assert request.meta.reasoning_details == reasoning_details
+      assert request.meta.thinking_trace == thinking_trace
+      assert request.meta.last_thinking == "Final reasoning"
     end
   end
 
@@ -478,5 +673,19 @@ defmodule Jido.AI.AgentTest do
     test "returns empty list for empty input" do
       assert Agent.tools_from_skills([]) == []
     end
+  end
+
+  defp with_failed_strategy(agent, result) do
+    strategy_state = %{status: :error, result: result, termination_reason: :provider_error}
+    put_in(agent.state[:__strategy__], strategy_state)
+  end
+
+  defp with_completed_strategy(agent, result, overrides) do
+    strategy_state =
+      agent.state[:__strategy__]
+      |> Map.merge(%{status: :completed, result: result})
+      |> Map.merge(overrides)
+
+    put_in(agent.state[:__strategy__], strategy_state)
   end
 end

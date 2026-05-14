@@ -11,6 +11,7 @@ defmodule Jido.AI.SignalTest do
     RequestError,
     RequestFailed,
     RequestStarted,
+    ToolStarted,
     ToolResult,
     Usage
   }
@@ -97,7 +98,8 @@ defmodule Jido.AI.SignalTest do
           usage: %{input_tokens: 200, output_tokens: 100},
           model: "openai:gpt-4o",
           duration_ms: 2500,
-          thinking_content: "I need to consider multiple options..."
+          thinking_content: "I need to consider multiple options...",
+          metadata: %{request_id: "req_1", strategy: :react}
         })
 
       assert signal.data.call_id == "call_full"
@@ -105,6 +107,24 @@ defmodule Jido.AI.SignalTest do
       assert signal.data.model == "openai:gpt-4o"
       assert signal.data.duration_ms == 2500
       assert signal.data.thinking_content == "I need to consider multiple options..."
+      assert signal.data.metadata == %{request_id: "req_1", strategy: :react}
+    end
+  end
+
+  describe "ToolStarted" do
+    test "creates signal with correlation metadata" do
+      signal =
+        ToolStarted.new!(%{
+          call_id: "tool_call_1",
+          tool_name: "weather",
+          arguments: %{"city" => "Chicago"},
+          metadata: %{request_id: "req_1", strategy: :react}
+        })
+
+      assert signal.type == "ai.tool.started"
+      assert signal.data.call_id == "tool_call_1"
+      assert signal.data.tool_name == "weather"
+      assert signal.data.metadata == %{request_id: "req_1", strategy: :react}
     end
   end
 
@@ -152,6 +172,34 @@ defmodule Jido.AI.SignalTest do
         })
 
       assert signal.data.delta == ""
+    end
+
+    test "creates partial signal with metadata for request correlation" do
+      signal =
+        LLMDelta.new!(%{
+          call_id: "call_partial_5",
+          delta: "hello",
+          metadata: %{request_id: "req_1", run_id: "req_1", strategy: :react}
+        })
+
+      assert signal.data.metadata == %{request_id: "req_1", run_id: "req_1", strategy: :react}
+    end
+
+    test "creates partial signal with runtime ordering metadata" do
+      signal =
+        LLMDelta.new!(%{
+          call_id: "call_partial_6",
+          delta: "ordered",
+          seq: 42,
+          run_id: "run_1",
+          request_id: "req_1",
+          iteration: 3
+        })
+
+      assert signal.data.seq == 42
+      assert signal.data.run_id == "run_1"
+      assert signal.data.request_id == "req_1"
+      assert signal.data.iteration == 3
     end
 
     test "creates multiple partial signals for streaming" do

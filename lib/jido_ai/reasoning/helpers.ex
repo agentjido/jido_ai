@@ -59,7 +59,7 @@ defmodule Jido.AI.Reasoning.Helpers do
   end
 
   @doc """
-  Executes an instruction if its action is a module implementing `run/2`.
+  Executes an instruction if its action is a loadable module implementing `run/2`.
 
   Returns `:noop` when the action is not an executable module.
   """
@@ -68,12 +68,18 @@ defmodule Jido.AI.Reasoning.Helpers do
   def maybe_execute_action_instruction(%Agent{} = agent, %Jido.Instruction{} = instruction, ctx \\ %{}) do
     action = instruction.action
 
-    if is_atom(action) and function_exported?(action, :run, 2) do
+    if executable_action_module?(action) do
       execute_action_instruction(agent, instruction, ctx)
     else
       :noop
     end
   end
+
+  defp executable_action_module?(action) when is_atom(action) do
+    Code.ensure_loaded?(action) and function_exported?(action, :run, 2)
+  end
+
+  defp executable_action_module?(_), do: false
 
   @doc """
   Builds normalized context for plugin-routed action execution.

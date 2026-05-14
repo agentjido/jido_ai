@@ -23,6 +23,9 @@ defmodule Jido.AI.Reasoning.ReAct.State do
               active_tools: Zoi.map() |> Zoi.default(%{}),
               pending_tool_calls: Zoi.list(PendingToolCall.schema()) |> Zoi.default([]),
               usage: Zoi.map() |> Zoi.default(%{}),
+              output: Zoi.map() |> Zoi.default(%{}),
+              streaming_text: Zoi.string() |> Zoi.default(""),
+              streaming_thinking: Zoi.string() |> Zoi.default(""),
               result: Zoi.any() |> Zoi.nullish(),
               error: Zoi.any() |> Zoi.nullish(),
               started_at_ms: Zoi.integer() |> Zoi.default(0),
@@ -67,6 +70,9 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       active_tools: %{},
       pending_tool_calls: [],
       usage: %{},
+      output: %{},
+      streaming_text: "",
+      streaming_thinking: "",
       started_at_ms: now,
       updated_at_ms: now,
       seq: 0
@@ -100,6 +106,9 @@ defmodule Jido.AI.Reasoning.ReAct.State do
         active_tools: Map.get(map, :active_tools, Map.get(map, "active_tools", %{})) || %{},
         pending_tool_calls: restore_pending(Map.get(map, :pending_tool_calls, Map.get(map, "pending_tool_calls", []))),
         usage: Map.get(map, :usage, Map.get(map, "usage", %{})) || %{},
+        output: Map.get(map, :output, Map.get(map, "output", %{})) || %{},
+        streaming_text: Map.get(map, :streaming_text, Map.get(map, "streaming_text", "")) || "",
+        streaming_thinking: Map.get(map, :streaming_thinking, Map.get(map, "streaming_thinking", "")) || "",
         result: Map.get(map, :result, Map.get(map, "result")),
         error: Map.get(map, :error, Map.get(map, "error")),
         started_at_ms: Map.get(map, :started_at_ms, Map.get(map, "started_at_ms", now_ms())),
@@ -133,6 +142,9 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       active_tools: state.active_tools,
       pending_tool_calls: state.pending_tool_calls,
       usage: state.usage,
+      output: state.output,
+      streaming_text: state.streaming_text,
+      streaming_thinking: state.streaming_thinking,
       result: state.result,
       error: state.error,
       started_at_ms: state.started_at_ms,
@@ -204,6 +216,22 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   @spec put_result(t(), term()) :: t()
   def put_result(%__MODULE__{} = state, result) do
     %{state | result: result, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Stores structured output metadata.
+  """
+  @spec put_output(t(), map()) :: t()
+  def put_output(%__MODULE__{} = state, output) when is_map(output) do
+    %{state | output: output, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Clears streaming accumulators before a new LLM turn starts.
+  """
+  @spec clear_streaming(t()) :: t()
+  def clear_streaming(%__MODULE__{} = state) do
+    %{state | streaming_text: "", streaming_thinking: "", updated_at_ms: now_ms()}
   end
 
   @doc """

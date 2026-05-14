@@ -42,14 +42,38 @@ defmodule Jido.AI.CoreTest do
     :ok
   end
 
+  defp with_model_aliases(aliases, fun) do
+    original = Application.get_env(:jido_ai, :model_aliases)
+    Application.put_env(:jido_ai, :model_aliases, aliases)
+
+    on_exit(fn ->
+      if is_nil(original) do
+        Application.delete_env(:jido_ai, :model_aliases)
+      else
+        Application.put_env(:jido_ai, :model_aliases, original)
+      end
+    end)
+
+    fun.()
+  end
+
   describe "model aliases and llm defaults" do
     test "model_aliases/0 merges configured aliases over defaults" do
-      Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4.1-mini", custom: "test:custom"})
-      aliases = AI.model_aliases()
+      aliases =
+        with_model_aliases(%{fast: "openai:gpt-4.1-mini", custom: "test:custom"}, fn ->
+          AI.model_aliases()
+        end)
 
       assert aliases[:fast] == "openai:gpt-4.1-mini"
       assert aliases[:custom] == "test:custom"
       assert is_binary(aliases[:capable])
+    end
+
+    test "model_aliases/0 supports direct model specs for configured aliases" do
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+
+      aliases = with_model_aliases(%{capable: inline_model}, fn -> AI.model_aliases() end)
+      assert aliases[:capable] == inline_model
     end
 
     test "resolve_model/1 passes strings, resolves aliases, and raises for unknown alias" do
@@ -58,6 +82,57 @@ defmodule Jido.AI.CoreTest do
 
       assert_raise ArgumentError, ~r/Unknown model alias/, fn ->
         AI.resolve_model(:does_not_exist)
+      end
+    end
+
+    test "resolve_model/1 resolves aliases to direct model specs" do
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+
+      with_model_aliases(%{capable: inline_model}, fn ->
+        assert AI.resolve_model(:capable) == inline_model
+      end)
+    end
+
+    test "resolve_model/1 accepts ReqLLM tuple, inline map, and model struct inputs" do
+      tuple_model = {:openai, "gpt-4.1", [reasoning_effort: :medium]}
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+      struct_model = LLMDB.Model.new!(%{provider: :openai, id: "gpt-4.1"})
+
+      assert AI.resolve_model(tuple_model) == tuple_model
+      assert AI.resolve_model(inline_model) == inline_model
+      assert AI.resolve_model(struct_model) == struct_model
+    end
+
+    test "model helpers normalize labels and fingerprints for direct ReqLLM inputs" do
+      tuple_model = {:openai, "gpt-4.1", [reasoning_effort: :medium]}
+
+      assert AI.model_label(:fast) == AI.resolve_model(:fast)
+      assert AI.model_label(tuple_model) == "openai:gpt-4.1"
+      assert is_binary(AI.model_fingerprint_segment(tuple_model))
+      assert AI.provider_opt_keys(:fast) |> is_map()
+    end
+
+    test "model helpers normalize labels and fingerprints for alias-backed inline specs" do
+      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
+
+      with_model_aliases(%{capable: inline_model}, fn ->
+        assert AI.model_label(:capable) == "openai:gpt-4.1"
+        assert is_binary(AI.model_fingerprint_segment(:capable))
+        assert AI.provider_opt_keys(:capable) |> is_map()
+      end)
+    end
+
+    test "resolve_model/1 raises for invalid configured alias specs" do
+      with_model_aliases(%{capable: [:invalid]}, fn ->
+        assert_raise ArgumentError, ~r/Invalid model spec configured for alias :capable/, fn ->
+          AI.resolve_model(:capable)
+        end
+      end)
+    end
+
+    test "resolve_model/1 raises for unsupported direct model inputs" do
+      assert_raise ArgumentError, ~r/invalid model input/, fn ->
+        AI.resolve_model(123)
       end
     end
 
@@ -157,6 +232,36 @@ defmodule Jido.AI.CoreTest do
       end)
 
       assert {:ok, :registered} = AI.register_tool(self(), ValidTool)
+    end
+
+    test "register_tool_direct validates and updates strategy tool config without AgentServer call" do
+      agent = %Jido.Agent{state: %{}}
+
+      assert {:error, {:not_loaded, Missing.Tool}} =
+               AI.register_tool_direct(agent, Missing.Tool)
+
+      assert {:error, :not_a_tool} = AI.register_tool_direct(agent, IncompleteTool)
+
+      assert {:ok, agent} = AI.register_tool_direct(agent, ValidTool)
+
+      config = AI.get_strategy_config(agent)
+      assert config.tools == [ValidTool]
+      assert config.actions_by_name == %{"valid_tool" => ValidTool}
+      assert AI.list_tools(agent) == [ValidTool]
+      assert AI.has_tool?(agent, "valid_tool")
+    end
+
+    test "unregister_tool_direct removes tool config without AgentServer call" do
+      agent = %Jido.Agent{state: %{}}
+      assert {:ok, agent} = AI.register_tool_direct(agent, ValidTool)
+      assert {:ok, agent} = AI.unregister_tool_direct(agent, "valid_tool")
+
+      config = AI.get_strategy_config(agent)
+      assert config.tools == []
+      assert config.actions_by_name == %{}
+      assert config.reqllm_tools == []
+      assert AI.list_tools(agent) == []
+      refute AI.has_tool?(agent, "valid_tool")
     end
 
     test "unregister_tool and set_system_prompt wrap signals and delegate call" do

@@ -10,6 +10,9 @@ defmodule Jido.AI.ObserveTest do
     assert Map.has_key?(metadata, :request_id)
     assert Map.has_key?(metadata, :run_id)
     assert Map.has_key?(metadata, :tool_name)
+    assert Map.has_key?(metadata, :origin)
+    assert Map.has_key?(metadata, :operation)
+    assert Map.has_key?(metadata, :strategy)
     assert metadata.request_id == "req_1"
     assert metadata.model == "test"
   end

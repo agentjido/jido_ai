@@ -22,7 +22,8 @@ defmodule Jido.AI.Signal.LLMResponse do
       usage: [type: :map, doc: "Token usage: %{input_tokens: N, output_tokens: M}"],
       model: [type: :string, doc: "Actual model used for the request"],
       duration_ms: [type: :integer, doc: "Request duration in milliseconds"],
-      thinking_content: [type: :string, doc: "Extended thinking content (for reasoning models)"]
+      thinking_content: [type: :string, doc: "Extended thinking content (for reasoning models)"],
+      metadata: [type: :map, default: %{}, doc: "Optional request/run/origin metadata for correlation"]
     ]
 
   @doc """
@@ -69,6 +70,7 @@ defmodule Jido.AI.Signal.LLMResponse do
     call_id = Keyword.fetch!(opts, :call_id)
     duration_ms = Keyword.get(opts, :duration_ms)
     model_override = Keyword.get(opts, :model)
+    metadata = Keyword.get(opts, :metadata, %{})
     turn_opts = if is_binary(model_override), do: [model: model_override], else: []
 
     turn = Turn.from_response(response, turn_opts)
@@ -84,6 +86,8 @@ defmodule Jido.AI.Signal.LLMResponse do
 
     signal_data =
       if turn.thinking_content, do: Map.put(signal_data, :thinking_content, turn.thinking_content), else: signal_data
+
+    signal_data = if metadata == %{}, do: signal_data, else: Map.put(signal_data, :metadata, metadata)
 
     new(signal_data)
   end

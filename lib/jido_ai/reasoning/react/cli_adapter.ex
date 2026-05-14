@@ -126,9 +126,9 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
             # Prefer snapshot.result (general contract), fallback to raw_state.last_answer
             answer =
               case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_answer, "")
-                "" -> Map.get(status.raw_state, :last_answer, "")
-                result -> result
+                nil -> format_cli_answer(Map.get(status.raw_state, :last_answer, ""))
+                "" -> format_cli_answer(Map.get(status.raw_state, :last_answer, ""))
+                result -> format_cli_answer(result)
               end
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
@@ -171,4 +171,8 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
       }
     end
   end
+
+  defp format_cli_answer(nil), do: ""
+  defp format_cli_answer(value) when is_binary(value), do: value
+  defp format_cli_answer(value), do: inspect(value)
 end

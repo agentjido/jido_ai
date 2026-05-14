@@ -4,6 +4,9 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
+  alias Jido.AI.PendingInputServer
+  alias Jido.AI.Request
+  alias Jido.AI.Reasoning.ReAct.Event
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
@@ -77,6 +80,15 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     }
   end
 
+  defp with_stream_request(agent, request_id, sink \\ self()) do
+    requests =
+      agent.state
+      |> Map.get(:requests, %{})
+      |> Map.put(request_id, %{stream_to: {:pid, sink}})
+
+    %{agent | state: Map.put(agent.state, :requests, requests)}
+  end
+
   describe "init validation" do
     test "raises for unsupported request_policy values" do
       assert_raise ArgumentError, ~r/unsupported request_policy/, fn ->
@@ -111,6 +123,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       route_map = Map.new(routes)
 
       assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
+      assert route_map["ai.react.steer"] == {:strategy_cmd, :ai_react_steer}
+      assert route_map["ai.react.inject"] == {:strategy_cmd, :ai_react_inject}
       assert route_map["ai.react.set_system_prompt"] == {:strategy_cmd, :ai_react_set_system_prompt}
       refute Map.has_key?(route_map, "ai.react.set_context")
       assert route_map["ai.react.context.modify"] == {:strategy_cmd, :ai_react_context_modify}
@@ -470,6 +484,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "worker runtime event updates state and emits lifecycle signals" do
       agent = create_agent(tools: [TestCalculator])
+      agent = with_stream_request(agent, "req_evt")
+      tag = Request.Stream.message_tag()
 
       event = runtime_event(:request_started, "req_evt", 1, %{query: "hello"})
 
@@ -483,13 +499,235 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       trace = state.request_traces["req_evt"]
       assert trace.truncated? == false
       assert length(trace.events) == 1
+
+      assert_receive {^tag, %Event{kind: :request_started, request_id: "req_evt"}}
+    end
+
+    test "steer queues input for an active run" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_steer"})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert is_pid(state.pending_input_server)
+      assert Process.alive?(state.pending_input_server)
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.steer_action(), %{
+              content: "Actually answer Q2",
+              expected_request_id: "req_steer",
+              source: "/test/steer",
+              extra_refs: %{origin: "suite"}
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.kind == :steer
+      assert state.last_pending_input_control.status == :queued
+      assert state.last_pending_input_control.request_id == "req_steer"
+
+      [queued] = PendingInputServer.drain(state.pending_input_server)
+      assert queued.content == "Actually answer Q2"
+      assert queued.source == "/test/steer"
+      assert queued.refs == %{origin: "suite"}
+    end
+
+    test "queued input is dropped if the request fails before runtime drain" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_drop"})],
+          %{}
+        )
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.steer_action(), %{
+              content: "Actually answer Q2",
+              expected_request_id: "req_drop",
+              source: "/test/steer"
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.status == :queued
+
+      event =
+        runtime_event(:request_failed, "req_drop", 2, %{
+          error: :boom
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_drop", event: event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.status == :error
+      assert state.pending_input_server == nil
+
+      core_thread = ThreadAgent.get(agent)
+      ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
+
+      assert Enum.map(ai_messages, & &1.payload.content) == ["Q1"]
+      refute Enum.any?(ai_messages, &(&1.payload.content == "Actually answer Q2"))
+    end
+
+    test "inject rejects while idle" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.inject_action(), %{content: "Programmatic input"})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.kind == :inject
+      assert state.last_pending_input_control.status == :rejected
+      assert state.last_pending_input_control.reason == :idle
+    end
+
+    test "steer rejects request_id mismatches without mutating the queue" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_live"})],
+          %{}
+        )
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.steer_action(), %{
+              content: "Wrong run",
+              expected_request_id: "req_other"
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.kind == :steer
+      assert state.last_pending_input_control.status == :rejected
+      assert state.last_pending_input_control.reason == :request_mismatch
+      assert [] == PendingInputServer.drain(state.pending_input_server)
+    end
+
+    test "steer rejects blank content without mutating the queue" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_blank"})],
+          %{}
+        )
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [
+            instruction(ReAct.steer_action(), %{
+              content: "   ",
+              expected_request_id: "req_blank"
+            })
+          ],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.last_pending_input_control.kind == :steer
+      assert state.last_pending_input_control.status == :rejected
+      assert state.last_pending_input_control.reason == :empty_content
+      assert [] == PendingInputServer.drain(state.pending_input_server)
+    end
+
+    test "input_injected runtime events update run context and append a user thread entry" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_input_injected"})],
+          %{}
+        )
+
+      event =
+        runtime_event(:input_injected, "req_input_injected", 2, %{
+          content: "Actually answer Q2",
+          source: "/test/runtime",
+          refs: %{origin: "suite"}
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_input_injected", event: event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state.status == :awaiting_llm
+      assert state.result == nil
+
+      run_messages = Jido.AI.Context.to_messages(state.run_context)
+      run_users = Enum.filter(run_messages, &(&1.role == :user))
+      assert Enum.map(run_users, & &1.content) == ["Q1", "Actually answer Q2"]
+
+      assert List.last(run_users).refs == %{
+               origin: "suite",
+               request_id: "req_input_injected",
+               run_id: "req_input_injected",
+               signal_id: "evt_2"
+             }
+
+      core_thread = ThreadAgent.get(agent)
+      ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
+      assert Enum.map(ai_messages, & &1.payload.role) == [:user, :user]
+
+      injected_entry = List.last(ai_messages)
+      assert injected_entry.payload.content == "Actually answer Q2"
+      assert injected_entry.refs.request_id == "req_input_injected"
+      assert injected_entry.refs.run_id == "req_input_injected"
+      assert injected_entry.refs.signal_id == "evt_2"
+      assert injected_entry.refs.source == "/test/runtime"
+      assert injected_entry.refs.origin == "suite"
     end
 
     test "request_completed event marks request terminal and keeps checkpoint token" do
       agent = create_agent(tools: [TestCalculator])
 
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "q", request_id: "req_done"})],
+          %{}
+        )
+
       events = [
-        runtime_event(:request_started, "req_done", 1, %{query: "q"}),
         runtime_event(:checkpoint, "req_done", 2, %{token: "tok_1", reason: :after_llm}),
         runtime_event(:request_completed, "req_done", 3, %{
           result: "done",
@@ -509,6 +747,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.result == "done"
       assert state.checkpoint_token == "tok_1"
       assert state.react_worker_status == :ready
+      assert state.pending_input_server == nil
     end
 
     test "completed request history is reused for the next turn" do
@@ -697,6 +936,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "worker crash while active request marks request failed" do
       agent = create_agent(tools: [TestCalculator])
+      agent = with_stream_request(agent, "req_crash")
+      tag = Request.Stream.message_tag()
 
       state =
         agent
@@ -722,7 +963,34 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.active_request_id == nil
       assert state.react_worker_pid == nil
       assert state.react_worker_status == :missing
-      assert state.result =~ "react_worker_exit"
+      assert state.result == {:react_worker_exit, :killed}
+
+      assert_receive {^tag,
+                      %Event{
+                        kind: :request_failed,
+                        request_id: "req_crash",
+                        data: %{error: {:react_worker_exit, :killed}, reason: :react_worker_exit}
+                      }}
+    end
+
+    test "propagates runtime ordering metadata to LLMDelta signals" do
+      agent = create_agent(tools: [TestCalculator])
+      request_id = "req_delta_meta"
+
+      event = runtime_event(:llm_delta, request_id, 17, %{chunk_type: :content, delta: "ordered"})
+
+      {_agent, []} =
+        ReAct.cmd(agent, [instruction(:ai_react_worker_event, %{request_id: request_id, event: event})], %{})
+
+      assert_receive {:"$gen_cast", {:signal, signal}}
+      assert signal.type == "ai.llm.delta"
+      assert signal.data.call_id == "call_req_delta_meta"
+      assert signal.data.delta == "ordered"
+      assert signal.data.chunk_type == :content
+      assert signal.data.seq == 17
+      assert signal.data.run_id == request_id
+      assert signal.data.request_id == request_id
+      assert signal.data.iteration == 1
     end
 
     test "stores request trace up to 2000 events then marks truncated" do
@@ -740,6 +1008,40 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert trace.truncated? == true
       assert length(trace.events) == 2000
+    end
+
+    test "request_failed with {:incomplete_response, :incomplete} preserves structured error" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q_incomplete", request_id: "req_incomplete"})],
+          %{}
+        )
+
+      # This matches what runner.ex emits via fail_run when validate_terminal_response/1
+      # detects a blank text + failure finish_reason.
+      incomplete_error = {:incomplete_response, :incomplete}
+
+      failed_event =
+        runtime_event(:request_failed, "req_incomplete", 2, %{
+          error: incomplete_error,
+          error_type: :llm_response
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_incomplete", event: failed_event})],
+          %{}
+        )
+
+      snapshot = ReAct.snapshot(agent, %{})
+      assert snapshot.status == :failure
+      assert snapshot.done?
+      # The raw error tuple must be preserved — not stringified or wrapped
+      assert snapshot.result == incomplete_error
     end
   end
 
@@ -916,6 +1218,36 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert last_entry.kind == :ai_context_operation
       assert last_entry.payload.operation.type == :replace
       assert last_entry.payload.operation.reason == :manual
+    end
+
+    test "request_failed preserves raw error in snapshot result" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_raw_error"})],
+          %{}
+        )
+
+      error_struct = %{type: :stream_error, status: 503, message: "Too many connections"}
+
+      failed_event =
+        runtime_event(:request_failed, "req_raw_error", 2, %{
+          error: error_struct
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: "req_raw_error", event: failed_event})],
+          %{}
+        )
+
+      snapshot = ReAct.snapshot(agent, %{})
+      assert snapshot.status == :failure
+      assert snapshot.done?
+      assert snapshot.result == error_struct
     end
 
     test "context.modify replace while active run is deferred and applied after request failure" do
