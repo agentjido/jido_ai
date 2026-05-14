@@ -114,10 +114,10 @@ defmodule Jido.AI.Skill.Discovery do
   - `{:ok, []}` - Directory doesn't exist or is empty
   - `{:error, reason}` - Discovery failed
   """
-  @spec discover_from_project() :: {:ok, [discovery_metadata()]} | {:error, term()}
-  def discover_from_project do
-    if File.dir?(@project_path) do
-      discover_from([@project_path], scope: :project)
+  @spec discover_from_project(String.t()) :: {:ok, [discovery_metadata()]} | {:error, term()}
+  def discover_from_project(base_path \\ @project_path) do
+    if File.dir?(base_path) do
+      discover_from([base_path], scope: :project)
     else
       {:ok, []}
     end
@@ -132,10 +132,10 @@ defmodule Jido.AI.Skill.Discovery do
   - `{:ok, []}` - Directory doesn't exist or is empty
   - `{:error, reason}` - Discovery failed
   """
-  @spec discover_from_user() :: {:ok, [discovery_metadata()]} | {:error, term()}
-  def discover_from_user do
-    if File.dir?(@user_path) do
-      discover_from([@user_path], scope: :user)
+  @spec discover_from_user(String.t()) :: {:ok, [discovery_metadata()]} | {:error, term()}
+  def discover_from_user(base_path \\ @user_path) do
+    if File.dir?(base_path) do
+      discover_from([base_path], scope: :user)
     else
       {:ok, []}
     end
@@ -146,14 +146,20 @@ defmodule Jido.AI.Skill.Discovery do
 
   Returns the first matching skill with project-level taking precedence.
 
+  When `paths` is given, searches those directories instead of the default
+  project/user discovery sources — useful for scoped lookups and testing.
+
   ## Examples
 
       {:ok, metadata} = Jido.AI.Skill.Discovery.find("code-review")
       {:error, :not_found} = Jido.AI.Skill.Discovery.find("unknown-skill")
+      {:ok, metadata} = Jido.AI.Skill.Discovery.find("local-skill", ["priv/skills/"])
   """
-  @spec find(String.t()) :: {:ok, discovery_metadata()} | {:error, :not_found}
-  def find(name) when is_binary(name) do
-    case discover() do
+  @spec find(String.t(), [String.t()] | nil) :: {:ok, discovery_metadata()} | {:error, :not_found}
+  def find(name, paths \\ nil) when is_binary(name) do
+    discovery = if is_list(paths), do: discover_from(paths), else: discover()
+
+    case discovery do
       {:ok, skills} ->
         case Enum.find(skills, &(&1.name == name)) do
           nil -> {:error, :not_found}
@@ -173,7 +179,7 @@ defmodule Jido.AI.Skill.Discovery do
       {:ok, metadata} = Jido.AI.Skill.Discovery.find("code-review")
       {:ok, spec} = Jido.AI.Skill.Discovery.to_spec(metadata)
   """
-  @spec to_spec(discovery_metadata()) :: {:ok, Spec.t()} | {:error, term()}
+  @spec to_spec(discovery_metadata() | map()) :: {:ok, Spec.t()} | {:error, term()}
   def to_spec(%{skill_md_path: path, scope: scope, root_dir: _root_dir}) do
     case Loader.load(path, lenient: true) do
       {:ok, spec} ->
@@ -185,6 +191,8 @@ defmodule Jido.AI.Skill.Discovery do
         {:error, reason}
     end
   end
+
+  def to_spec(_invalid_metadata), do: {:error, :invalid_metadata}
 
   # Private functions
 

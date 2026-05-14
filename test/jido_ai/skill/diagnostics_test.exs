@@ -9,7 +9,7 @@ defmodule Jido.AI.Skill.DiagnosticsTest do
 
       assert diag.warnings == []
       assert diag.errors == []
-      assert diag.timestamp != nil
+      assert diag.timestamp
     end
   end
 
@@ -135,7 +135,7 @@ defmodule Jido.AI.Skill.DiagnosticsTest do
       assert w.type == :type_a
       assert w.message == "msg"
       assert w.severity == :low
-      assert w.timestamp != nil
+      assert w.timestamp
     end
 
     test "creates warning with custom severity" do

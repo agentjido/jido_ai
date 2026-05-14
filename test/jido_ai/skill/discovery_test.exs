@@ -55,7 +55,7 @@ defmodule Jido.AI.Skill.DiscoveryTest do
     end
 
     test "discovers nested skills", %{tmp_dir: tmp_dir} do
-      nested = Path.join(tmp_dir, "nested", "deep-skill")
+      nested = Path.join([tmp_dir, "nested", "deep-skill"])
       File.mkdir_p!(nested)
 
       File.write!(Path.join(nested, "SKILL.md"), """
@@ -101,17 +101,17 @@ defmodule Jido.AI.Skill.DiscoveryTest do
     end
   end
 
-  describe "discover_from_project/0" do
-    test "returns empty list when project path does not exist" do
-      # By default .agents/skills does not exist in test env
-      assert {:ok, []} = Discovery.discover_from_project()
+  describe "discover_from_project/1" do
+    test "returns empty list when project path does not exist", %{tmp_dir: tmp_dir} do
+      missing = Path.join(tmp_dir, "no-such-skills-dir")
+      assert {:ok, []} = Discovery.discover_from_project(missing)
     end
   end
 
-  describe "discover_from_user/0" do
-    test "returns empty list when user path does not exist" do
-      # ~/.agents/skills typically does not exist in test env
-      assert {:ok, []} = Discovery.discover_from_user()
+  describe "discover_from_user/1" do
+    test "returns empty list when user path does not exist", %{tmp_dir: tmp_dir} do
+      missing = Path.join(tmp_dir, "no-such-skills-dir")
+      assert {:ok, []} = Discovery.discover_from_user(missing)
     end
   end
 
@@ -133,8 +133,7 @@ defmodule Jido.AI.Skill.DiscoveryTest do
       Body.
       """)
 
-      # Override project path temporarily by using discover_from
-      assert {:ok, skill} = Discovery.find("find-me")
+      assert {:ok, skill} = Discovery.find("find-me", [tmp_dir])
       assert skill.name == "find-me"
       assert skill.description == "Found it"
     end

@@ -60,7 +60,7 @@ defmodule Jido.AI.Skill.ResourcesTest do
   describe "resolve_path/2" do
     test "resolves relative paths" do
       assert Resources.resolve_path("/base", "sub/file.txt") ==
-               Path.join("/base", "sub/file.txt")
+               {:ok, Path.join("/base", "sub/file.txt")}
     end
 
     test "blocks path traversal attempts" do

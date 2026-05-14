@@ -61,16 +61,15 @@ defmodule Jido.AI.Skill.Activation do
       build_context_from_registry(name)
     else
       # Try to resolve the skill
-      with {:ok, spec} <- resolve_skill(name),
-           {:ok, context} <- do_activate(spec) do
-        {:ok, context}
+      with {:ok, spec} <- resolve_skill(name) do
+        do_activate(spec)
       end
     end
   end
 
   def activate(%Spec{} = spec) do
     if Registry.activated?(spec.name) do
-      {:ok, build_context_from_registry(spec.name)}
+      build_context_from_registry(spec.name)
     else
       do_activate(spec)
     end
@@ -82,7 +81,7 @@ defmodule Jido.AI.Skill.Activation do
       spec = mod.manifest()
 
       if Registry.activated?(spec.name) do
-        {:ok, build_context_from_registry(spec.name)}
+        build_context_from_registry(spec.name)
       else
         do_activate(spec)
       end
@@ -133,6 +132,18 @@ defmodule Jido.AI.Skill.Activation do
   @spec list_activated() :: [String.t()]
   def list_activated do
     Registry.list_activated()
+  end
+
+  @doc """
+  Returns true if the named skill is activated in the current session.
+
+  ## Examples
+
+      Jido.AI.Skill.Activation.activated?("code-review")
+  """
+  @spec activated?(String.t()) :: boolean()
+  def activated?(name) when is_binary(name) do
+    Registry.activated?(name)
   end
 
   @doc """
@@ -203,7 +214,9 @@ defmodule Jido.AI.Skill.Activation do
     # Mark as activated in registry
     :ok = Registry.mark_activated(spec.name, context)
 
-    {:ok, context}
+    # Return the registry's canonical context so the first activation and any
+    # subsequent (idempotent) activations yield an identical result.
+    build_context_from_registry(spec.name)
   end
 
   defp build_context_from_registry(name) do

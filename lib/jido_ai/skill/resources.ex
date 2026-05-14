@@ -154,6 +154,16 @@ defmodule Jido.AI.Skill.Resources do
   """
   @spec resolve_path(String.t(), String.t()) :: {:ok, String.t()} | {:error, :path_traversal}
   def resolve_path(skill_root, relative_path) when is_binary(skill_root) and is_binary(relative_path) do
+    # Reject absolute inputs outright — `Path.join/2` would silently re-root
+    # them under the skill root, masking an attempted absolute-path injection.
+    if Path.type(relative_path) == :absolute do
+      {:error, :path_traversal}
+    else
+      do_resolve_path(skill_root, relative_path)
+    end
+  end
+
+  defp do_resolve_path(skill_root, relative_path) do
     # Normalize and resolve the path
     expanded_root = Path.expand(skill_root)
     absolute_path = Path.join(expanded_root, relative_path) |> Path.expand()
@@ -237,8 +247,7 @@ defmodule Jido.AI.Skill.Resources do
 
       full_pattern
       |> Path.wildcard()
-      |> Enum.filter(&File.regular?/1)
-      |> Enum.filter(&within_root?(&1, expanded_root))
+      |> Enum.filter(&(File.regular?(&1) and within_root?(&1, expanded_root)))
       |> Enum.map(fn absolute_path ->
         relative_path = Path.relative_to(absolute_path, expanded_root)
         stat = File.stat!(absolute_path)

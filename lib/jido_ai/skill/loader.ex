@@ -143,7 +143,7 @@ defmodule Jido.AI.Skill.Loader do
         description: description,
         license: frontmatter["license"],
         compatibility: validate_compatibility(frontmatter["compatibility"]),
-        metadata: Map.put(frontmatter["metadata"] || %{}, :diagnostics, Diagnostics.to_map(diagnostics)),
+        metadata: frontmatter["metadata"] || %{},
         allowed_tools: parse_allowed_tools(frontmatter["allowed-tools"]),
         source: {:file, path},
         body_ref: {:inline, body},
