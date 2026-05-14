@@ -58,7 +58,7 @@ defmodule Jido.AI.Skill.Activation do
     # First check if already activated
     if Registry.activated?(name) do
       # Return existing activation context
-      {:ok, build_context_from_registry(name)}
+      build_context_from_registry(name)
     else
       # Try to resolve the skill
       with {:ok, spec} <- resolve_skill(name),
@@ -150,7 +150,7 @@ defmodule Jido.AI.Skill.Activation do
   @spec get_context(String.t()) :: {:ok, activation_context()} | {:error, :not_activated}
   def get_context(name) when is_binary(name) do
     if Registry.activated?(name) do
-      {:ok, build_context_from_registry(name)}
+      build_context_from_registry(name)
     else
       {:error, :not_activated}
     end

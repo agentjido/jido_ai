@@ -232,13 +232,15 @@ defmodule Jido.AI.Skill.Resources do
   @spec search(String.t(), String.t()) :: [resource_info()]
   def search(skill_root, pattern) when is_binary(skill_root) and is_binary(pattern) do
     if File.dir?(skill_root) do
-      full_pattern = Path.join(skill_root, pattern)
+      expanded_root = Path.expand(skill_root)
+      full_pattern = Path.join(expanded_root, pattern)
 
       full_pattern
       |> Path.wildcard()
       |> Enum.filter(&File.regular?/1)
+      |> Enum.filter(&within_root?(&1, expanded_root))
       |> Enum.map(fn absolute_path ->
-        relative_path = Path.relative_to(absolute_path, skill_root)
+        relative_path = Path.relative_to(absolute_path, expanded_root)
         stat = File.stat!(absolute_path)
 
         %{
@@ -252,6 +254,13 @@ defmodule Jido.AI.Skill.Resources do
     else
       []
     end
+  end
+
+  # Guards `search/2` results against patterns that traverse outside the
+  # skill root (e.g. "../**/*.md"), matching the protection in `resolve_path/2`.
+  defp within_root?(absolute_path, expanded_root) do
+    expanded = Path.expand(absolute_path)
+    expanded == expanded_root or String.starts_with?(expanded, expanded_root <> "/")
   end
 
   # Private functions

@@ -66,7 +66,9 @@ defmodule Jido.AI.Skill.Loader do
     diagnostics = Diagnostics.new()
 
     case load(path, lenient: lenient, diagnostics: diagnostics) do
-      {:ok, spec} -> {:ok, spec, diagnostics}
+      # load/2 accumulates diagnostics inside the spec; pull them back out
+      # so the documented {:ok, spec, diagnostics} contract is honored.
+      {:ok, spec} -> {:ok, spec, spec.diagnostics || diagnostics}
       {:error, reason} -> {:error, reason, diagnostics}
     end
   end
@@ -104,10 +106,14 @@ defmodule Jido.AI.Skill.Loader do
     case Regex.run(~r/\A---\r?\n(.*?)\r?\n---\r?\n(.*)\z/s, content) do
       [_, yaml, body] ->
         case YamlElixir.read_from_string(yaml) do
-          {:ok, frontmatter} -> {:ok, {frontmatter, String.trim(body)}, diagnostics}
+          {:ok, frontmatter} ->
+            {:ok, {frontmatter, String.trim(body)}, diagnostics}
+
           {:error, reason} ->
             if lenient do
-              diagnostics = Diagnostics.add_error(diagnostics, %Error.Parse.InvalidYaml{file_path: path, reason: reason})
+              diagnostics =
+                Diagnostics.add_error(diagnostics, %Error.Parse.InvalidYaml{file_path: path, reason: reason})
+
               # Return empty frontmatter to continue in lenient mode
               {:ok, {%{}, String.trim(body)}, diagnostics}
             else
@@ -163,10 +169,11 @@ defmodule Jido.AI.Skill.Loader do
     normalized_name = String.downcase(name)
 
     if normalized_dir != normalized_name do
-      warning = Diagnostics.Warning.new(
-        :directory_name_mismatch,
-        "Skill name '#{name}' does not match parent directory '#{parent_dir}'"
-      )
+      warning =
+        Diagnostics.Warning.new(
+          :directory_name_mismatch,
+          "Skill name '#{name}' does not match parent directory '#{parent_dir}'"
+        )
 
       if lenient do
         Diagnostics.add_warning(diagnostics, warning)
@@ -185,7 +192,13 @@ defmodule Jido.AI.Skill.Loader do
     if lenient do
       # Generate a fallback name from the path in lenient mode
       fallback = "unnamed-skill-#{:erlang.unique_integer([:positive])}"
-      diagnostics = Diagnostics.add_warning(diagnostics, Diagnostics.Warning.new(:missing_name, "Missing required field: name, using fallback: #{fallback}"))
+
+      diagnostics =
+        Diagnostics.add_warning(
+          diagnostics,
+          Diagnostics.Warning.new(:missing_name, "Missing required field: name, using fallback: #{fallback}")
+        )
+
       {:ok, fallback, diagnostics}
     else
       {:error, error}
@@ -199,7 +212,13 @@ defmodule Jido.AI.Skill.Loader do
 
         if lenient do
           truncated = String.slice(name, 0, @max_name_length)
-          warning = Diagnostics.Warning.new(:name_too_long, "Skill name exceeds #{@max_name_length} chars, truncated to: #{truncated}")
+
+          warning =
+            Diagnostics.Warning.new(
+              :name_too_long,
+              "Skill name exceeds #{@max_name_length} chars, truncated to: #{truncated}"
+            )
+
           diagnostics = Diagnostics.add_warning(diagnostics, warning)
           {:ok, truncated, diagnostics}
         else
@@ -211,12 +230,15 @@ defmodule Jido.AI.Skill.Loader do
 
         if lenient do
           # Normalize the name (lowercase, replace invalid chars with hyphens)
-          normalized = name
-          |> String.downcase()
-          |> String.replace(~r/[^a-z0-9]+/, "-")
-          |> String.trim("-")
+          normalized =
+            name
+            |> String.downcase()
+            |> String.replace(~r/[^a-z0-9]+/, "-")
+            |> String.trim("-")
 
-          warning = Diagnostics.Warning.new(:invalid_name_format, "Invalid skill name '#{name}', normalized to: #{normalized}")
+          warning =
+            Diagnostics.Warning.new(:invalid_name_format, "Invalid skill name '#{name}', normalized to: #{normalized}")
+
           diagnostics = Diagnostics.add_warning(diagnostics, warning)
           {:ok, normalized, diagnostics}
         else
@@ -233,7 +255,13 @@ defmodule Jido.AI.Skill.Loader do
 
     if lenient do
       fallback = "unnamed-skill-#{:erlang.unique_integer([:positive])}"
-      diagnostics = Diagnostics.add_warning(diagnostics, Diagnostics.Warning.new(:invalid_name_type, "Invalid name type, using fallback: #{fallback}"))
+
+      diagnostics =
+        Diagnostics.add_warning(
+          diagnostics,
+          Diagnostics.Warning.new(:invalid_name_type, "Invalid name type, using fallback: #{fallback}")
+        )
+
       {:ok, fallback, diagnostics}
     else
       {:error, error}
@@ -255,7 +283,13 @@ defmodule Jido.AI.Skill.Loader do
     if String.length(desc) > @max_description_length do
       # Always truncate long descriptions as a warning
       truncated = String.slice(desc, 0, @max_description_length)
-      warning = Diagnostics.Warning.new(:description_too_long, "Description exceeds #{@max_description_length} chars, truncated")
+
+      warning =
+        Diagnostics.Warning.new(
+          :description_too_long,
+          "Description exceeds #{@max_description_length} chars, truncated"
+        )
+
       diagnostics = Diagnostics.add_warning(diagnostics, warning)
       {:ok, truncated, diagnostics}
     else
