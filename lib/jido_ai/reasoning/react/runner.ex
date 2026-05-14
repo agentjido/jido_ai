@@ -263,7 +263,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     with {:ok, request} <- build_turn_request(state, config, runtime_context) do
       state = %{state | active_tools: request.tools}
 
-      case request_turn(state, owner, ref, config, request.messages, request.llm_opts) do
+      case request_turn(state, owner, ref, config, request.messages, request.llm_opts, request.model) do
         {:ok, state, turn, response_id} ->
           state =
             state
@@ -335,7 +335,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     base_request = %{
       messages: AIContext.to_messages(state.context),
       llm_opts: config |> Config.llm_opts() |> maybe_put_previous_response_id(state.llm_response_id),
-      tools: config.tools
+      tools: config.tools,
+      model: config.model
     }
 
     with {:ok, request} <- maybe_transform_request(base_request, state, config, runtime_context),
@@ -343,7 +344,13 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
          {:ok, messages} <- normalize_request_messages(request),
          {:ok, tools} <- normalize_request_tools(request),
          llm_opts <- sync_tools_in_llm_opts(config, request.llm_opts, tools) do
-      {:ok, %{messages: messages, llm_opts: maybe_put_openai_websocket_session(config, llm_opts), tools: tools}}
+      {:ok,
+       %{
+         messages: messages,
+         llm_opts: maybe_put_openai_websocket_session(config, llm_opts),
+         tools: tools,
+         model: Map.get(request, :model, config.model)
+       }}
     end
   end
 
@@ -368,6 +375,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp apply_request_overrides(request, overrides, %Config{} = config) when is_map(request) and is_map(overrides) do
+    # Resolve `:model` first so any per-turn provider swap is in place before
+    # we re-validate llm_opts overrides — `provider_options` keys differ per
+    # provider, so xAI-only keys (e.g. `xai_api`) must validate against xAI's
+    # schema, not the compile-time provider's schema.
+    request = maybe_put_request_model(request, Map.get(overrides, :model, Map.get(overrides, "model")))
+
     request
     |> maybe_put_request_field(:messages, Map.get(overrides, :messages, Map.get(overrides, "messages")))
     |> maybe_put_request_field(:tools, Map.get(overrides, :tools, Map.get(overrides, "tools")))
@@ -377,11 +390,22 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp maybe_put_request_field(request, _field, nil), do: request
   defp maybe_put_request_field(request, field, value), do: Map.put(request, field, value)
 
+  defp maybe_put_request_model(request, nil), do: request
+
+  defp maybe_put_request_model(request, model_override) do
+    Map.put(request, :model, Jido.AI.resolve_model(model_override))
+  end
+
   defp maybe_merge_request_llm_opts(request, _config, nil), do: request
 
   defp maybe_merge_request_llm_opts(request, %Config{} = config, llm_opts_override) do
+    # If a per-turn `:model` override was applied earlier in apply_request_overrides,
+    # validate the llm_opts overrides against THAT provider's schema. Otherwise
+    # fall back to the compile-time `config.model` schema (existing behavior).
+    effective_model = Map.get(request, :model, config.model)
+
     Map.update!(request, :llm_opts, fn base_opts ->
-      Config.merge_llm_opts(config, base_opts, llm_opts_override)
+      Config.merge_llm_opts(config, base_opts, llm_opts_override, effective_model)
     end)
   end
 
@@ -411,18 +435,18 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     |> Keyword.put(:tools, reqllm_tools)
   end
 
-  defp request_turn(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
+  defp request_turn(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts, model) do
     case config.streaming do
       false ->
-        request_turn_generate(state, config, messages, llm_opts)
+        request_turn_generate(state, config, messages, llm_opts, model)
 
       _ ->
-        request_turn_stream(state, owner, ref, config, messages, llm_opts)
+        request_turn_stream(state, owner, ref, config, messages, llm_opts, model)
     end
   end
 
-  defp request_turn_stream(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
-    case ReqLLM.Generation.stream_text(config.model, messages, llm_opts) do
+  defp request_turn_stream(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts, model) do
+    case ReqLLM.Generation.stream_text(model, messages, llm_opts) do
       {:ok, stream_response} ->
         announce_stream_control(owner, ref, stream_response)
 
@@ -436,8 +460,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp request_turn_generate(%State{} = state, %Config{} = config, messages, llm_opts) do
-    case ReqLLM.Generation.generate_text(config.model, messages, llm_opts) do
+  defp request_turn_generate(%State{} = state, %Config{} = config, messages, llm_opts, model) do
+    case ReqLLM.Generation.generate_text(model, messages, llm_opts) do
       {:ok, response} ->
         consume_generate(state, config, response)
 
