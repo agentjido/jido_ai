@@ -1472,10 +1472,13 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp invoke_stream_cancel(%{stream_cancelled?: true} = state), do: state
 
   defp invoke_stream_cancel(%{stream_cancel: cancel_fun} = state) when is_function(cancel_fun, 0) do
-    _ = cancel_fun.()
+    try do
+      _ = cancel_fun.()
+    catch
+      _, _ -> :ok
+    end
+
     %{state | stream_cancelled?: true}
-  catch
-    _, _ -> %{state | stream_cancelled?: true}
   end
 
   defp invoke_stream_cancel(state), do: state

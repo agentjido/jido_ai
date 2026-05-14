@@ -887,6 +887,31 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert_receive :idle_stream_cancelled, 200
   end
 
+  test "successful stream cleanup ignores dead cancel process exits" do
+    {:ok, dead_pid} = Agent.start_link(fn -> :ok end)
+    dead_ref = Process.monitor(dead_pid)
+    Agent.stop(dead_pid)
+
+    assert_receive {:DOWN, ^dead_ref, :process, ^dead_pid, :normal}, 200
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Hello")],
+         %{finish_reason: :stop, usage: %{input_tokens: 1, output_tokens: 1}},
+         model,
+         cancel: fn -> GenServer.call(dead_pid, :cancel, 5_000) end
+       )}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}})
+
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert request_completed.data.result == "Hello"
+  end
+
   test "preserves reasoning_details across tool turns" do
     parent = self()
 
