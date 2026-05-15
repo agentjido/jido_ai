@@ -50,7 +50,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   Creates initial runtime state for a new query.
   """
   @spec new(String.t(), String.t() | nil, keyword()) :: t()
-  def new(query, system_prompt, opts \\ []) when is_binary(query) do
+  def new(query, system_prompt, opts \\ []) when is_binary(query) or is_list(query) do
     now = now_ms()
 
     request_id = Keyword.get(opts, :request_id, "req_#{Jido.Util.generate_id()}")

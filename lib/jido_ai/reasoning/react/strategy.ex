@@ -38,6 +38,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Observe
   alias Jido.AI.Output
+  alias Jido.AI.Query
   alias Jido.AI.Directive
   alias Jido.AI.Effects
   alias Jido.AI.Request.Stream, as: RequestStream
@@ -182,7 +183,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     @start => %{
       schema:
         Zoi.object(%{
-          query: Zoi.string(),
+          query: Query.schema(),
           request_id: Zoi.string() |> Zoi.optional(),
           tool_context: Zoi.map() |> Zoi.optional(),
           tools: Zoi.any() |> Zoi.optional(),
@@ -575,7 +576,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp process_start(agent, %{query: query} = params) when is_binary(query) do
+  defp process_start(agent, %{query: query} = params) when is_binary(query) or is_list(query) do
     state = StratState.get(agent, %{})
     config = state[:config] || %{}
     request_id = Map.get(params, :request_id, generate_call_id())
@@ -1996,7 +1997,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp runtime_state_from_context(%AIContext{} = context, query, request_id, run_id)
-       when is_binary(query) and is_binary(request_id) and is_binary(run_id) do
+       when (is_binary(query) or is_list(query)) and is_binary(request_id) and is_binary(run_id) do
     ReActState.new(query, context.system_prompt, request_id: request_id, run_id: run_id)
     |> Map.put(:context, context)
   end

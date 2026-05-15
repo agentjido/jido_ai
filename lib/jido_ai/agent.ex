@@ -518,9 +518,9 @@ defmodule Jido.AI.Agent do
           {:ok, result} = MyAgent.await(request)
 
       """
-      @spec ask(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+      @spec ask(pid() | atom() | {:via, module(), term()}, String.t() | [ReqLLM.Message.ContentPart.t()], keyword()) ::
               {:ok, Request.Handle.t()} | {:error, term()}
-      def ask(pid, query, opts \\ []) when is_binary(query) do
+      def ask(pid, query, opts \\ []) when is_binary(query) or is_list(query) do
         Request.create_and_send(
           pid,
           query,
@@ -552,9 +552,13 @@ defmodule Jido.AI.Agent do
           {:ok, result} = MyAgent.await(request)
 
       """
-      @spec ask_stream(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+      @spec ask_stream(
+              pid() | atom() | {:via, module(), term()},
+              String.t() | [ReqLLM.Message.ContentPart.t()],
+              keyword()
+            ) ::
               {:ok, %{request: Request.Handle.t(), events: Enumerable.t()}} | {:error, term()}
-      def ask_stream(pid, query, opts \\ []) when is_binary(query) do
+      def ask_stream(pid, query, opts \\ []) when is_binary(query) or is_list(query) do
         opts = Keyword.put(opts, :stream_to, {:pid, self()})
 
         with {:ok, request} <- ask(pid, query, opts) do
@@ -611,9 +615,13 @@ defmodule Jido.AI.Agent do
           {:ok, result} = MyAgent.ask_sync(pid, "What is 2+2?", timeout: 10_000)
 
       """
-      @spec ask_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+      @spec ask_sync(
+              pid() | atom() | {:via, module(), term()},
+              String.t() | [ReqLLM.Message.ContentPart.t()],
+              keyword()
+            ) ::
               {:ok, any()} | {:error, term()}
-      def ask_sync(pid, query, opts \\ []) when is_binary(query) do
+      def ask_sync(pid, query, opts \\ []) when is_binary(query) or is_list(query) do
         Request.send_and_await(
           pid,
           query,
