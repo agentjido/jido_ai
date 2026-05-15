@@ -65,7 +65,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
         tool_name: tool_name,
         result:
           {:error,
-           SignalHelpers.normalize_error(error, :execution_error, "Tool execution failed", %{tool_name: tool_name}), []},
+           SignalHelpers.normalize_error(error, :execution_error, "Tool execution failed", %{tool_name: tool_name}),
+           []},
         metadata: metadata
       })
 

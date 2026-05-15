@@ -504,6 +504,7 @@ defmodule Jido.AI.Agent do
       - `:tools` - Request-scoped tool registry override for this run only
       - `:allowed_tools` - Request-scoped allowlist of tool names
       - `:request_transformer` - Module implementing per-turn ReAct request shaping
+      - `:max_iterations` - Request-scoped maximum reasoning iterations
       - `:stream_timeout_ms` - Request-scoped runtime inactivity timeout.
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
@@ -599,6 +600,7 @@ defmodule Jido.AI.Agent do
       - `:tools` - Request-scoped tool registry override for this run only
       - `:allowed_tools` - Request-scoped allowlist of tool names
       - `:request_transformer` - Module implementing per-turn ReAct request shaping
+      - `:max_iterations` - Request-scoped maximum reasoning iterations
       - `:stream_timeout_ms` - Request-scoped runtime inactivity timeout.
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
