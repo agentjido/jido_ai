@@ -892,8 +892,8 @@ defmodule Jido.AI.Agent do
       @impl true
       @spec restore(map(), map()) :: {:ok, Jido.Agent.t()} | {:error, term()}
       def restore(data, ctx) when is_map(data) and is_map(ctx) do
-        agent = new(id: data[:id] || data["id"])
-        base_state = data[:state] || data["state"] || %{}
+        agent = new(id: data[:id])
+        base_state = data[:state] || %{}
         agent = %{agent | state: Map.merge(agent.state, base_state)}
         externalized_keys = data[:externalized_keys] || %{}
 

@@ -736,12 +736,6 @@ defmodule Jido.AI.ContextTest do
       messages =
         original.entries
         |> Enum.reverse()
-        |> Enum.map(fn entry ->
-          case entry do
-            %{role: :user, content: c} -> %{role: :user, content: c}
-            %{role: :assistant, content: c} -> %{role: :assistant, content: c}
-          end
-        end)
 
       # Rebuild
       rebuilt =

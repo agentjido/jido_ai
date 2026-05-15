@@ -114,11 +114,9 @@ defmodule Jido.AI.Reasoning.ReAct.Token do
   end
 
   defp decode_payload(payload_bin) do
-    try do
-      {:ok, :erlang.binary_to_term(payload_bin, [:safe])}
-    rescue
-      _ -> {:error, :invalid_token_payload}
-    end
+    {:ok, :erlang.binary_to_term(payload_bin, [:safe])}
+  rescue
+    _ -> {:error, :invalid_token_payload}
   end
 
   defp validate_payload(payload, %Config{} = config) when is_map(payload) do
