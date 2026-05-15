@@ -6,6 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Query
   alias Jido.AI.Reasoning.ReAct.{Config, Event, Runner, Signal}
 
   @start :react_worker_start
@@ -22,7 +23,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
         Zoi.object(%{
           request_id: Zoi.string(),
           run_id: Zoi.string(),
-          query: Zoi.string(),
+          query: Query.schema(),
           config: Zoi.any(),
           state: Zoi.any() |> Zoi.optional(),
           context: Zoi.map() |> Zoi.default(%{}),

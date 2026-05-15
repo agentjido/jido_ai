@@ -3,6 +3,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Continue do
   Continue a ReAct runtime execution from a signed checkpoint token.
   """
 
+  alias Jido.AI.Query
+
   use Jido.Action,
     name: "react_continue",
     description: "Resume a Task-based ReAct runtime stream from checkpoint token",
@@ -12,7 +14,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Continue do
     schema:
       Zoi.object(%{
         checkpoint_token: Zoi.string(description: "Signed ReAct checkpoint token"),
-        query: Zoi.string() |> Zoi.optional(),
+        query: Query.schema() |> Zoi.optional(),
         model: Zoi.any() |> Zoi.optional(),
         system_prompt: Zoi.string() |> Zoi.optional(),
         tools: Zoi.any() |> Zoi.optional(),
@@ -43,8 +45,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Continue do
         runtime_context: Zoi.map() |> Zoi.optional()
       })
 
-  alias Jido.AI.Reasoning.ReAct.Actions.Helpers
   alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.Reasoning.ReAct.Actions.Helpers
 
   @impl Jido.Action
   def run(params, context) do

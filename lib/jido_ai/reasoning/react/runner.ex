@@ -6,8 +6,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   state outside of caller-owned checkpoint tokens.
   """
 
-  alias Jido.AI.PendingInputServer
   alias Jido.AI.Output
+  alias Jido.AI.PendingInputServer
+  alias Jido.AI.Query
   alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token, ToolSelection}
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
@@ -36,7 +37,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   Starts a new ReAct coordinator task and returns a lazy event stream.
   """
   @spec stream(String.t(), Config.t(), [stream_opt()]) :: Enumerable.t()
-  def stream(query, %Config{} = config, opts \\ []) when is_binary(query) do
+  def stream(query, %Config{} = config, opts \\ []) when is_binary(query) or is_list(query) do
     initial_state =
       case Keyword.get(opts, :state) do
         %State{} = state -> state
@@ -56,6 +57,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     state =
       case query do
         q when is_binary(q) and q != "" -> append_query(state, q)
+        q when is_list(q) -> append_query(state, q)
         _ -> state
       end
 
@@ -515,11 +517,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp extract_response_id(%ReqLLM.Response{message: %ReqLLM.Message{metadata: metadata}})
        when is_map(metadata) do
-    metadata[:response_id] || metadata["response_id"]
+    metadata[:response_id]
   end
 
   defp extract_response_id(%{message: %{metadata: metadata}}) when is_map(metadata) do
-    metadata[:response_id] || metadata["response_id"]
+    metadata[:response_id]
   end
 
   defp extract_response_id(_), do: nil
@@ -761,9 +763,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp maybe_apply_tool_guardrail_callback(tool_call, context) when is_map(context) do
-    callback =
-      Map.get(context, :__tool_guardrail_callback__) ||
-        Map.get(context, "__tool_guardrail_callback__")
+    callback = context[:__tool_guardrail_callback__]
 
     case callback do
       fun when is_function(fun, 1) -> fun.(tool_call)
@@ -1150,11 +1150,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp latest_query(%State{} = state) do
     case AIContext.last_entry(state.context) do
       %{role: :user, content: content} when is_binary(content) -> content
+      %{role: :user, content: content} when is_list(content) -> Query.summarize(content)
       _ -> ""
     end
   end
 
-  defp append_query(%State{} = state, query) when is_binary(query) do
+  defp append_query(%State{} = state, query) when is_binary(query) or is_list(query) do
     %{state | context: AIContext.append_user(state.context, query), status: :running, updated_at_ms: now_ms()}
   end
 
@@ -1556,8 +1557,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp tool_call_signature(tool_calls) when is_list(tool_calls) do
     tool_calls
     |> Enum.map(fn tc ->
-      name = Map.get(tc, :name) || Map.get(tc, "name") || ""
-      args = Map.get(tc, :arguments) || Map.get(tc, "arguments") || ""
+      name = Map.get(tc, :name, "")
+      args = Map.get(tc, :arguments, "")
       "#{name}:#{inspect(args)}"
     end)
     |> Enum.sort()

@@ -414,7 +414,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
         execute_action_instructions(agent, instructions, ctx)
 
       %{params: params} ->
-        prompt = Map.get(params, :prompt) || Map.get(params, "prompt") || ""
+        prompt = params[:prompt] || ""
 
         # Select strategy
         {strategy_type, complexity_score, task_type} =

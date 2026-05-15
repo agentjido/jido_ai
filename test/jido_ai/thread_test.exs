@@ -59,6 +59,16 @@ defmodule Jido.AI.ContextTest do
       assert first.content == "First"
       assert second.content == "Second"
     end
+
+    test "appends multimodal user content" do
+      parts = [ContentPart.text("Describe this"), ContentPart.image_url("data:image/png;base64,AQID")]
+
+      thread =
+        AIContext.new()
+        |> AIContext.append_user(parts)
+
+      assert [%{role: :user, content: ^parts}] = AIContext.to_messages(thread)
+    end
   end
 
   describe "append_assistant/3" do
@@ -726,12 +736,6 @@ defmodule Jido.AI.ContextTest do
       messages =
         original.entries
         |> Enum.reverse()
-        |> Enum.map(fn entry ->
-          case entry do
-            %{role: :user, content: c} -> %{role: :user, content: c}
-            %{role: :assistant, content: c} -> %{role: :assistant, content: c}
-          end
-        end)
 
       # Rebuild
       rebuilt =

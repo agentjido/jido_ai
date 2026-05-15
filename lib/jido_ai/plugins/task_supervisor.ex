@@ -60,11 +60,6 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
 
   # Starts a new anonymous Task.Supervisor.
   defp start_supervisor do
-    # Start the supervisor without a name (anonymous)
-    # This ensures each agent instance gets its own supervisor
-    case Task.Supervisor.start_link() do
-      {:ok, pid} -> {:ok, pid}
-      {:error, reason} -> {:error, reason}
-    end
+    Task.Supervisor.start_link()
   end
 end

@@ -41,14 +41,10 @@ defmodule Jido.AI.Output do
   def new(attrs) when is_list(attrs) or is_map(attrs) do
     attrs = Map.new(attrs)
 
-    schema =
-      Map.get(attrs, :schema) ||
-        Map.get(attrs, "schema") ||
-        Map.get(attrs, :object_schema) ||
-        Map.get(attrs, "object_schema")
+    schema = attrs[:schema] || attrs[:object_schema]
 
-    retries = Map.get(attrs, :retries, Map.get(attrs, "retries", @default_retries))
-    mode = Map.get(attrs, :on_validation_error, Map.get(attrs, "on_validation_error", @default_on_validation_error))
+    retries = Map.get(attrs, :retries, @default_retries)
+    mode = Map.get(attrs, :on_validation_error, @default_on_validation_error)
 
     with {:ok, schema_kind} <- schema_kind(schema),
          {:ok, retries} <- normalize_retries(retries),
@@ -224,8 +220,8 @@ defmodule Jido.AI.Output do
   @doc false
   @spec imported_schema?(term()) :: boolean()
   def imported_schema?(%{} = schema) do
-    type = Map.get(schema, "type") || Map.get(schema, :type)
-    properties = Map.get(schema, "properties") || Map.get(schema, :properties)
+    type = schema[:type]
+    properties = schema[:properties]
     type in ["object", :object] and is_map(properties)
   end
 

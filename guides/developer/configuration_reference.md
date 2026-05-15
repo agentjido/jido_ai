@@ -73,7 +73,7 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
 
 - await timeout: `30_000ms`
 - max retained requests per agent state: `100`
-- request-scoped ReAct overrides: `tools`, `allowed_tools`, `request_transformer`, `tool_context`, `req_http_options`, `llm_opts`
+- request-scoped ReAct overrides: `tools`, `allowed_tools`, `request_transformer`, `max_iterations`, `tool_context`, `req_http_options`, `llm_opts`
 
 ## Security Defaults
 

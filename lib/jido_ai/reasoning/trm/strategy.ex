@@ -318,6 +318,7 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp process_instruction(agent, %Jido.Instruction{action: action, params: params} = instruction, ctx) do
+    params = normalize_keys(params)
     normalized_action = normalize_action(action)
     state = StratState.get(agent, %{})
 
@@ -353,14 +354,14 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   defp normalize_action(action), do: action
 
   defp to_machine_msg(@start, params, _status) do
-    prompt = Map.get(params, :prompt) || Map.get(params, "prompt")
-    request_id = Map.get(params, :request_id) || Map.get(params, "request_id") || Machine.generate_call_id()
+    prompt = params[:prompt]
+    request_id = params[:request_id] || Machine.generate_call_id()
     {:start, prompt, request_id}
   end
 
   defp to_machine_msg(@llm_result, params, status) do
-    call_id = Map.get(params, :call_id) || Map.get(params, "call_id")
-    result = Map.get(params, :result) || Map.get(params, "result")
+    call_id = params[:call_id]
+    result = params[:result]
     phase = resolve_result_phase(params, result, status)
 
     # Convert to appropriate machine message based on phase
@@ -373,9 +374,9 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   end
 
   defp to_machine_msg(@llm_partial, params, _status) do
-    call_id = Map.get(params, :call_id) || Map.get(params, "call_id")
-    delta = Map.get(params, :delta) || Map.get(params, "delta")
-    chunk_type = Map.get(params, :chunk_type) || Map.get(params, "chunk_type") || :content
+    call_id = params[:call_id]
+    delta = params[:delta]
+    chunk_type = params[:chunk_type] || :content
     {:llm_partial, call_id, delta, chunk_type}
   end
 
@@ -391,20 +392,18 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   end
 
   defp extract_phase_from_params(params) when is_map(params) do
-    Map.get(params, :phase) ||
-      Map.get(params, "phase") ||
-      (params[:metadata] && extract_phase_from_metadata(params[:metadata])) ||
-      (params["metadata"] && extract_phase_from_metadata(params["metadata"]))
+    params[:phase] ||
+      (params[:metadata] && extract_phase_from_metadata(params[:metadata]))
   end
 
   defp extract_phase_from_result({:ok, result}) when is_map(result) do
-    extract_phase_from_metadata(Map.get(result, :metadata) || Map.get(result, "metadata"))
+    extract_phase_from_metadata(result[:metadata])
   end
 
   defp extract_phase_from_result(_), do: nil
 
   defp extract_phase_from_metadata(metadata) when is_map(metadata) do
-    Map.get(metadata, :phase) || Map.get(metadata, "phase")
+    metadata[:phase]
   end
 
   defp extract_phase_from_metadata(_), do: nil
@@ -421,9 +420,9 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   defp normalize_phase(_), do: nil
 
   defp process_request_error(agent, params) do
-    request_id = Map.get(params, :request_id) || Map.get(params, "request_id")
-    reason = Map.get(params, :reason) || Map.get(params, "reason")
-    message = Map.get(params, :message) || Map.get(params, "message")
+    request_id = params[:request_id]
+    reason = params[:reason]
+    message = params[:message]
 
     if is_binary(request_id) do
       state = StratState.get(agent, %{})
@@ -617,4 +616,15 @@ defmodule Jido.AI.Reasoning.TRM.Strategy do
   def default_improvement_prompt do
     Supervision.default_improvement_system_prompt()
   end
+
+  defp normalize_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_binary(k) -> {String.to_existing_atom(k), v}
+      pair -> pair
+    end)
+  rescue
+    ArgumentError -> map
+  end
+
+  defp normalize_keys(other), do: other
 end
