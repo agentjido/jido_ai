@@ -58,14 +58,15 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
     agent_pid = self()
     metadata = Map.get(directive, :metadata, %{})
 
+    normalized_error =
+      SignalHelpers.normalize_error(error, :execution_error, "Tool execution failed", %{tool_name: tool_name})
+
     # Emit the error result synchronously (no task needed)
     signal =
       Signal.ToolResult.new!(%{
         call_id: call_id,
         tool_name: tool_name,
-        result:
-          {:error,
-           SignalHelpers.normalize_error(error, :execution_error, "Tool execution failed", %{tool_name: tool_name}), []},
+        result: {:error, normalized_error, []},
         metadata: metadata
       })
 

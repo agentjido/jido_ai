@@ -8,6 +8,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Config
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReActStrategy
+  alias ReqLLM.Message.ContentPart
 
   defmodule RetryTool do
     use Jido.Action,
@@ -198,6 +199,32 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end)
 
     :ok
+  end
+
+  test "streams multimodal user content to ReqLLM" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      send(parent, {:messages, messages})
+
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("I can see it")],
+         %{finish_reason: :stop},
+         model
+       )}
+    end)
+
+    image = ContentPart.image_url("data:image/png;base64,AQID")
+    query = [ContentPart.text("Describe this"), image]
+    config = Config.new(%{model: :capable, tools: %{}})
+
+    events = ReAct.stream(query, config, request_id: "req_multimodal", run_id: "run_multimodal") |> Enum.to_list()
+
+    assert_receive {:messages, messages}
+    assert Enum.any?(events, &(&1.kind == :request_started and &1.data.query =~ "[Image]"))
+    assert [%{role: :user, content: [text, ^image]}] = messages
+    assert text.text == "Describe this"
   end
 
   test "emits ordered event envelopes for a final-answer run" do

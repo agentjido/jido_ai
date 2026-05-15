@@ -567,8 +567,8 @@ defmodule Jido.AI.Reasoning.Helpers do
   defp extract_plugin_state(%Agent{} = agent, %{agent_module: agent_module})
        when is_atom(agent_module) do
     if function_exported?(agent_module, :plugin_specs, 0) do
-      Enum.reduce(agent_module.plugin_specs(), %{}, fn spec, acc ->
-        Map.put(acc, spec.state_key, Map.get(agent.state, spec.state_key))
+      Map.new(agent_module.plugin_specs(), fn spec ->
+        {spec.state_key, Map.get(agent.state, spec.state_key)}
       end)
     else
       agent.state || %{}

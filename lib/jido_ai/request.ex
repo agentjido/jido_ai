@@ -61,6 +61,7 @@ defmodule Jido.AI.Request do
   """
 
   alias Jido.AI.Request.Stream, as: RequestStream
+  alias Jido.AI.Query
   alias Jido.Signal
 
   @type status :: :pending | :completed | :failed | :timeout
@@ -86,7 +87,7 @@ defmodule Jido.AI.Request do
               %{
                 id: Zoi.string(description: "Unique request identifier (UUID)"),
                 server: Zoi.any(description: "The agent server (pid, atom, or via tuple)"),
-                query: Zoi.string(description: "The original query/prompt"),
+                query: Query.schema(description: "The original query/prompt"),
                 status:
                   Zoi.enum([:pending, :completed, :failed, :timeout],
                     description: "Current request status"
@@ -157,6 +158,7 @@ defmodule Jido.AI.Request do
   - `:tools` - ReAct-only request-scoped tool registry override for this run
   - `:allowed_tools` - ReAct-only request-scoped allowlist of tool names
   - `:request_transformer` - ReAct-only module implementing per-turn request shaping
+  - `:max_iterations` - ReAct-only request-scoped maximum reasoning iterations
   - `:stream_timeout_ms` - ReAct-only request-scoped runtime inactivity timeout.
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
@@ -180,15 +182,16 @@ defmodule Jido.AI.Request do
         source: "/ai/react/agent"
       )
   """
-  @spec create_and_send(server(), String.t(), keyword()) ::
+  @spec create_and_send(server(), String.t() | [ReqLLM.Message.ContentPart.t()], keyword()) ::
           {:ok, Handle.t()} | {:error, term()}
-  def create_and_send(server, query, opts) when is_binary(query) do
+  def create_and_send(server, query, opts) when is_binary(query) or is_list(query) do
     signal_type = Keyword.fetch!(opts, :signal_type)
     source = Keyword.fetch!(opts, :source)
     tool_context = Keyword.get(opts, :tool_context, %{})
     tools = Keyword.get(opts, :tools)
     allowed_tools = Keyword.get(opts, :allowed_tools)
     request_transformer = Keyword.get(opts, :request_transformer)
+    max_iterations = Keyword.get(opts, :max_iterations)
     stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms))
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
@@ -207,6 +210,7 @@ defmodule Jido.AI.Request do
         |> maybe_add_tools(tools)
         |> maybe_add_allowed_tools(allowed_tools)
         |> maybe_add_request_transformer(request_transformer)
+        |> maybe_add_max_iterations(max_iterations)
         |> maybe_add_stream_timeout_ms(stream_timeout_ms)
         |> maybe_add_req_http_options(req_http_options)
         |> maybe_add_llm_opts(llm_opts)
@@ -245,9 +249,9 @@ defmodule Jido.AI.Request do
         source: "/ai/react/agent"
       )
   """
-  @spec send_and_await(server(), String.t(), keyword()) ::
+  @spec send_and_await(server(), String.t() | [ReqLLM.Message.ContentPart.t()], keyword()) ::
           {:ok, any()} | {:error, term()}
-  def send_and_await(server, query, opts) when is_binary(query) do
+  def send_and_await(server, query, opts) when is_binary(query) or is_list(query) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
 
     with {:ok, request} <- create_and_send(server, query, opts) do
@@ -560,6 +564,13 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_stream_timeout_ms(payload, _), do: payload
+
+  defp maybe_add_max_iterations(payload, max_iterations)
+       when is_integer(max_iterations) and max_iterations > 0 do
+    Map.put(payload, :max_iterations, max_iterations)
+  end
+
+  defp maybe_add_max_iterations(payload, _), do: payload
 
   defp maybe_add_stream_to(payload, nil), do: payload
   defp maybe_add_stream_to(payload, stream_to), do: Map.put(payload, :stream_to, stream_to)

@@ -504,6 +504,7 @@ defmodule Jido.AI.Agent do
       - `:tools` - Request-scoped tool registry override for this run only
       - `:allowed_tools` - Request-scoped allowlist of tool names
       - `:request_transformer` - Module implementing per-turn ReAct request shaping
+      - `:max_iterations` - Request-scoped maximum reasoning iterations
       - `:stream_timeout_ms` - Request-scoped runtime inactivity timeout.
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
@@ -518,9 +519,9 @@ defmodule Jido.AI.Agent do
           {:ok, result} = MyAgent.await(request)
 
       """
-      @spec ask(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+      @spec ask(pid() | atom() | {:via, module(), term()}, String.t() | [ReqLLM.Message.ContentPart.t()], keyword()) ::
               {:ok, Request.Handle.t()} | {:error, term()}
-      def ask(pid, query, opts \\ []) when is_binary(query) do
+      def ask(pid, query, opts \\ []) when is_binary(query) or is_list(query) do
         Request.create_and_send(
           pid,
           query,
@@ -552,9 +553,13 @@ defmodule Jido.AI.Agent do
           {:ok, result} = MyAgent.await(request)
 
       """
-      @spec ask_stream(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+      @spec ask_stream(
+              pid() | atom() | {:via, module(), term()},
+              String.t() | [ReqLLM.Message.ContentPart.t()],
+              keyword()
+            ) ::
               {:ok, %{request: Request.Handle.t(), events: Enumerable.t()}} | {:error, term()}
-      def ask_stream(pid, query, opts \\ []) when is_binary(query) do
+      def ask_stream(pid, query, opts \\ []) when is_binary(query) or is_list(query) do
         opts = Keyword.put(opts, :stream_to, {:pid, self()})
 
         with {:ok, request} <- ask(pid, query, opts) do
@@ -599,6 +604,7 @@ defmodule Jido.AI.Agent do
       - `:tools` - Request-scoped tool registry override for this run only
       - `:allowed_tools` - Request-scoped allowlist of tool names
       - `:request_transformer` - Module implementing per-turn ReAct request shaping
+      - `:max_iterations` - Request-scoped maximum reasoning iterations
       - `:stream_timeout_ms` - Request-scoped runtime inactivity timeout.
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
@@ -611,9 +617,13 @@ defmodule Jido.AI.Agent do
           {:ok, result} = MyAgent.ask_sync(pid, "What is 2+2?", timeout: 10_000)
 
       """
-      @spec ask_sync(pid() | atom() | {:via, module(), term()}, String.t(), keyword()) ::
+      @spec ask_sync(
+              pid() | atom() | {:via, module(), term()},
+              String.t() | [ReqLLM.Message.ContentPart.t()],
+              keyword()
+            ) ::
               {:ok, any()} | {:error, term()}
-      def ask_sync(pid, query, opts \\ []) when is_binary(query) do
+      def ask_sync(pid, query, opts \\ []) when is_binary(query) or is_list(query) do
         Request.send_and_await(
           pid,
           query,
@@ -884,8 +894,8 @@ defmodule Jido.AI.Agent do
       @impl true
       @spec restore(map(), map()) :: {:ok, Jido.Agent.t()} | {:error, term()}
       def restore(data, ctx) when is_map(data) and is_map(ctx) do
-        agent = new(id: data[:id] || data["id"])
-        base_state = data[:state] || data["state"] || %{}
+        agent = new(id: data[:id])
+        base_state = data[:state] || %{}
         agent = %{agent | state: Map.merge(agent.state, base_state)}
         externalized_keys = data[:externalized_keys] || %{}
 
