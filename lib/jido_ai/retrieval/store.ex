@@ -20,11 +20,12 @@ defmodule Jido.AI.Retrieval.Store do
   @spec upsert(String.t(), memory()) :: memory()
   def upsert(namespace, memory) when is_binary(namespace) and is_map(memory) do
     ensure_table!()
+    memory = normalize_keys(memory)
 
     now = System.system_time(:millisecond)
-    id = to_string(Map.get(memory, :id) || Map.get(memory, "id") || "mem_#{Jido.Util.generate_id()}")
-    text = to_string(Map.get(memory, :text) || Map.get(memory, "text") || "")
-    metadata = Map.get(memory, :metadata) || Map.get(memory, "metadata") || %{}
+    id = to_string(memory[:id] || "mem_#{Jido.Util.generate_id()}")
+    text = to_string(memory[:text] || "")
+    metadata = memory[:metadata] || %{}
 
     existing =
       case :ets.lookup(@table, {namespace, id}) do
@@ -181,5 +182,14 @@ defmodule Jido.AI.Retrieval.Store do
       _ ->
         heir_loop()
     end
+  end
+
+  defp normalize_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_binary(k) -> {String.to_existing_atom(k), v}
+      pair -> pair
+    end)
+  rescue
+    ArgumentError -> map
   end
 end

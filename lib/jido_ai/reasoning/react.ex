@@ -14,8 +14,8 @@ defmodule Jido.AI.Reasoning.ReAct do
   @doc """
   Starts a new ReAct run and returns a lazy event stream.
   """
-  @spec stream(String.t(), config_input(), keyword()) :: Enumerable.t()
-  def stream(query, config, opts \\ []) when is_binary(query) and is_list(opts) do
+  @spec stream(String.t() | [ReqLLM.Message.ContentPart.t()], config_input(), keyword()) :: Enumerable.t()
+  def stream(query, config, opts \\ []) when (is_binary(query) or is_list(query)) and is_list(opts) do
     config = build_config(config)
     Runner.stream(query, config, opts)
   end
@@ -32,8 +32,8 @@ defmodule Jido.AI.Reasoning.ReAct do
   @doc """
   Runs ReAct to completion and returns an aggregated result map.
   """
-  @spec run(String.t(), config_input(), keyword()) :: map()
-  def run(query, config, opts \\ []) when is_binary(query) and is_list(opts) do
+  @spec run(String.t() | [ReqLLM.Message.ContentPart.t()], config_input(), keyword()) :: map()
+  def run(query, config, opts \\ []) when (is_binary(query) or is_list(query)) and is_list(opts) do
     query
     |> stream(config, opts)
     |> collect_stream()
@@ -42,8 +42,9 @@ defmodule Jido.AI.Reasoning.ReAct do
   @doc """
   Starts a run and returns run metadata plus a stream handle.
   """
-  @spec start(String.t(), config_input(), keyword()) :: {:ok, map()} | {:error, term()}
-  def start(query, config, opts \\ []) when is_binary(query) and is_list(opts) do
+  @spec start(String.t() | [ReqLLM.Message.ContentPart.t()], config_input(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def start(query, config, opts \\ []) when (is_binary(query) or is_list(query)) and is_list(opts) do
     config = build_config(config)
 
     state = State.new(query, config.system_prompt, Keyword.take(opts, [:request_id, :run_id]))

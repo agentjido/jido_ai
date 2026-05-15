@@ -3,6 +3,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
   Start a ReAct runtime execution and return an event stream.
   """
 
+  alias Jido.AI.Query
+
   use Jido.Action,
     name: "react_start",
     description: "Start a Task-based ReAct runtime stream",
@@ -11,7 +13,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
     vsn: "1.0.0",
     schema:
       Zoi.object(%{
-        query: Zoi.string(description: "User query for ReAct execution"),
+        query: Query.schema(description: "User query for ReAct execution"),
         request_id: Zoi.string() |> Zoi.optional(),
         run_id: Zoi.string() |> Zoi.optional(),
         model: Zoi.any() |> Zoi.optional(),
@@ -44,30 +46,47 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
         runtime_context: Zoi.map() |> Zoi.optional()
       })
 
-  alias Jido.AI.Reasoning.ReAct.Actions.Helpers
   alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.Reasoning.ReAct.Actions.Helpers
   alias Jido.AI.Validation
 
   @impl Jido.Action
   def run(params, context) do
-    with {:ok, _} <- Validation.validate_string(params[:query], max_length: Validation.max_input_length()) do
-      config = Helpers.build_config(params, context)
-      opts = Helpers.build_runner_opts(params, context)
-      request_id = params[:request_id] || "req_#{Jido.Util.generate_id()}"
-      run_id = params[:run_id] || "run_#{Jido.Util.generate_id()}"
+    case validate_query(params[:query]) do
+      :ok ->
+        config = Helpers.build_config(params, context)
+        opts = Helpers.build_runner_opts(params, context)
+        request_id = params[:request_id] || "req_#{Jido.Util.generate_id()}"
+        run_id = params[:run_id] || "run_#{Jido.Util.generate_id()}"
 
-      events = ReAct.stream(params[:query], config, Keyword.merge(opts, request_id: request_id, run_id: run_id))
+        events = ReAct.stream(params[:query], config, Keyword.merge(opts, request_id: request_id, run_id: run_id))
 
-      {:ok,
-       %{
-         run_id: run_id,
-         request_id: request_id,
-         events: events,
-         checkpoint_token: nil
-       }}
-    else
-      {:error, :empty_string} -> {:error, :query_required}
-      {:error, reason} -> {:error, reason}
+        {:ok,
+         %{
+           run_id: run_id,
+           request_id: request_id,
+           events: events,
+           checkpoint_token: nil
+         }}
+
+      {:error, :empty_string} ->
+        {:error, :query_required}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
+
+  defp validate_query(query) when is_binary(query) do
+    case Validation.validate_string(query, max_length: Validation.max_input_length()) do
+      {:ok, _query} -> :ok
+      error -> error
+    end
+  end
+
+  defp validate_query([_ | _] = query) do
+    Query.validate_content_parts(query, [])
+  end
+
+  defp validate_query(_query), do: {:error, :query_required}
 end

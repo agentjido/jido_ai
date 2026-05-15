@@ -326,11 +326,12 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
   defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 
   defp process_instruction(agent, %{action: @start, params: params}, _ctx) do
+    params = normalize_keys(params)
     state = StratState.get(agent, %{})
     machine = Machine.from_map(state)
 
-    prompt = Map.get(params, :prompt) || Map.get(params, "prompt")
-    request_id = Map.get(params, :request_id) || Map.get(params, "request_id") || Machine.generate_call_id()
+    prompt = params[:prompt]
+    request_id = params[:request_id] || Machine.generate_call_id()
 
     {updated_machine, directives} = Machine.update(machine, {:start, prompt, request_id}, %{})
     lifted = lift_directives(directives, state)
@@ -351,11 +352,12 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
   end
 
   defp process_instruction(agent, %{action: @llm_result, params: params}, _ctx) do
+    params = normalize_keys(params)
     state = StratState.get(agent, %{})
     machine = Machine.from_map(state)
 
-    call_id = Map.get(params, :call_id) || Map.get(params, "call_id")
-    result = Map.get(params, :result) || Map.get(params, "result")
+    call_id = params[:call_id]
+    result = params[:result]
 
     {updated_machine, directives} = Machine.update(machine, {:llm_result, call_id, result}, %{})
     lifted = lift_directives(directives, state)
@@ -372,12 +374,13 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
   end
 
   defp process_instruction(agent, %{action: @llm_partial, params: params}, _ctx) do
+    params = normalize_keys(params)
     state = StratState.get(agent, %{})
     machine = Machine.from_map(state)
 
-    call_id = Map.get(params, :call_id) || Map.get(params, "call_id")
-    delta = Map.get(params, :delta) || Map.get(params, "delta")
-    chunk_type = Map.get(params, :chunk_type) || Map.get(params, "chunk_type") || :content
+    call_id = params[:call_id]
+    delta = params[:delta]
+    chunk_type = params[:chunk_type] || :content
 
     {updated_machine, directives} =
       Machine.update(machine, {:llm_partial, call_id, delta, chunk_type}, %{})
@@ -395,9 +398,10 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
   end
 
   defp process_instruction(agent, %{action: @request_error, params: params}, _ctx) do
-    request_id = Map.get(params, :request_id) || Map.get(params, "request_id")
-    reason = Map.get(params, :reason) || Map.get(params, "reason")
-    message = Map.get(params, :message) || Map.get(params, "message")
+    params = normalize_keys(params)
+    request_id = params[:request_id]
+    reason = params[:reason]
+    message = params[:message]
 
     if is_binary(request_id) do
       state = StratState.get(agent, %{})
@@ -553,4 +557,15 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Strategy do
     {:ok, context} = Context.normalize(conversation, validate: false)
     Context.to_list(context)
   end
+
+  defp normalize_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_binary(k) -> {String.to_existing_atom(k), v}
+      pair -> pair
+    end)
+  rescue
+    ArgumentError -> map
+  end
+
+  defp normalize_keys(other), do: other
 end

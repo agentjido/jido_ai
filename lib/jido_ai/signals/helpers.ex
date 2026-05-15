@@ -307,18 +307,15 @@ defmodule Jido.AI.Signal.Helpers do
   defp extract_retry_hint(_), do: nil
 
   defp extract_nested_reason(%{} = map) do
-    Map.get(map, :reason) ||
-      Map.get(map, "reason") ||
-      if(is_atom(Map.get(map, :message)), do: Map.get(map, :message), else: nil) ||
-      if(is_atom(Map.get(map, "message")), do: Map.get(map, "message"), else: nil)
+    map[:reason] ||
+      if(is_atom(map[:message]), do: map[:message], else: nil)
   end
 
   defp extract_nested_reason(_), do: nil
 
   defp extract_retry_value(%{} = map) do
     cond do
-      Map.has_key?(map, :retry) -> Map.get(map, :retry)
-      Map.has_key?(map, "retry") -> Map.get(map, "retry")
+      Map.has_key?(map, :retry) -> map[:retry]
       true -> nil
     end
   end

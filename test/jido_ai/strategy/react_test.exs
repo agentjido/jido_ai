@@ -200,6 +200,48 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.pending_worker_start.config.llm.max_tokens == 4_096
     end
 
+    test "start preserves configured max_iterations when request omits override" do
+      agent = create_agent(tools: [TestCalculator], max_iterations: 4)
+
+      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_1"})
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.pending_worker_start.config.max_iterations == 4
+    end
+
+    test "start applies request-scoped max_iterations override to runtime config" do
+      agent = create_agent(tools: [TestCalculator], max_iterations: 4)
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          max_iterations: 2
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.pending_worker_start.config.max_iterations == 2
+    end
+
+    test "start ignores invalid request-scoped max_iterations override" do
+      agent = create_agent(tools: [TestCalculator], max_iterations: 4)
+
+      start_instruction =
+        instruction(ReAct.start_action(), %{
+          query: "What is 2 + 2?",
+          request_id: "req_1",
+          max_iterations: 0
+        })
+
+      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+
+      state = StratState.get(agent, %{})
+      assert state.pending_worker_start.config.max_iterations == 4
+    end
+
     test "start propagates stream_timeout_ms option into runtime config" do
       agent = create_agent(tools: [TestCalculator], stream_timeout_ms: 123_456)
 

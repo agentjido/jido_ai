@@ -4,8 +4,8 @@ defmodule Jido.AI.Skill.RuntimeContractsTest do
   alias Jido.AI.Skill
   alias Jido.AI.Skill.{Error, Loader, Prompt, Registry, Spec}
 
-  @code_review_skill Path.expand("../../../priv/skills/code-review/SKILL.md", __DIR__)
-  @skills_glob Path.expand("../../../priv/skills/**/SKILL.md", __DIR__)
+  @code_review_skill Application.app_dir(:jido_ai, "priv/skills/code-review/SKILL.md")
+  @skills_glob Application.app_dir(:jido_ai, "priv/skills/**/SKILL.md")
 
   setup do
     start_supervised!(Registry)
