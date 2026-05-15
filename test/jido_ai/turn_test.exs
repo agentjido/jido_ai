@@ -423,7 +423,9 @@ defmodule Jido.AI.TurnTest do
           handler_id,
           [:jido, :ai, :tool, :execute, :stop],
           fn _event, _measurements, metadata, _config ->
-            send(test_pid, {:stop_metadata, metadata})
+            if metadata[:tool_call_id] == "tc_run_tools_1" do
+              send(test_pid, {:stop_metadata, metadata})
+            end
           end,
           nil
         )
@@ -468,8 +470,10 @@ defmodule Jido.AI.TurnTest do
         :telemetry.attach(
           handler_id,
           [:jido, :ai, :tool, :execute, :stop],
-          fn _event, measurements, _metadata, _config ->
-            send(test_pid, {:stop_measurements, measurements})
+          fn _event, measurements, metadata, _config ->
+            if metadata[:tool_call_id] == "tc_duration_1" do
+              send(test_pid, {:stop_measurements, measurements})
+            end
           end,
           nil
         )
@@ -480,7 +484,7 @@ defmodule Jido.AI.TurnTest do
                Turn.execute_module(
                  Calculator,
                  %{operation: "add", a: 1, b: 2},
-                 %{observability: %{emit_telemetry?: true}}
+                 %{observability: %{emit_telemetry?: true}, call_id: "tc_duration_1"}
                )
 
       assert_receive {:stop_measurements, measurements}
@@ -498,7 +502,9 @@ defmodule Jido.AI.TurnTest do
           stop_handler_id,
           [:jido, :ai, :tool, :execute, :stop],
           fn _event, _measurements, metadata, _config ->
-            send(test_pid, {:stop_metadata, metadata})
+            if metadata[:tool_call_id] == "tc_meta_1" do
+              send(test_pid, {:stop_metadata, metadata})
+            end
           end,
           nil
         )
@@ -530,7 +536,9 @@ defmodule Jido.AI.TurnTest do
           start_handler_id,
           [:jido, :ai, :tool, :execute, :start],
           fn _event, _measurements, metadata, _config ->
-            send(test_pid, {:start_metadata, metadata})
+            if metadata[:tool_call_id] == "tc_ctx_1" do
+              send(test_pid, {:start_metadata, metadata})
+            end
           end,
           nil
         )
@@ -540,7 +548,9 @@ defmodule Jido.AI.TurnTest do
           stop_handler_id,
           [:jido, :ai, :tool, :execute, :stop],
           fn _event, _measurements, metadata, _config ->
-            send(test_pid, {:stop_metadata, metadata})
+            if metadata[:tool_call_id] == "tc_ctx_1" do
+              send(test_pid, {:stop_metadata, metadata})
+            end
           end,
           nil
         )
@@ -572,7 +582,9 @@ defmodule Jido.AI.TurnTest do
           stop_handler_id,
           [:jido, :ai, :tool, :execute, :stop],
           fn _event, _measurements, metadata, _config ->
-            send(test_pid, {:stop_metadata, metadata})
+            if metadata[:tool_call_id] == "tc_legacy_1" do
+              send(test_pid, {:stop_metadata, metadata})
+            end
           end,
           nil
         )

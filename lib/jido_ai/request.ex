@@ -158,6 +158,7 @@ defmodule Jido.AI.Request do
   - `:tools` - ReAct-only request-scoped tool registry override for this run
   - `:allowed_tools` - ReAct-only request-scoped allowlist of tool names
   - `:request_transformer` - ReAct-only module implementing per-turn request shaping
+  - `:max_iterations` - ReAct-only request-scoped maximum reasoning iterations
   - `:stream_timeout_ms` - ReAct-only request-scoped runtime inactivity timeout.
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
@@ -190,6 +191,7 @@ defmodule Jido.AI.Request do
     tools = Keyword.get(opts, :tools)
     allowed_tools = Keyword.get(opts, :allowed_tools)
     request_transformer = Keyword.get(opts, :request_transformer)
+    max_iterations = Keyword.get(opts, :max_iterations)
     stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms))
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
@@ -208,6 +210,7 @@ defmodule Jido.AI.Request do
         |> maybe_add_tools(tools)
         |> maybe_add_allowed_tools(allowed_tools)
         |> maybe_add_request_transformer(request_transformer)
+        |> maybe_add_max_iterations(max_iterations)
         |> maybe_add_stream_timeout_ms(stream_timeout_ms)
         |> maybe_add_req_http_options(req_http_options)
         |> maybe_add_llm_opts(llm_opts)
@@ -561,6 +564,13 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_stream_timeout_ms(payload, _), do: payload
+
+  defp maybe_add_max_iterations(payload, max_iterations)
+       when is_integer(max_iterations) and max_iterations > 0 do
+    Map.put(payload, :max_iterations, max_iterations)
+  end
+
+  defp maybe_add_max_iterations(payload, _), do: payload
 
   defp maybe_add_stream_to(payload, nil), do: payload
   defp maybe_add_stream_to(payload, stream_to), do: Map.put(payload, :stream_to, stream_to)
