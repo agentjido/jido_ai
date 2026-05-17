@@ -165,9 +165,6 @@ defmodule Jido.AI.Skill.Discovery do
           nil -> {:error, :not_found}
           skill -> {:ok, skill}
         end
-
-      {:error, _reason} ->
-        {:error, :not_found}
     end
   end
 
