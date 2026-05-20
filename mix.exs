@@ -104,7 +104,7 @@ defmodule JidoAi.MixProject do
         "doctor --summary --raise",
         "dialyzer"
       ],
-      docs: "docs -f html"
+      docs: "docs --open"
     ]
   end
 
@@ -134,6 +134,7 @@ defmodule JidoAi.MixProject do
   defp docs do
     [
       main: "readme",
+      formatters: ["html", "markdown"],
       source_ref: "v#{@version}",
       extras: [
         "README.md",
