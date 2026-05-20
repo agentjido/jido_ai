@@ -243,29 +243,24 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       |> State.clear_streaming()
       |> State.put_llm_call_id(call_id)
 
-    {state, _} =
-      emit_event(
-        state,
-        owner,
-        ref,
-        :llm_started,
-        %{
-          call_id: call_id,
-          model: config.model,
-          message_count:
-            AIContext.length(state.context) +
-              case state.context.system_prompt do
-                nil -> 0
-                _ -> 1
-              end
-        },
-        llm_call_id: call_id
-      )
-
     with {:ok, request} <- build_turn_request(state, config, runtime_context) do
       state = %{state | active_tools: request.tools}
 
-      case request_turn(state, owner, ref, config, request.messages, request.llm_opts) do
+      {state, _} =
+        emit_event(
+          state,
+          owner,
+          ref,
+          :llm_started,
+          %{
+            call_id: call_id,
+            model: Jido.AI.model_label(request.model),
+            message_count: length(request.messages)
+          },
+          llm_call_id: call_id
+        )
+
+      case request_turn(state, owner, ref, config, request.messages, request.llm_opts, request.model) do
         {:ok, state, turn, response_id} ->
           state =
             state
@@ -282,6 +277,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                   :llm_completed,
                   %{
                     call_id: call_id,
+                    model: turn.model,
                     turn_type: turn.type,
                     text: turn.text,
                     thinking_content: turn.thinking_content,
@@ -337,15 +333,24 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     base_request = %{
       messages: AIContext.to_messages(state.context),
       llm_opts: config |> Config.llm_opts() |> maybe_put_previous_response_id(state.llm_response_id),
-      tools: config.tools
+      tools: config.tools,
+      model: config.model
     }
 
     with {:ok, request} <- maybe_transform_request(base_request, state, config, runtime_context),
          request <- maybe_apply_output_instructions(request, config.output),
          {:ok, messages} <- normalize_request_messages(request),
          {:ok, tools} <- normalize_request_tools(request),
-         llm_opts <- sync_tools_in_llm_opts(config, request.llm_opts, tools) do
-      {:ok, %{messages: messages, llm_opts: maybe_put_openai_websocket_session(config, llm_opts), tools: tools}}
+         effective_model <- Map.get(request, :model, config.model),
+         llm_opts <- sync_tools_in_llm_opts(config, request.llm_opts, tools),
+         llm_opts <- maybe_put_openai_websocket_session(effective_model, llm_opts) do
+      {:ok,
+       %{
+         messages: messages,
+         llm_opts: llm_opts,
+         tools: tools,
+         model: effective_model
+       }}
     end
   end
 
@@ -370,6 +375,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp apply_request_overrides(request, overrides, %Config{} = config) when is_map(request) and is_map(overrides) do
+    # Resolve `:model` first so any per-turn provider swap is in place before
+    # we re-validate llm_opts overrides — `provider_options` keys differ per
+    # provider, so xAI-only keys (e.g. `xai_api`) must validate against xAI's
+    # schema, not the compile-time provider's schema.
+    request = maybe_put_request_model(request, Map.get(overrides, :model, Map.get(overrides, "model")))
+
     request
     |> maybe_put_request_field(:messages, Map.get(overrides, :messages, Map.get(overrides, "messages")))
     |> maybe_put_request_field(:tools, Map.get(overrides, :tools, Map.get(overrides, "tools")))
@@ -379,11 +390,22 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp maybe_put_request_field(request, _field, nil), do: request
   defp maybe_put_request_field(request, field, value), do: Map.put(request, field, value)
 
+  defp maybe_put_request_model(request, nil), do: request
+
+  defp maybe_put_request_model(request, model_override) do
+    Map.put(request, :model, Jido.AI.resolve_model(model_override))
+  end
+
   defp maybe_merge_request_llm_opts(request, _config, nil), do: request
 
   defp maybe_merge_request_llm_opts(request, %Config{} = config, llm_opts_override) do
+    # If a per-turn `:model` override was applied earlier in apply_request_overrides,
+    # validate the llm_opts overrides against THAT provider's schema. Otherwise
+    # fall back to the compile-time `config.model` schema (existing behavior).
+    effective_model = Map.get(request, :model, config.model)
+
     Map.update!(request, :llm_opts, fn base_opts ->
-      Config.merge_llm_opts(config, base_opts, llm_opts_override)
+      Config.merge_llm_opts(config, base_opts, llm_opts_override, effective_model)
     end)
   end
 
@@ -413,22 +435,22 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     |> Keyword.put(:tools, reqllm_tools)
   end
 
-  defp request_turn(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
+  defp request_turn(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts, model) do
     case config.streaming do
       false ->
-        request_turn_generate(state, config, messages, llm_opts)
+        request_turn_generate(state, config, messages, llm_opts, model)
 
       _ ->
-        request_turn_stream(state, owner, ref, config, messages, llm_opts)
+        request_turn_stream(state, owner, ref, config, messages, llm_opts, model)
     end
   end
 
-  defp request_turn_stream(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts) do
-    case ReqLLM.Generation.stream_text(config.model, messages, llm_opts) do
+  defp request_turn_stream(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts, model) do
+    case ReqLLM.Generation.stream_text(model, messages, llm_opts) do
       {:ok, stream_response} ->
         announce_stream_control(owner, ref, stream_response)
 
-        case consume_stream(state, owner, ref, config, stream_response) do
+        case consume_stream(state, owner, ref, config, stream_response, model) do
           {:ok, updated_state, turn, response_id} -> {:ok, updated_state, turn, response_id}
           {:error, updated_state, reason} -> {:error, updated_state, reason, :llm_stream}
         end
@@ -438,17 +460,17 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp request_turn_generate(%State{} = state, %Config{} = config, messages, llm_opts) do
-    case ReqLLM.Generation.generate_text(config.model, messages, llm_opts) do
+  defp request_turn_generate(%State{} = state, %Config{} = config, messages, llm_opts, model) do
+    case ReqLLM.Generation.generate_text(model, messages, llm_opts) do
       {:ok, response} ->
-        consume_generate(state, config, response)
+        consume_generate(state, config, response, model)
 
       {:error, reason} ->
         {:error, state, reason, :llm_request}
     end
   end
 
-  defp consume_stream(%State{} = state, owner, ref, %Config{} = config, stream_response) do
+  defp consume_stream(%State{} = state, owner, ref, %Config{} = config, stream_response, model) do
     check_cancel!(state, ref)
 
     trace_cfg = config.trace
@@ -460,14 +482,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
     case ReqLLM.StreamResponse.process_stream(
            stream_response,
-           stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms)
+           stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms, model)
          ) do
       {:ok, response} ->
         current_state = current_stream_state(state_key, state)
 
         turn =
           response
-          |> Turn.from_response(model: Jido.AI.model_label(config.model))
+          |> Turn.from_response(model: Jido.AI.model_label(model))
           |> apply_stream_accumulator(current_state)
 
         {:ok, current_state, turn, extract_response_id(response)}
@@ -483,8 +505,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     Process.delete(stream_signal_key(ref))
   end
 
-  defp consume_generate(%State{} = state, %Config{} = config, response) do
-    turn = Turn.from_response(response, model: Jido.AI.model_label(config.model))
+  defp consume_generate(%State{} = state, %Config{} = _config, response, model) do
+    turn = Turn.from_response(response, model: Jido.AI.model_label(model))
     {:ok, state, turn, extract_response_id(response)}
   rescue
     e ->
@@ -525,11 +547,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp normalize_provider_options(_options), do: []
 
-  defp maybe_put_openai_websocket_session(%Config{} = config, llm_opts) when is_list(llm_opts) do
+  defp maybe_put_openai_websocket_session(model, llm_opts) when is_list(llm_opts) do
     provider_options = llm_opts |> Keyword.get(:provider_options, []) |> normalize_provider_options()
 
-    if reuse_openai_websocket?(config, provider_options) and is_nil(provider_options[:openai_websocket_session]) do
-      case openai_websocket_session(config, llm_opts) do
+    if reuse_openai_websocket?(model, provider_options) and is_nil(provider_options[:openai_websocket_session]) do
+      case openai_websocket_session(model, llm_opts) do
         session when is_pid(session) ->
           Keyword.put(llm_opts, :provider_options, Keyword.put(provider_options, :openai_websocket_session, session))
 
@@ -541,14 +563,21 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp reuse_openai_websocket?(%Config{} = config, provider_options) do
-    openai_responses_websocket_model?(config.model) and truthy?(provider_options[:openai_reuse_websocket]) and
+  defp reuse_openai_websocket?(model, provider_options) do
+    openai_responses_websocket_model?(model) and truthy?(provider_options[:openai_reuse_websocket]) and
       provider_options[:openai_stream_transport] in [:websocket, "websocket"]
   end
 
   defp openai_responses_websocket_model?(model) when is_map(model) do
     Map.get(model, :provider) in [:openai, :openai_codex]
   end
+
+  defp openai_responses_websocket_model?({provider, _model_id, _provider_opts})
+       when provider in [:openai, :openai_codex],
+       do: true
+
+  defp openai_responses_websocket_model?({provider, _provider_opts}) when provider in [:openai, :openai_codex],
+    do: true
 
   defp openai_responses_websocket_model?(model) when is_binary(model) do
     String.starts_with?(model, ["openai:", "openai_codex:"])
@@ -558,13 +587,13 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp truthy?(value), do: value in [true, "true", 1, "1"]
 
-  defp openai_websocket_session(%Config{} = config, llm_opts) do
+  defp openai_websocket_session(model, llm_opts) do
     case Process.get(@openai_websocket_session_key) do
       session when is_pid(session) ->
         session
 
       _ ->
-        start_openai_websocket_session(config.model, llm_opts)
+        start_openai_websocket_session(model, llm_opts)
     end
   end
 
@@ -586,6 +615,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp openai_websocket_session_module(%{provider: :openai_codex}), do: ReqLLM.Providers.OpenAICodex
+  defp openai_websocket_session_module({:openai_codex, _model_id, _provider_opts}), do: ReqLLM.Providers.OpenAICodex
+  defp openai_websocket_session_module({:openai_codex, _provider_opts}), do: ReqLLM.Providers.OpenAICodex
   defp openai_websocket_session_module("openai_codex:" <> _model), do: ReqLLM.Providers.OpenAICodex
   defp openai_websocket_session_module(_model), do: ReqLLM.Providers.OpenAI
 
@@ -1194,19 +1225,19 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp delta_captured?(text, trace_cfg), do: trace_cfg[:capture_deltas?] == true and is_binary(text) and text != ""
 
-  defp stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms) do
+  defp stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms, model) do
     []
     |> Keyword.put(:on_chunk, fn chunk ->
       note_stream_chunk_activity(chunk, state_key, owner, ref, trace_cfg, heartbeat_interval_ms)
     end)
     |> maybe_put_stream_callback(trace_cfg, :on_result, fn text ->
-      emit_stream_delta(state_key, owner, ref, :content, text)
+      emit_stream_delta(state_key, owner, ref, :content, text, model)
     end)
     |> maybe_put_stream_callback(trace_cfg, :on_thinking, fn text ->
-      emit_stream_delta(state_key, owner, ref, :thinking, text)
+      emit_stream_delta(state_key, owner, ref, :thinking, text, model)
     end)
     |> maybe_put_stream_callback(trace_cfg, :on_tool_call, fn chunk ->
-      emit_stream_delta(state_key, owner, ref, :tool_call, chunk.name || "")
+      emit_stream_delta(state_key, owner, ref, :tool_call, chunk.name || "", model)
     end)
   end
 
@@ -1217,15 +1248,19 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp emit_stream_delta(_state_key, _owner, _ref, _chunk_type, text) when text in [nil, ""], do: :ok
+  defp emit_stream_delta(_state_key, _owner, _ref, _chunk_type, text, _model) when text in [nil, ""], do: :ok
 
-  defp emit_stream_delta(state_key, owner, ref, chunk_type, text) do
+  defp emit_stream_delta(state_key, owner, ref, chunk_type, text, model) do
     update_stream_state(state_key, fn
       %State{} = current_state ->
         current_state = append_stream_delta(current_state, chunk_type, text)
 
         {next_state, _} =
-          emit_event(current_state, owner, ref, :llm_delta, %{chunk_type: chunk_type, delta: text})
+          emit_event(current_state, owner, ref, :llm_delta, %{
+            chunk_type: chunk_type,
+            delta: text,
+            model: Jido.AI.model_label(model)
+          })
 
         next_state
 

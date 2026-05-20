@@ -245,12 +245,22 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
   @doc """
   Merge request-scoped LLM option overrides into an existing normalized option list.
+
+  The 3-arg form validates `provider_options` overrides against the compile-time
+  `config.model`'s schema. The 4-arg form takes an explicit `model_override` so
+  per-turn provider swaps (via a `request_transformer` returning `:model`) can
+  validate against the *runtime* provider's schema instead.
   """
   @spec merge_llm_opts(t(), keyword(), keyword() | map() | nil) :: keyword()
-  def merge_llm_opts(%__MODULE__{} = _config, base_opts, nil) when is_list(base_opts), do: base_opts
+  def merge_llm_opts(%__MODULE__{} = config, base_opts, overrides) when is_list(base_opts),
+    do: merge_llm_opts(config, base_opts, overrides, nil)
 
-  def merge_llm_opts(%__MODULE__{} = config, base_opts, overrides) when is_list(base_opts) do
-    provider_opt_keys_by_string = provider_opt_keys_by_string(config.model)
+  @spec merge_llm_opts(t(), keyword(), keyword() | map() | nil, term() | nil) :: keyword()
+  def merge_llm_opts(%__MODULE__{} = _config, base_opts, nil, _model) when is_list(base_opts), do: base_opts
+
+  def merge_llm_opts(%__MODULE__{} = config, base_opts, overrides, model_override) when is_list(base_opts) do
+    model = model_override || config.model
+    provider_opt_keys_by_string = provider_opt_keys_by_string(model)
     normalized_overrides = normalize_llm_opts(overrides, provider_opt_keys_by_string)
     maybe_merge_llm_opts(base_opts, normalized_overrides)
   end

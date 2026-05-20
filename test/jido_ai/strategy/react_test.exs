@@ -1035,6 +1035,39 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert signal.data.iteration == 1
     end
 
+    test "uses runtime event model for LLM delta telemetry" do
+      agent = create_agent(tools: [TestCalculator])
+      request_id = "req_delta_model_meta"
+      handler_id = "react-delta-model-#{System.unique_integer([:positive])}"
+      parent = self()
+
+      :telemetry.attach(
+        handler_id,
+        Jido.AI.Observe.llm(:delta),
+        fn _event, _measurements, metadata, _config ->
+          if metadata.request_id == request_id do
+            send(parent, {:delta_metadata, metadata})
+          end
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      event =
+        runtime_event(:llm_delta, request_id, 18, %{
+          chunk_type: :content,
+          delta: "ordered",
+          model: "anthropic:claude-sonnet-4-5"
+        })
+
+      {_agent, []} =
+        ReAct.cmd(agent, [instruction(:ai_react_worker_event, %{request_id: request_id, event: event})], %{})
+
+      assert_receive {:delta_metadata, metadata}, 200
+      assert metadata.model == "anthropic:claude-sonnet-4-5"
+    end
+
     test "stores request trace up to 2000 events then marks truncated" do
       agent = create_agent(tools: [TestCalculator])
       request_id = "req_trace"

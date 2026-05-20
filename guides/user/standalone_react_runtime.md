@@ -148,6 +148,24 @@ Typical pattern:
 
 This keeps the LLM-visible tool list, the executable tool registry, and the structured-output contract aligned inside one run.
 
+The overrides map also accepts `model:` to swap which provider handles the next turn. The runtime re-validates any `llm_opts.provider_options` overrides against the override model's provider schema, so a transformer can route between providers and add provider-specific options on the matching turns without breaking validation on the other ones:
+
+```elixir
+def transform_request(_request, _state, _config, _runtime_context) do
+  case current_review_model() do
+    %{provider: :xai} = model ->
+      {:ok,
+       %{
+         model: model,
+         llm_opts: [provider_options: [xai_api: :responses]]
+       }}
+
+    model ->
+      {:ok, %{model: model}}
+  end
+end
+```
+
 ## Run To Completion
 
 `run/3` streams internally and returns the aggregated result map. Simplest path when you do not need the event stream.
