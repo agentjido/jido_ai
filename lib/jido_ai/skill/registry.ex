@@ -144,7 +144,7 @@ defmodule Jido.AI.Skill.Registry do
 
   Used by `Jido.AI.Skill.Activation` to track activated skills.
   """
-  @spec mark_activated(String.t(), map()) :: :ok
+  @spec mark_activated(String.t(), map()) :: :ok | {:error, term()}
   def mark_activated(name, context) when is_binary(name) and is_map(context) do
     with_started_registry(fn ->
       GenServer.call(__MODULE__, {:mark_activated, name, context})
@@ -186,7 +186,7 @@ defmodule Jido.AI.Skill.Registry do
   def get_activation_context(name) when is_binary(name) do
     with_started_registry(fn ->
       case :ets.lookup(@activation_table, name) do
-        [{^name, context}] -> {:ok, context}
+        [{^name, %{context: context}}] -> {:ok, context}
         [] -> {:error, :not_activated}
       end
     end)
@@ -272,6 +272,7 @@ defmodule Jido.AI.Skill.Registry do
 
   def handle_call(:clear, _from, state) do
     :ets.delete_all_objects(@table_name)
+    :ets.delete_all_objects(@activation_table)
     {:reply, :ok, state}
   end
 
@@ -281,14 +282,14 @@ defmodule Jido.AI.Skill.Registry do
   end
 
   def handle_call({:mark_activated, name, context}, _from, state) do
-    :ets.insert(@activation_table, {name, Map.put(context, :durable, false)})
+    :ets.insert(@activation_table, {name, %{context: context, durable: false}})
     {:reply, :ok, state}
   end
 
   def handle_call({:mark_durable, name}, _from, state) do
     case :ets.lookup(@activation_table, name) do
-      [{^name, context}] ->
-        :ets.insert(@activation_table, {name, %{context | durable: true}})
+      [{^name, activation}] ->
+        :ets.insert(@activation_table, {name, %{activation | durable: true}})
         {:reply, :ok, state}
 
       [] ->
@@ -298,8 +299,8 @@ defmodule Jido.AI.Skill.Registry do
 
   def handle_call({:unmark_durable, name}, _from, state) do
     case :ets.lookup(@activation_table, name) do
-      [{^name, context}] ->
-        :ets.insert(@activation_table, {name, %{context | durable: false}})
+      [{^name, activation}] ->
+        :ets.insert(@activation_table, {name, %{activation | durable: false}})
         {:reply, :ok, state}
 
       [] ->

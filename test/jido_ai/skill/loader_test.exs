@@ -267,4 +267,23 @@ defmodule Jido.AI.Skill.LoaderTest do
       refute Enum.any?(diagnostics.warnings, &(&1.type == :directory_name_mismatch))
     end
   end
+
+  describe "lenient name normalization" do
+    test "falls back when normalization cannot produce a valid skill name" do
+      content = """
+      ---
+      name: "!!!"
+      description: Invalid name.
+      ---
+
+      Body.
+      """
+
+      assert {:ok, %Spec{name: name, diagnostics: diagnostics}} =
+               Loader.parse(content, "inline", lenient: true)
+
+      assert String.starts_with?(name, "unnamed-skill-")
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_name_format))
+    end
+  end
 end

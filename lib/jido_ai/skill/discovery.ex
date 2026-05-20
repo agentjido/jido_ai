@@ -36,9 +36,8 @@ defmodule Jido.AI.Skill.Discovery do
   alias Jido.AI.Skill.{Spec, Loader}
 
   @project_path ".agents/skills"
-  @user_path Path.join([System.user_home!(), ".agents", "skills"])
 
-  @type scope :: :project | :user
+  @type scope :: :project | :user | :custom
   @type discovery_metadata :: %{
           name: String.t(),
           description: String.t() | nil,
@@ -133,7 +132,7 @@ defmodule Jido.AI.Skill.Discovery do
   - `{:error, reason}` - Discovery failed
   """
   @spec discover_from_user(String.t()) :: {:ok, [discovery_metadata()]} | {:error, term()}
-  def discover_from_user(base_path \\ @user_path) do
+  def discover_from_user(base_path \\ default_user_path()) do
     if File.dir?(base_path) do
       discover_from([base_path], scope: :user)
     else
@@ -196,6 +195,10 @@ defmodule Jido.AI.Skill.Discovery do
   defp scan_directory(path) do
     skill_pattern = Path.join([path, "**", "SKILL.md"])
     Path.wildcard(skill_pattern)
+  end
+
+  defp default_user_path do
+    Path.join([System.user_home!(), ".agents", "skills"])
   end
 
   defp build_metadata(skill_md_path, scope) do

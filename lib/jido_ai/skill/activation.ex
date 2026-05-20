@@ -68,22 +68,15 @@ defmodule Jido.AI.Skill.Activation do
   end
 
   def activate(%Spec{} = spec) do
-    if Registry.activated?(spec.name) do
-      build_context_from_registry(spec.name)
-    else
-      do_activate(spec)
-    end
+    activate_spec(spec)
   end
 
   def activate(mod) when is_atom(mod) do
     # Module-based skills
     if function_exported?(mod, :manifest, 0) do
-      spec = mod.manifest()
-
-      if Registry.activated?(spec.name) do
-        build_context_from_registry(spec.name)
-      else
-        do_activate(spec)
+      case mod.manifest() do
+        %Spec{} = spec -> activate_spec(spec)
+        _other -> {:error, :invalid_skill_module}
       end
     else
       {:error, :invalid_skill_module}
@@ -168,6 +161,16 @@ defmodule Jido.AI.Skill.Activation do
   end
 
   # Private functions
+
+  defp activate_spec(%Spec{name: name} = spec) when is_binary(name) do
+    if Registry.activated?(name) do
+      build_context_from_registry(spec.name)
+    else
+      do_activate(spec)
+    end
+  end
+
+  defp activate_spec(%Spec{}), do: {:error, :invalid_skill_spec}
 
   defp resolve_skill(name) when is_binary(name) do
     # Try registry first

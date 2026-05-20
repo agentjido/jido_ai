@@ -219,16 +219,19 @@ defmodule Jido.AI.Skill.Loader do
         error = %Error.Validation.InvalidName{name: name}
 
         if lenient do
-          truncated = String.slice(name, 0, @max_name_length)
+          normalized =
+            name
+            |> normalize_skill_name()
+            |> String.slice(0, @max_name_length)
+            |> String.trim("-")
 
-          warning =
-            Diagnostics.Warning.new(
-              :name_too_long,
-              "Skill name exceeds #{@max_name_length} chars, truncated to: #{truncated}"
-            )
-
-          diagnostics = Diagnostics.add_warning(diagnostics, warning)
-          {:ok, truncated, diagnostics}
+          normalize_or_fallback_name(
+            name,
+            normalized,
+            diagnostics,
+            :name_too_long,
+            "Skill name exceeds #{@max_name_length} chars, truncated to: "
+          )
         else
           {:error, error}
         end
@@ -237,18 +240,13 @@ defmodule Jido.AI.Skill.Loader do
         error = %Error.Validation.InvalidName{name: name}
 
         if lenient do
-          # Normalize the name (lowercase, replace invalid chars with hyphens)
-          normalized =
-            name
-            |> String.downcase()
-            |> String.replace(~r/[^a-z0-9]+/, "-")
-            |> String.trim("-")
-
-          warning =
-            Diagnostics.Warning.new(:invalid_name_format, "Invalid skill name '#{name}', normalized to: #{normalized}")
-
-          diagnostics = Diagnostics.add_warning(diagnostics, warning)
-          {:ok, normalized, diagnostics}
+          normalize_or_fallback_name(
+            name,
+            normalize_skill_name(name),
+            diagnostics,
+            :invalid_name_format,
+            "Invalid skill name '#{name}', normalized to: "
+          )
         else
           {:error, error}
         end
@@ -262,7 +260,7 @@ defmodule Jido.AI.Skill.Loader do
     error = %Error.Validation.MissingField{field: :name}
 
     if lenient do
-      fallback = "unnamed-skill-#{:erlang.unique_integer([:positive])}"
+      fallback = fallback_name()
 
       diagnostics =
         Diagnostics.add_warning(
@@ -332,4 +330,32 @@ defmodule Jido.AI.Skill.Loader do
   defp parse_allowed_tools(tools) when is_list(tools), do: Enum.map(tools, &to_string/1)
   defp parse_allowed_tools(tools) when is_binary(tools), do: String.split(tools, ~r/\s+/, trim: true)
   defp parse_allowed_tools(_), do: []
+
+  defp normalize_or_fallback_name(original, "", diagnostics, _warning_type, _message_prefix) do
+    fallback = fallback_name()
+
+    warning =
+      Diagnostics.Warning.new(
+        :invalid_name_format,
+        "Invalid skill name '#{original}', using fallback: #{fallback}"
+      )
+
+    {:ok, fallback, Diagnostics.add_warning(diagnostics, warning)}
+  end
+
+  defp normalize_or_fallback_name(_original, normalized, diagnostics, warning_type, message_prefix) do
+    warning = Diagnostics.Warning.new(warning_type, message_prefix <> normalized)
+    {:ok, normalized, Diagnostics.add_warning(diagnostics, warning)}
+  end
+
+  defp normalize_skill_name(name) do
+    name
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9]+/, "-")
+    |> String.trim("-")
+  end
+
+  defp fallback_name do
+    "unnamed-skill-#{:erlang.unique_integer([:positive])}"
+  end
 end

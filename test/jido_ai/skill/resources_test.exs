@@ -72,5 +72,36 @@ defmodule Jido.AI.Skill.ResourcesTest do
       assert Resources.resolve_path("/base", "/etc/passwd") ==
                {:error, :path_traversal}
     end
+
+    test "blocks symlink escapes", %{tmp_dir: tmp_dir} do
+      outside_path = Path.join(tmp_dir, "outside.txt")
+      skill_root = Path.join(tmp_dir, "skill")
+      link_path = Path.join(skill_root, "linked.txt")
+
+      File.mkdir_p!(skill_root)
+      File.write!(outside_path, "secret")
+      File.ln_s!(outside_path, link_path)
+
+      assert Resources.resolve_path(skill_root, "linked.txt") ==
+               {:error, :path_traversal}
+    end
+  end
+
+  describe "search/2" do
+    test "filters symlink escapes from matches", %{tmp_dir: tmp_dir} do
+      outside_dir = Path.join(tmp_dir, "outside")
+      skill_root = Path.join(tmp_dir, "skill")
+      references_dir = Path.join(skill_root, "references")
+
+      File.mkdir_p!(outside_dir)
+      File.mkdir_p!(references_dir)
+      File.write!(Path.join(references_dir, "inside.md"), "# Inside")
+      File.write!(Path.join(outside_dir, "outside.md"), "# Outside")
+      File.ln_s!(outside_dir, Path.join(references_dir, "linked"))
+
+      matches = Resources.search(skill_root, "references/**/*.md")
+
+      assert Enum.map(matches, & &1.relative_path) == ["references/inside.md"]
+    end
   end
 end

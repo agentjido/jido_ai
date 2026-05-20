@@ -22,6 +22,7 @@ defmodule Jido.AI.Skill.ActivationTest do
       assert context.skill_body == "Skill body content"
       assert context.root_dir == "/tmp/skills/test-skill"
       assert context.resources == %{scripts: [], references: [], assets: []}
+      refute Map.has_key?(context, :durable)
     end
 
     test "returns existing context on duplicate activation" do
@@ -78,6 +79,14 @@ defmodule Jido.AI.Skill.ActivationTest do
 
     test "returns error for invalid module" do
       assert {:error, :invalid_skill_module} = Activation.activate(String)
+    end
+
+    test "returns error when module manifest is not a skill spec" do
+      defmodule InvalidManifestModule do
+        def manifest, do: %{name: "not-a-spec"}
+      end
+
+      assert {:error, :invalid_skill_module} = Activation.activate(InvalidManifestModule)
     end
   end
 
