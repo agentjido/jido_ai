@@ -180,7 +180,7 @@ defmodule Jido.AI.Skill.Discovery do
     case Loader.load(path, lenient: true) do
       {:ok, spec} ->
         # Enhance spec with discovery metadata
-        enhanced = %{spec | source: {:file, path}, metadata: Map.put(spec.metadata || %{}, :discovery_scope, scope)}
+        enhanced = %{spec | source: {:file, path}, metadata: Map.put(spec.metadata, :discovery_scope, scope)}
         {:ok, enhanced}
 
       {:error, reason} ->
@@ -208,7 +208,7 @@ defmodule Jido.AI.Skill.Discovery do
 
     # Quick peek at frontmatter to get name/description without full parse
     case peek_frontmatter(skill_md_path) do
-      {:ok, %{"name" => name} = frontmatter} ->
+      {:ok, %{"name" => name} = frontmatter} when is_binary(name) ->
         %{
           name: name,
           description: frontmatter["description"],

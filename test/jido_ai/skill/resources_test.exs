@@ -85,6 +85,19 @@ defmodule Jido.AI.Skill.ResourcesTest do
       assert Resources.resolve_path(skill_root, "linked.txt") ==
                {:error, :path_traversal}
     end
+
+    test "blocks symlink escapes even when final target is missing", %{tmp_dir: tmp_dir} do
+      outside_dir = Path.join(tmp_dir, "outside")
+      skill_root = Path.join(tmp_dir, "skill")
+      link_path = Path.join(skill_root, "linked")
+
+      File.mkdir_p!(outside_dir)
+      File.mkdir_p!(skill_root)
+      File.ln_s!(outside_dir, link_path)
+
+      assert Resources.resolve_path(skill_root, "linked/missing.txt") ==
+               {:error, :path_traversal}
+    end
   end
 
   describe "search/2" do

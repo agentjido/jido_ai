@@ -208,17 +208,7 @@ defmodule Jido.AI.Skill.Resources do
     case resolve_path(skill_root, relative_path) do
       {:ok, absolute_path} ->
         if File.regular?(absolute_path) do
-          stat = File.stat!(absolute_path)
-
-          info = %{
-            name: Path.basename(relative_path),
-            relative_path: relative_path,
-            absolute_path: absolute_path,
-            size: stat.size,
-            modified: stat.mtime |> NaiveDateTime.from_erl!() |> DateTime.from_naive!("Etc/UTC")
-          }
-
-          {:ok, info}
+          {:ok, resource_info_for(absolute_path, relative_path)}
         else
           {:error, :not_found}
         end
@@ -248,15 +238,7 @@ defmodule Jido.AI.Skill.Resources do
       |> Enum.filter(&(File.regular?(&1) and within_root?(&1, expanded_root, real_root)))
       |> Enum.map(fn absolute_path ->
         relative_path = Path.relative_to(absolute_path, expanded_root)
-        stat = File.stat!(absolute_path)
-
-        %{
-          name: Path.basename(relative_path),
-          relative_path: relative_path,
-          absolute_path: absolute_path,
-          size: stat.size,
-          modified: stat.mtime |> NaiveDateTime.from_erl!() |> DateTime.from_naive!("Etc/UTC")
-        }
+        resource_info_for(absolute_path, relative_path)
       end)
       |> Enum.sort_by(& &1.relative_path)
     else
@@ -285,15 +267,7 @@ defmodule Jido.AI.Skill.Resources do
       |> Enum.filter(&(File.regular?(&1) and within_root?(&1, expanded_root, real_root)))
       |> Enum.map(fn absolute_path ->
         relative_path = Path.relative_to(absolute_path, expanded_root)
-        stat = File.stat!(absolute_path)
-
-        %{
-          name: Path.basename(relative_path),
-          relative_path: relative_path,
-          absolute_path: absolute_path,
-          size: stat.size,
-          modified: stat.mtime |> NaiveDateTime.from_erl!() |> DateTime.from_naive!("Etc/UTC")
-        }
+        resource_info_for(absolute_path, relative_path)
       end)
       |> Enum.sort_by(& &1.relative_path)
     else
@@ -312,7 +286,7 @@ defmodule Jido.AI.Skill.Resources do
 
     case resolve_existing_path(path) do
       {:ok, real_path} -> within_path?(real_path, real_root)
-      {:error, :enoent} -> true
+      {:missing, resolved_path} -> within_path?(resolved_path, real_root)
       {:error, _reason} -> false
     end
   end
@@ -320,6 +294,7 @@ defmodule Jido.AI.Skill.Resources do
   defp real_path(path) do
     case resolve_existing_path(path) do
       {:ok, real_path} -> real_path
+      {:missing, resolved_path} -> resolved_path
       {:error, _reason} -> Path.expand(path)
     end
   end
@@ -350,6 +325,9 @@ defmodule Jido.AI.Skill.Resources do
       {:ok, _stat} ->
         do_resolve_symlinks(candidate, rest, seen)
 
+      {:error, :enoent} ->
+        {:missing, append_path(candidate, rest)}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -375,4 +353,16 @@ defmodule Jido.AI.Skill.Resources do
 
   defp append_path(base, []), do: base
   defp append_path(base, parts), do: Path.join(base, Path.join(parts))
+
+  defp resource_info_for(absolute_path, relative_path) do
+    stat = File.stat!(absolute_path)
+
+    %{
+      name: Path.basename(relative_path),
+      relative_path: relative_path,
+      absolute_path: absolute_path,
+      size: stat.size,
+      modified: stat.mtime |> NaiveDateTime.from_erl!() |> DateTime.from_naive!("Etc/UTC")
+    }
+  end
 end

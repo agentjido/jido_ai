@@ -51,6 +51,21 @@ defmodule Jido.AI.Skill.ActivationTest do
       assert context.root_dir == nil
       assert context.resources == %{scripts: [], references: [], assets: []}
     end
+
+    @tag :tmp_dir
+    test "returns error when body file cannot be loaded", %{tmp_dir: tmp_dir} do
+      missing_body_path = Path.join(tmp_dir, "missing-body.md")
+
+      spec = %Spec{
+        name: "missing-body",
+        description: "Missing body",
+        body_ref: {:file, missing_body_path},
+        source: nil
+      }
+
+      assert {:error, {:body_load_failed, :enoent}} = Activation.activate(spec)
+      refute Activation.activated?("missing-body")
+    end
   end
 
   describe "activate/1 with name" do

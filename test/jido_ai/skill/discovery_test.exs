@@ -54,6 +54,22 @@ defmodule Jido.AI.Skill.DiscoveryTest do
       assert {:ok, []} = Discovery.discover_from([tmp_dir])
     end
 
+    test "ignores skills with non-string names in frontmatter", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "bad-name-type")
+      File.mkdir_p!(skill_dir)
+
+      File.write!(Path.join(skill_dir, "SKILL.md"), """
+      ---
+      name: 123
+      description: Invalid name type
+      ---
+
+      Body.
+      """)
+
+      assert {:ok, []} = Discovery.discover_from([tmp_dir])
+    end
+
     test "discovers nested skills", %{tmp_dir: tmp_dir} do
       nested = Path.join([tmp_dir, "nested", "deep-skill"])
       File.mkdir_p!(nested)

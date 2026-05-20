@@ -188,41 +188,41 @@ defmodule Jido.AI.Skill.Activation do
   end
 
   defp do_activate(%Spec{} = spec) do
-    # Extract root directory from source
-    root_dir =
-      case spec.source do
-        {:file, path} -> Path.dirname(path)
-        _ -> nil
-      end
-
-    # Get skill body
-    skill_body = Jido.AI.Skill.body(spec)
-
-    # List resources
-    resources =
-      if root_dir do
-        Resources.list_resources(root_dir)
-      else
-        %{scripts: [], references: [], assets: []}
-      end
-
-    # Build context
-    context = %{
-      skill: spec,
-      skill_body: skill_body,
-      root_dir: root_dir,
-      resources: resources
-    }
-
-    # Mark as activated in registry
-    :ok = Registry.mark_activated(spec.name, context)
-
-    # Return the registry's canonical context so the first activation and any
-    # subsequent (idempotent) activations yield an identical result.
-    build_context_from_registry(spec.name)
+    with {:ok, skill_body} <- load_skill_body(spec),
+         :ok <- Registry.mark_activated(spec.name, activation_context(spec, skill_body)) do
+      # Return the registry's canonical context so the first activation and any
+      # subsequent (idempotent) activations yield an identical result.
+      build_context_from_registry(spec.name)
+    end
   end
 
   defp build_context_from_registry(name) do
     Registry.get_activation_context(name)
   end
+
+  defp activation_context(%Spec{} = spec, skill_body) do
+    root_dir = root_dir(spec)
+
+    %{
+      skill: spec,
+      skill_body: skill_body,
+      root_dir: root_dir,
+      resources: list_resources(root_dir)
+    }
+  end
+
+  defp load_skill_body(%Spec{body_ref: {:file, path}}) do
+    case File.read(path) do
+      {:ok, body} -> {:ok, body}
+      {:error, reason} -> {:error, {:body_load_failed, reason}}
+    end
+  end
+
+  defp load_skill_body(%Spec{} = spec), do: {:ok, Jido.AI.Skill.body(spec)}
+
+  defp root_dir(%Spec{source: {:file, path}}), do: Path.dirname(path)
+  defp root_dir(%Spec{}), do: nil
+
+  defp list_resources(nil), do: %{scripts: [], references: [], assets: []}
+  defp list_resources(root_dir), do: Resources.list_resources(root_dir)
 end

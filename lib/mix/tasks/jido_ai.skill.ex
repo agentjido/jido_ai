@@ -143,7 +143,7 @@ defmodule Mix.Tasks.JidoAi.Skill do
             Mix.shell().info("#{IO.ANSI.cyan()}Allowed Tools:#{IO.ANSI.reset()} #{Enum.join(spec.allowed_tools, ", ")}")
           end
 
-          if spec.metadata && map_size(spec.metadata) > 0 do
+          if map_size(spec.metadata) > 0 do
             Mix.shell().info("#{IO.ANSI.cyan()}Metadata:#{IO.ANSI.reset()}")
 
             Enum.each(spec.metadata, fn {k, v} ->

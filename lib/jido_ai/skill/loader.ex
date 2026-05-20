@@ -138,19 +138,21 @@ defmodule Jido.AI.Skill.Loader do
     # Validate fields, allowing lenient mode to proceed with defaults
     with {:ok, name, diagnostics} <- validate_name(frontmatter["name"], diagnostics, lenient),
          {:ok, description, diagnostics} <- validate_description(frontmatter["description"], diagnostics, lenient) do
+      {metadata, diagnostics} = parse_metadata(frontmatter["metadata"], diagnostics)
+
       spec = %Spec{
         name: name,
         description: description,
-        license: frontmatter["license"],
+        license: optional_string(frontmatter["license"]),
         compatibility: validate_compatibility(frontmatter["compatibility"]),
-        metadata: frontmatter["metadata"] || %{},
+        metadata: metadata,
         allowed_tools: parse_allowed_tools(frontmatter["allowed-tools"]),
         source: {:file, path},
         body_ref: {:inline, body},
         actions: [],
         plugins: [],
-        vsn: frontmatter["vsn"] || frontmatter["version"],
-        tags: List.wrap(frontmatter["tags"]),
+        vsn: optional_string(frontmatter["vsn"] || frontmatter["version"]),
+        tags: parse_tags(frontmatter["tags"]),
         diagnostics: diagnostics
       }
 
@@ -199,7 +201,7 @@ defmodule Jido.AI.Skill.Loader do
 
     if lenient do
       # Generate a fallback name from the path in lenient mode
-      fallback = "unnamed-skill-#{:erlang.unique_integer([:positive])}"
+      fallback = fallback_name()
 
       diagnostics =
         Diagnostics.add_warning(
@@ -285,21 +287,33 @@ defmodule Jido.AI.Skill.Loader do
     end
   end
 
-  defp validate_description(desc, diagnostics, _lenient) when is_binary(desc) do
-    if String.length(desc) > @max_description_length do
-      # Always truncate long descriptions as a warning
-      truncated = String.slice(desc, 0, @max_description_length)
+  defp validate_description(desc, diagnostics, lenient) when is_binary(desc) do
+    cond do
+      String.trim(desc) == "" ->
+        if lenient do
+          fallback = "No description provided"
+          warning = Diagnostics.Warning.new(:blank_description, "Blank required field: description, using fallback")
+          diagnostics = Diagnostics.add_warning(diagnostics, warning)
+          {:ok, fallback, diagnostics}
+        else
+          {:error, %Error.Validation.MissingField{field: :description}}
+        end
 
-      warning =
-        Diagnostics.Warning.new(
-          :description_too_long,
-          "Description exceeds #{@max_description_length} chars, truncated"
-        )
+      String.length(desc) > @max_description_length ->
+        # Always truncate long descriptions as a warning
+        truncated = String.slice(desc, 0, @max_description_length)
 
-      diagnostics = Diagnostics.add_warning(diagnostics, warning)
-      {:ok, truncated, diagnostics}
-    else
-      {:ok, desc, diagnostics}
+        warning =
+          Diagnostics.Warning.new(
+            :description_too_long,
+            "Description exceeds #{@max_description_length} chars, truncated"
+          )
+
+        diagnostics = Diagnostics.add_warning(diagnostics, warning)
+        {:ok, truncated, diagnostics}
+
+      true ->
+        {:ok, desc, diagnostics}
     end
   end
 
@@ -331,6 +345,27 @@ defmodule Jido.AI.Skill.Loader do
   defp parse_allowed_tools(tools) when is_binary(tools), do: String.split(tools, ~r/\s+/, trim: true)
   defp parse_allowed_tools(_), do: []
 
+  defp parse_metadata(nil, diagnostics), do: {%{}, diagnostics}
+  defp parse_metadata(metadata, diagnostics) when is_map(metadata), do: {metadata, diagnostics}
+
+  defp parse_metadata(_metadata, diagnostics) do
+    diagnostics =
+      Diagnostics.add_warning(
+        diagnostics,
+        Diagnostics.Warning.new(:invalid_metadata_type, "Invalid metadata type, using empty metadata")
+      )
+
+    {%{}, diagnostics}
+  end
+
+  defp parse_tags(nil), do: []
+  defp parse_tags(tags) when is_list(tags), do: Enum.map(tags, &to_string/1)
+  defp parse_tags(tag) when is_binary(tag), do: [tag]
+  defp parse_tags(tag), do: [to_string(tag)]
+
+  defp optional_string(value) when is_binary(value), do: value
+  defp optional_string(_value), do: nil
+
   defp normalize_or_fallback_name(original, "", diagnostics, _warning_type, _message_prefix) do
     fallback = fallback_name()
 
@@ -352,6 +387,7 @@ defmodule Jido.AI.Skill.Loader do
     name
     |> String.downcase()
     |> String.replace(~r/[^a-z0-9]+/, "-")
+    |> String.replace(~r/-+/, "-")
     |> String.trim("-")
   end
 
