@@ -198,6 +198,33 @@ Tool execution envelopes are canonical triples:
 Legacy 2-tuples (`{:ok, result}` / `{:error, reason}`) are normalized at runtime boundaries.
 Use triple pattern-matching in new code.
 
+## ReAct Agent Tool Results
+
+`Jido.AI.Turn.tool_results` is the low-level surface used when you build a
+custom tool loop yourself. When `Jido.AI.Agent` manages the ReAct loop for you,
+inspect completed tool outputs through the agent snapshot:
+
+```elixir
+{:ok, status} = Jido.AgentServer.status(pid)
+
+tool_results = status.snapshot.details[:tool_results] || []
+```
+
+`status.snapshot.result` remains the final assistant answer. Tool result
+entries keep the normalized action envelope under `:result`:
+
+```elixir
+%{
+  id: "call_abc",
+  name: "multiply",
+  arguments: %{"a" => 6, "b" => 7},
+  result: {:ok, %{product: 42}, []}
+}
+```
+
+Use `snapshot.details[:conversation]` for restoring message history, not for
+recovering structured tool payloads.
+
 ## Effect Policy And Ordering
 
 - `Turn.execute/4` and `Turn.execute_module/4` filter tool-emitted effects through `context[:effect_policy]` when provided.

@@ -162,6 +162,20 @@ get_in(status.raw_state, [:requests, request_id, :meta])
 # %{usage: %{...}, reasoning_details: [...], ...}
 ```
 
+The status snapshot separates the final assistant answer from completed tool
+outputs:
+
+```elixir
+{:ok, status} = Jido.AgentServer.status(pid)
+
+answer = status.snapshot.result
+tool_results = status.snapshot.details[:tool_results] || []
+```
+
+`tool_results` is scoped to the current or most recent ReAct run and is meant
+for inspection. Persist durable business data from the tool itself, or return an
+allowed state effect when later turns need to read it.
+
 ## Failure Mode: Timeouts Under Load
 
 Symptom:

@@ -72,6 +72,11 @@ context =
   |> Context.append_messages(conversation_messages)
 ```
 
+Use `snapshot.details.conversation` for message restore/import workflows. Tool
+messages in that conversation are serialized for LLM projection, so do not parse
+them to recover structured tool payloads. For completed ReAct tool outputs, use
+`snapshot.details[:tool_results]`.
+
 ## ReAct Context Operations
 
 Canonical strategy signal for context lifecycle:
