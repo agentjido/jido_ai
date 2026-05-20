@@ -189,6 +189,42 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule RuntimeAnthropicModelTransformer do
+    def transform_request(_request, _state, _config, _runtime_context) do
+      {:ok, %{model: "anthropic:claude-sonnet-4-5"}}
+    end
+  end
+
+  defmodule RuntimeOpenAIWebSocketTransformer do
+    def transform_request(_request, _state, _config, _runtime_context) do
+      {:ok,
+       %{
+         model: {:openai, "gpt-4o-mini", []},
+         llm_opts: [
+           provider_options: [
+             openai_stream_transport: :websocket,
+             openai_reuse_websocket: true
+           ]
+         ]
+       }}
+    end
+  end
+
+  defmodule RuntimeAnthropicWebSocketTransformer do
+    def transform_request(_request, _state, _config, _runtime_context) do
+      {:ok,
+       %{
+         model: "anthropic:claude-sonnet-4-5",
+         llm_opts: [
+           provider_options: [
+             openai_stream_transport: :websocket,
+             openai_reuse_websocket: true
+           ]
+         ]
+       }}
+    end
+  end
+
   setup :set_mimic_from_context
 
   setup do
@@ -685,6 +721,114 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     events = ReAct.stream("Say hello", config) |> Enum.to_list()
 
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "request_transformer model override is reflected in runtime turn events" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :generate_text, fn model, _messages, _opts ->
+      send(parent, {:generate_model, model})
+
+      {:ok,
+       %{
+         message: %{content: "Runtime model answer", tool_calls: nil},
+         finish_reason: :stop,
+         usage: %{input_tokens: 3, output_tokens: 2},
+         model: "openai:gpt-4.1"
+       }}
+    end)
+
+    config =
+      Config.new(%{
+        model: "openai:gpt-4.1",
+        tools: %{},
+        streaming: false,
+        request_transformer: RuntimeAnthropicModelTransformer
+      })
+
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert_receive {:generate_model, "anthropic:claude-sonnet-4-5"}, 200
+
+    llm_started = Enum.find(events, &(&1.kind == :llm_started))
+    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
+
+    assert llm_started.data.model == "anthropic:claude-sonnet-4-5"
+    assert llm_completed.data.model == "anthropic:claude-sonnet-4-5"
+    assert llm_completed.data.text == "Runtime model answer"
+  end
+
+  test "request_transformer OpenAI model override enables websocket session setup" do
+    parent = self()
+    session = exited_pid()
+
+    Mimic.stub(ReqLLM.Providers.OpenAI, :start_responses_session, fn model, _opts ->
+      send(parent, {:websocket_started, Jido.AI.model_label(model)})
+      {:ok, session}
+    end)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
+      assert model == {:openai, "gpt-4o-mini", []}
+
+      assert opts
+             |> Keyword.fetch!(:provider_options)
+             |> Keyword.fetch!(:openai_websocket_session) == session
+
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("OpenAI override answer")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
+         model
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: "anthropic:claude-sonnet-4-5",
+        tools: %{},
+        request_transformer: RuntimeOpenAIWebSocketTransformer
+      })
+
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    assert_receive {:websocket_started, "openai:gpt-4o-mini"}, 200
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+  end
+
+  test "request_transformer non-OpenAI model override skips OpenAI websocket setup" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Providers.OpenAI, :start_responses_session, fn model, _opts ->
+      send(parent, {:unexpected_websocket_start, Jido.AI.model_label(model)})
+      {:ok, exited_pid()}
+    end)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
+      assert model == "anthropic:claude-sonnet-4-5"
+
+      refute opts
+             |> Keyword.get(:provider_options, [])
+             |> Keyword.has_key?(:openai_websocket_session)
+
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Anthropic override answer")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
+         model
+       )}
+    end)
+
+    config =
+      Config.new(%{
+        model: "openai:gpt-4.1",
+        tools: %{},
+        request_transformer: RuntimeAnthropicWebSocketTransformer
+      })
+
+    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+
+    refute_receive {:unexpected_websocket_start, _model}, 100
     assert Enum.any?(events, &(&1.kind == :request_completed))
   end
 
@@ -1715,6 +1859,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       model: model,
       context: Keyword.get(opts, :context, ReqLLM.Context.new([]))
     }
+  end
+
+  defp exited_pid do
+    pid = spawn(fn -> :ok end)
+    ref = Process.monitor(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 200
+    pid
   end
 
   defp process_stream_response(%{stream: stream} = stream_response, opts) do

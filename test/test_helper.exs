@@ -1,6 +1,8 @@
 Mimic.copy(ReqLLM)
 Mimic.copy(ReqLLM.Generation)
 Mimic.copy(ReqLLM.Embedding)
+Mimic.copy(ReqLLM.Providers.OpenAI)
+Mimic.copy(ReqLLM.Providers.OpenAICodex)
 Mimic.copy(ReqLLM.StreamResponse)
 Mimic.copy(Jido.AgentServer)
 

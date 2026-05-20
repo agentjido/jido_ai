@@ -1565,6 +1565,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_calls = event_field(data, :tool_calls, [])
         usage = event_field(data, :usage, %{})
         call_id = llm_call_id || event_field(data, :call_id, "")
+        model = event_field(data, :model, config_model(state))
 
         pending_tool_calls =
           Enum.map(tool_calls, fn tc ->
@@ -1607,12 +1608,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
                  thinking_content: thinking_content,
                  reasoning_details: reasoning_details,
                  tool_calls: tool_calls,
+                 model: model,
                  usage: usage
                }, []},
             metadata: runtime_signal_metadata(request_id, run_id, iteration, :generate_text)
           })
 
-        usage_signal = maybe_usage_signal(call_id, config_model(state), usage, request_id, run_id, iteration)
+        usage_signal = maybe_usage_signal(call_id, model, usage, request_id, run_id, iteration)
         emit_runtime_telemetry(state, :llm_completed, request_id, run_id, iteration, call_id, event, data)
         {updated, Enum.reject([llm_signal, usage_signal], &is_nil/1)}
 
@@ -2395,7 +2397,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         llm_call_id: llm_call_id,
         tool_call_id: event_field(event, :tool_call_id),
         tool_name: event_field(event, :tool_name),
-        model: Jido.AI.model_label(config_model(state)),
+        model: telemetry_model_label(state, data),
         origin: :worker_runtime,
         operation: telemetry_operation(kind),
         strategy: :react,
@@ -2456,6 +2458,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           measurements,
           normalize_tool_result(event_field(data, :result))
         )
+    end
+  end
+
+  defp telemetry_model_label(state, data) do
+    case event_field(data, :model) do
+      nil -> Jido.AI.model_label(config_model(state))
+      model -> Jido.AI.model_label(model)
     end
   end
 
