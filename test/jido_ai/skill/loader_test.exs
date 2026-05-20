@@ -232,4 +232,39 @@ defmodule Jido.AI.Skill.LoaderTest do
       end
     end
   end
+
+  describe "non-binary name" do
+    # Regression: build_spec/5 ran the directory-name comparison before
+    # validating the name's type, so a YAML scalar like `name: 123` hit
+    # String.downcase/1 on an integer and raised instead of producing a
+    # validation error (strict) or a fallback name (lenient).
+    @non_binary_name """
+    ---
+    name: 123
+    description: Name is not a string.
+    ---
+
+    Body.
+    """
+
+    test "strict mode returns a validation error without raising" do
+      assert {:error, %Error.Validation.MissingField{field: :name}} =
+               Loader.parse(@non_binary_name)
+    end
+
+    test "lenient mode generates the documented fallback name" do
+      assert {:ok, %Spec{name: name, diagnostics: diagnostics}} =
+               Loader.parse(@non_binary_name, "inline", lenient: true)
+
+      assert String.starts_with?(name, "unnamed-skill-")
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_name_type))
+    end
+
+    test "does not warn about a directory-name mismatch for a non-binary name" do
+      assert {:ok, %Spec{diagnostics: diagnostics}} =
+               Loader.parse(@non_binary_name, "inline", lenient: true)
+
+      refute Enum.any?(diagnostics.warnings, &(&1.type == :directory_name_mismatch))
+    end
+  end
 end

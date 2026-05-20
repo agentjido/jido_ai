@@ -158,10 +158,18 @@ defmodule Jido.AI.Skill.Loader do
     end
   end
 
-  # Check if the directory name matches the declared skill name
-  defp check_directory_name_match(nil, _path, diagnostics, _lenient), do: diagnostics
+  # Check if the directory name matches the declared skill name.
+  #
+  # Only binary names can be compared. A nil or non-binary name (e.g.
+  # `name: 123` in the YAML) is left for validate_name/3 to handle —
+  # either as a strict validation error or a lenient fallback name.
+  # Comparing here first would call String.downcase/1 on a non-binary
+  # and raise before validation ever runs.
+  defp check_directory_name_match(name, _path, diagnostics, _lenient)
+       when not is_binary(name),
+       do: diagnostics
 
-  defp check_directory_name_match(name, path, diagnostics, lenient) do
+  defp check_directory_name_match(name, path, diagnostics, lenient) when is_binary(name) do
     parent_dir = path |> Path.dirname() |> Path.basename()
 
     # Normalize for comparison (kebab-case variations allowed)
