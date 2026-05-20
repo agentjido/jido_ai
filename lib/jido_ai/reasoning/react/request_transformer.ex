@@ -11,6 +11,11 @@ defmodule Jido.AI.Reasoning.ReAct.RequestTransformer do
   - dynamic structured-output schemas
   - provider-specific `llm_opts` based on tool results
   - custom message projection beyond the default context rendering
+  - **per-turn model selection** — returning `model:` in the overrides swaps
+    which provider handles the next LLM turn. `llm_opts.provider_options`
+    overrides are re-validated against the selected model's provider schema,
+    so xAI-only keys (e.g. `xai_api`) can be added on xAI turns without
+    breaking Fireworks turns on the same agent.
 
   The runtime always regenerates `llm_opts[:tools]` from the returned `tools`
   field so the exposed LLM tools and execution registry stay aligned.
@@ -21,13 +26,15 @@ defmodule Jido.AI.Reasoning.ReAct.RequestTransformer do
   @type request :: %{
           required(:messages) => [map()],
           required(:llm_opts) => keyword(),
-          required(:tools) => ToolSelection.tools_input()
+          required(:tools) => ToolSelection.tools_input(),
+          required(:model) => term()
         }
 
   @type overrides :: %{
           optional(:messages) => [map()],
           optional(:llm_opts) => keyword() | map(),
-          optional(:tools) => ToolSelection.tools_input()
+          optional(:tools) => ToolSelection.tools_input(),
+          optional(:model) => term()
         }
 
   @doc """
