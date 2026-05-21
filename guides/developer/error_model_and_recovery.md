@@ -45,6 +45,10 @@ At this boundary, envelope `details` are normalized to JSON-safe values. Raw
 runtime terms (for example tuples, pids, refs) are stringified so signal and
 telemetry payload encoding stays reliable.
 
+Already-decoded maps with string keys are accepted when their type/code atom
+already exists, so JSON round-trips do not silently lose known error types or
+retry hints.
+
 ## Example: Sanitized User Message + Full Log
 
 ```elixir

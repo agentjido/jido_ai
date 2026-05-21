@@ -74,6 +74,21 @@ defmodule Jido.AI.Error.ModelTest do
              }
     end
 
+    test "normalizes string-keyed envelopes without changing the canonical shape" do
+      input = %{
+        "type" => "timeout",
+        "message" => "timed out",
+        "details" => %{"retry" => true, "timeout_ms" => 100}
+      }
+
+      assert Error.normalize(input) == %{
+               type: :timeout,
+               message: "timed out",
+               details: %{"retry" => true, "timeout_ms" => 100},
+               retryable?: true
+             }
+    end
+
     test "normalizes non-binary messages and preserves transient retry hints" do
       input = %{type: :execution_error, message: :transient_error, details: %{}}
 
@@ -159,6 +174,7 @@ defmodule Jido.AI.Error.ModelTest do
             pid: self(),
             ref: make_ref(),
             tuple: {:error, :bad},
+            improper_list: [1 | 2],
             nested: %{inner: {:ok, :value}}
           }
         })
@@ -166,6 +182,7 @@ defmodule Jido.AI.Error.ModelTest do
       assert is_binary(envelope.details.pid)
       assert is_binary(envelope.details.ref)
       assert is_binary(envelope.details.tuple)
+      assert is_binary(envelope.details.improper_list)
       assert is_binary(envelope.details.nested.inner)
       assert Jason.encode!(envelope)
     end
@@ -220,6 +237,9 @@ defmodule Jido.AI.Error.ModelTest do
       assert Error.retryable?({:error, %{type: :timeout}, []})
       assert Error.retryable?(:transient)
       assert Error.retryable?(%{type: :execution_error, message: :transient_error, details: %{}})
+      assert Error.retryable?(%{"type" => "execution_error", "message" => "transient_error", "details" => %{}})
+      assert Error.retryable?(%{type: :execution_error, details: %{"retry" => true}})
+      refute Error.retryable?(%{type: :timeout, details: %{"retry" => "false"}})
       refute Error.retryable?({:error, %{type: :execution_error}, []})
       refute Error.retryable?({:ok, :done, []})
     end

@@ -56,7 +56,7 @@ defmodule Jido.AI.Error do
     error_envelope(
       type,
       normalize_message(message),
-      merge_error_details(Map.get(error, :details, %{}), extra_details),
+      merge_error_details(error_details(error), extra_details),
       normalize_retryable(error, type)
     )
   end
@@ -66,7 +66,31 @@ defmodule Jido.AI.Error do
     error_envelope(
       type,
       normalize_message(message),
-      merge_error_details(Map.get(error, :details, %{}), extra_details),
+      merge_error_details(error_details(error), extra_details),
+      normalize_retryable(error, type)
+    )
+  end
+
+  def normalize(%{"type" => type, "message" => message} = error, fallback_type, _fallback_message, extra_details)
+      when is_binary(type) and is_map(extra_details) do
+    type = normalize_type(type, fallback_type)
+
+    error_envelope(
+      type,
+      normalize_message(message),
+      merge_error_details(error_details(error), extra_details),
+      normalize_retryable(error, type)
+    )
+  end
+
+  def normalize(%{"code" => type, "message" => message} = error, fallback_type, _fallback_message, extra_details)
+      when is_binary(type) and is_map(extra_details) do
+    type = normalize_type(type, fallback_type)
+
+    error_envelope(
+      type,
+      normalize_message(message),
+      merge_error_details(error_details(error), extra_details),
       normalize_retryable(error, type)
     )
   end
@@ -94,7 +118,7 @@ defmodule Jido.AI.Error do
       when not is_nil(message) and is_map(extra_details) do
     details =
       error
-      |> Map.drop([:message, :retryable, :retryable?])
+      |> Map.drop([:message, :retryable, :retryable?, "message", "retryable", "retryable?"])
       |> merge_error_details(extra_details)
 
     error_envelope(fallback_type, normalize_message(message), details, normalize_retryable(error, fallback_type))
@@ -191,8 +215,12 @@ defmodule Jido.AI.Error do
   def retryable?({:error, reason}), do: retryable?(reason)
   def retryable?(%{retryable?: value}) when is_boolean(value), do: value
   def retryable?(%{retryable: value}) when is_boolean(value), do: value
+  def retryable?(%{"retryable?" => value}) when is_boolean(value), do: value
+  def retryable?(%{"retryable" => value}) when is_boolean(value), do: value
   def retryable?(%{type: type} = error) when is_atom(type), do: retryable_hint(error, retryable_type?(type))
   def retryable?(%{code: type} = error) when is_atom(type), do: retryable_hint(error, retryable_type?(type))
+  def retryable?(%{"type" => type} = error) when is_binary(type), do: retryable_from_string_type(error, type)
+  def retryable?(%{"code" => type} = error) when is_binary(type), do: retryable_from_string_type(error, type)
   def retryable?(reason) when is_atom(reason), do: retryable_type?(reason)
   def retryable?(_reason), do: false
 
@@ -230,7 +258,11 @@ defmodule Jido.AI.Error do
   defp normalize_json_safe_value(value) when is_atom(value), do: value
 
   defp normalize_json_safe_value(value) when is_list(value) do
-    Enum.map(value, &normalize_json_safe_value/1)
+    if proper_list?(value) do
+      Enum.map(value, &normalize_json_safe_value/1)
+    else
+      inspect(value)
+    end
   end
 
   defp normalize_json_safe_value(%_{} = struct) do
@@ -248,10 +280,24 @@ defmodule Jido.AI.Error do
   defp normalize_retryable(error, type) do
     cond do
       is_boolean(Map.get(error, :retryable?)) -> Map.get(error, :retryable?)
+      is_boolean(Map.get(error, "retryable?")) -> Map.get(error, "retryable?")
       is_boolean(Map.get(error, :retryable)) -> Map.get(error, :retryable)
+      is_boolean(Map.get(error, "retryable")) -> Map.get(error, "retryable")
       true -> retryable_hint(error, retryable_type?(type))
     end
   end
+
+  defp error_details(error), do: Map.get(error, :details, Map.get(error, "details", %{}))
+
+  defp normalize_type(type, _fallback) when is_atom(type), do: type
+
+  defp normalize_type(type, fallback) when is_binary(type) do
+    String.to_existing_atom(type)
+  rescue
+    ArgumentError -> fallback
+  end
+
+  defp normalize_type(_type, fallback), do: fallback
 
   defp normalize_message(message) when is_binary(message), do: message
   defp normalize_message(message) when is_atom(message), do: Atom.to_string(message)
@@ -290,14 +336,39 @@ defmodule Jido.AI.Error do
     String.starts_with?(module_name, @upstream_jido_error_prefixes)
   end
 
-  defp retryable_hint(term, default) do
-    case extract_retry_hint(term) do
-      nil -> default
-      value -> value != false
+  defp retryable_from_string_type(error, type) do
+    case normalize_type(type, nil) do
+      nil -> retryable_hint(error, false)
+      type -> retryable_hint(error, retryable_type?(type))
     end
   end
 
+  defp retryable_hint(term, default) do
+    case extract_retry_hint(term) do
+      nil -> default
+      value -> retry_hint_truthy?(value)
+    end
+  end
+
+  defp retry_hint_truthy?(false), do: false
+  defp retry_hint_truthy?("false"), do: false
+  defp retry_hint_truthy?("0"), do: false
+  defp retry_hint_truthy?(_), do: true
+
   defp extract_retry_hint(%{details: details} = error) do
+    case extract_retry_value(details) do
+      nil ->
+        details
+        |> extract_nested_reason()
+        |> Kernel.||(extract_nested_reason(error))
+        |> extract_retry_hint()
+
+      value ->
+        value
+    end
+  end
+
+  defp extract_retry_hint(%{"details" => details} = error) do
     case extract_retry_value(details) do
       nil ->
         details
@@ -319,11 +390,14 @@ defmodule Jido.AI.Error do
 
   defp extract_retry_hint(nil), do: nil
   defp extract_retry_hint(reason) when is_atom(reason), do: retryable_type?(reason)
+  defp extract_retry_hint(reason) when is_binary(reason), do: retryable_type_from_string(reason)
   defp extract_retry_hint(_), do: nil
 
   defp extract_nested_reason(%{} = map) do
     map[:reason] ||
-      if(is_atom(map[:message]), do: map[:message], else: nil)
+      map["reason"] ||
+      retry_hint_message(map[:message]) ||
+      retry_hint_message(map["message"])
   end
 
   defp extract_nested_reason(_), do: nil
@@ -331,6 +405,11 @@ defmodule Jido.AI.Error do
   defp extract_retry_value(%{} = map) do
     cond do
       Map.has_key?(map, :retry) -> map[:retry]
+      Map.has_key?(map, "retry") -> map["retry"]
+      Map.has_key?(map, :retryable?) -> map[:retryable?]
+      Map.has_key?(map, "retryable?") -> map["retryable?"]
+      Map.has_key?(map, :retryable) -> map[:retryable]
+      Map.has_key?(map, "retryable") -> map["retryable"]
       true -> nil
     end
   end
@@ -340,6 +419,21 @@ defmodule Jido.AI.Error do
   end
 
   defp extract_retry_value(_), do: nil
+
+  defp retry_hint_message(message) when is_atom(message), do: message
+  defp retry_hint_message(message) when is_binary(message), do: normalize_type(message, nil)
+  defp retry_hint_message(_), do: nil
+
+  defp retryable_type_from_string(type) do
+    case normalize_type(type, nil) do
+      nil -> nil
+      type -> retryable_type?(type)
+    end
+  end
+
+  defp proper_list?([]), do: true
+  defp proper_list?([_head | tail]), do: proper_list?(tail)
+  defp proper_list?(_), do: false
 
   defp retryable_type?(type) when type in [:timeout, :transient, :transient_error, :rate_limited], do: true
   defp retryable_type?(_type), do: false
