@@ -61,8 +61,32 @@ defmodule Jido.AI.Error do
     )
   end
 
+  def normalize(%{type: type, message: message} = error, fallback_type, _fallback_message, extra_details)
+      when is_binary(type) and is_map(extra_details) do
+    type = normalize_type(type, fallback_type)
+
+    error_envelope(
+      type,
+      normalize_message(message),
+      merge_error_details(error_details(error), extra_details),
+      normalize_retryable(error, type)
+    )
+  end
+
   def normalize(%{code: type, message: message} = error, _fallback_type, _fallback_message, extra_details)
       when is_atom(type) and is_map(extra_details) do
+    error_envelope(
+      type,
+      normalize_message(message),
+      merge_error_details(error_details(error), extra_details),
+      normalize_retryable(error, type)
+    )
+  end
+
+  def normalize(%{code: type, message: message} = error, fallback_type, _fallback_message, extra_details)
+      when is_binary(type) and is_map(extra_details) do
+    type = normalize_type(type, fallback_type)
+
     error_envelope(
       type,
       normalize_message(message),
@@ -219,6 +243,8 @@ defmodule Jido.AI.Error do
   def retryable?(%{"retryable" => value}) when is_boolean(value), do: value
   def retryable?(%{type: type} = error) when is_atom(type), do: retryable_hint(error, retryable_type?(type))
   def retryable?(%{code: type} = error) when is_atom(type), do: retryable_hint(error, retryable_type?(type))
+  def retryable?(%{type: type} = error) when is_binary(type), do: retryable_from_string_type(error, type)
+  def retryable?(%{code: type} = error) when is_binary(type), do: retryable_from_string_type(error, type)
   def retryable?(%{"type" => type} = error) when is_binary(type), do: retryable_from_string_type(error, type)
   def retryable?(%{"code" => type} = error) when is_binary(type), do: retryable_from_string_type(error, type)
   def retryable?(reason) when is_atom(reason), do: retryable_type?(reason)
@@ -347,8 +373,15 @@ defmodule Jido.AI.Error do
   end
 
   defp retry_hint_truthy?(false), do: false
-  defp retry_hint_truthy?("false"), do: false
-  defp retry_hint_truthy?("0"), do: false
+  defp retry_hint_truthy?(0), do: false
+
+  defp retry_hint_truthy?(value) when is_binary(value) do
+    value
+    |> String.trim()
+    |> String.downcase()
+    |> then(&(&1 not in ["", "0", "false", "no", "off"]))
+  end
+
   defp retry_hint_truthy?(_), do: true
 
   defp extract_retry_hint(%{details: details} = error) do
