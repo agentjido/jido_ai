@@ -58,6 +58,22 @@ defmodule Jido.AI.UsageTest do
       assert Jido.AI.Usage.merge(%{input_tokens: 3}, :bad_usage) == %{input_tokens: 3}
     end
 
+    test "does not coerce numeric-looking provider metadata identifiers" do
+      assert Jido.AI.Usage.merge(
+               %{
+                 cost: %{line_items: [%{id: "001", cost: "0.001"}]},
+                 provider_meta: %{request_id: "001", shard: "03"}
+               },
+               %{
+                 cost: %{line_items: [%{id: "002", cost: "0.002"}]},
+                 provider_meta: %{request_id: "002"}
+               }
+             ) == %{
+               cost: %{line_items: [%{id: "002", cost: 0.002}]},
+               provider_meta: %{request_id: "002", shard: "03"}
+             }
+    end
+
     test "derives total tokens when input and output counters are present" do
       assert Jido.AI.Usage.ensure_total_tokens(%{input_tokens: 2, output_tokens: "3"}) == %{
                input_tokens: 2,

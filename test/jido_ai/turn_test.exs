@@ -101,7 +101,7 @@ defmodule Jido.AI.TurnTest do
           cost: %{
             total: "0.003",
             currency: "USD",
-            line_items: [%{id: "prompt", cost: "0.001"}]
+            line_items: [%{id: "001", cost: "0.001"}]
           }
         }
       }
@@ -115,7 +115,7 @@ defmodule Jido.AI.TurnTest do
                cost: %{
                  total: 0.003,
                  currency: "USD",
-                 line_items: [%{id: "prompt", cost: 0.001}]
+                 line_items: [%{id: "001", cost: 0.001}]
                }
              }
     end

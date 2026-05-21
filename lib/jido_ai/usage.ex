@@ -3,13 +3,63 @@ defmodule Jido.AI.Usage do
   Helpers for merging provider usage metadata.
   """
 
+  @numeric_usage_keys MapSet.new([
+                        "accepted_prediction_tokens",
+                        "attempts",
+                        "audio_tokens",
+                        "cache_creation_input_tokens",
+                        "cache_read_input_tokens",
+                        "cached_input_tokens",
+                        "calls",
+                        "completion_tokens",
+                        "cost",
+                        "duration_ms",
+                        "images",
+                        "input_audio_tokens",
+                        "input_cost",
+                        "input_tokens",
+                        "output_audio_tokens",
+                        "output_cost",
+                        "output_tokens",
+                        "prompt_tokens",
+                        "reasoning_tokens",
+                        "rejected_prediction_tokens",
+                        "requests",
+                        "retries",
+                        "total",
+                        "total_cost",
+                        "total_tokens"
+                      ])
+
+  @numeric_usage_suffixes [
+    "_cost",
+    "_count",
+    "_duration_ms",
+    "_tokens"
+  ]
+
+  @doc """
+  Normalizes common usage counter keys and numeric counter values.
+  """
+  @spec normalize(term()) :: map() | nil
+  def normalize(nil), do: nil
+
+  def normalize(%{} = usage) do
+    Map.new(usage, fn {key, value} ->
+      key = normalize_usage_key(key)
+      {key, normalize_usage_value(key, value)}
+    end)
+  end
+
+  def normalize(_usage), do: nil
+
   @doc """
   Merges two usage maps while summing numeric counters and preserving provider metadata.
   """
   @spec merge(term(), term()) :: map()
   def merge(existing, incoming) do
-    Map.merge(usage_map(existing), usage_map(incoming), fn _key, left, right ->
-      merge_value(left, right)
+    Map.merge(usage_map(existing), usage_map(incoming), fn key, left, right ->
+      merge_value(key, left, right)
     end)
   end
 
@@ -29,16 +79,19 @@ defmodule Jido.AI.Usage do
     end
   end
 
-  defp usage_map(%{} = usage), do: normalize_usage_values(usage)
-  defp usage_map(_usage), do: %{}
+  defp usage_map(usage), do: normalize(usage) || %{}
 
-  defp merge_value(left, right) do
-    case {numeric_value(left), numeric_value(right)} do
-      {{:ok, left}, {:ok, right}} ->
-        left + right
+  defp merge_value(key, left, right) do
+    if numeric_usage_key?(key) do
+      case {numeric_value(left), numeric_value(right)} do
+        {{:ok, left}, {:ok, right}} ->
+          left + right
 
-      _ ->
-        merge_metadata_value(left, right)
+        _ ->
+          merge_metadata_value(left, right)
+      end
+    else
+      merge_metadata_value(left, right)
     end
   end
 
@@ -47,22 +100,41 @@ defmodule Jido.AI.Usage do
   defp merge_metadata_value(left, nil), do: left
   defp merge_metadata_value(_left, right), do: right
 
-  defp normalize_usage_values(usage) do
-    Map.new(usage, fn {key, value} -> {key, normalize_usage_value(value)} end)
+  defp normalize_usage_key("input_tokens"), do: :input_tokens
+  defp normalize_usage_key("output_tokens"), do: :output_tokens
+  defp normalize_usage_key("total_tokens"), do: :total_tokens
+  defp normalize_usage_key("cache_creation_input_tokens"), do: :cache_creation_input_tokens
+  defp normalize_usage_key("cache_read_input_tokens"), do: :cache_read_input_tokens
+  defp normalize_usage_key(key), do: key
+
+  defp normalize_usage_value(_key, value) when is_map(value), do: normalize(value)
+
+  defp normalize_usage_value(_key, value) when is_list(value) do
+    Enum.map(value, fn
+      %{} = item -> normalize(item)
+      item -> item
+    end)
   end
 
-  defp normalize_usage_value(value) when is_map(value), do: normalize_usage_values(value)
-
-  defp normalize_usage_value(value) when is_list(value) do
-    Enum.map(value, &normalize_usage_value/1)
-  end
-
-  defp normalize_usage_value(value) do
-    case numeric_value(value) do
-      {:ok, number} -> number
-      :error -> value
+  defp normalize_usage_value(key, value) do
+    if numeric_usage_key?(key) do
+      case numeric_value(value) do
+        {:ok, number} -> number
+        :error -> value
+      end
+    else
+      value
     end
   end
+
+  defp numeric_usage_key?(key) when is_atom(key), do: key |> Atom.to_string() |> numeric_usage_key?()
+
+  defp numeric_usage_key?(key) when is_binary(key) do
+    MapSet.member?(@numeric_usage_keys, key) or
+      Enum.any?(@numeric_usage_suffixes, &String.ends_with?(key, &1))
+  end
+
+  defp numeric_usage_key?(_key), do: false
 
   defp numeric_value(value) when is_integer(value) or is_float(value), do: {:ok, value}
 
