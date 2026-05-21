@@ -7,9 +7,12 @@ defmodule Jido.AI.QueryTest do
   describe "content_part?/1" do
     test "accepts compatible file and video content maps" do
       assert Query.content_part?(%{type: :file, file_id: "file_123"})
+      assert Query.content_part?(%{type: "file", file_id: "file_123"})
       assert Query.content_part?(%{"type" => "file", "file_id" => "file_123"})
       assert Query.content_part?(%{type: :video_url, url: "https://example.com/video.mp4"})
       assert Query.content_part?(%{"type" => "video_url", "url" => "https://example.com/video.mp4"})
+      assert Query.content_part?(%{type: :document, source: %{file_id: "file_123"}})
+      assert Query.content_part?(%{"type" => "file_id", "file_id" => "file_123"})
     end
   end
 
@@ -47,6 +50,31 @@ defmodule Jido.AI.QueryTest do
         assert file_part.file_id == "file_123"
         assert file_part.media_type == "application/pdf"
         assert file_part.metadata.title == "Quarterly report"
+      else
+        assert {:error, {:unsupported_content_part_file_id, message}} = result
+        assert message =~ "ReqLLM.Message.ContentPart.file_id/3"
+      end
+    end
+
+    test "accepts singular file_reference and normalizes optional metadata" do
+      result =
+        Query.attach_file_references("Summarize this.",
+          file_reference: [
+            file_id: "file_123",
+            media_type: " ",
+            filename: " report.pdf ",
+            metadata: [custom: true],
+            context: "Uploaded through the Files API"
+          ]
+        )
+
+      if file_reference_supported?() do
+        assert {:ok, [_text_part, file_part]} = result
+
+        file_part = Map.from_struct(file_part)
+        assert file_part.media_type == "application/pdf"
+        assert file_part.filename == "report.pdf"
+        assert file_part.metadata == %{custom: true, context: "Uploaded through the Files API"}
       else
         assert {:error, {:unsupported_content_part_file_id, message}} = result
         assert message =~ "ReqLLM.Message.ContentPart.file_id/3"
@@ -95,10 +123,13 @@ defmodule Jido.AI.QueryTest do
           ContentPart.text("Review this file."),
           ContentPart.file("PDF", "report.pdf", "application/pdf"),
           %{"type" => "file", "filename" => "appendix.pdf"},
-          %{type: :file}
+          %{"type" => "document", "filename" => "source.pdf"},
+          %{type: :file_id},
+          %{type: "file", filename: "notes.txt"}
         ])
 
-      assert summary == "Review this file.\n[File: report.pdf]\n[File: appendix.pdf]\n[File]"
+      assert summary ==
+               "Review this file.\n[File: report.pdf]\n[File: appendix.pdf]\n[File: source.pdf]\n[File]\n[File: notes.txt]"
     end
   end
 

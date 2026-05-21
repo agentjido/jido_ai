@@ -6,6 +6,12 @@ defmodule Jido.AI.Query do
   @type t :: String.t() | [ContentPart.t() | map()]
   @typedoc "Uploaded file reference accepted by generated request helpers."
   @type file_reference :: String.t() | keyword() | map()
+  @content_part_types [:text, :image, :image_url, :video_url, :file, :file_id, :document, :thinking]
+  @content_part_type_strings Enum.map(@content_part_types, &Atom.to_string/1)
+  @content_part_type_values @content_part_types ++ @content_part_type_strings
+  @file_part_types [:file, :file_id, :document]
+  @file_part_type_strings Enum.map(@file_part_types, &Atom.to_string/1)
+  @file_part_type_values @file_part_types ++ @file_part_type_strings
   @file_metadata_keys [:title, :context, :citations]
 
   @doc "Returns a Zoi schema that accepts text or a non-empty list of ReqLLM content parts."
@@ -40,19 +46,19 @@ defmodule Jido.AI.Query do
   @spec content_part?(term()) :: boolean()
   def content_part?(%ContentPart{}), do: true
 
-  def content_part?(%{type: type}) when type in [:text, :image, :image_url, :video_url, :file, :thinking], do: true
+  def content_part?(%{type: type}) when type in @content_part_type_values, do: true
 
-  def content_part?(%{"type" => type}) when type in ["text", "image", "image_url", "video_url", "file", "thinking"],
-    do: true
+  def content_part?(%{"type" => type}) when type in @content_part_type_strings, do: true
 
   def content_part?(_part), do: false
 
   @doc """
   Appends uploaded file references from request options to a text or content-part query.
 
-  Supports `:file_id`, `:file_ids`, and `:file_references`. File references can be
-  strings, keyword lists, or maps with `:file_id`/`"file_id"` plus optional
-  `:media_type`, `:filename`, `:metadata`, `:title`, `:context`, or `:citations`.
+  Supports `:file_id`, `:file_ids`, `:file_reference`, and `:file_references`.
+  File references can be strings, keyword lists, or maps with `:file_id`/`"file_id"`
+  plus optional `:media_type`, `:filename`, `:metadata`, `:title`, `:context`, or
+  `:citations`.
 
   Returns an explicit unsupported error when the active ReqLLM version does not
   expose `ReqLLM.Message.ContentPart.file_id/3`.
@@ -78,19 +84,44 @@ defmodule Jido.AI.Query do
 
   def summarize(parts) when is_list(parts) do
     Enum.map_join(parts, "\n", fn
-      %ContentPart{type: :text, text: text} when is_binary(text) -> text
-      %ContentPart{type: type} when type in [:image, :image_url] -> "[Image]"
-      %ContentPart{type: :file, filename: filename} when is_binary(filename) -> "[File: #{filename}]"
-      %ContentPart{type: :file} -> "[File]"
-      %{type: type, text: text} when type in [:text, "text"] and is_binary(text) -> text
-      %{type: type} when type in [:image, :image_url, "image", "image_url"] -> "[Image]"
-      %{type: type, filename: filename} when type in [:file, "file"] and is_binary(filename) -> "[File: #{filename}]"
-      %{type: type} when type in [:file, "file"] -> "[File]"
-      %{"type" => type, "text" => text} when type == "text" and is_binary(text) -> text
-      %{"type" => type} when type in ["image", "image_url"] -> "[Image]"
-      %{"type" => "file", "filename" => filename} when is_binary(filename) -> "[File: #{filename}]"
-      %{"type" => "file"} -> "[File]"
-      part -> inspect(part)
+      %ContentPart{type: :text, text: text} when is_binary(text) ->
+        text
+
+      %ContentPart{type: type} when type in [:image, :image_url] ->
+        "[Image]"
+
+      %ContentPart{type: :file, filename: filename} when is_binary(filename) ->
+        "[File: #{filename}]"
+
+      %ContentPart{type: :file} ->
+        "[File]"
+
+      %{type: type, text: text} when type in [:text, "text"] and is_binary(text) ->
+        text
+
+      %{type: type} when type in [:image, :image_url, "image", "image_url"] ->
+        "[Image]"
+
+      %{type: type, filename: filename} when type in @file_part_type_values and is_binary(filename) ->
+        "[File: #{filename}]"
+
+      %{type: type} when type in @file_part_type_values ->
+        "[File]"
+
+      %{"type" => type, "text" => text} when type == "text" and is_binary(text) ->
+        text
+
+      %{"type" => type} when type in ["image", "image_url"] ->
+        "[Image]"
+
+      %{"type" => type, "filename" => filename} when type in @file_part_type_strings and is_binary(filename) ->
+        "[File: #{filename}]"
+
+      %{"type" => type} when type in @file_part_type_strings ->
+        "[File]"
+
+      part ->
+        inspect(part)
     end)
   end
 
@@ -98,6 +129,7 @@ defmodule Jido.AI.Query do
     []
     |> maybe_add_reference(Keyword.get(opts, :file_id))
     |> maybe_add_references(Keyword.get(opts, :file_ids))
+    |> maybe_add_reference(Keyword.get(opts, :file_reference))
     |> maybe_add_references(Keyword.get(opts, :file_references))
   end
 
@@ -193,9 +225,9 @@ defmodule Jido.AI.Query do
       {:ok,
        %{
          file_id: file_id,
-         media_type: reference_value(reference, source, :media_type),
+         media_type: normalize_optional_binary(reference_value(reference, source, :media_type)),
          metadata: reference_metadata(reference),
-         filename: reference_value(reference, source, :filename)
+         filename: normalize_optional_binary(reference_value(reference, source, :filename))
        }}
     end
   end
@@ -221,6 +253,7 @@ defmodule Jido.AI.Query do
     metadata =
       case Map.get(reference, :metadata) || Map.get(reference, "metadata") do
         metadata when is_map(metadata) -> metadata
+        metadata when is_list(metadata) -> if(Keyword.keyword?(metadata), do: Map.new(metadata), else: %{})
         _metadata -> %{}
       end
 
@@ -234,6 +267,15 @@ defmodule Jido.AI.Query do
       end
     end)
   end
+
+  defp normalize_optional_binary(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      value -> value
+    end
+  end
+
+  defp normalize_optional_binary(_value), do: nil
 
   defp query_to_parts(query) when is_binary(query), do: [ContentPart.text(query)]
   defp query_to_parts(query) when is_list(query), do: query

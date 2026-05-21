@@ -163,8 +163,8 @@ defmodule Jido.AI.Request do
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
-  - `:file_id` / `:file_ids` / `:file_references` - Uploaded file references appended
-    to the user query as ReqLLM content parts when supported by the ReqLLM version
+  - `:file_id` / `:file_ids` / `:file_reference` / `:file_references` - Uploaded
+    file references appended to the user query as ReqLLM content parts when supported by the ReqLLM version
   - `:output` - `:raw` to bypass agent-level structured output for this request,
     or a request-scoped structured output config
   - `:extra_refs` - Map of additional refs to attach to the user message thread entry

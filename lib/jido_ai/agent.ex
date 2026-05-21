@@ -509,8 +509,8 @@ defmodule Jido.AI.Agent do
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
-      - `:file_id` / `:file_ids` / `:file_references` - Uploaded file references appended
-        to the user query as ReqLLM content parts when supported by the ReqLLM version
+      - `:file_id` / `:file_ids` / `:file_reference` / `:file_references` - Uploaded
+        file references appended to the user query as ReqLLM content parts when supported by the ReqLLM version
       - `:output` - `:raw` to bypass structured output or a request-scoped output config
       - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
       - `:timeout` - Timeout for the underlying cast (default: no timeout)
@@ -611,8 +611,8 @@ defmodule Jido.AI.Agent do
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
-      - `:file_id` / `:file_ids` / `:file_references` - Uploaded file references appended
-        to the user query as ReqLLM content parts when supported by the ReqLLM version
+      - `:file_id` / `:file_ids` / `:file_reference` / `:file_references` - Uploaded
+        file references appended to the user query as ReqLLM content parts when supported by the ReqLLM version
       - `:output` - `:raw` to bypass structured output or a request-scoped output config
       - `:timeout` - How long to wait in milliseconds (default: 30_000)
 
