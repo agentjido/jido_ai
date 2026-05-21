@@ -73,7 +73,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   alias Jido.AI.Directive
   alias Jido.AI.Effects
   alias Jido.AI.Reasoning.Helpers
-  alias Jido.AI.Signal.Helpers, as: SignalHelpers
+  alias Jido.AI.Error
   alias Jido.AI.Reasoning.TreeOfThoughts.Machine
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
@@ -918,7 +918,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   defp normalize_map_opt({:%{}, _meta, pairs}) when is_list(pairs), do: Map.new(pairs)
   defp normalize_map_opt(_), do: %{}
 
-  defp normalize_tool_result(result), do: SignalHelpers.normalize_result(result, :tool_error, "Tool execution failed")
+  defp normalize_tool_result(result), do: Error.normalize_result(result, :tool_error, "Tool execution failed")
 
   defp generate_call_id, do: Machine.generate_call_id()
 

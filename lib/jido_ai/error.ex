@@ -5,6 +5,7 @@ defmodule Jido.AI.Error do
   Provides structured error types for AI operations including:
   - API errors (rate limits, authentication, transient failures)
   - Validation errors
+  - Runtime error envelope normalization and retryability policy
   """
 
   use Splode,
@@ -13,6 +14,304 @@ defmodule Jido.AI.Error do
       validation: Jido.AI.Error.Validation
     ],
     unknown_error: Jido.AI.Error.Unknown
+
+  @type error_envelope :: %{
+          type: atom(),
+          message: String.t(),
+          details: map(),
+          retryable?: boolean()
+        }
+
+  @doc """
+  Builds a normalized AI runtime error envelope.
+
+  The envelope is the package-owned caller-visible contract used by tool,
+  LLM, directive, and signal result paths.
+  """
+  @spec error_envelope(atom(), String.t(), map(), boolean()) :: error_envelope()
+  def error_envelope(type, message, details \\ %{}, retryable? \\ false)
+      when is_atom(type) and is_binary(message) and is_map(details) and is_boolean(retryable?) do
+    %{
+      type: type,
+      message: message,
+      details: normalize_json_safe_map(details),
+      retryable?: retryable?
+    }
+  end
+
+  @doc """
+  Normalizes arbitrary runtime error values into the canonical AI error envelope.
+  """
+  @spec normalize(term(), atom(), String.t(), map()) :: error_envelope()
+  def normalize(reason, fallback_type \\ :execution_error, fallback_message \\ "Execution failed", extra_details \\ %{})
+
+  def normalize(%{type: type, message: message} = error, _fallback_type, _fallback_message, extra_details)
+      when is_atom(type) and is_map(extra_details) do
+    error_envelope(
+      type,
+      normalize_message(message),
+      merge_error_details(Map.get(error, :details, %{}), extra_details),
+      normalize_retryable(error, type)
+    )
+  end
+
+  def normalize(%{code: type, message: message} = error, _fallback_type, _fallback_message, extra_details)
+      when is_atom(type) and is_map(extra_details) do
+    error_envelope(
+      type,
+      normalize_message(message),
+      merge_error_details(Map.get(error, :details, %{}), extra_details),
+      normalize_retryable(error, type)
+    )
+  end
+
+  def normalize(%module{} = reason, fallback_type, fallback_message, extra_details)
+      when is_map(extra_details) do
+    cond do
+      jido_error_struct?(module) and Code.ensure_loaded?(Jido.Error) and function_exported?(Jido.Error, :to_map, 1) and
+          function_exported?(module, :message, 1) ->
+        reason
+        |> Jido.Error.to_map()
+        |> Map.drop([:stacktrace])
+        |> normalize(fallback_type, fallback_message, extra_details)
+
+      is_exception(reason) ->
+        error_envelope(
+          fallback_type,
+          Exception.message(reason),
+          merge_error_details(Map.from_struct(reason), extra_details),
+          false
+        )
+
+      true ->
+        error_envelope(
+          fallback_type,
+          fallback_message,
+          merge_error_details(%{reason: inspect(reason)}, extra_details),
+          false
+        )
+    end
+  end
+
+  def normalize(%{message: message} = error, fallback_type, _fallback_message, extra_details)
+      when not is_nil(message) and is_map(extra_details) do
+    details =
+      error
+      |> Map.drop([:message, :retryable, :retryable?])
+      |> merge_error_details(extra_details)
+
+    error_envelope(fallback_type, normalize_message(message), details, normalize_retryable(error, fallback_type))
+  end
+
+  def normalize({type, message}, _fallback_type, _fallback_message, extra_details)
+      when is_atom(type) and is_binary(message) and is_map(extra_details) do
+    error_envelope(type, message, extra_details, retryable_type?(type))
+  end
+
+  def normalize({:error, reason}, fallback_type, fallback_message, extra_details)
+      when is_map(extra_details) do
+    normalize(reason, fallback_type, fallback_message, extra_details)
+  end
+
+  def normalize({:unknown_tool, message}, _fallback_type, _fallback_message, extra_details)
+      when is_binary(message) and is_map(extra_details) do
+    error_envelope(:unknown_tool, message, extra_details, false)
+  end
+
+  def normalize({:validation, details}, _fallback_type, _fallback_message, extra_details)
+      when is_map(extra_details) do
+    error_envelope(
+      :validation,
+      "Tool validation failed",
+      merge_error_details(%{details: details}, extra_details),
+      false
+    )
+  end
+
+  def normalize({:timeout, details}, _fallback_type, _fallback_message, extra_details)
+      when is_map(details) and is_map(extra_details) do
+    error_envelope(:timeout, "Tool execution timed out", merge_error_details(details, extra_details), true)
+  end
+
+  def normalize(:timeout, _fallback_type, _fallback_message, extra_details) when is_map(extra_details) do
+    error_envelope(:timeout, "Tool execution timed out", extra_details, true)
+  end
+
+  def normalize(reason, fallback_type, _fallback_message, extra_details)
+      when is_atom(reason) and is_map(extra_details) do
+    error_envelope(
+      fallback_type,
+      Atom.to_string(reason),
+      merge_error_details(%{reason: reason}, extra_details),
+      retryable_type?(reason)
+    )
+  end
+
+  def normalize(reason, fallback_type, fallback_message, extra_details) when is_map(extra_details) do
+    error_envelope(
+      fallback_type,
+      fallback_message,
+      merge_error_details(%{reason: inspect(reason)}, extra_details),
+      retryable_type?(fallback_type)
+    )
+  end
+
+  @doc """
+  Serializes a runtime error term as the canonical AI runtime error map.
+  """
+  @spec to_map(term()) :: error_envelope()
+  def to_map(reason), do: normalize(reason)
+
+  @doc """
+  Ensures result payloads use `{:ok, term, effects}` or `{:error, reason, effects}` tuples.
+  """
+  @spec normalize_result(term(), atom(), String.t()) ::
+          {:ok, term(), [term()]} | {:error, error_envelope(), [term()]}
+  def normalize_result(result, fallback_type \\ :invalid_result, fallback_message \\ "Invalid result envelope")
+
+  def normalize_result({:ok, value, effects}, _fallback_type, _fallback_message),
+    do: {:ok, value, List.wrap(effects)}
+
+  def normalize_result({:ok, value}, _fallback_type, _fallback_message), do: {:ok, value, []}
+
+  def normalize_result({:error, reason, effects}, fallback_type, fallback_message),
+    do: {:error, normalize(reason, fallback_type, fallback_message), List.wrap(effects)}
+
+  def normalize_result({:error, reason}, fallback_type, fallback_message),
+    do: {:error, normalize(reason, fallback_type, fallback_message), []}
+
+  def normalize_result(result, fallback_type, fallback_message) do
+    {:error, error_envelope(fallback_type, fallback_message, %{result: inspect(result)}), []}
+  end
+
+  @doc """
+  Returns whether a result or error should be treated as retryable by runtime policy.
+  """
+  @spec retryable?(term()) :: boolean()
+  def retryable?({:ok, _, _}), do: false
+  def retryable?({:ok, _}), do: false
+  def retryable?({:error, reason, _effects}), do: retryable?(reason)
+  def retryable?({:error, reason}), do: retryable?(reason)
+  def retryable?(%{retryable?: value}) when is_boolean(value), do: value
+  def retryable?(%{retryable: value}) when is_boolean(value), do: value
+  def retryable?(%{type: type} = error) when is_atom(type), do: retryable_hint(error, retryable_type?(type))
+  def retryable?(%{code: type} = error) when is_atom(type), do: retryable_hint(error, retryable_type?(type))
+  def retryable?(reason) when is_atom(reason), do: retryable_type?(reason)
+  def retryable?(_reason), do: false
+
+  defp merge_error_details(details, extra_details) when is_map(details) and is_map(extra_details) do
+    Map.merge(details, extra_details)
+    |> normalize_json_safe_map()
+  end
+
+  defp normalize_json_safe_map(map) when is_map(map) do
+    Map.new(map, fn {key, value} ->
+      {normalize_json_safe_key(key), normalize_json_safe_value(value)}
+    end)
+  end
+
+  defp normalize_json_safe_key(key) when is_binary(key), do: key
+  defp normalize_json_safe_key(key) when is_atom(key), do: key
+  defp normalize_json_safe_key(key), do: inspect(key)
+
+  defp normalize_json_safe_value(value) when is_nil(value), do: nil
+  defp normalize_json_safe_value(value) when is_boolean(value), do: value
+  defp normalize_json_safe_value(value) when is_integer(value), do: value
+  defp normalize_json_safe_value(value) when is_float(value), do: value
+  defp normalize_json_safe_value(value) when is_binary(value), do: value
+  defp normalize_json_safe_value(value) when is_atom(value), do: value
+
+  defp normalize_json_safe_value(value) when is_list(value) do
+    Enum.map(value, &normalize_json_safe_value/1)
+  end
+
+  defp normalize_json_safe_value(%_{} = struct) do
+    struct
+    |> Map.from_struct()
+    |> normalize_json_safe_map()
+  end
+
+  defp normalize_json_safe_value(value) when is_map(value) do
+    normalize_json_safe_map(value)
+  end
+
+  defp normalize_json_safe_value(value), do: inspect(value)
+
+  defp normalize_retryable(error, type) do
+    cond do
+      is_boolean(Map.get(error, :retryable?)) -> Map.get(error, :retryable?)
+      is_boolean(Map.get(error, :retryable)) -> Map.get(error, :retryable)
+      true -> retryable_hint(error, retryable_type?(type))
+    end
+  end
+
+  defp normalize_message(message) when is_binary(message), do: message
+  defp normalize_message(message) when is_atom(message), do: Atom.to_string(message)
+  defp normalize_message(nil), do: "Execution failed"
+  defp normalize_message(message), do: inspect(message)
+
+  defp jido_error_struct?(module) do
+    module_name = Atom.to_string(module)
+
+    String.starts_with?(module_name, [
+      "Elixir.Jido.Action.Error.",
+      "Elixir.Jido.Error."
+    ])
+  end
+
+  defp retryable_hint(term, default) do
+    case extract_retry_hint(term) do
+      nil -> default
+      value -> value != false
+    end
+  end
+
+  defp extract_retry_hint(%{details: details} = error) do
+    case extract_retry_value(details) do
+      nil ->
+        details
+        |> extract_nested_reason()
+        |> Kernel.||(extract_nested_reason(error))
+        |> extract_retry_hint()
+
+      value ->
+        value
+    end
+  end
+
+  defp extract_retry_hint(%{} = map) do
+    case extract_retry_value(map) do
+      nil -> map |> extract_nested_reason() |> extract_retry_hint()
+      value -> value
+    end
+  end
+
+  defp extract_retry_hint(nil), do: nil
+  defp extract_retry_hint(reason) when is_atom(reason), do: retryable_type?(reason)
+  defp extract_retry_hint(_), do: nil
+
+  defp extract_nested_reason(%{} = map) do
+    map[:reason] ||
+      if(is_atom(map[:message]), do: map[:message], else: nil)
+  end
+
+  defp extract_nested_reason(_), do: nil
+
+  defp extract_retry_value(%{} = map) do
+    cond do
+      Map.has_key?(map, :retry) -> map[:retry]
+      true -> nil
+    end
+  end
+
+  defp extract_retry_value(keyword) when is_list(keyword) do
+    if Keyword.keyword?(keyword), do: Keyword.get(keyword, :retry), else: nil
+  end
+
+  defp extract_retry_value(_), do: nil
+
+  defp retryable_type?(type) when type in [:timeout, :transient, :transient_error, :rate_limited], do: true
+  defp retryable_type?(_type), do: false
 end
 
 defmodule Jido.AI.Error.API do

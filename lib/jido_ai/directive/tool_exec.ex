@@ -95,9 +95,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   This prevents the Machine from deadlocking in `awaiting_tool` state.
   """
 
+  alias Jido.AI.Error
   alias Jido.AI.Observe
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Turn
   alias Jido.Tracing.Context, as: TraceContext
 
@@ -255,7 +255,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           call_id,
           tool_name,
           {:error,
-           SignalHelpers.error_envelope(
+           Error.error_envelope(
              :supervisor,
              "Failed to start tool execution task",
              %{tool_name: tool_name, reason: inspect(reason)},
@@ -282,8 +282,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
          obs_cfg
        ) do
     0..max_retries
-    |> Enum.reduce_while({{:error, SignalHelpers.error_envelope(:executor, "uninitialized error"), []}, 0}, fn attempt,
-                                                                                                               _acc ->
+    |> Enum.reduce_while({{:error, Error.error_envelope(:executor, "uninitialized error"), []}, 0}, fn attempt, _acc ->
       if attempt > 0 do
         maybe_emit(obs_cfg, Observe.tool(:retry), %{duration_ms: 0, retry_count: attempt}, event_meta)
 
@@ -307,7 +306,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           {:halt, {ok, attempt}}
 
         {:error, error, _effects} ->
-          retryable? = SignalHelpers.retryable?(error)
+          retryable? = Error.retryable?(error)
 
           if retryable? and attempt < max_retries do
             {:cont, {result, attempt}}
@@ -340,12 +339,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
             normalize_result(result, tool_name)
 
           {:exit, _reason} ->
-            {:error,
-             SignalHelpers.error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
+            {:error, Error.error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
 
           nil ->
-            {:error,
-             SignalHelpers.error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
+            {:error, Error.error_envelope(:timeout, "Tool execution timed out", %{timeout_ms: timeout_ms}, true), []}
         end
       after
         Process.demonitor(task.ref, [:flush])
@@ -370,7 +367,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     rescue
       e ->
         {:error,
-         SignalHelpers.error_envelope(
+         Error.error_envelope(
            :exception,
            Exception.message(e),
            %{tool_name: tool_name, exception_type: inspect(e.__struct__)},
@@ -379,7 +376,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     catch
       kind, reason ->
         {:error,
-         SignalHelpers.error_envelope(
+         Error.error_envelope(
            :exception,
            "Caught #{kind}: #{inspect(reason)}",
            %{tool_name: tool_name, kind: kind},
@@ -397,18 +394,17 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   defp normalize_result({:ok, result}, _tool_name), do: {:ok, result, []}
 
   defp normalize_result({:error, reason, effects}, tool_name) do
-    {:error, SignalHelpers.normalize_error(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name}),
+    {:error, Error.normalize(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name}),
      List.wrap(effects)}
   end
 
   defp normalize_result({:error, reason}, tool_name) do
-    {:error, SignalHelpers.normalize_error(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name}),
-     []}
+    {:error, Error.normalize(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name}), []}
   end
 
   defp normalize_result(other, tool_name) do
     {:error,
-     SignalHelpers.error_envelope(
+     Error.error_envelope(
        :executor,
        "Unexpected tool execution result: #{inspect(other)}",
        %{tool_name: tool_name, result: inspect(other)},
@@ -454,7 +450,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
           tool_name: tool_name || "unknown",
           result:
             {:error,
-             SignalHelpers.error_envelope(
+             Error.error_envelope(
                :internal_error,
                "Signal construction failed: #{Exception.message(e)}",
                %{tool_name: tool_name || "unknown"},

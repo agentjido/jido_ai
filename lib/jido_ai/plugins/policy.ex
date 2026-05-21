@@ -41,6 +41,7 @@ defmodule Jido.AI.Plugins.Policy do
     vsn: "1.0.0"
 
   alias Jido.AI.Signal
+  alias Jido.AI.Error
   alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.AI.Validation
   alias Jido.Signal, as: BaseSignal
@@ -153,7 +154,7 @@ defmodule Jido.AI.Plugins.Policy do
     normalized =
       data
       |> Map.get(:result, Map.get(data, "result"))
-      |> SignalHelpers.normalize_result(:malformed_result, "Malformed result envelope")
+      |> Error.normalize_result(:malformed_result, "Malformed result envelope")
 
     put_signal_data(signal, Map.put(data, :result, normalized))
   end

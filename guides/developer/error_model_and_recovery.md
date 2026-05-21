@@ -28,6 +28,10 @@ After this guide, you can classify failures and pick the right recovery path.
 `jido_ai` owns the AI runtime error envelope used in signals, tool results, and
 telemetry-facing payloads.
 
+Use `Jido.AI.Error.normalize/4` to adapt arbitrary runtime errors into the
+canonical envelope, `Jido.AI.Error.normalize_result/3` for result tuples, and
+`Jido.AI.Error.retryable?/1` for retry policy decisions.
+
 Upstream packages such as `jido_action` should stay generic. They can expose
 error type/message/details and retryability, but they should not define
 AI-specific contracts.

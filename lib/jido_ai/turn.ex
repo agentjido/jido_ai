@@ -12,8 +12,7 @@ defmodule Jido.AI.Turn do
   - Optional executed tool results
   """
 
-  alias Jido.AI.{Effects, Observe, ToolAdapter, Usage}
-  alias Jido.AI.Signal.Helpers, as: SignalHelpers
+  alias Jido.AI.{Effects, Error, Observe, ToolAdapter, Usage}
   alias Jido.Action.Error.TimeoutError
   alias Jido.Action.Tool, as: ActionTool
   alias ReqLLM.Context
@@ -197,7 +196,7 @@ defmodule Jido.AI.Turn do
 
         :error ->
           {:error,
-           SignalHelpers.error_envelope(
+           Error.error_envelope(
              :not_found,
              "Tool not found: #{tool_name}",
              %{tool_name: tool_name},
@@ -398,14 +397,14 @@ defmodule Jido.AI.Turn do
   def format_tool_result_content({:error, error}) do
     encode_tool_result_envelope(%{
       ok: false,
-      error: SignalHelpers.normalize_error(error, :execution_error, "Tool execution failed")
+      error: Error.normalize(error, :execution_error, "Tool execution failed")
     })
   end
 
   def format_tool_result_content(other) do
     encode_tool_result_envelope(%{
       ok: false,
-      error: SignalHelpers.error_envelope(:invalid_result, "Invalid tool result envelope", %{result: inspect(other)})
+      error: Error.error_envelope(:invalid_result, "Invalid tool result envelope", %{result: inspect(other)})
     })
   end
 
@@ -573,7 +572,7 @@ defmodule Jido.AI.Turn do
     timeout_ms = reason.timeout || timeout_from_details(reason.details)
     message = Exception.message(reason)
 
-    SignalHelpers.error_envelope(
+    Error.error_envelope(
       :timeout,
       message,
       %{tool_name: tool_name, timeout_ms: timeout_ms}
@@ -583,11 +582,11 @@ defmodule Jido.AI.Turn do
   end
 
   defp format_error(tool_name, reason) when is_exception(reason) do
-    SignalHelpers.normalize_error(reason, :execution_error, Exception.message(reason), %{tool_name: tool_name})
+    Error.normalize(reason, :execution_error, Exception.message(reason), %{tool_name: tool_name})
   end
 
   defp format_error(tool_name, reason) do
-    SignalHelpers.normalize_error(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name})
+    Error.normalize(reason, :execution_error, "Tool execution failed", %{tool_name: tool_name})
   end
 
   defp format_exception(tool_name, exception, stacktrace) do
@@ -600,7 +599,7 @@ defmodule Jido.AI.Turn do
 
     message = Exception.message(exception)
 
-    SignalHelpers.error_envelope(
+    Error.error_envelope(
       :exception,
       message,
       %{tool_name: tool_name, exception_type: exception.__struct__},
@@ -611,7 +610,7 @@ defmodule Jido.AI.Turn do
   defp format_catch(tool_name, kind, reason) do
     message = "Caught #{kind}: #{inspect(reason)}"
 
-    SignalHelpers.error_envelope(
+    Error.error_envelope(
       :caught,
       message,
       %{tool_name: tool_name, kind: kind, reason: inspect(reason)},
@@ -747,7 +746,7 @@ defmodule Jido.AI.Turn do
     raw_result =
       case tool_name do
         "" ->
-          {:error, SignalHelpers.error_envelope(:validation, "Missing tool name"), []}
+          {:error, Error.error_envelope(:validation, "Missing tool name"), []}
 
         _ ->
           execute(tool_name, arguments, context, exec_opts)

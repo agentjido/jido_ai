@@ -45,8 +45,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
   receives a tool_result signal for every pending tool call, preventing deadlock.
   """
 
+  alias Jido.AI.Error
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.Helpers, as: SignalHelpers
 
   def exec(directive, _input_signal, state) do
     %{
@@ -59,7 +59,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
     metadata = Map.get(directive, :metadata, %{})
 
     normalized_error =
-      SignalHelpers.normalize_error(error, :execution_error, "Tool execution failed", %{tool_name: tool_name})
+      Error.normalize(error, :execution_error, "Tool execution failed", %{tool_name: tool_name})
 
     # Emit the error result synchronously (no task needed)
     signal =
