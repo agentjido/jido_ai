@@ -115,7 +115,7 @@ defmodule Jido.AI.Request do
     @doc """
     Creates a new Handle struct.
     """
-    @spec new(String.t(), server(), String.t()) :: t()
+    @spec new(String.t(), server(), Query.t()) :: t()
     def new(id, server, query) do
       %__MODULE__{
         id: id,
@@ -163,6 +163,8 @@ defmodule Jido.AI.Request do
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
+  - `:file_id` / `:file_ids` / `:file_references` - Uploaded file references appended
+    to the user query as ReqLLM content parts when supported by the ReqLLM version
   - `:output` - `:raw` to bypass agent-level structured output for this request,
     or a request-scoped structured output config
   - `:extra_refs` - Map of additional refs to attach to the user message thread entry
@@ -182,7 +184,7 @@ defmodule Jido.AI.Request do
         source: "/ai/react/agent"
       )
   """
-  @spec create_and_send(server(), String.t() | [ReqLLM.Message.ContentPart.t()], keyword()) ::
+  @spec create_and_send(server(), Query.t(), keyword()) ::
           {:ok, Handle.t()} | {:error, term()}
   def create_and_send(server, query, opts) when is_binary(query) or is_list(query) do
     signal_type = Keyword.fetch!(opts, :signal_type)
@@ -199,7 +201,8 @@ defmodule Jido.AI.Request do
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
     stream_to = Keyword.get(opts, :stream_to)
 
-    with {:ok, stream_to} <- RequestStream.normalize_sink(stream_to) do
+    with {:ok, query} <- Query.attach_file_references(query, opts),
+         {:ok, stream_to} <- RequestStream.normalize_sink(stream_to) do
       # Build payload with request_id for correlation.
       # Keep both query and prompt keys so all strategy start schemas can consume it.
       extra_refs = Keyword.get(opts, :extra_refs, %{})
@@ -249,7 +252,7 @@ defmodule Jido.AI.Request do
         source: "/ai/react/agent"
       )
   """
-  @spec send_and_await(server(), String.t() | [ReqLLM.Message.ContentPart.t()], keyword()) ::
+  @spec send_and_await(server(), Query.t(), keyword()) ::
           {:ok, any()} | {:error, term()}
   def send_and_await(server, query, opts) when is_binary(query) or is_list(query) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
@@ -372,8 +375,9 @@ defmodule Jido.AI.Request do
         {:ok, agent, action}
       end
   """
-  @spec start_request(struct(), String.t(), String.t(), keyword()) :: struct()
-  def start_request(agent, request_id, query, opts \\ []) when is_binary(request_id) and is_binary(query) do
+  @spec start_request(struct(), String.t(), Query.t(), keyword()) :: struct()
+  def start_request(agent, request_id, query, opts \\ [])
+      when is_binary(request_id) and (is_binary(query) or is_list(query)) do
     stream_to = Keyword.get(opts, :stream_to)
 
     request =
@@ -538,7 +542,7 @@ defmodule Jido.AI.Request do
       requests: quote(do: Zoi.map() |> Zoi.default(%{})),
       last_request_id: quote(do: Zoi.string() |> Zoi.optional()),
       # Backward compat fields
-      last_query: quote(do: Zoi.string() |> Zoi.default("")),
+      last_query: quote(do: Jido.AI.Query.schema() |> Zoi.default("")),
       last_answer: quote(do: Zoi.string() |> Zoi.default("")),
       completed: quote(do: Zoi.boolean() |> Zoi.default(false))
     }

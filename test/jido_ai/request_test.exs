@@ -4,6 +4,7 @@ defmodule JidoTest.AI.RequestTest do
   alias Jido.AI.Request
   alias Jido.AI.Request.Handle
   alias Jido.AI.Reasoning.ReAct.Event
+  alias ReqLLM.Message.ContentPart
 
   defmodule TestRequestTransformer do
     def transform_request(request, _state, _config, _context), do: {:ok, request}
@@ -155,6 +156,19 @@ defmodule JidoTest.AI.RequestTest do
       agent = Request.start_request(agent, "req-1", "What is 2+2?", stream_to: {:pid, self()})
 
       assert agent.state.requests["req-1"].stream_to == {:pid, self()}
+    end
+
+    test "start_request/4 tracks multimodal queries" do
+      query = [
+        ContentPart.text("Review this."),
+        ContentPart.file("PDF", "report.pdf", "application/pdf")
+      ]
+
+      agent = %MockAgent{state: Request.init_state(%{})}
+      agent = Request.start_request(agent, "req-1", query)
+
+      assert agent.state.requests["req-1"].query == query
+      assert agent.state.last_query == query
     end
 
     test "complete_request/3 updates request with result" do
@@ -447,6 +461,44 @@ defmodule JidoTest.AI.RequestTest do
                  source: "/ai/test",
                  stream_to: :bad_sink
                )
+    end
+
+    test "create_and_send/3 appends uploaded file references when supported by ReqLLM" do
+      server = start_runtime_server([])
+
+      result =
+        Request.create_and_send(server, "Summarize this document.",
+          signal_type: "ai.test.query",
+          source: "/ai/test",
+          request_id: "req_file",
+          file_references: [
+            %{
+              file_id: "file_123",
+              media_type: "application/pdf",
+              title: "Quarterly report"
+            }
+          ]
+        )
+
+      if function_exported?(ContentPart, :file_id, 3) do
+        assert {:ok, handle} = result
+        signal = FakeRuntimeServer.last_signal(server)
+
+        assert [text_part, file_part] = signal.data.query
+        assert signal.data.prompt == signal.data.query
+        assert handle.query == signal.data.query
+        assert %ContentPart{type: :text, text: "Summarize this document."} = text_part
+
+        file_part = Map.from_struct(file_part)
+        assert file_part.type == :file
+        assert file_part.file_id == "file_123"
+        assert file_part.media_type == "application/pdf"
+        assert file_part.metadata.title == "Quarterly report"
+      else
+        assert {:error, {:unsupported_content_part_file_id, message}} = result
+        assert message =~ "ReqLLM.Message.ContentPart.file_id/3"
+        assert FakeRuntimeServer.last_signal(server) == nil
+      end
     end
 
     test "await/2 returns successful result for completed request payload" do

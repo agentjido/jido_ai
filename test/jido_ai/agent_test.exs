@@ -11,6 +11,7 @@ defmodule Jido.AI.AgentTest do
   alias Jido.AI.Agent
   alias Jido.AI.Reasoning.ReAct.Event
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
+  alias ReqLLM.Message.ContentPart
 
   # ============================================================================
   # Test Action Modules (simulating external modules like ash_jido)
@@ -549,6 +550,19 @@ defmodule Jido.AI.AgentTest do
 
     test "ask_stream/3 exists as stream wrapper" do
       assert :erlang.fun_info(&BasicAgent.ask_stream/3, :arity) == {:arity, 3}
+    end
+
+    test "generated request helpers surface unsupported file reference options before dispatch" do
+      unless function_exported?(ContentPart, :file_id, 3) do
+        assert {:error, {:unsupported_content_part_file_id, _message}} =
+                 BasicAgent.ask(self(), "Summarize this.", file_id: "file_123")
+
+        assert {:error, {:unsupported_content_part_file_id, _message}} =
+                 BasicAgent.ask_stream(self(), "Summarize this.", file_id: "file_123")
+
+        assert {:error, {:unsupported_content_part_file_id, _message}} =
+                 BasicAgent.ask_sync(self(), "Summarize this.", file_id: "file_123", timeout: 1)
+      end
     end
   end
 
