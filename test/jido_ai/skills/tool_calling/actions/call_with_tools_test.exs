@@ -216,6 +216,75 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
       assert result.usage.total_tokens > 0
     end
 
+    test "merges nested provider usage across auto_execute turns" do
+      call_key = {__MODULE__, :nested_usage_call_count, self()}
+      on_exit(fn -> :persistent_term.erase(call_key) end)
+
+      Mimic.stub(ReqLLM.Generation, :generate_text, fn model, _messages, _opts ->
+        count = :persistent_term.get(call_key, 0) + 1
+        :persistent_term.put(call_key, count)
+
+        case count do
+          1 ->
+            {:ok,
+             %{
+               message: %{
+                 content: "",
+                 tool_calls: [
+                   %{
+                     id: "tc_1",
+                     name: "calculator",
+                     arguments: %{"operation" => "add", "a" => 5, "b" => 3}
+                   }
+                 ]
+               },
+               finish_reason: :tool_calls,
+               usage: %{
+                 input_tokens: 10,
+                 output_tokens: 8,
+                 total_cost: 0.001,
+                 cost: %{total: 0.001, line_items: [%{id: "first"}]}
+               },
+               model: model
+             }}
+
+          2 ->
+            {:ok,
+             %{
+               message: %{content: "Tool execution complete: 8", tool_calls: nil},
+               finish_reason: :stop,
+               usage: %{
+                 input_tokens: 12,
+                 output_tokens: 6,
+                 total_cost: 0.002,
+                 cost: %{total: 0.002, line_items: [%{id: "second"}]}
+               },
+               model: model
+             }}
+        end
+      end)
+
+      params = %{
+        prompt: "Calculate 5 + 3",
+        tools: ["calculator"],
+        auto_execute: true
+      }
+
+      context = %{
+        tools: %{TestCalculator.name() => TestCalculator}
+      }
+
+      assert {:ok, result} = CallWithTools.run(params, context)
+
+      assert result.usage == %{
+               input_tokens: 22,
+               output_tokens: 14,
+               total_tokens: 36,
+               total_cost: 0.003,
+               cost: %{total: 0.003, line_items: [%{id: "second"}]}
+             }
+    end
+
     test "preserves OpenAI Responses response_id across auto_execute turns" do
       test_pid = self()
 

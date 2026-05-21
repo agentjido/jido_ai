@@ -249,12 +249,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   def merge_usage(%__MODULE__{} = state, nil), do: state
 
   def merge_usage(%__MODULE__{} = state, usage) when is_map(usage) do
-    merged =
-      Map.merge(state.usage, usage, fn _k, old, new ->
-        normalize_numeric(old) + normalize_numeric(new)
-      end)
-
-    %{state | usage: merged, updated_at_ms: now_ms()}
+    %{state | usage: Jido.AI.Usage.merge(state.usage, usage), updated_at_ms: now_ms()}
   end
 
   def merge_usage(%__MODULE__{} = state, _), do: state
@@ -323,18 +318,6 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   end
 
   defp normalize_status(_), do: :error
-
-  defp normalize_numeric(value) when is_integer(value), do: value
-  defp normalize_numeric(value) when is_float(value), do: trunc(value)
-
-  defp normalize_numeric(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, ""} -> int
-      _ -> 0
-    end
-  end
-
-  defp normalize_numeric(_), do: 0
 
   defp now_ms, do: System.system_time(:millisecond)
 end

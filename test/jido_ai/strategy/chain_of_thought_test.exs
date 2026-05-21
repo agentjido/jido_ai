@@ -200,6 +200,58 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       assert state[:cot_worker_status] == :ready
     end
 
+    test "llm_completed worker events merge nested provider usage without crashing" do
+      agent = create_agent()
+
+      usage_1 = %{
+        input_tokens: 10,
+        output_tokens: 5,
+        total_cost: 0.001,
+        add_reasoning_to_cost: false,
+        cost: %{total: 0.001, input_cost: 0.0008, line_items: [%{id: "first"}]},
+        tool_usage: %{calls: 1}
+      }
+
+      usage_2 = %{
+        input_tokens: 7,
+        output_tokens: 3,
+        total_cost: 0.002,
+        add_reasoning_to_cost: true,
+        cost: %{total: 0.002, input_cost: 0.0015, line_items: [%{id: "second"}]},
+        tool_usage: %{calls: 2}
+      }
+
+      events = [
+        worker_event(:request_started, "req_cot_usage", 1, %{query: "Compute"}),
+        worker_event(:llm_completed, "req_cot_usage", 2, %{
+          call_id: "cot_call_req_cot_usage_1",
+          text: "Draft 1",
+          usage: usage_1
+        }),
+        worker_event(:llm_completed, "req_cot_usage", 3, %{
+          call_id: "cot_call_req_cot_usage_2",
+          text: "Draft 2",
+          usage: usage_2
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ChainOfThought.cmd(acc, [instruction(:cot_worker_event, %{request_id: "req_cot_usage", event: event})], %{})
+        end)
+
+      state = StratState.get(agent, %{})
+
+      assert state[:usage] == %{
+               input_tokens: 17,
+               output_tokens: 8,
+               total_cost: 0.003,
+               add_reasoning_to_cost: true,
+               cost: %{total: 0.003, input_cost: 0.0023, line_items: [%{id: "second"}]},
+               tool_usage: %{calls: 3}
+             }
+    end
+
     test "propagates runtime ordering metadata to LLMDelta signals" do
       agent = create_agent()
       request_id = "req_cot_delta_meta"

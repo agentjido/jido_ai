@@ -792,6 +792,70 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.pending_input_server == nil
     end
 
+    test "llm_completed events merge nested provider usage without crashing" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "q", request_id: "req_usage"})],
+          %{}
+        )
+
+      usage_1 = %{
+        input_tokens: 10,
+        output_tokens: 5,
+        total_cost: 0.001,
+        input_includes_cached: false,
+        cost: %{total: 0.001, input_cost: 0.0008, line_items: [%{id: "first"}]},
+        image_usage: %{images: 1}
+      }
+
+      usage_2 = %{
+        input_tokens: 7,
+        output_tokens: 3,
+        total_cost: 0.002,
+        input_includes_cached: true,
+        cost: %{total: 0.002, input_cost: 0.0015, line_items: [%{id: "second"}]},
+        image_usage: %{images: 2}
+      }
+
+      events = [
+        runtime_event(:llm_completed, "req_usage", 1, %{
+          turn_type: :final_answer,
+          text: "draft one",
+          thinking_content: nil,
+          reasoning_details: [],
+          tool_calls: [],
+          usage: usage_1
+        }),
+        runtime_event(:llm_completed, "req_usage", 2, %{
+          turn_type: :final_answer,
+          text: "draft two",
+          thinking_content: nil,
+          reasoning_details: [],
+          tool_calls: [],
+          usage: usage_2
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_usage", event: event})], %{})
+        end)
+
+      state = StratState.get(agent, %{})
+
+      assert state.usage == %{
+               input_tokens: 17,
+               output_tokens: 8,
+               total_cost: 0.003,
+               input_includes_cached: true,
+               cost: %{total: 0.003, input_cost: 0.0023, line_items: [%{id: "second"}]},
+               image_usage: %{images: 3}
+             }
+    end
+
     test "completed request history is reused for the next turn" do
       agent = create_agent(tools: [TestCalculator])
       reasoning_details = [%{signature: "sig_123", provider: :openai}]

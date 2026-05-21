@@ -12,7 +12,7 @@ defmodule Jido.AI.Turn do
   - Optional executed tool results
   """
 
-  alias Jido.AI.{Effects, Observe, ToolAdapter}
+  alias Jido.AI.{Effects, Observe, ToolAdapter, Usage}
   alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Action.Error.TimeoutError
   alias Jido.Action.Tool, as: ActionTool
@@ -530,44 +530,10 @@ defmodule Jido.AI.Turn do
     }
   end
 
-  defp normalize_usage(nil), do: nil
-
-  defp normalize_usage(usage) when is_map(usage) do
-    usage
-    |> Enum.map(fn {key, value} -> {normalize_usage_key(key), normalize_usage_value(value)} end)
-    |> Map.new()
-  end
-
-  defp normalize_usage(_), do: nil
+  defp normalize_usage(usage), do: Usage.normalize(usage)
 
   defp normalize_metadata(%{} = metadata), do: metadata
   defp normalize_metadata(_), do: %{}
-
-  defp normalize_usage_key("input_tokens"), do: :input_tokens
-  defp normalize_usage_key("output_tokens"), do: :output_tokens
-  defp normalize_usage_key("total_tokens"), do: :total_tokens
-  defp normalize_usage_key("cache_creation_input_tokens"), do: :cache_creation_input_tokens
-  defp normalize_usage_key("cache_read_input_tokens"), do: :cache_read_input_tokens
-  defp normalize_usage_key(key) when is_binary(key), do: key
-  defp normalize_usage_key(key), do: key
-
-  defp normalize_usage_value(value) when is_integer(value), do: value
-  defp normalize_usage_value(value) when is_float(value), do: value
-
-  defp normalize_usage_value(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, ""} ->
-        int
-
-      _ ->
-        case Float.parse(value) do
-          {float, _} -> float
-          :error -> 0
-        end
-    end
-  end
-
-  defp normalize_usage_value(_), do: 0
 
   defp execute_internal(module, tool_name, params, context, timeout, exec_opts) do
     schema = module.schema()
