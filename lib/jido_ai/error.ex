@@ -289,15 +289,11 @@ defmodule Jido.AI.Error do
 
   defp error_details(error), do: Map.get(error, :details, Map.get(error, "details", %{}))
 
-  defp normalize_type(type, _fallback) when is_atom(type), do: type
-
-  defp normalize_type(type, fallback) when is_binary(type) do
+  defp normalize_type(type, fallback) do
     String.to_existing_atom(type)
   rescue
     ArgumentError -> fallback
   end
-
-  defp normalize_type(_type, fallback), do: fallback
 
   defp normalize_message(message) when is_binary(message), do: message
   defp normalize_message(message) when is_atom(message), do: Atom.to_string(message)
