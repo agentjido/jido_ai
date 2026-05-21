@@ -265,7 +265,7 @@ Tool execution emits `:telemetry` events via `Jido.AI.Observe`:
 | Event | Path | Measurements | Key Metadata |
 |---|---|---|---|
 | start | `[:jido, :ai, :tool, :execute, :start]` | `system_time` | `tool_name`, `params`, `call_id`, `run_id`, `agent_id`, `iteration` |
-| stop | `[:jido, :ai, :tool, :execute, :stop]` | `duration_ms`, `duration` | `tool_name`, `result`, `call_id`, `run_id`, `agent_id`, `thread_id` |
+| stop | `[:jido, :ai, :tool, :execute, :stop]` | `duration_ms`, `duration` | `tool_name`, `result` summary, `call_id`, `run_id`, `agent_id`, `thread_id` |
 | exception | `[:jido, :ai, :tool, :execute, :exception]` | `duration_ms`, `duration` | `tool_name`, `reason`, `call_id`, `run_id`, `agent_id`, `thread_id` |
 
 Subscribe example:
@@ -281,7 +281,7 @@ Subscribe example:
 )
 ```
 
-Sensitive parameters are sanitized via `Observe.sanitize_sensitive/1` before emission.
+Telemetry metadata is passed through `Observe.sanitize_telemetry_metadata/1` before emission. Sensitive parameters are redacted, large nested values are bounded, and tool `result` metadata is retained as a low-cardinality summary rather than the raw result blob. Tool-result content sent back through the model/tool transport is encoded through `Observe.sanitize_transport_payload/1` so arbitrary action outputs become bounded JSON-safe data.
 
 ## Failure Mode: Tool Not Found
 

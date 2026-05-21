@@ -30,7 +30,7 @@ obs_cfg = %{emit_telemetry?: true, emit_llm_deltas?: false}
   )
 ```
 
-`Observe` normalizes required metadata/measurement keys before emit.
+`Observe` normalizes required metadata/measurement keys before emit. Metadata also passes through the telemetry sanitizer boundary: sensitive keys are redacted, large nested values are bounded, and payload-shaped fields such as `result`, `output`, `content`, `messages`, or raw provider responses are summarized instead of emitted as raw blobs.
 
 Required metadata keys:
 `agent_id`, `request_id`, `run_id`, `iteration`, `llm_call_id`, `tool_call_id`, `tool_name`, `model`, `termination_reason`, `error_type`.
@@ -50,6 +50,27 @@ Required measurement keys:
   nil
 )
 ```
+
+## Sanitizer Profiles
+
+Use `Observe.sanitize_telemetry_metadata/1` for event metadata and `Observe.sanitize_transport_payload/1` before JSON/public transport encoding.
+
+```elixir
+metadata =
+  Observe.sanitize_telemetry_metadata(%{
+    request_id: "req-42",
+    api_key: "secret",
+    result: {:ok, %{large_payload: String.duplicate("x", 10_000)}, []}
+  })
+
+payload =
+  Observe.sanitize_transport_payload(%{
+    ok: true,
+    result: %{token: "secret", value: {:not_json_safe, self()}}
+  })
+```
+
+`sanitize_sensitive/1` remains available when you only need recursive key-based redaction.
 
 ## Telemetry + Signal Example
 
@@ -73,7 +94,7 @@ metadata =
 :ok = Observe.emit(%{emit_telemetry?: true}, Observe.request(:start), %{duration_ms: 0}, metadata)
 ```
 
-Use `Observe.sanitize_sensitive/1` before attaching user/tool payloads to telemetry metadata.
+Prefer `Observe.sanitize_telemetry_metadata/1` before attaching user/tool payloads to telemetry metadata. Direct `Observe.emit/5` calls apply that profile automatically.
 
 ## Enable/Disable Behavior
 
