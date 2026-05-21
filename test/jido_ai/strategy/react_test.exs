@@ -884,6 +884,128 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
              ]
     end
 
+    test "snapshot formats pending tool calls with string keys" do
+      agent = create_agent(tools: [TestCalculator])
+
+      state =
+        agent
+        |> StratState.get(%{})
+        |> Map.put(:status, :awaiting_tool)
+        |> Map.put(:pending_tool_calls, [
+          %{
+            "id" => "call_string",
+            "name" => "calculator",
+            "arguments" => %{"operation" => "add", "a" => 2, "b" => 3},
+            "result" => nil
+          }
+        ])
+
+      agent = StratState.put(agent, state)
+
+      assert ReAct.snapshot(agent, %{}).details.tool_calls == [
+               %{
+                 id: "call_string",
+                 name: "calculator",
+                 arguments: %{"operation" => "add", "a" => 2, "b" => 3},
+                 status: :running,
+                 result: nil
+               }
+             ]
+    end
+
+    test "snapshot exposes completed tool results after final answer" do
+      agent = create_agent(tools: [TestCalculator, TestSearch])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Use tools", request_id: "req_tools"})], %{})
+
+      replayed_tool_result =
+        runtime_event(:tool_completed, "req_tools", 3, %{
+          tool_call_id: "call_calc",
+          tool_name: "calculator",
+          result: {:ok, %{result: 5}, []}
+        })
+
+      events = [
+        runtime_event(:request_started, "req_tools", 1, %{query: "Use tools"}),
+        runtime_event(:llm_completed, "req_tools", 2, %{
+          turn_type: :tool_calls,
+          text: "",
+          thinking_content: nil,
+          tool_calls: [
+            %{
+              id: "call_calc",
+              name: "calculator",
+              arguments: %{"operation" => "add", "a" => 2, "b" => 3}
+            },
+            %{
+              id: "call_search",
+              name: "search",
+              arguments: %{"query" => "jido"}
+            }
+          ],
+          usage: %{}
+        }),
+        replayed_tool_result,
+        replayed_tool_result,
+        runtime_event(:tool_completed, "req_tools", 4, %{
+          tool_call_id: "call_search",
+          tool_name: "search",
+          result: {:error, %{type: :timeout, message: "search timed out"}, []}
+        }),
+        runtime_event(:llm_completed, "req_tools", 5, %{
+          turn_type: :final_answer,
+          text: "The tools finished.",
+          thinking_content: nil,
+          tool_calls: [],
+          usage: %{}
+        }),
+        runtime_event(:request_completed, "req_tools", 6, %{
+          result: "The tools finished.",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_tools", event: event})], %{})
+        end)
+
+      snapshot = ReAct.snapshot(agent, %{})
+
+      assert snapshot.result == "The tools finished."
+
+      assert snapshot.details.tool_results == [
+               %{
+                 id: "call_calc",
+                 name: "calculator",
+                 arguments: %{"operation" => "add", "a" => 2, "b" => 3},
+                 result: {:ok, %{result: 5}, []}
+               },
+               %{
+                 id: "call_search",
+                 name: "search",
+                 arguments: %{"query" => "jido"},
+                 result:
+                   {:error,
+                    %{
+                      type: :timeout,
+                      message: "search timed out",
+                      details: %{},
+                      retryable?: true
+                    }, []}
+               }
+             ]
+
+      refute Map.has_key?(snapshot.details, :tool_calls)
+
+      {agent, [_spawn]} =
+        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Next run", request_id: "req_next"})], %{})
+
+      refute Map.has_key?(ReAct.snapshot(agent, %{}).details, :tool_results)
+    end
+
     test "request completion clears ephemeral req_http_options" do
       agent = create_agent(tools: [TestCalculator])
 

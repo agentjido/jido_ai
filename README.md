@@ -143,6 +143,11 @@ end
 - `tools:` replaces the tool registry for one request.
 - `request_transformer:` lets you reshape each LLM turn, including dynamic tool gating and structured-output schemas.
 
+After a ReAct run, `snapshot.result` is the final assistant answer. Completed
+tool outputs are available separately through
+`snapshot.details[:tool_results]`, so callers do not need to parse conversation
+messages or request traces to recover structured tool data.
+
 For retrieval or classification flows, prefer having tools write `StateOp.SetState` updates and let a `request_transformer` read `context[:state]` to constrain the next turn. That keeps tool exposure, runtime state, and output schemas aligned without scraping message history. See [Standalone ReAct Runtime](guides/user/standalone_react_runtime.md) for the pattern.
 
 Need one-shot text generation without an agent process?

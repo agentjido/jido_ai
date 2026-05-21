@@ -398,6 +398,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       output: state[:output],
       duration_ms: calculate_duration(state[:started_at]),
       tool_calls: format_tool_calls(state[:pending_tool_calls] || []),
+      tool_results: state[:tool_results] || [],
       current_llm_call_id: state[:current_llm_call_id],
       active_request_id: state[:active_request_id],
       checkpoint_token: state[:checkpoint_token],
@@ -434,13 +435,55 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp format_tool_calls(pending_tool_calls) do
     Enum.map(pending_tool_calls, fn tc ->
+      result = fetch_map_value(tc, :result)
+
       %{
-        id: tc.id,
-        name: tc.name,
-        arguments: tc.arguments,
-        status: if(tc.result == nil, do: :running, else: :completed),
-        result: tc.result
+        id: fetch_map_value(tc, :id),
+        name: fetch_map_value(tc, :name),
+        arguments: fetch_map_value(tc, :arguments) || %{},
+        status: if(result == nil, do: :running, else: :completed),
+        result: result
       }
+    end)
+  end
+
+  defp completed_tool_result_entry(state, tool_call_id, tool_name, tool_result) do
+    %{
+      id: tool_call_id,
+      name: tool_name,
+      arguments: pending_tool_arguments(state, tool_call_id),
+      result: tool_result
+    }
+  end
+
+  defp put_completed_tool_result(state, tool_result_entry) do
+    existing =
+      case Map.get(state, :tool_results, []) do
+        results when is_list(results) -> results
+        _ -> []
+      end
+
+    updated =
+      case Enum.split_while(existing, &(fetch_map_value(&1, :id) != tool_result_entry[:id])) do
+        {_before, []} ->
+          existing ++ [tool_result_entry]
+
+        {before, [_old | after_results]} ->
+          before ++ [tool_result_entry | after_results]
+      end
+
+    Map.put(state, :tool_results, updated)
+  end
+
+  defp pending_tool_arguments(state, tool_call_id) do
+    state
+    |> Map.get(:pending_tool_calls, [])
+    |> Enum.find_value(%{}, fn call ->
+      if fetch_map_value(call, :id) == tool_call_id do
+        fetch_map_value(call, :arguments) || %{}
+      else
+        false
+      end
     end)
   end
 
@@ -460,6 +503,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         run_context: nil,
         active_context_ref: active_context_ref,
         pending_tool_calls: [],
+        tool_results: [],
         final_answer: nil,
         result: nil,
         current_llm_call_id: nil,
@@ -675,6 +719,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:streaming_text, "")
           |> Map.put(:streaming_thinking, "")
           |> Map.put(:pending_tool_calls, [])
+          |> Map.put(:tool_results, [])
           |> Map.put(:cancel_reason, nil)
           |> Map.put(:checkpoint_token, nil)
           |> Map.put(:run_context, run_context)
@@ -1524,6 +1569,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:started_at, event_field(event, :at_ms, System.monotonic_time(:millisecond)))
           |> Map.put(:streaming_text, "")
           |> Map.put(:streaming_thinking, "")
+          |> Map.put(:tool_results, [])
           |> ensure_request_trace(request_id)
 
         signal =
@@ -1659,6 +1705,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_call_id = event_field(data, :tool_call_id, event_field(event, :tool_call_id, ""))
         tool_name = event_field(data, :tool_name, event_field(event, :tool_name, ""))
         tool_result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
+        tool_result_entry = completed_tool_result_entry(base_state, tool_call_id, tool_name, tool_result)
 
         refs = runtime_event_refs(event, request_id)
 
@@ -1669,6 +1716,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
               if tc.id == tool_call_id, do: %{tc | result: tool_result}, else: tc
             end)
           end)
+          |> put_completed_tool_result(tool_result_entry)
           |> append_tool_result_to_run_context(tool_call_id, tool_name, tool_result, refs)
 
         signal =

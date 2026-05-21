@@ -143,6 +143,33 @@ signal = Jido.Signal.new!(
 {:ok, _agent} = Jido.AI.set_system_prompt(pid, "You are a concise support specialist.")
 ```
 
+## Final Answer Vs Tool Outputs
+
+`ask_sync/3` and `snapshot.result` return the final assistant answer. Tool
+Actions may also return structured data that you want to inspect directly. For
+that, read `snapshot.details[:tool_results]` instead of parsing conversation
+messages or internal request traces.
+
+| Surface | Contains | Use for |
+|---|---|---|
+| `snapshot.result` | Final assistant answer | What to show the user |
+| `snapshot.details[:tool_results]` | Completed tool outputs for the current or most recent ReAct run | URLs, IDs, records, and other structured tool data |
+| `snapshot.details[:conversation]` | Projected LLM messages, including serialized tool messages | Restoring conversation context |
+
+```elixir
+{:ok, status} = Jido.AgentServer.status(pid)
+
+image_results =
+  status.snapshot.details[:tool_results]
+  |> List.wrap()
+  |> Enum.filter(&(&1.name == "generate_image"))
+  |> Enum.map(fn %{result: {:ok, output, _effects}} -> output end)
+```
+
+Use this for run inspection. If a tool produces domain data that must survive
+process restarts or serve as the system of record, persist it from the tool or
+return an allowed state effect.
+
 ## Optional: Restore Conversation Context
 
 If you persist the conversation history (e.g. from `snapshot.details.conversation`),
