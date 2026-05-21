@@ -1856,9 +1856,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   end
 
   defp merge_usage(existing, incoming) do
-    Map.merge(existing || %{}, incoming || %{}, fn _k, left, right ->
-      (left || 0) + (right || 0)
-    end)
+    Jido.AI.Usage.merge(existing, incoming)
   end
 
   defp event_kind(event) do
