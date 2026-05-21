@@ -3,6 +3,7 @@ defmodule Jido.AI.Error.ModelTest do
 
   alias Jido.Action.Error, as: ActionError
   alias Jido.AI.Error
+  alias Jido.Signal.Error, as: SignalError
 
   test "unknown error formats wrapped payload" do
     assert Error.Unknown.message(%Error.Unknown{error: {:bad_state, %{step: 2}}}) ==
@@ -95,6 +96,17 @@ defmodule Jido.AI.Error.ModelTest do
              }
     end
 
+    test "normalizes Jido.Signal error structs through Jido.Error.to_map/1" do
+      error = SignalError.timeout_error("dispatch timed out", %{timeout: 50, retry: true})
+
+      assert Error.normalize(error) == %{
+               type: :timeout,
+               message: "dispatch timed out",
+               details: %{timeout: 50, retry: true},
+               retryable?: true
+             }
+    end
+
     test "normalizes supervisor failures without changing the public envelope shape" do
       assert Error.normalize(
                %{
@@ -155,6 +167,20 @@ defmodule Jido.AI.Error.ModelTest do
       assert is_binary(envelope.details.ref)
       assert is_binary(envelope.details.tuple)
       assert is_binary(envelope.details.nested.inner)
+      assert Jason.encode!(envelope)
+    end
+
+    test "wraps malformed details payloads without crashing normalization" do
+      envelope =
+        Error.normalize(%{
+          type: :execution_error,
+          message: "boom",
+          details: {:bad_details, self()}
+        })
+
+      assert envelope.type == :execution_error
+      assert envelope.message == "boom"
+      assert is_binary(envelope.details.details)
       assert Jason.encode!(envelope)
     end
 

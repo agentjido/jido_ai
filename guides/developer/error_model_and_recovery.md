@@ -36,6 +36,11 @@ Upstream packages such as `jido_action` should stay generic. They can expose
 error type/message/details and retryability, but they should not define
 AI-specific contracts.
 
+`Jido.AI.Error.normalize/4` adapts upstream `Jido.Action.Error`,
+`Jido.Signal.Error`, and `Jido.Error` structs through the generic `Jido.Error`
+map contract. Plain Elixir exceptions use the caller-provided fallback type
+while preserving the exception message and sanitized struct fields.
+
 At this boundary, envelope `details` are normalized to JSON-safe values. Raw
 runtime terms (for example tuples, pids, refs) are stringified so signal and
 telemetry payload encoding stays reliable.

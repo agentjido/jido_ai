@@ -15,6 +15,12 @@ defmodule Jido.AI.Error do
     ],
     unknown_error: Jido.AI.Error.Unknown
 
+  @upstream_jido_error_prefixes [
+    "Elixir.Jido.Action.Error.",
+    "Elixir.Jido.Error.",
+    "Elixir.Jido.Signal.Error."
+  ]
+
   @type error_envelope :: %{
           type: atom(),
           message: String.t(),
@@ -68,20 +74,11 @@ defmodule Jido.AI.Error do
   def normalize(%module{} = reason, fallback_type, fallback_message, extra_details)
       when is_map(extra_details) do
     cond do
-      jido_error_struct?(module) and Code.ensure_loaded?(Jido.Error) and function_exported?(Jido.Error, :to_map, 1) and
-          function_exported?(module, :message, 1) ->
-        reason
-        |> Jido.Error.to_map()
-        |> Map.drop([:stacktrace])
-        |> normalize(fallback_type, fallback_message, extra_details)
+      upstream_jido_error_struct?(module) ->
+        normalize_upstream_jido_error(reason, fallback_type, fallback_message, extra_details)
 
       is_exception(reason) ->
-        error_envelope(
-          fallback_type,
-          Exception.message(reason),
-          merge_error_details(Map.from_struct(reason), extra_details),
-          false
-        )
+        normalize_exception(reason, fallback_type, extra_details)
 
       true ->
         error_envelope(
@@ -204,6 +201,17 @@ defmodule Jido.AI.Error do
     |> normalize_json_safe_map()
   end
 
+  defp merge_error_details(details, extra_details) when is_map(extra_details) do
+    details
+    |> normalize_error_details()
+    |> Map.merge(extra_details)
+    |> normalize_json_safe_map()
+  end
+
+  defp normalize_error_details(nil), do: %{}
+  defp normalize_error_details(details) when is_map(details), do: details
+  defp normalize_error_details(details), do: %{details: details}
+
   defp normalize_json_safe_map(map) when is_map(map) do
     Map.new(map, fn {key, value} ->
       {normalize_json_safe_key(key), normalize_json_safe_value(value)}
@@ -250,13 +258,36 @@ defmodule Jido.AI.Error do
   defp normalize_message(nil), do: "Execution failed"
   defp normalize_message(message), do: inspect(message)
 
-  defp jido_error_struct?(module) do
+  defp normalize_upstream_jido_error(reason, fallback_type, fallback_message, extra_details) do
+    reason
+    |> Jido.Error.to_map()
+    |> Map.drop([:stacktrace])
+    |> normalize(fallback_type, fallback_message, extra_details)
+  end
+
+  defp normalize_exception(reason, fallback_type, extra_details) do
+    error_envelope(
+      fallback_type,
+      Exception.message(reason),
+      merge_error_details(Map.from_struct(reason), extra_details),
+      false
+    )
+  end
+
+  defp upstream_jido_error_struct?(module) do
+    jido_error_adapter_available?() and exception_struct?(module) and jido_error_namespace?(module)
+  end
+
+  defp jido_error_adapter_available? do
+    Code.ensure_loaded?(Jido.Error) and function_exported?(Jido.Error, :to_map, 1)
+  end
+
+  defp exception_struct?(module), do: function_exported?(module, :message, 1)
+
+  defp jido_error_namespace?(module) do
     module_name = Atom.to_string(module)
 
-    String.starts_with?(module_name, [
-      "Elixir.Jido.Action.Error.",
-      "Elixir.Jido.Error."
-    ])
+    String.starts_with?(module_name, @upstream_jido_error_prefixes)
   end
 
   defp retryable_hint(term, default) do

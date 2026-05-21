@@ -1,6 +1,7 @@
 defmodule Jido.AI.Signal.HelpersTest do
   use ExUnit.Case, async: true
 
+  alias Jido.AI.Error
   alias Jido.AI.Signal.Helpers
 
   describe "correlation_id/1" do
@@ -17,6 +18,21 @@ defmodule Jido.AI.Signal.HelpersTest do
     test "removes control bytes and truncates by max chars" do
       assert Helpers.sanitize_delta("abc" <> <<1>> <> "def", 10) == "abcdef"
       assert Helpers.sanitize_delta("abcdefghijklmnopqrstuvwxyz", 5) == "abcde"
+    end
+  end
+
+  describe "error compatibility delegates" do
+    test "forward to Jido.AI.Error" do
+      assert apply(Helpers, :error_envelope, [:execution_error, "boom", %{}, false]) ==
+               Error.error_envelope(:execution_error, "boom")
+
+      assert apply(Helpers, :normalize_error, [:timeout, :execution_error, "failed", %{}]) ==
+               Error.normalize(:timeout, :execution_error, "failed")
+
+      assert apply(Helpers, :normalize_result, [{:error, :timeout}, :tool_error, "failed"]) ==
+               Error.normalize_result({:error, :timeout}, :tool_error, "failed")
+
+      assert apply(Helpers, :retryable?, [:timeout])
     end
   end
 end
