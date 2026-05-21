@@ -553,21 +553,31 @@ defmodule Jido.AI.Turn do
 
   defp normalize_usage_value(value) when is_integer(value), do: value
   defp normalize_usage_value(value) when is_float(value), do: value
+  defp normalize_usage_value(value) when is_boolean(value), do: value
+  defp normalize_usage_value(nil), do: nil
+
+  defp normalize_usage_value(value) when is_map(value), do: normalize_usage(value)
+
+  defp normalize_usage_value(value) when is_list(value) do
+    Enum.map(value, &normalize_usage_value/1)
+  end
 
   defp normalize_usage_value(value) when is_binary(value) do
-    case Integer.parse(value) do
+    trimmed = String.trim(value)
+
+    case Integer.parse(trimmed) do
       {int, ""} ->
         int
 
       _ ->
-        case Float.parse(value) do
-          {float, _} -> float
-          :error -> 0
+        case Float.parse(trimmed) do
+          {float, ""} -> float
+          _ -> value
         end
     end
   end
 
-  defp normalize_usage_value(_), do: 0
+  defp normalize_usage_value(value), do: value
 
   defp execute_internal(module, tool_name, params, context, timeout, exec_opts) do
     schema = module.schema()

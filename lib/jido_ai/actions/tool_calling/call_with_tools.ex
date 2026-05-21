@@ -62,7 +62,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
           |> Zoi.default(10)
       })
 
-  alias Jido.AI.{ToolAdapter, Turn, Validation}
+  alias Jido.AI.{ToolAdapter, Turn, Usage, Validation}
   alias ReqLLM.Context
 
   @doc """
@@ -303,27 +303,9 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   defp maybe_put_message_attr(map, key, value), do: Map.put(map, key, value)
 
   defp merge_usage(first, second) do
-    first_usage = normalize_usage(first)
-    second_usage = normalize_usage(second)
-
-    input_tokens = first_usage.input_tokens + second_usage.input_tokens
-    output_tokens = first_usage.output_tokens + second_usage.output_tokens
-
-    %{
-      input_tokens: input_tokens,
-      output_tokens: output_tokens,
-      total_tokens: input_tokens + output_tokens
-    }
-  end
-
-  defp normalize_usage(nil), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
-
-  defp normalize_usage(%{} = usage) do
-    input_tokens = Map.get(usage, :input_tokens, 0)
-    output_tokens = Map.get(usage, :output_tokens, 0)
-    total_tokens = Map.get(usage, :total_tokens, input_tokens + output_tokens)
-
-    %{input_tokens: input_tokens, output_tokens: output_tokens, total_tokens: total_tokens}
+    first
+    |> Usage.merge(second)
+    |> Usage.ensure_total_tokens()
   end
 
   defp apply_context_defaults(params, context) when is_map(params) do

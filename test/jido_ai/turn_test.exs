@@ -90,6 +90,36 @@ defmodule Jido.AI.TurnTest do
       assert Turn.needs_tools?(turn)
     end
 
+    test "preserves nested provider usage metadata" do
+      response = %{
+        message: %{content: "hello", tool_calls: nil},
+        finish_reason: :stop,
+        usage: %{
+          input_tokens: "10",
+          output_tokens: "5",
+          input_includes_cached: false,
+          cost: %{
+            total: "0.003",
+            currency: "USD",
+            line_items: [%{id: "prompt", cost: "0.001"}]
+          }
+        }
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.usage == %{
+               input_tokens: 10,
+               output_tokens: 5,
+               input_includes_cached: false,
+               cost: %{
+                 total: 0.003,
+                 currency: "USD",
+                 line_items: [%{id: "prompt", cost: 0.001}]
+               }
+             }
+    end
+
     test "uses ReqLLM.Response classification for canonical responses" do
       reasoning_details = [
         %ReqLLM.Message.ReasoningDetails{

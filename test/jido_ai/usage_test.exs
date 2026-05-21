@@ -42,5 +42,34 @@ defmodule Jido.AI.UsageTest do
                tool_usage: %{calls: 3}
              }
     end
+
+    test "sums numeric strings and ignores malformed top-level usage inputs" do
+      assert Jido.AI.Usage.merge(%{input_tokens: "10", cost: %{total: "0.001"}}, %{
+               input_tokens: 7,
+               cost: %{total: "0.002"},
+               provider: "anthropic"
+             }) == %{
+               input_tokens: 17,
+               cost: %{total: 0.003},
+               provider: "anthropic"
+             }
+
+      assert Jido.AI.Usage.merge(:bad_usage, %{input_tokens: "3"}) == %{input_tokens: 3}
+      assert Jido.AI.Usage.merge(%{input_tokens: 3}, :bad_usage) == %{input_tokens: 3}
+    end
+
+    test "derives total tokens when input and output counters are present" do
+      assert Jido.AI.Usage.ensure_total_tokens(%{input_tokens: 2, output_tokens: "3"}) == %{
+               input_tokens: 2,
+               output_tokens: "3",
+               total_tokens: 5
+             }
+
+      assert Jido.AI.Usage.ensure_total_tokens(%{input_tokens: 2, output_tokens: 3, total_tokens: 99}) == %{
+               input_tokens: 2,
+               output_tokens: 3,
+               total_tokens: 99
+             }
+    end
   end
 end
