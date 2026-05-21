@@ -81,6 +81,31 @@ defmodule Jido.AI.QueryTest do
       end
     end
 
+    test "accepts nested source options as keyword lists" do
+      result =
+        Query.attach_file_references("Summarize this.",
+          file_reference: [
+            source: [
+              file_id: " file_123 ",
+              media_type: " application/pdf "
+            ],
+            filename: " report.pdf "
+          ]
+        )
+
+      if file_reference_supported?() do
+        assert {:ok, [_text_part, file_part]} = result
+
+        file_part = Map.from_struct(file_part)
+        assert file_part.file_id == "file_123"
+        assert file_part.media_type == "application/pdf"
+        assert file_part.filename == "report.pdf"
+      else
+        assert {:error, {:unsupported_content_part_file_id, message}} = result
+        assert message =~ "ReqLLM.Message.ContentPart.file_id/3"
+      end
+    end
+
     test "appends normalized file reference content parts when ReqLLM supports them" do
       result =
         Query.attach_file_references("Compare these files.",

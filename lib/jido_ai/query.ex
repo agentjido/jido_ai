@@ -215,11 +215,12 @@ defmodule Jido.AI.Query do
 
   defp normalize_file_reference(%{} = reference) do
     file_id = Map.get(reference, :file_id) || Map.get(reference, "file_id")
-    source = Map.get(reference, :source) || Map.get(reference, "source")
+    source = reference_source(reference)
 
     file_id =
       file_id ||
-        if(is_map(source), do: Map.get(source, :file_id) || Map.get(source, "file_id"))
+        Map.get(source, :file_id) ||
+        Map.get(source, "file_id")
 
     with {:ok, file_id} <- normalize_file_id(file_id) do
       {:ok,
@@ -243,10 +244,19 @@ defmodule Jido.AI.Query do
 
   defp normalize_file_id(_file_id), do: {:error, {:invalid_file_reference, :missing_file_id}}
 
+  defp reference_source(reference) do
+    case Map.get(reference, :source) || Map.get(reference, "source") do
+      %{} = source -> source
+      source when is_list(source) -> if(Keyword.keyword?(source), do: Map.new(source), else: %{})
+      _source -> %{}
+    end
+  end
+
   defp reference_value(reference, source, key) do
     Map.get(reference, key) ||
       Map.get(reference, Atom.to_string(key)) ||
-      if(is_map(source), do: Map.get(source, key) || Map.get(source, Atom.to_string(key)))
+      Map.get(source, key) ||
+      Map.get(source, Atom.to_string(key))
   end
 
   defp reference_metadata(reference) do
