@@ -127,10 +127,34 @@ defmodule Jido.AI.Skill.RegistryTest do
     test "removes all registered skills" do
       Registry.register(%Spec{name: "clear-a", description: "A"})
       Registry.register(%Spec{name: "clear-b", description: "B"})
+      Registry.mark_activated("clear-a", %{skill: "context"})
 
       assert length(Registry.list()) == 2
+      assert Registry.activated?("clear-a")
       assert :ok = Registry.clear()
       assert [] = Registry.list()
+      refute Registry.activated?("clear-a")
+    end
+  end
+
+  describe "activation lifecycle" do
+    test "tracks activation state without exposing durable bookkeeping" do
+      context = %{skill: %Spec{name: "active-skill", description: "Active"}}
+
+      assert :ok = Registry.mark_activated("active-skill", context)
+      assert Registry.activated?("active-skill")
+      assert {:ok, ^context} = Registry.get_activation_context("active-skill")
+
+      assert :ok = Registry.mark_durable("active-skill")
+      assert Registry.durable?("active-skill")
+      assert {:ok, ^context} = Registry.get_activation_context("active-skill")
+      assert {:error, :skill_is_durable} = Registry.deactivate("active-skill")
+
+      assert :ok = Registry.unmark_durable("active-skill")
+      refute Registry.durable?("active-skill")
+      assert :ok = Registry.deactivate("active-skill")
+      refute Registry.activated?("active-skill")
+      assert {:error, :not_activated} = Registry.get_activation_context("active-skill")
     end
   end
 

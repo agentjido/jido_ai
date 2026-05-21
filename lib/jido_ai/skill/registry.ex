@@ -21,6 +21,7 @@ defmodule Jido.AI.Skill.Registry do
   alias Jido.AI.Skill.{Spec, Loader, Error}
 
   @table_name :jido_skill_registry
+  @activation_table :jido_skill_activations
 
   # Client API
 
@@ -136,12 +137,126 @@ defmodule Jido.AI.Skill.Registry do
     end
   end
 
+  # Session/Activation API
+
+  @doc """
+  Marks a skill as activated with its activation context.
+
+  Used by `Jido.AI.Skill.Activation` to track activated skills.
+  """
+  @spec mark_activated(String.t(), map()) :: :ok | {:error, term()}
+  def mark_activated(name, context) when is_binary(name) and is_map(context) do
+    with_started_registry(fn ->
+      GenServer.call(__MODULE__, {:mark_activated, name, context})
+    end)
+    |> unwrap_or_error()
+  end
+
+  @doc """
+  Checks if a skill has been activated in this session.
+  """
+  @spec activated?(String.t()) :: boolean()
+  def activated?(name) when is_binary(name) do
+    with_started_registry(fn ->
+      :ets.lookup(@activation_table, name) != []
+    end)
+    |> unwrap_or_false()
+  end
+
+  @doc """
+  Lists all activated skill names in the current session.
+  """
+  @spec list_activated() :: [String.t()]
+  def list_activated do
+    with_started_registry(fn ->
+      :ets.select(@activation_table, [{{:"$1", :_}, [], [:"$1"]}])
+    end)
+    |> unwrap_or_empty_list()
+  end
+
+  @doc """
+  Gets the activation context for an activated skill.
+
+  ## Returns
+
+  - `{:ok, context}` - Skill is activated, context returned
+  - `{:error, :not_activated}` - Skill not found in activation table
+  """
+  @spec get_activation_context(String.t()) :: {:ok, map()} | {:error, :not_activated}
+  def get_activation_context(name) when is_binary(name) do
+    with_started_registry(fn ->
+      case :ets.lookup(@activation_table, name) do
+        [{^name, %{context: context}}] -> {:ok, context}
+        [] -> {:error, :not_activated}
+      end
+    end)
+    |> unwrap_or_error()
+  end
+
+  @doc """
+  Marks an activated skill as durable, protecting it from compaction.
+
+  Durable skills remain in the activation table until explicitly
+  deactivated or the registry is cleared.
+  """
+  @spec mark_durable(String.t()) :: :ok | {:error, term()}
+  def mark_durable(name) when is_binary(name) do
+    with_started_registry(fn ->
+      GenServer.call(__MODULE__, {:mark_durable, name})
+    end)
+    |> unwrap_or_error()
+  end
+
+  @doc """
+  Unmarks a durable skill, allowing it to be compacted.
+  """
+  @spec unmark_durable(String.t()) :: :ok | {:error, term()}
+  def unmark_durable(name) when is_binary(name) do
+    with_started_registry(fn ->
+      GenServer.call(__MODULE__, {:unmark_durable, name})
+    end)
+    |> unwrap_or_error()
+  end
+
+  @doc """
+  Checks if a skill is marked as durable.
+  """
+  @spec durable?(String.t()) :: boolean()
+  def durable?(name) when is_binary(name) do
+    with_started_registry(fn ->
+      case :ets.lookup(@activation_table, name) do
+        [{^name, %{durable: true}}] -> true
+        _ -> false
+      end
+    end)
+    |> unwrap_or_false()
+  end
+
+  @doc """
+  Deactivates a skill, removing it from the activation table.
+
+  Fails if the skill is marked as durable.
+  """
+  @spec deactivate(String.t()) :: :ok | {:error, term()}
+  def deactivate(name) when is_binary(name) do
+    with_started_registry(fn ->
+      GenServer.call(__MODULE__, {:deactivate, name})
+    end)
+    |> unwrap_or_error()
+  end
+
   # Server callbacks
 
   @impl true
   def init(_opts) do
+    # Main registry table
     table = :ets.new(@table_name, [:named_table, :set, :public, read_concurrency: true])
-    {:ok, %{table: table}}
+
+    # Activation tracking table (separate for session management)
+    activation_table =
+      :ets.new(@activation_table, [:named_table, :set, :public, read_concurrency: true])
+
+    {:ok, %{table: table, activation_table: activation_table}}
   end
 
   @impl true
@@ -157,12 +272,51 @@ defmodule Jido.AI.Skill.Registry do
 
   def handle_call(:clear, _from, state) do
     :ets.delete_all_objects(@table_name)
+    :ets.delete_all_objects(@activation_table)
     {:reply, :ok, state}
   end
 
   def handle_call({:load_paths, paths}, _from, state) do
     result = do_load_paths(paths)
     {:reply, result, state}
+  end
+
+  def handle_call({:mark_activated, name, context}, _from, state) do
+    :ets.insert(@activation_table, {name, %{context: context, durable: false}})
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:mark_durable, name}, _from, state) do
+    case :ets.lookup(@activation_table, name) do
+      [{^name, activation}] ->
+        :ets.insert(@activation_table, {name, %{activation | durable: true}})
+        {:reply, :ok, state}
+
+      [] ->
+        {:reply, {:error, :not_activated}, state}
+    end
+  end
+
+  def handle_call({:unmark_durable, name}, _from, state) do
+    case :ets.lookup(@activation_table, name) do
+      [{^name, activation}] ->
+        :ets.insert(@activation_table, {name, %{activation | durable: false}})
+        {:reply, :ok, state}
+
+      [] ->
+        {:reply, :ok, state}
+    end
+  end
+
+  def handle_call({:deactivate, name}, _from, state) do
+    case :ets.lookup(@activation_table, name) do
+      [{^name, %{durable: true}}] ->
+        {:reply, {:error, :skill_is_durable}, state}
+
+      _ ->
+        :ets.delete(@activation_table, name)
+        {:reply, :ok, state}
+    end
   end
 
   # Private functions
@@ -214,4 +368,9 @@ defmodule Jido.AI.Skill.Registry do
 
   defp unwrap_or_empty_list({:error, _reason}), do: []
   defp unwrap_or_empty_list(value) when is_list(value), do: value
+
+  defp unwrap_or_false({:error, _reason}), do: false
+  defp unwrap_or_false(value) when is_boolean(value), do: value
+  defp unwrap_or_false(nil), do: false
+  defp unwrap_or_false(_), do: true
 end

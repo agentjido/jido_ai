@@ -231,5 +231,132 @@ defmodule Jido.AI.Skill.LoaderTest do
                "Expected #{name} to be invalid"
       end
     end
+
+    test "lenient mode normalizes repeated separators" do
+      content = """
+      ---
+      name: my__bad---skill
+      description: Test.
+      ---
+
+      Body.
+      """
+
+      assert {:ok, %Spec{name: "my-bad-skill", diagnostics: diagnostics}} =
+               Loader.parse(content, "inline", lenient: true)
+
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_name_format))
+    end
+  end
+
+  describe "field normalization" do
+    test "strict mode rejects blank descriptions" do
+      content = """
+      ---
+      name: blank-description
+      description: "   "
+      ---
+
+      Body.
+      """
+
+      assert {:error, %Error.Validation.MissingField{field: :description}} =
+               Loader.parse(content)
+    end
+
+    test "lenient mode falls back for blank descriptions" do
+      content = """
+      ---
+      name: blank-description
+      description: "   "
+      ---
+
+      Body.
+      """
+
+      assert {:ok, %Spec{description: "No description provided", diagnostics: diagnostics}} =
+               Loader.parse(content, "inline", lenient: true)
+
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :blank_description))
+    end
+
+    test "normalizes optional fields to their public spec types" do
+      content = """
+      ---
+      name: normalized-fields
+      description: Normalizes optional field types.
+      license: 123
+      version: 456
+      tags:
+        - one
+        - 2
+      metadata: invalid
+      ---
+
+      Body.
+      """
+
+      assert {:ok, %Spec{} = spec} = Loader.parse(content, "inline", lenient: true)
+
+      assert spec.license == nil
+      assert spec.vsn == nil
+      assert spec.tags == ["one", "2"]
+      assert spec.metadata == %{}
+      assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_metadata_type))
+    end
+  end
+
+  describe "non-binary name" do
+    # Regression: build_spec/5 ran the directory-name comparison before
+    # validating the name's type, so a YAML scalar like `name: 123` hit
+    # String.downcase/1 on an integer and raised instead of producing a
+    # validation error (strict) or a fallback name (lenient).
+    @non_binary_name """
+    ---
+    name: 123
+    description: Name is not a string.
+    ---
+
+    Body.
+    """
+
+    test "strict mode returns a validation error without raising" do
+      assert {:error, %Error.Validation.MissingField{field: :name}} =
+               Loader.parse(@non_binary_name)
+    end
+
+    test "lenient mode generates the documented fallback name" do
+      assert {:ok, %Spec{name: name, diagnostics: diagnostics}} =
+               Loader.parse(@non_binary_name, "inline", lenient: true)
+
+      assert String.starts_with?(name, "unnamed-skill-")
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_name_type))
+    end
+
+    test "does not warn about a directory-name mismatch for a non-binary name" do
+      assert {:ok, %Spec{diagnostics: diagnostics}} =
+               Loader.parse(@non_binary_name, "inline", lenient: true)
+
+      refute Enum.any?(diagnostics.warnings, &(&1.type == :directory_name_mismatch))
+    end
+  end
+
+  describe "lenient name normalization" do
+    test "falls back when normalization cannot produce a valid skill name" do
+      content = """
+      ---
+      name: "!!!"
+      description: Invalid name.
+      ---
+
+      Body.
+      """
+
+      assert {:ok, %Spec{name: name, diagnostics: diagnostics}} =
+               Loader.parse(content, "inline", lenient: true)
+
+      assert String.starts_with?(name, "unnamed-skill-")
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_name_format))
+    end
   end
 end
