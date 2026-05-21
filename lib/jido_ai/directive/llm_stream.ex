@@ -89,9 +89,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   when an agent is created.
   """
 
-  alias Jido.AI.{Observe, Signal, Turn}
+  alias Jido.AI.{Error, Observe, Signal, Turn}
   alias Jido.AI.Directive.Helpers
-  alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
@@ -197,7 +196,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
            signal =
              Signal.LLMResponse.new!(%{
                call_id: call_id,
-               result: SignalHelpers.normalize_result(result, :llm_error, "LLM request failed"),
+               result: Error.normalize_result(result, :llm_error, "LLM request failed"),
                metadata: signal_metadata(event_meta)
              })
 
@@ -212,7 +211,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
             call_id: call_id,
             result:
               {:error,
-               SignalHelpers.error_envelope(
+               Error.error_envelope(
                  :supervisor,
                  "Failed to start LLM stream task",
                  %{reason: inspect(reason)},

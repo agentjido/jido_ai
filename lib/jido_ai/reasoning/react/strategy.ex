@@ -48,7 +48,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Reasoning.ReAct.Config, as: ReActRuntimeConfig
   alias Jido.AI.Reasoning.ReAct.ToolSelection
   alias Jido.AI.Signal
-  alias Jido.AI.Signal.Helpers, as: SignalHelpers
+  alias Jido.AI.Error
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.ToolAdapter
@@ -2409,7 +2409,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     |> Map.get(:effect_policy, Effects.default_policy())
   end
 
-  defp normalize_tool_result(result), do: SignalHelpers.normalize_result(result, :tool_error, "Tool execution failed")
+  defp normalize_tool_result(result), do: Error.normalize_result(result, :tool_error, "Tool execution failed")
 
   defp request_stream_to(agent, request_id) when is_binary(request_id) do
     get_in(agent.state, [:requests, request_id, :stream_to])

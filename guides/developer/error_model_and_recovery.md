@@ -28,13 +28,26 @@ After this guide, you can classify failures and pick the right recovery path.
 `jido_ai` owns the AI runtime error envelope used in signals, tool results, and
 telemetry-facing payloads.
 
+Use `Jido.AI.Error.normalize/4` to adapt arbitrary runtime errors into the
+canonical envelope, `Jido.AI.Error.normalize_result/3` for result tuples, and
+`Jido.AI.Error.retryable?/1` for retry policy decisions.
+
 Upstream packages such as `jido_action` should stay generic. They can expose
 error type/message/details and retryability, but they should not define
 AI-specific contracts.
 
+`Jido.AI.Error.normalize/4` adapts upstream `Jido.Action.Error`,
+`Jido.Signal.Error`, and `Jido.Error` structs through the generic `Jido.Error`
+map contract. Plain Elixir exceptions use the caller-provided fallback type
+while preserving the exception message and sanitized struct fields.
+
 At this boundary, envelope `details` are normalized to JSON-safe values. Raw
 runtime terms (for example tuples, pids, refs) are stringified so signal and
 telemetry payload encoding stays reliable.
+
+Already-decoded maps with string keys are accepted when their type/code atom
+already exists, so JSON round-trips do not silently lose known error types or
+retry hints.
 
 ## Example: Sanitized User Message + Full Log
 

@@ -1,7 +1,9 @@
 defmodule Jido.AI.Error.ModelTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Action.Error, as: ActionError
   alias Jido.AI.Error
+  alias Jido.Signal.Error, as: SignalError
 
   test "unknown error formats wrapped payload" do
     assert Error.Unknown.message(%Error.Unknown{error: {:bad_state, %{step: 2}}}) ==
@@ -46,6 +48,214 @@ defmodule Jido.AI.Error.ModelTest do
                "Invalid field: prompt"
 
       assert Error.Validation.Invalid.message(%Error.Validation.Invalid{}) == "Validation error"
+    end
+  end
+
+  describe "runtime envelope normalization" do
+    test "passes through ok and error tuples and wraps invalid values" do
+      assert Error.normalize_result({:ok, 1}) == {:ok, 1, []}
+
+      assert Error.normalize_result({:error, %{code: :x, message: "boom"}}) ==
+               {:error, %{type: :x, message: "boom", details: %{}, retryable?: false}, []}
+
+      assert {:error, envelope, []} = Error.normalize_result(:bad, :invalid_result, "Bad result")
+      assert envelope.type == :invalid_result
+      assert envelope.retryable? == false
+    end
+
+    test "normalizes structs and retryable aliases into the canonical envelope" do
+      input = %{code: :timeout, message: "timed out", details: %{timeout_ms: 100}, retryable: true}
+
+      assert Error.normalize(input) == %{
+               type: :timeout,
+               message: "timed out",
+               details: %{timeout_ms: 100},
+               retryable?: true
+             }
+    end
+
+    test "normalizes string-keyed envelopes without changing the canonical shape" do
+      input = %{
+        "type" => "timeout",
+        "message" => "timed out",
+        "details" => %{"retry" => true, "timeout_ms" => 100}
+      }
+
+      assert Error.normalize(input) == %{
+               type: :timeout,
+               message: "timed out",
+               details: %{"retry" => true, "timeout_ms" => 100},
+               retryable?: true
+             }
+    end
+
+    test "normalizes atom-keyed envelopes with string type values" do
+      input = %{type: "timeout", message: "timed out", details: %{timeout_ms: 100}}
+
+      assert Error.normalize(input) == %{
+               type: :timeout,
+               message: "timed out",
+               details: %{timeout_ms: 100},
+               retryable?: true
+             }
+    end
+
+    test "normalizes non-binary messages and preserves transient retry hints" do
+      input = %{type: :execution_error, message: :transient_error, details: %{}}
+
+      assert Error.normalize(input) == %{
+               type: :execution_error,
+               message: "transient_error",
+               details: %{},
+               retryable?: true
+             }
+    end
+
+    test "normalizes Jido.Action error structs through Jido.Error.to_map/1" do
+      error = ActionError.execution_error("boom", %{step: :list, retry: false})
+
+      assert Error.normalize(error) == %{
+               type: :execution_error,
+               message: "boom",
+               details: %{step: :list, retry: false},
+               retryable?: false
+             }
+    end
+
+    test "normalizes Jido.Signal error structs through Jido.Error.to_map/1" do
+      error = SignalError.timeout_error("dispatch timed out", %{timeout: 50, retry: true})
+
+      assert Error.normalize(error) == %{
+               type: :timeout,
+               message: "dispatch timed out",
+               details: %{timeout: 50, retry: true},
+               retryable?: true
+             }
+    end
+
+    test "normalizes supervisor failures without changing the public envelope shape" do
+      assert Error.normalize(
+               %{
+                 type: :supervisor,
+                 message: "Failed to start LLM task",
+                 details: %{reason: ":noproc"},
+                 retryable?: true
+               },
+               :llm_error,
+               "LLM request failed"
+             ) == %{
+               type: :supervisor,
+               message: "Failed to start LLM task",
+               details: %{reason: ":noproc"},
+               retryable?: true
+             }
+    end
+
+    test "normalizes plain exceptions with caller fallback type and details" do
+      envelope = Error.normalize(RuntimeError.exception("boom"), :execution_error, "Tool execution failed")
+
+      assert envelope.type == :execution_error
+      assert envelope.message == "boom"
+      assert envelope.details.message == "boom"
+      assert envelope.retryable? == false
+    end
+
+    test "normalizes timeout atoms and timeout detail tuples as retryable" do
+      assert Error.normalize(:timeout) == %{
+               type: :timeout,
+               message: "Tool execution timed out",
+               details: %{},
+               retryable?: true
+             }
+
+      assert Error.normalize({:timeout, %{timeout_ms: 50}}) == %{
+               type: :timeout,
+               message: "Tool execution timed out",
+               details: %{timeout_ms: 50},
+               retryable?: true
+             }
+    end
+
+    test "normalizes details into JSON-safe values" do
+      envelope =
+        Error.normalize(%{
+          type: :execution_error,
+          message: "boom",
+          details: %{
+            pid: self(),
+            ref: make_ref(),
+            tuple: {:error, :bad},
+            improper_list: [1 | 2],
+            nested: %{inner: {:ok, :value}}
+          }
+        })
+
+      assert is_binary(envelope.details.pid)
+      assert is_binary(envelope.details.ref)
+      assert is_binary(envelope.details.tuple)
+      assert is_binary(envelope.details.improper_list)
+      assert is_binary(envelope.details.nested.inner)
+      assert Jason.encode!(envelope)
+    end
+
+    test "wraps malformed details payloads without crashing normalization" do
+      envelope =
+        Error.normalize(%{
+          type: :execution_error,
+          message: "boom",
+          details: {:bad_details, self()}
+        })
+
+      assert envelope.type == :execution_error
+      assert envelope.message == "boom"
+      assert is_binary(envelope.details.details)
+      assert Jason.encode!(envelope)
+    end
+
+    test "error_envelope/4 sanitizes direct details payloads" do
+      envelope =
+        Error.error_envelope(:execution_error, "boom", %{
+          pid: self(),
+          ref: make_ref(),
+          tuple: {:error, :bad},
+          map_key: %{1 => :one}
+        })
+
+      assert is_binary(envelope.details.pid)
+      assert is_binary(envelope.details.ref)
+      assert is_binary(envelope.details.tuple)
+      assert envelope.details.map_key["1"] == :one
+      assert Jason.encode!(envelope)
+    end
+
+    test "to_map/1 serializes any error as the canonical envelope" do
+      assert Error.to_map({:validation, %{field: :query}}) == %{
+               type: :validation,
+               message: "Tool validation failed",
+               details: %{details: %{field: :query}},
+               retryable?: false
+             }
+    end
+  end
+
+  describe "retryable?/1" do
+    test "uses canonical retryable flags first" do
+      assert Error.retryable?(%{type: :execution_error, retryable?: true})
+      refute Error.retryable?(%{type: :timeout, retryable?: false})
+    end
+
+    test "handles tuple results and conservative fallback types" do
+      assert Error.retryable?({:error, %{type: :timeout}, []})
+      assert Error.retryable?(:transient)
+      assert Error.retryable?(%{type: :execution_error, message: :transient_error, details: %{}})
+      assert Error.retryable?(%{"type" => "execution_error", "message" => "transient_error", "details" => %{}})
+      assert Error.retryable?(%{type: :execution_error, details: %{"retry" => true}})
+      assert Error.retryable?(%{type: "timeout", details: %{}})
+      refute Error.retryable?(%{type: :timeout, details: %{"retry" => "false"}})
+      refute Error.retryable?(%{type: :timeout, details: %{"retry" => " FALSE "}})
+      refute Error.retryable?(%{type: :timeout, details: %{"retry" => "off"}})
+      refute Error.retryable?({:error, %{type: :execution_error}, []})
+      refute Error.retryable?({:ok, :done, []})
     end
   end
 end
