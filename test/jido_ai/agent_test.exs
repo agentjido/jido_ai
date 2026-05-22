@@ -314,7 +314,7 @@ defmodule Jido.AI.AgentTest do
 
       refute Jido.Memory.Plugin in modules
       assert Jido.Thread.Plugin in modules
-      assert Jido.Identity.Plugin in modules
+      assert Jido.Agent.Identity.Plugin in modules
     end
 
     test "forwards default plugin replacements with config to Jido.Agent" do
