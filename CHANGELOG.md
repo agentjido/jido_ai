@@ -63,6 +63,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog -->
 
+## [v2.2.0](https://github.com/agentjido/jido_ai/compare/v2.1.0...v2.2.0) (2026-05-22)
+
+
+
+
+### Features:
+
+* agent: support uploaded file references (#298) by mikehostetler
+
+* skill: add discovery, activation, diagnostics, and resources (#286) by dl-alexandre
+
+* support multimodal ReAct queries (#278) by Danila Poyarkov
+
+* reuse OpenAI Responses WebSocket sessions by Danila Poyarkov
+
+* add request event streaming (#262) by mikehostetler
+
+* react: emit tool_call streaming deltas from ReAct runner (#247) by ryan-mckeeman-cfgi
+
+* Support rich model specs in aliases (maps, tuples, structs) (#248) by c22
+
+### Bug Fixes:
+
+* reasoning: merge nested usage metadata safely (#297) by mikehostetler
+
+* react: expose completed tool results (#296) by mikehostetler
+
+* react: honor runtime model overrides in turn handling by mikehostetler
+
+* validation: anchor `<...system...>` and `{...role:system...}` to single lines (#290) by Adrian Rangel
+
+* ignore ReAct stream cancel exits by mikehostetler
+
+* forward agent signal routes by mikehostetler
+
+* tool_call_id is missing from certain tool call events in telemtery (#276) by Julien
+
+* preserve LLM delta ordering metadata by Danila Poyarkov
+
+* sanitize unsafe tool response details by mikehostetler
+
+* lazy-load plugin-routed action modules (#268) by pcharbon70
+
+* add direct tool registration API (#267) by mikehostetler
+
+* forward default plugin overrides from AI agents (#263) by mikehostetler
+
+* add preflight callback for ReAct tool rounds by mikehostetler
+
+* exclude binary content parts from JSON-encoded tool result payload (#250) by ryan-mckeeman-cfgi
+
+* incomplete response handling (#239) by Pradeep Kumar
+
+### Refactoring:
+
+* error: centralize runtime error contract by mikehostetler
+
+* fix ex_slop findings and remove DualKeyAccess (#279) by Danila Poyarkov
+
 ## [v2.1.0](https://github.com/agentjido/jido_ai/compare/v2.0.0...v2.1.0) (2026-03-29)
 
 
