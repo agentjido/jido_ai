@@ -3,12 +3,14 @@
 [![Hex.pm](https://img.shields.io/hexpm/v/jido_ai.svg)](https://hex.pm/packages/jido_ai)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/jido_ai/)
 [![CI](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml)
-[![License](https://img.shields.io/hexpm/l/jido_ai.svg)](https://github.com/agentjido/jido_ai/blob/main/LICENSE.md)
-[![Coverage Status](https://coveralls.io/repos/github/agentjido/jido_ai/badge.svg?branch=main)](https://coveralls.io/github/agentjido/jido_ai?branch=main)
+[![License](https://img.shields.io/hexpm/l/jido_ai.svg)](https://github.com/agentjido/jido_ai/blob/main/LICENSE)
+[![Website](https://img.shields.io/badge/website-jido.run-0f172a.svg)](https://jido.run)
+[![Ecosystem](https://img.shields.io/badge/ecosystem-jido.run-0ea5e9.svg)](https://jido.run/ecosystem)
+[![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://jido.run/discord)
 
 Build tool-using Elixir agents with explicit reasoning strategies and production-ready request orchestration.
 
-[Hex](https://hex.pm/packages/jido_ai) | [HexDocs](https://hexdocs.pm/jido_ai) | [Jido Ecosystem](https://agentjido.xyz) | [Discord](https://agentjido.xyz/discord)
+[Hex](https://hex.pm/packages/jido_ai) | [HexDocs](https://hexdocs.pm/jido_ai) | [Jido Ecosystem](https://jido.run/ecosystem) | [Discord](https://jido.run/discord)
 
 `jido_ai` is the AI runtime layer for Jido. You define tools and agents as Elixir modules, then run synchronous or asynchronous requests with built-in model routing, retries, and observability.
 
@@ -44,7 +46,7 @@ end
 - [req_llm](https://hex.pm/packages/req_llm): provider abstraction for Anthropic, OpenAI, Google, and others
 
 Use `jido_ai` when you need long-lived agents, tool-calling loops, or explicit reasoning strategies. You can also use it without a running agent process via `Jido.AI.generate_text/2`, `Jido.AI.ask/2`, or `Jido.Exec.run/3` with any action module.
-For cross-package tutorials (for example `jido` + `jido_ai` + app packages), see [agentjido.xyz](https://agentjido.xyz).
+For cross-package tutorials and the package map, see [jido.run/ecosystem](https://jido.run/ecosystem).
 
 ## Installation
 
@@ -191,7 +193,8 @@ Full tradeoff matrix: [Strategy Selection Playbook](guides/user/strategy_selecti
 ## Documentation
 
 - [HexDocs](https://hexdocs.pm/jido_ai) — Full API reference and guides
-- [agentjido.xyz](https://agentjido.xyz) — Ecosystem overview and cross-package tutorials
+- [Jido Ecosystem](https://jido.run/ecosystem) — Ecosystem overview and cross-package tutorials
+- [Discord](https://jido.run/discord) — Community discussion
 
 ### Documentation Map
 
