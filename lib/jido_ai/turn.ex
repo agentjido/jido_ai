@@ -815,7 +815,10 @@ defmodule Jido.AI.Turn do
   end
 
   defp encode_tool_result_envelope(payload, parts \\ []) when is_map(payload) and is_list(parts) do
-    encoded = Jason.encode!(payload)
+    encoded =
+      payload
+      |> Observe.sanitize_transport_payload()
+      |> Jason.encode!()
 
     case parts do
       [] -> encoded

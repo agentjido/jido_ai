@@ -347,6 +347,25 @@ defmodule Jido.AI.TurnExecutionTest do
              }
     end
 
+    test "transport-sanitizes non-json-safe tool payloads" do
+      decoded =
+        Turn.format_tool_result_content(
+          {:ok,
+           %{
+             password: "secret",
+             tuple: {:ok, self()},
+             callback: fn -> :ok end
+           }}
+        )
+        |> decode_tool_content()
+
+      assert decoded["ok"] == true
+      assert decoded["result"]["password"] == "[REDACTED]"
+      assert decoded["result"]["tuple"]["type"] == "tuple"
+      assert decoded["result"]["tuple"]["size"] == 2
+      assert decoded["result"]["callback"]["type"] == "function"
+    end
+
     test "normalizes map content parts into multimodal tool content" do
       assert [
                %ContentPart{type: :text, text: encoded_payload},

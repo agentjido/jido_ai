@@ -72,6 +72,73 @@ defmodule Jido.AI.ObserveTest do
     assert Enum.at(sanitized.notes, 1).private_key == "[REDACTED]"
   end
 
+  test "sanitize_telemetry_metadata redacts, bounds, and summarizes payload fields" do
+    metadata = %{
+      request_id: "req_1",
+      params: %{
+        "api_key" => "secret",
+        "query" => String.duplicate("x", 20)
+      },
+      result:
+        {:error,
+         %{
+           type: :timeout,
+           message: String.duplicate("timeout ", 10),
+           details: %{token: "secret"}
+         }, []},
+      tags: Enum.to_list(1..6)
+    }
+
+    sanitized =
+      Observe.sanitize_telemetry_metadata(metadata,
+        max_string_chars: 12,
+        max_list_items: 3
+      )
+
+    assert sanitized.params["api_key"] == "[REDACTED]"
+    assert sanitized.params["query"] == "xxxxxxxxxxxx...[truncated]"
+
+    assert sanitized.result.status == :error
+    assert sanitized.result.error.type == :timeout
+    assert sanitized.result.error.message == "timeout time...[truncated]"
+    refute match?({:error, _, _}, sanitized.result)
+
+    assert Enum.take(sanitized.tags, 3) == [1, 2, 3]
+    assert List.last(sanitized.tags) == %{__jido_ai_truncated__: %{omitted_items: 3}}
+  end
+
+  test "sanitize_telemetry_metadata does not inspect unexpected payload terms" do
+    sanitized =
+      Observe.sanitize_telemetry_metadata(%{
+        result: {:unexpected, %{api_key: "secret", value: "visible"}}
+      })
+
+    assert sanitized.result == %{type: :tuple, size: 2}
+    refute inspect(sanitized) =~ "secret"
+    refute inspect(sanitized) =~ "visible"
+  end
+
+  test "sanitize_transport_payload produces bounded JSON-safe data" do
+    payload = %{
+      ok: true,
+      result: %{
+        password: "secret",
+        tuple: {:ok, self()},
+        callback: fn -> :ok end,
+        text: String.duplicate("a", 16)
+      }
+    }
+
+    sanitized = Observe.sanitize_transport_payload(payload, max_string_chars: 8)
+
+    assert sanitized.result.password == "[REDACTED]"
+    assert sanitized.result.tuple.type == :tuple
+    assert sanitized.result.tuple.size == 2
+    assert sanitized.result.callback.type == :function
+    assert sanitized.result.text == "aaaaaaaa...[truncated]"
+    assert {:ok, _json} = Jason.encode(sanitized)
+  end
+
   test "emit executes telemetry with normalized shape" do
     ref = make_ref()
     handler_id = "observe-test-emit-#{inspect(ref)}"
@@ -100,6 +167,40 @@ defmodule Jido.AI.ObserveTest do
     assert measurements.duration_ms == 1
     assert metadata.request_id == "req_1"
     assert Map.has_key?(metadata, :agent_id)
+  end
+
+  test "emit sanitizes telemetry metadata before delivery" do
+    ref = make_ref()
+    handler_id = "observe-test-emit-sanitize-#{inspect(ref)}"
+
+    :telemetry.attach(
+      handler_id,
+      Observe.request(:complete),
+      fn _event, _measurements, metadata, _ ->
+        send(self(), {:telemetry_seen, metadata})
+      end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    :ok =
+      Observe.emit(
+        %{emit_telemetry?: true},
+        Observe.request(:complete),
+        %{duration_ms: 1},
+        %{
+          request_id: "req_1",
+          api_key: "secret",
+          result: {:ok, %{payload: String.duplicate("x", 1_000)}, []}
+        }
+      )
+
+    assert_receive {:telemetry_seen, metadata}
+    assert metadata.api_key == "[REDACTED]"
+    assert metadata.result.status == :ok
+    assert metadata.result.value.type == :map
+    refute match?({:ok, _, _}, metadata.result)
   end
 
   test "emit does not emit telemetry when disabled" do

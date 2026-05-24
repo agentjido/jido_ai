@@ -9,8 +9,10 @@ defmodule Jido.AI.Observe do
   - Feature-gated event emission
   - Span lifecycle wrappers that honor AI observability config
   - Sensitive value redaction helpers for telemetry payloads
+  - Bounded telemetry and transport-safe payload shaping
   """
 
+  alias Jido.AI.Observe.Sanitize
   alias Jido.Observe, as: CoreObserve
 
   require Logger
@@ -40,34 +42,13 @@ defmodule Jido.AI.Observe do
     :queue_ms
   ]
 
-  @sensitive_exact_keys MapSet.new([
-                          "api_key",
-                          "apikey",
-                          "password",
-                          "secret",
-                          "token",
-                          "auth_token",
-                          "authtoken",
-                          "private_key",
-                          "privatekey",
-                          "access_key",
-                          "accesskey",
-                          "bearer",
-                          "api_secret",
-                          "apisecret",
-                          "client_secret",
-                          "clientsecret"
-                        ])
-
-  @sensitive_contains ["secret_"]
-  @sensitive_suffixes ["_secret", "_key", "_token", "_password"]
-
   @type obs_cfg :: map() | nil
   @type event_name :: [atom()]
   @type measurements :: map()
   @type metadata :: map()
   @type span_ctx :: CoreObserve.span_ctx() | :noop
   @type feature_gate :: :llm_deltas
+  @type sanitize_profile :: Sanitize.profile()
 
   @doc """
   Builds an LLM telemetry event path under `[:jido, :ai, :llm, ...]`.
@@ -126,6 +107,7 @@ defmodule Jido.AI.Observe do
         metadata
         |> ensure_required_metadata()
         |> enrich_with_trace_metadata()
+        |> sanitize_telemetry_metadata()
       )
     end
 
@@ -150,6 +132,7 @@ defmodule Jido.AI.Observe do
         metadata
         |> ensure_required_metadata()
         |> enrich_with_trace_metadata()
+        |> sanitize_telemetry_metadata()
       )
     else
       :noop
@@ -200,18 +183,32 @@ defmodule Jido.AI.Observe do
   Redacts sensitive keys recursively for telemetry-safe payloads.
   """
   @spec sanitize_sensitive(term()) :: term()
-  def sanitize_sensitive(payload) when is_map(payload) do
-    Map.new(payload, fn {key, value} ->
-      if sensitive_key?(key) do
-        {key, "[REDACTED]"}
-      else
-        {key, sanitize_sensitive(value)}
-      end
-    end)
-  end
+  defdelegate sanitize_sensitive(payload), to: Sanitize, as: :sensitive
 
-  def sanitize_sensitive(payload) when is_list(payload), do: Enum.map(payload, &sanitize_sensitive/1)
-  def sanitize_sensitive(payload), do: payload
+  @doc """
+  Sanitizes arbitrary payloads for a specific boundary profile.
+
+  The `:telemetry` profile keeps metadata low-cardinality by redacting
+  sensitive keys, truncating large values, and summarizing payload-shaped
+  fields such as results and provider responses.
+
+  The `:transport` profile preserves more payload detail while converting
+  arbitrary terms into bounded JSON-safe data.
+  """
+  @spec sanitize(term(), sanitize_profile(), keyword()) :: term()
+  defdelegate sanitize(payload, profile, opts \\ []), to: Sanitize
+
+  @doc """
+  Sanitizes event metadata before it crosses the telemetry boundary.
+  """
+  @spec sanitize_telemetry_metadata(term(), keyword()) :: term()
+  defdelegate sanitize_telemetry_metadata(metadata, opts \\ []), to: Sanitize, as: :telemetry_metadata
+
+  @doc """
+  Sanitizes a public/tool payload into bounded JSON-safe data.
+  """
+  @spec sanitize_transport_payload(term(), keyword()) :: term()
+  defdelegate sanitize_transport_payload(payload, opts \\ []), to: Sanitize, as: :transport_payload
 
   defp emit_enabled?(obs_cfg, opts) do
     Map.get(obs_cfg, :emit_telemetry?, true) and feature_gate_enabled?(obs_cfg, Keyword.get(opts, :feature_gate))
@@ -258,16 +255,4 @@ defmodule Jido.AI.Observe do
         )
     end
   end
-
-  defp sensitive_key?(key) when is_atom(key), do: key |> Atom.to_string() |> sensitive_key?()
-
-  defp sensitive_key?(key) when is_binary(key) do
-    key = String.downcase(key)
-
-    MapSet.member?(@sensitive_exact_keys, key) or
-      Enum.any?(@sensitive_contains, &String.contains?(key, &1)) or
-      Enum.any?(@sensitive_suffixes, &String.ends_with?(key, &1))
-  end
-
-  defp sensitive_key?(_key), do: false
 end

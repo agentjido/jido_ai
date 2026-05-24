@@ -520,7 +520,10 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       Turn.execute("nonexistent", %{}, %{}, tools: tools)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _},
-                      %{tool_name: "nonexistent", result: {:error, %{type: :not_found}, []}}}
+                      %{
+                        tool_name: "nonexistent",
+                        result: %{status: :error, error: %{type: :not_found}}
+                      }}
 
       :telemetry.detach("integration-stop-error-handler")
     end

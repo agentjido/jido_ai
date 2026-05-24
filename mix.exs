@@ -192,6 +192,7 @@ defmodule JidoAi.MixProject do
           Jido.AI.Thread.Entry,
           Jido.AI.Turn,
           Jido.AI.Observe,
+          Jido.AI.Observe.Sanitize,
           Jido.AI.Validation,
           Jido.AI.ToolAdapter,
           Jido.AI.PluginStack
