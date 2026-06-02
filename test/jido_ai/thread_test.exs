@@ -615,6 +615,57 @@ defmodule Jido.AI.ContextTest do
                %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
              ] = projected.content
     end
+
+    test "preserves uploaded file reference media types when importing messages" do
+      parts = [
+        %{"type" => "text", "text" => "Summarize these files"},
+        %{
+          "type" => "file",
+          "file_id" => "file_text",
+          "media_type" => "text/plain",
+          "filename" => "notes.txt",
+          "metadata" => %{"purpose" => "fixture"}
+        },
+        %{
+          type: :document,
+          source: %{file_id: "file_pdf", media_type: "application/pdf"},
+          title: "Source PDF"
+        }
+      ]
+
+      messages = [
+        %{role: :user, content: parts}
+      ]
+
+      thread = AIContext.new() |> AIContext.append_messages(messages)
+
+      [entry] = thread.entries
+
+      assert [
+               %ContentPart{type: :text, text: "Summarize these files"},
+               %ContentPart{
+                 type: :file,
+                 file_id: "file_text",
+                 media_type: "text/plain",
+                 filename: "notes.txt",
+                 metadata: %{"purpose" => "fixture"}
+               },
+               %ContentPart{
+                 type: :file,
+                 file_id: "file_pdf",
+                 media_type: "application/pdf",
+                 metadata: %{title: "Source PDF"}
+               }
+             ] = entry.content
+
+      [projected] = AIContext.to_messages(thread)
+
+      assert [
+               %ContentPart{type: :text, text: "Summarize these files"},
+               %ContentPart{type: :file, file_id: "file_text", media_type: "text/plain"},
+               %ContentPart{type: :file, file_id: "file_pdf", media_type: "application/pdf"}
+             ] = projected.content
+    end
   end
 
   # ============================================================================

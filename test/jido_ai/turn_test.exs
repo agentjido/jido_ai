@@ -410,6 +410,32 @@ defmodule Jido.AI.TurnTest do
                "result" => nil
              }
     end
+
+    test "map-based uploaded file references preserve media types outside JSON payload" do
+      file_part = %{
+        type: :file_id,
+        file_id: "file_text",
+        media_type: "text/plain",
+        filename: "notes.txt",
+        metadata: %{purpose: "fixture"}
+      }
+
+      assert [
+               %ContentPart{type: :text, text: encoded_payload},
+               %ContentPart{
+                 type: :file,
+                 file_id: "file_text",
+                 media_type: "text/plain",
+                 filename: "notes.txt",
+                 metadata: %{purpose: "fixture"}
+               }
+             ] = Turn.format_tool_result_content({:ok, [file_part]})
+
+      assert Jason.decode!(encoded_payload) == %{
+               "ok" => true,
+               "result" => nil
+             }
+    end
   end
 
   describe "run_tools/3" do
