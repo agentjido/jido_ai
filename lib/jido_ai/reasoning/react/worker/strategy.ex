@@ -162,7 +162,7 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   defp process_instruction(_agent, _instruction), do: :noop
 
   defp start_run(agent, %{request_id: request_id, run_id: run_id, query: query, config: config_input} = params)
-       when is_binary(request_id) and is_binary(run_id) and is_binary(query) do
+       when is_binary(request_id) and is_binary(run_id) and (is_binary(query) or is_list(query)) do
     state = StratState.get(agent, %{})
 
     if state[:status] == :running and is_binary(state[:active_request_id]) do
