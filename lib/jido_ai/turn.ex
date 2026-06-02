@@ -929,25 +929,79 @@ defmodule Jido.AI.Turn do
     end
   end
 
-  defp normalize_content_part_map(type, part) when type in [:file, "file"] do
-    data = get_field(part, :data)
-    filename = get_field(part, :filename)
-    media_type = get_field(part, :media_type, "application/octet-stream")
+  defp normalize_content_part_map(type, part)
+       when type in [:file, "file", :file_id, "file_id", :document, "document"] do
+    file_id = part_binary_field(part, :file_id)
+    data = part_field(part, :data)
+    filename = part_binary_field(part, :filename)
+    media_type = part_binary_field(part, :media_type)
 
-    if is_binary(data) and is_binary(filename) do
-      ContentPart.file(data, filename, media_type)
-    else
-      nil
+    cond do
+      is_binary(file_id) ->
+        file_id
+        |> ContentPart.file_id(media_type || "application/pdf", part_metadata(part))
+        |> maybe_put_filename(filename)
+
+      is_binary(data) and is_binary(filename) ->
+        ContentPart.file(data, filename, media_type || "application/octet-stream")
+
+      true ->
+        nil
     end
   end
 
   defp normalize_content_part_map(_, _), do: nil
 
+  defp part_field(part, key) do
+    source = part_source(part)
+    get_field(part, key) || get_field(source, key)
+  end
+
+  defp part_source(part) do
+    case get_field(part, :source) do
+      %{} = source -> source
+      source when is_list(source) -> if(Keyword.keyword?(source), do: Map.new(source), else: %{})
+      _source -> %{}
+    end
+  end
+
+  defp part_binary_field(part, key) do
+    case part_field(part, key) do
+      value when is_binary(value) ->
+        case String.trim(value) do
+          "" -> nil
+          value -> value
+        end
+
+      _value ->
+        nil
+    end
+  end
+
+  defp part_metadata(part) do
+    metadata =
+      case get_field(part, :metadata) do
+        metadata when is_map(metadata) -> metadata
+        metadata when is_list(metadata) -> if(Keyword.keyword?(metadata), do: Map.new(metadata), else: %{})
+        _metadata -> %{}
+      end
+
+    Enum.reduce([:title, :context, :citations], metadata, fn key, acc ->
+      case part_field(part, key) do
+        nil -> acc
+        value -> Map.put_new(acc, key, value)
+      end
+    end)
+  end
+
+  defp maybe_put_filename(part, filename) when is_binary(filename), do: %{part | filename: filename}
+  defp maybe_put_filename(part, _filename), do: part
+
   defp content_parts_list?(parts) when is_list(parts) and parts != [] do
     Enum.all?(parts, fn
       %ContentPart{} -> true
-      %{type: type} when type in [:text, :thinking, :image_url, :image, :file] -> true
-      %{"type" => type} when type in ["text", "thinking", "image_url", "image", "file"] -> true
+      %{type: type} when type in [:text, :thinking, :image_url, :image, :file, :file_id, :document] -> true
+      %{"type" => type} when type in ["text", "thinking", "image_url", "image", "file", "file_id", "document"] -> true
       _ -> false
     end)
   end
