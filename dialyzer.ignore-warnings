@@ -1,20 +1,41 @@
 Unknown function 'Elixir.Unicode':from_ucs4be/1
-Unknown function 'Elixir.Unicode':to_ucs4be/1
+Unknown function 'Elixir.Unicode':is_ascii/1
+Unknown function 'Elixir.Unicode':is_bmpchar/1
+Unknown function 'Elixir.Unicode':is_iso10646/1
+Unknown function 'Elixir.Unicode':is_iso646_basic/1
+Unknown function 'Elixir.Unicode':is_latin1/1
+Unknown function 'Elixir.Unicode':is_unicode/1
 Unknown function 'Elixir.Unicode':is_visible_ascii/1
 Unknown function 'Elixir.Unicode':is_visible_latin1/1
-Unknown function 'Elixir.Unicode':is_iso646_basic/1
-Unknown function 'Elixir.Unicode':is_ascii/1
-Unknown function 'Elixir.Unicode':is_latin1/1
-Unknown function 'Elixir.Unicode':is_bmpchar/1
-Unknown function 'Elixir.Unicode':is_unicode/1
-Unknown function 'Elixir.Unicode':is_iso10646/1
+Unknown function 'Elixir.Unicode':to_ucs4be/1
+missing specification for function from_latin9/1
+missing specification for function from_ucs2be/1
+missing specification for function from_ucs2be/2
+missing specification for function from_ucs2le/1
+missing specification for function from_ucs2le/2
 missing specification for function from_ucs4be/1
-missing specification for function to_ucs4be/1
+missing specification for function from_ucs4be/2
+missing specification for function from_ucs4le/1
+missing specification for function from_ucs4le/2
+missing specification for function from_utf16be/1
+missing specification for function from_utf16be/2
+missing specification for function from_utf16le/1
+missing specification for function from_utf16le/2
+missing specification for function from_utf8/1
+missing specification for function is_ascii/1
+missing specification for function is_bmpchar/1
+missing specification for function is_incharset/2
+missing specification for function is_iso10646/1
+missing specification for function is_iso646_basic/1
+missing specification for function is_latin1/1
+missing specification for function is_unicode/1
 missing specification for function is_visible_ascii/1
 missing specification for function is_visible_latin1/1
-missing specification for function is_iso646_basic/1
-missing specification for function is_ascii/1
-missing specification for function is_latin1/1
-missing specification for function is_bmpchar/1
-missing specification for function is_unicode/1
-missing specification for function is_iso10646/1
+missing specification for function to_ucs2be/1
+missing specification for function to_ucs2le/1
+missing specification for function to_ucs4be/1
+missing specification for function to_ucs4le/1
+missing specification for function to_unicode/2
+missing specification for function to_utf16be/1
+missing specification for function to_utf16le/1
+missing specification for function to_utf8/1
