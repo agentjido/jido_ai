@@ -36,6 +36,10 @@ defmodule Jido.AI.Agent do
     from tool_timeout_ms + 60s). How long to wait for events between coordinator
     updates. Increase for agents with slow LLM responses or long tool executions.
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
+  - `:tool_heartbeat_ms` - Tool-execution keepalive interval in ms (default: 0 =
+    off). When `> 0`, the runner emits a `:keepalive` event every interval while
+    tools execute, keeping a short-`stream_event_timeout_ms` consumer alive
+    through long-running tool calls.
   - `:effect_policy` - Agent-level effect policy (default allow-list)
   - `:strategy_effect_policy` - Optional strategy-level narrowing policy (cannot broaden agent policy)
   - `:runtime_adapter` - Deprecated compatibility flag (delegated ReAct runtime is always enabled)
@@ -335,6 +339,7 @@ defmodule Jido.AI.Agent do
     tool_max_retries = Keyword.get(opts, :tool_max_retries, 1)
     tool_retry_backoff_ms = Keyword.get(opts, :tool_retry_backoff_ms, 200)
     stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms, 0))
+    tool_heartbeat_ms = Keyword.get(opts, :tool_heartbeat_ms, 0)
     # ReAct delegation is always enabled; keep runtime_adapter option for compatibility only.
     _runtime_adapter_opt = Keyword.get(opts, :runtime_adapter, true)
     runtime_adapter = true
@@ -419,6 +424,7 @@ defmodule Jido.AI.Agent do
         tool_max_retries: tool_max_retries,
         tool_retry_backoff_ms: tool_retry_backoff_ms,
         stream_timeout_ms: stream_timeout_ms,
+        tool_heartbeat_ms: tool_heartbeat_ms,
         runtime_adapter: runtime_adapter,
         runtime_task_supervisor: runtime_task_supervisor,
         observability: observability,
@@ -507,6 +513,9 @@ defmodule Jido.AI.Agent do
       - `:max_iterations` - Request-scoped maximum reasoning iterations
       - `:stream_timeout_ms` - Request-scoped runtime inactivity timeout.
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
+      - `:tool_heartbeat_ms` - Request-scoped tool-execution keepalive interval in
+        ms (0 = off). Emits a `:keepalive` event while tools run so a short
+        `stream_event_timeout_ms` consumer survives long tool calls.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:file_id` / `:file_ids` / `:file_reference` / `:file_references` - Uploaded
@@ -609,6 +618,9 @@ defmodule Jido.AI.Agent do
       - `:max_iterations` - Request-scoped maximum reasoning iterations
       - `:stream_timeout_ms` - Request-scoped runtime inactivity timeout.
         `:stream_receive_timeout_ms` is accepted as a compatibility alias.
+      - `:tool_heartbeat_ms` - Request-scoped tool-execution keepalive interval in
+        ms (0 = off). Emits a `:keepalive` event while tools run so a short
+        `stream_event_timeout_ms` consumer survives long tool calls.
       - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
       - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
       - `:file_id` / `:file_ids` / `:file_reference` / `:file_references` - Uploaded

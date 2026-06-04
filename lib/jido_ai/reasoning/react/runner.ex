@@ -667,18 +667,24 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             )
           end)
 
+        heartbeat = start_tool_heartbeat(state, owner, ref, config)
+
         results =
-          pending
-          |> Task.async_stream(
-            fn call -> execute_tool_with_retries(call, tool_config, context) end,
-            ordered: true,
-            max_concurrency: tool_config.tool_exec.concurrency,
-            timeout: tool_config.tool_exec.timeout_ms + 50
-          )
-          |> Enum.map(fn
-            {:ok, result} -> result
-            {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
-          end)
+          try do
+            pending
+            |> Task.async_stream(
+              fn call -> execute_tool_with_retries(call, tool_config, context) end,
+              ordered: true,
+              max_concurrency: tool_config.tool_exec.concurrency,
+              timeout: tool_config.tool_exec.timeout_ms + 50
+            )
+            |> Enum.map(fn
+              {:ok, result} -> result
+              {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
+            end)
+          after
+            stop_tool_heartbeat(heartbeat)
+          end
 
         {state, updated_context} =
           Enum.reduce(results, {state, state.context}, fn
@@ -1122,6 +1128,57 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp notify_progress(owner, ref) do
     send(owner, {:react_runner, ref, :progress})
     :ok
+  end
+
+  # Periodic keepalive during tool execution: tools produce no stream events
+  # while they run, which would starve a consumer that set a short
+  # `stream_event_timeout_ms` on the request stream enumerable. Emitting a real
+  # `:keepalive` event keeps BOTH idle layers (runner `next_event/2` and
+  # `Jido.AI.Request.Stream`) alive without affecting tool semantics. Opt-in via
+  # `tool_heartbeat_ms` (0 = disabled).
+  defp start_tool_heartbeat(%State{} = state, owner, ref, %Config{} = config) do
+    case Config.tool_heartbeat_ms(config) do
+      interval when is_integer(interval) and interval > 0 ->
+        template = %{
+          run_id: state.run_id,
+          request_id: state.request_id,
+          iteration: state.iteration,
+          seq: state.seq
+        }
+
+        spawn_link(fn -> tool_heartbeat_loop(owner, ref, interval, template) end)
+
+      _ ->
+        nil
+    end
+  end
+
+  defp stop_tool_heartbeat(nil), do: :ok
+
+  defp stop_tool_heartbeat(pid) when is_pid(pid) do
+    Process.unlink(pid)
+    send(pid, :stop)
+    :ok
+  end
+
+  defp tool_heartbeat_loop(owner, ref, interval, template) do
+    receive do
+      :stop -> :ok
+    after
+      interval ->
+        event =
+          Event.new(%{
+            seq: template.seq,
+            run_id: template.run_id,
+            request_id: template.request_id,
+            iteration: template.iteration,
+            kind: :keepalive,
+            data: %{source: :tool_execution}
+          })
+
+        send(owner, {:react_runner, ref, :event, event})
+        tool_heartbeat_loop(owner, ref, interval, template)
+    end
   end
 
   defp cleanup(_owner, %{pid: pid} = state) when is_pid(pid) do
