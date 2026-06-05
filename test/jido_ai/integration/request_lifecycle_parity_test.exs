@@ -200,7 +200,6 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
   end
 
   describe "non-delegated strategy request lifecycle parity" do
-    @tag :flaky
     test "AoT emits request started/completed signals and request telemetry" do
       request_id = "req_aot_lifecycle"
       handler_id = attach_request_handler(self(), [Observe.request(:start), Observe.request(:complete)])

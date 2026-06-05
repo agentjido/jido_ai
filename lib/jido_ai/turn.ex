@@ -1109,8 +1109,5 @@ defmodule Jido.AI.Turn do
   # Extract a compact tool result payload for telemetry (bypasses :result summary sanitization
   # so downstream bridges get the actual payload data rather than a type/size summary).
   defp extract_tool_result({:ok, result, _effects}), do: result
-  defp extract_tool_result({:ok, result}), do: result
   defp extract_tool_result({:error, _reason, _effects}), do: nil
-  defp extract_tool_result({:error, _reason}), do: nil
-  defp extract_tool_result(_), do: nil
 end
