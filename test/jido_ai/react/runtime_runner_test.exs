@@ -1764,8 +1764,26 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       assert keepalives != [], "expected at least one :keepalive event during slow tool execution"
       assert Enum.all?(keepalives, &(&1.data.source == :tool_execution))
 
+      # Regression: keepalive events must not reuse or duplicate sequence numbers.
+      # The heartbeat allocates seqs out-of-band (separate process) while the
+      # runner is blocked in Task.async_stream; every event seq across the whole
+      # run must remain unique and monotonically increasing, and the keepalives
+      # must interleave above the prior events and below the events emitted after
+      # the tool completes.
+      seqs = Enum.map(events, & &1.seq)
+      assert seqs == Enum.sort(seqs), "event seqs must be monotonically increasing across keepalives"
+      assert seqs == Enum.uniq(seqs), "event seqs must be unique even when keepalives are emitted"
+
+      keepalive_seqs = Enum.map(keepalives, & &1.seq)
+      assert keepalive_seqs == Enum.uniq(keepalive_seqs), "each keepalive must carry a distinct seq"
+
+      tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_hb_slow"))
+      assert tool_completed
+      # Every keepalive precedes the post-tool event, proving the runner resumed
+      # above the heartbeat's allocated range rather than colliding with it.
+      assert Enum.all?(keepalive_seqs, &(&1 < tool_completed.seq))
+
       # The run is NOT aborted mid-tool: the tool completes and the run finishes.
-      assert Enum.any?(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_hb_slow"))
       assert Enum.any?(events, &(&1.kind == :request_completed))
     after
       :persistent_term.erase({__MODULE__, :hb_llm_call_count})

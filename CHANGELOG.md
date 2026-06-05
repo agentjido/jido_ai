@@ -5,22 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-
-- `:keepalive` runtime event kind and a new opt-in `:tool_heartbeat_ms` ReAct
-  config option (default `0` = off). When `> 0`, the ReAct runner emits a
-  periodic `:keepalive` event every `tool_heartbeat_ms` while tools execute.
-  This keeps both stream idle layers alive — the runner's `next_event/2`
-  (`stream_timeout_ms`) and the `Jido.AI.Request.Stream` enumerable
-  (`stream_event_timeout_ms`) — so a consumer that sets a short
-  `stream_event_timeout_ms` no longer times out and aborts a run during a
-  long-running tool call. `:tool_heartbeat_ms` is threaded through the same call
-  sites as `:stream_timeout_ms` (per-agent macro option, per-request
-  `ask`/`ask_sync`/`ask_stream` options, and the ReAct action schemas), and
-  truly-dead streams still time out normally when no heartbeat is configured.
-
 ## [2.0.0-rc.0] - 2026-02-22
 
 ### Added

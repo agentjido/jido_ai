@@ -669,22 +669,33 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
         heartbeat = start_tool_heartbeat(state, owner, ref, config)
 
-        results =
+        {results, heartbeat_last_seq} =
           try do
-            pending
-            |> Task.async_stream(
-              fn call -> execute_tool_with_retries(call, tool_config, context) end,
-              ordered: true,
-              max_concurrency: tool_config.tool_exec.concurrency,
-              timeout: tool_config.tool_exec.timeout_ms + 50
-            )
-            |> Enum.map(fn
-              {:ok, result} -> result
-              {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
-            end)
+            mapped =
+              pending
+              |> Task.async_stream(
+                fn call -> execute_tool_with_retries(call, tool_config, context) end,
+                ordered: true,
+                max_concurrency: tool_config.tool_exec.concurrency,
+                timeout: tool_config.tool_exec.timeout_ms + 50
+              )
+              |> Enum.map(fn
+                {:ok, result} -> result
+                {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
+              end)
+
+            # Synchronously stop the heartbeat and learn the highest seq it
+            # allocated, so the runner can resume above that range.
+            {mapped, stop_tool_heartbeat(heartbeat)}
           after
-            stop_tool_heartbeat(heartbeat)
+            # Crash-safety net: guarantee the heartbeat process is gone even if
+            # the tool block raised before the synchronous stop ran.
+            kill_tool_heartbeat(heartbeat)
           end
+
+        # Adopt the heartbeat's final seq so the next emitted event is strictly
+        # greater than every keepalive (preserves unique + monotonic seqs).
+        state = State.adopt_seq(state, heartbeat_last_seq)
 
         {state, updated_context} =
           Enum.reduce(results, {state, state.context}, fn
@@ -1136,39 +1147,70 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   # `:keepalive` event keeps BOTH idle layers (runner `next_event/2` and
   # `Jido.AI.Request.Stream`) alive without affecting tool semantics. Opt-in via
   # `tool_heartbeat_ms` (0 = disabled).
+  #
+  # The heartbeat runs in a separate process because the runner is blocked inside
+  # `Task.async_stream` for the whole tool window and cannot allocate seqs itself.
+  # The runner does NOT emit any event during that window, so the seq range
+  # `[base + 1, ..]` is exclusively the heartbeat's: it allocates a fresh,
+  # strictly-increasing seq per keepalive (never reusing a value), and on stop
+  # reports the highest seq it reached so the runner can resume above it via
+  # `State.adopt_seq/2`. This keeps every event seq unique and monotonic.
   defp start_tool_heartbeat(%State{} = state, owner, ref, %Config{} = config) do
     case Config.tool_heartbeat_ms(config) do
       interval when is_integer(interval) and interval > 0 ->
         template = %{
           run_id: state.run_id,
           request_id: state.request_id,
-          iteration: state.iteration,
-          seq: state.seq
+          iteration: state.iteration
         }
 
-        spawn_link(fn -> tool_heartbeat_loop(owner, ref, interval, template) end)
+        base_seq = state.seq
+        spawn_link(fn -> tool_heartbeat_loop(owner, ref, interval, base_seq, template) end)
 
       _ ->
         nil
     end
   end
 
-  defp stop_tool_heartbeat(nil), do: :ok
+  # Synchronously stop the heartbeat and return the highest seq it allocated
+  # (or `nil` when there was no heartbeat). The handshake guarantees the
+  # heartbeat has emitted its last keepalive before the runner resumes, so the
+  # reconciled seq covers every keepalive in flight.
+  defp stop_tool_heartbeat(nil), do: nil
 
   defp stop_tool_heartbeat(pid) when is_pid(pid) do
     Process.unlink(pid)
-    send(pid, :stop)
+    send(pid, {:stop, self()})
+
+    receive do
+      {:heartbeat_stopped, ^pid, last_seq} -> last_seq
+    after
+      1_000 ->
+        Process.exit(pid, :kill)
+        nil
+    end
+  end
+
+  defp kill_tool_heartbeat(nil), do: :ok
+
+  defp kill_tool_heartbeat(pid) when is_pid(pid) do
+    Process.unlink(pid)
+    Process.exit(pid, :kill)
     :ok
   end
 
-  defp tool_heartbeat_loop(owner, ref, interval, template) do
+  defp tool_heartbeat_loop(owner, ref, interval, seq, template) do
     receive do
-      :stop -> :ok
+      {:stop, from} ->
+        send(from, {:heartbeat_stopped, self(), seq})
+        :ok
     after
       interval ->
+        next_seq = seq + 1
+
         event =
           Event.new(%{
-            seq: template.seq,
+            seq: next_seq,
             run_id: template.run_id,
             request_id: template.request_id,
             iteration: template.iteration,
@@ -1177,7 +1219,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           })
 
         send(owner, {:react_runner, ref, :event, event})
-        tool_heartbeat_loop(owner, ref, interval, template)
+        tool_heartbeat_loop(owner, ref, interval, next_seq, template)
     end
   end
 

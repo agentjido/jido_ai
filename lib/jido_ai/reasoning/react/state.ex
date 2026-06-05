@@ -163,6 +163,23 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   end
 
   @doc """
+  Advances the event sequence counter to `seq` when it is ahead of the current
+  value, leaving it untouched otherwise.
+
+  Used to reconcile sequence numbers allocated out-of-band by the tool-execution
+  heartbeat (which runs in a separate process while the runner is blocked inside
+  `Task.async_stream`). Adopting the heartbeat's final seq guarantees the next
+  normal event the runner emits is strictly greater than every keepalive,
+  preserving the monotonic-and-unique seq invariant.
+  """
+  @spec adopt_seq(t(), integer() | nil) :: t()
+  def adopt_seq(%__MODULE__{} = state, seq) when is_integer(seq) and seq > state.seq do
+    %{state | seq: seq, updated_at_ms: now_ms()}
+  end
+
+  def adopt_seq(%__MODULE__{} = state, _seq), do: state
+
+  @doc """
   Increments the reasoning iteration counter.
   """
   @spec inc_iteration(t()) :: t()
