@@ -118,6 +118,23 @@ defmodule Jido.AI.ObserveTest do
     refute inspect(sanitized) =~ "visible"
   end
 
+  test "sanitize_telemetry_metadata preserves nested tool_result payload fields" do
+    sanitized =
+      Observe.sanitize_telemetry_metadata(%{
+        result: {:ok, %{result: "answer"}, []},
+        tool_result: %{
+          result: "answer",
+          content: %{output: "full text", token: "secret"}
+        }
+      })
+
+    assert sanitized.result.status == :ok
+    assert sanitized.result.value.type == :map
+    assert sanitized.tool_result.result == "answer"
+    assert sanitized.tool_result.content.output == "full text"
+    assert sanitized.tool_result.content.token == "[REDACTED]"
+  end
+
   test "sanitize_transport_payload produces bounded JSON-safe data" do
     payload = %{
       ok: true,

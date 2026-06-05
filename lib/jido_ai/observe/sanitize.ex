@@ -174,6 +174,9 @@ defmodule Jido.AI.Observe.Sanitize do
         sensitive_key?(key) ->
           {sanitize_key(key), @redacted}
 
+        profile == :telemetry and tool_result_key?(key) ->
+          {sanitize_key(key), sanitize_value(entry_value, :transport, opts, depth + 1)}
+
         profile == :telemetry and telemetry_payload_summary_key?(key) ->
           {sanitize_key(key), summarize_value(entry_value, profile, opts)}
 
@@ -317,6 +320,8 @@ defmodule Jido.AI.Observe.Sanitize do
   defp sanitize_key(key), do: inspect_limited(key, @telemetry_defaults.max_inspect_chars)
 
   defp telemetry_payload_summary_key?(key), do: MapSet.member?(@telemetry_payload_summary_keys, key)
+
+  defp tool_result_key?(key), do: key in [:tool_result, "tool_result"]
 
   defp take_with_omitted_count(list, max_items) do
     items = Enum.take(list, max_items + 1)
