@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.EmbedResult do
   Signal for embedding generation completion.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.embed.result",
     default_source: "/ai/embed",
     schema: [

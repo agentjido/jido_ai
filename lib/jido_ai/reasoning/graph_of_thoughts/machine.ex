@@ -344,21 +344,21 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
   """
   @spec get_ancestors(t(), String.t()) :: [String.t()]
   def get_ancestors(machine, node_id) do
-    get_ancestors_recursive(machine, node_id, MapSet.new())
-    |> MapSet.to_list()
+    get_ancestors_recursive(machine, node_id, %{})
+    |> Map.keys()
   end
 
-  # OTP 29 reports the recursive MapSet accumulator as opaque at this private boundary.
-  @dialyzer {:nowarn_function, get_ancestors_recursive: 3, get_descendants_recursive: 3}
-  @spec get_ancestors_recursive(t(), String.t(), MapSet.t(String.t())) :: MapSet.t(String.t())
+  @spec get_ancestors_recursive(t(), String.t(), %{optional(String.t()) => true}) :: %{
+          optional(String.t()) => true
+        }
   defp get_ancestors_recursive(machine, node_id, visited) do
     parents = get_parents(machine, node_id)
 
     Enum.reduce(parents, visited, fn parent_id, acc ->
-      if MapSet.member?(acc, parent_id) do
+      if Map.has_key?(acc, parent_id) do
         acc
       else
-        visited = MapSet.put(acc, parent_id)
+        visited = Map.put(acc, parent_id, true)
         get_ancestors_recursive(machine, parent_id, visited)
       end
     end)
@@ -369,19 +369,21 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
   """
   @spec get_descendants(t(), String.t()) :: [String.t()]
   def get_descendants(machine, node_id) do
-    get_descendants_recursive(machine, node_id, MapSet.new())
-    |> MapSet.to_list()
+    get_descendants_recursive(machine, node_id, %{})
+    |> Map.keys()
   end
 
-  @spec get_descendants_recursive(t(), String.t(), MapSet.t(String.t())) :: MapSet.t(String.t())
+  @spec get_descendants_recursive(t(), String.t(), %{optional(String.t()) => true}) :: %{
+          optional(String.t()) => true
+        }
   defp get_descendants_recursive(machine, node_id, visited) do
     children = get_children(machine, node_id)
 
     Enum.reduce(children, visited, fn child_id, acc ->
-      if MapSet.member?(acc, child_id) do
+      if Map.has_key?(acc, child_id) do
         acc
       else
-        visited = MapSet.put(acc, child_id)
+        visited = Map.put(acc, child_id, true)
         get_descendants_recursive(machine, child_id, visited)
       end
     end)

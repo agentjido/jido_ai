@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.Signal do
   Signal envelope used by strategies/adapters to consume ReAct runtime events.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.react.worker.event",
     default_source: "/ai/react/worker",
     schema: [

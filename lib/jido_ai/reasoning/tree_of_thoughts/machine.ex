@@ -58,19 +58,23 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
   Never compare `machine.status` directly with atoms - use `Machine.to_map/1` first.
   """
 
-  use Fsmx.Struct,
-    state_field: :status,
-    transitions: %{
-      "idle" => ["generating"],
-      "generating" => ["evaluating", "error"],
-      "evaluating" => ["expanding", "completed", "error"],
-      "expanding" => ["generating", "completed", "error"],
-      "completed" => [],
-      "error" => []
-    }
+  @fsm_transitions %{
+    "idle" => ["generating"],
+    "generating" => ["evaluating", "error"],
+    "evaluating" => ["expanding", "completed", "error"],
+    "expanding" => ["generating", "completed", "error"],
+    "completed" => [],
+    "error" => []
+  }
 
-  # Fsmx macro expansion emits a spurious `warn_matching` on this module.
-  @dialyzer :no_match
+  @doc false
+  def __fsmx__(:status), do: __MODULE__
+
+  @doc false
+  def __fsmx__(:status, :transitions), do: @fsm_transitions
+
+  @doc false
+  def __fsmx__(:status, :fsm), do: __MODULE__
 
   # Telemetry event names
   @telemetry_prefix [:jido, :ai, :tot]
@@ -229,10 +233,9 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
     }
   end
 
-  # Provide the deprecated arity expected by Fsmx runtime checks so transitions
-  # can use this explicit callback path without relying on generated fallback.
-  @spec before_transition(t(), internal_status(), internal_status()) :: {:ok, t()}
-  def before_transition(struct, _from, _to), do: {:ok, struct}
+  @doc false
+  @spec before_transition(t(), internal_status(), internal_status(), atom()) :: {:ok, t()}
+  def before_transition(struct, _from, _to, _state_field), do: {:ok, struct}
 
   @doc """
   Updates the machine state based on a message.
@@ -1095,16 +1098,14 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
   end
 
   defp max_nodes_exceeded?(%__MODULE__{max_nodes: max_nodes, nodes: nodes}) do
-    is_integer(max_nodes) and max_nodes > 0 and map_size(nodes) >= max_nodes
+    map_size(nodes) >= max_nodes
   end
 
   defp max_duration_exceeded?(%__MODULE__{max_duration_ms: nil}), do: false
 
-  defp max_duration_exceeded?(%__MODULE__{max_duration_ms: ms} = machine) when is_integer(ms) and ms > 0 do
+  defp max_duration_exceeded?(%__MODULE__{max_duration_ms: ms} = machine) do
     calculate_duration(machine) >= ms
   end
-
-  defp max_duration_exceeded?(_), do: false
 
   defp find_threshold_solution(machine, child_ids) do
     threshold = machine.early_success_threshold
@@ -1125,7 +1126,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
          convergence_window: window,
          min_score_improvement: min_improvement
        })
-       when is_list(scores) and is_integer(window) and window > 1 do
+       when window > 1 do
     if length(scores) < window do
       false
     else
@@ -1138,11 +1139,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
 
   defp converged?(_), do: false
 
-  defp maybe_trim_beam(frontier, beam_width) when is_integer(beam_width) and beam_width > 0 do
+  defp maybe_trim_beam(frontier, beam_width) when not is_nil(beam_width) do
     Enum.take(frontier, beam_width)
   end
 
-  defp maybe_trim_beam(frontier, _), do: frontier
+  defp maybe_trim_beam(frontier, nil), do: frontier
 
   defp maybe_retry_parse(%__MODULE__{} = machine, phase, raw_text, on_exhausted)
        when phase in [:generation, :evaluation] and is_function(on_exhausted, 1) do

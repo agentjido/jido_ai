@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.RequestFailed do
   Signal for request lifecycle failure.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.request.failed",
     default_source: "/ai/request",
     schema: [
