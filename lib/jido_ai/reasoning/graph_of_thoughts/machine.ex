@@ -356,9 +356,8 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
       if MapSet.member?(acc, parent_id) do
         acc
       else
-        acc
-        |> MapSet.put(parent_id)
-        |> then(&get_ancestors_recursive(machine, parent_id, &1))
+        visited = MapSet.put(acc, parent_id)
+        get_ancestors_recursive(machine, parent_id, visited)
       end
     end)
   end
@@ -380,9 +379,8 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
       if MapSet.member?(acc, child_id) do
         acc
       else
-        acc
-        |> MapSet.put(child_id)
-        |> then(&get_descendants_recursive(machine, child_id, &1))
+        visited = MapSet.put(acc, child_id)
+        get_descendants_recursive(machine, child_id, visited)
       end
     end)
   end
