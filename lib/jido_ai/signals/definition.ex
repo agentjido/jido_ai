@@ -49,7 +49,7 @@ defmodule Jido.AI.Signal.Definition do
       def dataschema, do: @signal_dataschema
 
       @doc "Returns the field schema used to validate signal data."
-      @spec schema() :: Jido.AI.Signal.Definition.schema()
+      @spec schema() :: keyword(keyword())
       def schema, do: @signal_schema
 
       @doc "Returns the extension policy for this signal module."
@@ -209,7 +209,6 @@ defmodule Jido.AI.Signal.Definition do
   defp valid_type?(:string, value), do: is_binary(value)
   defp valid_type?(_type, _value), do: false
 
-  defp type_description(:any), do: "any value"
   defp type_description(:atom), do: "an atom"
   defp type_description(:integer), do: "an integer"
   defp type_description(:map), do: "a map"

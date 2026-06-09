@@ -31,6 +31,72 @@ defmodule Jido.AI.SignalTest do
     end
   end
 
+  describe "typed signal validation" do
+    test "reports missing required fields" do
+      assert {:error, message} = LLMDelta.new(%{call_id: "call_missing_delta"})
+      assert message =~ "missing required field :delta"
+
+      assert_raise RuntimeError, ~r/missing required field :delta/, fn ->
+        LLMDelta.new!(%{call_id: "call_missing_delta"})
+      end
+    end
+
+    test "rejects unknown fields" do
+      assert {:error, message} =
+               LLMDelta.new(%{
+                 call_id: "call_unknown",
+                 delta: "hello",
+                 unknown: true
+               })
+
+      assert message =~ "received unknown field :unknown"
+    end
+
+    test "rejects invalid field types" do
+      assert {:error, message} =
+               LLMDelta.new(%{
+                 call_id: "call_bad_type",
+                 delta: "hello",
+                 seq: "1"
+               })
+
+      assert message =~ "expected :seq to be an integer"
+    end
+
+    test "accepts string keys for schema fields and applies signal options" do
+      assert {:ok, signal} =
+               LLMDelta.new(
+                 %{
+                   "call_id" => "call_string_keys",
+                   "delta" => "hello"
+                 },
+                 source: "/custom/source",
+                 subject: "subject-1"
+               )
+
+      assert signal.source == "/custom/source"
+      assert signal.subject == "subject-1"
+      assert signal.data.call_id == "call_string_keys"
+      assert signal.data.delta == "hello"
+      assert signal.data.chunk_type == :content
+    end
+
+    test "exposes signal metadata accessors" do
+      assert LLMDelta.type() == "ai.llm.delta"
+      assert LLMDelta.default_source() == "/ai/llm"
+      assert LLMDelta.datacontenttype() == nil
+      assert LLMDelta.dataschema() == nil
+      assert LLMDelta.extension_policy() == %{}
+
+      metadata = LLMDelta.__signal_metadata__()
+
+      assert metadata.type == LLMDelta.type()
+      assert metadata.default_source == LLMDelta.default_source()
+      assert metadata.schema == LLMDelta.schema()
+      assert metadata.extension_policy == %{}
+    end
+  end
+
   describe "LLMResponse" do
     test "creates signal with required fields" do
       signal =
