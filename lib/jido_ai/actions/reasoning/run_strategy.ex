@@ -172,7 +172,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   defp ensure_runner_runtime do
     case Jido.start(name: @runner_jido) do
       {:ok, _pid} -> :ok
-      {:error, {:already_started, _pid}} -> :ok
       {:error, reason} -> {:error, reason}
     end
   end

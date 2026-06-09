@@ -158,8 +158,6 @@ defmodule Jido.AI.Query do
       )
   end
 
-  defp keyword_reference?(_value), do: false
-
   defp ensure_file_reference_support do
     if function_exported?(ContentPart, :file_id, 3) do
       :ok

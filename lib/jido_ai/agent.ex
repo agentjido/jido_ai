@@ -157,18 +157,6 @@ defmodule Jido.AI.Agent do
       {key, value} when not is_atom(key) or key not in [:__aliases__, :%, :%{}, :{}] ->
         {key, value}
 
-      # Reject function calls and other unsafe constructs
-      {func, meta, args} = node when is_atom(func) and is_list(args) ->
-        if func in [:__aliases__, :%, :%{}, :{}] do
-          node
-        else
-          raise CompileError,
-            description:
-              "Unsafe construct in tool_context or tools: function call #{inspect(func)} is not allowed. " <>
-                "Only module aliases, atoms, strings, numbers, lists, and maps are permitted.",
-            line: Keyword.get(meta, :line, 0)
-        end
-
       # Reject module attributes with clear error
       {:@, meta, [{name, _, _}]} ->
         raise CompileError,
@@ -185,6 +173,18 @@ defmodule Jido.AI.Agent do
               "Use literal values instead.",
           line: Keyword.get(meta, :line, 0)
 
+      # Reject function calls and other unsafe constructs
+      {func, meta, args} = node when is_atom(func) and is_list(args) ->
+        if func in [:__aliases__, :%, :%{}, :{}] do
+          node
+        else
+          raise CompileError,
+            description:
+              "Unsafe construct in tool_context or tools: function call #{inspect(func)} is not allowed. " <>
+                "Only module aliases, atoms, strings, numbers, lists, and maps are permitted.",
+            line: Keyword.get(meta, :line, 0)
+        end
+
       other ->
         other
     end)
@@ -195,12 +195,6 @@ defmodule Jido.AI.Agent do
     case value do
       nil ->
         nil
-
-      value when is_tuple(value) ->
-        value
-        |> expand_aliases_in_ast(caller_env)
-        |> Code.eval_quoted([], caller_env)
-        |> elem(0)
 
       value when is_map(value) ->
         value
@@ -219,6 +213,12 @@ defmodule Jido.AI.Agent do
 
       {:%, _, _} = struct_ast ->
         struct_ast
+        |> expand_aliases_in_ast(caller_env)
+        |> Code.eval_quoted([], caller_env)
+        |> elem(0)
+
+      value when is_tuple(value) ->
+        value
         |> expand_aliases_in_ast(caller_env)
         |> Code.eval_quoted([], caller_env)
         |> elem(0)

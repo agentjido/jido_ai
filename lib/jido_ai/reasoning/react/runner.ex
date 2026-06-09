@@ -156,7 +156,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp run_loop(%State{} = state, owner, ref, %Config{} = config, context) do
+  defp run_loop(%State{} = state, owner, ref, %Config{} = config, context, prev_tool_signature \\ nil) do
     check_cancel!(state, ref)
 
     cond do
@@ -166,7 +166,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       state.status == :awaiting_tools and state.pending_tool_calls != [] ->
         case run_pending_tool_round(state, owner, ref, config, context) do
           {:ok, state, context} ->
-            run_loop(state, owner, ref, config, context)
+            run_loop(state, owner, ref, config, context, prev_tool_signature)
 
           {:error, state, reason, error_type} ->
             fail_run(state, owner, ref, config, reason, error_type)
@@ -192,7 +192,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               {:final_answer, state} ->
                 case maybe_continue_after_final_answer(state, owner, ref, config) do
                   {:continue, state} ->
-                    run_loop(state, owner, ref, config, context)
+                    run_loop(state, owner, ref, config, context, prev_tool_signature)
 
                   {:complete, state} ->
                     state
@@ -202,22 +202,19 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                 end
 
               {:tool_calls, state, tool_calls} ->
-                prev_signature = Map.get(state, :__prev_tool_signature__)
                 current_signature = tool_call_signature(tool_calls)
 
                 case run_tool_round(state, owner, ref, config, context, tool_calls) do
                   {:ok, state, context} ->
-                    state = Map.put(state, :__prev_tool_signature__, current_signature)
-
                     state =
-                      if prev_signature == current_signature and prev_signature != nil do
+                      if prev_tool_signature == current_signature and prev_tool_signature != nil do
                         corrected_context = AIContext.append_user(state.context, @cycle_warning)
                         %{state | context: corrected_context}
                       else
                         state
                       end
 
-                    run_loop(state, owner, ref, config, context)
+                    run_loop(state, owner, ref, config, context, current_signature)
 
                   {:error, state, reason, error_type} ->
                     fail_run(state, owner, ref, config, reason, error_type)
