@@ -66,7 +66,6 @@ defmodule JidoAi.MixProject do
       # Runtime
       {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
-      {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
       {:yaml_elixir, "~> 2.12"},
       {:zoi, "~> 0.18"},
@@ -80,7 +79,6 @@ defmodule JidoAi.MixProject do
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:mimic, "~> 2.0", only: :test},
-      {:stream_data, "~> 1.0", only: [:dev, :test]},
       {:igniter, "~> 0.7", optional: true}
     ]
   end
