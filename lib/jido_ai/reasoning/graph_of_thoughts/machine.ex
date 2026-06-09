@@ -348,6 +348,8 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
     |> MapSet.to_list()
   end
 
+  # OTP 29 reports the recursive MapSet accumulator as opaque at this private boundary.
+  @dialyzer {:nowarn_function, get_ancestors_recursive: 3, get_descendants_recursive: 3}
   @spec get_ancestors_recursive(t(), String.t(), MapSet.t(String.t())) :: MapSet.t(String.t())
   defp get_ancestors_recursive(machine, node_id, visited) do
     parents = get_parents(machine, node_id)
