@@ -664,6 +664,7 @@ defmodule Jido.AI.Turn do
       %{
         tool_name: tool_name,
         result: result,
+        tool_result: extract_tool_result(result),
         tool_call_id: tool_call_id,
         call_id: context[:call_id],
         request_id: context[:request_id] || context[:run_id],
@@ -1104,4 +1105,9 @@ defmodule Jido.AI.Turn do
   end
 
   defp normalize_tool_arguments(_), do: %{}
+
+  # Extract a compact tool result payload for telemetry (bypasses :result summary sanitization
+  # so downstream bridges get the actual payload data rather than a type/size summary).
+  defp extract_tool_result({:ok, result, _effects}), do: result
+  defp extract_tool_result({:error, _reason, _effects}), do: nil
 end

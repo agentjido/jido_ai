@@ -657,6 +657,37 @@ defmodule Jido.AI.TurnTest do
       assert_receive {:stop_metadata, stop_metadata}
       assert stop_metadata.tool_call_id == "tc_legacy_1"
     end
+
+    test "execute telemetry preserves nested tool_result payload values" do
+      test_pid = self()
+      stop_handler_id = "turn-stop-tool-result-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          stop_handler_id,
+          [:jido, :ai, :tool, :execute, :stop],
+          fn _event, _measurements, metadata, _config ->
+            if metadata[:tool_call_id] == "tc_payload_1" do
+              send(test_pid, {:stop_metadata, metadata})
+            end
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(stop_handler_id) end)
+
+      assert {:ok, _result, _effects} =
+               Turn.execute_module(
+                 Calculator,
+                 %{operation: "add", a: 1, b: 2},
+                 %{observability: %{emit_telemetry?: true}, tool_call_id: "tc_payload_1"}
+               )
+
+      assert_receive {:stop_metadata, stop_metadata}
+      assert stop_metadata.result.status == :ok
+      assert stop_metadata.result.value.type == :map
+      assert stop_metadata.tool_result.result == 3
+    end
   end
 
   describe "log_level propagation" do

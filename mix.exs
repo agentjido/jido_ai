@@ -30,7 +30,8 @@ defmodule JidoAi.MixProject do
 
       # Dialyzer
       dialyzer: [
-        plt_add_apps: [:mix, :llm_db]
+        plt_add_apps: [:mix, :llm_db, :jsv],
+        ignore_warnings: "dialyzer.ignore-warnings"
       ]
     ]
   end
