@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.Usage do
   Signal for token usage and cost tracking.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.usage",
     default_source: "/ai/usage",
     schema: [

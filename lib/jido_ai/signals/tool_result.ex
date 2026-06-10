@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.ToolResult do
   Signal for tool execution completion.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.tool.result",
     default_source: "/ai/tool",
     schema: [

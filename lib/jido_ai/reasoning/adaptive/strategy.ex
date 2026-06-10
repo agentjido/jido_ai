@@ -420,7 +420,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
         {strategy_type, complexity_score, task_type} =
           select_strategy_for_task(prompt, state[:config])
 
-        strategy_module = Map.get(@strategy_modules, strategy_type)
+        strategy_module = Map.fetch!(@strategy_modules, strategy_type)
 
         # Initialize the selected strategy
         strategy_ctx = Map.put(ctx, :strategy_opts, state[:config].strategy_opts)

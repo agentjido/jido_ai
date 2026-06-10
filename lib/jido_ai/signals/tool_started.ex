@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.ToolStarted do
   Signal emitted when a tool execution starts.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.tool.started",
     default_source: "/ai/tool",
     schema: [

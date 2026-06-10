@@ -217,9 +217,9 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Machine do
   def from_map(map) when is_map(map) do
     status =
       case map[:status] do
+        nil -> "idle"
         s when is_atom(s) -> Atom.to_string(s)
         s when is_binary(s) -> s
-        nil -> "idle"
       end
 
     %__MODULE__{

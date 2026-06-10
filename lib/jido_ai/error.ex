@@ -158,11 +158,6 @@ defmodule Jido.AI.Error do
     normalize(reason, fallback_type, fallback_message, extra_details)
   end
 
-  def normalize({:unknown_tool, message}, _fallback_type, _fallback_message, extra_details)
-      when is_binary(message) and is_map(extra_details) do
-    error_envelope(:unknown_tool, message, extra_details, false)
-  end
-
   def normalize({:validation, details}, _fallback_type, _fallback_message, extra_details)
       when is_map(extra_details) do
     error_envelope(
@@ -263,7 +258,6 @@ defmodule Jido.AI.Error do
   end
 
   defp normalize_error_details(nil), do: %{}
-  defp normalize_error_details(details) when is_map(details), do: details
   defp normalize_error_details(details), do: %{details: details}
 
   defp normalize_json_safe_map(map) when is_map(map) do
@@ -321,9 +315,9 @@ defmodule Jido.AI.Error do
     ArgumentError -> fallback
   end
 
+  defp normalize_message(nil), do: "Execution failed"
   defp normalize_message(message) when is_binary(message), do: message
   defp normalize_message(message) when is_atom(message), do: Atom.to_string(message)
-  defp normalize_message(nil), do: "Execution failed"
   defp normalize_message(message), do: inspect(message)
 
   defp normalize_upstream_jido_error(reason, fallback_type, fallback_message, extra_details) do

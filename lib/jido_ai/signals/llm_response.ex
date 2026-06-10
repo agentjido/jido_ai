@@ -8,7 +8,7 @@ defmodule Jido.AI.Signal.LLMResponse do
 
   alias Jido.AI.Turn
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.llm.response",
     default_source: "/ai/llm",
     schema: [

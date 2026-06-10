@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.LLMDelta do
   Signal for streaming LLM token chunks.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.llm.delta",
     default_source: "/ai/llm",
     schema: [

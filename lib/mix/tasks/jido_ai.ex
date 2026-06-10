@@ -56,8 +56,6 @@ defmodule Mix.Tasks.JidoAi do
 
   alias Jido.AI.CLI.Adapter
 
-  require Logger
-
   @supported_types ~w(react aot cod cot tot got trm adaptive)
   @supported_formats ~w(text json)
   @no_query_error """
