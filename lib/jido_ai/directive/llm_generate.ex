@@ -79,6 +79,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   """
 
   alias Jido.AI.{Error, Observe, Signal, Turn}
+  alias Jido.AI.Actions.Helpers, as: ActionHelpers
   alias Jido.AI.Directive.Helpers
 
   def exec(directive, _input_signal, state) do
@@ -149,9 +150,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
            duration_ms = System.monotonic_time(:millisecond) - started_at
 
            case result do
-             {:ok, _} ->
-               Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
-               maybe_emit(obs_cfg, Observe.llm(:complete), %{duration_ms: duration_ms}, event_meta)
+             {:ok, turn} ->
+               usage = turn_usage(turn)
+               measurements = %{duration_ms: duration_ms} |> Map.merge(ActionHelpers.token_measurements(usage))
+               metadata = maybe_put_usage(event_meta, usage)
+
+               Observe.finish_span(span_ctx, measurements)
+               maybe_emit(obs_cfg, Observe.llm(:complete), measurements, metadata)
 
              {:error, reason} ->
                Observe.finish_span_error(span_ctx, :error, reason, [])
@@ -244,8 +249,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
   defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
 
   defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
-    input_tokens = usage[:input_tokens] || 0
-    output_tokens = usage[:output_tokens] || 0
+    raw_usage = usage
+    usage = ActionHelpers.extract_usage(usage)
+    input_tokens = usage.input_tokens
+    output_tokens = usage.output_tokens
 
     if input_tokens > 0 or output_tokens > 0 do
       signal =
@@ -254,10 +261,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
           model: model,
           input_tokens: input_tokens,
           output_tokens: output_tokens,
-          total_tokens: input_tokens + output_tokens,
+          total_tokens: usage.total_tokens,
           metadata: %{
-            cache_creation_input_tokens: Map.get(usage, :cache_creation_input_tokens),
-            cache_read_input_tokens: Map.get(usage, :cache_read_input_tokens)
+            cache_creation_input_tokens: usage_value(raw_usage, :cache_creation_input_tokens),
+            cache_read_input_tokens: usage_value(raw_usage, :cache_read_input_tokens)
           }
         })
 
@@ -272,6 +279,18 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
     |> Map.take([:request_id, :run_id, :iteration, :origin, :operation, :strategy])
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)
     |> Map.new()
+  end
+
+  defp turn_usage(%Turn{usage: usage}), do: usage
+
+  defp maybe_put_usage(metadata, usage) when is_map(usage) and usage != %{} do
+    Map.put(metadata, :usage, Map.merge(usage, ActionHelpers.extract_usage(usage)))
+  end
+
+  defp maybe_put_usage(metadata, _usage), do: metadata
+
+  defp usage_value(usage, key) when is_map(usage) and is_atom(key) do
+    Map.get(usage, key) || Map.get(usage, Atom.to_string(key))
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do

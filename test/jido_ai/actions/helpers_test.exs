@@ -136,6 +136,46 @@ defmodule Jido.AI.Actions.HelpersTest do
       assert usage.output_tokens == 0
       assert usage.total_tokens == 0
     end
+
+    test "normalizes alternate token keys for telemetry measurements" do
+      response = %{
+        usage: %{
+          "input" => "4",
+          :completion_tokens => 6,
+          "totalTokenCount" => "10"
+        }
+      }
+
+      assert Helpers.extract_usage(response) == %{
+               input_tokens: 4,
+               output_tokens: 6,
+               total_tokens: 10
+             }
+
+      assert Helpers.token_measurements(response) == %{
+               input_tokens: 4,
+               output_tokens: 6,
+               total_tokens: 10
+             }
+    end
+
+    test "normalizes nested and provider camel-case token keys" do
+      response = %{
+        usage: %{
+          "tokens" => %{
+            "promptTokenCount" => "8.0",
+            "candidatesTokenCount" => 3.9
+          },
+          "totalTokenCount" => "11.0"
+        }
+      }
+
+      assert Helpers.extract_usage(response) == %{
+               input_tokens: 8,
+               output_tokens: 3,
+               total_tokens: 11
+             }
+    end
   end
 
   describe "validate_and_sanitize_input/2" do

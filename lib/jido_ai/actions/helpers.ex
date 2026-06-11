@@ -148,16 +148,45 @@ defmodule Jido.AI.Actions.Helpers do
   end
 
   def extract_usage(usage) when is_map(usage) do
+    usage_sources = usage_sources(usage)
+
     input_tokens =
-      Map.get(usage, :input_tokens) || Map.get(usage, :prompt_tokens) ||
-        Map.get(usage, "input_tokens") || Map.get(usage, "prompt_tokens") || 0
+      first_token_value(usage_sources, [
+        :input_tokens,
+        :prompt_tokens,
+        :input,
+        :promptTokenCount,
+        :inputTokenCount,
+        "input_tokens",
+        "prompt_tokens",
+        "input",
+        "promptTokenCount",
+        "inputTokenCount"
+      ]) || 0
 
     output_tokens =
-      Map.get(usage, :output_tokens) || Map.get(usage, :completion_tokens) ||
-        Map.get(usage, "output_tokens") || Map.get(usage, "completion_tokens") || 0
+      first_token_value(usage_sources, [
+        :output_tokens,
+        :completion_tokens,
+        :output,
+        :candidatesTokenCount,
+        :outputTokenCount,
+        "output_tokens",
+        "completion_tokens",
+        "output",
+        "candidatesTokenCount",
+        "outputTokenCount"
+      ]) || 0
 
     total_tokens =
-      Map.get(usage, :total_tokens) || Map.get(usage, "total_tokens") ||
+      first_token_value(usage_sources, [
+        :total_tokens,
+        :total,
+        :totalTokenCount,
+        "total_tokens",
+        "total",
+        "totalTokenCount"
+      ]) ||
         input_tokens + output_tokens
 
     %{
@@ -168,6 +197,62 @@ defmodule Jido.AI.Actions.Helpers do
   end
 
   def extract_usage(_), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
+
+  defp usage_sources(usage) when is_map(usage) do
+    nested_tokens = Map.get(usage, :tokens) || Map.get(usage, "tokens")
+
+    [usage, nested_tokens]
+    |> Enum.filter(&is_map/1)
+  end
+
+  @doc """
+  Builds canonical token measurements for AI telemetry events.
+  """
+  @spec token_measurements(term()) :: %{
+          input_tokens: non_neg_integer(),
+          output_tokens: non_neg_integer(),
+          total_tokens: non_neg_integer()
+        }
+  def token_measurements(response_or_usage) do
+    usage = extract_usage(response_or_usage)
+
+    %{
+      input_tokens: usage.input_tokens,
+      output_tokens: usage.output_tokens,
+      total_tokens: usage.total_tokens
+    }
+  end
+
+  defp first_token_value(usage_sources, keys) do
+    Enum.find_value(usage_sources, fn usage ->
+      Enum.find_value(keys, fn key ->
+        usage
+        |> Map.get(key)
+        |> token_value()
+      end)
+    end)
+  end
+
+  defp token_value(value) when is_integer(value), do: max(value, 0)
+  defp token_value(value) when is_float(value), do: max(trunc(value), 0)
+
+  defp token_value(value) when is_binary(value) do
+    value = String.trim(value)
+
+    case Integer.parse(value) do
+      {int, ""} -> max(int, 0)
+      _ -> parse_float_token(value)
+    end
+  end
+
+  defp token_value(_), do: nil
+
+  defp parse_float_token(value) do
+    case Float.parse(value) do
+      {float, ""} -> max(trunc(float), 0)
+      _ -> nil
+    end
+  end
 
   @doc """
   Validates and sanitizes input parameters with security checks.

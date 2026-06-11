@@ -129,17 +129,20 @@ defmodule Jido.AI.Actions.LLM.GenerateObject do
              opts
            ) do
       duration_native = System.monotonic_time() - start_time
+      usage = Helpers.extract_usage(response)
 
-      measurements = %{
-        duration: duration_native,
-        duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
-      }
+      measurements =
+        %{
+          duration: duration_native,
+          duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+        }
+        |> Map.merge(Helpers.token_measurements(usage))
 
       result_metadata =
         base_metadata
         |> Map.merge(%{
           model: model,
-          usage: Helpers.extract_usage(response)
+          usage: usage
         })
         |> Observe.sanitize_sensitive()
 
