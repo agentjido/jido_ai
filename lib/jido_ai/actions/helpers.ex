@@ -29,8 +29,7 @@ defmodule Jido.AI.Actions.Helpers do
   """
 
   alias Jido.AI.Error.Sanitize
-  alias Jido.AI.Validation
-  alias Jido.AI.Turn
+  alias Jido.AI.{Observe, Turn, Usage, Validation}
 
   @doc """
   Resolves a model parameter to a model spec.
@@ -139,71 +138,7 @@ defmodule Jido.AI.Actions.Helpers do
       iex> extract_text(%{usage: %{input_tokens: 10, output_tokens: 20}})
       %{input_tokens: 10, output_tokens: 20, total_tokens: 30}
   """
-  def extract_usage(%ReqLLM.Response{usage: usage}) when is_map(usage) do
-    extract_usage(usage)
-  end
-
-  def extract_usage(%{usage: usage}) when is_map(usage) do
-    extract_usage(usage)
-  end
-
-  def extract_usage(usage) when is_map(usage) do
-    usage_sources = usage_sources(usage)
-
-    input_tokens =
-      first_token_value(usage_sources, [
-        :input_tokens,
-        :prompt_tokens,
-        :input,
-        :promptTokenCount,
-        :inputTokenCount,
-        "input_tokens",
-        "prompt_tokens",
-        "input",
-        "promptTokenCount",
-        "inputTokenCount"
-      ]) || 0
-
-    output_tokens =
-      first_token_value(usage_sources, [
-        :output_tokens,
-        :completion_tokens,
-        :output,
-        :candidatesTokenCount,
-        :outputTokenCount,
-        "output_tokens",
-        "completion_tokens",
-        "output",
-        "candidatesTokenCount",
-        "outputTokenCount"
-      ]) || 0
-
-    total_tokens =
-      first_token_value(usage_sources, [
-        :total_tokens,
-        :total,
-        :totalTokenCount,
-        "total_tokens",
-        "total",
-        "totalTokenCount"
-      ]) ||
-        input_tokens + output_tokens
-
-    %{
-      input_tokens: input_tokens,
-      output_tokens: output_tokens,
-      total_tokens: total_tokens
-    }
-  end
-
-  def extract_usage(_), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
-
-  defp usage_sources(usage) when is_map(usage) do
-    nested_tokens = Map.get(usage, :tokens) || Map.get(usage, "tokens")
-
-    [usage, nested_tokens]
-    |> Enum.filter(&is_map/1)
-  end
+  def extract_usage(response_or_usage), do: Usage.token_counts(response_or_usage)
 
   @doc """
   Builds canonical token measurements for AI telemetry events.
@@ -213,46 +148,7 @@ defmodule Jido.AI.Actions.Helpers do
           output_tokens: non_neg_integer(),
           total_tokens: non_neg_integer()
         }
-  def token_measurements(response_or_usage) do
-    usage = extract_usage(response_or_usage)
-
-    %{
-      input_tokens: usage.input_tokens,
-      output_tokens: usage.output_tokens,
-      total_tokens: usage.total_tokens
-    }
-  end
-
-  defp first_token_value(usage_sources, keys) do
-    Enum.find_value(usage_sources, fn usage ->
-      Enum.find_value(keys, fn key ->
-        usage
-        |> Map.get(key)
-        |> token_value()
-      end)
-    end)
-  end
-
-  defp token_value(value) when is_integer(value), do: max(value, 0)
-  defp token_value(value) when is_float(value), do: max(trunc(value), 0)
-
-  defp token_value(value) when is_binary(value) do
-    value = String.trim(value)
-
-    case Integer.parse(value) do
-      {int, ""} -> max(int, 0)
-      _ -> parse_float_token(value)
-    end
-  end
-
-  defp token_value(_), do: nil
-
-  defp parse_float_token(value) do
-    case Float.parse(value) do
-      {float, ""} -> max(trunc(float), 0)
-      _ -> nil
-    end
-  end
+  defdelegate token_measurements(response_or_usage), to: Usage
 
   @doc """
   Validates and sanitizes input parameters with security checks.
@@ -383,6 +279,60 @@ defmodule Jido.AI.Actions.Helpers do
       error_type: nil
     }
     |> Map.merge(extra)
+  end
+
+  @doc """
+  Emits canonical completion telemetry for direct LLM actions.
+
+  Returns the canonical usage map so action results can reuse the same values.
+  """
+  def emit_llm_complete(obs_cfg, start_time, base_metadata, model, response, extra_metadata \\ %{})
+      when is_map(base_metadata) and is_map(extra_metadata) do
+    duration_native = System.monotonic_time() - start_time
+    usage = extract_usage(response)
+
+    measurements =
+      %{
+        duration: duration_native,
+        duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+      }
+      |> Map.merge(token_measurements(usage))
+
+    metadata =
+      base_metadata
+      |> Map.merge(%{model: model, usage: usage})
+      |> Map.merge(extra_metadata)
+      |> Observe.sanitize_sensitive()
+
+    Observe.emit(obs_cfg, Observe.llm(:complete), measurements, metadata)
+
+    usage
+  end
+
+  @doc """
+  Emits canonical error telemetry for direct LLM actions.
+  """
+  def emit_llm_error(obs_cfg, start_time, base_metadata, reason) when is_map(base_metadata) do
+    duration_native = System.monotonic_time() - start_time
+
+    metadata =
+      base_metadata
+      |> Map.merge(%{
+        error_type: telemetry_error_type(reason),
+        error_reason: inspect(reason),
+        termination_reason: :error
+      })
+      |> Observe.sanitize_sensitive()
+
+    Observe.emit(
+      obs_cfg,
+      Observe.llm(:error),
+      %{
+        duration: duration_native,
+        duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
+      },
+      metadata
+    )
   end
 
   @doc """

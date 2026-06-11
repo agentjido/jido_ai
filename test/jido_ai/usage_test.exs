@@ -88,4 +88,56 @@ defmodule Jido.AI.UsageTest do
              }
     end
   end
+
+  describe "token_counts/1" do
+    test "normalizes alternate token keys for telemetry measurements" do
+      response = %{
+        usage: %{
+          "input" => "4",
+          :completion_tokens => 6,
+          "totalTokenCount" => "10"
+        }
+      }
+
+      assert Jido.AI.Usage.token_counts(response) == %{
+               input_tokens: 4,
+               output_tokens: 6,
+               total_tokens: 10
+             }
+
+      assert Jido.AI.Usage.token_measurements(response) == %{
+               input_tokens: 4,
+               output_tokens: 6,
+               total_tokens: 10
+             }
+    end
+
+    test "normalizes nested and provider camel-case token keys" do
+      response = %{
+        usage: %{
+          "tokens" => %{
+            "promptTokenCount" => "8.0",
+            "candidatesTokenCount" => 3.9
+          },
+          "totalTokenCount" => "11.0"
+        }
+      }
+
+      assert Jido.AI.Usage.token_counts(response) == %{
+               input_tokens: 8,
+               output_tokens: 3,
+               total_tokens: 11
+             }
+    end
+
+    test "merges canonical token counts into provider usage metadata" do
+      assert Jido.AI.Usage.with_token_counts(%{"prompt_tokens" => "2", "completion_tokens" => "3"}) == %{
+               "completion_tokens" => "3",
+               "prompt_tokens" => "2",
+               input_tokens: 2,
+               output_tokens: 3,
+               total_tokens: 5
+             }
+    end
+  end
 end

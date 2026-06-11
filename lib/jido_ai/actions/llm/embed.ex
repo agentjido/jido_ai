@@ -69,7 +69,6 @@ defmodule Jido.AI.Actions.LLM.Embed do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Error.Sanitize
   alias Jido.AI.Observe
   alias Jido.AI.Validation
 
@@ -108,51 +107,15 @@ defmodule Jido.AI.Actions.LLM.Embed do
          {:ok, model} <- Helpers.resolve_model(params[:model], :embedding),
          opts = build_opts(params),
          {:ok, response} <- ReqLLM.Embedding.embed(model, texts, opts) do
-      duration_native = System.monotonic_time() - start_time
-      usage = Helpers.extract_usage(response)
+      Helpers.emit_llm_complete(obs_cfg, start_time, base_metadata, model, response, %{
+        dimensions: get_in(response, [:usage, :dimensions]) || extract_dimensions(response)
+      })
 
-      measurements =
-        %{
-          duration: duration_native,
-          duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
-        }
-        |> Map.merge(Helpers.token_measurements(usage))
-
-      result_metadata =
-        base_metadata
-        |> Map.merge(%{
-          model: model,
-          usage: usage,
-          dimensions: get_in(response, [:usage, :dimensions]) || extract_dimensions(response)
-        })
-        |> Observe.sanitize_sensitive()
-
-      Observe.emit(obs_cfg, Observe.llm(:complete), measurements, result_metadata)
       {:ok, format_result(response, model)}
     else
       {:error, reason} ->
-        duration_native = System.monotonic_time() - start_time
-
-        error_metadata =
-          base_metadata
-          |> Map.merge(%{
-            error_type: Helpers.telemetry_error_type(reason),
-            error_reason: inspect(reason),
-            termination_reason: :error
-          })
-          |> Observe.sanitize_sensitive()
-
-        Observe.emit(
-          obs_cfg,
-          Observe.llm(:error),
-          %{
-            duration: duration_native,
-            duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
-          },
-          error_metadata
-        )
-
-        {:error, sanitize_error_for_user(reason)}
+        Helpers.emit_llm_error(obs_cfg, start_time, base_metadata, reason)
+        {:error, Helpers.sanitize_error(reason)}
     end
   end
 
@@ -179,16 +142,6 @@ defmodule Jido.AI.Actions.LLM.Embed do
   end
 
   defp validate_texts(_params), do: {:error, :texts_required}
-
-  defp sanitize_error_for_user(error) when is_struct(error) do
-    Sanitize.sanitize_error_message(error)
-  end
-
-  defp sanitize_error_for_user(error) when is_atom(error) do
-    Sanitize.sanitize_error_message(error)
-  end
-
-  defp sanitize_error_for_user(_error), do: "An error occurred"
 
   defp apply_context_defaults(params, context) when is_map(params) do
     context = normalize_context(context)

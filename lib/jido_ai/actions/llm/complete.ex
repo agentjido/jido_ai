@@ -48,7 +48,6 @@ defmodule Jido.AI.Actions.LLM.Complete do
       })
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Error.Sanitize
   alias Jido.AI.Observe
   alias ReqLLM.Context
 
@@ -94,50 +93,12 @@ defmodule Jido.AI.Actions.LLM.Complete do
          {:ok, req_context} <- build_messages(validated_params[:prompt]),
          opts = Helpers.build_opts(validated_params),
          {:ok, response} <- ReqLLM.Generation.generate_text(model, req_context.messages, opts) do
-      duration_native = System.monotonic_time() - start_time
-      usage = Helpers.extract_usage(response)
-
-      measurements =
-        %{
-          duration: duration_native,
-          duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
-        }
-        |> Map.merge(Helpers.token_measurements(usage))
-
-      result_metadata =
-        base_metadata
-        |> Map.merge(%{
-          model: model,
-          usage: usage
-        })
-        |> Observe.sanitize_sensitive()
-
-      Observe.emit(obs_cfg, Observe.llm(:complete), measurements, result_metadata)
-      {:ok, format_result(response, model)}
+      usage = Helpers.emit_llm_complete(obs_cfg, start_time, base_metadata, model, response)
+      {:ok, format_result(response, model, usage)}
     else
       {:error, reason} ->
-        duration_native = System.monotonic_time() - start_time
-
-        error_metadata =
-          base_metadata
-          |> Map.merge(%{
-            error_type: Helpers.telemetry_error_type(reason),
-            error_reason: inspect(reason),
-            termination_reason: :error
-          })
-          |> Observe.sanitize_sensitive()
-
-        Observe.emit(
-          obs_cfg,
-          Observe.llm(:error),
-          %{
-            duration: duration_native,
-            duration_ms: System.convert_time_unit(duration_native, :native, :millisecond)
-          },
-          error_metadata
-        )
-
-        {:error, sanitize_error_for_user(reason)}
+        Helpers.emit_llm_error(obs_cfg, start_time, base_metadata, reason)
+        {:error, Helpers.sanitize_error(reason)}
     end
   end
 
@@ -146,16 +107,6 @@ defmodule Jido.AI.Actions.LLM.Complete do
   defp build_messages(prompt) do
     Context.normalize(prompt, [])
   end
-
-  defp sanitize_error_for_user(error) when is_struct(error) do
-    Sanitize.sanitize_error_message(error)
-  end
-
-  defp sanitize_error_for_user(error) when is_atom(error) do
-    Sanitize.sanitize_error_message(error)
-  end
-
-  defp sanitize_error_for_user(_error), do: "An error occurred"
 
   defp apply_context_defaults(params, context) when is_map(params) do
     context = normalize_context(context)
@@ -229,11 +180,11 @@ defmodule Jido.AI.Actions.LLM.Complete do
   defp normalize_context(context) when is_map(context), do: context
   defp normalize_context(_), do: %{}
 
-  defp format_result(response, model) do
+  defp format_result(response, model, usage) do
     %{
       text: Helpers.extract_text(response),
       model: model,
-      usage: Helpers.extract_usage(response)
+      usage: usage
     }
   end
 end

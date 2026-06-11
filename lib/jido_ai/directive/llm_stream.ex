@@ -90,7 +90,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   """
 
   alias Jido.AI.{Error, Observe, Signal, Turn}
-  alias Jido.AI.Actions.Helpers, as: ActionHelpers
   alias Jido.AI.Directive.Helpers
   alias Jido.Tracing.Context, as: TraceContext
 
@@ -174,12 +173,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
            case result do
              {:ok, turn} ->
-               usage = turn_usage(turn)
-               measurements = %{duration_ms: duration_ms} |> Map.merge(ActionHelpers.token_measurements(usage))
-               metadata = maybe_put_usage(event_meta, usage)
-
-               Observe.finish_span(span_ctx, measurements)
-               maybe_emit(obs_cfg, Observe.llm(:complete), measurements, metadata)
+               Helpers.finish_llm_complete(obs_cfg, span_ctx, duration_ms, event_meta, turn)
 
              {:error, reason} ->
                Observe.finish_span_error(span_ctx, :error, reason, [])
@@ -292,7 +286,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
             turn = Turn.from_response(response, model: model)
 
             # Emit usage report signal for per-call tracking
-            emit_usage_report(agent_pid, call_id, model, turn.usage)
+            Helpers.emit_llm_usage_report(agent_pid, call_id, model, turn.usage)
 
             {:ok, turn}
 
@@ -305,52 +299,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     end
   end
 
-  # Emit ai.usage signal for per-call usage tracking
-  defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
-
-  defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
-    raw_usage = usage
-    usage = ActionHelpers.extract_usage(usage)
-    input_tokens = usage.input_tokens
-    output_tokens = usage.output_tokens
-
-    if input_tokens > 0 or output_tokens > 0 do
-      signal =
-        Signal.Usage.new!(%{
-          call_id: call_id,
-          model: model,
-          input_tokens: input_tokens,
-          output_tokens: output_tokens,
-          total_tokens: usage.total_tokens,
-          metadata: %{
-            cache_creation_input_tokens: usage_value(raw_usage, :cache_creation_input_tokens),
-            cache_read_input_tokens: usage_value(raw_usage, :cache_read_input_tokens)
-          }
-        })
-
-      Jido.AgentServer.cast(agent_pid, signal)
-    end
-
-    :ok
-  end
-
   defp signal_metadata(event_meta) do
     event_meta
     |> Map.take([:request_id, :run_id, :iteration, :origin, :operation, :strategy])
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)
     |> Map.new()
-  end
-
-  defp turn_usage(%Turn{usage: usage}), do: usage
-
-  defp maybe_put_usage(metadata, usage) when is_map(usage) and usage != %{} do
-    Map.put(metadata, :usage, Map.merge(usage, ActionHelpers.extract_usage(usage)))
-  end
-
-  defp maybe_put_usage(metadata, _usage), do: metadata
-
-  defp usage_value(usage, key) when is_map(usage) and is_atom(key) do
-    Map.get(usage, key) || Map.get(usage, Atom.to_string(key))
   end
 
   defp maybe_emit(obs_cfg, event, measurements, metadata) do
