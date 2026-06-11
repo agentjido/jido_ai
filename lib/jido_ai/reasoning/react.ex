@@ -8,6 +8,7 @@ defmodule Jido.AI.Reasoning.ReAct do
 
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.ReAct.{Config, Runner, State, Token}
+  alias Jido.AI.Usage
 
   @type config_input :: Config.t() | map() | keyword()
 
@@ -198,12 +199,16 @@ defmodule Jido.AI.Reasoning.ReAct do
 
   defp update_collect_from_event(acc, %{kind: :checkpoint, data: %{token: token}}), do: %{acc | final_token: token}
 
+  defp update_collect_from_event(acc, %{kind: :llm_completed, data: data}) do
+    %{acc | usage: merge_collect_usage(acc.usage, Map.get(data, :usage))}
+  end
+
   defp update_collect_from_event(acc, %{kind: :request_completed, data: data}) do
     %{
       acc
       | result: Map.get(data, :result),
         termination_reason: Map.get(data, :termination_reason, :final_answer),
-        usage: Map.get(data, :usage, acc.usage)
+        usage: terminal_collect_usage(acc.usage, Map.get(data, :usage))
     }
   end
 
@@ -216,6 +221,18 @@ defmodule Jido.AI.Reasoning.ReAct do
   end
 
   defp update_collect_from_event(acc, _event), do: acc
+
+  defp merge_collect_usage(existing, %{} = incoming) when map_size(incoming) > 0 do
+    Usage.merge(existing, incoming)
+  end
+
+  defp merge_collect_usage(existing, _incoming), do: existing
+
+  defp terminal_collect_usage(_existing, %{} = incoming) when map_size(incoming) > 0 do
+    Usage.normalize(incoming) || incoming
+  end
+
+  defp terminal_collect_usage(existing, _incoming), do: existing
 
   defp decode_termination_reason(%State{status: :completed}), do: :completed
   defp decode_termination_reason(%State{status: :failed}), do: :failed

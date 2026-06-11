@@ -1733,7 +1733,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       :request_completed ->
         result = event_field(data, :result)
         termination_reason = event_field(data, :termination_reason, :final_answer)
-        usage = event_field(data, :usage, %{})
+        usage = completed_request_usage(Map.get(base_state, :usage, %{}), event_field(data, :usage, %{}))
+        telemetry_data = Map.put(data, :usage, usage)
 
         updated =
           base_state
@@ -1741,7 +1742,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> Map.put(:status, :completed)
           |> Map.put(:result, result)
           |> Map.put(:termination_reason, termination_reason)
-          |> Map.put(:usage, usage || %{})
+          |> Map.put(:usage, usage)
           |> commit_run_context()
           |> Map.put(:active_request_id, nil)
           |> Map.delete(:run_tool_context)
@@ -1755,7 +1756,17 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             run_id: request_id
           })
 
-        emit_runtime_telemetry(state, :request_completed, request_id, run_id, iteration, llm_call_id, event, data)
+        emit_runtime_telemetry(
+          state,
+          :request_completed,
+          request_id,
+          run_id,
+          iteration,
+          llm_call_id,
+          event,
+          telemetry_data
+        )
+
         {updated, [signal]}
 
       :request_failed ->
@@ -1858,6 +1869,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp merge_usage(existing, incoming) do
     Jido.AI.Usage.merge(existing, incoming)
   end
+
+  defp completed_request_usage(existing, incoming) when incoming in [nil, %{}], do: existing || %{}
+
+  defp completed_request_usage(_existing, %{} = incoming) do
+    Jido.AI.Usage.normalize(incoming) || incoming
+  end
+
+  defp completed_request_usage(existing, _incoming), do: existing || %{}
 
   defp event_kind(event) do
     case event_field(event, :kind) do
