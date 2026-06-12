@@ -16,6 +16,25 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
     :ok
   end
 
+  defp attach_llm_complete_probe(call_id) do
+    test_pid = self()
+    handler_id = "directive-llm-complete-#{System.unique_integer([:positive])}"
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:jido, :ai, :llm, :complete],
+        fn _event, measurements, metadata, _config ->
+          if metadata[:llm_call_id] == call_id do
+            send(test_pid, {:llm_complete, call_id, measurements, metadata})
+          end
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+  end
+
   defp assert_ok_result({:ok, value, []}), do: value
   defp assert_error_result({:error, error, []}), do: error
 
@@ -33,7 +52,12 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
          %{
            message: %{content: "hello world", tool_calls: nil},
            finish_reason: :stop,
-           usage: %{input_tokens: 2, output_tokens: 3}
+           usage: %{
+             "prompt_tokens" => "2",
+             "completion_tokens" => 3,
+             "cache_creation_input_tokens" => "1",
+             "cache_read_input_tokens" => 2
+           }
          }}
       end)
 
@@ -43,9 +67,11 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
           model_alias: :fast,
           system_prompt: "Keep it brief",
           context: [%{role: :user, content: "hello"}],
-          timeout: 321
+          timeout: 321,
+          metadata: %{observability: %{emit_telemetry?: true}, request_id: "req_llm_gen_ok"}
         })
 
+      attach_llm_complete_probe("llm_gen_ok")
       state = DirectiveSupport.state_with_supervisor(supervisor)
 
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
@@ -53,11 +79,27 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       usage_signal = DirectiveSupport.assert_signal_cast("ai.usage")
       assert usage_signal.data.call_id == "llm_gen_ok"
       assert usage_signal.data.total_tokens == 5
+      assert usage_signal.data.metadata.cache_creation_input_tokens == 1
+      assert usage_signal.data.metadata.cache_read_input_tokens == 2
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
       assert response_signal.data.call_id == "llm_gen_ok"
       assert %Jido.AI.Turn{text: "hello world"} = assert_ok_result(response_signal.data.result)
-      assert response_signal.data.metadata == %{origin: :directive, operation: :generate_text}
+
+      assert response_signal.data.metadata == %{
+               origin: :directive,
+               operation: :generate_text,
+               request_id: "req_llm_gen_ok",
+               run_id: "req_llm_gen_ok"
+             }
+
+      assert_receive {:llm_complete, "llm_gen_ok", measurements, metadata}
+      assert measurements.input_tokens == 2
+      assert measurements.output_tokens == 3
+      assert measurements.total_tokens == 5
+      assert metadata.usage.input_tokens == 2
+      assert metadata.usage.output_tokens == 3
+      assert metadata.usage.total_tokens == 5
     end
 
     test "returns sync ok with supervisor error envelope when task cannot start" do
@@ -201,7 +243,12 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       Mimic.stub(ReqLLM.StreamResponse, :process_stream, fn :stream_response, callbacks ->
         callbacks[:on_thinking].("thinking chunk")
         callbacks[:on_result].("content chunk")
-        {:ok, %{message: %{content: "hello world"}, usage: %{input_tokens: 2, output_tokens: 3}}}
+
+        {:ok,
+         %{
+           message: %{content: "hello world"},
+           usage: %{"promptTokenCount" => "2", "candidatesTokenCount" => 3}
+         }}
       end)
 
       Mimic.stub(Jido.AI.Turn, :from_response, fn response, model: model ->
@@ -215,9 +262,11 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
           model_alias: :fast,
           system_prompt: "Keep it brief",
           context: [%{role: :user, content: "hello"}],
-          timeout: 321
+          timeout: 321,
+          metadata: %{observability: %{emit_telemetry?: true}, request_id: "req_llm_stream_ok"}
         })
 
+      attach_llm_complete_probe("llm_stream_ok")
       state = DirectiveSupport.state_with_supervisor(supervisor)
 
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
@@ -233,6 +282,14 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
       assert %Jido.AI.Turn{text: "hello world"} = assert_ok_result(response_signal.data.result)
+
+      assert_receive {:llm_complete, "llm_stream_ok", measurements, metadata}
+      assert measurements.input_tokens == 2
+      assert measurements.output_tokens == 3
+      assert measurements.total_tokens == 5
+      assert metadata.usage.input_tokens == 2
+      assert metadata.usage.output_tokens == 3
+      assert metadata.usage.total_tokens == 5
     end
 
     test "does not emit usage signal when stream usage is nil" do

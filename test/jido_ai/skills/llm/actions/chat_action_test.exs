@@ -37,6 +37,38 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
       assert result.usage.total_tokens == result.usage.input_tokens + result.usage.output_tokens
     end
 
+    test "emits token usage in llm complete telemetry measurements" do
+      test_pid = self()
+      request_id = "req_chat_measurements_#{System.unique_integer([:positive])}"
+      handler_id = "chat-complete-measurements-#{System.unique_integer([:positive])}"
+
+      :ok =
+        :telemetry.attach(
+          handler_id,
+          [:jido, :ai, :llm, :complete],
+          fn _event, measurements, metadata, _config ->
+            if metadata[:request_id] == request_id do
+              send(test_pid, {:llm_complete, measurements, metadata})
+            end
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      context = %{request_id: request_id, observability: %{emit_telemetry?: true}}
+
+      assert {:ok, _result} = Chat.run(%{prompt: "Hello world"}, context)
+      assert_receive {:llm_complete, measurements, metadata}
+
+      assert measurements.input_tokens == 12
+      assert measurements.output_tokens == 24
+      assert measurements.total_tokens == 36
+      assert metadata.usage.input_tokens == 12
+      assert metadata.usage.output_tokens == 24
+      assert metadata.usage.total_tokens == 36
+    end
+
     test "returns validation error when prompt is missing" do
       assert {:error, _reason} = Chat.run(%{}, %{})
     end

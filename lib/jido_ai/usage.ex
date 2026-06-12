@@ -38,6 +38,41 @@ defmodule Jido.AI.Usage do
     "_tokens"
   ]
 
+  @input_token_keys [
+    :input_tokens,
+    :prompt_tokens,
+    :input,
+    :promptTokenCount,
+    :inputTokenCount,
+    "input_tokens",
+    "prompt_tokens",
+    "input",
+    "promptTokenCount",
+    "inputTokenCount"
+  ]
+
+  @output_token_keys [
+    :output_tokens,
+    :completion_tokens,
+    :output,
+    :candidatesTokenCount,
+    :outputTokenCount,
+    "output_tokens",
+    "completion_tokens",
+    "output",
+    "candidatesTokenCount",
+    "outputTokenCount"
+  ]
+
+  @total_token_keys [
+    :total_tokens,
+    :total,
+    :totalTokenCount,
+    "total_tokens",
+    "total",
+    "totalTokenCount"
+  ]
+
   @doc """
   Normalizes common usage counter keys and numeric counter values.
   """
@@ -80,6 +115,84 @@ defmodule Jido.AI.Usage do
   end
 
   defp usage_map(usage), do: normalize(usage) || %{}
+
+  @doc """
+  Returns canonical input/output/total token counters from provider usage shapes.
+  """
+  @spec token_counts(term()) :: %{
+          input_tokens: non_neg_integer(),
+          output_tokens: non_neg_integer(),
+          total_tokens: non_neg_integer()
+        }
+  def token_counts(%ReqLLM.Response{usage: usage}) when is_map(usage), do: token_counts(usage)
+  def token_counts(%{usage: usage}) when is_map(usage), do: token_counts(usage)
+
+  def token_counts(usage) when is_map(usage) do
+    usage_sources = usage_sources(usage)
+
+    input_tokens = first_token_value(usage_sources, @input_token_keys) || 0
+    output_tokens = first_token_value(usage_sources, @output_token_keys) || 0
+    total_tokens = first_token_value(usage_sources, @total_token_keys) || input_tokens + output_tokens
+
+    %{
+      input_tokens: input_tokens,
+      output_tokens: output_tokens,
+      total_tokens: total_tokens
+    }
+  end
+
+  def token_counts(_usage), do: %{input_tokens: 0, output_tokens: 0, total_tokens: 0}
+
+  @doc """
+  Builds canonical token measurements for telemetry events.
+  """
+  @spec token_measurements(term()) :: %{
+          input_tokens: non_neg_integer(),
+          output_tokens: non_neg_integer(),
+          total_tokens: non_neg_integer()
+        }
+  def token_measurements(response_or_usage), do: token_counts(response_or_usage)
+
+  @doc """
+  Merges canonical token counters into a provider usage map.
+  """
+  @spec with_token_counts(term()) :: map() | nil
+  def with_token_counts(%{} = usage), do: Map.merge(usage, token_counts(usage))
+  def with_token_counts(_usage), do: nil
+
+  @doc """
+  Reads a usage value from atom or string keys.
+  """
+  @spec value(term(), atom()) :: term()
+  def value(usage, key) when is_map(usage) and is_atom(key) do
+    Map.get(usage, key) || Map.get(usage, Atom.to_string(key))
+  end
+
+  def value(_usage, _key), do: nil
+
+  defp usage_sources(usage) when is_map(usage) do
+    nested_tokens = Map.get(usage, :tokens) || Map.get(usage, "tokens")
+
+    [usage, nested_tokens]
+    |> Enum.filter(&is_map/1)
+  end
+
+  defp first_token_value(usage_sources, keys) do
+    Enum.find_value(usage_sources, fn usage ->
+      Enum.find_value(keys, fn key ->
+        usage
+        |> Map.get(key)
+        |> token_value()
+      end)
+    end)
+  end
+
+  defp token_value(value) do
+    case numeric_value(value) do
+      {:ok, number} when is_number(number) -> max(trunc(number), 0)
+      :error -> nil
+    end
+  end
 
   defp merge_value(key, left, right) do
     if numeric_usage_key?(key) do
