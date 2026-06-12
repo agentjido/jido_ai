@@ -364,10 +364,6 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     {:start, prompt, request_id}
   end
 
-  defp to_machine_msg(@llm_result, %{call_id: call_id, result: result}) do
-    {:llm_result, call_id, result}
-  end
-
   defp to_machine_msg(@llm_partial, %{call_id: call_id, delta: delta, chunk_type: chunk_type}) do
     {:llm_partial, call_id, delta, chunk_type}
   end

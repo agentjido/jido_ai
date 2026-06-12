@@ -1384,8 +1384,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp initial_active_context_ref(_), do: @default_context_ref
-
   defp core_thread_last_seq(%Agent{} = agent) do
     agent
     |> ThreadAgent.get()

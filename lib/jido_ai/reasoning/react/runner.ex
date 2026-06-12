@@ -202,12 +202,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                 end
 
               {:tool_calls, state, tool_calls} ->
-                prev_signature = Map.get(state, :__prev_tool_signature__)
+                prev_signature = state.prev_tool_signature
                 current_signature = tool_call_signature(tool_calls)
 
                 case run_tool_round(state, owner, ref, config, context, tool_calls) do
                   {:ok, state, context} ->
-                    state = Map.put(state, :__prev_tool_signature__, current_signature)
+                    state = %{state | prev_tool_signature: current_signature}
 
                     state =
                       if prev_signature == current_signature and prev_signature != nil do

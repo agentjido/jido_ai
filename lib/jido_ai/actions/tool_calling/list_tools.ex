@@ -216,8 +216,6 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
     end)
   end
 
-  defp format_schema_list(_), do: nil
-
   defp format_schema_map(schema) do
     schema
     |> extract_schema_fields()

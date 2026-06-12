@@ -30,6 +30,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
               error: Zoi.any() |> Zoi.nullish(),
               started_at_ms: Zoi.integer() |> Zoi.default(0),
               updated_at_ms: Zoi.integer() |> Zoi.default(0),
+              prev_tool_signature: Zoi.any() |> Zoi.nullish(),
               seq: Zoi.integer() |> Zoi.default(0)
             },
             coerce: true
@@ -73,6 +74,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       output: %{},
       streaming_text: "",
       streaming_thinking: "",
+      prev_tool_signature: nil,
       started_at_ms: now,
       updated_at_ms: now,
       seq: 0
@@ -113,6 +115,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
         error: Map.get(map, :error, Map.get(map, "error")),
         started_at_ms: Map.get(map, :started_at_ms, Map.get(map, "started_at_ms", now_ms())),
         updated_at_ms: Map.get(map, :updated_at_ms, Map.get(map, "updated_at_ms", now_ms())),
+        prev_tool_signature: Map.get(map, :prev_tool_signature, Map.get(map, "prev_tool_signature")),
         seq: Map.get(map, :seq, Map.get(map, "seq", 0))
       }
 
@@ -149,6 +152,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       error: state.error,
       started_at_ms: state.started_at_ms,
       updated_at_ms: state.updated_at_ms,
+      prev_tool_signature: state.prev_tool_signature,
       seq: state.seq
     }
   end

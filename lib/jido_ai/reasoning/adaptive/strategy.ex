@@ -84,17 +84,6 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   @default_model :fast
   @default_strategy :react
 
-  # Strategy module mapping
-  @strategy_modules %{
-    cod: ChainOfDraft,
-    cot: ChainOfThought,
-    react: ReAct,
-    aot: AlgorithmOfThoughts,
-    tot: TreeOfThoughts,
-    got: GraphOfThoughts,
-    trm: TRM
-  }
-
   # Default complexity thresholds
   @default_thresholds %{
     simple: 0.3,
@@ -420,7 +409,7 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
         {strategy_type, complexity_score, task_type} =
           select_strategy_for_task(prompt, state[:config])
 
-        strategy_module = Map.get(@strategy_modules, strategy_type)
+        strategy_module = strategy_module_for(strategy_type)
 
         # Initialize the selected strategy
         strategy_ctx = Map.put(ctx, :strategy_opts, state[:config].strategy_opts)
@@ -582,6 +571,14 @@ defmodule Jido.AI.Reasoning.Adaptive.Strategy do
   defp child_exit_action_for(:cot), do: :cot_worker_child_exit
   defp child_exit_action_for(:react), do: :ai_react_worker_child_exit
   defp child_exit_action_for(_), do: @child_exit
+
+  defp strategy_module_for(:cod), do: ChainOfDraft
+  defp strategy_module_for(:cot), do: ChainOfThought
+  defp strategy_module_for(:react), do: ReAct
+  defp strategy_module_for(:aot), do: AlgorithmOfThoughts
+  defp strategy_module_for(:tot), do: TreeOfThoughts
+  defp strategy_module_for(:got), do: GraphOfThoughts
+  defp strategy_module_for(:trm), do: TRM
 
   defp select_strategy_for_task(prompt, config) do
     # Check for manual override
