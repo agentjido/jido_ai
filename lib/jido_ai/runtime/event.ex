@@ -14,6 +14,7 @@ defmodule Jido.AI.Runtime.Event do
     :output_failed,
     :tool_started,
     :tool_completed,
+    :keepalive,
     :checkpoint,
     :request_completed,
     :request_failed,

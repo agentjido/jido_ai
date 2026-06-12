@@ -27,6 +27,16 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
   - `tool_timeout_ms`: `15_000`
   - `tool_max_retries`: `1`
   - `tool_retry_backoff_ms`: `200`
+  - `stream_timeout_ms`: `0` (0 = auto-derive the runner's inter-event idle
+    timeout from `tool_timeout_ms + 60_000`; `stream_receive_timeout_ms` is
+    accepted as a compatibility alias)
+  - `tool_heartbeat_ms`: `0` (0 = off). When `> 0`, the runner emits a
+    `:keepalive` runtime event every interval *while tools execute*. Tools
+    produce no stream events while running, which would otherwise starve a
+    consumer that set a short `stream_event_timeout_ms` on
+    `Jido.AI.Request.Stream.events/2` (or a short `stream_timeout_ms` on the
+    runner) and abort the run mid-tool. The heartbeat keeps both idle layers
+    alive; truly-dead streams (no tool, no heartbeat) still time out normally.
   - `req_http_options`: `[]`
   - `llm_opts`: `[]`
   - `request_transformer`: `nil`
@@ -73,7 +83,7 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
 
 - await timeout: `30_000ms`
 - max retained requests per agent state: `100`
-- request-scoped ReAct overrides: `tools`, `allowed_tools`, `request_transformer`, `max_iterations`, `tool_context`, `req_http_options`, `llm_opts`
+- request-scoped ReAct overrides: `tools`, `allowed_tools`, `request_transformer`, `max_iterations`, `stream_timeout_ms`, `tool_heartbeat_ms`, `tool_context`, `req_http_options`, `llm_opts`
 
 ## Security Defaults
 

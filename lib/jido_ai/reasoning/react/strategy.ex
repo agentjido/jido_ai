@@ -75,6 +75,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           stream_receive_timeout_ms: pos_integer(),
           stream_timeout_ms: non_neg_integer(),
           stream_receive_timeout_ms: pos_integer(),
+          tool_heartbeat_ms: non_neg_integer(),
           tool_timeout_ms: pos_integer(),
           tool_max_retries: non_neg_integer(),
           tool_retry_backoff_ms: non_neg_integer(),
@@ -192,6 +193,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           stream_to: Zoi.any() |> Zoi.optional(),
           stream_receive_timeout_ms: Zoi.integer() |> Zoi.optional(),
           stream_timeout_ms: Zoi.integer() |> Zoi.optional(),
+          tool_heartbeat_ms: Zoi.integer() |> Zoi.optional(),
           req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),
           llm_opts: Zoi.any() |> Zoi.optional(),
           max_iterations: Zoi.integer() |> Zoi.optional(),
@@ -660,6 +662,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             tools: effective_tools,
             stream_receive_timeout_ms: Map.get(params, :stream_receive_timeout_ms),
             stream_timeout_ms: Map.get(params, :stream_timeout_ms),
+            tool_heartbeat_ms: Map.get(params, :tool_heartbeat_ms),
             max_iterations: Map.get(params, :max_iterations),
             request_transformer: request_transformer,
             output: output,
@@ -1930,6 +1933,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         Map.get(config, :stream_timeout_ms, Map.get(config, :stream_receive_timeout_ms, 0))
       )
 
+    tool_heartbeat_ms =
+      case Keyword.fetch(opts, :tool_heartbeat_ms) do
+        {:ok, ms} when is_integer(ms) and ms >= 0 -> ms
+        _ -> Map.get(config, :tool_heartbeat_ms, 0)
+      end
+
     runtime_opts = %{
       model: config[:model],
       system_prompt: config[:system_prompt],
@@ -1939,6 +1948,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       max_tokens: config[:max_tokens],
       streaming: config[:streaming],
       stream_timeout_ms: stream_timeout_ms,
+      tool_heartbeat_ms: tool_heartbeat_ms,
       req_http_options: req_http_options,
       llm_opts: llm_opts,
       tool_timeout_ms: config[:tool_timeout_ms],
@@ -2237,6 +2247,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         |> normalize_stream_receive_timeout_ms(30_000),
       request_policy: request_policy,
       stream_timeout_ms: Keyword.get(opts, :stream_timeout_ms, 0),
+      tool_heartbeat_ms: Keyword.get(opts, :tool_heartbeat_ms, 0),
       tool_timeout_ms: Keyword.get(opts, :tool_timeout_ms, 15_000),
       tool_max_retries: Keyword.get(opts, :tool_max_retries, 1),
       tool_retry_backoff_ms: Keyword.get(opts, :tool_retry_backoff_ms, 200),
