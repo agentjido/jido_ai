@@ -9,7 +9,7 @@ defmodule Jido.AI.AgentTest do
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Request
   alias Jido.AI.Agent
-  alias Jido.AI.Reasoning.ReAct.Event
+  alias Jido.AI.Runtime.Event
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias ReqLLM.Message.ContentPart
 
