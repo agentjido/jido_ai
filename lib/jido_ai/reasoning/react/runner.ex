@@ -9,7 +9,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   alias Jido.AI.Output
   alias Jido.AI.PendingInputServer
   alias Jido.AI.Query
-  alias Jido.AI.Reasoning.ReAct.{Config, Event, PendingToolCall, State, Token, ToolSelection}
+  alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall, State, Token, ToolSelection}
+  alias Jido.AI.Runtime.Event
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Error

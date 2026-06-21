@@ -908,7 +908,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp process_context_modify(agent, _params), do: {agent, []}
 
   defp initial_context(%Agent{} = agent, config) do
-    state = agent.state || %{}
+    state = agent.state
 
     case Map.fetch(state, :context) do
       {:ok, nil} ->

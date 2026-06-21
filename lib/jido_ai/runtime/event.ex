@@ -1,6 +1,9 @@
 defmodule Jido.AI.Runtime.Event do
   @moduledoc """
   Canonical runtime event envelope shared across AI reasoning runtimes.
+
+  `:input_injected` records user-visible input added to an active runtime run,
+  such as pending input drained by ReAct before continuing a request.
   """
 
   @kind_values [
@@ -17,7 +20,8 @@ defmodule Jido.AI.Runtime.Event do
     :checkpoint,
     :request_completed,
     :request_failed,
-    :request_cancelled
+    :request_cancelled,
+    :input_injected
   ]
 
   @schema Zoi.struct(

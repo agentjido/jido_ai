@@ -7,7 +7,8 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Query
-  alias Jido.AI.Reasoning.ReAct.{Config, Event, Runner, Signal}
+  alias Jido.AI.Reasoning.ReAct.{Config, Runner, Signal}
+  alias Jido.AI.Runtime.Event
 
   @start :react_worker_start
   @cancel :react_worker_cancel

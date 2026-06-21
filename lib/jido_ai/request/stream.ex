@@ -3,11 +3,11 @@ defmodule Jido.AI.Request.Stream do
   Request-scoped runtime event streaming helpers.
 
   The stream transport is intentionally narrow: callers can provide a pid sink
-  and receive canonical ReAct runtime events for one request.
+  and receive canonical runtime events for one request.
   """
 
-  alias Jido.AI.Reasoning.ReAct.Event
   alias Jido.AI.Request.Handle
+  alias Jido.AI.Runtime.Event
 
   @message_tag :jido_ai_request_event
   @terminal_kinds [:request_completed, :request_failed, :request_cancelled]
