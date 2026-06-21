@@ -11,6 +11,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   alias Jido.AI.Query
   alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall, State, Token, ToolSelection}
   alias Jido.AI.Runtime.Event
+  alias Jido.AI.Test.ReActScript
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Error
@@ -448,27 +449,47 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp request_turn_stream(%State{} = state, owner, ref, %Config{} = config, messages, llm_opts, model) do
-    case ReqLLM.Generation.stream_text(model, messages, llm_opts) do
-      {:ok, stream_response} ->
-        announce_stream_control(owner, ref, stream_response)
+    case request_scripted_turn(state, config, messages, llm_opts, model) do
+      :not_scripted ->
+        case ReqLLM.Generation.stream_text(model, messages, llm_opts) do
+          {:ok, stream_response} ->
+            announce_stream_control(owner, ref, stream_response)
 
-        case consume_stream(state, owner, ref, config, stream_response, model) do
-          {:ok, updated_state, turn, response_id} -> {:ok, updated_state, turn, response_id}
-          {:error, updated_state, reason} -> {:error, updated_state, reason, :llm_stream}
+            case consume_stream(state, owner, ref, config, stream_response, model) do
+              {:ok, updated_state, turn, response_id} -> {:ok, updated_state, turn, response_id}
+              {:error, updated_state, reason} -> {:error, updated_state, reason, :llm_stream}
+            end
+
+          {:error, reason} ->
+            {:error, state, reason, :llm_request}
         end
 
-      {:error, reason} ->
-        {:error, state, reason, :llm_request}
+      result ->
+        result
     end
   end
 
   defp request_turn_generate(%State{} = state, %Config{} = config, messages, llm_opts, model) do
-    case ReqLLM.Generation.generate_text(model, messages, llm_opts) do
-      {:ok, response} ->
-        consume_generate(state, config, response, model)
+    case request_scripted_turn(state, config, messages, llm_opts, model) do
+      :not_scripted ->
+        case ReqLLM.Generation.generate_text(model, messages, llm_opts) do
+          {:ok, response} ->
+            consume_generate(state, config, response, model)
 
-      {:error, reason} ->
-        {:error, state, reason, :llm_request}
+          {:error, reason} ->
+            {:error, state, reason, :llm_request}
+        end
+
+      result ->
+        result
+    end
+  end
+
+  defp request_scripted_turn(%State{} = state, %Config{} = config, messages, llm_opts, model) do
+    case ReActScript.next_response(llm_opts, messages) do
+      {:ok, response} -> consume_generate(state, config, response, model)
+      {:error, reason} -> {:error, state, reason, :llm_request}
+      :not_scripted -> :not_scripted
     end
   end
 
