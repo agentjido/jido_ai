@@ -166,6 +166,47 @@ def transform_request(_request, _state, _config, _runtime_context) do
 end
 ```
 
+## Deterministic ReAct Tests
+
+Use `Jido.AI.TestCase` when you need to test ReAct behavior without stubbing `ReqLLM` internals. The helper scripts model decisions while your app still runs its real ReAct runtime, tools, event projection, and assertions.
+
+```elixir
+defmodule MyApp.AgentTest do
+  use Jido.AI.TestCase, async: true
+
+  test "agent reads a file and answers" do
+    expect_react do
+      user "summarize README"
+      call "read", %{path: "README.md"}
+      answer "README says Hello."
+    end
+
+    result =
+      Jido.AI.Reasoning.ReAct.run("summarize README", %{
+        tools: [MyApp.Actions.ReadFile]
+      })
+
+    assert_final_answer(result, "README says Hello.")
+    assert_tool_called(result, "read", %{path: "README.md"})
+    assert_no_runtime_failure(result)
+  end
+end
+```
+
+For code that starts agents outside the current test process tree, pass the returned script explicitly:
+
+```elixir
+script =
+  expect_react do
+    user "summarize README"
+    answer "README says Hello."
+  end
+
+MyAgent.ask_sync(pid, "summarize README", react_opts(script))
+```
+
+For direct standalone `ReAct.run/3` configs, put `react_llm_opts(script)` under `:llm_opts`.
+
 ## Run To Completion
 
 `run/3` streams internally and returns the aggregated result map. Simplest path when you do not need the event stream.

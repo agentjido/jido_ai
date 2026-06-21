@@ -14,6 +14,7 @@ After this guide, you should be able to explain the package in a prioritized way
 4. Plugin-based capability mixins for reusable runtime features
 5. Action APIs for direct AI workflows outside agent macros
 6. First-class observability via signals, directives, and telemetry
+7. Public ExUnit helpers for deterministic ReAct tests without ReqLLM stubs
 
 ## Priority 1: `Jido.AI.Agent` (Default ReAct Agent)
 
@@ -169,6 +170,17 @@ Pragmatically:
 
 - Agent macros are the primary production surface for long-lived agent orchestration.
 - Direct actions are the flexible lower-level surface for pipelines, jobs, and custom runtime composition.
+
+## Testing Surface
+
+`Jido.AI.TestCase` and `Jido.AI.Test` provide deterministic ReAct scripts for consumer tests:
+
+- `expect_react` scripts user prompts, model tool calls, final answers, and model failures.
+- `react_opts(script)` passes a script through agent request options.
+- `react_llm_opts(script)` passes a script through standalone ReAct config `:llm_opts`.
+- `assert_tool_called`, `assert_final_answer`, and `assert_no_runtime_failure` assert against canonical runtime events.
+
+These helpers replace only the model decision boundary. The application still executes its own tools, runtime lifecycle, event projection, and domain assertions.
 
 ## Runtime Map (End-To-End)
 

@@ -30,7 +30,7 @@ defmodule JidoAi.MixProject do
 
       # Dialyzer
       dialyzer: [
-        plt_add_apps: [:mix, :llm_db, :jsv],
+        plt_add_apps: [:mix, :ex_unit, :llm_db, :jsv],
         ignore_warnings: "dialyzer.ignore-warnings"
       ]
     ]
@@ -245,6 +245,11 @@ defmodule JidoAi.MixProject do
         ],
         Directives: [
           ~r/Jido\.AI\.Directive\..*/
+        ],
+        Testing: [
+          Jido.AI.Test,
+          Jido.AI.TestCase,
+          ~r/Jido\.AI\.Test\..*/
         ],
         Skills: [
           Jido.AI.Skill,
