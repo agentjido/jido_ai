@@ -128,15 +128,6 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
     end
   end
 
-  defp load_instructions(%Spec{name: name}) do
-    {:error,
-     %{
-       type: :skill_body_unavailable,
-       message: "Could not load skill body for '#{name}'",
-       reason: :invalid_body_ref
-     }}
-  end
-
   defp payload(%Spec{} = spec, instructions, true) do
     spec
     |> payload(instructions, false)
