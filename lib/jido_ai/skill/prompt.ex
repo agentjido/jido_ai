@@ -7,7 +7,13 @@ defmodule Jido.AI.Skill.Prompt do
   """
 
   alias Jido.AI.Skill
-  alias Jido.AI.Skill.Spec
+  alias Jido.AI.Skill.{Registry, Spec}
+
+  @default_index_header "## Skills"
+  @default_load_instruction """
+  When the user's request matches a skill above, call `load_skill` with the skill
+  name to retrieve the full instructions, then follow them step by step.
+  """
 
   @doc """
   Renders a list of skills into a formatted prompt section.
@@ -39,6 +45,60 @@ defmodule Jido.AI.Skill.Prompt do
     else
       "#{header}\n\n#{skill_sections}"
     end
+  end
+
+  @doc """
+  Renders a compact, model-facing skill index.
+
+  Unlike `render/2`, this function intentionally omits skill bodies so prompts
+  can advertise available skills without loading their full instructions. Pair
+  the rendered index with `Jido.AI.Actions.Skill.LoadSkill` so a model can load
+  the selected skill body on demand.
+
+  ## Options
+
+  - `:tags` - String, atom, or list of tags used to filter skills.
+  - `:tag_match` - `:any` (default) or `:all` when multiple tags are provided.
+  - `:header` - Header text (default: `"## Skills"`). Set to `false` or `nil`
+    to omit.
+  - `:load_instruction` - Instruction appended after the index. Set to `false`
+    or `nil` to omit.
+  - `:include_allowed_tools` - Append allowed tool names to each entry.
+  """
+  @spec render_index([module() | Spec.t() | String.t()], keyword()) :: String.t()
+  def render_index(skills, opts \\ []) do
+    tag_filter = normalize_tags(Keyword.get(opts, :tags, []))
+    tag_match = Keyword.get(opts, :tag_match, :any)
+    include_allowed_tools = Keyword.get(opts, :include_allowed_tools, false)
+
+    entries =
+      skills
+      |> Enum.map(&resolve_skill/1)
+      |> Enum.reject(&is_nil/1)
+      |> filter_by_tags(tag_filter, tag_match)
+      |> Enum.map_join("\n", &format_index_entry(&1, include_allowed_tools))
+
+    if entries == "" do
+      ""
+    else
+      opts
+      |> index_parts(entries)
+      |> Enum.join("\n\n")
+    end
+  end
+
+  @doc """
+  Renders a compact index for skills currently registered in the runtime registry.
+
+  This is the common entry point for lazy skill loading: register runtime skills,
+  render a filtered index into the agent system prompt, and expose the
+  `load_skill` action so the agent can retrieve the full body only when needed.
+  """
+  @spec render_registry_index(keyword()) :: String.t()
+  def render_registry_index(opts \\ []) do
+    Registry.all()
+    |> Enum.sort_by(& &1.name)
+    |> render_index(opts)
   end
 
   @doc """
@@ -120,6 +180,65 @@ defmodule Jido.AI.Skill.Prompt do
     """
     |> String.trim_trailing()
   end
+
+  defp index_parts(opts, entries) do
+    header = Keyword.get(opts, :header, @default_index_header)
+    load_instruction = Keyword.get(opts, :load_instruction, @default_load_instruction)
+
+    [header, entries, load_instruction]
+    |> Enum.reject(&(&1 in [nil, false, ""]))
+    |> Enum.map(&String.trim/1)
+  end
+
+  defp format_index_entry(%Spec{} = spec, include_allowed_tools) do
+    tools =
+      case {include_allowed_tools, spec.allowed_tools} do
+        {true, [_ | _] = allowed_tools} -> " (tools: #{Enum.join(allowed_tools, ", ")})"
+        _ -> ""
+      end
+
+    description =
+      spec.description
+      |> String.trim()
+      |> String.replace("\n", "\n  ")
+
+    "* **#{spec.name}**: #{description}#{tools}"
+  end
+
+  defp filter_by_tags(specs, [], _tag_match), do: specs
+
+  defp filter_by_tags(specs, tags, :all) do
+    required = MapSet.new(tags)
+
+    Enum.filter(specs, fn %Spec{tags: spec_tags} ->
+      spec_set = spec_tags |> normalize_tags() |> MapSet.new()
+      MapSet.subset?(required, spec_set)
+    end)
+  end
+
+  defp filter_by_tags(specs, tags, _tag_match) do
+    wanted = MapSet.new(tags)
+
+    Enum.filter(specs, fn %Spec{tags: spec_tags} ->
+      spec_tags
+      |> normalize_tags()
+      |> Enum.any?(&MapSet.member?(wanted, &1))
+    end)
+  end
+
+  defp normalize_tags(nil), do: []
+  defp normalize_tags(tag) when is_atom(tag), do: [Atom.to_string(tag)]
+  defp normalize_tags(tag) when is_binary(tag), do: [tag]
+
+  defp normalize_tags(tags) when is_list(tags) do
+    tags
+    |> Enum.flat_map(&normalize_tags/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+  end
+
+  defp normalize_tags(_), do: []
 
   defp get_tool_name(tool) when is_atom(tool) do
     if function_exported?(tool, :name, 0) do
