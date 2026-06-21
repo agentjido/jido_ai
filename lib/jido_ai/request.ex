@@ -161,6 +161,8 @@ defmodule Jido.AI.Request do
   - `:max_iterations` - ReAct-only request-scoped maximum reasoning iterations
   - `:stream_timeout_ms` - ReAct-only request-scoped runtime inactivity timeout.
     `:stream_receive_timeout_ms` is accepted as a compatibility alias.
+  - `:tool_heartbeat_ms` - ReAct-only request-scoped tool-execution keepalive
+    interval in ms (0 = off). Emits a `:keepalive` event while tools run.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
   - `:llm_opts` - Per-request ReqLLM generation options forwarded to ReAct runtime
   - `:file_id` / `:file_ids` / `:file_reference` / `:file_references` - Uploaded
@@ -195,6 +197,7 @@ defmodule Jido.AI.Request do
     request_transformer = Keyword.get(opts, :request_transformer)
     max_iterations = Keyword.get(opts, :max_iterations)
     stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms))
+    tool_heartbeat_ms = Keyword.get(opts, :tool_heartbeat_ms)
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
     output = Keyword.get(opts, :output)
@@ -215,6 +218,7 @@ defmodule Jido.AI.Request do
         |> maybe_add_request_transformer(request_transformer)
         |> maybe_add_max_iterations(max_iterations)
         |> maybe_add_stream_timeout_ms(stream_timeout_ms)
+        |> maybe_add_tool_heartbeat_ms(tool_heartbeat_ms)
         |> maybe_add_req_http_options(req_http_options)
         |> maybe_add_llm_opts(llm_opts)
         |> maybe_add_output(output)
@@ -568,6 +572,13 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_stream_timeout_ms(payload, _), do: payload
+
+  defp maybe_add_tool_heartbeat_ms(payload, tool_heartbeat_ms)
+       when is_integer(tool_heartbeat_ms) and tool_heartbeat_ms >= 0 do
+    Map.put(payload, :tool_heartbeat_ms, tool_heartbeat_ms)
+  end
+
+  defp maybe_add_tool_heartbeat_ms(payload, _), do: payload
 
   defp maybe_add_max_iterations(payload, max_iterations)
        when is_integer(max_iterations) and max_iterations > 0 do

@@ -64,6 +64,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
               max_iterations: Zoi.integer() |> Zoi.default(@default_max_iterations),
               streaming: Zoi.boolean() |> Zoi.default(true),
               stream_timeout_ms: Zoi.integer() |> Zoi.default(0),
+              tool_heartbeat_ms: Zoi.integer() |> Zoi.default(0),
               effect_policy: Zoi.any() |> Zoi.default(%{}),
               output: Zoi.any() |> Zoi.nullish(),
               llm: @llm_schema,
@@ -154,6 +155,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
         normalize_pos_integer(get_opt(opts_map, :max_iterations, @default_max_iterations), @default_max_iterations),
       streaming: normalize_boolean(get_opt(opts_map, :streaming, true), true),
       stream_timeout_ms: normalize_non_neg_integer(resolve_stream_timeout_ms(opts_map), 0),
+      tool_heartbeat_ms: normalize_non_neg_integer(get_opt(opts_map, :tool_heartbeat_ms, 0), 0),
       effect_policy: get_opt(opts_map, :effect_policy, %{}),
       output: output,
       llm: llm,
@@ -219,6 +221,18 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       ms -> ms
     end
   end
+
+  @doc """
+  Returns the tool-execution heartbeat interval in milliseconds.
+
+  When `> 0`, the ReAct runner emits a `:keepalive` event every interval while
+  tools are executing, so a consumer that sets a short
+  `stream_event_timeout_ms` on `Jido.AI.Request.Stream.events/2` does not time
+  out during a long-running tool call. `0` (default) disables heartbeats.
+  """
+  @spec tool_heartbeat_ms(t()) :: non_neg_integer()
+  def tool_heartbeat_ms(%__MODULE__{tool_heartbeat_ms: ms}) when is_integer(ms) and ms >= 0, do: ms
+  def tool_heartbeat_ms(%__MODULE__{}), do: 0
 
   @doc """
   Convert config to generation options for `ReqLLM.Generation.stream_text/3`
