@@ -787,6 +787,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert state.status == :completed
       assert state.active_request_id == nil
       assert state.result == "done"
+      assert state.usage == %{input_tokens: 10, output_tokens: 5}
       assert state.checkpoint_token == "tok_1"
       assert state.react_worker_status == :ready
       assert state.pending_input_server == nil
@@ -854,6 +855,48 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                cost: %{total: 0.003, input_cost: 0.0023, line_items: [%{id: "second"}]},
                image_usage: %{images: 3}
              }
+    end
+
+    test "request_completed with empty usage preserves accumulated LLM usage" do
+      agent = create_agent(tools: [TestCalculator])
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "q", request_id: "req_empty_terminal_usage"})],
+          %{}
+        )
+
+      events = [
+        runtime_event(:llm_completed, "req_empty_terminal_usage", 1, %{
+          turn_type: :final_answer,
+          text: "Yo",
+          thinking_content: nil,
+          reasoning_details: [],
+          tool_calls: [],
+          usage: %{input_tokens: 3, output_tokens: 1}
+        }),
+        runtime_event(:request_completed, "req_empty_terminal_usage", 2, %{
+          result: "Yo",
+          termination_reason: :final_answer,
+          usage: %{}
+        })
+      ]
+
+      {agent, []} =
+        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
+          ReAct.cmd(
+            acc,
+            [instruction(:ai_react_worker_event, %{request_id: "req_empty_terminal_usage", event: event})],
+            %{}
+          )
+        end)
+
+      state = StratState.get(agent, %{})
+
+      assert state.status == :completed
+      assert state.result == "Yo"
+      assert state.usage == %{input_tokens: 3, output_tokens: 1}
     end
 
     test "completed request history is reused for the next turn" do

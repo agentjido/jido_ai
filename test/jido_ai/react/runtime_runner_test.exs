@@ -298,6 +298,66 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :llm_completed))
     assert Enum.any?(events, &(&1.kind == :request_completed))
     assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+
+    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
+    assert Map.take(llm_completed.data.usage, [:input_tokens, :output_tokens]) == %{input_tokens: 3, output_tokens: 2}
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+
+    assert Map.take(request_completed.data.usage, [:input_tokens, :output_tokens]) == %{
+             input_tokens: 3,
+             output_tokens: 2
+           }
+  end
+
+  test "propagates usage from streaming meta chunks into request completion" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [
+           ReqLLM.StreamChunk.text("Yo"),
+           ReqLLM.StreamChunk.meta(%{usage: %{"prompt_tokens" => "3", "completion_tokens" => "1"}})
+         ],
+         %{finish_reason: :stop},
+         model
+       )}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}})
+
+    events =
+      ReAct.stream("Say hello", config, request_id: "req_stream_chunk_usage", run_id: "run_stream_chunk_usage")
+      |> Enum.to_list()
+
+    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
+    assert llm_completed.data.text == "Yo"
+
+    assert Jido.AI.Usage.token_counts(llm_completed.data.usage) == %{
+             input_tokens: 3,
+             output_tokens: 1,
+             total_tokens: 4
+           }
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert request_completed.data.result == "Yo"
+
+    assert Jido.AI.Usage.token_counts(request_completed.data.usage) == %{
+             input_tokens: 3,
+             output_tokens: 1,
+             total_tokens: 4
+           }
+  end
+
+  test "collect_stream keeps accumulated LLM usage when terminal event is empty" do
+    collected =
+      ReAct.collect_stream([
+        %{kind: :llm_completed, data: %{usage: %{input_tokens: 3, output_tokens: 1}}},
+        %{kind: :request_completed, data: %{result: "Yo", termination_reason: :final_answer, usage: %{}}}
+      ])
+
+    assert collected.result == "Yo"
+    assert collected.termination_reason == :final_answer
+    assert collected.usage == %{input_tokens: 3, output_tokens: 1}
   end
 
   test "validates structured output before request completion" do
@@ -464,6 +524,11 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     request_completed = Enum.find(events, &(&1.kind == :request_completed))
     assert request_completed.data.result == "A2"
+
+    assert Map.take(request_completed.data.usage, [:input_tokens, :output_tokens]) == %{
+             input_tokens: 7,
+             output_tokens: 4
+           }
   end
 
   test "fails the request when the pending input queue disappears before final completion" do
@@ -573,9 +638,11 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
     assert llm_completed.data.text == "Hello from generate"
     assert llm_completed.data.turn_type == :final_answer
+    assert llm_completed.data.usage == %{input_tokens: 3, output_tokens: 2}
 
     request_completed = Enum.find(events, &(&1.kind == :request_completed))
     assert request_completed.data.result == "Hello from generate"
+    assert request_completed.data.usage == %{input_tokens: 3, output_tokens: 2}
   end
 
   test "passes req_http_options to streaming requests" do

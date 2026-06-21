@@ -10,6 +10,8 @@ defmodule Jido.AI.Directive.Helpers do
   - Error classification
   """
 
+  alias Jido.AI.{Observe, Signal, Turn, Usage}
+
   @doc """
   Gets the task supervisor from agent state.
 
@@ -127,6 +129,64 @@ defmodule Jido.AI.Directive.Helpers do
   @spec add_tools_opt(keyword(), list()) :: keyword()
   def add_tools_opt(opts, []), do: opts
   def add_tools_opt(opts, tools), do: Keyword.put(opts, :tools, tools)
+
+  @doc """
+  Finishes a successful LLM directive telemetry span and emits completion telemetry.
+  """
+  def finish_llm_complete(obs_cfg, span_ctx, duration_ms, event_meta, turn)
+      when is_map(event_meta) do
+    usage = turn_usage(turn)
+    measurements = llm_complete_measurements(duration_ms, usage)
+    metadata = llm_complete_metadata(event_meta, usage)
+
+    Observe.finish_span(span_ctx, measurements)
+    Observe.emit(obs_cfg, Observe.llm(:complete), measurements, metadata)
+  end
+
+  @doc """
+  Emits an `ai.usage` signal for per-call directive usage tracking.
+  """
+  def emit_llm_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
+
+  def emit_llm_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
+    token_counts = Usage.token_counts(usage)
+
+    if token_counts.input_tokens > 0 or token_counts.output_tokens > 0 do
+      metadata_usage = Usage.normalize(usage) || usage
+
+      signal =
+        Signal.Usage.new!(%{
+          call_id: call_id,
+          model: model,
+          input_tokens: token_counts.input_tokens,
+          output_tokens: token_counts.output_tokens,
+          total_tokens: token_counts.total_tokens,
+          metadata: %{
+            cache_creation_input_tokens: Usage.value(metadata_usage, :cache_creation_input_tokens),
+            cache_read_input_tokens: Usage.value(metadata_usage, :cache_read_input_tokens)
+          }
+        })
+
+      Jido.AgentServer.cast(agent_pid, signal)
+    end
+
+    :ok
+  end
+
+  defp turn_usage(%Turn{usage: usage}), do: usage
+  defp turn_usage(%{usage: usage}), do: usage
+  defp turn_usage(_turn), do: nil
+
+  defp llm_complete_measurements(duration_ms, usage) do
+    %{duration_ms: duration_ms}
+    |> Map.merge(Usage.token_measurements(usage))
+  end
+
+  defp llm_complete_metadata(event_meta, usage) when is_map(usage) and map_size(usage) > 0 do
+    Map.put(event_meta, :usage, Usage.with_token_counts(usage))
+  end
+
+  defp llm_complete_metadata(event_meta, _usage), do: event_meta
 
   @doc """
   Classifies an error into a runtime category.

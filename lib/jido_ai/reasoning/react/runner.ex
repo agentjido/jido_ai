@@ -15,6 +15,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Error
   alias Jido.AI.Turn
+  alias Jido.AI.Usage
   alias Jido.Agent.State, as: AgentState
 
   require Logger
@@ -476,21 +477,27 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
     trace_cfg = config.trace
     state_key = stream_state_key(ref)
+    usage_key = stream_usage_key(ref)
     heartbeat_interval_ms = progress_interval_ms(config)
 
     Process.put(state_key, state)
+    Process.put(usage_key, %{})
     Process.put(stream_signal_key(ref), monotonic_ms())
 
     case ReqLLM.StreamResponse.process_stream(
            stream_response,
-           stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms, model)
+           stream_process_opts(owner, ref, trace_cfg, state_key, usage_key, heartbeat_interval_ms, model)
          ) do
       {:ok, response} ->
         current_state = current_stream_state(state_key, state)
+        chunk_usage = current_stream_usage(usage_key)
+        metadata_usage = stream_response_usage(stream_response)
 
         turn =
           response
           |> Turn.from_response(model: Jido.AI.model_label(model))
+          |> maybe_put_stream_usage(metadata_usage)
+          |> maybe_put_stream_usage(chunk_usage)
           |> apply_stream_accumulator(current_state)
 
         {:ok, current_state, turn, extract_response_id(response)}
@@ -503,6 +510,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       {:error, current_stream_state(stream_state_key(ref), state), %{error: Exception.message(e), type: e.__struct__}}
   after
     Process.delete(stream_state_key(ref))
+    Process.delete(stream_usage_key(ref))
     Process.delete(stream_signal_key(ref))
   end
 
@@ -1202,6 +1210,34 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp maybe_put_accumulated_thinking(turn, _accumulated), do: turn
 
+  defp maybe_put_stream_usage(%Turn{usage: usage} = turn, _incoming) when is_map(usage) and map_size(usage) > 0,
+    do: turn
+
+  defp maybe_put_stream_usage(%Turn{} = turn, incoming) do
+    case normalize_stream_usage(incoming) do
+      %{} = usage when map_size(usage) > 0 -> %{turn | usage: usage}
+      _ -> turn
+    end
+  end
+
+  defp normalize_stream_usage(%{} = usage) do
+    normalized = Usage.normalize(usage) || usage
+    Usage.with_token_counts(normalized) || normalized
+  end
+
+  defp normalize_stream_usage(_usage), do: nil
+
+  defp stream_response_usage(stream_response) do
+    case ReqLLM.StreamResponse.usage(stream_response) do
+      %{} = usage when map_size(usage) > 0 -> usage
+      _ -> nil
+    end
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
+  end
+
   defp maybe_note_owner_signal(true, _owner, _ref, _last_owner_signal_ms, _interval_ms), do: monotonic_ms()
 
   defp maybe_note_owner_signal(false, owner, ref, last_owner_signal_ms, interval_ms) do
@@ -1226,10 +1262,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp delta_captured?(text, trace_cfg), do: trace_cfg[:capture_deltas?] == true and is_binary(text) and text != ""
 
-  defp stream_process_opts(owner, ref, trace_cfg, state_key, heartbeat_interval_ms, model) do
+  defp stream_process_opts(owner, ref, trace_cfg, state_key, usage_key, heartbeat_interval_ms, model) do
     []
     |> Keyword.put(:on_chunk, fn chunk ->
-      note_stream_chunk_activity(chunk, state_key, owner, ref, trace_cfg, heartbeat_interval_ms)
+      note_stream_chunk_activity(chunk, state_key, usage_key, owner, ref, trace_cfg, heartbeat_interval_ms)
     end)
     |> maybe_put_stream_callback(trace_cfg, :on_result, fn text ->
       emit_stream_delta(state_key, owner, ref, :content, text, model)
@@ -1283,9 +1319,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp append_stream_delta(%State{} = state, _chunk_type, _text), do: state
 
   defp stream_state_key(ref), do: {__MODULE__, :stream_state, ref}
+  defp stream_usage_key(ref), do: {__MODULE__, :stream_usage, ref}
   defp stream_signal_key(ref), do: {__MODULE__, :stream_signal, ref}
 
-  defp note_stream_chunk_activity(chunk, state_key, owner, ref, trace_cfg, heartbeat_interval_ms) do
+  defp note_stream_chunk_activity(chunk, state_key, usage_key, owner, ref, trace_cfg, heartbeat_interval_ms) do
+    record_stream_chunk_usage(chunk, usage_key)
+
     case current_stream_state(state_key, nil) do
       %State{} = current_state -> check_cancel!(current_state, ref)
       _ -> :ok
@@ -1306,8 +1345,49 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     :ok
   end
 
+  defp record_stream_chunk_usage(%ReqLLM.StreamChunk{metadata: metadata}, usage_key) when is_map(metadata) do
+    case Map.get(metadata, :usage) || Map.get(metadata, "usage") do
+      %{} = usage ->
+        updated = merge_stream_usage(Process.get(usage_key, %{}), usage)
+        Process.put(usage_key, updated)
+
+      _ ->
+        :ok
+    end
+
+    :ok
+  end
+
+  defp record_stream_chunk_usage(_chunk, _usage_key), do: :ok
+
+  defp merge_stream_usage(existing, incoming) do
+    normalized_existing = normalize_stream_usage(existing) || %{}
+    normalized_incoming = normalize_stream_usage(incoming) || %{}
+
+    Map.merge(normalized_existing, normalized_incoming)
+    |> Map.merge(max_token_counts(normalized_existing, normalized_incoming))
+  end
+
+  defp max_token_counts(existing, incoming) do
+    existing_counts = Usage.token_counts(existing)
+    incoming_counts = Usage.token_counts(incoming)
+
+    %{
+      input_tokens: max(existing_counts.input_tokens, incoming_counts.input_tokens),
+      output_tokens: max(existing_counts.output_tokens, incoming_counts.output_tokens),
+      total_tokens: max(existing_counts.total_tokens, incoming_counts.total_tokens)
+    }
+  end
+
   defp current_stream_state(state_key, default) do
     Process.get(state_key, default)
+  end
+
+  defp current_stream_usage(usage_key) do
+    case Process.get(usage_key) do
+      %{} = usage when map_size(usage) > 0 -> usage
+      _ -> nil
+    end
   end
 
   defp update_stream_state(state_key, update_fun) when is_function(update_fun, 1) do

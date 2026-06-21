@@ -172,9 +172,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
            duration_ms = System.monotonic_time(:millisecond) - started_at
 
            case result do
-             {:ok, _} ->
-               Observe.finish_span(span_ctx, %{duration_ms: duration_ms})
-               maybe_emit(obs_cfg, Observe.llm(:complete), %{duration_ms: duration_ms}, event_meta)
+             {:ok, turn} ->
+               Helpers.finish_llm_complete(obs_cfg, span_ctx, duration_ms, event_meta, turn)
 
              {:error, reason} ->
                Observe.finish_span_error(span_ctx, :error, reason, [])
@@ -287,7 +286,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
             turn = Turn.from_response(response, model: model)
 
             # Emit usage report signal for per-call tracking
-            emit_usage_report(agent_pid, call_id, model, turn.usage)
+            Helpers.emit_llm_usage_report(agent_pid, call_id, model, turn.usage)
 
             {:ok, turn}
 
@@ -298,33 +297,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       {:error, reason} ->
         {:error, reason}
     end
-  end
-
-  # Emit ai.usage signal for per-call usage tracking
-  defp emit_usage_report(_agent_pid, _call_id, _model, nil), do: :ok
-
-  defp emit_usage_report(agent_pid, call_id, model, usage) when is_map(usage) do
-    input_tokens = usage[:input_tokens] || 0
-    output_tokens = usage[:output_tokens] || 0
-
-    if input_tokens > 0 or output_tokens > 0 do
-      signal =
-        Signal.Usage.new!(%{
-          call_id: call_id,
-          model: model,
-          input_tokens: input_tokens,
-          output_tokens: output_tokens,
-          total_tokens: input_tokens + output_tokens,
-          metadata: %{
-            cache_creation_input_tokens: Map.get(usage, :cache_creation_input_tokens),
-            cache_read_input_tokens: Map.get(usage, :cache_read_input_tokens)
-          }
-        })
-
-      Jido.AgentServer.cast(agent_pid, signal)
-    end
-
-    :ok
   end
 
   defp signal_metadata(event_meta) do
