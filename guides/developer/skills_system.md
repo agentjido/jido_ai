@@ -11,6 +11,7 @@ After this guide, you can load skill files, register specs, render prompts, and 
 - `Jido.AI.Skill.Loader`
 - `Jido.AI.Skill.Registry`
 - `Jido.AI.Skill.Prompt`
+- `Jido.AI.Actions.Skill.LoadSkill`
 - `mix jido_ai.skill`
 
 ## Lifecycle: Load, Register, Resolve, Retire
@@ -33,6 +34,36 @@ Registry lifecycle guarantees:
 - explicit startup via `start_link/1`
 - lazy startup via `ensure_started/0` used by public APIs
 - safe unregister/clear operations for runtime teardown
+
+## Lazy Loading Skill Bodies
+
+Use a compact skill index when full skill bodies would make the agent prompt too
+large. The index advertises names and descriptions only; the model can call the
+packaged `load_skill` action to retrieve the selected body.
+
+```elixir
+index =
+  Jido.AI.Skill.Prompt.render_registry_index(
+    tags: "support-agent",
+    include_allowed_tools: true
+  )
+
+# Add `index` to your agent system prompt and expose this action with the agent tools.
+Jido.AI.Actions.Skill.LoadSkill
+```
+
+The rendered index includes guidance for the model to call `load_skill` with the
+skill name. `render_registry_index/1` accepts `:tags` and `:tag_match` so agents
+can advertise only the skills intended for that agent.
+
+You can load a skill directly from application code as well:
+
+```elixir
+{:ok, loaded} =
+  Jido.AI.Actions.Skill.LoadSkill.run(%{name: "code-review"}, %{})
+
+loaded.instructions
+```
 
 ## CLI Surface + Error Handling
 

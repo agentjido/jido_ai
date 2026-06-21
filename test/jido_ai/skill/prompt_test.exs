@@ -22,6 +22,20 @@ defmodule Jido.AI.Skill.PromptTest do
       description: "Minimal skill with no tools."
   end
 
+  defmodule TaggedSkill do
+    use Jido.AI.Skill,
+      name: "tagged-skill",
+      description: """
+      Helps tagged agents.
+      Use when the agent needs scoped instructions.
+      """,
+      allowed_tools: ~w(load_skill),
+      tags: ["support", "agent-a"],
+      body: """
+      # Tagged Skill Body
+      """
+  end
+
   # Mock tool modules
   defmodule MockToolA do
     def name, do: "tool_a"
@@ -104,6 +118,61 @@ defmodule Jido.AI.Skill.PromptTest do
     test "returns empty string for unknown skill" do
       result = Prompt.render_one("unknown")
       assert result == ""
+    end
+  end
+
+  describe "render_index/2" do
+    test "renders compact entries without skill bodies" do
+      result = Prompt.render_index([TestSkill, TaggedSkill], include_allowed_tools: true)
+
+      assert result =~ "## Skills"
+      assert result =~ "* **test-skill**: A test skill. (tools: tool_a, tool_b)"
+      assert result =~ "* **tagged-skill**: Helps tagged agents.\n  Use when the agent needs scoped instructions."
+      assert result =~ "call `load_skill`"
+      refute result =~ "# Test Skill Body"
+      refute result =~ "# Tagged Skill Body"
+    end
+
+    test "filters compact entries by any tag" do
+      result = Prompt.render_index([TestSkill, TaggedSkill], tags: ["agent-a"])
+
+      assert result =~ "tagged-skill"
+      refute result =~ "test-skill"
+    end
+
+    test "filters compact entries by all tags" do
+      result = Prompt.render_index([TaggedSkill], tags: ["support", "agent-a"], tag_match: :all)
+      assert result =~ "tagged-skill"
+
+      result = Prompt.render_index([TaggedSkill], tags: ["support", "agent-b"], tag_match: :all)
+      assert result == ""
+    end
+
+    test "can omit header and load instruction" do
+      result = Prompt.render_index([TestSkill], header: false, load_instruction: false)
+
+      assert result == "* **test-skill**: A test skill."
+    end
+  end
+
+  describe "render_registry_index/1" do
+    test "renders registered skills filtered by tag" do
+      Registry.register(%{
+        TaggedSkill.manifest()
+        | name: "runtime-agent-skill",
+          tags: ["agent-b"]
+      })
+
+      Registry.register(%{
+        TestSkill.manifest()
+        | name: "runtime-other-skill",
+          tags: ["other"]
+      })
+
+      result = Prompt.render_registry_index(tags: "agent-b")
+
+      assert result =~ "runtime-agent-skill"
+      refute result =~ "runtime-other-skill"
     end
   end
 

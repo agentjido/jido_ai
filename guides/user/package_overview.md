@@ -153,9 +153,11 @@ Finalized standalone action set (recommended):
    - `Jido.AI.Actions.Reasoning.Analyze`
    - `Jido.AI.Actions.Reasoning.Infer`
    - `Jido.AI.Actions.Reasoning.Explain`
-5. Dedicated strategy orchestration
+5. Skill orchestration
+   - `Jido.AI.Actions.Skill.LoadSkill` (lazy skill body loading from a compact prompt index)
+6. Dedicated strategy orchestration
    - `Jido.AI.Actions.Reasoning.RunStrategy` (isolated strategy execution for `:cod | :cot | :aot | :tot | :got | :trm | :adaptive`)
-6. Compatibility convenience
+7. Compatibility convenience
    - `Jido.AI.Actions.LLM.Complete` (simple completion path; overlaps with `Chat` and can remain as convenience)
 
 Not part of standalone action surface:

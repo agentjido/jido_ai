@@ -220,6 +220,9 @@ defmodule JidoAi.MixProject do
         "Actions — Quota": [
           ~r/Jido\.AI\.Actions\.Quota\..*/
         ],
+        "Actions — Skill": [
+          ~r/Jido\.AI\.Actions\.Skill\..*/
+        ],
         "Reasoning Strategies": [
           Jido.AI.Reasoning.Helpers,
           ~r/Jido\.AI\.Reasoning\..*/

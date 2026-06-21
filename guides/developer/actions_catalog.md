@@ -25,13 +25,15 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 5. Quota operations:
    - `Jido.AI.Actions.Quota.GetStatus`
    - `Jido.AI.Actions.Quota.Reset`
-6. Reasoning templates (optional):
+6. Skill orchestration:
+   - `Jido.AI.Actions.Skill.LoadSkill`
+7. Reasoning templates (optional):
    - `Jido.AI.Actions.Reasoning.Analyze`
    - `Jido.AI.Actions.Reasoning.Infer`
    - `Jido.AI.Actions.Reasoning.Explain`
-7. Dedicated strategy orchestration:
+8. Dedicated strategy orchestration:
    - `Jido.AI.Actions.Reasoning.RunStrategy`
-8. Compatibility convenience:
+9. Compatibility convenience:
    - `Jido.AI.Actions.LLM.Complete`
 
 ## LLM Actions
@@ -106,6 +108,14 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
   - Output contract: `%{quota: %{scope, reset}}`.
   - Runnable example: [`examples/scripts/demo/actions_quota_runtime_demo.exs`](https://github.com/agentjido/jido_ai/blob/v2.0.0-rc.0/examples/scripts/demo/actions_quota_runtime_demo.exs)
 
+## Skill Actions
+
+- `Jido.AI.Actions.Skill.LoadSkill`
+  - Use when a prompt advertises a compact skill index and the selected skill body should be loaded only on demand.
+  - Required params: `name`. Optional params: `include_metadata` (default `true`).
+  - Output contract: `%{name, description, instructions}` plus metadata fields when requested.
+  - Pair with `Jido.AI.Skill.Prompt.render_registry_index/1` for tag-filtered skill indexes.
+
 ## Reasoning Actions
 
 - `Jido.AI.Actions.Reasoning.Analyze`
@@ -148,6 +158,7 @@ These belong to strategy orchestration and are not app-level AI primitives.
 - Need structured planning templates: use Planning actions.
 - Need in-process memory upsert/recall/clear primitives: use Retrieval actions.
 - Need rolling quota status or a quota counter reset operation: use Quota actions.
+- Need lazy skill body loading from a compact prompt index: use `LoadSkill`.
 - Need explicit reasoning strategy execution as a callable capability: use `RunStrategy`.
 
 ## Failure Mode: Action Used Outside Expected Context

@@ -21,21 +21,8 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
   }
 
   alias Jido.AI.Actions.Reasoning.RunStrategy
+  alias Jido.AI.Actions.Skill.LoadSkill
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
-
-  require Jido.AI.Plugins.Chat
-  require Jido.AI.Actions.LLM.{Chat, Complete, Embed, GenerateObject}
-  require Jido.AI.Plugins.Planning
-  require Jido.AI.Actions.Planning.{Plan, Decompose, Prioritize}
-  require Jido.AI.Plugins.Reasoning.Adaptive
-  require Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts
-  require Jido.AI.Plugins.Reasoning.ChainOfDraft
-  require Jido.AI.Plugins.Reasoning.ChainOfThought
-  require Jido.AI.Plugins.Reasoning.GraphOfThoughts
-  require Jido.AI.Plugins.Reasoning.TRM
-  require Jido.AI.Plugins.Reasoning.TreeOfThoughts
-  require Jido.AI.Actions.Reasoning.RunStrategy
-  require Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
   describe "LLM and Tool-Calling Action Schemas" do
     test "Chat action has schema function" do
@@ -85,6 +72,12 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
     end
   end
 
+  describe "Skill Action Schemas" do
+    test "LoadSkill action has schema function" do
+      assert function_exported?(LoadSkill, :schema, 0)
+    end
+  end
+
   describe "Schema Structure" do
     test "all core action schemas return map-like structures" do
       actions = [
@@ -98,13 +91,14 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
         CallWithTools,
         ExecuteTool,
         ListTools,
+        LoadSkill,
         RunStrategy
       ]
 
       for action <- actions do
         schema = action.schema()
 
-        assert is_map(schema) or is_struct(schema),
+        assert is_map(schema),
                "#{inspect(action)} schema should return a map-like structure"
       end
     end
