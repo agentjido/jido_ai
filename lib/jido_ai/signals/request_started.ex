@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.RequestStarted do
   Signal for request lifecycle start.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.request.started",
     default_source: "/ai/request",
     schema: [
