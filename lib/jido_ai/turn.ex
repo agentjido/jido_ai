@@ -797,7 +797,6 @@ defmodule Jido.AI.Turn do
   defp has_binary_content?([_ | tail]), do: has_binary_content?(tail)
 
   defp printable_charlist?(list) when is_list(list), do: :io_lib.printable_list(list)
-  defp printable_charlist?(_), do: false
 
   defp get_field(map, key, default \\ nil) when is_map(map) do
     Map.get(map, key, Map.get(map, Atom.to_string(key), default))

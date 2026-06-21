@@ -280,7 +280,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       |> Enum.to_list()
 
     assert length(events) >= 6
-    assert Enum.all?(events, &is_map/1)
+    assert Enum.all?(events, &match?(%Jido.AI.Runtime.Event{}, &1))
 
     seqs = Enum.map(events, & &1.seq)
     assert seqs == Enum.sort(seqs)
@@ -511,6 +511,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       ReAct.stream("Q1", config, request_id: "req_pending_after_final", run_id: "req_pending_after_final")
       |> Enum.to_list()
 
+    assert Enum.all?(events, &match?(%Jido.AI.Runtime.Event{}, &1))
     assert Enum.count(events, &(&1.kind == :llm_started)) == 2
     assert Enum.count(events, &(&1.kind == :llm_completed)) == 2
     assert Enum.count(events, &(&1.kind == :input_injected)) == 1

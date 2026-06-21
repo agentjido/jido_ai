@@ -908,7 +908,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp process_context_modify(agent, _params), do: {agent, []}
 
   defp initial_context(%Agent{} = agent, config) do
-    state = agent.state || %{}
+    state = agent.state
 
     case Map.fetch(state, :context) do
       {:ok, nil} ->
@@ -1383,8 +1383,6 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       _ -> @default_context_ref
     end
   end
-
-  defp initial_active_context_ref(_), do: @default_context_ref
 
   defp core_thread_last_seq(%Agent{} = agent) do
     agent

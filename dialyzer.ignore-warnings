@@ -8,6 +8,11 @@ Unknown function 'Elixir.Unicode':is_unicode/1
 Unknown function 'Elixir.Unicode':is_visible_ascii/1
 Unknown function 'Elixir.Unicode':is_visible_latin1/1
 Unknown function 'Elixir.Unicode':to_ucs4be/1
+deps/jido_signal/lib/jido_signal/using.ex:6: Function validate_policy_extension_data/4 will never be called
+deps/jido_signal/lib/jido_signal/using.ex:6: Function validate_policy_extension_entry/3 will never be called
+deps/jido_signal/lib/jido_signal/using.ex:11: Function validate_policy_extension_data/4 will never be called
+deps/jido_signal/lib/jido_signal/using.ex:11: Function validate_policy_extension_entry/3 will never be called
+deps/jido_signal/lib/jido_signal/using.ex:336: The pattern 'false' can never match the type 'true'
 missing specification for function from_latin9/1
 missing specification for function from_ucs2be/1
 missing specification for function from_ucs2be/2

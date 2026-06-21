@@ -271,6 +271,10 @@ defmodule Jido.AI.Observe.Sanitize do
 
   defp maybe_add_summary_details(summary, _value, _profile, _opts), do: summary
 
+  defp summarize_error(error, _profile, opts) when is_exception(error) do
+    %{type: module_label(error.__struct__), message: sanitize_binary(Exception.message(error), opts.max_string_chars)}
+  end
+
   defp summarize_error(%{} = error, profile, opts) do
     %{}
     |> maybe_put_summary_field(:type, Map.get(error, :type, Map.get(error, "type")))
@@ -284,10 +288,6 @@ defmodule Jido.AI.Observe.Sanitize do
       empty when empty == %{} -> summarize_value(Map.drop(error, [:details, "details"]), profile, opts)
       summary -> summary
     end
-  end
-
-  defp summarize_error(error, _profile, opts) when is_exception(error) do
-    %{type: module_label(error.__struct__), message: sanitize_binary(Exception.message(error), opts.max_string_chars)}
   end
 
   defp summarize_error(error, profile, opts), do: summarize_value(error, profile, opts)

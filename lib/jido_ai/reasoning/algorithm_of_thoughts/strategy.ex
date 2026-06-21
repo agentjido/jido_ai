@@ -215,8 +215,6 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
   defp apply_machine_update(agent, {:llm_result, call_id, _result}, _config) when not is_binary(call_id),
     do: {agent, []}
 
-  defp apply_machine_update(agent, nil, _config), do: {agent, []}
-
   defp apply_machine_update(agent, msg, config) do
     state = StratState.get(agent, %{})
     machine = Machine.from_map(state)

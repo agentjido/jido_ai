@@ -6,7 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.AI.Directive
   alias Jido.AI.PendingInputServer
   alias Jido.AI.Request
-  alias Jido.AI.Reasoning.ReAct.Event
+  alias Jido.AI.Runtime.Event
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
