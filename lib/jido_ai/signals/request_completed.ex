@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.RequestCompleted do
   Signal for request lifecycle completion.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.request.completed",
     default_source: "/ai/request",
     schema: [

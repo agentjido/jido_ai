@@ -51,7 +51,6 @@
   "sourceror": {:hex, :sourceror, "1.12.0", "da354c5f35aad3cc1132f5d5b0d8437d865e2661c263260480bab51b5eedb437", [:mix], [], "hexpm", "755703683bd014ebcd5de9acc24b68fb874a660a568d1d63f8f98cd8a6ef9cd0"},
   "spitfire": {:hex, :spitfire, "0.3.13", "edd207b065eaec57acc5484097d0aa3e97fe4246168c54e67a9af040b8dee4c1", [:mix], [], "hexpm", "3601be88ceed4967b584e96444de3e1d12d6555ae0864a7390b9cd5332d134b4"},
   "splode": {:hex, :splode, "0.3.1", "9843c54f84f71b7833fec3f0be06c3cfb5be6b35960ee195ea4fad84b1c25030", [:mix], [], "hexpm", "8f2309b6ec2ecbb01435656429ed1d9ed04ba28797a3280c3b0d1217018ecfbd"},
-  "stream_data": {:hex, :stream_data, "1.3.0", "bde37905530aff386dea1ddd86ecbf00e6642dc074ceffc10b7d4e41dfd6aac9", [:mix], [], "hexpm", "3cc552e286e817dca43c98044c706eec9318083a1480c52ae2688b08e2936e3c"},
   "telemetry": {:hex, :telemetry, "1.4.2", "a0cb522801dffb1c49fe6e30561badffc7b6d0e180db1300df759faa22062855", [:rebar3], [], "hexpm", "928f6495066506077862c0d1646609eed891a4326bee3126ba54b60af61febb1"},
   "telemetry_metrics": {:hex, :telemetry_metrics, "1.1.0", "5bd5f3b5637e0abea0426b947e3ce5dd304f8b3bc6617039e2b5a008adc02f8f", [:mix], [{:telemetry, "~> 0.4 or ~> 1.0", [hex: :telemetry, repo: "hexpm", optional: false]}], "hexpm", "e7b79e8ddfde70adb6db8a6623d1778ec66401f366e9a8f5dd0955c56bc8ce67"},
   "text_diff": {:hex, :text_diff, "0.1.0", "1caf3175e11a53a9a139bc9339bd607c47b9e376b073d4571c031913317fecaa", [:mix], [], "hexpm", "d1ffaaecab338e49357b6daa82e435f877e0649041ace7755583a0ea3362dbd7"},

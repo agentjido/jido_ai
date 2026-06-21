@@ -3,7 +3,7 @@ defmodule Jido.AI.Signal.RequestError do
   Signal for request rejection.
   """
 
-  use Jido.Signal,
+  use Jido.AI.Signal.Definition,
     type: "ai.request.error",
     default_source: "/ai/strategy",
     schema: [
