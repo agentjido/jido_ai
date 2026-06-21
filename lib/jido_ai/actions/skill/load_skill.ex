@@ -44,44 +44,102 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   alias Jido.AI.Skill.{Registry, Spec}
   alias Jido.AI.Validation
 
+  @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
+  @max_name_length 64
+
   @doc """
   Loads the requested skill body from the registry.
   """
   @impl Jido.Action
-  def run(params, _context) do
-    with {:ok, name} <- validate_name(params[:name]) do
-      case Skill.resolve(name) do
-        {:ok, %Spec{} = spec} ->
-          {:ok, payload(spec, params[:include_metadata] != false)}
-
-        {:error, _reason} ->
-          {:error,
-           %{
-             type: :skill_not_found,
-             message: "Unknown skill '#{name}'",
-             available_skills: Registry.list() |> Enum.sort()
-           }}
-      end
+  def run(params, _context) when is_map(params) do
+    with {:ok, name} <- validate_name(param(params, :name)),
+         {:ok, include_metadata?} <- validate_include_metadata(param(params, :include_metadata, true)),
+         {:ok, %Spec{} = spec} <- resolve_skill(name),
+         {:ok, instructions} <- load_instructions(spec) do
+      {:ok, payload(spec, instructions, include_metadata?)}
     end
   end
 
-  defp validate_name(name) when is_binary(name) do
-    name = String.trim(name)
+  def run(_params, _context), do: {:error, %{type: :invalid_params, message: "Parameters must be a map"}}
 
-    with false <- name == "",
-         {:ok, _name} <- Validation.validate_string(name, max_length: 128, allow_empty: false) do
-      {:ok, name}
-    else
-      true -> {:error, %{type: :invalid_skill_name, message: "Skill name is required"}}
+  defp param(params, key, default \\ nil) do
+    Map.get(params, key, Map.get(params, Atom.to_string(key), default))
+  end
+
+  defp validate_name(nil), do: {:error, %{type: :invalid_skill_name, message: "Skill name is required"}}
+
+  defp validate_name(name) do
+    case Validation.validate_string(name, max_length: @max_name_length, allow_empty: false) do
+      {:ok, name} -> validate_name_format(name)
+      {:error, :empty_string} -> {:error, %{type: :invalid_skill_name, message: "Skill name is required"}}
       {:error, reason} -> {:error, %{type: :invalid_skill_name, message: "Invalid skill name", reason: reason}}
     end
   end
 
-  defp validate_name(_), do: {:error, %{type: :invalid_skill_name, message: "Skill name is required"}}
+  defp validate_name_format(name) do
+    if Regex.match?(@name_regex, name) do
+      {:ok, name}
+    else
+      {:error, %{type: :invalid_skill_name, message: "Invalid skill name", reason: :invalid_format}}
+    end
+  end
 
-  defp payload(%Spec{} = spec, true) do
+  defp validate_include_metadata(nil), do: {:ok, true}
+  defp validate_include_metadata(include_metadata?) when is_boolean(include_metadata?), do: {:ok, include_metadata?}
+
+  defp validate_include_metadata(_include_metadata?) do
+    {:error,
+     %{
+       type: :invalid_include_metadata,
+       message: "include_metadata must be a boolean"
+     }}
+  end
+
+  defp resolve_skill(name) do
+    case Skill.resolve(name) do
+      {:ok, %Spec{} = spec} ->
+        {:ok, spec}
+
+      {:error, _reason} ->
+        {:error,
+         %{
+           type: :skill_not_found,
+           message: "Unknown skill '#{name}'",
+           available_skills: Registry.list() |> Enum.sort()
+         }}
+    end
+  end
+
+  defp load_instructions(%Spec{body_ref: {:inline, instructions}}) when is_binary(instructions), do: {:ok, instructions}
+  defp load_instructions(%Spec{body_ref: nil}), do: {:ok, ""}
+
+  defp load_instructions(%Spec{name: name, body_ref: {:file, path}}) when is_binary(path) do
+    case File.read(path) do
+      {:ok, instructions} ->
+        {:ok, instructions}
+
+      {:error, reason} ->
+        {:error,
+         %{
+           type: :skill_body_unavailable,
+           message: "Could not load skill body for '#{name}'",
+           reason: reason
+         }}
+    end
+  end
+
+  defp load_instructions(%Spec{name: name}) do
+    {:error,
+     %{
+       type: :skill_body_unavailable,
+       message: "Could not load skill body for '#{name}'",
+       reason: :invalid_body_ref
+     }}
+  end
+
+  defp payload(%Spec{} = spec, instructions, true) do
     spec
-    |> payload(false)
+    |> payload(instructions, false)
     |> Map.merge(%{
       allowed_tools: spec.allowed_tools,
       tags: spec.tags,
@@ -92,11 +150,11 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
     })
   end
 
-  defp payload(%Spec{} = spec, false) do
+  defp payload(%Spec{} = spec, instructions, false) do
     %{
       name: spec.name,
       description: spec.description,
-      instructions: Skill.body(spec)
+      instructions: instructions
     }
   end
 end

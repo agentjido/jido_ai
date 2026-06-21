@@ -60,6 +60,16 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert result.name == "insights"
     end
 
+    test "accepts string-keyed tool parameters" do
+      assert {:ok, result} = LoadSkill.run(%{"name" => "insights", "include_metadata" => false}, %{})
+
+      assert result == %{
+               name: "insights",
+               description: "Analyze product signals.",
+               instructions: "# Insights\n\nFollow the product analysis workflow."
+             }
+    end
+
     test "returns structured error with available skills when missing" do
       assert {:error, error} = LoadSkill.run(%{name: "missing"}, %{})
 
@@ -68,9 +78,46 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert error.available_skills == ["insights"]
     end
 
-    test "rejects missing or blank skill names" do
+    test "returns structured error when a skill body file is unavailable" do
+      missing_path = Path.join(System.tmp_dir!(), "missing-skill-#{System.unique_integer([:positive])}.md")
+
+      :ok =
+        Registry.register(%Spec{
+          name: "file-backed",
+          description: "Loads from disk.",
+          body_ref: {:file, missing_path}
+        })
+
+      assert {:error, error} = LoadSkill.run(%{name: "file-backed"}, %{})
+
+      assert error.type == :skill_body_unavailable
+      assert error.message == "Could not load skill body for 'file-backed'"
+      assert error.reason == :enoent
+    end
+
+    test "rejects missing, blank, or invalid skill names" do
       assert {:error, %{type: :invalid_skill_name}} = LoadSkill.run(%{}, %{})
       assert {:error, %{type: :invalid_skill_name}} = LoadSkill.run(%{name: "  "}, %{})
+
+      assert {:error, %{type: :invalid_skill_name, reason: :invalid_format}} =
+               LoadSkill.run(%{name: "Invalid_Name"}, %{})
+
+      assert {:error, %{type: :invalid_skill_name, reason: :string_too_long}} =
+               LoadSkill.run(%{name: String.duplicate("a", 65)}, %{})
+    end
+
+    test "rejects invalid include_metadata values" do
+      assert {:error, error} = LoadSkill.run(%{name: "insights", include_metadata: "false"}, %{})
+
+      assert error.type == :invalid_include_metadata
+      assert error.message == "include_metadata must be a boolean"
+    end
+
+    test "rejects non-map parameters" do
+      assert {:error, error} = LoadSkill.run([], %{})
+
+      assert error.type == :invalid_params
+      assert error.message == "Parameters must be a map"
     end
   end
 end
