@@ -48,6 +48,8 @@ end
 Use `jido_ai` when you need long-lived agents, tool-calling loops, or explicit reasoning strategies. You can also use it without a running agent process via `Jido.AI.generate_text/2`, `Jido.AI.ask/2`, or `Jido.Exec.run/3` with any action module.
 For cross-package tutorials and the package map, see [jido.run/ecosystem](https://jido.run/ecosystem).
 
+In `jido_ai`, tool actions are allowed to be effectful. They often perform HTTP, LLM, database, or file I/O because the model needs the result back in the same ReAct loop. The purity boundary lives in the agent strategy and runtime orchestration layer: use a tool action when the next reasoning step needs the result now, and use directives, signals, or runtime integrations when an outbound effect has already been decided and the runtime should own delivery.
+
 ## Installation
 
 ### Igniter Installation (Recommended)

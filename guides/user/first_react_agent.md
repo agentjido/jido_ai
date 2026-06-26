@@ -18,6 +18,16 @@ defmodule MyApp.Actions.AddNumbers do
 end
 ```
 
+This arithmetic tool is pure, but tool actions do not have to be. A ReAct agent
+uses tools when the model or workflow needs a result now, so a tool can call an
+HTTP API, query a database, read a file, run retrieval, or call another model and
+return that data from `run/2`.
+
+When the workflow has already decided on an outbound effect, such as sending a
+notification or publishing a final event, prefer a runtime-owned directive,
+signal, or integration so delivery policy stays outside the strategy decision
+logic.
+
 ## Build The Agent
 
 ```elixir

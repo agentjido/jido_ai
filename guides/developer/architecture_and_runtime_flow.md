@@ -15,10 +15,17 @@ After this guide, you can trace one request end-to-end and debug failures at the
 
 ## Key Boundaries
 
-- Strategy: state transitions and orchestration policy
-- Directive: side-effect intent only
-- Runtime: side-effect execution and signal emission
+- Strategy: pure state transitions and orchestration policy
+- Tool action: reusable execution unit that may be pure or effectful when the current reasoning loop needs its result
+- Directive: runtime-owned side-effect intent only
+- Runtime: directive execution, tool execution, retries, timeouts, and signal emission
 - Signal: typed contract between runtime and strategy
+
+The practical rule is: use an effectful tool action when the model or workflow
+needs the result now to continue a ReAct/tool-calling loop. Use a directive,
+signal, or runtime integration when the workflow has already decided on an
+outbound effect and wants runtime policy to own delivery, retry, and
+observability.
 
 ## Minimal Trace Setup
 

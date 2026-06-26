@@ -20,6 +20,22 @@ defmodule MyApp.Actions.Multiply do
 end
 ```
 
+## Tool I/O Boundary
+
+Tool actions may be pure or effectful. In ReAct-style loops, the model calls a
+tool because it needs the result before it can continue reasoning, so HTTP, LLM,
+database, file, or retrieval I/O inside `run/2` is normal when that result is the
+tool output.
+
+Use directives, signals, or runtime integrations when the workflow has already
+decided on an outbound effect and wants the runtime to own delivery, retries, or
+observability.
+
+| Workflow step | Use |
+|---|---|
+| Fetch an account record, search an index, call a weather API, or ask another model so the current turn can continue | Effectful tool action that returns the data from `run/2` |
+| Send a final email, publish a webhook, emit an audit signal, or dispatch a notification after the decision is made | Runtime-owned directive, signal, or integration |
+
 ## One-Shot Tool Calling (`CallWithTools`)
 
 One-shot mode returns a terminal turn map without executing tools automatically.
