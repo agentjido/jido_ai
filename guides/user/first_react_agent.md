@@ -45,6 +45,8 @@ end
 ## Optional: Configure Tool Effect Policy
 
 Use `effect_policy` to bound which tool-emitted effects are allowed at runtime.
+It applies to effects returned from the tool result, such as `StateOp.SetState`
+or `Directive.Emit`; it is not a rule that tool `run/2` functions must be pure.
 
 ```elixir
 defmodule MyApp.SafeMathAgent do

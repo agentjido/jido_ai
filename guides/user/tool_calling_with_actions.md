@@ -27,6 +27,10 @@ tool because it needs the result before it can continue reasoning, so HTTP, LLM,
 database, file, or retrieval I/O inside `run/2` is normal when that result is the
 tool output.
 
+This direct I/O is separate from tool-emitted effects returned in the optional
+third tuple. `effect_policy` filters returned effects such as `StateOp.SetState`
+or `Directive.Emit`; it does not require every `run/2` implementation to be pure.
+
 Use directives, signals, or runtime integrations when the workflow has already
 decided on an outbound effect and wants the runtime to own delivery, retries, or
 observability.
