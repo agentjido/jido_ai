@@ -69,6 +69,17 @@ defmodule Jido.AI.OutputTest do
     assert {:error, _reason} = Output.new(schema: Zoi.string())
   end
 
+  test "accepts a string-keyed JSON Schema (as decoded from JSON over the wire)" do
+    json_schema = %{
+      "type" => "object",
+      "properties" => %{"summary" => %{"type" => "string"}},
+      "required" => ["summary"]
+    }
+
+    assert Output.imported_schema?(json_schema)
+    assert {:ok, %Output{schema_kind: :json_schema}} = Output.new(schema: json_schema)
+  end
+
   test "adds structured output instructions to message lists" do
     {:ok, output} = Output.new(schema: @schema)
 
