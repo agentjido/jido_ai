@@ -220,8 +220,8 @@ defmodule Jido.AI.Output do
   @doc false
   @spec imported_schema?(term()) :: boolean()
   def imported_schema?(%{} = schema) do
-    type = schema[:type]
-    properties = schema[:properties]
+    type = schema[:type] || schema["type"]
+    properties = schema[:properties] || schema["properties"]
     type in ["object", :object] and is_map(properties)
   end
 
