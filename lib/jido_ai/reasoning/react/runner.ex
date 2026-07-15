@@ -9,6 +9,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   alias Jido.AI.Output
   alias Jido.AI.PendingInputServer
   alias Jido.AI.Query
+  alias Jido.AI.Actions.Skill.LoadSkill
   alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall, State, Token, ToolSelection}
   alias Jido.AI.Runtime.Event
   alias Jido.AI.Test.ReActScript
@@ -731,7 +732,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           Enum.reduce(results, {state, state.context}, fn
             {pending_call, result, attempts, duration_ms}, {acc, context_acc} ->
               completed = PendingToolCall.complete(pending_call, result, attempts, duration_ms)
-              refs = durable_tool_result_refs(completed.name, result)
+              refs = durable_tool_result_refs(completed.name, result, tool_config.tools)
 
               {acc, _} =
                 emit_event(
@@ -1651,7 +1652,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp normalize_optional_refs(%{} = refs), do: refs
   defp normalize_optional_refs(_), do: nil
 
-  defp durable_tool_result_refs("load_skill", result) do
+  defp durable_tool_result_refs("load_skill", result, %{"load_skill" => LoadSkill}) do
     case Effects.normalize_result(result) do
       {:ok, payload, _effects} when is_map(payload) ->
         durable_skill_refs(payload)
@@ -1661,7 +1662,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp durable_tool_result_refs(_tool_name, _result), do: %{}
+  defp durable_tool_result_refs(_tool_name, _result, _tools), do: %{}
 
   defp durable_skill_refs(payload) do
     name = Map.get(payload, :name, Map.get(payload, "name"))

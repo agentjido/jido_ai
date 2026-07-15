@@ -51,6 +51,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Error
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Context, as: AIContext
+  alias Jido.AI.Actions.Skill.LoadSkill
   alias Jido.AI.Skill.AgentIntegration
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
@@ -1199,6 +1200,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           data
           |> event_field(:refs, %{})
           |> normalize_event_message_refs(runtime_event_refs(event, request_id))
+          |> sanitize_skill_activation_refs(tool_name, state)
 
         append_ai_message_event(
           agent,
@@ -1208,7 +1210,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           request_id,
           run_id,
           signal_id,
-          refs || %{}
+          refs
         )
 
       _ ->
@@ -1723,6 +1725,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           data
           |> event_field(:refs, %{})
           |> normalize_event_message_refs(runtime_event_refs(event, request_id))
+          |> sanitize_skill_activation_refs(tool_name, base_state)
 
         updated =
           base_state
@@ -2234,32 +2237,32 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_event_message_refs(%{} = refs, _fallback_refs), do: refs
   defp normalize_event_message_refs(_refs, fallback_refs), do: fallback_refs
 
+  defp sanitize_skill_activation_refs(refs, tool_name, state) when is_map(refs) do
+    if tool_name == "load_skill" and get_in(state, [:config, :actions_by_name, "load_skill"]) == LoadSkill do
+      refs
+    else
+      Map.drop(refs, [:durable, :kind, :skill_name, "durable", "kind", "skill_name"])
+    end
+  end
+
+  defp sanitize_skill_activation_refs(_refs, _tool_name, _state), do: %{}
+
   defp preserve_durable_entries(%AIContext{} = current, %AIContext{} = replacement, :compaction) do
-    existing_skill_names =
-      replacement.entries
-      |> Enum.map(&durable_skill_name/1)
-      |> Enum.reject(&is_nil/1)
-      |> MapSet.new()
-
-    durable_tools =
-      Enum.filter(current.entries, fn entry ->
-        case durable_skill_name(entry) do
-          nil -> false
-          skill_name -> not MapSet.member?(existing_skill_names, skill_name)
-        end
-      end)
-
     durable_tool_call_ids =
-      durable_tools
+      current.entries
+      |> Enum.filter(&is_binary(durable_skill_name(&1)))
       |> Enum.map(&fetch_map_value(&1, :tool_call_id))
-      |> Enum.filter(&is_binary/1)
       |> MapSet.new()
+      |> MapSet.intersection(assistant_tool_call_ids(current.entries, "load_skill"))
+
+    replacement_tool_call_ids = assistant_tool_call_ids(replacement.entries, nil)
 
     preserved =
       current.entries
       |> Enum.flat_map(fn entry ->
         cond do
-          entry in durable_tools ->
+          fetch_map_value(entry, :role) in [:tool, "tool"] and
+              MapSet.member?(durable_tool_call_ids, fetch_map_value(entry, :tool_call_id)) ->
             [entry]
 
           fetch_map_value(entry, :role) in [:assistant, "assistant"] ->
@@ -2268,7 +2271,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
               |> fetch_map_value(:tool_calls)
               |> List.wrap()
               |> Enum.filter(fn tool_call ->
-                MapSet.member?(durable_tool_call_ids, fetch_map_value(tool_call, :id))
+                id = fetch_map_value(tool_call, :id)
+                MapSet.member?(durable_tool_call_ids, id) and not MapSet.member?(replacement_tool_call_ids, id)
               end)
 
             if tool_calls == [], do: [], else: [Map.put(entry, :tool_calls, tool_calls)]
@@ -2278,7 +2282,13 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         end
       end)
 
-    %{replacement | entries: replacement.entries ++ preserved}
+    replacement_entries =
+      Enum.reject(replacement.entries, fn entry ->
+        fetch_map_value(entry, :role) in [:tool, "tool"] and
+          MapSet.member?(durable_tool_call_ids, fetch_map_value(entry, :tool_call_id))
+      end)
+
+    %{replacement | entries: replacement_entries ++ preserved}
   end
 
   defp preserve_durable_entries(_current, replacement, _reason), do: replacement
@@ -2297,6 +2307,17 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
          is_binary(tool_call_id) and is_binary(skill_name),
        do: skill_name,
        else: nil
+  end
+
+  defp assistant_tool_call_ids(entries, required_name) do
+    for entry <- entries,
+        fetch_map_value(entry, :role) in [:assistant, "assistant"],
+        tool_call <- List.wrap(fetch_map_value(entry, :tool_calls)),
+        id = fetch_map_value(tool_call, :id),
+        name = fetch_map_value(tool_call, :name),
+        is_binary(id) and (is_nil(required_name) or name == required_name),
+        into: MapSet.new(),
+        do: id
   end
 
   defp build_config(agent, ctx) do

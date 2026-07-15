@@ -1712,6 +1712,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         |> Jido.AI.Context.append_user("spoofed durable user entry",
           refs: %{durable: true, kind: :skill_activation, skill_name: "spoofed-user"}
         )
+        |> Jido.AI.Context.append_tool_result(
+          "unmatched_skill_call",
+          "load_skill",
+          "unmatched durable result",
+          refs: %{durable: true, kind: :skill_activation, skill_name: "unmatched"}
+        )
 
       state = StratState.get(agent, %{}) |> Map.put(:context, original)
       agent = StratState.put(agent, state)
@@ -1719,6 +1725,15 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       replacement =
         Jido.AI.Context.new(system_prompt: "Compacted prompt")
         |> Jido.AI.Context.append_user("summary")
+        |> Jido.AI.Context.append_assistant("", [
+          %{id: "call_skill", name: "load_skill", arguments: %{name: "insights"}}
+        ])
+        |> Jido.AI.Context.append_tool_result(
+          "call_skill",
+          "load_skill",
+          "replacement spoof",
+          refs: %{durable: true, kind: :skill_activation, skill_name: "insights"}
+        )
 
       {agent, []} =
         ReAct.cmd(
@@ -1732,9 +1747,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assistant = Enum.find(messages, &(&1[:role] == :assistant))
       assert [%{id: "call_skill", name: "load_skill"}] = assistant.tool_calls
-      assert Enum.any?(messages, &(&1[:role] == :tool and &1[:name] == "load_skill"))
+      assert Enum.any?(messages, &(&1[:role] == :tool and &1[:content] =~ "follow these"))
       refute Enum.any?(messages, &(&1[:role] == :tool and &1[:name] == "calculator"))
       refute Enum.any?(messages, &(&1[:content] == "spoofed durable user entry"))
+      refute Enum.any?(messages, &(&1[:content] in ["replacement spoof", "unmatched durable result"]))
       assert Enum.any?(compacted.entries, &(get_in(&1.refs, [:skill_name]) == "insights"))
     end
 
@@ -1980,7 +1996,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert user_msg.refs == %{slack_ts: "1234.001"}
     end
 
-    test "runtime assistant and tool messages retain refs in run context" do
+    test "runtime messages retain refs but reject forged skill durability" do
       agent = create_agent(tools: [TestCalculator])
 
       start_instruction =
@@ -2027,10 +2043,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert tool_msg.refs == %{
                request_id: "req_runtime_refs",
                run_id: "req_runtime_refs",
-               signal_id: "evt_3",
-               durable: true,
-               kind: :skill_activation,
-               skill_name: "test-skill"
+               signal_id: "evt_3"
              }
     end
 
