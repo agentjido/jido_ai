@@ -36,6 +36,9 @@ defmodule Jido.AI.Skill.Discovery do
   alias Jido.AI.Skill.{Spec, Loader}
 
   @project_path ".agents/skills"
+  @default_max_depth 6
+  @default_max_directories 2_000
+  @default_excluded_directories [".git", "node_modules"]
 
   @type scope :: :project | :user | :custom
   @type discovery_metadata :: %{
@@ -63,10 +66,10 @@ defmodule Jido.AI.Skill.Discovery do
       {:ok, skills} = Jido.AI.Skill.Discovery.discover()
       # skills will have project-level skills overriding user-level
   """
-  @spec discover() :: {:ok, [discovery_metadata()]} | {:error, term()}
-  def discover do
-    with {:ok, project_skills} <- discover_from_project(),
-         {:ok, user_skills} <- discover_from_user() do
+  @spec discover(keyword()) :: {:ok, [discovery_metadata()]} | {:error, term()}
+  def discover(opts \\ []) do
+    with {:ok, project_skills} <- discover_from_project(@project_path, opts),
+         {:ok, user_skills} <- discover_from_user(default_user_path(), opts) do
       # Merge with precedence: project > user
       merged =
         (project_skills ++ user_skills)
@@ -85,6 +88,10 @@ defmodule Jido.AI.Skill.Discovery do
   ## Options
 
   - `:scope` - Assign scope metadata (`:project` or `:user`), defaults to `:custom`
+  - `:max_depth` - Maximum directory depth to scan (default: `6`)
+  - `:max_directories` - Maximum directories visited across all paths (default: `2000`)
+  - `:exclude_directories` - Directory basenames to skip (default: `.git` and `node_modules`)
+  - `:trust` - `true`, `false`, or a one-argument function that approves each root path
 
   ## Examples
 
@@ -93,15 +100,19 @@ defmodule Jido.AI.Skill.Discovery do
   """
   @spec discover_from([String.t()], keyword()) :: {:ok, [discovery_metadata()]} | {:error, term()}
   def discover_from(paths, opts \\ []) do
-    scope = Keyword.get(opts, :scope, :custom)
+    with :ok <- validate_arguments(paths, opts),
+         :ok <- validate_options(opts),
+         :ok <- validate_trusted_paths(paths, opts),
+         {:ok, files} <- scan_paths(paths, opts) do
+      scope = Keyword.get(opts, :scope, :custom)
 
-    skills =
-      paths
-      |> Enum.flat_map(&scan_directory/1)
-      |> Enum.map(&build_metadata(&1, scope))
-      |> Enum.reject(&is_nil/1)
+      skills =
+        files
+        |> Enum.map(&build_metadata(&1, scope))
+        |> Enum.reject(&is_nil/1)
 
-    {:ok, skills}
+      {:ok, skills}
+    end
   end
 
   @doc """
@@ -113,10 +124,11 @@ defmodule Jido.AI.Skill.Discovery do
   - `{:ok, []}` - Directory doesn't exist or is empty
   - `{:error, reason}` - Discovery failed
   """
-  @spec discover_from_project(String.t()) :: {:ok, [discovery_metadata()]} | {:error, term()}
-  def discover_from_project(base_path \\ @project_path) do
+  @spec discover_from_project(String.t(), keyword()) ::
+          {:ok, [discovery_metadata()]} | {:error, term()}
+  def discover_from_project(base_path \\ @project_path, opts \\ []) do
     if File.dir?(base_path) do
-      discover_from([base_path], scope: :project)
+      discover_from([base_path], Keyword.put(opts, :scope, :project))
     else
       {:ok, []}
     end
@@ -131,10 +143,11 @@ defmodule Jido.AI.Skill.Discovery do
   - `{:ok, []}` - Directory doesn't exist or is empty
   - `{:error, reason}` - Discovery failed
   """
-  @spec discover_from_user(String.t()) :: {:ok, [discovery_metadata()]} | {:error, term()}
-  def discover_from_user(base_path \\ default_user_path()) do
+  @spec discover_from_user(String.t(), keyword()) ::
+          {:ok, [discovery_metadata()]} | {:error, term()}
+  def discover_from_user(base_path \\ default_user_path(), opts \\ []) do
     if File.dir?(base_path) do
-      discover_from([base_path], scope: :user)
+      discover_from([base_path], Keyword.put(opts, :scope, :user))
     else
       {:ok, []}
     end
@@ -154,9 +167,10 @@ defmodule Jido.AI.Skill.Discovery do
       {:error, :not_found} = Jido.AI.Skill.Discovery.find("unknown-skill")
       {:ok, metadata} = Jido.AI.Skill.Discovery.find("local-skill", ["priv/skills/"])
   """
-  @spec find(String.t(), [String.t()] | nil) :: {:ok, discovery_metadata()} | {:error, :not_found}
-  def find(name, paths \\ nil) when is_binary(name) do
-    discovery = if is_list(paths), do: discover_from(paths), else: discover()
+  @spec find(String.t(), [String.t()] | nil, keyword()) ::
+          {:ok, discovery_metadata()} | {:error, term()}
+  def find(name, paths \\ nil, opts \\ []) when is_binary(name) do
+    discovery = if is_list(paths), do: discover_from(paths, opts), else: discover(opts)
 
     case discovery do
       {:ok, skills} ->
@@ -164,6 +178,9 @@ defmodule Jido.AI.Skill.Discovery do
           nil -> {:error, :not_found}
           skill -> {:ok, skill}
         end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -192,9 +209,133 @@ defmodule Jido.AI.Skill.Discovery do
 
   # Private functions
 
-  defp scan_directory(path) do
-    skill_pattern = Path.join([path, "**", "SKILL.md"])
-    Path.wildcard(skill_pattern)
+  defp validate_arguments(paths, opts) do
+    cond do
+      not (is_list(paths) and Enum.all?(paths, &is_binary/1)) ->
+        {:error, {:invalid_discovery_option, :paths}}
+
+      not (is_list(opts) and Keyword.keyword?(opts)) ->
+        {:error, {:invalid_discovery_option, :options}}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_options(opts) do
+    max_depth = Keyword.get(opts, :max_depth, @default_max_depth)
+    max_directories = Keyword.get(opts, :max_directories, @default_max_directories)
+    excluded = Keyword.get(opts, :exclude_directories, @default_excluded_directories)
+    trust = Keyword.get(opts, :trust, true)
+
+    cond do
+      not (is_integer(max_depth) and max_depth >= 0) ->
+        {:error, {:invalid_discovery_option, :max_depth}}
+
+      not (is_integer(max_directories) and max_directories > 0) ->
+        {:error, {:invalid_discovery_option, :max_directories}}
+
+      not (is_list(excluded) and Enum.all?(excluded, &is_binary/1)) ->
+        {:error, {:invalid_discovery_option, :exclude_directories}}
+
+      trust not in [true, false] and not is_function(trust, 1) ->
+        {:error, {:invalid_discovery_option, :trust}}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_trusted_paths(paths, opts) do
+    trust = Keyword.get(opts, :trust, true)
+
+    Enum.reduce_while(paths, :ok, fn path, :ok ->
+      expanded = Path.expand(path)
+
+      if trusted_path?(expanded, trust) do
+        {:cont, :ok}
+      else
+        {:halt, {:error, {:untrusted_skill_path, expanded}}}
+      end
+    end)
+  end
+
+  defp trusted_path?(_path, true), do: true
+  defp trusted_path?(_path, false), do: false
+  defp trusted_path?(path, trust) when is_function(trust, 1), do: trust.(path) == true
+  defp trusted_path?(_path, _trust), do: false
+
+  defp scan_paths(paths, opts) do
+    Enum.reduce_while(paths, {:ok, [], 0}, fn path, {:ok, files, directory_count} ->
+      expanded = Path.expand(path)
+
+      cond do
+        File.regular?(expanded) and Path.basename(expanded) == "SKILL.md" ->
+          {:cont, {:ok, [expanded | files], directory_count}}
+
+        File.dir?(expanded) ->
+          case walk_directories([{expanded, 0}], files, directory_count, opts) do
+            {:ok, next_files, next_count} -> {:cont, {:ok, next_files, next_count}}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+
+        true ->
+          {:cont, {:ok, files, directory_count}}
+      end
+    end)
+    |> case do
+      {:ok, files, _directory_count} -> {:ok, Enum.sort(files)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp walk_directories([], files, directory_count, _opts),
+    do: {:ok, files, directory_count}
+
+  defp walk_directories([{directory, depth} | rest], files, directory_count, opts) do
+    max_directories = Keyword.get(opts, :max_directories, @default_max_directories)
+
+    if directory_count >= max_directories do
+      {:error, {:discovery_limit_exceeded, :max_directories, max_directories}}
+    else
+      {files, children} = scan_one_directory(directory, depth, files, opts)
+      walk_directories(rest ++ children, files, directory_count + 1, opts)
+    end
+  end
+
+  defp scan_one_directory(directory, depth, files, opts) do
+    skill_file = Path.join(directory, "SKILL.md")
+    files = if File.regular?(skill_file), do: [skill_file | files], else: files
+    max_depth = Keyword.get(opts, :max_depth, @default_max_depth)
+
+    children =
+      if depth < max_depth do
+        excluded = Keyword.get(opts, :exclude_directories, @default_excluded_directories)
+
+        case File.ls(directory) do
+          {:ok, entries} ->
+            entries
+            |> Enum.sort()
+            |> Enum.reject(&(&1 in excluded))
+            |> Enum.map(&Path.join(directory, &1))
+            |> Enum.filter(&(File.dir?(&1) and not symlink?(&1)))
+            |> Enum.map(&{&1, depth + 1})
+
+          {:error, _reason} ->
+            []
+        end
+      else
+        []
+      end
+
+    {files, children}
+  end
+
+  defp symlink?(path) do
+    case File.lstat(path) do
+      {:ok, %File.Stat{type: :symlink}} -> true
+      _ -> false
+    end
   end
 
   defp default_user_path do

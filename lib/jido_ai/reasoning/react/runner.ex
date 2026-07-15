@@ -731,6 +731,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           Enum.reduce(results, {state, state.context}, fn
             {pending_call, result, attempts, duration_ms}, {acc, context_acc} ->
               completed = PendingToolCall.complete(pending_call, result, attempts, duration_ms)
+              refs = durable_tool_result_refs(completed.name, result)
 
               {acc, _} =
                 emit_event(
@@ -743,14 +744,20 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                     tool_name: completed.name,
                     result: result,
                     attempts: attempts,
-                    duration_ms: duration_ms
+                    duration_ms: duration_ms,
+                    refs: refs
                   },
                   tool_call_id: completed.id,
                   tool_name: completed.name
                 )
 
               content = Turn.format_tool_result_content(result)
-              context_acc = AIContext.append_tool_result(context_acc, completed.id, completed.name, content)
+
+              context_acc =
+                AIContext.append_tool_result(context_acc, completed.id, completed.name, content,
+                  refs: normalize_optional_refs(refs)
+                )
+
               {acc, context_acc}
 
             {:error, reason}, {acc, context_acc} ->
@@ -1642,6 +1649,19 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp normalize_optional_refs(%{} = refs), do: refs
   defp normalize_optional_refs(_), do: nil
+
+  defp durable_tool_result_refs("load_skill", {:ok, result, _effects}) when is_map(result) do
+    name = Map.get(result, :name, Map.get(result, "name"))
+    instructions = Map.get(result, :instructions, Map.get(result, "instructions"))
+
+    if is_binary(name) and is_binary(instructions) do
+      %{durable: true, kind: :skill_activation, skill_name: name}
+    else
+      %{}
+    end
+  end
+
+  defp durable_tool_result_refs(_tool_name, _result), do: %{}
 
   defp fetch_extra(extra, key, default \\ nil)
 

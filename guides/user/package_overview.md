@@ -77,8 +77,10 @@ ToT flexibility controls exposed at the agent macro level:
 Skills are reusable instruction/capability units loaded at runtime:
 
 - `Jido.AI.Skill.Loader` parses skill files.
-- `Jido.AI.Skill.Registry` stores and resolves active skills.
-- Skills are strategy-agnostic and can be injected into agent behavior/context.
+- `Jido.AI.Skill.Registry` stores specs and session-scoped activations.
+- `Jido.AI.Agent` accepts `agent_skills: true`, trusted paths, or bounded discovery options.
+- Agents receive a compact catalog and load full instructions only when needed.
+- Activated skill content is retained across ReAct context compaction.
 - Skills are useful for domain behavior reuse without duplicating agent code.
 
 This is the main packaging mechanism for reusable AI behavior in your system.

@@ -304,6 +304,54 @@ defmodule Jido.AI.Skill.LoaderTest do
       assert spec.metadata == %{}
       assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_metadata_type))
     end
+
+    test "strict mode rejects overlong descriptions and compatibility" do
+      long_description = String.duplicate("d", 1_025)
+      long_compatibility = String.duplicate("c", 501)
+
+      assert {:error, %Error.Validation.InvalidField{field: :description, reason: :too_long}} =
+               Loader.parse("---\nname: strict-fields\ndescription: #{long_description}\n---\n")
+
+      assert {:error, %Error.Validation.InvalidField{field: :compatibility, reason: :too_long}} =
+               Loader.parse("---\nname: strict-fields\ndescription: Valid\ncompatibility: #{long_compatibility}\n---\n")
+    end
+
+    test "strict mode requires string metadata keys and values" do
+      content = """
+      ---
+      name: strict-metadata
+      description: Valid metadata is interoperable.
+      metadata:
+        version: 2
+      ---
+      """
+
+      assert {:error, %Error.Validation.InvalidField{field: :metadata, reason: :invalid_metadata}} =
+               Loader.parse(content)
+
+      assert {:ok, %Spec{metadata: %{"version" => "2"}, diagnostics: diagnostics}} =
+               Loader.parse(content, "inline", lenient: true)
+
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_metadata_entries))
+    end
+
+    @tag :tmp_dir
+    test "strict mode requires the name to match the parent directory", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "actual-name")
+      File.mkdir_p!(skill_dir)
+      path = Path.join(skill_dir, "SKILL.md")
+
+      File.write!(path, "---\nname: declared-name\ndescription: Test\n---\n")
+
+      assert {:error,
+              %Error.Validation.InvalidField{
+                field: :name,
+                reason: :directory_name_mismatch
+              }} = Loader.load(path)
+
+      assert {:ok, %Spec{diagnostics: diagnostics}} = Loader.load(path, lenient: true)
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :directory_name_mismatch))
+    end
   end
 
   describe "non-binary name" do

@@ -87,6 +87,14 @@ defmodule Jido.AI.AgentTest do
       tools: [TestCalculator, TestSearch]
   end
 
+  defmodule AgentWithAgentSkills do
+    use Jido.AI.Agent,
+      name: "agent_with_agent_skills",
+      tools: [TestCalculator],
+      system_prompt: "Base instructions.",
+      agent_skills: [".agents/skills"]
+  end
+
   defmodule AgentWithToolContext do
     use Jido.AI.Agent,
       name: "agent_with_context",
@@ -507,6 +515,20 @@ defmodule Jido.AI.AgentTest do
       assert TestCalculator in tools
       assert TestSearch in tools
       assert Enum.all?(tools, &is_atom/1)
+    end
+
+    test "agent_skills wires the catalog, loading tool, and scoped specs" do
+      agent = AgentWithAgentSkills.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert Jido.AI.Actions.Skill.LoadSkill in ReAct.list_tools(agent)
+      assert config.system_prompt =~ "Base instructions."
+      assert config.system_prompt =~ "**hex-release**"
+      refute config.system_prompt =~ "# Hex Release"
+
+      specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
+      assert %Jido.AI.Skill.Spec{name: "hex-release"} = specs["hex-release"]
     end
 
     test "does not warn when consumer defines its own thinking_meta/1" do

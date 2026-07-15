@@ -55,6 +55,10 @@ defmodule Jido.AI.Agent do
     Runtime reserves `:state` (core Jido-compatible) for tool execution snapshots.
     User-provided values for that key are overwritten per request.
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
+  - `:agent_skills` - Agent Skills (`SKILL.md`) integration. Pass `true` to trust
+    and discover standard roots, a list of trusted roots, or discovery options
+    with an explicit `:trust` policy. The agent automatically receives the compact
+    catalog and `load_skill` tool.
   - `:signal_routes` - Additional agent-level signal routes forwarded to `Jido.Agent`.
     ReAct routes are still provided by the default strategy.
 
@@ -289,6 +293,14 @@ defmodule Jido.AI.Agent do
         mod when is_atom(mod) -> mod
       end)
 
+    agent_skills =
+      opts
+      |> Keyword.get(:agent_skills, false)
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
+      |> Jido.AI.Skill.AgentIntegration.prepare!()
+
+    tools = Enum.uniq(tools ++ agent_skills.tools)
+
     description = Keyword.get(opts, :description, "AI agent #{name}")
     tags = Keyword.get(opts, :tags, [])
     system_prompt_raw = Keyword.get(opts, :system_prompt)
@@ -312,6 +324,14 @@ defmodule Jido.AI.Agent do
               file: __CALLER__.file,
               line: system_prompt_line
           end
+      end
+
+    system_prompt =
+      case {system_prompt, agent_skills.index} do
+        {prompt, ""} -> prompt
+        {:absent, index} -> {:resolved, index}
+        {{:resolved, prompt}, index} -> {:resolved, append_system_prompt(prompt, index)}
+        {{:deferred, _attr_ast} = deferred, _index} -> deferred
       end
 
     model =
@@ -400,6 +420,8 @@ defmodule Jido.AI.Agent do
           other
       end
 
+    tool_context = Map.merge(tool_context, agent_skills.tool_context)
+
     strategy_opts =
       [
         tools: tools,
@@ -442,10 +464,17 @@ defmodule Jido.AI.Agent do
                    unquote(system_prompt_line)
                  ) do
               :absent ->
-                unquote(Macro.escape(strategy_opts))
+                case unquote(agent_skills.index) do
+                  "" -> unquote(Macro.escape(strategy_opts))
+                  index -> Keyword.put(unquote(Macro.escape(strategy_opts)), :system_prompt, index)
+                end
 
               {:resolved, value} ->
-                Keyword.put(unquote(Macro.escape(strategy_opts)), :system_prompt, value)
+                Keyword.put(
+                  unquote(Macro.escape(strategy_opts)),
+                  :system_prompt,
+                  unquote(__MODULE__).append_system_prompt(value, unquote(agent_skills.index))
+                )
             end
           end
 
@@ -886,6 +915,13 @@ defmodule Jido.AI.Agent do
                      inject: 3
     end
   end
+
+  @doc false
+  def append_system_prompt(prompt, "") when is_binary(prompt), do: prompt
+  def append_system_prompt("", addition) when is_binary(addition), do: addition
+
+  def append_system_prompt(prompt, addition) when is_binary(prompt) and is_binary(addition),
+    do: prompt <> "\n\n" <> addition
 
   @doc false
   @spec compatibility_overrides_ast() :: Macro.t()

@@ -968,7 +968,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
          context_ref: context_ref,
          operation: %{type: :replace} = operation
        }) do
-    context = operation.result_context
+    context = preserve_durable_entries(state[:context], operation.result_context, operation.reason)
+    operation = %{operation | result_context: context}
 
     state =
       state
@@ -1193,6 +1194,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
         content = Turn.format_tool_result_content(tool_result)
 
+        refs =
+          data
+          |> event_field(:refs, %{})
+          |> normalize_event_message_refs(runtime_event_refs(event, request_id))
+
         append_ai_message_event(
           agent,
           state,
@@ -1200,7 +1206,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           %{role: :tool, content: content, tool_call_id: tool_call_id, name: tool_name},
           request_id,
           run_id,
-          signal_id
+          signal_id,
+          refs || %{}
         )
 
       _ ->
@@ -1624,7 +1631,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             }
           end)
 
-        refs = runtime_event_refs(event, request_id)
+        refs =
+          data
+          |> event_field(:refs, %{})
+          |> normalize_event_message_refs(runtime_event_refs(event, request_id))
 
         updated =
           base_state
@@ -1708,7 +1718,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
         tool_result_entry = completed_tool_result_entry(base_state, tool_call_id, tool_name, tool_result)
 
-        refs = runtime_event_refs(event, request_id)
+        refs =
+          data
+          |> event_field(:refs, %{})
+          |> normalize_event_message_refs(runtime_event_refs(event, request_id))
 
         updated =
           base_state
@@ -2219,6 +2232,63 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
   defp normalize_event_message_refs(%{} = refs, _fallback_refs), do: refs
   defp normalize_event_message_refs(_refs, fallback_refs), do: fallback_refs
+
+  defp preserve_durable_entries(%AIContext{} = current, %AIContext{} = replacement, :compaction) do
+    existing_skill_names =
+      replacement.entries
+      |> Enum.map(&durable_skill_name/1)
+      |> Enum.reject(&is_nil/1)
+      |> MapSet.new()
+
+    durable_tools =
+      Enum.filter(current.entries, fn entry ->
+        case durable_skill_name(entry) do
+          nil -> false
+          skill_name -> not MapSet.member?(existing_skill_names, skill_name)
+        end
+      end)
+
+    durable_tool_call_ids =
+      durable_tools
+      |> Enum.map(&fetch_map_value(&1, :tool_call_id))
+      |> Enum.filter(&is_binary/1)
+      |> MapSet.new()
+
+    preserved =
+      current.entries
+      |> Enum.flat_map(fn entry ->
+        cond do
+          entry in durable_tools ->
+            [entry]
+
+          fetch_map_value(entry, :role) in [:assistant, "assistant"] ->
+            tool_calls =
+              entry
+              |> fetch_map_value(:tool_calls)
+              |> List.wrap()
+              |> Enum.filter(fn tool_call ->
+                MapSet.member?(durable_tool_call_ids, fetch_map_value(tool_call, :id))
+              end)
+
+            if tool_calls == [], do: [], else: [Map.put(entry, :tool_calls, tool_calls)]
+
+          true ->
+            []
+        end
+      end)
+
+    %{replacement | entries: replacement.entries ++ preserved}
+  end
+
+  defp preserve_durable_entries(_current, replacement, _reason), do: replacement
+
+  defp durable_skill_name(entry) do
+    refs = fetch_map_value(entry, :refs)
+    durable? = fetch_map_value(refs, :durable) == true
+    skill_name = fetch_map_value(refs, :skill_name)
+
+    if durable? and is_binary(skill_name), do: skill_name, else: nil
+  end
 
   defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []

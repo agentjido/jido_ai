@@ -1,15 +1,20 @@
 defmodule Jido.AI.Actions.Skill.LoadSkill do
   @moduledoc """
-  A Jido.Action for lazily loading registered skill instructions.
+  A Jido.Action for lazily loading available skill instructions.
 
   Pair this action with `Jido.AI.Skill.Prompt.render_registry_index/1` to expose
   a compact skill index in an agent prompt. The model can call `load_skill` only
   after selecting a relevant skill, keeping full skill bodies out of the prompt
   until they are needed.
 
+  The action routes through `Jido.AI.Skill.Activation`, returning the skill root
+  and a bounded resource listing with the instructions. It scopes activation
+  from `session_id`, `agent_id`, or `request_id` in the runtime context and tags
+  the resulting tool message as durable for ReAct compaction.
+
   ## Parameters
 
-  * `name` (required) - Registered skill name to load.
+  * `name` (required) - Available skill name to load.
   * `include_metadata` (optional) - Include skill metadata in the response
     (default: `true`).
 
@@ -25,7 +30,7 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   use Jido.Action,
     name: "load_skill",
     description: """
-    Loads the full instructions for a registered skill by name. Call this after
+    Loads the full instructions for an available skill by name. Call this after
     selecting a skill from a compact skill index.
     """,
     category: "ai",
@@ -33,30 +38,34 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
     vsn: "1.0.0",
     schema:
       Zoi.object(%{
-        name: Zoi.string(description: "The registered skill name to load"),
+        name: Zoi.string(description: "The available skill name to load"),
         include_metadata:
           Zoi.boolean(description: "Include metadata such as tags and allowed tools")
           |> Zoi.default(true)
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Skill
-  alias Jido.AI.Skill.{Registry, Spec}
+  alias Jido.AI.Skill.{Activation, Registry, Spec}
   alias Jido.AI.Validation
 
   @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
   @max_name_length 64
+  @context_skills_key :__jido_ai_agent_skills__
+
+  @doc false
+  def context_skills_key, do: @context_skills_key
 
   @doc """
-  Loads the requested skill body from the registry.
+  Loads and activates the requested skill from the agent catalog or registry.
   """
   @impl Jido.Action
-  def run(params, _context) when is_map(params) do
+  def run(params, context) when is_map(params) do
+    context = if is_map(context), do: context, else: %{}
+
     with {:ok, name} <- validate_name(param(params, :name)),
          {:ok, include_metadata?} <- validate_include_metadata(param(params, :include_metadata, true)),
-         {:ok, %Spec{} = spec} <- resolve_skill(name),
-         {:ok, instructions} <- load_instructions(spec) do
-      {:ok, payload(spec, instructions, include_metadata?)}
+         {:ok, activation} <- activate_skill(name, context) do
+      {:ok, payload(activation, include_metadata?)}
     end
   end
 
@@ -95,42 +104,69 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
      }}
   end
 
-  defp resolve_skill(name) do
-    case Skill.resolve(name) do
-      {:ok, %Spec{} = spec} ->
-        {:ok, spec}
+  defp activate_skill(name, context) do
+    skill = Map.get(agent_skill_specs(context), name, name)
+    opts = [session_id: activation_session_id(context)]
 
-      {:error, _reason} ->
-        {:error,
-         %{
-           type: :skill_not_found,
-           message: "Unknown skill '#{name}'",
-           available_skills: Registry.list() |> Enum.sort()
-         }}
-    end
-  end
+    case Activation.activate(skill, opts) do
+      {:ok, activation} ->
+        with :ok <- Registry.mark_durable(name, opts) do
+          {:ok, activation}
+        end
 
-  defp load_instructions(%Spec{body_ref: {:inline, instructions}}) when is_binary(instructions), do: {:ok, instructions}
-  defp load_instructions(%Spec{body_ref: nil}), do: {:ok, ""}
+      {:error, :skill_not_found} ->
+        skill_not_found(name, context)
 
-  defp load_instructions(%Spec{name: name, body_ref: {:file, path}}) when is_binary(path) do
-    case File.read(path) do
-      {:ok, instructions} ->
-        {:ok, instructions}
+      {:error, {:body_load_failed, reason}} ->
+        skill_body_unavailable(name, reason)
 
       {:error, reason} ->
-        {:error,
-         %{
-           type: :skill_body_unavailable,
-           message: "Could not load skill body for '#{name}'",
-           reason: reason
-         }}
+        {:error, %{type: :skill_activation_failed, message: "Could not activate '#{name}'", reason: reason}}
     end
   end
 
-  defp payload(%Spec{} = spec, instructions, true) do
-    spec
-    |> payload(instructions, false)
+  defp agent_skill_specs(context) do
+    case Map.get(context, @context_skills_key, Map.get(context, Atom.to_string(@context_skills_key), %{})) do
+      %{} = specs -> specs
+      _ -> %{}
+    end
+  end
+
+  defp activation_session_id(context) do
+    context[:session_id] || context["session_id"] ||
+      context[:agent_id] || context["agent_id"] ||
+      context[:request_id] || context["request_id"] || self()
+  end
+
+  defp skill_not_found(name, context) do
+    available_skills =
+      context
+      |> agent_skill_specs()
+      |> Map.keys()
+      |> Kernel.++(Registry.list())
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    {:error,
+     %{
+       type: :skill_not_found,
+       message: "Unknown skill '#{name}'",
+       available_skills: available_skills
+     }}
+  end
+
+  defp skill_body_unavailable(name, reason) do
+    {:error,
+     %{
+       type: :skill_body_unavailable,
+       message: "Could not load skill body for '#{name}'",
+       reason: reason
+     }}
+  end
+
+  defp payload(%{skill: %Spec{} = spec} = activation, true) do
+    activation
+    |> payload(false)
     |> Map.merge(%{
       allowed_tools: spec.allowed_tools,
       tags: spec.tags,
@@ -141,11 +177,13 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
     })
   end
 
-  defp payload(%Spec{} = spec, instructions, false) do
+  defp payload(%{skill: %Spec{} = spec} = activation, false) do
     %{
       name: spec.name,
       description: spec.description,
-      instructions: instructions
+      instructions: activation.skill_body,
+      root_dir: activation.root_dir,
+      resources: activation.resources
     }
   end
 end

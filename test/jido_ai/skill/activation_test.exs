@@ -206,5 +206,17 @@ defmodule Jido.AI.Skill.ActivationTest do
       Activation.activate!(spec)
       assert Activation.activated?("is-active")
     end
+
+    test "does not share same-named activations across sessions" do
+      first = %Spec{name: "session-skill", description: "First", body_ref: {:inline, "first"}}
+      second = %Spec{name: "session-skill", description: "Second", body_ref: {:inline, "second"}}
+
+      assert {:ok, %{skill_body: "first"}} = Activation.activate(first, session_id: "one")
+      assert {:ok, %{skill_body: "second"}} = Activation.activate(second, session_id: "two")
+
+      assert Activation.activated?("session-skill", session_id: "one")
+      assert Activation.activated?("session-skill", session_id: "two")
+      refute Activation.activated?("session-skill", session_id: "three")
+    end
   end
 end

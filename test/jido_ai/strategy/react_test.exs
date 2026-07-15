@@ -1688,6 +1688,51 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert entry.payload.operation.reason == :compaction
     end
 
+    test "compaction preserves durable skill tool output and its assistant tool call" do
+      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+
+      original =
+        Jido.AI.Context.new(system_prompt: "Original prompt")
+        |> Jido.AI.Context.append_assistant("", [
+          %{id: "call_skill", name: "load_skill", arguments: %{name: "insights"}},
+          %{id: "call_other", name: "calculator", arguments: %{operation: "add", a: 1, b: 2}}
+        ])
+        |> Jido.AI.Context.append_tool_result(
+          "call_skill",
+          "load_skill",
+          ~s({"ok":true,"result":{"name":"insights","instructions":"follow these"}}),
+          refs: %{durable: true, kind: :skill_activation, skill_name: "insights"}
+        )
+        |> Jido.AI.Context.append_tool_result(
+          "call_other",
+          "calculator",
+          ~s({"ok":true,"result":3})
+        )
+
+      state = StratState.get(agent, %{}) |> Map.put(:context, original)
+      agent = StratState.put(agent, state)
+
+      replacement =
+        Jido.AI.Context.new(system_prompt: "Compacted prompt")
+        |> Jido.AI.Context.append_user("summary")
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [context_replace_instruction(replacement, reason: :compaction, op_id: "op_durable")],
+          %{}
+        )
+
+      compacted = StratState.get(agent, %{}).context
+      messages = Jido.AI.Context.to_messages(compacted)
+
+      assistant = Enum.find(messages, &(&1[:role] == :assistant))
+      assert [%{id: "call_skill", name: "load_skill"}] = assistant.tool_calls
+      assert Enum.any?(messages, &(&1[:role] == :tool and &1[:name] == "load_skill"))
+      refute Enum.any?(messages, &(&1[:role] == :tool and &1[:name] == "calculator"))
+      assert Enum.any?(compacted.entries, &(get_in(&1.refs, [:skill_name]) == "insights"))
+    end
+
     test "context.modify deduplicates duplicate op_id" do
       agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
 
@@ -1957,7 +2002,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         runtime_event(:tool_completed, "req_runtime_refs", 3, %{
           tool_call_id: "tc_1",
           tool_name: "calculator",
-          result: {:ok, %{result: 3}, []}
+          result: {:ok, %{result: 3}, []},
+          refs: %{durable: true, kind: :skill_activation, skill_name: "test-skill"}
         })
       ]
 
@@ -1972,7 +2018,15 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       tool_msg = Enum.find(messages, &(&1.role == :tool))
 
       assert assistant_msg.refs == %{request_id: "req_runtime_refs", run_id: "req_runtime_refs", signal_id: "evt_2"}
-      assert tool_msg.refs == %{request_id: "req_runtime_refs", run_id: "req_runtime_refs", signal_id: "evt_3"}
+
+      assert tool_msg.refs == %{
+               request_id: "req_runtime_refs",
+               run_id: "req_runtime_refs",
+               signal_id: "evt_3",
+               durable: true,
+               kind: :skill_activation,
+               skill_name: "test-skill"
+             }
     end
 
     test "extra_refs cannot override reserved thread entry refs" do

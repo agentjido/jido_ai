@@ -115,6 +115,42 @@ defmodule Jido.AI.Skill.DiscoveryTest do
       names = Enum.map(skills, & &1.name) |> Enum.sort()
       assert names == ["skill-a", "skill-b"]
     end
+
+    test "rejects roots that are not trusted", %{tmp_dir: tmp_dir} do
+      assert {:error, {:untrusted_skill_path, path}} =
+               Discovery.discover_from([tmp_dir], trust: false)
+
+      assert path == Path.expand(tmp_dir)
+    end
+
+    test "rejects malformed paths and trust policies" do
+      assert {:error, {:invalid_discovery_option, :paths}} =
+               Discovery.discover_from([:not_a_path])
+
+      assert {:error, {:invalid_discovery_option, :trust}} =
+               Discovery.discover_from([], trust: :implicit)
+    end
+
+    test "honors depth bounds and excluded directories", %{tmp_dir: tmp_dir} do
+      visible = Path.join(tmp_dir, "visible")
+      too_deep = Path.join([tmp_dir, "one", "two"])
+      excluded = Path.join([tmp_dir, "node_modules", "hidden"])
+
+      for {directory, name} <- [{visible, "visible"}, {too_deep, "too-deep"}, {excluded, "hidden"}] do
+        File.mkdir_p!(directory)
+        File.write!(Path.join(directory, "SKILL.md"), "---\nname: #{name}\ndescription: test\n---\n")
+      end
+
+      assert {:ok, skills} = Discovery.discover_from([tmp_dir], max_depth: 1)
+      assert Enum.map(skills, & &1.name) == ["visible"]
+    end
+
+    test "fails safely when the directory bound is exceeded", %{tmp_dir: tmp_dir} do
+      File.mkdir_p!(Path.join(tmp_dir, "child"))
+
+      assert {:error, {:discovery_limit_exceeded, :max_directories, 1}} =
+               Discovery.discover_from([tmp_dir], max_directories: 1)
+    end
   end
 
   describe "discover_from_project/1" do
