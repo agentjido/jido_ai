@@ -1282,6 +1282,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "marks only the real load_skill action durable in runtime events" do
+    start_supervised!(Jido.AI.Skill.Registry)
+
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
       :persistent_term.put({__MODULE__, :llm_call_count}, count)
@@ -1337,9 +1339,6 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
              kind: :skill_activation,
              skill_name: "review"
            }
-
-    :ok =
-      Jido.AI.Skill.Registry.clear_activations(session_id: "runtime-load-skill-authenticity")
   end
 
   test "does not retry non-retryable tool failures" do
