@@ -84,6 +84,15 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert error.available_skills == ["insights"]
     end
 
+    test "does not fall through a scoped catalog to the global registry" do
+      context = %{LoadSkill.context_skills_key() => %{}, agent_id: "scoped-agent"}
+
+      assert {:error, error} = LoadSkill.run(%{name: "insights"}, context)
+      assert error.type == :skill_not_found
+      assert error.available_skills == []
+      refute Registry.activated?("insights", session_id: "scoped-agent")
+    end
+
     test "returns structured error when a skill body file is unavailable" do
       missing_path = Path.join(System.tmp_dir!(), "missing-skill-#{System.unique_integer([:positive])}.md")
 
@@ -130,7 +139,7 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert {:ok, _result} = LoadSkill.run(%{name: "insights"}, %{agent_id: "agent-a"})
 
       assert Registry.activated?("insights", session_id: "agent-a")
-      assert Registry.durable?("insights", session_id: "agent-a")
+      refute Registry.durable?("insights", session_id: "agent-a")
       refute Registry.activated?("insights", session_id: "agent-b")
 
       assert {:ok, _result} = LoadSkill.run(%{name: "insights"}, %{agent_id: "agent-b"})

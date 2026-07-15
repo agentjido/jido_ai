@@ -129,6 +129,9 @@ defmodule Jido.AI.Skill.DiscoveryTest do
 
       assert {:error, {:invalid_discovery_option, :trust}} =
                Discovery.discover_from([], trust: :implicit)
+
+      assert {:error, {:invalid_discovery_option, :scope}} =
+               Discovery.discover_from([], scope: :unknown)
     end
 
     test "honors depth bounds and excluded directories", %{tmp_dir: tmp_dir} do
@@ -150,6 +153,20 @@ defmodule Jido.AI.Skill.DiscoveryTest do
 
       assert {:error, {:discovery_limit_exceeded, :max_directories, 1}} =
                Discovery.discover_from([tmp_dir], max_directories: 1)
+    end
+
+    test "does not follow symlinked SKILL.md files", %{tmp_dir: tmp_dir} do
+      trusted_root = Path.join(tmp_dir, "trusted")
+      skill_dir = Path.join(trusted_root, "escaped")
+      outside_dir = Path.join(tmp_dir, "outside")
+      File.mkdir_p!(skill_dir)
+      File.mkdir_p!(outside_dir)
+
+      outside_skill = Path.join(outside_dir, "SKILL.md")
+      File.write!(outside_skill, "---\nname: escaped\ndescription: Outside\n---\n")
+      File.ln_s!(outside_skill, Path.join(skill_dir, "SKILL.md"))
+
+      assert {:ok, []} = Discovery.discover_from([trusted_root])
     end
   end
 
@@ -225,7 +242,8 @@ defmodule Jido.AI.Skill.DiscoveryTest do
       assert spec.description == "For spec conversion"
       assert spec.license == "MIT"
       assert spec.source == {:file, skill_md}
-      assert spec.metadata[:discovery_scope] == :project
+      assert spec.metadata["jido_ai.discovery_scope"] == "project"
+      assert Enum.all?(spec.metadata, fn {key, value} -> is_binary(key) and is_binary(value) end)
     end
   end
 end

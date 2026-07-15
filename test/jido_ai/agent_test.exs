@@ -531,6 +531,36 @@ defmodule Jido.AI.AgentTest do
       assert %Jido.AI.Skill.Spec{name: "hex-release"} = specs["hex-release"]
     end
 
+    @tag :tmp_dir
+    test "agent_skills resolves at agent initialization instead of module compilation", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "runtime-skill")
+      File.mkdir_p!(skill_dir)
+      skill_file = Path.join(skill_dir, "SKILL.md")
+
+      File.write!(skill_file, "---\nname: runtime-skill\ndescription: Compile-time version\n---\n\nOld body\n")
+
+      module_name = Module.concat(__MODULE__, :"RuntimeSkillsAgent#{System.unique_integer([:positive, :monotonic])}")
+
+      Code.compile_string("""
+      defmodule #{inspect(module_name)} do
+        use Jido.AI.Agent,
+          name: "runtime_skills_agent",
+          tools: [#{inspect(TestCalculator)}],
+          agent_skills: [#{inspect(tmp_dir)}]
+      end
+      """)
+
+      File.write!(skill_file, "---\nname: runtime-skill\ndescription: Runtime version\n---\n\nNew body\n")
+
+      agent = module_name.new()
+      config = StratState.get(agent, %{}).config
+      specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
+
+      assert config.system_prompt =~ "Runtime version"
+      refute config.system_prompt =~ "Compile-time version"
+      assert Jido.AI.Skill.body(specs["runtime-skill"]) == "New body"
+    end
+
     test "does not warn when consumer defines its own thinking_meta/1" do
       module_name = Module.concat(__MODULE__, :"CollisionAgent#{System.unique_integer([:positive, :monotonic])}")
 

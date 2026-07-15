@@ -14,7 +14,7 @@ defmodule Jido.AI.Skill.Activation do
   - `skill` - The full `Jido.AI.Skill.Spec`
   - `skill_body` - The rendered skill body text
   - `root_dir` - Skill root directory for resource resolution
-  - `resources` - Bounded listing of bundled resources
+  - `resources` - Listing of bundled resources
 
   ## Usage
 
@@ -22,7 +22,8 @@ defmodule Jido.AI.Skill.Activation do
       {:ok, context} = Jido.AI.Skill.Activation.activate("code-review")
 
       # Activate a spec directly
-      {:ok, spec} = Jido.AI.Skill.Discovery.find("code-review") |> Jido.AI.Skill.Discovery.to_spec()
+      {:ok, metadata} = Jido.AI.Skill.Discovery.find("code-review")
+      {:ok, spec} = Jido.AI.Skill.Discovery.to_spec(metadata)
       {:ok, context} = Jido.AI.Skill.Activation.activate(spec)
 
       # Check if already activated
@@ -164,6 +165,15 @@ defmodule Jido.AI.Skill.Activation do
       {:error, :not_activated}
     end
   end
+
+  @doc """
+  Clears all activations for the selected session.
+
+  Pass the same `:session_id` used for activation. Without one, the caller
+  process is used.
+  """
+  @spec clear(keyword()) :: :ok | {:error, term()}
+  def clear(opts \\ []), do: Registry.clear_activations(opts)
 
   # Private functions
 

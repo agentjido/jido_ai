@@ -18,12 +18,10 @@ defmodule Jido.AI.Skill.Registry do
 
   use GenServer
 
-  alias Jido.AI.Skill.{Spec, Loader, Error}
+  alias Jido.AI.Skill.{Discovery, Spec, Loader, Error}
 
   @table_name :jido_skill_registry
   @activation_table :jido_skill_activations
-
-  @type session_id :: term()
 
   # Client API
 
@@ -274,6 +272,22 @@ defmodule Jido.AI.Skill.Registry do
     |> unwrap_or_error()
   end
 
+  @doc """
+  Removes every activation for the selected session, including durable entries.
+
+  Use this when a conversation or agent session ends. The optional `:session_id`
+  defaults to the caller process.
+  """
+  @spec clear_activations(keyword()) :: :ok | {:error, term()}
+  def clear_activations(opts \\ []) do
+    selected_session = session_id(opts)
+
+    with_started_registry(fn ->
+      GenServer.call(__MODULE__, {:clear_activations, selected_session})
+    end)
+    |> unwrap_or_error()
+  end
+
   # Server callbacks
 
   @impl true
@@ -348,17 +362,22 @@ defmodule Jido.AI.Skill.Registry do
     end
   end
 
+  def handle_call({:clear_activations, session_id}, _from, state) do
+    :ets.select_delete(@activation_table, [{{{session_id, :_}, :_}, [], [true]}])
+    {:reply, :ok, state}
+  end
+
   # Private functions
 
   defp do_load_paths(paths) do
-    paths
-    |> Enum.flat_map(&find_skill_files/1)
-    |> Enum.reduce_while({:ok, 0}, fn path, {:ok, count} ->
-      case load_and_register(path) do
-        :ok -> {:cont, {:ok, count + 1}}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
+    with {:ok, files} <- Discovery.discover_files(paths, trust: true) do
+      Enum.reduce_while(files, {:ok, 0}, fn path, {:ok, count} ->
+        case load_and_register(path) do
+          :ok -> {:cont, {:ok, count + 1}}
+          {:error, _} = error -> {:halt, error}
+        end
+      end)
+    end
   end
 
   defp load_and_register(path) do
@@ -369,19 +388,6 @@ defmodule Jido.AI.Skill.Registry do
 
       {:error, _reason} = error ->
         error
-    end
-  end
-
-  defp find_skill_files(path) do
-    cond do
-      File.regular?(path) and String.ends_with?(path, "SKILL.md") ->
-        [path]
-
-      File.dir?(path) ->
-        Path.wildcard(Path.join([path, "**", "SKILL.md"]))
-
-      true ->
-        []
     end
   end
 

@@ -218,5 +218,13 @@ defmodule Jido.AI.Skill.ActivationTest do
       assert Activation.activated?("session-skill", session_id: "two")
       refute Activation.activated?("session-skill", session_id: "three")
     end
+
+    test "clears all activations for a completed session" do
+      spec = %Spec{name: "session-cleanup", description: "Cleanup", body_ref: {:inline, "body"}}
+
+      assert {:ok, _context} = Activation.activate(spec, session_id: "finished")
+      assert :ok = Activation.clear(session_id: "finished")
+      refute Activation.activated?("session-cleanup", session_id: "finished")
+    end
   end
 end

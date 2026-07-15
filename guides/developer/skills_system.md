@@ -36,7 +36,9 @@ This discovers `.agents/skills/` and `~/.agents/skills/`, appends only the compa
 name/description catalog to the system prompt, adds
 `Jido.AI.Actions.Skill.LoadSkill` to the tools, and makes the resolved specs
 available through reserved tool context for that agent. Discovery and catalog
-construction happen when the agent module is compiled.
+construction happen when each agent instance initializes, so paths and bundled
+resources refer to the runtime filesystem rather than the build host. Skills
+that fail strict Agent Skills validation prevent the agent from initializing.
 
 Prefer an explicit list when only particular roots are trusted:
 
@@ -100,6 +102,9 @@ default to the caller process; pass a stable ID when activation spans processes:
 activation.skill_body
 activation.root_dir
 activation.resources
+
+# Release activation state when the session ends.
+:ok = Jido.AI.Skill.Activation.clear(session_id: conversation_id)
 ```
 
 The `load_skill` action derives its session from `session_id`, then `agent_id`,
@@ -162,8 +167,10 @@ Strict loading (`lenient: false`, the default) enforces the Agent Skills format:
 
 - the declared name exactly matches the parent directory
 - descriptions are non-empty and at most 1,024 characters
+- license is a string when present
 - compatibility is non-empty and at most 500 characters when present
 - metadata contains only string keys and string values
+- `allowed-tools` is a space-separated string when present
 
 Lenient loading keeps interoperability behavior: it records diagnostics and can
 normalize or truncate recoverable values.
@@ -171,8 +178,8 @@ normalize or truncate recoverable values.
 ## Bounded Discovery And Trust
 
 `Discovery.discover_from/2` defaults to a maximum depth of 6 and 2,000 visited
-directories, skips `.git` and `node_modules`, and does not follow directory
-symlinks. Custom callers can require trust explicitly:
+directories, skips `.git` and `node_modules`, and does not follow file or
+directory symlinks. Custom callers can require trust explicitly:
 
 ```elixir
 Jido.AI.Skill.Discovery.discover_from(paths,

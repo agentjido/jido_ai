@@ -100,10 +100,7 @@ defmodule Jido.AI.Skill.Discovery do
   """
   @spec discover_from([String.t()], keyword()) :: {:ok, [discovery_metadata()]} | {:error, term()}
   def discover_from(paths, opts \\ []) do
-    with :ok <- validate_arguments(paths, opts),
-         :ok <- validate_options(opts),
-         :ok <- validate_trusted_paths(paths, opts),
-         {:ok, files} <- scan_paths(paths, opts) do
+    with {:ok, files} <- discover_files(paths, opts) do
       scope = Keyword.get(opts, :scope, :custom)
 
       skills =
@@ -112,6 +109,21 @@ defmodule Jido.AI.Skill.Discovery do
         |> Enum.reject(&is_nil/1)
 
       {:ok, skills}
+    end
+  end
+
+  @doc """
+  Returns bounded, symlink-safe `SKILL.md` paths without parsing them.
+
+  This is the shared scanner used by discovery and registry loading. It accepts
+  the same bounds, exclusions, and trust options as `discover_from/2`.
+  """
+  @spec discover_files([String.t()], keyword()) :: {:ok, [String.t()]} | {:error, term()}
+  def discover_files(paths, opts \\ []) do
+    with :ok <- validate_arguments(paths, opts),
+         :ok <- validate_options(opts),
+         :ok <- validate_trusted_paths(paths, opts) do
+      scan_paths(paths, opts)
     end
   end
 
@@ -192,12 +204,21 @@ defmodule Jido.AI.Skill.Discovery do
       {:ok, metadata} = Jido.AI.Skill.Discovery.find("code-review")
       {:ok, spec} = Jido.AI.Skill.Discovery.to_spec(metadata)
   """
-  @spec to_spec(discovery_metadata() | map()) :: {:ok, Spec.t()} | {:error, term()}
-  def to_spec(%{skill_md_path: path, scope: scope, root_dir: _root_dir}) do
-    case Loader.load(path, lenient: true) do
+  @spec to_spec(discovery_metadata() | map(), keyword()) :: {:ok, Spec.t()} | {:error, term()}
+  def to_spec(metadata, opts \\ [])
+
+  def to_spec(%{skill_md_path: path, scope: scope, root_dir: _root_dir}, opts)
+      when scope in [:project, :user, :custom] and is_list(opts) do
+    case Loader.load(path, Keyword.put_new(opts, :lenient, true)) do
       {:ok, spec} ->
         # Enhance spec with discovery metadata
-        enhanced = %{spec | source: {:file, path}, metadata: Map.put(spec.metadata, :discovery_scope, scope)}
+        enhanced =
+          %{
+            spec
+            | source: {:file, path},
+              metadata: Map.put(spec.metadata, "jido_ai.discovery_scope", Atom.to_string(scope))
+          }
+
         {:ok, enhanced}
 
       {:error, reason} ->
@@ -205,7 +226,7 @@ defmodule Jido.AI.Skill.Discovery do
     end
   end
 
-  def to_spec(_invalid_metadata), do: {:error, :invalid_metadata}
+  def to_spec(_invalid_metadata, _opts), do: {:error, :invalid_metadata}
 
   # Private functions
 
@@ -227,6 +248,7 @@ defmodule Jido.AI.Skill.Discovery do
     max_directories = Keyword.get(opts, :max_directories, @default_max_directories)
     excluded = Keyword.get(opts, :exclude_directories, @default_excluded_directories)
     trust = Keyword.get(opts, :trust, true)
+    scope = Keyword.get(opts, :scope, :custom)
 
     cond do
       not (is_integer(max_depth) and max_depth >= 0) ->
@@ -240,6 +262,9 @@ defmodule Jido.AI.Skill.Discovery do
 
       trust not in [true, false] and not is_function(trust, 1) ->
         {:error, {:invalid_discovery_option, :trust}}
+
+      scope not in [:project, :user, :custom] ->
+        {:error, {:invalid_discovery_option, :scope}}
 
       true ->
         :ok
@@ -270,10 +295,10 @@ defmodule Jido.AI.Skill.Discovery do
       expanded = Path.expand(path)
 
       cond do
-        File.regular?(expanded) and Path.basename(expanded) == "SKILL.md" ->
+        regular_file?(expanded) and Path.basename(expanded) == "SKILL.md" ->
           {:cont, {:ok, [expanded | files], directory_count}}
 
-        File.dir?(expanded) ->
+        directory?(expanded) ->
           case walk_directories([{expanded, 0}], files, directory_count, opts) do
             {:ok, next_files, next_count} -> {:cont, {:ok, next_files, next_count}}
             {:error, reason} -> {:halt, {:error, reason}}
@@ -305,7 +330,7 @@ defmodule Jido.AI.Skill.Discovery do
 
   defp scan_one_directory(directory, depth, files, opts) do
     skill_file = Path.join(directory, "SKILL.md")
-    files = if File.regular?(skill_file), do: [skill_file | files], else: files
+    files = if regular_file?(skill_file), do: [skill_file | files], else: files
     max_depth = Keyword.get(opts, :max_depth, @default_max_depth)
 
     children =
@@ -318,7 +343,7 @@ defmodule Jido.AI.Skill.Discovery do
             |> Enum.sort()
             |> Enum.reject(&(&1 in excluded))
             |> Enum.map(&Path.join(directory, &1))
-            |> Enum.filter(&(File.dir?(&1) and not symlink?(&1)))
+            |> Enum.filter(&directory?/1)
             |> Enum.map(&{&1, depth + 1})
 
           {:error, _reason} ->
@@ -331,9 +356,16 @@ defmodule Jido.AI.Skill.Discovery do
     {files, children}
   end
 
-  defp symlink?(path) do
+  defp regular_file?(path) do
     case File.lstat(path) do
-      {:ok, %File.Stat{type: :symlink}} -> true
+      {:ok, %File.Stat{type: :regular}} -> true
+      _ -> false
+    end
+  end
+
+  defp directory?(path) do
+    case File.lstat(path) do
+      {:ok, %File.Stat{type: :directory}} -> true
       _ -> false
     end
   end
@@ -352,7 +384,7 @@ defmodule Jido.AI.Skill.Discovery do
       {:ok, %{"name" => name} = frontmatter} when is_binary(name) ->
         %{
           name: name,
-          description: frontmatter["description"],
+          description: binary_or_nil(frontmatter["description"]),
           skill_md_path: skill_md_path,
           root_dir: root_dir,
           scope: scope,
@@ -380,4 +412,7 @@ defmodule Jido.AI.Skill.Discovery do
         {:error, reason}
     end
   end
+
+  defp binary_or_nil(value) when is_binary(value), do: value
+  defp binary_or_nil(_value), do: nil
 end

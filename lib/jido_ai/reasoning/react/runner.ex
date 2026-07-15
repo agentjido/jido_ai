@@ -1647,12 +1647,25 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     PendingInputServer.seal_if_empty(server)
   end
 
+  defp normalize_optional_refs(refs) when refs == %{}, do: nil
   defp normalize_optional_refs(%{} = refs), do: refs
   defp normalize_optional_refs(_), do: nil
 
-  defp durable_tool_result_refs("load_skill", {:ok, result, _effects}) when is_map(result) do
-    name = Map.get(result, :name, Map.get(result, "name"))
-    instructions = Map.get(result, :instructions, Map.get(result, "instructions"))
+  defp durable_tool_result_refs("load_skill", result) do
+    case Effects.normalize_result(result) do
+      {:ok, payload, _effects} when is_map(payload) ->
+        durable_skill_refs(payload)
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp durable_tool_result_refs(_tool_name, _result), do: %{}
+
+  defp durable_skill_refs(payload) do
+    name = Map.get(payload, :name, Map.get(payload, "name"))
+    instructions = Map.get(payload, :instructions, Map.get(payload, "instructions"))
 
     if is_binary(name) and is_binary(instructions) do
       %{durable: true, kind: :skill_activation, skill_name: name}
@@ -1660,8 +1673,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       %{}
     end
   end
-
-  defp durable_tool_result_refs(_tool_name, _result), do: %{}
 
   defp fetch_extra(extra, key, default \\ nil)
 

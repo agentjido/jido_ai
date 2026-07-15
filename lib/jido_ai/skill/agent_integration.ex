@@ -1,7 +1,7 @@
 defmodule Jido.AI.Skill.AgentIntegration do
   @moduledoc """
   Builds the Agent Skills catalog, loading tool, and reserved tool context for a
-  `Jido.AI.Agent` at agent module compilation time.
+  `Jido.AI.Agent` when the agent instance initializes.
 
   Discovery is explicit because scanning a project loads instructions from its
   filesystem. Passing `true` trusts the standard project and user skill roots;
@@ -92,7 +92,7 @@ defmodule Jido.AI.Skill.AgentIntegration do
 
   defp load_specs(metadata) do
     Enum.reduce_while(metadata, {:ok, []}, fn item, {:ok, specs} ->
-      case Discovery.to_spec(item) do
+      case Discovery.to_spec(item, lenient: false) do
         {:ok, spec} -> {:cont, {:ok, [spec | specs]}}
         {:error, reason} -> {:halt, {:error, {:skill_load_failed, item.skill_md_path, reason}}}
       end

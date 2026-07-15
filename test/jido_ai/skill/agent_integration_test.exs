@@ -49,4 +49,21 @@ defmodule Jido.AI.Skill.AgentIntegrationTest do
     assert {:error, {:invalid_agent_skills_option, :paths}} =
              AgentIntegration.prepare([:not_a_path])
   end
+
+  test "rejects specification-invalid skills instead of silently normalizing them", %{tmp_dir: tmp_dir} do
+    skill_dir = Path.join(tmp_dir, "actual-name")
+    File.mkdir_p!(skill_dir)
+
+    File.write!(
+      Path.join(skill_dir, "SKILL.md"),
+      "---\nname: different-name\ndescription: Invalid directory match\n---\n"
+    )
+
+    assert {:error,
+            {:skill_load_failed, _path,
+             %Jido.AI.Skill.Error.Validation.InvalidField{
+               field: :name,
+               reason: :directory_name_mismatch
+             }}} = AgentIntegration.prepare([tmp_dir])
+  end
 end

@@ -43,7 +43,8 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
   - `agent_skills`: `false` (explicit opt-in trust boundary). Use `true` for
     standard `.agents/skills` roots, a list of trusted roots, or keyword options
     with `paths`, an explicit `trust` policy, `max_depth`, `max_directories`, and
-    `exclude_directories`.
+    `exclude_directories`. Discovery and strict validation run when each agent
+    instance initializes.
   - `signal_routes`: `[]` (agent-level routes merged with ReAct strategy routes)
 
 - CoT (`Jido.AI.CoTAgent`)

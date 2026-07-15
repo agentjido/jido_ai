@@ -136,16 +136,19 @@ defmodule Jido.AI.Skill.Loader do
     with {:ok, name, diagnostics} <- validate_name(frontmatter["name"], diagnostics, lenient),
          {:ok, diagnostics} <- check_directory_name_match(name, path, diagnostics, lenient),
          {:ok, description, diagnostics} <- validate_description(frontmatter["description"], diagnostics, lenient),
+         {:ok, license, diagnostics} <- validate_license(frontmatter["license"], diagnostics, lenient),
          {:ok, compatibility, diagnostics} <-
            validate_compatibility(frontmatter["compatibility"], diagnostics, lenient),
-         {:ok, metadata, diagnostics} <- parse_metadata(frontmatter["metadata"], diagnostics, lenient) do
+         {:ok, metadata, diagnostics} <- parse_metadata(frontmatter["metadata"], diagnostics, lenient),
+         {:ok, allowed_tools, diagnostics} <-
+           validate_allowed_tools(frontmatter["allowed-tools"], diagnostics, lenient) do
       spec = %Spec{
         name: name,
         description: description,
-        license: optional_string(frontmatter["license"]),
+        license: license,
         compatibility: compatibility,
         metadata: metadata,
-        allowed_tools: parse_allowed_tools(frontmatter["allowed-tools"]),
+        allowed_tools: allowed_tools,
         source: {:file, path},
         body_ref: {:inline, body},
         actions: [],
@@ -174,7 +177,7 @@ defmodule Jido.AI.Skill.Loader do
   end
 
   defp do_check_directory_name_match(name, path, diagnostics, lenient) do
-    parent_dir = path |> Path.dirname() |> Path.basename()
+    parent_dir = path |> Path.expand() |> Path.dirname() |> Path.basename()
 
     if parent_dir != name do
       warning =
@@ -338,6 +341,13 @@ defmodule Jido.AI.Skill.Loader do
     end
   end
 
+  defp validate_license(nil, diagnostics, _lenient), do: {:ok, nil, diagnostics}
+  defp validate_license(license, diagnostics, _lenient) when is_binary(license), do: {:ok, license, diagnostics}
+
+  defp validate_license(license, diagnostics, lenient) do
+    invalid_optional_string(:license, license, :invalid_type, diagnostics, lenient)
+  end
+
   defp validate_compatibility(nil, diagnostics, _lenient), do: {:ok, nil, diagnostics}
 
   defp validate_compatibility(compat, diagnostics, lenient) when is_binary(compat) do
@@ -372,10 +382,35 @@ defmodule Jido.AI.Skill.Loader do
     invalid_optional_string(:compatibility, compat, :invalid_type, diagnostics, lenient)
   end
 
-  defp parse_allowed_tools(nil), do: []
-  defp parse_allowed_tools(tools) when is_list(tools), do: Enum.map(tools, &to_string/1)
-  defp parse_allowed_tools(tools) when is_binary(tools), do: String.split(tools, ~r/\s+/, trim: true)
-  defp parse_allowed_tools(_), do: []
+  defp validate_allowed_tools(nil, diagnostics, _lenient), do: {:ok, [], diagnostics}
+
+  defp validate_allowed_tools(tools, diagnostics, _lenient) when is_binary(tools) do
+    {:ok, String.split(tools, ~r/\s+/, trim: true), diagnostics}
+  end
+
+  defp validate_allowed_tools(tools, diagnostics, true) when is_list(tools) do
+    warning =
+      Diagnostics.Warning.new(
+        :invalid_allowed_tools_type,
+        "allowed-tools must be a space-separated string; list entries were normalized"
+      )
+
+    {:ok, Enum.map(tools, &metadata_string/1), Diagnostics.add_warning(diagnostics, warning)}
+  end
+
+  defp validate_allowed_tools(_tools, diagnostics, true) do
+    warning = Diagnostics.Warning.new(:invalid_allowed_tools_type, "Invalid allowed-tools; field omitted")
+    {:ok, [], Diagnostics.add_warning(diagnostics, warning)}
+  end
+
+  defp validate_allowed_tools(tools, _diagnostics, false) do
+    {:error,
+     %Error.Validation.InvalidField{
+       field: :allowed_tools,
+       reason: :invalid_type,
+       value: tools
+     }}
+  end
 
   defp parse_metadata(nil, diagnostics, _lenient), do: {:ok, %{}, diagnostics}
 
@@ -443,7 +478,7 @@ defmodule Jido.AI.Skill.Loader do
   defp metadata_string(value), do: inspect(value)
 
   defp invalid_field_warning(:compatibility), do: :invalid_compatibility
-  defp invalid_field_warning(_field), do: :invalid_optional_field
+  defp invalid_field_warning(:license), do: :invalid_license
 
   defp parse_tags(nil), do: []
   defp parse_tags(tags) when is_list(tags), do: Enum.map(tags, &to_string/1)

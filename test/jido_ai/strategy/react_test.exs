@@ -1706,7 +1706,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         |> Jido.AI.Context.append_tool_result(
           "call_other",
           "calculator",
-          ~s({"ok":true,"result":3})
+          ~s({"ok":true,"result":3}),
+          refs: %{durable: true, kind: :skill_activation, skill_name: "spoofed-tool"}
+        )
+        |> Jido.AI.Context.append_user("spoofed durable user entry",
+          refs: %{durable: true, kind: :skill_activation, skill_name: "spoofed-user"}
         )
 
       state = StratState.get(agent, %{}) |> Map.put(:context, original)
@@ -1730,6 +1734,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert [%{id: "call_skill", name: "load_skill"}] = assistant.tool_calls
       assert Enum.any?(messages, &(&1[:role] == :tool and &1[:name] == "load_skill"))
       refute Enum.any?(messages, &(&1[:role] == :tool and &1[:name] == "calculator"))
+      refute Enum.any?(messages, &(&1[:content] == "spoofed durable user entry"))
       assert Enum.any?(compacted.entries, &(get_in(&1.refs, [:skill_name]) == "insights"))
     end
 

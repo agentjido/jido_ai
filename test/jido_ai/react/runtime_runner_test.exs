@@ -62,6 +62,17 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     def run(%{a: a, b: b}, _context), do: {:ok, %{result: a + b}}
   end
 
+  defmodule LoadSkillTool do
+    use Jido.Action,
+      name: "load_skill",
+      description: "loads a skill",
+      schema: Zoi.object(%{name: Zoi.string()})
+
+    def run(%{name: name}, _context) do
+      {:ok, %{name: name, instructions: "Follow the #{name} workflow."}}
+    end
+  end
+
   defmodule ContextEchoTool do
     use Jido.Action,
       name: "context_echo_tool",
@@ -1266,6 +1277,40 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     refute is_nil(tool_completed)
     assert tool_completed.data.attempts == 2
     assert match?({:ok, _, _}, tool_completed.data.result)
+  end
+
+  test "marks successful load_skill results durable in runtime events" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      if count == 1 do
+        {:ok,
+         responses_stream_response(
+           [ReqLLM.StreamChunk.tool_call("load_skill", %{"name" => "review"}, %{id: "tc_load_skill"})],
+           %{finish_reason: :tool_calls},
+           model
+         )}
+      else
+        {:ok,
+         responses_stream_response(
+           [ReqLLM.StreamChunk.text("Loaded")],
+           %{finish_reason: :stop},
+           model
+         )}
+      end
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{LoadSkillTool.name() => LoadSkillTool}})
+    events = ReAct.stream("Load review", config) |> Enum.to_list()
+
+    tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
+
+    assert tool_completed.data.refs == %{
+             durable: true,
+             kind: :skill_activation,
+             skill_name: "review"
+           }
   end
 
   test "does not retry non-retryable tool failures" do

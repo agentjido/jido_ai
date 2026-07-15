@@ -51,6 +51,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Error
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Context, as: AIContext
+  alias Jido.AI.Skill.AgentIntegration
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
   alias Jido.Thread
@@ -2285,22 +2286,31 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp durable_skill_name(entry) do
     refs = fetch_map_value(entry, :refs)
     durable? = fetch_map_value(refs, :durable) == true
+    kind = fetch_map_value(refs, :kind)
     skill_name = fetch_map_value(refs, :skill_name)
+    role = fetch_map_value(entry, :role)
+    tool_name = fetch_map_value(entry, :name)
+    tool_call_id = fetch_map_value(entry, :tool_call_id)
 
-    if durable? and is_binary(skill_name), do: skill_name, else: nil
+    if durable? and kind in [:skill_activation, "skill_activation"] and
+         role in [:tool, "tool"] and tool_name == "load_skill" and
+         is_binary(tool_call_id) and is_binary(skill_name),
+       do: skill_name,
+       else: nil
   end
 
   defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []
     observability_overrides = opts |> Keyword.get(:observability, %{}) |> normalize_map_opt()
     tool_context_opt = opts |> Keyword.get(:tool_context, %{}) |> normalize_map_opt()
+    skill_integration = opts |> Keyword.get(:agent_skills, false) |> AgentIntegration.prepare!()
 
     agent_effect_policy =
       Keyword.get(opts, :agent_effect_policy, Keyword.get(opts, :effect_policy, %{}))
 
     strategy_effect_policy = Keyword.get(opts, :strategy_effect_policy, %{})
 
-    tools_modules =
+    configured_tools =
       case Keyword.fetch(opts, :tools) do
         {:ok, mods} when is_list(mods) ->
           mods
@@ -2310,8 +2320,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
                 "Jido.AI.Reasoning.ReAct.Strategy requires :tools option (list of Jido.Action modules)"
       end
 
+    tools_modules = Enum.uniq(configured_tools ++ skill_integration.tools)
+
     actions_by_name = Map.new(tools_modules, &{&1.name(), &1})
     reqllm_tools = ToolAdapter.from_actions(tools_modules)
+    base_tool_context = Map.get(agent.state, :tool_context) || tool_context_opt
 
     raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
@@ -2325,7 +2338,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
       request_transformer: validate_request_transformer_opt!(Keyword.get(opts, :request_transformer)),
-      system_prompt: normalize_system_prompt_opt(opts),
+      system_prompt: append_system_prompt(normalize_system_prompt_opt(opts), skill_integration.index),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens),
@@ -2354,7 +2367,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           observability_overrides
         ),
       agent_id: agent.id,
-      base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt,
+      base_tool_context: Map.merge(base_tool_context, skill_integration.tool_context),
       base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options(),
       base_llm_opts: opts |> Keyword.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string),
       output: opts |> Keyword.get(:output) |> Output.new!(),
@@ -2378,6 +2391,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
               "invalid system_prompt: expected binary, nil, or false, got #{inspect(other)}"
     end
   end
+
+  defp append_system_prompt(prompt, ""), do: prompt
+  defp append_system_prompt(nil, addition), do: addition
+  defp append_system_prompt("", addition), do: addition
+  defp append_system_prompt(prompt, addition), do: prompt <> "\n\n" <> addition
 
   defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 

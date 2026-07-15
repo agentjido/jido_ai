@@ -173,6 +173,18 @@ defmodule Jido.AI.Skill.RegistryTest do
       assert Registry.list_activated(session_id: "session-a") == ["shared-skill"]
       assert Registry.list_activated(session_id: "session-b") == ["shared-skill"]
     end
+
+    test "clears one session without affecting another" do
+      context = %{skill: %Spec{name: "session-cleanup", description: "Cleanup"}}
+
+      assert :ok = Registry.mark_activated("session-cleanup", context, session_id: "session-a")
+      assert :ok = Registry.mark_durable("session-cleanup", session_id: "session-a")
+      assert :ok = Registry.mark_activated("session-cleanup", context, session_id: "session-b")
+
+      assert :ok = Registry.clear_activations(session_id: "session-a")
+      refute Registry.activated?("session-cleanup", session_id: "session-a")
+      assert Registry.activated?("session-cleanup", session_id: "session-b")
+    end
   end
 
   describe "load_from_paths/1" do

@@ -8,7 +8,7 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   until they are needed.
 
   The action routes through `Jido.AI.Skill.Activation`, returning the skill root
-  and a bounded resource listing with the instructions. It scopes activation
+  and resource listing with the instructions. It scopes activation
   from `session_id`, `agent_id`, or `request_id` in the runtime context and tags
   the resulting tool message as durable for ReAct compaction.
 
@@ -105,17 +105,20 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   end
 
   defp activate_skill(name, context) do
-    skill = Map.get(agent_skill_specs(context), name, name)
     opts = [session_id: activation_session_id(context)]
 
+    with {:ok, skill} <- activation_target(name, context) do
+      activate(name, skill, opts, context)
+    end
+  end
+
+  defp activate(name, skill, opts, context) do
     case Activation.activate(skill, opts) do
       {:ok, activation} ->
-        with :ok <- Registry.mark_durable(name, opts) do
-          {:ok, activation}
-        end
+        {:ok, activation}
 
       {:error, :skill_not_found} ->
-        skill_not_found(name, context)
+        skill_not_found(name, available_skill_names(context))
 
       {:error, {:body_load_failed, reason}} ->
         skill_body_unavailable(name, reason)
@@ -125,10 +128,31 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
     end
   end
 
+  defp activation_target(name, context) do
+    case agent_skill_specs(context) do
+      {:scoped, specs} ->
+        case Map.fetch(specs, name) do
+          {:ok, %Spec{} = spec} -> {:ok, spec}
+          _ -> skill_not_found(name, specs |> Map.keys() |> Enum.sort())
+        end
+
+      :unscoped ->
+        {:ok, name}
+    end
+  end
+
   defp agent_skill_specs(context) do
-    case Map.get(context, @context_skills_key, Map.get(context, Atom.to_string(@context_skills_key), %{})) do
-      %{} = specs -> specs
-      _ -> %{}
+    case fetch_agent_skill_specs(context) do
+      {:ok, %{} = specs} -> {:scoped, specs}
+      {:ok, _invalid} -> {:scoped, %{}}
+      :error -> :unscoped
+    end
+  end
+
+  defp fetch_agent_skill_specs(context) do
+    case Map.fetch(context, @context_skills_key) do
+      {:ok, specs} -> {:ok, specs}
+      :error -> Map.fetch(context, Atom.to_string(@context_skills_key))
     end
   end
 
@@ -138,21 +162,20 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
       context[:request_id] || context["request_id"] || self()
   end
 
-  defp skill_not_found(name, context) do
-    available_skills =
-      context
-      |> agent_skill_specs()
-      |> Map.keys()
-      |> Kernel.++(Registry.list())
-      |> Enum.uniq()
-      |> Enum.sort()
-
+  defp skill_not_found(name, available_skills) do
     {:error,
      %{
        type: :skill_not_found,
        message: "Unknown skill '#{name}'",
        available_skills: available_skills
      }}
+  end
+
+  defp available_skill_names(context) do
+    case agent_skill_specs(context) do
+      {:scoped, specs} -> specs |> Map.keys() |> Enum.sort()
+      :unscoped -> Registry.list() |> Enum.sort()
+    end
   end
 
   defp skill_body_unavailable(name, reason) do
