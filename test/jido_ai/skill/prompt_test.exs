@@ -55,14 +55,14 @@ defmodule Jido.AI.Skill.PromptTest do
   end
 
   describe "render/2" do
-    test "renders single skill with body" do
+    test "omits skill bodies by default" do
       result = Prompt.render([TestSkill])
 
       assert result =~ "You have access to the following skills:"
       assert result =~ "## test-skill"
       assert result =~ "A test skill."
       assert result =~ "Allowed tools: tool_a, tool_b"
-      assert result =~ "# Test Skill Body"
+      refute result =~ "# Test Skill Body"
     end
 
     test "renders multiple skills" do
@@ -72,12 +72,11 @@ defmodule Jido.AI.Skill.PromptTest do
       assert result =~ "## minimal"
     end
 
-    test "respects include_body: false option" do
-      result = Prompt.render([TestSkill], include_body: false)
+    test "includes bodies only when explicitly requested" do
+      result = Prompt.render([TestSkill], include_body: true)
 
       assert result =~ "## test-skill"
-      assert result =~ "A test skill."
-      refute result =~ "# Test Skill Body"
+      assert result =~ "# Test Skill Body"
     end
 
     test "uses custom header" do

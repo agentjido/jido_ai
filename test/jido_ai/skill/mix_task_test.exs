@@ -7,7 +7,7 @@ defmodule Mix.Tasks.JidoAi.SkillTest do
     Mix.shell(Mix.Shell.Process)
 
     tmp_dir = Path.join(System.tmp_dir!(), "jido_ai_skill_task_#{System.unique_integer([:positive, :monotonic])}")
-    valid_dir = Path.join(tmp_dir, "valid")
+    valid_dir = Path.join(tmp_dir, "demo-skill")
     invalid_dir = Path.join(tmp_dir, "invalid")
 
     File.mkdir_p!(valid_dir)

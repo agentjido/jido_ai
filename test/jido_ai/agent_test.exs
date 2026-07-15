@@ -87,6 +87,14 @@ defmodule Jido.AI.AgentTest do
       tools: [TestCalculator, TestSearch]
   end
 
+  defmodule AgentWithAgentSkills do
+    use Jido.AI.Agent,
+      name: "agent_with_agent_skills",
+      tools: [TestCalculator],
+      system_prompt: "Base instructions.",
+      agent_skills: [".agents/skills"]
+  end
+
   defmodule AgentWithToolContext do
     use Jido.AI.Agent,
       name: "agent_with_context",
@@ -507,6 +515,50 @@ defmodule Jido.AI.AgentTest do
       assert TestCalculator in tools
       assert TestSearch in tools
       assert Enum.all?(tools, &is_atom/1)
+    end
+
+    test "agent_skills wires the catalog, loading tool, and scoped specs" do
+      agent = AgentWithAgentSkills.new()
+      state = StratState.get(agent, %{})
+      config = state[:config]
+
+      assert Jido.AI.Actions.Skill.LoadSkill in ReAct.list_tools(agent)
+      assert config.system_prompt =~ "Base instructions."
+      assert config.system_prompt =~ "**hex-release**"
+      refute config.system_prompt =~ "# Hex Release"
+
+      specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
+      assert %Jido.AI.Skill.Spec{name: "hex-release"} = specs["hex-release"]
+    end
+
+    @tag :tmp_dir
+    test "agent_skills resolves at agent initialization instead of module compilation", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "runtime-skill")
+      File.mkdir_p!(skill_dir)
+      skill_file = Path.join(skill_dir, "SKILL.md")
+
+      File.write!(skill_file, "---\nname: runtime-skill\ndescription: Compile-time version\n---\n\nOld body\n")
+
+      module_name = Module.concat(__MODULE__, :"RuntimeSkillsAgent#{System.unique_integer([:positive, :monotonic])}")
+
+      Code.compile_string("""
+      defmodule #{inspect(module_name)} do
+        use Jido.AI.Agent,
+          name: "runtime_skills_agent",
+          tools: [#{inspect(TestCalculator)}],
+          agent_skills: [#{inspect(tmp_dir)}]
+      end
+      """)
+
+      File.write!(skill_file, "---\nname: runtime-skill\ndescription: Runtime version\n---\n\nNew body\n")
+
+      agent = module_name.new()
+      config = StratState.get(agent, %{}).config
+      specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
+
+      assert config.system_prompt =~ "Runtime version"
+      refute config.system_prompt =~ "Compile-time version"
+      assert Jido.AI.Skill.body(specs["runtime-skill"]) == "New body"
     end
 
     test "does not warn when consumer defines its own thinking_meta/1" do

@@ -18,7 +18,7 @@ defmodule Jido.AI.Skill.Registry do
 
   use GenServer
 
-  alias Jido.AI.Skill.{Spec, Loader, Error}
+  alias Jido.AI.Skill.{Discovery, Spec, Loader, Error}
 
   @table_name :jido_skill_registry
   @activation_table :jido_skill_activations
@@ -142,34 +142,45 @@ defmodule Jido.AI.Skill.Registry do
   @doc """
   Marks a skill as activated with its activation context.
 
-  Used by `Jido.AI.Skill.Activation` to track activated skills.
+  Used by `Jido.AI.Skill.Activation` to track activated skills. The optional
+  `:session_id` defaults to the caller process.
   """
-  @spec mark_activated(String.t(), map()) :: :ok | {:error, term()}
-  def mark_activated(name, context) when is_binary(name) and is_map(context) do
+  @spec mark_activated(String.t(), map(), keyword()) :: :ok | {:error, term()}
+  def mark_activated(name, context, opts \\ []) when is_binary(name) and is_map(context) do
+    session_id = session_id(opts)
+
     with_started_registry(fn ->
-      GenServer.call(__MODULE__, {:mark_activated, name, context})
+      GenServer.call(__MODULE__, {:mark_activated, session_id, name, context})
     end)
     |> unwrap_or_error()
   end
 
   @doc """
-  Checks if a skill has been activated in this session.
+  Checks if a skill has been activated in the selected session.
+
+  The optional `:session_id` defaults to the caller process.
   """
-  @spec activated?(String.t()) :: boolean()
-  def activated?(name) when is_binary(name) do
+  @spec activated?(String.t(), keyword()) :: boolean()
+  def activated?(name, opts \\ []) when is_binary(name) do
+    session_id = session_id(opts)
+
     with_started_registry(fn ->
-      :ets.lookup(@activation_table, name) != []
+      :ets.lookup(@activation_table, {session_id, name}) != []
     end)
     |> unwrap_or_false()
   end
 
   @doc """
-  Lists all activated skill names in the current session.
+  Lists all activated skill names in the selected session.
+
+  The optional `:session_id` defaults to the caller process.
   """
-  @spec list_activated() :: [String.t()]
-  def list_activated do
+  @spec list_activated(keyword()) :: [String.t()]
+  def list_activated(opts \\ []) do
+    session_id = session_id(opts)
+
     with_started_registry(fn ->
-      :ets.select(@activation_table, [{{:"$1", :_}, [], [:"$1"]}])
+      :ets.select(@activation_table, [{{{session_id, :"$1"}, :_}, [], [:"$1"]}])
     end)
     |> unwrap_or_empty_list()
   end
@@ -177,16 +188,20 @@ defmodule Jido.AI.Skill.Registry do
   @doc """
   Gets the activation context for an activated skill.
 
+  The optional `:session_id` defaults to the caller process.
+
   ## Returns
 
   - `{:ok, context}` - Skill is activated, context returned
   - `{:error, :not_activated}` - Skill not found in activation table
   """
-  @spec get_activation_context(String.t()) :: {:ok, map()} | {:error, :not_activated}
-  def get_activation_context(name) when is_binary(name) do
+  @spec get_activation_context(String.t(), keyword()) :: {:ok, map()} | {:error, :not_activated}
+  def get_activation_context(name, opts \\ []) when is_binary(name) do
+    session_id = session_id(opts)
+
     with_started_registry(fn ->
-      case :ets.lookup(@activation_table, name) do
-        [{^name, %{context: context}}] -> {:ok, context}
+      case :ets.lookup(@activation_table, {session_id, name}) do
+        [{{^session_id, ^name}, %{context: context}}] -> {:ok, context}
         [] -> {:error, :not_activated}
       end
     end)
@@ -194,38 +209,48 @@ defmodule Jido.AI.Skill.Registry do
   end
 
   @doc """
-  Marks an activated skill as durable, protecting it from compaction.
+  Marks an activated skill as durable for lifecycle bookkeeping.
 
-  Durable skills remain in the activation table until explicitly
-  deactivated or the registry is cleared.
+  Durable skills remain in the activation table until the registry is cleared.
+  `Jido.AI.Actions.Skill.LoadSkill` also tags its conversation tool result so
+  ReAct can preserve the actual instructions during compaction. Calling this
+  registry function alone does not mutate conversation context.
   """
-  @spec mark_durable(String.t()) :: :ok | {:error, term()}
-  def mark_durable(name) when is_binary(name) do
+  @spec mark_durable(String.t(), keyword()) :: :ok | {:error, term()}
+  def mark_durable(name, opts \\ []) when is_binary(name) do
+    session_id = session_id(opts)
+
     with_started_registry(fn ->
-      GenServer.call(__MODULE__, {:mark_durable, name})
+      GenServer.call(__MODULE__, {:mark_durable, session_id, name})
     end)
     |> unwrap_or_error()
   end
 
   @doc """
-  Unmarks a durable skill, allowing it to be compacted.
+  Clears durable lifecycle bookkeeping for a skill activation.
   """
-  @spec unmark_durable(String.t()) :: :ok | {:error, term()}
-  def unmark_durable(name) when is_binary(name) do
+  @spec unmark_durable(String.t(), keyword()) :: :ok | {:error, term()}
+  def unmark_durable(name, opts \\ []) when is_binary(name) do
+    session_id = session_id(opts)
+
     with_started_registry(fn ->
-      GenServer.call(__MODULE__, {:unmark_durable, name})
+      GenServer.call(__MODULE__, {:unmark_durable, session_id, name})
     end)
     |> unwrap_or_error()
   end
 
   @doc """
   Checks if a skill is marked as durable.
+
+  The optional `:session_id` defaults to the caller process.
   """
-  @spec durable?(String.t()) :: boolean()
-  def durable?(name) when is_binary(name) do
+  @spec durable?(String.t(), keyword()) :: boolean()
+  def durable?(name, opts \\ []) when is_binary(name) do
+    session_id = session_id(opts)
+
     with_started_registry(fn ->
-      case :ets.lookup(@activation_table, name) do
-        [{^name, %{durable: true}}] -> true
+      case :ets.lookup(@activation_table, {session_id, name}) do
+        [{{^session_id, ^name}, %{durable: true}}] -> true
         _ -> false
       end
     end)
@@ -237,10 +262,28 @@ defmodule Jido.AI.Skill.Registry do
 
   Fails if the skill is marked as durable.
   """
-  @spec deactivate(String.t()) :: :ok | {:error, term()}
-  def deactivate(name) when is_binary(name) do
+  @spec deactivate(String.t(), keyword()) :: :ok | {:error, term()}
+  def deactivate(name, opts \\ []) when is_binary(name) do
+    session_id = session_id(opts)
+
     with_started_registry(fn ->
-      GenServer.call(__MODULE__, {:deactivate, name})
+      GenServer.call(__MODULE__, {:deactivate, session_id, name})
+    end)
+    |> unwrap_or_error()
+  end
+
+  @doc """
+  Removes every activation for the selected session, including durable entries.
+
+  Use this when a conversation or agent session ends. The optional `:session_id`
+  defaults to the caller process.
+  """
+  @spec clear_activations(keyword()) :: :ok | {:error, term()}
+  def clear_activations(opts \\ []) do
+    selected_session = session_id(opts)
+
+    with_started_registry(fn ->
+      GenServer.call(__MODULE__, {:clear_activations, selected_session})
     end)
     |> unwrap_or_error()
   end
@@ -281,15 +324,15 @@ defmodule Jido.AI.Skill.Registry do
     {:reply, result, state}
   end
 
-  def handle_call({:mark_activated, name, context}, _from, state) do
-    :ets.insert(@activation_table, {name, %{context: context, durable: false}})
+  def handle_call({:mark_activated, session_id, name, context}, _from, state) do
+    :ets.insert(@activation_table, {{session_id, name}, %{context: context, durable: false}})
     {:reply, :ok, state}
   end
 
-  def handle_call({:mark_durable, name}, _from, state) do
-    case :ets.lookup(@activation_table, name) do
-      [{^name, activation}] ->
-        :ets.insert(@activation_table, {name, %{activation | durable: true}})
+  def handle_call({:mark_durable, session_id, name}, _from, state) do
+    case :ets.lookup(@activation_table, {session_id, name}) do
+      [{{^session_id, ^name}, activation}] ->
+        :ets.insert(@activation_table, {{session_id, name}, %{activation | durable: true}})
         {:reply, :ok, state}
 
       [] ->
@@ -297,10 +340,10 @@ defmodule Jido.AI.Skill.Registry do
     end
   end
 
-  def handle_call({:unmark_durable, name}, _from, state) do
-    case :ets.lookup(@activation_table, name) do
-      [{^name, activation}] ->
-        :ets.insert(@activation_table, {name, %{activation | durable: false}})
+  def handle_call({:unmark_durable, session_id, name}, _from, state) do
+    case :ets.lookup(@activation_table, {session_id, name}) do
+      [{{^session_id, ^name}, activation}] ->
+        :ets.insert(@activation_table, {{session_id, name}, %{activation | durable: false}})
         {:reply, :ok, state}
 
       [] ->
@@ -308,28 +351,33 @@ defmodule Jido.AI.Skill.Registry do
     end
   end
 
-  def handle_call({:deactivate, name}, _from, state) do
-    case :ets.lookup(@activation_table, name) do
-      [{^name, %{durable: true}}] ->
+  def handle_call({:deactivate, session_id, name}, _from, state) do
+    case :ets.lookup(@activation_table, {session_id, name}) do
+      [{{^session_id, ^name}, %{durable: true}}] ->
         {:reply, {:error, :skill_is_durable}, state}
 
       _ ->
-        :ets.delete(@activation_table, name)
+        :ets.delete(@activation_table, {session_id, name})
         {:reply, :ok, state}
     end
+  end
+
+  def handle_call({:clear_activations, session_id}, _from, state) do
+    :ets.select_delete(@activation_table, [{{{session_id, :_}, :_}, [], [true]}])
+    {:reply, :ok, state}
   end
 
   # Private functions
 
   defp do_load_paths(paths) do
-    paths
-    |> Enum.flat_map(&find_skill_files/1)
-    |> Enum.reduce_while({:ok, 0}, fn path, {:ok, count} ->
-      case load_and_register(path) do
-        :ok -> {:cont, {:ok, count + 1}}
-        {:error, _} = error -> {:halt, error}
-      end
-    end)
+    with {:ok, files} <- Discovery.discover_files(paths, trust: true) do
+      Enum.reduce_while(files, {:ok, 0}, fn path, {:ok, count} ->
+        case load_and_register(path) do
+          :ok -> {:cont, {:ok, count + 1}}
+          {:error, _} = error -> {:halt, error}
+        end
+      end)
+    end
   end
 
   defp load_and_register(path) do
@@ -343,18 +391,7 @@ defmodule Jido.AI.Skill.Registry do
     end
   end
 
-  defp find_skill_files(path) do
-    cond do
-      File.regular?(path) and String.ends_with?(path, "SKILL.md") ->
-        [path]
-
-      File.dir?(path) ->
-        Path.wildcard(Path.join([path, "**", "SKILL.md"]))
-
-      true ->
-        []
-    end
-  end
+  defp session_id(opts), do: Keyword.get(opts, :session_id, self())
 
   defp with_started_registry(fun) when is_function(fun, 0) do
     case ensure_started() do

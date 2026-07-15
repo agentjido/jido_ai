@@ -43,6 +43,8 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert result.license == "MIT"
       assert result.compatibility == ">= 2.0.0"
       assert result.vsn == "1.2.3"
+      assert result.root_dir == nil
+      assert result.resources == %{scripts: [], references: [], assets: []}
     end
 
     test "can omit metadata fields" do
@@ -51,7 +53,9 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert result == %{
                name: "insights",
                description: "Analyze product signals.",
-               instructions: "# Insights\n\nFollow the product analysis workflow."
+               instructions: "# Insights\n\nFollow the product analysis workflow.",
+               root_dir: nil,
+               resources: %{scripts: [], references: [], assets: []}
              }
     end
 
@@ -66,7 +70,9 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert result == %{
                name: "insights",
                description: "Analyze product signals.",
-               instructions: "# Insights\n\nFollow the product analysis workflow."
+               instructions: "# Insights\n\nFollow the product analysis workflow.",
+               root_dir: nil,
+               resources: %{scripts: [], references: [], assets: []}
              }
     end
 
@@ -76,6 +82,15 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert error.type == :skill_not_found
       assert error.message == "Unknown skill 'missing'"
       assert error.available_skills == ["insights"]
+    end
+
+    test "does not fall through a scoped catalog to the global registry" do
+      context = %{LoadSkill.context_skills_key() => %{}, agent_id: "scoped-agent"}
+
+      assert {:error, error} = LoadSkill.run(%{name: "insights"}, context)
+      assert error.type == :skill_not_found
+      assert error.available_skills == []
+      refute Registry.activated?("insights", session_id: "scoped-agent")
     end
 
     test "returns structured error when a skill body file is unavailable" do
@@ -118,6 +133,17 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
 
       assert error.type == :invalid_params
       assert error.message == "Parameters must be a map"
+    end
+
+    test "activates and deduplicates within the runtime session only" do
+      assert {:ok, _result} = LoadSkill.run(%{name: "insights"}, %{agent_id: "agent-a"})
+
+      assert Registry.activated?("insights", session_id: "agent-a")
+      refute Registry.durable?("insights", session_id: "agent-a")
+      refute Registry.activated?("insights", session_id: "agent-b")
+
+      assert {:ok, _result} = LoadSkill.run(%{name: "insights"}, %{agent_id: "agent-b"})
+      assert Registry.activated?("insights", session_id: "agent-b")
     end
   end
 end

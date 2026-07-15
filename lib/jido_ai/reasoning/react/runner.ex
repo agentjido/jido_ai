@@ -9,6 +9,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   alias Jido.AI.Output
   alias Jido.AI.PendingInputServer
   alias Jido.AI.Query
+  alias Jido.AI.Actions.Skill.LoadSkill
   alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall, State, Token, ToolSelection}
   alias Jido.AI.Runtime.Event
   alias Jido.AI.Test.ReActScript
@@ -731,6 +732,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           Enum.reduce(results, {state, state.context}, fn
             {pending_call, result, attempts, duration_ms}, {acc, context_acc} ->
               completed = PendingToolCall.complete(pending_call, result, attempts, duration_ms)
+              refs = durable_tool_result_refs(completed.name, result, tool_config.tools)
 
               {acc, _} =
                 emit_event(
@@ -743,14 +745,20 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                     tool_name: completed.name,
                     result: result,
                     attempts: attempts,
-                    duration_ms: duration_ms
+                    duration_ms: duration_ms,
+                    refs: refs
                   },
                   tool_call_id: completed.id,
                   tool_name: completed.name
                 )
 
               content = Turn.format_tool_result_content(result)
-              context_acc = AIContext.append_tool_result(context_acc, completed.id, completed.name, content)
+
+              context_acc =
+                AIContext.append_tool_result(context_acc, completed.id, completed.name, content,
+                  refs: normalize_optional_refs(refs)
+                )
+
               {acc, context_acc}
 
             {:error, reason}, {acc, context_acc} ->
@@ -1640,8 +1648,32 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     PendingInputServer.seal_if_empty(server)
   end
 
+  defp normalize_optional_refs(refs) when refs == %{}, do: nil
   defp normalize_optional_refs(%{} = refs), do: refs
   defp normalize_optional_refs(_), do: nil
+
+  defp durable_tool_result_refs("load_skill", result, %{"load_skill" => LoadSkill}) do
+    case Effects.normalize_result(result) do
+      {:ok, payload, _effects} when is_map(payload) ->
+        durable_skill_refs(payload)
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp durable_tool_result_refs(_tool_name, _result, _tools), do: %{}
+
+  defp durable_skill_refs(payload) do
+    name = Map.get(payload, :name, Map.get(payload, "name"))
+    instructions = Map.get(payload, :instructions, Map.get(payload, "instructions"))
+
+    if is_binary(name) and is_binary(instructions) do
+      %{durable: true, kind: :skill_activation, skill_name: name}
+    else
+      %{}
+    end
+  end
 
   defp fetch_extra(extra, key, default \\ nil)
 

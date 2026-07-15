@@ -30,10 +30,12 @@ defmodule Jido.AI.Skill.RegistryTest do
     Body two.
     """
 
-    nested_dir = Path.join(@fixtures_path, "nested")
+    skill1_dir = Path.join(@fixtures_path, "skill-one")
+    nested_dir = Path.join([@fixtures_path, "nested", "skill-two"])
+    File.mkdir_p!(skill1_dir)
     File.mkdir_p!(nested_dir)
 
-    File.write!(Path.join(@fixtures_path, "SKILL.md"), skill1)
+    File.write!(Path.join(skill1_dir, "SKILL.md"), skill1)
     File.write!(Path.join(nested_dir, "SKILL.md"), skill2)
 
     on_exit(fn ->
@@ -156,6 +158,33 @@ defmodule Jido.AI.Skill.RegistryTest do
       refute Registry.activated?("active-skill")
       assert {:error, :not_activated} = Registry.get_activation_context("active-skill")
     end
+
+    test "isolates activation state by session" do
+      context_a = %{skill: %Spec{name: "shared-skill", description: "Session A"}}
+      context_b = %{skill: %Spec{name: "shared-skill", description: "Session B"}}
+
+      assert :ok = Registry.mark_activated("shared-skill", context_a, session_id: "session-a")
+      assert Registry.activated?("shared-skill", session_id: "session-a")
+      refute Registry.activated?("shared-skill", session_id: "session-b")
+
+      assert :ok = Registry.mark_activated("shared-skill", context_b, session_id: "session-b")
+      assert {:ok, ^context_a} = Registry.get_activation_context("shared-skill", session_id: "session-a")
+      assert {:ok, ^context_b} = Registry.get_activation_context("shared-skill", session_id: "session-b")
+      assert Registry.list_activated(session_id: "session-a") == ["shared-skill"]
+      assert Registry.list_activated(session_id: "session-b") == ["shared-skill"]
+    end
+
+    test "clears one session without affecting another" do
+      context = %{skill: %Spec{name: "session-cleanup", description: "Cleanup"}}
+
+      assert :ok = Registry.mark_activated("session-cleanup", context, session_id: "session-a")
+      assert :ok = Registry.mark_durable("session-cleanup", session_id: "session-a")
+      assert :ok = Registry.mark_activated("session-cleanup", context, session_id: "session-b")
+
+      assert :ok = Registry.clear_activations(session_id: "session-a")
+      refute Registry.activated?("session-cleanup", session_id: "session-a")
+      assert Registry.activated?("session-cleanup", session_id: "session-b")
+    end
   end
 
   describe "load_from_paths/1" do
@@ -168,7 +197,7 @@ defmodule Jido.AI.Skill.RegistryTest do
     end
 
     test "loads skill from direct file path" do
-      file_path = Path.join(@fixtures_path, "SKILL.md")
+      file_path = Path.join([@fixtures_path, "skill-one", "SKILL.md"])
 
       assert {:ok, 1} = Registry.load_from_paths([file_path])
       assert {:ok, %Spec{name: "skill-one"}} = Registry.lookup("skill-one")

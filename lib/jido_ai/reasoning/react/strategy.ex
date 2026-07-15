@@ -51,6 +51,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   alias Jido.AI.Error
   alias Jido.AI.Reasoning.Helpers
   alias Jido.AI.Context, as: AIContext
+  alias Jido.AI.Actions.Skill.LoadSkill
+  alias Jido.AI.Skill.AgentIntegration
   alias Jido.AI.ToolAdapter
   alias Jido.AI.Turn
   alias Jido.Thread
@@ -968,7 +970,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
          context_ref: context_ref,
          operation: %{type: :replace} = operation
        }) do
-    context = operation.result_context
+    context = preserve_durable_entries(state[:context], operation.result_context, operation.reason)
+    operation = %{operation | result_context: context}
 
     state =
       state
@@ -1193,6 +1196,12 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
         content = Turn.format_tool_result_content(tool_result)
 
+        refs =
+          data
+          |> event_field(:refs, %{})
+          |> normalize_event_message_refs(runtime_event_refs(event, request_id))
+          |> sanitize_skill_activation_refs(tool_name, state)
+
         append_ai_message_event(
           agent,
           state,
@@ -1200,7 +1209,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           %{role: :tool, content: content, tool_call_id: tool_call_id, name: tool_name},
           request_id,
           run_id,
-          signal_id
+          signal_id,
+          refs
         )
 
       _ ->
@@ -1624,7 +1634,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             }
           end)
 
-        refs = runtime_event_refs(event, request_id)
+        refs =
+          data
+          |> event_field(:refs, %{})
+          |> normalize_event_message_refs(runtime_event_refs(event, request_id))
 
         updated =
           base_state
@@ -1708,7 +1721,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_result = normalize_tool_result(event_field(data, :result, {:error, :unknown, []}))
         tool_result_entry = completed_tool_result_entry(base_state, tool_call_id, tool_name, tool_result)
 
-        refs = runtime_event_refs(event, request_id)
+        refs =
+          data
+          |> event_field(:refs, %{})
+          |> normalize_event_message_refs(runtime_event_refs(event, request_id))
+          |> sanitize_skill_activation_refs(tool_name, base_state)
 
         updated =
           base_state
@@ -2220,17 +2237,101 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_event_message_refs(%{} = refs, _fallback_refs), do: refs
   defp normalize_event_message_refs(_refs, fallback_refs), do: fallback_refs
 
+  defp sanitize_skill_activation_refs(refs, tool_name, state) when is_map(refs) do
+    if tool_name == "load_skill" and get_in(state, [:config, :actions_by_name, "load_skill"]) == LoadSkill do
+      refs
+    else
+      Map.drop(refs, [:durable, :kind, :skill_name, "durable", "kind", "skill_name"])
+    end
+  end
+
+  defp sanitize_skill_activation_refs(_refs, _tool_name, _state), do: %{}
+
+  defp preserve_durable_entries(%AIContext{} = current, %AIContext{} = replacement, :compaction) do
+    durable_tool_call_ids =
+      current.entries
+      |> Enum.filter(&is_binary(durable_skill_name(&1)))
+      |> Enum.map(&fetch_map_value(&1, :tool_call_id))
+      |> MapSet.new()
+      |> MapSet.intersection(assistant_tool_call_ids(current.entries, "load_skill"))
+
+    replacement_tool_call_ids = assistant_tool_call_ids(replacement.entries, nil)
+
+    preserved =
+      current.entries
+      |> Enum.flat_map(fn entry ->
+        cond do
+          fetch_map_value(entry, :role) in [:tool, "tool"] and
+              MapSet.member?(durable_tool_call_ids, fetch_map_value(entry, :tool_call_id)) ->
+            [entry]
+
+          fetch_map_value(entry, :role) in [:assistant, "assistant"] ->
+            tool_calls =
+              entry
+              |> fetch_map_value(:tool_calls)
+              |> List.wrap()
+              |> Enum.filter(fn tool_call ->
+                id = fetch_map_value(tool_call, :id)
+                MapSet.member?(durable_tool_call_ids, id) and not MapSet.member?(replacement_tool_call_ids, id)
+              end)
+
+            if tool_calls == [], do: [], else: [Map.put(entry, :tool_calls, tool_calls)]
+
+          true ->
+            []
+        end
+      end)
+
+    replacement_entries =
+      Enum.reject(replacement.entries, fn entry ->
+        fetch_map_value(entry, :role) in [:tool, "tool"] and
+          MapSet.member?(durable_tool_call_ids, fetch_map_value(entry, :tool_call_id))
+      end)
+
+    %{replacement | entries: replacement_entries ++ preserved}
+  end
+
+  defp preserve_durable_entries(_current, replacement, _reason), do: replacement
+
+  defp durable_skill_name(entry) do
+    refs = fetch_map_value(entry, :refs)
+    durable? = fetch_map_value(refs, :durable) == true
+    kind = fetch_map_value(refs, :kind)
+    skill_name = fetch_map_value(refs, :skill_name)
+    role = fetch_map_value(entry, :role)
+    tool_name = fetch_map_value(entry, :name)
+    tool_call_id = fetch_map_value(entry, :tool_call_id)
+
+    if durable? and kind in [:skill_activation, "skill_activation"] and
+         role in [:tool, "tool"] and tool_name == "load_skill" and
+         is_binary(tool_call_id) and is_binary(skill_name),
+       do: skill_name,
+       else: nil
+  end
+
+  defp assistant_tool_call_ids(entries, required_name) do
+    for entry <- entries,
+        fetch_map_value(entry, :role) in [:assistant, "assistant"],
+        tool_call <- List.wrap(fetch_map_value(entry, :tool_calls)),
+        id = fetch_map_value(tool_call, :id),
+        name = fetch_map_value(tool_call, :name),
+        is_binary(id) and (is_nil(required_name) or name == required_name),
+        into: MapSet.new(),
+        do: id
+  end
+
   defp build_config(agent, ctx) do
     opts = ctx[:strategy_opts] || []
     observability_overrides = opts |> Keyword.get(:observability, %{}) |> normalize_map_opt()
     tool_context_opt = opts |> Keyword.get(:tool_context, %{}) |> normalize_map_opt()
+    skill_integration = opts |> Keyword.get(:agent_skills, false) |> AgentIntegration.prepare!()
 
     agent_effect_policy =
       Keyword.get(opts, :agent_effect_policy, Keyword.get(opts, :effect_policy, %{}))
 
     strategy_effect_policy = Keyword.get(opts, :strategy_effect_policy, %{})
 
-    tools_modules =
+    configured_tools =
       case Keyword.fetch(opts, :tools) do
         {:ok, mods} when is_list(mods) ->
           mods
@@ -2240,8 +2341,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
                 "Jido.AI.Reasoning.ReAct.Strategy requires :tools option (list of Jido.Action modules)"
       end
 
+    tools_modules = Enum.uniq(configured_tools ++ skill_integration.tools)
+
     actions_by_name = Map.new(tools_modules, &{&1.name(), &1})
     reqllm_tools = ToolAdapter.from_actions(tools_modules)
+    base_tool_context = Map.get(agent.state, :tool_context) || tool_context_opt
 
     raw_model = Keyword.get(opts, :model, Map.get(agent.state, :model, @default_model))
     resolved_model = resolve_model_spec(raw_model)
@@ -2255,7 +2359,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
       request_transformer: validate_request_transformer_opt!(Keyword.get(opts, :request_transformer)),
-      system_prompt: normalize_system_prompt_opt(opts),
+      system_prompt: append_system_prompt(normalize_system_prompt_opt(opts), skill_integration.index),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),
       max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens),
@@ -2284,7 +2388,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           observability_overrides
         ),
       agent_id: agent.id,
-      base_tool_context: Map.get(agent.state, :tool_context) || tool_context_opt,
+      base_tool_context: Map.merge(base_tool_context, skill_integration.tool_context),
       base_req_http_options: opts |> Keyword.get(:req_http_options, []) |> normalize_req_http_options(),
       base_llm_opts: opts |> Keyword.get(:llm_opts, []) |> normalize_llm_opts(provider_opt_keys_by_string),
       output: opts |> Keyword.get(:output) |> Output.new!(),
@@ -2308,6 +2412,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
               "invalid system_prompt: expected binary, nil, or false, got #{inspect(other)}"
     end
   end
+
+  defp append_system_prompt(prompt, ""), do: prompt
+  defp append_system_prompt(nil, addition), do: addition
+  defp append_system_prompt("", addition), do: addition
+  defp append_system_prompt(prompt, addition), do: prompt <> "\n\n" <> addition
 
   defp resolve_model_spec(model), do: Jido.AI.resolve_model(model)
 

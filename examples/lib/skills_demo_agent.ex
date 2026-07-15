@@ -63,7 +63,7 @@ defmodule Jido.AI.Examples.SkillsDemoAgent do
     Show your work clearly and provide helpful explanations.
     """
 
-    skill_prompt = Prompt.render(skills())
+    skill_prompt = Prompt.render(skills(), include_body: true)
     base <> "\n\n" <> skill_prompt
   end
 
@@ -71,7 +71,7 @@ defmodule Jido.AI.Examples.SkillsDemoAgent do
   Renders just the skill sections (for inspection/debugging).
   """
   def render_skills do
-    Prompt.render(skills())
+    Prompt.render(skills(), include_body: true)
   end
 
   @doc """

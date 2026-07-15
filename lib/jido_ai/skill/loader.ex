@@ -132,21 +132,23 @@ defmodule Jido.AI.Skill.Loader do
   end
 
   defp build_spec(frontmatter, body, path, diagnostics, lenient) do
-    # Check for parent directory name mismatch (non-fatal warning)
-    diagnostics = check_directory_name_match(frontmatter["name"], path, diagnostics, lenient)
-
     # Validate fields, allowing lenient mode to proceed with defaults
     with {:ok, name, diagnostics} <- validate_name(frontmatter["name"], diagnostics, lenient),
-         {:ok, description, diagnostics} <- validate_description(frontmatter["description"], diagnostics, lenient) do
-      {metadata, diagnostics} = parse_metadata(frontmatter["metadata"], diagnostics)
-
+         {:ok, diagnostics} <- check_directory_name_match(name, path, diagnostics, lenient),
+         {:ok, description, diagnostics} <- validate_description(frontmatter["description"], diagnostics, lenient),
+         {:ok, license, diagnostics} <- validate_license(frontmatter["license"], diagnostics, lenient),
+         {:ok, compatibility, diagnostics} <-
+           validate_compatibility(frontmatter["compatibility"], diagnostics, lenient),
+         {:ok, metadata, diagnostics} <- parse_metadata(frontmatter["metadata"], diagnostics, lenient),
+         {:ok, allowed_tools, diagnostics} <-
+           validate_allowed_tools(frontmatter["allowed-tools"], diagnostics, lenient) do
       spec = %Spec{
         name: name,
         description: description,
-        license: optional_string(frontmatter["license"]),
-        compatibility: validate_compatibility(frontmatter["compatibility"]),
+        license: license,
+        compatibility: compatibility,
         metadata: metadata,
-        allowed_tools: parse_allowed_tools(frontmatter["allowed-tools"]),
+        allowed_tools: allowed_tools,
         source: {:file, path},
         body_ref: {:inline, body},
         actions: [],
@@ -160,25 +162,24 @@ defmodule Jido.AI.Skill.Loader do
     end
   end
 
-  # Check if the directory name matches the declared skill name.
-  #
-  # Only binary names can be compared. A nil or non-binary name (e.g.
-  # `name: 123` in the YAML) is left for validate_name/3 to handle —
-  # either as a strict validation error or a lenient fallback name.
-  # Comparing here first would call String.downcase/1 on a non-binary
-  # and raise before validation ever runs.
-  defp check_directory_name_match(name, _path, diagnostics, _lenient)
-       when not is_binary(name),
-       do: diagnostics
+  # Check if the directory name exactly matches the validated skill name.
+  # Inline parse sources do not have a filesystem directory to compare.
+  defp check_directory_name_match(_name, path, diagnostics, _lenient)
+       when not is_binary(path),
+       do: {:ok, diagnostics}
 
   defp check_directory_name_match(name, path, diagnostics, lenient) when is_binary(name) do
-    parent_dir = path |> Path.dirname() |> Path.basename()
+    if Path.basename(path) != "SKILL.md" do
+      {:ok, diagnostics}
+    else
+      do_check_directory_name_match(name, path, diagnostics, lenient)
+    end
+  end
 
-    # Normalize for comparison (kebab-case variations allowed)
-    normalized_dir = String.downcase(parent_dir) |> String.replace("_", "-")
-    normalized_name = String.downcase(name)
+  defp do_check_directory_name_match(name, path, diagnostics, lenient) do
+    parent_dir = path |> Path.expand() |> Path.dirname() |> Path.basename()
 
-    if normalized_dir != normalized_name do
+    if parent_dir != name do
       warning =
         Diagnostics.Warning.new(
           :directory_name_mismatch,
@@ -186,13 +187,17 @@ defmodule Jido.AI.Skill.Loader do
         )
 
       if lenient do
-        Diagnostics.add_warning(diagnostics, warning)
+        {:ok, Diagnostics.add_warning(diagnostics, warning)}
       else
-        # In strict mode, this could still be a warning but not fatal
-        Diagnostics.add_warning(diagnostics, warning)
+        {:error,
+         %Error.Validation.InvalidField{
+           field: :name,
+           reason: :directory_name_mismatch,
+           value: name
+         }}
       end
     else
-      diagnostics
+      {:ok, diagnostics}
     end
   end
 
@@ -300,17 +305,25 @@ defmodule Jido.AI.Skill.Loader do
         end
 
       String.length(desc) > @max_description_length ->
-        # Always truncate long descriptions as a warning
-        truncated = String.slice(desc, 0, @max_description_length)
+        if lenient do
+          truncated = String.slice(desc, 0, @max_description_length)
 
-        warning =
-          Diagnostics.Warning.new(
-            :description_too_long,
-            "Description exceeds #{@max_description_length} chars, truncated"
-          )
+          warning =
+            Diagnostics.Warning.new(
+              :description_too_long,
+              "Description exceeds #{@max_description_length} chars, truncated"
+            )
 
-        diagnostics = Diagnostics.add_warning(diagnostics, warning)
-        {:ok, truncated, diagnostics}
+          diagnostics = Diagnostics.add_warning(diagnostics, warning)
+          {:ok, truncated, diagnostics}
+        else
+          {:error,
+           %Error.Validation.InvalidField{
+             field: :description,
+             reason: :too_long,
+             value: desc
+           }}
+        end
 
       true ->
         {:ok, desc, diagnostics}
@@ -328,35 +341,144 @@ defmodule Jido.AI.Skill.Loader do
     end
   end
 
-  defp validate_compatibility(nil), do: nil
+  defp validate_license(nil, diagnostics, _lenient), do: {:ok, nil, diagnostics}
+  defp validate_license(license, diagnostics, _lenient) when is_binary(license), do: {:ok, license, diagnostics}
 
-  defp validate_compatibility(compat) when is_binary(compat) do
-    if String.length(compat) > @max_compatibility_length do
-      String.slice(compat, 0, @max_compatibility_length)
-    else
-      compat
+  defp validate_license(license, diagnostics, lenient) do
+    invalid_optional_string(:license, license, :invalid_type, diagnostics, lenient)
+  end
+
+  defp validate_compatibility(nil, diagnostics, _lenient), do: {:ok, nil, diagnostics}
+
+  defp validate_compatibility(compat, diagnostics, lenient) when is_binary(compat) do
+    cond do
+      String.trim(compat) == "" ->
+        invalid_optional_string(:compatibility, compat, :empty, diagnostics, lenient)
+
+      String.length(compat) > @max_compatibility_length ->
+        if lenient do
+          warning =
+            Diagnostics.Warning.new(
+              :compatibility_too_long,
+              "Compatibility exceeds #{@max_compatibility_length} chars, truncated"
+            )
+
+          {:ok, String.slice(compat, 0, @max_compatibility_length), Diagnostics.add_warning(diagnostics, warning)}
+        else
+          {:error,
+           %Error.Validation.InvalidField{
+             field: :compatibility,
+             reason: :too_long,
+             value: compat
+           }}
+        end
+
+      true ->
+        {:ok, compat, diagnostics}
     end
   end
 
-  defp validate_compatibility(_), do: nil
+  defp validate_compatibility(compat, diagnostics, lenient) do
+    invalid_optional_string(:compatibility, compat, :invalid_type, diagnostics, lenient)
+  end
 
-  defp parse_allowed_tools(nil), do: []
-  defp parse_allowed_tools(tools) when is_list(tools), do: Enum.map(tools, &to_string/1)
-  defp parse_allowed_tools(tools) when is_binary(tools), do: String.split(tools, ~r/\s+/, trim: true)
-  defp parse_allowed_tools(_), do: []
+  defp validate_allowed_tools(nil, diagnostics, _lenient), do: {:ok, [], diagnostics}
 
-  defp parse_metadata(nil, diagnostics), do: {%{}, diagnostics}
-  defp parse_metadata(metadata, diagnostics) when is_map(metadata), do: {metadata, diagnostics}
+  defp validate_allowed_tools(tools, diagnostics, _lenient) when is_binary(tools) do
+    {:ok, String.split(tools, ~r/\s+/, trim: true), diagnostics}
+  end
 
-  defp parse_metadata(_metadata, diagnostics) do
+  defp validate_allowed_tools(tools, diagnostics, true) when is_list(tools) do
+    warning =
+      Diagnostics.Warning.new(
+        :invalid_allowed_tools_type,
+        "allowed-tools must be a space-separated string; list entries were normalized"
+      )
+
+    {:ok, Enum.map(tools, &metadata_string/1), Diagnostics.add_warning(diagnostics, warning)}
+  end
+
+  defp validate_allowed_tools(_tools, diagnostics, true) do
+    warning = Diagnostics.Warning.new(:invalid_allowed_tools_type, "Invalid allowed-tools; field omitted")
+    {:ok, [], Diagnostics.add_warning(diagnostics, warning)}
+  end
+
+  defp validate_allowed_tools(tools, _diagnostics, false) do
+    {:error,
+     %Error.Validation.InvalidField{
+       field: :allowed_tools,
+       reason: :invalid_type,
+       value: tools
+     }}
+  end
+
+  defp parse_metadata(nil, diagnostics, _lenient), do: {:ok, %{}, diagnostics}
+
+  defp parse_metadata(metadata, diagnostics, _lenient)
+       when is_map(metadata) and map_size(metadata) == 0,
+       do: {:ok, metadata, diagnostics}
+
+  defp parse_metadata(metadata, diagnostics, lenient) when is_map(metadata) do
+    if Enum.all?(metadata, fn {key, value} -> is_binary(key) and is_binary(value) end) do
+      {:ok, metadata, diagnostics}
+    else
+      if lenient do
+        warning =
+          Diagnostics.Warning.new(
+            :invalid_metadata_entries,
+            "Metadata keys and values must be strings; invalid entries were normalized"
+          )
+
+        {:ok, normalize_metadata(metadata), Diagnostics.add_warning(diagnostics, warning)}
+      else
+        {:error,
+         %Error.Validation.InvalidField{
+           field: :metadata,
+           reason: :invalid_metadata,
+           value: metadata
+         }}
+      end
+    end
+  end
+
+  defp parse_metadata(_metadata, diagnostics, true) do
     diagnostics =
       Diagnostics.add_warning(
         diagnostics,
         Diagnostics.Warning.new(:invalid_metadata_type, "Invalid metadata type, using empty metadata")
       )
 
-    {%{}, diagnostics}
+    {:ok, %{}, diagnostics}
   end
+
+  defp parse_metadata(metadata, _diagnostics, false) do
+    {:error,
+     %Error.Validation.InvalidField{
+       field: :metadata,
+       reason: :invalid_type,
+       value: metadata
+     }}
+  end
+
+  defp invalid_optional_string(field, _value, _reason, diagnostics, true) do
+    warning = Diagnostics.Warning.new(invalid_field_warning(field), "Invalid #{field}; field omitted")
+    {:ok, nil, Diagnostics.add_warning(diagnostics, warning)}
+  end
+
+  defp invalid_optional_string(field, value, reason, _diagnostics, false) do
+    {:error, %Error.Validation.InvalidField{field: field, reason: reason, value: value}}
+  end
+
+  defp normalize_metadata(metadata) do
+    Map.new(metadata, fn {key, value} -> {metadata_string(key), metadata_string(value)} end)
+  end
+
+  defp metadata_string(value) when is_binary(value), do: value
+  defp metadata_string(value) when is_atom(value) or is_number(value), do: to_string(value)
+  defp metadata_string(value), do: inspect(value)
+
+  defp invalid_field_warning(:compatibility), do: :invalid_compatibility
+  defp invalid_field_warning(:license), do: :invalid_license
 
   defp parse_tags(nil), do: []
   defp parse_tags(tags) when is_list(tags), do: Enum.map(tags, &to_string/1)

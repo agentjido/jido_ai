@@ -22,7 +22,11 @@ defmodule Jido.AI.Examples.Skills.Calculator do
       end
       
       # Inject skill context into system prompt
-      skill_prompt = Jido.AI.Skill.Prompt.render([Jido.AI.Examples.Skills.Calculator])
+      skill_prompt =
+        Jido.AI.Skill.Prompt.render(
+          [Jido.AI.Examples.Skills.Calculator],
+          include_body: true
+        )
       full_prompt = skill_prompt <> "\\n\\n" <> base_system_prompt
   """
 

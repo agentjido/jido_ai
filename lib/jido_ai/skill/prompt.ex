@@ -20,7 +20,8 @@ defmodule Jido.AI.Skill.Prompt do
 
   ## Options
 
-  - `:include_body` - Include skill body content (default: true)
+  - `:include_body` - Include skill body content (default: false). Prefer
+    `render_index/2` plus `Jido.AI.Actions.Skill.LoadSkill` for progressive disclosure.
   - `:header` - Custom header text (default: "You have access to the following skills:")
 
   ## Example
@@ -31,7 +32,7 @@ defmodule Jido.AI.Skill.Prompt do
   """
   @spec render([module() | Spec.t() | String.t()], keyword()) :: String.t()
   def render(skills, opts \\ []) do
-    include_body = Keyword.get(opts, :include_body, true)
+    include_body = Keyword.get(opts, :include_body, false)
     header = Keyword.get(opts, :header, "You have access to the following skills:")
 
     skill_sections =

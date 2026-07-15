@@ -115,6 +115,59 @@ defmodule Jido.AI.Skill.DiscoveryTest do
       names = Enum.map(skills, & &1.name) |> Enum.sort()
       assert names == ["skill-a", "skill-b"]
     end
+
+    test "rejects roots that are not trusted", %{tmp_dir: tmp_dir} do
+      assert {:error, {:untrusted_skill_path, path}} =
+               Discovery.discover_from([tmp_dir], trust: false)
+
+      assert path == Path.expand(tmp_dir)
+    end
+
+    test "rejects malformed paths and trust policies" do
+      assert {:error, {:invalid_discovery_option, :paths}} =
+               Discovery.discover_from([:not_a_path])
+
+      assert {:error, {:invalid_discovery_option, :trust}} =
+               Discovery.discover_from([], trust: :implicit)
+
+      assert {:error, {:invalid_discovery_option, :scope}} =
+               Discovery.discover_from([], scope: :unknown)
+    end
+
+    test "honors depth bounds and excluded directories", %{tmp_dir: tmp_dir} do
+      visible = Path.join(tmp_dir, "visible")
+      too_deep = Path.join([tmp_dir, "one", "two"])
+      excluded = Path.join([tmp_dir, "node_modules", "hidden"])
+
+      for {directory, name} <- [{visible, "visible"}, {too_deep, "too-deep"}, {excluded, "hidden"}] do
+        File.mkdir_p!(directory)
+        File.write!(Path.join(directory, "SKILL.md"), "---\nname: #{name}\ndescription: test\n---\n")
+      end
+
+      assert {:ok, skills} = Discovery.discover_from([tmp_dir], max_depth: 1)
+      assert Enum.map(skills, & &1.name) == ["visible"]
+    end
+
+    test "fails safely when the directory bound is exceeded", %{tmp_dir: tmp_dir} do
+      File.mkdir_p!(Path.join(tmp_dir, "child"))
+
+      assert {:error, {:discovery_limit_exceeded, :max_directories, 1}} =
+               Discovery.discover_from([tmp_dir], max_directories: 1)
+    end
+
+    test "does not follow symlinked SKILL.md files", %{tmp_dir: tmp_dir} do
+      trusted_root = Path.join(tmp_dir, "trusted")
+      skill_dir = Path.join(trusted_root, "escaped")
+      outside_dir = Path.join(tmp_dir, "outside")
+      File.mkdir_p!(skill_dir)
+      File.mkdir_p!(outside_dir)
+
+      outside_skill = Path.join(outside_dir, "SKILL.md")
+      File.write!(outside_skill, "---\nname: escaped\ndescription: Outside\n---\n")
+      File.ln_s!(outside_skill, Path.join(skill_dir, "SKILL.md"))
+
+      assert {:ok, []} = Discovery.discover_from([trusted_root])
+    end
   end
 
   describe "discover_from_project/1" do
@@ -189,7 +242,8 @@ defmodule Jido.AI.Skill.DiscoveryTest do
       assert spec.description == "For spec conversion"
       assert spec.license == "MIT"
       assert spec.source == {:file, skill_md}
-      assert spec.metadata[:discovery_scope] == :project
+      assert spec.metadata["jido_ai.discovery_scope"] == "project"
+      assert Enum.all?(spec.metadata, fn {key, value} -> is_binary(key) and is_binary(value) end)
     end
   end
 end

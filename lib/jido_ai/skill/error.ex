@@ -89,6 +89,25 @@ defmodule Jido.AI.Skill.Error.Validation.MissingField do
   def message(%{field: field}), do: "Missing required field: #{field}"
 end
 
+defmodule Jido.AI.Skill.Error.Validation.InvalidField do
+  @moduledoc "Invalid skill frontmatter field"
+
+  use Splode.Error,
+    fields: [:field, :reason, :value],
+    class: :validation
+
+  @impl true
+  def message(%{field: field, reason: reason}),
+    do: "Invalid #{field}: #{format_reason(reason)}"
+
+  defp format_reason(:directory_name_mismatch), do: "must match the parent directory name"
+  defp format_reason(:too_long), do: "exceeds the maximum length"
+  defp format_reason(:empty), do: "must not be empty"
+  defp format_reason(:invalid_type), do: "has an invalid type"
+  defp format_reason(:invalid_metadata), do: "must contain only string keys and string values"
+  defp format_reason(reason), do: inspect(reason)
+end
+
 defmodule Jido.AI.Skill.Error.NotFound do
   @moduledoc "Skill not found in registry"
 

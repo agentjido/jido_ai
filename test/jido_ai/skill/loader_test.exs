@@ -143,10 +143,15 @@ defmodule Jido.AI.Skill.LoaderTest do
       assert {:error, %Error.Validation.MissingField{field: :name}} = Loader.load(path)
     end
 
-    test "parses allowed-tools as list" do
+    test "normalizes allowed-tools lists only in lenient mode" do
       path = Path.join(@fixtures_path, "allowed_tools_list.md")
-      assert {:ok, %Spec{allowed_tools: tools}} = Loader.load(path)
+
+      assert {:error, %Error.Validation.InvalidField{field: :allowed_tools, reason: :invalid_type}} =
+               Loader.load(path)
+
+      assert {:ok, %Spec{allowed_tools: tools, diagnostics: diagnostics}} = Loader.load(path, lenient: true)
       assert tools == ["tool1", "tool2", "tool3"]
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_allowed_tools_type))
     end
   end
 
@@ -302,7 +307,79 @@ defmodule Jido.AI.Skill.LoaderTest do
       assert spec.vsn == nil
       assert spec.tags == ["one", "2"]
       assert spec.metadata == %{}
+      assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_license))
       assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_metadata_type))
+    end
+
+    test "strict mode rejects overlong descriptions and compatibility" do
+      long_description = String.duplicate("d", 1_025)
+      long_compatibility = String.duplicate("c", 501)
+
+      assert {:error, %Error.Validation.InvalidField{field: :description, reason: :too_long}} =
+               Loader.parse("---\nname: strict-fields\ndescription: #{long_description}\n---\n")
+
+      assert {:error, %Error.Validation.InvalidField{field: :compatibility, reason: :too_long}} =
+               Loader.parse("---\nname: strict-fields\ndescription: Valid\ncompatibility: #{long_compatibility}\n---\n")
+    end
+
+    test "strict mode requires string metadata keys and values" do
+      content = """
+      ---
+      name: strict-metadata
+      description: Valid metadata is interoperable.
+      metadata:
+        version: 2
+      ---
+      """
+
+      assert {:error, %Error.Validation.InvalidField{field: :metadata, reason: :invalid_metadata}} =
+               Loader.parse(content)
+
+      assert {:ok, %Spec{metadata: %{"version" => "2"}, diagnostics: diagnostics}} =
+               Loader.parse(content, "inline", lenient: true)
+
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_metadata_entries))
+    end
+
+    test "strict mode requires optional standard fields to use specification types" do
+      assert {:ok, %Spec{license: ""}} =
+               Loader.parse("---\nname: empty-license\ndescription: Valid\nlicense: \"\"\n---\n")
+
+      assert {:error, %Error.Validation.InvalidField{field: :license, reason: :invalid_type}} =
+               Loader.parse("---\nname: strict-license\ndescription: Valid\nlicense: 123\n---\n")
+
+      assert {:error, %Error.Validation.InvalidField{field: :allowed_tools, reason: :invalid_type}} =
+               Loader.parse("---\nname: strict-tools\ndescription: Valid\nallowed-tools: [read, write]\n---\n")
+    end
+
+    @tag :tmp_dir
+    test "strict mode requires the name to match the parent directory", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "actual-name")
+      File.mkdir_p!(skill_dir)
+      path = Path.join(skill_dir, "SKILL.md")
+
+      File.write!(path, "---\nname: declared-name\ndescription: Test\n---\n")
+
+      assert {:error,
+              %Error.Validation.InvalidField{
+                field: :name,
+                reason: :directory_name_mismatch
+              }} = Loader.load(path)
+
+      assert {:ok, %Spec{diagnostics: diagnostics}} = Loader.load(path, lenient: true)
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :directory_name_mismatch))
+    end
+
+    @tag :tmp_dir
+    test "strict mode resolves a relative SKILL.md path before checking its parent", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "relative-skill")
+      File.mkdir_p!(skill_dir)
+      skill_file = Path.join(skill_dir, "SKILL.md")
+      File.write!(skill_file, "---\nname: relative-skill\ndescription: Test\n---\n")
+      relative_path = Path.relative_to(skill_file, File.cwd!())
+
+      assert Path.type(relative_path) == :relative
+      assert {:ok, %Spec{name: "relative-skill"}} = Loader.load(relative_path)
     end
   end
 
