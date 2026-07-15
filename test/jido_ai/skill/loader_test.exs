@@ -374,11 +374,12 @@ defmodule Jido.AI.Skill.LoaderTest do
     test "strict mode resolves a relative SKILL.md path before checking its parent", %{tmp_dir: tmp_dir} do
       skill_dir = Path.join(tmp_dir, "relative-skill")
       File.mkdir_p!(skill_dir)
-      File.write!(Path.join(skill_dir, "SKILL.md"), "---\nname: relative-skill\ndescription: Test\n---\n")
+      skill_file = Path.join(skill_dir, "SKILL.md")
+      File.write!(skill_file, "---\nname: relative-skill\ndescription: Test\n---\n")
+      relative_path = Path.relative_to(skill_file, File.cwd!())
 
-      File.cd!(skill_dir, fn ->
-        assert {:ok, %Spec{name: "relative-skill"}} = Loader.load("SKILL.md")
-      end)
+      assert Path.type(relative_path) == :relative
+      assert {:ok, %Spec{name: "relative-skill"}} = Loader.load(relative_path)
     end
   end
 
