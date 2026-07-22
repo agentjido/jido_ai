@@ -598,34 +598,31 @@ defmodule Jido.AI.Context do
   defp extract_entry_thinking(content) when is_list(content) do
     thinking =
       content
-      |> Enum.filter(fn
-        %{type: :thinking} -> true
-        %{type: "thinking"} -> true
-        _ -> false
-      end)
-      |> Enum.map_join("", fn
-        %{thinking: t} when is_binary(t) -> t
-        %{text: t} when is_binary(t) -> t
-        _ -> ""
-      end)
+      |> Enum.filter(&(content_part_type(&1) in [:thinking, "thinking"]))
+      |> Enum.map_join("", &content_part_text(&1, [:thinking, :text]))
 
     text =
       content
-      |> Enum.filter(fn
-        %{type: :text} -> true
-        %{type: "text"} -> true
-        _ -> false
-      end)
-      |> Enum.map_join("", fn
-        %{text: t} when is_binary(t) -> t
-        _ -> ""
-      end)
+      |> Enum.filter(&(content_part_type(&1) in [:text, "text"]))
+      |> Enum.map_join("", &content_part_text(&1, [:text]))
 
     thinking = if thinking == "", do: nil, else: thinking
     {text, thinking}
   end
 
   defp extract_entry_thinking(content), do: {content, nil}
+
+  defp content_part_type(part) when is_map(part), do: get_field(part, :type)
+  defp content_part_type(_part), do: nil
+
+  defp content_part_text(part, fields) do
+    Enum.find_value(fields, "", fn field ->
+      case get_field(part, field) do
+        text when is_binary(text) -> text
+        _other -> nil
+      end
+    end)
+  end
 
   # Helper to get a field from either atom or string key
   defp get_field(map, key) do
