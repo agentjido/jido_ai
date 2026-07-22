@@ -719,6 +719,25 @@ defmodule Jido.AI.ContextTest do
       assert entry.thinking == "Some reasoning"
     end
 
+    test "preserves assistant content through a JSON round-trip" do
+      original =
+        AIContext.new()
+        |> AIContext.append_assistant("Here is my answer", nil, thinking: "Some reasoning")
+
+      messages =
+        original
+        |> AIContext.to_messages()
+        |> Jason.encode!()
+        |> Jason.decode!()
+
+      rebuilt = AIContext.new() |> AIContext.append_messages(messages)
+
+      [entry] = rebuilt.entries
+      assert entry.content == "Here is my answer"
+      assert entry.thinking == "Some reasoning"
+      assert AIContext.to_messages(rebuilt) == AIContext.to_messages(original)
+    end
+
     test "ignores malformed thinking and text blocks" do
       messages = [
         %{
@@ -845,6 +864,38 @@ defmodule Jido.AI.ContextTest do
                %ContentPart{type: :text, text: ~s({"result": 42})},
                %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
              ] = projected.content
+    end
+
+    test "preserves string-keyed assistant content parts from raw context maps" do
+      raw = %{
+        "id" => "ctx",
+        "entries" => [
+          %{
+            "role" => "assistant",
+            "content" => [
+              %{"type" => "thinking", "thinking" => "Some reasoning"},
+              %{"type" => "text", "text" => "Here is my answer"}
+            ]
+          }
+        ],
+        "system_prompt" => nil
+      }
+
+      assert {:ok, %AIContext{} = coerced} = AIContext.coerce(raw)
+
+      [entry] = coerced.entries
+      assert entry.content == "Here is my answer"
+      assert entry.thinking == "Some reasoning"
+
+      assert [
+               %{
+                 role: :assistant,
+                 content: [
+                   %{type: :thinking, thinking: "Some reasoning"},
+                   %{type: :text, text: "Here is my answer"}
+                 ]
+               }
+             ] = AIContext.to_messages(coerced)
     end
 
     test "rejects Jido.Thread structs" do
