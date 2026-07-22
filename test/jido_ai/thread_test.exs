@@ -719,6 +719,25 @@ defmodule Jido.AI.ContextTest do
       assert entry.thinking == "Some reasoning"
     end
 
+    test "uses text fallback when a thinking field is not a string" do
+      messages = [
+        %{
+          role: :assistant,
+          content: [
+            %{type: :thinking, thinking: 123, text: "Atom fallback"},
+            %{"type" => "thinking", "thinking" => 456, "text" => "String fallback"},
+            %{type: :text, text: "The result"}
+          ]
+        }
+      ]
+
+      thread = AIContext.new() |> AIContext.append_messages(messages)
+
+      [entry] = thread.entries
+      assert entry.content == "The result"
+      assert entry.thinking == "Atom fallbackString fallback"
+    end
+
     test "preserves assistant content through a JSON round-trip" do
       original =
         AIContext.new()

@@ -599,22 +599,12 @@ defmodule Jido.AI.Context do
     thinking =
       content
       |> Enum.filter(&(content_part_type(&1) in [:thinking, "thinking"]))
-      |> Enum.map_join("", fn part ->
-        case get_field(part, :thinking) || get_field(part, :text) do
-          text when is_binary(text) -> text
-          _other -> ""
-        end
-      end)
+      |> Enum.map_join("", &content_part_text(&1, [:thinking, :text]))
 
     text =
       content
       |> Enum.filter(&(content_part_type(&1) in [:text, "text"]))
-      |> Enum.map_join("", fn part ->
-        case get_field(part, :text) do
-          text when is_binary(text) -> text
-          _other -> ""
-        end
-      end)
+      |> Enum.map_join("", &content_part_text(&1, [:text]))
 
     thinking = if thinking == "", do: nil, else: thinking
     {text, thinking}
@@ -624,6 +614,15 @@ defmodule Jido.AI.Context do
 
   defp content_part_type(part) when is_map(part), do: get_field(part, :type)
   defp content_part_type(_part), do: nil
+
+  defp content_part_text(part, fields) do
+    Enum.find_value(fields, "", fn field ->
+      case get_field(part, field) do
+        text when is_binary(text) -> text
+        _other -> nil
+      end
+    end)
+  end
 
   # Helper to get a field from either atom or string key
   defp get_field(map, key) do
