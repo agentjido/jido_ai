@@ -63,6 +63,47 @@ Pid sinks are request-scoped and use the calling process mailbox. They do not
 provide backpressure; keep handlers lightweight and always consume terminal
 events so request streams close cleanly.
 
+### Stream Sinks And Durable Checkpoints
+
+A stream sink is a live pid, so it is process-local by definition. It is held on
+the request record only while the request is in flight:
+
+- Reaching a terminal state (completed, failed, or cancelled) drops the sink.
+- Checkpoints never contain it, including while a request is still active.
+
+This matters because checkpoints outlive the VM that wrote them. An encoded pid
+carries its node atom, and storage adapters decode with
+`:erlang.binary_to_term/2` `[:safe]`, which refuses to create that atom in a VM
+that has never seen it. A persisted sink would make the checkpoint permanently
+undecodable after a distribution config change — for example moving from long
+names to short names. See `Jido.AI.Checkpoint` for the full list of runtime
+handles that are stripped.
+
+Cancelling a streamed request emits `:request_cancelled` to the sink before the
+sink is dropped, so a consumer's enumerable always halts on a terminal event.
+
+### Restoring An Interrupted Streamed Request
+
+A sink cannot be re-attached after a thaw: the consumer process is gone. A
+request that was still running when the checkpoint was written is restored with
+deterministic, inspectable state:
+
+```elixir
+{:ok, agent} = MyApp.MathAgent.restore(checkpoint, %{})
+
+agent.state.requests[request_id]
+#=> %{status: :pending, stream_interrupted: true, query: "Show your work", ...}
+```
+
+- `:status` stays `:pending` — the request is not silently reported as completed.
+- `:stream_to` is absent — nothing is delivered to the original consumer.
+- `stream_interrupted: true` records that a consumer was attached and lost.
+
+Use `Jido.AI.Checkpoint.interrupted_request?/1` to detect these. The underlying
+ReAct run does not survive the thaw, so re-issue the query to get an answer;
+`await/2` on an interrupted request returns `{:error, :timeout}` rather than
+blocking on a run that no longer exists.
+
 ## Steering An Active ReAct Run
 
 `ask/await` remains the request API. Mid-run steering is a separate control path:

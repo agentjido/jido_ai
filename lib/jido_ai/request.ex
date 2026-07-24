@@ -70,6 +70,10 @@ defmodule Jido.AI.Request do
   @default_timeout 30_000
   @default_max_requests 100
 
+  # A request in one of these states will never emit another runtime event, so
+  # its stream sink is dropped rather than carried in agent state.
+  @terminal_statuses [:completed, :failed, :timeout]
+
   # ---------------------------------------------------------------------------
   # Handle Struct
   # ---------------------------------------------------------------------------
@@ -372,6 +376,13 @@ defmodule Jido.AI.Request do
 
   Called in `on_before_cmd/2` when a request starts.
 
+  ## Stream sinks
+
+  When `:stream_to` is given, the sink is stored on the request record so the
+  strategy can route runtime events to it. The sink is a live pid, so it is
+  dropped again as soon as the request reaches a terminal state, and it is never
+  written to a checkpoint — see `Jido.AI.Checkpoint`.
+
   ## Examples
 
       def on_before_cmd(agent, {:ai_react_start, %{query: query, request_id: req_id}} = action) do
@@ -437,6 +448,7 @@ defmodule Jido.AI.Request do
         req ->
           %{req | status: :completed, result: result, completed_at: System.system_time(:millisecond)}
           |> Map.put(:meta, Map.merge(Map.get(req, :meta, %{}), meta))
+          |> drop_stream_sink()
       end)
       |> Map.put(:last_answer, last_answer)
       |> Map.put(:completed, true)
@@ -455,7 +467,9 @@ defmodule Jido.AI.Request do
   @doc """
   Marks a request as failed with an error.
 
-  Called when a request encounters an error.
+  Called when a request encounters an error. Cancellation is recorded through
+  this function with a `{:cancelled, reason}` error, so completed, failed, and
+  cancelled requests all drop their stream sink here.
   """
   @spec fail_request(struct(), String.t(), any()) :: struct()
   def fail_request(agent, request_id, error) do
@@ -470,11 +484,78 @@ defmodule Jido.AI.Request do
 
         req ->
           %{req | status: :failed, error: error, completed_at: System.system_time(:millisecond)}
+          |> drop_stream_sink()
       end)
       |> Map.put(:completed, true)
 
     %{agent | state: state}
   end
+
+  @doc """
+  Returns the stream sink recorded for a request, or `nil`.
+
+  Read the sink *before* moving a request to a terminal state: the terminal
+  transition drops it so no pid reaches a checkpoint.
+  """
+  @spec stream_sink(struct(), String.t()) :: RequestStream.sink() | nil
+  def stream_sink(agent, request_id) when is_binary(request_id) do
+    get_in(agent.state, [:requests, request_id, :stream_to])
+  end
+
+  def stream_sink(_agent, _request_id), do: nil
+
+  @doc """
+  Removes request stream sinks from agent state for persistence or restore.
+
+  Stream sinks are `{:pid, pid}` handles that are only meaningful inside the VM
+  that created them. They must never reach durable storage — see
+  `Jido.AI.Checkpoint` for why an encoded pid makes a checkpoint undecodable.
+
+  Requests that are still in flight are additionally flagged with
+  `stream_interrupted: true`, recording that a consumer was attached and will
+  never receive the remaining events.
+
+  ## Modes
+
+  - `:checkpoint` - sanitizing state on its way into a checkpoint payload
+  - `:restore` - scrubbing a payload written before sanitization existed
+
+  Both modes behave identically; the mode is kept for call-site clarity.
+
+  ## Examples
+
+      iex> state = %{requests: %{"r1" => %{status: :pending, stream_to: {:pid, self()}}}}
+      iex> Jido.AI.Request.sanitize_requests(state, :checkpoint)
+      %{requests: %{"r1" => %{status: :pending, stream_interrupted: true}}}
+  """
+  @spec sanitize_requests(map(), :checkpoint | :restore) :: map()
+  def sanitize_requests(state, mode) when is_map(state) and mode in [:checkpoint, :restore] do
+    case Map.get(state, :requests) do
+      requests when is_map(requests) ->
+        Map.put(state, :requests, Map.new(requests, fn {id, req} -> {id, sanitize_request(req)} end))
+
+      _absent ->
+        state
+    end
+  end
+
+  def sanitize_requests(state, _mode), do: state
+
+  defp sanitize_request(%{stream_to: _sink} = request) do
+    request
+    |> drop_stream_sink()
+    |> mark_interrupted_if_active()
+  end
+
+  defp sanitize_request(request), do: request
+
+  defp mark_interrupted_if_active(%{status: status} = request) when status in @terminal_statuses do
+    request
+  end
+
+  defp mark_interrupted_if_active(request), do: Map.put(request, :stream_interrupted, true)
+
+  defp drop_stream_sink(request) when is_map(request), do: Map.delete(request, :stream_to)
 
   @doc """
   Gets a request by ID from agent state.

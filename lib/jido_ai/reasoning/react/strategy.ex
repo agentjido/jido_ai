@@ -2549,7 +2549,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
   defp normalize_tool_result(result), do: Error.normalize_result(result, :tool_error, "Tool execution failed")
 
   defp request_stream_to(agent, request_id) when is_binary(request_id) do
-    get_in(agent.state, [:requests, request_id, :stream_to])
+    Jido.AI.Request.stream_sink(agent, request_id)
   end
 
   defp request_stream_to(_agent, _request_id), do: nil
