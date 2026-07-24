@@ -461,6 +461,32 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
              }
     end
 
+    test "passes the directive timeout_ms through to Turn execution" do
+      supervisor = DirectiveSupport.start_task_supervisor!()
+      on_exit(fn -> DirectiveSupport.stop_task_supervisor(supervisor) end)
+
+      Mimic.stub(Jido.AI.Turn, :execute_module, fn _module, _params, _context, opts ->
+        # Without threading, Turn falls back to its own 30s default and can
+        # kill an action whose directive granted a larger budget.
+        assert Keyword.get(opts, :timeout) == 120_000
+        {:ok, %{value: :ok}}
+      end)
+
+      directive =
+        ToolExec.new!(%{
+          id: "tool_timeout_threaded",
+          tool_name: "dummy",
+          action_module: DummyAction,
+          timeout_ms: 120_000
+        })
+
+      state = DirectiveSupport.state_with_supervisor(supervisor)
+      assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
+
+      signal = DirectiveSupport.assert_signal_cast("ai.tool.result")
+      assert signal.data.result == {:ok, %{value: :ok}, []}
+    end
+
     test "emits timeout error when execution exceeds timeout_ms" do
       supervisor = DirectiveSupport.start_task_supervisor!()
       on_exit(fn -> DirectiveSupport.stop_task_supervisor(supervisor) end)
