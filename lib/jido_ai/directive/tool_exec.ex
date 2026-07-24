@@ -330,7 +330,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     if is_integer(timeout_ms) and timeout_ms > 0 do
       task =
         Task.Supervisor.async_nolink(task_supervisor, fn ->
-          execute_action(action_module, tool_name, arguments, context, tools, event_meta)
+          execute_action(action_module, tool_name, arguments, context, tools, event_meta, timeout_ms)
         end)
 
       try do
@@ -348,21 +348,28 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
         Process.demonitor(task.ref, [:flush])
       end
     else
-      execute_action(action_module, tool_name, arguments, context, tools, event_meta)
+      execute_action(action_module, tool_name, arguments, context, tools, event_meta, timeout_ms)
       |> normalize_result(tool_name)
     end
   end
 
-  defp execute_action(action_module, tool_name, arguments, context, tools, event_meta) do
+  defp execute_action(action_module, tool_name, arguments, context, tools, event_meta, timeout_ms) do
+    timeout_opts = if is_integer(timeout_ms) and timeout_ms > 0, do: [timeout: timeout_ms], else: []
+
     try do
       telemetry_metadata = turn_telemetry_metadata(event_meta)
 
       case action_module do
         nil ->
-          Turn.execute(tool_name, arguments, context, tools: tools, telemetry_metadata: telemetry_metadata)
+          Turn.execute(
+            tool_name,
+            arguments,
+            context,
+            [tools: tools, telemetry_metadata: telemetry_metadata] ++ timeout_opts
+          )
 
         module when is_atom(module) ->
-          Turn.execute_module(module, arguments, context, telemetry_metadata: telemetry_metadata)
+          Turn.execute_module(module, arguments, context, [telemetry_metadata: telemetry_metadata] ++ timeout_opts)
       end
     rescue
       e ->
