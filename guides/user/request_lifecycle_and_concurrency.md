@@ -92,17 +92,23 @@ deterministic, inspectable state:
 {:ok, agent} = MyApp.MathAgent.restore(checkpoint, %{})
 
 agent.state.requests[request_id]
-#=> %{status: :pending, stream_interrupted: true, query: "Show your work", ...}
+#=> %{
+#     status: :failed,
+#     error: :stream_interrupted,
+#     stream_interrupted: true,
+#     query: "Show your work",
+#     ...
+#   }
 ```
 
-- `:status` stays `:pending` — the request is not silently reported as completed.
+- `:status` is `:failed` with `error: :stream_interrupted`.
 - `:stream_to` is absent — nothing is delivered to the original consumer.
 - `stream_interrupted: true` records that a consumer was attached and lost.
 
 Use `Jido.AI.Checkpoint.interrupted_request?/1` to detect these. The underlying
 ReAct run does not survive the thaw, so re-issue the query to get an answer;
-`await/2` on an interrupted request returns `{:error, :timeout}` rather than
-blocking on a run that no longer exists.
+`await/2` on the old request returns `{:error, :stream_interrupted}`
+immediately.
 
 ## Steering An Active ReAct Run
 

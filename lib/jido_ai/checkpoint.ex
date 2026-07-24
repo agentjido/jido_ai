@@ -30,7 +30,10 @@ defmodule Jido.AI.Checkpoint do
   | `state.__strategy__.react_worker_pid` | ReAct worker process | Reset to `nil` / `:missing` |
   | `state.__strategy__.pending_input_server` | Steering queue process | Reset to `nil` |
   | `state.__strategy__.pending_worker_start` | Queued worker payload embedding a state snapshot | Reset to `nil` |
-  | `state.__strategy__.config.reqllm_tools` | `ReqLLM.Tool` structs holding anonymous callbacks | Rebuilt from `config.tools` |
+
+  `state.__strategy__.config.reqllm_tools` stays in the payload. Its callback is
+  the durable MFA placeholder `{ReqLLM.Tool, :new}`, so an older reader still
+  receives the field and a new VM can decode it with `[:safe]`.
 
   The per-instance `Task.Supervisor` is dropped by
   `Jido.AI.Plugins.TaskSupervisor.on_checkpoint/2` and re-mounted by `new/1`
@@ -43,11 +46,12 @@ defmodule Jido.AI.Checkpoint do
 
   - no `:stream_to` — nothing will ever be delivered to the original consumer,
   - `stream_interrupted: true` — a durable marker that the run was cut short,
-  - its original `:pending` status — the request is *not* silently completed.
+  - `status: :failed` and `error: :stream_interrupted`.
 
-  Callers that need the answer must re-issue the query. `Jido.AI.Request.await/2`
-  on such a request returns `{:error, :timeout}` rather than hanging forever on a
-  run that no longer exists. Use `interrupted_request?/1` to detect them.
+  The parent strategy also restores to an idle state with no active request.
+  Callers can re-issue the query, and `Jido.AI.Request.await/2` on the old handle
+  returns `{:error, :stream_interrupted}` immediately. Use
+  `interrupted_request?/1` to detect these requests in state.
 
   ## Residual handles
 
@@ -71,11 +75,41 @@ defmodule Jido.AI.Checkpoint do
   @type handle :: {handle_path(), :pid | :port | :reference | :function}
 
   # Strategy fields holding process handles, with the value each is reset to.
-  @strategy_resets %{
+  @strategy_handle_resets %{
     react_worker_pid: nil,
     react_worker_status: :missing,
     pending_worker_start: nil,
     pending_input_server: nil
+  }
+
+  # An in-flight ReAct run cannot continue after thaw. Reset its run-local
+  # logical state while preserving durable context, request traces, and config.
+  @interrupted_run_resets %{
+    status: :idle,
+    iteration: 0,
+    run_context: nil,
+    pending_tool_calls: [],
+    tool_results: [],
+    final_answer: nil,
+    result: nil,
+    current_llm_call_id: nil,
+    termination_reason: nil,
+    run_tool_context: %{},
+    run_req_http_options: [],
+    run_llm_opts: [],
+    active_request_id: nil,
+    pending_input_server: nil,
+    last_pending_input_control: nil,
+    cancel_reason: nil,
+    usage: %{},
+    started_at: nil,
+    streaming_text: "",
+    streaming_thinking: "",
+    thinking_trace: [],
+    checkpoint_token: nil,
+    react_worker_pid: nil,
+    react_worker_status: :missing,
+    pending_worker_start: nil
   }
 
   @doc """
@@ -88,7 +122,7 @@ defmodule Jido.AI.Checkpoint do
 
       iex> state = %{requests: %{"r1" => %{status: :pending, stream_to: {:pid, self()}}}}
       iex> Jido.AI.Checkpoint.sanitize_state(state)
-      %{requests: %{"r1" => %{status: :pending, stream_interrupted: true}}}
+      %{requests: %{"r1" => %{status: :failed, error: :stream_interrupted, stream_interrupted: true}}}
   """
   @spec sanitize_state(map()) :: map()
   def sanitize_state(state) when is_map(state) do
@@ -188,14 +222,39 @@ defmodule Jido.AI.Checkpoint do
 
   defp sanitize_strategy(strategy) do
     strategy
-    |> Map.merge(@strategy_resets)
-    |> update_strategy_config(&Map.delete(&1, :reqllm_tools))
+    |> reset_interrupted_run()
+    |> reset_react_handles()
+    |> update_strategy_config(&restore_reqllm_tools/1)
   end
 
   defp rehydrate_strategy(strategy) do
     strategy
-    |> Map.merge(@strategy_resets)
+    |> reset_interrupted_run()
+    |> reset_react_handles()
     |> update_strategy_config(&restore_reqllm_tools/1)
+  end
+
+  defp reset_interrupted_run(strategy) do
+    if react_run_active?(strategy) do
+      Map.merge(strategy, @interrupted_run_resets)
+    else
+      strategy
+    end
+  end
+
+  defp react_run_active?(strategy) do
+    react_strategy_state?(strategy) and
+      (is_binary(Map.get(strategy, :active_request_id)) or
+         Map.get(strategy, :status) in [:awaiting_llm, :awaiting_tool] or
+         Map.get(strategy, :react_worker_status) in [:starting, :running])
+  end
+
+  defp reset_react_handles(strategy) do
+    if react_strategy_state?(strategy), do: Map.merge(strategy, @strategy_handle_resets), else: strategy
+  end
+
+  defp react_strategy_state?(strategy) do
+    Map.has_key?(strategy, :react_worker_pid) or Map.has_key?(strategy, :react_worker_status)
   end
 
   defp update_strategy_config(strategy, fun) do
@@ -205,8 +264,9 @@ defmodule Jido.AI.Checkpoint do
     end
   end
 
-  # `reqllm_tools` is a pure projection of `config.tools`, kept in sync by the
-  # strategy whenever tools are registered or unregistered at runtime.
+  # `reqllm_tools` is a pure projection of `config.tools`. Rebuild it to replace
+  # callbacks created by older releases and to restore payloads written by an
+  # earlier version of this checkpoint sanitizer that dropped the field.
   defp restore_reqllm_tools(%{tools: tools} = config) when is_list(tools) do
     Map.put(config, :reqllm_tools, ToolAdapter.from_actions(tools))
   end
@@ -233,13 +293,14 @@ defmodule Jido.AI.Checkpoint do
   end
 
   defp collect_handles(term, path, acc) when is_map(term) do
-    Enum.reduce(term, acc, fn {key, value}, inner -> collect_handles(value, [key | path], inner) end)
+    Enum.reduce(term, acc, fn {key, value}, inner ->
+      inner = collect_handles(key, [{:key, key} | path], inner)
+      collect_handles(value, [key | path], inner)
+    end)
   end
 
   defp collect_handles(term, path, acc) when is_list(term) do
-    term
-    |> Enum.with_index()
-    |> Enum.reduce(acc, fn {value, index}, inner -> collect_handles(value, [{:at, index} | path], inner) end)
+    collect_list_handles(term, 0, path, acc)
   end
 
   defp collect_handles(term, path, acc) when is_tuple(term) do
@@ -251,6 +312,17 @@ defmodule Jido.AI.Checkpoint do
 
   defp collect_handles(_term, _path, acc), do: acc
 
+  defp collect_list_handles([], _index, _path, acc), do: acc
+
+  defp collect_list_handles([head | tail], index, path, acc) do
+    acc = collect_handles(head, [{:at, index} | path], acc)
+    collect_list_handles(tail, index + 1, path, acc)
+  end
+
+  defp collect_list_handles(tail, index, path, acc) do
+    collect_handles(tail, [{:tail, index} | path], acc)
+  end
+
   defp external_capture?(fun) do
     Function.info(fun, :type) == {:type, :external}
   end
@@ -260,6 +332,8 @@ defmodule Jido.AI.Checkpoint do
   defp format_path(path) do
     Enum.map_join(path, ".", fn
       {:at, index} -> "[#{index}]"
+      {:tail, index} -> "[tail@#{index}]"
+      {:key, key} -> "[key #{inspect(key)}]"
       {:elem, index} -> "{#{index}}"
       segment when is_binary(segment) -> segment
       segment -> inspect(segment)

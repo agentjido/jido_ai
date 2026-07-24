@@ -63,6 +63,21 @@ defmodule Jido.AI.CheckpointTest do
       token_secret: "test-secret-that-is-long-enough-123"
   end
 
+  defmodule CustomCheckpointAgent do
+    @moduledoc false
+    use Jido.AI.Agent,
+      name: "custom_checkpoint_test_agent",
+      tools: [ReadTool],
+      token_secret: "test-secret-that-is-long-enough-123"
+
+    @impl true
+    def checkpoint(agent, ctx) do
+      with {:ok, payload} <- super(agent, ctx) do
+        {:ok, Map.put(payload, :custom_checkpoint, true)}
+      end
+    end
+  end
+
   @doc false
   def gate_owner, do: @gate_owner
 
@@ -100,6 +115,21 @@ defmodule Jido.AI.CheckpointTest do
   end
 
   defp request_record(payload, request_id), do: get_in(payload, [:state, :requests, request_id])
+
+  defp mark_react_run_active(agent, request_id) do
+    update_in(agent.state.__strategy__, fn strategy ->
+      Map.merge(strategy, %{
+        status: :awaiting_llm,
+        active_request_id: request_id,
+        react_worker_pid: self(),
+        react_worker_status: :running,
+        pending_input_server: self(),
+        run_tool_context: %{request: request_id},
+        run_req_http_options: [receive_timeout: 1_000],
+        run_llm_opts: [temperature: 0.1]
+      })
+    end)
+  end
 
   # ---------------------------------------------------------------------------
   # Acceptance criterion 1 - terminal states drop the stream sink
@@ -236,6 +266,38 @@ defmodule Jido.AI.CheckpointTest do
 
       assert [{[Jido.AI.Runtime.Event, :data, :pid], :pid}] = Checkpoint.runtime_handles(event)
     end
+
+    test "reports runtime handles used as map keys" do
+      pid = self()
+      ref = make_ref()
+      fun = fn -> :anonymous end
+
+      handles = Checkpoint.runtime_handles(%{pid => :pid, ref => :ref, fun => :fun})
+
+      assert Enum.any?(handles, fn
+               {[{:key, ^pid}], :pid} -> true
+               _other -> false
+             end)
+
+      assert Enum.any?(handles, fn
+               {[{:key, ^ref}], :reference} -> true
+               _other -> false
+             end)
+
+      assert Enum.any?(handles, fn
+               {[{:key, ^fun}], :function} -> true
+               _other -> false
+             end)
+    end
+
+    test "descends into improper list tails" do
+      ref = make_ref()
+
+      assert [
+               {[{:at, 0}], :pid},
+               {[{:tail, 1}], :reference}
+             ] = Checkpoint.runtime_handles([self() | ref])
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -243,7 +305,7 @@ defmodule Jido.AI.CheckpointTest do
   # ---------------------------------------------------------------------------
 
   describe "checkpoint payloads" do
-    test "an active streamed request contributes no pid and is flagged interrupted" do
+    test "an active streamed request is failed in the payload and flagged interrupted" do
       agent =
         CheckpointAgent.new()
         |> Request.start_request("req_active", "query", stream_to: {:pid, self()})
@@ -254,11 +316,13 @@ defmodule Jido.AI.CheckpointTest do
       {:ok, payload} = CheckpointAgent.checkpoint(agent, %{})
       record = request_record(payload, "req_active")
 
-      assert record.status == :pending
+      assert record.status == :failed
+      assert record.error == :stream_interrupted
       refute Map.has_key?(record, :stream_to)
       assert record.stream_interrupted == true
       assert Checkpoint.runtime_handles(payload) == []
       assert agent.state.requests["req_active"].stream_to == {:pid, self()}
+      assert agent.state.requests["req_active"].status == :pending
     end
 
     test "a completed streamed request contributes no pid and is not flagged" do
@@ -297,7 +361,21 @@ defmodule Jido.AI.CheckpointTest do
       assert strategy.react_worker_status == :missing
       assert strategy.pending_input_server == nil
       assert strategy.pending_worker_start == nil
+      assert strategy.status == :idle
+      assert strategy.active_request_id == nil
       refute Map.has_key?(payload.state, :__task_supervisor_skill__)
+      assert Checkpoint.runtime_handles(payload) == []
+    end
+
+    test "consumer checkpoint overrides compose with sanitization" do
+      agent =
+        CustomCheckpointAgent.new()
+        |> Request.start_request("req_custom", "query", stream_to: {:pid, self()})
+
+      {:ok, payload} = CustomCheckpointAgent.checkpoint(agent, %{})
+
+      assert payload.custom_checkpoint == true
+      assert request_record(payload, "req_custom").error == :stream_interrupted
       assert Checkpoint.runtime_handles(payload) == []
     end
 
@@ -339,18 +417,17 @@ defmodule Jido.AI.CheckpointTest do
       assert is_pid(:erlang.binary_to_term(encoded_pid, [:safe]))
     end
 
-    test "anonymous tool callbacks live in agent state but never reach the payload" do
-      # ReqLLM.Tool.callback is an anonymous fun, and [:safe] rejects anonymous
-      # funs outright in a VM that has not itself created them - no node atom
-      # involved. config.reqllm_tools is therefore dropped here and rebuilt on
-      # restore from config.tools.
+    test "tool callbacks use durable MFA tuples and stay in the payload" do
       agent = CheckpointAgent.new()
+      tools = agent.state.__strategy__.config.reqllm_tools
 
-      assert Enum.any?(Checkpoint.runtime_handles(agent.state), fn {_path, kind} -> kind == :function end)
-      assert agent.state.__strategy__.config.reqllm_tools != []
+      assert tools != []
+      assert Enum.all?(tools, &(&1.callback == {ReqLLM.Tool, :new}))
+      refute Enum.any?(Checkpoint.runtime_handles(agent.state), fn {_path, kind} -> kind == :function end)
 
       {:ok, payload} = CheckpointAgent.checkpoint(agent, %{})
 
+      assert payload.state.__strategy__.config.reqllm_tools == tools
       assert Checkpoint.runtime_handles(payload) == []
     end
 
@@ -372,6 +449,8 @@ defmodule Jido.AI.CheckpointTest do
 
       assert decoded == payload
       assert decoded.state.requests["req_active"].stream_interrupted == true
+      assert decoded.state.requests["req_active"].status == :failed
+      assert decoded.state.requests["req_active"].error == :stream_interrupted
       assert decoded.state.requests["req_done"].status == :completed
     end
   end
@@ -381,20 +460,26 @@ defmodule Jido.AI.CheckpointTest do
   # ---------------------------------------------------------------------------
 
   describe "restore" do
-    test "an interrupted streamed request stays pending, unstreamable, and flagged" do
+    test "an interrupted streamed request fails, becomes unstreamable, and releases the strategy" do
       agent =
         CheckpointAgent.new()
         |> Request.start_request("req_active", "query", stream_to: {:pid, self()})
+        |> mark_react_run_active("req_active")
 
       {:ok, payload} = CheckpointAgent.checkpoint(agent, %{})
       {:ok, restored} = CheckpointAgent.restore(payload, %{})
 
       record = restored.state.requests["req_active"]
 
-      assert record.status == :pending
+      assert record.status == :failed
+      assert record.error == :stream_interrupted
       refute Map.has_key?(record, :stream_to)
       assert Checkpoint.interrupted_request?(record)
       assert Request.stream_sink(restored, "req_active") == nil
+      assert restored.state.__strategy__.status == :idle
+      assert restored.state.__strategy__.active_request_id == nil
+      assert restored.state.__strategy__.react_worker_pid == nil
+      assert restored.state.__strategy__.react_worker_status == :missing
 
       # Nothing is delivered to the original consumer after a thaw.
       assert Request.Stream.send_event(Request.stream_sink(restored, "req_active"), %{
@@ -407,6 +492,21 @@ defmodule Jido.AI.CheckpointTest do
              }) == :ok
 
       refute_receive {_tag, %Jido.AI.Runtime.Event{}}, 50
+
+      {next_agent, directives} =
+        CheckpointAgent.cmd(
+          restored,
+          {:ai_react_start, %{query: "new query", request_id: "req_next"}}
+        )
+
+      refute Enum.any?(directives, &is_struct(&1, Jido.AI.Directive.EmitRequestError))
+      assert next_agent.state.__strategy__.active_request_id == "req_next"
+
+      pending_input_server = next_agent.state.__strategy__.pending_input_server
+
+      if is_pid(pending_input_server) do
+        Jido.AI.PendingInputServer.stop(pending_input_server)
+      end
     end
 
     test "a completed request restores without an interrupted flag" do
@@ -437,15 +537,19 @@ defmodule Jido.AI.CheckpointTest do
       legacy =
         payload
         |> put_in([:state, :requests, "req_legacy", :stream_to], {:pid, self()})
+        |> put_in([:state, :requests, "req_legacy", :status], :pending)
+        |> put_in([:state, :requests, "req_legacy", :error], nil)
         |> update_in([:state, :requests, "req_legacy"], &Map.delete(&1, :stream_interrupted))
 
       {:ok, restored} = CheckpointAgent.restore(legacy, %{})
 
       assert Request.stream_sink(restored, "req_legacy") == nil
       assert Checkpoint.interrupted_request?(restored.state.requests["req_legacy"])
+      assert restored.state.requests["req_legacy"].status == :failed
+      assert restored.state.requests["req_legacy"].error == :stream_interrupted
     end
 
-    test "await/2 on an interrupted request times out instead of blocking forever" do
+    test "await/2 on an interrupted request returns its explicit failure" do
       agent =
         CheckpointAgent.new()
         |> Request.start_request("req_interrupted", "query", stream_to: {:pid, self()})
@@ -468,17 +572,19 @@ defmodule Jido.AI.CheckpointTest do
       on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
 
       # The run backing this request died with the previous VM, so awaiting it
-      # resolves deterministically rather than hanging on a run that is gone.
+      # resolves immediately with the durable interruption error.
       handle = Request.Handle.new("req_interrupted", pid, "query")
 
-      assert {:error, :timeout} = Request.await(handle, timeout: 200)
+      assert {:error, :stream_interrupted} = Request.await(handle, timeout: 5_000)
     end
 
-    test "derived runtime values dropped from the payload are rebuilt" do
+    test "durable tool callbacks remain compatible and missing legacy tools are rebuilt" do
       agent = CheckpointAgent.new()
       {:ok, payload} = CheckpointAgent.checkpoint(agent, %{})
 
-      refute Map.has_key?(payload.state.__strategy__.config, :reqllm_tools)
+      payload_tools = payload.state.__strategy__.config.reqllm_tools
+      assert payload_tools != []
+      assert Enum.all?(payload_tools, &(&1.callback == {ReqLLM.Tool, :new}))
 
       {:ok, restored} = CheckpointAgent.restore(payload, %{})
       config = restored.state.__strategy__.config
@@ -486,6 +592,10 @@ defmodule Jido.AI.CheckpointTest do
       assert length(config.reqllm_tools) == length(config.tools)
       assert Enum.all?(config.reqllm_tools, &is_struct(&1, ReqLLM.Tool))
       assert Enum.sort(Enum.map(config.reqllm_tools, & &1.name)) == ["gate", "read"]
+
+      legacy_payload = update_in(payload.state.__strategy__.config, &Map.delete(&1, :reqllm_tools))
+      {:ok, restored_legacy} = CheckpointAgent.restore(legacy_payload, %{})
+      assert Enum.sort(Enum.map(restored_legacy.state.__strategy__.config.reqllm_tools, & &1.name)) == ["gate", "read"]
 
       # A fresh, live task supervisor replaces the one dropped at checkpoint.
       assert is_pid(restored.state.__task_supervisor_skill__.supervisor)
@@ -534,9 +644,12 @@ defmodule Jido.AI.CheckpointTest do
       {:ok, payload} = CheckpointAgent.checkpoint(live, %{})
       record = request_record(payload, request.id)
 
-      assert record.status == :pending
+      assert record.status == :failed
+      assert record.error == :stream_interrupted
       refute Map.has_key?(record, :stream_to)
       assert record.stream_interrupted == true
+      assert payload.state.__strategy__.status == :idle
+      assert payload.state.__strategy__.active_request_id == nil
       assert Checkpoint.runtime_handles(payload) == []
       assert :erlang.binary_to_term(:erlang.term_to_binary(payload), [:safe]) == payload
 

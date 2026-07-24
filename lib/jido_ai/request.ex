@@ -69,6 +69,7 @@ defmodule Jido.AI.Request do
 
   @default_timeout 30_000
   @default_max_requests 100
+  @stream_interrupted_error :stream_interrupted
 
   # A request in one of these states will never emit another runtime event, so
   # its stream sink is dropped rather than carried in agent state.
@@ -511,9 +512,10 @@ defmodule Jido.AI.Request do
   that created them. They must never reach durable storage — see
   `Jido.AI.Checkpoint` for why an encoded pid makes a checkpoint undecodable.
 
-  Requests that are still in flight are additionally flagged with
-  `stream_interrupted: true`, recording that a consumer was attached and will
-  never receive the remaining events.
+  Requests that are still in flight are additionally failed with
+  `error: :stream_interrupted` and flagged with `stream_interrupted: true`.
+  The failed status lets `await/2` return immediately after restore instead of
+  waiting for a run that no longer exists.
 
   ## Modes
 
@@ -526,7 +528,7 @@ defmodule Jido.AI.Request do
 
       iex> state = %{requests: %{"r1" => %{status: :pending, stream_to: {:pid, self()}}}}
       iex> Jido.AI.Request.sanitize_requests(state, :checkpoint)
-      %{requests: %{"r1" => %{status: :pending, stream_interrupted: true}}}
+      %{requests: %{"r1" => %{status: :failed, error: :stream_interrupted, stream_interrupted: true}}}
   """
   @spec sanitize_requests(map(), :checkpoint | :restore) :: map()
   def sanitize_requests(state, mode) when is_map(state) and mode in [:checkpoint, :restore] do
@@ -547,13 +549,22 @@ defmodule Jido.AI.Request do
     |> mark_interrupted_if_active()
   end
 
+  defp sanitize_request(%{stream_interrupted: true} = request) do
+    mark_interrupted_if_active(request)
+  end
+
   defp sanitize_request(request), do: request
 
   defp mark_interrupted_if_active(%{status: status} = request) when status in @terminal_statuses do
     request
   end
 
-  defp mark_interrupted_if_active(request), do: Map.put(request, :stream_interrupted, true)
+  defp mark_interrupted_if_active(request) do
+    request
+    |> Map.put(:status, :failed)
+    |> Map.put(:error, @stream_interrupted_error)
+    |> Map.put(:stream_interrupted, true)
+  end
 
   defp drop_stream_sink(request) when is_map(request), do: Map.delete(request, :stream_to)
 

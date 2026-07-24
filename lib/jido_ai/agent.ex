@@ -968,6 +968,8 @@ defmodule Jido.AI.Agent do
       end
 
       def restore(_data, _ctx), do: {:error, :invalid_checkpoint_payload}
+
+      defoverridable checkpoint: 2
     end
   end
 
