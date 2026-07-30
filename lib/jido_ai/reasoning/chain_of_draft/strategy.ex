@@ -72,7 +72,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.Strategy do
       schema:
         Zoi.object(%{
           call_id: Zoi.string(),
-          delta: Zoi.string(),
+          delta: Zoi.any(),
           chunk_type: Zoi.atom() |> Zoi.default(:content)
         }),
       doc: "Legacy no-op in delegated CoD mode",

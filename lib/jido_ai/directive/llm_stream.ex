@@ -3,8 +3,8 @@ defmodule Jido.AI.Directive.LLMStream do
   Directive asking the runtime to stream an LLM response via ReqLLM.
 
   Uses ReqLLM for streaming. The runtime will execute this asynchronously
-  and send partial tokens as `ai.llm.delta` signals and the final result
-  as a `ai.llm.response` signal.
+  and send text or complete content parts as `ai.llm.delta` signals. It sends
+  the final result as an `ai.llm.response` signal.
 
   ## New Fields
 
@@ -69,10 +69,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
   @moduledoc """
   Spawns an async task to stream an LLM response and sends results back to the agent.
 
-  This implementation provides **true streaming**: as tokens arrive from the LLM,
-  they are immediately sent as `ai.llm.delta` signals. When the stream completes,
-  a final `ai.llm.response` signal is sent with the full classification (tool calls
-  or final answer).
+  This implementation provides **true streaming**: as text or complete content
+  parts arrive from the LLM, they are immediately sent as `ai.llm.delta`
+  signals. When the stream completes, a final `ai.llm.response` signal is sent
+  with the full classification (tool calls or final answer).
 
   Supports:
   - `model_alias` resolution via `Jido.AI.resolve_model/1`
@@ -278,7 +278,26 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
           maybe_emit_delta(obs_cfg, Observe.llm(:delta), %{duration_ms: 0}, event_meta)
         end
 
+        on_chunk = fn chunk ->
+          case Turn.stream_content_part(chunk) do
+            {:ok, content_part} ->
+              partial_signal =
+                Signal.LLMDelta.new!(%{
+                  call_id: call_id,
+                  delta: content_part,
+                  chunk_type: :content_part
+                })
+
+              Jido.AgentServer.cast(agent_pid, partial_signal)
+              maybe_emit_delta(obs_cfg, Observe.llm(:delta), %{duration_ms: 0}, event_meta)
+
+            :error ->
+              :ok
+          end
+        end
+
         case ReqLLM.StreamResponse.process_stream(stream_response,
+               on_chunk: on_chunk,
                on_result: on_content,
                on_thinking: on_thinking
              ) do

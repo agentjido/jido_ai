@@ -185,7 +185,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
           | {:thoughts_generated, call_id :: String.t(), thoughts :: [String.t()]}
           | {:thoughts_evaluated, call_id :: String.t(), scores :: %{String.t() => float()}}
           | {:llm_result, call_id :: String.t(), result :: term()}
-          | {:llm_partial, call_id :: String.t(), delta :: String.t(), chunk_type :: atom()}
+          | {:llm_partial, call_id :: String.t(), delta :: term(), chunk_type :: atom()}
 
   @type directive ::
           {:generate_thoughts, id :: String.t(), context :: list(), count :: pos_integer()}
@@ -342,7 +342,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
     if call_id == machine.current_call_id do
       machine =
         case chunk_type do
-          :content ->
+          :content when is_binary(delta) ->
             Map.update!(machine, :streaming_text, &(&1 <> delta))
 
           _ ->

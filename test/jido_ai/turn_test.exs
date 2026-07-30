@@ -63,6 +63,8 @@ defmodule Jido.AI.TurnTest do
 
       assert turn.type == :final_answer
       assert turn.text == "hello\nworld"
+      assert Turn.assistant_content(turn) == "hello\nworld"
+      assert Turn.result(turn) == "hello\nworld"
       assert turn.thinking_content == "let me think"
       assert turn.tool_calls == []
       assert turn.usage == %{input_tokens: 10, output_tokens: 5}
@@ -161,6 +163,64 @@ defmodule Jido.AI.TurnTest do
       assert turn.usage == %{input_tokens: 4, output_tokens: 2}
       assert turn.model == "anthropic:claude-haiku-4-5"
       assert turn.message_metadata == %{response_id: "resp_1"}
+    end
+
+    test "retains generated images from canonical and map responses" do
+      image = ContentPart.image(<<1, 2, 3>>, "image/png")
+      image_url = ContentPart.image_url("https://example.com/generated.png")
+
+      response = %ReqLLM.Response{
+        id: "resp_image",
+        model: "openrouter:google/gemini-3-pro-image",
+        context: ReqLLM.Context.new(),
+        message: ReqLLM.Context.assistant([ContentPart.text("Generated:"), image, image_url]),
+        stream?: false,
+        stream: nil,
+        usage: %{},
+        finish_reason: :stop,
+        provider_meta: %{},
+        error: nil
+      }
+
+      turn = Turn.from_response(response)
+
+      assert turn.text == "Generated:"
+      assert turn.content_parts == [ContentPart.text("Generated:"), image, image_url]
+      assert Turn.images(turn) == [image, image_url]
+      assert Turn.result(turn) == turn.content_parts
+      assert Turn.assistant_message(turn).content == turn.content_parts
+      assert Turn.to_result_map(turn).content_parts == turn.content_parts
+
+      map_turn =
+        Turn.from_response(%{
+          message: %{
+            content: [
+              %{"type" => "image_url", "url" => "https://example.com/generated.png"},
+              %{"type" => "text", "text" => "Caption"}
+            ]
+          },
+          finish_reason: :stop
+        })
+
+      assert map_turn.content_parts == [image_url, ContentPart.text("Caption")]
+      assert Turn.result(map_turn) == map_turn.content_parts
+    end
+
+    test "retains ordered complete content parts from stream chunks" do
+      image = ContentPart.image(<<1, 2, 3>>, "image/png")
+
+      chunks = [
+        ReqLLM.StreamChunk.text("Before "),
+        ReqLLM.StreamChunk.text("image"),
+        content_part_chunk(image),
+        ReqLLM.StreamChunk.text("After")
+      ]
+
+      assert Turn.content_parts_from_chunks(chunks) == [
+               ContentPart.text("Before image"),
+               image,
+               ContentPart.text("After")
+             ]
     end
 
     test "propagates finish_reason from ReqLLM.Response for incomplete responses" do
@@ -791,5 +851,11 @@ defmodule Jido.AI.TurnTest do
 
       refute log =~ "Executing"
     end
+  end
+
+  defp content_part_chunk(content_part) do
+    ReqLLM.StreamChunk.meta(%{})
+    |> Map.put(:type, :content_part)
+    |> Map.put(:content_part, content_part)
   end
 end

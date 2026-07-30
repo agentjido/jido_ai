@@ -10,6 +10,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
+  alias ReqLLM.Message.ContentPart
 
   defmodule TestCalculator do
     use Jido.Action,
@@ -1262,6 +1263,49 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert signal.data.run_id == request_id
       assert signal.data.request_id == request_id
       assert signal.data.iteration == 1
+    end
+
+    test "passes complete content parts without appending them to text state" do
+      agent = create_agent(tools: [TestCalculator])
+      request_id = "req_content_part"
+      image = ContentPart.image(<<1, 2, 3>>, "image/png")
+
+      delta_event =
+        runtime_event(:llm_delta, request_id, 18, %{
+          chunk_type: :content_part,
+          delta: image
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: request_id, event: delta_event})],
+          %{}
+        )
+
+      assert_receive {:"$gen_cast", {:signal, signal}}
+      assert signal.type == "ai.llm.delta"
+      assert signal.data.chunk_type == :content_part
+      assert signal.data.delta == image
+      assert StratState.get(agent, %{}).streaming_text == ""
+
+      completed_event =
+        runtime_event(:llm_completed, request_id, 19, %{
+          turn_type: :final_answer,
+          text: "",
+          content_parts: [image],
+          tool_calls: [],
+          usage: %{}
+        })
+
+      {agent, []} =
+        ReAct.cmd(
+          agent,
+          [instruction(:ai_react_worker_event, %{request_id: request_id, event: completed_event})],
+          %{}
+        )
+
+      assert StratState.get(agent, %{}).result == [image]
     end
 
     test "uses runtime event model for LLM delta telemetry" do

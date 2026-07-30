@@ -99,7 +99,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Machine do
   @type msg ::
           {:start, prompt :: String.t(), call_id :: String.t()}
           | {:llm_result, call_id :: String.t(), result :: term()}
-          | {:llm_partial, call_id :: String.t(), delta :: String.t(), chunk_type :: atom()}
+          | {:llm_partial, call_id :: String.t(), delta :: term(), chunk_type :: atom()}
 
   @type directive ::
           {:call_llm_stream, id :: String.t(), context :: list()}
@@ -177,7 +177,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Machine do
     if call_id == machine.current_call_id do
       machine =
         case chunk_type do
-          :content ->
+          :content when is_binary(delta) ->
             Map.update!(machine, :streaming_text, &(&1 <> delta))
 
           _ ->

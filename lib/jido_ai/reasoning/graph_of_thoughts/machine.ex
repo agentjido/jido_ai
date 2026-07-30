@@ -638,10 +638,12 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
     {machine, []}
   end
 
-  defp handle_llm_partial(machine, delta, _chunk_type) do
-    machine = Map.update!(machine, :streaming_text, &(&1 <> (delta || "")))
+  defp handle_llm_partial(machine, delta, :content) when is_binary(delta) do
+    machine = Map.update!(machine, :streaming_text, &(&1 <> delta))
     {machine, []}
   end
+
+  defp handle_llm_partial(machine, _delta, _chunk_type), do: {machine, []}
 
   defp handle_thought_generated(machine, content, env) do
     current_node = get_node(machine, machine.current_node_id)

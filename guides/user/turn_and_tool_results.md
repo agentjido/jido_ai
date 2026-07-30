@@ -42,11 +42,24 @@ turn = Turn.from_response(response, model: "my-custom-tag")
 The turn struct contains:
 - `type` — `:tool_calls` or `:final_answer`
 - `text` — extracted text content
+- `content_parts` — ordered ReqLLM content parts, including generated images
 - `thinking_content` — extended thinking output (or `nil`)
 - `tool_calls` — normalized list of tool call maps
 - `usage` — token usage metadata
 - `model` — model identifier
 - `tool_results` — populated after tool execution
+
+For a text-only turn, `Turn.result/1` returns the text string. For a
+multimodal turn, it returns the ordered visible content parts:
+
+```elixir
+result = Turn.result(turn)
+images = Turn.images(turn)
+```
+
+Generated images also use `:content_part` `ai.llm.delta` signals while a
+response streams. The signal `delta` is the complete
+`ReqLLM.Message.ContentPart`.
 
 You can also build from an already-classified map:
 

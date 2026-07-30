@@ -284,6 +284,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                     model: turn.model,
                     turn_type: turn.type,
                     text: turn.text,
+                    content_parts: turn.content_parts,
                     thinking_content: turn.thinking_content,
                     reasoning_details: Map.get(turn, :reasoning_details),
                     tool_calls: turn.tool_calls,
@@ -296,7 +297,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               state =
                 AIContext.append_assistant(
                   state.context,
-                  turn.text,
+                  Turn.assistant_content(turn),
                   case turn.type do
                     :tool_calls -> turn.tool_calls
                     _ -> nil
@@ -315,7 +316,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                   completed =
                     state
                     |> State.put_status(:completed)
-                    |> State.put_result(turn.text)
+                    |> State.put_result(Turn.result(turn))
 
                   {:final_answer, completed}
               end
@@ -1386,6 +1387,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp visible_chunk?(%ReqLLM.StreamChunk{type: :content, text: text}, trace_cfg), do: delta_captured?(text, trace_cfg)
   defp visible_chunk?(%ReqLLM.StreamChunk{type: :thinking, text: text}, trace_cfg), do: delta_captured?(text, trace_cfg)
   defp visible_chunk?(%ReqLLM.StreamChunk{type: :tool_call}, trace_cfg), do: trace_cfg[:capture_deltas?] == true
+
+  defp visible_chunk?(%{__struct__: ReqLLM.StreamChunk, type: :content_part} = chunk, trace_cfg) do
+    trace_cfg[:capture_deltas?] == true and match?({:ok, _content_part}, Turn.stream_content_part(chunk))
+  end
+
   defp visible_chunk?(_chunk, _trace_cfg), do: false
 
   defp delta_captured?(text, trace_cfg), do: trace_cfg[:capture_deltas?] == true and is_binary(text) and text != ""
@@ -1394,6 +1400,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     []
     |> Keyword.put(:on_chunk, fn chunk ->
       note_stream_chunk_activity(chunk, state_key, usage_key, owner, ref, trace_cfg, heartbeat_interval_ms)
+      maybe_emit_content_part_delta(chunk, state_key, owner, ref, trace_cfg, model)
     end)
     |> maybe_put_stream_callback(trace_cfg, :on_result, fn text ->
       emit_stream_delta(state_key, owner, ref, :content, text, model)
@@ -1410,6 +1417,15 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     case trace_cfg[:capture_deltas?] do
       true -> Keyword.put(opts, callback_key, callback_fun)
       _ -> opts
+    end
+  end
+
+  defp maybe_emit_content_part_delta(chunk, state_key, owner, ref, trace_cfg, model) do
+    with true <- trace_cfg[:capture_deltas?] == true,
+         {:ok, content_part} <- Turn.stream_content_part(chunk) do
+      emit_stream_delta(state_key, owner, ref, :content_part, content_part, model)
+    else
+      _other -> :ok
     end
   end
 
@@ -1607,7 +1623,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       Turn.needs_tools?(turn) ->
         :ok
 
-      turn.text != "" ->
+      Turn.result(turn) != "" ->
         :ok
 
       invalid_blank_terminal_finish_reason?(turn.finish_reason) ->

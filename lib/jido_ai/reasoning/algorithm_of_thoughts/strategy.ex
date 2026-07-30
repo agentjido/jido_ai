@@ -68,7 +68,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy do
       schema:
         Zoi.object(%{
           call_id: Zoi.string(),
-          delta: Zoi.string(),
+          delta: Zoi.any(),
           chunk_type: Zoi.atom() |> Zoi.default(:content)
         }),
       doc: "Handle streaming LLM token chunk",

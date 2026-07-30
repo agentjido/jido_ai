@@ -319,6 +319,34 @@ defmodule Jido.AI.ContextTest do
       assert text_block == %{type: :text, text: "The answer is 42."}
     end
 
+    test "keeps multimodal assistant content flat when thinking is present" do
+      image = ContentPart.image_url("https://example.com/generated.png")
+      content = [ContentPart.text("Generated:"), image]
+
+      thread =
+        AIContext.new()
+        |> AIContext.append_assistant(content, nil, thinking: "I will make an image.")
+
+      [message] = AIContext.to_messages(thread)
+
+      assert message.content == [
+               %{type: :thinking, thinking: "I will make an image."},
+               ContentPart.text("Generated:"),
+               image
+             ]
+
+      rebuilt = AIContext.new() |> AIContext.append_messages([message])
+      [entry] = rebuilt.entries
+
+      assert entry.content == content
+      assert entry.thinking == "I will make an image."
+      assert AIContext.to_messages(rebuilt) == [message]
+
+      output = capture_io(fn -> assert :ok = AIContext.pp(rebuilt) end)
+      assert output =~ "[asst]"
+      assert output =~ "image_url"
+    end
+
     test "projects assistant message without thinking as plain string" do
       thread =
         AIContext.new()

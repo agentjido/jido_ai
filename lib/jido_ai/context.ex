@@ -105,7 +105,7 @@ defmodule Jido.AI.Context do
   @doc """
   Append an assistant message to the thread, optionally with tool calls and thinking content.
   """
-  @spec append_assistant(t(), String.t() | nil, list() | nil, keyword()) :: t()
+  @spec append_assistant(t(), String.t() | [ContentPart.t()] | nil, list() | nil, keyword()) :: t()
   def append_assistant(thread, content, tool_calls \\ nil, opts \\ []) do
     thinking = Keyword.get(opts, :thinking)
     reasoning_details = Keyword.get(opts, :reasoning_details)
@@ -206,7 +206,7 @@ defmodule Jido.AI.Context do
   @doc """
   Get the last assistant response content.
   """
-  @spec last_assistant_content(t()) :: String.t() | nil
+  @spec last_assistant_content(t()) :: String.t() | [ContentPart.t()] | nil
   def last_assistant_content(%__MODULE__{entries: entries}) do
     # Entries are stored in reverse order, so first match is most recent
     entries
@@ -351,11 +351,11 @@ defmodule Jido.AI.Context do
   defp truncate_content(content, max), do: content |> inspect() |> truncate_string(max)
 
   defp format_entry_for_pp(%Entry{role: :user, content: content}) do
-    "[user]   #{content}"
+    "[user]   #{format_content_for_pp(content)}"
   end
 
   defp format_entry_for_pp(%Entry{role: :assistant, content: content, tool_calls: nil}) do
-    "[asst]   #{content}"
+    "[asst]   #{format_content_for_pp(content)}"
   end
 
   defp format_entry_for_pp(%Entry{role: :assistant, tool_calls: tool_calls}) when is_list(tool_calls) do
@@ -377,12 +377,14 @@ defmodule Jido.AI.Context do
   end
 
   defp format_entry_for_pp(%Entry{role: :system, content: content}) do
-    "[system] #{content}"
+    "[system] #{format_content_for_pp(content)}"
   end
 
   defp format_entry_for_pp(%Entry{role: role, content: content}) do
-    "[#{role}] #{content}"
+    "[#{role}] #{format_content_for_pp(content)}"
   end
+
+  defp format_content_for_pp(content), do: truncate_content(content, 200)
 
   # Private helpers
 
@@ -440,6 +442,10 @@ defmodule Jido.AI.Context do
   defp build_assistant_content(content, nil), do: content
   defp build_assistant_content(content, ""), do: content
 
+  defp build_assistant_content(content, thinking) when is_list(content) and is_binary(thinking) do
+    [%{type: :thinking, thinking: thinking} | content]
+  end
+
   defp build_assistant_content(content, thinking) when is_binary(thinking) do
     [
       %{type: :thinking, thinking: thinking},
@@ -467,6 +473,19 @@ defmodule Jido.AI.Context do
 
   defp normalize_entry_content(role, content, _text_content) when role in [:user, :tool] and is_list(content),
     do: normalize_content_parts(content)
+
+  defp normalize_entry_content(:assistant, content, text_content) when is_list(content) do
+    content_parts =
+      content
+      |> Enum.reject(&(content_part_type(&1) in [:thinking, "thinking"]))
+      |> normalize_content_parts()
+
+    if Enum.any?(content_parts, &match?(%ContentPart{type: type} when type != :text, &1)) do
+      content_parts
+    else
+      text_content
+    end
+  end
 
   defp normalize_entry_content(_role, _content, text_content), do: text_content
 

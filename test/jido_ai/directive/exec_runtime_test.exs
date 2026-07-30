@@ -38,6 +38,12 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
   defp assert_ok_result({:ok, value, []}), do: value
   defp assert_error_result({:error, error, []}), do: error
 
+  defp content_part_chunk(content_part) do
+    ReqLLM.StreamChunk.meta(%{})
+    |> Map.put(:type, :content_part)
+    |> Map.put(:content_part, content_part)
+  end
+
   describe "LLMGenerate DirectiveExec" do
     test "emits usage and llm response signals on success" do
       supervisor = DirectiveSupport.start_task_supervisor!()
@@ -230,6 +236,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
     test "emits deltas, usage, and final response on successful stream processing" do
       supervisor = DirectiveSupport.start_task_supervisor!()
       on_exit(fn -> DirectiveSupport.stop_task_supervisor(supervisor) end)
+      image = ReqLLM.Message.ContentPart.image(<<1, 2, 3>>, "image/png")
 
       Mimic.copy(ReqLLM.StreamResponse)
 
@@ -241,6 +248,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       end)
 
       Mimic.stub(ReqLLM.StreamResponse, :process_stream, fn :stream_response, callbacks ->
+        callbacks[:on_chunk].(content_part_chunk(image))
         callbacks[:on_thinking].("thinking chunk")
         callbacks[:on_result].("content chunk")
 
@@ -273,8 +281,17 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
 
       signal_1 = DirectiveSupport.assert_signal_cast("ai.llm.delta")
       signal_2 = DirectiveSupport.assert_signal_cast("ai.llm.delta")
+      signal_3 = DirectiveSupport.assert_signal_cast("ai.llm.delta")
 
-      assert Enum.sort([signal_1.data.chunk_type, signal_2.data.chunk_type]) == [:content, :thinking]
+      signals = [signal_1, signal_2, signal_3]
+
+      assert Enum.sort_by(Enum.map(signals, & &1.data.chunk_type), &Atom.to_string/1) == [
+               :content,
+               :content_part,
+               :thinking
+             ]
+
+      assert Enum.find(signals, &(&1.data.chunk_type == :content_part)).data.delta == image
 
       usage_signal = DirectiveSupport.assert_signal_cast("ai.usage")
       assert usage_signal.data.call_id == "llm_stream_ok"
