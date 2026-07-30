@@ -492,12 +492,7 @@ defmodule Jido.AI.Request do
     %{agent | state: state}
   end
 
-  @doc """
-  Returns the stream sink recorded for a request, or `nil`.
-
-  Read the sink *before* moving a request to a terminal state: the terminal
-  transition drops it so no pid reaches a checkpoint.
-  """
+  @doc false
   @spec stream_sink(struct(), String.t()) :: RequestStream.sink() | nil
   def stream_sink(agent, request_id) when is_binary(request_id) do
     get_in(agent.state, [:requests, request_id, :stream_to])
@@ -505,33 +500,9 @@ defmodule Jido.AI.Request do
 
   def stream_sink(_agent, _request_id), do: nil
 
-  @doc """
-  Removes request stream sinks from agent state for persistence or restore.
-
-  Stream sinks are `{:pid, pid}` handles that are only meaningful inside the VM
-  that created them. They must never reach durable storage — see
-  `Jido.AI.Checkpoint` for why an encoded pid makes a checkpoint undecodable.
-
-  Requests that are still in flight are additionally failed with
-  `error: :stream_interrupted` and flagged with `stream_interrupted: true`.
-  The failed status lets `await/2` return immediately after restore instead of
-  waiting for a run that no longer exists.
-
-  ## Modes
-
-  - `:checkpoint` - sanitizing state on its way into a checkpoint payload
-  - `:restore` - scrubbing a payload written before sanitization existed
-
-  Both modes behave identically; the mode is kept for call-site clarity.
-
-  ## Examples
-
-      iex> state = %{requests: %{"r1" => %{status: :pending, stream_to: {:pid, self()}}}}
-      iex> Jido.AI.Request.sanitize_requests(state, :checkpoint)
-      %{requests: %{"r1" => %{status: :failed, error: :stream_interrupted, stream_interrupted: true}}}
-  """
-  @spec sanitize_requests(map(), :checkpoint | :restore) :: map()
-  def sanitize_requests(state, mode) when is_map(state) and mode in [:checkpoint, :restore] do
+  @doc false
+  @spec sanitize_requests(map()) :: map()
+  def sanitize_requests(state) when is_map(state) do
     case Map.get(state, :requests) do
       requests when is_map(requests) ->
         Map.put(state, :requests, Map.new(requests, fn {id, req} -> {id, sanitize_request(req)} end))
@@ -541,7 +512,7 @@ defmodule Jido.AI.Request do
     end
   end
 
-  def sanitize_requests(state, _mode), do: state
+  def sanitize_requests(state), do: state
 
   defp sanitize_request(%{stream_to: _sink} = request) do
     request

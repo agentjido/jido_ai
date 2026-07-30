@@ -58,14 +58,7 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
     end
   end
 
-  @doc """
-  Drops the supervisor pid from checkpoint payloads.
-
-  The supervisor is process-local: it dies with the agent, and an encoded pid
-  makes the checkpoint undecodable by `:erlang.binary_to_term/2` with `[:safe]`
-  once the writing node is gone. Dropping the key lets `new/1` mount a fresh
-  supervisor during restore. See `Jido.AI.Checkpoint`.
-  """
+  @doc false
   @impl Jido.Plugin
   @spec on_checkpoint(term(), map()) :: :drop
   def on_checkpoint(_plugin_state, _context), do: :drop

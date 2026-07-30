@@ -141,10 +141,7 @@ defmodule Jido.AI.ToolAdapter do
       name: apply_prefix(action_module.name(), prefix),
       description: action_module.description(),
       parameter_schema: build_json_schema(action_module.schema()),
-      # Jido owns tool execution, so ReqLLM only needs a serializable callback
-      # placeholder. These atoms already exist wherever a ReqLLM.Tool struct can
-      # be decoded, which keeps old checkpoint readers compatible with [:safe].
-      callback: {ReqLLM.Tool, :new},
+      callback: {__MODULE__, :noop_callback},
       strict: strict
     )
   end
@@ -330,6 +327,10 @@ defmodule Jido.AI.ToolAdapter do
   defp infer_strict?(module) do
     if function_exported?(module, :strict?, 0), do: module.strict?(), else: false
   end
+
+  @doc false
+  @spec noop_callback(map()) :: {:ok, map()}
+  def noop_callback(_args), do: {:ok, %{}}
 
   defp apply_prefix(name, nil), do: name
   defp apply_prefix(name, prefix) when is_binary(prefix), do: prefix <> name

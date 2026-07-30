@@ -913,22 +913,13 @@ defmodule Jido.AI.Agent do
       @doc """
       Builds a durable checkpoint payload for this agent.
 
-      Strips process-local runtime handles — request stream sinks, the ReAct
-      worker pid, the steering queue, and the `ReqLLM.Tool` callbacks — before
-      delegating to the default implementation, so the payload survives
-      `:erlang.binary_to_term/2` with `[:safe]` on another node.
-
-      See `Jido.AI.Checkpoint` for the full list and the restore contract.
+      Removes request stream sinks and ReAct process handles before storage.
       """
       @impl true
       @spec checkpoint(Jido.Agent.t(), map()) :: {:ok, map()} | {:error, term()}
       def checkpoint(agent, ctx) do
         sanitized = %{agent | state: Jido.AI.Checkpoint.sanitize_state(agent.state)}
-
-        with {:ok, payload} <- super(sanitized, ctx) do
-          Jido.AI.Checkpoint.warn_on_residual_handles(__MODULE__, payload)
-          {:ok, payload}
-        end
+        super(sanitized, ctx)
       end
 
       @impl true
