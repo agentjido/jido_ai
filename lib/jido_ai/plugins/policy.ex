@@ -27,8 +27,9 @@ defmodule Jido.AI.Plugins.Policy do
 
   - `ai.llm.response` and `ai.tool.result` normalize `data.result` into
     `{:ok, result, effects}` or `{:error, reason, effects}` tuples.
-  - `ai.llm.delta` sanitizes `data.delta` by removing control bytes and
-    truncating to `max_delta_chars` (default `4_000`).
+  - `ai.llm.delta` sanitizes text in `data.delta` by removing control bytes
+    and truncating to `max_delta_chars` (default `4_000`). Typed content parts
+    pass through unchanged.
   """
 
   use Jido.Plugin,
@@ -74,7 +75,7 @@ defmodule Jido.AI.Plugins.Policy do
   def schema do
     Zoi.object(%{
       mode: Zoi.atom(description: "Policy mode (:enforce or :monitor)") |> Zoi.default(:enforce),
-      max_delta_chars: Zoi.integer(description: "Max chars kept in ai.llm.delta payloads") |> Zoi.default(4_000),
+      max_delta_chars: Zoi.integer(description: "Max chars kept in text ai.llm.delta payloads") |> Zoi.default(4_000),
       block_on_validation_error:
         Zoi.boolean(description: "Block request/query/chat signals on validation failures")
         |> Zoi.default(true)

@@ -75,15 +75,20 @@ defmodule Jido.AI.Signal.Helpers do
   def correlation_id(_), do: nil
 
   @doc """
-  Sanitizes streaming deltas by removing control bytes and truncating payload size.
+  Sanitizes text deltas by removing control bytes and truncating payload size.
+
+  Non-text deltas, such as complete content parts, pass through unchanged.
   """
-  @spec sanitize_delta(term(), non_neg_integer()) :: String.t()
-  def sanitize_delta(delta, max_chars \\ 4_000) when is_integer(max_chars) and max_chars > 0 do
+  @spec sanitize_delta(term(), pos_integer()) :: term()
+  def sanitize_delta(delta, max_chars \\ 4_000)
+
+  def sanitize_delta(delta, max_chars) when is_binary(delta) and is_integer(max_chars) and max_chars > 0 do
     delta
-    |> to_string()
     |> String.replace(~r/[\x00-\x08\x0B\x0C\x0E-\x1F]/u, "")
     |> String.slice(0, max_chars)
   end
+
+  def sanitize_delta(delta, max_chars) when is_integer(max_chars) and max_chars > 0, do: delta
 
   defp first_present(values), do: Enum.find(values, &(not is_nil(&1)))
 end

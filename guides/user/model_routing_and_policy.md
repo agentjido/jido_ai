@@ -137,7 +137,8 @@ Fix:
 
 - Model routing applies only when `model` is omitted
 - Policy also normalizes malformed `ai.llm.response` / `ai.tool.result` envelopes
-- Policy sanitizes/truncates `ai.llm.delta` using `max_delta_chars`
+- Policy sanitizes and truncates text in `ai.llm.delta` using
+  `max_delta_chars`. Typed content parts pass through unchanged.
 
 ## When To Use / Not Use
 

@@ -2,7 +2,9 @@ defmodule Jido.AI.Plugins.PolicyTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Plugins.Policy
+  alias Jido.AI.Signal.LLMDelta
   alias Jido.Signal
+  alias ReqLLM.Message.ContentPart
 
   defp ctx(policy_state) do
     %{
@@ -65,6 +67,16 @@ defmodule Jido.AI.Plugins.PolicyTest do
                Policy.handle_signal(signal, ctx(%{mode: :enforce, max_delta_chars: 5}))
 
       assert rewritten.data.delta == "abcde"
+    end
+
+    test "preserves complete content parts in ai.llm.delta signals" do
+      image = ContentPart.image(<<1, 2, 3>>, "image/png")
+      signal = LLMDelta.new!(%{call_id: "c1", chunk_type: :content_part, delta: image})
+
+      assert {:ok, {:continue, rewritten}} =
+               Policy.handle_signal(signal, ctx(%{mode: :enforce, max_delta_chars: 5}))
+
+      assert rewritten.data.delta == image
     end
   end
 end

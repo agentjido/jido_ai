@@ -370,6 +370,74 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert ReAct.collect_stream(events).result == [image]
   end
 
+  test "replays generated images and thinking as flat content on the next tool round" do
+    parent = self()
+    image = ContentPart.image_url("https://example.com/generated.png")
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_image"})],
+             %{finish_reason: :tool_calls},
+             model
+           )}
+
+        2 ->
+          send(parent, {:second_round_messages, messages})
+
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("Done")],
+             %{finish_reason: :stop},
+             model
+           )}
+      end
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, fn stream_response, opts ->
+      {:ok, response} = process_stream_response(stream_response, opts)
+
+      if :persistent_term.get({__MODULE__, :llm_call_count}, 0) == 1 do
+        {:ok,
+         put_in(response, [:message, :content], [
+           %{type: :thinking, thinking: "I made an image before using the tool."},
+           image
+         ])}
+      else
+        {:ok, response}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0
+      })
+
+    events = ReAct.stream("Make an image, then calculate", config) |> Enum.to_list()
+
+    assert_receive {:second_round_messages, messages}
+
+    assistant_message =
+      Enum.find(messages, fn
+        %{role: :assistant, tool_calls: [_ | _]} -> true
+        _message -> false
+      end)
+
+    assert assistant_message.content == [
+             %{type: :thinking, thinking: "I made an image before using the tool."},
+             image
+           ]
+
+    assert Enum.find(events, &(&1.kind == :request_completed)).data.result == "Done"
+  end
+
   test "propagates usage from streaming meta chunks into request completion" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       {:ok,
