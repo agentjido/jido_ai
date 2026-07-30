@@ -23,6 +23,14 @@ defmodule Jido.AI.OutputTest do
       ]
   end
 
+  defmodule RepairCallback do
+    @moduledoc false
+
+    def repair(_output, _raw, _reason, _context) do
+      {:ok, %{"category" => "technical", "summary" => "Normalized"}}
+    end
+  end
+
   test "agent macro accepts structured output config" do
     assert function_exported?(StructuredOutputAgent, :ask_sync, 3)
   end
@@ -129,5 +137,19 @@ defmodule Jido.AI.OutputTest do
   test "redacts sensitive keys in metadata previews" do
     assert Output.raw_preview(%{api_key: "secret", nested: %{token: "hidden"}, ok: "visible"}) =~ "[REDACTED]"
     refute Output.raw_preview(%{api_key: "secret"}) =~ "secret"
+  end
+
+  test "uses a configured repair callback from the runner call path" do
+    assert {:ok, output} =
+             Output.new(
+               schema: @schema,
+               repair_fun: &RepairCallback.repair/4
+             )
+
+    assert output.repair_fun == {RepairCallback, :repair}
+    assert :erlang.binary_to_term(:erlang.term_to_binary(output), [:safe]) == output
+
+    assert {:ok, %{category: :technical, confidence: 1.0, summary: "Normalized"}} =
+             Output.repair(output, "invalid", :invalid, %{})
   end
 end
