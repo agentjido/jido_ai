@@ -26,6 +26,7 @@ defmodule Jido.AI.Reasoning.Helpers do
   alias Jido.Agent.StateOp
   alias Jido.Agent.StateOps
   alias Jido.Agent
+  alias Jido.Observe.Config, as: ObserveConfig
 
   @type state_op ::
           StateOp.SetState.t() | StateOp.SetPath.t() | StateOp.DeleteKeys.t() | StateOp.DeletePath.t()
@@ -41,10 +42,13 @@ defmodule Jido.AI.Reasoning.Helpers do
   @spec execute_action_instruction(Agent.t(), Jido.Instruction.t(), strategy_ctx()) ::
           {Agent.t(), [struct()]}
   def execute_action_instruction(%Agent{} = agent, %Jido.Instruction{} = instruction, ctx \\ %{}) do
+    exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], instruction.opts)
+
     instruction =
       %Jido.Instruction{
         instruction
-        | context:
+        | opts: exec_opts,
+          context:
             instruction.context
             |> normalize_context()
             |> Map.merge(
