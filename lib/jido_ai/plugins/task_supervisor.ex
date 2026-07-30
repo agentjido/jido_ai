@@ -58,6 +58,11 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
     end
   end
 
+  @doc false
+  @impl Jido.Plugin
+  @spec on_checkpoint(term(), map()) :: :drop
+  def on_checkpoint(_plugin_state, _context), do: :drop
+
   # Starts a new anonymous Task.Supervisor.
   defp start_supervisor do
     Task.Supervisor.start_link()

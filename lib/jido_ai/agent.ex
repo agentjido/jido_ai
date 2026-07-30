@@ -666,7 +666,7 @@ defmodule Jido.AI.Agent do
             {:ai_react_request_error, %{request_id: request_id, reason: reason, message: message}} = action
           ) do
         error = {:rejected, reason, message}
-        stream_to = get_in(agent.state, [:requests, request_id, :stream_to])
+        stream_to = Request.stream_sink(agent, request_id)
 
         agent = Request.fail_request(agent, request_id, error)
         Request.Stream.send_event(stream_to, Request.Stream.failed_event(request_id, error, reason: reason))
@@ -720,7 +720,12 @@ defmodule Jido.AI.Agent do
         agent =
           if is_binary(request_id) and request_pending?(agent, request_id) do
             failure = {:cancelled, reason}
+            # Read the sink before the terminal transition drops it, and emit the
+            # terminal event here so the consumer's stream halts on the cancel
+            # rather than on a worker acknowledgement that may never arrive.
+            stream_to = Request.stream_sink(agent, request_id)
             emit_request_failed_signal(agent, request_id, failure)
+            Request.Stream.send_event(stream_to, Request.Stream.cancelled_event(request_id, reason))
             Request.fail_request(agent, request_id, failure)
           else
             agent
@@ -905,11 +910,23 @@ defmodule Jido.AI.Agent do
       @spec plugin_specs() :: [map()]
       def plugin_specs, do: @plugin_specs
 
+      @doc """
+      Builds a durable checkpoint payload for this agent.
+
+      Removes request stream sinks and ReAct process handles before storage.
+      """
+      @impl true
+      @spec checkpoint(Jido.Agent.t(), map()) :: {:ok, map()} | {:error, term()}
+      def checkpoint(agent, ctx) do
+        sanitized = %{agent | state: Jido.AI.Checkpoint.sanitize_state(agent.state)}
+        super(sanitized, ctx)
+      end
+
       @impl true
       @spec restore(map(), map()) :: {:ok, Jido.Agent.t()} | {:error, term()}
       def restore(data, ctx) when is_map(data) and is_map(ctx) do
         agent = new(id: data[:id])
-        base_state = data[:state] || %{}
+        base_state = Jido.AI.Checkpoint.rehydrate_state(data[:state] || %{})
         agent = %{agent | state: Map.merge(agent.state, base_state)}
         externalized_keys = data[:externalized_keys] || %{}
 
@@ -942,6 +959,8 @@ defmodule Jido.AI.Agent do
       end
 
       def restore(_data, _ctx), do: {:error, :invalid_checkpoint_payload}
+
+      defoverridable checkpoint: 2
     end
   end
 

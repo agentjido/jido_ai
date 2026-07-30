@@ -79,6 +79,14 @@ defmodule Jido.AI.Request.Stream do
   end
 
   @doc """
+  Creates a synthetic terminal cancellation event.
+  """
+  @spec cancelled_event(String.t(), term(), keyword()) :: Event.t()
+  def cancelled_event(request_id, reason, opts \\ []) when is_binary(request_id) do
+    new_event(request_id, :request_cancelled, %{reason: reason}, opts)
+  end
+
+  @doc """
   Returns true when the event kind terminates a request stream.
   """
   @spec terminal_kind?(atom()) :: boolean()

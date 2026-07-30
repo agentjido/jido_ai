@@ -63,6 +63,34 @@ Pid sinks are request-scoped and use the calling process mailbox. They do not
 provide backpressure; keep handlers lightweight and always consume terminal
 events so request streams close cleanly.
 
+### Stream Sinks And Durable Checkpoints
+
+A stream sink is a live pid. It is kept on the request only while the request is
+active:
+
+- Reaching a terminal state (completed, failed, or cancelled) drops the sink.
+- Checkpoints never contain it, including while a request is still active.
+
+Cancelling a streamed request emits `:request_cancelled` to the sink before the
+sink is dropped.
+
+### Restoring An Interrupted Streamed Request
+
+A stream cannot continue after restore. A request that was active when the
+checkpoint was written is restored as:
+
+```elixir
+%{
+  status: :failed,
+  error: :stream_interrupted,
+  stream_interrupted: true
+}
+```
+
+The restored request has no `:stream_to`. `await/2` returns
+`{:error, :stream_interrupted}` for its old handle. Send a new request to start
+a new stream.
+
 ## Steering An Active ReAct Run
 
 `ask/await` remains the request API. Mid-run steering is a separate control path:

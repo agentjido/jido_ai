@@ -54,6 +54,14 @@ defmodule Jido.AI.ToolAdapterTest do
       assert tool.name == "param_action"
       assert tool.description == "An action with parameters"
       assert is_map(tool.parameter_schema)
+      assert tool.callback == {ToolAdapter, :noop_callback}
+    end
+
+    test "uses a serializable callback placeholder" do
+      tool = ToolAdapter.from_action(ParamAction)
+
+      assert :erlang.binary_to_term(:erlang.term_to_binary(tool), [:safe]) == tool
+      assert {:ok, %{}} = ReqLLM.Tool.execute(tool, %{query: "value"})
     end
 
     test "applies prefix to tool name" do
