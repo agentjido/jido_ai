@@ -335,6 +335,41 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
            }
   end
 
+  test "retains generated images in stream deltas and the final result" do
+    image = ContentPart.image(<<1, 2, 3>>, "image/png")
+    chunk = content_part_chunk(image)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok, responses_stream_response([chunk], %{finish_reason: :stop}, model)}
+    end)
+
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, fn stream_response, opts ->
+      Enum.each(stream_response.stream, opts[:on_chunk])
+
+      {:ok,
+       %{
+         message: %{content: [image], metadata: %{}},
+         finish_reason: :stop,
+         usage: %{},
+         model: stream_response.model
+       }}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}})
+    events = ReAct.stream("Draw an image", config) |> Enum.to_list()
+
+    delta = Enum.find(events, &(&1.kind == :llm_delta))
+    assert delta.data.chunk_type == :content_part
+    assert delta.data.delta == image
+
+    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
+    assert llm_completed.data.content_parts == [image]
+
+    request_completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert request_completed.data.result == [image]
+    assert ReAct.collect_stream(events).result == [image]
+  end
+
   test "propagates usage from streaming meta chunks into request completion" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       {:ok,
@@ -2122,6 +2157,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       model: model,
       context: Keyword.get(opts, :context, ReqLLM.Context.new([]))
     }
+  end
+
+  defp content_part_chunk(content_part) do
+    ReqLLM.StreamChunk.meta(%{})
+    |> Map.put(:type, :content_part)
+    |> Map.put(:content_part, content_part)
   end
 
   defp exited_pid do

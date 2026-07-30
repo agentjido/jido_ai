@@ -105,7 +105,7 @@ defmodule Jido.AI.Context do
   @doc """
   Append an assistant message to the thread, optionally with tool calls and thinking content.
   """
-  @spec append_assistant(t(), String.t() | nil, list() | nil, keyword()) :: t()
+  @spec append_assistant(t(), String.t() | [ContentPart.t()] | nil, list() | nil, keyword()) :: t()
   def append_assistant(thread, content, tool_calls \\ nil, opts \\ []) do
     thinking = Keyword.get(opts, :thinking)
     reasoning_details = Keyword.get(opts, :reasoning_details)
@@ -206,7 +206,7 @@ defmodule Jido.AI.Context do
   @doc """
   Get the last assistant response content.
   """
-  @spec last_assistant_content(t()) :: String.t() | nil
+  @spec last_assistant_content(t()) :: String.t() | [ContentPart.t()] | nil
   def last_assistant_content(%__MODULE__{entries: entries}) do
     # Entries are stored in reverse order, so first match is most recent
     entries

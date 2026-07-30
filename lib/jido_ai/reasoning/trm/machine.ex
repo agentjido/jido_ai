@@ -181,7 +181,7 @@ defmodule Jido.AI.Reasoning.TRM.Machine do
           | {:reasoning_result, call_id :: String.t(), result :: term()}
           | {:supervision_result, call_id :: String.t(), result :: term()}
           | {:improvement_result, call_id :: String.t(), result :: term()}
-          | {:llm_partial, call_id :: String.t(), delta :: String.t(), chunk_type :: atom()}
+          | {:llm_partial, call_id :: String.t(), delta :: term(), chunk_type :: atom()}
 
   @type directive ::
           {:reason, id :: String.t(), context :: map()}
@@ -316,7 +316,7 @@ defmodule Jido.AI.Reasoning.TRM.Machine do
     if call_id == machine.current_call_id do
       machine =
         case chunk_type do
-          :content ->
+          :content when is_binary(delta) ->
             Map.update!(machine, :streaming_text, &(&1 <> delta))
 
           _ ->

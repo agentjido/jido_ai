@@ -319,7 +319,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       schema:
         Zoi.object(%{
           call_id: Zoi.string(),
-          delta: Zoi.string(),
+          delta: Zoi.any(),
           chunk_type: Zoi.atom() |> Zoi.default(:content)
         }),
       doc: "Legacy no-op in delegated ReAct mode",
@@ -1171,9 +1171,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       :llm_completed ->
         turn_type = event_field(data, :turn_type, :final_answer)
         text = event_field(data, :text, "")
+        content_parts = event_field(data, :content_parts, [])
         tool_calls = event_field(data, :tool_calls, [])
         thinking = event_field(data, :thinking_content)
         assistant_tool_calls = if turn_type == :tool_calls, do: tool_calls, else: nil
+        content = Turn.assistant_content(%Turn{text: text, content_parts: content_parts})
 
         append_ai_message_event(
           agent,
@@ -1181,7 +1183,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           context_ref,
           %{
             role: :assistant,
-            content: text,
+            content: content,
             tool_calls: assistant_tool_calls,
             thinking: thinking
           },
@@ -1599,11 +1601,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
         updated =
           case chunk_type do
-            :thinking ->
+            :thinking when is_binary(delta) ->
               Map.update(base_state, :streaming_thinking, delta, &(&1 <> delta))
 
-            _ ->
+            :content when is_binary(delta) ->
               Map.update(base_state, :streaming_text, delta, &(&1 <> delta))
+
+            _other ->
+              base_state
           end
 
         signal =
@@ -1617,12 +1622,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       :llm_completed ->
         turn_type = event_field(data, :turn_type, :final_answer)
         text = event_field(data, :text, "")
+        content_parts = event_field(data, :content_parts, [])
         thinking_content = event_field(data, :thinking_content)
         reasoning_details = event_field(data, :reasoning_details)
         tool_calls = event_field(data, :tool_calls, [])
         usage = event_field(data, :usage, %{})
         call_id = llm_call_id || event_field(data, :call_id, "")
         model = event_field(data, :model, config_model(state))
+        result = Turn.result(%Turn{text: text, content_parts: content_parts})
 
         pending_tool_calls =
           Enum.map(tool_calls, fn tc ->
@@ -1646,6 +1653,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           |> append_assistant_to_run_context(
             turn_type,
             text,
+            content_parts,
             tool_calls,
             thinking_content,
             reasoning_details,
@@ -1655,7 +1663,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             merge_usage(existing, usage || %{})
           end)
           |> maybe_append_thinking_trace(thinking_content)
-          |> maybe_put_result(turn_type, text)
+          |> maybe_put_result(turn_type, result)
 
         llm_signal =
           Signal.LLMResponse.new!(%{
@@ -1665,6 +1673,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
                %{
                  type: turn_type,
                  text: text,
+                 content_parts: content_parts,
                  thinking_content: thinking_content,
                  reasoning_details: reasoning_details,
                  tool_calls: tool_calls,
@@ -2136,6 +2145,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
          state,
          turn_type,
          text,
+         content_parts,
          tool_calls,
          thinking_content,
          reasoning_details,
@@ -2146,6 +2156,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     case context do
       %AIContext{} = context ->
         assistant_tool_calls = if turn_type == :tool_calls, do: tool_calls, else: nil
+        content = Turn.assistant_content(%Turn{text: text, content_parts: content_parts})
 
         assistant_opts =
           []
@@ -2156,7 +2167,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         Map.put(
           state,
           :run_context,
-          AIContext.append_assistant(context, text, assistant_tool_calls, assistant_opts)
+          AIContext.append_assistant(context, content, assistant_tool_calls, assistant_opts)
         )
 
       _ ->

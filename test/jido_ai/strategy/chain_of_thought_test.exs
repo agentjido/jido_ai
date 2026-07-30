@@ -6,6 +6,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   alias Jido.AI.Reasoning.ChainOfThought.Machine
   alias Jido.AI.Directive
   alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
+  alias ReqLLM.Message.ContentPart
 
   defp create_agent(opts \\ []) do
     %Jido.Agent{
@@ -269,6 +270,50 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       assert signal.data.seq == 23
       assert signal.data.run_id == request_id
       assert signal.data.request_id == request_id
+    end
+
+    test "passes complete content parts and preserves a multimodal result" do
+      agent = create_agent()
+      request_id = "req_cot_content_part"
+      image = ContentPart.image(<<1, 2, 3>>, "image/png")
+
+      delta_event =
+        worker_event(:llm_delta, request_id, 24, %{
+          chunk_type: :content_part,
+          delta: image
+        })
+
+      {agent, []} =
+        ChainOfThought.cmd(
+          agent,
+          [instruction(:cot_worker_event, %{request_id: request_id, event: delta_event})],
+          %{}
+        )
+
+      assert_receive {:"$gen_cast", {:signal, signal}}
+      assert signal.type == "ai.llm.delta"
+      assert signal.data.chunk_type == :content_part
+      assert signal.data.delta == image
+
+      completed_event =
+        worker_event(:request_completed, request_id, 25, %{
+          result: [image],
+          text: "",
+          termination_reason: :success,
+          usage: %{}
+        })
+
+      {agent, []} =
+        ChainOfThought.cmd(
+          agent,
+          [instruction(:cot_worker_event, %{request_id: request_id, event: completed_event})],
+          %{}
+        )
+
+      state = StratState.get(agent, %{})
+      assert state[:result] == [image]
+      assert state[:raw_response] == ""
+      assert state[:steps] == []
     end
 
     test "request_failed worker event transitions to error state" do

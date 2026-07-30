@@ -8,6 +8,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.ChainOfThought.Machine
   alias Jido.AI.Runtime.Event
+  alias Jido.AI.Turn
 
   @default_model :fast
 
@@ -354,6 +355,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
         chunks = Enum.reverse(chunks)
         summary = ReqLLM.Response.Stream.summarize(chunks)
         text = summary.text
+        content_parts = Turn.content_parts_from_chunks(chunks)
+        result = Turn.result(%Turn{text: text, content_parts: content_parts})
         usage = ReqLLM.StreamResponse.usage(stream_response) || summary.usage || %{}
 
         {seq, _event} =
@@ -367,6 +370,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
               call_id: llm_call_id,
               turn_type: :final_answer,
               text: text,
+              content_parts: content_parts,
               thinking_content: normalize_blank(summary.thinking),
               tool_calls: [],
               usage: usage
@@ -382,7 +386,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
             seq,
             :request_completed,
             %{
-              result: text,
+              result: result,
+              text: text,
               termination_reason: :success,
               usage: usage
             }
@@ -463,6 +468,31 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Worker.Strategy do
       )
     else
       {seq, nil}
+    end
+  end
+
+  defp maybe_emit_delta(
+         worker_pid,
+         request_id,
+         run_id,
+         llm_call_id,
+         %{__struct__: ReqLLM.StreamChunk, type: :content_part} = chunk,
+         config,
+         seq
+       ) do
+    with true <- config.capture_deltas?,
+         {:ok, content_part} <- Turn.stream_content_part(chunk) do
+      emit_runtime_event(
+        worker_pid,
+        request_id,
+        run_id,
+        seq,
+        :llm_delta,
+        %{chunk_type: :content_part, delta: content_part},
+        llm_call_id: llm_call_id
+      )
+    else
+      _other -> {seq, nil}
     end
   end
 

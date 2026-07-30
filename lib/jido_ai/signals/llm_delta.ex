@@ -8,8 +8,12 @@ defmodule Jido.AI.Signal.LLMDelta do
     default_source: "/ai/llm",
     schema: [
       call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
-      delta: [type: :string, required: true, doc: "Text chunk from the stream"],
-      chunk_type: [type: :atom, default: :content, doc: "Type: :content or :thinking"],
+      delta: [type: :any, required: true, doc: "Text or complete content part from the stream"],
+      chunk_type: [
+        type: :atom,
+        default: :content,
+        doc: "Type: :content, :content_part, or :thinking"
+      ],
       metadata: [type: :map, default: %{}, doc: "Optional request/run metadata for correlation"],
       seq: [type: :integer, doc: "Monotonic runtime sequence number for this delta, when available"],
       run_id: [type: :string, doc: "Runtime run identifier, when available"],

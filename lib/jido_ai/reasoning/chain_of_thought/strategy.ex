@@ -129,7 +129,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
       schema:
         Zoi.object(%{
           call_id: Zoi.string(),
-          delta: Zoi.string(),
+          delta: Zoi.any(),
           chunk_type: Zoi.atom() |> Zoi.default(:content)
         }),
       doc: "Legacy no-op in delegated CoT mode",
@@ -473,7 +473,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
         delta = event_field(data, :delta, "")
 
         updated =
-          if chunk_type == :content do
+          if chunk_type == :content and is_binary(delta) do
             Map.update(base_state, :streaming_text, delta, &(&1 <> delta))
           else
             base_state
@@ -486,6 +486,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
 
       :llm_completed ->
         text = event_field(data, :text, "")
+        content_parts = event_field(data, :content_parts, [])
         usage = event_field(data, :usage, %{})
         call_id = event_field(data, :call_id, llm_call_id)
 
@@ -502,6 +503,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
               {:ok,
                %{
                  text: text,
+                 content_parts: content_parts,
                  usage: usage
                }, []},
             metadata: runtime_signal_metadata(request_id, run_id, :generate_text)
@@ -512,10 +514,17 @@ defmodule Jido.AI.Reasoning.ChainOfThought.Strategy do
         {updated, Enum.reject([llm_signal, usage_signal], &is_nil/1)}
 
       :request_completed ->
-        text = event_field(data, :result, "")
+        terminal_result = event_field(data, :result, "")
+        text = event_field(data, :text, if(is_binary(terminal_result), do: terminal_result, else: ""))
         usage = event_field(data, :usage, %{})
-        {steps, conclusion} = Machine.extract_steps_and_conclusion(text)
-        result = conclusion || text
+
+        {steps, conclusion, result} =
+          if is_binary(terminal_result) do
+            {steps, conclusion} = Machine.extract_steps_and_conclusion(terminal_result)
+            {steps, conclusion, conclusion || terminal_result}
+          else
+            {[], nil, terminal_result}
+          end
 
         updated =
           base_state

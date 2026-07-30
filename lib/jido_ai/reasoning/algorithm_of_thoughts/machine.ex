@@ -69,7 +69,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Machine do
   @type msg ::
           {:start, String.t(), String.t()}
           | {:llm_result, String.t(), term()}
-          | {:llm_partial, String.t(), String.t(), atom()}
+          | {:llm_partial, String.t(), term(), atom()}
 
   @type directive ::
           {:call_llm_stream, String.t(), list()}
@@ -121,7 +121,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Machine do
   end
 
   def update(%__MODULE__{status: "exploring"} = machine, {:llm_partial, call_id, delta, chunk_type}, _env) do
-    if call_id == machine.current_call_id and chunk_type == :content do
+    if call_id == machine.current_call_id and chunk_type == :content and is_binary(delta) do
       {Map.update!(machine, :streaming_text, &(&1 <> delta)), []}
     else
       {machine, []}

@@ -6,7 +6,7 @@ defmodule Jido.AI.Turn do
   directives:
 
   - Response classification (`:tool_calls` or `:final_answer`)
-  - Extracted text and optional thinking content
+  - Ordered multimodal content, extracted text, and optional thinking content
   - Normalized tool calls
   - Usage/model metadata
   - Optional executed tool results
@@ -45,6 +45,7 @@ defmodule Jido.AI.Turn do
   @type t :: %__MODULE__{
           type: response_type(),
           text: String.t(),
+          content_parts: [ContentPart.t()],
           thinking_content: String.t() | nil,
           reasoning_details: list() | nil,
           tool_calls: list(term()),
@@ -57,6 +58,7 @@ defmodule Jido.AI.Turn do
 
   defstruct type: :final_answer,
             text: "",
+            content_parts: [],
             thinking_content: nil,
             reasoning_details: nil,
             tool_calls: [],
@@ -85,17 +87,19 @@ defmodule Jido.AI.Turn do
 
   def from_response(%ReqLLM.Response{} = response, opts) do
     classified = ReqLLM.Response.classify(response)
+    message = response.message || %{}
 
     %__MODULE__{
       type: normalize_type(classified.type),
       text: normalize_text(classified.text),
+      content_parts: normalize_content_parts(Map.get(message, :content)),
       thinking_content: normalize_optional_string(classified.thinking),
-      reasoning_details: normalize_reasoning_details(Map.get(response.message || %{}, :reasoning_details)),
+      reasoning_details: normalize_reasoning_details(Map.get(message, :reasoning_details)),
       tool_calls: normalize_tool_calls(classified.tool_calls),
       usage: normalize_usage(ReqLLM.Response.usage(response)),
       model: Keyword.get(opts, :model, response.model),
       finish_reason: normalize_finish_reason(classified.finish_reason),
-      message_metadata: normalize_metadata(response.message.metadata),
+      message_metadata: normalize_metadata(Map.get(message, :metadata)),
       tool_results: []
     }
   end
@@ -109,6 +113,7 @@ defmodule Jido.AI.Turn do
     %__MODULE__{
       type: classify_type(tool_calls, finish_reason),
       text: extract_from_content(content),
+      content_parts: normalize_content_parts(content),
       thinking_content: extract_thinking_content(content),
       reasoning_details: normalize_reasoning_details(get_field(message, :reasoning_details)),
       tool_calls: tool_calls,
@@ -130,6 +135,7 @@ defmodule Jido.AI.Turn do
     %__MODULE__{
       type: normalize_type(get_field(map, :type, :final_answer)),
       text: normalize_text(get_field(map, :text, "")),
+      content_parts: map |> get_field(:content_parts, []) |> normalize_content_parts(),
       thinking_content: normalize_optional_string(get_field(map, :thinking_content)),
       reasoning_details: normalize_reasoning_details(get_field(map, :reasoning_details)),
       tool_calls: map |> get_field(:tool_calls, []) |> normalize_tool_calls(),
@@ -156,8 +162,55 @@ defmodule Jido.AI.Turn do
   def assistant_message(%__MODULE__{} = turn) do
     [metadata: turn.message_metadata]
     |> maybe_put_keyword(:tool_calls, assistant_tool_calls(turn))
-    |> then(&Context.assistant(turn.text, &1))
+    |> then(&Context.assistant(assistant_content(turn), &1))
     |> maybe_add(:reasoning_details, turn.reasoning_details)
+  end
+
+  @doc """
+  Returns the ordered visible content for assistant-message projection.
+  """
+  @spec assistant_content(t()) :: String.t() | [ContentPart.t()]
+  def assistant_content(%__MODULE__{} = turn) do
+    content_parts = visible_content_parts(turn.content_parts)
+
+    if multimodal?(content_parts), do: content_parts, else: turn.text
+  end
+
+  @doc """
+  Returns generated image content parts in response order.
+  """
+  @spec images(t()) :: [ContentPart.t()]
+  def images(%__MODULE__{content_parts: content_parts}) do
+    Enum.filter(content_parts, &match?(%ContentPart{type: type} when type in [:image, :image_url], &1))
+  end
+
+  @doc """
+  Returns text for text-only turns or ordered content parts for multimodal turns.
+  """
+  @spec result(t()) :: String.t() | [ContentPart.t()]
+  def result(%__MODULE__{} = turn) do
+    content_parts = visible_content_parts(turn.content_parts)
+
+    if multimodal?(content_parts), do: content_parts, else: turn.text
+  end
+
+  @doc false
+  @spec stream_content_part(term()) :: {:ok, ContentPart.t()} | :error
+  def stream_content_part(%{
+        __struct__: ReqLLM.StreamChunk,
+        type: :content_part,
+        content_part: %ContentPart{} = content_part
+      }),
+      do: {:ok, content_part}
+
+  def stream_content_part(_chunk), do: :error
+
+  @doc false
+  @spec content_parts_from_chunks(Enumerable.t()) :: [ContentPart.t()]
+  def content_parts_from_chunks(chunks) do
+    chunks
+    |> Enum.reduce([], &prepend_stream_content/2)
+    |> Enum.reverse()
   end
 
   @doc """
@@ -416,6 +469,7 @@ defmodule Jido.AI.Turn do
     %{
       type: turn.type,
       text: turn.text,
+      content_parts: turn.content_parts,
       thinking_content: turn.thinking_content,
       tool_calls: turn.tool_calls,
       usage: turn.usage,
@@ -454,6 +508,36 @@ defmodule Jido.AI.Turn do
 
   defp normalize_optional_string(value) when is_binary(value) and value != "", do: value
   defp normalize_optional_string(_), do: nil
+
+  defp visible_content_parts(content_parts) when is_list(content_parts) do
+    Enum.reject(content_parts, &match?(%ContentPart{type: :thinking}, &1))
+  end
+
+  defp visible_content_parts(_content_parts), do: []
+
+  defp multimodal?(content_parts) do
+    Enum.any?(content_parts, &match?(%ContentPart{type: type} when type != :text, &1))
+  end
+
+  defp prepend_stream_content(
+         %ReqLLM.StreamChunk{type: :content, text: text},
+         [%ContentPart{type: :text, text: existing} = part | rest]
+       )
+       when is_binary(text) and text != "" and is_binary(existing) do
+    [%{part | text: existing <> text} | rest]
+  end
+
+  defp prepend_stream_content(%ReqLLM.StreamChunk{type: :content, text: text}, content_parts)
+       when is_binary(text) and text != "" do
+    [ContentPart.text(text) | content_parts]
+  end
+
+  defp prepend_stream_content(chunk, content_parts) do
+    case stream_content_part(chunk) do
+      {:ok, content_part} -> [content_part | content_parts]
+      :error -> content_parts
+    end
+  end
 
   defp normalize_reasoning_details(reasoning_details) when is_list(reasoning_details) and reasoning_details != [],
     do: reasoning_details

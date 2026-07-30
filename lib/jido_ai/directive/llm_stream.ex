@@ -278,7 +278,26 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
           maybe_emit_delta(obs_cfg, Observe.llm(:delta), %{duration_ms: 0}, event_meta)
         end
 
+        on_chunk = fn chunk ->
+          case Turn.stream_content_part(chunk) do
+            {:ok, content_part} ->
+              partial_signal =
+                Signal.LLMDelta.new!(%{
+                  call_id: call_id,
+                  delta: content_part,
+                  chunk_type: :content_part
+                })
+
+              Jido.AgentServer.cast(agent_pid, partial_signal)
+              maybe_emit_delta(obs_cfg, Observe.llm(:delta), %{duration_ms: 0}, event_meta)
+
+            :error ->
+              :ok
+          end
+        end
+
         case ReqLLM.StreamResponse.process_stream(stream_response,
+               on_chunk: on_chunk,
                on_result: on_content,
                on_thinking: on_thinking
              ) do
