@@ -44,16 +44,18 @@ defmodule Jido.AI.Reasoning.HelpersTest do
     end
 
     test "applies global action observability options" do
-      original = Application.get_env(:jido, :telemetry, [])
-      on_exit(fn -> Application.put_env(:jido, :telemetry, original) end)
-      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :none)
+      preserve_env(:jido, :telemetry)
 
-      expect_exec_opts(fn opts ->
-        assert opts[:log_level] == :warning
-        assert opts[:telemetry] == :silent
-      end)
+      for log_args <- [:none, :keys_only] do
+        Application.put_env(:jido, :telemetry, log_level: :debug, log_args: log_args)
 
-      Helpers.execute_action_instruction(test_agent(), test_instruction())
+        expect_exec_opts(fn opts ->
+          assert opts[:log_level] == :warning
+          assert opts[:telemetry] == :silent
+        end)
+
+        Helpers.execute_action_instruction(test_agent(), test_instruction())
+      end
     end
 
     test "preserves explicit instruction options" do
@@ -71,8 +73,7 @@ defmodule Jido.AI.Reasoning.HelpersTest do
     end
 
     test "uses per-instance observability options from strategy context" do
-      original = Application.get_env(:jido_ai, TestJido, [])
-      on_exit(fn -> Application.put_env(:jido_ai, TestJido, original) end)
+      preserve_env(:jido_ai, TestJido)
       Application.put_env(:jido_ai, TestJido, telemetry: [log_level: :debug, log_args: :full])
 
       expect_exec_opts(fn opts ->
@@ -92,6 +93,17 @@ defmodule Jido.AI.Reasoning.HelpersTest do
   end
 
   defp test_agent, do: %Jido.Agent{id: "test-agent", name: "test", state: %{}}
+
+  defp preserve_env(app, key) do
+    original = Application.fetch_env(app, key)
+
+    on_exit(fn ->
+      case original do
+        {:ok, value} -> Application.put_env(app, key, value)
+        :error -> Application.delete_env(app, key)
+      end
+    end)
+  end
 
   defp test_instruction do
     %Jido.Instruction{action: FailingAction, params: %{}, context: %{}}
