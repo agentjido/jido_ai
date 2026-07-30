@@ -36,6 +36,26 @@ defmodule Jido.AI.OutputTest do
     assert parsed == %{category: :billing, confidence: 0.91, summary: "Refund request"}
   end
 
+  test "normalizes string keys in arrays of Zoi objects" do
+    schema =
+      Zoi.object(%{
+        items:
+          Zoi.array(
+            Zoi.object(%{
+              category: Zoi.enum([:billing, :technical]),
+              summary: Zoi.string()
+            })
+          )
+      })
+
+    {:ok, output} = Output.new(schema: schema)
+
+    assert {:ok, %{items: [%{category: :billing, summary: "Refund request"}]}} =
+             Output.validate(output, %{
+               "items" => [%{"category" => "billing", "summary" => "Refund request"}]
+             })
+  end
+
   test "parses fenced JSON text" do
     {:ok, output} = Output.new(schema: @schema)
 

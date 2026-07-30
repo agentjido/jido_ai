@@ -390,6 +390,10 @@ defmodule Jido.AI.Output do
     end)
   end
 
+  defp normalize_zoi_input(%Zoi.Types.Array{inner: inner}, value) when is_list(value) do
+    Enum.map(value, &normalize_zoi_input(inner, &1))
+  end
+
   defp normalize_zoi_input(%Zoi.Types.Enum{enum_type: :atom, values: values}, value) when is_binary(value) do
     values
     |> Map.new(fn
