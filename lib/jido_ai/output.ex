@@ -16,16 +16,19 @@ defmodule Jido.AI.Output do
 
   @type schema_kind :: :zoi | :json_schema
   @type validation_mode :: :repair | :error
+  @type repair_callback :: {module(), atom()}
 
   @type t :: %__MODULE__{
           schema: Zoi.schema() | map(),
           schema_kind: schema_kind(),
           retries: non_neg_integer(),
-          on_validation_error: validation_mode()
+          on_validation_error: validation_mode(),
+          repair_fun: repair_callback() | nil
         }
 
   defstruct [
     :schema,
+    :repair_fun,
     schema_kind: :zoi,
     retries: @default_retries,
     on_validation_error: @default_on_validation_error
@@ -45,12 +48,21 @@ defmodule Jido.AI.Output do
 
     retries = Map.get(attrs, :retries, @default_retries)
     mode = Map.get(attrs, :on_validation_error, @default_on_validation_error)
+    repair_fun = Map.get(attrs, :repair_fun)
 
     with {:ok, schema_kind} <- schema_kind(schema),
          {:ok, retries} <- normalize_retries(retries),
          {:ok, mode} <- normalize_mode(mode),
+         {:ok, repair_fun} <- normalize_repair_fun(repair_fun),
          :ok <- validate_schema_shape(schema, schema_kind) do
-      {:ok, %__MODULE__{schema: schema, schema_kind: schema_kind, retries: retries, on_validation_error: mode}}
+      {:ok,
+       %__MODULE__{
+         schema: schema,
+         schema_kind: schema_kind,
+         retries: retries,
+         on_validation_error: mode,
+         repair_fun: repair_fun
+       }}
     end
   end
 
@@ -127,9 +139,11 @@ defmodule Jido.AI.Output do
   @doc """
   Repairs a raw assistant answer into the configured object shape.
   """
-  @spec repair(t(), term(), term(), map()) :: {:ok, map()} | {:error, term()}
-  def repair(%__MODULE__{} = output, raw, reason, context) when is_map(context) do
-    with {:ok, repaired} <- default_repair(output, raw, reason, context) do
+  @spec repair(t(), term(), term(), map(), keyword()) :: {:ok, map()} | {:error, term()}
+  def repair(%__MODULE__{} = output, raw, reason, context, opts \\ []) when is_map(context) do
+    repair_fun = Keyword.get(opts, :repair_fun, output.repair_fun)
+
+    with {:ok, repaired} <- invoke_repair(repair_fun, output, raw, reason, context) do
       validate(output, repaired)
     end
   rescue
@@ -184,7 +198,8 @@ defmodule Jido.AI.Output do
       schema_kind: output.schema_kind,
       schema: json_schema(output),
       retries: output.retries,
-      on_validation_error: output.on_validation_error
+      on_validation_error: output.on_validation_error,
+      repair_fun: output.repair_fun
     }
 
     :crypto.hash(:sha256, :erlang.term_to_binary(data, [:deterministic]))
@@ -259,6 +274,30 @@ defmodule Jido.AI.Output do
           {:error, output_error({:repair_failed, reason_message(error)}, raw)}
       end
     end
+  end
+
+  defp invoke_repair(nil, output, raw, reason, context) do
+    default_repair(output, raw, reason, context)
+  end
+
+  defp invoke_repair(fun, output, raw, reason, context) when is_function(fun, 4) do
+    fun.(output, raw, reason, context)
+  end
+
+  defp invoke_repair(fun, output, raw, reason, _context) when is_function(fun, 3) do
+    fun.(output, raw, reason)
+  end
+
+  defp invoke_repair({module, function}, output, raw, reason, context) do
+    cond do
+      function_exported?(module, function, 4) -> apply(module, function, [output, raw, reason, context])
+      function_exported?(module, function, 3) -> apply(module, function, [output, raw, reason])
+      true -> default_repair(output, raw, reason, context)
+    end
+  end
+
+  defp invoke_repair(_repair_fun, output, raw, reason, context) do
+    default_repair(output, raw, reason, context)
   end
 
   defp repair_prompt(context, raw, reason) do
@@ -357,6 +396,32 @@ defmodule Jido.AI.Output do
   defp normalize_mode(value) when value in [:repair, "repair"], do: {:ok, :repair}
   defp normalize_mode(value) when value in [:error, "error"], do: {:ok, :error}
   defp normalize_mode(_value), do: {:error, "output on_validation_error must be :repair or :error"}
+
+  defp normalize_repair_fun(nil), do: {:ok, nil}
+
+  defp normalize_repair_fun({module, function} = repair_fun)
+       when is_atom(module) and is_atom(function) do
+    if Code.ensure_loaded?(module) and
+         (function_exported?(module, function, 4) or function_exported?(module, function, 3)) do
+      {:ok, repair_fun}
+    else
+      {:error, "output repair_fun must reference a public function with arity 3 or 4"}
+    end
+  end
+
+  defp normalize_repair_fun(fun) when is_function(fun, 3) or is_function(fun, 4) do
+    with {:type, :external} <- Function.info(fun, :type),
+         {:module, module} <- Function.info(fun, :module),
+         {:name, function} <- Function.info(fun, :name) do
+      normalize_repair_fun({module, function})
+    else
+      _other -> {:error, "output repair_fun must be an external function capture or {module, function}"}
+    end
+  end
+
+  defp normalize_repair_fun(_repair_fun) do
+    {:error, "output repair_fun must be an external function capture or {module, function}"}
+  end
 
   defp zoi_schema?(schema), do: is_struct(schema) and not is_nil(Zoi.Type.impl_for(schema))
 
