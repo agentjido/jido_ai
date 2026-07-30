@@ -130,4 +130,8 @@ defmodule Jido.AI.OutputTest do
     assert Output.raw_preview(%{api_key: "secret", nested: %{token: "hidden"}, ok: "visible"}) =~ "[REDACTED]"
     refute Output.raw_preview(%{api_key: "secret"}) =~ "secret"
   end
+
+  test "does not expose an unused repair callback option" do
+    refute function_exported?(Output, :repair, 5)
+  end
 end

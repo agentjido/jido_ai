@@ -127,18 +127,9 @@ defmodule Jido.AI.Output do
   @doc """
   Repairs a raw assistant answer into the configured object shape.
   """
-  @spec repair(t(), term(), term(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  def repair(%__MODULE__{} = output, raw, reason, context, opts \\ []) when is_map(context) do
-    repair_fun = Keyword.get(opts, :repair_fun)
-
-    repair_fun =
-      cond do
-        is_function(repair_fun, 4) -> repair_fun
-        is_function(repair_fun, 3) -> fn output, raw, reason, _context -> repair_fun.(output, raw, reason) end
-        true -> &default_repair/4
-      end
-
-    with {:ok, repaired} <- repair_fun.(output, raw, reason, context) do
+  @spec repair(t(), term(), term(), map()) :: {:ok, map()} | {:error, term()}
+  def repair(%__MODULE__{} = output, raw, reason, context) when is_map(context) do
+    with {:ok, repaired} <- default_repair(output, raw, reason, context) do
       validate(output, repaired)
     end
   rescue
