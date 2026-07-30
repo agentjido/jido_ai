@@ -51,9 +51,10 @@ defmodule Jido.AI.OutputTest do
     {:ok, output} = Output.new(schema: schema)
 
     assert {:ok, %{items: [%{category: :billing, summary: "Refund request"}]}} =
-             Output.validate(output, %{
-               "items" => [%{"category" => "billing", "summary" => "Refund request"}]
-             })
+             Output.parse(
+               output,
+               ~s({"items":[{"category":"billing","summary":"Refund request"}]})
+             )
   end
 
   test "parses fenced JSON text" do
