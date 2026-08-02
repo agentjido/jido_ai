@@ -46,6 +46,23 @@ defmodule Jido.AI.ToolAdapterTest do
       ]
   end
 
+  defmodule OpenParamsAction do
+    use Jido.Action,
+      name: "open_params_action",
+      description: "An action with card-specific parameters",
+      schema: %{
+        "type" => "object",
+        "properties" => %{
+          "id" => %{"type" => "string"},
+          "params" => %{"type" => "object", "additionalProperties" => true}
+        },
+        "required" => ["id", "params"],
+        "additionalProperties" => false
+      }
+
+    def strict?, do: false
+  end
+
   describe "from_action/2" do
     test "converts action to ReqLLM.Tool struct" do
       tool = ToolAdapter.from_action(ParamAction)
@@ -107,6 +124,21 @@ defmodule Jido.AI.ToolAdapterTest do
 
       # Nested objects inside array items
       assert schema["properties"]["items"]["items"]["additionalProperties"] == false
+    end
+
+    test "preserves explicitly open nested objects for non-strict tools" do
+      tool = ToolAdapter.from_action(OpenParamsAction)
+
+      assert tool.strict == false
+      assert tool.parameter_schema["additionalProperties"] == false
+      assert tool.parameter_schema["properties"]["params"]["additionalProperties"] == true
+    end
+
+    test "closes explicitly open nested objects when strict mode is requested" do
+      tool = ToolAdapter.from_action(OpenParamsAction, strict: true)
+
+      assert tool.strict == true
+      assert tool.parameter_schema["properties"]["params"]["additionalProperties"] == false
     end
 
     test "handles empty schema with valid JSON schema output" do
