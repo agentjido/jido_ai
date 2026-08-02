@@ -284,6 +284,8 @@ defmodule Jido.AI.ToolAdapter do
   # Support released jido_action API (`to_json_schema/1`) and
   # newer branch API (`to_json_schema/2`) used by some dev setups.
   defp action_schema_to_json_schema(schema, strict?) do
+    Code.ensure_loaded!(ActionSchema)
+
     cond do
       function_exported?(ActionSchema, :to_json_schema, 2) ->
         apply(ActionSchema, :to_json_schema, [schema, [strict: strict?]])
@@ -292,7 +294,7 @@ defmodule Jido.AI.ToolAdapter do
         ActionSchema.to_json_schema(schema)
 
       true ->
-        %{}
+        raise ArgumentError, "Jido.Action.Schema does not expose to_json_schema/1 or to_json_schema/2"
     end
   end
 
