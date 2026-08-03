@@ -19,6 +19,13 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
   setup :set_mimic_from_context
   setup :stub_req_llm
 
+  setup_all do
+    # Complete the one-time catalog load before a strategy request starts its
+    # 750 ms timeout budget.
+    _ = LLMDB.providers()
+    :ok
+  end
+
   defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
 
   defp assert_strategy_response({:ok, payload}, strategy) do
