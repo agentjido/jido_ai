@@ -140,7 +140,7 @@ defmodule Jido.AI.ToolAdapter do
     ReqLLM.Tool.new!(
       name: apply_prefix(action_module.name(), prefix),
       description: action_module.description(),
-      parameter_schema: build_json_schema(action_module.schema()),
+      parameter_schema: build_json_schema(action_module.schema(), strict),
       callback: {__MODULE__, :noop_callback},
       strict: strict
     )
@@ -271,8 +271,8 @@ defmodule Jido.AI.ToolAdapter do
     Enum.filter(modules, filter_fn)
   end
 
-  defp build_json_schema(schema) do
-    case schema |> action_schema_to_json_schema() |> enforce_no_additional_properties() do
+  defp build_json_schema(schema, strict?) do
+    case schema |> action_schema_to_json_schema(strict?) |> enforce_no_additional_properties() do
       empty when empty == %{} ->
         %{"type" => "object", "properties" => %{}, "required" => [], "additionalProperties" => false}
 
@@ -281,18 +281,20 @@ defmodule Jido.AI.ToolAdapter do
     end
   end
 
-  # Support released jido_action API (`to_json_schema/1`) and
-  # newer branch API (`to_json_schema/2`) used by some dev setups.
-  defp action_schema_to_json_schema(schema) do
+  # Prefer the converter that accepts strictness. Keep the arity-one fallback
+  # for compatible jido_action versions that do not accept options.
+  defp action_schema_to_json_schema(schema, strict?) do
+    Code.ensure_loaded!(ActionSchema)
+
     cond do
       function_exported?(ActionSchema, :to_json_schema, 2) ->
-        apply(ActionSchema, :to_json_schema, [schema, [strict: true]])
+        apply(ActionSchema, :to_json_schema, [schema, [strict: strict?]])
 
       function_exported?(ActionSchema, :to_json_schema, 1) ->
         ActionSchema.to_json_schema(schema)
 
       true ->
-        %{}
+        raise ArgumentError, "Jido.Action.Schema does not expose to_json_schema/1 or to_json_schema/2"
     end
   end
 

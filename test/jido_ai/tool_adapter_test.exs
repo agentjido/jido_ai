@@ -46,6 +46,40 @@ defmodule Jido.AI.ToolAdapterTest do
       ]
   end
 
+  defmodule OpenParamsAction do
+    use Jido.Action,
+      name: "open_params_action",
+      description: "An action with card-specific parameters",
+      schema: %{
+        "type" => "object",
+        "properties" => %{
+          "id" => %{"type" => "string"},
+          "params" => %{"type" => "object", "additionalProperties" => true}
+        },
+        "required" => ["id", "params"],
+        "additionalProperties" => false
+      }
+
+    def strict?, do: false
+  end
+
+  defmodule StrictOpenParamsAction do
+    use Jido.Action,
+      name: "strict_open_params_action",
+      description: "A strict action with card-specific parameters",
+      schema: %{
+        "type" => "object",
+        "properties" => %{
+          "id" => %{"type" => "string"},
+          "params" => %{"type" => "object", "additionalProperties" => true}
+        },
+        "required" => ["id", "params"],
+        "additionalProperties" => false
+      }
+
+    def strict?, do: true
+  end
+
   describe "from_action/2" do
     test "converts action to ReqLLM.Tool struct" do
       tool = ToolAdapter.from_action(ParamAction)
@@ -107,6 +141,36 @@ defmodule Jido.AI.ToolAdapterTest do
 
       # Nested objects inside array items
       assert schema["properties"]["items"]["items"]["additionalProperties"] == false
+    end
+
+    test "preserves explicitly open nested objects for non-strict tools" do
+      tool = ToolAdapter.from_action(OpenParamsAction)
+
+      assert tool.strict == false
+      assert tool.parameter_schema["additionalProperties"] == false
+      assert tool.parameter_schema["properties"]["params"]["additionalProperties"] == true
+    end
+
+    test "uses an explicit non-strict override during schema conversion" do
+      tool = ToolAdapter.from_action(StrictOpenParamsAction, strict: false)
+
+      assert tool.strict == false
+      assert tool.parameter_schema["properties"]["params"]["additionalProperties"] == true
+    end
+
+    test "preserves the open schema in the OpenAI tool payload" do
+      tool = ToolAdapter.from_action(OpenParamsAction)
+      function = ReqLLM.Tool.to_schema(tool, :openai)["function"]
+
+      refute Map.has_key?(function, "strict")
+      assert function["parameters"]["properties"]["params"]["additionalProperties"] == true
+    end
+
+    test "closes explicitly open nested objects when strict mode is requested" do
+      tool = ToolAdapter.from_action(OpenParamsAction, strict: true)
+
+      assert tool.strict == true
+      assert tool.parameter_schema["properties"]["params"]["additionalProperties"] == false
     end
 
     test "handles empty schema with valid JSON schema output" do
