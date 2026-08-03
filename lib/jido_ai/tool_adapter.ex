@@ -281,8 +281,8 @@ defmodule Jido.AI.ToolAdapter do
     end
   end
 
-  # Support released jido_action API (`to_json_schema/1`) and
-  # newer branch API (`to_json_schema/2`) used by some dev setups.
+  # Prefer the converter that accepts strictness. Keep the arity-one fallback
+  # for compatible jido_action versions that do not accept options.
   defp action_schema_to_json_schema(schema, strict?) do
     Code.ensure_loaded!(ActionSchema)
 
