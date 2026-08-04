@@ -243,6 +243,44 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule RepairMessageTransformer do
+    def transform_request(request, _state, config, runtime_context) do
+      case Process.get({__MODULE__, :calls}, 0) + 1 do
+        1 ->
+          Process.put({__MODULE__, :calls}, 1)
+          {:ok, %{}}
+
+        call ->
+          Process.put({__MODULE__, :calls}, call)
+          send(runtime_context.test_pid, {:repair_message_transformer_request, request})
+
+          {:ok,
+           %{
+             model: "openai:gpt-4.1",
+             tools: config.tools,
+             messages: [
+               %{role: :system, content: "Apply the tenant repair policy."},
+               %{role: :user, content: "Return the normalized ticket object."}
+             ]
+           }}
+      end
+    end
+  end
+
+  defmodule InvalidRepairMessageTransformer do
+    def transform_request(_request, _state, _config, _runtime_context) do
+      case Process.get({__MODULE__, :calls}, 0) + 1 do
+        1 ->
+          Process.put({__MODULE__, :calls}, 1)
+          {:ok, %{}}
+
+        call ->
+          Process.put({__MODULE__, :calls}, call)
+          {:ok, %{messages: :invalid}}
+      end
+    end
+  end
+
   defmodule RuntimeAnthropicModelTransformer do
     def transform_request(_request, _state, _config, _runtime_context) do
       {:ok, %{model: "anthropic:claude-sonnet-4-5"}}
@@ -776,6 +814,101 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert_receive {:repair_transformer_request, _first_repair_request}
     assert_receive {:repair_transformer_request, _second_repair_request}
     refute_receive {:repair_transformer_request, _request}
+  end
+
+  test "structured output transformer receives and overrides the exact repair request" do
+    schema = ticket_schema()
+
+    transformed_messages = [
+      %{role: :system, content: "Apply the tenant repair policy."},
+      %{role: :user, content: "Return the normalized ticket object."}
+    ]
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("This is a billing issue with high confidence.")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
+         model
+       )}
+    end)
+
+    Mimic.expect(ReqLLM.Generation, :generate_object, fn model, messages, ^schema, opts ->
+      assert model == "openai:gpt-4.1"
+      assert messages == transformed_messages
+      assert Keyword.get(opts, :stream) == false
+      refute Keyword.has_key?(opts, :tools)
+      refute Keyword.has_key?(opts, :tool_choice)
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "repair-output",
+         model: "test",
+         context: nil,
+         object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}
+       }}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        output: [schema: schema],
+        request_transformer: RepairMessageTransformer
+      })
+
+    events =
+      ReAct.stream("Classify this ticket", config, context: %{test_pid: self()})
+      |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+    assert_receive {:repair_message_transformer_request, repair_request}
+
+    assert repair_request.tools == %{}
+    assert Keyword.get(repair_request.llm_opts, :stream) == false
+    refute Keyword.has_key?(repair_request.llm_opts, :tools)
+    refute Keyword.has_key?(repair_request.llm_opts, :tool_choice)
+
+    assert Enum.any?(repair_request.messages, fn message ->
+             message.role == :user and
+               message.content =~ "Classify this ticket" and
+               message.content =~ "This is a billing issue with high confidence."
+           end)
+  end
+
+  test "structured output repair rejects invalid transformed messages before the provider call" do
+    schema = ticket_schema()
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("This is not structured output.")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
+         model
+       )}
+    end)
+
+    Mimic.stub(ReqLLM.Generation, :generate_object, fn _model, _messages, ^schema, _opts ->
+      send(parent, :unexpected_repair_request)
+      {:error, :unexpected_repair_request}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        output: [schema: schema],
+        request_transformer: InvalidRepairMessageTransformer
+      })
+
+    events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
+
+    refute_receive :unexpected_repair_request
+    failed = Enum.find(events, &(&1.kind == :request_failed))
+    assert failed.data.error_type == :request_transform
+    assert failed.data.error == :invalid_request_messages
+    assert Enum.any?(events, &(&1.kind == :output_failed))
   end
 
   test "passes inline model specs through to ReqLLM requests" do

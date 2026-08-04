@@ -1033,7 +1033,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         validation_error: reason
       )
 
-    case output_context(state, config, runtime_context) do
+    case output_context(state, config, runtime_context, raw, reason) do
       {:ok, context} ->
         case Output.repair(output, raw, reason, context) do
           {:ok, parsed} ->
@@ -1098,23 +1098,29 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     emit_event(state, owner, ref, kind, data)
   end
 
-  defp output_context(%State{} = state, %Config{} = config, runtime_context) do
-    base_request = %{
-      messages: AIContext.to_messages(state.context),
+  defp output_context(%State{} = state, %Config{} = config, runtime_context, raw, reason) do
+    base_context = %{
+      model: config.model,
       llm_opts: Config.llm_opts(config),
-      tools: config.tools,
-      model: config.model
+      user_message: latest_query(state),
+      request_id: state.request_id,
+      run_id: state.run_id
     }
 
-    with {:ok, request} <- maybe_transform_request(base_request, state, config, runtime_context) do
-      {:ok,
-       %{
-         model: Map.get(request, :model, config.model),
-         llm_opts: request.llm_opts,
-         user_message: latest_query(state),
-         request_id: state.request_id,
-         run_id: state.run_id
-       }}
+    base_request = Output.repair_request(raw, reason, base_context)
+
+    with {:ok, request} <- maybe_transform_request(base_request, state, config, runtime_context),
+         {:ok, messages} <- normalize_request_messages(request),
+         {:ok, _tools} <- normalize_request_tools(request) do
+      context =
+        base_context
+        |> Map.put(:model, Map.get(request, :model, config.model))
+        |> Map.put(:messages, messages)
+        |> Map.put(:llm_opts, request.llm_opts)
+
+      repair_request = Output.repair_request(raw, reason, context)
+
+      {:ok, Map.merge(context, Map.take(repair_request, [:model, :messages, :llm_opts]))}
     end
   end
 
@@ -1333,7 +1339,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp latest_query(%State{} = state) do
-    case AIContext.last_entry(state.context) do
+    case Enum.find(state.context.entries, &(&1.role == :user)) do
       %{role: :user, content: content} when is_binary(content) -> content
       %{role: :user, content: content} when is_list(content) -> Query.summarize(content)
       _ -> ""
