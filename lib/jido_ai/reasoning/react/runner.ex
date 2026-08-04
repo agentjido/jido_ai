@@ -999,7 +999,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp finalize_output(%State{} = state, _owner, _ref, %Config{output: nil}, _runtime_context), do: {:ok, state}
 
   defp finalize_output(%State{} = state, owner, ref, %Config{output: %Output{} = output} = config, runtime_context) do
-    context = output_context(state, config, runtime_context)
     {state, _} = emit_output_event(state, owner, ref, :output_started, output, :started, state.result, attempt: 0)
 
     case Output.parse(output, state.result) do
@@ -1012,7 +1011,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         {:ok, state |> State.put_result(parsed) |> State.put_output(meta)}
 
       {:error, reason} ->
-        repair_or_fail_output(state, owner, ref, output, context, state.result, reason, 1)
+        repair_or_fail_output(state, owner, ref, config, output, runtime_context, state.result, reason, 1)
     end
   end
 
@@ -1020,8 +1019,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
          state,
          owner,
          ref,
+         config,
          %Output{on_validation_error: :repair, retries: retries} = output,
-         context,
+         runtime_context,
          raw,
          reason,
          attempt
@@ -1033,30 +1033,60 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         validation_error: reason
       )
 
-    case Output.repair(output, raw, reason, context) do
-      {:ok, parsed} ->
-        meta = Output.meta(output, :repaired, raw, attempt: attempt, validation_error: reason)
+    case output_context(state, config, runtime_context) do
+      {:ok, context} ->
+        case Output.repair(output, raw, reason, context) do
+          {:ok, parsed} ->
+            meta = Output.meta(output, :repaired, raw, attempt: attempt, validation_error: reason)
 
-        {state, _} =
-          emit_output_event(state, owner, ref, :output_validated, output, :validated, parsed, attempt: attempt)
+            {state, _} =
+              emit_output_event(state, owner, ref, :output_validated, output, :validated, parsed, attempt: attempt)
 
-        {:ok, state |> State.put_result(parsed) |> State.put_output(meta)}
+            {:ok, state |> State.put_result(parsed) |> State.put_output(meta)}
 
-      {:error, repair_reason} ->
-        repair_or_fail_output(state, owner, ref, output, context, raw, repair_reason, attempt + 1)
+          {:error, repair_reason} ->
+            repair_or_fail_output(
+              state,
+              owner,
+              ref,
+              config,
+              output,
+              runtime_context,
+              raw,
+              repair_reason,
+              attempt + 1
+            )
+        end
+
+      {:error, transform_reason} ->
+        fail_output(state, owner, ref, output, raw, transform_reason, attempt, :request_transform)
     end
   end
 
-  defp repair_or_fail_output(state, owner, ref, %Output{} = output, _context, raw, reason, attempt) do
-    meta = Output.meta(output, :error, raw, attempt: max(attempt - 1, 0), error: reason)
+  defp repair_or_fail_output(
+         state,
+         owner,
+         ref,
+         _config,
+         %Output{} = output,
+         _runtime_context,
+         raw,
+         reason,
+         attempt
+       ) do
+    fail_output(state, owner, ref, output, raw, reason, max(attempt - 1, 0), :output_validation)
+  end
+
+  defp fail_output(state, owner, ref, output, raw, reason, attempt, error_type) do
+    meta = Output.meta(output, :error, raw, attempt: attempt, error: reason)
 
     {state, _} =
       emit_output_event(state, owner, ref, :output_failed, output, :error, raw,
-        attempt: max(attempt - 1, 0),
+        attempt: attempt,
         error: reason
       )
 
-    {:error, State.put_output(state, meta), reason, :output_validation}
+    {:error, State.put_output(state, meta), reason, error_type}
   end
 
   defp emit_output_event(%State{} = state, owner, ref, kind, %Output{} = output, status, raw, opts) do
@@ -1069,21 +1099,23 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp output_context(%State{} = state, %Config{} = config, runtime_context) do
-    base_request = %{llm_opts: Config.llm_opts(config), tools: config.tools, model: config.model}
-
-    {model, llm_opts} =
-      case maybe_transform_request(base_request, state, config, runtime_context) do
-        {:ok, request} -> {Map.get(request, :model, config.model), request.llm_opts}
-        {:error, _reason} -> {config.model, base_request.llm_opts}
-      end
-
-    %{
-      model: model,
-      llm_opts: llm_opts,
-      user_message: latest_query(state),
-      request_id: state.request_id,
-      run_id: state.run_id
+    base_request = %{
+      messages: AIContext.to_messages(state.context),
+      llm_opts: Config.llm_opts(config),
+      tools: config.tools,
+      model: config.model
     }
+
+    with {:ok, request} <- maybe_transform_request(base_request, state, config, runtime_context) do
+      {:ok,
+       %{
+         model: Map.get(request, :model, config.model),
+         llm_opts: request.llm_opts,
+         user_message: latest_query(state),
+         request_id: state.request_id,
+         run_id: state.run_id
+       }}
+    end
   end
 
   defp output_schema_summary(%Output{} = output) do
