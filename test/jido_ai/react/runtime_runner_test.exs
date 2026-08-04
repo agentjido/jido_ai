@@ -214,6 +214,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule RepairCredentialTransformer do
+    def transform_request(_request, _state, _config, _runtime_context) do
+      {:ok, %{llm_opts: [access_key_id: "test-access-key", secret_access_key: "test-secret-key"]}}
+    end
+  end
+
   defmodule RuntimeAnthropicModelTransformer do
     def transform_request(_request, _state, _config, _runtime_context) do
       {:ok, %{model: "anthropic:claude-sonnet-4-5"}}
@@ -564,6 +570,47 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     assert Enum.any?(events, &(&1.kind == :output_repair))
     assert Enum.any?(events, &(&1.kind == :output_validated and &1.data.status == :validated))
+  end
+
+  test "structured output repair runs llm_opts through the configured request_transformer" do
+    schema = ticket_schema()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("This is a billing issue with high confidence.")],
+         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
+         model
+       )}
+    end)
+
+    Mimic.expect(ReqLLM.Generation, :generate_object, fn _model, _messages, ^schema, opts ->
+      assert Keyword.get(opts, :access_key_id) == "test-access-key"
+      assert Keyword.get(opts, :secret_access_key) == "test-secret-key"
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "repair-output",
+         model: "test",
+         context: nil,
+         object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}
+       }}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{},
+        output: [schema: schema],
+        request_transformer: RepairCredentialTransformer
+      })
+
+    events =
+      ReAct.stream("Classify this ticket", config, request_id: "req_repair_creds", run_id: "run_repair_creds")
+      |> Enum.to_list()
+
+    completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert completed.data.result.category == :billing
   end
 
   test "passes inline model specs through to ReqLLM requests" do
