@@ -17,8 +17,14 @@ defmodule Jido.AI.Reasoning.ReAct.RequestTransformer do
     so xAI-only keys (e.g. `xai_api`) can be added on xAI turns without
     breaking Fireworks turns on the same agent.
 
-  The runtime always regenerates `llm_opts[:tools]` from the returned `tools`
-  field so the exposed LLM tools and execution registry stay aligned.
+  For normal ReAct turns, the runtime regenerates `llm_opts[:tools]` from the
+  returned `tools` field so the exposed LLM tools and execution registry stay
+  aligned.
+
+  Structured-output repair turns also pass through the transformer. Their
+  request contains the repair prompt and an empty tool set. The runtime applies
+  `messages`, `model`, and `llm_opts` overrides, but it keeps tools disabled for
+  the repair call.
   """
 
   alias Jido.AI.Reasoning.ReAct.{Config, State, ToolSelection}

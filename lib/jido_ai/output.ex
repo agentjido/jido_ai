@@ -244,29 +244,42 @@ defmodule Jido.AI.Output do
     |> String.slice(0, @raw_preview_bytes)
   end
 
-  defp default_repair(output, raw, reason, context) do
-    model = Map.get(context, :model)
+  @doc false
+  @spec repair_request(term(), term(), map()) :: %{
+          required(:model) => term(),
+          required(:messages) => [map()],
+          required(:llm_opts) => keyword(),
+          required(:tools) => %{}
+        }
+  def repair_request(raw, reason, context) when is_map(context) do
+    messages =
+      case Map.get(context, :messages) do
+        messages when is_list(messages) -> messages
+        _other -> default_repair_messages(raw, reason, context)
+      end
 
-    if is_nil(model) do
+    llm_opts =
+      context
+      |> Map.get(:llm_opts, [])
+      |> Keyword.delete(:tools)
+      |> Keyword.delete(:tool_choice)
+      |> Keyword.put(:stream, false)
+
+    %{
+      model: Map.get(context, :model),
+      messages: messages,
+      llm_opts: llm_opts,
+      tools: %{}
+    }
+  end
+
+  defp default_repair(output, raw, reason, context) do
+    request = repair_request(raw, reason, context)
+
+    if is_nil(request.model) do
       {:error, output_error(:missing_repair_model, raw)}
     else
-      messages = [
-        %{
-          role: :system,
-          content:
-            "Extract a JSON object that matches the provided schema from the assistant answer. Return only the structured object."
-        },
-        %{role: :user, content: repair_prompt(context, raw, reason)}
-      ]
-
-      llm_opts =
-        context
-        |> Map.get(:llm_opts, [])
-        |> Keyword.delete(:tools)
-        |> Keyword.delete(:tool_choice)
-        |> Keyword.put(:stream, false)
-
-      case ReqLLM.Generation.generate_object(model, messages, output.schema, llm_opts) do
+      case ReqLLM.Generation.generate_object(request.model, request.messages, output.schema, request.llm_opts) do
         {:ok, response} ->
           unwrap_generated_response(response)
 
@@ -274,6 +287,17 @@ defmodule Jido.AI.Output do
           {:error, output_error({:repair_failed, reason_message(error)}, raw)}
       end
     end
+  end
+
+  defp default_repair_messages(raw, reason, context) do
+    [
+      %{
+        role: :system,
+        content:
+          "Extract a JSON object that matches the provided schema from the assistant answer. Return only the structured object."
+      },
+      %{role: :user, content: repair_prompt(context, raw, reason)}
+    ]
   end
 
   defp invoke_repair(nil, output, raw, reason, context) do

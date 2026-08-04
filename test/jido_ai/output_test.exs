@@ -152,4 +152,29 @@ defmodule Jido.AI.OutputTest do
     assert {:ok, %{category: :technical, confidence: 1.0, summary: "Normalized"}} =
              Output.repair(output, "invalid", :invalid, %{})
   end
+
+  test "builds a sanitized repair request and preserves explicit messages" do
+    request =
+      Output.repair_request("invalid answer", :invalid, %{
+        model: :capable,
+        user_message: "Classify the ticket",
+        llm_opts: [tools: [:tool], tool_choice: :auto, stream: true, temperature: 0.2]
+      })
+
+    assert request.model == :capable
+    assert request.tools == %{}
+    assert request.llm_opts[:stream] == false
+    assert request.llm_opts[:temperature] == 0.2
+    refute Keyword.has_key?(request.llm_opts, :tools)
+    refute Keyword.has_key?(request.llm_opts, :tool_choice)
+
+    assert Enum.any?(request.messages, fn message ->
+             message.role == :user and
+               message.content =~ "Classify the ticket" and
+               message.content =~ "invalid answer"
+           end)
+
+    messages = [%{role: :user, content: "Policy-adjusted repair prompt"}]
+    assert Output.repair_request("invalid answer", :invalid, %{messages: messages}).messages == messages
+  end
 end
