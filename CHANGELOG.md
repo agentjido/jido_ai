@@ -63,6 +63,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog -->
 
+## [v2.3.0](https://github.com/agentjido/jido_ai/compare/v2.2.0...v2.3.0) (2026-08-05)
+
+
+
+
+### Features:
+
+* test: add deterministic ReAct helpers by mikehostetler
+
+* skill: add lazy skill loading by mikehostetler
+
+* react: emit keepalive events during tool execution by Dohan Kim
+
+### Bug Fixes:
+
+* reasoning/react: run structured-output repair through request_transformer (#343) by Eduardo
+
+* tools: preserve non-strict open schemas (#341) by Evadne Wu
+
+* streaming: retain generated image content (#340) by mikehostetler
+
+* output: wire configured repair callbacks (#339) by mikehostetler
+
+* reasoning: honor action observability options (#338) by mikehostetler
+
+* output: normalize Zoi array items (#337) by mikehostetler
+
+* request: keep stream sink pids out of durable checkpoints (#332) by mikehostetler
+
+* tool-exec: thread the directive timeout_ms through to Turn execution (#331) by Lanny Bose
+
+* context: preserve string-keyed assistant content (#329) by mikehostetler
+
+* deps: update Mint for CVE-2026-59249 by mikehostetler
+
+* align Agent Skills lifecycle with specification (#325) by mikehostetler
+
+* output: accept string-keyed JSON Schema in imported_schema?/1 (#319) by Eduardo
+
+* deps: update mint and hpax by mikehostetler
+
+* report llm token usage in telemetry by mikehostetler
+
+* react: emit canonical runtime events by Danila Poyarkov
+
+* telemetry: restore full token usage and tool result payloads in AI telemetry events (#309) by dl-alexandre
+
+* context: preserve file reference media types (#306) by mikehostetler
+
+* react: start worker for multimodal queries by mikehostetler
+
+* observe: bound telemetry and transport payloads by mikehostetler
+
 ## [v2.2.0](https://github.com/agentjido/jido_ai/compare/v2.1.0...v2.2.0) (2026-05-22)
 
 
