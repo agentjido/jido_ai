@@ -40,7 +40,7 @@ defmodule Jido.AI do
           }
         }
 
-  A broad list of provider/model IDs is available at: https://llmdb.xyz
+  A broad list of provider/model IDs is available at: https://llmcatalog.dev
 
   ## LLM Defaults
 
