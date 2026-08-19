@@ -64,6 +64,40 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     def run(%{a: a, b: b}, _context), do: {:ok, %{result: a + b}}
   end
 
+  defmodule InterceptorAgent do
+    @behaviour Jido.AI.ToolInterceptor
+
+    @impl Jido.AI.ToolInterceptor
+    def before_tool_call(tool_call, _context), do: {:ok, tool_call}
+
+    @impl Jido.AI.ToolInterceptor
+    def after_tool_call(tool_call, tool_result, context) do
+      _schema = tool_call.action_module.schema()
+      send(context.test_pid, {:after_tool_call, tool_result, tool_call})
+      {:ok, {:ok, %{result: "projected calculator result"}, []}}
+    end
+  end
+
+  defmodule BeforeOnlyAgent do
+    def before_tool_call(%{name: "calculator"} = tool_call, context) do
+      _schema = tool_call.action_module.schema()
+      send(context.test_pid, {:before_tool_call, tool_call})
+      {:ok, %{tool_call | arguments: %{"a" => tool_call.arguments["a"], "b" => 8}}}
+    end
+  end
+
+  defmodule UnknownToolTrackingAgent do
+    def before_tool_call(tool_call, context) do
+      send(context.test_pid, {:unexpected_unknown_before_tool_call, tool_call})
+      {:ok, tool_call}
+    end
+
+    def after_tool_call(tool_call, result, context) do
+      send(context.test_pid, {:unexpected_unknown_after_tool_call, tool_call, result})
+      {:ok, result}
+    end
+  end
+
   defmodule ImpostorLoadSkillTool do
     use Jido.Action,
       name: "load_skill",
@@ -503,6 +537,174 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
            ]
 
     assert Enum.find(events, &(&1.kind == :request_completed)).data.result == "Done"
+  end
+
+  test "after_tool_call callback transforms the canonical tool result" do
+    parent = self()
+    :persistent_term.erase({__MODULE__, :llm_call_count})
+
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_projected"})],
+             %{finish_reason: :tool_calls},
+             model
+           )}
+
+        2 ->
+          send(parent, {:projected_messages, messages})
+
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("Done")],
+             %{finish_reason: :stop},
+             model
+           )}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0
+      })
+
+    events =
+      ReAct.stream("Calculate 2 + 3", config, context: %{test_pid: self(), agent_module: InterceptorAgent})
+      |> Enum.to_list()
+
+    assert_receive {:after_tool_call, {:ok, %{result: 5}, []},
+                    %{id: "tc_projected", name: "calculator", action_module: CalculatorTool}}
+
+    assert_receive {:projected_messages, messages}
+
+    assert Enum.any?(messages, fn
+             %{role: :tool, content: content} when is_binary(content) ->
+               content =~ "projected calculator result"
+
+             _ ->
+               false
+           end)
+
+    tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
+    assert {:ok, %{result: "projected calculator result"}, []} = tool_completed.data.result
+  end
+
+  test "optional before_tool_call callback can rewrite tool arguments" do
+    parent = self()
+    :persistent_term.erase({__MODULE__, :before_tool_call_llm_count})
+
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :before_tool_call_llm_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :before_tool_call_llm_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_rewrite"})],
+             %{finish_reason: :tool_calls},
+             model
+           )}
+
+        2 ->
+          send(parent, {:rewritten_messages, messages})
+
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("Done")],
+             %{finish_reason: :stop},
+             model
+           )}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0
+      })
+
+    events =
+      ReAct.stream("Calculate 2 + 3", config, context: %{test_pid: self(), agent_module: BeforeOnlyAgent})
+      |> Enum.to_list()
+
+    assert_receive {:before_tool_call,
+                    %{
+                      id: "tc_rewrite",
+                      name: "calculator",
+                      arguments: %{"a" => 2, "b" => 3},
+                      action_module: CalculatorTool
+                    }}
+
+    assert_receive {:rewritten_messages, messages}
+
+    assert Enum.any?(messages, fn
+             %{role: :tool, content: content} when is_binary(content) -> content =~ "10"
+             _ -> false
+           end)
+
+    tool_started = Enum.find(events, &(&1.kind == :tool_started))
+    assert tool_started.data.arguments == %{"a" => 2, "b" => 8}
+
+    tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
+    assert {:ok, %{result: 10}, []} = tool_completed.data.result
+  end
+
+  test "tool interceptor skips unknown tools and preserves existing unknown-tool result" do
+    :persistent_term.erase({__MODULE__, :unknown_tool_llm_count})
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :unknown_tool_llm_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :unknown_tool_llm_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("missing_tool", %{"value" => 1}, %{id: "tc_missing"})],
+             %{finish_reason: :tool_calls},
+             model
+           )}
+
+        2 ->
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("Done")],
+             %{finish_reason: :stop},
+             model
+           )}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0
+      })
+
+    events =
+      ReAct.stream("Call a missing tool", config, context: %{test_pid: self(), agent_module: UnknownToolTrackingAgent})
+      |> Enum.to_list()
+
+    refute_receive {:unexpected_unknown_before_tool_call, _}
+    refute_receive {:unexpected_unknown_after_tool_call, _, _}
+
+    tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
+    assert {:error, %{type: :unknown_tool}, []} = tool_completed.data.result
   end
 
   test "propagates usage from streaming meta chunks into request completion" do

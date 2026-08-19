@@ -13,10 +13,24 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       state: %{}
     }
     |> then(fn agent ->
-      ctx = %{strategy_opts: opts}
+      ctx = %{strategy_opts: opts, agent_module: Keyword.get(opts, :agent_module)}
       {agent, []} = TreeOfThoughts.init(agent, ctx)
       agent
     end)
+  end
+
+  defmodule InterceptorAgent do
+    def before_tool_call(%{name: "ordering_slow_tool"} = tool_call, context) do
+      _schema = tool_call.action_module.schema()
+      send(context.test_pid, {:tot_before_tool_call, tool_call})
+      {:ok, %{tool_call | arguments: Map.put(tool_call.arguments, "rewritten", true)}}
+    end
+
+    def after_tool_call(tool_call, result, context) do
+      _schema = tool_call.action_module.schema()
+      send(context.test_pid, {:tot_after_tool_call, tool_call, result})
+      {:ok, {:ok, %{tool: :transformed}, []}}
+    end
   end
 
   defmodule OrderingSlowTool do
@@ -333,6 +347,117 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       state = StratState.get(agent, %{})
       assert state[:pending_tool_call_id] == call_id
     end
+
+    test "before_tool_call transforms directive arguments" do
+      agent =
+        create_agent(
+          tools: [OrderingSlowTool],
+          agent_module: InterceptorAgent,
+          tool_context: %{test_pid: self()}
+        )
+
+      start_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.start_action(),
+        params: %{prompt: "Use a tool"}
+      }
+
+      {agent, _start_directives} = TreeOfThoughts.cmd(agent, [start_instruction], %{})
+      state = StratState.get(agent, %{})
+      call_id = state[:current_call_id]
+      agent = StratState.put(agent, Map.put(state, :last_request_id, "req_tot_intercept"))
+
+      llm_result_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.llm_result_action(),
+        params: %{
+          call_id: call_id,
+          result: %{
+            type: :tool_calls,
+            text: "Calling tool",
+            tool_calls: [
+              %{id: "call_rewrite", name: OrderingSlowTool.name(), arguments: %{"original" => true}}
+            ],
+            usage: %{}
+          }
+        }
+      }
+
+      {_agent, [directive]} = TreeOfThoughts.cmd(agent, [llm_result_instruction], %{})
+
+      assert_receive {:tot_before_tool_call,
+                      %{
+                        id: "call_rewrite",
+                        name: "ordering_slow_tool",
+                        arguments: %{"original" => true},
+                        action_module: OrderingSlowTool
+                      }}
+
+      assert %Jido.AI.Directive.ToolExec{} = directive
+      assert directive.arguments == %{"original" => true, "rewritten" => true}
+    end
+
+    test "after_tool_call transforms canonical result before follow-up messages" do
+      agent =
+        create_agent(
+          tools: [OrderingSlowTool],
+          agent_module: InterceptorAgent,
+          tool_context: %{test_pid: self()}
+        )
+
+      turn =
+        Jido.AI.Turn.from_result_map(%{
+          type: :tool_calls,
+          text: "Tool round",
+          tool_calls: [
+            %{id: "call_1", name: OrderingSlowTool.name(), arguments: %{}}
+          ],
+          usage: %{}
+        })
+
+      state = StratState.get(agent, %{})
+
+      configured_state =
+        state
+        |> Map.put(:pending_tool_calls, %{
+          "call_1" => %{
+            call_id: "call_1",
+            tool_name: OrderingSlowTool.name(),
+            arguments: %{},
+            action_module: OrderingSlowTool
+          }
+        })
+        |> Map.put(:pending_tool_call_order, ["call_1"])
+        |> Map.put(:pending_tool_results, %{})
+        |> Map.put(:pending_tool_call_id, "llm_intercept_1")
+        |> Map.put(:pending_tool_turn, turn)
+        |> Map.put(:llm_call_aliases, %{"llm_intercept_1" => [%{role: :user, content: "Intercept"}]})
+        |> Map.put(:last_request_id, "req_tot_intercept")
+        |> Map.put(:config, Map.merge(state[:config] || %{}, %{model: "test:model"}))
+
+      agent = StratState.put(agent, configured_state)
+
+      result_instruction = %Jido.Instruction{
+        action: TreeOfThoughts.tool_result_action(),
+        params: %{
+          call_id: "call_1",
+          tool_name: OrderingSlowTool.name(),
+          result: {:ok, %{tool: :slow}, []}
+        }
+      }
+
+      {_agent, [followup_directive]} = TreeOfThoughts.cmd(agent, [result_instruction], %{})
+
+      assert_receive {:tot_after_tool_call,
+                      %{
+                        id: "call_1",
+                        name: "ordering_slow_tool",
+                        arguments: %{},
+                        action_module: OrderingSlowTool
+                      }, {:ok, %{tool: :slow}, []}}
+
+      assert %Jido.AI.Directive.LLMStream{} = followup_directive
+
+      assert Enum.any?(tool_message_contents(followup_directive.context), &String.contains?(&1, "transformed"))
+    end
   end
 
   describe "tool round ordering" do
@@ -604,6 +729,24 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       Map.get(message, :tool_call_id, Map.get(message, "tool_call_id"))
     end)
   end
+
+  defp tool_message_contents(context) when is_list(context) do
+    context
+    |> Enum.filter(fn message ->
+      role = Map.get(message, :role, Map.get(message, "role"))
+      role in [:tool, "tool"]
+    end)
+    |> Enum.map(fn message ->
+      message
+      |> Map.get(:content, Map.get(message, "content"))
+      |> content_to_string()
+    end)
+  end
+
+  defp content_to_string(parts) when is_list(parts), do: Enum.map_join(parts, "", &content_to_string/1)
+  defp content_to_string(%ReqLLM.Message.ContentPart{text: text}) when is_binary(text), do: text
+  defp content_to_string(content) when is_binary(content), do: content
+  defp content_to_string(content), do: inspect(content)
 
   defp assistant_response_id(context) when is_list(context) do
     context

@@ -906,6 +906,14 @@ defmodule Jido.AI.Agent do
   @spec compatibility_overrides_ast() :: Macro.t()
   def compatibility_overrides_ast do
     quote location: :keep do
+      @behaviour Jido.AI.ToolInterceptor
+
+      @impl Jido.AI.ToolInterceptor
+      def before_tool_call(tool_call, _context), do: {:ok, tool_call}
+
+      @impl Jido.AI.ToolInterceptor
+      def after_tool_call(_tool_call, result, _context), do: {:ok, result}
+
       # Broaden the contract to avoid false positives from upstream plugin-spec typing.
       @spec plugin_specs() :: [map()]
       def plugin_specs, do: @plugin_specs
@@ -960,7 +968,9 @@ defmodule Jido.AI.Agent do
 
       def restore(_data, _ctx), do: {:error, :invalid_checkpoint_payload}
 
-      defoverridable checkpoint: 2
+      defoverridable before_tool_call: 2,
+                     after_tool_call: 3,
+                     checkpoint: 2
     end
   end
 

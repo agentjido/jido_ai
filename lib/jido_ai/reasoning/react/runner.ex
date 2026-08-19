@@ -16,6 +16,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   alias Jido.AI.Effects
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Error
+  alias Jido.AI.ToolInterceptor
   alias Jido.AI.Turn
   alias Jido.AI.Usage
   alias Jido.Agent.State, as: AgentState
@@ -679,107 +680,176 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           end
 
         tool_config = %{config | tools: effective_tools}
-        pending = Enum.map(tool_calls, &PendingToolCall.from_tool_call/1)
-        state = State.put_pending_tools(state, pending)
+        agent_module = Map.get(context, :agent_module)
 
-        {state, _} =
-          Enum.reduce(pending, {state, nil}, fn pending_call, {acc, _} ->
-            emit_event(
-              acc,
-              owner,
-              ref,
-              :tool_started,
-              %{
+        with {:ok, pending} <- prepare_tool_calls(tool_calls, agent_module, context, effective_tools) do
+          state = State.put_pending_tools(state, pending)
+
+          {state, _} =
+            Enum.reduce(pending, {state, nil}, fn pending_call, {acc, _} ->
+              emit_event(
+                acc,
+                owner,
+                ref,
+                :tool_started,
+                %{
+                  tool_call_id: pending_call.id,
+                  tool_name: pending_call.name,
+                  arguments: maybe_redact_args(pending_call.arguments, config)
+                },
                 tool_call_id: pending_call.id,
-                tool_name: pending_call.name,
-                arguments: maybe_redact_args(pending_call.arguments, config)
-              },
-              tool_call_id: pending_call.id,
-              tool_name: pending_call.name
-            )
-          end)
-
-        heartbeat = start_tool_heartbeat(state, owner, ref, config)
-
-        {results, heartbeat_last_seq} =
-          try do
-            mapped =
-              pending
-              |> Task.async_stream(
-                fn call -> execute_tool_with_retries(call, tool_config, context) end,
-                ordered: true,
-                max_concurrency: tool_config.tool_exec.concurrency,
-                timeout: tool_config.tool_exec.timeout_ms + 50
+                tool_name: pending_call.name
               )
-              |> Enum.map(fn
-                {:ok, result} -> result
-                {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
-              end)
+            end)
 
-            # Synchronously stop the heartbeat and learn the highest seq it
-            # allocated, so the runner can resume above that range.
-            {mapped, stop_tool_heartbeat(heartbeat)}
-          after
-            # Crash-safety net: guarantee the heartbeat process is gone even if
-            # the tool block raised before the synchronous stop ran.
-            kill_tool_heartbeat(heartbeat)
+          heartbeat = start_tool_heartbeat(state, owner, ref, config)
+
+          {results, heartbeat_last_seq} =
+            try do
+              mapped =
+                pending
+                |> Task.async_stream(
+                  fn call -> execute_tool_with_retries(call, tool_config, context) end,
+                  ordered: true,
+                  max_concurrency: tool_config.tool_exec.concurrency,
+                  timeout: tool_config.tool_exec.timeout_ms + 50
+                )
+                |> Enum.map(fn
+                  {:ok, result} -> result
+                  {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
+                end)
+
+              # Synchronously stop the heartbeat and learn the highest seq it
+              # allocated, so the runner can resume above that range.
+              {mapped, stop_tool_heartbeat(heartbeat)}
+            after
+              # Crash-safety net: guarantee the heartbeat process is gone even if
+              # the tool block raised before the synchronous stop ran.
+              kill_tool_heartbeat(heartbeat)
+            end
+
+          # Adopt the heartbeat's final seq so the next emitted event is strictly
+          # greater than every keepalive (preserves unique + monotonic seqs).
+          state = State.adopt_seq(state, heartbeat_last_seq)
+
+          transformed_results =
+            Enum.reduce_while(results, {:ok, state, state.context, []}, fn
+              {pending_call, result, attempts, duration_ms}, {:ok, acc, context_acc, result_acc} ->
+                tool_call = tool_call_from_pending(pending_call)
+
+                case maybe_after_tool_call(agent_module, tool_call, result, context) do
+                  {:ok, transformed_result} ->
+                    completed = PendingToolCall.complete(pending_call, transformed_result, attempts, duration_ms)
+                    refs = durable_tool_result_refs(completed.name, transformed_result, tool_config.tools)
+                    content = Turn.format_tool_result_content(transformed_result)
+
+                    {acc, _} =
+                      emit_event(
+                        acc,
+                        owner,
+                        ref,
+                        :tool_completed,
+                        %{
+                          tool_call_id: completed.id,
+                          tool_name: completed.name,
+                          result: transformed_result,
+                          attempts: attempts,
+                          duration_ms: duration_ms,
+                          refs: refs
+                        },
+                        tool_call_id: completed.id,
+                        tool_name: completed.name
+                      )
+
+                    context_acc =
+                      AIContext.append_tool_result(context_acc, completed.id, completed.name, content,
+                        refs: normalize_optional_refs(refs)
+                      )
+
+                    {:cont,
+                     {:ok, acc, context_acc, [{pending_call, transformed_result, attempts, duration_ms} | result_acc]}}
+
+                  {:error, reason} ->
+                    {:halt, {:error, acc, reason}}
+                end
+
+              {:error, reason}, {:ok, acc, context_acc, result_acc} ->
+                Logger.error("tool task failure", reason: inspect(reason))
+                {:cont, {:ok, acc, context_acc, result_acc}}
+            end)
+
+          case transformed_results do
+            {:ok, state, updated_context, completed_results} ->
+              state =
+                state
+                |> State.put_status(:running)
+                |> State.clear_pending_tools()
+                |> State.inc_iteration()
+                |> Map.put(:context, updated_context)
+
+              {state, _token} = emit_checkpoint(state, owner, ref, config, :after_tools)
+              {:ok, state, evolve_context_state_snapshot(context, Enum.reverse(completed_results))}
+
+            {:error, state, reason} ->
+              {:error, State.put_status(state, :failed), reason, :tool_interceptor}
           end
+        else
+          {:interrupt, interrupt} ->
+            {:error, State.put_status(state, :failed), {:interrupt, interrupt}, :tool_interceptor}
 
-        # Adopt the heartbeat's final seq so the next emitted event is strictly
-        # greater than every keepalive (preserves unique + monotonic seqs).
-        state = State.adopt_seq(state, heartbeat_last_seq)
-
-        {state, updated_context} =
-          Enum.reduce(results, {state, state.context}, fn
-            {pending_call, result, attempts, duration_ms}, {acc, context_acc} ->
-              completed = PendingToolCall.complete(pending_call, result, attempts, duration_ms)
-              refs = durable_tool_result_refs(completed.name, result, tool_config.tools)
-
-              {acc, _} =
-                emit_event(
-                  acc,
-                  owner,
-                  ref,
-                  :tool_completed,
-                  %{
-                    tool_call_id: completed.id,
-                    tool_name: completed.name,
-                    result: result,
-                    attempts: attempts,
-                    duration_ms: duration_ms,
-                    refs: refs
-                  },
-                  tool_call_id: completed.id,
-                  tool_name: completed.name
-                )
-
-              content = Turn.format_tool_result_content(result)
-
-              context_acc =
-                AIContext.append_tool_result(context_acc, completed.id, completed.name, content,
-                  refs: normalize_optional_refs(refs)
-                )
-
-              {acc, context_acc}
-
-            {:error, reason}, {acc, context_acc} ->
-              Logger.error("tool task failure", reason: inspect(reason))
-              {acc, context_acc}
-          end)
-
-        state =
-          state
-          |> State.put_status(:running)
-          |> State.clear_pending_tools()
-          |> State.inc_iteration()
-          |> Map.put(:context, updated_context)
-
-        {state, _token} = emit_checkpoint(state, owner, ref, config, :after_tools)
-        {:ok, state, evolve_context_state_snapshot(context, results)}
+          {:error, reason} ->
+            {:error, State.put_status(state, :failed), reason, :tool_interceptor}
+        end
 
       {:error, reason} ->
         {:error, State.put_status(state, :failed), reason, :tool_guardrail}
     end
+  end
+
+  defp prepare_tool_calls(tool_calls, agent_module, context, tools) do
+    Enum.reduce_while(tool_calls, {:ok, []}, fn tool_call, {:ok, acc} ->
+      pending_call = PendingToolCall.from_tool_call(tool_call)
+      action_module = Map.get(tools, pending_call.name)
+
+      case is_atom(action_module) and not is_nil(action_module) do
+        true ->
+          resolved_call = %{
+            id: pending_call.id,
+            name: pending_call.name,
+            arguments: pending_call.arguments,
+            action_module: action_module
+          }
+
+          case ToolInterceptor.before_tool_call(agent_module, resolved_call, context) do
+            {:ok, transformed_call} -> {:cont, {:ok, [PendingToolCall.from_tool_call(transformed_call) | acc]}}
+            {:error, reason} -> {:halt, {:error, reason}}
+            {:interrupt, interrupt} -> {:halt, {:interrupt, interrupt}}
+          end
+
+        false ->
+          {:cont, {:ok, [pending_call | acc]}}
+      end
+    end)
+    |> case do
+      {:ok, calls} -> {:ok, Enum.reverse(calls)}
+      other -> other
+    end
+  end
+
+  defp maybe_after_tool_call(agent_module, %{action_module: action_module} = tool_call, result, context)
+       when is_atom(action_module) and not is_nil(action_module) do
+    ToolInterceptor.after_tool_call(agent_module, tool_call, result, context)
+  end
+
+  defp maybe_after_tool_call(_agent_module, _tool_call, result, _context), do: {:ok, Effects.normalize_result(result)}
+
+  defp tool_call_from_pending(%PendingToolCall{} = pending_call) do
+    %{
+      id: pending_call.id,
+      name: pending_call.name,
+      arguments: pending_call.arguments,
+      action_module: pending_call.action_module
+    }
   end
 
   defp run_pending_tool_round(%State{} = state, owner, ref, %Config{} = config, context) do
@@ -790,7 +860,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       config,
       context,
       Enum.map(state.pending_tool_calls, fn
-        %PendingToolCall{} = call -> %{id: call.id, name: call.name, arguments: call.arguments}
+        %PendingToolCall{} = call -> tool_call_from_pending(call)
         %{} = call -> call
       end)
     )
@@ -935,7 +1005,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp delete_in_path(map, _path), do: map
 
   defp execute_tool_with_retries(%PendingToolCall{} = pending_call, %Config{} = config, context) do
-    module = Map.get(config.tools, pending_call.name)
+    module = pending_call.action_module || Map.get(config.tools, pending_call.name)
 
     case is_atom(module) and function_exported?(module, :name, 0) and function_exported?(module, :run, 2) do
       true ->

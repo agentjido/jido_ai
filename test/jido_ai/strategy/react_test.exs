@@ -40,7 +40,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       state: %{}
     }
     |> then(fn agent ->
-      ctx = %{strategy_opts: opts}
+      ctx = %{strategy_opts: opts, agent_module: Keyword.get(opts, :agent_module)}
       {agent, []} = ReAct.init(agent, ctx)
       agent
     end)
@@ -364,6 +364,27 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       state = StratState.get(agent, %{})
 
       assert state.pending_worker_start.config.request_transformer == TestRequestTransformer
+    end
+
+    test "start installs agent module and tool context in worker context" do
+      agent =
+        create_agent(
+          tools: [TestCalculator],
+          agent_module: __MODULE__,
+          tool_context: %{tenant_id: "tenant-1"}
+        )
+
+      {agent, [_spawn]} =
+        ReAct.cmd(
+          agent,
+          [instruction(ReAct.start_action(), %{query: "Use a tool", request_id: "req_plugin"})],
+          %{}
+        )
+
+      context = StratState.get(agent, %{}).pending_worker_start.context
+
+      assert context.agent_module == __MODULE__
+      assert context.tool_context == %{tenant_id: "tenant-1"}
     end
 
     test "start applies request-scoped stream timeout override to runtime config" do
@@ -1945,7 +1966,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         runtime_event(:tool_completed, "req_ai_message", 3, %{
           tool_call_id: "tc_1",
           tool_name: "calculator",
-          result: {:ok, %{result: 3}, []}
+          result: {:ok, %{result: "projected result"}, []}
         }),
         runtime_event(:request_completed, "req_ai_message", 4, %{
           result: "3",
@@ -1964,6 +1985,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert Enum.map(ai_messages, fn entry -> entry.payload.role end) == [:user, :assistant, :tool]
       assert Enum.all?(ai_messages, fn entry -> entry.payload.context_ref == "default" end)
+      assert List.last(ai_messages).payload.content =~ "projected result"
     end
 
     test "start action normalization preserves extra_refs" do

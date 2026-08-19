@@ -8,6 +8,7 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
             %{
               id: Zoi.string(description: "LLM tool call ID"),
               name: Zoi.string(description: "Tool/action name"),
+              action_module: Zoi.atom(description: "Resolved action module") |> Zoi.optional(),
               arguments: Zoi.map(description: "Tool call arguments") |> Zoi.default(%{}),
               status: Zoi.atom(description: "Execution status") |> Zoi.default(:pending),
               result: Zoi.any(description: "Raw tool execution result") |> Zoi.optional(),
@@ -33,17 +34,24 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
   """
   @spec from_tool_call(map()) :: t()
   def from_tool_call(%{} = tool_call) do
-    attrs = %{
-      id: to_string(Map.get(tool_call, :id, Map.get(tool_call, "id", ""))),
-      name: to_string(Map.get(tool_call, :name, Map.get(tool_call, "name", ""))),
-      arguments: Map.get(tool_call, :arguments, Map.get(tool_call, "arguments", %{})) || %{}
-    }
+    attrs =
+      %{
+        id: to_string(Map.get(tool_call, :id, Map.get(tool_call, "id", ""))),
+        name: to_string(Map.get(tool_call, :name, Map.get(tool_call, "name", ""))),
+        arguments: Map.get(tool_call, :arguments, Map.get(tool_call, "arguments", %{})) || %{}
+      }
+      |> maybe_put_action_module(Map.get(tool_call, :action_module, Map.get(tool_call, "action_module")))
 
     case Zoi.parse(@schema, attrs) do
       {:ok, call} -> call
       {:error, _} -> %__MODULE__{id: "", name: "", arguments: %{}}
     end
   end
+
+  defp maybe_put_action_module(attrs, module) when is_atom(module) and not is_nil(module),
+    do: Map.put(attrs, :action_module, module)
+
+  defp maybe_put_action_module(attrs, _module), do: attrs
 
   @doc """
   Marks a pending call as completed with result, attempts, and duration metadata.
