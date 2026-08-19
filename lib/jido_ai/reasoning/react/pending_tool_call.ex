@@ -3,6 +3,8 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
   Tracks a tool call in the ReAct runtime.
   """
 
+  alias Jido.AI.Effects.Applier
+
   @schema Zoi.struct(
             __MODULE__,
             %{
@@ -56,14 +58,17 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
   @doc """
   Marks a pending call as completed with result, attempts, and duration metadata.
   """
-  @spec complete(t(), {:ok, term()} | {:error, term()}, non_neg_integer(), non_neg_integer()) :: t()
+  @spec complete(t(), Applier.result_tuple(), non_neg_integer(), non_neg_integer()) :: t()
   def complete(%__MODULE__{} = call, result, attempts, duration_ms) do
     %__MODULE__{
       call
       | result: result,
-        status: if(match?({:ok, _}, result), do: :ok, else: :error),
+        status: result_status(result),
         attempts: max(attempts, 1),
         duration_ms: duration_ms
     }
   end
+
+  defp result_status({:ok, _payload, _effects}), do: :ok
+  defp result_status({:error, _reason, _effects}), do: :error
 end
