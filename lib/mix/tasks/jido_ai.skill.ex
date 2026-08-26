@@ -273,7 +273,7 @@ defmodule Mix.Tasks.JidoAi.Skill do
 
   defp find_skill_files(path) do
     cond do
-      File.regular?(path) && Path.basename(path) == "SKILL.md" -> [path]
+      File.regular?(path) -> [path]
       File.dir?(path) -> Path.wildcard(Path.join([path, "**", "SKILL.md"]))
       true -> []
     end
