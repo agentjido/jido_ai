@@ -158,6 +158,7 @@ Finalized standalone action set (recommended):
    - `Jido.AI.Actions.Reasoning.Explain`
 5. Skill orchestration
    - `Jido.AI.Actions.Skill.LoadSkill` (lazy skill body loading from a compact prompt index)
+   - `Jido.AI.Actions.Skill.LoadResource` (bounded text loading from an activated skill)
 6. Dedicated strategy orchestration
    - `Jido.AI.Actions.Reasoning.RunStrategy` (isolated strategy execution for `:cod | :cot | :aot | :tot | :got | :trm | :adaptive`)
 7. Compatibility convenience

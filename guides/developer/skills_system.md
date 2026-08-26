@@ -11,9 +11,12 @@ use session-scoped activation, validate skill files, and bound custom discovery.
 - `Jido.AI.Skill.Spec`
 - `Jido.AI.Skill.Loader`
 - `Jido.AI.Skill.Registry`
+- `Jido.AI.Skill.Resources`
+- `Jido.AI.Skill.ResourcePolicy`
 - `Jido.AI.Skill.AgentIntegration`
 - `Jido.AI.Skill.Prompt`
 - `Jido.AI.Actions.Skill.LoadSkill`
+- `Jido.AI.Actions.Skill.LoadResource`
 - `mix jido_ai.skill`
 
 ## Turnkey Agent Integration
@@ -34,7 +37,8 @@ end
 
 This discovers `.agents/skills/` and `~/.agents/skills/`, appends only the compact
 name/description catalog to the system prompt, adds
-`Jido.AI.Actions.Skill.LoadSkill` to the tools, and makes metadata-only specs
+`Jido.AI.Actions.Skill.LoadSkill` and `Jido.AI.Actions.Skill.LoadResource` to the
+tool list, and makes metadata-only specs
 available through reserved tool context for that agent. Discovery and catalog
 construction happen when each agent instance initializes. The selected skill
 file is read and strictly validated when `load_skill` activates it. Thus, the
@@ -57,7 +61,16 @@ agent_skills: [
   trust: true,
   max_depth: 4,
   max_directories: 500,
-  exclude_directories: [".git", "node_modules", "deps", "_build"]
+  exclude_directories: [".git", "node_modules", "deps", "_build"],
+  resource_policy: [
+    max_resources: 128,
+    max_depth: 6,
+    max_directories: 512,
+    max_listing_bytes: 32_768,
+    max_file_bytes: 524_288,
+    max_text_bytes: 131_072,
+    binary: :reject
+  ]
 ]
 ```
 
@@ -135,9 +148,62 @@ agent instances do not share activation state. Its structured result contains:
 }
 ```
 
+The `resources` value also has the complete relative-path list, limit details,
+and truncation state:
+
+```elixir
+%{
+  resources: [%{relative_path: "LICENSE", size: 1_067, ...}],
+  scripts: [...],
+  references: [...],
+  assets: [...],
+  complete: true,
+  truncated: false,
+  truncation_reasons: [],
+  limits: %{...}
+}
+```
+
+The conventional groups are compatibility views of the general list. The
+general list also includes root files and custom directories. It excludes the
+root `SKILL.md` and does not contain absolute paths.
+
 Skill tool results are marked durable in conversation refs. A ReAct context
 replacement with `reason: :compaction` retains the skill output and its matching
 assistant tool call.
+
+## Bounded Resource Loading
+
+After `load_skill` activates a skill, use `load_skill_resource` with one listed
+relative path:
+
+```elixir
+{:ok, resource} =
+  Jido.AI.Actions.Skill.LoadResource.run(
+    %{name: "code-review", path: "references/checks.md"},
+    %{agent_id: conversation_id}
+  )
+
+resource.content
+```
+
+The action requires activation in the same runtime session. It rejects absolute
+paths, traversal, symlinks, the root `SKILL.md`, oversized files, oversized text,
+and binary content. Missing, invalid, oversized, and binary resources return
+structured action errors.
+
+`Jido.AI.Skill.ResourcePolicy` has these defaults:
+
+- 256 resources
+- depth 8
+- 1,024 visited directories
+- 64 KiB for the encoded general-resource list
+- 1 MiB for one file
+- 256 KiB of returned text
+- binary text loading rejected
+
+When a listing reaches a count, depth, directory, or payload limit, `complete`
+is false and `truncation_reasons` identifies the reached limits.
 
 ## Lazy Loading Skill Bodies
 
@@ -278,6 +344,8 @@ Fix:
 - skill registry stores specs by skill name
 - activation registry stores by session ID and skill name
 - `body_ref` can be inline or file-backed
+- resource listings use relative paths and report incomplete results
+- resource text loading rejects binary content
 - allowed tools are normalized to string names
 - `Prompt.render/2` ignores unresolved skills, renders only valid specs, and omits bodies by default
 

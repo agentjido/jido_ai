@@ -23,7 +23,9 @@ defmodule Jido.AI.Skill.ActivationTest do
       assert context.skill.name == "test-skill"
       assert context.skill_body == "Skill body content"
       assert context.root_dir == "/tmp/skills/test-skill"
-      assert context.resources == %{scripts: [], references: [], assets: []}
+      assert context.resources.resources == []
+      assert context.resources.complete
+      assert context.resource_policy.max_text_bytes == 262_144
       refute Map.has_key?(context, :durable)
     end
 
@@ -51,7 +53,8 @@ defmodule Jido.AI.Skill.ActivationTest do
 
       assert {:ok, context} = Activation.activate(spec)
       assert context.root_dir == nil
-      assert context.resources == %{scripts: [], references: [], assets: []}
+      assert context.resources.resources == []
+      assert context.resources.complete
     end
 
     @tag :tmp_dir

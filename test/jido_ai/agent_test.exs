@@ -523,6 +523,7 @@ defmodule Jido.AI.AgentTest do
       config = state[:config]
 
       assert Jido.AI.Actions.Skill.LoadSkill in ReAct.list_tools(agent)
+      assert Jido.AI.Actions.Skill.LoadResource in ReAct.list_tools(agent)
       assert config.system_prompt =~ "Base instructions."
       assert config.system_prompt =~ "**hex-release**"
       refute config.system_prompt =~ "# Hex Release"

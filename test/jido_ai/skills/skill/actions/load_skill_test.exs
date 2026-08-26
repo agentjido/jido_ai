@@ -2,7 +2,7 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Actions.Skill.LoadSkill
-  alias Jido.AI.Skill.{Discovery, Registry, Spec}
+  alias Jido.AI.Skill.{Discovery, Registry, Resources, Spec}
 
   setup do
     start_supervised!(Registry)
@@ -44,19 +44,20 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert result.compatibility == ">= 2.0.0"
       assert result.vsn == "1.2.3"
       assert result.root_dir == nil
-      assert result.resources == %{scripts: [], references: [], assets: []}
+      assert result.resources.resources == []
+      assert result.resources.complete
     end
 
     test "can omit metadata fields" do
       assert {:ok, result} = LoadSkill.run(%{name: "insights", include_metadata: false}, %{})
 
-      assert result == %{
+      assert %{
                name: "insights",
                description: "Analyze product signals.",
                instructions: "# Insights\n\nFollow the product analysis workflow.",
                root_dir: nil,
-               resources: %{scripts: [], references: [], assets: []}
-             }
+               resources: %{resources: [], scripts: [], references: [], assets: [], complete: true}
+             } = result
     end
 
     test "trims skill names before lookup" do
@@ -67,13 +68,13 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
     test "accepts string-keyed tool parameters" do
       assert {:ok, result} = LoadSkill.run(%{"name" => "insights", "include_metadata" => false}, %{})
 
-      assert result == %{
+      assert %{
                name: "insights",
                description: "Analyze product signals.",
                instructions: "# Insights\n\nFollow the product analysis workflow.",
                root_dir: nil,
-               resources: %{scripts: [], references: [], assets: []}
-             }
+               resources: %{resources: [], scripts: [], references: [], assets: [], complete: true}
+             } = result
     end
 
     test "returns structured error with available skills when missing" do
@@ -156,6 +157,14 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
 
       assert error.type == :invalid_include_metadata
       assert error.message == "include_metadata must be a boolean"
+    end
+
+    test "returns a structured error for an invalid context resource policy" do
+      context = %{Resources.context_policy_key() => [max_text_bytes: 0]}
+
+      assert {:error, error} = LoadSkill.run(%{name: "insights"}, context)
+      assert error.type == :invalid_resource_policy
+      assert error.reason == {:invalid_resource_policy, :max_text_bytes}
     end
 
     test "rejects non-map parameters" do

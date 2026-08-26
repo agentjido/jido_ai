@@ -32,7 +32,7 @@ defmodule Jido.AI.Skill.Activation do
       Jido.AI.Skill.Activation.activated?("code-review")
   """
 
-  alias Jido.AI.Skill.{Discovery, Loader, Registry, Resources, Spec}
+  alias Jido.AI.Skill.{Discovery, Loader, Registry, ResourcePolicy, Resources, Spec}
 
   @discovery_option_keys [:trust, :max_depth, :max_directories, :exclude_directories]
 
@@ -40,7 +40,8 @@ defmodule Jido.AI.Skill.Activation do
           skill: Spec.t(),
           skill_body: String.t(),
           root_dir: String.t() | nil,
-          resources: Resources.resource_listing()
+          resources: Resources.resource_listing(),
+          resource_policy: ResourcePolicy.t()
         }
 
   @doc """
@@ -248,7 +249,8 @@ defmodule Jido.AI.Skill.Activation do
 
   defp do_activate(%Spec{} = spec, opts) do
     with {:ok, skill_body} <- load_skill_body(spec),
-         :ok <- Registry.mark_activated(spec.name, activation_context(spec, skill_body), opts) do
+         {:ok, context} <- activation_context(spec, skill_body, opts),
+         :ok <- Registry.mark_activated(spec.name, context, opts) do
       # Return the registry's canonical context so the first activation and any
       # subsequent (idempotent) activations yield an identical result.
       build_context_from_registry(spec.name, opts)
@@ -259,15 +261,21 @@ defmodule Jido.AI.Skill.Activation do
     Registry.get_activation_context(name, opts)
   end
 
-  defp activation_context(%Spec{} = spec, skill_body) do
+  defp activation_context(%Spec{} = spec, skill_body, opts) do
     root_dir = root_dir(spec)
+    policy_or_opts = Keyword.get(opts, :resource_policy, ResourcePolicy.default())
 
-    %{
-      skill: spec,
-      skill_body: skill_body,
-      root_dir: root_dir,
-      resources: list_resources(root_dir)
-    }
+    with {:ok, policy} <- ResourcePolicy.new(policy_or_opts),
+         {:ok, resources} <- list_resources(root_dir, policy) do
+      {:ok,
+       %{
+         skill: spec,
+         skill_body: skill_body,
+         root_dir: root_dir,
+         resources: resources,
+         resource_policy: policy
+       }}
+    end
   end
 
   defp load_skill_body(%Spec{body_ref: {:file, path}}) do
@@ -282,6 +290,6 @@ defmodule Jido.AI.Skill.Activation do
   defp root_dir(%Spec{source: {:file, path}}), do: Path.dirname(path)
   defp root_dir(%Spec{}), do: nil
 
-  defp list_resources(nil), do: %{scripts: [], references: [], assets: []}
-  defp list_resources(root_dir), do: Resources.list_resources(root_dir)
+  defp list_resources(nil, policy), do: Resources.empty_listing(policy)
+  defp list_resources(root_dir, policy), do: Resources.list_all(root_dir, policy)
 end

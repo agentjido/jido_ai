@@ -27,6 +27,7 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
    - `Jido.AI.Actions.Quota.Reset`
 6. Skill orchestration:
    - `Jido.AI.Actions.Skill.LoadSkill`
+   - `Jido.AI.Actions.Skill.LoadResource`
 7. Reasoning templates (optional):
    - `Jido.AI.Actions.Reasoning.Analyze`
    - `Jido.AI.Actions.Reasoning.Infer`
@@ -113,8 +114,13 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 - `Jido.AI.Actions.Skill.LoadSkill`
   - Use when a prompt advertises a compact skill index and the selected skill body should be loaded only on demand.
   - Required params: `name`. Optional params: `include_metadata` (default `true`).
-  - Output contract: `%{name, description, instructions}` plus metadata fields when requested.
+  - Output contract: `%{name, description, instructions, resources}` plus metadata fields when requested.
   - Pair with `Jido.AI.Skill.Prompt.render_registry_index/1` for tag-filtered skill indexes.
+- `Jido.AI.Actions.Skill.LoadResource`
+  - Use after `LoadSkill` when skill instructions refer to one bundled text file.
+  - Required params: `name` and relative `path`.
+  - Output contract: `%{skill, path, content, size}`.
+  - Requires the skill to be active in the same runtime session and enforces the configured resource policy.
 
 ## Reasoning Actions
 
@@ -159,6 +165,7 @@ These belong to strategy orchestration and are not app-level AI primitives.
 - Need in-process memory upsert/recall/clear primitives: use Retrieval actions.
 - Need rolling quota status or a quota counter reset operation: use Quota actions.
 - Need lazy skill body loading from a compact prompt index: use `LoadSkill`.
+- Need one file from an activated skill: use `LoadResource`.
 - Need explicit reasoning strategy execution as a callable capability: use `RunStrategy`.
 
 ## Failure Mode: Action Used Outside Expected Context
