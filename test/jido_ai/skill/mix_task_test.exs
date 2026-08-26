@@ -72,6 +72,21 @@ defmodule Mix.Tasks.JidoAi.SkillTest do
 
       assert Enum.any?(errors, &String.contains?(&1, "Usage: mix jido_ai.skill list <path> [<path>...]"))
     end
+
+    test "reports an explicit skill file with an invalid filename", %{
+      valid_skill_path: valid_skill_path,
+      valid_dir: valid_dir
+    } do
+      invalid_filename = Path.join(valid_dir, "fooSKILL.md")
+      File.cp!(valid_skill_path, invalid_filename)
+
+      messages = run_task_with_output(["list", invalid_filename])
+      output = format_messages(messages)
+
+      assert output =~ "Skills found: 0"
+      assert output =~ "Errors: 1"
+      assert output =~ "invalid_skill_filename"
+    end
   end
 
   describe "show command" do
@@ -145,6 +160,27 @@ defmodule Mix.Tasks.JidoAi.SkillTest do
 
       assert_raise Mix.Error, "Validation failed for 1 skill(s)", fn ->
         invoke_task(["validate", path, "--strict"])
+      end
+    end
+
+    test "validates an explicit skill file with an invalid filename", %{
+      valid_skill_path: valid_skill_path,
+      valid_dir: valid_dir
+    } do
+      invalid_filename = Path.join(valid_dir, "fooSKILL.md")
+      File.cp!(valid_skill_path, invalid_filename)
+
+      messages = run_task_with_output(["validate", invalid_filename])
+      output = format_messages(messages)
+
+      assert output =~ invalid_filename
+      assert output =~ "invalid_skill_filename"
+      assert output =~ "Warnings: 1"
+
+      flush_shell_messages()
+
+      assert_raise Mix.Error, "Validation failed for 1 skill(s)", fn ->
+        invoke_task(["validate", invalid_filename, "--strict"])
       end
     end
 
