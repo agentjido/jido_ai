@@ -32,8 +32,36 @@ defmodule Jido.AI.ToolInterceptorTest do
     def before_tool_call(tool_call, _context), do: {:ok, %{tool_call | name: "other"}}
   end
 
+  defmodule IdChanging do
+    def before_tool_call(tool_call, _context), do: {:ok, %{tool_call | id: "call-2"}}
+  end
+
   defmodule ModuleChanging do
     def before_tool_call(tool_call, _context), do: {:ok, %{tool_call | action_module: BeforeOnly}}
+  end
+
+  defmodule InvalidBeforeResult do
+    def before_tool_call(_tool_call, _context), do: :ok
+  end
+
+  defmodule InvalidAfterResult do
+    def after_tool_call(_tool_call, _result, _context), do: {:ok, :not_a_tool_result}
+  end
+
+  defmodule EffectAddingAfter do
+    def after_tool_call(_tool_call, _result, _context), do: {:ok, {:ok, :transformed, [:not_allowed]}}
+  end
+
+  defmodule RaisingBefore do
+    def before_tool_call(_tool_call, _context), do: raise("before failed")
+  end
+
+  defmodule ThrowingBefore do
+    def before_tool_call(_tool_call, _context), do: throw(:before_failed)
+  end
+
+  defmodule ExitingAfter do
+    def after_tool_call(_tool_call, _result, _context), do: exit(:after_failed)
   end
 
   test "missing callbacks use identity behavior" do
@@ -74,10 +102,63 @@ defmodule Jido.AI.ToolInterceptorTest do
              ToolInterceptor.before_tool_call(NameChanging, tool_call, %{})
   end
 
+  test "before_tool_call rejects tool call ID changes" do
+    tool_call = %{id: "call-1", name: "search", arguments: %{}, action_module: SearchAction}
+
+    assert {:error, {:tool_interceptor_changed_id, IdChanging, "call-1", "call-2"}} =
+             ToolInterceptor.before_tool_call(IdChanging, tool_call, %{})
+  end
+
   test "before_tool_call rejects action module changes" do
     tool_call = %{id: "call-1", name: "search", arguments: %{}, action_module: SearchAction}
 
     assert {:error, {:tool_interceptor_changed_action_module, ModuleChanging, SearchAction, BeforeOnly}} =
              ToolInterceptor.before_tool_call(ModuleChanging, tool_call, %{})
+  end
+
+  test "before_tool_call rejects an invalid callback return" do
+    tool_call = %{id: "call-1", name: "search", arguments: %{}, action_module: SearchAction}
+
+    assert {:error, {:invalid_tool_interceptor_result, :before_tool_call, InvalidBeforeResult, :ok}} =
+             ToolInterceptor.before_tool_call(InvalidBeforeResult, tool_call, %{})
+  end
+
+  test "after_tool_call rejects a non-canonical tool result" do
+    tool_call = %{id: "call-1", name: "search", arguments: %{}, action_module: SearchAction}
+    result = {:ok, %{result: "hello"}, []}
+
+    assert {:error, {:invalid_tool_interceptor_result, :after_tool_call, InvalidAfterResult, {:ok, :not_a_tool_result}}} =
+             ToolInterceptor.after_tool_call(InvalidAfterResult, tool_call, result, %{})
+  end
+
+  test "after_tool_call applies the active effect policy to transformed effects" do
+    tool_call = %{id: "call-1", name: "search", arguments: %{}, action_module: SearchAction}
+    result = {:ok, %{result: "hello"}, []}
+
+    assert {:ok, {:ok, :transformed, []}} =
+             ToolInterceptor.after_tool_call(EffectAddingAfter, tool_call, result, %{
+               effect_policy: %{mode: :deny_all}
+             })
+  end
+
+  test "callback exceptions become structured interceptor errors" do
+    tool_call = %{id: "call-1", name: "search", arguments: %{}, action_module: SearchAction}
+
+    assert {:error,
+            {:tool_interceptor_exception, :before_tool_call, RaisingBefore,
+             %{type: RuntimeError, message: "before failed"}}} =
+             ToolInterceptor.before_tool_call(RaisingBefore, tool_call, %{})
+  end
+
+  test "callback throws and exits become structured interceptor errors" do
+    tool_call = %{id: "call-1", name: "search", arguments: %{}, action_module: SearchAction}
+    result = {:ok, %{result: "hello"}, []}
+
+    assert {:error,
+            {:tool_interceptor_catch, :before_tool_call, ThrowingBefore, %{kind: :throw, reason: ":before_failed"}}} =
+             ToolInterceptor.before_tool_call(ThrowingBefore, tool_call, %{})
+
+    assert {:error, {:tool_interceptor_catch, :after_tool_call, ExitingAfter, %{kind: :exit, reason: ":after_failed"}}} =
+             ToolInterceptor.after_tool_call(ExitingAfter, tool_call, result, %{})
   end
 end

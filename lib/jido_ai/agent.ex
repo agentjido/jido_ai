@@ -70,6 +70,8 @@ defmodule Jido.AI.Agent do
   - `ask_sync/2,3` - Sync convenience: sends query and waits for result
   - `on_before_cmd/2` - Captures request in state before processing
   - `on_after_cmd/3` - Updates request result when done
+  - `before_tool_call/2` - Optional argument transformation before agent tool execution
+  - `after_tool_call/3` - Optional canonical result transformation after agent tool execution
 
   ## Request Tracking
 

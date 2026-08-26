@@ -2,9 +2,26 @@ defmodule Jido.AI.ToolInterceptor do
   @moduledoc """
   Optional AI-agent callbacks for canonical tool-call interception.
 
-  These hooks are invoked by tool-capable strategies around a logical tool
-  execution. They are optional: modules that do not export the callbacks use
-  identity behavior.
+  Tool-capable agent strategies invoke these hooks around one logical tool
+  execution. Modules that do not export a hook use identity behavior.
+
+  `before_tool_call/2` runs after the runtime resolves the action module and
+  before argument validation, execution, and retries. It can change only the
+  `:arguments` map. The tool call `:id`, `:name`, and `:action_module` are
+  immutable.
+
+  `after_tool_call/3` runs once after retries produce a final canonical result.
+  It can change the result payload and effects. The runtime applies the active
+  effect policy to the returned effects.
+
+  Hooks run in the strategy execution path. They must return quickly and must
+  not depend on being called from the action process. A callback error, invalid
+  return, exception, throw, or exit stops the current tool round with a
+  structured interceptor error.
+
+  These hooks apply to agent-managed tool execution. Direct calls through
+  `Jido.AI.Turn`, `Jido.Exec`, or the standalone tool-calling actions do not
+  invoke agent callbacks.
   """
 
   alias Jido.AI.Effects
@@ -18,28 +35,34 @@ defmodule Jido.AI.ToolInterceptor do
 
   @type tool_result :: {:ok, term(), [term()]} | {:error, term(), [term()]}
 
+  @doc """
+  Transforms a resolved tool call before argument validation and execution.
+
+  The callback can change only `tool_call.arguments`. Return `{:interrupt,
+  value}` to stop the current tool round without executing the tool.
+  """
   @callback before_tool_call(tool_call(), map()) ::
               {:ok, tool_call()} | {:error, term()} | {:interrupt, term()}
 
+  @doc """
+  Transforms the final canonical result after tool retries finish.
+
+  Return the transformed result inside `{:ok, result}`. Return `{:error,
+  reason}` to stop the current tool round because the interceptor failed.
+  """
   @callback after_tool_call(tool_call(), tool_result(), map()) ::
               {:ok, tool_result()} | {:error, term()}
+
+  @optional_callbacks before_tool_call: 2, after_tool_call: 3
 
   @doc false
   @spec before_tool_call(module() | nil, map(), map()) ::
           {:ok, tool_call()} | {:error, term()} | {:interrupt, term()}
   def before_tool_call(agent_module, tool_call, context) when is_map(tool_call) and is_map(context) do
-    with {:ok, original} <- normalize_tool_call(tool_call) do
-      case exports_callback?(agent_module, :before_tool_call, 2) do
-        true ->
-          agent_module.before_tool_call(original, context)
-          |> normalize_before_result(original, agent_module)
-
-        false ->
-          {:ok, original}
-      end
+    with {:ok, original} <- normalize_tool_call(tool_call),
+         {:ok, callback_result} <- invoke_before_callback(agent_module, original, context) do
+      normalize_before_result(callback_result, original, agent_module)
     end
-  rescue
-    error -> {:error, callback_exception(:before_tool_call, agent_module, error)}
   end
 
   def before_tool_call(_agent_module, tool_call, _context) do
@@ -49,30 +72,12 @@ defmodule Jido.AI.ToolInterceptor do
   @doc false
   @spec after_tool_call(module() | nil, tool_call(), term(), map()) :: {:ok, tool_result()} | {:error, term()}
   def after_tool_call(agent_module, tool_call, result, context) when is_map(tool_call) and is_map(context) do
-    with {:ok, normalized_call} <- normalize_tool_call(tool_call) do
-      normalized_result = Effects.normalize_result(result)
-
-      transformed_result =
-        case exports_callback?(agent_module, :after_tool_call, 3) do
-          true -> agent_module.after_tool_call(normalized_call, normalized_result, context)
-          false -> {:ok, normalized_result}
-        end
-
-      case transformed_result do
-        {:ok, result} ->
-          policy = Effects.policy_from_context(context, Effects.default_policy())
-          {filtered_result, _stats} = Effects.filter_result(result, policy)
-          {:ok, filtered_result}
-
-        {:error, reason} ->
-          {:error, {:tool_interceptor, :after_tool_call, agent_module, reason}}
-
-        other ->
-          {:error, {:invalid_tool_interceptor_result, :after_tool_call, agent_module, other}}
-      end
+    with {:ok, normalized_call} <- normalize_tool_call(tool_call),
+         normalized_result <- Effects.normalize_result(result),
+         {:ok, callback_result} <-
+           invoke_after_callback(agent_module, normalized_call, normalized_result, context) do
+      normalize_after_result(callback_result, agent_module, context)
     end
-  rescue
-    error -> {:error, callback_exception(:after_tool_call, agent_module, error)}
   end
 
   def after_tool_call(agent_module, tool_call, _result, _context) do
@@ -84,6 +89,28 @@ defmodule Jido.AI.ToolInterceptor do
   end
 
   defp exports_callback?(_module, _name, _arity), do: false
+
+  defp invoke_before_callback(agent_module, tool_call, context) do
+    case exports_callback?(agent_module, :before_tool_call, 2) do
+      true -> invoke_callback(agent_module, :before_tool_call, [tool_call, context])
+      false -> {:ok, {:ok, tool_call}}
+    end
+  end
+
+  defp invoke_after_callback(agent_module, tool_call, result, context) do
+    case exports_callback?(agent_module, :after_tool_call, 3) do
+      true -> invoke_callback(agent_module, :after_tool_call, [tool_call, result, context])
+      false -> {:ok, {:ok, result}}
+    end
+  end
+
+  defp invoke_callback(agent_module, callback, args) do
+    {:ok, apply(agent_module, callback, args)}
+  rescue
+    error -> {:error, callback_exception(callback, agent_module, error)}
+  catch
+    kind, reason -> {:error, callback_catch(callback, agent_module, kind, reason)}
+  end
 
   defp normalize_before_result({:ok, %{} = tool_call}, original, agent_module) do
     with {:ok, normalized} <- normalize_tool_call(tool_call),
@@ -101,6 +128,32 @@ defmodule Jido.AI.ToolInterceptor do
   defp normalize_before_result(other, _original, agent_module) do
     {:error, {:invalid_tool_interceptor_result, :before_tool_call, agent_module, other}}
   end
+
+  defp normalize_after_result({:ok, result}, agent_module, context) do
+    case canonical_tool_result(result) do
+      {:ok, normalized_result} ->
+        policy = Effects.policy_from_context(context, Effects.default_policy())
+        {filtered_result, _stats} = Effects.filter_result(normalized_result, policy)
+        {:ok, filtered_result}
+
+      :error ->
+        {:error, {:invalid_tool_interceptor_result, :after_tool_call, agent_module, {:ok, result}}}
+    end
+  end
+
+  defp normalize_after_result({:error, reason}, agent_module, _context) do
+    {:error, {:tool_interceptor, :after_tool_call, agent_module, reason}}
+  end
+
+  defp normalize_after_result(other, agent_module, _context) do
+    {:error, {:invalid_tool_interceptor_result, :after_tool_call, agent_module, other}}
+  end
+
+  defp canonical_tool_result({status, _payload, effects} = result)
+       when status in [:ok, :error] and is_list(effects),
+       do: {:ok, result}
+
+  defp canonical_tool_result(_result), do: :error
 
   defp normalize_tool_call(%{} = tool_call) do
     id = Map.get(tool_call, :id, Map.get(tool_call, "id", Map.get(tool_call, :call_id, Map.get(tool_call, "call_id"))))
@@ -143,5 +196,9 @@ defmodule Jido.AI.ToolInterceptor do
 
   defp callback_exception(callback, agent_module, error) do
     {:tool_interceptor_exception, callback, agent_module, %{type: error.__struct__, message: Exception.message(error)}}
+  end
+
+  defp callback_catch(callback, agent_module, kind, reason) do
+    {:tool_interceptor_catch, callback, agent_module, %{kind: kind, reason: inspect(reason)}}
   end
 end

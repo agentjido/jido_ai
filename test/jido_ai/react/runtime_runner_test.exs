@@ -662,6 +662,67 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert {:ok, %{result: 10}, []} = tool_completed.data.result
   end
 
+  test "tool guardrail validates arguments after before_tool_call rewrites them" do
+    parent = self()
+    :persistent_term.erase({__MODULE__, :guardrail_after_interceptor_llm_count})
+
+    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      count = :persistent_term.get({__MODULE__, :guardrail_after_interceptor_llm_count}, 0) + 1
+      :persistent_term.put({__MODULE__, :guardrail_after_interceptor_llm_count}, count)
+
+      case count do
+        1 ->
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_guardrail_rewrite"})],
+             %{finish_reason: :tool_calls},
+             model
+           )}
+
+        2 ->
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.text("Done")],
+             %{finish_reason: :stop},
+             model
+           )}
+      end
+    end)
+
+    guardrail = fn %{arguments: arguments} ->
+      send(parent, {:guardrail_arguments, arguments})
+
+      if arguments["b"] == 8 do
+        :ok
+      else
+        {:error, :arguments_not_intercepted}
+      end
+    end
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        tool_max_retries: 0
+      })
+
+    events =
+      ReAct.stream("Calculate 2 + 3", config,
+        context: %{
+          test_pid: self(),
+          agent_module: BeforeOnlyAgent,
+          __tool_guardrail_callback__: guardrail
+        }
+      )
+      |> Enum.to_list()
+
+    assert_receive {:guardrail_arguments, %{"a" => 2, "b" => 8}}
+    assert Enum.any?(events, &(&1.kind == :request_completed))
+    refute Enum.any?(events, &(&1.kind == :request_failed))
+  end
+
   test "tool interceptor skips unknown tools and preserves existing unknown-tool result" do
     :persistent_term.erase({__MODULE__, :unknown_tool_llm_count})
     Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)

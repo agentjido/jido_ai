@@ -671,18 +671,18 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp run_tool_round(%State{} = state, owner, ref, %Config{} = config, context, tool_calls)
        when is_list(tool_calls) do
-    case preflight_tool_calls(tool_calls, context) do
-      :ok ->
-        effective_tools =
-          case state.active_tools do
-            %{} = tools when map_size(tools) > 0 -> tools
-            _ -> config.tools
-          end
+    effective_tools =
+      case state.active_tools do
+        %{} = tools when map_size(tools) > 0 -> tools
+        _ -> config.tools
+      end
 
-        tool_config = %{config | tools: effective_tools}
-        agent_module = Map.get(context, :agent_module)
+    tool_config = %{config | tools: effective_tools}
+    agent_module = Map.get(context, :agent_module)
 
-        with {:ok, pending} <- prepare_tool_calls(tool_calls, agent_module, context, effective_tools) do
+    with {:ok, pending} <- prepare_tool_calls(tool_calls, agent_module, context, effective_tools) do
+      case preflight_tool_calls(pending, context) do
+        :ok ->
           state = State.put_pending_tools(state, pending)
 
           {state, _} =
@@ -793,16 +793,16 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             {:error, state, reason} ->
               {:error, State.put_status(state, :failed), reason, :tool_interceptor}
           end
-        else
-          {:interrupt, interrupt} ->
-            {:error, State.put_status(state, :failed), {:interrupt, interrupt}, :tool_interceptor}
 
-          {:error, reason} ->
-            {:error, State.put_status(state, :failed), reason, :tool_interceptor}
-        end
+        {:error, reason} ->
+          {:error, State.put_status(state, :failed), reason, :tool_guardrail}
+      end
+    else
+      {:interrupt, interrupt} ->
+        {:error, State.put_status(state, :failed), {:interrupt, interrupt}, :tool_interceptor}
 
       {:error, reason} ->
-        {:error, State.put_status(state, :failed), reason, :tool_guardrail}
+        {:error, State.put_status(state, :failed), reason, :tool_interceptor}
     end
   end
 
