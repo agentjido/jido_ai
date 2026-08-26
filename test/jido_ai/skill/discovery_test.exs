@@ -168,6 +168,45 @@ defmodule Jido.AI.Skill.DiscoveryTest do
 
       assert {:ok, []} = Discovery.discover_from([trusted_root])
     end
+
+    test "uses earlier configured roots and reports shadowed skills", %{tmp_dir: tmp_dir} do
+      first_root = Path.join(tmp_dir, "z-first")
+      second_root = Path.join(tmp_dir, "a-second")
+      first_skill = write_skill(first_root, "shared", "First root wins.")
+      second_skill = write_skill(second_root, "shared", "Second root is shadowed.")
+
+      assert {:ok, [selected], diagnostics} =
+               Discovery.discover_from_with_diagnostics([first_root, second_root])
+
+      assert selected.description == "First root wins."
+      assert selected.skill_md_path == first_skill
+      assert selected.source_metadata.shadowed_locations == [second_skill]
+
+      assert [warning] = Enum.filter(diagnostics.warnings, &(&1.type == :shadowed_skill))
+      assert warning.message =~ first_skill
+      assert warning.message =~ second_skill
+    end
+
+    test "reads only frontmatter during discovery", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "binary-body")
+      File.mkdir_p!(skill_dir)
+
+      File.write!(
+        Path.join(skill_dir, "SKILL.md"),
+        "---\nname: binary-body\ndescription: Discovery stops before the body.\n---\n" <> <<0xFF, 0xFE>>
+      )
+
+      assert {:ok, [%{name: "binary-body"} = metadata]} = Discovery.discover_from([tmp_dir])
+      refute Map.has_key?(metadata, :body)
+    end
+
+    test "ignores malformed YAML without raising", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "malformed")
+      File.mkdir_p!(skill_dir)
+      File.write!(Path.join(skill_dir, "SKILL.md"), "---\nname: [\n---\nBody.\n")
+
+      assert {:ok, []} = Discovery.discover_from([tmp_dir])
+    end
   end
 
   describe "discover_from_project/1" do
@@ -214,7 +253,7 @@ defmodule Jido.AI.Skill.DiscoveryTest do
     end
 
     test "converts metadata to spec with source", %{tmp_dir: tmp_dir} do
-      skill_dir = Path.join(tmp_dir, "to-spec")
+      skill_dir = Path.join(tmp_dir, "to-spec-skill")
       File.mkdir_p!(skill_dir)
       skill_md = Path.join(skill_dir, "SKILL.md")
 
@@ -245,5 +284,58 @@ defmodule Jido.AI.Skill.DiscoveryTest do
       assert spec.metadata["jido_ai.discovery_scope"] == "project"
       assert Enum.all?(spec.metadata, fn {key, value} -> is_binary(key) and is_binary(value) end)
     end
+
+    test "uses strict loading by default and keeps lenient loading explicit", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "strict-runtime")
+      File.mkdir_p!(skill_dir)
+      skill_md = Path.join(skill_dir, "SKILL.md")
+
+      File.write!(
+        skill_md,
+        "---\nname: strict-runtime\ndescription: Runtime loading is strict.\ntags: [legacy]\n---\n"
+      )
+
+      metadata = %{
+        name: "strict-runtime",
+        description: "Runtime loading is strict.",
+        skill_md_path: skill_md,
+        root_dir: skill_dir,
+        scope: :custom,
+        source_metadata: %{}
+      }
+
+      assert {:error,
+              %Jido.AI.Skill.Error.Validation.InvalidField{
+                reason: :unsupported_top_level_fields
+              }} = Discovery.to_spec(metadata)
+
+      assert {:ok, %Jido.AI.Skill.Spec{}} = Discovery.to_spec(metadata, lenient: true)
+    end
+
+    test "creates a metadata-only catalog spec", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "catalog-only")
+      skill_md = Path.join(skill_dir, "SKILL.md")
+
+      metadata = %{
+        name: "catalog-only",
+        description: "Catalog metadata only.",
+        skill_md_path: skill_md,
+        root_dir: skill_dir,
+        scope: :custom,
+        source_metadata: %{}
+      }
+
+      assert {:ok, %Jido.AI.Skill.Spec{} = spec} = Discovery.to_catalog_spec(metadata)
+      assert spec.body_ref == {:file, skill_md}
+      assert spec.metadata == %{"jido_ai.discovery_scope" => "custom"}
+    end
+  end
+
+  defp write_skill(root, name, description) do
+    skill_dir = Path.join(root, name)
+    File.mkdir_p!(skill_dir)
+    path = Path.join(skill_dir, "SKILL.md")
+    File.write!(path, "---\nname: #{name}\ndescription: #{description}\n---\nBody.\n")
+    path
   end
 end

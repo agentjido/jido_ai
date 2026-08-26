@@ -34,11 +34,11 @@ end
 
 This discovers `.agents/skills/` and `~/.agents/skills/`, appends only the compact
 name/description catalog to the system prompt, adds
-`Jido.AI.Actions.Skill.LoadSkill` to the tools, and makes the resolved specs
+`Jido.AI.Actions.Skill.LoadSkill` to the tools, and makes metadata-only specs
 available through reserved tool context for that agent. Discovery and catalog
-construction happen when each agent instance initializes, so paths and bundled
-resources refer to the runtime filesystem rather than the build host. Skills
-that fail strict Agent Skills validation prevent the agent from initializing.
+construction happen when each agent instance initializes. The selected skill
+file is read and strictly validated when `load_skill` activates it. Thus, the
+catalog does not keep all skill bodies in memory.
 
 Prefer an explicit list when only particular roots are trusted:
 
@@ -93,7 +93,9 @@ Registry lifecycle guarantees:
 ## Activation And Session Isolation
 
 Activation state is keyed by `{session_id, skill_name}`. Public activation calls
-default to the caller process; pass a stable ID when activation spans processes:
+default to the caller process. Name activation checks the registry and does not
+scan the filesystem by default. Pass a stable ID when activation spans
+processes:
 
 ```elixir
 {:ok, activation} =
@@ -105,6 +107,18 @@ activation.resources
 
 # Release activation state when the session ends.
 :ok = Jido.AI.Skill.Activation.clear(session_id: conversation_id)
+```
+
+To activate by name from a filesystem root, give the paths and the trust policy
+in the same call:
+
+```elixir
+{:ok, activation} =
+  Jido.AI.Skill.Activation.activate("code-review",
+    paths: ["priv/skills"],
+    trust: true,
+    session_id: conversation_id
+  )
 ```
 
 The `load_skill` action derives its session from `session_id`, then `agent_id`,
@@ -198,7 +212,8 @@ and is not the Agent Skills pre-approval meaning.
 
 `Discovery.discover_from/2` defaults to a maximum depth of 6 and 2,000 visited
 directories, skips `.git` and `node_modules`, and does not follow file or
-directory symlinks. Custom callers can require trust explicitly:
+directory symlinks. It reads at most 64 KiB of frontmatter and does not read the
+skill body. Custom callers can require trust explicitly:
 
 ```elixir
 Jido.AI.Skill.Discovery.discover_from(paths,
@@ -211,6 +226,11 @@ Jido.AI.Skill.Discovery.discover_from(paths,
 An unapproved root returns `{:error, {:untrusted_skill_path, absolute_path}}`;
 exceeding the directory bound returns a structured `:discovery_limit_exceeded`
 error.
+
+Root order is significant. The first root wins when two roots contain the same
+skill name. `discover_from_with_diagnostics/2` returns a `:shadowed_skill`
+warning that names the selected and shadowed files. Agent integration also
+returns these diagnostics.
 
 ## CLI Surface + Error Handling
 

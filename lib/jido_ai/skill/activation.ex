@@ -18,19 +18,23 @@ defmodule Jido.AI.Skill.Activation do
 
   ## Usage
 
-      # Activate by name (looks up in discovery and registry)
+      # Activate a registered skill by name
       {:ok, context} = Jido.AI.Skill.Activation.activate("code-review")
 
-      # Activate a spec directly
-      {:ok, metadata} = Jido.AI.Skill.Discovery.find("code-review")
-      {:ok, spec} = Jido.AI.Skill.Discovery.to_spec(metadata)
-      {:ok, context} = Jido.AI.Skill.Activation.activate(spec)
+      # Search trusted paths only when you give both options
+      {:ok, context} =
+        Jido.AI.Skill.Activation.activate("code-review",
+          paths: ["priv/skills"],
+          trust: true
+        )
 
       # Check if already activated
       Jido.AI.Skill.Activation.activated?("code-review")
   """
 
-  alias Jido.AI.Skill.{Spec, Registry, Discovery, Resources}
+  alias Jido.AI.Skill.{Discovery, Loader, Registry, Resources, Spec}
+
+  @discovery_option_keys [:trust, :max_depth, :max_directories, :exclude_directories]
 
   @type activation_context :: %{
           skill: Spec.t(),
@@ -45,6 +49,10 @@ defmodule Jido.AI.Skill.Activation do
   Returns activation context for use in host/client injection.
   Prevents duplicate activation within the same session. Pass `:session_id`
   when the session spans processes; otherwise the caller process is used.
+
+  Name activation first checks the registry. It does not scan the filesystem
+  unless `:paths` and `:trust` are both present. A metadata-only catalog spec is
+  loaded and strictly validated from its source file at activation time.
 
   ## Returns
 
@@ -67,7 +75,7 @@ defmodule Jido.AI.Skill.Activation do
       build_context_from_registry(name, opts)
     else
       # Try to resolve the skill
-      with {:ok, spec} <- resolve_skill(name) do
+      with {:ok, spec} <- resolve_skill(name, opts) do
         do_activate(spec, opts)
       end
     end
@@ -181,26 +189,62 @@ defmodule Jido.AI.Skill.Activation do
     if Registry.activated?(name, opts) do
       build_context_from_registry(spec.name, opts)
     else
-      do_activate(spec, opts)
+      with {:ok, resolved_spec} <- resolve_activation_spec(spec) do
+        do_activate(resolved_spec, opts)
+      end
     end
   end
 
   defp activate_spec(%Spec{}, _opts), do: {:error, :invalid_skill_spec}
 
-  defp resolve_skill(name) when is_binary(name) do
-    # Try registry first
+  defp resolve_skill(name, opts) when is_binary(name) do
     case Registry.lookup(name) do
       {:ok, spec} ->
         {:ok, spec}
 
       {:error, _} ->
-        # Try discovery
-        case Discovery.find(name) do
-          {:ok, metadata} -> Discovery.to_spec(metadata)
-          {:error, _} -> {:error, :skill_not_found}
-        end
+        resolve_discovered_skill(name, opts)
     end
   end
+
+  defp resolve_discovered_skill(name, opts) do
+    case {Keyword.fetch(opts, :paths), Keyword.fetch(opts, :trust)} do
+      {{:ok, paths}, {:ok, _trust}} ->
+        discovery_opts = Keyword.take(opts, @discovery_option_keys)
+
+        result =
+          case paths do
+            :default -> Discovery.find(name, nil, discovery_opts)
+            paths when is_list(paths) -> Discovery.find(name, paths, discovery_opts)
+            _invalid -> {:error, {:invalid_discovery_option, :paths}}
+          end
+
+        case result do
+          {:ok, metadata} -> Discovery.to_spec(metadata, lenient: false)
+          {:error, :not_found} -> {:error, :skill_not_found}
+          {:error, reason} -> {:error, reason}
+        end
+
+      {{:ok, _paths}, :error} ->
+        {:error, :filesystem_discovery_requires_explicit_trust}
+
+      _ ->
+        {:error, :skill_not_found}
+    end
+  end
+
+  defp resolve_activation_spec(%Spec{
+         source: {:file, path},
+         body_ref: {:file, path},
+         metadata: %{"jido_ai.discovery_scope" => _scope} = catalog_metadata
+       }) do
+    case Loader.load(path, lenient: false) do
+      {:ok, spec} -> {:ok, %{spec | metadata: Map.merge(spec.metadata, catalog_metadata)}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp resolve_activation_spec(%Spec{} = spec), do: {:ok, spec}
 
   defp do_activate(%Spec{} = spec, opts) do
     with {:ok, skill_body} <- load_skill_body(spec),

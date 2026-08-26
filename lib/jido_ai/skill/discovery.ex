@@ -9,7 +9,12 @@ defmodule Jido.AI.Skill.Discovery do
   ## Precedence Rules
 
   Project-level skills override user-level skills when both have the same name.
-  This follows deterministic precedence: **project > user**
+  For custom roots, an earlier root overrides a later root. Discovery records a
+  warning with both locations when names collide.
+
+  Discovery reads only bounded YAML frontmatter. It does not read skill bodies.
+  Use `to_catalog_spec/1` for a metadata-only catalog and strict load at
+  activation time. Use `to_spec/2` when a caller needs a complete spec now.
 
   ## Metadata Tracking
 
@@ -33,12 +38,13 @@ defmodule Jido.AI.Skill.Discovery do
       {:ok, spec} = Jido.AI.Skill.Discovery.find("code-review")
   """
 
-  alias Jido.AI.Skill.{Spec, Loader}
+  alias Jido.AI.Skill.{Diagnostics, Error, Loader, Spec}
 
   @project_path ".agents/skills"
   @default_max_depth 6
   @default_max_directories 2_000
   @default_excluded_directories [".git", "node_modules"]
+  @max_frontmatter_bytes 65_536
 
   @type scope :: :project | :user | :custom
   @type discovery_metadata :: %{
@@ -68,15 +74,28 @@ defmodule Jido.AI.Skill.Discovery do
   """
   @spec discover(keyword()) :: {:ok, [discovery_metadata()]} | {:error, term()}
   def discover(opts \\ []) do
-    with {:ok, project_skills} <- discover_from_project(@project_path, opts),
-         {:ok, user_skills} <- discover_from_user(default_user_path(), opts) do
-      # Merge with precedence: project > user
-      merged =
-        (project_skills ++ user_skills)
-        |> Enum.group_by(& &1.name)
-        |> Enum.map(fn {_name, [first | _]} -> first end)
+    case discover_with_diagnostics(opts) do
+      {:ok, skills, _diagnostics} -> {:ok, skills}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
-      {:ok, merged}
+  @doc """
+  Discovers standard project and user skills and returns collision diagnostics.
+
+  Project skills have precedence over user skills. A selected skill records its
+  shadowed locations in `source_metadata.shadowed_locations`.
+  """
+  @spec discover_with_diagnostics(keyword()) ::
+          {:ok, [discovery_metadata()], Diagnostics.t()} | {:error, term()}
+  def discover_with_diagnostics(opts \\ []) do
+    with {:ok, project_skills, project_diagnostics} <-
+           discover_scope(@project_path, :project, opts),
+         {:ok, user_skills, user_diagnostics} <-
+           discover_scope(default_user_path(), :user, opts) do
+      diagnostics = merge_diagnostics(project_diagnostics, user_diagnostics)
+      {skills, diagnostics} = select_by_precedence(project_skills ++ user_skills, diagnostics)
+      {:ok, skills, diagnostics}
     end
   end
 
@@ -100,6 +119,20 @@ defmodule Jido.AI.Skill.Discovery do
   """
   @spec discover_from([String.t()], keyword()) :: {:ok, [discovery_metadata()]} | {:error, term()}
   def discover_from(paths, opts \\ []) do
+    case discover_from_with_diagnostics(paths, opts) do
+      {:ok, skills, _diagnostics} -> {:ok, skills}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Discovers skills from trusted roots and returns duplicate-name diagnostics.
+
+  Earlier roots have precedence over later roots.
+  """
+  @spec discover_from_with_diagnostics([String.t()], keyword()) ::
+          {:ok, [discovery_metadata()], Diagnostics.t()} | {:error, term()}
+  def discover_from_with_diagnostics(paths, opts \\ []) do
     with {:ok, files} <- discover_files(paths, opts) do
       scope = Keyword.get(opts, :scope, :custom)
 
@@ -108,7 +141,8 @@ defmodule Jido.AI.Skill.Discovery do
         |> Enum.map(&build_metadata(&1, scope))
         |> Enum.reject(&is_nil/1)
 
-      {:ok, skills}
+      {skills, diagnostics} = select_by_precedence(skills, Diagnostics.new())
+      {:ok, skills, diagnostics}
     end
   end
 
@@ -139,10 +173,9 @@ defmodule Jido.AI.Skill.Discovery do
   @spec discover_from_project(String.t(), keyword()) ::
           {:ok, [discovery_metadata()]} | {:error, term()}
   def discover_from_project(base_path \\ @project_path, opts \\ []) do
-    if File.dir?(base_path) do
-      discover_from([base_path], Keyword.put(opts, :scope, :project))
-    else
-      {:ok, []}
+    case discover_scope(base_path, :project, opts) do
+      {:ok, skills, _diagnostics} -> {:ok, skills}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -158,10 +191,9 @@ defmodule Jido.AI.Skill.Discovery do
   @spec discover_from_user(String.t(), keyword()) ::
           {:ok, [discovery_metadata()]} | {:error, term()}
   def discover_from_user(base_path \\ default_user_path(), opts \\ []) do
-    if File.dir?(base_path) do
-      discover_from([base_path], Keyword.put(opts, :scope, :user))
-    else
-      {:ok, []}
+    case discover_scope(base_path, :user, opts) do
+      {:ok, skills, _diagnostics} -> {:ok, skills}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -209,7 +241,7 @@ defmodule Jido.AI.Skill.Discovery do
 
   def to_spec(%{skill_md_path: path, scope: scope, root_dir: _root_dir}, opts)
       when scope in [:project, :user, :custom] and is_list(opts) do
-    case Loader.load(path, Keyword.put_new(opts, :lenient, true)) do
+    case Loader.load(path, Keyword.put_new(opts, :lenient, false)) do
       {:ok, spec} ->
         # Enhance spec with discovery metadata
         enhanced =
@@ -227,6 +259,51 @@ defmodule Jido.AI.Skill.Discovery do
   end
 
   def to_spec(_invalid_metadata, _opts), do: {:error, :invalid_metadata}
+
+  @doc """
+  Converts discovery metadata to a metadata-only catalog spec.
+
+  This function does not read the skill body. The returned file body reference
+  is resolved with strict loading during activation.
+  """
+  @spec to_catalog_spec(discovery_metadata() | map()) :: {:ok, Spec.t()} | {:error, term()}
+  def to_catalog_spec(%{
+        name: name,
+        description: description,
+        skill_md_path: path,
+        root_dir: root_dir,
+        scope: scope
+      })
+      when is_binary(name) and is_binary(description) and is_binary(path) and is_binary(root_dir) and
+             scope in [:project, :user, :custom] do
+    cond do
+      String.trim(description) == "" ->
+        {:error, %Error.Validation.MissingField{field: :description}}
+
+      Path.basename(root_dir) != name ->
+        {:error,
+         %Error.Validation.InvalidField{
+           field: :name,
+           reason: :directory_name_mismatch,
+           value: name
+         }}
+
+      true ->
+        {:ok,
+         %Spec{
+           name: name,
+           description: description,
+           source: {:file, path},
+           body_ref: {:file, path},
+           metadata: %{"jido_ai.discovery_scope" => Atom.to_string(scope)}
+         }}
+    end
+  end
+
+  def to_catalog_spec(%{description: nil}),
+    do: {:error, %Error.Validation.MissingField{field: :description}}
+
+  def to_catalog_spec(_invalid_metadata), do: {:error, :invalid_metadata}
 
   # Private functions
 
@@ -296,12 +373,15 @@ defmodule Jido.AI.Skill.Discovery do
 
       cond do
         regular_file?(expanded) and Path.basename(expanded) == "SKILL.md" ->
-          {:cont, {:ok, [expanded | files], directory_count}}
+          {:cont, {:ok, files ++ [expanded], directory_count}}
 
         directory?(expanded) ->
-          case walk_directories([{expanded, 0}], files, directory_count, opts) do
-            {:ok, next_files, next_count} -> {:cont, {:ok, next_files, next_count}}
-            {:error, reason} -> {:halt, {:error, reason}}
+          case walk_directories([{expanded, 0}], [], directory_count, opts) do
+            {:ok, root_files, next_count} ->
+              {:cont, {:ok, files ++ Enum.sort(root_files), next_count}}
+
+            {:error, reason} ->
+              {:halt, {:error, reason}}
           end
 
         true ->
@@ -309,7 +389,7 @@ defmodule Jido.AI.Skill.Discovery do
       end
     end)
     |> case do
-      {:ok, files, _directory_count} -> {:ok, Enum.sort(files)}
+      {:ok, files, _directory_count} -> {:ok, Enum.uniq(files)}
       {:error, reason} -> {:error, reason}
     end
   end
@@ -379,7 +459,7 @@ defmodule Jido.AI.Skill.Discovery do
     root_dir = Path.dirname(skill_md_path)
     dir_name = Path.basename(root_dir)
 
-    # Quick peek at frontmatter to get name/description without full parse
+    # Read only the frontmatter. The body is loaded during activation.
     case peek_frontmatter(skill_md_path) do
       {:ok, %{"name" => name} = frontmatter} when is_binary(name) ->
         %{
@@ -401,16 +481,111 @@ defmodule Jido.AI.Skill.Discovery do
   end
 
   defp peek_frontmatter(path) do
-    case File.read(path) do
-      {:ok, content} ->
-        case Regex.run(~r/\A---\r?\n(.*?)\r?\n---\r?\n/s, content) do
-          [_, yaml] -> YamlElixir.read_from_string(yaml)
-          _ -> {:error, :no_frontmatter}
+    with {:ok, io} <- File.open(path, [:read, :utf8]) do
+      try do
+        case IO.read(io, :line) do
+          line when is_binary(line) ->
+            if strip_bom(line) in ["---\n", "---\r\n"] do
+              read_frontmatter(io, [], 0)
+            else
+              {:error, :no_frontmatter}
+            end
+
+          _ ->
+            {:error, :no_frontmatter}
         end
+      after
+        File.close(io)
+      end
+    end
+  end
+
+  defp read_frontmatter(io, lines, byte_count) do
+    case IO.read(io, :line) do
+      line when line in ["---", "---\n", "---\r\n"] ->
+        lines
+        |> Enum.reverse()
+        |> IO.iodata_to_binary()
+        |> decode_frontmatter()
+        |> require_mapping()
+
+      line when is_binary(line) and byte_count + byte_size(line) <= @max_frontmatter_bytes ->
+        read_frontmatter(io, [line | lines], byte_count + byte_size(line))
+
+      line when is_binary(line) ->
+        {:error, :frontmatter_too_large}
+
+      :eof ->
+        {:error, :unclosed_frontmatter}
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp require_mapping({:ok, frontmatter}) when is_map(frontmatter), do: {:ok, frontmatter}
+  defp require_mapping({:ok, _frontmatter}), do: {:error, :frontmatter_must_be_mapping}
+  defp require_mapping({:error, reason}), do: {:error, reason}
+
+  defp decode_frontmatter(yaml) do
+    try do
+      YamlElixir.read_from_string(yaml)
+    rescue
+      exception -> {:error, Exception.message(exception)}
+    catch
+      kind, reason -> {:error, {kind, reason}}
+    end
+  end
+
+  defp strip_bom(<<0xEF, 0xBB, 0xBF, rest::binary>>), do: rest
+  defp strip_bom(line), do: line
+
+  defp discover_scope(base_path, scope, opts) do
+    if File.dir?(base_path) do
+      discover_from_with_diagnostics([base_path], Keyword.put(opts, :scope, scope))
+    else
+      {:ok, [], Diagnostics.new()}
+    end
+  end
+
+  defp select_by_precedence(skills, diagnostics) do
+    Enum.reduce(skills, {[], %{}, diagnostics}, fn skill, {selected, winners, diagnostics} ->
+      case Map.fetch(winners, skill.name) do
+        :error ->
+          {selected ++ [skill], Map.put(winners, skill.name, skill), diagnostics}
+
+        {:ok, winner} ->
+          warning =
+            Diagnostics.Warning.new(
+              :shadowed_skill,
+              "Skill '#{skill.name}' at '#{skill.skill_md_path}' is shadowed by '#{winner.skill_md_path}'",
+              severity: :medium
+            )
+
+          selected = Enum.map(selected, &record_shadowed_location(&1, winner, skill.skill_md_path))
+          {selected, winners, Diagnostics.add_warning(diagnostics, warning)}
+      end
+    end)
+    |> then(fn {selected, _winners, diagnostics} -> {selected, diagnostics} end)
+  end
+
+  defp record_shadowed_location(skill, winner, shadowed_path) do
+    if skill.skill_md_path == winner.skill_md_path do
+      source_metadata =
+        Map.update(skill.source_metadata, :shadowed_locations, [shadowed_path], &(&1 ++ [shadowed_path]))
+
+      %{skill | source_metadata: source_metadata}
+    else
+      skill
+    end
+  end
+
+  defp merge_diagnostics(%Diagnostics{} = left, %Diagnostics{} = right) do
+    %Diagnostics{
+      left
+      | warnings: left.warnings ++ right.warnings,
+        errors: left.errors ++ right.errors
+    }
   end
 
   defp binary_or_nil(value) when is_binary(value), do: value

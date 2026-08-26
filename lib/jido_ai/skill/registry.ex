@@ -18,7 +18,9 @@ defmodule Jido.AI.Skill.Registry do
 
   use GenServer
 
-  alias Jido.AI.Skill.{Discovery, Spec, Loader, Error}
+  require Logger
+
+  alias Jido.AI.Skill.{Discovery, Error, Spec}
 
   @table_name :jido_skill_registry
   @activation_table :jido_skill_activations
@@ -370,9 +372,12 @@ defmodule Jido.AI.Skill.Registry do
   # Private functions
 
   defp do_load_paths(paths) do
-    with {:ok, files} <- Discovery.discover_files(paths, trust: true) do
-      Enum.reduce_while(files, {:ok, 0}, fn path, {:ok, count} ->
-        case load_and_register(path) do
+    with {:ok, skills, diagnostics} <-
+           Discovery.discover_from_with_diagnostics(paths, trust: true) do
+      Enum.each(diagnostics.warnings, &Logger.warning(&1.message))
+
+      Enum.reduce_while(skills, {:ok, 0}, fn metadata, {:ok, count} ->
+        case load_and_register(metadata) do
           :ok -> {:cont, {:ok, count + 1}}
           {:error, _} = error -> {:halt, error}
         end
@@ -380,8 +385,8 @@ defmodule Jido.AI.Skill.Registry do
     end
   end
 
-  defp load_and_register(path) do
-    case Loader.load(path) do
+  defp load_and_register(metadata) do
+    case Discovery.to_spec(metadata, lenient: false) do
       {:ok, spec} ->
         :ets.insert(@table_name, {spec.name, spec})
         :ok

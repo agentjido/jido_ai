@@ -1,7 +1,9 @@
 defmodule Jido.AI.Skill.ActivationTest do
   use ExUnit.Case
 
-  alias Jido.AI.Skill.{Activation, Registry, Spec}
+  alias Jido.AI.Skill.{Activation, Discovery, Registry, Spec}
+
+  @moduletag :tmp_dir
 
   setup do
     start_supervised!(Registry)
@@ -71,6 +73,53 @@ defmodule Jido.AI.Skill.ActivationTest do
   describe "activate/1 with name" do
     test "returns error for unknown skill name" do
       assert {:error, :skill_not_found} = Activation.activate("nonexistent-skill")
+    end
+
+    test "does not scan paths without an explicit trust policy", %{tmp_dir: tmp_dir} do
+      write_skill(tmp_dir, "trusted-skill", "Initial body.")
+
+      assert {:error, :filesystem_discovery_requires_explicit_trust} =
+               Activation.activate("trusted-skill", paths: [tmp_dir])
+    end
+
+    test "activates from explicitly trusted paths", %{tmp_dir: tmp_dir} do
+      write_skill(tmp_dir, "trusted-skill", "Trusted body.")
+
+      assert {:ok, context} =
+               Activation.activate("trusted-skill", paths: [tmp_dir], trust: true)
+
+      assert context.skill.name == "trusted-skill"
+      assert context.skill_body == "Trusted body."
+    end
+
+    test "loads a catalog spec only when it is activated", %{tmp_dir: tmp_dir} do
+      skill_path = write_skill(tmp_dir, "lazy-skill", "Initial body.")
+      assert {:ok, [metadata]} = Discovery.discover_from([tmp_dir])
+      assert {:ok, catalog_spec} = Discovery.to_catalog_spec(metadata)
+
+      File.write!(skill_path, skill_document("lazy-skill", "Updated body."))
+
+      assert {:ok, context} = Activation.activate(catalog_spec)
+      assert context.skill_body == "Updated body."
+      assert context.skill.body_ref == {:inline, "Updated body."}
+    end
+
+    test "strictly validates a catalog spec during activation", %{tmp_dir: tmp_dir} do
+      skill_path = write_skill(tmp_dir, "strict-skill", "Body.")
+      assert {:ok, [metadata]} = Discovery.discover_from([tmp_dir])
+      assert {:ok, catalog_spec} = Discovery.to_catalog_spec(metadata)
+
+      File.write!(
+        skill_path,
+        "---\nname: strict-skill\ndescription: Strict skill.\ntags: [legacy]\n---\nBody.\n"
+      )
+
+      assert {:error,
+              %Jido.AI.Skill.Error.Validation.InvalidField{
+                reason: :unsupported_top_level_fields
+              }} = Activation.activate(catalog_spec)
+
+      refute Activation.activated?("strict-skill")
     end
   end
 
@@ -226,5 +275,17 @@ defmodule Jido.AI.Skill.ActivationTest do
       assert :ok = Activation.clear(session_id: "finished")
       refute Activation.activated?("session-cleanup", session_id: "finished")
     end
+  end
+
+  defp write_skill(root, name, body) do
+    skill_dir = Path.join(root, name)
+    File.mkdir_p!(skill_dir)
+    path = Path.join(skill_dir, "SKILL.md")
+    File.write!(path, skill_document(name, body))
+    path
+  end
+
+  defp skill_document(name, body) do
+    "---\nname: #{name}\ndescription: #{name} description.\n---\n#{body}\n"
   end
 end

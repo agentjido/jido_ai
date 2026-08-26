@@ -8,16 +8,21 @@ defmodule Jido.AI.Skill.AgentIntegration do
   passing a list trusts only those roots. Keyword options expose the discovery
   bounds and a custom trust predicate. Keyword options do not trust any root
   unless `:trust` is explicitly set.
+
+  The catalog contains metadata-only specs. Full files are read and strictly
+  validated only after the model selects a skill. Duplicate names use the first
+  trusted root and are available in the returned diagnostics.
   """
 
   alias Jido.AI.Actions.Skill.LoadSkill
-  alias Jido.AI.Skill.{Discovery, Prompt, Spec}
+  alias Jido.AI.Skill.{Diagnostics, Discovery, Prompt, Spec}
 
   @type t :: %{
           specs: [Spec.t()],
           index: String.t(),
           tools: [module()],
-          tool_context: map()
+          tool_context: map(),
+          diagnostics: Diagnostics.t()
         }
 
   @doc """
@@ -72,8 +77,8 @@ defmodule Jido.AI.Skill.AgentIntegration do
       |> Keyword.take([:trust, :max_depth, :max_directories, :exclude_directories])
       |> Keyword.put_new(:trust, false)
 
-    with {:ok, metadata} <- discover(paths, discovery_opts),
-         {:ok, specs} <- load_specs(metadata) do
+    with {:ok, metadata, diagnostics} <- discover(paths, discovery_opts),
+         {:ok, specs} <- catalog_specs(metadata) do
       specs = Enum.sort_by(specs, & &1.name)
 
       {:ok,
@@ -81,18 +86,22 @@ defmodule Jido.AI.Skill.AgentIntegration do
          specs: specs,
          index: Prompt.render_index(specs),
          tools: if(specs == [], do: [], else: [LoadSkill]),
-         tool_context: %{LoadSkill.context_skills_key() => Map.new(specs, &{&1.name, &1})}
+         tool_context: %{LoadSkill.context_skills_key() => Map.new(specs, &{&1.name, &1})},
+         diagnostics: diagnostics
        }}
     end
   end
 
-  defp discover(:default, opts), do: Discovery.discover(opts)
-  defp discover(paths, opts) when is_list(paths), do: Discovery.discover_from(paths, opts)
+  defp discover(:default, opts), do: Discovery.discover_with_diagnostics(opts)
+
+  defp discover(paths, opts) when is_list(paths),
+    do: Discovery.discover_from_with_diagnostics(paths, opts)
+
   defp discover(_paths, _opts), do: {:error, {:invalid_agent_skills_option, :paths}}
 
-  defp load_specs(metadata) do
+  defp catalog_specs(metadata) do
     Enum.reduce_while(metadata, {:ok, []}, fn item, {:ok, specs} ->
-      case Discovery.to_spec(item, lenient: false) do
+      case Discovery.to_catalog_spec(item) do
         {:ok, spec} -> {:cont, {:ok, [spec | specs]}}
         {:error, reason} -> {:halt, {:error, {:skill_load_failed, item.skill_md_path, reason}}}
       end
@@ -100,6 +109,6 @@ defmodule Jido.AI.Skill.AgentIntegration do
   end
 
   defp empty do
-    %{specs: [], index: "", tools: [], tool_context: %{}}
+    %{specs: [], index: "", tools: [], tool_context: %{}, diagnostics: Diagnostics.new()}
   end
 end

@@ -529,6 +529,7 @@ defmodule Jido.AI.AgentTest do
 
       specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
       assert %Jido.AI.Skill.Spec{name: "hex-release"} = specs["hex-release"]
+      assert %Jido.AI.Skill.Diagnostics{} = config.skill_diagnostics
     end
 
     @tag :tmp_dir
@@ -558,7 +559,8 @@ defmodule Jido.AI.AgentTest do
 
       assert config.system_prompt =~ "Runtime version"
       refute config.system_prompt =~ "Compile-time version"
-      assert Jido.AI.Skill.body(specs["runtime-skill"]) == "New body"
+      assert specs["runtime-skill"].body_ref == {:file, skill_file}
+      refute inspect(specs["runtime-skill"]) =~ "New body"
     end
 
     test "does not warn when consumer defines its own thinking_meta/1" do
