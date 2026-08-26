@@ -104,6 +104,19 @@ defmodule Jido.AI.Skill.ActivationTest do
       assert context.skill.body_ref == {:inline, "Updated body."}
     end
 
+    test "strictly resolves a registered catalog spec when activated by name", %{tmp_dir: tmp_dir} do
+      skill_path = write_skill(tmp_dir, "registered-lazy", "Initial body.")
+      assert {:ok, [metadata]} = Discovery.discover_from([tmp_dir])
+      assert {:ok, catalog_spec} = Discovery.to_catalog_spec(metadata)
+      assert :ok = Registry.register(catalog_spec)
+
+      File.write!(skill_path, skill_document("registered-lazy", "Updated body."))
+
+      assert {:ok, context} = Activation.activate("registered-lazy")
+      assert context.skill_body == "Updated body."
+      assert context.skill.body_ref == {:inline, "Updated body."}
+    end
+
     test "strictly validates a catalog spec during activation", %{tmp_dir: tmp_dir} do
       skill_path = write_skill(tmp_dir, "strict-skill", "Body.")
       assert {:ok, [metadata]} = Discovery.discover_from([tmp_dir])

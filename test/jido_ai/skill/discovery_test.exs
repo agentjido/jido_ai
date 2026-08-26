@@ -329,6 +329,24 @@ defmodule Jido.AI.Skill.DiscoveryTest do
       assert spec.body_ref == {:file, skill_md}
       assert spec.metadata == %{"jido_ai.discovery_scope" => "custom"}
     end
+
+    test "rejects catalog names that the loading action cannot use", %{tmp_dir: tmp_dir} do
+      for invalid_name <- ["Bad Name", "UPPER", String.duplicate("a", 65)] do
+        skill_dir = Path.join(tmp_dir, invalid_name)
+
+        metadata = %{
+          name: invalid_name,
+          description: "Invalid catalog name.",
+          skill_md_path: Path.join(skill_dir, "SKILL.md"),
+          root_dir: skill_dir,
+          scope: :custom,
+          source_metadata: %{}
+        }
+
+        assert {:error, %Jido.AI.Skill.Error.Validation.InvalidName{name: ^invalid_name}} =
+                 Discovery.to_catalog_spec(metadata)
+      end
+    end
   end
 
   defp write_skill(root, name, description) do

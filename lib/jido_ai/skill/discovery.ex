@@ -45,6 +45,8 @@ defmodule Jido.AI.Skill.Discovery do
   @default_max_directories 2_000
   @default_excluded_directories [".git", "node_modules"]
   @max_frontmatter_bytes 65_536
+  @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
+  @max_name_length 64
 
   @type scope :: :project | :user | :custom
   @type discovery_metadata :: %{
@@ -277,6 +279,9 @@ defmodule Jido.AI.Skill.Discovery do
       when is_binary(name) and is_binary(description) and is_binary(path) and is_binary(root_dir) and
              scope in [:project, :user, :custom] do
     cond do
+      String.length(name) > @max_name_length or not Regex.match?(@name_regex, name) ->
+        {:error, %Error.Validation.InvalidName{name: name}}
+
       String.trim(description) == "" ->
         {:error, %Error.Validation.MissingField{field: :description}}
 
